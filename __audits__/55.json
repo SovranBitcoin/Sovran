@@ -1,0 +1,399 @@
+{
+  "audit": {
+    "date": "2026-05-04",
+    "commit": "8f099b6b",
+    "entry_point": "user-feedback-2026-05-04 (BIP321 + modal stacking + biometrics + cache-first reads)",
+    "entry_point_autoselected": false,
+    "entry_point_selection_rationale": "User supplied 9 feedback items. Slice clusters them along three structural seams: (a) modal-overlay layering (action menu + cross-flow profile push render under native iOS modals), (b) payment-flow correctness (mockFailMelt unwired, BIP321 mintless-cashu vs lightning routing, isFailed visual styling), (c) cache-first reads (FaceID prompt repetition driven by non-single-flight retrieveMnemonic, contacts tab re-fetches mint info). Two of the structural-health weak dimensions (Hygiene 5/100, Code Complexity 40/100) flow through the same files.",
+    "repos_touched": [
+      "sovran-app",
+      "coco-payment-ux"
+    ],
+    "prior_audits_consulted": [
+      "04.json",
+      "07.json",
+      "08.json",
+      "10.json",
+      "25.json",
+      "31.json",
+      "36.json",
+      "50.json",
+      "52.json",
+      "53.json",
+      "54.json"
+    ],
+    "sov_specs_consulted": [],
+    "skills_consulted": [
+      "zustand-5",
+      "react-native-best-practices",
+      "animating-react-native-expo",
+      "security-review"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose",
+      "prompt-engineering-patterns"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "not run (read-only audit)",
+      "lint": "not run (read-only audit)",
+      "knip": "not run (read-only audit)",
+      "analyze_structure": "Overall 41/100; weakest dims Hygiene 5, Code Complexity 40, Architecture 40; lowest two motivate the consolidation findings (F-005, F-007)",
+      "lookalikes": "not run for this slice — slice is feedback-driven, not duplication-driven",
+      "log_doctor": "log.txt present but findings here are structural / behavioural-by-construction, not perf-spike claims; F-006 face-ID-prompt cadence cited as UNVERIFIED-by-static-trace, the call-site list is the evidence"
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "<ActionMenuHost /> rendered as sibling of root <Stack> — every native iOS modal screen (camera, mintQuote, meltQuote, share, currency) covers the action menu",
+      "repo": "sovran-app",
+      "path": "app/_layout.tsx",
+      "line": 732,
+      "symbol": "RootLayout",
+      "dimension": 12,
+      "description": "RootLayout mounts <ActionMenuHost /> at app/_layout.tsx:732 as a sibling of <RootLayoutContent /> (which owns the <Stack> at line 329). On iOS, screens registered with presentation: 'modal' / 'formSheet' / 'fullScreenModal' (config/modalScreens.ts:22, 75, 92, 114) are presented on a separate UIViewController layer above the root view. ActionMenuHost is a heroui-native bottom-sheet rendered into the same React tree as the Stack root, so it lands BELOW the OS-level modal layer regardless of z-index. User-visible symptoms confirmed in feedback: BIP321 'Choose how to pay' (shared/lib/popup/popups/actionSheets.tsx:276) and 'Payment failed — try another method' (actionSheets.tsx:292) appear under the camera modal (config/modalScreens.ts:114). Same root cause for any imperatively-dispatched popup whose host lives at root: PopupHost (app/_layout.tsx:731) shares the issue.",
+      "why_it_matters": "Two of the user's three modal-stacking complaints reduce to this. Any payment flow that scans a BIP321 from the camera modal cannot complete the picker step — the user sees only the camera, has no idea the menu is dispatched, and the only feedback is the camera not closing. A failed payment fallback (paymentFallbackPopup) reaches a similar dead-end if the originating screen is a native modal. This is funds-adjacent: a user who can't see the picker can't choose Lightning fallback after a Cashu failure.",
+      "fix": "The host must render INSIDE every flow that may dispatch its payload. Two structural choices: (a) mount an <ActionMenuHost /> in each (X-flow)/_layout.tsx beside the nested <Stack>, so the host is a child of the modal's view controller (this is what the existing (mint-flow)/userMessages.tsx 1-line re-export pattern is doing for cross-flow navigation — the same shape applies to overlays); or (b) introduce a dedicated route group like (action-menu-flow) and make actionMenuPopup navigate to it via expo-router, so the OS treats the menu as a sibling modal screen that stacks correctly above the camera. (a) keeps the existing imperative API; (b) needs a pump but solves PopupHost too. Either way the fix is structural — there is no z-index that beats a UIViewController.",
+      "references": [
+        "app/_layout.tsx:329",
+        "app/_layout.tsx:731",
+        "shared/blocks/popup/ActionMenuHost.tsx:1",
+        "shared/lib/popup/popups/actionMenu.ts:237",
+        "config/modalScreens.ts:114",
+        "config/modalScreens.ts:97",
+        "skill:improve-codebase-architecture",
+        "skill:zoom-out"
+      ],
+      "verification_note": "Re-read app/_layout.tsx:719-740 and confirmed the sibling tree shape. Counter-argument considered: maybe iOS lets a React-side fullscreen overlay paint on top of formSheet via portals — refuted by react-native-screens behaviour; the gorhom bottom sheet ActionMenuHost uses is rendered into the React tree, which sits inside the root UIViewController and is occluded by any modal pushed onto the navigation controller above it. Also matches the user's report that the menu IS dispatched (sometimes audible haptic/log) but invisible.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "MintInfoScreen npub-tap pushes /(user-flow)/profile — navigates onto the root stack while the call site lives inside the (mint-flow) modal, so the profile screen appears behind the modal",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintInfoScreen.tsx",
+      "line": 437,
+      "symbol": "openContact case 'nostr'",
+      "dimension": 12,
+      "description": "MintInfoScreen is reached via /(mint-flow)/info (config/modalScreens.ts groups (mint-flow) as a modal flow at modalScreens.ts:97-106 and the route file lives at app/(mint-flow)/info.tsx). Tapping a Nostr contact runs router.push({ pathname: '/(user-flow)/profile', params: { npub: info } }). expo-router resolves /(user-flow)/profile against the root Stack, so the new screen pushes onto the OUTER navigator while the (mint-flow) modal sits above it — same UIViewController-layering symptom as F-001, but caused by a missing sibling-route file rather than overlay placement. The codebase already encodes this pattern: app/(mint-flow)/userMessages.tsx is a 1-line `export { default } from '@/features/user/screens/UserMessagesRoute';` re-export so opening user-messages from inside the mint-flow stays in the modal stack. There is no equivalent (mint-flow)/profile.tsx.",
+      "why_it_matters": "User-visible: tapping a mint-operator's npub from MintInfoScreen 'opens it but it opens behind the current modal.' Symmetric for any other cross-flow navigation triggered from inside (mint-flow), and the same anti-pattern recurs anywhere the codebase pushes to a root-level group from a modal-flow leaf. The fix shape is also a small consolidation: the rule is 'inside flow X, sibling-route to user surfaces by re-exporting' — currently encoded by hand per route.",
+      "fix": "Add app/(mint-flow)/profile.tsx as a 1-line re-export of UserProfileRoute (or whatever the route component is named — match the (mint-flow)/userMessages.tsx shape). Update MintInfoScreen.tsx:437 to push '/(mint-flow)/profile' when the originating route is inside (mint-flow). Stronger fix (dim-12 leverage): introduce a withinFlow(currentFlow, screen) helper that resolves the correct sibling — removes the per-call-site decision and turns the rule into one module. Audit all router.push to /(user-flow)/* from screens whose entry routes live in (X-flow)/ groups; the openProfile handler in features/send/lib/sovranPaymentConfig.ts:881 has the same shape and may collide when invoked from inside the send flow.",
+      "references": [
+        "features/mint/screens/MintInfoScreen.tsx:437",
+        "app/(mint-flow)/_layout.tsx:31",
+        "app/(mint-flow)/userMessages.tsx:1",
+        "features/send/lib/sovranPaymentConfig.ts:881",
+        "config/modalScreens.ts:97",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Confirmed by reading app/(mint-flow)/_layout.tsx — the only userMessages-shaped route is registered. Counter-argument: maybe expo-router's modal-aware routing handles cross-group navigation transparently — refuted by the existing (mint-flow)/userMessages.tsx workaround, which would not exist if cross-group push worked. Counter: maybe the user is wrong about the symptom and it's overlay-related — refuted because MintInfoScreen's npub link uses router.push (not actionMenuPopup), so F-001 doesn't apply.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 1.0,
+      "title": "mockFailMelt and mockFailSend toggles in settings are not wired through to coco-payment-ux — only mockFailPaymentRequest has an effect",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 214,
+      "symbol": "createCocoPaymentUX config",
+      "dimension": 1,
+      "description": "settingsStore declares three mock-fail toggles at shared/stores/global/settingsStore.ts:43-45 (mockFailSend, mockFailMelt, mockFailPaymentRequest) and exposes setters + UI rows on SettingsScreen at features/settings/screens/SettingsScreen.tsx:362-405. Only mockFailPaymentRequest is plumbed into the payment machine: features/send/providers/CocoPaymentUX.tsx:214 sets shouldMockFailPaymentRequest, which is consumed by coco-payment-ux/src/operations/defaultOperations.ts:247 inside mockFailEnabled() and gated at executePaymentRequest sites (defaultOperations.ts:740, 773). executeMelt (defaultOperations.ts:574) and executeSend (defaultOperations.ts:254) have no equivalent gate and no equivalent shouldMockFail* config field. The settings UI therefore lies: a user toggles mockFailMelt expecting BIP321 lightning to fail, the melt path runs unmodified, the payment succeeds, the user concludes the toggle is broken.",
+      "why_it_matters": "Direct user feedback: 'I tried to do a bip321 lightning payment with mock fail melt enabled but somehow the melt still works.' This is a dev/QA correctness bug — every payment-flow regression test that relies on the toggle is silently passing on production code. F-008 in 07.json already noted that shouldMockFailPaymentRequest needs gating against prod misconfig; the inverse problem here is that the dev gates simply do not exist for melt and send. Also dim-14 (API legibility): the public coco-payment-ux config exposes one mock toggle but the surrounding wallet UI implies three.",
+      "fix": "Add shouldMockFailMelt and shouldMockFailSend to coco-payment-ux/src/operations/defaultOperations.ts:211 (DefaultOperationsConfig) and to coco-payment-ux/src/core/createCocoPaymentUX.ts:63. In defaultOperations.ts:574 (executeMelt), insert a `if (mockFailEnabled('melt')) throw new Error('Mock melt failure (dev)');` early, identical shape to the existing payment-request gate. Same for executeSend at :254. Wire the new fields in features/send/providers/CocoPaymentUX.tsx:214 by reading useSettingsStore.getState().mockFailMelt / .mockFailSend. Generalise mockFailEnabled to take a key so the prod-NODE_ENV guard remains shared. (Alternative consolidation: collapse the three toggles into one settingsStore field `mockFailMode: 'off' | 'send' | 'melt' | 'paymentRequest'` — fewer state fields, one rule, surfaces a clearer mental model in the UI.)",
+      "references": [
+        "shared/stores/global/settingsStore.ts:43",
+        "shared/stores/global/settingsStore.ts:97",
+        "features/settings/screens/SettingsScreen.tsx:376",
+        "features/send/providers/CocoPaymentUX.tsx:214",
+        "coco-payment-ux/src/operations/defaultOperations.ts:211",
+        "coco-payment-ux/src/operations/defaultOperations.ts:247",
+        "coco-payment-ux/src/operations/defaultOperations.ts:574",
+        "coco-payment-ux/src/operations/defaultOperations.ts:254",
+        "skill:prompt-engineering-patterns"
+      ],
+      "verification_note": "Re-read the three call sites inside coco-payment-ux/src/operations/defaultOperations.ts and confirmed mockFailEnabled is referenced ONLY at lines 740 and 773 (both inside executePaymentRequest). grep -n in the same file for mockFail returned no other hits. Counter-argument: maybe melt failure is mocked elsewhere (e.g. in CocoPaymentUX.tsx via a manager wrapper) — refuted by the grep across coco-payment-ux/src + features/send/providers, which finds zero references to mockFailMelt or shouldMockFailMelt. The toggle is genuinely dead.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "BIP321 paymentRequest with no mint hint is annotated 'recommended' over Lightning even though receiver-side cashu redemption requires a self-melt — Lightning is more efficient end-to-end",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/annotate.ts",
+      "line": 31,
+      "symbol": "hasMatchingMintWithBalance + PAYMENT_REQUEST_RULES",
+      "dimension": 1,
+      "description": "annotate.ts:34-37 falls back to ctx.trustedMintUrls when info.mints is empty. Combined with PAYMENT_REQUEST_RULES[0] at annotate.ts:60, this marks the paymentRequest option 'recommended' for any BIP321 that omits a mint hint, as long as the sender has any trusted mint with sufficient balance. The user's argument (load-bearing for the rule and worth recording in code): when no mint is specified, the recipient will receive proofs at the sender's preferred mint and immediately need to swap to their own preferred mint — which is itself a self-lightning melt on the recipient side. Net cost: two mint round-trips and one lightning route hop versus one lightning route hop direct. The recommended branch should flip when info.mints.length === 0 AND a lightning option exists in the same paymentRequest.",
+      "why_it_matters": "Direct user feedback. The BIP321 flow is the most-trafficked external-payment surface, and the current default funnels users into the slower, fee-heavier path. Beyond performance, the rationale is non-obvious: a future maintainer reading PAYMENT_REQUEST_RULES will not realise that mints: [] is a Lightning signal, not a Cashu-friendly signal. The user explicitly asked: 'I think we should make sure to put all these reasons in code somewhere so we don't lose track of them.' The annotate.ts rules table is exactly the right home; the fix doubles as a doc artefact.",
+      "fix": "In annotate.ts, add a new rule at the top of PAYMENT_REQUEST_RULES: when info.mints?.length === 0 AND the option set contains any LIGHTNING_RULES kind (lightningInvoice / lightningAddress / lnurlp), demote paymentRequest to status 'available' (NOT recommended). Concretely: noMintHintAndLightningAvailable predicate fed into a 'demote-from-recommended' rule. Add a comment block above PAYMENT_REQUEST_RULES with the rationale (recipient self-melt cost) so the why survives. Add a coco-payment-ux unit test in __tests__/flows/bip321-multi-option.test.ts covering the mints:[] case: assert that lightningInvoice is recommended and paymentRequest is 'available'. UNVERIFIED on whether all real-world senders have a trusted-mint match for empty-hint requests; if some senders lack any trusted mint, the existing 'available' status path already wins and no behaviour change is needed for them — the rule fires only when the current code WOULD have promoted Cashu.",
+      "references": [
+        "coco-payment-ux/src/annotate.ts:26",
+        "coco-payment-ux/src/annotate.ts:58",
+        "coco-payment-ux/src/annotate.ts:89",
+        "coco-payment-ux/__tests__/flows/bip321-multi-option.test.ts:1",
+        "nuts/18.md",
+        "skill:prompt-engineering-patterns"
+      ],
+      "verification_note": "Re-read annotate.ts:26-94 and confirmed that mints:[] takes the trustedMintUrls fallback path and lights up the 'recommended' rule. Counter-argument: maybe the receiver mint accepts arbitrary cashu and the swap-to-preferred-mint isn't free for them either — irrelevant to the cost analysis on the SENDER's side, but noted as 'UNVERIFIED' for the absolute cost claim because we don't have BIP321/NUT-18 protocol guarantees about receiver behaviour. The relative ordering (lightning ≤ cashu-then-melt) holds even if the absolute cost number doesn't.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Failed item in 'Payment failed — try another method' menu only colors the description text via Menu.Item variant=danger; user expects the whole row red like the 'Cancel Transaction' button",
+      "repo": "sovran-app",
+      "path": "shared/blocks/popup/ActionMenuHost.tsx",
+      "line": 382,
+      "symbol": "renderActionButton",
+      "dimension": 8,
+      "description": "ActionMenuHost.tsx:382-388 maps button.isFailed to heroui Menu.Item variant='danger', and at :395 sets `variant: isDanger ? 'danger' : 'default'`. heroui's Menu.Item.danger variant tints the text/description but not the row background or the leading icon. Compare to the SendTokenScreen 'Cancel Transaction' button at features/send/screens/SendTokenScreen.tsx:202, which uses `variant: 'dangerous'` on a BottomButtons surface — that variant applies a full-row red treatment with the contrast the user expects. Result: in the paymentFallbackPopup (shared/lib/popup/popups/actionSheets.tsx:296), the failed Cashu/Lightning row is visually almost indistinguishable from a disabled item; the user reads it as 'unavailable' rather than 'tried, broke, do not retry'. User feedback: 'I think the whole failed item should be red (same styling our Cancel Transaction is styled).'",
+      "why_it_matters": "Recovery from a failed payment is exactly the moment the UI must be unambiguous about which option just broke. The current treatment relies on the description prefix 'Failed: ...' for legibility, which is locale-/length-sensitive and competes with neighbouring 'Recommended' descriptions for visual weight. Adjacent issue: the failed reason text is overloaded with the role 'why this is disabled' (the same property is reused for non-failed disabled items at ActionMenuHost.tsx:386-388), so adding a red row treatment without disentangling the two states will retreat from the existing accessibility contract.",
+      "fix": "Add a 'failed' variant to the ActionMenuButton render path (NOT a reuse of 'danger', so non-failed danger items like 'Disconnect mint' don't accidentally get the failed treatment). Either (a) wrap the failed Menu.Item in a View with className='bg-danger/10 rounded-...' so the whole row tints, OR (b) introduce a dedicated heroui Menu.Item slot/className override. Mirror the BottomButtons 'dangerous' visual treatment so the two surfaces stay consistent. Keep the 'reason' description prefix for screen-reader users — colour alone is not an accessibility-contract signal. Cross-link: this finding may move from Medium to Low if F-001 is fixed first, because a hidden menu can't communicate styling either way; track them as an ordered pair.",
+      "references": [
+        "shared/blocks/popup/ActionMenuHost.tsx:382",
+        "shared/lib/popup/popups/actionMenu.ts:112",
+        "shared/lib/popup/popups/actionSheets.tsx:296",
+        "features/send/screens/SendTokenScreen.tsx:202",
+        "skill:prompt-engineering-patterns"
+      ],
+      "verification_note": "Cross-checked by re-reading ActionMenuHost.tsx:382-410 and confirming there is no row-level background applied for danger variant. Counter-argument: heroui's Menu.Item danger variant might paint a background on a future heroui release — fine, but the audit is for the current state and the visual gap is observable today.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "retrieveMnemonic() is not single-flight — every call triggers a fresh SecureStore.getItemAsync with requireAuthentication:true, producing multiple FaceID prompts on app launch",
+      "repo": "sovran-app",
+      "path": "shared/lib/nostr/secureStorage.ts",
+      "line": 249,
+      "symbol": "retrieveMnemonic",
+      "dimension": 7,
+      "description": "secureStorage.ts:40 sets IOS_SECURE_OPTIONS = { requireAuthentication: true }, applied to every secureGet via secureOptions() at :46. retrieveMnemonic at :249 calls secureGet with no in-memory cache and no in-flight promise dedupe (compare ensureMnemonicExists at :302, which DOES single-flight via inflightEnsureMnemonic at :296-310 — the pattern is in this very file). Boot-time call sites that each independently trigger retrieveMnemonic — and therefore each independently trigger a FaceID prompt: shared/lib/nostr/secureStorage.ts:611 (useMnemonic hook autoLoad), shared/providers/NostrKeysProvider.tsx:113 (getMnemonicForDerivation when local mnemonic state is null), shared/blocks/AppGate.tsx:48 (useReinstallDetection — gated, but fires for fresh installs), shared/blocks/AppGate.tsx:176 (RestoreGate when restoreStatus==='unknown'). The NostrKeysProvider invocation can race the useMnemonic hydration: deriveKeys (line 121) and deriveCashuMnemonic (line 149) each call getMnemonicForDerivation independently, which falls through to retrieveMnemonic if the React state hasn't propagated yet. User feedback: 'I have to scan my face 3 times when opening the app to get in.' Plausible mapping: useMnemonic prompt #1, deriveKeys prompt #2, deriveCashuMnemonic prompt #3.",
+      "why_it_matters": "Funds-adjacent UX: an app that prompts for biometrics three times in a row trains users to dismiss prompts reflexively, which weakens the security signal the prompt is meant to carry. It also gates first-paint by N FaceID round-trips. Beyond UX, the security-side cost is real — the user's reflex on a phishing-context FaceID prompt should be 'this is unusual, why is the wallet asking', not 'this happens every launch.' Adjacent to 54.json:F-002 (concurrent BIP-32 derivation) and 54.json:F-003 (sync derivation on JS thread), but distinct cause: the prompts repeat even when the derivation succeeds and caches.",
+      "fix": "Single-flight retrieveMnemonic the same way ensureMnemonicExists is single-flighted at secureStorage.ts:296-310 — module-level inflightRetrieve promise that all concurrent callers await. Stronger fix (dim-12 leverage): hoist the mnemonic fetch into NostrKeysProvider's mount effect so there is exactly one boot-time retrieve, and route every subsequent consumer through the resulting in-memory ref/value. The hook useMnemonic and the AppGate retrieves can read off the same single-flight resolution. Document the rule in shared/lib/nostr/secureStorage.ts above retrieveMnemonic: 'every call triggers FaceID; callers MUST share a single in-flight promise.' UNVERIFIED on the exact prompt count without log-doctor evidence — the structural call graph supports 3 concurrent prompts on cold boot, but the actual count depends on iOS LAContext coalescing, which we should not rely on.",
+      "references": [
+        "shared/lib/nostr/secureStorage.ts:40",
+        "shared/lib/nostr/secureStorage.ts:249",
+        "shared/lib/nostr/secureStorage.ts:296",
+        "shared/lib/nostr/secureStorage.ts:611",
+        "shared/providers/NostrKeysProvider.tsx:113",
+        "shared/blocks/AppGate.tsx:48",
+        "shared/blocks/AppGate.tsx:176",
+        "skill:diagnose",
+        "skill:security-review"
+      ],
+      "verification_note": "Re-read all four call sites. Counter-argument: iOS may coalesce simultaneous LAContext requests into a single prompt — partly true (the in-app LAContext bound to a single keychain item can de-dup), but expo-secure-store creates a fresh LAContext per getItemAsync call (per its source), so coalescing is not guaranteed. UNVERIFIED-marked on the absolute count for that reason; the structural fix is correct regardless. Also linked to 04.json:F-001 — that finding noted requireAuthentication:false; the file has since flipped to true (good for security, but exposes this prompt-storming bug).",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "retrieveMnemonic single-flighted via inflightRetrieveMnemonic, mirroring inflightEnsureMnemonic. Concurrent boot-time callers (useMnemonic, NostrKeysProvider getMnemonicForDerivation, AppGate) share one SecureStore.getItemAsync call and therefore one FaceID prompt."
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "useMintContacts re-fetches every trusted mint's getInfo on every Contacts tab open — no zustand cache, no last-known fallback",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useMintContacts.ts",
+      "line": 35,
+      "symbol": "useMintContacts",
+      "dimension": 12,
+      "description": "useMintContacts at features/payments/hooks/useMintContacts.ts:35-90 holds mintsWithInfo in component state and calls getMintInfo(mint.mintUrl) for every mint inside a useEffect that fires whenever `mints` or `getMintInfo` changes. There is no read-through cache: shared/stores/profile/mintStore.ts has no cachedInfo / lastSeenInfo field for mint info — every Contacts tab navigation pays a full Promise.all(getMintInfo) round-trip across all trusted mints, plus one prefetchImages pass on the resolved icon URLs (line 94). MintInfoScreen has the same shape (every screen mount = fresh getInfo); useRecentContacts is also state-held with no persistence (decryptedContacts at :112 is component state). User feedback: 'i do not like that our contacts tab takes time for the contacts to load … all our mints should be stored locally, or their last known data should be stored in some cache or zustand … But having two seperate ways of fetching info is messy.' The user is identifying a real seam-design failure: the wallet has zustand stores for mintStore, mintQuoteStore, swapStatusStore, etc., but mint info / Nostr-DM-derived contact metadata is not part of any of them — they live in transient component state.",
+      "why_it_matters": "Direct user-experience complaint, and the fix is leverage-positive: pulling mint info into mintStore (with version + zod-rehydration) gives instant render to MintInfoScreen, the receive flow's mint selector, the send flow's mint selector, BIP321 annotate.ts (which calls detectors.getPaymentRequestInfo synchronously and would benefit from cached mint metadata), and any other surface that currently calls getInfo on mount. It also satisfies the user's correct architectural intuition: 'we want our pages to load instantly but still fetch in case data is missing or wrong.' Adjacent lever: chat-history loading (whitenoise/nostr DMs) has the same shape — paginated load on screen mount with no cache-first hydration.",
+      "fix": "Extend mintStore with a `cachedInfo: Record<MintUrl, { info: GetInfoResponse; fetchedAt: number }>` slice (zod-validated on rehydrate, version-bumped per persist-shape rule). Replace useMintContacts' useState<MintWithInfo[]> with a selector that reads cachedInfo first, falls through to background-fetch via getMintInfo only when missing or stale (TTL-driven). Mirror the change for useRecentContacts: gift-wrap unwrap cache already exists at shared/lib/nostr/giftWrapCache.ts (used at line 51 of useRecentContacts.ts); the missing piece is hoisting the *unwrapped DM list* into a zustand profile-store so the Contacts tab renders before any Nostr round-trip. The user explicitly named the correct architectural seam — 'all our mints should be stored locally' — so the fix shape is a consolidation, not new code: delete the per-screen getInfo effects after introducing the cache. Defer to a research note (research:cache-first-data-fetching) before the code change to align on TTL semantics, eviction, and migration path for users without cached data.",
+      "references": [
+        "features/payments/hooks/useMintContacts.ts:35",
+        "features/payments/hooks/useRecentContacts.ts:112",
+        "shared/stores/profile/mintStore.ts:1",
+        "shared/lib/nostr/giftWrapCache.ts:1",
+        "skill:zustand-5",
+        "skill:improve-codebase-architecture",
+        "skill:native-data-fetching"
+      ],
+      "verification_note": "Re-read useMintContacts.ts:35-90 and confirmed component-state holding; cross-checked mintStore.ts for any cachedInfo field and found none. Counter-argument: maybe getMintInfo is HTTP-cached and the perceived slowness is icon prefetch — possible secondary contributor but does not explain the network-shaped delay the user sees on tab switch (icons are prefetched async without blocking). The real gating effect is Promise.all over every trusted mint's getInfo before setMintsWithInfo fires.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Every LegendList consumer hardcodes estimatedItemSize without measuring; no row or container onLayout log emits to log-doctor for observed-vs-estimated comparison",
+      "repo": "sovran-app",
+      "path": "features/contacts/screens/ContactsScreen.tsx",
+      "line": 512,
+      "symbol": "LegendList estimatedItemSize",
+      "dimension": 13,
+      "description": "Every LegendList in the codebase passes a hand-tuned estimatedItemSize literal: ContactsScreen.tsx:512 = 68, :534 = 68, HomeFeed.tsx:722 = 300, UserFeed.tsx:800 = 200, UserFeed.tsx:821 = 300, ThreadView.tsx:502 = 200, WhitenoiseDMScreen.tsx:208 = 80, Transactions.tsx:615 (no estimatedItemSize at all on AnimatedLegendList). None of these consumers emit a row or container layout event to the structured logger. log-doctor cannot answer 'is the estimate within X% of observed' or 'what is the variance'. When virtualization underperforms (recycle thrash, scroll position drift, blank space on fast scroll) there is no signal to compute the right estimate, so the next round of optimisation will start from guesses again. User feedback: 'for all lists of items we should log the height of the container or the item so that when we eventually get around to optimisations the log-doctor results will clearly say how large they are, and if its fixed size thats great because many virtualisations can be greatly improved but even a rough average height will be useful too.'",
+      "why_it_matters": "dim-13 (diagnosability): the codebase is structurally preventing the optimisation diagnosis the user describes. This finding is intentionally low-severity but high-leverage on the next perf-audit cycle — adding a small instrumentation primitive once unblocks a class of follow-up findings (variance-driven estimate tuning, fixed-size short-circuiting). The same instrumentation also catches the WhitenoiseDMScreen / UserMessages 'historical messages slow' complaint by exposing whether the slowness is virtualisation or fetch.",
+      "fix": "Introduce a thin wrapper hook useListLayoutLogger(name) that returns onLayout callbacks for the container and per-row, emitting one debug event per render burst (debounced, with min/max/mean over the burst window). Add a log-doctor mode `lists` (codereview/log-doctor/index.ts) that joins the container event with row events and prints the estimatedItemSize used at the call site against observed mean/p50/p99 and variance. Migrate one LegendList (ContactsScreen — the user's pain point) as the proof-of-concept. Avoid logging in render bodies (50.json:F-014 noted that anti-pattern). UNVERIFIED on the right log cadence; favour onLayout fires only when height changes by > 1px to keep the buffer cheap.",
+      "references": [
+        "features/contacts/screens/ContactsScreen.tsx:512",
+        "features/feed/components/HomeFeed.tsx:722",
+        "features/feed/components/UserFeed.tsx:800",
+        "features/feed/components/ThreadView.tsx:502",
+        "features/whitenoise/screens/WhitenoiseDMScreen.tsx:208",
+        "features/transactions/components/Transactions.tsx:615",
+        "skill:react-native-best-practices",
+        "skill:diagnose"
+      ],
+      "verification_note": "grep across features confirmed every estimatedItemSize is a literal with no nearby onLayout sibling. Counter-argument: maybe LegendList already exposes a ref-level metrics surface — partly true, the LegendListRef has measurement APIs, but they are not consumed anywhere in this codebase, so the diagnosability gap is real.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "SwipeableRow + RN Pressable race: a drag that ends before crossing the 12px right-pan threshold still fires onPress on the wrapped row",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/SwipeableRow.tsx",
+      "line": 62,
+      "symbol": "Gesture.Pan().activeOffsetX",
+      "dimension": 1,
+      "description": "SwipeableRow at features/transactions/components/SwipeableRow.tsx wraps the row body in <GestureDetector gesture={pan}>. The pan is configured with activeOffsetX([-9999, 12]) and failOffsetY([-8, 8]) at lines 62-63. The wrapped child is the row Pressable from features/transactions/components/Transaction.tsx:239. RN Pressable cancels onPress when the touch moves past its own ~10dp tolerance, but the threshold is in screen-space and is not coupled to the parent's pan threshold. Two real race windows: (a) user drags 6-10px right (under both Pressable's threshold AND pan's 12px activeOffsetX), releases — Pressable fires onPress, opening the transaction detail when the user clearly intended a swipe; (b) user drags vertically inside failOffsetY's [-8, 8] band, the parent ScrollView claims the gesture, the user releases, RN Pressable still fires onPress because GestureDetector did not assert exclusivity over the inner touchable. User feedback: 'when we drag it also opens it because it perceives it as a press.'",
+      "why_it_matters": "The transactions tab is the surface where the most users encounter the drag-to-cancel affordance. A misfire opens the detail screen and obscures the cancel intent — the user feedback explicitly identifies this as a friction point. Same issue applies anywhere a Pressable is the direct child of a GestureDetector with a non-zero activeOffset (search the codebase for Gesture.Pan().activeOffsetX wrapping a Pressable to find the population). Confidence is 0.7 rather than higher because RN's Pressable behaviour can be platform-version-dependent and we have not directly captured the misfire in log-doctor.",
+      "fix": "Replace the inner RN Pressable with a Gesture.Tap composed via Gesture.Race(pan, tap) (or Gesture.Exclusive) so the tap branch is mutually exclusive with the pan branch — Tap fires only when no other branch activates. Alternatively, set delayPressIn on the Pressable to ~150ms so the parent has time to claim. The first option is the dim-12-correct fix because it makes the gesture relationship explicit at the seam. Document the rule in features/transactions/components/SwipeableRow.tsx: 'children of a GestureDetector with activeOffset must NOT be RN Pressable; use Gesture.Tap composed via Gesture.Race.' UNVERIFIED on whether the same misfire reproduces on the splitBill or whitenoise swipeable rows — grep widely before fixing in one place.",
+      "references": [
+        "features/transactions/components/SwipeableRow.tsx:62",
+        "features/transactions/components/Transaction.tsx:239",
+        "shared/ui/primitives/Pressable.tsx:75",
+        "skill:animating-react-native-expo",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read SwipeableRow.tsx:50-100 and Transaction.tsx:230-330; the inner row really is a plain Pressable inside the GestureDetector. Counter-argument: maybe the user's complaint is about a different layer (modal-drag-down that fires the underlying screen's onPress) — possible, but the friction described 'we can drag to dismiss or rollback a tx, but when we drag it also opens it' is most consistent with the swipe-to-cancel + tap-to-open pair on the transactions tab. The same fix shape would apply to either layer.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "skipped",
+    "3": "skipped",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "skipped",
+    "7": "partial",
+    "8": "partial",
+    "9": "skipped",
+    "10": "skipped",
+    "11": "partial",
+    "12": "pass",
+    "13": "partial",
+    "14": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Mount ActionMenuHost (and PopupHost) inside every (X-flow)/_layout.tsx instead of as a single root sibling — one change touches all native-modal screens at once. F-001 fix.",
+      "files": [
+        "app/_layout.tsx",
+        "app/(send-flow)/_layout.tsx",
+        "app/(receive-flow)/_layout.tsx",
+        "app/(mint-flow)/_layout.tsx",
+        "app/(transactions-flow)/_layout.tsx",
+        "app/(filter-flow)/_layout.tsx",
+        "app/(map-flow)/_layout.tsx",
+        "app/(split-bill-flow)/_layout.tsx",
+        "app/(theme-flow)/_layout.tsx",
+        "app/(stories-flow)/_layout.tsx",
+        "app/(settings-flow)/_layout.tsx",
+        "app/(user-flow)/_layout.tsx",
+        "shared/blocks/popup/ActionMenuHost.tsx",
+        "shared/blocks/popup/PopupHost.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Add (mint-flow)/profile.tsx as a 1-line re-export of UserProfileRoute, mirroring the existing (mint-flow)/userMessages.tsx pattern. Audit other cross-flow router.push call sites for the same shape and either re-export per flow or introduce a withinFlow() resolver that picks the correct sibling. F-002 fix.",
+      "files": [
+        "app/(mint-flow)/profile.tsx",
+        "features/mint/screens/MintInfoScreen.tsx",
+        "features/send/lib/sovranPaymentConfig.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Collapse mockFailSend / mockFailMelt / mockFailPaymentRequest into a single mockFailMode union OR plumb shouldMockFailMelt and shouldMockFailSend through to coco-payment-ux's executeMelt / executeSend the same way shouldMockFailPaymentRequest is wired. Add the prod-NODE_ENV guard to all three. F-003 fix.",
+      "files": [
+        "shared/stores/global/settingsStore.ts",
+        "features/settings/screens/SettingsScreen.tsx",
+        "features/send/providers/CocoPaymentUX.tsx",
+        "coco-payment-ux/src/operations/defaultOperations.ts",
+        "coco-payment-ux/src/core/createCocoPaymentUX.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Add a 'no mint hint + lightning available' rule to PAYMENT_REQUEST_RULES that demotes paymentRequest to 'available' so Lightning takes the recommended slot. Add a comment block above the rules table capturing the receiver-self-melt rationale. Add a unit test in __tests__/flows/bip321-multi-option.test.ts. F-004 fix.",
+      "files": [
+        "coco-payment-ux/src/annotate.ts",
+        "coco-payment-ux/__tests__/flows/bip321-multi-option.test.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Move mint info into a zustand mintStore.cachedInfo slice with version + zod rehydration; replace component-state effects in useMintContacts and MintInfoScreen with cache-first selectors. Mirror the change for unwrapped DMs in useRecentContacts. F-007 fix.",
+      "files": [
+        "shared/stores/profile/mintStore.ts",
+        "features/payments/hooks/useMintContacts.ts",
+        "features/payments/hooks/useRecentContacts.ts",
+        "features/mint/screens/MintInfoScreen.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Single-flight retrieveMnemonic with a module-level inflight promise (mirroring ensureMnemonicExists at secureStorage.ts:296). Hoist the boot-time mnemonic fetch to NostrKeysProvider so every consumer reads from one in-memory ref. F-006 fix.",
+      "files": [
+        "shared/lib/nostr/secureStorage.ts",
+        "shared/providers/NostrKeysProvider.tsx",
+        "shared/blocks/AppGate.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Add useListLayoutLogger(name) hook + log-doctor 'lists' mode that joins container/row layout events and prints estimatedItemSize vs observed mean/p50/p99/variance. Migrate ContactsScreen as proof-of-concept. F-008 fix.",
+      "files": [
+        "shared/hooks/useListLayoutLogger.ts",
+        "codereview/log-doctor/index.ts",
+        "features/contacts/screens/ContactsScreen.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Replace inner RN Pressable with Gesture.Tap composed via Gesture.Race so tap is mutually exclusive with the parent pan. Document the rule in SwipeableRow. Audit other GestureDetector + Pressable call sites for the same anti-pattern. F-009 fix.",
+      "files": [
+        "features/transactions/components/SwipeableRow.tsx",
+        "features/transactions/components/Transaction.tsx"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Write __research__/cache-first-data-fetching.md to align on TTL/eviction semantics for mint info, DM unwrap caches, and other read-through caches before the F-007 code change. Captures the user's correct architectural intuition so future audits don't re-litigate it.",
+      "files": [
+        "__research__/cache-first-data-fetching.md"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Write __research__/modal-overlay-routing.md capturing the 'native modal occludes React-side overlay' rule, the (X-flow)/userMessages.tsx re-export pattern, and the consequences for actionMenuPopup / paymentOptionsPopup / cross-flow router.push. F-001 + F-002 are instances of the same rule.",
+      "files": [
+        "__research__/modal-overlay-routing.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "F-006 prompt count is structurally explicable but not log-doctor confirmed — need a phone-test or instrumented launch to verify whether iOS LAContext coalesces concurrent retrieveMnemonic calls in practice.",
+    "F-004 assumes empty info.mints means 'sender chooses' rather than 'protocol-specified empty set with semantic'. Confirm with NUT-18 / BIP-321 spec readers before the rule lands.",
+    "F-001 fix shape (ActionMenuHost in each flow vs one (action-menu-flow) route group) needs a single-pump prototype before committing — the second option may interact poorly with the existing imperative actionMenuPopup() API surface.",
+    "F-009 confidence 0.7 because we have no log-doctor capture of the misfire. A phone-test reproducing the drag-to-open behaviour would close the gap; absent that, the structural fix is still correct but severity may be Low → Nit."
+  ]
+}
