@@ -92,7 +92,7 @@ function FiatAmountDisplay({
   );
 }
 
-export interface AmountEntryViewProps {
+interface AmountEntryViewProps {
   /** Raw keyboard input string; source of truth for CustomKeyboard's internal state. */
   rawInput: string;
   /** Parsed amount as a number (sats when inputMode === 'sat'). */

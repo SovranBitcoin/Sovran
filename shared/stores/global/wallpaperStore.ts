@@ -44,7 +44,7 @@ export interface WallpaperCatalogEntry extends Omit<SchemaWallpaperEntry, 'palet
   palette: ThemePalette;
 }
 
-export interface DownloadedWallpaper extends WallpaperCatalogEntry {
+interface DownloadedWallpaper extends WallpaperCatalogEntry {
   localUri: string;
   downloadedAt: number;
 }
@@ -55,7 +55,7 @@ export interface DownloadedWallpaper extends WallpaperCatalogEntry {
  * the admin panel; absent values become `'Other'` so Gallery grouping can
  * rely on the field at the type level.
  */
-export interface AlbumMeta extends Omit<SchemaAlbumMeta, 'topic' | 'coverThemeName'> {
+interface AlbumMeta extends Omit<SchemaAlbumMeta, 'topic' | 'coverThemeName'> {
   topic: string;
   coverThemeName?: string;
 }

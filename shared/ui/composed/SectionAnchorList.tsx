@@ -79,7 +79,7 @@ export interface AnchorSection<T> {
   renderHeader?: () => ReactNode;
 }
 
-export interface SectionAnchorListProps<T> {
+interface SectionAnchorListProps<T> {
   sections: AnchorSection<T>[];
   /** Per-item renderer. Used when `rowChunkSize` is 1 (the default). */
   renderItem: (item: T, sectionId: string) => ReactNode;

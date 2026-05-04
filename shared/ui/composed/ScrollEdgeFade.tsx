@@ -33,7 +33,7 @@ import opacity from 'hex-color-opacity';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
-export interface ScrollEdgeFadeProps {
+interface ScrollEdgeFadeProps {
   /** Which edge the fade pins to. */
   edge: 'top' | 'bottom';
   /** Total absolute height of the fade region in pixels. */

@@ -25,12 +25,12 @@ const FIAT_SYMBOLS: Record<DisplayCurrency, string> = {
   gbp: '£',
 };
 
-export interface UseLocalAmountEntryOptions {
+interface UseLocalAmountEntryOptions {
   /** Base unit for sat mode. Defaults to 'sat'. */
   unit?: string;
 }
 
-export interface UseLocalAmountEntryResult {
+interface UseLocalAmountEntryResult {
   rawInput: string;
   inputMode: 'sat' | 'fiat';
   numericValue: number;

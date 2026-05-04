@@ -56,7 +56,7 @@ export interface ActionMenuVariant {
   onPress: () => void | Promise<void>;
 }
 
-export interface ActionMenuButtonProps {
+interface ActionMenuButtonProps {
   /** Label shown on the primary button. */
   label: string;
   /** iconify name for the primary button. */

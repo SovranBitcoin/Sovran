@@ -48,7 +48,7 @@ import { relativeTime } from '@/shared/lib/time';
 // Identity types
 // ---------------------------------------------------------------------------
 
-export interface NostrProfileLike {
+interface NostrProfileLike {
   name?: string;
   display_name?: string;
   displayName?: string;
@@ -78,7 +78,7 @@ export interface NostrIdentity {
 /** Stats that a mint may carry — present on `MintListItem` and on lighter
  *  mint shapes (NUT-06 info, search results). Gated per-field so a mint
  *  known only by URL + name still works. */
-export interface MintStatFields {
+interface MintStatFields {
   balance?: number;
   unit?: string;
   status?: 'available' | 'disabled';
@@ -134,7 +134,7 @@ export interface SelfIdentity {
 
 export type Identity = NostrIdentity | MintIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
-export type StatKey =
+type StatKey =
   | 'balance'
   | 'score'
   | 'audit'
@@ -264,7 +264,7 @@ export function selfIdentity(
 // Props
 // ---------------------------------------------------------------------------
 
-export interface ContactRowProps {
+interface ContactRowProps {
   /** One identity, or an array for composites (e.g. mint + nostr). */
   identity: Identity | Identity[];
 

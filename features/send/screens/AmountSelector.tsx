@@ -42,7 +42,7 @@ function readAmountEntryFields(entry: Record<string, unknown>) {
   };
 }
 
-export interface AmountSelectorProps {
+interface AmountSelectorProps {
   entry: Record<string, unknown>;
   actions: AmountEntryActions;
   suggestions?: QuickSendSuggestion[];

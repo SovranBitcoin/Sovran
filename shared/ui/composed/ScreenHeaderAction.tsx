@@ -3,7 +3,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
-export interface ScreenHeaderActionProps {
+interface ScreenHeaderActionProps {
   icon: string;
   onPress: () => void;
   testID?: string;

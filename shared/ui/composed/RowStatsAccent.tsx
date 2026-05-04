@@ -74,7 +74,7 @@ export interface RowStat {
   accessibilityLabel?: string;
 }
 
-export interface RowStatsAccentProps {
+interface RowStatsAccentProps {
   stats: RowStat[];
   /** Trailing note appended below the stats (e.g. a disabled reason). */
   note?: string;

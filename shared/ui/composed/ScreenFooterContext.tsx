@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-export interface ScreenFooterContextValue {
+interface ScreenFooterContextValue {
   setFooterHeight: (height: number) => void;
 }
 

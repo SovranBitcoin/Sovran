@@ -62,7 +62,7 @@ const DebugRow = ({
   </View>
 );
 
-export interface LayoutDebugWrapperProps {
+interface LayoutDebugWrapperProps {
   children: ReactNode;
   /**
    * Enable debug overlays showing safe areas and insets

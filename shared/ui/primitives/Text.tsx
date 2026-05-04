@@ -96,7 +96,7 @@ export const StyledText = ({
 
 type TextProps = DefaultText['props'] & { id?: string };
 
-export interface CustomTextProps extends TextProps {
+interface CustomTextProps extends TextProps {
   thin?: boolean;
   extralight?: boolean;
   light?: boolean;

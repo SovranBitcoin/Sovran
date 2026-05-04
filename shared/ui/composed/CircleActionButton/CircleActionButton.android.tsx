@@ -4,4 +4,3 @@
  * as a thin re-export so future Android-specific tweaks have a home.
  */
 export { CircleActionButton } from './CircleActionButton.ios';
-export type { CircleActionButtonProps } from './CircleActionButton.ios';

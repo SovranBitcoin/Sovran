@@ -28,9 +28,9 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ModalLayoutWrapper } from './ModalLayoutWrapper';
 import { ScreenBackgroundContext, ScreenFooterContext } from './ScreenFooterContext';
 
-export type ScreenScrollMode = 'auto' | 'animated' | 'none' | 'custom';
+type ScreenScrollMode = 'auto' | 'animated' | 'none' | 'custom';
 
-export interface ScreenProps {
+interface ScreenProps {
   /** Required. Names the screen boundary for log-doctor + phone-tree testID paths. */
   name: string;
   children: ReactNode;

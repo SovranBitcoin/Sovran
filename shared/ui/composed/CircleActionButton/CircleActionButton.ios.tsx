@@ -36,7 +36,7 @@ import { supportsLiquidGlass } from '@/shared/lib/version';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
-export interface CircleActionButtonProps {
+interface CircleActionButtonProps {
   /** Monicon name used on Android and the pre-liquid-glass iOS fallback. */
   icon: string;
   /** SF Symbol name for the SwiftUI glass path (iOS 26+). If omitted on

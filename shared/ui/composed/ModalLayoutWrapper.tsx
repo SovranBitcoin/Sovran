@@ -38,7 +38,7 @@ const DebugRow = ({
   </View>
 );
 
-export interface ModalLayoutWrapperProps {
+interface ModalLayoutWrapperProps {
   children: ReactNode;
   /** Enable debug overlays to visualize safe areas and header height */
   debug?: boolean;

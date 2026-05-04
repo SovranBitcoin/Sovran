@@ -50,7 +50,7 @@ export interface ListRowIconCircle {
   backgroundColor?: string;
 }
 
-export interface ListRowProps {
+interface ListRowProps {
   /** Leading slot — pick exactly one. `leading` takes priority as the escape hatch. */
   avatar?: ListRowAvatar;
   iconCircle?: ListRowIconCircle;
