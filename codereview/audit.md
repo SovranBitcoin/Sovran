@@ -118,8 +118,8 @@ CWD is `sovran-app/`. All paths below are relative to it unless noted.
    pre-computed signal that arms `fix.md`'s touched-file boy-scout
    rule (`fix.md` §1b principle 6 + Phase 5): when the fixer ships an
    unrelated dimension fix on the same file, the cross-cite tells it
-   the file's score is in the tail *and which architecture skill's
-   lens to apply when picking the one-small improvement*. This is
+   the file's score is in the tail _and which architecture skill's
+   lens to apply when picking the one-small improvement_. This is
    recording existing signal, not a separate finding; no Pass 0 work
    is required because the Matt Pocock skills are already loaded.
 
@@ -244,8 +244,8 @@ disk via the Read tool, end-to-end**. The four mandatory paths:
 
 If any required-phase skill is missing from disk, **stop** and tell the
 user to run `npx skills add mattpocock/skills --all -y` — do not proceed
-without them. Bash `cat`, the §4 `awk` index, and the SKILL.md *frontmatter
-description* line all do **not** count as loading; the body must enter the
+without them. Bash `cat`, the §4 `awk` index, and the SKILL.md _frontmatter
+description_ line all do **not** count as loading; the body must enter the
 assistant's context window via the Read tool.
 
 Record every skill actually loaded under **Process skills consulted** in
@@ -254,7 +254,7 @@ demonstrating the body was read. Self-check §10 item 9 blocks the audit
 if this list is empty or contains skills without a non-empty note.
 
 This phase is the auditor's analogue of `fix.md` §5 Phase 0. The Matt
-Pocock set governs *how* the auditor reasons, not *which* dimension is
+Pocock set governs _how_ the auditor reasons, not _which_ dimension is
 covered — load them every run regardless of ENTRY.
 
 ### Pass 1 — Survey (read everything cheap before opening files)
@@ -433,6 +433,12 @@ that shape, not when the auditor forgot to look.
     parse/reject tests. Critical state-machine transitions integration-tested.
     Logs use scoped loggers from `shared/lib/logger` with redaction; no
     secrets/seeds/full proofs. Skills: `jest-react-testing`.
+    **Running tests** — always `npx jest <testfile> --forceExit`. The
+    jest-expo preset imports modules that leak open handles (timers,
+    websockets, native bridges); without `--forceExit` jest hangs after
+    the last test reports `passed`. Locally users Ctrl-C; in an agent
+    shell it just times out at 10 min. Pin the file — don't run the
+    whole suite during an audit.
 11. **Frame coherence (zoom-out)** — does the module sit at the right level of
     abstraction? File or symbol name doesn't match what it actually does (a
     file called `utils.ts` that owns a state machine; a hook named
@@ -466,8 +472,8 @@ that shape, not when the auditor forgot to look.
     `as any` cast that hides a type error) destroy the feedback loop and
     are dim-13. Missing instrumentation that would let `log-doctor` see
     a perf spike or race (cf. dim 7's "log-doctor evidence or
-    `UNVERIFIED`") is dim-13 when the gap is *observability*, not
-    *behaviour*. Test seams that are too shallow to exercise the real
+    `UNVERIFIED`") is dim-13 when the gap is _observability_, not
+    _behaviour_. Test seams that are too shallow to exercise the real
     bug (a unit test of a pure function whose bugs only manifest at
     multi-caller integration) are dim-13: "the codebase architecture is
     preventing the bug from being locked down" is itself a finding. Hidden
@@ -481,7 +487,7 @@ that shape, not when the auditor forgot to look.
     where a branded `Hex32` or `Npub` would prevent mis-routing; loose
     string unions that should be `z.enum`). Error envelopes that lose the
     cause (raw `Error` thrown across a seam where `{ kind, message,
-    cause }` would let the caller branch). For LLM-facing code (prompt
+cause }` would let the caller branch). For LLM-facing code (prompt
     builders, tool-use schemas, structured-output parsers): prompts that
     are vague/verbose where they should be specific/terse/structured;
     Pydantic-equivalent (zod) schemas missing `.strictObject` or
@@ -513,11 +519,11 @@ confidence < 0.4 in Phase B.
 
 **"Loaded" means "read end-to-end via the Read tool, with the body in
 the assistant's context window."** Listing the skill name in
-`audit.process_skills_consulted` is *not* loading. Bash `cat`, the §4
+`audit.process_skills_consulted` is _not_ loading. Bash `cat`, the §4
 `awk` index, and the SKILL.md frontmatter description line all do **not**
 count.
 
-These govern *how* the auditor reasons, not *which* dimension it covers.
+These govern _how_ the auditor reasons, not _which_ dimension it covers.
 Loaded at Pass 0 from `.agents/skills/` — every run, regardless of ENTRY.
 A required skill missing from disk halts the auditor (Pass 0). Every
 skill here MUST appear under "Process skills consulted" in the §9.1
@@ -526,12 +532,12 @@ if the note is "no Critical/High in slice — diagnose loop deferred" or
 similar. The §10 self-check item 9 blocks the audit if any required
 skill is absent from the report or has an empty note.
 
-| Skill                                 | Pass that requires it          | Dim | What it shapes                                                                |
-| ------------------------------------- | ------------------------------ | --- | ----------------------------------------------------------------------------- |
-| `skill:zoom-out`                      | Pass 1                         | 11  | Broaden frame; ENTRY comes from distance-from-covered-set, not first hit. Drives dim-11 (Frame coherence) findings. |
-| `skill:improve-codebase-architecture` | Pass 2                         | 12  | ENTRY named in depth/seam/leverage vocabulary; refactor-plan items cite this. Drives dim-12 (Module depth & seam) findings. |
-| `skill:diagnose`                      | Pass 3 (Critical/High only)    | 13  | Reproduce → minimise → hypothesise → instrument → fix loop, recorded in trail. Drives dim-13 (Diagnosability) findings. |
-| `skill:prompt-engineering-patterns`   | Pass 5 (markdown + JSON emit)  | 14  | Report + JSON stay specific, terse, structured — both are downstream prompts. Drives dim-14 (API legibility) findings. |
+| Skill                                 | Pass that requires it         | Dim | What it shapes                                                                                                              |
+| ------------------------------------- | ----------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------- |
+| `skill:zoom-out`                      | Pass 1                        | 11  | Broaden frame; ENTRY comes from distance-from-covered-set, not first hit. Drives dim-11 (Frame coherence) findings.         |
+| `skill:improve-codebase-architecture` | Pass 2                        | 12  | ENTRY named in depth/seam/leverage vocabulary; refactor-plan items cite this. Drives dim-12 (Module depth & seam) findings. |
+| `skill:diagnose`                      | Pass 3 (Critical/High only)   | 13  | Reproduce → minimise → hypothesise → instrument → fix loop, recorded in trail. Drives dim-13 (Diagnosability) findings.     |
+| `skill:prompt-engineering-patterns`   | Pass 5 (markdown + JSON emit) | 14  | Report + JSON stay specific, terse, structured — both are downstream prompts. Drives dim-14 (API legibility) findings.      |
 
 Skill paths (verbatim, for the Read tool):
 
