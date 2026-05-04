@@ -113,8 +113,8 @@
       ],
       "verification_note": "Phase B: traced through swapStatusPopup → showCustomToast → onHide → clear. Counter-argument: maybe View is intended to be a 'dismiss the swap from the user's mental model' action. Rejected — the orchestration loop continues in the background per the deliberate comment at MintRebalancePlanScreen.tsx:146–152, and AccountPagerViewLayout's gate is the user-visible compensation for that. Clearing the store while the loop runs is a contract violation.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Removed the redundant useSwapStatusStore.clear() calls in SwapStatusToast (auto-dismiss timer + onPressView) -- swapStatusPopup's onHide already clears the store after the heroui dismiss animation, so the toast no longer double-clears. The remaining concern -- onHide clearing the store while state === 'running' (e.g. swipe-to-dismiss mid-swap) -- belongs to swapStatusPopup itself and stays open. See 36.F-004."
+      "completion_status": "complete",
+      "completion_note": "Resolved by gating swapStatusPopup's onHide on state !== 'running' AND adding useSwapStatusListener to re-pop on running→terminal transitions when the toast was dismissed mid-flight. AccountPagerViewLayout's payment-button gate now stays load-bearing across user swipes; the runner's complete()/fail()/cancel() always reach the user."
     },
     {
       "id": "F-003",
@@ -157,8 +157,8 @@
       ],
       "verification_note": "Phase B: traced popup engine bridge.ts:120-152 (showCustomToast.onHide is invoked by the toast manager regardless of dismissal cause). Counter-argument: maybe the design intentionally treats user-dismissal as 'I don't care about this swap anymore'. Weakens but doesn't kill the finding — failures still need a surface, and the gate-violation in F-002 makes the 'don't care' interpretation unsafe.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "swapStatusPopup-level wiring: onHide should guard against clearing while state === 'running' instead of the toast belt-and-suspenders calling clear() itself (which this slice removed). Belongs with the swap-status-popup lifecycle pass."
+      "completion_status": "complete",
+      "completion_note": "Resolved alongside F-002 by the same lifecycle fix: swapStatusPopup's onHide skips clear() while state === 'running', and useSwapStatusListener re-pops swapStatusPopup() on running→done|failed|cancelled when no toast is mounted, so users always see a terminal-state notification even after dismissing the in-flight toast."
     },
     {
       "id": "F-005",
