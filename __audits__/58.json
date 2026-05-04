@@ -114,7 +114,9 @@
         "features/feed/components/nostr/image-overlay/provider.tsx:720"
       ],
       "verification_note": "Counter-argument: `runOnJS` still works in Reanimated v4 and is not yet deprecation-warned. Verified — call sites function correctly; this is a convention/maintainability finding, not a runtime bug. Severity Medium because the slice has 24 occurrences and the sibling already uses the correct API, so the cost of misalignment is concentrated.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "AnimatedImageOverlay.tsx now uses scheduleOnRN from react-native-worklets across all 19 worklet→JS call sites; matches the convention provider.tsx already uses. Single canonical worklet→JS API across the package."
     },
     {
       "id": "F-004",
@@ -158,7 +160,9 @@
         "features/feed/components/nostr/image-overlay/types.ts:10"
       ],
       "verification_note": "Verified by grepping `from '.*image-overlay/provider'` — only AnimatedImageOverlay.tsx:37 imports from `./provider`, and it imports values, not types. Counter-argument: an external consumer outside this slice could import types from `./provider` — checked with `grep -rn 'from .*image-overlay/provider'` across sovran-app, no hits outside the subtree. Safe to delete.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "provider.tsx no longer re-exports the types it imports from ./types — duplicate export block deleted. ./types is now the single source; barrel index.ts already re-exports from ./types. External consumers (HomeFeed, UserFeed, shared.tsx) already imported via the barrel; internal sibling modules already imported from ./types."
     },
     {
       "id": "F-006",
@@ -230,7 +234,9 @@
         "features/feed/components/nostr/image-overlay/provider.tsx:232"
       ],
       "verification_note": "Verified at provider.tsx:167-176 and provider.tsx:232. Counter-argument: works at runtime, no test breaks. Confirmed — but the role of dim-13 is to flag friction that prevents future debugging, not just runtime correctness. Severity Nit because it never produces a wrong outcome, only a hostile reading experience.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "thumbnailLayoutsRef and the four sibling refs (openSessionInitialLayoutRef, openSessionInitialIndexRef, openSessionLayoutsByIndexRef, clearUrlTimeoutRef, openPanelAnimationTimeoutRef) moved above registerThumbnailLayout so the closure no longer references a binding declared 65 lines later. No behaviour change (useRef hoisting made it work either way)."
     },
     {
       "id": "F-009",
