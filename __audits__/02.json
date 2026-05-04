@@ -160,8 +160,8 @@
       ],
       "verification_note": "Verified all three helpers launch uncancellable promises. apiClient.ts has no signal parameter (prior audit).",
       "prior_audit_id": "F-004@01.json",
-      "completion_status": "deferred",
-      "completion_note": "Fire-and-forget enrichment fetches without AbortSignal — separate slice once useMintEnrichment is extracted."
+      "completion_status": "stale",
+      "completion_note": "Re-verified 2026-05-04 — fetchMintProfiles / fetchMintAuditData / fetchMintReviewData no longer exist in CocoPaymentUX.tsx (grep is empty across the repo). The provider now delegates per-mint enrichment to getMintEnrichment (cache reads only — no fetch) and bulk catalog data to getMintCatalog. Any remaining cancellable-fetch work for this surface lives in the on-demand audit/KYM/profile hooks (useAuditedMint / useAuditedMints / MintReviewsScreen), all of which already pass an AbortSignal through apiClient — see auditMint / reviewMint call sites in features/mint/hooks/useAuditedMint.ts and useAuditedMints.ts."
     },
     {
       "id": "F-008",

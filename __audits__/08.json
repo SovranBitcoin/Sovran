@@ -1,0 +1,520 @@
+{
+  "audit": {
+    "date": "2026-04-18",
+    "commit": "f797ae15",
+    "entry_point": "sovran-app/coco-payment-ux",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json"
+    ]
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "executeMelt does not wrap mgr.ops.melt.execute in try/catch — reserved proofs leak on execute failure",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/operations/defaultOperations.ts",
+      "line": 564,
+      "symbol": "executeMelt",
+      "dimension": 1,
+      "description": "executeMelt calls `mgr.ops.melt.prepare(...)` at :564-568, which reserves proofs on the mint side, then `mgr.ops.melt.execute(operation.id)` at :570. If execute throws (mint unreachable mid-flight, network drop after prepare returned, mint returns a 5xx on /v1/melt/bolt11), there is no catch → no call to `mgr.ops.melt.cancel(operationId, ...)`. Contrast with executePaymentRequest (:665-699) which wraps execute in try/attemptRollback. The proofs stay reserved until the next manager restart / reconciliation, during which the user cannot send those sats.",
+      "why_it_matters": "User taps Pay on a Lightning invoice, the mint times out between prepare and execute response, proofs are locked at the mint side, wallet surfaces a generic MELT_FAILED. User retries — but the proofs are reserved so the retry quote fails too. The melt appears stuck until the coco manager next runs reconciliation. If the mint never reports back (mint down for days), the user has a permanent hold on those sats. Not direct funds loss, but a user-visible freeze of real balance that no UX path currently unblocks.",
+      "fix": "Wrap `mgr.ops.melt.execute(operation.id)` in try/catch. On throw, call `mgr.ops.melt.cancel(operation.id, 'execute-failed').catch(...)` and re-throw so the machine's error path fires. Record a telemetry event (scoped logger, see 07.json F-002) so post-mortem can distinguish prepare failures from execute failures. Verify coco-core's `melt.cancel` is a no-op on already-settled quotes so the rollback is idempotent.",
+      "references": [
+        "coco-payment-ux/src/operations/defaultOperations.ts:548-585",
+        "coco-payment-ux/src/operations/defaultOperations.ts:59-92 (attemptRollback)",
+        "nuts/05.md"
+      ],
+      "verification_note": "Re-read defaultOperations.ts:548-585. Confirmed no try/catch wraps the execute call. Counter-argument considered: coco-core may internally rollback on execute throw — checked coco/packages/coco-core/src/ops/melt/MeltOperationsApi.ts; execute() rethrows without cancelling the prepared operation. Confirmed the gap.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "executeMelt now wraps execute() in try/catch and calls mgr.ops.melt.cancel on failure — reserved proofs no longer leak."
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.85,
+      "title": "derivedAmountConfig useMemo with [] deps freezes destination, unit, and display-currency at first render — amountEntry screen becomes stale when flow changes",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/coco-payment-ux/src/react/useScreenActions.ts",
+      "line": 336,
+      "symbol": "useScreenActions.derivedAmountConfig",
+      "dimension": 3,
+      "description": "`derivedAmountConfig = useMemo(...,[])` at :336-354 runs exactly once per hook mount. Inside the memo the closure captures `isEcashSend = flowCtx.destination === 'sendEcash'`, `flowCtx.unit`, and `dc = getDisplayCurrencyRef.current?.()` — all snapshot values. Two of those values are then baked into the returned config as static fields (`offlineOptimization: isEcashSend`, `unit: flowCtx.unit`, `fiatCurrency: dc?.code`, `fiatSymbol: dc?.symbol`). If the user changes display currency mid-flow (BTC price store updates dc from USD to EUR), opens the keypad a second time from a different destination (e.g. meltLightningAddress vs sendEcash), or switches units — the amountConfig still reports the first-render values. The getter functions inside (getMintUrl, getProofAmounts, getBtcPrice) read fresh from refs so those stay current, but the five baked-in fields do not. `createAmountActionManager` then bakes them further: `hasFiatToggle = !!fiatCurrency && !!fiatSymbol` is decided once at construction (amount-actions/createManager.ts:73), and the manager is stored in `managerRef.current` at useScreenActionsWithConfig:157-170 — the manager is NEVER recreated.",
+      "why_it_matters": "Two concrete user-visible bugs: (a) a user who changes display currency in settings and returns to the amount keypad still sees the previous currency symbol and fiat-toggle availability; (b) a user coming from the split-bill send-ecash path then starting a lightning-address melt will have `offlineOptimization: true` even though lightning sends don't use offline optimization, resulting in quick-send suggestions filtered by the proof-composability guard that does not apply to melts. Because the manager ref persists for the hook's lifetime, the only way to recover is to unmount the screen. This is a silent correctness bug on a primary wallet surface.",
+      "fix": "Either (a) drop the useMemo entirely and recompute the config on every inspect() — the Sovran app hits amountEntry once per flow so re-creating an AmountActionManager per mount is cheap; (b) spread the derived config as computed getters — replace `unit: flowCtx.unit` with `unit: () => machine.getContext().unit`, and teach createAmountActionManager to accept function-valued fields; (c) add the mutable fields to the deps array explicitly (`machine.getContext().destination`, `machine.getContext().unit`, `getDisplayCurrencyRef.current?.()?.code`) so the memo rebuilds when they change, and invalidate managerRef in a follow-up effect. Option (a) is smallest and ships today.",
+      "references": [
+        "coco-payment-ux/src/react/useScreenActions.ts:336-354",
+        "coco-payment-ux/src/react/useScreenActions.ts:155-172 (manager ref stored once)",
+        "coco-payment-ux/src/amount-actions/createManager.ts:59-73 (hasFiatToggle decided at construction)",
+        "sovran-app/features/send/screens/AmountFlowScreen.tsx:33 (uses derived path — no amountConfig arg)"
+      ],
+      "verification_note": "Re-read useScreenActions.ts:336-354; confirmed `[]` deps. Confirmed `flowCtx.destination`, `flowCtx.unit`, and `dc` are read inside the memo and baked as static properties. Confirmed AmountFlowScreen.tsx:33 calls `useScreenActions('amountEntry', ...)` with no third-arg amountConfig, so the derived path is live. Counter-argument considered: the eslint disable comment on :354 suggests the author knew about the deps — but the silent-staleness failure mode is still present and there's no runtime warning when fields go stale.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Slice d7d97184 widens CreateAmountActionManagerConfig's reactive fields (offlineOptimization, unit, fiatCurrency, fiatSymbol) to value-or-getter unions and resolves them through asGetter() inside createAmountActionManager. compute() / setMode / toggle re-read every getter on each call so the manager — still held in managerRef across the screen's lifetime — tracks destination, unit, and display-currency changes without rebuilding (no input-state reset). useScreenActions's derivedAmountConfig drops the flowCtx + dc closure-baking and passes machine-context + display-currency getters; the useMemo dep is now [isAmountEntry, options?.amountConfig], with the eslint-disable scoped to the stable refs the getters close over. AmountResolution gains fiatCurrency + btcPrice and resolutionEqual now compares them, paired with the F-014 mergeAmountResolution write so availability sees the same value the manager exposes."
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "CocoPaymentUXProvider writes ~15 refs, mutates locale registry, and creates the payment machine during render — not just during the two lines prior audit flagged",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx",
+      "line": 273,
+      "symbol": "CocoPaymentUXProvider",
+      "dimension": 3,
+      "description": "07.json F-011 flagged usePaymentFlowMachine:458-459 (two ref writes). The bigger surface is the provider itself. During every render, lines 273-300 execute 15 imperative ref writes: getLocaleRef, notificationsRef, operationsRef, navigationRef, writeClipboardRef, shareContentRef, getOfflineRef, getBtcPriceRef, getDisplayCurrencyRef, walletContextRef indirectly via propsRef. Lines 288-292 loop over `translations` and call `registerLocale(lang, dict)` — a module-level side effect on the shared `locales` map in formatting/locales.ts:131-133, executed on every render of every consumer. Lines 308-329 write `propsRef.current = { ... }` on every render. Lines 331-370 create a full PaymentMachine (with subscriptions, refs, and a Proxy) synchronously during render — guarded by `!machineRef.current` so it only runs once, but the Proxy construction and `handlersRef.current = factory(...)` at :367-369 still runs inside the render body. StrictMode double-invoke on first render creates a machine, logs its first transition, and then throws away the ‘first' render — but the locale registrations at :288 happen twice and may duplicate translations in the registry map.",
+      "why_it_matters": "Render-time side effects are React-unsound: any component that reads walletContextRef.current synchronously mid-commit sees whatever the most recent render wrote, not what the current consumer passed. Concrete failure: two screens mounting in the same commit (e.g. Suspense resolve with a new flow) race to set walletContextRef — the second screen's send() reads the first screen's wallet context. The translations loop executed every render is also a wasteful allocation — `Object.entries(translations)` on every render of the provider, no memoization. With expo-router's concurrent transitions in SDK 55, this class of bug moves from latent to reproducible. Fix is trivial — wrap in useLayoutEffect with the correct deps.",
+      "fix": "Move every `xxxRef.current = xxx` to a single `useLayoutEffect(() => { ... }, [xxx])` per ref (or one effect with the right deps array). Move the `registerLocale` loop into `useEffect(() => { for (const [lang, dict] of Object.entries(translations ?? {})) registerLocale(lang, dict); }, [translations])`. Hoist `propsRef.current` assignment similarly. The machine-creation block at :331-370 should stay on first render (it needs to be available to first-render consumers) but the `handlersRef.current = factory(...)` call should move into a useLayoutEffect so the factory is re-invoked when handlersFactory prop identity changes. Pair this with the existing F-011@07.json fix for usePaymentFlowMachine.",
+      "references": [
+        "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:273-300",
+        "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:288-292",
+        "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:308-329",
+        "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:331-370",
+        "coco-payment-ux/src/formatting/locales.ts:131-133",
+        "sovran-app/__audits__/07.json (F-011)"
+      ],
+      "verification_note": "Re-read CocoPaymentUXProvider.tsx:261-370. Confirmed 15 ref writes + registerLocale loop + propsRef assignment + machine-creation block all inside function body before any useEffect. Counter-argument considered: ref writes are cheap; useEffect is overkill — but the correctness issue (read-during-same-commit from another consumer) is real in concurrent React and the perf hit is not measurable either way.",
+      "prior_audit_id": "F-011@07.json",
+      "completion_status": "partial",
+      "completion_note": "Ref writes resolved in commit c2932a64 — every `xxxRef.current = xxx` in CocoPaymentUXProvider is now `useLatestRef(xxx)`, which mirrors through `useInsertionEffect` (after commit, before any user-space useLayoutEffect/useEffect) and matches the canonical fix prescribed here. The `registerLocale` loop at :288-292 and the `propsRef.current = { ... }` write at :308-329 still run during render — those are out of scope for the ref-mirror slice and remain deferred."
+    },
+    {
+      "id": "F-004",
+      "severity": "High",
+      "confidence": 0.85,
+      "title": "Nostr payment request rollback race — mint.execute commits proofs before sendNostrDM runs, crash in between leaves tokens spent but undelivered",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/operations/defaultOperations.ts",
+      "line": 665,
+      "symbol": "executePaymentRequest (nostr transport)",
+      "dimension": 2,
+      "description": "Lines 665-695: `prepared = await mgr.ops.send.prepare(...)`, then `{ operation, token } = await mgr.ops.send.execute(prepared.id)` which spends proofs at the mint, then `await sendNostrDM(nprofile, JSON.stringify(payload))`. If the app crashes or is force-killed between `execute` resolving and `sendNostrDM` starting (or while the DM publish is in flight), proofs are spent at the mint but the recipient has nothing. On next launch, `attemptRollback(mgr, operationId)` (:679-694) could reclaim IF the operation is still in a reclaimable state — but `attemptRollback` is only invoked from the post-dm catch block in the current session. A process kill after execute but before the catch fires never runs rollback.",
+      "why_it_matters": "User sends 10k sats via Nostr payment request. OS kills the app (memory pressure, phone call, user swipes away). The coco manager on next launch sees a send operation in 'pending' state and — per coco-core's queue — may or may not attempt reclaim depending on whether that path is instrumented. Without an explicit at-rest persistence of 'token not delivered yet' marker, the user sees a 'send successful' history entry with no way to know the DM never went out. Ecash is bearer: if the token was ever captured (e.g. a logging hook on the payload), a third party could still redeem; if not, the funds are simply frozen until coco's reconciliation eventually notices.",
+      "fix": "Either (a) flip the order: publish an encrypted placeholder DM first (just the paymentRequest id and a `token-pending` marker), only then execute the mint send, then publish the real token in a second DM — the recipient polls. (b) Persist a 'token-pending-delivery' record to SQLite immediately after execute resolves and before sendNostrDM starts; on app launch, scan pending records and either retry delivery or trigger rollback. (c) Use a single atomic operation boundary: coco's send.execute could take a `deliverFn` callback that the op only marks as complete after the fn resolves — requires an upstream change to coco-core and a patch-package patch under sovran-app/patches/. Shortest path is (b).",
+      "references": [
+        "coco-payment-ux/src/operations/defaultOperations.ts:648-706",
+        "coco-payment-ux/src/operations/defaultOperations.ts:59-92 (attemptRollback — only reachable from the in-session catch)",
+        "nuts/03.md (swap is an irreversible state change at the mint)"
+      ],
+      "verification_note": "Re-read defaultOperations.ts:648-706. Confirmed execute runs before sendNostrDM with no intermediate persistence. Counter-argument considered: coco-core's own ReclaimService may automatically recover pending operations on next launch — verified by reading coco/packages/coco-core/src/ops/send; reclaim is triggered on explicit `mgr.ops.send.reclaim(id)` calls, not automatically on boot. The gap is real.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "createMachine.ts releases sendLocked before dispatchHandler completes — concurrent tap can race the handler",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/machine/createMachine.ts",
+      "line": 380,
+      "symbol": "CONFIRM_MELT|CONFIRM_PAYMENT_REQUEST",
+      "dimension": 1,
+      "description": "The CONFIRM_MELT branch at :318-391 sets `sendLocked = false` at :380, then `if (step !== originalStep) await dispatchHandler(step, stepData)` at :383-389. CONFIRM_PAYMENT_REQUEST at :393-477 does the same at :466 and :469-475. If dispatchHandler (usually a navigation) awaits a long animation or a screen-mount promise, and during that await the user somehow re-fires CONFIRM_MELT (from a nested sheet that didn't unmount, or a keyboard-shortcut / NFC re-tap), the lock is already released. A second CONFIRM_MELT sees `step !== 'navigateToMeltPreview'` (the branch condition :318) because step changed to chooseFallbackOption or stayed on the terminal — so the second event falls through to the main transition path, where sendLocked is re-acquired. Net effect depends on what the main transition path does with a second CONFIRM_MELT in that state. The main path likely no-ops, but the asymmetric lock handling (release-then-dispatch vs release-in-finally) is an inconsistency waiting to bite on any future refactor.",
+      "why_it_matters": "Today the asymmetry is probably benign — the user has likely navigated away by the time dispatchHandler resolves. But for the Nostr transport, where delivery is slow and the 'Sending…' notification blocks the UI, a second tap of a sheet button is plausible. The main-path branch below uses try/finally (lines 936-944) which is the correct pattern. Applying it consistently is defensive with zero downside.",
+      "fix": "Move `sendLocked = false` into a `finally` block that wraps the dispatchHandler call: `try { if (step !== originalStep) await dispatchHandler(step, stepData); } finally { sendLocked = false; notify(); }`. Apply to both CONFIRM_MELT and CONFIRM_PAYMENT_REQUEST branches. Same applies to the NFC auto-resolve path at :572-698 which never explicitly releases sendLocked — it relies on the outer main-path finally at :942, which is correct but non-obvious.",
+      "references": [
+        "coco-payment-ux/src/machine/createMachine.ts:275-281 (sendLocked acquisition)",
+        "coco-payment-ux/src/machine/createMachine.ts:378-390 (CONFIRM_MELT release-then-dispatch)",
+        "coco-payment-ux/src/machine/createMachine.ts:464-476 (CONFIRM_PAYMENT_REQUEST release-then-dispatch)",
+        "coco-payment-ux/src/machine/createMachine.ts:936-944 (main path try/finally — correct shape)"
+      ],
+      "verification_note": "Re-read createMachine.ts:275-477. Confirmed sendLocked released at :380 and :466 before the guarded dispatchHandler. Counter-argument considered: the dispatchHandler is always a navigation, so the second event has nowhere to go — but the reason sendLocked exists at all is to prevent that assumption. Move the release into finally.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Considered for inclusion in slice d5dcbfaa but kept out of scope: sendLocked release-vs-dispatch ordering is a behaviour change, separate from the snapshot-discipline rewrites. Release-then-dispatch asymmetry still present at createMachine.ts CONFIRM_MELT/CONFIRM_PAYMENT_REQUEST branches."
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "createMachine.ts mutates stepData in place at buildMintListItems and buildMintReviewInfo completion — breaks useSyncExternalStore snapshot immutability",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/machine/createMachine.ts",
+      "line": 862,
+      "symbol": "selectMint|reviewMint|openMint",
+      "dimension": 3,
+      "description": "Lines 862, 889, 913-915: `(stepData as any).mintListItems = items;` / `(stepData as any).mintInfo = info;` / on trustMint error `stepData = { code:..., message:... } as any` — two of these paths do in-place mutation of the SAME object reference that was already passed to `notify()` in the preceding block (:858-859 for selectMint, :885-886 for reviewMint). deriveExecutionState wraps stepData in `details: data as Record<string, unknown>` (:48, :59, :81, :92) without cloning. `cachedSnapshot.details` therefore points at stepData. A consumer that read `state.details` after the first notify and holds onto it sees the mutation bleed through when the enrichment arrives — without any second notify. A consumer that reads after the second notify sees the full payload. Inconsistent snapshot semantics across subscribers.",
+      "why_it_matters": "useSyncExternalStore expects `getSnapshot()` to return identical references between notifications and different references across them. Mutation violates both halves: (a) a React component that memoizes `details.mintListItems` by `[details]` never recomputes because details is the same ref, so the enriched list never renders; (b) a logger or analytics consumer that captured the pre-enrichment snapshot reports mutated data. The main notify at :934 does rebuild cachedSnapshot via deriveExecutionState, so the outer wrapper ref changes — but since `details` is passed by reference, any nested useMemo keyed on details still sees the stale identity. This is an intermittent re-render bug that manifests when list data arrives after initial screen paint.",
+      "fix": "Replace in-place mutation with `stepData = { ...(stepData as any), mintListItems: items }` and `stepData = { ...(stepData as any), mintInfo: info }`. This creates a fresh object reference so downstream `useMemo(..., [details])` sees a change. Pair with a small helper `setStepData<S>(s, d)` (also recommended by 07.json F-015 for the as-any problem).",
+      "references": [
+        "coco-payment-ux/src/machine/createMachine.ts:856-873 (selectMint → mintListItems)",
+        "coco-payment-ux/src/machine/createMachine.ts:877-900 (reviewMint/openMint → mintInfo)",
+        "coco-payment-ux/src/machine/createMachine.ts:195-202 (notify rebuilds outer wrapper but shares details ref)"
+      ],
+      "verification_note": "Re-read createMachine.ts:856-900. Confirmed `(stepData as any).X = Y` in-place assignment before the trailing notify(). Confirmed deriveExecutionState uses `details: data as Record<string, unknown>` with no copy. Counter-argument considered: consumers typically read `details.mintListItems` on the current snapshot without memoization — then the mutation is invisible. True for simple render paths, but any `useMemo(() => mapItems(details.mintListItems), [details])` will skip the update.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Slice d5dcbfaa replaces both `(stepData as any).mintListItems = items` (createMachine.ts:897) and `(stepData as any).mintInfo = info` (createMachine.ts:923) with `setStep('selectMint', { ...data, mintListItems: items })` and `setStep(reviewStep, { ...reviewData, mintInfo: info })` respectively. `notify()` now sees a fresh stepData ref so the cached snapshot's `details` field carries a new identity, letting downstream `useMemo(..., [details])` and useSyncExternalStore consumers actually re-render on enrichment."
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "amountEntry.next availability is gated on numericValue > 0 — fiat-mode user enters $0.000001, button enables, tap silently no-ops",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/screen-actions/availability.ts",
+      "line": 99,
+      "symbol": "amountEntryAvailability.next",
+      "dimension": 1,
+      "description": "availability.ts:99: `next: { available: numericValue > 0 }`. `numericValue` is set by resolve.ts from parseFloat(rawInput) — in fiat mode this is the dollar amount (e.g. 0.000001), not the effective sats. The corresponding default handler (defaultHandlers.ts:446-458) reads `effectiveSatAmount` and early-returns at :453 `if (typeof effectiveSat !== 'number' || effectiveSat <= 0) return;`. Gap: a user in fiat mode types $0.00001 USD → numericValue = 1e-5 > 0 → next button shows enabled → user taps → handler silently returns with no feedback. User sees an enabled button that does nothing.",
+      "why_it_matters": "Every unresponsive button is a bug report. At current BTC prices any fiat amount < ~$0.005 rounds to 0 sats. Combined with no onAmountEntryFailed notification (the default handler is a silent `void machine.enterAmount(...)`), the user has no path to learn why tapping Next does nothing. Particularly bad for non-English locales where comma is the decimal separator — a stray digit can land the user under the rounding threshold.",
+      "fix": "Change availability to `next: { available: effectiveSatAmount > 0 }` (effectiveSatAmount is already on the merged entry per screen-actions/createManager.ts:65-85). Alternatively keep the numeric gate but emit `notify('onAmountRoundsToZero')` from the default handler when effectiveSatAmount <= 0 and numericValue > 0, giving the wallet a hook to toast.",
+      "references": [
+        "coco-payment-ux/src/screen-actions/availability.ts:86-103",
+        "coco-payment-ux/src/screen-actions/defaultHandlers.ts:446-458",
+        "coco-payment-ux/src/screen-actions/createManager.ts:65-85 (mergeAmountResolution writes effectiveSatAmount)"
+      ],
+      "verification_note": "Re-read availability.ts:86-103 and defaultHandlers.ts:446-458. Confirmed numericValue > 0 gate and the effectiveSat > 0 early-return. Counter-argument considered: the UX may intentionally allow the tap to trigger a validation warning inside enterAmount — the default handler has no such path. File path confirms the silent-no-op.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "amountEntry next gates on effectiveSatAmount >= 1, matching the handler's existing check."
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "FormattedTimestamp instantiates Intl.DateTimeFormat / Intl.RelativeTimeFormat on every getter call — list renders allocate one formatter per entry per getter",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/formatting/FormattedTimestamp.ts",
+      "line": 55,
+      "symbol": "FormattedTimestamp.short|full|datetime|relative",
+      "dimension": 7,
+      "description": "Lines 41, 55, 64, 75 each `new Intl.DateTimeFormat(...)` / `new Intl.RelativeTimeFormat(...)` per call. A transaction history list rendering 50 entries where each entry reads `.short` and `.relative` allocates 100 formatters per render pass. On iOS Hermes `Intl.DateTimeFormat` construction is non-trivial (~0.5-2ms each on mid-range devices) because it loads ICU locale data on first use. Each FormattedTimestamp is also a Number subclass instance (line 17) — consumers who grab .valueOf() also pay the boxing cost.",
+      "why_it_matters": "The session log shows 46 perf.js_thread_blocked events with blocked_ms up to 804ms in a 62.8s session — attribution is not directly traceable to this package (F-002@07.json: no scoped logger means no timeline match), but Intl.* is a well-known Hermes bottleneck. For a wallet whose primary surface is a history list, this is the single most allocation-heavy helper. Low-impact to fix and high-impact on scroll performance.",
+      "fix": "Move each formatter to a module-scope WeakMap keyed on locale: `const shortCache = new Map<string, Intl.DateTimeFormat>();` and `cached(locale, () => new Intl.DateTimeFormat(locale, { ...opts }))`. Four separate caches (short/full/datetime/relative). Each locale still pays the one-time construction cost, but subsequent calls are O(1). In the 50-entry en-only case this drops 100 allocations per render to 0.",
+      "references": [
+        "coco-payment-ux/src/formatting/FormattedTimestamp.ts:40-84",
+        "log-doctor errors --latest (46 perf.js_thread_blocked events, up to 804ms blocked)"
+      ],
+      "verification_note": "Re-read FormattedTimestamp.ts:40-84. Confirmed no caching. Log-doctor evidence: 46 perf.js_thread_blocked entries present in current session; attribution to this formatter UNVERIFIED without scoped logs in coco-payment-ux. Counter-argument considered: Hermes may intern DateTimeFormat construction — checked react-native's upstream Hermes notes; no such optimization.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Per-getter Intl formatter allocation — distinct perf slice."
+    },
+    {
+      "id": "F-009",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "rollbackSend swallows all non-'not found' errors — caller sees success when reclaim failed, wallet state drifts from mint state",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/operations/defaultOperations.ts",
+      "line": 459,
+      "symbol": "rollbackSend",
+      "dimension": 1,
+      "description": "rollbackSend (verified at :459-484 via the operation's structure) wraps reclaim in try/catch and returns (no throw) when the catch fires. The caller in defaultHandlers.ts (`sendToken.cancel` handler) treats a no-throw as success and emits `notify('onSendCancelled', ...)`. If reclaim failed because the mint is unreachable, the mint still holds the spent proofs in 'pending' state — from the mint's perspective the token is live and can be redeemed by the recipient. The wallet has told the user the send was cancelled.",
+      "why_it_matters": "User decides to cancel a pending send. Mint is unreachable. rollbackSend fails silently. UI says 'cancelled'. User believes funds returned to balance; in reality the token is still pending at the mint and could still be redeemed. On next mint reconciliation the wallet corrects its balance down but the user has spent the same amount in a later transaction — now overdraft-like double-accounting. Funds aren't lost per se (mint reconciliation eventually catches up) but the UX lies to the user in a way that can induce duplicate sends.",
+      "fix": "Return `{ success: boolean, reason?: string }` instead of void-with-thrown. Caller inspects success and routes failure through `onSendCancelRejected` notification. Alternative: re-throw for any error except 'operation not found' / 'already settled' (idempotent cases), and let the machine's routeOperationFailure handle it.",
+      "references": [
+        "coco-payment-ux/src/operations/defaultOperations.ts:459-484 (rollbackSend)",
+        "coco-payment-ux/src/screen-actions/defaultHandlers.ts (sendToken.cancel)"
+      ],
+      "verification_note": "Re-read defaultOperations.ts:459-484. Confirmed catch→console.warn→return pattern. Counter-argument considered: reclaim is inherently best-effort — correct for transient failures but the caller has no signal of persistent failure either.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "rollbackSend now re-throws on real reclaim failures so sendToken.cancel emits onSendCancelFailed instead of falsely reporting cancelled."
+    },
+    {
+      "id": "F-010",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "walletContextTracker: sequential proof fetch across mints, no error handling on bootstrap refresh, no backoff on persistent failures",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/core/walletContextTracker.ts",
+      "line": 38,
+      "symbol": "createWalletContextTracker",
+      "dimension": 7,
+      "description": "Three related issues in one file: (1) lines 61-71 `for (const mint of trustedMints) { const proofs = await proofService.getReadyProofs(...) }` is serial — 10 mints × 50ms local-DB latency = 500ms on every refresh; event storm multiplies this. (2) line 104 `void refresh()` at construction has no `.catch(...)` — if the initial Promise.all at :46-49 rejects (manager not ready, DB locked during rehydrate), the whole tracker stays at `trustedMintUrls = []` and the wallet UI reports 'no mints' indistinguishably from empty wallet. (3) lines 78-84 the `finally` unconditionally kicks `pendingRefresh` back into the loop — if every refresh throws for a persistent reason (DB gone, manager disposed), this is an infinite retry loop with no backoff. The `try { ... } finally { ... }` at :45-84 does not catch outer rejections — only mint-level inner errors are caught at :62-70.",
+      "why_it_matters": "(1) is a UX-visible cold-start delay for multi-mint wallets. (2) is an invisible bricked state — the wallet looks empty until the next manager event, and if that event is also failing, it stays bricked. (3) burns CPU and logs at full rate if a teardown / dispose isn't observed before manager events fire. The tracker is the single source of truth for balances and proof composition, so its correctness is load-bearing for every downstream screen.",
+      "fix": "(1) `const amounts = Object.fromEntries(await Promise.all(trustedMints.map(async m => [m.mintUrl, ...]))` parallelises proof fetch. (2) `void refresh().catch(err => { console.error('[walletContextTracker] init refresh failed', err); /* retry-once with backoff or surface via onInitError callback */ })` at :104. (3) wrap the whole try body in an additional try/catch; on catch, clear pendingRefresh and log — prefer a single error than an infinite loop. Add a max-retries counter that disables the tracker after N consecutive failures so a poisoned state doesn't spin forever.",
+      "references": [
+        "coco-payment-ux/src/core/walletContextTracker.ts:38-85",
+        "coco-payment-ux/src/core/walletContextTracker.ts:104"
+      ],
+      "verification_note": "Re-read walletContextTracker.ts end-to-end. Confirmed sequential loop, no init error path, unconditional retry. Counter-argument considered: coco's event bus may only emit events when underlying data is ready — correct for normal startup but does not cover DB reset / manager disposal / migration cases.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Sequential getReadyProofs / repeated history JSON.parse — distinct perf slice."
+    },
+    {
+      "id": "F-011",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "createScreenActionManager.execute mutates the ctx object returned from getContext() — not re-entrant, not cache-safe",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/screen-actions/createManager.ts",
+      "line": 168,
+      "symbol": "execute",
+      "dimension": 1,
+      "description": "Lines 168-177: `const ctx = getContext(); if (effectiveEntry) ctx.entry = effectiveEntry; if (params) Object.assign(ctx, params); await effectiveHandler(ctx);`. `getContext` is injected at construction (useScreenActions.ts:264-280 builds a new object per call — so currently safe) but nothing in the type or contract prevents it from returning a memoized or cached ScreenActionContext. The moment a future caller caches — because it's the obvious optimization when notifications/writeClipboard/shareContent are all frozen refs — the mutation contaminates subsequent executes with the previous entry and params.",
+      "why_it_matters": "Two concrete failure modes: (a) two concurrent `execute` calls (e.g. user taps two different action buttons quickly, or a queued auto-retry) see Object.assign races — params from the first call bleed into the second. (b) If a consumer memoizes the ctx (valid optimization), the 'entry' field assignment permanently replaces the intended context's entry. The fix is trivial and the guard is one spread operator.",
+      "fix": "Replace the block with `const base = getContext(); const ctx = { ...base, ...(effectiveEntry ? { entry: effectiveEntry } : {}), ...(params ?? {}) };`. No mutation; each execute gets a fresh ctx. Document that `getContext` is expected to be cheap (it's called per execute).",
+      "references": [
+        "coco-payment-ux/src/screen-actions/createManager.ts:168-177",
+        "coco-payment-ux/src/react/useScreenActions.ts:264-280 (caller builds fresh ctx today)"
+      ],
+      "verification_note": "Re-read createManager.ts:168-177. Confirmed in-place mutation. Counter-argument considered: the current caller always returns a fresh object — correct for now, but the API contract doesn't require that and the next optimisation pass will break it.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Slice d5dcbfaa rewrites screen-actions/createManager.ts execute() to build ctx via immutable spread: `const ctx = { ...base, ...(effectiveEntry ? { entry: effectiveEntry } : {}), ...(params ?? {}) }`. The Object.assign + `ctx.entry =` mutations are gone, so a future caller memoising `getContext()` no longer contaminates subsequent executes."
+    },
+    {
+      "id": "F-012",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "transitions.ts sets ctx.amount from intent.info.amount without validating integer / finite / in-range — invalid payment request propagates through machine",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/machine/transitions.ts",
+      "line": 46,
+      "symbol": "handleExecute|handleOptionChosen|handleAmountEntered",
+      "dimension": 1,
+      "description": "Every `ctx.amount = X` site in transitions.ts takes its value from parsed user input (payment request, BIP321 amount param, typed keypad input) and assigns without validating `Number.isSafeInteger(n) && n > 0 && n <= 2_100_000_000_000_000n`. Review_dimensions §1 explicitly requires this for wallet code. A malicious or malformed payment request encoding `amount: 0.5`, `amount: 1e20`, `amount: NaN`, or `amount: -1` lands in ctx.amount and then in executeSend({ amount }) / executeMeltQuote(... amount). Downstream mint will reject most, but the pre-mint UX can show 1e20 as 'amount' on the amountEntry review screen, and composeSatoshis applied to a non-integer silently misbehaves (internal math assumes integer inputs).",
+      "why_it_matters": "Cashu amounts are unsigned 64-bit integers per NUT-00. Using JS `number` is already a partial footgun (precision above 2^53), but at minimum every site that stamps ctx.amount should enforce integer / positive / in-range. Without it, a malformed BIP321 URI or a pre-signed payment request with an injected non-integer amount flows through guards, annotation, the UI amount display, and the mint API — surfacing as a late-stage mint error instead of an early-stage validation reject.",
+      "fix": "Extract `function setAmount(ctx, n) { if (!Number.isSafeInteger(n) || n <= 0) throw ..., and wrap every `ctx.amount = X` site. Alternatively, validate at the trust boundaries — parse.ts's intent resolution and the AMOUNT_ENTERED event handler — and guarantee by-contract that any value reaching transitions.ts is already valid. Best paired with 07.json F-003's zod-schemas work: a shared CashuAmountSchema (`z.number().int().positive().max(2_100_000_000_000_000)`) used everywhere.",
+      "references": [
+        "coco-payment-ux/src/machine/transitions.ts (all ctx.amount = X sites)",
+        "coco-payment-ux/src/offline.ts (composeSatoshis assumes integer inputs)",
+        "nuts/00.md (amount is u64)"
+      ],
+      "verification_note": "Read transitions.ts end-to-end (large file). Confirmed no amount validation at any assignment. Counter-argument considered: the mint rejects garbage amounts — true, but the UI displays and machine branches run first on the unvalidated value.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ctx.amount assignments in transitions.ts gated by isValidSatAmount (positive safe-int, ≤21M BTC in sats); malformed payment-request amounts no longer propagate."
+    },
+    {
+      "id": "F-013",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "FormattedString.truncate uses substring — splits UTF-16 surrogate pairs, corrupts emoji and non-BMP characters",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/formatting/FormattedString.ts",
+      "line": 60,
+      "symbol": "truncate",
+      "dimension": 8,
+      "description": "Lines 60, 64, 68, 77, 81: `str.substring(0, n)` and `str.substring(str.length - n)` operate on UTF-16 code units. A Lightning address `🚀@example.com` is 1 emoji (2 code units as surrogate pair) + '@example.com'. `substring(0, 2)` on the local part returns only the high surrogate — rendered as U+FFFD replacement character. Tokens in cashuB / base64url encoding don't contain surrogate pairs, so the common case is safe; Lightning addresses and user-entered display names do contain them. The 'beforeAt' mode is the one most at risk because it's specifically for addresses that users customize.",
+      "why_it_matters": "Cosmetic but visible — a user copies a Lightning address with an emoji in the local part, NPC displays it as 'U+FFFD@domain' instead of '🚀@domain'. Low for pure en-US wallets; higher visibility for international users. WCAG 2.2 text guideline flags 'characters cannot be programmatically determined' when display drops content.",
+      "fix": "Use Array.from(str) or the iterator `[...str]` for code-point segmentation: `[...str].slice(0, n).join('')`. For correct grapheme handling (ZWJ sequences like country flags), Intl.Segmenter is the canonical choice — falls back to code-point iteration on Hermes which doesn't ship Segmenter yet.",
+      "references": [
+        "coco-payment-ux/src/formatting/FormattedString.ts:51-85"
+      ],
+      "verification_note": "Re-read FormattedString.ts:51-85. Confirmed substring-based truncation. Counter-argument considered: most inputs are ASCII-only tokens — correct for token strings, but FormattedString is also used for pubkey / lightning address display where emojis are normalized user content.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "substring-based truncate corrupts surrogates — distinct formatting slice."
+    },
+    {
+      "id": "F-014",
+      "severity": "Medium",
+      "confidence": 0.75,
+      "title": "amountEntryAvailability.hasFiatToggle checks entry fields that mergeAmountResolution does not write — toggle availability is entirely dependent on caller populating entrySeed correctly",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/screen-actions/availability.ts",
+      "line": 90,
+      "symbol": "amountEntryAvailability.hasFiatToggle",
+      "dimension": 1,
+      "description": "availability.ts:90-94 checks `entry.fiatCurrency` (string) and `entry.btcPrice` (number > 0). mergeAmountResolution at screen-actions/createManager.ts:65-85 writes `fiatSymbol` only — not `fiatCurrency`, not `btcPrice`. So `hasFiatToggle` is only true if the `base` entry (from entrySeed) already carried those fields. The README at coco-payment-ux/README.md:197 says the wallet should pass them, but nothing in the type system enforces it — the entrySeed is typed `Record<string, unknown>`. A wallet that forgets either field sees the toggle button permanently unavailable with no error. Conversely, an app that changes display currency in settings and re-renders amountEntry without explicitly writing the new code into entrySeed keeps showing the previous toggle state.",
+      "why_it_matters": "Silent feature disablement. Fiat input is a primary wallet UX — not catching this at contract-level means it can regress in a PR that touches entrySeed construction in features/send/screens/AmountFlowScreen.tsx. Pair with F-002 (the derivedAmountConfig stale closure): the availability check relies on `entry.fiatCurrency` which is NOT in derivedAmountConfig either, so the only way the toggle works today is if the Sovran wrapper explicitly writes these into entrySeed. Verify by grepping features/send for `fiatCurrency:` entries on the amountEntry screen.",
+      "fix": "Either (a) have mergeAmountResolution write `fiatCurrency` and `btcPrice` from the AmountActionManager config so the toggle availability derives from the same source that controls the toggle's effect; (b) accept that the toggle availability is a caller contract, but make it type-safe via `type AmountEntryEntrySeed = { destination: Destination; unit: string; selectedMintUrl?: string; fiatCurrency?: string; btcPrice?: number }` and have useScreenActions narrow the type for amountEntry. Option (a) is self-consistent.",
+      "references": [
+        "coco-payment-ux/src/screen-actions/availability.ts:86-103",
+        "coco-payment-ux/src/screen-actions/createManager.ts:65-85 (mergeAmountResolution)",
+        "coco-payment-ux/README.md:197 (entrySeed contract)"
+      ],
+      "verification_note": "Re-read availability.ts:86-103 and createManager.ts:65-85. Confirmed fiatCurrency + btcPrice are not written by mergeAmountResolution. Counter-argument considered: the Sovran app may write them into entrySeed — true per the README, but the contract is hand-maintained. A concrete verification would be grepping AmountFlowScreen.tsx for `fiatCurrency:` in the entrySeed literal.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Slice d7d97184 takes option (a): AmountResolution gains fiatCurrency + btcPrice (sourced from createAmountActionManager's getFiatCurrency / getBtcPrice), mergeAmountResolution writes both into the merged entry alongside fiatSymbol, and resolutionEqual treats them as identity-bearing. amountEntryAvailability.hasFiatToggle now reads the same fields the manager publishes — wallets no longer have to thread fiatCurrency / btcPrice through entrySeed by hand, and a settings currency change flows through to availability without an entrySeed rebuild. Closes the contract gap; option (b) (entrySeed type narrowing) is unnecessary now that the package is the source of truth."
+    },
+    {
+      "id": "F-015",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "suggestions.ts 'Send all' label omits 'sats' suffix — inconsistent with every other sat-mode label",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/amount-actions/suggestions.ts",
+      "line": 165,
+      "symbol": "computeQuickSendSuggestions",
+      "dimension": 8,
+      "description": "suggestions.ts:149 emits `label: \\`${satFormatter.format(satTarget)} sats\\`` — 'X sats'. Line 165 emits `label: \\`Send all ${satFormatter.format(totalBalance)}\\`` — 'Send all 12,345' with no unit. User scanning the row list sees '$5 · 2,100 sats · Send all 12,345' and has to infer the unit from context.",
+      "why_it_matters": "Cosmetic but user-facing. Inconsistency cost is small but zero-excuse.",
+      "fix": "`label: \\`Send all ${satFormatter.format(totalBalance)} sats\\``.",
+      "references": [
+        "coco-payment-ux/src/amount-actions/suggestions.ts:149,165"
+      ],
+      "verification_note": "Re-read suggestions.ts:140-171. Confirmed label delta.",
+      "prior_audit_id": null,
+      "completion_status": "complete"
+    },
+    {
+      "id": "F-016",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "confirmPaymentRequest returns stale lastPaymentRequestResult when a concurrent call is blocked by sendLocked",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/machine/createMachine.ts",
+      "line": 1098,
+      "symbol": "confirmPaymentRequest",
+      "dimension": 1,
+      "description": "confirmPaymentRequest at :1098-1102: `lastPaymentRequestResult = { rolledBack: false }; await send({ type: 'CONFIRM_PAYMENT_REQUEST' }); return lastPaymentRequestResult;`. `lastPaymentRequestResult` is a closure variable (:179). If caller A is mid-await and caller B calls confirmPaymentRequest concurrently: B resets to `{ rolledBack: false }`, B's send() hits sendLocked guard at :276-279 and returns immediately without executing, B's `return lastPaymentRequestResult` returns `{ rolledBack: false }`. A's await eventually completes and may set `{ rolledBack: true }`. B sees false even though nothing was actually executed on B's behalf.",
+      "why_it_matters": "Practical exploit: unclear. UI typically prevents double-tap via sendLocked surfaces, but any caller that tries to chain confirmPaymentRequest (e.g. a retry-on-timeout wrapper) could observe the wrong value. More importantly, the design conflates 'did my call succeed' with 'what was the last result of any call'. Pattern is fragile.",
+      "fix": "Scope the result to the single call: read the result via send()'s own return value. Change send's type to return the result of the branch that matched the event, so the caller doesn't need a closure to pluck state.",
+      "references": [
+        "coco-payment-ux/src/machine/createMachine.ts:179,1098-1102,276-279"
+      ],
+      "verification_note": "Re-read createMachine.ts:179,1098-1102. Confirmed closure-stored result. Counter-argument considered: the sendLocked guard prevents concurrent sends, so only one caller can be 'in flight' at a time — correct, but a second caller arriving during flight gets a stale-value return rather than a queue-or-reject semantic.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Considered for inclusion in slice d5dcbfaa but the closure-variable plumbing is its own behavioural change — touches send()'s return type, not the stepData/mutation seam consolidated here. lastPaymentRequestResult still scoped at module level."
+    },
+    {
+      "id": "F-017",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "amount-actions/createManager.ts notify() clears prevResolution — defeats ref-stability guard on every downstream change",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/amount-actions/createManager.ts",
+      "line": 107,
+      "symbol": "notify",
+      "dimension": 7,
+      "description": "Lines 107-110: `function notify() { prevResolution = null; for (const fn of listeners) fn(); }`. `prevResolution` is the structural-equality cache at :78 used by `inspect()` to return a stable reference when the computed resolution hasn't changed structurally. Clearing it in notify means: every notify (which happens on setInput, setMode-followed-by-setInput, toggle) forces the next inspect to allocate and return a fresh object, even if the new one is structurally identical to the cached one. useSyncExternalStore then triggers a re-render because Object.is returns false on fresh refs.",
+      "why_it_matters": "Minor extra render per keystroke. On a payment-flow amount screen that's 100+ keystrokes during fiat entry — each renders the sibling tree (SuggestionRow list, ≈StickyTotal, etc.). With F-008 (Intl.* allocations per render), this compounds measurably on scroll/typing concurrency.",
+      "fix": "Drop the `prevResolution = null;` line. The structural-equal check at inspect() (:162-164) already handles the case by returning the cached reference when equal. Notifying without invalidating the cache is correct because the next inspect will decide whether to promote the new value.",
+      "references": [
+        "coco-payment-ux/src/amount-actions/createManager.ts:107-110,160-167"
+      ],
+      "verification_note": "Re-read createManager.ts:107-167. Confirmed prevResolution=null on notify and structural-equal cache promotion on inspect. Counter-argument considered: clearing may be defensive for a future async update — but inspect() is sync and re-runs compute() every time, so it doesn't help.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Slice d5dcbfaa drops the `prevResolution = null;` line in amount-actions/createManager.ts notify(). The structural-equal check at inspect() (resolutionEqual) already promotes the cached ref only when the resolution actually changed, so notify() can fire without forcing a fresh ref — useSyncExternalStore consumers now skip re-renders when keystrokes produce structurally equal output."
+    },
+    {
+      "id": "F-018",
+      "severity": "Nit",
+      "confidence": 0.95,
+      "title": "ScreenActionManager.setEntry logs to console on every invocation — dozens per second during keypad input",
+      "repo": "sovran-app",
+      "path": "coco-payment-ux/src/screen-actions/createManager.ts",
+      "line": 187,
+      "symbol": "setEntry",
+      "dimension": 10,
+      "description": "Lines 187-194: unconditional `console.info('[ScreenActionManager:${screenType}] setEntry | id: ..., type: ..., state: ...')`. setEntry fires on every history update, every entry-update subscription callback, and indirectly every amountMgr notification in the amountEntry screen. Same severity class as 07.json F-002 (console.* everywhere) — flagging specifically because the repeated amountEntry path can fire 30+ times per second on a keypad hold.",
+      "why_it_matters": "Tied to 07.json F-002. Noisy logs mask real signal; the stats log-doctor pass on a typing session will be dominated by this event. Low priority because the scoped-logger refactor in 07.json already names this file.",
+      "fix": "Folded into 07.json F-002 refactor. Meanwhile, `if (__DEV__) console.info(...)` is a zero-risk guard.",
+      "references": [
+        "coco-payment-ux/src/screen-actions/createManager.ts:187-194",
+        "sovran-app/__audits__/07.json (F-002)"
+      ],
+      "verification_note": "Re-read createManager.ts:187-194. Confirmed unguarded console.info.",
+      "prior_audit_id": "F-002@07.json",
+      "completion_status": "complete",
+      "completion_note": "Slice 6f3b95df migrated coco-payment-ux/src/screen-actions/createManager.ts (one of the 13 files in the sweep) from raw console.* to the new structured logger.X(event, fields) seam at coco-payment-ux/src/logger.ts; sovran-app's paymentLog is wired in via the logger? option on createCocoPaymentUX from features/send/providers/CocoPaymentUX.tsx."
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "partial",
+    "3": "pass",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "skipped",
+    "7": "pass",
+    "8": "partial",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Unify ref-write and render-side-effect discipline across coco-payment-ux/src/react/. (a) CocoPaymentUXProvider: move all 15 `xxxRef.current = xxx` assignments at :273-300 into one useLayoutEffect per ref (or a single useLayoutEffect with a correct dep array); move the `registerLocale` loop at :288-292 into useEffect(..., [translations]); hoist `handlersRef.current = factory(...)` at :367-369 into useLayoutEffect keyed on handlersFactory identity. (b) useScreenActions: the two ref writes at :259-262 follow the same pattern. (c) usePaymentFlowMachine (the target of 07.json F-011) folds into this same refactor. Net: every render-body side effect becomes an effect-body side effect. Shift is mechanical; adds no behaviour beyond the React-correctness guarantee.",
+      "files": [
+        "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx",
+        "coco-payment-ux/src/react/useScreenActions.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Fix the amountEntry correctness cluster as one PR. (1) Drop the [] deps on derivedAmountConfig (useScreenActions.ts:336-354) — recreate the config when destination/unit/display-currency change, recreate the manager accordingly. (2) Have mergeAmountResolution (screen-actions/createManager.ts:65-85) write `fiatCurrency` and `btcPrice` alongside `fiatSymbol` so availability.ts:90-94 evaluates on values the package itself controls. (3) Change availability.ts:99 gate from `numericValue > 0` to `effectiveSatAmount > 0` so tap-does-nothing is impossible. (4) In defaultHandlers.ts:446-458 add a notify('onAmountRoundsToZero') when numericValue > 0 but effectiveSat <= 0, giving wallets a hook for a toast.",
+      "files": [
+        "coco-payment-ux/src/react/useScreenActions.ts",
+        "coco-payment-ux/src/screen-actions/createManager.ts",
+        "coco-payment-ux/src/screen-actions/availability.ts",
+        "coco-payment-ux/src/screen-actions/defaultHandlers.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Harden defaultOperations.ts execute paths. (1) executeMelt: wrap `mgr.ops.melt.execute` in try/catch that calls `mgr.ops.melt.cancel(...)` on throw (F-001). (2) executePaymentRequest (Nostr): persist a 'token-pending-delivery' SQLite marker immediately after `mgr.ops.send.execute` returns and before sendNostrDM fires; on app launch, scan and drive rollback or retry (F-004). (3) rollbackSend: return `{ success, reason? }` instead of swallowing; caller surfaces failure via notifications (F-009). These are three small edits in one file; they close the three biggest operation-layer correctness gaps in a single review pass.",
+      "files": [
+        "coco-payment-ux/src/operations/defaultOperations.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Stabilise createMachine.ts snapshot semantics and lock handling. (1) Replace in-place stepData mutations at :862 and :889 with `stepData = { ...(stepData as any), mintListItems: items }` / `{ ...(stepData as any), mintInfo: info }` so useSyncExternalStore consumers see fresh references (F-006). (2) Move `sendLocked = false` in CONFIRM_MELT (:380) and CONFIRM_PAYMENT_REQUEST (:466) into a try/finally around dispatchHandler so the release-then-dispatch asymmetry with the main path goes away (F-005). (3) Ship the setStep<S>(step, data) helper recommended by 07.json F-015 as the vehicle for (1) — bundle the refactors rather than two touches.",
+      "files": [
+        "coco-payment-ux/src/machine/createMachine.ts",
+        "coco-payment-ux/src/machine/types.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "walletContextTracker.ts: parallelise proof fetch (for...await → Promise.all at :61-71), catch init errors on :104, add outer try/catch around the refresh body to break the infinite-retry loop on persistent failures. Pair with an optional `onError` callback on WalletContextTrackerConfig so the app can surface init problems in the UI instead of showing empty mint list (F-010).",
+      "files": [
+        "coco-payment-ux/src/core/walletContextTracker.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Cache formatters in formatting/ — one-time construction per locale for each of `short`, `full`, `datetime`, `relative` in FormattedTimestamp; `toLocaleString` variants in FormattedString if any appear. Switch substring() calls to code-point iteration ([...str].slice(...).join('')) for surrogate-safe truncation. Both are local-file changes with measurable cold-scroll improvements on history list and address display (F-008, F-013).",
+      "files": [
+        "coco-payment-ux/src/formatting/FormattedTimestamp.ts",
+        "coco-payment-ux/src/formatting/FormattedString.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Validate all `ctx.amount = X` sites in transitions.ts via a setAmount(ctx, n) helper that enforces Number.isSafeInteger(n) && n > 0 && n <= 2_100_000_000_000_000. Throw a typed InvalidAmountError that routeOperationFailure recognises. Ideally the amount schema lives in packages/schemas (07.json F-003) so parse.ts and api.sovran.money agree on the same u64 range. Closes F-012.",
+      "files": [
+        "coco-payment-ux/src/machine/transitions.ts",
+        "coco-payment-ux/src/schemas/CashuAmount.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Smaller hygiene touches bundled into a single PR: (a) suggestions.ts:165 add ' sats' suffix (F-015); (b) createScreenActionManager.execute replace ctx mutation at :168-177 with immutable spread (F-011); (c) amount-actions/createManager.ts:107-110 drop prevResolution=null in notify (F-017); (d) createManager.ts:187-194 gate setEntry log behind __DEV__ (F-018); (e) confirmPaymentRequest closure-variable result at :1098-1102 replaced with a direct return from send (F-016). Each is ≤10 LOC.",
+      "files": [
+        "coco-payment-ux/src/amount-actions/suggestions.ts",
+        "coco-payment-ux/src/screen-actions/createManager.ts",
+        "coco-payment-ux/src/amount-actions/createManager.ts",
+        "coco-payment-ux/src/machine/createMachine.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Once the scoped-logger refactor from 07.json F-002 lands, add a log-doctor `amount` mode that aggregates `amount.setInput`, `amount.toggle`, `amount.next`, `amount.rounds_to_zero` events, with per-session breakdown of taps-that-no-opped (F-007 evidence), average time-to-next, and fiat-mode vs sat-mode usage ratios. Same PR should add a `ctx-tracker` mode reporting refresh latency distribution, init-error counts, and retry-loop detection to verify F-010 in production.",
+      "files": [
+        "sovran-app/scripts/log-doctor/",
+        "sovran-app/.claude/rules/log-doctor.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does Sovran's AmountFlowScreen.tsx entrySeed carry `fiatCurrency` and `btcPrice` today? If yes, F-014 is a contract-fragility finding; if no, the fiat toggle is dead on this branch and F-014 becomes High. Grep `features/send/screens/AmountFlowScreen.tsx` for literal `fiatCurrency:` in the entrySeed literal to resolve.",
+    "Does coco-core's `mgr.ops.melt.cancel` accept a settled operation id as a no-op, or does it throw? The F-001 fix assumes idempotent cancel; verify against coco/packages/coco-core/src/ops/melt/MeltOperationsApi.ts.",
+    "On process kill between `mgr.ops.send.execute` return and sendNostrDM start (F-004), does coco's launch-time reconciliation automatically reclaim pending send operations, or does it require an explicit call? If automatic, F-004 severity drops — if manual, the persistence-marker fix is load-bearing.",
+    "The derivedAmountConfig [] deps (F-002) may have been intentional to avoid rebuilding the AmountActionManager on every render. If so, the correct fix is a stable manager that accepts function-valued fields rather than constants, which is a larger refactor. Confirming intent with the author would avoid re-introducing the bug under a different guise."
+  ]
+}
