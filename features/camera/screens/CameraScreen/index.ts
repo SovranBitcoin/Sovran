@@ -1,2 +1,2 @@
-export { CameraScreen } from './CameraScreen';
-export type { ScanningData, CameraScreenProps } from './types';
+export { CameraScreen, cameraRouteParamsSchema } from './CameraScreen';
+export type { ScanningData } from './types';

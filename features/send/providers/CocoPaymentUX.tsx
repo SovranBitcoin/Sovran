@@ -12,7 +12,7 @@ import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
-import { useCameraPermissions } from 'expo-camera';
+import { useHandleCameraPermission } from '@/features/camera/hooks/useHandleCameraPermission';
 
 import { URDecoder } from '@gandlaf21/bc-ur';
 
@@ -64,7 +64,7 @@ import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
-export { usePaymentFlowMachine } from 'coco-payment-ux/react';
+export { usePaymentFlowMachine, useCocoPaymentUXContext } from 'coco-payment-ux/react';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
 
@@ -150,14 +150,11 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   // Camera permission lives here rather than behind a (receive-flow)-scoped
   // context provider so it's reachable from this provider's navigation /
   // screen-action bridges. A descendant context would resolve to undefined
-  // here and silently no-op the Receive scan-QR button.
-  const [cameraPermission, requestCameraPermissionRaw] = useCameraPermissions();
-  const cameraGrantedRef = useLatestRef(cameraPermission?.granted ?? false);
-  const requestCameraPermission = useCallback(async (): Promise<boolean> => {
-    if (cameraGrantedRef.current) return true;
-    const result = await requestCameraPermissionRaw();
-    return result.granted;
-  }, [requestCameraPermissionRaw]);
+  // here and silently no-op the Receive scan-QR button. Delegating to
+  // useHandleCameraPermission keeps a single canonical permission gateway
+  // (the hook owns the explainer + Open-Settings popup chain).
+  const { handlePermission } = useHandleCameraPermission();
+  const requestCameraPermission = useCallback(() => handlePermission(), [handlePermission]);
 
   const npubRef = useLatestRef(keys?.npub);
   const pubkeyRef = useLatestRef(keys?.pubkey);

@@ -10,18 +10,20 @@ import { z } from 'zod';
 
 import Icon from 'assets/icons';
 import { CameraScreen } from '@/features/camera';
+import { cameraRouteParamsSchema } from './CameraScreen/CameraScreen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useCocoPaymentUXContext } from 'coco-payment-ux/react';
+import { useCocoPaymentUXContext } from '@/features/send/providers/CocoPaymentUX';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
-const ParamsSchema = z.object({
-  unit: z.string().max(16).optional(),
+const ParamsSchema = cameraRouteParamsSchema.extend({
   action: z.enum(['nfc-pay']).optional(),
 });
 
 export function StandaloneCameraScreen() {
-  useLifecycleLogger('StandaloneCameraScreen');
+  // Logger name distinguishes the wrapper from the inner CameraScreen so log-doctor
+  // mount sequences are unambiguous: shell mount → inner mount → inner unmount → shell unmount.
+  useLifecycleLogger('StandaloneCameraShell');
   const params = useRouteParams(ParamsSchema, { where: 'camera.standalone' });
   const action = params?.action;
   const foreground = useThemeColor('foreground');

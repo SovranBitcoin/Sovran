@@ -1,6 +1,7 @@
 import React from 'react';
 import { useWindowDimensions } from 'react-native';
 import { CameraView } from 'expo-camera';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -17,7 +18,7 @@ export function CameraLayout({
   flashlightOn,
   loading,
   hasPermission,
-  scanLocked,
+  requestPermission,
   handleScan,
   handleCameraReady,
   children,
@@ -26,7 +27,25 @@ export function CameraLayout({
   const scanBoxSize = width * 0.8;
 
   if (!hasPermission) {
-    return <View className="relative flex-1 bg-black" />;
+    return (
+      <View className="relative flex-1 items-center justify-center bg-black px-8">
+        <Text className="text-foreground mb-2 text-center" size={20} weight="semibold">
+          Camera permission required
+        </Text>
+        <Text className="text-foreground/70 mb-6 text-center" size={14}>
+          Sovran needs camera access to scan QR codes for payments.
+        </Text>
+        <Pressable
+          onPress={requestPermission}
+          className="bg-foreground rounded-full px-6 py-3"
+          accessibilityRole="button"
+          accessibilityLabel="Grant camera permission">
+          <Text className="text-background" size={16} weight="semibold">
+            Grant access
+          </Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (
@@ -47,7 +66,7 @@ export function CameraLayout({
             barcodeTypes: ['qr'],
           }}
           onCameraReady={handleCameraReady}
-          onBarcodeScanned={scanLocked ? undefined : handleScan}
+          onBarcodeScanned={handleScan}
         />
 
         <View

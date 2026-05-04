@@ -446,8 +446,13 @@ export function usePaymentFlowMachine({
 }: UsePaymentFlowMachineConfig): PaymentMachine {
   const ctx = usePaymentFlowContext();
 
-  ctx.walletContextRef.current = walletContext;
-  ctx.unitRef.current = unit;
+  // Refs are written in useEffect (not during render) so concurrent renders
+  // that get discarded — transition aborted, suspense fallback — don't mutate
+  // shared provider state with values that were never committed.
+  useEffect(() => {
+    ctx.walletContextRef.current = walletContext;
+    ctx.unitRef.current = unit;
+  }, [ctx, walletContext, unit]);
 
   useEffect(() => {
     ctx.optionDismissRef.current = onOptionDismiss;

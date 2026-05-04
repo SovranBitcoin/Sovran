@@ -3,10 +3,6 @@ export interface ScanningData {
   type?: string;
 }
 
-export interface CameraScreenProps {
-  scanLocked?: boolean;
-}
-
 export interface CameraScreenShared {
   foreground: string;
   insets: { bottom: number; top: number; left: number; right: number };
@@ -14,7 +10,7 @@ export interface CameraScreenShared {
   flashlightOn: boolean | null;
   loading: boolean;
   hasPermission: boolean;
-  scanLocked: boolean;
+  requestPermission: () => void;
   handleScan: (data: { data?: string }) => void;
   handleCameraReady: () => void;
   handleClipboardPress: () => void;
