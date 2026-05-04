@@ -30,7 +30,6 @@ import opacity from 'hex-color-opacity';
 
 import { encode } from '@/shared/lib/third-party/emoji';
 import { log, useRenderLogger } from '@/shared/lib/logger';
-import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
 import { CurrencyIcon } from 'assets/icons';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -282,7 +281,7 @@ export function EmojiPickerContent({ payload, close, setFooterConfig, canPop, po
       await Clipboard.setStringAsync(encodedEmoji);
       copyPopup('token', {
         onOpen: close,
-        icon: <AnimatedEmoji emoji={emoji} size={28} />,
+        icon: <Text style={{ fontSize: 28, lineHeight: 32 }}>{emoji}</Text>,
       });
     },
     [payload.token, close, searchQuery]
