@@ -521,12 +521,19 @@ export async function sendMessage(
     temperature?: number;
     max_tokens?: number;
     stream?: boolean;
+    signal?: AbortSignal;
   } = {}
 ): Promise<{
   response?: OpenAI.Chat.Completions.ChatCompletion;
   stream?: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
 }> {
-  const { model = 'gpt-3.5-turbo', temperature = 0.7, max_tokens, stream = false } = options;
+  const {
+    model = 'gpt-3.5-turbo',
+    temperature = 0.7,
+    max_tokens,
+    stream = false,
+    signal,
+  } = options;
   const totalTokens = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
   apiLog.info('api.routstr.chat.start', {
     model,
@@ -553,6 +560,7 @@ export async function sendMessage(
           ...(max_tokens != null && { max_tokens }),
           stream: true,
         }),
+        signal,
       });
       const requestId = response.headers.get('x-routstr-request-id') || undefined;
       apiLog.debug('api.routstr.chat.response_received', {

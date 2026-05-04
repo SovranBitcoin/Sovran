@@ -1,10 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { router } from 'expo-router';
 import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
+import { isAbortError } from '@/shared/lib/apiClient';
+import { pickFinalizeMessage } from '../lib/finalize';
 import {
   actionMenuPopup,
   modelSwitchedPopup,
@@ -119,6 +121,22 @@ export function useAiSend() {
 
   const { keys: nostrKeys } = useNostrKeysContext();
 
+  // Stream + balance lifecycle. Each `streamIntoPlaceholder` aborts the
+  // prior stream (so backgrounding mid-stream stops billing) and awaits
+  // the prior balance promise so the new flow's `balanceBeforeMsats`
+  // snapshot is fresh — without that wait, a retry-during-balance-refresh
+  // captures the same pre-send balance as the first call and double-counts
+  // the cost diff.
+  const streamControllerRef = useRef<AbortController | null>(null);
+  const balancePromiseRef = useRef<Promise<unknown> | null>(null);
+
+  useEffect(
+    () => () => {
+      streamControllerRef.current?.abort();
+    },
+    []
+  );
+
   const navigateToTopUp = useCallback(
     (pendingMessage: string) => {
       if (!nostrKeys?.pubkey) {
@@ -160,6 +178,15 @@ export function useAiSend() {
         noApiKeyPopup();
         return;
       }
+
+      // Abort any prior in-flight stream and wait for its balance refresh
+      // to settle so this flow's snapshot reflects the prior call's debit.
+      streamControllerRef.current?.abort();
+      if (balancePromiseRef.current) {
+        await balancePromiseRef.current.catch(() => {});
+      }
+      const controller = new AbortController();
+      streamControllerRef.current = controller;
 
       const storeState = useRoutstrStore.getState();
       const balanceBeforeMsats = storeState.balance ?? 0;
@@ -245,6 +272,7 @@ export function useAiSend() {
               model: candidate,
               temperature: 0.7,
               stream: true,
+              signal: controller.signal,
             });
             stream = result.stream;
             modelToUse = candidate;
@@ -261,6 +289,7 @@ export function useAiSend() {
             break;
           } catch (err) {
             lastConnectErr = err;
+            if (isAbortError(err)) throw err;
             if (!isRetryableConnectError(err) || i === candidateChain.length - 1) throw err;
             aiLog.warn('ai.send.candidate_failed', {
               flowId,
@@ -407,16 +436,15 @@ export function useAiSend() {
         // Single atomic write: persist final content + reasoning + thinking
         // duration in place, preserving the placeholder's parentId so the
         // tree shape doesn't shift mid-finalisation.
-        if (!fullContent && chunkCount > 0) {
+        const finalizePayload = pickFinalizeMessage({
+          fullContent,
+          fullReasoning,
+          chunkCount,
+        });
+        if (finalizePayload) {
           finalizeAssistantMessage(assistantMessageId, {
-            content: '(No response received)',
+            ...finalizePayload,
             thinkingDurationSec: thinkingSec,
-          });
-        } else if (fullContent) {
-          finalizeAssistantMessage(assistantMessageId, {
-            content: fullContent,
-            thinkingDurationSec: thinkingSec,
-            reasoningContent: fullReasoning || undefined,
           });
         }
         aiLog.info('ai.send.assistant_finalized', {
@@ -436,16 +464,19 @@ export function useAiSend() {
         // actually used, so the post-stream log can quote both numbers.
         const predicted = getAffordabilityDetails(modelToUse, balanceSats, cachedModels);
         const usedModelCatalogEntry = cachedModels.find((m) => m.id === modelToUse) ?? null;
-        void checkBalance(apiKey)
+        // Track this flow's balance promise so the next streamIntoPlaceholder
+        // call awaits it before snapshotting balanceBeforeMsats — without that
+        // a retry tap during balance refresh re-uses the stale store balance
+        // and double-counts the cost diff.
+        const balancePromise = checkBalance(apiKey, { signal: controller.signal })
           .then((data) => {
             setBalance(data.balance);
             const costMsats = balanceBeforeMsats - data.balance;
             const costSats = costMsats > 0 ? Math.ceil(costMsats / 1000) : undefined;
-            if (costSats != null) {
+            if (costSats != null && finalizePayload) {
               finalizeAssistantMessage(assistantMessageId, {
-                content: fullContent || '(No response received)',
+                ...finalizePayload,
                 thinkingDurationSec: thinkingSec,
-                reasoningContent: fullReasoning || undefined,
                 costSats,
               });
             }
@@ -492,11 +523,19 @@ export function useAiSend() {
             });
           })
           .catch((err) => {
+            if (isAbortError(err)) return;
             aiLog.warn('ai.send.balance_refresh_failed', { flowId, err });
           });
+        balancePromiseRef.current = balancePromise;
 
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
       } catch (err: any) {
+        if (isAbortError(err)) {
+          aiLog.info('ai.send.aborted', { flowId });
+          removeMessages(new Set([assistantMessageId]));
+          span.end({ outcome: 'aborted' });
+          return;
+        }
         aiLog.error('ai.send.failed', {
           flowId,
           status: err?.status,
