@@ -89,7 +89,9 @@
         "log:swap-1-1777617128482 doneLegs=0 totalLegs=1"
       ],
       "verification_note": "Phase B: re-read MintRebalancePlanScreen.tsx:1283-1368 and the useEffect at 142-144. Counter-argument: maybe the runner reads the ref before the React commit cycle by design (so terminal flips are deferred to the next render). Rejected — the runner explicitly relies on `finalStatus` to fire setLegDone/Failed/Skipped, and the orchestrator at 1345-1350 calls complete() unconditionally when anyFailed=false, so a missed setLegDone == silent success report. log.txt confirms two distinct swap IDs hit the bug across one session.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Out of scope for the popup-tree slice — lives inside the manual swap orchestrator (MintRebalancePlanScreen), not the toast/engine seam."
     },
     {
       "id": "F-002",
@@ -176,7 +178,9 @@
         "skill:zoom-out"
       ],
       "verification_note": "Phase B: confirmed swapStatusStore.ts:115 and 126 both early-return when get().active is null, so the no-op behavior is real. The finding is about clarity/maintainability, not a current bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Out of scope for the popup-tree slice — same orchestrator file/closure as F-001."
     },
     {
       "id": "F-006",
@@ -197,8 +201,8 @@
       ],
       "verification_note": "Phase B: verified PaymentStatusToast.tsx:11 imports `router` not `guardedRouter` and the navigate call at line 247 uses it. Verified SwapStatusToast.tsx:15 uses guardedRouter. Verified commit 38797b50 message claims AccountPagerView et al. were migrated.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "PaymentStatusToast's onPressViewTransaction guards via useSingleFlight (history fetch + navigate); SwapStatusToast.onPressView uses guardedRouter.push. Both are valid double-tap guards but they aren't the same primitive; unifying them is a separate ubiquitous-language pass on navigation guards."
+      "completion_status": "complete",
+      "completion_note": "PaymentStatusToast's onPressViewTransaction guards via useSingleFlight (history fetch + navigate); SwapStatusToast.onPressView uses guardedRouter.push. Both are valid double-tap guards but they aren't the same primitive; unifying them is a separate ubiquitous-language pass on navigation guards.\n\nSlice ca2ecf15 switches PaymentStatusToast.tsx from `import { router } from 'expo-router'` to `guardedRouter` (and from generic `log` to `popupLog`). The `router.navigate({ pathname, params })` inside `useSingleFlight` is now `guardedRouter.navigate(...)`, so PaymentStatusToast and SwapStatusToast share the same 600ms cooldown — a rapid double-tap on the toast's \"View\" action no longer stacks the destination screen on the back stack. The `useSingleFlight` wrap stays in place because it serializes the `getPaginatedHistory(0, 100)` fetch, which guardedRouter does not."
     },
     {
       "id": "F-007",

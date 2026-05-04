@@ -29,7 +29,7 @@
       "analyze-structure": "37 files / 4769 code-LOC, 0 cycles, 18 reported orphans (all verified false-positives — consumed through popups/index.ts re-exports), 6 colocate suggestions (engine.tsx 100% from popups, bridge.ts 75% from popups, BlurView/version/HStack/currency leaning toward popup root)"
     }
   },
-  "completion_status": "deferred",
+  "completion_status": "partial",
   "findings": [
     {
       "id": "F-001",
@@ -135,8 +135,8 @@
       ],
       "verification_note": "Re-checked both dictionaries word-for-word. 9/9 of engine's keys appear in parsePaymentError's set. parsePaymentError adds 'proof already spent', 'already spent', 'invoice already paid', 'quote already issued', 'mint .* is not trusted' (regex), 'not trusted', 'operation already in progress', 'operation not found', 'invalid token', 'network request failed', 'connection failed', 'quote expired'. Counter-argument considered: engine's 9 keys include action-buttons ('Update Wallet') that parsePaymentError can't handle — true. The fix proposal preserves the action-bearing entries in the engine while delegating text-only mapping to parsePaymentError.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "engine.tsx + parsePaymentError.ts are a separate seam from the wrapper modules; not touched by this slice."
+      "completion_status": "complete",
+      "completion_note": "engine.tsx + parsePaymentError.ts are a separate seam from the wrapper modules; not touched by this slice.\n\nSlice ca2ecf15 deletes the 9-entry MESSAGE_CONFIGS dictionary from engine.tsx in its entirety — every `popup({ message })` callsite was a hardcoded title string with no caller passing a raw cashu/mint error.message that the dictionary needed to translate. parsePaymentError.ts is now the canonical (and only) error-string→user-text mapping; its 21-entry MESSAGE_MAP covers every key MESSAGE_CONFIGS held plus eleven more. The duplicate is removed by deletion rather than merge."
     },
     {
       "id": "F-006",
@@ -178,8 +178,8 @@
       ],
       "verification_note": "Re-grepped 'ActionMenuButton' across the repo: hits in shared/blocks/ActionMenuHost.tsx and several feature files — these import from `@/shared/lib/popup`, which IS the popups/index.ts re-export path. So the index.ts re-exports of ActionMenuButton/Input/Payload/PrimaryAction are NOT actually dead — knip's report is a false positive caused by the barrel + named-import pattern. Confirmed: the 7 popup-tree types from bridge/actionMenu/actionSheets ARE genuinely unused and removable; the 4 popups/index.ts re-exports must stay. Adjusted finding: the actionable cleanup is 7 types, not 11.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Touches actionMenu / actionSheets / bridge surfaces, not the per-domain wrapper modules. Mechanical cleanup remains a valid follow-up."
+      "completion_status": "complete",
+      "completion_note": "Touches actionMenu / actionSheets / bridge surfaces, not the per-domain wrapper modules. Mechanical cleanup remains a valid follow-up.\n\nSlice ca2ecf15 dropped the `export` keyword on six file-private types (CustomToastConfig, ActionMenuSearchable, ActionMenuPayload, ProfileSwitcherPopupPayload, PaymentOptionsPopupPayload, PaymentFallbackPopupPayload, ProofSelectorPopupPayload) and removed four unused barrel re-exports from popups/index.ts (ActionMenuButton, ActionMenuInput, ActionMenuPayload, ActionMenuPrimaryAction). knip is now silent on the popup tree."
     },
     {
       "id": "F-008",
@@ -220,8 +220,8 @@
       ],
       "verification_note": "Counted: popups/index.ts ends at line 130 (per `wc -l`: 129 — close enough). Counter-argument considered: explicit barrels give precise control over public API shape — true, but only meaningful when the surface intentionally hides some symbols; here it exposes every symbol from every wrapper file. Drop to Nit because today's burden is small.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "F-002's chosen partial fix (factory + per-domain modules) preserves named exports, so popups/index.ts still mirrors them one-for-one. Collapsing the barrel would require switching call sites to a registry-key API — out of scope here."
+      "completion_status": "partial",
+      "completion_note": "F-002's chosen partial fix (factory + per-domain modules) preserves named exports, so popups/index.ts still mirrors them one-for-one. Collapsing the barrel would require switching call sites to a registry-key API — out of scope here.\n\nSlice ca2ecf15 trimmed popups/index.ts from 130 to 122 lines by removing the four unused ActionMenu* barrel re-exports (knip-confirmed). The full registry-pattern collapse the finding contemplates remains a separate refactor — it depends on F-002 landing first, since a single `popups({...})` dispatcher is the natural shape only after the per-popup wrappers consolidate onto the factory pattern."
     }
   ],
   "dimensions": {
