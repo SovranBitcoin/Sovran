@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
-import { encodeGeohash, type LocationTier } from 'bitchat-module';
+import { encodeGeohash } from 'bitchat-module/geohash';
+import type { LocationTier } from 'bitchat-module';
 import { LOCATION_TIERS, BLUETOOTH_TIER } from '../lib/constants';
 import { bitchatLog } from '@/shared/lib/logger';
 

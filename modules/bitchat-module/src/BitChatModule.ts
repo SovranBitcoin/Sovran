@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { requireNativeModule, type EventSubscription } from 'expo-modules-core';
 import type {
   BLEDiagnostics,
@@ -8,8 +9,6 @@ import type {
   NostrMessageEvent,
   NostrPrivateMessageEvent,
 } from './types';
-
-const NativeModule = requireNativeModule<BitChatNativeModule>('BitChat');
 
 interface BitChatNativeModule {
   // BLE
@@ -31,14 +30,34 @@ interface BitChatNativeModule {
   removeListeners(count: number): void;
 }
 
+// expo-module.config.json declares `{ "platforms": ["apple"] }` — calling
+// `requireNativeModule('BitChat')` on Android throws synchronously at module
+// load. Mirror the canonical pattern used by liquid-glass-text: resolve to
+// `null` off-iOS, and have each export degrade gracefully.
+const NativeModule: BitChatNativeModule | null =
+  Platform.OS === 'ios' ? requireNativeModule<BitChatNativeModule>('BitChat') : null;
+
+export class BitChatUnavailableError extends Error {
+  constructor() {
+    super('BitChat native module is unavailable on this platform');
+    this.name = 'BitChatUnavailableError';
+  }
+}
+
+const NOOP_SUBSCRIPTION: EventSubscription = { remove: () => {} };
+
+function unavailable(): Promise<never> {
+  return Promise.reject(new BitChatUnavailableError());
+}
+
 // --- BLE Mesh ---
 
 export function startBLE(nickname: string): Promise<void> {
-  return NativeModule.startBLE(nickname);
+  return NativeModule ? NativeModule.startBLE(nickname) : unavailable();
 }
 
 export function sendBLEMessage(content: string): Promise<void> {
-  return NativeModule.sendBLEMessage(content);
+  return NativeModule ? NativeModule.sendBLEMessage(content) : unavailable();
 }
 
 /**
@@ -46,7 +65,7 @@ export function sendBLEMessage(content: string): Promise<void> {
  * exists yet. Safe to call repeatedly — no-op once a session is established.
  */
 export function startBLEPrivateChat(peerID: string): Promise<void> {
-  return NativeModule.startBLEPrivateChat(peerID);
+  return NativeModule ? NativeModule.startBLEPrivateChat(peerID) : unavailable();
 }
 
 /**
@@ -60,55 +79,61 @@ export function sendBLEPrivateMessage(
   content: string,
   nickname: string
 ): Promise<void> {
-  return NativeModule.sendBLEPrivateMessage(peerID, content, nickname);
+  return NativeModule
+    ? NativeModule.sendBLEPrivateMessage(peerID, content, nickname)
+    : unavailable();
 }
 
 export function addBLEPrivateMessageListener(
   listener: (event: BLEPrivateMessageEvent) => void
 ): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onBLEPrivateMessage', listener as (e: unknown) => void);
 }
 
 export function getBLEPeers(): BLEPeer[] {
-  return NativeModule.getBLEPeers();
+  return NativeModule ? NativeModule.getBLEPeers() : [];
 }
 
 export function getBLEState(): string {
-  return NativeModule.getBLEState();
+  return NativeModule ? NativeModule.getBLEState() : 'unavailable';
 }
 
 export function addBLEMessageListener(
   listener: (event: BLEMessageEvent) => void
 ): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onBLEMessage', listener as (e: unknown) => void);
 }
 
 export function addBLEPeerListener(listener: (event: BLEPeerEvent) => void): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onBLEPeerUpdate', listener as (e: unknown) => void);
 }
 
 export function addBLEStateListener(
   listener: (event: { state: string }) => void
 ): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onBLEStateChanged', listener as (e: unknown) => void);
 }
 
 // --- Nostr ---
 
 export function startNostr(): Promise<void> {
-  return NativeModule.startNostr();
+  return NativeModule ? NativeModule.startNostr() : unavailable();
 }
 
 export function joinGeohash(hash: string): Promise<void> {
-  return NativeModule.joinGeohash(hash);
+  return NativeModule ? NativeModule.joinGeohash(hash) : unavailable();
 }
 
 export function leaveGeohash(): Promise<void> {
-  return NativeModule.leaveGeohash();
+  return NativeModule ? NativeModule.leaveGeohash() : unavailable();
 }
 
 export function sendGeohashMessage(content: string, nickname: string): Promise<void> {
-  return NativeModule.sendGeohashMessage(content, nickname);
+  return NativeModule ? NativeModule.sendGeohashMessage(content, nickname) : unavailable();
 }
 
 /**
@@ -118,18 +143,22 @@ export function sendGeohashMessage(content: string, nickname: string): Promise<v
  * `onNostrMessage` events).
  */
 export function sendGeohashPrivateMessage(recipientPubkey: string, content: string): Promise<void> {
-  return NativeModule.sendGeohashPrivateMessage(recipientPubkey, content);
+  return NativeModule
+    ? NativeModule.sendGeohashPrivateMessage(recipientPubkey, content)
+    : unavailable();
 }
 
 export function addNostrMessageListener(
   listener: (event: NostrMessageEvent) => void
 ): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onNostrMessage', listener as (e: unknown) => void);
 }
 
 export function addNostrPrivateMessageListener(
   listener: (event: NostrPrivateMessageEvent) => void
 ): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onNostrPrivateMessage', listener as (e: unknown) => void);
 }
 

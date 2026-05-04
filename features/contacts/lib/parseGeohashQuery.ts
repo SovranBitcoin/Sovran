@@ -1,4 +1,4 @@
-import { isValidGeohash } from 'bitchat-module';
+import { isValidGeohash } from 'bitchat-module/geohash';
 
 /**
  * Extract a geohash from the raw query: accept "#abc" and bare "abc" as
