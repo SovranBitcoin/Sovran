@@ -14,7 +14,6 @@
  *    { _kind, len, preview } summaries.
  *
  * 3. CAUSAL LINKAGE — Logs explain WHY something happened, not just WHAT.
- *    Logs explain WHY something happened, not just WHAT.
  *
  * TIMING FEATURES:
  *   - Monotonic _t field on every entry (performance.now based, immune to clock skew)
@@ -464,7 +463,33 @@ function consoleTransport(pretty: boolean) {
 
 // ─── Logger Factory ──────────────────────────────────────────────────────────
 
-function createLogger(options: LoggerOptions = {}): Logger {
+// LoggerCore holds every piece of state that should be unified across the root
+// logger and all of its children: the ring buffer that powers dumpForLLM and
+// log-doctor, the transport list, the dedup state, the mutable severity, and
+// the once-per-app device-info latch. `child()` produces a new Logger view
+// over the same core, so a domain logger's entries are visible to the parent's
+// dump and `setLevel` propagates instantly.
+interface LoggerCore {
+  buffer: RingBuffer<LogEntry>;
+  transports: ((entry: LogEntry) => void)[];
+  compactOpts: {
+    maxStringLength: number;
+    maxArrayItems: number;
+    maxDepth: number;
+    maxObjectKeys: number;
+  };
+  async: boolean;
+  enabled: boolean;
+  dedupWindowMs: number;
+  minSeverity: number;
+  hasLoggedDevice: boolean;
+  lastEvent: string;
+  lastEventTime: number;
+  lastEntry: LogEntry | null;
+  dedupCount: number;
+}
+
+export function createLogger(options: LoggerOptions = {}): Logger {
   const {
     level = IS_DEV ? 'debug' : 'warn',
     context = {},
@@ -479,34 +504,51 @@ function createLogger(options: LoggerOptions = {}): Logger {
     dedupWindowMs = 50,
   } = options;
 
-  let minSeverity = LEVEL_SEVERITY[level];
-  const compactOpts = { maxStringLength, maxArrayItems, maxDepth, maxObjectKeys };
-  const ringBuffer = new RingBuffer<LogEntry>(ringBufferSize);
-  let hasLoggedDevice = false;
+  const core: LoggerCore = {
+    buffer: new RingBuffer<LogEntry>(ringBufferSize),
+    transports,
+    compactOpts: { maxStringLength, maxArrayItems, maxDepth, maxObjectKeys },
+    async,
+    enabled,
+    dedupWindowMs,
+    minSeverity: LEVEL_SEVERITY[level],
+    hasLoggedDevice: false,
+    lastEvent: '',
+    lastEventTime: 0,
+    lastEntry: null,
+    dedupCount: 0,
+  };
 
-  // ── Dedup state ──
-  let lastEvent = '';
-  let lastEventTime = 0;
-  let lastEntry: LogEntry | null = null;
-  let dedupCount = 0;
+  return makeLogger(core, context);
+}
 
+function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger {
   function emit(logLevel: LogLevel, event: string, params?: Record<string, unknown>): void {
-    if (!SHOW_LOGS || !enabled) return;
-    if (LEVEL_SEVERITY[logLevel] < minSeverity) return;
+    if (!SHOW_LOGS || !core.enabled) return;
+    if (LEVEL_SEVERITY[logLevel] < core.minSeverity) return;
 
     // Collapse rapid-fire identical event names into a single entry with _dedup count.
     // Warnings/errors are never deduped — you always want to see those.
-    if (dedupWindowMs > 0 && logLevel !== 'warn' && logLevel !== 'error' && logLevel !== 'fatal') {
+    if (
+      core.dedupWindowMs > 0 &&
+      logLevel !== 'warn' &&
+      logLevel !== 'error' &&
+      logLevel !== 'fatal'
+    ) {
       const t = now();
-      if (event === lastEvent && t - lastEventTime < dedupWindowMs && lastEntry) {
-        dedupCount++;
-        (lastEntry.params ??= {})._dedup = dedupCount;
-        lastEventTime = t;
+      if (
+        event === core.lastEvent &&
+        t - core.lastEventTime < core.dedupWindowMs &&
+        core.lastEntry
+      ) {
+        core.dedupCount++;
+        (core.lastEntry.params ??= {})._dedup = core.dedupCount;
+        core.lastEventTime = t;
         return;
       }
-      lastEvent = event;
-      lastEventTime = t;
-      dedupCount = 1;
+      core.lastEvent = event;
+      core.lastEventTime = t;
+      core.dedupCount = 1;
     }
 
     const src = getCallerLocation(3);
@@ -532,11 +574,12 @@ function createLogger(options: LoggerOptions = {}): Logger {
           );
           if (extraKeys.length > 0) {
             const extras: Record<string, unknown> = {};
-            for (const ek of extraKeys) extras[ek] = compactValue((val as any)[ek], compactOpts);
+            for (const ek of extraKeys)
+              extras[ek] = compactValue((val as any)[ek], core.compactOpts);
             errorInfo.properties = extras;
           }
         } else {
-          cleanParams[key] = compactValue(val, compactOpts);
+          cleanParams[key] = compactValue(val, core.compactOpts);
         }
       }
       if (Object.keys(cleanParams).length === 0) cleanParams = undefined;
@@ -553,18 +596,19 @@ function createLogger(options: LoggerOptions = {}): Logger {
       ...(errorInfo ? { error: errorInfo } : {}),
     };
 
-    // Attach device info on first log entry (gives LLM the env context once)
-    if (!hasLoggedDevice) {
+    // Attach device info on first log entry across the whole logger tree
+    // (gives LLM the env context once per app launch, not once per child).
+    if (!core.hasLoggedDevice) {
       entry.device = getExpoDeviceInfo();
-      hasLoggedDevice = true;
+      core.hasLoggedDevice = true;
     }
 
     // Always push to ring buffer (even if async)
-    ringBuffer.push(entry);
-    lastEntry = entry;
+    core.buffer.push(entry);
+    core.lastEntry = entry;
 
     const write = () => {
-      for (const transport of transports) {
+      for (const transport of core.transports) {
         try {
           transport(entry);
         } catch {
@@ -573,7 +617,7 @@ function createLogger(options: LoggerOptions = {}): Logger {
       }
     };
 
-    if (async && logLevel !== 'fatal') {
+    if (core.async && logLevel !== 'fatal') {
       scheduleIdle(write);
     } else {
       write(); // Fatal is always synchronous — must be captured before crash
@@ -586,29 +630,14 @@ function createLogger(options: LoggerOptions = {}): Logger {
     warn: (event, params) => emit('warn', event, params),
     error: (event, params) => emit('error', event, params),
     fatal: (event, params) => emit('fatal', event, params),
-    child: (childContext) =>
-      createLogger({
-        level:
-          (Object.keys(LEVEL_SEVERITY) as LogLevel[]).find(
-            (k) => LEVEL_SEVERITY[k] === minSeverity
-          ) ?? 'debug',
-        context: { ...context, ...childContext },
-        maxStringLength,
-        maxArrayItems,
-        maxDepth,
-        maxObjectKeys,
-        transports,
-        async,
-        enabled,
-        ringBufferSize,
-      }),
+    child: (childContext) => makeLogger(core, { ...context, ...childContext }),
     setLevel: (newLevel) => {
-      minSeverity = LEVEL_SEVERITY[newLevel];
+      core.minSeverity = LEVEL_SEVERITY[newLevel];
     },
-    getRecentLogs: () => ringBuffer.getAll(),
-    clearRecentLogs: () => ringBuffer.clear(),
+    getRecentLogs: () => core.buffer.getAll(),
+    clearRecentLogs: () => core.buffer.clear(),
     dumpForLLM: (dumpOpts?: DumpOptions) => {
-      const logs = ringBuffer.getAll();
+      const logs = core.buffer.getAll();
       if (logs.length === 0) return '(no recent logs)';
 
       const fmt = dumpOpts?.format ?? 'json';
