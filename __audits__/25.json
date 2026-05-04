@@ -1,0 +1,366 @@
+{
+  "audit": {
+    "date": "2026-04-21",
+    "commit": "f63699a1",
+    "entry_point": "sovran-app/features/mint",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Highest churn among uncovered subtrees (112 commits/90d) with zero path coverage across 24 prior audits except MintRebalancePlanScreen.tsx / rebalance/demoRunner.ts (partly cited in 12.json). Funds-at-risk surface (mint trust onboarding). Top disqualified: features/transactions (score 7, 86 commits) and features/feed (score 7, 82 commits).",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/README.md"
+    ],
+    "skills_consulted": [],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": null,
+      "lint": null,
+      "knip": null,
+      "analyze_structure": "no cycles; 0 orphans outside barrel pattern; 11 colocate suggestions (mostly shared primitives pulled only by this feature); screens folder has 88 cross-boundary imports up"
+    }
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "useMintSearch cancellation flag is never flipped — setTimeout discards the inner cleanup return",
+      "repo": "sovran-app",
+      "path": "features/mint/hooks/useMintSearch.ts",
+      "line": 97,
+      "symbol": "useMintSearch",
+      "dimension": 1,
+      "description": "Inside the outer useEffect, the `setTimeout` callback declares `let cancelled = false` and kicks off `searchMints(...)`, then returns `() => { cancelled = true }` at line 97–99. `setTimeout` ignores the callback's return value; the only cleanup path is the outer useEffect return (line 102–104) which merely calls `clearTimeout(timerRef.current)`. Once the timer has fired and the network request is in flight, there is no path that flips `cancelled` to true. `fetchCountRef.current` is only used for logging — it does not guard `setResults` or `setError`.",
+      "why_it_matters": "When the user types a sequence of queries faster than the API settles (or switches currency while a fetch is in flight), two or more `searchMints` requests overlap. The slower earlier response can land after the faster newer one, overwriting fresher results with stale ones. Users see the wrong list of mints for their current query — a trust-breaking UX flaw on the mint-add surface, and a concrete last-write-wins race (dim 1 structural race, self-evident from the source). Same pattern repeated in `useSovranDiscoveredMints` and `useNostrDiscoveredMints` without unmount guards.",
+      "fix": "Lift the `cancelled` flag and the `AbortController` up into the outer useEffect scope, not the setTimeout callback. Return a single cleanup function from the useEffect that both `clearTimeout(timerRef.current)` and sets `cancelled = true` (and ideally `controller.abort()` if `searchMints` accepts an AbortSignal). Either (a) pass an `AbortSignal` into `searchMints` so the fetch is actually cancelled on re-render, or (b) at minimum guard every state setter with `if (fetchId === fetchCountRef.current)` so only the latest fetch's result is committed. `useAuditedMints` already uses a `mountedRef.current` pattern — adopt it here too.",
+      "references": [
+        "skill:neverthrow-return-types",
+        "skill:native-data-fetching"
+      ],
+      "verification_note": "Re-read L39-104 after stating claim: the `return () => { cancelled = true }` is syntactically inside the setTimeout's arrow-function body; setTimeout takes `(handler, timeout)` and returns an id, so the closure's return is discarded. Counter-argument considered: the outer cleanup could theoretically run before the timer fires (in which case clearTimeout aborts cleanly) — true for the debounce window but not after the timer has resolved.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Two divergent code paths to 'add a trusted mint' — `addMint(url, {trusted:true})` vs. `trustMint(url)`",
+      "repo": "sovran-app",
+      "path": "features/mint/hooks/useMintManagement.ts",
+      "line": 44,
+      "symbol": "useMintManagement.addMint",
+      "dimension": 1,
+      "description": "`useMintManagement.addMint` (line 44) calls `manager.mint.trustMint(mintUrl)` and nothing else. `MintAddScreen.handleSave` (features/mint/screens/MintAddScreen.tsx:509) instead calls `manager.mint.addMint(mintUrl, { trusted: true })`. In coco-core, these have different semantics: `MintService.addMintByUrl` (coco/packages/core/services/MintService.ts:44) creates the mint row with `trusted` set up-front then runs `updateMint` to fetch info + keysets; `MintService.trustMint` (same file L165) calls `setMintTrusted(url, true)` *before* `ensureUpdatedMint` — the trust flip happens on a mint row that may not exist yet, and its creation (via `ensureUpdatedMint` L110–125) defaults `trusted: false` before the flip lands.",
+      "why_it_matters": "For a fresh mint URL that has never been added before, `trustMint(url)` runs `setMintTrusted` on a nonexistent row first; the subsequent `ensureUpdatedMint` creates the row with `trusted: false`; depending on repository ordering semantics this can leave the mint persisted but untrusted, or trigger a repo-level error. This is a latent funds-adjacent bug (mint shown as trusted in one surface, untrusted in another), and a maintenance hazard: two APIs that look identical but diverge on the `not-yet-exists` branch. `useMintManagement.addMint` is exported as a hook but MintAddScreen intentionally bypasses it — indicating the author already knew the wrapper was not equivalent, without reconciling the two paths.",
+      "fix": "Pick one call site. Change `useMintManagement.addMint` to `manager.mint.addMint(mintUrl, { trusted: true })` so it matches MintAddScreen, then either delete the local hook wrapper or make MintAddScreen call it. If the coco-core `trustMint` branch on not-yet-exists is genuinely broken, that's a patches/ change — file a separate patch-package entry. Audit every other call site of `useMintManagement.addMint` and the raw `manager.mint.trustMint` / `manager.mint.addMint` to ensure the chosen path is used consistently.",
+      "references": [
+        "skill:neverthrow-return-types"
+      ],
+      "verification_note": "Confirmed by reading MintService.ts L44-85 and L165-171 in the upstream coco checkout. Counter-argument: perhaps `setMintTrusted` on a missing row is a no-op and `ensureUpdatedMint` then re-applies trust correctly; checking coco-core wording shows no such reconciliation.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "MintDistributionScreen serialises N `getMintInfo` calls with no abort or unmount guard",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintDistributionScreen.tsx",
+      "line": 119,
+      "symbol": "MintDistributionScreen.loadMintInfo",
+      "dimension": 7,
+      "description": "Lines 118–133 run a `for...of trustedMints` loop with an `await getMintInfo(mint.mintUrl)` per iteration, then `setMintInfoMap(infoMap)` once the loop finishes. There is no `Promise.all`, no concurrency limit, no AbortController, and no `mountedRef` check before the final setState.",
+      "why_it_matters": "Cold open with 5+ trusted mints runs 5 sequential round-trips to mint `/v1/info` before the distribution bar renders. Each round-trip is ~100-400ms; combined with the existing JS-thread blocks observed in log.txt (perf.js_thread_blocked blocked_ms=782.56, 4608.07, 6737.52 — see log-doctor slow evidence below) this compounds into visible lag on a screen whose whole job is immediate editing of proportions. Unmount-mid-fetch leaks: if the user backs out while iteration 3/5 is in flight, the `setMintInfoMap` at L130 still fires on an unmounted component (RN warns and the update is dropped). See `useAuditedMints` (line 78) for the correct concurrency-limited + mountedRef pattern.",
+      "fix": "Replace the sequential loop with `Promise.allSettled(trustedMints.map(m => getMintInfo(m.mintUrl).catch(() => m.mintInfo ?? null)))` and build `infoMap` from the settled results. Gate `setMintInfoMap` behind a `mountedRef.current` guard (declared in a sibling effect, mirroring `useAuditedMints`). If ordering matters for rate-limit reasons, bound concurrency via `p-limit` or the `CONCURRENT_LIMIT = 5` pattern already present in `useAuditedMints.ts:78`.",
+      "references": [
+        "skill:native-data-fetching",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read L112-133. The final setState is at L130, single-shot after the loop; the risk is exactly as described. Counter-argument: sequential loops serialise network — no, coco's RequestRateLimiter already tokens per-mint (observed in log-doctor stats: ratelimiter_token_granted_immediately with tokens=19 capacity=20).",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "useSovranDiscoveredMints: bare fetch with no timeout, no AbortController, unbounded parallel fanout",
+      "repo": "sovran-app",
+      "path": "features/mint/hooks/useSovranDiscoveredMints.ts",
+      "line": 64,
+      "symbol": "useSovranDiscoveredMints.fetchMints",
+      "dimension": 7,
+      "description": "Line 64 `fetch(SOVRAN_MINTS_API_URL)` has no timeout and no AbortController, so a hanging backend blocks the hook forever (loading state stays true). Lines 111–140 then fire `urlsToProcess.forEach(async (url) => await fetchMintInfo(url))` — unbounded parallel fanout into N independent mint `/v1/info` calls. Unlike the sibling `useAuditedMints.ts:78` which uses `CONCURRENT_LIMIT = 5`, there is no bound here. Line 153 deps include the `knownMints` array reference, so the entire effect re-runs every time the trusted-mint list updates — refetching the whole Sovran list redundantly.",
+      "why_it_matters": "On a slow link or a full 39k-entry response (there is no `limit` on the API either — see btc_map reference in log.txt showing 39180 items once fetched), the app issues dozens of concurrent HTTPS handshakes, potentially starving other traffic and triggering rate-limits on the mints themselves. Absence of unmount guard means late responses land on unmounted components (React warns). Re-running the effect every time `knownMints` changes also trashes `processedUrls.current` via `.clear()` at L62, losing work and hammering the API.",
+      "fix": "Wrap the initial fetch in an AbortController with a 10-15s timeout; re-key the `processedUrls` set so it survives knownMints churn; reuse the `CONCURRENT_LIMIT = 5` queue pattern from `useAuditedMints.ts`. Add a `mountedRef` and gate setMints behind it. Replace `[knownMints, retryCount]` with `[retryCount]` in the effect deps — re-fetching the Sovran catalogue on every trusted-mint change is wasteful; filter client-side against the current knownMints using `useMemo` instead.",
+      "references": [
+        "skill:native-data-fetching"
+      ],
+      "verification_note": "Confirmed L64 has no timeout, L111-140 no concurrency cap, L62 clears processedUrls on every re-run. Counter-argument: the API is Sovran-controlled and presumably fast — true for the happy path, but the hook needs to cope with degraded networks by design, and the `knownMints`-driven re-runs are pure waste even on fast links.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.75,
+      "title": "Deep-link params on MintInfoScreen and MintReviewsScreen skip zod validation",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintReviewsScreen.tsx",
+      "line": 284,
+      "symbol": "MintReviewsScreen",
+      "dimension": 5,
+      "description": "Both `MintInfoScreen` (features/mint/screens/MintInfoScreen.tsx:420, param `mintInfoEntry`) and `MintReviewsScreen` (features/mint/screens/MintReviewsScreen.tsx:284, param `mintUrl`) read `useLocalSearchParams<{...}>()` and pass the result directly — to `useScreenActions('mintInfo', entryParam)`, `reviewMint({ mintUrl })`, and `Link`/`router.navigate` — with no runtime schema parse. The generic type arg is a TS compile-time cast only.",
+      "why_it_matters": "Deep links and in-app navigation with hand-crafted params can feed any string (including attacker-controlled URLs from QR, NFC, Nostr payloads) into an API call (`reviewMint(mintUrl)`) that then hits `api.sovran.money`. For the review surface this means the UI can be made to display review stats for a different mint than the user thinks they are viewing. Not a direct funds-at-risk vector (the mint isn't *added* from this screen), but it breaks the trust boundary that every input crossing the app perimeter passes through a validated schema. The planned `packages/schemas` boundary is also not yet exercised here — if that package exists by audit time it should be the single source for MintUrl / EntryId schemas.",
+      "fix": "Declare a zod schema per screen (`MintInfoParams`, `MintReviewsParams`) — ideally in `packages/schemas` once that package is stood up — and replace the direct destructure with `const parsed = MintInfoParams.safeParse(raw); if (!parsed.success) { router.back(); return; }`. Validate `mintUrl` as `z.url().max(2048)` with an https-only check (server URL strings should never exceed ~512 bytes in practice). `useScreenActions('mintInfo', entryParam)` likely has its own entry-id semantics — still worth bounding with `z.string().max(256)`.",
+      "references": [
+        "skill:zod-4",
+        "skill:security-review"
+      ],
+      "verification_note": "Confirmed no parse before use at MintReviewsScreen L284-304 and MintInfoScreen L420-475. Counter-argument: expo-router already types the generic — only at compile time; at runtime the param is whatever the linker injected.",
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "MintInfoScreen and MintReviewsScreen sit in features/mint; the deep-link zod-validation slice (commit 0dddea5f) covered (send-flow), (receive-flow), (transactions-flow), and the top-level token/quote routes only. Mint-feature routes remain a follow-up."
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "Cross-feature reach: MintInfoScreen imports Section from features/settings",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintInfoScreen.tsx",
+      "line": 20,
+      "symbol": "Section",
+      "dimension": 3,
+      "description": "`import { Section } from '@/features/settings/screens/SettingsScreen';` pulls a component from the settings feature into the mint feature. The settings screen is not a public barrel — it is a screen file. If `Section` is load-bearing for both features, it belongs in `shared/ui/composed/` (Card, ListGroup, BlurCardFrame live there today). If it is settings-specific, MintInfoScreen should not be using it.",
+      "why_it_matters": "Feature folders in this codebase are meant to be independent domains (per .cursor/rules/folder-structure.mdc). A cross-feature import of an internal component couples the mint feature's lifecycle to the settings feature's internal shape — a rename of `Section` in SettingsScreen.tsx silently breaks MintInfoScreen. The coupling matrix from analyze-structure already shows `features/mint/screens` pulls 88 cross-boundary imports up; the single imports into `../settings` and `../receive` stand out as leaks.",
+      "fix": "Move `Section` to `shared/ui/composed/Section.tsx` with its own test. Update the two feature imports (settings, mint) to the new path. If `Section` is essentially a thin wrapper around `ListGroup.Section` from heroui-native, delete it instead.",
+      "references": [],
+      "verification_note": "Confirmed by re-reading line 20 and cross-checking analyze-structure output which flags features/mint → ../settings (1 importer) and ../receive (1 importer) as anomalies. Counter-argument: maybe the import is a one-off visual alignment — still the wrong fix; promote it.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.75,
+      "title": "Batch mint-add swallows unexpected errors with an empty catch",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintAddScreen.tsx",
+      "line": 542,
+      "symbol": "MintAddScreen.handleSave",
+      "dimension": 10,
+      "description": "The outer `try { ... } catch {} finally { setIsAdding(false); }` at L487–547 catches any throw from the batch loop setup (e.g. `CocoManager.getInstance()` misbehaving, the `mintUrlsToAdd.map` normalisation throwing, state-reducer anomalies). The catch is empty — only `log.error('mint.add.batch.unexpected_error')` with zero payload, no err, no stack. Individual per-mint failures are caught separately and logged with full detail at L527-528, so this outer catch only fires on something surprising — exactly the case where detail is most valuable.",
+      "why_it_matters": "When an audit or post-mortem asks 'why did this user's bulk add fail silently?', the log line `mint.add.batch.unexpected_error` gives zero actionable information. Fund-adjacent flows should never drop error detail at the last barrier. Also triggers eslint-plugin-neverthrow's preference for `Result<T, E>` adapters over hand-rolled try/catch on async boundaries.",
+      "fix": "Change to `catch (err) { log.error('mint.add.batch.unexpected_error', { error: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined }); ... }`. Better: wrap the whole handler in `ResultAsync.fromThrowable` or equivalent adapter and lean on neverthrow's typed error union instead of try/catch.",
+      "references": [
+        "skill:neverthrow-wrap-exceptions"
+      ],
+      "verification_note": "Re-read L487-548; confirmed the outer catch is bare-braces. Counter-argument: `mintsAddFailedPopup()` gives user feedback — true for UX, not for diagnostics, which is the point of the log line.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "HTTP mint URLs pass through unchanged when user input already carries a protocol",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintAddScreen.tsx",
+      "line": 500,
+      "symbol": "MintAddScreen.handleSave",
+      "dimension": 2,
+      "description": "L500-502 builds the final URL list as `u.startsWith('https://') || u.startsWith('http://') ? u : normalizeUrlForApi(u)`. A URL that already starts with `http://` (not https) is passed through verbatim to `manager.mint.addMint(mintUrl, { trusted: true })`. Coco's `normalizeMintUrl` (coco/packages/core/utils.ts:228) uses `new URL(mintUrl)` which preserves the http protocol — so the mint row is persisted with `http://` and all subsequent RPC traffic (mint info, keysets, mint/melt quotes, proof swaps) travels in plaintext.",
+      "why_it_matters": "For URLs that came from typing into the search bar the upstream validator (`useDebouncedMintValidation` → `normalizeUrlForApi`) force-upgrades http→https, so the direct user-typed path is safe today. The gap is for URLs that reach `selectedMints` from elsewhere — server search results (if the backend ever emits http URLs), pseudo-mints from future deep-link flows, or an attacker who controls the Sovran search backend (e.g. supply chain). `normalizeUrlForApi` is already the canonical normaliser; the `startsWith('http://') || startsWith('https://')` fork only exists to preserve pre-formatted URLs. Making it https-only removes a defence-in-depth gap.",
+      "fix": "Simplify to `const mintUrlsToAdd = Array.from(selectedMints).map(normalizeUrlForApi);` — `normalizeUrlForApi` already strips any `http(s)?://` prefix and re-prepends `https://`. If the intent is to preserve non-default http ports or .onion URLs, handle those explicitly (onion addresses would need a separate allowlist; Cashu mints on Tor are rare but legitimate).",
+      "references": [
+        "nuts/06.md",
+        "skill:security-review"
+      ],
+      "verification_note": "Confirmed by reading coco's utils.ts L228-249 which keeps whatever protocol the URL constructor parses. Counter-argument: the Sovran search API currently only returns https URLs — true today, but the check is one-line defence that survives API drift.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "Linking.openURL on untrusted mint-operator contact strings (mailto / x.com)",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintInfoScreen.tsx",
+      "line": 433,
+      "symbol": "handleContactPress",
+      "dimension": 2,
+      "description": "L433-437 construct URLs from mint-operator-controlled contact strings: `mailto:${info}` and `https://x.com/${info.replace('@', '')}`. `info` originates from the mint's NUT-06 contact array — controlled by whoever runs the mint. A crafted `info` like `me@example.com?bcc=attacker@evil.com` or `elonmusk/status/123?ref=attacker` becomes the target URL. Linking.openURL then hands it to the OS mail/x.com app.",
+      "why_it_matters": "Mint operators are semi-trusted — a user chose to trust this mint for funds, so a narrow self-targeting risk is acceptable. But the current handler encourages treating mint-derived contact strings as pre-validated. Nothing prevents a malicious mint from pre-populating a mailto with an attacker BCC (email harvesting) or an x.com path that redirects off-site. `info.replace('@', '')` only strips the literal '@' character and doesn't defuse `/?ref=...` or path traversal inside the handle.",
+      "fix": "Validate `info` against a schema per method: email → `z.email().max(254)`; x/twitter handle → `z.string().regex(/^[A-Za-z0-9_]{1,15}$/)`; nostr → already goes through `npubToPubkey` which decodes or passes through. Reject on parse failure with a toast instead of silently opening the OS handler. Consider showing the resolved URL in a confirmation toast before `Linking.openURL` when the source is mint metadata.",
+      "references": [
+        "nuts/06.md",
+        "skill:zod-4",
+        "skill:security-review"
+      ],
+      "verification_note": "Re-read L428-448. Counter-argument: mint operator is trusted by definition — partially true, but mints displayed as 'untrusted' via `fromScan` / `fromAccepter` flows also render contact rows, and even trusted mints can be compromised upstream.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "`PseudoMint.mintInfo?: any` contradicts the actual GetInfoResponse passed in",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintAddScreen.tsx",
+      "line": 60,
+      "symbol": "PseudoMint",
+      "dimension": 1,
+      "description": "L60 declares `mintInfo?: any` on the PseudoMint interface; L416 populates it from `customMintInfo` (typed `GetInfoResponse | null` in `useDebouncedMintValidation` return shape). Same `any` appears on `review: any` (MintReviewsScreen L50), `(method: any)` (MintDistributionScreen L72/99/104), and `(event: any)` (useNostrDiscoveredMints L91). Each is an `@typescript-eslint/no-explicit-any` hit.",
+      "why_it_matters": "The types exist already — `GetInfoResponse`, `MintRecommendation`, NDK's `NDKEvent`. Throwing `any` on top surrenders the type safety that made importing the library worthwhile, and makes downstream rendering code susceptible to stray property-path bugs (e.g. `mintInfo?.nuts?.['4']?.methods.some((method: any) => ...)` silently accepts a shape shift in the spec).",
+      "fix": "Type `PseudoMint.mintInfo` as `GetInfoResponse`; `review` as the shape from `MintRecommendation` (pubkey, score, comment, created_at); `method: any` as the concrete NUT-04 PaymentMethod shape (defined in @cashu/cashu-ts); `event` as `NDKEvent` / `NostrEvent` from the app's nostr/client. Remove the `any`-cast sites as a batch.",
+      "references": [
+        "lint:@typescript-eslint/no-explicit-any",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Counter-argument: rapid iteration warrants `any` during prototyping — fair; the fix is one hour once the feature has stabilised.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "Hard-coded hex colours bypass the theme token system",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintAddScreen.tsx",
+      "line": 260,
+      "symbol": "statItems",
+      "dimension": 8,
+      "description": "L260 `isError ? '#EF4444' : success`, L264 `color: '#3B82F6'`, L266 `color: '#3B82F6'` — three literal hex colours inside a component that otherwise pulls `danger` / `success` / `foreground` from `useThemeColor`. Same pattern in MintItem.tsx L85, L91, L97.",
+      "why_it_matters": "Hard-coded colours break both light/dark theme swapping (themes.ts already defines `danger` and `success`) and WCAG contrast guarantees — the hex is only tested in one theme. The codebase has a consistent `useThemeColor([...tokens])` pattern; these three lines are drift.",
+      "fix": "Add `'blue-500'` (or similar) as a token in `themes.ts` if a brand-blue accent is intentional, then replace `'#3B82F6'` with the token. Replace `'#EF4444'` with `danger` (already imported). Same replacement in MintItem.tsx.",
+      "references": [],
+      "verification_note": "Counter-argument: these are 'brand' colours not meant to theme — if so, put them in a dedicated `accentColors` module, not inline.",
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "MintAddScreen.tsx no longer contains the cited #3B82F6/#EF4444 hex literals; MintItem.tsx no longer exists."
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "log.debug fired unconditionally in render body on two screens",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintInfoScreen.tsx",
+      "line": 426,
+      "symbol": "MintInfoScreen / MintReviewsScreen",
+      "dimension": 10,
+      "description": "MintInfoScreen.tsx:426 `log.debug('mint.info.display', { mintUrl, displayName, hasEntry: !!entry })` sits directly in the component body outside any useEffect; same pattern at MintReviewsScreen.tsx:306 `log.debug('mint.reviews.load', ...)`. Every render — including re-renders caused by focus flips, theme toggles, or unrelated upstream state — emits a log line.",
+      "why_it_matters": "Logger dedup (50ms window) hides most of this, and stats output doesn't flag it as noise today. But the pattern contradicts the 'log events, not renders' rule implicit in the scoped loggers; moving it into a `useEffect` with the right deps gives the same diagnostic value without the per-render noise.",
+      "fix": "Wrap each call in `useEffect(() => { log.debug(...) }, [mintUrl, ...])`. Emit once per identity change, not per render.",
+      "references": [],
+      "verification_note": "Counter-argument: debug logs dedup within 50ms — they do, but the dedup window is an adaptation, not a licence.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Dropped log.debug from MintInfoScreen render body and MintReviewsScreen render body. useLifecycleLogger covers mount in both files."
+    },
+    {
+      "id": "F-013",
+      "severity": "Low",
+      "confidence": 0.6,
+      "title": "Legacy `react-native` Animated API mixed with Reanimated v4 in MintInfoScreen",
+      "repo": "sovran-app",
+      "path": "features/mint/screens/MintInfoScreen.tsx",
+      "line": 3,
+      "symbol": "Animated, Easing",
+      "dimension": 4,
+      "description": "MintInfoScreen imports `Animated, Easing` from `react-native` (the legacy Animated API) and uses it for ProgressRing, AnimatedAvatar, RatingBarChart — L55, L58, L112, L124, L294, L313. The rest of the codebase (including sibling `DistributionSlider.tsx` and `MintCurrencyTabs.tsx`) is on Reanimated v4 + worklets.",
+      "why_it_matters": "Legacy Animated runs on the JS thread unless `useNativeDriver: true` (which is set here for transform/opacity — so the hot path is native). Not a correctness bug; a drift signal. As the codebase converges on Reanimated v4 these surfaces will need migration; tracking them now prevents surprise New-Arch breakage later.",
+      "fix": "Rewrite the ProgressRing opacity fade, AnimatedAvatar spring badge, and RatingBarChart bar scale using `withSpring` / `withTiming` from `react-native-reanimated` with `useAnimatedStyle`. No functional change; matches surrounding files.",
+      "references": [
+        "skill:animating-react-native-expo",
+        "skill:creating-reanimated-animations"
+      ],
+      "verification_note": "Counter-argument: these views render infrequently and performance is not impacted — true, but the inconsistency is worth naming so future refactors see it.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "partial",
+    "3": "partial",
+    "4": "partial",
+    "5": "partial",
+    "6": "partial",
+    "7": "pass",
+    "8": "partial",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Pick one canonical 'trusted mint add' API and route every call site through it. Today `useMintManagement.addMint` (trustMint) and `MintAddScreen.handleSave` (addMint with {trusted:true}) diverge on the not-yet-exists branch. Either make the hook wrap `addMint({trusted:true})` or delete the wrapper and have MintAddScreen call the manager directly — pick one; do not keep both.",
+      "files": [
+        "sovran-app/features/mint/hooks/useMintManagement.ts",
+        "sovran-app/features/mint/screens/MintAddScreen.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "All three discovery hooks (useMintSearch, useSovranDiscoveredMints, useNostrDiscoveredMints) share the same race/unmount-guard class of bugs. Factor out a single `useDebouncedFetchList(fetcher, { limit, concurrentFanoutLimit })` helper that handles AbortController, mountedRef, fetchId monotonicity, and concurrency bounds. The existing useAuditedMints is the closest reference for the right shape.",
+      "files": [
+        "sovran-app/features/mint/hooks/useMintSearch.ts",
+        "sovran-app/features/mint/hooks/useSovranDiscoveredMints.ts",
+        "sovran-app/features/mint/hooks/useNostrDiscoveredMints.ts",
+        "sovran-app/features/mint/hooks/useAuditedMints.ts"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Promote `Section` out of `features/settings/screens/SettingsScreen.tsx` into `shared/ui/composed/Section.tsx`. Two features currently depend on it from a screen file; rename + move + update both import sites.",
+      "files": [
+        "sovran-app/features/settings/screens/SettingsScreen.tsx",
+        "sovran-app/features/mint/screens/MintInfoScreen.tsx"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Draft a `mint-trust-review-policy.md` research note capturing the decision on when the KYM-score / trust-review interstitial applies. Today MintAddScreen skips any per-mint review on bulk add (trusted:true wholesale), while MintInfoScreen's `actions.trust.execute()` path goes through the coco-payment-ux trust interstitial. The divergence is intentional for curated search results but should be written down so SOV-10 (Mint Management & Trust) has something to ratify.",
+      "files": [
+        "sovran-app/__research__/mint-trust-review-policy.md"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Propose a new `log-doctor mints` mode that groups by `mint.add.*`, `mint.search.*`, `mint.audit.*`, `mint.nostr.*`, `mint.sovran.*` event families and shows per-flow p50/p95 duration, search-race detection (out-of-order fetchIds on `mint.search.results`), and bulk-add success/fail ratios. Would let the next audit verify the F-001 race dynamically.",
+      "files": [
+        "sovran-app/scripts/log-doctor.ts"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does `manager.mint.trustMint(url)` on a nonexistent mint row succeed or throw in coco-core? Tracing MintService.trustMint + MintRepository.setMintTrusted would confirm whether the useMintManagement.addMint wrapper is actually equivalent to addMintByUrl({trusted:true}) or silently creates an untrusted mint.",
+    "Does the Sovran search API (GET /api/cashu/mints/search) ever emit http:// URLs, or is https mandated server-side? If mandated, the F-008 passthrough is strictly defence-in-depth; if not, it's a real exposure.",
+    "Should `MintListScreen` (the shared-view component, different from `MintListScreen` inferred from the nav) be the only entry to add-a-mint, with a per-mint trust-review interstitial? That would align MintAddScreen (bulk) and MintInfoScreen (per-mint) on the same model and close the F-015 intent gap — recommend a SOV-10 write to ratify."
+  ]
+}

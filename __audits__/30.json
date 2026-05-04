@@ -1,0 +1,346 @@
+{
+  "audit": {
+    "date": "2026-04-21",
+    "commit": "1c2fb9b0",
+    "entry_point": "sovran-app/features/auth",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "No prior audit covers features/auth (score +7: +3 unaudited slice, +2 no substring in covered_paths across 29 prior audits, +1 dim-2/4 coverage gap on wallet auth gate, +1 recent churn across all 5 files in last 90d). Disqualified tied candidates: features/payments (+7) — NIP-04 decrypt deserves its own dedicated audit; modules/bitchat-module (+7) — Swift/iOS native review needs different tooling depth. Auth wins on security priority for a funds-holding app.",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/README.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "react-native-best-practices",
+      "security-review"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "clean for features/auth — errors elsewhere out of scope",
+      "lint": "clean for features/auth",
+      "knip": "no output captured",
+      "analyze_structure": "3 apparent orphans in features/auth/ — all false positives (externally imported); 467 LOC across 6 files; no cycles"
+    }
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Critical",
+      "confidence": 0.98,
+      "title": "PasscodeGate is non-functional — gate never locks because passcode is excluded from persist",
+      "repo": "sovran-app",
+      "path": "features/auth/components/PasscodeGate.tsx",
+      "line": 7,
+      "symbol": "PasscodeGate",
+      "dimension": 2,
+      "description": "PasscodeGate reads state.passcode from useSettingsStore. The settings store explicitly excludes passcode from partialize (shared/stores/global/settingsStore.ts:300-317) and the initial state sets passcode to '' (settingsStore.ts:156). On every cold boot the passcode value is therefore ''. PasscodeGate.tsx:8 does useState(!passcode) which evaluates to useState(true) at first mount, so unlocked is true immediately. The conditional at PasscodeGate.tsx:17 (`if (passcode && !unlocked)`) can never evaluate truthy on cold boot and the children render unobstructed. Log-doctor confirms: 29 firings of auth.gate.no_passcode_set in sovran-app/log.txt, zero firings of auth.gate.locked, auth.gate.unlocked, or any auth.passcode.verify_* event across the captured session. The gate has never executed its protective path in recorded usage. Users who think they have set a wallet passcode are not actually protected.",
+      "why_it_matters": "This is a wallet. A user who configures a passcode expects the app to be locked on device theft or when someone else picks up the phone. Instead the feature is a UI that does nothing — the false sense of security is worse than no feature, because the user stops taking other precautions (e.g. iOS device passcode). Funds are directly exposed to anyone with physical access to an unlocked device.",
+      "fix": "Either (a) tear the feature out cleanly — delete PasscodeGate from app/_layout.tsx:121, delete features/auth/components/PasscodeGate.tsx, delete the app/(settings-flow)/passcode.tsx route, delete the passcode field + setPasscode/getPasscode/clearPasscode from settingsStore, and add a migration to clear any stray values; or (b) actually ship the feature: persist a hashed passcode (Argon2id via a native module, never plaintext) to expo-secure-store with requireAuthentication and WHEN_UNLOCKED_THIS_DEVICE_ONLY; rewire PasscodeGate to be driven by a session-lock store (fresh boot → locked, background→foreground after N seconds → locked) that is orthogonal to the passcode-set-or-not question; compare with a constant-time comparator; add biometric fast-path via expo-local-authentication; add brute-force throttling. Either path is acceptable — shipping a half-wired gate is not. A ratified SOV-40 spec (`docs/README.md` indexes it as TODO) would lock the decision. Recommendation: pick one before the next release.",
+      "references": [
+        "features/auth/components/PasscodeGate.tsx:7-31",
+        "shared/stores/global/settingsStore.ts:156",
+        "shared/stores/global/settingsStore.ts:300",
+        "docs/README.md",
+        "skill:security-review",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read PasscodeGate.tsx, settingsStore.ts partialize block, and app/_layout.tsx provider stack. Counter-argument considered: could passcode be rehydrated from somewhere else? Searched the whole repo for any write to setPasscode outside features/auth/screens/PasscodeScreen.tsx — none. Counter-argument: could the feature be deliberately stubbed pending SOV-40 ratification? The provider is wired into production `_layout.tsx` (line 121), not behind a feature flag or __DEV__ guard. Evidence from log.txt (29 × no_passcode_set, 0 × locked) is dispositive. Still present at head.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "Gate cannot re-lock after passcode is set in-session — unlocked state is captured once at mount",
+      "repo": "sovran-app",
+      "path": "features/auth/components/PasscodeGate.tsx",
+      "line": 8,
+      "symbol": "PasscodeGate",
+      "dimension": 1,
+      "description": "useState(!passcode) captures the initial passcode value at mount (the provider stack mounts very early, before any user interaction). The useEffect at lines 10-15 only ever calls setUnlocked(true) — when passcode transitions to empty. There is no path that calls setUnlocked(false) when passcode transitions from empty to set. Consequence: even if passcode persistence were fixed, a user who sets a passcode mid-session would not be gated on a subsequent app-state change — the gate's internal unlocked flag is already true from mount and never flips back. There is also no AppState listener (foreground/background) that re-locks the gate after backgrounding, which is the canonical expectation for a wallet lock screen.",
+      "why_it_matters": "Any future fix to F-001 that preserves this component's useState contract will still ship a gate that cannot re-lock. This is a structural bug that would survive a naive persistence fix.",
+      "fix": "Drive the lock state from a dedicated session-lock store (Zustand, not persisted, not the settings store) with two orthogonal inputs: (1) is a passcode configured? (read from a persisted secure-storage-backed store), and (2) is the session currently locked? (reset to `true` on cold boot, on AppState → background transitions, and after a configurable inactivity timeout). The gate reads (2); the passcode-set UI writes (1). Add an AppState subscription with a mounted-guard cleanup.",
+      "references": [
+        "features/auth/components/PasscodeGate.tsx:8-15",
+        "skill:zustand-5",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read the component. Counter-argument: could React re-render and re-initialise the useState on dependency change? No — useState initial value is only consumed on mount; subsequent passcode changes are ignored by useState and only handled by the useEffect, which has no false-setting branch. Still present at head.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.92,
+      "title": "Passcode settings screen is registered but has no user-reachable entry point",
+      "repo": "sovran-app",
+      "path": "app/(settings-flow)/passcode.tsx",
+      "line": 1,
+      "symbol": "PasscodeRoute",
+      "dimension": 5,
+      "description": "app/(settings-flow)/_layout.tsx:21 registers the `passcode` Stack.Screen with title 'Passcode', and app/(settings-flow)/passcode.tsx mounts features/auth/screens/PasscodeScreen. Grep across features/settings for 'passcode' or 'Passcode' returns zero hits — no settings screen, section, or list item navigates to /(settings-flow)/passcode. The screen is reachable only via manual deep link. Combined with F-001 this means: (a) no user can configure a passcode through the UI, (b) the gate can't gate anyway, (c) the entire feature — component, screen, store fields, popup, route registration — is vestigial surface area in a production build.",
+      "why_it_matters": "Dead security UI is a liability: it widens the attack surface (deep links can be crafted to reach it), confuses reviewers, and creates false confidence that the feature is shipping. It also means that whichever direction F-001's fix goes (ship or delete), there's a navigation entry to add or remove.",
+      "fix": "Decide per F-001. If deleting the feature: remove app/(settings-flow)/passcode.tsx, the Stack.Screen registration at (settings-flow)/_layout.tsx:21, features/auth/screens/PasscodeScreen.tsx, features/auth/components/PasscodeScreen.tsx, features/auth/components/PasscodeGate.tsx, features/auth/components/NumericKeyboard.tsx (see F-006 for CustomKeyboard relocation), passcodeNotMatchPopup at shared/lib/popup/popups/auth.ts:58-65, and the passcode field + setPasscode/getPasscode/clearPasscode from settingsStore (those are all dead after). If shipping: add a 'Passcode & Biometrics' entry to SettingsScreen with appropriate destructive-action confirmations on disable.",
+      "references": [
+        "app/(settings-flow)/passcode.tsx:1",
+        "app/(settings-flow)/_layout.tsx:21",
+        "features/settings",
+        "docs/README.md"
+      ],
+      "verification_note": "Grep `passcode|Passcode` across features/settings — no matches. Grep for router.navigate / router.push / href patterns mentioning passcode across the app — no matches. Confirmed dead navigation surface.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-004",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "No brute-force throttling on passcode entry",
+      "repo": "sovran-app",
+      "path": "features/auth/components/PasscodeScreen.tsx",
+      "line": 94,
+      "symbol": "handlePress",
+      "dimension": 2,
+      "description": "On a wrong passcode, the handler runs a 200ms shake animation then resets value and keyIdx — no attempt counter, no exponential backoff, no lockout after N failures, no seed-wipe-on-N-failures fallback. A 4-digit passcode has 10,000 combinations; at ~200ms per attempt, full brute-force is ~33 minutes of uninterrupted tapping, well within the time a stolen device stays on before battery/OS-lock. This would be Critical if the gate actually gated (see F-001); conditional on F-001 being fixed, this finding becomes a High blocker for the fix.",
+      "why_it_matters": "Any real lock screen for a wallet needs throttling. Without it, a 4-digit PIN offers the attacker <1-hour coverage against a tech-savvy thief.",
+      "fix": "Track a failed-attempts counter in a secure-storage-backed store. After 5 failures, require a 1-minute cooldown; after 10, 15 minutes; after 20, offer only the 'Forgot passcode — recover via seed' escape path. Persist the counter and the last-failed-at timestamp so that force-closing the app does not reset the counter. Consider increasing the passcode length to 6 digits (standard iOS default since iOS 9) — 1M combinations is materially better than 10K.",
+      "references": [
+        "features/auth/components/PasscodeScreen.tsx:70-98",
+        "skill:security-review"
+      ],
+      "verification_note": "Re-read handlePress. No counter, no persistence, no backoff. Finding stands independent of F-001; the fix for F-001 must include this.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Plaintext passcode in settings store state — acceptable only while never persisted",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/settingsStore.ts",
+      "line": 38,
+      "symbol": "SettingsState.passcode",
+      "dimension": 2,
+      "description": "The passcode field lives on SettingsState as a raw string, set/read without any hashing or KDF. settingsStore.ts:178-180 stores the plaintext string. In the current broken state (F-001) this never reaches disk because partialize excludes it. But the partialize exclusion is load-bearing: one missed entry in partialize and the passcode would ship to AsyncStorage cleartext. AsyncStorage is not the secure enclave — its database file is accessible via iOS filesystem inspection (jailbreak, iTunes backup with no passcode, USB debugging on dev builds). A single partialize mistake would be a Critical data-leak finding.",
+      "why_it_matters": "Guardrails that rely on humans remembering a partialize opt-out are fragile. The correct primitive for a passcode is expo-secure-store with a hashed value, not a Zustand store field.",
+      "fix": "Remove the passcode field from settingsStore entirely (and its set/get/clear actions). Replace with a small module under shared/lib/nostr/secureStorage.ts or a sibling (e.g. shared/lib/auth/passcodeHash.ts) that stores only the Argon2id hash in expo-secure-store with requireAuthentication: true and keychainAccessible: WHEN_UNLOCKED_THIS_DEVICE_ONLY. Compare in constant time. See AUDIT.md §dim-2 on the canonical secure-storage contract and the prior secureStorage audits (04.json, 10.json, 11.json) for the established pattern.",
+      "references": [
+        "shared/stores/global/settingsStore.ts:38",
+        "shared/stores/global/settingsStore.ts:178-186",
+        "shared/stores/global/settingsStore.ts:300-317",
+        "shared/lib/nostr/secureStorage.ts",
+        "skill:security-review",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-checked partialize — passcode indeed excluded. Counter-argument: 'it's just an in-memory gate, plaintext is fine' — true *today*, but the fragility is real: any future field addition to the store that copies the partialize block as a template risks including passcode. Downgraded from High to Medium because the current state is defensive-by-exclusion, not defensive-by-design.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "CustomKeyboard lives in features/auth but is only used for payment amount entry",
+      "repo": "sovran-app",
+      "path": "features/auth/components/CustomKeyboard.tsx",
+      "line": 1,
+      "symbol": "CustomKeyboard",
+      "dimension": 4,
+      "description": "CustomKeyboard is a numeric+decimal keypad with fiat/sat unit awareness and two-decimal-place clamping. It is imported from @/features/auth by app/(user-flow)/splitBill/amount.tsx:15 and features/send/screens/AmountSelector.tsx:15. It is NOT used by any auth component — the passcode screens both use NumericKeyboard (sibling file). Its placement inside features/auth is misleading and the import `import { CustomKeyboard } from '@/features/auth'` reads wrong at the call site (amount entry has nothing to do with authentication). analyze-structure reports it as a potential orphan within features/auth because none of features/auth's own files import it.",
+      "why_it_matters": "Misplaced files erode the feature-folder convention and make future navigation harder. In the event F-001/F-003 are resolved by deleting features/auth, CustomKeyboard would be an accidental casualty.",
+      "fix": "Move CustomKeyboard to shared/ui/composed/CustomKeyboard.tsx (it satisfies the composed-component definition: depends on primitives + Haptics, used by ≥2 features). Update the two import sites in splitBill/amount.tsx:15 and features/send/screens/AmountSelector.tsx:15. Remove the CustomKeyboard re-export from features/auth/index.ts:6.",
+      "references": [
+        "features/auth/components/CustomKeyboard.tsx",
+        "features/auth/index.ts:6",
+        "app/(user-flow)/splitBill/amount.tsx:15",
+        "features/send/screens/AmountSelector.tsx:15"
+      ],
+      "verification_note": "analyze-structure confirms CustomKeyboard has zero internal importers within features/auth. External importers are exactly 2, both for payment amount entry. Relocation is safe.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Legacy React Native Animated API used in PasscodeScreen — codebase convention is Reanimated v4",
+      "repo": "sovran-app",
+      "path": "features/auth/components/PasscodeScreen.tsx",
+      "line": 2,
+      "symbol": "PasscodeScreen",
+      "dimension": 4,
+      "description": "PasscodeScreen imports Animated from 'react-native' and uses Animated.Value, Animated.timing, Animated.sequence for fade-out-on-success and shake-on-failure. The repo's declared animation stack is Reanimated v4 + react-native-worklets (AUDIT.md dim-4; package.json lists react-native-reanimated and react-native-worklets as first-class deps). Legacy Animated still works under the New Architecture but is outside the codebase's animation discipline (worklet offloading, shared values, scheduleOnRN boundary).",
+      "why_it_matters": "Inconsistency with the rest of the app's animation discipline. Two animation systems in the same app mean two places to audit for UI-thread blocks, two sets of patterns to teach, and two lifecycle models to reconcile.",
+      "fix": "Port the opacity fade and shake to Reanimated v4: useSharedValue for opacity and shakeX, useAnimatedStyle for the Animated.View replacement, withTiming + withSequence for the animation curves. Run the success callback via scheduleOnRN from the withTiming completion, not from a JS-side .start() callback.",
+      "references": [
+        "features/auth/components/PasscodeScreen.tsx:1-2",
+        "features/auth/components/PasscodeScreen.tsx:65-93",
+        "skill:creating-reanimated-animations",
+        "skill:animating-react-native-expo"
+      ],
+      "verification_note": "Confirmed import source. The animation works correctly today via useNativeDriver: true, so this is inconsistency not a bug. Kept at Medium because the codebase is explicit about Reanimated being the convention.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "Passcode numeric keypad lacks accessibility labels on every button",
+      "repo": "sovran-app",
+      "path": "features/auth/components/NumericKeyboard.tsx",
+      "line": 34,
+      "symbol": "KeyButton",
+      "dimension": 8,
+      "description": "NumericKeyboard renders Button primitives whose only child is a Text node containing the digit or the ⌫ glyph. There is no accessibilityLabel, no accessibilityRole, no accessibilityHint on the Button itself. CustomKeyboard has the same gap: the TouchableOpacity at line 74-91 wraps either a text digit or an <Icon> (lucide:delete) with no explicit label. VoiceOver will attempt to speak the visible content, which for the backspace glyph '⌫' reads as 'eraser' or nothing at all depending on OS locale. For a passcode screen specifically — one of the highest-stakes interaction moments in the app for vision-impaired users — the labels should be explicit.",
+      "why_it_matters": "A user with VoiceOver on who sets a passcode must be able to distinguish 'one', 'two', … 'delete' without relying on visual layout.",
+      "fix": "Add accessibilityLabel (e.g. 'Digit 1', 'Delete') and accessibilityRole='button' to KeyButton in NumericKeyboard.tsx:34 and to the TouchableOpacity in CustomKeyboard.tsx:74. Optionally add accessibilityHint on the delete button ('Removes the last digit').",
+      "references": [
+        "features/auth/components/NumericKeyboard.tsx:34-63",
+        "features/auth/components/CustomKeyboard.tsx:74-91"
+      ],
+      "verification_note": "Re-read both files. No accessibility props are set on either keyboard's touch targets. Finding is real.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "setTimeout after wrong passcode has no unmount guard",
+      "repo": "sovran-app",
+      "path": "features/auth/components/PasscodeScreen.tsx",
+      "line": 94,
+      "symbol": "handlePress",
+      "dimension": 7,
+      "description": "After a wrong-passcode attempt, the handler schedules `setTimeout(() => { setValue(''); setKeyIdx((k) => k + 1); }, 200)` with no cleanup. If the component unmounts within 200ms (AppGate remounts on account switch, for example), the setState fires on an unmounted component. React will warn but no crash. The same handler runs an Animated.sequence that continues after unmount.",
+      "why_it_matters": "Low-risk in normal operation but contributes to log noise and the kind of 'stray state update after unmount' pattern that accretes across a codebase.",
+      "fix": "Stash the timer id in a useRef and clear it in a useEffect cleanup. Also cancel the shake animation on cleanup (store the Animated.CompositeAnimation returned by .start() and call .stop() on unmount).",
+      "references": [
+        "features/auth/components/PasscodeScreen.tsx:72-97"
+      ],
+      "verification_note": "Confirmed no cleanup. Given F-001 means this codepath doesn't fire in practice, kept at Low.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Unused settings-store API — getPasscode and clearPasscode never called outside the store",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/settingsStore.ts",
+      "line": 97,
+      "symbol": "getPasscode / clearPasscode",
+      "dimension": 3,
+      "description": "settingsStore.ts declares and implements getPasscode (line 97, 182) and clearPasscode (line 98, 183-186). Grep across sovran-app outside settingsStore.ts returns zero call sites for either method. Dead API surface.",
+      "why_it_matters": "Dead action methods on a store tempt future authors to use them rather than re-evaluate whether they should exist (see F-005 — the right answer is to remove the field entirely).",
+      "fix": "Included in the F-001 resolution path. If shipping the feature: drop these methods in favour of a dedicated passcode-hash module. If deleting the feature: remove the field and all three methods (setPasscode, getPasscode, clearPasscode) along with the passcode-excluded partialize note.",
+      "references": [
+        "shared/stores/global/settingsStore.ts:97-98",
+        "shared/stores/global/settingsStore.ts:182-186"
+      ],
+      "verification_note": "Grep confirms zero external callers for both. Stands.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-011",
+      "severity": "Nit",
+      "confidence": 0.95,
+      "title": "passcodeNotMatchPopup grammar: 'Passcode Not Match' → 'Passcodes do not match'",
+      "repo": "sovran-app",
+      "path": "shared/lib/popup/popups/auth.ts",
+      "line": 60,
+      "symbol": "passcodeNotMatchPopup",
+      "dimension": 8,
+      "description": "Popup message reads 'Passcode Not Match' — grammatical. Should read 'Passcodes do not match' (or 'Passcode doesn't match' if referring to the stored value).",
+      "why_it_matters": "Minor polish issue on a user-facing string. Nit.",
+      "fix": "Change shared/lib/popup/popups/auth.ts:60 `message: 'Passcode Not Match'` to `message: 'Passcodes do not match'`.",
+      "references": [
+        "shared/lib/popup/popups/auth.ts:58-65"
+      ],
+      "verification_note": "Minor. Kept because the popup is part of features/auth's user-visible surface.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "pass",
+    "6": "skipped",
+    "7": "partial",
+    "8": "pass",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "dead-code",
+      "description": "Decision required: either ship or delete the passcode feature. Deleting means removing app/(settings-flow)/passcode.tsx, features/auth/components/PasscodeGate.tsx, features/auth/components/PasscodeScreen.tsx, features/auth/screens/PasscodeScreen.tsx, passcodeNotMatchPopup, and the passcode field + setPasscode/getPasscode/clearPasscode actions from settingsStore. Shipping means actually implementing secure-storage-backed hashed storage, session-lock store, brute-force throttling, biometric fast-path, and a user-reachable settings entry (SOV-40).",
+      "files": [
+        "features/auth/components/PasscodeGate.tsx",
+        "features/auth/components/PasscodeScreen.tsx",
+        "features/auth/screens/PasscodeScreen.tsx",
+        "app/(settings-flow)/passcode.tsx",
+        "app/(settings-flow)/_layout.tsx",
+        "app/_layout.tsx",
+        "shared/stores/global/settingsStore.ts",
+        "shared/lib/popup/popups/auth.ts"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Move CustomKeyboard to shared/ui/composed/CustomKeyboard.tsx — both importers are outside features/auth (splitBill/amount.tsx and features/send/screens/AmountSelector.tsx) and the component is a reusable numeric+decimal keypad unrelated to authentication. Update import sites and drop the re-export from features/auth/index.ts.",
+      "files": [
+        "features/auth/components/CustomKeyboard.tsx"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Open a research note under sovran-app/__research__/passcode-and-biometric-gate-design.md with status: draft. Capture: the current broken state, the decision tree (ship vs delete), the dependencies on SOV-40 and SOV-41, biometric-fast-path options (expo-local-authentication), session-lock store shape, brute-force throttling policy, and the migration plan for any users who set a passcode in the broken build (their passcode is unrecoverable and was never protecting anything — document the zero-user-impact rationale). When the approach is picked, promote to SOV-40.",
+      "files": [
+        "sovran-app/__research__/"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Has anyone shipped a build where a user believed their passcode was active? If so the marketing/help-centre copy should address it when the fix ships.",
+    "Is biometric fast-path (Face ID / Touch ID) in scope for the initial version of a real passcode gate, or is it deferred? SOV-40 has not been written.",
+    "Should the gate survive profile switching? app/_layout.tsx:94-128 remounts inner providers on accountIndex change via React key. A session-lock that lives on the inner side would reset across profile switches — deliberate or bug?",
+    "Does the split-bill amount screen actually need its own keypad, or can it reuse the send AmountSelector's controls once CustomKeyboard is relocated? Out of scope for this audit but worth checking when the relocation lands."
+  ]
+}

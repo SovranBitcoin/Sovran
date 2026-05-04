@@ -1,0 +1,278 @@
+{
+  "audit": {
+    "date": "2026-04-24",
+    "commit": "88439b80",
+    "entry_point": "feat/split-bill-flow-refactor (branch-wide review)",
+    "entry_point_autoselected": false,
+    "entry_point_selection_rationale": null,
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json"
+    ],
+    "sov_specs_consulted": [],
+    "skills_consulted": [
+      "zustand-5",
+      "zod-4",
+      "neverthrow-return-types"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "11 errors (pre-existing, none in branch-modified files)",
+      "lint": null,
+      "knip": "~20 unused type/interface exports in new files",
+      "analyze_structure": null
+    }
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Medium",
+      "confidence": 0.75,
+      "title": "Coco mint-operation response duck-typed via `as any` in split-bill orchestrator",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 321,
+      "symbol": "useSplitBillOrchestrator",
+      "dimension": 1,
+      "description": "The orchestrator reads `mintOp` fields (quoteId, invoice, etc.) via `(mintOp as any)?.quoteId` without a schema or typed surface. The coco-core response shape is not re-validated at this boundary, so a version bump or field rename upstream will silently degrade participants' invoice metadata (mintQuoteId becomes undefined) rather than fail loudly.",
+      "why_it_matters": "Invoice metadata feeds participant-facing BIP-321 URIs. A silent schema drift produces URIs that parse but carry no mint context, which downstream wallets cannot resolve back to the originating mint quote.",
+      "fix": "Add a zod v4 schema at the coco->wallet boundary for the mint-operation response (ideally in packages/schemas once it exists). safeParse at the read site; return a neverthrow Result so callers cannot silently dereference missing fields. Until packages/schemas lands, colocate the schema next to the orchestrator.",
+      "references": [
+        "skill:zod-4",
+        "skill:neverthrow-return-types"
+      ],
+      "verification_note": "Re-read path:line; no counter-evidence that coco guarantees these fields at the type level. Severity Medium because the failure mode is recoverable (URI works without metadata) and the call site runs post-await so the race angle does not apply.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Coco mint-operation as-any cast belongs to Slice C (coco event handler typing); not in this PR."
+    },
+    {
+      "id": "F-002",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Dead `View` import from react-native in MeltQuoteScreen",
+      "repo": "sovran-app",
+      "path": "features/send/screens/MeltQuoteScreen.tsx",
+      "line": 33,
+      "symbol": "View",
+      "dimension": 8,
+      "description": "`import { View } from 'react-native';` at line 33 is unused — the file reaches for `HStack` and `VStack` from the Uniwind primitives on lines 34-35. In a Uniwind codebase every raw `View` import should either be a deliberate raw primitive (AUDIT.md Dim-8 exception, e.g. for absoluteFill overlays) or a leftover; this one has no consumer in the file.",
+      "why_it_matters": "Dead imports inflate bundle analysis noise and confuse future readers about whether raw RN primitives are permitted here.",
+      "fix": "Delete the line. If any future raw View is needed, alias it `View as RNView` per the pattern in `features/health/screens/HealthModalScreen.tsx`.",
+      "references": [
+        "lint:unused-imports/no-unused-imports"
+      ],
+      "verification_note": "Grepped the file; only the primitives View on line 104 and elsewhere are used. The RN View import at line 33 has zero references below it.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "HeroUI Slot.Pressable workaround duplicated across ButtonHandler and ActionMenuButton",
+      "repo": "sovran-app",
+      "path": "shared/ui/composed/ButtonHandler.tsx",
+      "line": 188,
+      "symbol": "openMoreMenu",
+      "dimension": 4,
+      "description": "`setTimeout(() => moreMenuTriggerRef.current?.open(), 0)` is used to defer-open a `Menu.Trigger` because heroui-native's `Slot.Pressable` does not compose with the app's custom TouchableOpacity-wrapped Button primitive. The same pattern appears in `shared/ui/composed/ActionMenuButton.tsx` around line 122. It is documented in-line, but a duplicated workaround invites drift — one site will get a fix and the other will rot.",
+      "why_it_matters": "The setTimeout-open dance is fragile: a heroui-native upgrade that changes Slot.Pressable semantics breaks both call sites silently. Extracting it into a single helper captures the cost in one place and keeps the fix localised.",
+      "fix": "Extract a tiny helper `useImperativeMenuTrigger()` in shared/ui/composed/ that returns `{ ref, open }` and encapsulates the ref + setTimeout + open pair. Both call sites import the same helper. File an upstream heroui-native issue asking for Trigger asChild to compose with non-Pressable children; remove the helper when the issue lands.",
+      "references": [
+        "skill:building-native-ui"
+      ],
+      "verification_note": "Grepped for `trigger.*open()` / `setTimeout.*open` across shared/ui — only these two sites. Workaround is real per the in-file comments.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Nit",
+      "confidence": 0.95,
+      "title": "~20 exported types/interfaces on new primitives have no external consumer",
+      "repo": "sovran-app",
+      "path": "shared/ui/composed/Screen.tsx",
+      "line": 31,
+      "symbol": "ScreenProps, ScreenScrollMode, ScreenFooterContextValue, ScreenHeaderActionProps, ActionMenuButtonProps, AmountEntryViewProps, RowStatsAccentProps, ScrollEdgeFadeProps, SectionAnchorListProps, ContactRowProps, NostrProfileLike, MintStatFields, StatKey, QuoteIdToSplitBillIndex, SplitBillStore, UseLocalAmountEntryOptions, UseLocalAmountEntryResult, ActionMenuPayload, ParticipantRowProps, AmountSelectorProps, ModalLayoutWrapperProps",
+      "dimension": 3,
+      "description": "Knip surfaces ~20 newly-exported types/interfaces on the primitives introduced by this branch whose symbol is not imported anywhere else in the repo. Each type is legitimate for internal definition; exporting it from the module signals a public contract that no caller is relying on.",
+      "why_it_matters": "Exported-but-unused types accumulate as a pseudo-public API. When someone eventually picks one up, it quietly becomes load-bearing; when the type author later changes shape, external consumers break in hard-to-find ways.",
+      "fix": "Un-export the props interfaces (they are only consumed by the defining component). Keep exports only where the type is genuinely part of a hook or component's external contract (e.g. `ContactRow.Identity` shape is used by candidateToIdentity.ts — keep that exported).",
+      "references": [
+        "knip:unused-export"
+      ],
+      "verification_note": "Cross-checked knip output against grep for each symbol; no external importers. Some props interfaces are exported reflexively as a styling convention — downgrade to Nit rather than Low.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "Pre-existing type-check failures block CI; branch does not regress but also does not clear them",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 701,
+      "symbol": "Manager.proofRepository",
+      "dimension": 1,
+      "description": "`npm run type-check` returns 11 errors. None are in files modified on this branch. Categories: (a) access to private members of Manager (manager.ts lines 701/702/742/884/885/892, migration.ts 135/152/187, WalletContextProvider.tsx 84/89); (b) expo-image API drift — `contentFit` rejected in WallpaperThumbnail.tsx:72 and GalleryScreen.tsx:136; (c) @legendapp/list API drift — `waitForInitialLayout` rejected in Transactions.tsx:558 and UserMessagesScreen.tsx:2438; (d) native tabs `title` prop missing in nativeTabs.tsx:157/215 and CapsuleButton.android.tsx:35; (e) log-doctor FlatNode missing `hasText` at scripts/log-doctor.ts:3620; (f) downloadedThemeRegistry.ts:17-18 importing non-exported DominantColor/GradientColor. This branch inherits these from upstream, but does not clean them up.",
+      "why_it_matters": "Type-check failures on main block CI's type-check gate and mask new type regressions that this branch would otherwise surface cleanly. The private-access violations in manager.ts are technical debt that will eventually force either a visibility bump in coco or a patch-package patch.",
+      "fix": "File a separate cleanup PR to either (a) expose the Manager surface coco-wallet-side via patch-package or (b) narrow the caller to the public Manager API. Upgrade expo-image / @legendapp/list consumers or pin older versions that accept the old props. Re-export DominantColor/GradientColor from config/backgroundImageThemes. These fixes do not belong in this refactor — the refactor is scope-clean — but they need a tracked owner.",
+      "references": [
+        "ts:TS2341",
+        "ts:TS2322",
+        "ts:TS2459"
+      ],
+      "verification_note": "None of the 11 error paths intersect the branch change set (git diff --stat main...HEAD + git diff HEAD). Severity Low because root-cause is pre-existing and the refactor is not the author of the drift.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "BIP321 picker and offline-send pickers render on a different surface than the branch's canonical Menu pattern — deletable once migrated",
+      "repo": "sovran-app",
+      "path": "shared/lib/popup/sheets/payment-options/content.tsx",
+      "line": 3,
+      "symbol": "PaymentOptionsContent, PaymentFallbackContent, ProofSelectorContent",
+      "dimension": 8,
+      "description": "Correction of this audit's initial read. The user's actual concern was visual and code inconsistency: the branch establishes a canonical `Menu presentation=\"bottom-sheet\"` + `Menu.Item` surface (shared/blocks/popup/ActionMenuHost.tsx + shared/lib/popup/popups/actionMenu.ts + shared/ui/composed/ActionMenuButton.tsx + ButtonHandler overflow at shared/ui/composed/ButtonHandler.tsx:270-312), used by 'Select option', Copy-as-Text/Emoji, Next-as-Ecash/Lightning, and UserMessagesScreen's imperative menu. Three adjacent surfaces still render on the older `BottomSheet` + `ListGroup` + `PressableFeedback` + `Alert` pattern and never migrated: (a) shared/lib/popup/sheets/payment-options/content.tsx (149 LOC) — BIP321 method picker; (b) shared/lib/popup/sheets/payment-fallback/content.tsx (166 LOC) — payment-failure / mint-offline fallback; (c) shared/lib/popup/sheets/proof-selector/content.tsx (123 LOC) — 'Choose amount' round-up/round-down offline exact-proof picker. All three are reached from features/send/lib/sovranPaymentConfig.ts:989-998 via paymentOptionsPopup / paymentFallbackPopup / proofSelectorPopup. The user sees two different-looking surfaces for the same conceptual action ('pick one of N options') and correctly wants them collapsed onto the Menu pattern.",
+      "why_it_matters": "Two visual dialects for the same interaction is a UX regression and a code smell. Migrating to the ActionMenu Menu pattern deletes ~440 LOC of sheet content plus connective tissue in PopupHost (CUSTOM_SHEET_CONTENT map entries, Animated slide routing), actionSheetTypes.ts (three payload shapes), actionSheets.ts (three popup wrappers), sheetLayoutConfig.ts (three contentHeight entries), and the sheets/index.ts barrel. Conservatively ~500 LOC net.",
+      "fix": "Extend the existing ActionMenu surface to carry the per-item data those three sheets need (all of it already has a home in the Menu pattern): (1) amount suffix — add `suffix?: { amount: number; unit: string }` to ActionMenuVariant so renderMenuPortal can render AmountFormatter on the trailing edge of Menu.Item; (2) failure state on payment-fallback — per-item `isFailed?: boolean` that flips isDisabled + colours the description in danger (reuse existing variant='danger' plumbing); (3) proof-selector's 'Change Mint' sticky footer — render as a trailing tertiary Menu.Item (Menu has no footer slot, but a separator + tertiary item is the idiomatic heroui pattern). Then rewrite the three popup helpers in-place: paymentOptionsPopup/paymentFallbackPopup/proofSelectorPopup each call actionMenuPopup with mapped variants, replacing the custom sheet trigger. Delete shared/lib/popup/sheets/{payment-options,payment-fallback,proof-selector}/ (three directories), the three payload entries in actionSheetTypes.ts and sheetLayoutConfig.ts, the three exports in sheets/index.ts, and the three branches in PopupHost.tsx's CUSTOM_SHEET_CONTENT map. Verify the Alert-header semantic (warning on fallback, warning on proof-selector) survives — use Menu.Label for the headline and an italic Menu.ItemDescription-like subtitle, or a one-off `<ActionMenuBanner>` composed into the Menu.Content children. Keep the `useExecutionState(machine)` integration by threading an `isExecuting` prop through actionMenuPopup and OR-ing it into each variant's isDisabled.",
+      "references": [
+        "skill:building-native-ui"
+      ],
+      "verification_note": "Re-read ActionMenuHost.tsx (70 lines) and ActionMenuButton.tsx (278 lines) to confirm the Menu-based pattern's expressiveness. Menu.Item with HStack{ icon + VStack{ItemTitle, ItemDescription} } covers label + subtitle. Amount suffix is missing from the current ActionMenuVariant shape — that's the one real extension the migration requires. The initial audit pass logged F-006 as 'no legacy to delete' because the sheets were already HeroUI-primitive based; that answer missed the deeper question the user asked, which is consistency with the branch's new canonical pattern.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "`docs/contact-row.md` (+563 lines) was added without an explicit user request trail",
+      "repo": "sovran-app",
+      "path": "docs/contact-row.md",
+      "line": 1,
+      "symbol": null,
+      "dimension": 9,
+      "description": "The committed refactor `88439b80` adds a 563-line markdown design doc at docs/contact-row.md. CLAUDE.md's baseline rule is that documentation files should not be created unless the user asks for them. The doc itself is plausibly useful — it documents ContactRow's variant surface — but its inclusion inside a refactor PR that already touches 64 files inflates review cost and may violate the no-unrequested-docs rule.",
+      "why_it_matters": "Design docs inside code PRs rot quickly because nothing enforces their accuracy. A reviewer who approves the code has implicitly approved the doc; if the doc drifts from the code, future readers lose faith in both.",
+      "fix": "If the user asked for it, ignore this finding. If not, either (a) move the doc into features/contacts/components/ as a short README adjacent to ContactRow.tsx so it rots visibly when ContactRow changes, or (b) drop it — JSDoc on the ContactRow component covers the same ground and stays honest under rename refactors.",
+      "references": [
+        "git:88439b80"
+      ],
+      "verification_note": "Re-read first 40 lines of docs/contact-row.md to confirm it is descriptive documentation, not a design rationale or SOV-XX-style spec. Low confidence on whether the user requested it — if they did, the finding is void.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "partial",
+    "2": "pass",
+    "3": "pass",
+    "4": "partial",
+    "5": "pass",
+    "6": "partial",
+    "7": "partial",
+    "8": "partial",
+    "9": "partial",
+    "10": "skipped"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Migrate payment-options, payment-fallback, and proof-selector from the custom BottomSheet+ListGroup pattern to the branch's canonical Menu(presentation='bottom-sheet') pattern via actionMenuPopup. Extend ActionMenuVariant with `suffix?: { amount: number; unit: string }` for amount display, `isFailed?: boolean` for per-item failure state, and a `bannerSubtitle?: string` on ActionMenuPayload for the warning-style header. Rewrite paymentOptionsPopup/paymentFallbackPopup/proofSelectorPopup in shared/lib/popup/popups/actionSheets.ts to build an ActionMenuPayload from StepDataMap['chooseOption']/['chooseProofs'] and dispatch via actionMenuPopup. Delete shared/lib/popup/sheets/{payment-options,payment-fallback,proof-selector}/ (3 dirs, ~440 LOC), the three entries in shared/lib/popup/actionSheetTypes.ts and sheetLayoutConfig.ts, the three branches in shared/blocks/popup/PopupHost.tsx's CUSTOM_SHEET_CONTENT, and the three exports in sheets/index.ts. Net ~500 LOC deleted; visual parity with 'Select option', Copy-as-Text/Emoji, and Next-as-Ecash/Lightning menus.",
+      "files": [
+        "shared/lib/popup/sheets/payment-options/content.tsx",
+        "shared/lib/popup/sheets/payment-fallback/content.tsx",
+        "shared/lib/popup/sheets/proof-selector/content.tsx",
+        "shared/lib/popup/sheets/index.ts",
+        "shared/lib/popup/sheets/sheetLayoutConfig.ts",
+        "shared/lib/popup/actionSheetTypes.ts",
+        "shared/lib/popup/popups/actionSheets.ts",
+        "shared/lib/popup/popups/actionMenu.ts",
+        "shared/ui/composed/ActionMenuButton.tsx",
+        "shared/blocks/popup/ActionMenuHost.tsx",
+        "shared/blocks/popup/PopupHost.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Extract the heroui-native Menu.Trigger setTimeout-open workaround into a single `useImperativeMenuTrigger()` helper in shared/ui/composed/ and re-point ButtonHandler.tsx:188 and ActionMenuButton.tsx:~122 at it. File an upstream heroui-native issue asking for Trigger asChild to compose with non-Pressable children.",
+      "files": [
+        "shared/ui/composed/ButtonHandler.tsx",
+        "shared/ui/composed/ActionMenuButton.tsx"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Un-export the ~20 knip-flagged internal Props interfaces and type aliases on new primitives (Screen.tsx, ContactRow.tsx, AmountEntryView.tsx, RowStatsAccent.tsx, ScrollEdgeFade.tsx, SectionAnchorList.tsx, ScreenFooterContext.tsx, ScreenHeaderAction.tsx, ActionMenuButton.tsx, ParticipantRow.tsx, AmountSelector.tsx, ModalLayoutWrapper.tsx, splitBillTransactionsStore.ts, useLocalAmountEntry.ts, actionMenu.ts). Keep ContactRow.Identity and other types that candidateToIdentity.ts / external callers already import.",
+      "files": [
+        "shared/ui/composed/Screen.tsx",
+        "shared/ui/composed/ContactRow.tsx",
+        "shared/ui/composed/AmountEntryView.tsx",
+        "shared/ui/composed/RowStatsAccent.tsx",
+        "shared/ui/composed/ScrollEdgeFade.tsx",
+        "shared/ui/composed/SectionAnchorList.tsx",
+        "shared/ui/composed/ScreenFooterContext.tsx",
+        "shared/ui/composed/ScreenHeaderAction.tsx",
+        "shared/ui/composed/ActionMenuButton.tsx",
+        "shared/ui/composed/ModalLayoutWrapper.tsx",
+        "features/splitBill/components/ParticipantRow.tsx",
+        "features/send/screens/AmountSelector.tsx",
+        "shared/stores/profile/splitBillTransactionsStore.ts",
+        "shared/hooks/useLocalAmountEntry.ts",
+        "shared/lib/popup/popups/actionMenu.ts"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Delete the unused `import { View } from 'react-native';` at features/send/screens/MeltQuoteScreen.tsx:33.",
+      "files": [
+        "features/send/screens/MeltQuoteScreen.tsx"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Propose a research note under sovran-app/__research__/coco-response-schemas.md (status: draft) capturing the fact that coco-core's mint-operation response shape is currently duck-typed at the wallet boundary, and the proposed zod-at-boundary pattern. This would anchor F-001's fix and similar future boundary cleanups.",
+      "files": [
+        "features/splitBill/hooks/useSplitBillOrchestrator.ts"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Did the user request docs/contact-row.md, or did the agent add it proactively? If proactive, this violates the no-unrequested-docs rule and should be removed or downgraded into a component-adjacent README.",
+    "Should sendToken/receiveToken/meltQuote/mintQuote screens migrate from iOS-native `presentation: 'modal'` to HeroUI BottomSheet? This is a design question about swipe-to-dismiss feel, not a code-deletion question — worth a separate research note before acting.",
+    "Is there a tracked owner for the 11 pre-existing type-check failures (F-005)? Without an owner they will block the next CI pipeline that enables strict type-check gating.",
+    "Does coco-core version drift (the `mintOp as any` in F-001) have an existing schema contract anywhere? If so, F-001 becomes a refactor-to-use-the-existing-schema; if not, packages/schemas needs the shape."
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "audit": {
+    "date": "2026-04-20",
+    "commit": "830b9d12",
+    "entry_point": "Split Bill amount modal vs Fixed Amount modal — reuse audit",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "building-native-ui",
+      "react-native-best-practices"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": null,
+      "lint": null,
+      "knip": null,
+      "analyze_structure": null
+    }
+  },
+  "completion_status": "complete",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Split-Bill reimplements the AmountSelector shell instead of reusing it",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/splitBill/amount.tsx",
+      "line": 49,
+      "symbol": "SplitBillAmountScreen",
+      "dimension": 1,
+      "description": "Both SplitBillAmountScreen (app/(user-flow)/splitBill/amount.tsx:49-89) and AmountSelector (features/send/screens/AmountSelector.tsx:227-354) render the same five-part shell: Screen -> centred VStack with title micro-copy + AmountFormatter + optional secondary pill -> BottomButtons with CustomKeyboard + ButtonHandler containing a primary 'Next' button. The CustomKeyboard controlled-input pattern, the AmountFormatter config (size 48, weight heavy, centered, animated), and the BottomButtons+HStack+ButtonHandler rail are byte-for-byte equivalent modulo SplitBill having no extra buttons and no suggestions row. CustomKeyboard is imported only by these two screens plus its own definition and barrel export — confirming that the reuse surface is exactly these two consumers today.",
+      "why_it_matters": "Maintenance cost grows non-linearly. Split-Bill silently loses the responsive-sizing ladder AmountSelector.tsx:144-149 applies on compact phones (amountTextSize drops to 42/36 on screens <=760/680 px) — on a small iPhone the Split-Bill figure will overflow where the send/receive figure does not. Split-Bill also loses the fiat-toggle path; the fileoverview comment explicitly names this as a TODO ('Future: toggle fiat like the receive flow'), and when that lands FiatAmountDisplay (private to AmountSelector.tsx:42-91) will be copy-pasted, widening the drift. Instrumentation diverges too — AmountSelector emits 'amount.input.key' / 'amount.next' / 'amount.input.toggle'; Split-Bill emits a single 'split_bill.amount.next'. Every new amount-entry surface (e.g. a future 'Add cashu' or 'Withdraw' flow) makes the fork more expensive to converge.",
+      "fix": "Extract a presentational primitive AmountEntryView into shared/ui/composed/AmountEntryView.tsx with a typed contract: rawInput: string, numericValue: number, unit: string, keyboardUnit: string, inputMode: 'sat' | 'fiat'; onKeyPress: (value: string) => void, onNext: () => void | Promise<void>; nextLoading?: boolean, nextDisabled?: boolean, nextText?: string, nextTestID?: string; fiatSymbol?: string | null, secondaryDisplay?: string | null, onToggleMode?: () => void; suggestions?: QuickSendSuggestion[], onSuggestionTap?: (s) => void; extraButtons?: ButtonHandlerProps['buttons']; transactionType: 'send' | 'receive' | 'neutral' (add the neutral variant so Split-Bill renders in foreground, not danger); header?: React.ReactNode, footer?: React.ReactNode (slots for 'Total to split' / 'You'll pick who pays next' microcopy); screenName: string (threaded to the Screen wrapper). Move FiatAmountDisplay into AmountEntryView. Rewire AmountSelector into a ~30-line adapter that unpacks the machine entry via the existing readAmountEntryFields helper and wires actions.setInput/actions.next/actions.toggle/actions.paste/actions.scanQr plus suggestions and machineBusy into the new contract. Rewire SplitBillAmountScreen into a ~40-line consumer that owns useState('') + parseInt locally and passes the header/footer microcopy through the slot props. The 'Future: toggle fiat' TODO then collapses to 'add onToggleMode + secondaryDisplay props' on the existing AmountEntryView call — no new UI work.",
+      "references": [
+        "app/(user-flow)/splitBill/amount.tsx:4",
+        "app/(user-flow)/splitBill/amount.tsx:49",
+        "features/send/screens/AmountSelector.tsx:120",
+        "features/send/screens/AmountSelector.tsx:227",
+        "features/send/screens/AmountFlowScreen.tsx:33",
+        "features/auth/components/CustomKeyboard.tsx:1",
+        "skill:building-native-ui",
+        "skill:react-native-best-practices",
+        "git:f797ae15"
+      ],
+      "verification_note": "Re-opened both files after Phase A. Verified AmountSelector takes entry + actions as props and is not fetching them internally (AmountSelector.tsx:120-135). Verified AmountFlowScreen is the sole caller of useScreenActions('amountEntry', ...) (AmountFlowScreen.tsx:33-36). Verified both send-flow and receive-flow amount routes already share AmountFlowScreen via thin route wrappers (app/(send-flow)/amount.tsx, app/(receive-flow)/amount.tsx), so the three-surface reuse story is achievable — Split-Bill is the only outlier. Counter-argument considered: 'AmountSelector's entry shape is designed around the machine's loose Record<string, unknown>, so Split-Bill would have to pretend to be a machine entry.' Correct, which is why the fix is to introduce a new typed primitive rather than forcing Split-Bill through AmountSelector directly.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "Fileoverview comment at splitBill/amount.tsx misrepresents why AmountSelector reuse was skipped",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/splitBill/amount.tsx",
+      "line": 4,
+      "symbol": "fileoverview",
+      "dimension": 1,
+      "description": "The comment at lines 4-7 claims: 'Lightweight standalone amount screen; doesn't use AmountSelector because that screen is tied to coco-payment-ux's useScreenActions(\"amountEntry\") state machine, which is scoped to actual send/receive payment flows.' AmountSelector is not tied to useScreenActions — it accepts entry: Record<string, unknown> and actions: AmountEntryActions as props (AmountSelector.tsx:120-127). The useScreenActions call lives one layer up in AmountFlowScreen.tsx:33-36. The real friction is that AmountSelector's typed prop contract is shaped by coco-payment-ux's machine entry fields, not that the component itself is bound to the machine.",
+      "why_it_matters": "The comment talks future readers (including this auditor on first pass) out of the reuse refactor by framing the duplicate as architecturally necessary. It isn't — it's an ergonomics gap that F-001's extraction closes. Leaving the comment in place perpetuates the misconception; removing it without the refactor leaves Split-Bill duplicating AmountSelector's shell with no explanation at all.",
+      "fix": "Delete or rewrite the comment once AmountEntryView lands. The replacement should describe what the file does (step 1 of the Split-Bill flow: enter total to split) and why it is small (it is a local-state consumer of the shared AmountEntryView primitive), with no claim about coco-payment-ux coupling.",
+      "references": [
+        "app/(user-flow)/splitBill/amount.tsx:4",
+        "features/send/screens/AmountSelector.tsx:120",
+        "features/send/screens/AmountFlowScreen.tsx:33"
+      ],
+      "verification_note": "Verified the claim by re-reading AmountSelector.tsx:120-135 (prop signature) and AmountFlowScreen.tsx:33-36 (where useScreenActions('amountEntry', ...) is actually called). Counter-argument considered: 'The comment could be interpreted loosely — AmountSelector's shape is effectively tied to the machine.' True but the comment says 'that screen is tied to ... useScreenActions', which is a concrete, inspectable claim, and it is wrong about the component boundary.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "skipped",
+    "3": "skipped",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "skipped",
+    "7": "skipped",
+    "8": "partial",
+    "9": "skipped",
+    "10": "skipped"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Extract a framework-neutral AmountEntryView into shared/ui/composed/AmountEntryView.tsx with a typed contract (rawInput, numericValue, unit, keyboardUnit, inputMode, onKeyPress, onNext, nextLoading, nextDisabled, nextText, nextTestID, fiatSymbol, secondaryDisplay, onToggleMode, suggestions, onSuggestionTap, extraButtons, transactionType ('send'|'receive'|'neutral'), header, footer, screenName). Move FiatAmountDisplay (currently private to AmountSelector.tsx:42-91) into the new primitive. Rewire AmountSelector into a ~30-line adapter that unpacks the machine entry via readAmountEntryFields and wires actions through; rewire SplitBillAmountScreen into a ~40-line local-state consumer that uses header/footer slots for its 'Total to split' and 'You'll pick who pays next' micro-copy. Picks up compact-phone responsive sizing for Split-Bill for free and unlocks fiat support in Split-Bill without duplicating FiatAmountDisplay.",
+      "files": [
+        "app/(user-flow)/splitBill/amount.tsx",
+        "features/send/screens/AmountSelector.tsx",
+        "shared/ui/composed/AmountEntryView.tsx"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Delete or rewrite the fileoverview comment block at app/(user-flow)/splitBill/amount.tsx:4-10 once AmountEntryView ships. It currently describes a coupling that the refactor removes and that the code itself does not actually have.",
+      "files": [
+        "app/(user-flow)/splitBill/amount.tsx"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does Split-Bill eventually want fiat entry on step 1 (per the TODO in the fileoverview), or does it stay sats-only? If fiat is planned, the AmountEntryView extraction is strictly blocking — without it, FiatAmountDisplay will be copy-pasted.",
+    "Should a 'neutral' transactionType variant land in AmountFormatter's useTypeColors too, or is neutral colouring always foreground? Send uses danger, receive uses foreground; Split-Bill semantics want foreground."
+  ]
+}

@@ -1,0 +1,342 @@
+{
+  "audit": {
+    "date": "2026-04-21",
+    "commit": "1c2fb9b0",
+    "entry_point": "sovran-app/features/transactions/components/Transactions.tsx",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Autoselection score ~7 (slice features/transactions never covered by any of the 28 prior audits, 14 commits in last 90 days, fund-display regression surface per SOV-16). Top disqualified: features/wallet (-3, exact match audit 27); shared/hooks (score ~8 but too diffuse for a concrete ENTRY file — 28 commits spread across many helpers); features/user (+2 only due to app/(user-flow) overlap in audit 18). Farthest from the most-recent band of CocoPayment/feed/wallet/settings/mint/receive audits (22-28).",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/README.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "vercel-react-native-skills",
+      "react-native-best-practices",
+      "native-data-fetching"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "TS2322 on features/transactions/components/Transactions.tsx:558 (waitForInitialLayout); other errors in unrelated files (GalleryScreen, UserMessagesScreen, manager.ts, migration.ts, WalletContextProvider, CapsuleButton.android, nativeTabs)",
+      "lint": "no findings inside features/transactions (21 problems elsewhere, mostly prettier/prettier in splitBill and unused-vars)",
+      "knip": "no findings inside features/transactions (28 unused files elsewhere, none in this feature)",
+      "analyze_structure": "no cycles in features/transactions; no real orphans (tool misreports files that are consumed from outside the queried subtree); fan-in ranking dominated by shared/ deps; only meaningful colocate hint is hooks/useHistoryWithMelts.ts → screens/ (2/2 importers)"
+    }
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Critical",
+      "confidence": 0.95,
+      "title": "Diagnostic log still dumps full scanHistoryStore.entries (raw ecash tokens) and transaction geo-location map to the ring buffer on every Transactions mount and every row tap",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/Transactions.tsx",
+      "line": 131,
+      "symbol": "tx.stores.dump (useEffect in Transactions)",
+      "dimension": 2,
+      "description": "Transactions.tsx:124-142 fires `log.info('tx.stores.dump', { ... scanEntries: scanState.entries, locations: locationState.locations })` on every mount. `ScanHistoryEntry.raw` is the raw scanned string (scanHistoryStore.ts:29), and sovranPaymentConfig.ts:548 calls `addScan(rawInput, rawInput, scanType, ...)` with rawInput = the full scanned payload — for `intentType === 'receiveToken'` (sovranPaymentConfig.ts:529) that payload is a Cashu ecash token including secrets/proofs. The diagnostic also emits the entire `locations` map (lat/long per historyEntry.id per transactionLocationStore.ts:16-20). A paired tap-time dump at Transaction.tsx:114-131 emits the full `locationEntry` and `scanEntry` objects on every transaction press. The ring buffer is user-exportable via `log.dumpForLLM()` (.claude/rules/log-doctor.md). grep of sovran-app/log.txt confirms 41 existing `tx.stores.dump`/`tx.detail.lookup` entries in the log — the logger path is live.",
+      "why_it_matters": "Ecash is a bearer instrument. Per AUDIT.md dim 2: any console.log, Sentry breadcrumb, or error-reporter path that could capture a token string is Critical. An attacker with device log access (USB debugging, a buggy log exporter, a crash-reporter upload) walks away with spendable tokens. The location map is also PII — plotting a user's payment locations over time is a de-anonymisation primitive. This was filed as F-001 in audit 03 (scanHistoryStore entry point) and is still present at the same line.",
+      "fix": "Change the diagnostic dump to emit counts and IDs only: `scanCount`, `scanEntries.map(e => ({ id: e.id, type: e.type, source: e.source, hasTx: !!e.transactionId }))` — never `raw`, never `processed`, never `optionKinds` shape. Same for locations: emit `locationCount` and the set of `entryId`s, not the lat/long. On the row-tap path (Transaction.tsx:119-131), drop the dump entirely — the `transaction.press` debug line at Transaction.tsx:115 already has what a triage run needs. If geo correlation is still needed for investigation, gate the raw dump behind an `__DEV__ && settings.diagnostics.dumpRawScans` flag so production users never emit it. The comment at Transactions.tsx:122-124 says 'Remove after investigating' — it has been there long enough that 03.json flagged it; the investigation must either complete or the gate must ship.",
+      "references": [
+        "docs/SOV-04.md (planned)",
+        ".claude/rules/log-doctor.md",
+        "skill:security-review"
+      ],
+      "verification_note": "Re-checked: Transactions.tsx:127-139 is unchanged from audit 03; scanHistoryStore.ts:29 still declares raw as the raw scanned string; sovranPaymentConfig.ts:548 still passes rawInput as both args of addScan. Counter-argument considered: the scanEntries array was observed empty in the latest log session — does that make the path benign? No: emptiness is session-state, not code-state. Any user who has ever scanned a token to receive ecash has a populated entries array and the next mount of Transactions writes those tokens to the ring buffer.",
+      "prior_audit_id": "F-001@03.json"
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "`waitForInitialLayout` is not a LegendList prop — TS2322 compile error on Transactions list root",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/Transactions.tsx",
+      "line": 558,
+      "symbol": "LegendList waitForInitialLayout={false}",
+      "dimension": 1,
+      "description": "`npm run type-check` emits `TS2322: Property 'waitForInitialLayout' does not exist on type 'IntrinsicAttributes & Omit<LegendListPropsBase<...>, ...> & RefAttributes<...>'`. The prop is silently ignored at runtime. Same error recurs at features/user/screens/UserMessagesScreen.tsx:2464 — this is a codebase-wide pattern, but this audit is scoped to the transactions feature.",
+      "why_it_matters": "A failing type-check lets any future type error in the file slip through unless someone reads the full output. The prop was presumably meant to affect initial-render behaviour of the list — its silent removal means the list renders with default behaviour, which may cause the user-visible symptom the prop was added to fix. Worth verifying against the Legend-List-3.0 migration warning emitted at log.txt line 24: 'Legend List 3.0 deprecates the root import ... please switch to platform-specific imports.' A major-version migration likely renamed/removed the prop.",
+      "fix": "Open the installed `@legendapp/list` version's d.ts (or the package's CHANGELOG for 3.x) to confirm whether the prop was renamed (e.g. to `initialScrollIndex` + `maintainVisibleContentPosition` alternatives) or removed. If removed with equivalent default, delete the prop. If the intent was to skip a pre-measure pass, file a follow-up on how that's now expressed. Also switch the import per the deprecation warning from '@legendapp/list' to '@legendapp/list/react-native' (Transactions.tsx:4). Fix the same pattern at features/user/screens/UserMessagesScreen.tsx:2464 in the same change.",
+      "references": [
+        "ts:TS2322",
+        "skill:vercel-react-native-skills"
+      ],
+      "verification_note": "Re-verified by running type-check; the error is emitted against the exact line in my ENTRY file. Counter-argument: the project ships with this error, so the product works despite it. True — but the prop isn't doing what the code expects, and type errors mask future regressions.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.85,
+      "title": "Per-row linear scan over scanHistoryStore.entries — O(N_rows × M_scan_entries) selector cost on every scan-store mutation",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/Transaction.tsx",
+      "line": 80,
+      "symbol": "useTransactionSource + useBip321Options (local to Transaction.tsx) and useTransactionSource + useBip321Info (TransactionSourceSection.tsx)",
+      "dimension": 7,
+      "description": "Transaction.tsx:79-99 subscribes each rendered row to `useScanHistoryStore` twice — once via `useTransactionSource` (state.entries.find(e => e.transactionId === historyEntry.id)) and once via `useBip321Options` (same .find). TransactionSourceSection.tsx:36-64 does the same for detail screens and defines THREE subscriptions per transaction (source, isBip321, optionKinds), each with its own independent linear scan. For N rendered rows and M persisted scan entries, any mutation to scanHistoryStore (addScan, linkTransaction, removeEntry) triggers O(N × M) work across subscribers, and every scroll that mounts new rows adds new subscriptions with the same cost profile. The store itself only exposes array-scan helpers (findByTransactionId in scanHistoryStore.ts:189) — no indexed lookup.",
+      "why_it_matters": "A user who uses the wallet heavily accumulates scan entries indefinitely (the store has no eviction). Combined with the Transactions list rendering the entire month of history at once (no virtualised windowing of the Transaction component's own state subscriptions), per-row work compounds. No log-doctor slow/gc trace directly captures this today because the scan entries array is small in the captured session, but the pattern is a structural race/perf smell per AUDIT.md dim 7 'self-evident from the source.'",
+      "fix": "Extend scanHistoryStore with a derived `entriesByTransactionId: Record<string, ScanHistoryEntry>` maintained by addScan/linkTransaction/removeEntry/clearHistory — then every row selector becomes `state.entriesByTransactionId[id]`, O(1). In the same change, consolidate the duplicated hooks (see F-006) so there is one `useTransactionSource(historyEntry)` that both the row and detail-section consume. Detail screens additionally need to drop the three-selector pattern and use a single `useShallow`-wrapped tuple or the new indexed accessor.",
+      "references": [
+        "skill:zustand-5",
+        "skill:vercel-react-native-skills"
+      ],
+      "verification_note": "Self-evident structural perf pattern from the source; quantified impact would need log-doctor instrumentation (propose scanHistoryStore logging state.entries.length at every mutation, paired with Transactions.tsx emitting list length, then running slow --threshold 16 during a scroll). Counter-argument: React Compiler may reduce some re-render churn, but cannot collapse the selector work since selectors run on every store update regardless of downstream render.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "`getTimelineKey` falls back to `Math.random()` and can use raw bearer tokens as React keys",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/Transactions.tsx",
+      "line": 50,
+      "symbol": "getTimelineKey",
+      "dimension": 1,
+      "description": "Lines 50-58: `if (entry.id) return entry.id; if ('token' in entry && entry.token) return typeof entry.token === 'string' ? entry.token : JSON.stringify(entry.token); return Math.random().toString();`. Two defects: (a) a fresh `Math.random()` on every render means the key for that item changes every render — React cannot reconcile the row, the Transaction component is destroyed and remounted on every parent update, state is lost, and any mount-time effect (including the row's own scan-history subscriptions) re-fires. (b) When an entry has a `token` string, the token — which is a Cashu bearer instrument carrying secrets — is stamped into React's internal fiber tree and exposed via React DevTools. It also risks 'duplicate key' warnings if the same token surfaces twice.",
+      "why_it_matters": "Random keys are a known React footgun causing flicker, lost focus, broken animations, and in this feature, repeated remounts of rows that each subscribe to Zustand. Token-as-key leaks funds-carrying data through React's own introspection surface — anyone using DevTools on a dev build sees the token in the element tree.",
+      "fix": "Replace the fallback chain with a deterministic composite key: `return `${item.kind}-${entry.type}-${entry.createdAt}-${entry.amount}``; the tuple is stable and cannot collide with another TimelineItem. Remove the `entry.token` branch entirely — a token is never a safe key. If IDs are missing from HistoryEntry in some coco paths, file upstream (or via sovran-app/patches/) rather than papering over it in UI code.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-checked file; behaviour is as described. Counter-argument: entries may always have an id in practice — true for most types, but the fallback exists specifically because some paths don't, and the fix is so cheap that removing the risk is the right call.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Two hooks named `useHistoryEntry` — one inline in Transaction.tsx, one exported from hooks/useHistoryEntry.ts — with completely different return shapes",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/Transaction.tsx",
+      "line": 101,
+      "symbol": "useHistoryEntry (inline) vs useHistoryEntry (exported)",
+      "dimension": 4,
+      "description": "Transaction.tsx:101-186 declares a local `useHistoryEntry(historyEntry)` returning `{ isSend, isReceive, isRolledBack, fiatAmount, handlePress, displayLabel }` — pure row-UI concerns. features/transactions/hooks/useHistoryEntry.ts:32 declares a hook of the same name returning `{ entry, error }` — parses a JSON-or-object initialEntry and subscribes to manager 'history:updated' events for real-time sync. The barrel index.ts:27 re-exports only the hooks/ version. A reader opening Transaction.tsx expecting the barrel hook finds a silently-shadowed local with different semantics; the names collide with no compiler aid since the inline version isn't exported.",
+      "why_it_matters": "Name collisions on hooks are a long-term maintenance hazard: someone refactoring the row 'pulls the hook up' and accidentally merges with or imports the other one. The functions share no meaningful behaviour.",
+      "fix": "Rename the inline hook. `useTransactionRow(historyEntry)` is accurate (it bundles row-UI state + handlePress). Keep the file-scope definition or move it next to Transaction since it's row-scoped. The hooks/useHistoryEntry.ts name is better preserved because it's imported by detail screens (meltQuote, sendToken, etc.) and those call sites would be more churn to rename.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Confirmed both definitions and the barrel export. No counter-argument — the collision is real and self-evident.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "`useTransactionSource` and `useBip321*` are duplicated across Transaction.tsx and TransactionSourceSection.tsx with mismatched signatures",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/detail/TransactionSourceSection.tsx",
+      "line": 36,
+      "symbol": "useTransactionSource, useBip321Info vs Transaction.tsx:79 useTransactionSource, :93 useBip321Options",
+      "dimension": 4,
+      "description": "Transaction.tsx:79 defines `useTransactionSource(historyEntry: HistoryEntry): TransactionSource | null` returning the raw enum key ('qr', 'nfc', etc.); TransactionSourceSection.tsx:36 exports `useTransactionSource(transactionId: string | undefined): string | null` returning the human-readable label ('QR Code', 'NFC'). Transaction.tsx:93 defines `useBip321Options(transactionId)` returning `string[] | null`; TransactionSourceSection.tsx:48 exports `useBip321Info(transactionId)` returning `{ isBip321, optionKinds }`. Four hooks, two names, two subtly different APIs, and per F-003 each one runs its own linear scan over scanHistoryStore.entries.",
+      "why_it_matters": "The two code paths drift independently. An engineer who adds a new ScanSource or a new bip321 option kind must update four call sites, not one, and easily misses the detail-section variant because it lives in a child folder. Bundled with F-003, this is also three-plus extra selector subscriptions per detail screen.",
+      "fix": "Consolidate into `shared/stores/profile/scanHistoryStore.ts` as indexed selectors: `useScanEntryForTransaction(id) → ScanHistoryEntry | null`. Row and detail-section both derive from that. Display concerns (icon map, label map) live at the call site. This collapses F-003's perf issue, F-005's and F-006's duplication in one move.",
+      "references": [
+        "skill:zustand-5"
+      ],
+      "verification_note": "Confirmed via grep — both files import useScanHistoryStore; both run .find over entries; both expose near-identical hook surfaces.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.55,
+      "title": "Inline `renderItem` and `ListHeaderComponent` create fresh references on every Transactions render",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/Transactions.tsx",
+      "line": 566,
+      "symbol": "LegendList renderItem + ListHeaderComponent",
+      "dimension": 7,
+      "description": "Line 570: `renderItem={({ item: section }) => (...)}` is an inline arrow. Line 566: `ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}` constructs a fresh View element each render. React Compiler (confirmed enabled via app.json:118 reactCompiler:true) may memoize the closures, but LegendList's internal windowing/memoization still benefits from a stable renderItem reference, and the extra `<View>` wrapper on the header is redundant when `header` itself is already a ReactNode.",
+      "why_it_matters": "Marginal — React Compiler likely handles both cases. Flagged because it's visible defensive noise and the header wrapper is load-bearing for nothing.",
+      "fix": "`const renderItem = useCallback(({ item: section }) => ( ... ), [foreground, muted, borderColor, renderTimelineItem])`. For header, pass the resolved node directly: `const resolvedHeader = useMemo(() => (typeof header === 'function' ? header() : header), [header]); ... ListHeaderComponent={resolvedHeader}`.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Downgraded from initial Medium — React Compiler is enabled so the perf impact is likely marginal. Kept as Low because the header wrapper is genuinely redundant even ignoring memoization.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "`estimatedItemSize` is the first section's height only — mis-sizes all other sections in LegendList",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/Transactions.tsx",
+      "line": 563,
+      "symbol": "LegendList estimatedItemSize",
+      "dimension": 7,
+      "description": "Line 552-553: `estimateSectionHeight(section) = HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16`, and the LegendList prop is `estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}` — a single number derived from section 0. Each section has a distinct number of rows, so this systematically mis-sizes the others, which shows up as scroll-position jumps when the list re-estimates, and incorrect total-content-height for the scrollbar.",
+      "why_it_matters": "User-visible scroll glitching on the transactions list. Modest.",
+      "fix": "Compute the average: `const avg = useMemo(() => sectionsToDisplay.length ? Math.round(sectionsToDisplay.reduce((s, sec) => s + estimateSectionHeight(sec), 0) / sectionsToDisplay.length) : ITEM_HEIGHT, [sectionsToDisplay])`, pass `estimatedItemSize={avg}`. If LegendList 3.x exposes a per-item `getEstimatedItemSize`/`getItemLayout` callback, prefer that.",
+      "references": [
+        "skill:vercel-react-native-skills"
+      ],
+      "verification_note": "Straightforward reading of the code. Counter-argument: a constant estimate is fine if sections are uniform-ish — true for the Confirmed tab; not true for the All tab when pending + expired + confirmed sections differ wildly.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Dead `type?: string` field on the `Account` interface",
+      "repo": "sovran-app",
+      "path": "features/transactions/components/Transactions.tsx",
+      "line": 62,
+      "symbol": "Account.type",
+      "dimension": 1,
+      "description": "`interface Account { unit: string; type?: string }` at line 62-65. `type` is never read anywhere in Transactions.tsx — every reference to `account.X` uses only `account.unit`. Call sites (TransactionsScreen.tsx, WalletScreen, SendScreen etc.) pass `{ unit }` objects without a `type`.",
+      "why_it_matters": "Dead type surface. Small, but removes a reader-question ('what happens when type differs from unit?').",
+      "fix": "Remove `type?: string` from the Account interface (and any call site that passes it, if any).",
+      "references": [],
+      "verification_note": "grep confirms no usage of `account.type` inside the file. Counter-argument: external callers might set `type` to hint the Transactions internal logic — but none do, and the field is never read inside the file, so it's dead.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.45,
+      "title": "UNVERIFIED: `useHistoryWithMelts` subscribes to `history:updated` and calls refresh(), which may re-emit the same event",
+      "repo": "sovran-app",
+      "path": "features/transactions/hooks/useHistoryWithMelts.ts",
+      "line": 131,
+      "symbol": "history:updated subscription",
+      "dimension": 1,
+      "description": "Lines 131-136 subscribe to `manager.on('history:updated', () => { void paginatedResult.refresh(); })`. If coco's `usePaginatedHistory` internally emits `history:updated` as part of its refresh() implementation (e.g. when it writes back to the HistoryRepository after fetching), this handler triggers itself, producing a feedback loop. I did not open coco/packages/coco-react to verify refresh() semantics.",
+      "why_it_matters": "An event → refresh → event loop would pin the JS thread and burn battery. log-doctor perf.js_thread_blocked firing 12x in an 80s session (slow --latest) includes blocks up to 225ms but I did not isolate them to this loop. If refresh() is idempotent and only triggers UI state replacement (no back-emit), this is fine.",
+      "fix": "Open coco-react's usePaginatedHistory.refresh implementation or add a throttle: debounce the handler by 200ms to collapse any immediate re-emission. If the loop is real, a stronger fix is a dedup guard — track last-processed history version number and skip the handler if it hasn't changed.",
+      "references": [
+        "skill:native-data-fetching"
+      ],
+      "verification_note": "UNVERIFIED — requires reading coco/packages/coco-react/src/hooks/usePaginatedHistory.ts (out of audit scope here) or enabling a perf.js_thread_blocked scope on this event pair. Proposed probe: cashuLog.debug('tx.history.refresh', { source: 'history:updated' }) inside the handler + stats --event 'tx.history.refresh' over a long session; counts > 2 per real update are the diagnostic signal.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "`filteredByTypeHistory` is fed to MonthSelector but never to Transactions — two filter pipelines diverge silently",
+      "repo": "sovran-app",
+      "path": "features/transactions/screens/TransactionsScreen.tsx",
+      "line": 114,
+      "symbol": "filteredByTypeHistory",
+      "dimension": 1,
+      "description": "TransactionsScreen.tsx:114-122 builds `filteredByTypeHistory` by applying `selectedCurrency` + `getCocoTransactionTypes()` to `history`. That value is passed to MonthSelector (line 130) but the `<Transactions>` component receives the unfiltered `history={history}` (line 157). `Transactions` then does its own filter using `filter`, `type`, `mintUrlFilter`, `account.unit` — a different implementation of the same filter logic. Today the two match, but any future divergence (e.g. adding a 'receive' sub-filter to only one of them) would cause MonthSelector to offer months whose transactions don't appear in the list below.",
+      "why_it_matters": "Double-sourced filter logic is a footgun. Current behaviour is correct but fragile.",
+      "fix": "Either (a) pass `filteredByTypeHistory` down as the data source so both MonthSelector and Transactions operate on the same pre-filtered array and Transactions drops the matching branches of its internal filter; or (b) delete `filteredByTypeHistory` and derive MonthSelector's month list from whatever Transactions actually rendered. Option (a) is the cleaner separation.",
+      "references": [],
+      "verification_note": "Confirmed via reading both files. Counter-argument: keeping Transactions self-filtering makes it reusable from WalletScreen and other contexts without a pre-filter step — valid. In that case, push the filter logic into a shared helper (`filterHistory(history, opts)`) that both TransactionsScreen and Transactions can call.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "`tx.list.render` logs on every TransactionsScreen render, outside any memo",
+      "repo": "sovran-app",
+      "path": "features/transactions/screens/TransactionsScreen.tsx",
+      "line": 102,
+      "symbol": "log.debug('tx.list.render', ...)",
+      "dimension": 10,
+      "description": "Lines 102-109 fire `log.debug('tx.list.render', { ... })` synchronously in the render body — every render, not just on meaningful state changes. Even at DEBUG level this produces ring-buffer noise; log-doctor `stats` flags any event >15% of total as 'excessively repeated', and this is a classic candidate.",
+      "why_it_matters": "Ring buffer is finite (1k entries typical). Every render-log entry evicts a potentially-useful entry. When investigating a real regression, noise wins.",
+      "fix": "Move inside a `useEffect([tab, paymentType, direction, selectedCurrency, filterMintUrl, selectedMonth, history.length])` so it only fires when an input meaningfully changes, or drop it entirely and rely on the existing `tx.sections_computed` log at Transactions.tsx:367 (same information, memoized).",
+      "references": [
+        ".claude/rules/log-doctor.md"
+      ],
+      "verification_note": "Confirmed in the file. Counter-argument: DEBUG events get dedup'd at 50ms by the logger, so N identical renders within 50ms collapse to one entry — true, and this mitigates the noise but doesn't remove it. The useEffect form is still cleaner.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Dropped tx.list.render log; tx.sections_computed already covers the same data per the audit's preferred fix."
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "partial",
+    "4": "pass",
+    "5": "skipped",
+    "6": "skipped",
+    "7": "pass",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Merge Transaction.tsx-local useTransactionSource/useBip321Options with TransactionSourceSection.tsx exports into a single scanHistory-sourced hook API. Add an `entriesByTransactionId` index on scanHistoryStore maintained in addScan/linkTransaction/removeEntry; expose `useScanEntryForTransaction(id)` and derive source/bip321 at the call site. Fixes F-003, F-005's sibling naming pattern, and F-006 together. Also rename Transaction.tsx's inline `useHistoryEntry` to `useTransactionRow` to end the F-005 collision.",
+      "files": [
+        "features/transactions/components/Transaction.tsx",
+        "features/transactions/components/detail/TransactionSourceSection.tsx",
+        "shared/stores/profile/scanHistoryStore.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Extract the filter logic shared between TransactionsScreen.tsx and Transactions.tsx into a `filterHistory(history, opts)` helper under features/transactions/lib/ (new folder). Call sites become single-source. Resolves F-011 without breaking reusability of Transactions from WalletScreen.",
+      "files": [
+        "features/transactions/screens/TransactionsScreen.tsx",
+        "features/transactions/components/Transactions.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Propose a log-doctor mode: `npm run log-doctor -- privacy` that scans the latest session for events containing sensitive keys — scanEntries[].raw, tokens (regex `cashu[ABC][A-Za-z0-9=+/-]{80,}`), lat/long numeric pairs inside log bodies, and mnemonic-like whitespace-separated word sequences. Emit a count per offending event name and the first few cited bodies so future auditors catch F-001-style regressions automatically without a manual grep. Document in .claude/rules/log-doctor.md in the same PR.",
+      "files": [
+        "scripts/log-doctor.ts"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Recommend a research note `research:transactions-store-coupling.md` (status: exploring, tags: [transactions, zustand, dim-7, dim-3]) capturing the tradeoff between (a) per-feature row components subscribing to many small stores vs (b) a consolidated transaction-row selector that batches source + location + distribution in one subscription. F-003's perf fix is one datapoint, but the wider question — 'should Transaction.tsx own four separate selectors or one?' — is the kind of sketch that belongs in __research__ before it becomes an SOV spec.",
+      "files": [
+        "sovran-app/__research__/"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Is `@legendapp/list` 3.x's `waitForInitialLayout` prop renamed or removed? (F-002 fix depends on this. Same prop usage at features/user/screens/UserMessagesScreen.tsx:2464.)",
+    "Does coco-react's `usePaginatedHistory.refresh()` re-emit `history:updated`? (F-010 severity depends on this. Open coco/packages/coco-react/src/hooks to confirm, or log-instrument.)",
+    "Is SOV-16 (Transaction History & Metadata) the right band for this audit surface? The band is declared TODO in docs/README.md — ratifying it would give future audits a regression surface for the two hooks' contract, the scan-history integration, and the 'transactions.filter.slow' performance bar."
+  ]
+}

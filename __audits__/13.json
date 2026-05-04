@@ -1,0 +1,392 @@
+{
+  "audit": {
+    "date": "2026-04-20",
+    "commit": "bd018588",
+    "entry_point": "sovran-app/app/(user-flow)/bitchatDM.tsx",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "07.json",
+      "09.json",
+      "12.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md",
+      "docs/README.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "zod-4",
+      "security-review",
+      "react-native-best-practices",
+      "typescript-advanced-types",
+      "neverthrow-return-types"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "project-wide errors in unrelated files (WalletContextProvider.tsx, CapsuleButton.android.tsx etc.); zero errors in app/(user-flow)/bitchatDM.tsx, features/bitchat/**, modules/bitchat-module/**",
+      "lint": "11 errors + 1 warning project-wide, all in split-bill/mint-flow/drawer — zero lint hits in the blast radius",
+      "knip": "4 unused exports in bitchat: BITCHAT_EVENT_KIND_EPHEMERAL / _PRESENCE / _TEXT_NOTE in features/bitchat/lib/constants.ts:18-20 and 4 unused types (BitChatTransport, DMTarget, UseBLEPeersResult, GeohashChatScreenProps). No unused files reported by knip — dead files surfaced only via analyze-structure + manual grep",
+      "analyze_structure": "features/bitchat: 14 files, 1365 code-LOC, zero import cycles. Fan-in: useBitChat and useBLEPeers each imported only from screens; MessageBubble / MessageList / ChannelHeader / ComposeBar each imported only from BitChatScreen.tsx (which is itself reached only from app/(bitchat-flow)/[geohash].tsx — a route with no callers). 4 'potentially dead code' orphans flagged (3 false positives from subtree scope, 1 true — BitChatScreen.tsx). One colocate suggestion: hooks/useBitChat.ts"
+    }
+  },
+  "completion_status": "deferred",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Critical",
+      "confidence": 0.95,
+      "title": "NIP-17 impersonation: decryptPrivateMessage returns rumor.pubkey without verifying seal.pubkey == rumor.pubkey, so any attacker can forge a DM that the app attributes to any other peer",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/ios/BitChatVendor/bitchat/Nostr/NostrProtocol.swift",
+      "line": 100,
+      "symbol": "decryptPrivateMessage",
+      "dimension": 2,
+      "description": "NIP-17 mandates in nips/17.md:126 that clients MUST verify the kind:13 seal's pubkey matches the kind:14 rumor's pubkey — 'otherwise any sender can impersonate others by simply changing the pubkey on kind:14'. `NostrProtocol.decryptPrivateMessage` at lines 67-101 unwraps the gift wrap, opens the seal, and returns `(content: rumor.content, senderPubkey: rumor.pubkey, timestamp: rumor.created_at)` at line 100. It never reads `seal.pubkey`, never compares the two, and never verifies the seal's Schnorr signature (`openSeal` at lines 251-268 only calls `decrypt()` — there is no `seal.sign(with:).verify()` anywhere in the unwrap path). The bridge at `BitChatNostrBridge.swift:249-256` calls `decryptPrivateMessage` and emits `senderPubkey: decrypted.senderPubkey` to JS; the JS hook at `features/bitchat/hooks/useBitChat.ts:279` then routes the message into the DM thread keyed on that pubkey (`if (event.senderPubkey !== dmPeerID) return;`). Because NIP-44 v2 decryption only requires the seal content to have been encrypted with `shared_secret(seal.pubkey, recipient)` — which the attacker satisfies by signing the seal with their own key — a malicious peer can craft a rumor whose `pubkey` field is spoofed to any target identity, wrap it, send it to the recipient, and have the app display it as a message from that target. Spoofed rumor.pubkey can be a real contact's per-geohash identity (visible in any public geohash chat) or any pubkey the attacker wants to impersonate. Confidence 0.95 — the code path is auditable end-to-end; the only residual risk is that `BitChatVendor` is a submodule whose latest upstream may have added the check elsewhere (I checked the file in-tree as it ships today and none exists).",
+      "why_it_matters": "Direct social-engineering path to funds loss. Concrete scenario: Alice and Bob are in the same #city geohash; Alice regularly DMs Bob about splitting the bill. Attacker Eve reads Alice's per-geohash pubkey off public chat, then Bob's. Eve wraps a kind:14 rumor with `pubkey = Bob_per_geohash_pubkey`, content = 'Hey, my regular address broke — send it to lnbc1…<attacker invoice> instead', seals with Eve's key, gift-wraps to Alice. Alice's app decrypts, routes into the Bob DM thread, renders 'Bob: my regular address broke…'. Alice trusts Bob, pays the Lightning invoice, loses funds. The attack needs no handshake with Alice, no pairing, no prior contact — only the target's per-geohash pubkey (public). It is also ambient: the 24h gift-wrap lookback (TransportConfig.nostrDMSubscribeLookbackSeconds wired at BitChatNostrBridge.swift:135) means the spoofed event is replayed every time Alice rejoins the geohash, so the attack doesn't require Alice to have her DM screen open when it lands. This is a flat violation of a NIP-17 MUST.",
+      "fix": "Three layers, pick the cheapest that works. (A, preferred) Add the check in `NostrProtocol.decryptPrivateMessage` before returning: extract `seal.pubkey` from the inner unwrap, compare to `rumor.pubkey` (case-insensitive), throw `NostrError.impersonationAttempt` if they diverge. Also call `seal.verify()` (Schnorr verify of seal.sig over seal.id) before trusting seal.pubkey — a seal whose sig doesn't verify is attacker-forged regardless. Because `BitChatVendor` is a git submodule, either fork the submodule to a Sovran-controlled branch or carry the patch as a Swift-level shim in `modules/bitchat-module/ios/` that wraps `decryptPrivateMessage` with the missing check. (B, minimum viable in-bridge) In `BitChatNostrBridge.swift:handleGiftWrap`, do not call `NostrProtocol.decryptPrivateMessage`; re-implement the two-step unwrap locally so the bridge has access to both seal and rumor, perform `guard seal.pubkey.lowercased() == rumor.pubkey.lowercased() else { return }`, then emit. (C, defence in depth) In `BitChatNostrBridge.handleGiftWrap:278-288`, additionally verify the seal's Schnorr signature using the P256K binding already present in `NostrEvent.sign`. Open an upstream issue on bitchat with the exploit POC so the fix propagates. File it in sovran-app/patches/ or as a submodule fork — do NOT wait on upstream. Cross-reference nips/17.md:126, nips/59.md (NIP-59 gift-wrap spec).",
+      "references": [
+        "nips/17.md:126",
+        "nips/59.md",
+        "skill:security-review",
+        "skill:wycheproof"
+      ],
+      "verification_note": "Re-read NostrProtocol.swift:67-101 (decryptPrivateMessage — returns rumor.pubkey with no seal.pubkey check), 251-268 (openSeal — decrypt only, no verify), 227-249 (unwrapGiftWrap — decrypt only, no verify). Grepped for `seal.pubkey`, `verifySignature`, `verify(`, `seal.sig` under modules/bitchat-module/ios/BitChatVendor/bitchat/Nostr/ — only match is the seal CREATION at line 193 (seal.sign). Confirmed no verify path. Re-read nips/17.md:126 for the MUST. Counter-argument considered: 'upstream bitchat's own client has the same surface, so this is a protocol-layer problem not a Sovran one'. Rejected — AUDIT.md dim-2 requires NIP compliance regardless of upstream's position, and the recommended fix path (patches/ + submodule fork) is already the codebase convention for wallet-side coco patches. Also considered: 'maybe NostrEvent(from:) verifies the sig during parse'. Grepped NostrEvent.swift for `init(from` — bash output was empty, suggesting the init either doesn't exist by that name or doesn't verify; either way, no call to verify() appears in the unwrap chain. Confidence 0.95 reflects the residual chance upstream carries verification at a layer I didn't open, BUT even if so the seal.pubkey == rumor.pubkey check is definitively absent and that alone is the NIP-17 MUST. Severity Critical per the rubric — 'funds can be lost' with a clear attack path.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "bitchatDM deep-link params (transport, peerID, nickname, geohash) are not zod-validated — attacker-crafted link pipes any pubkey + any nickname into the DM flow, ciphering every typed message to the attacker under a spoofed display name",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/bitchatDM.tsx",
+      "line": 21,
+      "symbol": "BitchatDMRoute / useLocalSearchParams",
+      "dimension": 5,
+      "description": "The route pulls four params directly from `useLocalSearchParams<{ transport: 'ble-dm' | 'nostr-dm'; peerID: string; nickname?: string; geohash?: string }>()`. The TypeScript type is purely compile-time; at runtime `useLocalSearchParams` returns whatever the URL provides. The guard at line 29 is `if (!transport || !peerID) return null;` — truthiness only. No shape validation on `peerID` (should be /^[0-9a-f]{16}$/i for ble-dm or /^[0-9a-f]{64}$/ for nostr-dm), no allowlist on `transport` (TS literal union is unchecked at runtime), no length cap on `nickname`. Attack path: attacker sends a universal link `sovran://bitchatDM?transport=nostr-dm&peerID=<attacker_per_geohash_pubkey>&nickname=Alice&geohash=<a_geohash_the_victim_already_joined>`. Victim taps, app mounts `BitchatDMRoute`, which renders `GeohashChatScreen` with `dmPeerID=attacker_pubkey` and `dmNickname='Alice'`. The header title becomes 'Alice' (GeohashChatScreen.tsx:286-287). Every message the victim types is sent via `sendGeohashPrivateMessage(attacker_pubkey, content)` — NIP-17 gift-wrapped DM straight to the attacker — and added to the local thread as if the victim was chatting with their real friend Alice. This is distinct from F-001 (which spoofs inbound messages via rumor.pubkey forgery): F-002 spoofs the OUTBOUND side by misdirecting the user's composed messages. The two compose — F-001 lets the attacker forge replies that appear to come from 'Alice', F-002 lets them collect the user's replies addressed to 'Alice'.",
+      "why_it_matters": "Universal-link phishing on a messaging surface that is also a payments surface — users routinely discuss Lightning invoices, Cashu tokens, and addresses in bitchat DMs. Once the attacker has a bidirectional impersonated thread (F-001 inbound + F-002 outbound), the attack is a complete chat-layer MITM with no cryptographic red flag for the user to notice. The bar is trivial: a single tap on a hostile link, which iOS universal links can route directly into the app without an intermediate confirmation. Cross-cuts SOV-23 (Encrypted Messaging — TODO in docs/README.md) and SOV-34 (Deep Links — TODO); a ratified spec would freeze the 'deep links into DM must validate the peer is already known' rule. AUDIT.md dim-5 explicitly requires `Deep-link params are parsed through a zod schema; flag direct use of useLocalSearchParams() without validation` — this file uses exactly the forbidden pattern.",
+      "fix": "Replace the raw `useLocalSearchParams()` with a zod-validated parse. Define at the top of the file (or in `features/bitchat/lib/schemas.ts`): `const BitchatDMParams = z.discriminatedUnion('transport', [z.strictObject({ transport: z.literal('ble-dm'), peerID: z.string().regex(/^[0-9a-f]{16}$/i).transform(s => s.toLowerCase()), nickname: z.string().max(80).optional(), geohash: z.string().optional() }), z.strictObject({ transport: z.literal('nostr-dm'), peerID: z.string().regex(/^[0-9a-f]{64}$/).transform(s => s.toLowerCase()), nickname: z.string().max(80).optional(), geohash: z.string().regex(/^[0-9bcdefghjkmnpqrstuvwxyz]{1,12}$/).min(1) })]);` — note nostr-dm REQUIRES geohash (no fallback — see F-005), and the geohash alphabet excludes a/i/l/o per the bitchat spec. Then `const raw = useLocalSearchParams(); const parsed = BitchatDMParams.safeParse(raw); if (!parsed.success) return null;`. In addition, at the GeohashChatScreen level, when transport is nostr-dm or ble-dm, display a prominent 'First message to this contact' banner the first time a `dmPeerID` not in the user's existing DM history is opened — so deep-link-sourced impersonation is surfaced visually even if a future schema regression slips through. Skills to cite: zod-4 (z.strictObject, z.discriminatedUnion, regex + transform), security-review.",
+      "references": [
+        "nips/17.md:126",
+        "skill:zod-4",
+        "skill:security-review",
+        "docs/README.md (SOV-23 / SOV-34 TODO)"
+      ],
+      "verification_note": "Re-read bitchatDM.tsx:20-39 end-to-end. Confirmed `if (!transport || !peerID) return null;` is the only runtime check. Traced peerID flow: bitchatDM.tsx:35 → GeohashChatScreen:227 → useBitChat:74 (dmPeerID) → useBitChat:362 (sendBLEPrivateMessage) / :399 (sendGeohashPrivateMessage). Counter-argument considered: 'universal links require user tap — it's the user's own choice.' Weak — the user's choice is to OPEN the link, not to accept 'this peerID is actually Alice'. The spoofed nickname is the entire deception and iOS gives the user no preview. Also considered: 'no other screen validates useLocalSearchParams either'. True — dim-5 is a recurring pattern across the codebase — but this screen is uniquely dangerous because the params control a cryptographic recipient identity. Severity High, not Critical, because the damage vector is social engineering layered on top of a misdirection bug; not an automatic fund-drain. Stacks directly with F-001 — fixing F-001 alone does NOT fix F-002's outbound misdirection.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "bitchatDM now validates transport/peerID/nickname/geohash with zod via useRouteParams; peerID shape gated by transport."
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "useBitChat clears local message state on every effect teardown (transport switch, unmount, dep change) — ble-dm DMs are permanently lost because no replay exists on the BLE side",
+      "repo": "sovran-app",
+      "path": "features/bitchat/hooks/useBitChat.ts",
+      "line": 197,
+      "symbol": "ble-dm / nostr-dm / ble / nostr effect cleanups",
+      "dimension": 1,
+      "description": "All four transport effects call `setMessages([])` in their cleanup return: ble at line 139, ble-dm at line 197, nostr at line 252, nostr-dm at line 314. Combined with the fact that `messages` lives only in React state (no store, no SQLite, no MMKV), every navigation away from the DM screen wipes the thread. For nostr-dm, the native geo-dm subscription has a 24-hour lookback (`TransportConfig.nostrDMSubscribeLookbackSeconds`, wired at BitChatNostrBridge.swift:135), so reopening the DM within 24h re-materialises messages from gift-wrap replay. For ble-dm there is NO replay — BLE Noise-encrypted payloads are point-in-time transient; once the hook unmounts, those messages are gone forever. Also: since the own-echo at line 353-362 is synthesised in JS (BLE private messaging has no own-echo event), the user's own sent messages vanish too. The user types 'sending you 1000 sats: cashuB…', closes the DM, comes back five minutes later — empty thread, no evidence the message was sent.",
+      "why_it_matters": "Breaks the foundational trust expectation of a 1:1 messaging UI: messages should persist until the user deletes them. For ble-dm this is an absolute data loss (no replay source exists); for nostr-dm it is a time-bounded loss. For a wallet where users discuss payments in DMs, the data loss is directly adjacent to funds-risk UX (a user convinced 'did I send it? there's no record') — not a direct attack path, but a trust-undermining defect that composes badly with F-006 (optimistic send with no rollback): send fails silently, history is later wiped on unmount, the user has no way to tell send ever happened. Medium not High because it is a correctness/UX bug, not a direct funds-loss vector.",
+      "fix": "Remove `setMessages([])` from all four cleanup paths. Replace with a persistent store: a new profile-scoped Zustand slice `bitchatDMStore` keyed by `${transport}:${peerID}:${geohash_or_mesh}` holding the last N (e.g. 500) messages per thread, persisted via AsyncStorage with an explicit `version` + `migrate` per AUDIT.md dim-3 rules. The hook then (a) selects the thread's messages via `useShallow`, (b) appends on inbound/outbound events, (c) does NOT wipe on unmount. Important: exclude this store from any dumpForLLM / Sentry capture — DM content is secret. Also consider: the DM message list is a natural fit for the coco-style 'history' pattern; align with whatever SOV-23 (Encrypted Messaging — TODO) specifies when ratified. Minimum near-term fix if a store is too invasive: drop the `setMessages([])` on cleanup and let React state persist across navigation (it doesn't, but at least a re-open doesn't race with async teardown). Long-term is the store.",
+      "references": [
+        "skill:zustand-5",
+        "docs/README.md (SOV-23 TODO)"
+      ],
+      "verification_note": "Re-read useBitChat.ts:130-142 (ble), 195-202 (ble-dm), 248-255 (nostr), 310-317 (nostr-dm). Confirmed every cleanup path calls `setMessages([])`. Confirmed no persistence layer via grep across features/bitchat and shared/stores — the hook is the only owner. Confirmed nostr-dm replay exists via BitChatNostrBridge.swift:135 (dmSince = -nostrDMSubscribeLookbackSeconds). Confirmed ble-dm has no replay — BLE Noise payloads are not queued server-side. Counter-argument considered: 'clearing on unmount is a privacy feature — if someone grabs the phone, the thread is empty.' Weak — messages in memory live for the duration of the mount anyway, and a real privacy posture would tie thread access to auth re-prompt per SOV-40 (TODO). Also considered: 'ble-dm users should not expect persistence in a mesh-only protocol.' Partially defensible but the screen UI gives zero signal that messages are ephemeral; it looks identical to the nostr-dm variant. If ephemerality is intentional, it must be visible.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "DM own-echo stamps `senderPubkey: dmPeerID` on outgoing messages — groupingMap then conflates own + peer messages as a single sender, misrendering avatar/name/timestamp boundaries and masking first-message-in-thread cues",
+      "repo": "sovran-app",
+      "path": "features/bitchat/hooks/useBitChat.ts",
+      "line": 357,
+      "symbol": "ble-dm + nostr-dm own-echo builders",
+      "dimension": 1,
+      "description": "For ble-dm at line 357 and nostr-dm at line 392, the locally-synthesised own-message sets `senderPubkey: dmPeerID` — i.e., the PEER's pubkey, not the user's. For ble (public) at line 338 it sets `senderPubkey: ''`. The grouping algorithm in GeohashChatScreen.tsx:250-261 uses `senderPubkey` identity to compute `isFirst` / `isLast` flags: `const isFirst = !prev || prev.senderPubkey !== msg.senderPubkey`. In a ble-dm or nostr-dm thread, the user's outgoing messages now share a senderPubkey with the peer's incoming messages, so a sequence like [user-msg, user-msg, peer-msg, peer-msg] groups as a single 4-message run instead of two 2-message groups. Downstream: the peer's first message (index 2) gets `isFirst=false` and therefore NO avatar and NO name (GeohashChatScreen:104-115, :121-125). The user's last message (index 1) gets `isLast=false` and therefore NO timestamp (GeohashChatScreen:148-158). Bubble-corner radii flip tight/rounded incorrectly at the side-switch boundary. Visually: the thread loses the 'new sender' affordance at the exact point it matters most — side changes.",
+      "why_it_matters": "Not a security bug. UX correctness defect that (a) makes longer DM threads read as disorganized, and (b) hides the signal that a new person just spoke — important when a user re-opens the DM to check 'did Alice actually respond, or is this all me?' The grouping bug also breaks the pattern that outbound + inbound alternation should produce the densest visually-grouped output. A side-effect worth noting: for ble public chat the empty string senderPubkey collapses all own-messages into a single group with any other empty-senderPubkey messages (which don't exist in practice, but the pattern is fragile). No correctness impact on message delivery — the send paths at :341 / :364 / :375 / :399 use `dmPeerID` independently of this synthesised echo field.",
+      "fix": "Use an identity that actually belongs to the user. Cleanest: thread the active user's per-geohash Nostr pubkey (for nostr-dm) / the user's 16-hex BLE peerID (for ble-dm) through to `useBitChat`. For nostr-dm, `useNostrKeysContext` already provides the main npub, but the per-geohash derivation is owned by the native bridge — expose a new native method `getCurrentGeohashPubkey()` or read it off the first `onNostrMessage` where `isOwn=true`. For ble-dm, read `getBLEState()` or add a `getOwnBLEPeerID()` native accessor. Minimum near-term fix: use a sentinel like `senderPubkey: '__self__'` on own messages and update the grouping logic to treat `isOwn` as a hard group boundary regardless of senderPubkey — `const isFirst = !prev || prev.senderPubkey !== msg.senderPubkey || prev.isOwn !== msg.isOwn;` in GeohashChatScreen:256-257. This handles the case in one edit and is insensitive to the actual senderPubkey value.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read useBitChat.ts:330-339 (ble own-echo — senderPubkey:''), 353-362 (ble-dm own-echo — senderPubkey: dmPeerID), 388-397 (nostr-dm own-echo — senderPubkey: dmPeerID). Re-read GeohashChatScreen.tsx:250-261 (groupingMap logic). Walked through a 4-message sequence by hand and confirmed the described misgrouping. Counter-argument considered: 'maybe this is intentional so own+peer messages form a continuous visual thread.' Rejected — the bubble rendering at :90-98 explicitly aligns own/peer on opposite sides, so visual continuity is already broken at the side-switch; grouping should match. Also considered: 'maybe the nickname branch at :122-125 masks the missing-avatar.' Only fires when `isFirst` is true for a non-own message, which is exactly the case broken here. Verified via log-doctor: `bitchat.hook.send` fires at :325, no DM-specific flow in the latest session (only public ble/nostr), so runtime evidence is absent — the finding rests on structural reading of the source.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "bitchatDM.tsx passes `geohash ?? 'mesh'` as a fallback to GeohashChatScreen — for transport='nostr-dm' with a missing geohash param, the nostr-dm effect fires with joinGeohash('mesh'), subscribing to an attacker-populatable pseudo-channel",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/bitchatDM.tsx",
+      "line": 33,
+      "symbol": "GeohashChatScreen geohash prop",
+      "dimension": 1,
+      "description": "Line 33: `<GeohashChatScreen geohash={geohash ?? 'mesh'} ... />`. The string `'mesh'` is the sentinel used by BLUETOOTH_TIER (features/bitchat/lib/constants.ts:1-7) to represent the non-geohash BLE tier. It is NOT a valid geohash channel on the Nostr side, but every character (m, e, s, h) is in the base32 geohash alphabet, so native's `GeoRelayDirectory.closestRelays(toGeohash: 'mesh', count: 5)` and `NostrFilter.geohashEphemeral('mesh', ...)` / `NostrFilter.giftWrapsFor(...)` will happily subscribe to whatever relay set surrounds the decoded position of 'mesh'. An attacker who knows this fallback exists can populate `#g:mesh` with spoofed gift wraps and — combined with F-001 (rumor.pubkey spoofing) and F-002 (deep-link peerID injection) — deliver fabricated DM content into an unexpected pseudo-channel that no legitimate user joined intentionally. useBitChat.ts:267 guards `if (transport !== 'nostr-dm' || !dmPeerID || !geohash) return;` — with geohash='mesh' truthy, the guard passes. useBitChat.ts:300 then calls `joinGeohash('mesh')`. The route-level file comment at bitchatDM.tsx:7-9 is explicit: 'Only required for nostr-dm; ble-dm ignores it' — indicating the author knew the fallback is only safe for ble-dm, but the default is applied unconditionally.",
+      "why_it_matters": "Standalone, this is a low-severity liveness issue (subscribing to the wrong channel). Stacked with F-002 (deep-link peerID injection), it becomes an attacker-steerable sink: a hostile link that omits `geohash` forces the victim into an attacker-controlled subscription without the user ever choosing to join that geohash. This defeats the user's mental model that DMs are scoped to a location they consciously joined. Severity Medium; would be Low if F-002 were already fixed.",
+      "fix": "Two complementary changes. (A) In bitchatDM.tsx:33, split by transport: `const effectiveGeohash = transport === 'ble-dm' ? 'mesh' : geohash;` and render `null` (or a 'Missing geohash — can't open DM' error) when `transport === 'nostr-dm' && !geohash`. (B) In useBitChat.ts:267, tighten the effect guard to reject the `'mesh'` sentinel for nostr-dm: `if (transport !== 'nostr-dm' || !dmPeerID || !geohash || geohash === 'mesh') return;` — defence in depth. (C) Per F-002, hoist the validation into the zod schema so `nostr-dm` variants require geohash at parse time and the component never receives a half-valid shape. Consolidating (A) + (C) into a single zod-validated parse removes the fallback cleanly.",
+      "references": [
+        "skill:zod-4"
+      ],
+      "verification_note": "Re-read bitchatDM.tsx:32-39 and useBitChat.ts:267-317. Confirmed 'mesh' is the BLUETOOTH_TIER sentinel via features/bitchat/lib/constants.ts:3. Confirmed geohash alphabet includes m, e, s, h by inspection of the bitchat module's geohash.ts / native implementation. Counter-argument considered: 'the route is only linked from NetworkSheet.tsx:54-62 which always passes the correct transport + peerID + no geohash for ble-dm, so the fallback is safe in practice.' True for the intended call site, but deep-link reachability is the issue — any app that can construct a URL to `/(user-flow)/bitchatDM?transport=nostr-dm&peerID=<hex>` without a geohash triggers the bug. Severity Medium; demotes to Low only if F-002 is fixed first.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "sendMessage optimistically appends the user's message to the thread, then catches all send errors into a log line — a failed send leaves a phantom 'sent' message that the user cannot distinguish from a successful one",
+      "repo": "sovran-app",
+      "path": "features/bitchat/hooks/useBitChat.ts",
+      "line": 339,
+      "symbol": "sendMessage (ble / ble-dm / nostr-dm branches)",
+      "dimension": 1,
+      "description": "Three of the four send paths follow the same pattern: synthesise `ownMsg`, `setMessages((prev) => [...prev, ownMsg])`, then `try { await send…; } catch (err) { bitchatLog.error(…) }`. The catch is swallowed — no rollback of `ownMsg`, no status flag on the message, no toast to the user. Lines 337-348 (ble), 361-370 (ble-dm), 396-405 (nostr-dm). The nostr public branch at line 373-382 is the only one that does NOT optimistically add (it relies on the inbound subscription to echo), so it fails safely. On the three optimistic paths: network flake, BLE no-peer, mint unreachable, any throw from the native side — the user sees the bubble in the thread rendered identically to a successful message. Combined with F-003 (history wiped on unmount): the user has no way to reconstruct 'did my message actually send?' even by leaving and returning.",
+      "why_it_matters": "Trust-critical messaging UX. Users routinely discuss Lightning invoices, Cashu tokens, and agreements in DMs — a phantom 'sent' message that appears to convey a promise ('I sent you 1000 sats, here: cashuB…') when the send actually failed is both a reputational and (indirectly) funds-flow risk. Not a direct funds-loss attack but a confirmed correctness defect. Medium because failure mode is visible only after the fact (absence of reply).",
+      "fix": "Add an in-flight / failed status to each own-message. Minimum change: extend `ChatMessage` with an optional `status: 'sending' | 'sent' | 'failed'`, default `'sending'` on optimistic add, promote to `'sent'` after await resolves, demote to `'failed'` in catch. Render 'failed' bubbles with a red badge + retry tap. For nostr-dm the server echo is the truth signal — promote to 'sent' only when the inbound echo arrives with the matching messageID (note: nostr-dm has no self-echo per useBitChat's existing comment, so the local echo is the only state — can promote to 'sent' on await resolution, demote to 'failed' on catch, and rely on user-visible badge only for failures). Also: on failure, surface a toast via the shared popup-toast-sheet helpers per .cursor/rules/popup-toast-sheet-guidelines.mdc — logging an error without a user-visible signal is a dim-10 violation.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:neverthrow-return-types"
+      ],
+      "verification_note": "Re-read sendMessage at lines 323-410. Confirmed the three catches are swallowed with only a log call. Counter-argument considered: 'the inbound subscription will reconcile via id dedup (message.some(m => m.id === msg.id) at :124, :188, :228, :289).' Partly true for nostr public — but the own-message id pattern `own-${Date.now()}` never matches the native-emitted id, so dedup can't reconcile. Also considered: 'failure is rare.' AUDIT.md's dim-1 rule explicitly requires every Result/catch branch to be handled, and the user-visible impact of a silent failure dominates the frequency argument.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "GeohashMessageBubble calls useThemeColor inside each rendered item — N mounted bubbles equals N theme subscriptions, every token update re-renders every bubble",
+      "repo": "sovran-app",
+      "path": "features/bitchat/screens/GeohashChatScreen.tsx",
+      "line": 60,
+      "symbol": "GeohashMessageBubble / useThemeColor",
+      "dimension": 7,
+      "description": "Each `GeohashMessageBubble` instance invokes `useThemeColor(['foreground', 'default', 'surface-tertiary', 'shade-400'] as const)` at lines 60-65. `useThemeColor` (per repo convention) registers a subscription to the theme store — that is one subscription per mounted bubble. For a 500-message DM thread, LegendList keeps a windowed set mounted but the bubble component is defined inline (not memoised), and `recycleItems={false}` at line 379 means every visible-range item is mounted fresh on scroll. A theme change (user flips light/dark, swaps wallpaper, or the token-computation fires via the theme engine) then causes every mounted bubble to re-render — AUDIT.md dim-7 heuristic: 'List items with expensive children without a React.memo boundary are a finding'. Also: the color tuple passed to useThemeColor is a fresh `as const` array per render; whether useThemeColor memoises by array-identity or by key contents is not visible in this file, so worst-case the hook treats each render as a new subscription.",
+      "why_it_matters": "Re-render storm on theme changes in DM threads. Combined with `recycleItems={false}` (which the author chose for bubble-corner-radii variability per the grouping logic), every visible bubble mounts fresh on scroll, each pulling four theme tokens from the store. The log-doctor evidence for this audit's session shows `bg.view.render` firing 9 times in 30s with `theme='dark'` constant — the theme engine re-runs often even without user action. On a DM with 100+ messages and active scrolling, the per-bubble hook overhead compounds with the inline renderItem closure in F-008. No runtime trace confirms the storm because the DM path was not exercised in the latest session; the finding stands on structural reading plus the named dim-7 heuristic and is marked UNVERIFIED-on-dynamic but structurally evident.",
+      "fix": "Hoist the token selection to the parent screen (lines 200-220 already select foreground / muted / surface-tertiary / shade-400 / etc. — just add `default` and pass the relevant four down). Convert `GeohashMessageBubble` to accept `foreground`, `defaultColor`, `surfaceTertiary`, `shade400` as props, wrap in `React.memo` with a shallow-equal comparator that also diffs `message.content`/`isOwn`/`isFirstInGroup`/`isLastInGroup`. One screen-level subscription replaces N bubble-level subscriptions; the memo boundary confirms the dim-7 'List items with expensive children without a React.memo boundary' fix. Also: flip `recycleItems={true}` once the grouping-driven styling is prop-driven (the corner radii become a pure function of `isFirst`/`isLast` props, so recycling is safe). Add a scoped `cashuLog`-style log `bitchat.renders.bubble_count` gated on __DEV__ to let future audits verify the storm has been tamed.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:vercel-react-native-skills"
+      ],
+      "verification_note": "Re-read GeohashMessageBubble:59-162. Confirmed useThemeColor at 60-65 runs per render. Confirmed `recycleItems={false}` at :379. Confirmed renderItem at :363 is not memoised. log.txt/stats shows `render.count AnimatedBackgroundView` marked [EXCESSIVE] (36 renders in 5157s — that's background not bubbles, but confirms the theme engine fires often). Counter-argument considered: 'useThemeColor may already be a cheap selector — constant-time and cached.' Partial answer — the subscription count is the cost, not the read. And the cited dim-7 heuristic names this exact pattern. Marked 0.85 confidence because I didn't open useThemeColor to confirm its subscription shape; the structural finding is sound regardless. UNVERIFIED for the dynamic claim per AUDIT.md dim-7 perf-evidence rule — but the structural pattern (named trigger) survives Phase B on its own.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "LegendList renderItem is an inline closure allocated on every render of GeohashChatScreen — defeats LegendList's item-equality optimisations and forces visible bubbles to re-render on any parent state change",
+      "repo": "sovran-app",
+      "path": "features/bitchat/screens/GeohashChatScreen.tsx",
+      "line": 363,
+      "symbol": "LegendList renderItem",
+      "dimension": 7,
+      "description": "Line 363: `renderItem={({ item }: { item: ChatMessage }) => { const group = groupingMap.get(item.id); return <GeohashMessageBubble ... />; }}`. The function literal is allocated fresh on every render of the screen. Every parent state change — `messageText` on every keystroke in the input (line 222), `isSending` toggle (line 223), `isConnected` flip — creates a new `renderItem` reference. LegendList (like FlashList, like FlatList) identifies stale renderItem by reference; a new reference invalidates its per-item cache and forces visible items to re-render. Direct named dim-7 heuristic: 'FlatList / @legendapp/list renderItem that allocates a fresh function / object / style each render is a finding'. The effect is particularly bad during composition: a user typing a 30-character message fires 30 state updates, each causing a visible re-render of every in-view bubble. Compounds with F-007 (per-bubble useThemeColor) and with `recycleItems={false}` at :379, which means even out-of-view-entering items mount fresh rather than being recycled.",
+      "why_it_matters": "Typing latency in long DM threads. Each keystroke triggers a chain: setState → screen re-render → new renderItem closure → all visible bubbles re-run their useThemeColor subscription + bubble-radius computation (lines 72-88). For a user on a mid-tier iPhone scrolled to the middle of a 200-message thread with ~15 bubbles on screen, the work per keystroke is ~15 × (subscription + render). No log-doctor trace confirms it in the latest session (DM path not exercised), but this is a named dim-7 anti-pattern and the cost compounds with F-007.",
+      "fix": "Extract the renderItem to a stable reference via `useCallback`: `const renderItem = useCallback(({ item }: { item: ChatMessage }) => { const group = groupingMap.get(item.id); return <GeohashMessageBubble message={item} isFirstInGroup={group?.isFirst ?? true} isLastInGroup={group?.isLast ?? true} />; }, [groupingMap]);`. Note the dep: `groupingMap` rebuilds on every messages change (see F-007 fix discussion), so renderItem will still be stable except on real message arrivals. Pair with the F-007 fix (memoised GeohashMessageBubble with props-only inputs) so bubbles short-circuit when their props haven't changed. Also tighten `messageText` handling: the input onChange fires on every keystroke, but the screen-level re-render only matters if `messageText` is read by components that render list-adjacent UI. The send button at :477-485 does read it — consider extracting the input + send button into a memoised subcomponent so the list doesn't re-render on typing at all.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:vercel-react-native-skills"
+      ],
+      "verification_note": "Re-read GeohashChatScreen:360-393 (LegendList props). Confirmed renderItem is an inline arrow. Confirmed recycleItems={false}. Confirmed keyExtractor is also inline at :373 (same class of issue, lower impact because keyExtractor is called less often). Counter-argument considered: 'LegendList may not actually use renderItem reference equality — it may call it every render anyway.' Even if so, the closure allocation is measurable on hot paths; the AUDIT.md dim-7 heuristic names this exactly. Confidence 0.95 because this is a canonical, well-documented anti-pattern.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    },
+    {
+      "id": "F-009",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "app/(bitchat-flow)/[geohash].tsx + _layout.tsx + BitChatScreen.tsx + MessageList + MessageBubble + ChannelHeader + ComposeBar are unreachable dead code — no caller routes to /(bitchat-flow)/...; the live path is /(user-flow)/geohashChat using GeohashChatScreen",
+      "repo": "sovran-app",
+      "path": "app/(bitchat-flow)/[geohash].tsx",
+      "line": 1,
+      "symbol": "BitChatRoute + the entire (bitchat-flow) route group",
+      "dimension": 3,
+      "description": "`grep -rn` for `router.push('/(bitchat-flow)` / `pathname: '/(bitchat-flow)` / any href using `/bitchat-flow` across sovran-app returns zero matches. The three live callers that route to public geohash chat — `shared/ui/composed/SearchResultsList.tsx:55`, `features/contacts/components/LocationTierItem.tsx:45`, `features/contacts/screens/ContactsScreen.tsx:63` — all point at `/(user-flow)/geohashChat`, which renders `GeohashChatScreen` (the live implementation under `features/bitchat/screens/`). The `(bitchat-flow)` route group and its components are a pre-refactor artefact from the initial bitchat landing commit (fdf71023 — 'Add BitChat geohash chat feature & native module') that was subsequently superseded by the `(user-flow)/geohashChat.tsx` wrapper + the unified `GeohashChatScreen` component. Dead surface area: app/(bitchat-flow)/[geohash].tsx (22 LOC) + app/(bitchat-flow)/_layout.tsx (16 LOC) + features/bitchat/screens/BitChatScreen.tsx (46 LOC) + features/bitchat/components/MessageList.tsx (~41 LOC) + MessageBubble.tsx (~96 LOC) + ChannelHeader.tsx (~75 LOC) + ComposeBar.tsx (~95 LOC) ≈ 391 LOC total. knip did not flag these because MessageBubble → MessageList → BitChatScreen → (bitchat-flow)/[geohash].tsx form an internal chain rooted in an expo-router file-based entry, which knip counts as 'used'.",
+      "why_it_matters": "Dim-3 structural rot. Future engineers reading `features/bitchat/components/` see two parallel UI approaches: the MessageList/ComposeBar/ChannelHeader/MessageBubble stack (unused) and the GeohashChatScreen-inline stack (live). The MessageBubble component even uses `StyleSheet.create` + raw hex rgba (lines 53-60) while GeohashMessageBubble uses inline style + theme tokens — a dim-4 inconsistency that would only be 'resolved' by a refactor targeting the wrong one. Also: the NetworkSheet is mounted at `/(user-flow)/bitchatNetwork` (per app/(user-flow)/_layout.tsx:29) — it is reachable. It's the `(bitchat-flow)` *route group* that's dead, not every bitchat surface.",
+      "fix": "Delete the dead tree: `git rm app/(bitchat-flow)/[geohash].tsx app/(bitchat-flow)/_layout.tsx features/bitchat/screens/BitChatScreen.tsx features/bitchat/components/{MessageList,MessageBubble,ChannelHeader,ComposeBar}.tsx` and remove the `(bitchat-flow)` directory if it becomes empty. Verify no re-export is lost: `features/bitchat/index.ts` currently only re-exports `GeohashChatScreen`, `LOCATION_TIERS`, `useBitChat`, `useLocationTiers` — none of the dead components are in the barrel, so the delete is a clean cut. While deleting, drop the three unused kind constants in `features/bitchat/lib/constants.ts:18-20` (BITCHAT_EVENT_KIND_EPHEMERAL, _PRESENCE, _TEXT_NOTE) that knip explicitly flagged — those are JS-side mirrors of native constants that are read on the native side only.",
+      "references": [
+        "knip:unused-export",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Ran `grep -rn bitchat-flow` across sovran-app — no matches except the route files themselves. Ran `grep -rn geohashChat` — confirmed three live callers, all pointing at `/(user-flow)/geohashChat`. Ran analyze-structure on features/bitchat — confirmed BitChatScreen.tsx as a 46-LOC orphan in the subtree (the others are subtree-orphans but knip sees them as alive via the (bitchat-flow) route file). Ran `npm run knip` — no whole-file kills but 3 unused constants in features/bitchat/lib/constants.ts:18-20 and 4 unused types confirmed. Counter-argument considered: 'maybe (bitchat-flow) is reserved for deep-link routing or a future refactor.' Weak — there's no deep-link typedRoutes entry referring to /(bitchat-flow), and app/(user-flow)/geohashChat is the actively-maintained wrapper. Research note candidate rather than keeping the code. git history: `fdf71023 Add BitChat geohash chat feature & native module` introduced both approaches in one commit; the (user-flow)/geohashChat route was added to supersede it.",
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Confirmed during 2026-05-03 survey: features/bitchat/screens/ now contains only GeohashChatScreen.tsx and NetworkSheet.tsx; BitChatScreen / MessageList / MessageBubble / ChannelHeader / ComposeBar and the (bitchat-flow) route group are all deleted. Pattern resolved before this session."
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "listRef declared as useRef<any>(null) and never read — dead useRef + `any` cast in the same line",
+      "repo": "sovran-app",
+      "path": "features/bitchat/screens/GeohashChatScreen.tsx",
+      "line": 198,
+      "symbol": "listRef",
+      "dimension": 1,
+      "description": "Line 198: `const listRef = useRef<any>(null);`. Passed to `<LegendList ref={listRef}>` at line 361. Not referenced anywhere else in the file — no scroll-to-bottom, no scrollToIndex, no imperative method invocation. Two issues in one line: (1) unused ref allocation (ref is still attached, so LegendList holds a cell, but JS never reads it — a likely-removed feature stub); (2) `any` cast where `React.ElementRef<typeof LegendList>` or the LegendList imperative-handle type would apply, per AUDIT.md dim-1 'any casts' and AUDIT.md dim-10/skill:typescript-advanced-types.",
+      "why_it_matters": "Low: code-maintenance only. Most likely residue from a planned scroll-to-bottom-on-new-message feature that wasn't finished (reasonable to want given `maintainScrollAtEnd` at :375). Flag because AUDIT.md dim-3 rule: 'any, @ts-ignore without a reason' — this is exactly the case.",
+      "fix": "Either implement the probable intent (on-send scroll: `handleSendMessage` after send → `listRef.current?.scrollToEnd({ animated: true })`) and type the ref as `React.ElementRef<typeof LegendList>`, or delete the declaration and the `ref={listRef}` prop entirely. If LegendList's exposed imperative API isn't typed publicly, prefer `useRef<React.ComponentRef<typeof LegendList>>(null)` — still better than `any`.",
+      "references": [
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Re-read GeohashChatScreen.tsx:198 (declaration) and :361 (usage). grep for `listRef` in the file — only the declaration and the `ref={}` prop. Counter-argument considered: 'maybe LegendList needs a ref to internally track scroll — not reading it is fine.' Weak — LegendList does not require a ref to function. If it did, the type would not be `any`.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "useBitChat's BLE public-chat effect runs `setInterval(ble_diag, 10_000)` at INFO level — ~6 log entries per minute of INFO-level diagnostic spam that overlaps with BitchatBLEProvider's own lifecycle logs",
+      "repo": "sovran-app",
+      "path": "features/bitchat/hooks/useBitChat.ts",
+      "line": 108,
+      "symbol": "peerPoll interval",
+      "dimension": 10,
+      "description": "Lines 108-111: `const peerPoll = setInterval(() => { const diag = getBLEDiagnostics(); bitchatLog.info('bitchat.hook.ble_diag', { ...diag }); }, 10_000);`. `getBLEDiagnostics()` returns ~20 fields (peerCount, connectedPeers, announceReceivedCount, inboundNotifyCount, sentPrivateMessageCount, etc.). Emitted at INFO level every 10 seconds while the public BLE chat screen is mounted. For a user sitting in the mesh chat for 5 minutes, that's 30 fat INFO entries — each line carries ~20 numeric fields — in the ring buffer. log-doctor stats (latest session) confirms the pattern: one `bitchat.hook.ble_diag` in a 30s window with 19 additional fields serialised. Only fires for `transport === 'ble'` (public mesh), so DM flows are unaffected — but any dumpForLLM of a session that touched the mesh chat is inflated with noise.",
+      "why_it_matters": "Ring-buffer dilution. AUDIT.md dim-10 rule: logging must never crowd out signal; events that fire >15% of all logs should be rate-limited or collapsed. At 10s cadence with up to 20 fields each, ble_diag trivially breaches that. Also: the `bitchatLog = log.child({ module: 'bitchat' })` at line 29 is a bare `log` child — correctly scoped per dim-10, but the cadence is the issue, not the scope.",
+      "fix": "Three options, pick one: (A) Demote the periodic log to DEBUG level (the payload is purely diagnostic) — it then gets gated on __DEV__ per logger policy. (B) Keep INFO but emit only on state change: maintain a prior-diag snapshot in the effect, compare, log only when any tracked field changed. (C) Move the diag-poll into `BitchatBLEProvider` where it's emitted once per app session rather than once per screen mount; the screen shouldn't own a lifecycle concern the provider already handles. (A) is the smallest useful fix. Also consider dropping the interval entirely — `addBLEPeerListener` at :105 already emits on every peer change, so the 10s poll is belt-and-suspenders.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read useBitChat.ts:102-111 and confirmed with log-doctor latest-session timeline that one `bitchat.hook.ble_diag` fired at +7.6s from ble-start (see log-doctor output: `+7.6s INFO bitchat.hook.ble_diag …+19 more`). Session was only 32s long so only one fire; extrapolated cadence is 1 per 10s. Counter-argument considered: 'diagnostics are valuable for field debugging.' Fine — DEBUG level retains the data, just off by default.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Battery cost of a 10s setInterval at INFO level is a separate pattern from scope-mismatched logger drift."
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "Own-echo message id is `own-${Date.now()}` — two sends in the same millisecond collide, second is silently dropped by the dedup guard; also trivially forgeable by inbound events",
+      "repo": "sovran-app",
+      "path": "features/bitchat/hooks/useBitChat.ts",
+      "line": 331,
+      "symbol": "ownMsg.id across three send branches",
+      "dimension": 1,
+      "description": "Three send branches build own-messages with `id: \\`own-${Date.now()}\\``: ble at :331, ble-dm at :354, nostr-dm at :389. The inbound listeners dedup by id (:124, :188, :228, :289 — `if (prev.some((m) => m.id === msg.id)) return prev`). Two issues: (1) rapid double-tap on the send button (which `handleSendMessage` at GeohashChatScreen:263-274 already guards with `isSending`) — but a programmatic re-trigger via `onSubmitEditing` + keyboard autocorrect in the same event loop can still produce two sends within the same ms → second gets dropped by dedup against the first's `own-<ms>` id. (2) if the native side ever emits an event whose id happens to start with `own-<something>`, the client-local own-echo and the native-emitted event could dedup each other out. The second risk is small; the first is reproducible under stress.",
+      "why_it_matters": "Low: a dropped-by-dedup own message looks to the user like the send disappeared (combined with F-006, it appears nothing happened). Functional, not security. Cross-reference prior audit 12.json F-009 which flagged the same `Math.random()*10000` pattern in the rebalance flow — the codebase has a recurring id-uniqueness issue across features.",
+      "fix": "Use `globalThis.crypto?.randomUUID?.()` (React Native 0.83 has it; `react-native-get-random-values` is already installed app-wide) with a stable `own-` prefix so own-vs-native filtering by id-prefix remains cheap: `id: \\`own-${crypto.randomUUID()}\\``. Alternatively reuse the pattern from swapTransactionsStore's generateLegId / generateGroupId (identified in 12.json F-009 refactor plan) as the codebase convention: `\\`own-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}\\`` — 8 base36 digits of entropy eliminates same-ms collision under any realistic user-interaction rate.",
+      "references": [
+        "skill:security-review",
+        "prior-audit:F-009@12.json"
+      ],
+      "verification_note": "Re-read useBitChat:331, 354, 389. Confirmed Date.now()-only derivation. Counter-argument considered: 'handleSendMessage's isSending guard at GeohashChatScreen:265 prevents the double-tap.' It catches the synchronous double-tap, but `onSubmitEditing={handleSendMessage}` at TextInput:474 fires on the keyboard return, which on iOS can coincide with a programmatic text.trim()+onChange pair from autocorrect landing at the same Date.now(). Severity Low because the damage on collision is a missing own-echo, not fund loss.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-013",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "seenGiftWrapIDs cap uses `Array(Set).suffix(1000)` — Swift Set iteration is unordered, so the trim drops an arbitrary half rather than oldest-first; relay-replay dedup becomes non-deterministic after 2000 gift wraps",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/ios/BitChatNostrBridge.swift",
+      "line": 237,
+      "symbol": "seenGiftWrapIDs trim",
+      "dimension": 1,
+      "description": "Lines 237-241: `if seenGiftWrapIDs.count > 2000 { let kept = Array(seenGiftWrapIDs).suffix(1000); seenGiftWrapIDs = Set(kept) }`. Comment says 'Cheap trim — drop the oldest half', but `Set<String>.makeIterator()` iteration order is unspecified per the Swift standard library. `Array(set).suffix(1000)` therefore returns an arbitrary subset, not the newest ids. After 2000 gift wraps accumulate, any subsequent trim results in unpredictable dedup behaviour: a gift wrap that was seen 5 seconds ago may be dropped from the set while one seen an hour ago is retained. Exploitation path is narrow — attacker would need to (a) flood the subscription with 2000+ gift wraps, (b) wait for a natural trim, (c) re-send a prior gift wrap and bet on it having been purged — but the comment in the code asserts a property the code does not uphold, which is the dim-1 ('State, invariants') violation the finding is targeted at.",
+      "why_it_matters": "Low, bordering on Nit — actual DM replay protection rides on the NIP-17 outer layer (unique event IDs, relay-side dedup). The in-app dedup is a defence-in-depth layer whose correctness claim in the comment doesn't match the code. Cross-contaminates F-001's exploitability (an attacker whose replay gets let through via this window can deliver a spoofed rumor twice, confusing the thread).",
+      "fix": "Replace the unordered `Set` with an ordered container tracking insertion order. Minimum fix: keep `seenGiftWrapIDs: Set<String>` for O(1) contains-check AND maintain a parallel `seenGiftWrapOrder: [String]` array for FIFO trim. On insert, append to the array and insert in the set; on trim, drop the first N from the array and remove those from the set. Alternative: use `OrderedSet` from swift-collections (already a first-party Apple dependency) if available. Also: update the comment to match the code, either way.",
+      "references": [
+        "skill:security-review"
+      ],
+      "verification_note": "Re-read BitChatNostrBridge.swift:231-241. Swift docs confirm Set iteration is unordered. Counter-argument considered: 'in practice, Swift's Set uses a hash table whose iteration order is deterministic within a session.' Partially true — it's stable across iterations of the same Set but not across rehashes or insertions; Apple explicitly does not guarantee ordering semantics and has changed the behaviour between OS versions. The comment's claim is the bug.",
+      "prior_audit_id": null,
+      "completion_status": "deferred"
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "partial",
+    "5": "pass",
+    "6": "partial",
+    "7": "pass",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Build a DM identity-verification layer in the native bridge that upholds NIP-17's pubkey-check MUST: wrap decryptPrivateMessage so the bridge receives both seal and rumor, enforces seal.pubkey == rumor.pubkey (case-insensitive), and verifies seal.sig Schnorr-over-seal.id before emitting onNostrPrivateMessage. Fixes F-001. Reusable for any future NIP-17 surface (main-npub DMs if the app ever adds NIP-60 wallet-level DM support per SOV-23 TODO). Either fork the BitChatVendor submodule to a Sovran-controlled branch with the patch, or carry the patch as a Swift-level shim under modules/bitchat-module/ios/BitChatNostrBridgeSecure.swift that re-implements the two-step unwrap locally.",
+      "files": [
+        "modules/bitchat-module/ios/BitChatNostrBridge.swift",
+        "modules/bitchat-module/ios/BitChatVendor/bitchat/Nostr/NostrProtocol.swift"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Introduce a shared bitchat deep-link schema layer under features/bitchat/lib/schemas.ts (candidate for packages/schemas once ratified). Define zod discriminated unions for all bitchat routes: BitchatDMParams (nostr-dm requires geohash + 64-hex peerID; ble-dm requires 16-hex peerID, geohash fixed to 'mesh' sentinel, not deep-linkable), GeohashChatParams (public: geohash required, transport ∈ nostr/ble). Every bitchat/[bitchat-flow] / user-flow route parses via the shared schema. Fixes F-002, F-005, contains blast radius for any future bitchat deep-link. Cross-reference: same pattern flagged in 12.json F-008 for the mint-flow unit param — the codebase needs a unified deep-link-validation convention.",
+      "files": [
+        "features/bitchat/lib/schemas.ts",
+        "app/(user-flow)/bitchatDM.tsx",
+        "app/(user-flow)/geohashChat.tsx",
+        "app/(user-flow)/bitchatNetwork.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Introduce a profile-scoped bitchatDMStore (Zustand v5, persist + partialize + migrate) keyed by '${transport}:${peerID}:${geohash_or_mesh}' holding message threads across navigation. Replaces the wipe-on-unmount pattern in useBitChat with an append-only store, enabling replay for ble-dm (which has no server-side source) and for nostr-dm beyond the 24h lookback. Fixes F-003. Persistence excluded from dumpForLLM / Sentry per dim-10 / dim-2 secrecy rules. Also carries per-message status ('sending' | 'sent' | 'failed') so F-006 (phantom-sent) can be surfaced visually. Once SOV-23 (Encrypted Messaging) is ratified, align the store schema with its regression surface.",
+      "files": [
+        "shared/stores/profile/bitchatDMStore.ts",
+        "features/bitchat/hooks/useBitChat.ts",
+        "features/bitchat/screens/GeohashChatScreen.tsx"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Extract GeohashMessageBubble to features/bitchat/components/GeohashMessageBubble.tsx, wrap in React.memo with a shallow-equal comparator, accept theme tokens + grouping flags as props (not via useThemeColor inside). The screen selects tokens once at the top and threads them down. Fixes F-007 and F-008 together. Also flip recycleItems={true} once the bubble is pure-props-driven — corner radii become a pure function of isFirst/isLast props. Add a scoped cashuLog-equivalent diagnostic log `bitchat.renders.bubble_count` gated on __DEV__ so a follow-up audit can confirm the storm has been tamed via log-doctor renders mode.",
+      "files": [
+        "features/bitchat/components/GeohashMessageBubble.tsx",
+        "features/bitchat/screens/GeohashChatScreen.tsx"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Delete the unreachable (bitchat-flow) route group and its referenced UI stack: app/(bitchat-flow)/[geohash].tsx, app/(bitchat-flow)/_layout.tsx, features/bitchat/screens/BitChatScreen.tsx, features/bitchat/components/{MessageList,MessageBubble,ChannelHeader,ComposeBar}.tsx. Also drop features/bitchat/lib/constants.ts lines 18-20 (BITCHAT_EVENT_KIND_EPHEMERAL/PRESENCE/TEXT_NOTE — unused JS mirrors of native-only constants per knip). ~391 LOC + 3 unused constants. Fixes F-009. Run `npm run knip` post-delete to confirm no orphan regression.",
+      "files": [
+        "app/(bitchat-flow)/[geohash].tsx",
+        "app/(bitchat-flow)/_layout.tsx",
+        "features/bitchat/screens/BitChatScreen.tsx",
+        "features/bitchat/components/MessageList.tsx",
+        "features/bitchat/components/MessageBubble.tsx",
+        "features/bitchat/components/ChannelHeader.tsx",
+        "features/bitchat/components/ComposeBar.tsx",
+        "features/bitchat/lib/constants.ts"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Create __research__/bitchat-dm-authentication.md with status:draft capturing the design question behind F-001/F-002/F-005: how should the app signal to a user that a DM thread corresponds to an identity they've previously verified vs a fresh one from a deep link? Options to consider: (a) kind-0 profile pinning (show the kind-0 name + npub alongside the per-geohash nickname); (b) a 'first message to this contact' banner; (c) an explicit contact-add gate for deep-linked DMs. The note converges F-001's cryptographic fix with F-002's UX fix — both needed, neither sufficient alone. Feeds directly into SOV-23 (Encrypted Messaging) ratification. Include exploit POC from F-001 as the motivating scenario.",
+      "files": [
+        "sovran-app/__research__/bitchat-dm-authentication.md"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Extend log-doctor with a `bitchat` mode (or extend `ws` / `flows`) that surfaces per-DM thread activity grouped by transport+peerID+geohash: messages sent, messages received, failed sends, gift-wrap dedup hits, ble-diag snapshots, NIP-17 decrypt errors. Depends on scoped cashuLog-equivalent adoption in useBitChat and in the bridge (addressing F-006 + F-011). Makes future audits of DM race / loss behaviour confirmable in one command: `npm run log-doctor -- bitchat --latest`. Document in .claude/rules/log-doctor.md alongside the existing `coco` and `ws` modes.",
+      "files": [
+        "scripts/log-doctor/",
+        ".claude/rules/log-doctor.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "SOV-23 (Encrypted Messaging — NIP-17 / NIP-44) and SOV-30 (Bitchat BLE Mesh) are both TODO per docs/README.md. Ratifying SOV-23 is a prerequisite for F-001 severity being permanently locked — the NIP-17 pubkey-check MUST should be codified as a regression test in the spec, not just asserted per-audit. SOV-30 would anchor ble-dm's 'no persistence — messages are session-scoped' choice if that's actually the intended design (F-003 demotes to Low if so, but the UI must signal ephemerality).",
+    "BitChatVendor is a git submodule (per .gitmodules). Is Sovran tracking a specific upstream commit with an intent to follow-merge, or has it been pinned indefinitely? The F-001 fix path depends on the answer: if follow-merging, upstream an issue+PR first and carry a submodule-local patch as a bridge. If pinned, fork to Sovran and own the file. Either way, until fixed the vuln is live.",
+    "log.txt in the current session contains only public mesh + public nostr traffic — NO ble-dm or nostr-dm events were exercised. Every dynamic-behaviour finding here (F-003 wipe, F-004 grouping, F-006 phantom-sent, F-007 bubble re-render, F-008 renderItem churn) is marked UNVERIFIED at runtime and rests on structural reading. F-001 and F-002 are structural-evident (crypto/MUST violations don't need runtime). Recommendation: exercise ble-dm + nostr-dm paths in a test session and re-audit to confirm the performance claims.",
+    "The experiments.typedRoutes flag IS enabled (app.json:117). Why then are router.replace / router.push calls on NetworkSheet.tsx:54 and GeohashChatScreen.tsx:319 cast with `as any`? Likely a typedRoutes gap around (user-flow)-prefixed paths with dynamic params. Worth re-testing once expo-router lands a fix for dynamic-route typing under grouped layouts; meanwhile the `as any` should carry a comment referencing the upstream issue.",
+    "The `handleBack` onBack override in bitchatDM.tsx:37 always calls `router.back()` — which, when entered via `router.replace` from NetworkSheet (intentional per NetworkSheet.tsx:50-53), returns to the GeohashChat or the user-flow root rather than the NetworkSheet. This is documented as intent. But the same onBack fires when entered via a deep link with no prior history: on iOS, `router.back()` from a cold-started deep-link screen is a no-op. The DM becomes a one-way trap — no escape button works. Confirm whether the app handles cold-start deep-link-to-DM via a fallback `router.replace('/')` when back is impossible."
+  ]
+}

@@ -1,0 +1,353 @@
+{
+  "audit": {
+    "date": "2026-04-20",
+    "commit": "bd018588",
+    "entry_point": "bitchat / nostr / routstr DMs — consolidation question (one shared chat component vs. parallel UIs)",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "05.json",
+      "07.json",
+      "13.json",
+      "14.json",
+      "16.json",
+      "18.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/README.md (index)"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "react-native-best-practices",
+      "nostr",
+      "typescript-advanced-types"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": null,
+      "lint": null,
+      "knip": "confirmed still-dead bitchat constants (BITCHAT_EVENT_KIND_EPHEMERAL/PRESENCE/TEXT_NOTE) + GeohashChatScreenProps / BitChatTransport / DMTarget / UseBLEPeersResult unused interfaces",
+      "analyze_structure": null
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Critical",
+      "confidence": 0.95,
+      "title": "NIP-17 seal.pubkey == rumor.pubkey check still missing in native Swift bridge — DM impersonation vuln untouched since audit 13",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/ios/BitChatNostrBridge.swift",
+      "line": 1,
+      "symbol": "NIP-17 unwrap path in BitChatNostrBridge",
+      "dimension": 2,
+      "description": "Audit 13 F-001 (2026-04-18) identified that the native Swift side of the bitchat NIP-17 unwrap path does not enforce the seal.pubkey == rumor.pubkey MUST from NIP-59 / NIP-17, enabling DM sender impersonation in the bitchat nostr-dm transport (app/(user-flow)/bitchatDM.tsx → GeohashChatScreen with transport='nostr-dm', driven by native via BitChatNostrBridge / NostrProtocol.swift). Audit 18 (2026-04-20) explicitly noted the finding is still OPEN on this branch: 'Audit 13 findings F-001 through F-013 on bitchatDM.tsx / useBitChat.ts / BitChatNostrBridge.swift / seenGiftWrapIDs Swift trim / (bitchat-flow) dead code remain OPEN — none have been addressed per the current branch state (commit bd018588). The primary Critical (NIP-17 impersonation via seal.pubkey == rumor.pubkey check) is still live.' Contrast with the TypeScript-side helper at shared/lib/nostr/nip17.ts:222-229 which does perform the check correctly. The two code paths have diverged: TS-side Nostr NIP-17 DM sends/receives in UserMessagesScreen are safe; native-side bitchat nostr-dm is not. Because the user's scope is explicitly the chat surfaces and their consolidation, any proposal to merge the two NIP-17 paths into one component will either (a) leak the vulnerable native behaviour into a wider surface, or (b) force the fix as a prerequisite. The consolidation described in F-002 cannot safely ship on top of the current Swift bridge.",
+      "why_it_matters": "Funds-adjacent impersonation: bitchat nostr-dm is a transport the user has built explicitly for private 1:1 chat over relays, and the UI presents messages as authenticated by sender pubkey. Without the pubkey-equality check, a relay-side attacker (or anyone who can publish a kind 1059 addressed to the recipient's per-geohash pubkey) can have messages rendered as if from any arbitrary claimed sender. In the Sovran model this is particularly dangerous because DMs are a plausible channel for ecash handoffs (CashuTokenBubble in UserMessagesScreen is a first-class redeem surface — F-007) and payment-request coordination. An impersonated 'friend' asking 'can you cover X?' lands identically to a real request.",
+      "fix": "Ship the native-side fix before any chat-component consolidation (F-002). Options already outlined in audit 13's refactor_plan §1: (a) fork BitChatVendor to a Sovran-controlled branch carrying the pubkey-equality guard inside decryptPrivateMessage; or (b) shim the two-stage unwrap on the Sovran side under modules/bitchat-module/ios/BitChatNostrBridgeSecure.swift, re-implementing the layer-1 (wrap→seal) + layer-2 (seal→rumor) decrypt in the same shape as shared/lib/nostr/nip17.ts:207-241 and enforcing seal.pubkey == rumor.pubkey case-insensitively BEFORE the native bridge calls addNostrPrivateMessageListener. As a defensive cross-check, the JS receive path for the nostr-dm transport (useBitChat.ts, where the native-emitted message is consumed) could also perform the check — but the authoritative fix is at the decryption boundary, not post-hoc.",
+      "references": [
+        "nips/17.md",
+        "nips/59.md",
+        "skill:nostr",
+        "prior-audit:F-001@13.json"
+      ],
+      "verification_note": "Re-read shared/lib/nostr/nip17.ts:207-241 (TS side — check IS present). Confirmed BitChatVendor submodule is present and not patched locally (ls modules/bitchat-module/ios/BitChatVendor/bitchat/Nostr/NostrProtocol.swift shows vendor-original). Re-read audit 13 F-001 via Read on __audits__/13.json — still open per audit 18's open_questions (2026-04-20). Counter-argument considered: 'the TS-side path in UserMessagesScreen uses unwrapGiftWrap from shared/lib/nostr/nip17.ts, so when the user chats via the main Nostr DM flow they are safe.' True but irrelevant — app/(user-flow)/bitchatDM.tsx uses the native bridge, not the TS helper, per useBitChat.ts:389 (own-echo id for transport === 'nostr-dm' sends). Severity Critical regardless of confidence per AUDIT.md dim-2 (key-exposure / impersonation class).",
+      "prior_audit_id": "F-001@13.json"
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "Three parallel message-bubble implementations across the chat surfaces — the user's stated goal ('single chat component not repeating UI') is not met",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 543,
+      "symbol": "MessageBubble (UserMessagesScreen) / GeohashMessageBubble (GeohashChatScreen) / MessageBubble (features/bitchat/components)",
+      "dimension": 3,
+      "description": "Three disjoint message-bubble components render conceptually the same thing (a chat message with author, body, timestamp, ownership theming). (1) features/user/screens/UserMessagesScreen.tsx:543-768 defines `MessageBubble` — used for both Nostr NIP-17 DMs and routstr LLM chat. Handles isMe/isLoadingMetadata/isStreaming, thinking-reasoning expansion, typing indicator, streaming cursor, cashu-token inline redeem (via CashuTokenBubble), send-status checkmarks, avatar-on-side. Uses shared/ui primitives. (2) features/bitchat/screens/GeohashChatScreen.tsx:59-163 defines `GeohashMessageBubble` — used for bitchat public-geohash, bitchat nostr-dm, and bitchat ble-dm (a single component driven by a `transport` prop on the parent screen). Handles isFirstInGroup / isLastInGroup bubble-grouping corner radii, avatar-below-last-in-group, no cashu-token surface, no streaming, no reasoning. Uses shared/ui primitives but wired differently. (3) features/bitchat/components/MessageBubble.tsx:1-96 is the third, dead implementation flagged in audit 13 F-009 and still on disk as of 2026-04-20; uses StyleSheet.create + raw RN View/Text (no shared primitives) — it would be the WRONG one to standardise on. A `shared/ui/composed/ChatBubble` or equivalent primitive does not exist. The user's entry-point question was explicit: 'ideally its a single chat component we are using not repeating UI.' Current state: no shared primitive + three implementations + one of them dead. Same pattern applies to the composers: UserMessagesScreen inline input (:2595-2613), GeohashChatScreen inline input (:455-485), features/bitchat/components/ComposeBar.tsx (dead). And to the list scaffold: both live screens use @legendapp/list with `recycleItems={false}`, inline renderItem, and duplicated `maintainScrollAtEnd` props — no shared list wrapper.",
+      "why_it_matters": "Dim-3 structural rot at the level of a product concept. Every future chat-ergonomics decision (accessibility label on a send button, swipe-to-reply, long-press menu, message selection, reactions, typing indicator behaviour) has to be ported to two live implementations, ignored in the dead third, and the decision of where to add it first becomes political. Consistency also drifts: GeohashMessageBubble has group-aware corner radii (a UX nicety), UserMessagesScreen's MessageBubble does not (corner radius is static per isMe). GeohashMessageBubble shows avatar next to the last-in-group bubble; UserMessagesScreen shows avatar on every message. Neither approach is wrong, but they are visibly different across surfaces that both render 'a chat bubble'. Also: if F-001 is eventually fixed and the bitchat nostr-dm transport is trusted, there is still no way for a user to tell — same message, different visual, different affordances, different redeem surface.",
+      "fix": "Introduce shared/ui/composed/chat/ with four pure, prop-driven primitives: (1) `ChatBubble` accepting { isOwn, content, sender?, senderSubtitle?, timestamp?, showAvatar, avatarProps, isFirstInGroup?, isLastInGroup?, states: { sending, delivered, read }, extras?: ReactNode (e.g. CashuTokenBubble, TypingIndicator, StreamingCursor slot) }. (2) `ChatComposer` accepting { value, onChange, onSend, placeholder, leftAccessory?, disabled?, maxLength?, accessibilityLabel }. (3) `ChatList` wrapping LegendList with the common ( recycleItems=false | true , maintainScrollAtEnd, initialScrollAtEnd, alignItemsAtEnd, estimatedItemSize, keyboardDismissMode ) defaults. (4) `ChatHeader` as a thin Stack.Screen options builder accepting { title, subtitle?, leftIcon, rightContent, connectionDot? }. Each of the current four live screens (UserMessagesScreen, GeohashChatScreen public + nostr-dm + ble-dm) is then a ~200-line composition atop these primitives, with domain-specific logic (NIP-17 gift-wrap publish, BLE peer send, HTTPS SSE stream, cashu-token inline redeem) isolated in feature hooks. Accept that cashu-token inline redeem and streaming reasoning are slot-based extras — bitchat surfaces pass `extras=undefined`, UserMessagesScreen passes the cashu bubble, routstr passes the streaming cursor and reasoning panel. Keep `ChatBubble` pure (no useThemeColor inside — pass tokens down as props) so F-007@13.json (theme-subscription-per-bubble) doesn't recur in the shared primitive.",
+      "references": [
+        "skill:react-native-best-practices",
+        "prior-audit:F-007@13.json",
+        "prior-audit:F-009@13.json"
+      ],
+      "verification_note": "Read all three bubble implementations in full (UserMessagesScreen.tsx:543-768, GeohashChatScreen.tsx:59-163, features/bitchat/components/MessageBubble.tsx:1-96). Confirmed no shared primitive exists: listed shared/ui/composed/ — contains ListRow, GlassSearchBar, AmountFormatter, no chat-oriented primitive. Confirmed features/bitchat/index.ts exports only GeohashChatScreen / LOCATION_TIERS / useBitChat / useLocationTiers, so the dead MessageBubble/MessageList/ComposeBar trio are not even in the barrel — truly orphan. Counter-argument considered: 'the two live bubbles have genuinely different requirements (cashu / streaming / reasoning vs grouping / ephemeral-only), and a shared primitive would force a lowest-common-denominator.' Weak — the slot pattern (extras, leftAccessory) already addresses this in other shared/ui/composed pieces (see shared/ui/composed/ListRow.tsx). Severity High because AUDIT.md dim-3 + dim-4 both fire, and the question is the literal entry-point ask from the user.",
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "UserMessagesScreens MessageBubble now renders DM-only messages — its streaming UI fork (skeleton, TypingIndicator, StreamingCursor, reasoning expander) was deleted. AiMessageBubble and the WhitenoiseDM/GeohashChat bubbles still differ; full consolidation deferred."
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "UserMessagesScreen is a 2,683-line monolith that branches on `isRoutstrMode` — the single abstraction blocking consolidation into a shared chat component",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 924,
+      "symbol": "UserMessagesScreen + isRoutstrMode flag",
+      "dimension": 3,
+      "description": "UserMessagesScreen.tsx:924 declares `const isRoutstrMode = pubkey === ROUTSTR_PUBKEY;` and every effect, handler, and render block downstream branches on it. NIP-04 DM subscribe (:980), NIP-04 receive-side decrypt (:1263-1343), NIP-17 gift-wrap subscribe (:999), NIP-17 unwrap (:1012-1040), NIP-17 process (:1346-1392), routstr init / models fetch / balance check (:1131), routstr HTTPS/SSE send (:1442-1821), routstr 402 insufficient-balance popup (:1737-1795), routstr top-up flow (:1413-1432), attachments bottom sheet (:2343-2411), model-switch bottom sheet (:2414-2496), sessions panel mount (:2668-2679), send vs newSession vs anonymous-mode header-right (:2304-2337), balance/selectedModel subtitle (:2274-2300), top-up-balance floating action (:2626-2664) — all guarded by `isRoutstrMode`. The screen is conceptually three screens stapled together: a Nostr NIP-17 DM thread, a legacy NIP-04 receive pane, and an HTTPS LLM chat with model picker, sessions panel, streaming, and top-up. The 2,683-line length is the symptom; the isRoutstrMode fork is the cause. Any attempt to introduce the shared-primitive consolidation described in F-002 must first separate these concerns — a `ChatScreen` that both a Nostr-DM screen and a Routstr-chat screen compose.",
+      "why_it_matters": "Blocks F-002. Also concentrates risk: a bug in any branch (routstr SSE reconnect, NIP-17 decrypt handler, top-up focus-effect retry, anonymous-mode toggle) re-renders and re-subscribes every other branch. Prior audit 14 F-002 already flagged that this screen's untyped `useRoutstrStore()` destructure at :959 subscribes to ~17 actions + two scalars, meaning every setState during SSE streaming (updateMessage per chunk) re-renders the whole 2,683-line tree including the NIP-17 subscription useEffects. Testability suffers: every test of Nostr-DM receive has to stub routstr state, and vice versa.",
+      "fix": "Split into two screens behind a thin dispatcher. `features/user/screens/NostrDMScreen.tsx` owns the NIP-04 receive + NIP-17 publish/receive + cashu-token surface + send-money button + share-QR affordance. `features/routstr/screens/RoutstrChatScreen.tsx` owns the routstr HTTPS SSE send + model picker + sessions panel + top-up integration + attachments sheet + anonymous mode. `app/userMessages.tsx`, `app/(user-flow)/userMessages.tsx`, `app/(mint-flow)/userMessages.tsx` each read `pubkey === ROUTSTR_PUBKEY` and render the appropriate screen — the sentinel-check stays in the route wrapper, one place, not woven through 2,683 lines. Each screen then composes the shared primitives from F-002 (`ChatList`, `ChatComposer`, `ChatBubble`, `ChatHeader`) so the visual surface is unified without the logic being conflated. The extras slot on `ChatBubble` is how CashuTokenBubble / TypingIndicator / StreamingCursor remain local to their screens without leaking across.",
+      "references": [
+        "skill:zustand-5",
+        "skill:react-native-best-practices",
+        "prior-audit:F-002@14.json"
+      ],
+      "verification_note": "`wc -l features/user/screens/UserMessagesScreen.tsx` → 2,683. Grep for `isRoutstrMode` inside the file → 23 matches (control flow in effects, handlers, JSX). Confirmed three route wrappers (app/userMessages.tsx, app/(user-flow)/userMessages.tsx, app/(mint-flow)/userMessages.tsx) all funnel into this component. Counter-argument considered: 'the routstr HTTPS path and the Nostr NIP-17 path do share UI (the bubble, the composer, the list), so a split screen would duplicate chrome.' Weak — the shared chrome is exactly what F-002's primitives cover; the logic branches do NOT share and the isRoutstrMode fork is the symptom of a forced co-location. The routstr ContextMenu at :2132-2160 and the Nostr share-QR button at :2324-2336 share no code path — only the outer headerRight slot.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "UserMessagesScreen no longer branches on isRoutstrMode — file dropped from 2774 to ~830 LOC. Refactor at 4d36bf1e."
+    },
+    {
+      "id": "F-004",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "Routstr is wired as a Nostr-DM pubkey sentinel (ROUTSTR_PUBKEY) despite using HTTPS transport — the sentinel-in-route abstraction is the root cause of F-003",
+      "repo": "sovran-app",
+      "path": "shared/lib/constants.ts",
+      "line": 11,
+      "symbol": "ROUTSTR_PUBKEY",
+      "dimension": 3,
+      "description": "shared/lib/constants.ts:11 declares `ROUTSTR_PUBKEY = '8bf629b3d519a0f8a8390137a445c0eb2f5f2b4a8ed71151de898051e8006f13'` with the comment 'Sentinel pubkey that switches the userMessages screen to Routstr AI chat mode instead of Nostr DM mode.' Callers route to routstr via `/userMessages?pubkey=ROUTSTR_PUBKEY` (app/userMessages.tsx:14-26). UserMessagesScreen then derives `isRoutstrMode` from that (:924). But routstr's actual transport is HTTPS/SSE to api.routstr.com/v1 (shared/lib/routstr/api.ts:4), not Nostr: there is no Nostr subscription for this pubkey, no Nostr event is ever sent to it, and no message is ever signed to its key. The sentinel is a UI-routing shortcut that couples Routstr chat to the Nostr-DM route topology and drags every routstr-specific concern into the Nostr-DM screen. Downstream consequences: metadata subscription at :975 fires for ROUTSTR_PUBKEY (the real 8bf6…6f13 pubkey may or may not have a live kind-0 — if it doesn't, the avatar stays in 'loading' forever per shouldShowAvatarLoading at :1054); the DM subscription filter at :979-994 correctly short-circuits when isRoutstrMode (`return null`), but only after the two other subscriptions have been declared; the ContextMenu.Trigger at :2160 shows a bogus 'pubkey' in the subtitle trunc at :2298 (the header has its own routstr-subtitle branch, but if it ever fell through the wrong branch, a 64-hex pubkey would render instead of balance+model).",
+      "why_it_matters": "The sentinel is the mental model that makes F-002 impossible as a direct refactor — because 'the chat screen for pubkey X' is routstr when X is 8bf6…, so any shared-component work has to re-thread the sentinel. Also future-tripwire: if routstr ever gets a second instance / gateway / fallback provider, the sentinel explodes. The comment in constants.ts acknowledges this is a sentinel, not a real Nostr peer; the architecture didn't follow through with a separate route.",
+      "fix": "Introduce a first-class routstr route: `app/(routstr-flow)/chat.tsx` (or `app/routstr.tsx` for top-level) that mounts `RoutstrChatScreen` (F-003). All current callers that navigate to `/userMessages?pubkey=ROUTSTR_PUBKEY` (ExploreScreen.tsx, popups/routstr.ts, popups/messages.ts per prior grep) move to `/(routstr-flow)/chat`. `app/userMessages.tsx`'s effect at :19-23 (setSelectedModel on model param + pubkey == ROUTSTR_PUBKEY) moves to the new route wrapper. `ROUTSTR_PUBKEY` can stay as a constant if routstr ever gets a Nostr identity (e.g. for signed announcements), but it stops being a route-dispatch sentinel. This unblocks F-003 (the screen split) and F-002 (shared chat primitives) because routstr stops pretending to be a Nostr pubkey only for routing.",
+      "references": [
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Grep for ROUTSTR_PUBKEY across sovran-app → 22 match files. Key consumers: app/userMessages.tsx:12 (route wrapper model-param effect), features/user/screens/UserMessagesScreen.tsx:77 (isRoutstrMode fork), features/user/components/routstr/SessionsPanel.tsx (uses via store), shared/stores/profile/routstrStore.ts (no direct use — state), features/explore/screens/ExploreScreen.tsx, shared/lib/popup/popups/routstr.ts + popups/messages.ts (callers that navigate). Confirmed no Nostr subscription or event ever targets ROUTSTR_PUBKEY — it's purely a route sentinel. Counter-argument considered: 'routstr-as-pubkey lets the user view routstr as just another DM contact, which is on-brand with Sovran's Nostr-first identity model.' A reasonable design intent, but the cost (F-003's monolith) outweighs it and the sentinel can be replaced by a dedicated RoutstrChatScreen that renders with the same visual chrome, preserving the feel without the coupling.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ROUTSTR_PUBKEY constant deleted from shared/lib/constants.ts together with every consumer. Refactor at 4d36bf1e."
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Dead (bitchat-flow) route group and five orphaned bitchat UI components still present 2 days after audit 13 F-009 flagged them",
+      "repo": "sovran-app",
+      "path": "app/(bitchat-flow)/[geohash].tsx",
+      "line": 1,
+      "symbol": "(bitchat-flow) route group + BitChatScreen + MessageList + MessageBubble + ComposeBar + ChannelHeader",
+      "dimension": 3,
+      "description": "Audit 13 F-009 (2026-04-18) filed this at confidence 0.95. Audit 18 (2026-04-20) noted it was still outstanding. `ls` on 2026-04-20 confirms: app/(bitchat-flow)/[geohash].tsx and _layout.tsx are present, features/bitchat/screens/BitChatScreen.tsx is present, features/bitchat/components/{MessageList,MessageBubble,ComposeBar,ChannelHeader}.tsx are all present. Grep for any caller of /(bitchat-flow)/ or any import of BitChatScreen outside the dead route file → zero live references (the only caller is app/(bitchat-flow)/[geohash].tsx itself, which is the dead route entry). The live public-geohash path is app/(user-flow)/geohashChat.tsx → GeohashChatScreen, confirmed by audit 13's reference-check (SearchResultsList.tsx:55 / LocationTierItem.tsx:45 / ContactsScreen.tsx:63). Directly relevant to the consolidation entry point: these files ARE a message-bubble + message-list + composer stack that LOOKS like the 'shared primitives' F-002 recommends, but they are unused, unmaintained (StyleSheet.create + raw RN View/Text rather than shared/ui primitives), and would be the WRONG starting point for a refactor.",
+      "why_it_matters": "Dead code doesn't just waste bytes — it poisons the refactor choice for F-002. A future engineer opening features/bitchat/components/ sees 'we already have MessageBubble / MessageList / ComposeBar' and reaches for them as the consolidation target. That is the StyleSheet-heavy, non-theme-aware, non-shared-primitive version. knip did not flag them (audit 13 F-009 already explained why: the internal chain root is an expo-router file-based entry which knip counts as alive) so automated dead-code detection won't help. Also: features/bitchat/lib/constants.ts:18-20 still exports BITCHAT_EVENT_KIND_EPHEMERAL / _PRESENCE / _TEXT_NOTE unused; current knip run confirmed these are still unused.",
+      "fix": "Execute audit 13's refactor_plan §5 verbatim: `git rm app/(bitchat-flow)/[geohash].tsx app/(bitchat-flow)/_layout.tsx features/bitchat/screens/BitChatScreen.tsx features/bitchat/components/{MessageList,MessageBubble,ChannelHeader,ComposeBar}.tsx` and remove the (bitchat-flow) directory if empty. Drop features/bitchat/lib/constants.ts lines 18-20. Ship before F-002 so the consolidation work starts from a blank shared-primitive slate instead of having to decide between two candidate starting points.",
+      "references": [
+        "knip:unused-export",
+        "prior-audit:F-009@13.json"
+      ],
+      "verification_note": "Re-listed app/(bitchat-flow)/ → contains _layout.tsx + [geohash].tsx. Re-listed features/bitchat/components/ → ChannelHeader.tsx, ComposeBar.tsx, MessageBubble.tsx, MessageList.tsx (all present). Re-listed features/bitchat/screens/ → BitChatScreen.tsx + GeohashChatScreen.tsx + NetworkSheet.tsx. Ran `npm run knip` — confirmed BITCHAT_EVENT_KIND_* still flagged. Counter-argument considered: 'the delete may be blocked by a pending PR or a hesitation about losing the stylesheet approach as an option.' No such reason surfaced in git log since audit 13 — git log --oneline since 2026-04-18 shows no chat-surface work on this branch (feat/offline-send-suggestions).",
+      "prior_audit_id": "F-009@13.json",
+      "completion_status": "stale",
+      "completion_note": "Already addressed in commit 52d0d887 (refactor(bitchat): delete orphan parallel chat implementation)."
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "formatBalance / formatTimestamp / extractModelName duplicated between UserMessagesScreen, SessionsPanel, and GeohashChatScreen",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 106,
+      "symbol": "formatBalance / formatTimestamp / extractModelName",
+      "dimension": 4,
+      "description": "(1) `formatBalance(msats)` is defined at UserMessagesScreen.tsx:120-126 and again at features/user/components/routstr/SessionsPanel.tsx:54-60 — byte-identical. (2) `formatTimestamp` is defined at UserMessagesScreen.tsx:106-118 (takes UNIX seconds) and at GeohashChatScreen.tsx:35-47 (takes UNIX ms). The core logic is the same — 'today: HH:MM; yesterday: Yesterday; older: localeDateString' — but the ms-vs-s input convention silently differs; either could be passed to the other by mistake. (3) `extractModelName` is defined at UserMessagesScreen.tsx:135-151 (takes a RoutstrModel object, returns { provider, modelName }) and at SessionsPanel.tsx:62-79 (takes a modelId string + availableModels array, returns string) — different signatures, same intent, different parsing rules (UserMessagesScreen treats `model.name.includes(':')` first; SessionsPanel checks canonical_slug first). (4) `getProviderIcon` at UserMessagesScreen.tsx:153-210 is a 57-line provider→icon map that SessionsPanel does not use but would obviously need if its session rows ever displayed a model badge. (5) `isPlaceholderText` at UserMessagesScreen.tsx:522-541 is specific but a plausible dedup target for any future streaming UI. Directly relevant to F-002 / F-003: when the chat surfaces are consolidated, these helpers need one home. Consolidating the UI without consolidating its helpers leaves the drift in place.",
+      "why_it_matters": "Small dedup, but each of these is a formatting decision that should have exactly one definition. The seconds-vs-milliseconds divergence in formatTimestamp is an actual correctness tripwire — an engineer moving a timestamp between surfaces could pick the wrong variant silently.",
+      "fix": "Move routstr-specific formatters (formatBalance, extractModelName, getProviderIcon) to shared/lib/routstr/format.ts. Move formatTimestamp to shared/lib/time/chatTimestamp.ts (or a similar neutral home) with a single signature — recommend taking UNIX milliseconds and having callers pass `seconds * 1000`. Both variants currently format identically once the ms/s conversion is normalised; pick the convention (ms is more JS-native) and fix the two call sites. isPlaceholderText can move alongside a shared StreamingBubble extra under shared/ui/composed/chat/StreamingIndicator.tsx once F-002 lands.",
+      "references": [
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Diffed each helper pair by eye. formatBalance: identical. formatTimestamp: same logic, different input unit (×1000). extractModelName: different shape, similar regex-trimming intent. Confidence 0.9 because 'duplicated' is a structural observation and the re-use is easy to verify. Not critical on its own; it's the 'small helpers that should move when F-002 moves' category.",
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "UserMessagesScreen no longer carries formatBalance / extractModelName / extractProviderFromSlug duplicates (they were Routstr-only). formatTimestamp is still local to this screen and to GeohashChatScreen — full collapse deferred."
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "extractCashuToken + CashuTokenBubble are UserMessagesScreen-only — a bitchat (public or DM) message containing a cashu token renders as plain text with no redeem affordance",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 212,
+      "symbol": "extractCashuToken / CashuTokenBubble",
+      "dimension": 3,
+      "description": "`extractCashuToken(content)` at UserMessagesScreen.tsx:212-246 scans a message body for `cashuA…` / `cashuB…` prefixes and returns the longest valid-decoding substring via isValidEcashToken. `CashuTokenBubble` at :257-411 decodes it, shows mint URL + amount + USD estimate, and renders a 'Redeem' button that navigates to /receiveToken with a ReceiveHistoryEntry payload. Used in MessageBubble at :740 (`{cashuToken && <CashuTokenBubble token={cashuToken} isMe={isMe} />}`). GeohashMessageBubble (the bitchat public-geohash + nostr-dm + ble-dm bubble) has neither the extraction nor the inline redeem — bitchat messages with an embedded cashuB… token render as plain Text at GeohashChatScreen.tsx:138-145. Either this is intentional (bitchat public geohash chat is for broadcast; embedding bearer tokens in a public room would be reckless) and specific to the public-transport case, OR it is an oversight on the DM-over-bitchat transports (ble-dm, nostr-dm) that conceptually mirror Nostr NIP-17 DMs. The app surfaces both 'DM a user via Nostr' (UserMessagesScreen) and 'DM a user via bitchat' (GeohashChatScreen with transport=ble-dm / nostr-dm), with different primitives and different cashu-handling behaviour.",
+      "why_it_matters": "User-visible consistency gap across surfaces that look identical. If Kelbie sends a cashu token via NIP-17 DM, the receiver sees a rich redeem bubble; if Kelbie sends the same token via ble-dm or bitchat nostr-dm, the receiver sees a pasted string and has to long-press copy + paste into the receive flow. The inconsistency is load-bearing for the consolidation decision (F-002): if the shared ChatBubble has a slot for `extras`, bitchat surfaces pass `extras=undefined` deliberately OR they pass the cashu bubble and inherit redeem UX for free. This is an intent question, not a bug per se — but it's exactly the kind of decision that gets made by accident when three bubbles drift independently.",
+      "fix": "Two options, pick one and document: (A) Intentional: DM/chat surfaces OTHER than NIP-17 do not render inline cashu tokens because public-transport or mesh-transport echo changes the risk profile (a bearer token in a public geohash channel is everyone's to grab). Document in SOV-23 (Encrypted Messaging) when ratified, and in SOV-30 (Bitchat BLE Mesh). (B) Consolidate: when F-002 ships the shared ChatBubble with an `extras` slot, the bitchat-ble-dm / bitchat-nostr-dm transports pass `<CashuTokenBubble />` to get the inline redeem affordance; the bitchat-public-geohash (non-DM) transport deliberately omits it. This is the compromise path — private DMs get the redeem surface uniformly, public broadcast does not. Also: move CashuTokenBubble out of UserMessagesScreen.tsx to shared/ui/composed/chat/CashuTokenBubble.tsx so it's at the right layer to be consumed by either set of primitives.",
+      "references": [
+        "skill:nostr"
+      ],
+      "verification_note": "Read MessageBubble (UserMessagesScreen :543-768) vs GeohashMessageBubble (GeohashChatScreen :59-163). Confirmed: UserMessagesScreen calls extractCashuToken on every render (:578); GeohashMessageBubble does not. Confirmed no `CashuTokenBubble` import inside GeohashChatScreen.tsx. Counter-argument considered: 'bitchat public geohash is intentionally dumb / ephemeral and should not surface bearer instruments — the UX gap is a feature, not a bug.' Plausible for the public transport but not obviously correct for the DM transports (ble-dm, nostr-dm). Marking Medium because the intent is not written anywhere authoritative (SOV-23 / SOV-30 both TODO per docs/README.md). Confidence 0.85 reflects the intent-ambiguity — either answer needs to be written down.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "extractCashuToken + CashuTokenBubble remain UserMessagesScreen-only. Hoisting them to a shared chat module would be a separate slice."
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "isFlowContext prop is passed by (user-flow)/userMessages.tsx but destructured as `_isFlowContext` (ignored) — dead prop",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 873,
+      "symbol": "isFlowContext prop",
+      "dimension": 3,
+      "description": "UserMessagesScreen.tsx:864 declares `isFlowContext?: boolean;` in the props interface with the comment 'Whether this is rendered in a flow context (affects header styling)'. :873 destructures it as `isFlowContext: _isFlowContext = false` — the underscore prefix is the TypeScript/ESLint idiom for 'deliberately unused'. Grep for `_isFlowContext` in the file returns only the destructure; nothing reads it. app/(user-flow)/userMessages.tsx:16 passes `isFlowContext` to the component; app/userMessages.tsx and app/(mint-flow)/userMessages.tsx do not. The prop's stated intent ('affects header styling') is plausible (the user-flow modal group has a different header convention than the top-level modal) but the code path that would read it has been deleted or never written.",
+      "why_it_matters": "Low. A cosmetic / maintenance concern. Flag because AUDIT.md dim-3 rule: 'any, @ts-ignore without a reason, unused _vars' — this is the unused-prefix-convention case. It also suggests an aborted refactor of header styling; the next engineer adding a header-style branch might wire it to the prop without realising the other two wrappers don't pass it, reintroducing drift.",
+      "fix": "Either (a) delete the prop entirely — remove from UserMessagesScreenProps, remove from the destructure, update app/(user-flow)/userMessages.tsx to stop passing it; or (b) wire it: use it in the Stack.Screen options at :2097-2303 to branch header styling (e.g. different headerBackVisible for flow-context vs modal-context). Given F-003 recommends splitting the screen into two, (a) is the cheaper path — the split will naturally handle header styling per screen rather than per prop.",
+      "references": [
+        "lint:@typescript-eslint/no-unused-vars"
+      ],
+      "verification_note": "Grep `_isFlowContext|isFlowContext` across sovran-app → three hits: declaration, destructure, and the single passing call site. No read side. Counter-argument considered: 'maybe it is read via a dependent component prop drill.' Grep for any usage of the prop in child components rendered by UserMessagesScreen — none. Confidence 0.95 because it's a direct code-inspection verdict.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "isFlowContext prop removed from UserMessagesScreenProps and from the (user-flow) route wrapper. Refactor at 4d36bf1e."
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "extractCashuToken is O(n²) over content length and runs per render in MessageBubble — streaming + long-token hot-loop",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 212,
+      "symbol": "extractCashuToken",
+      "dimension": 7,
+      "description": "Lines 232-243: the nested for-loop iterates `i` from 6 up to `min(remainingText.length, maxTokenLength=5000)`, calling `isValidEcashToken(candidate)` each iteration. For a token-bearing message (common case: a 300-char cashuB… token embedded in a 500-char message body), that's up to 500 isValidEcashToken calls. The function is called in MessageBubble's render (:578) — it runs on EVERY render of the bubble, not memoized. During a routstr streaming response, MessageBubble re-renders per delta chunk (:1625-1661 updates `messages` state with each content+reasoning delta). If a streaming response embeds a cashu-like prefix (e.g. the model responds with example text containing 'cashuA'), the O(n) scan runs per chunk, amortising to O(n × chunks) ≈ O(n × n_tokens). For a 500-token streaming response, 500 × 300 ≈ 150k isValidEcashToken calls on the JS thread.",
+      "why_it_matters": "Low perf (UNVERIFIED without log-doctor slow evidence — log.txt's latest session did not exercise the chat surface, so no dynamic-behaviour trace exists). Structural though: a function that calls a crypto-adjacent validator (isValidEcashToken calls getDecodedToken inside) in a nested render-time loop is a textbook dim-7 heuristic. Impact scales with message length × chunk count — safe for a short routstr response, progressively more expensive for a reasoning-heavy long response.",
+      "fix": "Memoise the extract at the useMessage level: derive `cashuToken` once via `useMemo(() => extractCashuToken(content), [content])` in MessageBubble, rather than re-running on every render. Also short-circuit the loop: once isValidEcashToken has succeeded at length L, skip to length L+1 rather than retrying shorter prefixes (the current loop stores the longest valid but doesn't break out after a small window of non-matching suffixes). Also cheap guard: if content has no 'cashu' substring, skip the loop entirely (current impl checks for indexOf `cashua` / `cashub` first at :217-220, good — but the loop still runs for non-token content that happens to have 'cashu' as a substring). Most cost-effective: memoise + only re-run on content change. For F-002's shared ChatBubble, this belongs in a cashuTokenExtras slot that is passed a pre-computed cashuToken prop from the parent, not computed inside the bubble.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read :212-246 (extractCashuToken), :543-768 (MessageBubble) — confirmed no memoisation of the extract. log.txt latest session does not include any message-bearing events; this finding rests on structural reading, marked UNVERIFIED at runtime. Counter-argument considered: 'isValidEcashToken may fast-fail on non-cashu prefixes, making the inner calls cheap.' Partially true — it probably fails early on most candidates — but the outer loop still iterates every i from 6 to n, so it's still O(n) per render regardless of per-call cost. Confidence 0.7 because the real-world cost depends on isValidEcashToken's actual latency, which I didn't profile.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "extractCashuToken still runs per render in MessageBubble — algorithmic optimisation out of scope for this dead-code slice."
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "Routstr streaming SSE triggers updateMessage + setMessages per chunk — compounds with audit 14 F-002 whole-screen re-render storm",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 1621,
+      "symbol": "handleRoutstrSend stream loop",
+      "dimension": 7,
+      "description": "The SSE streaming loop at :1587-1671 processes each chunk by appending to `fullContent`, calling `updateMessage(assistantMessageId, fullContent)` on the routstr Zustand store (:1646), and calling `setMessages((prev) => prev.map(...))` on the screen's local state (:1650). Also `addMessage` is called on first content chunk (:1636). Per OpenAI-compatible SSE convention, a single response can produce hundreds of chunks (1-2 tokens per chunk in streaming mode). Combined with audit 14 F-002 (UserMessagesScreen.tsx:959 destructures ~17 store actions + two scalars from useRoutstrStore() — every store mutation re-renders the 2,683-line screen), the net effect during a 500-chunk streaming response is up to 500 whole-screen re-renders plus 500 MessageBubble re-renders (which trigger the O(n²) cashu-token extract per F-009 if the content contains a 'cashu' prefix). Audit 14 F-002 verification note cites the same screen's log-doctor trace: 'perf.js_thread_blocked 84× over 434s (stats --latest) — the base rate is already high; this store subscription pattern compounds it during chat.'",
+      "why_it_matters": "Compounding perf finding. Also increments the dim-7 race surface: every setMessages inside the stream loop reads prev via functional updater (safe from stale-closure), but the Zustand updateMessage runs `.map()` across `state.conversationHistory` at routstrStore.ts:214-221 each call — that's O(history_length) per chunk, so long sessions see O(H × C) work for H-message history × C chunks. Not exploitable, just slow.",
+      "fix": "Cross-reference audit 14 F-002's fix path (scoped Zustand selectors + getState() for actions). Additionally: batch the streaming updates — debounce updateMessage to every 50ms or every 10 chunks, not every chunk. Per-chunk setState on the screen can also be throttled: accumulate fullContent in a ref, setState via a rAF loop. The UI update cadence 60Hz already caps visible re-render to ~16ms; chunking faster than that is wasted work. Also: keep the latest fullContent in a ref and only write to the store once at stream end (plus occasional progress checkpoints for crash recovery). The current 'write to store per chunk' pattern is for resume-on-reload, which could instead checkpoint every N chunks. For F-002's shared ChatBubble, expose a `streamingContent` prop that updates frequently and a `committedContent` prop that updates infrequently — the bubble reads streamingContent during stream and commits on completion.",
+      "references": [
+        "skill:zustand-5",
+        "skill:react-native-best-practices",
+        "prior-audit:F-002@14.json"
+      ],
+      "verification_note": "Re-read UserMessagesScreen.tsx:1587-1671 (stream loop) and shared/stores/profile/routstrStore.ts:214-221 (updateMessage action). Confirmed per-chunk dispatch. log.txt does not contain a streaming session, so concrete chunk-count / frame-drop numbers are UNVERIFIED. Counter-argument considered: 'SSE chunks arrive network-rate-limited, so setState cadence is bounded by network, not rendering cost.' Partially true, but network rate can burst — and the screen's re-render work per call is not bounded by anything on the JS thread. Confidence 0.85 because the structural concern is clear; the concrete cost depends on profile data.",
+      "prior_audit_id": "F-002@14.json",
+      "completion_status": "complete",
+      "completion_note": "Routstr streaming SSE update path was deleted with the rest of the branch — no per-chunk Zustand writes from this screen anymore. Refactor at 4d36bf1e."
+    }
+  ],
+  "dimensions": {
+    "1": "partial",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "partial",
+    "6": "skipped",
+    "7": "partial",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Introduce shared/ui/composed/chat/ with four prop-driven primitives — ChatBubble, ChatComposer, ChatList (thin LegendList wrapper with chat-appropriate defaults), ChatHeader — and rewrite the three live chat screens (UserMessagesScreen's non-routstr branch, UserMessagesScreen's routstr branch, GeohashChatScreen's three transport modes) as ~200-line compositions. ChatBubble accepts an `extras` slot so CashuTokenBubble / TypingIndicator / StreamingCursor / ReasoningPanel stay local to their screens. Pure components that take theme tokens as props (not via useThemeColor inside) to avoid the per-bubble theme subscription anti-pattern flagged by audit 13 F-007. Fixes F-002 and partially F-007. Must ship AFTER F-001 (native NIP-17 guard) so the consolidated surface doesn't widen the impersonation blast radius.",
+      "files": [
+        "shared/ui/composed/chat/ChatBubble.tsx",
+        "shared/ui/composed/chat/ChatComposer.tsx",
+        "shared/ui/composed/chat/ChatList.tsx",
+        "shared/ui/composed/chat/ChatHeader.tsx",
+        "shared/ui/composed/chat/index.ts",
+        "features/user/screens/UserMessagesScreen.tsx",
+        "features/bitchat/screens/GeohashChatScreen.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Split UserMessagesScreen into features/user/screens/NostrDMScreen.tsx (NIP-04 legacy receive + NIP-17 gift-wrapped publish/receive + cashu inline redeem + send-money) and features/routstr/screens/RoutstrChatScreen.tsx (HTTPS SSE send + model picker bottom sheet + sessions panel + top-up integration + attachments sheet + anonymous mode). Each composes the F-002 primitives. The isRoutstrMode sentinel check moves OUT of the screen and INTO the route wrappers (app/userMessages.tsx, app/(user-flow)/userMessages.tsx, app/(mint-flow)/userMessages.tsx), or better, a dedicated routstr route replaces the sentinel entirely per F-004. Fixes F-003 and enables F-004.",
+      "files": [
+        "features/user/screens/NostrDMScreen.tsx",
+        "features/routstr/screens/RoutstrChatScreen.tsx",
+        "features/user/screens/UserMessagesScreen.tsx",
+        "app/userMessages.tsx",
+        "app/(user-flow)/userMessages.tsx",
+        "app/(mint-flow)/userMessages.tsx"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Promote a dedicated routstr route (e.g. app/(routstr-flow)/chat.tsx or app/routstr.tsx) and migrate all callers that currently navigate via pubkey=ROUTSTR_PUBKEY to it. Callers identified: features/explore/screens/ExploreScreen.tsx, shared/lib/popup/popups/routstr.ts, shared/lib/popup/popups/messages.ts. ROUTSTR_PUBKEY stays as a constant (still used for future signed-announcement capability) but is no longer a routing sentinel. Fixes F-004.",
+      "files": [
+        "app/(routstr-flow)/chat.tsx",
+        "features/explore/screens/ExploreScreen.tsx",
+        "shared/lib/popup/popups/routstr.ts",
+        "shared/lib/popup/popups/messages.ts",
+        "shared/lib/constants.ts"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Execute audit 13 F-009 refactor_plan §5 unchanged: delete app/(bitchat-flow)/[geohash].tsx, app/(bitchat-flow)/_layout.tsx, features/bitchat/screens/BitChatScreen.tsx, features/bitchat/components/MessageList.tsx, features/bitchat/components/MessageBubble.tsx, features/bitchat/components/ComposeBar.tsx, features/bitchat/components/ChannelHeader.tsx. Drop features/bitchat/lib/constants.ts lines 18-20 (BITCHAT_EVENT_KIND_EPHEMERAL/PRESENCE/TEXT_NOTE — unused per current knip run). Do this BEFORE F-002 so the shared-primitive work starts from a clean slate. Fixes F-005.",
+      "files": [
+        "app/(bitchat-flow)/[geohash].tsx",
+        "app/(bitchat-flow)/_layout.tsx",
+        "features/bitchat/screens/BitChatScreen.tsx",
+        "features/bitchat/components/MessageList.tsx",
+        "features/bitchat/components/MessageBubble.tsx",
+        "features/bitchat/components/ComposeBar.tsx",
+        "features/bitchat/components/ChannelHeader.tsx",
+        "features/bitchat/lib/constants.ts"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Move duplicated chat-surface helpers to their proper shared homes: formatBalance + extractModelName + getProviderIcon → shared/lib/routstr/format.ts. formatTimestamp (currently two versions, s and ms) → shared/lib/time/chatTimestamp.ts, normalised to take UNIX milliseconds; update both call sites. isPlaceholderText → shared/ui/composed/chat/StreamingIndicator.tsx once F-002 lands, alongside TypingIndicator/StreamingCursor. Fixes F-006.",
+      "files": [
+        "shared/lib/routstr/format.ts",
+        "shared/lib/time/chatTimestamp.ts",
+        "features/user/screens/UserMessagesScreen.tsx",
+        "features/user/components/routstr/SessionsPanel.tsx",
+        "features/bitchat/screens/GeohashChatScreen.tsx"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Extract CashuTokenBubble + extractCashuToken from UserMessagesScreen.tsx to shared/ui/composed/chat/CashuTokenBubble.tsx. Memoise the extract via useMemo on content change rather than per render (F-009 fix). The bitchat-DM transports (nostr-dm, ble-dm) then opt in to the extras slot; the bitchat-public-geohash transport deliberately opts out. Resolves the intent question in F-007 while paying down F-009.",
+      "files": [
+        "shared/ui/composed/chat/CashuTokenBubble.tsx",
+        "features/user/screens/UserMessagesScreen.tsx",
+        "features/bitchat/screens/GeohashChatScreen.tsx"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Create __research__/chat-component-consolidation.md with status:draft. Content: (a) enumerate the five live chat surfaces — bitchat public-geohash (nostr kind 20000 ephemeral), bitchat nostr-dm (NIP-17 via native bridge), bitchat ble-dm (Noise-encrypted BLE mesh), Nostr NIP-17 DM (UserMessagesScreen non-routstr), routstr HTTPS SSE. (b) map each to the F-002 primitives + extras slots. (c) document the intent on cashu-token inline redeem per surface (F-007 question). (d) call out the F-004 routstr-pubkey-sentinel tradeoff and the proposed route-based replacement. (e) link to the still-open audit 13 F-001 NIP-17 native guard — consolidation cannot ship before that. Once ratified, the note promotes to SOV-23 Encrypted Messaging (per docs/README.md band-2X) and/or SOV-30 Bitchat BLE Mesh. Feeds the next audit that reviews the refactor.",
+      "files": [
+        "sovran-app/__research__/chat-component-consolidation.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Is the absence of cashu-token inline redeem in the bitchat-DM transports (nostr-dm, ble-dm) intentional (F-007 option A) or incidental (F-007 option B)? The intent needs to be written down before F-002 ships, because the shared ChatBubble's extras-slot policy will pin the answer.",
+    "SOV-23 (Encrypted Messaging — NIP-17 / NIP-44), SOV-19 (Routstr Top-Up & Model Catalogue), SOV-30 (Bitchat BLE Mesh), SOV-31 (Geohash / NIP-29 Channels) are all TODO per docs/README.md. The chat-component consolidation crosses all four bands; whichever one ratifies first should cite the shared primitives and fix the cross-surface contract (message-bubble shape, composer contract, list scroll semantics) as a regression surface.",
+    "Should the Nostr NIP-04 (kind 4) legacy receive path at UserMessagesScreen.tsx:979-994 and 1263-1343 remain indefinitely for backwards compatibility, or is there a cutover date after which the app stops subscribing to kind 4 entirely? Current behaviour: send is NIP-17-only (safe), receive accepts both (tolerant). Leaving kind-4 receive on indefinitely is fine for legacy DMs, but every consolidation pass has to carry the two-subscription complexity forward — worth deciding once.",
+    "BitChatVendor is a submodule. Fixing F-001 means either forking it or shimming the native bridge — the decision was raised in audit 13's open_questions and is still open. Until it resolves, F-002 consolidation widens the potential blast radius of F-001 without new exploits but with a larger user-visible surface.",
+    "log.txt's latest session contains zero chat-surface traffic (120 entries, all coco RequestRateLimiter noise) — none of the dynamic-behaviour findings in this audit (F-009 O(n²) extract, F-010 per-chunk re-render) have been confirmed via log-doctor. The next audit that reviews the consolidation refactor should be preceded by a recorded chat session (NIP-17 send+receive, routstr streaming, bitchat public geohash, bitchat nostr-dm, bitchat ble-dm) so F-009 / F-010 can be confirmed or demoted."
+  ],
+  "completion_status": "partial"
+}
