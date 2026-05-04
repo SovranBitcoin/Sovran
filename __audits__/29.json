@@ -116,7 +116,9 @@
         "skill:vercel-react-native-skills"
       ],
       "verification_note": "Self-evident structural perf pattern from the source; quantified impact would need log-doctor instrumentation (propose scanHistoryStore logging state.entries.length at every mutation, paired with Transactions.tsx emitting list length, then running slow --threshold 16 during a scroll). Counter-argument: React Compiler may reduce some re-render churn, but cannot collapse the selector work since selectors run on every store update regardless of downstream render.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "scanHistoryStore now exposes entriesByTransactionId (Record<string,ScanHistoryEntry>) maintained by addScan/linkTransaction and rebuilt afterHydrate. New useScanEntryForTransactionId selector replaces all four state.entries.find call sites in Transaction.tsx and TransactionSourceSection.tsx — row+detail lookups are O(1)."
     },
     {
       "id": "F-004",
@@ -155,7 +157,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Confirmed both definitions and the barrel export. No counter-argument — the collision is real and self-evident.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Inline useHistoryEntry in Transaction.tsx renamed to useTransactionRow; the canonical hooks/useHistoryEntry export is no longer shadowed."
     },
     {
       "id": "F-006",
@@ -174,7 +178,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Confirmed via grep — both files import useScanHistoryStore; both run .find over entries; both expose near-identical hook surfaces.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Single useScanEntryForTransactionId selector consumed by both row (Transaction.tsx) and detail (TransactionSourceSection.tsx). Display concerns (SOURCE_ICONS, SOURCE_LABELS) stay at the call site as the audit fix prescribed; dead OPTION_KIND_LABELS dictionary removed in passing."
     },
     {
       "id": "F-007",
