@@ -120,7 +120,8 @@
         "skill:zustand-5"
       ],
       "verification_note": "Confirmed via `npm run analyze-structure -- shared/stores` output: `Cycle 1 (2 files): profile/themeStore.ts → global/wallpaperStore.ts`. Both imports are top-level.",
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Cycle removed by extracting the resolver into shared/lib/theme/resolveUnitWallpaper.ts. themeStore no longer imports wallpaperStore; wallpaperStore keeps its themeStore reads as a one-way arrow (no cycle). Verified via analyze-structure: sovran-app's only Cycle entry is gone."
     },
     {
       "id": "F-005",

@@ -163,7 +163,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-read both providers. Counter-argument considered: ProfileWallpaperProvider's role is to provide a Context value for non-Zustand consumers. Verdict: the only consumer of the Context is `useUnitWallpaper`, which itself reads from the store via `getState()` — the Context is vestigial. The 'gating' difference (root vs below-MigrationGate) is also moot because both providers tolerate pre-hydration via fallback, per ThemeProvider.tsx:33-37 comment.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ProfileWallpaperProvider deleted. The vestigial Context (created but never read) is gone; useUnitWallpaper now lives in shared/lib/theme/useUnitWallpaper.ts and consumers (ThemeProvider chrome resolution, features/wallet/components/Account.tsx) import directly from there. compose chain in app/_layout.tsx drops one provider layer."
     },
     {
       "id": "F-005",
