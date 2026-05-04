@@ -1,5 +1,5 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
-import { ScrollView, Animated, Linking, Easing, StyleSheet } from 'react-native';
+import { ScrollView, Animated, Easing, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
@@ -27,6 +27,7 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { openExternalUrl } from '@/shared/lib/url';
 
 const ParamsSchema = z.object({
   mintInfoEntry: z.string().min(1).max(64_000).optional(),
@@ -425,23 +426,26 @@ export function MintInfoScreen() {
 
   const handleContactPress = useCallback(async (method: string, info: string) => {
     log.info('mint.info.contact.press', { method });
-    try {
-      switch (method.toLowerCase()) {
-        case 'email':
-          await Linking.openURL(`mailto:${info}`);
-          break;
-        case 'twitter':
-        case 'x':
-          await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
-          break;
-        case 'nostr':
-          router.push({ pathname: '/(user-flow)/profile', params: { npub: info } });
-          break;
-        default:
-          await Clipboard.setStringAsync(info);
+    const open = async (raw: string) => {
+      const result = await openExternalUrl(raw);
+      if (result.isErr()) {
+        log.warn('mint.info.contact.open_failed', { method, reason: result.error.type });
+        await Clipboard.setStringAsync(info);
       }
-    } catch {
-      await Clipboard.setStringAsync(info);
+    };
+    switch (method.toLowerCase()) {
+      case 'email':
+        await open(`mailto:${info.trim()}`);
+        break;
+      case 'twitter':
+      case 'x':
+        await open(`https://x.com/${encodeURIComponent(info.replace('@', ''))}`);
+        break;
+      case 'nostr':
+        router.push({ pathname: '/(user-flow)/profile', params: { npub: info } });
+        break;
+      default:
+        await Clipboard.setStringAsync(info);
     }
   }, []);
 

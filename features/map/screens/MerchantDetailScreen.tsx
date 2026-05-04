@@ -5,7 +5,6 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
-import * as Linking from 'expo-linking';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
@@ -25,6 +24,8 @@ import opacity from 'hex-color-opacity';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
+import { openExternalUrl } from '@/shared/lib/url';
+import { openLinkFailedPopup } from '@/shared/lib/popup/popups/general';
 
 const ParamsSchema = z.object({
   placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
@@ -91,17 +92,28 @@ export function MerchantDetailScreen() {
     }
   }, [place?.name, navigation]);
 
-  const handleOpenURL = useCallback((url: string) => {
-    Linking.openURL(url);
+  const handleOpenURL = useCallback(async (url: string) => {
+    const result = await openExternalUrl(url);
+    if (result.isErr()) {
+      log.warn('map.merchant.open_link.failed', { url, reason: result.error.type });
+      openLinkFailedPopup();
+    }
   }, []);
 
-  const handleCall = useCallback((phone: string) => {
-    Linking.openURL(`tel:${phone}`);
-  }, []);
+  const handleCall = useCallback(
+    async (phone: string) => {
+      // Strip everything but digits and a leading + so user-supplied formatting
+      // (spaces, dashes, parens) doesn't fail URL parsing.
+      const sanitized = phone.replace(/[^\d+]/g, '');
+      await handleOpenURL(`tel:${sanitized}`);
+    },
+    [handleOpenURL]
+  );
 
-  const handleEmail = useCallback((email: string) => {
-    Linking.openURL(`mailto:${email}`);
-  }, []);
+  const handleEmail = useCallback(
+    async (email: string) => handleOpenURL(`mailto:${email.trim()}`),
+    [handleOpenURL]
+  );
 
   const supportsOnchain = place?.['osm:payment:onchain'] === 'yes';
   const supportsLightning = place?.['osm:payment:lightning'] === 'yes';

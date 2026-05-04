@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions, Linking } from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
 import { Stack, Link } from 'expo-router';
@@ -30,6 +30,7 @@ import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { truncateMiddle } from '@/shared/lib/strings';
+import { openExternalUrl } from '@/shared/lib/url';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -826,15 +827,11 @@ export function UserProfileScreen() {
   }, []);
 
   const handleOpenLink = useCallback(async (url: string) => {
-    try {
-      nostrLog.info('user.profile.open_link', { url });
-      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-      await Linking.openURL(fullUrl);
-    } catch (e) {
-      nostrLog.error('user.profile.open_link.failed', {
-        url,
-        error: e instanceof Error ? e : new Error(String(e)),
-      });
+    nostrLog.info('user.profile.open_link', { url });
+    const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+    const result = await openExternalUrl(fullUrl);
+    if (result.isErr()) {
+      nostrLog.error('user.profile.open_link.failed', { url, reason: result.error.type });
       openLinkFailedPopup();
     }
   }, []);

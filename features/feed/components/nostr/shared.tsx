@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Linking, Platform } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -22,6 +22,8 @@ import opacity from 'hex-color-opacity';
 import { nip19 } from 'nostr-tools';
 import { Metadata, ShortTextNote, Repost, GenericRepost } from 'nostr-tools/kinds';
 import { log } from '@/shared/lib/logger';
+import { openExternalUrl } from '@/shared/lib/url';
+import { openLinkFailedPopup } from '@/shared/lib/popup/popups/general';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
@@ -607,7 +609,13 @@ export const InlineLink = React.memo(function InlineLink({
       style={{ color: opacity(foreground, 0.5) }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
-      onPress={() => Linking.openURL(url).catch(() => {})}>
+      onPress={async () => {
+        const result = await openExternalUrl(url);
+        if (result.isErr()) {
+          log.warn('feed.inline_link.open_failed', { reason: result.error.type });
+          openLinkFailedPopup();
+        }
+      }}>
       {prettifyUrl(url)}
     </Text>
   );
@@ -636,7 +644,13 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
   const surface = useThemeColor('surface');
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   const isAndroid = Platform.OS === 'android';
-  const openInBrowser = useCallback(() => Linking.openURL(url).catch(() => {}), [url]);
+  const openInBrowser = useCallback(async () => {
+    const result = await openExternalUrl(url);
+    if (result.isErr()) {
+      log.warn('feed.video.open_failed', { reason: result.error.type });
+      openLinkFailedPopup();
+    }
+  }, [url]);
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
     p.muted = true;

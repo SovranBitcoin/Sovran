@@ -2,6 +2,49 @@
  * URL utility functions for consistent URL handling across the application
  */
 
+import { err, errAsync, ok, Result, ResultAsync } from 'neverthrow';
+import { Linking } from 'react-native';
+
+export type OpenUrlError =
+  | { type: 'invalid-url'; raw: string }
+  | { type: 'unsupported-scheme'; scheme: string }
+  | { type: 'open-failed'; cause: unknown };
+
+const ALLOWED_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+
+/**
+ * Pure validator. Parses `raw`, requires an allowlisted scheme. Returns the
+ * normalised `URL` on success. The allowlist exists to keep relay/server-
+ * supplied strings from triggering deep links (e.g. `javascript:`, `file:`,
+ * `intent://`) when handed to the native opener.
+ */
+export function validateExternalUrl(raw: string): Result<URL, OpenUrlError> {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return err({ type: 'invalid-url', raw });
+  }
+  if (!ALLOWED_SCHEMES.has(parsed.protocol)) {
+    return err({ type: 'unsupported-scheme', scheme: parsed.protocol });
+  }
+  return ok(parsed);
+}
+
+/**
+ * Open an externally-supplied URL through the native opener. Validates the
+ * scheme first and surfaces both validation and `Linking.openURL` rejections
+ * to the caller via `ResultAsync` so failures aren't silently swallowed.
+ */
+export function openExternalUrl(raw: string): ResultAsync<void, OpenUrlError> {
+  const validated = validateExternalUrl(raw);
+  if (validated.isErr()) return errAsync(validated.error);
+  return ResultAsync.fromPromise(
+    Linking.openURL(validated.value.toString()).then(() => undefined),
+    (cause): OpenUrlError => ({ type: 'open-failed', cause })
+  );
+}
+
 /**
  * Produces a protocol-free, domain-lowercased key for comparing / caching mint URLs.
  *
