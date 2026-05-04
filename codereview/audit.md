@@ -157,6 +157,23 @@ for d in .agents/skills/*/; do n=$(basename "$d"); desc=$(awk -F': ' '/^descript
 TOPIC="zustand persist"
 grep -rli "$TOPIC" .agents/skills/*/SKILL.md
 
+# ── Mandatory process-skill load (Matt Pocock set) ───────────────────
+# Read each file with the Read tool BEFORE any other survey step. Skimming
+# the index above is not loading. The §9.1 markdown report's "Process
+# skills" section requires a one-line paraphrase from each — that
+# paraphrase is the load-verification artifact and can only come from
+# reading the body. If a file is missing, halt and report.
+ls .agents/skills/zoom-out/SKILL.md \
+   .agents/skills/improve-codebase-architecture/SKILL.md \
+   .agents/skills/diagnose/SKILL.md \
+   .agents/skills/prompt-engineering-patterns/SKILL.md
+# Then: Read .agents/skills/zoom-out/SKILL.md
+#       Read .agents/skills/improve-codebase-architecture/SKILL.md
+#       Read .agents/skills/diagnose/SKILL.md
+#       Read .agents/skills/prompt-engineering-patterns/SKILL.md
+# (Use the Read tool for each. Bash `cat` does not count — file content
+# must enter the assistant's context window via Read.)
+
 # Static tooling
 npm run type-check          # tsc --noEmit; cite TS error codes (TS2322 etc.)
 npm run lint                # expo lint; cite rule IDs verbatim
@@ -187,7 +204,36 @@ invoke them by their canonical paths.
 
 ## 5. Workflow
 
+### Pass 0 — Mandatory skill load (non-negotiable)
+
+Before Pass 1, **read every Matt Pocock process skill listed in §8.1 from
+disk via the Read tool, end-to-end**. The four mandatory paths:
+
+- `.agents/skills/zoom-out/SKILL.md`
+- `.agents/skills/improve-codebase-architecture/SKILL.md`
+- `.agents/skills/diagnose/SKILL.md`
+- `.agents/skills/prompt-engineering-patterns/SKILL.md`
+
+If any required-phase skill is missing from disk, **stop** and tell the
+user to run `npx skills add mattpocock/skills --all -y` — do not proceed
+without them. Bash `cat`, the §4 `awk` index, and the SKILL.md *frontmatter
+description* line all do **not** count as loading; the body must enter the
+assistant's context window via the Read tool.
+
+Record every skill actually loaded under **Process skills consulted** in
+the §9.1 markdown report, each with a one-line paraphrase / note
+demonstrating the body was read. Self-check §10 item 9 blocks the audit
+if this list is empty or contains skills without a non-empty note.
+
+This phase is the auditor's analogue of `fix.md` §5 Phase 0. The Matt
+Pocock set governs *how* the auditor reasons, not *which* dimension is
+covered — load them every run regardless of ENTRY.
+
 ### Pass 1 — Survey (read everything cheap before opening files)
+
+Apply `skill:zoom-out` first — the prior-audit list is the broadest
+frame; the ENTRY must come from the distance-from-covered-set heuristic
+in Pass 2, not from latching onto the first finding read.
 
 1. Run the **prior audits**, **open findings**, and **covered subtrees**
    queries from §4. Memorise the open-pattern map.
@@ -202,14 +248,20 @@ invoke them by their canonical paths.
    slop/consolidation findings — they're often invisible to skill-based
    audits and account for many of the "default verdict: delete" cases the
    role description points at.
-4. Skim `.agents/skills/`. Always load the **process skills** below
-   (Matt Pocock set, mandatory). Defer domain skills until a finding's
-   dimension is active.
+4. Skim the rest of `.agents/skills/` via the index command in §4. Defer
+   domain skills until a finding's dimension is active — load them with
+   the Read tool the same way Pass 0 loads process skills, only when their
+   dimension fires.
 5. List `__research__/`, read `__research__/README.md`, open any note whose
    tags / `dim-N` overlap the likely entry.
 6. List `../docs/`. If ENTRY's band has a Ratified SOV-XX, read it.
 
 ### Pass 2 — Pick an ENTRY
+
+Apply `skill:improve-codebase-architecture` here — the ENTRY must be
+named in its **depth/seam/leverage** vocabulary, not in ad-hoc terms.
+"Audit the storage seam in `features/whitenoise/`" is right; "look at
+whitenoise" is not.
 
 **If user supplied one:** use it.
 
@@ -238,6 +290,14 @@ Two named patterns are **always in scope** regardless of slice choice:
 
 ### Pass 3 — Investigate
 
+Apply `skill:diagnose` for any candidate Critical/High correctness
+finding — narrate the investigation using its
+reproduce → minimise → hypothesise → instrument → fix → regression-test
+loop. The auditor is read-only, so the loop terminates at "fix" as a
+description (the downstream fixer writes the actual fix); the trail must
+still be recorded in the finding's `description` and `verification_note`
+so the fixer can resume.
+
 Apply the ten review dimensions (§6) to the ENTRY's blast radius. For each
 candidate finding:
 
@@ -260,6 +320,10 @@ For every Phase A finding:
 - Confirm severity rubric (§7).
 
 ### Pass 5 — Emit
+
+Apply `skill:prompt-engineering-patterns` to keep the report and JSON
+specific, terse, and structured — both are prompts for downstream
+review/fix agents.
 
 Markdown report inline (§9.1). Strict-JSON file at `__audits__/NN.json`
 (§9.2). Do nothing else on disk.
@@ -353,22 +417,40 @@ confidence < 0.4 in Phase B.
 
 ## 8. Skills to consult
 
-### 8.1 Process skills (Matt Pocock set — always loaded)
+### 8.1 Process skills (Matt Pocock set — MANDATORY load every run)
 
-Run before declaring blast radius / filing the first finding. Cite in
-`audit.process_skills_consulted`.
+**"Loaded" means "read end-to-end via the Read tool, with the body in
+the assistant's context window."** Listing the skill name in
+`audit.process_skills_consulted` is *not* loading. Bash `cat`, the §4
+`awk` index, and the SKILL.md frontmatter description line all do **not**
+count.
 
-- `skill:zoom-out` — broaden the frame before declaring blast radius.
-- `skill:improve-codebase-architecture` — depth/seam/leverage vocabulary;
-  refactor candidates use this language exclusively. Findings of
-  `kind: refactor` cite this skill.
-- `skill:diagnose` — narrate every Critical/High correctness finding using
-  its reproduce → minimise → hypothesise → instrument → fix → regression
-  loop (the auditor doesn't write the fix; it leaves a downstream-readable
-  trail).
-- `skill:prompt-engineering-patterns` — the auditor's output is itself a
-  prompt for downstream review/fix agents; apply specificity, structured
-  output, and token efficiency.
+These govern *how* the auditor reasons, not *which* dimension it covers.
+Loaded at Pass 0 from `.agents/skills/` — every run, regardless of ENTRY.
+A required skill missing from disk halts the auditor (Pass 0). Every
+skill here MUST appear under "Process skills consulted" in the §9.1
+markdown report with a non-empty one-line note on what it shaped, even
+if the note is "no Critical/High in slice — diagnose loop deferred" or
+similar. The §10 self-check item 9 blocks the audit if any required
+skill is absent from the report or has an empty note.
+
+| Skill                                 | Pass that requires it          | What it shapes                                                                |
+| ------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| `skill:zoom-out`                      | Pass 1                         | Broaden frame; ENTRY comes from distance-from-covered-set, not first hit.     |
+| `skill:improve-codebase-architecture` | Pass 2                         | ENTRY named in depth/seam/leverage vocabulary; refactor-plan items cite this. |
+| `skill:diagnose`                      | Pass 3 (Critical/High only)    | Reproduce → minimise → hypothesise → instrument → fix loop, recorded in trail.|
+| `skill:prompt-engineering-patterns`   | Pass 5 (markdown + JSON emit)  | Report + JSON stay specific, terse, structured — both are downstream prompts. |
+
+Skill paths (verbatim, for the Read tool):
+
+- `.agents/skills/zoom-out/SKILL.md`
+- `.agents/skills/improve-codebase-architecture/SKILL.md`
+- `.agents/skills/diagnose/SKILL.md`
+- `.agents/skills/prompt-engineering-patterns/SKILL.md`
+
+(The auditor differs from `fix.md` here on `tdd`: `fix.md` includes it
+because the fixer writes code; the auditor is read-only so `tdd` is
+out-of-set.)
 
 ### 8.2 Domain skills (load when matching dimension is active)
 
@@ -395,6 +477,17 @@ report it; the user can `npx skills add mattpocock/skills --all -y`.
 
 ## Entry point
 <path / slug>. Autoselected? <yes/no>. Blast radius: <N files>.
+
+## Process skills consulted (Matt Pocock set — required)
+- skill:zoom-out — <one line on what it shifted in the ENTRY choice>
+- skill:improve-codebase-architecture — <seam named, leverage estimate>
+- skill:diagnose — <which Critical/High the loop was applied to, or
+  "no Critical/High in slice — loop deferred">
+- skill:prompt-engineering-patterns — applied to report + JSON
+
+(Each note must paraphrase a specific instruction or vocabulary item from
+the loaded SKILL.md — the paraphrase is the load-verification artifact.
+See §8.1 and §10 item 9.)
 
 ## Summary
 <1 paragraph; counts by severity; top 3 risks named>
@@ -527,7 +620,15 @@ classify):
 6. Enums match §9.2 exactly.
 7. No patches, no edits except `__audits__/NN.json`.
 8. No persist-shape change is proposed without `version` bump + `migrate`.
-9. Matt Pocock process skills loaded are listed in `audit.process_skills_consulted`.
+9. **Process skills consulted (Matt Pocock set)** — Pass 0 ran. Every
+   skill in §8.1's table appears under "Process skills consulted" in the
+   §9.1 markdown report with a non-empty note that paraphrases a specific
+   instruction or vocabulary item from the loaded SKILL.md (the
+   paraphrase is the load-verification artifact and can only come from
+   reading the body). The same list appears in
+   `audit.process_skills_consulted` in the §9.2 JSON. An empty list, any
+   required skill missing, or any skill listed without a non-empty
+   paraphrase note blocks the audit and triggers a re-run from Pass 0.
 10. If `log.txt` absent, dependent findings are `UNVERIFIED`; if present,
     grounded lines are quoted in the markdown report.
 11. The two named cross-cutting patterns ("bypasses `coco-payment-ux/`",
