@@ -20,6 +20,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import {
+  EMPTY_DISTRIBUTION,
   useMintDistributionStore,
   TOTAL_BASIS_POINTS,
 } from '@/shared/stores/profile/mintDistributionStore';
@@ -60,17 +61,17 @@ export function MintDistributionScreen() {
 
   const [selectedCurrency, setSelectedCurrency] = useState<string>('SAT');
 
-  const distributions = useMintDistributionStore((state) => state.distributions);
+  // Narrow the selector to the per-unit slice. Returning the whole `distributions`
+  // record made any write to any unit re-render this screen even though only the
+  // selected currency's slice is read.
+  const distribution = useMintDistributionStore(
+    (state) => state.distributions[selectedCurrency.toLowerCase()] ?? EMPTY_DISTRIBUTION
+  );
   const setMintDistribution = useMintDistributionStore((state) => state.setMintDistribution);
   const initializeDistribution = useMintDistributionStore((state) => state.initializeDistribution);
   const equalizeMints = useMintDistributionStore((state) => state.equalizeMints);
   const maxMint = useMintDistributionStore((state) => state.maxMint);
   const minMint = useMintDistributionStore((state) => state.minMint);
-
-  const distribution = useMemo(
-    () => distributions[selectedCurrency.toLowerCase()] || {},
-    [distributions, selectedCurrency]
-  );
 
   const availableCurrencies = useMemo(() => {
     const units: string[] = [];

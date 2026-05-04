@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
@@ -158,365 +158,375 @@ function redistributeDelta(
   return result;
 }
 
+/**
+ * Stable, frozen empty distribution returned when a unit has no entry yet.
+ * Sharing one identity keeps `useMintDistributionStore((s) => s.distributions[unit] ?? EMPTY_DISTRIBUTION)`
+ * referentially stable across renders, so consumers don't re-render on unrelated writes.
+ */
+export const EMPTY_DISTRIBUTION: Readonly<Record<string, number>> = Object.freeze({});
+
 export const useMintDistributionStore = create<MintDistributionStore>()(
-  persist(
-    (set, get) => ({
-      // Initial state
-      distributions: {},
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
+        // Initial state
+        distributions: {},
 
-      // Get distribution for a unit
-      getDistribution: (unit: string) => {
-        const normalizedUnit = unit.toLowerCase();
-        return get().distributions[normalizedUnit] || {};
-      },
+        // Get distribution for a unit
+        getDistribution: (unit: string) => {
+          const normalizedUnit = unit.toLowerCase();
+          return get().distributions[normalizedUnit] || {};
+        },
 
-      // Get specific mint's distribution
-      getMintDistribution: (unit: string, mintUrl: string) => {
-        const normalizedUnit = unit.toLowerCase();
-        const distribution = get().distributions[normalizedUnit] || {};
-        return distribution[mintUrl] || 0;
-      },
+        // Get specific mint's distribution
+        getMintDistribution: (unit: string, mintUrl: string) => {
+          const normalizedUnit = unit.toLowerCase();
+          const distribution = get().distributions[normalizedUnit] || {};
+          return distribution[mintUrl] || 0;
+        },
 
-      // Set mint distribution with automatic redistribution
-      setMintDistribution: (
-        unit: string,
-        mintUrl: string,
-        newBp: number,
-        allMintUrls: string[]
-      ) => {
-        storeLog.debug('store.mint_dist.set', { unit, mintUrl, newBp });
-        const normalizedUnit = unit.toLowerCase();
-        const clampedBp = Math.max(0, Math.min(TOTAL_BASIS_POINTS, Math.round(newBp)));
+        // Set mint distribution with automatic redistribution
+        setMintDistribution: (
+          unit: string,
+          mintUrl: string,
+          newBp: number,
+          allMintUrls: string[]
+        ) => {
+          storeLog.debug('store.mint_dist.set', { unit, mintUrl, newBp });
+          const normalizedUnit = unit.toLowerCase();
+          const clampedBp = Math.max(0, Math.min(TOTAL_BASIS_POINTS, Math.round(newBp)));
 
-        set((state) => {
-          const currentDistribution = { ...(state.distributions[normalizedUnit] ?? {}) };
+          set((state) => {
+            const currentDistribution = { ...(state.distributions[normalizedUnit] ?? {}) };
 
-          // Ensure all mints have an entry
-          allMintUrls.forEach((url) => {
-            if (currentDistribution[url] === undefined) {
-              currentDistribution[url] = 0;
-            }
-          });
-
-          const currentBp = currentDistribution[mintUrl] || 0;
-          const delta = clampedBp - currentBp;
-
-          if (delta === 0) {
-            return state;
-          }
-
-          // Set the new value for the changed mint
-          currentDistribution[mintUrl] = clampedBp;
-
-          // Determine eligible mints for redistribution
-          const otherMints = allMintUrls.filter((url) => url !== mintUrl);
-
-          // Check if any mint currently has 100% (special case override)
-          const mintWith100Percent = allMintUrls.find(
-            (url) => (state.distributions[normalizedUnit]?.[url] || 0) === TOTAL_BASIS_POINTS
-          );
-
-          let eligibleMints: string[];
-
-          if (mintWith100Percent && mintWith100Percent !== mintUrl && delta < 0) {
-            // Special case: We're giving to a mint when another has 100%
-            // This shouldn't happen in normal flow, but handle it
-            eligibleMints = otherMints.filter((url) => url !== mintWith100Percent);
-          } else if (currentBp === TOTAL_BASIS_POINTS && delta < 0) {
-            /**
-             * Special case (UX): reducing a 100% mint should "wake up" the rest.
-             *
-             * Normal rule is “only redistribute among active mints (bp > 0)” so toggling a mint
-             * doesn’t unexpectedly activate a mint the user had at 0%.
-             *
-             * But when a mint is at 100%, every other mint is necessarily at 0%. If we enforced the
-             * active-only rule here, reducing from 100% would have nowhere to redistribute to.
-             */
-            eligibleMints = otherMints;
-          } else {
-            // Normal case: Only redistribute among active mints (bp > 0)
-            eligibleMints = otherMints.filter((url) => (currentDistribution[url] || 0) > 0);
-
-            // If no active mints and we're taking (increasing this mint),
-            // we need to take from somewhere - use all other mints
-            if (eligibleMints.length === 0 && delta > 0) {
-              eligibleMints = otherMints;
-            }
-          }
-
-          // Perform redistribution
-          const newDistribution = redistributeDelta(
-            currentDistribution,
-            mintUrl,
-            delta,
-            eligibleMints
-          );
-
-          // Verify sum equals 10,000 and correct if needed
-          const sum = Object.values(newDistribution).reduce((s, v) => s + v, 0);
-          if (sum !== TOTAL_BASIS_POINTS && allMintUrls.length > 0) {
-            const diff = TOTAL_BASIS_POINTS - sum;
-            /**
-             * Determinism / invariants:
-             * We must always end with exactly 10,000bp. Because we do integer math + rounding,
-             * we may be off by a handful of bp.
-             *
-             * We fix it by applying the remainder to the largest *other* mint. This keeps the
-             * changed mint exactly where the user set it, and avoids “flicker” when dragging.
-             */
-            const largestOther = otherMints.reduce(
-              (max, url) => ((newDistribution[url] || 0) > (newDistribution[max] || 0) ? url : max),
-              otherMints[0]
-            );
-            if (largestOther) {
-              newDistribution[largestOther] = Math.max(
-                0,
-                (newDistribution[largestOther] || 0) + diff
-              );
-            }
-          }
-
-          return {
-            distributions: {
-              ...state.distributions,
-              [normalizedUnit]: newDistribution,
-            },
-          };
-        });
-      },
-
-      // Initialize distribution for a unit
-      initializeDistribution: (unit: string, mintUrls: string[]) => {
-        storeLog.info('store.mint_dist.initialize', { unit, mintCount: mintUrls.length });
-        const normalizedUnit = unit.toLowerCase();
-
-        set((state) => {
-          const existing = state.distributions[normalizedUnit];
-
-          // If distribution exists, just ensure all mints are present
-          if (existing && Object.keys(existing).length > 0) {
-            const updated = { ...existing };
-            let needsUpdate = false;
-
-            // Add any new mints with 0 bp
-            mintUrls.forEach((url) => {
-              if (updated[url] === undefined) {
-                updated[url] = 0;
-                needsUpdate = true;
+            // Ensure all mints have an entry
+            allMintUrls.forEach((url) => {
+              if (currentDistribution[url] === undefined) {
+                currentDistribution[url] = 0;
               }
             });
 
-            // Remove mints that no longer exist
-            Object.keys(updated).forEach((url) => {
-              if (!mintUrls.includes(url)) {
-                delete updated[url];
-                needsUpdate = true;
-              }
-            });
+            const currentBp = currentDistribution[mintUrl] || 0;
+            const delta = clampedBp - currentBp;
 
-            if (!needsUpdate) {
+            if (delta === 0) {
               return state;
             }
 
-            // Normalize to ensure sum is 10,000
-            const values = mintUrls.map((url) => updated[url] || 0);
-            const sum = values.reduce((s, v) => s + v, 0);
+            // Set the new value for the changed mint
+            currentDistribution[mintUrl] = clampedBp;
 
-            if (sum !== TOTAL_BASIS_POINTS && sum > 0) {
-              const normalized = distributeProportionally(values, TOTAL_BASIS_POINTS);
-              mintUrls.forEach((url, i) => {
-                updated[url] = normalized[i];
-              });
-            } else if (sum === 0) {
-              // Equal distribution for new setup
-              const equal = distributeProportionally(
-                mintUrls.map(() => 1),
-                TOTAL_BASIS_POINTS
+            // Determine eligible mints for redistribution
+            const otherMints = allMintUrls.filter((url) => url !== mintUrl);
+
+            // Check if any mint currently has 100% (special case override)
+            const mintWith100Percent = allMintUrls.find(
+              (url) => (state.distributions[normalizedUnit]?.[url] || 0) === TOTAL_BASIS_POINTS
+            );
+
+            let eligibleMints: string[];
+
+            if (mintWith100Percent && mintWith100Percent !== mintUrl && delta < 0) {
+              // Special case: We're giving to a mint when another has 100%
+              // This shouldn't happen in normal flow, but handle it
+              eligibleMints = otherMints.filter((url) => url !== mintWith100Percent);
+            } else if (currentBp === TOTAL_BASIS_POINTS && delta < 0) {
+              /**
+               * Special case (UX): reducing a 100% mint should "wake up" the rest.
+               *
+               * Normal rule is “only redistribute among active mints (bp > 0)” so toggling a mint
+               * doesn’t unexpectedly activate a mint the user had at 0%.
+               *
+               * But when a mint is at 100%, every other mint is necessarily at 0%. If we enforced the
+               * active-only rule here, reducing from 100% would have nowhere to redistribute to.
+               */
+              eligibleMints = otherMints;
+            } else {
+              // Normal case: Only redistribute among active mints (bp > 0)
+              eligibleMints = otherMints.filter((url) => (currentDistribution[url] || 0) > 0);
+
+              // If no active mints and we're taking (increasing this mint),
+              // we need to take from somewhere - use all other mints
+              if (eligibleMints.length === 0 && delta > 0) {
+                eligibleMints = otherMints;
+              }
+            }
+
+            // Perform redistribution
+            const newDistribution = redistributeDelta(
+              currentDistribution,
+              mintUrl,
+              delta,
+              eligibleMints
+            );
+
+            // Verify sum equals 10,000 and correct if needed
+            const sum = Object.values(newDistribution).reduce((s, v) => s + v, 0);
+            if (sum !== TOTAL_BASIS_POINTS && allMintUrls.length > 0) {
+              const diff = TOTAL_BASIS_POINTS - sum;
+              /**
+               * Determinism / invariants:
+               * We must always end with exactly 10,000bp. Because we do integer math + rounding,
+               * we may be off by a handful of bp.
+               *
+               * We fix it by applying the remainder to the largest *other* mint. This keeps the
+               * changed mint exactly where the user set it, and avoids “flicker” when dragging.
+               */
+              const largestOther = otherMints.reduce(
+                (max, url) =>
+                  (newDistribution[url] || 0) > (newDistribution[max] || 0) ? url : max,
+                otherMints[0]
               );
+              if (largestOther) {
+                newDistribution[largestOther] = Math.max(
+                  0,
+                  (newDistribution[largestOther] || 0) + diff
+                );
+              }
+            }
+
+            return {
+              distributions: {
+                ...state.distributions,
+                [normalizedUnit]: newDistribution,
+              },
+            };
+          });
+        },
+
+        // Initialize distribution for a unit
+        initializeDistribution: (unit: string, mintUrls: string[]) => {
+          storeLog.info('store.mint_dist.initialize', { unit, mintCount: mintUrls.length });
+          const normalizedUnit = unit.toLowerCase();
+
+          set((state) => {
+            const existing = state.distributions[normalizedUnit];
+
+            // If distribution exists, just ensure all mints are present
+            if (existing && Object.keys(existing).length > 0) {
+              const updated = { ...existing };
+              let needsUpdate = false;
+
+              // Add any new mints with 0 bp
+              mintUrls.forEach((url) => {
+                if (updated[url] === undefined) {
+                  updated[url] = 0;
+                  needsUpdate = true;
+                }
+              });
+
+              // Remove mints that no longer exist
+              Object.keys(updated).forEach((url) => {
+                if (!mintUrls.includes(url)) {
+                  delete updated[url];
+                  needsUpdate = true;
+                }
+              });
+
+              if (!needsUpdate) {
+                return state;
+              }
+
+              // Normalize to ensure sum is 10,000
+              const values = mintUrls.map((url) => updated[url] || 0);
+              const sum = values.reduce((s, v) => s + v, 0);
+
+              if (sum !== TOTAL_BASIS_POINTS && sum > 0) {
+                const normalized = distributeProportionally(values, TOTAL_BASIS_POINTS);
+                mintUrls.forEach((url, i) => {
+                  updated[url] = normalized[i];
+                });
+              } else if (sum === 0) {
+                // Equal distribution for new setup
+                const equal = distributeProportionally(
+                  mintUrls.map(() => 1),
+                  TOTAL_BASIS_POINTS
+                );
+                mintUrls.forEach((url, i) => {
+                  updated[url] = equal[i];
+                });
+              }
+
+              return {
+                distributions: {
+                  ...state.distributions,
+                  [normalizedUnit]: updated,
+                },
+              };
+            }
+
+            // Create new equal distribution
+            const equalDistribution: Record<string, number> = {};
+            if (mintUrls.length > 0) {
+              const perMint = Math.floor(TOTAL_BASIS_POINTS / mintUrls.length);
+              const remainder = TOTAL_BASIS_POINTS - perMint * mintUrls.length;
               mintUrls.forEach((url, i) => {
-                updated[url] = equal[i];
+                equalDistribution[url] = perMint + (i < remainder ? 1 : 0);
               });
             }
 
             return {
               distributions: {
                 ...state.distributions,
-                [normalizedUnit]: updated,
+                [normalizedUnit]: equalDistribution,
               },
             };
-          }
+          });
+        },
 
-          // Create new equal distribution
-          const equalDistribution: Record<string, number> = {};
-          if (mintUrls.length > 0) {
-            const perMint = Math.floor(TOTAL_BASIS_POINTS / mintUrls.length);
-            const remainder = TOTAL_BASIS_POINTS - perMint * mintUrls.length;
-            mintUrls.forEach((url, i) => {
-              equalDistribution[url] = perMint + (i < remainder ? 1 : 0);
+        // Equalize among active mints only
+        equalizeMints: (unit: string, mintUrls: string[]) => {
+          storeLog.info('store.mint_dist.equalize', { unit, mintCount: mintUrls.length });
+          const normalizedUnit = unit.toLowerCase();
+
+          set((state) => {
+            const current = state.distributions[normalizedUnit] || {};
+
+            // Get active mints (bp > 0)
+            const activeMints = mintUrls.filter((url) => (current[url] || 0) > 0);
+
+            // If no active mints, equalize all
+            const mintsToEqualize = activeMints.length > 0 ? activeMints : mintUrls;
+
+            if (mintsToEqualize.length === 0) {
+              return state;
+            }
+
+            const newDistribution: Record<string, number> = {};
+
+            // Set non-equalized mints to 0
+            mintUrls.forEach((url) => {
+              if (!mintsToEqualize.includes(url)) {
+                newDistribution[url] = 0;
+              }
             });
-          }
 
-          return {
-            distributions: {
-              ...state.distributions,
-              [normalizedUnit]: equalDistribution,
-            },
-          };
-        });
-      },
+            // Distribute equally among mints to equalize
+            const perMint = Math.floor(TOTAL_BASIS_POINTS / mintsToEqualize.length);
+            const remainder = TOTAL_BASIS_POINTS - perMint * mintsToEqualize.length;
+            mintsToEqualize.forEach((url, i) => {
+              newDistribution[url] = perMint + (i < remainder ? 1 : 0);
+            });
 
-      // Equalize among active mints only
-      equalizeMints: (unit: string, mintUrls: string[]) => {
-        storeLog.info('store.mint_dist.equalize', { unit, mintCount: mintUrls.length });
-        const normalizedUnit = unit.toLowerCase();
+            return {
+              distributions: {
+                ...state.distributions,
+                [normalizedUnit]: newDistribution,
+              },
+            };
+          });
+        },
 
-        set((state) => {
-          const current = state.distributions[normalizedUnit] || {};
+        // Set mint to 100%
+        maxMint: (unit: string, mintUrl: string, allMintUrls: string[]) => {
+          storeLog.info('store.mint_dist.max', { unit, mintUrl });
+          const normalizedUnit = unit.toLowerCase();
 
-          // Get active mints (bp > 0)
-          const activeMints = mintUrls.filter((url) => (current[url] || 0) > 0);
+          set((state) => {
+            const newDistribution: Record<string, number> = {};
 
-          // If no active mints, equalize all
-          const mintsToEqualize = activeMints.length > 0 ? activeMints : mintUrls;
+            allMintUrls.forEach((url) => {
+              newDistribution[url] = url === mintUrl ? TOTAL_BASIS_POINTS : 0;
+            });
 
-          if (mintsToEqualize.length === 0) {
-            return state;
-          }
+            return {
+              distributions: {
+                ...state.distributions,
+                [normalizedUnit]: newDistribution,
+              },
+            };
+          });
+        },
 
-          const newDistribution: Record<string, number> = {};
+        // Set mint to 0% and redistribute
+        minMint: (unit: string, mintUrl: string, allMintUrls: string[]) => {
+          storeLog.info('store.mint_dist.min', { unit, mintUrl });
+          const normalizedUnit = unit.toLowerCase();
 
-          // Set non-equalized mints to 0
-          mintUrls.forEach((url) => {
-            if (!mintsToEqualize.includes(url)) {
-              newDistribution[url] = 0;
+          set((state) => {
+            const current = state.distributions[normalizedUnit] || {};
+            const currentBp = current[mintUrl] || 0;
+
+            if (currentBp === 0) {
+              return state;
             }
-          });
 
-          // Distribute equally among mints to equalize
-          const perMint = Math.floor(TOTAL_BASIS_POINTS / mintsToEqualize.length);
-          const remainder = TOTAL_BASIS_POINTS - perMint * mintsToEqualize.length;
-          mintsToEqualize.forEach((url, i) => {
-            newDistribution[url] = perMint + (i < remainder ? 1 : 0);
-          });
+            const otherMints = allMintUrls.filter((url) => url !== mintUrl);
 
-          return {
-            distributions: {
-              ...state.distributions,
-              [normalizedUnit]: newDistribution,
-            },
-          };
-        });
-      },
+            // Check if this mint has 100% - use override behavior
+            const isOnly100Percent = currentBp === TOTAL_BASIS_POINTS;
 
-      // Set mint to 100%
-      maxMint: (unit: string, mintUrl: string, allMintUrls: string[]) => {
-        storeLog.info('store.mint_dist.max', { unit, mintUrl });
-        const normalizedUnit = unit.toLowerCase();
-
-        set((state) => {
-          const newDistribution: Record<string, number> = {};
-
-          allMintUrls.forEach((url) => {
-            newDistribution[url] = url === mintUrl ? TOTAL_BASIS_POINTS : 0;
-          });
-
-          return {
-            distributions: {
-              ...state.distributions,
-              [normalizedUnit]: newDistribution,
-            },
-          };
-        });
-      },
-
-      // Set mint to 0% and redistribute
-      minMint: (unit: string, mintUrl: string, allMintUrls: string[]) => {
-        storeLog.info('store.mint_dist.min', { unit, mintUrl });
-        const normalizedUnit = unit.toLowerCase();
-
-        set((state) => {
-          const current = state.distributions[normalizedUnit] || {};
-          const currentBp = current[mintUrl] || 0;
-
-          if (currentBp === 0) {
-            return state;
-          }
-
-          const otherMints = allMintUrls.filter((url) => url !== mintUrl);
-
-          // Check if this mint has 100% - use override behavior
-          const isOnly100Percent = currentBp === TOTAL_BASIS_POINTS;
-
-          // Get eligible mints for redistribution
-          let eligibleMints: string[];
-          if (isOnly100Percent) {
-            // Distribute to ALL other mints
-            eligibleMints = otherMints;
-          } else {
-            // Distribute to active mints only
-            eligibleMints = otherMints.filter((url) => (current[url] || 0) > 0);
-            // If no active mints, distribute to all
-            if (eligibleMints.length === 0) {
+            // Get eligible mints for redistribution
+            let eligibleMints: string[];
+            if (isOnly100Percent) {
+              // Distribute to ALL other mints
               eligibleMints = otherMints;
-            }
-          }
-
-          const newDistribution = { ...current };
-          newDistribution[mintUrl] = 0;
-
-          if (eligibleMints.length > 0) {
-            // Distribute the removed bp
-            const eligibleValues = eligibleMints.map((url) => current[url] || 0);
-            const eligibleTotal = eligibleValues.reduce((sum, v) => sum + v, 0);
-
-            if (eligibleTotal === 0) {
-              // Equal distribution
-              const perMint = Math.floor(currentBp / eligibleMints.length);
-              const remainder = currentBp - perMint * eligibleMints.length;
-              eligibleMints.forEach((url, i) => {
-                newDistribution[url] = perMint + (i < remainder ? 1 : 0);
-              });
             } else {
-              // Proportional distribution
-              const additions = distributeProportionally(eligibleValues, currentBp);
-              eligibleMints.forEach((url, i) => {
-                newDistribution[url] = (current[url] || 0) + additions[i];
-              });
+              // Distribute to active mints only
+              eligibleMints = otherMints.filter((url) => (current[url] || 0) > 0);
+              // If no active mints, distribute to all
+              if (eligibleMints.length === 0) {
+                eligibleMints = otherMints;
+              }
             }
+
+            const newDistribution = { ...current };
+            newDistribution[mintUrl] = 0;
+
+            if (eligibleMints.length > 0) {
+              // Distribute the removed bp
+              const eligibleValues = eligibleMints.map((url) => current[url] || 0);
+              const eligibleTotal = eligibleValues.reduce((sum, v) => sum + v, 0);
+
+              if (eligibleTotal === 0) {
+                // Equal distribution
+                const perMint = Math.floor(currentBp / eligibleMints.length);
+                const remainder = currentBp - perMint * eligibleMints.length;
+                eligibleMints.forEach((url, i) => {
+                  newDistribution[url] = perMint + (i < remainder ? 1 : 0);
+                });
+              } else {
+                // Proportional distribution
+                const additions = distributeProportionally(eligibleValues, currentBp);
+                eligibleMints.forEach((url, i) => {
+                  newDistribution[url] = (current[url] || 0) + additions[i];
+                });
+              }
+            }
+
+            return {
+              distributions: {
+                ...state.distributions,
+                [normalizedUnit]: newDistribution,
+              },
+            };
+          });
+        },
+
+        // Clear distribution for a unit
+        clearDistribution: (unit: string) => {
+          storeLog.info('store.mint_dist.clear', { unit });
+          const normalizedUnit = unit.toLowerCase();
+
+          set((state) => {
+            const { [normalizedUnit]: _, ...rest } = state.distributions;
+            return { distributions: rest };
+          });
+        },
+      }),
+      persistConfig({
+        name: 'mint-distribution-store',
+        storage: createProfileScopedStorage(),
+        schema: PersistedMintDistributionStore,
+        logKey: 'mint_dist',
+        partialize: (state) => ({ distributions: state.distributions }),
+        afterHydrate: (state, error) => {
+          if (!error && __DEV__) {
+            storeLog.debug('store.mint_dist.rehydrated', { distributions: state?.distributions });
           }
-
-          return {
-            distributions: {
-              ...state.distributions,
-              [normalizedUnit]: newDistribution,
-            },
-          };
-        });
-      },
-
-      // Clear distribution for a unit
-      clearDistribution: (unit: string) => {
-        storeLog.info('store.mint_dist.clear', { unit });
-        const normalizedUnit = unit.toLowerCase();
-
-        set((state) => {
-          const { [normalizedUnit]: _, ...rest } = state.distributions;
-          return { distributions: rest };
-        });
-      },
-    }),
-    persistConfig({
-      name: 'mint-distribution-store',
-      storage: createProfileScopedStorage(),
-      schema: PersistedMintDistributionStore,
-      logKey: 'mint_dist',
-      partialize: (state) => ({ distributions: state.distributions }),
-      afterHydrate: (state, error) => {
-        if (!error && __DEV__) {
-          storeLog.debug('store.mint_dist.rehydrated', { distributions: state?.distributions });
-        }
-      },
-    })
+        },
+      })
+    )
   )
 );
 

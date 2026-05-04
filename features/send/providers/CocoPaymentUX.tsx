@@ -413,10 +413,16 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         }
 
         if (screenType === 'receive') {
+          // Narrow the NPC subscription to `mintUrl` so transient `isSyncing`
+          // / `isUpdating` flips during a refresh don't trigger duplicate
+          // `_npcMintUpdate` recomputations on the receive screen.
           unsubscribes.push(
-            useNpcMintStore.subscribe(() => {
-              callback({ _npcMintUpdate: true } as EntryRecord);
-            })
+            useNpcMintStore.subscribe(
+              (s) => s.mintUrl,
+              () => {
+                callback({ _npcMintUpdate: true } as EntryRecord);
+              }
+            )
           );
           const subscriber = (newKey: string | null) => {
             callback({ _p2pkKeyUpdate: true, p2pkKey: newKey } as EntryRecord);
@@ -436,9 +442,21 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           const pushEnrichment = () => {
             callback({ _mintEnrichment: true } as EntryRecord);
           };
-          unsubscribes.push(useAuditMintStore.subscribe(pushEnrichment));
-          unsubscribes.push(useKYMMintStore.subscribe(pushEnrichment));
-          unsubscribes.push(useMintProfileStore.subscribe(pushEnrichment));
+          // Scope to the cache slice for the mint currently being shown. The
+          // selector closes over `mintInfoFetchingUrl`, so cache writes for
+          // unrelated mints (and any non-cache state mutation) don't fire the
+          // listener; the screen only wakes when its mint's data updates.
+          const cacheSliceForCurrentMint = <T,>(cache: Record<string, T>): T | undefined =>
+            mintInfoFetchingUrl ? cache[mintInfoFetchingUrl] : undefined;
+          unsubscribes.push(
+            useAuditMintStore.subscribe((s) => cacheSliceForCurrentMint(s.cache), pushEnrichment)
+          );
+          unsubscribes.push(
+            useKYMMintStore.subscribe((s) => cacheSliceForCurrentMint(s.cache), pushEnrichment)
+          );
+          unsubscribes.push(
+            useMintProfileStore.subscribe((s) => cacheSliceForCurrentMint(s.cache), pushEnrichment)
+          );
 
           mintInfoCallback = callback;
           unsubscribes.push(() => {

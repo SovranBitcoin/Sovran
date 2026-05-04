@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { storeLog } from '@/shared/lib/logger';
@@ -38,41 +38,43 @@ const PersistedMintProfileStore = z.object({
 });
 
 export const useMintProfileStore = create<MintProfileStore>()(
-  persist(
-    (set, get) => ({
-      cache: {},
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
+        cache: {},
 
-      getCached: (mintUrl: string) => {
-        return get().cache[normalizeMintUrlKey(mintUrl)];
-      },
+        getCached: (mintUrl: string) => {
+          return get().cache[normalizeMintUrlKey(mintUrl)];
+        },
 
-      setCached: (mintUrl: string, followers: number, reputation: number) => {
-        const normalized = normalizeMintUrlKey(mintUrl);
-        storeLog.debug('store.mint_profile.set_cached', {
-          mintUrl: normalized,
-          followers,
-          reputation,
-        });
-        set((state) => ({
-          cache: {
-            ...state.cache,
-            [normalized]: { followers, reputation, timestamp: Date.now() },
-          },
-        }));
-      },
+        setCached: (mintUrl: string, followers: number, reputation: number) => {
+          const normalized = normalizeMintUrlKey(mintUrl);
+          storeLog.debug('store.mint_profile.set_cached', {
+            mintUrl: normalized,
+            followers,
+            reputation,
+          });
+          set((state) => ({
+            cache: {
+              ...state.cache,
+              [normalized]: { followers, reputation, timestamp: Date.now() },
+            },
+          }));
+        },
 
-      isStale: (mintUrl: string, maxAgeMinutes: number = 30) => {
-        const cached = get().cache[normalizeMintUrlKey(mintUrl)];
-        if (!cached) return true;
-        return (Date.now() - cached.timestamp) / (1000 * 60) > maxAgeMinutes;
-      },
-    }),
-    persistConfig({
-      name: 'mint-profile-store',
-      storage: AsyncStorage,
-      schema: PersistedMintProfileStore,
-      logKey: 'mint_profile',
-      partialize: (state) => ({ cache: state.cache }),
-    })
+        isStale: (mintUrl: string, maxAgeMinutes: number = 30) => {
+          const cached = get().cache[normalizeMintUrlKey(mintUrl)];
+          if (!cached) return true;
+          return (Date.now() - cached.timestamp) / (1000 * 60) > maxAgeMinutes;
+        },
+      }),
+      persistConfig({
+        name: 'mint-profile-store',
+        storage: AsyncStorage,
+        schema: PersistedMintProfileStore,
+        logKey: 'mint_profile',
+        partialize: (state) => ({ cache: state.cache }),
+      })
+    )
   )
 );

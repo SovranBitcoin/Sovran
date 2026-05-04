@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { storeLog } from '@/shared/lib/logger';
@@ -42,69 +42,71 @@ const PersistedKymMintStore = z.object({
 });
 
 export const useKYMMintStore = create<KYMMintStore>()(
-  persist(
-    (set, get) => ({
-      // Initial state
-      cache: {},
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
+        // Initial state
+        cache: {},
 
-      // Actions
-      getCached: (mintUrl: string) => {
-        const normalized = normalizeMintUrlKey(mintUrl);
-        const currentState = get();
-        return currentState.cache[normalized];
-      },
+        // Actions
+        getCached: (mintUrl: string) => {
+          const normalized = normalizeMintUrlKey(mintUrl);
+          const currentState = get();
+          return currentState.cache[normalized];
+        },
 
-      setCached: (mintUrl: string, score: number, recommendations: MintRecommendation[]) => {
-        const normalized = normalizeMintUrlKey(mintUrl);
-        storeLog.debug('store.kym_mint.set_cached', {
-          mintUrl: normalized,
-          score,
-          recommendationCount: recommendations.length,
-        });
-        set((state) => ({
-          cache: {
-            ...state.cache,
-            [normalized]: {
-              score,
-              recommendations,
-              timestamp: Date.now(),
+        setCached: (mintUrl: string, score: number, recommendations: MintRecommendation[]) => {
+          const normalized = normalizeMintUrlKey(mintUrl);
+          storeLog.debug('store.kym_mint.set_cached', {
+            mintUrl: normalized,
+            score,
+            recommendationCount: recommendations.length,
+          });
+          set((state) => ({
+            cache: {
+              ...state.cache,
+              [normalized]: {
+                score,
+                recommendations,
+                timestamp: Date.now(),
+              },
             },
-          },
-        }));
-      },
+          }));
+        },
 
-      clearCache: () => {
-        storeLog.info('store.kym_mint.clear_cache');
-        set({ cache: {} });
-      },
+        clearCache: () => {
+          storeLog.info('store.kym_mint.clear_cache');
+          set({ cache: {} });
+        },
 
-      clearMintCache: (mintUrl: string) => {
-        const normalized = normalizeMintUrlKey(mintUrl);
-        storeLog.debug('store.kym_mint.clear_mint_cache', { mintUrl: normalized });
-        set((state) => {
-          const newCache = { ...state.cache };
-          delete newCache[normalized];
-          return { cache: newCache };
-        });
-      },
+        clearMintCache: (mintUrl: string) => {
+          const normalized = normalizeMintUrlKey(mintUrl);
+          storeLog.debug('store.kym_mint.clear_mint_cache', { mintUrl: normalized });
+          set((state) => {
+            const newCache = { ...state.cache };
+            delete newCache[normalized];
+            return { cache: newCache };
+          });
+        },
 
-      isStale: (mintUrl: string, maxAgeMinutes: number = 60) => {
-        const normalized = normalizeMintUrlKey(mintUrl);
-        const currentState = get();
-        const cached = currentState.cache[normalized];
-        if (!cached) return true;
+        isStale: (mintUrl: string, maxAgeMinutes: number = 60) => {
+          const normalized = normalizeMintUrlKey(mintUrl);
+          const currentState = get();
+          const cached = currentState.cache[normalized];
+          if (!cached) return true;
 
-        const ageMinutes = (Date.now() - cached.timestamp) / (1000 * 60);
-        return ageMinutes > maxAgeMinutes;
-      },
-    }),
-    persistConfig({
-      name: 'kym-mint-store',
-      storage: AsyncStorage,
-      schema: PersistedKymMintStore,
-      logKey: 'kym_mint',
-      // Only persist the cache data
-      partialize: (state) => ({ cache: state.cache }),
-    })
+          const ageMinutes = (Date.now() - cached.timestamp) / (1000 * 60);
+          return ageMinutes > maxAgeMinutes;
+        },
+      }),
+      persistConfig({
+        name: 'kym-mint-store',
+        storage: AsyncStorage,
+        schema: PersistedKymMintStore,
+        logKey: 'kym_mint',
+        // Only persist the cache data
+        partialize: (state) => ({ cache: state.cache }),
+      })
+    )
   )
 );

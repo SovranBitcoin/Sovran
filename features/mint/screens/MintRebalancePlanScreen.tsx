@@ -21,7 +21,10 @@ import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';
 
-import { useMintDistributionStore } from '@/shared/stores/profile/mintDistributionStore';
+import {
+  EMPTY_DISTRIBUTION,
+  useMintDistributionStore,
+} from '@/shared/stores/profile/mintDistributionStore';
 import {
   useSwapTransactionsStore,
   type SwapLegLocalStatus,
@@ -84,8 +87,13 @@ export function MintRebalancePlanScreen() {
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, GetInfoResponse | null>>({});
 
-  const distributions = useMintDistributionStore((state) => state.distributions);
-  const distribution = useMemo(() => distributions[unit] || {}, [distributions, unit]);
+  // Narrow the selector to the per-unit slice. Returning the whole `distributions`
+  // record made any write to any unit re-render this screen even though only the
+  // active unit's slice is read. Falling back to a shared frozen empty object keeps
+  // the reference stable when the unit has no entry yet.
+  const distribution = useMintDistributionStore(
+    (state) => state.distributions[unit] ?? EMPTY_DISTRIBUTION
+  );
 
   const mintsForUnit = useMemo(() => {
     return trustedMints.filter((mint) => {

@@ -1,11 +1,13 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import type { SwapLeg } from '@/shared/stores/runtime/swapStatusStore';
 import { StatusToast, type StatusToastStatus } from './StatusToast';
 
-function legSummary(legs: SwapLeg[]): { doneCount: number; total: number } {
+function legSummary(legs: SwapLeg[] | undefined): { doneCount: number; total: number } {
+  if (!legs) return { doneCount: 0, total: 0 };
   let doneCount = 0;
   for (const l of legs) {
     if (l.status === 'done' || l.status === 'skipped') doneCount += 1;
@@ -20,11 +22,27 @@ type SwapStatusToastProps = {
 };
 
 export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
-  const active = useSwapStatusStore((s) => s.active);
-  const groupId = active?.groupId;
+  // Per-leg setters in `swapStatusStore` build a fresh `active` object on every
+  // status flip. Selecting just the fields the toast actually reads (with shallow
+  // equality) means identity-stable transitions don't re-render this surface
+  // while a multi-leg swap is in flight.
+  const view = useSwapStatusStore(
+    useShallow((s) =>
+      s.active
+        ? {
+            present: true as const,
+            state: s.active.state,
+            errorMessage: s.active.errorMessage,
+            groupId: s.active.groupId,
+            ...legSummary(s.active.legs),
+          }
+        : { present: false as const }
+    )
+  );
 
   // `swapStatusPopup`'s `onHide` clears `useSwapStatusStore.active` after the
   // dismiss animation, so the action only needs to navigate + hide.
+  const groupId = view.present ? view.groupId : undefined;
   const onPressView = useCallback(() => {
     if (!groupId) {
       hide();
@@ -34,27 +52,25 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
     hide();
   }, [groupId, hide]);
 
-  const summary = useMemo(() => legSummary(active?.legs ?? []), [active?.legs]);
+  if (!view.present) return null;
 
-  if (!active) return null;
-
-  const isDone = active.state === 'done';
-  const isFailed = active.state === 'failed';
+  const isDone = view.state === 'done';
+  const isFailed = view.state === 'failed';
   const status: StatusToastStatus = isFailed ? 'failed' : isDone ? 'confirmed' : 'pending';
   const title = isFailed ? 'Swap failed' : isDone ? 'Swap complete' : 'Swapping';
-  const total = summary.total;
+  const total = view.total;
   // Always render "X of Y swaps" so the toast shows progress from the first
   // frame ("0 of 2 swaps") instead of waiting for the first leg to resolve.
   const subtitle = isFailed
-    ? (active.errorMessage ?? `${summary.doneCount} of ${total} swaps`)
-    : `${isDone ? total : summary.doneCount} of ${total} swaps`;
+    ? (view.errorMessage ?? `${view.doneCount} of ${total} swaps`)
+    : `${isDone ? total : view.doneCount} of ${total} swaps`;
 
   return (
     <StatusToast
       status={status}
       title={title}
       subtitle={subtitle}
-      action={groupId ? { label: 'View', onPress: onPressView } : undefined}
+      action={view.groupId ? { label: 'View', onPress: onPressView } : undefined}
       toastProps={{ ...toastProps, hide }}
     />
   );
