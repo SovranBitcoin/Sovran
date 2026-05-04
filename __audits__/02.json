@@ -54,8 +54,8 @@
       ],
       "verification_note": "Re-read lines 121, 395-400, and 642. Counter-argument considered: receive screens are typically singleton-modal; co-mount window is narrow. Kept as Medium because the failure is silent and the fix is a one-liner.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "p2pkKeyRefreshedRef is a single-slot callback registry, not a render-time ref mirror — its writes happen inside onEntryUpdate's subscribe/unsubscribe callbacks. Different pattern from the useLatestRef slice; the fix here is to convert the slot to a Set keyed on subscriber identity."
+      "completion_status": "complete",
+      "completion_note": "Slice 338e2bb9 converts p2pkKeyRefreshedRef from a single slot to p2pkKeyRefreshedSubscribers (Set<callback>). onEntryUpdate('receive') adds its own callback and the unsubscribe deletes that exact entry; the notifications factory's onP2pkKeyRefreshed iterates the Set and fans the refresh out to every co-mounted receive screen. The navigation-transition window where a second receive screen's slot was clobbered by the first's cleanup is closed."
     },
     {
       "id": "F-003",
@@ -181,7 +181,8 @@
       ],
       "verification_note": "Verified the no-filter dispatch at lines 334-345 and confirmed defaultShouldApply filters downstream.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Slice 338e2bb9 introduces a HISTORY_TYPE_BY_SCREEN map (meltQuote→melt, mintQuote→mint, paymentRequest→send, receive→receive, receiveToken→receive, sendToken→send) and uses it to (a) skip the history:updated subscription entirely for screenTypes with no expected history-entry type — mintSelector, mintInfo, and the pre-flow amountEntry keypad — and (b) early-return inside the dispatch when updated.type doesn't match the expected type. defaultShouldApply still filters downstream, but the per-update dispatch cost is now paid only when there's a chance of a real match."
     },
     {
       "id": "F-009",

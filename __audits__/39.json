@@ -141,8 +141,8 @@
       ],
       "verification_note": "Re-checked at lines 64, 97, 117, 226-251, 369-371. Counter-argument: profile switch is a native restart (SOV-00 §10), so manager swap mid-session is rare. Held — this is Medium because the window exists in dev hot-reload and manager re-init paths, and the failure mode is a cross-session toast (user-visible regression but not data loss).",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Race window untouched in this slice; AbortController/cancelledRef threading is its own change."
+      "completion_status": "complete",
+      "completion_note": "Slice 338e2bb9 adds `if (cancelledRef.current) return;` after every await preceding a state write or popup — both `await manager.history.getPaginatedHistory(0, 100)` in mint-op:quote-state-changed (line 76) and `await manager.history.getPaginatedHistory(0, 20)` in receive-op:finalized (line 219). The receive-op handler's existing post-setTimeout check stays. Cross-session toasts on manager swap / dev hot reload are now blocked at every await point, matching the pre-existing pattern. AbortController plumbing remains a follow-up — cancelledRef is sufficient for the race window the audit identified."
     },
     {
       "id": "F-004",
