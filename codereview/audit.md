@@ -298,7 +298,7 @@ description (the downstream fixer writes the actual fix); the trail must
 still be recorded in the finding's `description` and `verification_note`
 so the fixer can resume.
 
-Apply the ten review dimensions (§6) to the ENTRY's blast radius. For each
+Apply the fourteen review dimensions (§6) to the ENTRY's blast radius. For each
 candidate finding:
 
 - Open the file. Quote the relevant tokens. Cite `path:line`.
@@ -328,9 +328,17 @@ review/fix agents.
 Markdown report inline (§9.1). Strict-JSON file at `__audits__/NN.json`
 (§9.2). Do nothing else on disk.
 
-## 6. Review dimensions (10)
+## 6. Review dimensions (14)
 
 Compact reference; consult the cited skills and protocol files for full rules.
+
+Dimensions 1–10 are **domain dimensions**: they fire when the slice touches a
+specific technical surface (Cashu, Nostr, Zustand, Reanimated, Zod, etc.) and
+are skipped otherwise. Dimensions 11–14 are **process dimensions** derived
+from the Matt Pocock skills loaded at Pass 0 — they are evaluated on every
+slice, because the skills they map to are mandatory loads. A process
+dimension is `skipped` only when the slice genuinely produced no findings of
+that shape, not when the auditor forgot to look.
 
 1. **Correctness & invariants** — logic bugs, broken state machines. Wallets:
    proof state UNSPENT→PENDING→SPENT must be atomic and unique-keyed on
@@ -397,6 +405,62 @@ Compact reference; consult the cited skills and protocol files for full rules.
     parse/reject tests. Critical state-machine transitions integration-tested.
     Logs use scoped loggers from `shared/lib/logger` with redaction; no
     secrets/seeds/full proofs. Skills: `jest-react-testing`.
+11. **Frame coherence (zoom-out)** — does the module sit at the right level of
+    abstraction? File or symbol name doesn't match what it actually does (a
+    file called `utils.ts` that owns a state machine; a hook named
+    `useFoo` that returns a side-effect-free pure value). Vocabulary leaks
+    across layers (UI components naming protocol-level concepts, or vice
+    versa). One file doing two unrelated jobs. Module is named in the
+    vocabulary of its caller rather than its own concern. Apply the rename
+    test: if you rename the file/symbol to what it really does, does any
+    other file need to change? If yes, the original name is the finding.
+    Cross-cutting: payment flows that bypass `coco-payment-ux/` and
+    `coco-payment-ux/` files that leak `sovran-app/`-specific assumptions
+    are dim-11 findings (in addition to whatever else they trip).
+    Skill: `zoom-out`.
+12. **Module depth & seam quality (improve-codebase-architecture)** — apply
+    the deletion test: imagine deleting the module. If complexity vanishes,
+    it was a pass-through. If the same complexity reappears in N callers,
+    the module was earning its keep. Shallow modules (interface ≈
+    implementation; check `analyze-structure` Top shallow modules), pass-
+    throughs (ratio=1, fanout=0), hypothetical seams (one adapter only —
+    real seams need two), interfaces that reveal implementation (private
+    state held in React context, exported types that surface secret
+    fields without a SECRET marker, public types with `any[]` or `unknown`
+    escape hatches). Cache maps held in `useState` instead of `useRef`,
+    which propagate identity churn through context, are dim-12. Findings
+    that consolidate or delete code are higher-leverage than findings
+    that propose new code. Skill: `improve-codebase-architecture`.
+13. **Diagnosability & feedback-loop seams (diagnose)** — can a future
+    debugger build a fast deterministic feedback loop against this code?
+    Silent no-op fallbacks (a context default that swallows missing
+    providers; a `try/catch` that returns `null` without logging; an
+    `as any` cast that hides a type error) destroy the feedback loop and
+    are dim-13. Missing instrumentation that would let `log-doctor` see
+    a perf spike or race (cf. dim 7's "log-doctor evidence or
+    `UNVERIFIED`") is dim-13 when the gap is *observability*, not
+    *behaviour*. Test seams that are too shallow to exercise the real
+    bug (a unit test of a pure function whose bugs only manifest at
+    multi-caller integration) are dim-13: "the codebase architecture is
+    preventing the bug from being locked down" is itself a finding. Hidden
+    coupling that prevents bisection (global mutable state, module-load
+    side effects, time/random not pinned) is dim-13. Skill: `diagnose`.
+14. **API legibility & structured surfaces (prompt-engineering-patterns)** —
+    public function signatures that hide their failure modes (throw
+    instead of returning a `Result<T, E>` per `neverthrow-return-types`;
+    return `T | null` where the null branch encodes ≥2 distinct failure
+    cases). Types that don't document their constraints (raw `string`
+    where a branded `Hex32` or `Npub` would prevent mis-routing; loose
+    string unions that should be `z.enum`). Error envelopes that lose the
+    cause (raw `Error` thrown across a seam where `{ kind, message,
+    cause }` would let the caller branch). For LLM-facing code (prompt
+    builders, tool-use schemas, structured-output parsers): prompts that
+    are vague/verbose where they should be specific/terse/structured;
+    Pydantic-equivalent (zod) schemas missing `.strictObject` or
+    `.max()`; example selection that doesn't match the target task.
+    Dim-14 overlaps with dim 1 (neverthrow) and dim 6 (zod) — file the
+    finding under whichever skill produced the strongest reason, and
+    `references` may include both. Skill: `prompt-engineering-patterns`.
 
 ## 7. Severity rubric
 
@@ -434,12 +498,12 @@ if the note is "no Critical/High in slice — diagnose loop deferred" or
 similar. The §10 self-check item 9 blocks the audit if any required
 skill is absent from the report or has an empty note.
 
-| Skill                                 | Pass that requires it          | What it shapes                                                                |
-| ------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
-| `skill:zoom-out`                      | Pass 1                         | Broaden frame; ENTRY comes from distance-from-covered-set, not first hit.     |
-| `skill:improve-codebase-architecture` | Pass 2                         | ENTRY named in depth/seam/leverage vocabulary; refactor-plan items cite this. |
-| `skill:diagnose`                      | Pass 3 (Critical/High only)    | Reproduce → minimise → hypothesise → instrument → fix loop, recorded in trail.|
-| `skill:prompt-engineering-patterns`   | Pass 5 (markdown + JSON emit)  | Report + JSON stay specific, terse, structured — both are downstream prompts. |
+| Skill                                 | Pass that requires it          | Dim | What it shapes                                                                |
+| ------------------------------------- | ------------------------------ | --- | ----------------------------------------------------------------------------- |
+| `skill:zoom-out`                      | Pass 1                         | 11  | Broaden frame; ENTRY comes from distance-from-covered-set, not first hit. Drives dim-11 (Frame coherence) findings. |
+| `skill:improve-codebase-architecture` | Pass 2                         | 12  | ENTRY named in depth/seam/leverage vocabulary; refactor-plan items cite this. Drives dim-12 (Module depth & seam) findings. |
+| `skill:diagnose`                      | Pass 3 (Critical/High only)    | 13  | Reproduce → minimise → hypothesise → instrument → fix loop, recorded in trail. Drives dim-13 (Diagnosability) findings. |
+| `skill:prompt-engineering-patterns`   | Pass 5 (markdown + JSON emit)  | 14  | Report + JSON stay specific, terse, structured — both are downstream prompts. Drives dim-14 (API legibility) findings. |
 
 Skill paths (verbatim, for the Read tool):
 
@@ -508,7 +572,7 @@ helper modes, proposed research notes. **No code patches.**
 
 ## Dimensions covered
 | Dim | Status |
-| 1 | pass | ... | 10 | partial |
+| 1 | pass | ... | 10 | partial | 11 | pass | 12 | partial | 13 | pass | 14 | skipped |
 
 ## Static tooling evidence
 Trimmed output that grounded findings, captioned with the command.
@@ -587,7 +651,11 @@ those later when work lands.
     "7": "partial",
     "8": "skipped",
     "9": "skipped",
-    "10": "partial"
+    "10": "partial",
+    "11": "pass",
+    "12": "partial",
+    "13": "pass",
+    "14": "skipped"
   },
   "refactor_plan": [{ "type": "consolidate", "description": "...", "files": ["..."] }],
   "open_questions": ["..."]
@@ -597,7 +665,9 @@ those later when work lands.
 **Enums** (other values are self-check failures):
 
 - `severity`: `Critical | High | Medium | Low | Nit`
-- `dimension`: integer 1–10
+- `dimension`: integer 1–14 (1–10 are domain dimensions, skipped when not
+  touched by the slice; 11–14 are process dimensions and are evaluated
+  every run because the Matt Pocock skills they map to are mandatory loads)
 - `dimensions.*`: `pass | partial | skipped`
 - `refactor_plan.type`: `consolidate | relocate | dead-code | log-helper | research-note`
 - `confidence`: 0.0–1.0
