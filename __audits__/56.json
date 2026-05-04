@@ -1,0 +1,594 @@
+{
+  "audit": {
+    "date": "2026-05-04",
+    "commit": "9bf69abb",
+    "entry_point": "sovran-app/shared/lib/logger.ts",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Distance-from-covered-set: shared/lib/logger.ts has never been an explicit entry point across 55 prior audits despite being a top-5 cognitive-complexity hotspot (628 per analyze-structure, 1303 LOC, 260 import sites, 147 logger-using files). Only two incidental cites in prior audits (34 F-005 perf, 50 F-012 frame-coherence). Recurring dim-10 dim-13 'use scoped logger' findings across dozens of audits all flow through this module; the file is the diagnostic seam for the entire repo's observability story including the log-doctor pipeline the auditor itself relies on. The 50 F-012 finding (Screen UI primitive lives in logger.ts) hinted at a much broader frame-coherence problem that has never been followed through. Funds/key adjacency: logger handles cashu_token / nsec / lightning_invoice strings as untrusted-input candidates for redaction, so dim-2 is automatic. Top disqualified candidates: features/mint/screens/MintRebalancePlanScreen.tsx (#1 cognitive hotspot but already deeply covered by audits 12 + 36); navigation/nativeTabs.tsx (narrow surface, mid-leverage); shared/ndk.ts (1-line file).",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "12.json",
+      "26.json",
+      "34.json",
+      "36.json",
+      "50.json",
+      "51.json",
+      "52.json",
+      "53.json",
+      "54.json",
+      "55.json"
+    ],
+    "sov_specs_consulted": [],
+    "skills_consulted": [
+      "react-native-best-practices",
+      "security-review",
+      "typescript-advanced-types"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose",
+      "prompt-engineering-patterns"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "pre-existing TS errors elsewhere (app/_layout.tsx Reanimated CSS-style typing, navigation/nativeTabs.tsx LiquidButton title prop, shared/lib/downloadedThemeRegistry.ts re-export hole, codereview/log-doctor/index.ts:3470 FlatNode.hasText); shared/lib/logger.ts itself compiles clean — no logger-originated diagnostics",
+      "lint": "not run for this audit",
+      "knip": "no shared/lib/logger.ts entries reported",
+      "analyze_structure": "Overall 41/100; weakest dimensions Hygiene 5/100 and Testability 1/100. shared/lib/logger.ts ranks #5 in cognitive complexity (cognitive=628 cyclomatic=245 nesting=8 code=894). 14 module-level child loggers exported. logger.ts not in cycle list.",
+      "lookalikes": "focus run on shared/lib/logger.ts not executed (single-file utility surface, lookalikes signal weak). Top duplicate-export-name `ModalScreen in 14 files` is unrelated to this slice."
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Critical",
+      "confidence": 0.9,
+      "title": "summarizeString previews instead of redacts — first 32 chars of nsec / cashu_token / lightning_invoice / pem_key land in the ring buffer, which a user-triggered Settings button copies verbatim to the clipboard",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 273,
+      "symbol": "summarizeString",
+      "dimension": 2,
+      "description": "summarizeString detects sensitive string types via VERBOSE_STRING_PATTERNS (line 243-264: jwt, base64, hex, pem_key, npub_or_nsec, cashu_token, lightning_invoice, connection_str, ...) and returns `{ _kind, len, preview: s.slice(0, 32) + '…' }` (line 276-277). For an nsec1-prefixed bech32 string, the first 32 chars carry roughly 27 data chars × 5 bits/char = 135 bits ≈ 17 bytes of the 32-byte private key, fully revealed in plaintext inside the ring buffer. cashu_token preview leaks the base64 prefix (mint URL chunk + first proof IDs); lightning_invoice preview leaks the bech32 amount + payment_hash region. Compounding: the regex `npub_or_nsec` (line 258-260) treats public and secret keys with one label, so a downstream redaction policy cannot distinguish (see F-012). Compounding more: features/settings/screens/SettingsStorageScreen.tsx:229 wires `Clipboard.setStringAsync(log.dumpForLLM())` to a user-tappable 'Copy debug logs' button with no __DEV__ gate; the team itself annotated shared/stores/global/migrateSettings.ts:43 with 'the ring buffer is exfiltrable via dumpForLLM' but trusted the logger to redact, when in reality the logger only previews. Current callers happen to redact at the call site (settings/keyring/import logs only the error message, cashu/utils logs `tokenLen` only) — that discipline is a feature of the team, not the logger. A future `cashuLog.debug('debug.swap', { nsec })` is a one-line key-exposure regression.",
+      "why_it_matters": "Funds and keys finding. A user who taps 'Copy debug logs' to share with support is currently emailing partial nsec / cashu_token bytes in plaintext if any past 200 logs touched a secret-shaped string. The logger advertises itself as 'sensitive-aware' (the regex is the strongest signal that it knows what these are) but the redaction action is preview, not removal. This is the inverse of what the regex implies.",
+      "fix": "summarizeString should branch on detected type: types in a hardcoded SECRET_KINDS set (nsec, cashu_token, lightning_invoice, pem_key, connection_str, jwt) return `{ _kind, len, preview: '<redacted>' }` with no actual content. Public-key types (npub, uuid, base64-but-not-detected-as-secret) keep the preview behaviour. Split the npub_or_nsec regex into two patterns so the type label is distinct. As a defence-in-depth measure, add a redactSensitive(value) boundary that runs across compactValue's leaf so even non-detected secret values can be marked as such by the caller via a `Sensitive` brand wrapper.",
+      "references": [
+        "shared/lib/logger.ts:243",
+        "shared/lib/logger.ts:258",
+        "shared/lib/logger.ts:273",
+        "features/settings/screens/SettingsStorageScreen.tsx:229",
+        "shared/stores/global/migrateSettings.ts:43",
+        "skill:security-review",
+        "nips/06.md"
+      ],
+      "verification_note": "Re-checked: line 273-278 returns `{ _kind, len, preview }` with `preview = s.slice(0, 32) + '…'` regardless of detected type. SettingsStorageScreen:229 confirmed unconditional. Counter-argument considered: regex requires whole-string match, so embedded nsec/token strings inside larger payloads escape detection — true, but every line is then logged in full because no redaction fires. The unsafe branch is the one that fires; the safe branch is the one that doesn't fire.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "SHOW_LOGS = true is hardcoded; production builds run a forever 200ms setTimeout heartbeat and emit perf.js_thread_blocked warnings — comment-vs-code lie",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 45,
+      "symbol": "SHOW_LOGS",
+      "dimension": 13,
+      "description": "Line 43 comment claims 'Tied to __DEV__ by default so dev builds always have logging.' Line 45 code is `const SHOW_LOGS = true;` — no __DEV__ check. Line 952 comment claims 'Only active in __DEV__ and when SHOW_LOGS is on, to avoid overhead in prod.' Line 997-1000 code is `if (SHOW_LOGS) { setTimeout(() => startJSThreadMonitor(), 1000); }` — no __DEV__ gate. The constant is referenced at line 494 (`if (!SHOW_LOGS || !enabled) return;`) which gates emit, and at line 997 which gates auto-start of the heartbeat. The constant is never set to false anywhere in the repo. Net effect: every production install runs a 200ms-interval setTimeout for the lifetime of the JS context, calling `_perfNow()` and emitting `log.warn('perf.js_thread_blocked', ...)` whenever blocking exceeds 100ms. Each warn emit walks `getCallerLocation()` which calls `new Error().stack` — see F-005.",
+      "why_it_matters": "A future maintainer reads `if (SHOW_LOGS)` as `if (__DEV__)` because the comment says so and reasons accordingly — building a Sentry transport that blindly forwards everything 'because in prod SHOW_LOGS is false anyway'. The lie is a prod-leak waiting to happen. Already today: prod builds pay battery and CPU for a 5×/sec timer + occasional Hermes Error allocation. On Android this is a measurable hit on background services where the JS thread is the only thread.",
+      "fix": "Set `const SHOW_LOGS = __DEV__;` (or wire to a build-time flag if the team really wants prod logging). Repair the line 43 and line 952 comments to match the new gate. Stop auto-starting the heartbeat in production via the same gate.",
+      "references": [
+        "shared/lib/logger.ts:43",
+        "shared/lib/logger.ts:45",
+        "shared/lib/logger.ts:494",
+        "shared/lib/logger.ts:952",
+        "shared/lib/logger.ts:997",
+        "skill:diagnose",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Confirmed by direct grep `grep -nE \"\\\\bSHOW_LOGS\\\\b|__DEV__\" shared/lib/logger.ts` — SHOW_LOGS appears at line 45 (declaration), 494 (emit gate), 997 (auto-start gate) and is never assigned anywhere else in the tree. IS_DEV is computed at line 183 but only used for level/pretty defaults, not for SHOW_LOGS. Counter-argument considered: maybe the team wants prod logging on for diagnostics — the comments contradict that intent, so the code is wrong either way (either flip to __DEV__ or rewrite the comments to match the always-on intent and document the prod cost).",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "Each child logger gets its own 100-entry RingBuffer — log.dumpForLLM() and log-doctor see only root-logger entries; the 14 named domain loggers (cashuLog, nostrLog, walletLog, paymentLog, …) are invisible to debugging tooling",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 484,
+      "symbol": "createLogger / child",
+      "dimension": 13,
+      "description": "createLogger allocates `const ringBuffer = new RingBuffer<LogEntry>(ringBufferSize)` per call (line 484). The Logger.child() method (line 589-604) calls createLogger again, allocating a fresh RingBuffer for the child. 14 module-level child loggers exported (line 906-919: nfcLog, cashuLog, nostrLog, walletLog, paymentLog, feedLog, apiLog, storeLog, aiLog, chatLog, bitchatLog, wnLog, popupLog, mapLog) each carry an isolated 100-entry buffer. The exfiltration / debug-dump path is `log.dumpForLLM()` which only walks the root logger's 200-entry buffer (line 611). features/settings/screens/SettingsStorageScreen.tsx:229 calls exactly that. codereview/log-doctor/index.ts:6 + features/settings expect dumpForLLM to surface 'app logs' but architecturally cannot see 13 of the 14 domain streams. So a `cashuLog.error('proof.spent.race')` lands in cashu's buffer and never appears in any dump, breadcrumb, or log-doctor session unless the consumer explicitly enumerates `cashuLog.getRecentLogs()` — which no caller does.",
+      "why_it_matters": "Diagnose-skill Phase-5 'no correct seam exists, that itself is the finding' applies here. Every prior dim-10 finding citing 'use the scoped logger' (audits 02, 03, 04, 05, 12, 14, 19, 27, 34, 50, ...) further fragments observability rather than improving it; the convention is actively destroying the diagnostic seam log-doctor was built around. Worst case: a wallet incident produces a clean root-logger dump that suggests nothing went wrong, while the cashuLog buffer holds the actual smoking gun.",
+      "fix": "Promote the RingBuffer to module-level singleton state shared by all loggers built by createLogger, so child() inherits the parent's buffer. Alternatively, expose a `collectAllRecentLogs()` that walks every named child logger registered in a module-level registry and merges their buffers in monotonic _t order — but the singleton is simpler and removes the divergence by construction. Update dumpForLLM to source from the singleton. Document at the top of logger.ts which path is the canonical diagnostic seam.",
+      "references": [
+        "shared/lib/logger.ts:484",
+        "shared/lib/logger.ts:563",
+        "shared/lib/logger.ts:589",
+        "shared/lib/logger.ts:606",
+        "shared/lib/logger.ts:611",
+        "shared/lib/logger.ts:906",
+        "features/settings/screens/SettingsStorageScreen.tsx:229",
+        "codereview/log-doctor/index.ts:6",
+        "skill:diagnose"
+      ],
+      "verification_note": "Confirmed: createLogger constructs `new RingBuffer<LogEntry>(ringBufferSize)` at line 484 with no shared-state hook. child() at 589-604 forwards options to a fresh createLogger call. getRecentLogs at line 608 reads the closure-captured ringBuffer. 14 child loggers at lines 906-919 each invoke .child() once. No `globalRingBuffer` or `__loggers` registry visible in the file. Counter-argument considered: maybe log-doctor or some other consumer manually walks the 14 named loggers — `grep -rE 'cashuLog\\.getRecentLogs|nostrLog\\.getRecentLogs|walletLog\\.getRecentLogs'` returns zero hits across the repo.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "child() now shares parent's LoggerCore (ring buffer + transports + minSeverity); dumpForLLM/getRecentLogs see entries from every domain logger"
+    },
+    {
+      "id": "F-004",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "logger.ts is a 1303-LOC god module: pure logging utility, JS-thread monitor, InteractionManager scheduler, React render hooks, and a Log JSX component cohabit one file (extends prior 50 F-012)",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 1,
+      "symbol": "module",
+      "dimension": 11,
+      "description": "shared/lib/logger.ts mixes five distinct concerns under one filename: (1) the actual logger factory + RingBuffer + transports + dedup + dumpForLLM (lines 41-820), (2) initialization-timing helpers — initLog/initPhase/initPhaseSync/useInitMount (lines 821-901), (3) a JS-thread block monitor with module-load auto-start side effect (lines 943-1000), (4) a perf-aware InteractionManager scheduler — deferWork (lines 1006-1051), (5) React UI hooks and a JSX component — useRenderLogger, useLifecycleLogger, UIPathContext, extractVisibleContent, deriveScreenTestID, Log (lines 1053-1303). Importing 'cashuLog' from this file pulls in React, createContext, runtime require('react-native'), the Log JSX element factory, and registers a setTimeout heartbeat as a side-effect of module evaluation. Audit 50 F-012 already flagged that a Screen UI primitive ships from logger.ts — that finding addressed only the surface; the disease is broader. Apply the rename test: `mv shared/lib/logger.ts shared/lib/instrumentation.ts` would not require any other file change because Log/useRenderLogger/initPhase callers already import by name. The fact that the rename concentrates concerns is the proof that the file is mis-named for what it actually does. Apply the deletion test: removing `Log` + `extractVisibleContent` + `UIPathContext` + `deriveScreenTestID` from logger.ts and re-housing them at `shared/ui/instrumentation/Log.tsx` deepens the architecture — the new file's interface is `<Log name=... />` and its implementation is the visibility-extraction recursion; nothing about logging itself is needed there. Same for the React hooks and the deferWork helper.",
+      "why_it_matters": "logger.ts is imported in 260 places (260 import sites across 147 files). Every one of them currently incurs a React import, a createContext call, the heartbeat side-effect, and the runtime require of 'react-native' that lives in deferWork's closure. Tree-shaking on Hermes is non-functional, so a node script invoking the logger (e.g. a test) drags the whole UI subsystem along. The file's growth pattern (init helpers → perf monitor → render hooks → UI primitive) suggests an additive culture: concerns get added to logger.ts because that's where instrumentation lives. Without explicit splitting, dim-2 (security: F-001), dim-13 (diagnosability: F-003), and dim-12 (seam quality) all keep accreting onto the same file.",
+      "fix": "Split into four files. (1) shared/lib/logger.ts — factory, RingBuffer, transports, child loggers, redactError. No React import. (2) shared/lib/perf/jsThreadMonitor.ts — startJSThreadMonitor, deferWork. Auto-start removed; explicit start from app root. (3) shared/lib/init/initTiming.ts — initLog, initPhase, initPhaseSync, useInitMount. (4) shared/ui/instrumentation/Log.tsx — Log, UIPathContext, extractVisibleContent, deriveScreenTestID, useRenderLogger, useLifecycleLogger. Re-export the React-free surface from logger.ts during a migration window if necessary, but the surface delivered to callers should reflect the actual concerns.",
+      "references": [
+        "shared/lib/logger.ts:1",
+        "shared/lib/logger.ts:825",
+        "shared/lib/logger.ts:943",
+        "shared/lib/logger.ts:997",
+        "shared/lib/logger.ts:1006",
+        "shared/lib/logger.ts:1066",
+        "shared/lib/logger.ts:1108",
+        "shared/lib/logger.ts:1222",
+        "skill:zoom-out",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Re-read each section to confirm the concerns are independent: initPhase imports nothing from the React subsystem; the JS thread monitor doesn't reference logger internals beyond `log.warn`; deferWork uses runtime require('react-native') so it can already live in any file; Log uses React.createContext + useRef + useEffect + React.createElement and is not depended on by any other section of logger.ts. Counter-argument considered: 'these all belong to instrumentation, the file is the instrumentation namespace' — but the user-visible cost is that pulling cashuLog drags React; the namespace argument doesn't justify the import-graph weight.",
+      "prior_audit_id": "F-012@50.json"
+    },
+    {
+      "id": "F-005",
+      "severity": "High",
+      "confidence": 0.85,
+      "title": "Every emit calls getCallerLocation() which throws `new Error()` and parses .stack — synchronous Hermes stack walk in production for warn+ logs",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 512,
+      "symbol": "emit / getCallerLocation",
+      "dimension": 7,
+      "description": "emit() calls `const src = getCallerLocation(3);` at line 512 unconditionally for every entry that passes the level filter. getCallerLocation (line 367-387) constructs `new Error()` and inspects its `.stack`, which on Hermes triggers a synchronous frame walk over the JavaScript call stack — O(stack depth) in time and memory. Combined with F-002 (SHOW_LOGS always true → prod gets warn-level emit) and F-003 (each child logger emits independently), a chatty session produces hundreds of stack-walks per minute. In production builds the regex parse at line 376 yields minified function/file names ('a' for func, 'b' for file) so the diagnostic value is near zero — the cost remains, the value disappears. Compounded by emit's later transport-write being deferred via scheduleIdle (F-011), which itself uses setTimeout because requestIdleCallback doesn't exist on Hermes — so the 'cheap async log' design pays full sync cost up front and then schedules a timer.",
+      "why_it_matters": "On Android Hermes the Error allocation hits the heap and requires a full JS-thread sync walk. Each warn emit thus charges ~0.5-2ms of JS thread time before the message even reaches the transport. In a recovery / mint-rebalance scenario where the wallet emits multiple warn events per second, that's hundreds of ms cumulative. Worse, the data captured (minified location) is unusable in prod, so the cost buys nothing.",
+      "fix": "In production builds, skip getCallerLocation entirely — set src to `{ file: 'minified', func: '?', line: 0 }` or omit the field. Alternatively, capture the stack only for level >= warn AND only when source maps are loaded (dev-only signal). Cheap path: short-circuit when IS_DEV is false. Long-term: encode the source location at compile time via a babel plugin that replaces log.warn(...) with log.warn.atSrc('file.ts:42', ...) so no runtime stack walk is needed.",
+      "references": [
+        "shared/lib/logger.ts:367",
+        "shared/lib/logger.ts:512",
+        "shared/lib/logger.ts:494",
+        "skill:react-native-best-practices",
+        "skill:diagnose"
+      ],
+      "verification_note": "Re-checked: line 512 is reached for every entry past the line 495 severity filter and the line 499 dedup short-circuit. The dedup short-circuit only catches debug/info/<warn entries, so warn/error/fatal always pay the stack-walk cost. The regex match at line 376 parses 'at funcName (file:line:col)' which on minified Hermes prod stacks gives mangled identifiers. Counter-argument considered: Hermes may have optimized Error.stack capture in newer versions — log-doctor not run, so the dynamic-cost claim is upgrade-version-dependent. Marked confidence 0.85 not 0.95 to reflect this uncertainty; the structural claim ('every emit allocates an Error') is unconditional from source.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "hasLoggedDevice is per-logger-instance — every domain logger emits a `device:` blob on its first log; the dump carries 14 redundant device snapshots",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 485,
+      "symbol": "createLogger / hasLoggedDevice",
+      "dimension": 1,
+      "description": "Line 485: `let hasLoggedDevice = false;` is closure-scoped per createLogger call. Line 556-560: on first emit, the entry gets `entry.device = getExpoDeviceInfo()` and the local flag flips. Each child logger (line 589-604 → createLogger) gets its own flag, so the first log of each of cashuLog, nostrLog, walletLog, paymentLog, feedLog, apiLog, storeLog, aiLog, chatLog, bitchatLog, wnLog, popupLog, mapLog, nfcLog carries a fresh device blob. The doc comment at line 103 ('Expo session + device metadata (only on first log or when requested)') reads as 'first log overall' but in practice it's 'first log of each logger instance' — 14× the device payload across the lifetime of a session, scattered across the (also-fragmented per F-003) ring buffers. The whole point of the device blob is to give an LLM dump 'env context once' (line 556 comment); 14 copies wastes tokens and contradicts the design intent.",
+      "why_it_matters": "Logger advertises itself as LLM-optimized (file header). Token waste in the dump directly degrades the value proposition. More importantly, this is a symptom of the deeper F-003 fragmentation — child loggers carry independent state for things that should be process-global.",
+      "fix": "Promote hasLoggedDevice to module-level state, paired with the singleton ring buffer from F-003's fix. Document that the device blob is emitted once per process.",
+      "references": [
+        "shared/lib/logger.ts:485",
+        "shared/lib/logger.ts:556",
+        "shared/lib/logger.ts:103",
+        "shared/lib/logger.ts:906"
+      ],
+      "verification_note": "Closure scope confirmed by re-reading createLogger (line 467-812). hasLoggedDevice is declared inside the factory and captured by emit. Counter-argument considered: maybe child loggers are intended to carry isolated device info because they may run in different sandboxes — RN apps have a single JS context, so this isn't the case here.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "hasLoggedDevice moved to LoggerCore; device blob attaches once across the whole logger tree"
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Module-load side-effect: importing logger.ts schedules a perpetual 200ms heartbeat — pure-utility module is impure",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 997,
+      "symbol": "module-init",
+      "dimension": 7,
+      "description": "Line 997-1000 at module top-level: `if (SHOW_LOGS) { setTimeout(() => startJSThreadMonitor(), 1000); }` — fires on import. There's no explicit `enableMonitor()` call; any import of the file (260 sites) ends up scheduling the heartbeat. The startJSThreadMonitor function at line 963 returns a stop function which the caller at line 999 discards (related: F-016). Test environments and HMR import logger.ts and inherit the timer. A pure logging utility should not have side effects on module load.",
+      "why_it_matters": "Tests leak open handles (Jest reports 'a worker process has failed to exit gracefully'). Cold start adds a 1-second-delayed timer to the boot sequence. The user has no opt-out short of editing the file. Combined with F-002 (SHOW_LOGS always true), this is unconditional in every build.",
+      "fix": "Remove the auto-start. Expose `startJSThreadMonitor()` as a named export and call it once from the app root layout (e.g. `app/_layout.tsx`) under an explicit __DEV__ guard. Tests that don't import the root layout get no heartbeat. Production gets the same instrumentation but explicitly.",
+      "references": [
+        "shared/lib/logger.ts:997",
+        "shared/lib/logger.ts:963",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Module-top-level if-block at line 997 confirmed. The cleanup function returned by startJSThreadMonitor (line 988-993) is unused. Counter-argument considered: 'auto-start makes onboarding new modules zero-config' — true, but at the cost of the import-graph contract that says importing a name should not register timers. The single explicit call at the root is one extra line to gain back the contract.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Dedup mutates an entry that has already been pushed to the ring buffer (and possibly already serialized by transports)",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 501,
+      "symbol": "emit / dedup",
+      "dimension": 1,
+      "description": "Lines 499-510: when the same event fires within `dedupWindowMs`, emit returns early after `(lastEntry.params ??= {})._dedup = dedupCount;` (line 503). lastEntry was assigned at line 564 the previous iteration — at that point it was already pushed to ringBuffer (line 563) and queued via scheduleIdle for transport write (line 577). By the time the dedup fires 25ms later, the console transport may have already serialized the entry without `_dedup`, may have queued it but not run, or may have not started yet. Result: identical input produces different log output depending on idle-callback timing. log-doctor consumers downstream rely on `_dedup` to know an event repeated; a stale 0 (because the transport ran before the dedup mutation) means log-doctor under-counts.",
+      "why_it_matters": "Non-deterministic logging is hard to reason about during incident triage. log-doctor's dedup-aware analysis (codereview/log-doctor/index.ts) becomes non-monotonic — counts change between runs of the same input. The mutation also violates a tacit invariant that an entry, once published, is immutable.",
+      "fix": "Don't dedup-mutate. Either: (a) emit a distinct `<event>.dedup` entry with `{ count: N, original_t: t0 }` at the end of the window, or (b) buffer dedup state in a Map keyed by event name and emit a single coalesced entry on flush, or (c) have transports check the dedup map at serialization time. Option (a) is the easiest correct fix.",
+      "references": [
+        "shared/lib/logger.ts:499",
+        "shared/lib/logger.ts:563",
+        "shared/lib/logger.ts:577",
+        "skill:diagnose"
+      ],
+      "verification_note": "Re-read emit body. lastEntry is assigned at line 564 — this is *before* the next iteration's dedup check at 501. The async write at 577 uses scheduleIdle which on RN falls back to setTimeout(...,1) — so the dedup window of 50ms gives the 1ms timer plenty of time to fire first, but not always (idle-callback ordering depends on JS event loop pressure). The race is real but probabilistic. confidence 0.85 because the worst case (transport serializes the un-deduped entry first) is the most common code path.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "child() recreates the entire logger pipeline; setLevel on the parent does not propagate, transport array is duplicated, dedup state diverges",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 589,
+      "symbol": "Logger.child",
+      "dimension": 12,
+      "description": "child(childContext) at line 589-604 calls createLogger with all options re-passed. Each child gets its own minSeverity (closure-captured at line 482) — so `log.setLevel('warn')` updates ONLY the parent's minSeverity. The 14 module-level domain loggers stay at whatever level they were created with. The transports array is passed by reference, so transports are shared, but the per-instance ringBuffer / dedup state / hasLoggedDevice are not (see F-003, F-006, F-008). The child() interface looks like deepening — small interface, lots of behaviour — but the implementation is wide because every aspect of state diverges per call.",
+      "why_it_matters": "API documents setLevel as a runtime control (line 130 'setLevel(level: LogLevel): void' — global-sounding signature). Caller intuition: `log.setLevel('warn')` silences debug noise everywhere. Reality: only the root logger goes quiet; cashuLog and friends keep at debug. Together with F-003 (separate ring buffers), the child-logger API is doing the opposite of what its name suggests — they're sibling loggers, not children.",
+      "fix": "Promote level + ring buffer + dedup state + hasLoggedDevice to a shared `LoggerCore` object held at module level. child() returns a thin wrapper over LoggerCore with its own context but shared state. setLevel() updates the core. This is the same singleton-ring-buffer fix as F-003, generalised: the child() API should be a deepening, not a duplication.",
+      "references": [
+        "shared/lib/logger.ts:589",
+        "shared/lib/logger.ts:482",
+        "shared/lib/logger.ts:605",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Walked the createLogger body — minSeverity at 482, ringBuffer at 484, hasLoggedDevice at 485, dedup state at 488-491 are all closure-local. The child() factory at 589 creates a fresh closure. Counter-argument considered: maybe setLevel is intended to work at-instance only — line 130's docstring is silent on that, and the implementation makes 'silence everything' impossible to express short of 14 setLevel calls.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "createLogger now builds a LoggerCore; child() returns a view sharing transports, dedup state, and mutable minSeverity — setLevel propagates instantly"
+    },
+    {
+      "id": "F-010",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "Logger interface accepts `params: Record<string, unknown>` — no compile-time guard against logging branded-secret types (Mnemonic, Seed, Nsec, Proof, CashuToken)",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 124,
+      "symbol": "Logger.debug / .info / .warn / .error / .fatal",
+      "dimension": 14,
+      "description": "Lines 124-128 declare every log level as `(event: string, params?: Record<string, unknown>) => void`. The TypeScript surface accepts any object, which is the loosest possible contract. The wallet codebase has the typed concepts a logger should refuse: shared/lib/nostr/secureStorage.ts handles `mnemonic`, `seedHex`, `privateKeyHex`, `cashuMnemonic`, `cashuSeed`; shared/providers/NostrKeysProvider.tsx exposes `keys.privKey`; coco-payment-ux deals with `Proof` arrays. None of these types are branded as 'must not be logged', and `params: Record<string, unknown>` accepts them silently. The runtime detector at F-001 then partially leaks them via preview. A type-system fix would prevent the entire class of leak at compile time.",
+      "why_it_matters": "F-001 is the runtime symptom of this type-level gap. Even if F-001 is fixed (proper redaction), nothing prevents a future developer from mistakenly logging a different secret-shaped value not in the SECRET_KINDS regex set (e.g. an x-only public-key derivation from a mnemonic). The type system can encode this invariant; the current interface declines to.",
+      "fix": "Define a branded type `LogSafe<T>` (or its inverse `LogForbidden<T>`) and re-declare the Logger interface as `(event: string, params?: LogParams) => void` where `LogParams = Record<string, LogSafe<unknown>>`. Brand the secret types at their definition site (Mnemonic, SeedHex, PrivateKeyHex, CashuMnemonic, ProofSecret, ...) so the type system rejects `cashuLog.debug('foo', { seed: secret.seedHex })` at compile time. Provide a `redactSensitive(value): LogSafe<{ kind, len }>` boundary for the rare cases a caller knowingly wants to record a derived non-secret summary. Skill: prompt-engineering-patterns — 'types that don't document their constraints' — `Record<string, unknown>` documents nothing.",
+      "references": [
+        "shared/lib/logger.ts:124",
+        "shared/lib/nostr/secureStorage.ts:20",
+        "shared/providers/NostrKeysProvider.tsx",
+        "skill:prompt-engineering-patterns",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Re-read lines 123-163: every method on Logger uses `params?: Record<string, unknown>`. Counter-argument considered: every logger in the world uses this loose shape, branding would be churn — but this is a wallet codebase where the cost of one accidentally-logged seed is total compromise; the church-of-log-everything default is the wrong tradeoff here. confidence 0.8 because the design space (LogSafe brand vs. opt-in Sensitive marker vs. zod-style schema gate) hasn't been explored in research and may have ergonomic surprises.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-011",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "scheduleIdle falls back to setTimeout(...,1) on Hermes — every async log allocates a timer; sustained logging produces 100s of pending timers",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 404,
+      "symbol": "scheduleIdle",
+      "dimension": 7,
+      "description": "Line 404-408: `const scheduleIdle = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : (cb) => setTimeout(() => cb(...), 1);`. Hermes does not implement requestIdleCallback, so the fallback is the actual code path on every RN build. Every async-mode log (which is the default — line 476 `async = true`) creates a setTimeout(..., 1) per entry. With 14 child loggers and a chatty session, this produces hundreds of pending timers per minute. RN's setTimeout goes through the Native module bridge on Android (and through CFRunLoop on iOS) — non-trivial cost relative to the work being scheduled (a JSON.stringify and console.log).",
+      "why_it_matters": "Combined with F-005 (synchronous Error allocation per emit) and F-002 (prod heartbeat always on), the logger is paying overhead on three axes simultaneously. The setTimeout queue itself isn't unbounded but adds JS-bridge calls that compete with the user's frame rate. Logging is supposed to be cheap; this design has it on the same critical path as the work it observes.",
+      "fix": "Replace scheduleIdle's fallback with `(cb) => queueMicrotask(() => cb({ didTimeout: false, timeRemaining: () => 50 }))` — Hermes has queueMicrotask. Microtasks run after the current call stack completes but before the next macrotask, so they don't go through the bridge. Or batch: queue entries into an array and drain once per macrotask via a single setTimeout, amortizing the bridge cost.",
+      "references": [
+        "shared/lib/logger.ts:404",
+        "shared/lib/logger.ts:476",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Hermes lacks requestIdleCallback (verified per RN documentation, Hermes 0.12+). queueMicrotask is exposed as a global on Hermes since 0.10. Counter-argument considered: RN's setTimeout is well-optimized for short delays — true, but the order-of-magnitude difference between setTimeout(...,1) (bridge call) and queueMicrotask (in-thread) matters when the count is hundreds. confidence 0.85 because the actual production cost depends on Hermes version and whether Bridgeless mode is enabled (RN 0.83 has it on for new arch, which sovran-app uses).",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-012",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "VERBOSE_STRING_PATTERNS lumps npub and nsec under one regex/_kind label — a downstream redaction policy cannot distinguish public from secret",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 258,
+      "symbol": "VERBOSE_STRING_PATTERNS",
+      "dimension": 2,
+      "description": "Lines 258-260: `{ name: 'npub_or_nsec', test: (s) => /^(npub|nsec)1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s) }`. One regex, one label. The summary at line 277 returns `{ _kind: 'npub_or_nsec', preview }` — a future redaction step that wants to drop preview content for secrets only cannot tell whether this entry was a public key (preview is fine) or a secret (preview must be empty). The single-label design forces F-001's all-or-nothing preview policy.",
+      "why_it_matters": "Even with F-001's fix, the type label needs to discriminate so a redactSensitive boundary can route correctly. Without splitting, the fix to F-001 must conservatively redact ALL npub_or_nsec previews, losing the legitimate utility of seeing 'this is an npub starting with npub1abc…' in dev logs.",
+      "fix": "Split into two patterns: `{ name: 'npub', test: (s) => /^npub1[…]{58}$/.test(s) }` and `{ name: 'nsec', test: (s) => /^nsec1[…]{58}$/.test(s) }`. summarizeString routes nsec → no preview, npub → 32-char preview. Same split for the cashu_token pattern (`cashuA…` vs `cashuB…` — currently one regex but they have different security properties; B-tokens carry mint URLs in plaintext while A-tokens are simpler).",
+      "references": [
+        "shared/lib/logger.ts:258",
+        "shared/lib/logger.ts:261",
+        "skill:security-review"
+      ],
+      "verification_note": "Re-read lines 243-264. Confirmed single regex for npub + nsec. cashu_token pattern at 261 uses one test for both formats. Counter-argument considered: 'whoever wrote the regex knew npub previews are safe but kept it loose for simplicity' — that intent is testable: read the comment at line 277-278 (`return { _kind: detectedType ?? 'long_string', len: s.length, preview: preview + '…' };`); it does not branch on detectedType, so the simplification is load-bearing.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-013",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "child() level derivation relies on Object.keys insertion order to invert minSeverity → LogLevel",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 591,
+      "symbol": "Logger.child / level inversion",
+      "dimension": 1,
+      "description": "Line 591-594: `level: (Object.keys(LEVEL_SEVERITY) as LogLevel[]).find((k) => LEVEL_SEVERITY[k] === minSeverity) ?? 'debug'`. Reverses the LEVEL_SEVERITY map (line 167-173) by walking keys and matching the value. For the five fixed string keys this works on V8/Hermes (insertion-order preservation), but the inverse-map style is fragile: a future maintainer who adds `LEVEL_SEVERITY['trace'] = 5` (alphabetically before `debug`) breaks the mapping silently because Object.keys does not guarantee insertion order across all engine variants. Also, every child() call walks up to 5 keys to invert a lookup that should be O(1).",
+      "why_it_matters": "Brittle in the future, marginally slow today. The fix is trivial (a paired SEVERITY_TO_LEVEL constant), so the cost-benefit of leaving it is negative.",
+      "fix": "Add `const SEVERITY_TO_LEVEL: Record<number, LogLevel> = { 10: 'debug', 20: 'info', 30: 'warn', 40: 'error', 50: 'fatal' };` next to LEVEL_SEVERITY. child() reads `SEVERITY_TO_LEVEL[minSeverity]`.",
+      "references": [
+        "shared/lib/logger.ts:167",
+        "shared/lib/logger.ts:591"
+      ],
+      "verification_note": "Confirmed: line 591 uses Object.keys + find. V8/Hermes spec guarantees insertion order for non-numeric string keys, so today this works — the brittleness is future-shape. confidence 0.85 because 'future shape' is a soft claim.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "child() no longer re-derives a LogLevel from Object.keys order — minSeverity lives on the shared core, no derivation needed"
+    },
+    {
+      "id": "F-014",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Multiple `as any` and `: any` casts inside the logger module — the module charged with type-aware redaction is itself type-unsafe",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 535,
+      "symbol": "compactValue / extractVisibleContent / Log",
+      "dimension": 1,
+      "description": "Concentrated at: line 535 `(val as any)[ek]` (Error extra-prop access); line 639 `(v as any)._kind` (compact value type-narrowing); line 1027 `const { InteractionManager } = require('react-native')` (untyped runtime require); line 1133 `const { type, props } = node as React.ReactElement<any>`; lines 1143-1149 `(type as any)?.type / (resolved as any)?.displayName / (resolved as any)?.name / (type as any)?.displayName`; line 1174 `style?: any` on LogProps. The React-internals casts in extractVisibleContent are unavoidable given React's loose runtime API, but `style?: any` could be `StyleProp<ViewStyle>` and `(v as any)._kind` could be a discriminated union via a type guard.",
+      "why_it_matters": "The logger is the module that knows the most about value shapes (it inspects every value passed to it). Having any-escapes here weakens the type guarantees the rest of the codebase relies on. Cosmetic but symptomatic — the module's type-discipline matches its conceptual discipline (mixed concerns per F-004).",
+      "fix": "Replace `style?: any` with `StyleProp<ViewStyle>`. Define a type guard `hasKind(v: unknown): v is { _kind: string }` and replace `(v as any)._kind`. The runtime require for InteractionManager can hoist to a top-level import once F-007 removes the module-load side-effect. The Error-extras and React-internals casts stay (genuine boundary).",
+      "references": [
+        "shared/lib/logger.ts:535",
+        "shared/lib/logger.ts:639",
+        "shared/lib/logger.ts:1027",
+        "shared/lib/logger.ts:1174",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Counted: 7 `as any` and 1 `: any` site in the file. analyze-structure top-list does not name logger.ts in the type-safety hotspots (top entries are redux/store/store.deprecated.ts at any=29 and HistoryEntryTimeline at as=53), so the cast density is moderate not extreme — Low not Medium.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-015",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "log.fatal lacks a transport-flush guarantee — Sentry breadcrumbs may not land before crash",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 578,
+      "symbol": "emit / fatal sync path",
+      "dimension": 9,
+      "description": "Line 576-580: fatal-level emit runs synchronously (`async && logLevel !== 'fatal'`). That guarantees the local transport.write() call is made before emit returns. But the transport itself can be async — a Sentry breadcrumb transport queues into the Sentry SDK's own buffer, which uploads on its own schedule. fatal is the most important call to land before a crash; the Logger interface has no `flush()` method to await all transports' pending work. Today no Sentry transport is wired in (only consoleTransport), so this is latent — but the file header at line 30 advertises 'Optional Sentry breadcrumb transport' as a planned feature.",
+      "why_it_matters": "The first time a Sentry transport is wired, fatal logs that fire just before a JavaScript crash will be lost — the SDK upload happens after the JS context dies. That's the inverse of what fatal is for.",
+      "fix": "Add `flush(): Promise<void>` to the Logger interface. Each transport optionally provides its own flush. emit's fatal branch awaits Promise.all(transports.flushAll()). Document that `await log.fatal(...)` is the safe form pre-crash.",
+      "references": [
+        "shared/lib/logger.ts:30",
+        "shared/lib/logger.ts:576"
+      ],
+      "verification_note": "UNVERIFIED in production because no Sentry transport is wired today. confidence 0.7 reflects that this is a latent finding — gates a future implementation rather than a current bug.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-016",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Auto-started JS-thread monitor's stop function is discarded — no way to disable it from a test",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 999,
+      "symbol": "module-init / startJSThreadMonitor",
+      "dimension": 1,
+      "description": "Line 963 startJSThreadMonitor returns `() => { clearTimeout(_heartbeatTimer); ... }`. Line 999 calls `setTimeout(() => startJSThreadMonitor(), 1000);` — the inner setTimeout's callback ignores the returned cleanup function. Once started, the heartbeat is not stoppable from outside the file. Jest workers leak the timer at teardown.",
+      "why_it_matters": "Test runner reports 'a worker process has failed to exit gracefully' — unrelated to the test under run. Cleanup discipline is broken.",
+      "fix": "Bound to F-007: remove auto-start, expose startJSThreadMonitor as a named export, capture the stop function at the call site (e.g. in app/_layout.tsx) and return it from `useEffect` for test isolation.",
+      "references": [
+        "shared/lib/logger.ts:963",
+        "shared/lib/logger.ts:999"
+      ],
+      "verification_note": "Confirmed by re-reading line 988-999. The setTimeout callback returns void; the cleanup return is unreachable.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-017",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "consoleTransport silently swallows transport errors — a misbehaving transport vanishes with no telemetry",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 567,
+      "symbol": "emit / transport try-catch",
+      "dimension": 10,
+      "description": "Lines 567-573: `for (const transport of transports) { try { transport(entry); } catch { /* never crash */ } }`. The 'never crash' instinct is correct, but the silent catch destroys the only signal a developer would have that their custom transport is broken. A misbehaving Sentry init or a serializer that throws on certain payloads becomes invisible.",
+      "why_it_matters": "Diagnosability gap. dim-13 in spirit (you can't debug what you can't see) but flagged as dim-10 (observability) because the fix is in the logger's own observability of itself.",
+      "fix": "Catch and re-emit the error via the *first surviving* transport: `console.warn('logger.transport.failed', { transportIndex: i, error: redactError(e) })` from the catch block, with a guard against infinite recursion (don't call back into the logger).",
+      "references": [
+        "shared/lib/logger.ts:567"
+      ],
+      "verification_note": "Confirmed. Counter-argument considered: 'logging about logging is a footgun' — true if naive, but routing through `console.warn` directly side-steps the recursion concern.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-018",
+      "severity": "Nit",
+      "confidence": 1.0,
+      "title": "File header repeats 'Logs explain WHY something happened, not just WHAT' on consecutive lines",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 16,
+      "symbol": "header doc",
+      "dimension": 9,
+      "description": "Lines 16-17: the bullet 'CAUSAL LINKAGE — Logs explain WHY something happened, not just WHAT.' is followed immediately by 'Logs explain WHY something happened, not just WHAT.' — a verbatim repetition with no added information. Cosmetic but symptomatic of how the file has grown without close reading.",
+      "why_it_matters": "Trivial on its own. Signals that the file gets edited additively without anyone re-reading the header.",
+      "fix": "Delete line 17.",
+      "references": [
+        "shared/lib/logger.ts:16"
+      ],
+      "verification_note": "Confirmed by direct read.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "duplicate header line removed (boy-scout while in the file)"
+    },
+    {
+      "id": "F-019",
+      "severity": "Nit",
+      "confidence": 0.8,
+      "title": "compactValue extracts non-standard Error properties via Object.keys(val).filter and serializes them — an SDK error with `headers`/`request`/`response` leaks via the params path",
+      "repo": "sovran-app",
+      "path": "shared/lib/logger.ts",
+      "line": 530,
+      "symbol": "emit / Error extras",
+      "dimension": 1,
+      "description": "Lines 530-537: when `params: { error: caughtError }` is passed, the Error gets unwrapped at line 520 into errorInfo, and any non-{name, message, stack} enumerable own properties are recursively compacted into `errorInfo.properties`. Third-party SDKs (axios, fetch wrappers) attach `request`, `response`, `config`, `code` to thrown errors — those properties land in the ring buffer via compactValue. While compactValue summarizes long strings, an SDK that attaches `response.data` with a JSON body of API state can still leak meaningful application data.",
+      "why_it_matters": "The redactError helper (line 930) exists exactly to prevent this — it returns `{ name, message }` only — but compactValue's Error path bypasses redactError. A developer following the dim-10 'always log via redactError' guidance gets the safe path; one who passes `{ error: e }` directly does not. The two paths are inconsistent.",
+      "fix": "Make compactValue's Error path mirror redactError: return `{ name, message }` only. Drop the extras-collection at lines 530-537. If callers want extras, they can attach them explicitly via `params: { ...redactError(e), code: e.code }`.",
+      "references": [
+        "shared/lib/logger.ts:520",
+        "shared/lib/logger.ts:930"
+      ],
+      "verification_note": "Two parallel error-handling paths (line 520 vs line 930) is a signal that the design is split; collapsing them onto the safer one is straightforward.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "skipped",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "skipped",
+    "7": "pass",
+    "8": "skipped",
+    "9": "partial",
+    "10": "partial",
+    "11": "pass",
+    "12": "pass",
+    "13": "pass",
+    "14": "pass"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Split shared/lib/logger.ts into four files. Promote the in-file UI subsystem (Log component, UIPathContext, extractVisibleContent, deriveScreenTestID) to shared/ui/instrumentation/Log.tsx. Promote the JS-thread monitor + deferWork to shared/lib/perf/jsThreadMonitor.ts. Promote initLog/initPhase/initPhaseSync/useInitMount to shared/lib/init/initTiming.ts. Leave only the logger factory + RingBuffer + transports + child loggers + redactError in shared/lib/logger.ts. logger.ts loses its React import and its module-load side effect. Re-export the React-free surface from logger.ts during a migration window.",
+      "files": [
+        "shared/lib/logger.ts",
+        "shared/ui/instrumentation/Log.tsx (new)",
+        "shared/lib/perf/jsThreadMonitor.ts (new)",
+        "shared/lib/init/initTiming.ts (new)"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Promote ringBuffer + hasLoggedDevice + minSeverity + dedup state to a module-level LoggerCore singleton. child() returns a wrapper over LoggerCore that adds context but shares state. setLevel updates the core. dumpForLLM reads the singleton. Single source of truth for diagnostics. Removes F-003, F-006, F-008, F-009 by construction.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Implement a redaction policy boundary inside summarizeString. Define SECRET_KINDS = { 'nsec', 'cashu_token', 'lightning_invoice', 'pem_key', 'connection_str', 'jwt' } and PUBLIC_KINDS = { 'npub', 'uuid', 'base64', 'hex', 'json_blob', 'xml_blob', 'data_uri', 'url', 'solana_pubkey' }. summarizeString returns `{ _kind, len, preview: '<redacted>' }` for secret kinds and `{ _kind, len, preview: s.slice(0,32)+'…' }` for public kinds. Split the npub_or_nsec regex into two patterns (and likewise for cashuA / cashuB if they have different secrecy properties). Closes F-001 and F-012 at the type-label boundary.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Set `const SHOW_LOGS = __DEV__;` (or wire to a build-time flag). Repair the line 43 and line 952 doc comments. Remove the line 999 module-load auto-start; expose startJSThreadMonitor as a named export and call it explicitly from app/_layout.tsx under a __DEV__ guard, capturing the stop function for test isolation. Closes F-002, F-007, F-016.",
+      "files": [
+        "shared/lib/logger.ts",
+        "app/_layout.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "In production builds, short-circuit getCallerLocation when IS_DEV is false: return a fixed `{ file: 'minified', func: '?', line: 0 }`. Optional follow-up: introduce a babel plugin that rewrites log.warn(...) calls to encode src at compile time (no runtime stack walk needed). Closes F-005.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Replace scheduleIdle's RN fallback with queueMicrotask, or implement a per-tick batching drain that amortizes the bridge cost across N entries. Closes F-011.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Replace dedup mutation-after-publish (line 503) with a deferred coalesce: emit a single `<event>.dedup { count, original_t }` entry at the end of the dedup window instead of mutating the previously-published entry. Closes F-008.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Make compactValue's Error path delegate to redactError so a `{ error: e }` param with non-Error extras never leaks request/response/headers. Drop the extras-collection at lines 530-537. Closes F-019.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Add `flush(): Promise<void>` to the Logger interface; transports may optionally implement their own flush(). emit's fatal branch awaits Promise.all of transport.flushAll() so a future Sentry-breadcrumb transport lands before a crash. Closes F-015.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Add a self-emit fallback inside the transport try/catch: when a transport throws, call console.warn('logger.transport.failed', { transportIndex, error: redactError(e) }) from the catch block, with a non-recursion guard. Closes F-017.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Delete the duplicated header line at logger.ts:17. Replace the Object.keys(LEVEL_SEVERITY) inverse lookup at line 591 with a paired SEVERITY_TO_LEVEL constant. Closes F-013, F-018.",
+      "files": [
+        "shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Open __research__/logger-redaction-policy.md to design a `LogSafe<T>` brand (or its inverse `LogForbidden<T>`) that prevents Mnemonic / SeedHex / PrivateKeyHex / CashuMnemonic / Proof / Nsec from being passed to logger.* at compile time. Document the migration path from `params: Record<string, unknown>` to a brand-aware shape, including the redactSensitive() boundary for callers that explicitly want to record a derived non-secret summary. Decision-tagged status:exploring; addresses F-010 at the design level.",
+      "files": [
+        "__research__/logger-redaction-policy.md (new)"
+      ]
+    }
+  ],
+  "open_questions": [
+    "shared/stores/global/migrateSettings.ts:43 annotates 'the ring buffer is exfiltrable via dumpForLLM' — does the team's mental model assume the logger redacts secret-shaped strings (in which case F-001 is a complete blind spot), or does it assume callers must redact at the call site (in which case the npub_or_nsec regex is functionally dead code, and the regex's existence is misleading)? Either interpretation supports a fix; the choice between SECRET_KINDS-side-of-logger redaction and brand-types-side-of-types-system enforcement should be made explicit.",
+    "Is the user-facing 'Copy debug logs' button at SettingsStorageScreen.tsx:229 intended to ship to production users, or was it meant to be __DEV__-gated? If the latter, F-001's exfiltration severity drops from end-user-visible to dev-only.",
+    "Does any caller currently rely on the 14× device-blob duplication (F-006) — e.g. a log-doctor heuristic that detects child-logger boundaries via the device-blob marker? grep suggests no, but worth confirming before promoting to a singleton.",
+    "Hermes version in current sovran-app build: F-005 cost depends on whether Error.stack capture has been optimized in 0.83's Hermes. log-doctor stats --latest could measure this if log.txt were available; not run for this audit.",
+    "F-010 LogSafe<T> brand design space: open question whether to brand-on-secret-types (Mnemonic, Seed, …) or to brand-on-redaction-result (Sensitive<T> wrapper that the caller must apply). The first is total but invasive; the second is opt-in but leaves drift risk."
+  ]
+}
