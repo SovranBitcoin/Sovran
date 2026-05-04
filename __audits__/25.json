@@ -66,7 +66,9 @@
         "skill:native-data-fetching"
       ],
       "verification_note": "Re-read L39-104 after stating claim: the `return () => { cancelled = true }` is syntactically inside the setTimeout's arrow-function body; setTimeout takes `(handler, timeout)` and returns an id, so the closure's return is discarded. Counter-argument considered: the outer cleanup could theoretically run before the timer fires (in which case clearTimeout aborts cleanly) — true for the debounce window but not after the timer has resolved.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "AbortController already lifted to outer effect; controller.signal.aborted guards every setState in useMintSearch.ts"
     },
     {
       "id": "F-002",
@@ -105,7 +107,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read L112-133. The final setState is at L130, single-shot after the loop; the risk is exactly as described. Counter-argument: sequential loops serialise network — no, coco's RequestRateLimiter already tokens per-mint (observed in log-doctor stats: ratelimiter_token_granted_immediately with tokens=19 capacity=20).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "MintDistributionScreen.loadMintInfo now uses Promise.allSettled and a mountedRef guard before setMintInfoMap"
     },
     {
       "id": "F-004",
@@ -124,7 +128,9 @@
         "skill:native-data-fetching"
       ],
       "verification_note": "Confirmed L64 has no timeout, L111-140 no concurrency cap, L62 clears processedUrls on every re-run. Counter-argument: the API is Sovran-controlled and presumably fast — true for the happy path, but the hook needs to cope with degraded networks by design, and the `knownMints`-driven re-runs are pure waste even on fast links.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useSovranDiscoveredMints filters knownMints client-side and bounds fetchMintInfo fanout to CONCURRENT_LIMIT=5 matching useAuditedMints.ts"
     },
     {
       "id": "F-005",
