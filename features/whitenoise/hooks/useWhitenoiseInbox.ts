@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWhitenoise } from '../WhitenoiseContext';
+import { resolveInboxRelays } from '../client/network';
 import { wnLog } from '@/shared/lib/logger';
 
 const GIFT_WRAP_KIND = 1059;
@@ -34,13 +35,7 @@ export function useWhitenoiseInbox() {
     (async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
       // back to the default app relay set.
-      let inboxRelays: string[];
-      try {
-        const learned = await client.network.getUserInboxRelays(selfPubkey);
-        inboxRelays = learned.length > 0 ? learned : [...relays];
-      } catch {
-        inboxRelays = [...relays];
-      }
+      const inboxRelays = await resolveInboxRelays(client.network, selfPubkey, relays);
       if (cancelled) return;
 
       wnLog.info('whitenoise.inbox.start', {

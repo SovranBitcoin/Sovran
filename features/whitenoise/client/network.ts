@@ -156,3 +156,24 @@ export function createWhitenoiseNetwork(
     },
   };
 }
+
+/**
+ * `network.getUserInboxRelays` already falls back to the relay set when no
+ * kind-10051 is published, but a network-level throw (relay timeout, NDK
+ * lookup error) propagates. Both the inbox watcher and the DM-send path need
+ * "best effort with fallback" — without this helper the DM send fails the
+ * whole send on a transient relay blip while the inbox watcher silently uses
+ * the fallback.
+ */
+export async function resolveInboxRelays(
+  network: Pick<NostrNetworkInterface, 'getUserInboxRelays'>,
+  pubkey: string,
+  fallbackRelays: readonly string[]
+): Promise<string[]> {
+  try {
+    const learned = await network.getUserInboxRelays(pubkey);
+    return learned.length > 0 ? learned : [...fallbackRelays];
+  } catch {
+    return [...fallbackRelays];
+  }
+}

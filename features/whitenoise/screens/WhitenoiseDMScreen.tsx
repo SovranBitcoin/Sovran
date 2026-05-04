@@ -13,7 +13,6 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import {
@@ -35,12 +34,11 @@ import { MarmotIcon } from '../components/MarmotIcon';
  */
 export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   useLifecycleLogger('WhitenoiseDMScreen');
-  const accountIndex = useProfileStore((s) => s.activeAccountIndex);
   const headerHeight = useHeaderHeight();
 
   const { metadata } = useNostrProfileMetadata(pubkey);
   const { isLoading, isCreatingGroup, error, hasGroup, messages, send, isClientReady } =
-    useWhitenoiseDM(pubkey, accountIndex);
+    useWhitenoiseDM(pubkey);
 
   const [surface, shade400, shade500, danger] = useThemeColor([
     'surface',

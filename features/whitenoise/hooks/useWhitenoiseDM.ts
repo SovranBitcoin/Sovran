@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import {
   deserializeApplicationRumor,
@@ -8,6 +8,7 @@ import {
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useWhitenoise } from '../WhitenoiseContext';
+import { resolveInboxRelays } from '../client/network';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
 import { WhitenoiseGroupHistory } from '../storage/groupHistory';
 import { mintLocalId } from '@/shared/lib/id';
@@ -50,11 +51,8 @@ function rumorToMessage(
   };
 }
 
-export function useWhitenoiseDM(
-  counterpartyPubkey: string,
-  accountIndex: number
-): UseWhitenoiseDMState {
-  const { client, relays } = useWhitenoise();
+export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMState {
+  const { client, relays, accountIndex } = useWhitenoise();
   const { keys } = useNostrKeysContext();
   const selfPubkey = keys?.pubkey ?? '';
 
@@ -64,19 +62,26 @@ export function useWhitenoiseDM(
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const indexRef = useRef<WhitenoiseDmIndex | null>(null);
-  if (!indexRef.current) {
-    indexRef.current = new WhitenoiseDmIndex(accountIndex);
-  }
+  // Tracks the dm-pubkey → groupId map for the active account. Keying the
+  // memo on accountIndex means a future provider re-mount with a different
+  // account creates a fresh index instead of reusing the previous account's
+  // (audit 33.json F-008).
+  const dmIndex = useMemo(() => new WhitenoiseDmIndex(accountIndex), [accountIndex]);
 
   const groupRef = useRef<WnGroup | null>(null);
   groupRef.current = group;
 
+  // Sorted insertion — ingest is monotonic by createdAt in the steady state,
+  // but local sends carry now() and historical hydration may interleave, so
+  // we still find the right slot. O(n) per upsert vs the previous full sort.
+  // Audit 33.json F-012.
   const upsertMessage = useCallback((msg: WhitenoiseDmMessage) => {
     setMessages((prev) => {
       if (prev.some((m) => m.id === msg.id)) return prev;
-      const next = [...prev, msg];
-      next.sort((a, b) => a.createdAt - b.createdAt);
+      const next = [...prev];
+      const idx = next.findIndex((m) => m.createdAt > msg.createdAt);
+      if (idx === -1) next.push(msg);
+      else next.splice(idx, 0, msg);
       return next;
     });
   }, []);
@@ -92,7 +97,7 @@ export function useWhitenoiseDM(
       setIsLoading(true);
       try {
         await client.loadAllGroups();
-        const groupIdHex = await indexRef.current!.get(counterpartyPubkey);
+        const groupIdHex = await dmIndex.get(counterpartyPubkey);
         if (!groupIdHex) {
           if (!cancelled) {
             setGroup(null);
@@ -128,7 +133,7 @@ export function useWhitenoiseDM(
     return () => {
       cancelled = true;
     };
-  }, [client, counterpartyPubkey, selfPubkey]);
+  }, [client, counterpartyPubkey, selfPubkey, dmIndex]);
 
   // Subscribe to kind-445 events for the group and feed them into ingest.
   // The h-tag uses the *Nostr* group id (from the MarmotGroupData extension),
@@ -196,8 +201,11 @@ export function useWhitenoiseDM(
         setIsCreatingGroup(true);
         try {
           const fallbackRelays = relays.length > 0 ? [...relays] : [];
-          const inboxRelays = await client.network.getUserInboxRelays(counterpartyPubkey);
-          const lookupRelays = inboxRelays.length > 0 ? inboxRelays : fallbackRelays;
+          const lookupRelays = await resolveInboxRelays(
+            client.network,
+            counterpartyPubkey,
+            fallbackRelays
+          );
           const events = await client.network.request(lookupRelays, [
             { kinds: [KEY_PACKAGE_KIND], authors: [counterpartyPubkey], limit: 1 },
           ]);
@@ -212,7 +220,7 @@ export function useWhitenoiseDM(
           })) as WnGroup;
           await created.inviteByKeyPackageEvent(keyPackageEvent);
 
-          await indexRef.current!.set(counterpartyPubkey, bytesToHex(created.id));
+          await dmIndex.set(counterpartyPubkey, bytesToHex(created.id));
           activeGroup = created;
           groupRef.current = created;
           setGroup(created);
@@ -253,7 +261,7 @@ export function useWhitenoiseDM(
         setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       }
     },
-    [client, counterpartyPubkey, relays, selfPubkey, upsertMessage]
+    [client, counterpartyPubkey, relays, selfPubkey, upsertMessage, dmIndex]
   );
 
   // The lazy group-creation path is the high-cost double-tap target: a
