@@ -117,7 +117,12 @@ function getDebugMnemonicOverride(): string | null {
     throw new Error('EXPO_PUBLIC_DEBUG_MNEMONIC must be exactly 12 words');
   }
 
-  return words.join(' ');
+  const normalized = words.join(' ');
+  if (!bip39.validateMnemonic(normalized, wordlist)) {
+    throw new Error('EXPO_PUBLIC_DEBUG_MNEMONIC failed BIP-39 validation');
+  }
+
+  return normalized;
 }
 
 /**
@@ -136,6 +141,15 @@ export async function storeMnemonic(mnemonic: string): Promise<boolean> {
   if (words.length !== 12) {
     nostrLog.error('nostr.secure.store_mnemonic_failed', {
       error: 'Mnemonic must be exactly 12 words',
+    });
+    return false;
+  }
+  // Reject mnemonics that fail the BIP-39 wordlist or checksum: a single
+  // mistyped word on restore otherwise persists, derives a wrong identity,
+  // and silently strands the user's funds against the correct mnemonic.
+  if (!bip39.validateMnemonic(mnemonic, wordlist)) {
+    nostrLog.error('nostr.secure.store_mnemonic_failed', {
+      error: 'Mnemonic failed BIP-39 validation',
     });
     return false;
   }

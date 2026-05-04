@@ -1,3 +1,6 @@
+import * as bip39 from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english';
+
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { DataMigration } from '@/shared/lib/cashu/migration';
 import { log, initLog } from '../logger';
@@ -48,7 +51,18 @@ function getLegacyReduxMnemonic(profile: LegacyReduxProfile | undefined): string
   if (!mnemonic) return null;
 
   const words = mnemonic.split(/\s+/);
-  return words.length === 12 ? mnemonic : null;
+  if (words.length !== 12) return null;
+  // Same BIP-39 boundary as secureStorage.storeMnemonic: reject bad-checksum
+  // mnemonics here so the legacy-bootstrap path never produces a wrong-identity
+  // restore. A bad legacy value is dropped; bootstrapRootMnemonic then falls
+  // through to its no-mnemonic branch.
+  if (!bip39.validateMnemonic(mnemonic, wordlist)) {
+    log.warn('migrations.legacy.bad_mnemonic_checksum', {
+      accountIdHint: typeof profile?.id === 'number' ? profile.id : null,
+    });
+    return null;
+  }
+  return mnemonic;
 }
 
 async function bootstrapRootMnemonic(rootState: RootState): Promise<string | null> {
