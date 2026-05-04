@@ -288,8 +288,8 @@
       ],
       "verification_note": "Re-read Checkbox.tsx:22-58. Confirmed lines 49 and 50 are the only hardcoded hexes in the file; all other branches use theme tokens. Grep for '#f5' across shared/ui — 1 match, confirming isolation. Confidence 0.95 — the claim is mechanical.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "Replaced #f59e0b with useThemeColor('warning'); Checkbox warning variant now tracks theme."
     },
     {
       "id": "F-012",
