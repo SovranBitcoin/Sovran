@@ -22,16 +22,12 @@ import {
   useSplitBillOrchestrator,
   useSplitBillPaymentWatcher,
 } from '@/features/splitBill/hooks/useSplitBillOrchestrator';
-import {
-  useSplitBillTransactionsStore,
-  type SplitBillParticipant,
-} from '@/shared/stores/profile/splitBillTransactionsStore';
+import { useSplitBillTransactionsStore } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler, type ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { HistoryEntryHeader } from '@/features/transactions';
 import { ListRow } from '@/shared/ui/composed/ListRow';
-import Icon from 'assets/icons';
 import { Log, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -39,53 +35,12 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
+import { ParticipantStatusIcon } from '@/features/splitBill/components/ParticipantStatusIcon';
+import { participantSubtitle } from '@/features/splitBill/lib/participantSubtitle';
 
 const ParamsSchema = z.object({
   groupId: z.string().min(1).max(256).optional(),
 });
-
-function ParticipantStatusIcon({
-  participant,
-  foreground,
-  danger,
-  success,
-}: {
-  participant: SplitBillParticipant;
-  foreground: string;
-  danger: string;
-  success: string;
-}) {
-  if (participant.paymentState === 'paid') {
-    return <Icon name="mdi:check-circle" size={22} color={success} />;
-  }
-  if (participant.paymentState === 'expired') {
-    return <Icon name="mdi:alert-circle" size={22} color={danger} />;
-  }
-  if (participant.deliveryState === 'failed') {
-    return <Icon name="mdi:alert-circle" size={22} color={danger} />;
-  }
-  if (participant.deliveryState === 'pending') {
-    return (
-      <Icon
-        name="ant-design:loading-outlined"
-        size={22}
-        color={opacity(foreground, 0.4)}
-        spin={{ duration: 1000, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
-      />
-    );
-  }
-  // sent, awaiting payment
-  return <Icon name="mdi:clock-outline" size={22} color={opacity(foreground, 0.5)} />;
-}
-
-function participantSubtitle(p: SplitBillParticipant): string {
-  if (p.paymentState === 'paid') return 'Paid ✓';
-  if (p.paymentState === 'expired') return 'Expired';
-  if (p.deliveryState === 'failed') return 'Delivery failed';
-  if (p.channel === 'qr-only') return 'Awaiting payment · tap for QR';
-  if (p.deliveryState === 'pending') return 'Sending invoice…';
-  return 'Invoice delivered · awaiting payment';
-}
 
 export default function SplitBillSummaryScreen() {
   useLifecycleLogger('SplitBillSummaryScreen', walletLog);
@@ -231,7 +186,7 @@ export default function SplitBillSummaryScreen() {
                   : undefined
               }
               title={p.nickname ?? p.pubkey?.slice(0, 12) ?? p.peerID ?? 'Participant'}
-              subtitle={participantSubtitle(p)}
+              subtitle={participantSubtitle(p, 'summary')}
               accent={
                 <AmountFormatter amount={p.amount} unit={group.unit} size={13} weight="heavy" />
               }

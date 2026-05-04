@@ -37,7 +37,6 @@ import {
   ParticipantCardDeck,
   type ParticipantCardDeckRef,
 } from '@/features/splitBill/components/ParticipantCardDeck';
-import Icon from 'assets/icons';
 import { Log, useLifecycleLogger, walletLog, paymentLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -45,52 +44,12 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
+import { ParticipantStatusIcon } from '@/features/splitBill/components/ParticipantStatusIcon';
+import { participantSubtitle } from '@/features/splitBill/lib/participantSubtitle';
 
 const ParamsSchema = z.object({
   groupId: z.string().min(1).max(256).optional(),
 });
-
-function StatusBadge({
-  participant,
-  foreground,
-  danger,
-  success,
-}: {
-  participant: SplitBillParticipant;
-  foreground: string;
-  danger: string;
-  success: string;
-}) {
-  if (participant.paymentState === 'paid') {
-    return <Icon name="mdi:check-circle" size={22} color={success} />;
-  }
-  if (participant.paymentState === 'expired') {
-    return <Icon name="mdi:alert-circle" size={22} color={danger} />;
-  }
-  if (participant.deliveryState === 'failed') {
-    return <Icon name="mdi:alert-circle" size={22} color={danger} />;
-  }
-  if (participant.deliveryState === 'pending') {
-    return (
-      <Icon
-        name="ant-design:loading-outlined"
-        size={22}
-        color={opacity(foreground, 0.4)}
-        spin={{ duration: 1000, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
-      />
-    );
-  }
-  return <Icon name="mdi:clock-outline" size={22} color={opacity(foreground, 0.5)} />;
-}
-
-function participantSubtitle(p: SplitBillParticipant): string {
-  if (p.paymentState === 'paid') return 'Paid ✓';
-  if (p.paymentState === 'expired') return 'Expired';
-  if (p.deliveryState === 'failed') return 'Delivery failed · tap to retry';
-  if (p.channel === 'qr-only') return 'Awaiting payment · QR only';
-  if (p.deliveryState === 'pending') return 'Sending invoice…';
-  return 'Invoice delivered · awaiting payment';
-}
 
 export default function SplitBillDetailScreen() {
   useLifecycleLogger('SplitBillDetailScreen', walletLog);
@@ -272,12 +231,12 @@ export default function SplitBillDetailScreen() {
                   bleNickname: p.nickname,
                   fallbackName: 'Participant',
                 })}
-                subtitle={participantSubtitle(p)}
+                subtitle={participantSubtitle(p, 'detail')}
                 accent={
                   <AmountFormatter amount={p.amount} unit={group.unit} size={13} weight="heavy" />
                 }
                 trailing={
-                  <StatusBadge
+                  <ParticipantStatusIcon
                     participant={p}
                     foreground={foreground}
                     danger={danger}
