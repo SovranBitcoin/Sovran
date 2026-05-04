@@ -72,7 +72,9 @@
         "skill:nostr"
       ],
       "verification_note": "Re-checked file at line 490 and coco-core types at node_modules/@cashu/coco-core/dist/index.d.ts:2874. Counter-argument considered: coco may expose deleteMint on a different path (e.g. manager.mint.service.deleteMint). It does — MintService has deleteMint at line 307 — but that is a private internal, not manager.mint. The type error is real. prior_audit_id null.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Add untrustMint cleanup after Promise.allSettled for discovered mints with !fundsFound; wallet.restore implicitly trusts via addMintByUrl"
     },
     {
       "id": "F-002",
@@ -136,7 +138,9 @@
         "luds/16.md"
       ],
       "verification_note": "Re-read fetchDiscoveredMintUrls at line 45. Confidence 0.9 because the attack requires backend compromise (Sovran owns api.sovran.money) but the layered defense (schema + allowlist) is cheap and expected for wallet code. Keeping at Medium rather than High because the API is under Sovran's control, not the wallet's threat surface by default.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Add hostname allowlist (reject localhost/.local/.internal/.onion/bare-IPs/IPv6) plus 100-entry cap on top of existing zod validation; log admitted/rejected counts"
     },
     {
       "id": "F-005",
