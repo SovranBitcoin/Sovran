@@ -6,7 +6,7 @@
  * multi-author feed using the same event format as UserFeed.
  */
 
-import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
+import { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -139,7 +139,7 @@ function EmptyFeed() {
 // Main HomeFeed Component
 // ============================================================================
 
-function HomeFeedInner({ activeFilter }: HomeFeedProps) {
+export function HomeFeed({ activeFilter }: HomeFeedProps) {
   useBackgroundConfig(BG_CONFIG);
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const imageOverlay = useImageOverlay();
@@ -750,12 +750,6 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
     </Log>
   );
 }
-
-function HomeFeedComponent({ activeFilter }: HomeFeedProps) {
-  return <HomeFeedInner activeFilter={activeFilter} />;
-}
-
-export const HomeFeed = React.memo(HomeFeedComponent);
 
 // ============================================================================
 // Stable references — defined outside the component to avoid re-creation

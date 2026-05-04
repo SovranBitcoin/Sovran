@@ -320,7 +320,7 @@ function EmptyFeed() {
 // Main UserFeed Component
 // ============================================================================
 
-function UserFeedInner({
+export function UserFeed({
   pubkey,
   authorName,
   authorPicture,
@@ -870,12 +870,6 @@ function UserFeedInner({
     </Log>
   );
 }
-
-function UserFeedComponent(props: UserFeedProps) {
-  return <UserFeedInner {...props} />;
-}
-
-export const UserFeed = React.memo(UserFeedComponent);
 
 // ============================================================================
 // Stable list references
