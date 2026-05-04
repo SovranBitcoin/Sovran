@@ -138,7 +138,9 @@
         "sovran-app/shared/providers/NostrKeysProvider.tsx:233-402"
       ],
       "verification_note": "Re-read ensureMnemonicExists and its two callers. Counter-argument considered: 'the lifecycle ordering makes this unreachable.' True today; the finding is about defence-in-depth — the invariant should be local to secureStorage, not implicit in the provider tree.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "single-flight inflight-promise lock added to ensureMnemonicExists"
     },
     {
       "id": "F-007",
@@ -237,7 +239,9 @@
       "fix": "Rename to `DerivedKeysSecureCache` and add a JSDoc: `/** SECRET — contains a 32-byte Nostr private key as hex. Lives only in SecureStore. Do NOT pass to logs, props, Zustand, or any component not inside NostrKeysProvider. */`. Optionally brand the field type (`privateKeyHex: string & { readonly __brand: 'SECRET' }`) so accidental Record<string,unknown> spreads surface as type errors.",
       "references": [],
       "verification_note": "Re-read L20-26 and the single import at NostrKeysProvider.tsx:22. Counter-argument: 'naming is style.' Naming for secret-bearing types is risk signalling, not style — and this codebase already has the `paymentLog`/`cashuLog` scope convention for the same defensive reason.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "JSDoc @SECRET marker added to nsec and privateKeyHex"
     },
     {
       "id": "F-012",
@@ -256,7 +260,9 @@
         "sovran-app/shared/lib/cashu/manager.ts:160"
       ],
       "verification_note": "Re-read the three cache retrievers. No deleteItemAsync on any error path. Counter-argument: 'corruption is rare.' True, but the cost of one recovery is 5s × every session forever. Kept Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "parseOrSelfHeal helper deletes corrupt blob; next session retries cleanly"
     },
     {
       "id": "F-013",
@@ -276,7 +282,8 @@
       ],
       "verification_note": "Confirmed the noble utils are depended on and used elsewhere. Counter-argument: none.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "stale",
+      "completion_note": "file already imports bytesToHex/hexToBytes from @noble/hashes"
     },
     {
       "id": "F-014",
@@ -315,7 +322,9 @@
       "fix": "Wrap the promotion setItemAsync in its own try/catch so its failure does not bubble to the isMigrationsComplete catch: `await SecureStore.setItemAsync(...).catch(e => log.warn('nostr.secure.promote_failed', { error: e }))`. Still return true after a successful legacy read.",
       "references": [],
       "verification_note": "Re-read L372-397. Counter-argument: self-healing makes this a non-issue. Kept as Nit at 0.4.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "current code returns true when legacy === true regardless of promotion secureSet outcome"
     },
     {
       "id": "F-016",
@@ -332,7 +341,9 @@
       "fix": "Add `assertHex32(pubkeyHex)` and `assertAccountIndex(n: number)` helpers at the top of the file and call them in each key builder. Throw a typed error on contract break. Zero runtime cost; loud failure mode.",
       "references": [],
       "verification_note": "Re-read L240-246, L319-321, L363-365, L412-414. Counter-argument: current call sites are clean. Kept as Nit because the surface is a security-sensitive key-builder layer.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "assertAccountIndex and assertPubkeyHex wired into all four key helpers"
     }
   ],
   "dimensions": {

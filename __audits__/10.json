@@ -116,7 +116,9 @@
         "nuts/13.md"
       ],
       "verification_note": "Still present since 04.json. Re-read L369-386. No validation added.",
-      "prior_audit_id": "F-003@04.json"
+      "prior_audit_id": "F-003@04.json",
+      "completion_status": "complete",
+      "completion_note": "retrieveCashuSeed asserts seed.length === 64; wrong-length blob is self-healed"
     },
     {
       "id": "F-005",
@@ -178,7 +180,9 @@
         "sovran-app/shared/providers/NostrKeysProvider.tsx"
       ],
       "verification_note": "Still present since 04.json. Source-tracking addition at L163-176 does not address the TOCTOU — the mark happens after storeMnemonic, not before, so the race window on the mnemonic write is unchanged.",
-      "prior_audit_id": "F-006@04.json"
+      "prior_audit_id": "F-006@04.json",
+      "completion_status": "complete",
+      "completion_note": "single-flight inflight-promise lock added to ensureMnemonicExists"
     },
     {
       "id": "F-008",
@@ -258,7 +262,9 @@
         "sovran-app/shared/lib/logger.ts"
       ],
       "verification_note": "Still present since 04.json. Re-read every catch block; all pass { error } raw.",
-      "prior_audit_id": "F-010@04.json"
+      "prior_audit_id": "F-010@04.json",
+      "completion_status": "stale",
+      "completion_note": "all catch blocks already wrap with redactError"
     },
     {
       "id": "F-012",
@@ -275,7 +281,9 @@
       "fix": "Rename to DerivedKeysSecureCache and add a JSDoc: '/** SECRET — contains a 32-byte Nostr private key as hex. Lives only in SecureStore. Do NOT pass to logs, props, Zustand, or any component not inside NostrKeysProvider. */'. Optionally brand the field type (privateKeyHex: string & { readonly __brand: 'SECRET' }).",
       "references": [],
       "verification_note": "Still present since 04.json. Re-read L20-26 and the single import at NostrKeysProvider.tsx:22.",
-      "prior_audit_id": "F-011@04.json"
+      "prior_audit_id": "F-011@04.json",
+      "completion_status": "complete",
+      "completion_note": "JSDoc @SECRET marker added to nsec and privateKeyHex"
     },
     {
       "id": "F-013",
@@ -294,7 +302,9 @@
         "sovran-app/shared/lib/cashu/manager.ts"
       ],
       "verification_note": "Still present since 04.json. Re-read the three retrievers; no deleteItemAsync on any error path.",
-      "prior_audit_id": "F-012@04.json"
+      "prior_audit_id": "F-012@04.json",
+      "completion_status": "complete",
+      "completion_note": "parseOrSelfHeal helper deletes corrupt blob; next session retries cleanly"
     },
     {
       "id": "F-014",
@@ -314,7 +324,9 @@
         "sovran-app/shared/lib/cashu/manager.ts"
       ],
       "verification_note": "Still present since 04.json.",
-      "prior_audit_id": "F-013@04.json"
+      "prior_audit_id": "F-013@04.json",
+      "completion_status": "stale",
+      "completion_note": "file already imports bytesToHex/hexToBytes from @noble/hashes"
     },
     {
       "id": "F-015",
@@ -353,7 +365,9 @@
       "fix": "Wrap the promotion setItemAsync in its own try/catch so its failure does not bubble to the isMigrationsComplete catch. Still return true after a successful legacy read.",
       "references": [],
       "verification_note": "Still present since 04.json.",
-      "prior_audit_id": "F-015@04.json"
+      "prior_audit_id": "F-015@04.json",
+      "completion_status": "stale",
+      "completion_note": "current code returns true when legacy === true regardless of promotion secureSet outcome"
     },
     {
       "id": "F-017",
@@ -370,7 +384,9 @@
       "fix": "Add assertHex32(pubkeyHex) and assertAccountIndex(n: number) helpers at the top of the file and call them in each key builder. Throw a typed error on contract break. Zero runtime cost; loud failure mode.",
       "references": [],
       "verification_note": "Still present since 04.json.",
-      "prior_audit_id": "F-016@04.json"
+      "prior_audit_id": "F-016@04.json",
+      "completion_status": "complete",
+      "completion_note": "assertAccountIndex and assertPubkeyHex wired into all four key helpers"
     },
     {
       "id": "F-018",
@@ -412,7 +428,9 @@
         "docs/SOV-00.md §5"
       ],
       "verification_note": "Re-read L136-182 with SOV-00 §4 Regression ('creator bit is set for a seed the app didn't generate' = the inverse of this race). Counter-argument considered: 'the crash window is microseconds and the failure is conservative'. Accepted — kept Low. Confidence 0.55 because the impact is UX-only and may not reproduce reliably enough to warrant a fix before F-002/F-003/F-005 land.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "markSeedCreatedNow now runs before storeMnemonic; crash window narrowed and recoverable"
     }
   ],
   "dimensions": {
