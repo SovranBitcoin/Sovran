@@ -49,7 +49,9 @@
         "docs/README.md (SOV-10 TODO)"
       ],
       "verification_note": "Re-read MintRebalancePlanScreen.tsx:805-819 (path A, executeStep auto-route), 1411-1450 (path B, handleRouteThrough), 1124-1135 and 1509-1521 (untrust-only-on-zero-balance), 208-260 (computeRouteSuggestion fed by auditMint API). Counter-argument considered: 'auditMint is a trusted first-party API, not an arbitrary remote; routes are scored and filtered by pickIntermediaryPath'. Weak — `pickIntermediaryPath` filters by policy settings (`middlemanRouting`) but does not verify the candidate mint against user consent, and 'first-party API' is a single compromise away from a supply-chain or server-side attacker injecting entries. Also: path B (handleRouteThrough) accepts any chainPath already in `routeSuggestion` — a user who taps 'Route through…' on a suggestion is approving the route's intent but is not being shown 'this will add 2 new mints to your trusted set.' No log-doctor evidence because log.txt contains no rebalance activity; structural race is self-evident from the source, so AUDIT.md's dim-7 evidence exception does not apply (this is a trust-elevation finding, not a perf/race one). Severity is Critical per the severity rubric — 'funds can be lost' with a clear attack path.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Trust window now bounded: every temporarily-trusted intermediary is untrusted in finally regardless of remaining balance. Stranded balances surface via routingDetail + cashuLog 'mint.rebalance.middleman_recovery_required'. Helper extracted to features/mint/components/rebalance/releaseTrustWindow.ts with focused regression test."
     },
     {
       "id": "F-002",
@@ -94,7 +96,9 @@
         "prior-audit:F-001@12.json"
       ],
       "verification_note": "Re-read lines 1120-1135 (executeStep finally untrust pass) and 1506-1521 (handleRouteThrough finally untrust pass). Confirmed identical logic: `if (bal > 0) { log.warn; continue } else { untrustMint }`. Counter-argument considered: 'if the chain has only a single candidate and it fails, the user will obviously notice because their balance at source is missing.' Partly true for the first hop failing, but if the chain has 2+ hops and the second fails, the user sees 'rebalance failed' and their source balance is reduced — they do NOT see 'and your funds are now on mint X which you never explicitly trusted.' Also considered 'keeping the mint trusted is intentional so they can recover the funds next time' — true, but trust-level is too high: a pinned affordance in the transaction history + `manager.mint.trust(..., { ephemeralToken })` would let the user recover funds without the permanent trust elevation.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Same fix as F-001: untrust always runs, balance-aware skip removed. Both call sites (handleRouteThrough finally, executeStep auto-route) now use the extracted releaseTrustWindow helper."
     },
     {
       "id": "F-004",
@@ -114,7 +118,9 @@
         "docs/SOV-00.md §4 (logging redaction)"
       ],
       "verification_note": "Re-read lines 95-109 (for-of await) and useMintManagement.ts:74-88 (getMintInfo is a network call). Counter-argument considered: 'sequential is intentional to avoid hammering a mint with parallel requests.' Each fetch is to a DIFFERENT mint URL, so parallelism here is across mints, not within a single mint — exactly the case Promise.all is for. The comment makes no such claim and the code structure suggests it's incidental. Marked UNVERIFIED because no log-doctor trace; structural evidence alone supports Medium severity per dim-7 heuristics (dim-7 rule: 'speculation without numbers is dropped in Phase B' — but the pattern itself is named in the heuristics list, so it survives Phase B).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Boy-scout: mintInfoMap loader switched from sequential await to Promise.allSettled with cancellation guard. O(K) waterfall → O(1) wall-time. Fallback to mint.mintInfo on rejection preserved."
     },
     {
       "id": "F-005",
@@ -239,7 +245,9 @@
         "skill:neverthrow-return-types"
       ],
       "verification_note": "Re-read lines 549-576 (prepare retry), 1011-1031 (hop prepare retry), 501-504 (probe-recap path also reissues), and swapTransactionsStore.ts:174-198 (tagMintQuote). Confirmed the overwrite semantics. Counter-argument considered: 'mint quotes are cheap and expire on their own; no need to cancel.' True for protocol liveness but wrong for defensive operational posture — a rebalance that fails noisily on a retry storm is worse than one that fails quickly.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Orphaned mint quote ids are now logged via appendDebug 'mint_quote_orphaned' on each retry path so the leak is observable to log-doctor's coco view. Underlying retry-and-reduce strategy unchanged — converging via probe is a separate slice."
     },
     {
       "id": "F-011",
@@ -282,7 +290,8 @@
       ],
       "verification_note": "Re-read lines 262-293 (function) and 1079 + 1179 (call sites). Confirmed the chain-path caller at 1079 ignores the boolean return. Counter-argument considered: 'swallowing errors is defensive — we don't want a transient mint ping to abort the whole rebalance.' Right for not aborting; wrong for silencing. The finding is about the silence, not the non-abort.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "waitForBalanceIncrease's getBalances no longer swallows. Transient fetch failures emit cashuLog.warn 'mint.rebalance.balance_fetch_failed' so they're distinguishable from a real timeout."
     },
     {
       "id": "F-013",
