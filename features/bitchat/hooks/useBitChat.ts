@@ -333,12 +333,16 @@ export function useBitChat(
 
         case 'ble-dm': {
           if (!dmPeerID) return;
-          // Noise-encrypted DM — also no own-echo, add locally.
+          // Noise-encrypted DM — also no own-echo, add locally. Use an
+          // empty senderPubkey (matching the ble public path) so the shared
+          // `useMessageGrouping` doesn't conflate own + peer runs — both
+          // sides used `dmPeerID` previously, which dropped the peer's
+          // first-in-group avatar/name at every side switch.
           const ownMsg: ChatMessage = {
             id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
-            senderPubkey: dmPeerID,
+            senderPubkey: '',
             timestamp: Date.now(),
             isPrivate: true,
             isOwn: true,
@@ -369,12 +373,13 @@ export function useBitChat(
         case 'nostr-dm': {
           if (!dmPeerID) return;
           // NIP-17 gift-wrap DMs don't echo back to the sender via the
-          // subscription, so add locally.
+          // subscription, so add locally. Empty senderPubkey for the same
+          // grouping reason as 'ble-dm' above.
           const ownMsg: ChatMessage = {
             id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
-            senderPubkey: dmPeerID,
+            senderPubkey: '',
             timestamp: Date.now(),
             isPrivate: true,
             isOwn: true,
