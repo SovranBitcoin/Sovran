@@ -10,7 +10,6 @@ wda.log
 .screenshots/
 tests/
 .test-drafts/
-scripts/test-dsl/
 scripts/start-wda.sh
 scripts/dev.sh
 docs/device-automation.md
