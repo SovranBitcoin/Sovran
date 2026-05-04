@@ -135,7 +135,9 @@
         "knip:unused-export"
       ],
       "verification_note": "Cross-checked knip output against grep for each symbol; no external importers. Some props interfaces are exported reflexively as a styling convention — downgrade to Nit rather than Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Un-exported the audit-cited prop interfaces in shared/ui (Screen, ScreenFooterContext, ScreenHeaderAction, ActionMenuButton, AmountEntryView, RowStatsAccent, ScrollEdgeFade, SectionAnchorList, ContactRow incl. NostrProfileLike/MintStatFields/StatKey/ContactRowProps), shared/hooks/useLocalAmountEntry, features/splitBill/components/ParticipantRow, features/send/screens/AmountSelector. Knip unused-exported-types: 88 -> 61."
     },
     {
       "id": "F-005",

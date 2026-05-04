@@ -287,8 +287,8 @@
       ],
       "verification_note": "Cross-checked each knip-flagged export by reading the cited file. The `*Props` interfaces are inlined as `function Component({...}: Props)` — but `Props` is the local positional type, never the exported interface. Counter-argument considered: external consumers might import the interfaces. Grepped — no external imports.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Theme + wallpaper-helper unused exports closed: BUILTIN_BASICS_TOPIC, BUILTIN_COLOR_THEMES, BuiltinColorTheme, SyntheticAlbumMeta, UnitPreviewCardProps, WallpaperThumbnailProps, AlbumGroup, ColorToken un-exported; WALLPAPER_DIR + ensureWallpaperDir un-exported and getDownloadedSize deleted (was unused). isBundledTheme + computeSyncPlan/syncAlbum/downloadAlbum/deleteAlbum from the original audit list are no longer in knip output (already cleaned in prior slices)."
+      "completion_status": "complete",
+      "completion_note": "Closing partial: shared/stores/global/wallpaperStore.ts DownloadedWallpaper + AlbumMeta un-exported. None of the originally-cited symbols remain in knip output."
     },
     {
       "id": "F-011",

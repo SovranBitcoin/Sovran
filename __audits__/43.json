@@ -396,7 +396,9 @@
         "knip:unused-export"
       ],
       "verification_note": "Knip output verified by re-running `npm run knip`; both names appear in the unused-exports list.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Verified against current tree: QuoteIdToSplitBillIndex (line 96) and SplitBillStore (line 150) are already declared without 'export'. Already fixed before this session."
     }
   ],
   "dimensions": {
