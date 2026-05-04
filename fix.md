@@ -25,6 +25,76 @@ diffs. Defers to `audit.md` for stack details, ground rules, and dimension
 definitions. Fast, terse, decisive — but stops and asks the user when the
 scope changes mid-flight.
 
+A good slice ends with **fewer lines, fewer abstractions, and one
+canonical way to do each thing**. Net-negative diffs are the default, not
+the exception. Skill and research files are inputs, not edit targets;
+audit files are inputs too, except for the `completion_status`
+annotation in Phase 6.
+
+## 1a. Mission for `coco-payment-ux/`
+
+`coco-payment-ux/` is the **first-party, UI-agnostic engine for complex
+coco payment flows** — the single home for every multi-step payment
+interaction (state transitions, side effects, async coordination, error
+recovery, retries). Consumers define their UI; the package wires it
+together. `sovran-app/` is the **first** consumer, not the only one —
+the design payoff is that other projects can drop in their own UI layer
+and inherit our payment flows for free.
+
+Do **not** confuse `coco-payment-ux/` with the external `coco/` library.
+The external `coco/` is read-only reference; `coco-payment-ux/` is ours
+and fully editable.
+
+The package is loosely inspired by state machines but is not a finished
+state-machine implementation, and large portions are stubbed, half-wired,
+or missing transitions. Two cross-cutting patterns are first-class slice
+targets and **always in scope**, even when the slice is named elsewhere:
+
+- **Bypass:** an ad-hoc coco payment flow that lives in `sovran-app/` and
+  doesn't route through `coco-payment-ux/`. Default verdict: bug. Either
+  migrate the flow into the package, or, if the package isn't ready, flag
+  the gap as follow-up — never entrench the bypass.
+- **Leak:** `coco-payment-ux/` imports a sovran component, sovran nav
+  primitive, sovran theme token, or sovran-only data shape across its
+  public API. Default verdict: bug. Either abstract the dependency to a
+  consumer-supplied prop/adapter or flag the leak as follow-up.
+
+Inside `coco-payment-ux/`, prefer names that are UI-agnostic over names
+borrowed from `sovran-app/`'s component vocabulary. Rename drift inside
+the package is a target, not a constraint — the package being ours
+means it's editable.
+
+## 1b. Guiding principles
+
+These hold across every slice. They're not negotiable and not obvious
+from "fix the audit findings" alone.
+
+1. **Refactor toward intent, not behavior.** When code's intent is clear
+   but the implementation is buggy, half-finished, or wrong, fix it —
+   don't preserve the bug just because it's the current behavior.
+   Optimistic-update flows are a recurring offender: verify they actually
+   roll back on failure, dedupe correctly, and reconcile against the
+   server-truth event before declaring "done". Inside `coco-payment-ux/`,
+   bypass is intent-vs-behavior failure on the consumer side; sovran-leak
+   is the same on the package side. Both are bugs to fix, not shapes to
+   preserve.
+2. **Question library usage.** If we're using a dependency against its
+   grain or reinventing what it already provides (zod, neverthrow,
+   Reanimated, Zustand, NDK, coco, cashu-ts), switch to the intended API.
+   Custom rolled state machines, hand-written promise pools, hand-written
+   debouncers, hand-written persistence migrators — all candidates for
+   "use the library that exists."
+3. **Ubiquitous language.** Names in our code match the vocabulary of
+   `coco/`, `cashu-ts/`, the protocol specs (`nuts/`, `nips/`, `luds/`),
+   and `../sovran-schemas/`. Parallel terms invented in-house are rename
+   targets. This applies inside `coco-payment-ux/` too — don't let the
+   package name imply the code is third-party.
+4. **Consolidate look-alikes.** When two components, helpers, or hooks
+   differ only for historical vibe-coded reasons or in ways the user
+   can't perceive, merge them. When the difference is intentional and
+   load-bearing, leave them. Use judgment; context usually makes the
+   call obvious.
+
 ## 2. Inheritance from audit.md
 
 This prompt **inherits** from `audit.md`:
@@ -128,11 +198,15 @@ audit_files_to_commit() {
 }
 audit_files_to_commit
 
-# 4.8  Compact structural-health (the score we want to drive to 100)
-bun run scripts/analyze-structure.mjs --llm | head -180
+# 4.8  Compact structural-health (the score we want to drive to 100).
+#      Run for BOTH packages — sovran-app and coco-payment-ux — so the
+#      slice can be picked from whichever has the lower-scoring dimensions.
+bun run scripts/analyze-structure.mjs --llm | head -180                   # sovran-app
+bun run scripts/analyze-structure.mjs coco-payment-ux --llm | head -180   # coco-payment-ux
 
 # 4.9  Lowest-scoring sub-dimensions (these are highest-leverage fixes)
 bun run scripts/analyze-structure.mjs --llm | sed -n '/^Overall:/,/^# Repo/p'
+bun run scripts/analyze-structure.mjs coco-payment-ux --llm | sed -n '/^Overall:/,/^# Repo/p'
 
 # 4.10 Skill index + topic search
 for d in .agents/skills/*/; do n=$(basename "$d"); desc=$(awk -F': ' '/^description:/{sub(/^[[:space:]]+/,"",$2); print $2; exit}' "$d/SKILL.md" 2>/dev/null); echo "$n :: $desc"; done
@@ -181,8 +255,17 @@ Apply `skill:zoom-out` first — the open-findings list is the broadest
 frame; the slice must come from clustering, not from latching onto the
 first finding read.
 
-Run §4.1, §4.2, §4.3, §4.5, §4.9. Build a flat list of open findings
-(untagged / partial / deferred). Group by:
+**Audits are signals, not specs.** The latest audit is typically days
+to weeks old. Some findings are stale (already fixed). Many similar
+issues elsewhere were never cited because the auditor wasn't looking at
+those files. For every finding that survives Phase 3 re-verification,
+**name the underlying pattern in one sentence and grep the whole repo
+for its footprint** — both `sovran-app/` and `coco-payment-ux/`. The
+slice fixes the pattern, not just the call sites the auditor happened
+to cite.
+
+Run §4.1, §4.2, §4.3, §4.5, §4.8, §4.9. Build a flat list of open
+findings (untagged / partial / deferred). Group by:
 
 - **path slice** (depth-2) — same architectural area
 - **dimension** — same skill applies
@@ -190,7 +273,18 @@ Run §4.1, §4.2, §4.3, §4.5, §4.9. Build a flat list of open findings
 - **shared root cause** — multiple findings explained by one underlying
   issue (e.g. five `useShallow` misses → one selector-hygiene slice)
 - **structural-health bucket** — findings that move the same
-  `analyze-structure` sub-dimension toward 100
+  `analyze-structure` sub-dimension toward 100, in either
+  `sovran-app/` or `coco-payment-ux/`
+- **partial findings with unfinished `coco-payment-ux/` side** — a
+  finding marked `partial` because one half landed in `sovran-app/`
+  and the `coco-payment-ux/` half wasn't done. These are high-leverage
+  and explicitly in-scope; check the audit's `completion_note` for
+  what's left.
+
+Run §4.11 and §4.12 (bypass + leak hunts) every Phase 1, regardless of
+the slice you're forming. If either grep returns hits that overlap the
+candidate slice, fold them in — bypass and leak are first-class
+patterns per §1a, not specialty cases.
 
 ### Phase 2 — Pick a slice
 
@@ -203,17 +297,25 @@ A slice is a related cluster that:
 
 - Shares **one architectural seam** (use `improve-codebase-architecture`
   vocabulary).
-- Fits **one PR** — ≈≤20 files, ≈≤500 logic lines net change.
+- Fits **one PR** — ≈≤20 files, ≈≤500 logic lines net change. **Bias
+  toward bundling more rather than less** when the unifying pattern is
+  the same: ten files all fixing the same selector-hygiene bug is a
+  good slice; ten unrelated nits across ten files is not. The cap is
+  on incoherent sprawl, not on related work.
 - **Favours deletion**: collapsing duplicates, removing dead code, aligning
   vocabulary with `../sovran-schemas` / `../coco` / `../cashu-ts` /
   `../nuts` / `../nips`.
 - Targets the **highest-leverage** open pattern: most LOC removed, most
   inconsistency consolidated, most follow-up unblocked, OR the lowest
-  score in `analyze-structure --llm`.
+  score in `analyze-structure --llm` for either package.
+- **Prefers patterns that close out partial findings** where the audit's
+  `completion_note` flags an unfinished `coco-payment-ux/` side, a
+  remaining call site, or a follow-up the previous slice deferred. These
+  give measurable closure for the same slice budget.
 
 If the cluster spans the `sovran-app/` ↔ `coco-payment-ux/` seam, follow it
-across the boundary — those bypass / leak patterns from `audit.md` §5 are
-first-class slice targets.
+across the boundary — those bypass / leak patterns from §1a are
+first-class slice targets, not specialty cases.
 
 If the highest-leverage slice would require building out missing machinery
 in `coco-payment-ux/`, prefer flagging the gap as follow-up over
@@ -322,12 +424,34 @@ Conventions (non-negotiable):
   `.cursor/rules/folder-structure.mdc`.
 - No `Co-Authored-By:` lines on commits.
 
+Apply §1b principles in passing:
+
+- **Refactor toward intent.** If a finding's neighborhood contains a
+  buggy optimistic-update path (no rollback, no dedupe, no reconciliation
+  against server-truth), an unhandled `Result.err`, a half-wired state
+  transition, or any other "implementation diverges from clear intent"
+  bug, fix it as part of this slice. Don't preserve the bug just because
+  it isn't the audit-cited line. Note the in-passing fix in the commit
+  body with `Also: <one line>` so reviewers see it.
+- **Question library usage.** When the slice touches code that reinvents
+  what `zod`, `neverthrow`, `Reanimated`, `Zustand`, NDK, `coco`, or
+  `cashu-ts` already provides, switch to the library API. Hand-written
+  promise pools, custom debouncers, custom state machines, custom
+  persistence migrators are all candidates.
+- **Ubiquitous language.** Rename in-house parallel terms to match the
+  vocabulary of the dependency they wrap (`coco/`, `cashu-ts/`,
+  `nuts/`, `nips/`, `luds/`, `../sovran-schemas/`). Inside
+  `coco-payment-ux/`, rename sovran-borrowed names to UI-agnostic
+  vocabulary.
+
 Stop and ask the user when:
 
 - A bundled fix needs a persist migration not in the brief.
 - A test fails for an unexpected reason that requires new scope.
 - The slice reveals a Critical/High not in `__audits__/` — file a new
   audit via `audit.md` rather than bundling mid-flight.
+- An in-passing fix opens a new pattern that would itself be a slice.
+  File it as follow-up rather than expanding mid-flight.
 
 ### Phase 6 — Annotate audit statuses + commit
 
@@ -484,9 +608,14 @@ SHAs: <feature-sha>, <audit-status-sha>.
    (see §5 Phase 6 + §4.7a). Run the §5 Phase 6 step-3 diff: every file
    in `audit_files_to_commit` must appear in `git show --name-only HEAD`.
    A non-empty diff between those two lists blocks the slice.
-10. The two named cross-cutting patterns ("bypasses `coco-payment-ux/`",
-    "leaks sovran-app assumptions") were considered when choosing the
-    slice — even if not picked, the plan says why.
+10. The two named cross-cutting patterns from §1a ("bypasses
+    `coco-payment-ux/`", "leaks sovran-app assumptions") were searched
+    via §4.11 even if the slice is named elsewhere; if hits exist, the
+    plan says whether they were folded in or deferred and why.
+10a. The §1b principles were applied: any in-passing intent-vs-behavior
+    bugs in the slice's neighborhood are fixed (with an `Also:` line in
+    the commit body), library-against-its-grain usage is migrated when
+    obvious, and rename drift inside the touched files is closed.
 11. Schemas added or changed live in `../sovran-schemas/src` unless
     app-only was explicitly justified in the plan.
 12. Final summary cites both commit SHAs.
