@@ -68,6 +68,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog, Log, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { LightningAddress } from '@sovranbitcoin/schemas';
 
 const PERF_SURFACE = 'nostr-dm' as const;
 
@@ -495,7 +496,12 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
 
   const displayName = resolveIdentityName({ pubkey, nostrProfile: counterpartyMetadata });
   const userPicture = counterpartyMetadata?.picture;
-  const lud16 = counterpartyMetadata?.lud16;
+  // lud16 is relay-supplied kind:0 metadata — validate the `name@host` shape
+  // before plumbing it into router params / coco-payment-ux. A malformed
+  // value should hide the Send Money affordance, not surface as a confusing
+  // error inside LNURL resolution.
+  const rawLud16 = counterpartyMetadata?.lud16;
+  const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
   const myProfile = useProfileDisplay(nostrKeys?.pubkey || '');
   const myName = myProfile.displayName;
   const shouldShowAvatarLoading = isMetadataLoading && !counterpartyMetadata;

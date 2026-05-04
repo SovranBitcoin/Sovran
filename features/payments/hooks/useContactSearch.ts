@@ -3,6 +3,7 @@ import { searchUsers as apiSearchUsers, type UserProfile } from '@/shared/lib/ap
 import { paymentLog } from '@/shared/lib/logger';
 import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStore';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
+import { Hex64 } from '@sovranbitcoin/schemas';
 
 export interface SearchResultData {
   pubkey: string;
@@ -83,13 +84,11 @@ export function useContactSearch(searchQuery: string) {
               if (res.profileEvent) {
                 try {
                   const parsed: unknown = JSON.parse(res.profileEvent);
-                  if (
-                    parsed !== null &&
-                    typeof parsed === 'object' &&
-                    'pubkey' in parsed &&
-                    typeof parsed.pubkey === 'string'
-                  ) {
-                    profileEventPubkey = parsed.pubkey;
+                  if (parsed !== null && typeof parsed === 'object' && 'pubkey' in parsed) {
+                    const validated = Hex64.safeParse(parsed.pubkey);
+                    if (validated.success) {
+                      profileEventPubkey = validated.data;
+                    }
                   }
                 } catch {
                   // Invalid profileEvent JSON

@@ -16,19 +16,36 @@ const ROUTSTR_TIMEOUT_MS = 30_000;
  * Minimal shape of an OpenAI-compatible chat completion stream chunk —
  * captures the fields useAiSend.ts actually reads (`choices[0].delta.*`).
  * Defining locally avoids shipping the full `openai` SDK in production.
+ *
+ * Validated at the SSE-chunk boundary by `ChatCompletionChunkSpine` below
+ * so a malformed line warns-and-skips rather than crashing the stream.
  */
-export interface ChatCompletionChunk {
-  choices?: {
-    delta?: {
-      content?: string | null;
-      reasoning_content?: string | null;
-      reasoning?: string | null;
-      message?: { content?: string | null };
-      text?: string | null;
-    };
-    finish_reason?: string | null;
-  }[];
-}
+const ChatCompletionDeltaSpine = z
+  .object({
+    content: z.string().nullish(),
+    reasoning_content: z.string().nullish(),
+    reasoning: z.string().nullish(),
+    message: z.object({ content: z.string().nullish() }).passthrough().nullish(),
+    text: z.string().nullish(),
+  })
+  .passthrough();
+
+const ChatCompletionChunkSpine = z
+  .object({
+    choices: z
+      .array(
+        z
+          .object({
+            delta: ChatCompletionDeltaSpine.optional(),
+            finish_reason: z.string().nullish(),
+          })
+          .passthrough()
+      )
+      .optional(),
+  })
+  .passthrough();
+
+export type ChatCompletionChunk = z.infer<typeof ChatCompletionChunkSpine>;
 
 /**
  * Spine validators for the JSON envelopes routstr returns. Like
@@ -437,12 +454,22 @@ function tryParseSSELine(line: string): ChatCompletionChunk | 'done' | null {
   const data = trimmed.slice(6).trim();
   if (data === '[DONE]') return 'done';
   if (!data) return null;
+  let raw: unknown;
   try {
-    return JSON.parse(data) as ChatCompletionChunk;
+    raw = JSON.parse(data);
   } catch {
     apiLog.warn('routstr.sse.parse_failed', { preview: data.substring(0, 100) });
     return null;
   }
+  const validated = ChatCompletionChunkSpine.safeParse(raw);
+  if (!validated.success) {
+    apiLog.warn('routstr.sse.invalid_shape', {
+      issues: validated.error.issues.length,
+      preview: data.substring(0, 100),
+    });
+    return null;
+  }
+  return validated.data;
 }
 
 async function* parseSSEFromReadableStream(
