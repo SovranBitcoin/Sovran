@@ -186,8 +186,8 @@
       ],
       "verification_note": "Confirmed via `grep '#3B82F6\\|#1a1a1a\\|#fff\\|rgba(255,255,255'`: 18 hex/rgba literals across 3 theme files. Counter-argument considered: gradient fallbacks at e.g. UnitPreviewCard:79-81 use `palette['800'] || '#1a1a1a'` — the literal is a fallback when the palette is missing. Verdict: the fallback is reachable at render time when the theme name doesn't exist in THEMES (e.g. for un-downloaded wallpapers); a token-based fallback (`useThemeColor('background')`) is theme-aware and still safe.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the brand-hex slice; theme-flow files mix literals with palette[<shade>] || '#xxxxxx' fallback chains and need a dedicated refactor that decides palette-fallback semantics."
+      "completion_status": "complete",
+      "completion_note": "Theme picker selection borders now read foreground via useThemeColor (UnitPreviewCard, WallpaperThumbnail); GalleryScreen author/follower tints switched to STAT_COLOR_SOCIAL + STAT_ICONS.followers from RowStatsAccent."
     },
     {
       "id": "F-006",
