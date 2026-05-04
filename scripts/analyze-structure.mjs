@@ -122,6 +122,7 @@ const showReexportDepth = !args.includes('--no-reexport-depth');
 const showDupExports = !args.includes('--no-dup-exports');
 const showUnusedExports = !args.includes('--no-unused-exports');
 const showTestColocation = !args.includes('--no-test-colocation');
+const showScore = !args.includes('--no-score');
 
 // New opt-in reports
 const showLeakage = args.includes('--leakage');
@@ -224,6 +225,7 @@ const allFlags = new Set([
   '--no-dup-exports',
   '--no-unused-exports',
   '--no-test-colocation',
+  '--no-score',
   '--leakage',
   '--vocab-drift',
   '--reach',
@@ -273,6 +275,7 @@ const anyAnalysis =
   showDupExports ||
   showUnusedExports ||
   showTestColocation ||
+  showScore ||
   showLeakage ||
   showVocabDrift ||
   showReach ||
@@ -2748,6 +2751,17 @@ function renderLlm(allFiles, dep, totals, historyResult) {
   const { faninMap, fanoutMap, edges, fileToFolder, importedNamesByTarget } = dep;
   const out = [];
 
+  const scores = computeScores(allFiles, dep, totals);
+  if (scores) {
+    out.push(`# Structural Health Score`);
+    out.push('');
+    out.push(`Overall: **${scores.overall}/100**`);
+    for (const cat of scores.categories) {
+      out.push(`- ${cat.name}: ${cat.score}/100 (weight ${cat.weight})`);
+    }
+    out.push('');
+  }
+
   const cycles = detectCycles(edges);
   const orphans = allFiles.filter((f) => !faninMap.has(f.fullPath));
   const shallow = computeShallow(allFiles);
@@ -2921,6 +2935,276 @@ function renderLlm(allFiles, dep, totals, historyResult) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// STRUCTURAL HEALTH SCORE
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Lighthouse-style scoring. Each category starts at 100 and loses points for
+// issues, with most deductions normalized per-100-files so big and small repos
+// can be compared. Tuning the constants below changes how punitive each metric
+// is — the *trends* between runs matter more than the absolute numbers.
+
+function clampDed(n, max) {
+  return Math.max(0, Math.min(max, n));
+}
+
+function computeScores(allFiles, dep, totals) {
+  if (!dep || totals.files === 0) return null;
+  const { faninMap, fanoutMap, edges, importedNamesByTarget } = dep;
+  const fc = totals.files;
+  const per100 = (n) => (n / fc) * 100;
+  const cats = [];
+
+  // ─── Architecture ──────────────────────────────────────────────────────
+  {
+    const cycles = detectCycles(edges);
+    const hub = computeHubSpoke(allFiles, faninMap, fanoutMap);
+    const archV = showArchitecture ? computeArchitectureViolations(edges) || [] : null;
+    const breakdown = [];
+    let d = 0;
+
+    const cyD = clampDed(cycles.length * 15, 60);
+    breakdown.push({ metric: 'circular dependencies', value: cycles.length, deduction: cyD });
+    d += cyD;
+
+    const hubD = clampDed(per100(hub.length) * 8, 30);
+    breakdown.push({ metric: 'hub-spoke god modules', value: hub.length, deduction: hubD });
+    d += hubD;
+
+    if (archV !== null) {
+      const aD = clampDed(archV.length * 3, 50);
+      breakdown.push({ metric: 'architecture rule violations', value: archV.length, deduction: aD });
+      d += aD;
+    }
+
+    cats.push({ name: 'Architecture', weight: 20, score: Math.round(clampDed(100 - d, 100)), breakdown });
+  }
+
+  // ─── Module Design ─────────────────────────────────────────────────────
+  {
+    const shallow = computeShallow(allFiles);
+    const pt = computePassThrough(allFiles, faninMap, fanoutMap);
+    const rxDeep = computeReexportDepth(allFiles, edges).filter((r) => r.depth >= 2);
+    const breakdown = [];
+    let d = 0;
+
+    const sD = clampDed(per100(shallow.length) * 4, 50);
+    breakdown.push({ metric: 'shallow modules', value: shallow.length, deduction: sD });
+    d += sD;
+
+    const ptD = clampDed(per100(pt.length) * 6, 40);
+    breakdown.push({ metric: 'pass-through suspects', value: pt.length, deduction: ptD });
+    d += ptD;
+
+    const rxD = clampDed(per100(rxDeep.length) * 5, 30);
+    breakdown.push({ metric: 're-export depth ≥2 (barrel hops)', value: rxDeep.length, deduction: rxD });
+    d += rxD;
+
+    cats.push({ name: 'Module Design', weight: 15, score: Math.round(clampDed(100 - d, 100)), breakdown });
+  }
+
+  // ─── Code Complexity ───────────────────────────────────────────────────
+  {
+    const cx = computeComplexityHotspots(allFiles);
+    // Severity: 5 pts if cog ≥ 3× threshold, 3 pts if ≥ 2×, 1 pt otherwise.
+    const severity = cx.reduce((s, r) => {
+      const x = r.cognitive / complexityThreshold;
+      return s + (x >= 3 ? 5 : x >= 2 ? 3 : 1);
+    }, 0);
+    const d = clampDed((severity / fc) * 100 * 0.8, 60);
+    cats.push({
+      name: 'Code Complexity',
+      weight: 15,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown: [{
+        metric: `complexity hotspots (cognitive ≥ ${complexityThreshold})`,
+        value: cx.length,
+        deduction: d,
+        detail: `weighted severity: ${severity}`,
+      }],
+    });
+  }
+
+  // ─── Type Safety ───────────────────────────────────────────────────────
+  {
+    const ts = computeTypesafety(allFiles);
+    const total = ts.reduce((s, r) => s + r.score, 0);
+    const perKLoc = totals.code > 0 ? (total / totals.code) * 1000 : 0;
+    const d = clampDed(perKLoc * 1.5, 70);
+    cats.push({
+      name: 'Type Safety',
+      weight: 10,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown: [{
+        metric: 'type-safety smells (any / ! / as / @ts-*)',
+        value: total,
+        deduction: d,
+        detail: `${perKLoc.toFixed(1)} weighted smells per kLOC`,
+      }],
+    });
+  }
+
+  // ─── Component Health (only if any React components exist) ─────────────
+  let totalComps = 0;
+  for (const f of allFiles) totalComps += (f.metrics?.react?.components || []).length;
+  if (totalComps > 0) {
+    const smells = computeComponentSmells(allFiles);
+    const rate = (smells.length / totalComps) * 100;
+    const d = clampDed(rate * 0.8, 70);
+    cats.push({
+      name: 'Component Health',
+      weight: 10,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown: [{
+        metric: 'flagged components',
+        value: smells.length,
+        deduction: d,
+        detail: `${rate.toFixed(1)}% of ${totalComps} components`,
+      }],
+    });
+  }
+
+  // ─── Hygiene ───────────────────────────────────────────────────────────
+  {
+    const importedPaths = new Set(faninMap.keys());
+    const orphans = allFiles.filter((f) => {
+      if (importedPaths.has(f.fullPath)) return false;
+      const rel = relative(targetDir, f.fullPath);
+      if (/^app[/\\]/.test(rel)) return false;
+      if (isLikelyBarrelFile(f)) return false;
+      if (isLikelyCompatibilitySurface(f)) return false;
+      return true;
+    });
+    const unused = computeUnusedExports(allFiles, importedNamesByTarget);
+    const dup = computeDupExports(allFiles);
+    const breakdown = [];
+    let d = 0;
+
+    const oD = clampDed(per100(orphans.length) * 5, 40);
+    breakdown.push({ metric: 'dead orphan files', value: orphans.length, deduction: oD });
+    d += oD;
+
+    const uD = clampDed(per100(unused.length) * 4, 30);
+    breakdown.push({ metric: 'files with unused exports', value: unused.length, deduction: uD });
+    d += uD;
+
+    const dpD = clampDed(per100(dup.dupRows.length) * 6, 25);
+    breakdown.push({ metric: 'duplicate export names', value: dup.dupRows.length, deduction: dpD });
+    d += dpD;
+
+    const cD = clampDed(dup.defaultPlusNamed.length * 5, 20);
+    breakdown.push({ metric: 'default+named clashes', value: dup.defaultPlusNamed.length, deduction: cD });
+    d += cD;
+
+    cats.push({ name: 'Hygiene', weight: 15, score: Math.round(clampDed(100 - d, 100)), breakdown });
+  }
+
+  // ─── Testability ───────────────────────────────────────────────────────
+  const testable = allFiles.filter((f) => {
+    const rel = relative(targetDir, f.fullPath);
+    if (/\.(d\.ts|test|spec)\./.test(f.name)) return false;
+    if (/^app[/\\]/.test(rel)) return false;
+    if (isLikelyBarrelFile(f)) return false;
+    if (rel.includes('__tests__/')) return false;
+    if ((f.exports || []).length === 0) return false;
+    return true;
+  }).length;
+  if (testable > 0) {
+    const gaps = computeTestColocation(allFiles).length;
+    const covered = testable - gaps;
+    const coverage = (covered / testable) * 100;
+    cats.push({
+      name: 'Testability',
+      weight: 10,
+      score: Math.round(clampDed(coverage, 100)),
+      breakdown: [{
+        metric: 'colocated test coverage',
+        value: covered,
+        deduction: Math.round(100 - coverage),
+        detail: `${covered}/${testable} testable files have a colocated test`,
+      }],
+    });
+  }
+
+  // ─── Conceptual Cohesion (only when those flags are on) ────────────────
+  if (showLeakage || showVocabDrift || showConcept) {
+    const breakdown = [];
+    let d = 0;
+    if (showLeakage) {
+      const cl = computeLeakage(allFiles);
+      const cD = clampDed(cl.length * 5, 40);
+      breakdown.push({ metric: 'information-leakage clusters', value: cl.length, deduction: cD });
+      d += cD;
+    }
+    if (showVocabDrift) {
+      const drift = computeVocabDrift(allFiles);
+      const dD = clampDed(drift.length * 1, 30);
+      breakdown.push({ metric: 'drifting vocabulary terms', value: drift.length, deduction: dD });
+      d += dD;
+    }
+    if (showConcept) {
+      const concept = computeConcept(allFiles) || [];
+      const spread = concept.filter((c) => c.folders >= 5).length;
+      const sD = clampDed(spread * 4, 30);
+      breakdown.push({ metric: 'high-spread concepts (≥5 folders)', value: spread, deduction: sD });
+      d += sD;
+    }
+    if (breakdown.length > 0) {
+      cats.push({ name: 'Conceptual Cohesion', weight: 5, score: Math.round(clampDed(100 - d, 100)), breakdown });
+    }
+  }
+
+  const totalWeight = cats.reduce((s, c) => s + c.weight, 0);
+  const overall = Math.round(cats.reduce((s, c) => s + c.score * c.weight, 0) / totalWeight);
+  return { overall, categories: cats, totalWeight };
+}
+
+function scoreColor(score) {
+  if (score >= 90) return '\x1b[32m'; // green
+  if (score >= 50) return '\x1b[33m'; // yellow
+  return '\x1b[31m';                  // red
+}
+
+function scoreBar(score, width = 30) {
+  const filled = Math.round((score / 100) * width);
+  return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+function renderScores(scores) {
+  if (!scores) return [];
+  const lines = [];
+  lines.push('');
+  lines.push('\x1b[1;36m══ Structural Health Score ══\x1b[0m');
+  lines.push(
+    `\x1b[2mEach category starts at 100; issues deduct points (most metrics normalized per 100 files). Weights sum to ${scores.totalWeight}. Track the trend, not the absolute.\x1b[0m`
+  );
+  lines.push('');
+
+  const oc = scoreColor(scores.overall);
+  lines.push(
+    `  \x1b[1mOverall\x1b[0m              ${oc}${String(scores.overall).padStart(3)}/100\x1b[0m  ${oc}${scoreBar(scores.overall, 40)}\x1b[0m`
+  );
+  lines.push('');
+
+  for (const cat of scores.categories) {
+    const c = scoreColor(cat.score);
+    const name = cat.name.padEnd(20);
+    lines.push(
+      `  \x1b[1m${name}\x1b[0m ${c}${String(cat.score).padStart(3)}/100\x1b[0m  ${c}${scoreBar(cat.score, 30)}\x1b[0m  \x1b[2m(weight ${cat.weight})\x1b[0m`
+    );
+    for (const b of cat.breakdown) {
+      const dRaw = typeof b.deduction === 'number' ? b.deduction : 0;
+      const dStr = dRaw > 0 ? `-${dRaw < 1 ? dRaw.toFixed(1) : Math.round(dRaw)}` : '0';
+      const padded = dStr.padStart(5);
+      const colored = dRaw > 0 ? `\x1b[33m${padded}\x1b[0m` : `\x1b[2m${padded}\x1b[0m`;
+      const detail = b.detail ? ` \x1b[2m— ${b.detail}\x1b[0m` : '';
+      lines.push(`    ${colored}  ${b.metric.padEnd(40)} value: ${b.value}${detail}`);
+    }
+    lines.push('');
+  }
+  return lines;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -3014,6 +3298,7 @@ if (showJson) {
     if (showUnusedExports)
       jsonOutput.unusedExports = computeUnusedExports(allFiles, importedNamesByTarget);
     if (showTestColocation) jsonOutput.testColocation = computeTestColocation(allFiles);
+    if (showScore) jsonOutput.score = computeScores(allFiles, dep, totals);
     if (showLeakage) jsonOutput.leakage = computeLeakage(allFiles);
     if (showConcept) jsonOutput.concept = computeConcept(allFiles);
     if (showVocabDrift) jsonOutput.vocabDrift = computeVocabDrift(allFiles);
@@ -3099,5 +3384,6 @@ if (showJson) {
       const lines = Array.isArray(r) ? r : r.lines;
       console.log(lines.join('\n'));
     }
+    if (showScore) console.log(renderScores(computeScores(allFiles, dep, totals)).join('\n'));
   }
 }
