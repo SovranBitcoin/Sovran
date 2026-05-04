@@ -87,7 +87,9 @@
         "skill:neverthrow-return-types"
       ],
       "verification_note": "Confirmed by reading MintService.ts L44-85 and L165-171 in the upstream coco checkout. Counter-argument: perhaps `setMintTrusted` on a missing row is a no-op and `ensureUpdatedMint` then re-applies trust correctly; checking coco-core wording shows no such reconciliation.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useMintManagement.addMint deleted entirely (deletion test: zero callers ever destructured it). Sovran-app's canonical trust-and-add path is now manager.mint.addMint(url, {trusted:true}) at every call site (MintAddScreen, MintRebalancePlanScreen x2, CocoProvider, migration). The buggy trustMint(url)-on-not-yet-exists branch is no longer reachable from sovran-app — coco-payment-ux/screen-actions still calls ops.trustMint after buildMintReviewInfo where the mint is guaranteed to exist (legitimate)."
     },
     {
       "id": "F-003",
@@ -208,7 +210,9 @@
         "skill:security-review"
       ],
       "verification_note": "Confirmed by reading coco's utils.ts L228-249 which keeps whatever protocol the URL constructor parses. Counter-argument: the Sovran search API currently only returns https URLs — true today, but the check is one-line defence that survives API drift.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "MintAddScreen.handleSave drops the http(s)?:// pass-through fork — every mint URL now flows through normalizeUrlForApi which strips the prefix and re-prepends https://, so http URLs from any future search-backend or deep-link source can't bypass the upgrade."
     },
     {
       "id": "F-009",
