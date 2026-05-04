@@ -209,6 +209,10 @@ export interface DefaultOperationsConfig {
    * failures.
    */
   shouldMockFailPaymentRequest?: () => boolean;
+  /** Dev-only: when true, executeMelt throws after prepare so the cancel-rescue path runs. */
+  shouldMockFailMelt?: () => boolean;
+  /** Dev-only: when true, executeSend throws before prepare. */
+  shouldMockFailSend?: () => boolean;
   /**
    * Per-request timeout for external lightning calls (LNURL pay-params,
    * LNURL invoice callback). Plumbed into `requestInvoiceFromLnurl` so a
@@ -236,23 +240,33 @@ export function createDefaultOperations(
     return mgr;
   }
 
-  // Dev-only kill-switch for the rollback test path. We do not trust
-  // `config.shouldMockFailPaymentRequest` in a release build: a misconfigured
-  // wallet (or a hostile config object passed in via deep link / config
-  // hydration) could otherwise force every send into the rollback branch in
-  // production. Metro and Bun both define `process.env.NODE_ENV`; we treat
-  // anything other than 'production' as dev. `process` is read off
-  // `globalThis` so this compiles in both the React Native (no @types/node)
-  // and Bun build contexts.
-  const mockFailEnabled = (): boolean => {
+  // Dev-only kill-switch for the failure-path tests. We do not trust the
+  // `shouldMockFail*` getters in a release build: a misconfigured wallet (or
+  // a hostile config object passed in via deep link / config hydration) could
+  // otherwise force every send into the failure branch in production. Metro
+  // and Bun both define `process.env.NODE_ENV`; we treat anything other than
+  // 'production' as dev. `process` is read off `globalThis` so this compiles
+  // in both the React Native (no @types/node) and Bun build contexts.
+  const mockFailEnabled = (kind: 'paymentRequest' | 'melt' | 'send'): boolean => {
     const proc = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process;
     if (proc?.env?.NODE_ENV === 'production') return false;
-    return config.shouldMockFailPaymentRequest?.() === true;
+    const getter =
+      kind === 'paymentRequest'
+        ? config.shouldMockFailPaymentRequest
+        : kind === 'melt'
+          ? config.shouldMockFailMelt
+          : config.shouldMockFailSend;
+    return getter?.() === true;
   };
 
   return {
     executeSend: async (mintUrl, amount) => {
       const mgr = requireManager();
+      // send.execute is atomic — there is no rollback to exercise — so the
+      // mock-fail gate runs before prepare to leave no reservation behind.
+      if (mockFailEnabled('send')) {
+        throw new Error('Mock send failure (dev)');
+      }
       logger.info('operations.executeSend.prepare', { mintUrl, amount });
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
       logger.info('operations.executeSend.execute', { operationId: prepared.id });
@@ -598,6 +612,11 @@ export function createDefaultOperations(
       // background reconciliation eventually frees them.
       let result: Awaited<ReturnType<typeof mgr.ops.melt.execute>>;
       try {
+        // Mock-fail gate inside the try so the existing cancel-after-failure
+        // rescue runs — exercising the same path the QA toggle exists to test.
+        if (mockFailEnabled('melt')) {
+          throw new Error('Mock melt failure (dev)');
+        }
         result = await mgr.ops.melt.execute(operation.id);
       } catch (e) {
         logger.warn('operations.executeMelt.executeFailed', {
@@ -737,7 +756,7 @@ export function createDefaultOperations(
           proofs: token.proofs,
         };
         try {
-          if (mockFailEnabled()) {
+          if (mockFailEnabled('paymentRequest')) {
             throw new Error('Mock delivery failure (dev)');
           }
           await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
@@ -770,7 +789,7 @@ export function createDefaultOperations(
         const transaction = await mgr.paymentRequests.prepare(parsed, { mintUrl, amount });
         operationId = transaction.sendOperation.id;
         try {
-          if (mockFailEnabled()) {
+          if (mockFailEnabled('paymentRequest')) {
             throw new Error('Mock delivery failure (dev)');
           }
           await mgr.paymentRequests.execute(transaction);

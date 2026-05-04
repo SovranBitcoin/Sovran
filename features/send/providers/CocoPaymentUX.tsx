@@ -212,6 +212,8 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         // from the local audit / KYM caches populated by `useAuditedMint`.
         enrichMintReviewInfo: getMintEnrichment,
         shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
+        shouldMockFailMelt: () => useSettingsStore.getState().mockFailMelt,
+        shouldMockFailSend: () => useSettingsStore.getState().mockFailSend,
         logger: paymentLog,
       }),
     [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency]

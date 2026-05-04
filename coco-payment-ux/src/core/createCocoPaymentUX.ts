@@ -61,6 +61,10 @@ export interface CocoPaymentUXConfig {
 
   /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
+  /** Dev: when true, executeMelt fails after prepare so the cancel-rescue path runs. */
+  shouldMockFailMelt?: () => boolean;
+  /** Dev: when true, executeSend fails before prepare. */
+  shouldMockFailSend?: () => boolean;
 
   /**
    * Per-request timeout for external lightning calls (LNURL pay-params,
@@ -120,6 +124,8 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
+    shouldMockFailMelt: config.shouldMockFailMelt,
+    shouldMockFailSend: config.shouldMockFailSend,
     lightningTimeoutMs: config.lightningTimeoutMs,
   });
 
