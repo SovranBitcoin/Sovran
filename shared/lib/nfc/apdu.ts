@@ -51,25 +51,35 @@ export async function sendApdu(command: number[], label?: string): Promise<ApduR
       sw,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStr = errorMessage || 'Unknown error';
-    nfcLog.error('nfc.apdu.transceive_failed', { error: errorStr });
-
-    if (errorStr.includes('Tag was lost') || errorStr.includes('TagLost')) {
-      throw new NfcError(
-        'NFC connection lost. Please hold your device steady near the terminal.',
-        'TAG_LOST'
-      );
-    }
-
-    if (errorStr.includes('Transceive failed') || errorStr === '' || errorStr === 'undefined') {
-      throw new NfcError(
-        'NFC communication failed. Please try again and hold steady.',
-        'TRANSCEIVE_FAILED'
-      );
-    }
-
     if (error instanceof NfcError) throw error;
-    throw new NfcError(`APDU communication failed: ${errorStr}`, 'TRANSCEIVE_FAILED');
+    const errorStr = (error instanceof Error ? error.message : String(error)) || 'Unknown error';
+    nfcLog.error('nfc.apdu.transceive_failed', { error: errorStr });
+    throw mapTransceiveError(errorStr);
   }
+}
+
+/**
+ * Map a `react-native-nfc-manager` transceive error message to an NfcError.
+ *
+ * The native module surfaces these failures as plain strings (Android:
+ * `"transceive fail: " + ex` from `NfcManager.java`; iOS: NSError localized
+ * descriptions). There is no error code on the JS side — substring matching
+ * the message is the only available signal. Centralised here so the
+ * upstream-string fragility lives in one named place; if RN-NFC-Manager ever
+ * exposes structured error codes, this is the seam to swap.
+ */
+function mapTransceiveError(message: string): NfcError {
+  if (message.includes('Tag was lost') || message.includes('TagLost')) {
+    return new NfcError(
+      'NFC connection lost. Please hold your device steady near the terminal.',
+      'TAG_LOST'
+    );
+  }
+  if (message.includes('Transceive failed') || message === '' || message === 'undefined') {
+    return new NfcError(
+      'NFC communication failed. Please try again and hold steady.',
+      'TRANSCEIVE_FAILED'
+    );
+  }
+  return new NfcError(`APDU communication failed: ${message}`, 'TRANSCEIVE_FAILED');
 }

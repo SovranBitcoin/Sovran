@@ -4,7 +4,7 @@
 
 import { Buffer } from 'buffer';
 import { NfcError } from './errors';
-import { SHORT_RECORD_FLAG } from './constants';
+import { NDEF_TEXT_LANG, SHORT_RECORD_FLAG } from './constants';
 import { nfcLog } from '../logger';
 
 function toBytes(str: string): number[] {
@@ -13,10 +13,19 @@ function toBytes(str: string): number[] {
 
 /**
  * Build NDEF Text record (Short or Normal format).
+ *
+ * Text is encoded UTF-8 per the NFC Forum Text RTD; `lang` defaults to
+ * `NDEF_TEXT_LANG` ('en') and must be ≤63 ASCII bytes (status byte limit).
  */
-export function buildTextNdef(text: string): number[] {
-  const lang = 'en';
+export function buildTextNdef(text: string, opts?: { lang?: string }): number[] {
+  const lang = opts?.lang ?? NDEF_TEXT_LANG;
   const langBytes = toBytes(lang);
+  if (langBytes.length > 63) {
+    throw new NfcError(
+      `Language tag too long (${langBytes.length} bytes, max 63)`,
+      'INVALID_LANG_TAG'
+    );
+  }
   const textBytes = toBytes(text);
   const payload = [langBytes.length, ...langBytes, ...textBytes];
 
@@ -108,7 +117,6 @@ export function decodeTextRecord(ndef: number[]): string {
   const langLen = status & 0x3f;
   const isUtf16 = (status & 0x80) !== 0;
   nfcLog.debug('nfc.ndef.text_record', { status: `0x${status.toString(16)}`, langLen, isUtf16 });
-  if (isUtf16) nfcLog.warn('nfc.ndef.utf16_detected');
 
   const textStart = payloadStart + 1 + langLen;
   const textLen = payloadLen - 1 - langLen;
@@ -121,7 +129,34 @@ export function decodeTextRecord(ndef: number[]): string {
   }
 
   const textBytes = ndef.slice(textStart, textStart + textLen);
-  const text = Buffer.from(textBytes).toString('utf8');
-  nfcLog.debug('nfc.ndef.decoded', { textLen, chars: text.length });
+  const text = isUtf16 ? decodeUtf16(textBytes) : Buffer.from(textBytes).toString('utf8');
+  nfcLog.debug('nfc.ndef.decoded', {
+    textLen,
+    chars: text.length,
+    encoding: isUtf16 ? 'utf16' : 'utf8',
+  });
   return text;
+}
+
+/**
+ * Decode UTF-16 bytes per the NFC Forum Text RTD: an optional BOM at the
+ * head selects byte order (FE FF = BE, FF FE = LE); without a BOM the spec
+ * defaults to big-endian. Node's Buffer only decodes UTF-16LE natively, so
+ * BE input is byte-swapped in place before decode.
+ */
+function decodeUtf16(bytes: number[]): string {
+  const hasBeBom = bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff;
+  const hasLeBom = bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe;
+  const isBigEndian = hasBeBom || (!hasLeBom && !hasBeBom);
+  const stripped = hasBeBom || hasLeBom ? bytes.slice(2) : bytes;
+  if (isBigEndian) {
+    const swapped = Buffer.from(stripped);
+    for (let i = 0; i + 1 < swapped.length; i += 2) {
+      const tmp = swapped[i];
+      swapped[i] = swapped[i + 1];
+      swapped[i + 1] = tmp;
+    }
+    return swapped.toString('utf16le');
+  }
+  return Buffer.from(stripped).toString('utf16le');
 }
