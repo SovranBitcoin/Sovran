@@ -336,7 +336,9 @@
         "skill:nostr"
       ],
       "verification_note": "Confirmed asymmetry between performSearch and performProfileFetch/recommended.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "runDvm helper now early-rejects kind 7000 for every DVM call (search included); previously only profile/recommended checked it"
     },
     {
       "id": "F-015",
@@ -396,7 +398,9 @@
         "skill:nostr"
       ],
       "verification_note": "Consumer side unverified (not in blast radius). Kept as Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "performProfileFetch now uses target.created_at (or null) instead of event.created_at; the DVM signs the response, so event.created_at is response time, not profile time"
     },
     {
       "id": "F-018",
@@ -416,7 +420,9 @@
         "skill:wycheproof"
       ],
       "verification_note": "Counter-argument 'Vertex contract guarantees positive' is quasi-verified but not enforced.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "pagerankToScore extracted to src/lib/dvm.ts with full guards; rejects negative/zero/NaN/Infinity rank and null/zero/negative nodes; never returns NaN"
     },
     {
       "id": "F-019",
@@ -455,7 +461,9 @@
         "skill:nostr"
       ],
       "verification_note": "Visually diffed both handlers — near-verbatim.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "performSearch / performRecommended consolidated through runDvm + enrichRecords; the ~140-line duplication is gone"
     },
     {
       "id": "F-021",
@@ -495,7 +503,9 @@
         "skill:zod-4"
       ],
       "verification_note": "UNVERIFIED — would need to observe vertexlab.io responses. Kept as Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "DVM record.pubkey now passes through normalizePubkey before fan-out; rows that can't be normalised are dropped instead of silently miscached"
     },
     {
       "id": "F-023",
@@ -533,7 +543,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Six cast sites verified.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "DVM kinds replaced by named constants in src/lib/dvm.ts (DVM_SEARCH_REQUEST etc.)"
     },
     {
       "id": "F-025",
@@ -550,7 +562,9 @@
       "fix": "Extract: `const ASSUMED_NOSTR_NODES = 317328; // 2025-XX snapshot; refresh via ...`. Or reject the response (null) when the nodes tag is absent — the score field becomes meaningless without it.",
       "references": [],
       "verification_note": "Verified at line 417.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Magic 317328 fallback gone; readNodesTag returns null when missing/invalid and pagerankToScore propagates that as score=null"
     }
   ],
   "dimensions": {
