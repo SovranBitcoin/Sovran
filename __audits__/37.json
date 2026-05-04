@@ -5,16 +5,61 @@
     "entry_point": "sovran-app/features/payments",
     "entry_point_autoselected": true,
     "entry_point_selection_rationale": "Score +7: features/payments slice never an ENTRY across 36 prior audits; only useRecentContacts.ts appears once in covered_paths (audit 33's runner-up substring). +3 unaudited slice, +2 name absent from covered_paths, +1 dim-2/6 underweighted in audits 32-36, +1 churn (7 commits in last 90d, including current branch fix #38797b50). Top disqualified: modules/bitchat-module (+6, only 1 commit/90d, no churn bonus); features/onboarding (+6, less crypto-critical surface). features/payments wins because it owns NIP-04 decryption (lib/decryptNip04Events.ts) plus contact-search hooks that key the send/split-bill picker — bearer-instrument crypto and untrusted-input boundaries on a wallet.",
-    "repos_touched": ["sovran-app"],
-    "prior_audits_consulted": [
-      "01.json","02.json","03.json","04.json","05.json","06.json","07.json","08.json","09.json","10.json",
-      "11.json","12.json","13.json","14.json","15.json","16.json","17.json","18.json","19.json","20.json",
-      "21.json","22.json","23.json","24.json","25.json","26.json","27.json","28.json","29.json","30.json",
-      "31.json","32.json","33.json","34.json","35.json","36.json"
+    "repos_touched": [
+      "sovran-app"
     ],
-    "sov_specs_consulted": ["docs/SOV-00.md"],
-    "skills_consulted": ["zod-4", "neverthrow-return-types", "zustand-5", "nostr"],
-    "process_skills_consulted": ["zoom-out", "improve-codebase-architecture", "diagnose"],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json",
+      "31.json",
+      "32.json",
+      "33.json",
+      "34.json",
+      "35.json",
+      "36.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zod-4",
+      "neverthrow-return-types",
+      "zustand-5",
+      "nostr"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose"
+    ],
     "research_consulted": [],
     "tooling_run": {
       "type_check": "clean for features/payments (errors elsewhere in shared/lib/cashu/manager.ts, migration.ts, downloadedThemeRegistry.ts, CapsuleButton.android.tsx — out of scope)",
@@ -164,8 +209,8 @@
       ],
       "verification_note": "Verified by reading the schema (profileEvent is `z.string().max(262_144).optional()`) and the consumer block. Counter-argument: the field appears to be the kind-0 raw event from the DVM enrichment, server-controlled, so trust is high. Accepted in part — kept Low rather than dropped because boundary discipline is the explicit goal of the shared schemas package.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Inline narrowing added: parsed.pubkey must be a string before promoting it. The audit's option (b) — moving the JSON.parse + Hex64-shape check into a NostrEventCodec inside @sovranbitcoin/schemas — is the right end state but is out of scope for a sovran-app slice."
+      "completion_status": "complete",
+      "completion_note": "parsed.pubkey now validated with Hex64.safeParse from @sovranbitcoin/schemas, replacing the inline typeof string narrowing. A non-hex64 pubkey is rejected at the JSON.parse boundary instead of flowing into setSearchResults / seedFromSearchResults / addSearch downstream. The audit's option (b) — moving JSON.parse + Hex64 into a NostrEventCodec inside @sovranbitcoin/schemas — remains the right end state but is cross-repo and out of scope here."
     },
     {
       "id": "F-007",
