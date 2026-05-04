@@ -1,13 +1,13 @@
 import React from 'react';
 import { Text as RNText, View } from 'react-native';
-import { router } from 'expo-router';
 
-import { log } from '../logger';
+import { popupLog } from '../logger';
 import { formatAmount } from '@/shared/lib/currency';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useToastSurface } from './useToastSurface';
 import { fmt, isAmountSegment, type PopupTextSegment } from './format';
@@ -190,13 +190,13 @@ export function PaymentStatusToast({
         } as const;
       }
       if (entry) {
-        router.navigate({
+        guardedRouter.navigate({
           pathname: config.route.pathname,
           params: { [config.route.paramKey]: JSON.stringify(entry) },
         });
       }
     } catch (e) {
-      log.warn('popup.open_transaction_failed', { error: e });
+      popupLog.warn('popup.open_transaction_failed', { error: e });
     }
     hide();
   });

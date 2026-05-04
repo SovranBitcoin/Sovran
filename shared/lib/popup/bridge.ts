@@ -59,7 +59,7 @@ export type ToastConfig = {
   onHide?: () => void;
 };
 
-export type CustomToastConfig = {
+type CustomToastConfig = {
   component: (
     props: Record<string, unknown> & { hide: (ids?: string | string[] | 'all') => void }
   ) => React.ReactElement;

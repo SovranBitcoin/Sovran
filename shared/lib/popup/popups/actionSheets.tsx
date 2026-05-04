@@ -18,11 +18,7 @@ import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
 import type { ProfileSwitcherAction } from '../actionSheetTypes';
-import {
-  actionMenuPopup,
-  type ActionMenuButton,
-  type ActionMenuSection,
-} from './actionMenu';
+import { actionMenuPopup, type ActionMenuButton, type ActionMenuSection } from './actionMenu';
 
 // ---------------------------------------------------------------------------
 // Profile switcher — dispatched through `actionMenuPopup` so each profile +
@@ -35,7 +31,7 @@ import {
 // for the nsec form.
 // ---------------------------------------------------------------------------
 
-export type ProfileSwitcherPopupPayload = {
+type ProfileSwitcherPopupPayload = {
   onRequestAction: (action: ProfileSwitcherAction) => void;
 };
 
@@ -257,7 +253,8 @@ function buildOptionButton(
     reason: extras?.isFailed
       ? (extras.failedReason ?? 'Failed')
       : (annotated.reason?.message ?? undefined),
-    description: !disabled && !extras?.isFailed && status === 'recommended' ? 'Recommended' : undefined,
+    description:
+      !disabled && !extras?.isFailed && status === 'recommended' ? 'Recommended' : undefined,
     isFailed: extras?.isFailed,
     suffix: hasAmount ? (
       <AmountFormatter amount={amount} unit={unit} size={16} weight="medium" />
@@ -268,7 +265,7 @@ function buildOptionButton(
   };
 }
 
-export type PaymentOptionsPopupPayload = StepDataMap['chooseOption'] & {
+type PaymentOptionsPopupPayload = StepDataMap['chooseOption'] & {
   machine: PaymentMachine;
   onDismiss?: () => void;
 };
@@ -282,7 +279,7 @@ export function paymentOptionsPopup(payload: PaymentOptionsPopupPayload): void {
   });
 }
 
-export type PaymentFallbackPopupPayload = StepDataMap['chooseFallbackOption'] & {
+type PaymentFallbackPopupPayload = StepDataMap['chooseFallbackOption'] & {
   machine: PaymentMachine;
   onDismiss?: () => void;
 };
@@ -303,7 +300,7 @@ export function paymentFallbackPopup(payload: PaymentFallbackPopupPayload): void
   });
 }
 
-export type ProofSelectorPopupPayload = StepDataMap['chooseProofs'] & {
+type ProofSelectorPopupPayload = StepDataMap['chooseProofs'] & {
   machine: PaymentMachine;
 };
 

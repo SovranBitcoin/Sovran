@@ -1,9 +1,11 @@
 /**
- * Parses coco/cashu errors into user-friendly messages for the payment status toast.
- * Matches known error strings (exact and substring) from MESSAGE_CONFIGS and coco.
+ * Canonical mapping of coco/cashu error strings to user-friendly text. Used by
+ * PaymentStatusToast / SwapStatusToast to render the failure subtitle.
+ *
+ * Patterns are checked in order, first match wins. Substring patterns
+ * lowercase the input before comparing; regex patterns match against the
+ * trimmed-but-cased original.
  */
-
-/** User-friendly text for known coco/cashu errors. Checked in order; first match wins. */
 const MESSAGE_MAP: { pattern: string | RegExp; text: string }[] = [
   {
     pattern: 'outputs have already been signed before',
@@ -101,8 +103,8 @@ function resolveText(rawMessage: string): string {
 }
 
 /**
- * Parses a coco/cashu error into a user-friendly message for the payment status toast.
- * Uses known error patterns; falls back to truncated raw message.
+ * Parse a coco/cashu error into user-friendly text for the payment status
+ * toast. Falls back to the truncated raw message when no pattern matches.
  */
 export function parsePaymentError(error: unknown): string {
   const raw = extractMessage(error);

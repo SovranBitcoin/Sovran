@@ -9,14 +9,7 @@ export {
 export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
-export {
-  actionMenuPopup,
-  dismissActionMenuPopup,
-  type ActionMenuButton,
-  type ActionMenuInput,
-  type ActionMenuPayload,
-  type ActionMenuPrimaryAction,
-} from './actionMenu';
+export { actionMenuPopup, dismissActionMenuPopup } from './actionMenu';
 export {
   paymentStatusPopup,
   swapStatusPopup,

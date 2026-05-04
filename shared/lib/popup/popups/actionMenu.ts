@@ -179,12 +179,12 @@ export interface ActionMenuSection {
  * Return `null` (or omit `renderResults`) to keep showing the section list
  * regardless of input — useful when the caller wants the input as filter only.
  */
-export interface ActionMenuSearchable {
+interface ActionMenuSearchable {
   placeholder?: string;
   renderResults?: (query: string) => React.ReactNode | null;
 }
 
-export interface ActionMenuPayload {
+interface ActionMenuPayload {
   /** Rendered as `Menu.Label` at the top of the sheet. */
   title?: string;
   /** Custom content rendered between the title and any items / inputs. */
