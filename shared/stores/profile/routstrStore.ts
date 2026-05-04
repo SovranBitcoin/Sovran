@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
@@ -443,7 +444,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       createSession: () => {
-        const sessionId = `session-${Date.now()}`;
+        const sessionId = mintLocalId('session');
         storeLog.info('store.routstr.create_session', { sessionId });
         const newSession: RoutstrSession = {
           id: sessionId,

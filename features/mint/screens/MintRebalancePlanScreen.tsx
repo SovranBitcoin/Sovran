@@ -49,6 +49,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
+import { mintLocalId } from '@/shared/lib/id';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 // StepState is imported from components/blocks/rebalance (groupSteps.ts)
@@ -828,13 +829,12 @@ export function MintRebalancePlanScreen() {
             }
 
             // Insert one visible row per hop immediately (swap-like grouped chain UX)
-            const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-            const chainId = `chain-${uniqueSuffix}`;
+            const chainId = mintLocalId('chain');
             const autoRouteSteps: TransferStep[] = [];
             for (let i = 0; i < chainPath.length - 1; i++) {
               autoRouteSteps.push({
                 ...step,
-                id: `auto-route-${id}-${candidateIdx}-${i}-${uniqueSuffix}`,
+                id: mintLocalId(`auto-route-${id}-${candidateIdx}-${i}`),
                 fromMintUrl: chainPath[i],
                 toMintUrl: chainPath[i + 1],
                 chainId,
@@ -1540,15 +1540,14 @@ export function MintRebalancePlanScreen() {
       }
 
       const afterId = step.id;
-      const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-      const chainId = `chain-${uniqueSuffix}`;
+      const chainId = mintLocalId('chain');
 
       // Create one TransferStep per hop in the path
       const rerouteSteps: TransferStep[] = [];
       for (let i = 0; i < chainPath.length - 1; i++) {
         rerouteSteps.push({
           ...step,
-          id: `reroute-${afterId}-${i}-${uniqueSuffix}`,
+          id: mintLocalId(`reroute-${afterId}-${i}`),
           fromMintUrl: chainPath[i],
           toMintUrl: chainPath[i + 1],
           chainId,

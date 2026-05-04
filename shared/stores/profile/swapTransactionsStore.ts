@@ -15,6 +15,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
@@ -99,9 +100,6 @@ interface SwapTransactionsActions {
 
 type SwapTransactionsStore = SwapTransactionsState & SwapTransactionsActions;
 
-const generateGroupId = () => `swap-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-const generateLegId = () => `leg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
 // Persisted-shape schema (defensive rehydrate validation).
 const SwapLegLocalStatusSchema = z.enum([
   'pending',
@@ -159,7 +157,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
       quoteIdToGroup: {},
 
       startGroup: ({ unit, title }) => {
-        const id = generateGroupId();
+        const id = mintLocalId('swap');
         storeLog.info('store.swap_tx.start_group', { id, unit, title });
         const group: SwapGroup = {
           id,
@@ -193,7 +191,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
       },
 
       addLeg: (groupId, leg) => {
-        const legId = generateLegId();
+        const legId = mintLocalId('leg');
         storeLog.info('store.swap_tx.add_leg', {
           groupId,
           legId,

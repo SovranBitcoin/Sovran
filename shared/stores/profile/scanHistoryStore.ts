@@ -14,6 +14,7 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
@@ -86,8 +87,6 @@ const PersistedScanHistoryStore = z.object({
   entries: z.array(PersistedScanEntry).max(10_000).default([]),
 });
 
-const generateId = () => `scan-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-
 export const useScanHistoryStore = create<ScanHistoryStore>()(
   subscribeWithSelector(
     persist(
@@ -121,7 +120,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
               return { entries: updated };
             }
             const newEntry: ScanHistoryEntry = {
-              id: generateId(),
+              id: mintLocalId('scan'),
               raw,
               processed,
               type,

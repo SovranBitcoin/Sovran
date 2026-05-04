@@ -24,6 +24,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
@@ -148,9 +149,6 @@ interface SplitBillStoreActions {
 
 type SplitBillStore = SplitBillStoreState & SplitBillStoreActions;
 
-const generateGroupId = () => `sb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-const generateParticipantId = () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
 // ---------------------------------------------------------------------------
 
 /**
@@ -239,7 +237,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
       quoteIdToSplitBill: {},
 
       startGroup: ({ unit, mintUrl, totalAmount, title, participants }) => {
-        const id = generateGroupId();
+        const id = mintLocalId('sb');
         const group: SplitBillGroup = {
           id,
           unit,
@@ -251,7 +249,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
           createdAt: Date.now(),
           state: 'draft',
           participants: participants.map((p) => ({
-            id: p.id ?? generateParticipantId(),
+            id: p.id ?? mintLocalId('p'),
             source: p.source,
             channel: p.channel,
             pubkey: p.pubkey,
