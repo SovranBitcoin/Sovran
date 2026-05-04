@@ -96,7 +96,9 @@
         "sovran-app/.claude/rules/zustand-persistence-review.md"
       ],
       "verification_note": "Re-read the three mutator functions; confirmed each writes both fields in the non-anonymous branch. partialize verified at L365-372 to persist both. Counter-argument considered: 'conversationHistory is the hot path and sessions is cold-storage — maybe the duplication is an intentional cache.' True motivation but the cache should not be persisted; persisting both bloats storage without speed benefit (reading one field vs two from JSON is the same). Counter-argument considered: 'anonymous mode needs conversationHistory as a session-less scratch space.' Also true, and that's why fix proposes a dedicated `anonymousMessages` field — the scratch-space role belongs in its own field, not overloaded onto a cache of the active session's messages.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "conversationHistory + activeChildren removed from partialize; afterHydrate restores from active session via restoreActiveSessionView"
     },
     {
       "id": "F-004",
@@ -187,7 +189,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-read getAllSessions L271-275 and SessionsPanel L213-248. Confirmed the sort allocation on every call and the missing useMemo on filteredSessions. Counter-argument considered: 'this is inside a component that only mounts when the panel is open.' True, but once open the panel re-renders per store mutation. Counter-argument considered: 'React 19 Compiler memoises the filter expression.' The Compiler can memo within SessionsPanel, but it cannot memo across the `getAllSessions()` call boundary since that's a user-called function with no memoisable signature. Kept Low — structural but bounded by session count.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "10 dead get-accessors removed (zero callers — SessionsPanel.tsx no longer exists); only isCacheStale survives because ModelChip.tsx calls it"
     },
     {
       "id": "F-008",
@@ -208,7 +212,9 @@
         "sovran-app/.cursor/rules/secure-storage-key-derivation.mdc"
       ],
       "verification_note": "Re-read store L38-39, L365-372 and topUp.ts L45-66,89-92. Confirmed the token-as-apiKey fallback persists. Counter-argument considered: 'this is how every Routstr client works.' Arguable — the Routstr client-side reference code is not authoritative, and wallet-app threat models differ from web-app threat models (device compromise vs browser compromise). Kept Low with 0.55 confidence. This is a design-decision finding, not a bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "audit confidence 0.55, recommended fixes (gate token-shape persist, or move to expo-secure-store) outside slice scope; pattern still real, retain for future slice"
     },
     {
       "id": "F-009",
