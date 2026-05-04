@@ -157,7 +157,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Verified closure scope at PrimaryBalance.tsx:218 (`useCallback`) and line 220 (`reservedTotal` read). ESLint did not flag this in `npm run lint` output — react-hooks/exhaustive-deps is either disabled or absent from the config.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Already fixed. PrimaryBalance.tsx:268 now lists [reservedTotal] in the deps array of handleReservedPressInner."
     },
     {
       "id": "F-006",
@@ -258,7 +260,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Lint run showed no @typescript-eslint/no-explicit-any violations here, suggesting the rule is disabled or the `any` is warn-not-error. Confirming with the rule enabled would make this a mechanical fix.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Already fixed. The Swiper-based AccountPagerView no longer exists; useAccountPagerView.ts was removed. react-native-web-infinite-swiper is now an unused dependency (knip-confirmed) — separate hygiene follow-up."
     },
     {
       "id": "F-011",

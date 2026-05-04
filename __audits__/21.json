@@ -54,7 +54,9 @@
         "git:f797ae15"
       ],
       "verification_note": "Re-opened both files after Phase A. Verified AmountSelector takes entry + actions as props and is not fetching them internally (AmountSelector.tsx:120-135). Verified AmountFlowScreen is the sole caller of useScreenActions('amountEntry', ...) (AmountFlowScreen.tsx:33-36). Verified both send-flow and receive-flow amount routes already share AmountFlowScreen via thin route wrappers (app/(send-flow)/amount.tsx, app/(receive-flow)/amount.tsx), so the three-surface reuse story is achievable — Split-Bill is the only outlier. Counter-argument considered: 'AmountSelector's entry shape is designed around the machine's loose Record<string, unknown>, so Split-Bill would have to pretend to be a machine entry.' Correct, which is why the fix is to introduce a new typed primitive rather than forcing Split-Bill through AmountSelector directly.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Already shipped. app/(split-bill-flow)/amount.tsx is now a thin local-state consumer of shared/ui/composed/AmountEntryView (via useLocalAmountEntry); the duplicate shell is gone."
     },
     {
       "id": "F-002",
@@ -76,7 +78,8 @@
       ],
       "verification_note": "Verified the claim by re-reading AmountSelector.tsx:120-135 (prop signature) and AmountFlowScreen.tsx:33-36 (where useScreenActions('amountEntry', ...) is actually called). Counter-argument considered: 'The comment could be interpreted loosely — AmountSelector's shape is effectively tied to the machine.' True but the comment says 'that screen is tied to ... useScreenActions', which is a concrete, inspectable claim, and it is wrong about the component boundary.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "stale",
+      "completion_note": "Already shipped. The misleading fileoverview comment was rewritten when amount.tsx was migrated to AmountEntryView; the current comment accurately frames the file as a local-state consumer."
     }
   ],
   "dimensions": {

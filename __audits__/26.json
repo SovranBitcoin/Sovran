@@ -154,7 +154,8 @@
       ],
       "verification_note": "Verified at HomeFeed.tsx:119. CATEGORY_PUBKEYS is currently sourced from a local module (features/feed/components/nostr/categoryNpubs), so no active exploit today. Flagged as trust-boundary hygiene.",
       "prior_audit_id": null,
-      "completion_status": "partial"
+      "completion_status": "complete",
+      "completion_note": "Replaced inline length-only check with shared isNostrPubkeyHex predicate (regex+length+typeof) at HomeFeed.tsx:107. Predicate exported from shared/lib/nostr/secureStorage.ts and consumed in SettingsKeyringScreen.tsx as well — three call sites collapse to one canonical seam. Regression test at __tests__/isNostrPubkeyHex.test.ts pins the audit's exact attack shape (a 64-char string with non-hex chars)."
     },
     {
       "id": "F-006",
