@@ -22,11 +22,19 @@
  *   node codereview/analyze-structure/index.mjs --llm                 # compact LLM summary
  *   node codereview/analyze-structure/index.mjs --history --since 6   # last 6 months of git
  *   node codereview/analyze-structure/index.mjs --architecture        # use .architecture.json
+ *   node codereview/analyze-structure/index.mjs --focus shared/foo.ts # full pass, filter to one file
  *
  *   node codereview/analyze-structure/index.mjs lookalikes            # default lookalikes
  *   node codereview/analyze-structure/index.mjs lookalikes features/x # subtree
  *   node codereview/analyze-structure/index.mjs lookalikes --by-name red
  *   node codereview/analyze-structure/index.mjs lookalikes --focus shared/theme.ts
+ *
+ * `--focus` (structural mode) does a full-repo scan and filters every section
+ * down to rows that mention the focused file. Sections without per-file rows
+ * (Score, totals, Instability per folder) pass through unchanged. A section
+ * with per-file rows but none mentioning the focus is dropped entirely so
+ * silence means "no signal," not "ran on zero files." Terminal and `--llm`
+ * modes apply the filter; `--json` is left unfiltered (consume programmatically).
  *
  * Default structural reports run unless suppressed with `--no-<name>`.
  * Opt-in (off by default): --history, --reach, --leakage, --concept,
@@ -212,6 +220,7 @@ const flagsWithValue = new Set([
   '--leakage-threshold',
   '--reach-top',
   '--architecture',
+  '--focus',
 ]);
 const allFlags = new Set([
   '--json',
@@ -268,6 +277,84 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 const targetDir = targetArg ? join(ROOT, targetArg) : ROOT;
+
+// ─── Focus filter ────────────────────────────────────────────────────────────
+// `--focus <file>` runs every report against the full target tree, then
+// trims the rendered output to rows that mention the focused file. The
+// filter operates on already-rendered lines so we never have to teach each
+// report to handle a single-file case — the data pass is unchanged.
+const focusIdx = args.indexOf('--focus');
+let focusAbs = null;
+let focusRel = null;
+if (focusIdx !== -1) {
+  const next = args[focusIdx + 1];
+  if (!next || next.startsWith('--')) {
+    console.error('Error: --focus requires a file path, e.g. --focus shared/lib/foo.ts');
+    process.exit(1);
+  }
+  focusAbs = resolve(ROOT, next);
+  if (!existsSync(focusAbs)) {
+    console.error(`--focus: file not found: ${next} (looked at ${focusAbs})`);
+    process.exit(1);
+  }
+  focusRel = relative(targetDir, focusAbs);
+}
+
+/**
+ * Drop sections that have per-file rows but none mention the focus file.
+ *
+ * A line is a "data row" if it references a file path (`*.tsx?`, `*.jsx?`,
+ * `*.[mc][jt]s`, `*.json`, `*.md(x)`). A section runs from one header
+ * (`══ ... ══`, `## ...`, `# ...`) to the next or EOF. Within a section:
+ *
+ *   - If there are no data rows at all → keep verbatim (Score, totals,
+ *     Instability per folder, and similar all pass through unchanged).
+ *   - If at least one data row mentions the focus file → keep header +
+ *     matching data rows + non-data context (separators, "…and N more"
+ *     trailers). Non-matching data rows are dropped so the kept rows are
+ *     visible in isolation.
+ *   - If data rows exist but none mention the focus → drop the whole
+ *     section so silence reads as "no signal in this dimension."
+ */
+function applyFocus(lines, rel) {
+  if (!rel) return lines;
+  const PATH_RE = /[A-Za-z0-9_\-./()[\]]+\.(?:tsx?|jsx?|m[jt]s|c[jt]s|json|mdx?)\b/;
+  const HEADER_RE = /══.*══|^##\s+|^#\s+/;
+  const tagged = lines.map((line) => {
+    const stripped = line.replace(/\x1b\[[0-9;]*m/g, '');
+    if (HEADER_RE.test(stripped)) return { kind: 'header', line };
+    if (PATH_RE.test(stripped)) return { kind: 'data', line, hasFocus: line.includes(rel) };
+    return { kind: 'other', line };
+  });
+  const out = [];
+  let i = 0;
+  // Pre-section preamble: keep meta lines, drop unmatched data rows.
+  while (i < tagged.length && tagged[i].kind !== 'header') {
+    const t = tagged[i];
+    if (t.kind !== 'data' || t.hasFocus) out.push(t.line);
+    i++;
+  }
+  // Per-section processing.
+  while (i < tagged.length) {
+    let j = i + 1;
+    while (j < tagged.length && tagged[j].kind !== 'header') j++;
+    const section = tagged.slice(i, j);
+    const dataRows = section.filter((t) => t.kind === 'data');
+    if (dataRows.length === 0) {
+      for (const t of section) out.push(t.line);
+    } else if (dataRows.some((t) => t.hasFocus)) {
+      for (const t of section) {
+        if (t.kind !== 'data' || t.hasFocus) out.push(t.line);
+      }
+    }
+    i = j;
+  }
+  return out;
+}
+
+function emit(lines) {
+  console.log(applyFocus(lines, focusRel).join('\n'));
+}
 
 // Whether any analysis mode is active (controls whether to build the dep graph)
 const anyAnalysis =
@@ -2875,44 +2962,57 @@ if (showJson) {
 } else if (showLlm) {
   // ── LLM compact mode ─────────────────────────────────────────────────────
   if (!dep) dep = buildDependencyGraph(allFiles);
-  console.log(renderLlm(allFiles, dep, totals, historyResult));
+  const llmOut = renderLlm(allFiles, dep, totals, historyResult);
+  if (focusRel) {
+    console.log(`> Focused on ${focusRel}. Sections with no row mentioning this file are hidden.`);
+    console.log('');
+    console.log(applyFocus(llmOut.split('\n'), focusRel).join('\n'));
+  } else {
+    console.log(llmOut);
+  }
 } else {
   // ── Terminal mode ────────────────────────────────────────────────────────
-  console.log(label);
-  console.log(renderTree(nodes).join('\n'));
+  if (focusRel) {
+    console.log(
+      `\x1b[1;33m▸ Focused on ${focusRel}\x1b[0m  ${'\x1b[2m'}Sections with no row mentioning this file are hidden; tree view skipped.\x1b[0m`
+    );
+    console.log('');
+  } else {
+    console.log(label);
+    console.log(renderTree(nodes).join('\n'));
+  }
   console.log(renderSummary(totals));
 
   if (anyAnalysis && dep) {
     const { faninMap, fanoutMap, edges, fileToFolder, pathToNode, importedNamesByTarget } = dep;
 
-    if (showFanin) console.log(renderFanin(faninMap, fileToFolder).join('\n'));
-    if (showCoupling) console.log(renderCoupling(edges, fileToFolder).join('\n'));
-    if (showCycles) console.log(renderCycles(edges).join('\n'));
-    if (showOrphans) console.log(renderOrphans(allFiles, faninMap).join('\n'));
-    if (showColocate) console.log(renderColocate(faninMap, fileToFolder, pathToNode).join('\n'));
-    if (showShallow) console.log(renderShallow(allFiles).join('\n'));
-    if (showPassthrough) console.log(renderPassThrough(allFiles, faninMap, fanoutMap).join('\n'));
-    if (showHubSpoke) console.log(renderHubSpoke(allFiles, faninMap, fanoutMap).join('\n'));
-    if (showInstability) console.log(renderInstability(edges, fileToFolder).join('\n'));
-    if (showReexportDepth) console.log(renderReexportDepth(allFiles, edges).join('\n'));
-    if (showComplexity) console.log(renderComplexity(allFiles).join('\n'));
-    if (showTypesafety) console.log(renderTypesafety(allFiles).join('\n'));
-    if (showComponent) console.log(renderComponent(allFiles).join('\n'));
-    if (showDupExports) console.log(renderDupExports(allFiles).join('\n'));
-    if (showUnusedExports)
-      console.log(renderUnusedExports(allFiles, importedNamesByTarget).join('\n'));
-    if (showTestColocation) console.log(renderTestColocation(allFiles).join('\n'));
-    if (showLeakage) console.log(renderLeakage(allFiles).join('\n'));
-    if (showConcept) console.log(renderConcept(allFiles).join('\n'));
-    if (showVocabDrift) console.log(renderVocabDrift(allFiles).join('\n'));
-    if (showReach) console.log(renderReach(allFiles, fanoutMap).join('\n'));
-    if (showArchitecture) console.log(renderArchitecture(edges).join('\n'));
-    if (boundaryA && boundaryB) console.log(renderBoundary(edges, boundaryA, boundaryB).join('\n'));
+    if (showFanin) emit(renderFanin(faninMap, fileToFolder));
+    if (showCoupling) emit(renderCoupling(edges, fileToFolder));
+    if (showCycles) emit(renderCycles(edges));
+    if (showOrphans) emit(renderOrphans(allFiles, faninMap));
+    if (showColocate) emit(renderColocate(faninMap, fileToFolder, pathToNode));
+    if (showShallow) emit(renderShallow(allFiles));
+    if (showPassthrough) emit(renderPassThrough(allFiles, faninMap, fanoutMap));
+    if (showHubSpoke) emit(renderHubSpoke(allFiles, faninMap, fanoutMap));
+    if (showInstability) emit(renderInstability(edges, fileToFolder));
+    if (showReexportDepth) emit(renderReexportDepth(allFiles, edges));
+    if (showComplexity) emit(renderComplexity(allFiles));
+    if (showTypesafety) emit(renderTypesafety(allFiles));
+    if (showComponent) emit(renderComponent(allFiles));
+    if (showDupExports) emit(renderDupExports(allFiles));
+    if (showUnusedExports) emit(renderUnusedExports(allFiles, importedNamesByTarget));
+    if (showTestColocation) emit(renderTestColocation(allFiles));
+    if (showLeakage) emit(renderLeakage(allFiles));
+    if (showConcept) emit(renderConcept(allFiles));
+    if (showVocabDrift) emit(renderVocabDrift(allFiles));
+    if (showReach) emit(renderReach(allFiles, fanoutMap));
+    if (showArchitecture) emit(renderArchitecture(edges));
+    if (boundaryA && boundaryB) emit(renderBoundary(edges, boundaryA, boundaryB));
     if (showHistory) {
       const r = renderHistory(allFiles);
       const lines = Array.isArray(r) ? r : r.lines;
-      console.log(lines.join('\n'));
+      emit(lines);
     }
-    if (showScore) console.log(renderScores(computeScores(allFiles, dep, totals)).join('\n'));
+    if (showScore) emit(renderScores(computeScores(allFiles, dep, totals)));
   }
 }

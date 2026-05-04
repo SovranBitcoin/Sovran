@@ -50,6 +50,7 @@ slice plan, or commit message.
 | ------------------------------------------------- | ------------------------------ | ------------------------------- |
 | "Where should we refactor next?"                  | `analyze-structure`            | `--llm` (score block)           |
 | "Which files are too coupled?"                    | `analyze-structure`            | default — fanin/coupling/cycles |
+| "Does this one file show up in any hotspot?"      | `analyze-structure`            | `--focus path/to/file.ts`       |
 | "Where are the duplicate names?"                  | `analyze-structure lookalikes` | default reports                 |
 | "Two values look the same — are they?"            | `analyze-structure lookalikes` | `--by-value '#FF0000'`          |
 | "What's `red` defined as in this repo?"           | `analyze-structure lookalikes` | `--by-name red`                 |
@@ -94,6 +95,12 @@ node codereview/analyze-structure/index.mjs coco-payment-ux --llm
 node codereview/analyze-structure/index.mjs --llm \
   --no-fanin --no-coupling --no-cycles --no-orphans --no-colocate \
   --no-component --no-typesafety
+
+# 6. Focus on one file — full repo pass, then filter to sections that
+#    cite it. Sections without per-file rows (Score, totals, Instability
+#    per folder) pass through unchanged. Silence in a hotspot section
+#    means the file genuinely has no signal in that dimension.
+node codereview/analyze-structure/index.mjs --llm --focus features/foo/Bar.tsx
 ```
 
 ### lookalikes subcommand recipes
