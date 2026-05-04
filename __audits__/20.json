@@ -161,8 +161,8 @@
       ],
       "verification_note": "Diffed each helper pair by eye. formatBalance: identical. formatTimestamp: same logic, different input unit (×1000). extractModelName: different shape, similar regex-trimming intent. Confidence 0.9 because 'duplicated' is a structural observation and the re-use is easy to verify. Not critical on its own; it's the 'small helpers that should move when F-002 moves' category.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "UserMessagesScreen no longer carries formatBalance / extractModelName / extractProviderFromSlug duplicates (they were Routstr-only). formatTimestamp is still local to this screen and to GeohashChatScreen — full collapse deferred."
+      "completion_status": "complete",
+      "completion_note": "formatTimestamp collapsed into shared/ui/composed/chat/formatChatTimestamp.ts; ChatMessageBubble + UserMessagesScreen now share one canonical helper, unit-drift (sec vs ms) made explicit at the call sites."
     },
     {
       "id": "F-007",
