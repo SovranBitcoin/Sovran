@@ -242,7 +242,7 @@ export function TransactionsScreen({
         listKey={listKey}
         account={{ ...parsedAccount, unit: selectedCurrency }}
         showMore={false}
-        history={history}
+        history={filteredByTypeHistory}
         isFetching={isFetching}
         filter={direction}
         type={paymentType}

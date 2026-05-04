@@ -58,9 +58,9 @@ function getTimelineKey(item: TimelineItem): string {
   if (item.kind === 'split-bill') return `split-bill-${item.data.id}`;
   const entry = item.data;
   if (entry.id) return entry.id;
-  if ('token' in entry && entry.token)
-    return typeof entry.token === 'string' ? entry.token : JSON.stringify(entry.token);
-  return Math.random().toString();
+  // Bearer tokens MUST NOT become React keys; Math.random() destroys list
+  // diffing. Derive a deterministic composite from invariant fields.
+  return `${entry.type}-${entry.createdAt}-${entry.amount}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -427,6 +427,32 @@ export const Transactions = React.memo(
       [onTransactionPress, onCancelPendingEcash]
     );
 
+    const getEstimatedItemSize = useCallback(
+      (section: Section) => HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16,
+      []
+    );
+
+    const renderSection = useCallback(
+      ({ item: section }: { item: Section }) => (
+        <VStack spacing={4} className="mb-4">
+          <Text size={14} heavy color={opacity(foreground, 0.33)} style={{ height: HEADER_HEIGHT }}>
+            {section.title}
+          </Text>
+          <View style={[styles.card, { borderColor }]}>
+            <BlurCardFrame accentColor={muted}>
+              <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
+            </BlurCardFrame>
+          </View>
+        </VStack>
+      ),
+      [foreground, muted, borderColor, renderTimelineItem]
+    );
+
+    const resolvedHeader = useMemo(
+      () => <View>{typeof header === 'function' ? header() : header}</View>,
+      [header]
+    );
+
     const emptyComponent = useMemo(
       () => (
         <View className="pt-8">
@@ -584,10 +610,6 @@ export const Transactions = React.memo(
       );
     }
 
-    // Estimate section height: header + (items * item height)
-    const estimateSectionHeight = (section: Section) =>
-      HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16; // 16 for spacing
-
     return (
       <Log name="Transactions">
         <AnimatedLegendList
@@ -595,7 +617,7 @@ export const Transactions = React.memo(
           style={{ flex: 1 }}
           data={sectionsToDisplay}
           keyExtractor={(section) => section.index!}
-          estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
+          getEstimatedItemSize={getEstimatedItemSize}
           maintainVisibleContentPosition
           // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
           // triggers a fresh LinearTransition on every measured-position
@@ -607,26 +629,11 @@ export const Transactions = React.memo(
           // moves in lock-step with the row's `layout` shrink.
           itemLayoutAnimation={LinearTransition.duration(16).easing(Easing.linear)}
           contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
-          ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
+          ListHeaderComponent={resolvedHeader}
           ListEmptyComponent={emptyComponent}
           onScroll={onScroll}
           scrollEventThrottle={16}
-          renderItem={({ item: section }) => (
-            <VStack spacing={4} className="mb-4">
-              <Text
-                size={14}
-                heavy
-                color={opacity(foreground, 0.33)}
-                style={{ height: HEADER_HEIGHT }}>
-                {section.title}
-              </Text>
-              <View style={[styles.card, { borderColor }]}>
-                <BlurCardFrame accentColor={muted}>
-                  <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
-                </BlurCardFrame>
-              </View>
-            </VStack>
-          )}
+          renderItem={renderSection}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
         />
       </Log>
