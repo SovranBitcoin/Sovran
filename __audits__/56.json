@@ -69,7 +69,9 @@
         "nips/06.md"
       ],
       "verification_note": "Re-checked: line 273-278 returns `{ _kind, len, preview }` with `preview = s.slice(0, 32) + '…'` regardless of detected type. SettingsStorageScreen:229 confirmed unconditional. Counter-argument considered: regex requires whole-string match, so embedded nsec/token strings inside larger payloads escape detection — true, but every line is then logged in full because no redaction fires. The unsafe branch is the one that fires; the safe branch is the one that doesn't fire.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "summarizeString split into SECRET_STRING_PATTERNS (no preview emitted) and LONG_STRING_PATTERNS (preview retained); pem_key/jwt/data_uri/connection_str/nsec/cashu_token/lightning_invoice no longer leak first 32 chars to ring buffer"
     },
     {
       "id": "F-002",
@@ -247,7 +249,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Re-read emit body. lastEntry is assigned at line 564 — this is *before* the next iteration's dedup check at 501. The async write at 577 uses scheduleIdle which on RN falls back to setTimeout(...,1) — so the dedup window of 50ms gives the 1ms timer plenty of time to fire first, but not always (idle-callback ordering depends on JS event loop pressure). The race is real but probabilistic. confidence 0.85 because the worst case (transport serializes the un-deduped entry first) is the most common code path.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "dedup no longer mutates already-pushed entry; suppression count tracked on core and flushed as a synthetic {_suppressed: N} entry when window closes"
     },
     {
       "id": "F-009",
@@ -294,7 +298,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Re-read lines 123-163: every method on Logger uses `params?: Record<string, unknown>`. Counter-argument considered: every logger in the world uses this loose shape, branding would be churn — but this is a wallet codebase where the cost of one accidentally-logged seed is total compromise; the church-of-log-everything default is the wrong tradeoff here. confidence 0.8 because the design space (LogSafe brand vs. opt-in Sensitive marker vs. zod-style schema gate) hasn't been explored in research and may have ergonomic surprises.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "branded-secret param type requires Mnemonic/Seed/Nsec/Proof/CashuToken brands in ../sovran-schemas; out of scope for this slice"
     },
     {
       "id": "F-011",
@@ -338,7 +344,9 @@
         "skill:security-review"
       ],
       "verification_note": "Re-read lines 243-264. Confirmed single regex for npub + nsec. cashu_token pattern at 261 uses one test for both formats. Counter-argument considered: 'whoever wrote the regex knew npub previews are safe but kept it loose for simplicity' — that intent is testable: read the comment at line 277-278 (`return { _kind: detectedType ?? 'long_string', len: s.length, preview: preview + '…' };`); it does not branch on detectedType, so the simplification is load-bearing.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "npub_or_nsec split: nsec moved to SECRET_STRING_PATTERNS (no preview), npub kept in LONG_STRING_PATTERNS (preview retained, classified as 'npub')"
     },
     {
       "id": "F-013",
@@ -383,7 +391,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Counted: 7 `as any` and 1 `: any` site in the file. analyze-structure top-list does not name logger.ts in the type-safety hotspots (top entries are redux/store/store.deprecated.ts at any=29 and HistoryEntryTimeline at as=53), so the cast density is moderate not extreme — Low not Medium.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "redaction-path (v as any)._kind cast at kvParams replaced with hasKind type guard; remaining as any in ndjson dump (line 797) and React DevTools displayName resolution (lines ~1214–1244, 1244 style) deferred — non-redaction paths"
     },
     {
       "id": "F-015",
@@ -403,7 +413,9 @@
         "shared/lib/logger.ts:576"
       ],
       "verification_note": "UNVERIFIED in production because no Sentry transport is wired today. confidence 0.7 reflects that this is a latent finding — gates a future implementation rather than a current bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "fatal transport flush is a separate concern from redaction; not bundled with this slice"
     },
     {
       "id": "F-016",
