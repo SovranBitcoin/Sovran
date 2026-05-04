@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clipboard, Alert, ActivityIndicator } from 'react-native';
+import { Alert, ActivityIndicator } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, router } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -343,11 +344,8 @@ export const SettingsKeyringScreen: React.FC = () => {
       })
   );
 
-  /**
-   * Copies a public key to clipboard
-   */
-  const handleCopyKey = (publicKey: string) => {
-    Clipboard.setString(publicKey);
+  const handleCopyKey = async (publicKey: string) => {
+    await Clipboard.setStringAsync(publicKey);
     copyPopup('publicKey');
   };
 
