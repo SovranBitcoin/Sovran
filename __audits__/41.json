@@ -303,7 +303,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-checked the cited line. Counter-argument considered: log.debug is dropped at a higher gate before reaching the ring buffer. Checked shared/lib/logger — debug is gated by `__DEV__` in production but writes to ring buffer and breadcrumbs unconditionally in dev. UNVERIFIED on log-doctor — debug-level theme events were absent from the captured session because the picker wasn't opened during it.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Dropped log.debug('theme.preview.card.resolve') from UnitPreviewSlot. Resolution is deterministic from store state."
     },
     {
       "id": "F-012",
