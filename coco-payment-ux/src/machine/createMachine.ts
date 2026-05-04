@@ -3,6 +3,7 @@ import { isMintOfflineError } from '../errors';
 import { t } from '../formatting/locales';
 import { errField, logger } from '../logger';
 import { composeSatoshis } from '../offline';
+import { parseHistoryEntryOnce } from '../operations/historyEntry';
 import { transition } from './transitions';
 import type { PaymentOption } from '../types';
 import type {
@@ -184,7 +185,12 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   let stepData: StepDataMap[FlowStep] = idleData;
   let handlerExecuting = false;
   let sendLocked = false;
-  let lastPaymentRequestResult: { rolledBack: boolean } = { rolledBack: false };
+  // Per-call result holders for `confirmPaymentRequest`. Each invocation
+  // pushes its own holder before awaiting `send`; the CONFIRM_PAYMENT_REQUEST
+  // handler snapshots and drains holders right after acquiring `sendLocked`,
+  // so concurrent callers blocked by the lock keep their own default and
+  // never observe another call's outcome.
+  let pendingPaymentRequestConfirms: { rolledBack: boolean }[] = [];
   const listeners = new Set<() => void>();
 
   function setStep<S extends FlowStep>(nextStep: S, data: StepDataMap[S]): void {
@@ -345,13 +351,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         const result = await operations.executeMelt(data.mintUrl, data.meltTarget, data.amount, data.unit);
         logger.info('machine.melt.success', { mintUrl: data.mintUrl });
 
-        if (operations.linkTransaction) {
-          try {
-            const parsed = JSON.parse(result.historyEntry);
-            if (parsed?.id) operations.linkTransaction(data.meltTarget, parsed.id);
-          } catch (e) {
-            logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
-          }
+        const parsed = parseHistoryEntryOnce(result.historyEntry);
+        if (operations.linkTransaction && parsed?.id) {
+          operations.linkTransaction(data.meltTarget, parsed.id);
         }
 
         void notifications?.onPaymentConfirmed?.({
@@ -362,28 +364,23 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           historyEntry: result.historyEntry,
         });
 
-        try {
-          const parsed = JSON.parse(result.historyEntry);
-          if (parsed?.id) {
-            void notifications?.onTransactionCreated?.({
-              transactionId: parsed.id,
-              type: 'melt',
-              mintUrl: data.mintUrl,
-              amount: data.amount,
-              unit: data.unit,
-              rawInput: flowCtx.rawInput,
-              source: flowCtx.source,
-            });
-            void notifications?.onMeltQuoteCreated?.({
-              mintUrl: data.mintUrl,
-              operationId: parsed.id,
-              amount: data.amount,
-              unit: data.unit,
-              meltTarget: data.meltTarget,
-            });
-          }
-        } catch (e) {
-          logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
+        if (parsed?.id) {
+          void notifications?.onTransactionCreated?.({
+            transactionId: parsed.id,
+            type: 'melt',
+            mintUrl: data.mintUrl,
+            amount: data.amount,
+            unit: data.unit,
+            rawInput: flowCtx.rawInput,
+            source: flowCtx.source,
+          });
+          void notifications?.onMeltQuoteCreated?.({
+            mintUrl: data.mintUrl,
+            operationId: parsed.id,
+            amount: data.amount,
+            unit: data.unit,
+            meltTarget: data.meltTarget,
+          });
         }
 
         setStep('navigateToMeltPreview', { ...data, historyEntry: result.historyEntry });
@@ -393,15 +390,19 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       }
 
       handlerExecuting = false;
-      sendLocked = false;
       notify();
 
-      if (step !== originalStep) {
-        try {
+      // Hold sendLocked across dispatchHandler so a re-entrant CONFIRM_MELT
+      // can't race the navigation. Mirrors the main-path try/finally below
+      // (search for "Wrap the main transition path"); previously the lock was
+      // released before dispatch, leaving an asymmetric window.
+      try {
+        if (step !== originalStep) {
           await dispatchHandler(step, stepData);
-        } finally {
           notify();
         }
+      } finally {
+        sendLocked = false;
       }
       return;
     }
@@ -409,6 +410,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     if (event.type === 'CONFIRM_PAYMENT_REQUEST' && step === 'navigateToPaymentRequest' && operations?.executePaymentRequest) {
       const originalStep = step;
       const data = stepData as StepDataMap['navigateToPaymentRequest'];
+      // Snapshot holders registered before this handler ran. Concurrent
+      // callers that arrive during the await below hit the sendLocked guard
+      // and resolve through their own holder (which never reaches this
+      // snapshot) — the prior closure-variable design leaked one call's
+      // result to a subsequent locked-out caller.
+      const holders = pendingPaymentRequestConfirms;
+      pendingPaymentRequestConfirms = [];
+      const settle = (rolledBack: boolean) => {
+        for (const h of holders) h.rolledBack = rolledBack;
+      };
       logger.info('machine.confirmPaymentRequest.start', {
         mintUrl: data.mintUrl,
         amount: data.amount,
@@ -433,7 +444,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             mintUrl: data.mintUrl,
             errorMessage: result.errorMessage,
           });
-          lastPaymentRequestResult = { rolledBack: true };
+          settle(true);
           routeOperationFailure(
             new Error(result.errorMessage ?? 'Delivery failed'),
             'paymentRequest',
@@ -444,15 +455,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         } else {
           // Normal success path
           logger.info('machine.paymentRequest.success', { mintUrl: data.mintUrl });
-          lastPaymentRequestResult = { rolledBack: false };
+          settle(false);
 
-          if (operations.linkTransaction) {
-            try {
-              const parsed = JSON.parse(result.historyEntry);
-              if (parsed?.id) operations.linkTransaction(data.paymentRequest, parsed.id);
-            } catch (e) {
-              logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
-            }
+          const parsed = parseHistoryEntryOnce(result.historyEntry);
+          if (operations.linkTransaction && parsed?.id) {
+            operations.linkTransaction(data.paymentRequest, parsed.id);
           }
 
           void notifications?.onPaymentConfirmed?.({
@@ -463,41 +470,39 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             historyEntry: result.historyEntry,
           });
 
-          try {
-            const parsed = JSON.parse(result.historyEntry);
-            if (parsed?.id) {
-              void notifications?.onTransactionCreated?.({
-                transactionId: parsed.id,
-                type: 'send',
-                mintUrl: data.mintUrl,
-                amount: data.amount,
-                unit: data.unit,
-                rawInput: flowCtx.rawInput,
-                source: flowCtx.source,
-              });
-            }
-          } catch (e) {
-            logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
+          if (parsed?.id) {
+            void notifications?.onTransactionCreated?.({
+              transactionId: parsed.id,
+              type: 'send',
+              mintUrl: data.mintUrl,
+              amount: data.amount,
+              unit: data.unit,
+              rawInput: flowCtx.rawInput,
+              source: flowCtx.source,
+            });
           }
 
           setStep('navigateToPaymentRequest', { ...data, historyEntry: result.historyEntry });
         }
       } catch (err) {
         logger.warn('machine.paymentRequest.failed', { error: errField(err) });
-        lastPaymentRequestResult = { rolledBack: false };
+        settle(false);
         routeOperationFailure(err, 'paymentRequest', data.paymentRequest, data);
       }
 
       handlerExecuting = false;
-      sendLocked = false;
       notify();
 
-      if (step !== originalStep) {
-        try {
+      // Hold sendLocked across dispatchHandler so a re-entrant
+      // CONFIRM_PAYMENT_REQUEST can't race the navigation. Same try/finally
+      // shape as CONFIRM_MELT above and the main path's wrapper below.
+      try {
+        if (step !== originalStep) {
           await dispatchHandler(step, stepData);
-        } finally {
           notify();
         }
+      } finally {
+        sendLocked = false;
       }
       return;
     }
@@ -657,14 +662,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             await nfcAdapter.writeToken(nfcSendResult.token);
             await nfcAdapter.releaseSession();
 
+            const parsed = parseHistoryEntryOnce(nfcSendResult.historyEntry);
             // Link transaction for scan history provenance
-            if (operations.linkTransaction && flowCtx.rawInput) {
-              try {
-                const parsed = JSON.parse(nfcSendResult.historyEntry);
-                if (parsed?.id) operations.linkTransaction(flowCtx.rawInput, parsed.id);
-              } catch (e) {
-                logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
-              }
+            if (operations.linkTransaction && flowCtx.rawInput && parsed?.id) {
+              operations.linkTransaction(flowCtx.rawInput, parsed.id);
             }
 
             void notifications?.onPaymentConfirmed?.({
@@ -675,21 +676,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               historyEntry: nfcSendResult.historyEntry,
             });
 
-            try {
-              const parsed = JSON.parse(nfcSendResult.historyEntry);
-              if (parsed?.id) {
-                void notifications?.onTransactionCreated?.({
-                  transactionId: parsed.id,
-                  type: 'send',
-                  mintUrl: data.mintUrl,
-                  amount: data.amount,
-                  unit: data.unit,
-                  rawInput: flowCtx.rawInput,
-                  source: 'nfc',
-                });
-              }
-            } catch (e) {
-              logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
+            if (parsed?.id) {
+              void notifications?.onTransactionCreated?.({
+                transactionId: parsed.id,
+                type: 'send',
+                mintUrl: data.mintUrl,
+                amount: data.amount,
+                unit: data.unit,
+                rawInput: flowCtx.rawInput,
+                source: 'nfc',
+              });
             }
 
             setStep('sendComplete', { historyEntry: nfcSendResult.historyEntry });
@@ -738,21 +734,17 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           logger.info('machine.send.success');
           setStep('sendComplete', { historyEntry: result.historyEntry });
 
-          try {
-            const parsed = JSON.parse(result.historyEntry);
-            if (parsed?.id) {
-              void notifications?.onTransactionCreated?.({
-                transactionId: parsed.id,
-                type: 'send',
-                mintUrl: data.mintUrl,
-                amount: data.amount,
-                unit: flowCtx.unit,
-                rawInput: flowCtx.rawInput,
-                source: flowCtx.source,
-              });
-            }
-          } catch (e) {
-            logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
+          const parsed = parseHistoryEntryOnce(result.historyEntry);
+          if (parsed?.id) {
+            void notifications?.onTransactionCreated?.({
+              transactionId: parsed.id,
+              type: 'send',
+              mintUrl: data.mintUrl,
+              amount: data.amount,
+              unit: flowCtx.unit,
+              rawInput: flowCtx.rawInput,
+              source: flowCtx.source,
+            });
           }
         } catch (err) {
           const walletCtx = getContext();
@@ -776,21 +768,17 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                   mintWasOffline: true,
                 });
 
-                try {
-                  const parsed = JSON.parse(result.historyEntry);
-                  if (parsed?.id) {
-                    void notifications?.onTransactionCreated?.({
-                      transactionId: parsed.id,
-                      type: 'send',
-                      mintUrl: data.mintUrl,
-                      amount: data.amount,
-                      unit: flowCtx.unit,
-                      rawInput: flowCtx.rawInput,
-                      source: flowCtx.source,
-                    });
-                  }
-                } catch (e) {
-                  logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
+                const parsed = parseHistoryEntryOnce(result.historyEntry);
+                if (parsed?.id) {
+                  void notifications?.onTransactionCreated?.({
+                    transactionId: parsed.id,
+                    type: 'send',
+                    mintUrl: data.mintUrl,
+                    amount: data.amount,
+                    unit: flowCtx.unit,
+                    rawInput: flowCtx.rawInput,
+                    source: flowCtx.source,
+                  });
                 }
 
                 handled = true;
@@ -857,21 +845,17 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           logger.info('machine.createMintQuote.success');
           setStep('mintQuoteCreated', { historyEntry: result.historyEntry, unit: data.unit });
 
-          try {
-            const parsed = JSON.parse(result.historyEntry);
-            if (parsed?.id) {
-              void notifications?.onTransactionCreated?.({
-                transactionId: parsed.id,
-                type: 'mint',
-                mintUrl: data.mintUrl,
-                amount: data.amount,
-                unit: data.unit,
-                rawInput: flowCtx.rawInput,
-                source: flowCtx.source,
-              });
-            }
-          } catch (e) {
-            logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
+          const parsed = parseHistoryEntryOnce(result.historyEntry);
+          if (parsed?.id) {
+            void notifications?.onTransactionCreated?.({
+              transactionId: parsed.id,
+              type: 'mint',
+              mintUrl: data.mintUrl,
+              amount: data.amount,
+              unit: data.unit,
+              rawInput: flowCtx.rawInput,
+              source: flowCtx.source,
+            });
           }
         } catch (err) {
           logger.warn('machine.createMintQuote.failed', { error: errField(err) });
@@ -1137,10 +1121,20 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   const mintTrusted = () => send({ type: 'MINT_TRUSTED' });
 
   const confirmMelt = () => send({ type: 'CONFIRM_MELT' });
-  const confirmPaymentRequest = async () => {
-    lastPaymentRequestResult = { rolledBack: false };
-    await send({ type: 'CONFIRM_PAYMENT_REQUEST' });
-    return lastPaymentRequestResult;
+  const confirmPaymentRequest = async (): Promise<{ rolledBack: boolean }> => {
+    // Per-call holder isolates this caller's result from any concurrent
+    // confirmPaymentRequest the lock blocks. The handler writes only to
+    // holders it snapshotted before its await, so a locked-out caller's
+    // holder retains its default `{ rolledBack: false }`.
+    const holder: { rolledBack: boolean } = { rolledBack: false };
+    pendingPaymentRequestConfirms.push(holder);
+    try {
+      await send({ type: 'CONFIRM_PAYMENT_REQUEST' });
+      return holder;
+    } finally {
+      const idx = pendingPaymentRequestConfirms.indexOf(holder);
+      if (idx >= 0) pendingPaymentRequestConfirms.splice(idx, 1);
+    }
   };
 
   const reset = () => {

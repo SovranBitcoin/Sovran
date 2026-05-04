@@ -16,6 +16,7 @@ import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 import { isMintOfflineError } from '../errors';
 import { errField, logger } from '../logger';
 import type { Destination, MachineOperations, PaymentMachine } from '../machine/types';
+import { parseHistoryEntryOnce } from '../operations/historyEntry';
 import type { ScreenActionContext, ScreenActionHandlerMap } from './types';
 
 // ---------------------------------------------------------------------------
@@ -196,32 +197,28 @@ export function createDefaultScreenActionHandlers(
             hasSetEntry: !!setEntry,
             hasHistoryEntry: !!result.historyEntry,
           });
-          if (setEntry && result.historyEntry) {
-            try {
-              const realEntry = JSON.parse(result.historyEntry);
-              logger.info('screenAction.receiveToken.redeem.entryUpdate.apply', {
-                id: realEntry.id,
-                type: realEntry.type,
-                amount: realEntry.amount,
-              });
-              setEntry(realEntry);
+          const realEntry = parseHistoryEntryOnce(result.historyEntry);
+          if (setEntry && realEntry) {
+            logger.info('screenAction.receiveToken.redeem.entryUpdate.apply', {
+              id: realEntry.id,
+              type: realEntry.type,
+              amount: realEntry.amount,
+            });
+            setEntry(realEntry as EntryLike);
 
-              // Link transaction for scan history. Prefer the original raw
-              // input captured from flowCtx so the wallet's scan store can
-              // match by `processed === raw`. Fall back to the entry's
-              // metadata.rawToken (re-encoded form) only if flowCtx.rawInput
-              // is missing (e.g. NPC/non-scan flows).
-              if (ops.linkTransaction && realEntry.id) {
-                const linkInput =
-                  scannedRawInput ??
-                  getString(getMetadata(entry), 'rawToken') ??
-                  tokenString;
-                ops.linkTransaction(linkInput, realEntry.id);
-              }
-            } catch (e) {
-              logger.warn('screenAction.receiveToken.historyParseFailed', { error: errField(e) });
+            // Link transaction for scan history. Prefer the original raw
+            // input captured from flowCtx so the wallet's scan store can
+            // match by `processed === raw`. Fall back to the entry's
+            // metadata.rawToken (re-encoded form) only if flowCtx.rawInput
+            // is missing (e.g. NPC/non-scan flows).
+            if (ops.linkTransaction && realEntry.id) {
+              const linkInput =
+                scannedRawInput ??
+                getString(getMetadata(entry), 'rawToken') ??
+                tokenString;
+              ops.linkTransaction(linkInput, realEntry.id);
             }
-          } else {
+          } else if (!setEntry || !result.historyEntry) {
             logger.warn('screenAction.receiveToken.redeem.entryUpdate.skipped', {
               hasSetEntry: !!setEntry,
               hasHistoryEntry: !!result.historyEntry,
@@ -236,20 +233,17 @@ export function createDefaultScreenActionHandlers(
             historyEntry: result.historyEntry,
           });
 
-          try {
-            const parsed = JSON.parse(result.historyEntry);
-            if (parsed?.id) {
-              notify('onTransactionCreated', {
-                transactionId: parsed.id,
-                type: 'receive',
-                mintUrl,
-                amount: amount ?? 0,
-                unit,
-                rawInput: scannedRawInput,
-                source: flowCtx?.source,
-              });
-            }
-          } catch { /* ignore parse errors */ }
+          if (realEntry?.id) {
+            notify('onTransactionCreated', {
+              transactionId: realEntry.id,
+              type: 'receive',
+              mintUrl,
+              amount: amount ?? 0,
+              unit,
+              rawInput: scannedRawInput,
+              source: flowCtx?.source,
+            });
+          }
 
           if (result.hadP2PKProofs != null) {
             notify('onP2PKReceiveCompleted', {
