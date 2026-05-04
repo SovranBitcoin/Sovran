@@ -160,7 +160,9 @@
         "skill:wycheproof"
       ],
       "verification_note": "Confirmed bytes flow: SecureStore → nip19.decode → privateKey: Uint8Array → createWhitenoiseSigner (closure capture) → never zeroed. Counter-argument: 'this matches the existing CocoManager pattern, and prior audits accepted that'. Read shared/lib/cashu/manager.ts:101 — also takes Uint8Array, also captures in a static field. Same gap. Filed here because the audit boundary is whitenoise; CocoManager's parallel issue is on the open list for audit 04.json/09.json. UNVERIFIED whether nostr-tools' nip44.v2.utils.getConversationKey caches the conversation key in a way that survives input zeroing — flagged in fix.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Signer now copies the privateKey into an owned buffer and exposes a dispose() that zeros the buffer + trips a guard. WhitenoiseProvider's useEffect cleanup calls disposeSigner on profile-switch / unmount. Regression test in __tests__/whitenoiseSignerDispose.test.ts. Note: nostr-tools' nip44.v2.utils.getConversationKey may cache derived secrets internally — UNVERIFIED upstream — so this is defense-in-depth, not a complete wipe."
     },
     {
       "id": "F-005",
@@ -226,7 +228,9 @@
         "features/whitenoise/hooks/useWhitenoiseInbox.ts:3"
       ],
       "verification_note": "analyze-structure cycle output: hooks/useWhitenoiseInbox.ts → WhitenoiseProvider.tsx → hooks/useWhitenoiseInbox.ts. Knip output corroborates by reporting useWhitenoiseClient as 'unused' — a known cycle-induced false positive. Confirmed by reading both files.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Cycle was already broken before this slice — useWhitenoiseInbox imports useWhitenoise from a separate WhitenoiseContext.ts module (see WhitenoiseContext.ts:16-20 comment documenting the prior fix). InboxWatcher is also already extracted as a sibling component inside WhitenoiseProvider."
     },
     {
       "id": "F-008",
@@ -249,7 +253,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Two paths confirmed. Counter-argument: 'they always agree because the provider remounts on profile switch and useProfileStore updates synchronously'. True today; but the audit boundary is correctness invariants. The fix is one-line per call site.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useWhitenoiseDM no longer takes accountIndex as a parameter — reads it from useWhitenoise() context like the sibling hooks (useWhitenoiseRequests, useWhitenoiseDmContacts). The lazy-init useRef for WhitenoiseDmIndex is now a useMemo keyed on accountIndex, so a future provider re-mount with a different account creates a fresh index. WhitenoiseDMScreen no longer reads activeAccountIndex from useProfileStore."
     },
     {
       "id": "F-009",
@@ -337,7 +343,9 @@
         "features/whitenoise/hooks/useWhitenoiseDM.ts:111-114"
       ],
       "verification_note": "Cited evidence: code path. No log-doctor measurement available — UNVERIFIED on actual perf impact, but the structural inefficiency is undeniable.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "upsertMessage now uses sorted insertion (findIndex + splice) — O(n) per upsert vs the previous full sort. Bundled into the F-008 useMemo refactor since both touch the same hook."
     },
     {
       "id": "F-013",
