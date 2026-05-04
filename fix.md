@@ -69,7 +69,15 @@ means it's editable.
 These hold across every slice. They're not negotiable and not obvious
 from "fix the audit findings" alone.
 
-1. **Refactor toward intent, not behavior.** When code's intent is clear
+1. **Default to deletion.** Slop is too much code, not too little. The
+   smallest viable diff is best; new code, new files, new abstractions,
+   new helpers, and new dependencies must justify themselves against the
+   "just delete the caller-side scaffold" alternative. The slice budget
+   (≤500 logic lines) is a cap on additions, not a target — additions
+   need stronger justification than deletions, and a slice that ships
+   with `+0 / -200` is a better outcome than one that ships `+250 / -250`
+   for the same finding set.
+2. **Refactor toward intent, not behavior.** When code's intent is clear
    but the implementation is buggy, half-finished, or wrong, fix it —
    don't preserve the bug just because it's the current behavior.
    Optimistic-update flows are a recurring offender: verify they actually
@@ -78,18 +86,18 @@ from "fix the audit findings" alone.
    bypass is intent-vs-behavior failure on the consumer side; sovran-leak
    is the same on the package side. Both are bugs to fix, not shapes to
    preserve.
-2. **Question library usage.** If we're using a dependency against its
+3. **Question library usage.** If we're using a dependency against its
    grain or reinventing what it already provides (zod, neverthrow,
    Reanimated, Zustand, NDK, coco, cashu-ts), switch to the intended API.
    Custom rolled state machines, hand-written promise pools, hand-written
    debouncers, hand-written persistence migrators — all candidates for
    "use the library that exists."
-3. **Ubiquitous language.** Names in our code match the vocabulary of
+4. **Ubiquitous language.** Names in our code match the vocabulary of
    `coco/`, `cashu-ts/`, the protocol specs (`nuts/`, `nips/`, `luds/`),
    and `../sovran-schemas/`. Parallel terms invented in-house are rename
    targets. This applies inside `coco-payment-ux/` too — don't let the
    package name imply the code is third-party.
-4. **Consolidate look-alikes.** When two components, helpers, or hooks
+5. **Consolidate look-alikes.** When two components, helpers, or hooks
    differ only for historical vibe-coded reasons or in ways the user
    can't perceive, merge them. When the difference is intentional and
    load-bearing, leave them. Use judgment; context usually makes the

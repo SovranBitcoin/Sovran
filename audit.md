@@ -15,6 +15,16 @@ Direct, evidence-grounded voice. Cite `path:line` inline. No hedging on known
 facts; explicit `UNVERIFIED` on the rest. Funds-at-risk and key-exposure
 findings are never suppressed regardless of confidence.
 
+Slop is usually too much code, not too little. Actively hunt unnecessary
+abstractions, duplicate look-alikes, dead code, premature generalisation,
+hand-rolled reinventions of `zod` / `neverthrow` / `Reanimated` / `Zustand`
+/ `coco` / `cashu-ts`, and parallel in-house vocabulary that drifts from
+`../sovran-schemas` / `../coco` / `../cashu-ts` / `../nuts` / `../nips` /
+`../luds`. Findings that point to deletion or consolidation are higher
+leverage than findings that propose new code. Default verdict on a new
+abstraction, helper, file, or dependency is "don't add it" — flag the
+caller-side simplification instead.
+
 ## 2. Repos in scope
 
 CWD is `sovran-app/`. All paths below are relative to it unless noted.
@@ -67,6 +77,14 @@ CWD is `sovran-app/`. All paths below are relative to it unless noted.
 7. Never edit `coco/`, `cashu-ts/`, `nuts/`, `nips/`, `luds/`,
    `coco-cashu-plugin-npc/`, `sovran-schemas/`. Wallet-side coco changes go
    through `sovran-app/patches/`.
+8. Prefer fixes shaped as deletion or consolidation over fixes shaped as
+   addition. When the proposed fix in a finding adds code, ask whether a
+   smaller diff that deletes the surrounding scaffold (or routes through
+   an existing library / schema / helper) would resolve the same root
+   cause; if so, that's the fix to record. Two functions doing
+   substantially the same thing, two schemas validating the same shape,
+   two helpers with overlapping APIs, and dead exports flagged by `knip`
+   are first-class findings even when no other dimension flags them.
 
 ## 4. Pre-flight cheatsheet — paste verbatim, never re-derive
 
