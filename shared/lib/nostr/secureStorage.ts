@@ -237,6 +237,13 @@ export async function storeMnemonic(mnemonic: string): Promise<boolean> {
   return secureSet(STORAGE_KEYS.USER_MNEMONIC, mnemonic, 'store_mnemonic');
 }
 
+// Single-flight guard: SecureStore reads with requireAuthentication:true
+// (IOS_SECURE_OPTIONS) trigger a FaceID/TouchID prompt per call. Multiple
+// concurrent boot-time callers (useMnemonic hydration, NostrKeysProvider
+// derivation, AppGate reinstall-detection) must share one prompt, not race
+// to issue several. Mirrors `inflightEnsureMnemonic` below.
+let inflightRetrieveMnemonic: Promise<string | null> | null = null;
+
 /**
  * Retrieves the user's mnemonic phrase from secure storage. The same BIP-39
  * gate that storeMnemonic enforces on the write side is re-checked here:
@@ -245,8 +252,21 @@ export async function storeMnemonic(mnemonic: string): Promise<boolean> {
  * wrong-identity derivation is worse than a loud null. Bad reads are NOT
  * auto-deleted — the user is the only holder of the seed, so a corrupt blob
  * is surfaced to the recovery path instead of being destroyed.
+ *
+ * Concurrent callers share one in-flight promise so a single FaceID prompt
+ * resolves the whole boot wave.
  */
-export async function retrieveMnemonic(): Promise<string | null> {
+export function retrieveMnemonic(): Promise<string | null> {
+  if (inflightRetrieveMnemonic) {
+    return inflightRetrieveMnemonic;
+  }
+  inflightRetrieveMnemonic = retrieveMnemonicInner().finally(() => {
+    inflightRetrieveMnemonic = null;
+  });
+  return inflightRetrieveMnemonic;
+}
+
+async function retrieveMnemonicInner(): Promise<string | null> {
   const value = await secureGet(STORAGE_KEYS.USER_MNEMONIC, 'retrieve_mnemonic');
   if (value == null) return null;
   if (!bip39.validateMnemonic(value, wordlist)) {
