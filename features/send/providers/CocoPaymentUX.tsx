@@ -48,7 +48,7 @@ import {
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { createNfcAdapter } from '@/shared/lib/nfc/adapter';
+import { createNfcAdapter } from '@/shared/lib/nfc';
 import { deeplinkFailedPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
