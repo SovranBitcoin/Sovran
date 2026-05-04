@@ -74,6 +74,7 @@ export function usePaymentStatusListener(): void {
         }
 
         const history = await manager.history.getPaginatedHistory(0, 100);
+        if (cancelledRef.current) return;
         const entry = history.find(
           (h) =>
             h.type === 'mint' && 'quoteId' in h && h.quoteId === quoteId && h.mintUrl === mintUrl
@@ -217,6 +218,7 @@ export function usePaymentStatusListener(): void {
         await new Promise((r) => setTimeout(r, 50));
         if (cancelledRef.current) return;
         const history = await manager.history.getPaginatedHistory(0, 20);
+        if (cancelledRef.current) return;
         const realEntry = history.find(
           (h) => h.type === 'receive' && h.amount === amount && h.mintUrl === mintUrl
         );

@@ -22,6 +22,7 @@ import type {
   MeltOperationLike,
   MintReviewInfo,
   NavigationCallbacks,
+  ScreenType,
 } from 'coco-payment-ux';
 import {
   createCocoPaymentUX,
@@ -66,6 +67,20 @@ import { normalizeMintUrlKey } from '@/shared/lib/url';
 export { usePaymentFlowMachine } from 'coco-payment-ux/react';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
+
+// Screens whose entry corresponds to a coco history-entry type. Used to
+// narrow the `history:updated` subscription so a mint-quote screen doesn't
+// recompute on every melt/send/receive mutation. Screens absent from this
+// map (mintSelector, mintInfo, amountEntry) carry non-history entries and
+// don't subscribe at all.
+const HISTORY_TYPE_BY_SCREEN: Partial<Record<ScreenType, string>> = {
+  meltQuote: 'melt',
+  mintQuote: 'mint',
+  paymentRequest: 'send',
+  receive: 'receive',
+  receiveToken: 'receive',
+  sendToken: 'send',
+};
 
 type EntryRecord = Record<string, unknown>;
 
@@ -138,7 +153,12 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   const privateKeyRef = useLatestRef(keys?.privateKey);
 
   const [nfcAdapter] = useState(() => createNfcAdapter());
-  const p2pkKeyRefreshedRef = useRef<((newKey: string | null) => void) | null>(null);
+  // Receive-screen subscribers register a callback here so the notifications
+  // factory can fan a p2pk-keypair regeneration out to every mounted receive
+  // surface. A Set (not a single slot) lets co-mounted receive screens — e.g.
+  // a modal pushed before the prior screen unmounts — each see the refresh
+  // instead of clobbering the prior subscriber's slot.
+  const p2pkKeyRefreshedSubscribers = useRef(new Set<(newKey: string | null) => void>());
   const getNpub = useCallback(() => npubRef.current, []);
 
   const getBtcPrice = useCallback(() => {
@@ -319,9 +339,17 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       onEntryUpdate: (screenType, callback) => {
         const unsubscribes: (() => void)[] = [];
 
-        if (screenType !== 'mintSelector' && screenType !== 'mintInfo') {
+        // Only screens whose entry maps to a coco history-entry type get the
+        // history:updated firehose; the rest (mintSelector, mintInfo, and the
+        // pre-flow amountEntry keypad) carry their own non-history entries
+        // and would just defaultShouldApply-reject every dispatch downstream.
+        // Narrowing here also avoids a per-update wakeup on every mint /
+        // melt / send / receive history mutation regardless of screen type.
+        const expectedHistoryType = HISTORY_TYPE_BY_SCREEN[screenType];
+        if (expectedHistoryType !== undefined) {
           unsubscribes.push(
             manager.on('history:updated', ({ entry: updated }: { mintUrl: string; entry: any }) => {
+              if (updated?.type !== expectedHistoryType) return;
               paymentLog.info('send.entry_updated', {
                 screenType,
                 type: updated?.type,
@@ -395,11 +423,12 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
               callback({ _npcMintUpdate: true } as EntryRecord);
             })
           );
-          p2pkKeyRefreshedRef.current = (newKey: string | null) => {
+          const subscriber = (newKey: string | null) => {
             callback({ _p2pkKeyUpdate: true, p2pkKey: newKey } as EntryRecord);
           };
+          p2pkKeyRefreshedSubscribers.current.add(subscriber);
           unsubscribes.push(() => {
-            p2pkKeyRefreshedRef.current = null;
+            p2pkKeyRefreshedSubscribers.current.delete(subscriber);
           });
         }
 
@@ -630,7 +659,11 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         getPubkey: () => pubkeyRef.current,
         getPrivateKey: () => privateKeyRef.current,
         getManager: () => manager,
-        onP2pkKeyRefreshed: (newKey) => p2pkKeyRefreshedRef.current?.(newKey),
+        onP2pkKeyRefreshed: (newKey) => {
+          for (const subscriber of p2pkKeyRefreshedSubscribers.current) {
+            subscriber(newKey);
+          }
+        },
       })}
       actions={actions}
       screenActionsBridge={screenActionsBridge}
