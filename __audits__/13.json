@@ -281,7 +281,9 @@
         "prior-audit:F-009@12.json"
       ],
       "verification_note": "Re-read useBitChat:331, 354, 389. Confirmed Date.now()-only derivation. Counter-argument considered: 'handleSendMessage's isSending guard at GeohashChatScreen:265 prevents the double-tap.' It catches the synchronous double-tap, but `onSubmitEditing={handleSendMessage}` at TextInput:474 fires on the keyboard return, which on iOS can coincide with a programmatic text.trim()+onChange pair from autocorrect landing at the same Date.now(). Severity Low because the damage on collision is a missing own-echo, not fund loss.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "already migrated to mintLocalId('own') in commit 3f9a0557; useBitChat lines 326/350/386 use the canonical helper"
     },
     {
       "id": "F-013",

@@ -5,16 +5,58 @@
     "entry_point": "sovran-app/features/whitenoise",
     "entry_point_autoselected": true,
     "entry_point_selection_rationale": "No prior audit covers features/whitenoise (score +7: +3 unaudited slice, +2 no substring overlap with covered_paths across 32 prior audits, +1 dim-2 priority for NIP-44/MLS encryption + bearer-key handling on a wallet, +1 recent churn — feature added in commits #186 and #189 within last 30 days). Disqualified candidates: features/ai (+7 — prompt-injection surface narrower than wallet-grade messenger crypto); features/payments/lib/decryptNip04Events.ts (+6 — single-file scope, NIP-04 decrypt narrow). Whitenoise wins because MLS-over-Nostr DMs hold long-lived secrets (group state, derived keys) and the signer holds the user's nsec.",
-    "repos_touched": ["sovran-app"],
-    "prior_audits_consulted": [
-      "01.json", "02.json", "03.json", "04.json", "05.json", "06.json", "07.json", "08.json", "09.json", "10.json",
-      "11.json", "12.json", "13.json", "14.json", "15.json", "16.json", "17.json", "18.json", "19.json", "20.json",
-      "21.json", "22.json", "23.json", "24.json", "25.json", "26.json", "27.json", "28.json", "29.json", "30.json",
-      "31.json", "32.json"
+    "repos_touched": [
+      "sovran-app"
     ],
-    "sov_specs_consulted": ["docs/README.md"],
-    "skills_consulted": ["zustand-5", "react-native-best-practices", "security-review", "wycheproof", "nostr"],
-    "process_skills_consulted": ["zoom-out", "improve-codebase-architecture", "diagnose"],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json",
+      "31.json",
+      "32.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/README.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "react-native-best-practices",
+      "security-review",
+      "wycheproof",
+      "nostr"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose"
+    ],
     "research_consulted": [],
     "tooling_run": {
       "type_check": "clean for features/whitenoise — no errors in scope",
@@ -265,7 +307,9 @@
         "features/whitenoise/hooks/useWhitenoiseDM.ts:75-82"
       ],
       "verification_note": "Confirmed Date.now() millisecond precision is the only id source. Same-ms collisions are rare but observable on fast input.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useWhitenoiseDM optimisticId now mints via mintLocalId; per-instance counterRef removed (module-scoped counter survives remounts)"
     },
     {
       "id": "F-012",
