@@ -149,7 +149,7 @@ async function rehydrateProfileStores(): Promise<void> {
   _skipPersistWrite = true;
   try {
     unstable_batchedUpdates(() => {
-      useMintStore.setState({ selectedMints: {} });
+      useMintStore.setState({ selectedMint: undefined });
       useMintDistributionStore.setState({ distributions: {} });
       useRoutstrStore.setState({
         apiKey: null,
@@ -167,8 +167,7 @@ async function rehydrateProfileStores(): Promise<void> {
       useTransactionLocationStore.setState({ locations: {} });
       useTransactionDistributionStore.setState({ distributions: {} });
       useNpcMintStore.setState({
-        mintUrls: {},
-        lastSyncedAt: {},
+        mintUrl: undefined,
         isSyncing: false,
         isUpdating: false,
       });

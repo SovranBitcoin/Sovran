@@ -203,10 +203,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         getLocale: () => useSettingsStore.getState().language || 'en',
         getBtcPrice,
         getDisplayCurrency,
-        getPreferredMintUrl: () => {
-          const pk = pubkeyRef.current;
-          return pk ? useMintStore.getState().getSelectedMint(pk) : undefined;
-        },
+        getPreferredMintUrl: () => useMintStore.getState().selectedMint,
         // Per-mint audit + KYM + operator Nostr profile, with a fallback to
         // coco's NUT-06 `getMintInfo` for mints that the auditor doesn't
         // track (e.g. mint.sovran.money is excluded from api.sovran.money).

@@ -11,7 +11,6 @@ import {
   getHeaderTitleWidthFromWidth,
   HEADER_LAYOUT,
 } from '@/features/wallet/lib/walletHeader';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
@@ -51,14 +50,11 @@ export function useMintSelector({
   unit = 'sat',
   width,
 }: MintSelectorProps): MintSelectorShared {
-  const { keys } = useNostrKeysContext();
-  const pubkey = keys?.pubkey;
-
   const { mints, isLoading: isMintsLoading } = useMintManagement();
   const { balances: liveBalances } = useBalanceContext();
 
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const mintUrl = selectedMintUrl ?? (pubkey ? selectedMints[pubkey] : undefined);
+  const storedSelectedMint = useMintStore((state) => state.selectedMint);
+  const mintUrl = selectedMintUrl ?? storedSelectedMint;
   const balance = mintUrl ? liveBalances.byMint[mintUrl]?.total || 0 : 0;
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),

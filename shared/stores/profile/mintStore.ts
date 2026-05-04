@@ -9,41 +9,55 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 const profileStorage = createProfileScopedStorage();
 
 interface MintState {
-  selectedMints: Record<string, string | undefined>;
+  selectedMint: string | undefined;
 }
 
 interface MintActions {
-  setSelectedMint: (pubkey: string, mintUrl: string) => void;
-  getSelectedMint: (pubkey: string) => string | undefined;
+  setSelectedMint: (mintUrl: string) => void;
 }
 
 type MintStore = MintState & MintActions;
 
+type PersistedMintShape = { selectedMint?: string };
+
 const PersistedMintStore = z.object({
-  selectedMints: z.record(z.string().max(128), z.string().max(2048).optional()).default({}),
+  selectedMint: z.string().max(2048).optional(),
 });
+
+// v1 -> v2: the legacy `selectedMints: Record<pubkey, url>` was double-scoped
+// inside an already-profile-scoped storage key, so the record holds at most
+// one meaningful entry — the active profile's. Pick the first defined value.
+function migrateMintStore(state: unknown, version: number): PersistedMintShape {
+  if (version >= 2 && state && typeof state === 'object' && 'selectedMint' in state) {
+    return { selectedMint: (state as PersistedMintShape).selectedMint };
+  }
+  if (state && typeof state === 'object' && 'selectedMints' in state) {
+    const map = (state as { selectedMints?: Record<string, string | undefined> }).selectedMints;
+    const first = map
+      ? Object.values(map).find((v): v is string => typeof v === 'string' && v.length > 0)
+      : undefined;
+    return { selectedMint: first };
+  }
+  return { selectedMint: undefined };
+}
 
 export const useMintStore = create<MintStore>()(
   persist(
-    (set, get) => ({
-      selectedMints: {},
+    (set) => ({
+      selectedMint: undefined,
 
-      setSelectedMint: (pubkey: string, mintUrl: string) => {
+      setSelectedMint: (mintUrl: string) => {
         storeLog.info('store.mint.set_selected', { mintUrl });
-        set((state) => ({
-          selectedMints: { ...state.selectedMints, [pubkey]: mintUrl },
-        }));
+        set({ selectedMint: mintUrl });
       },
-
-      getSelectedMint: (pubkey: string) => get().selectedMints[pubkey],
     }),
     persistConfig({
       name: 'mint-store',
       storage: profileStorage,
       schema: PersistedMintStore,
-      partialize: (state) => ({
-        selectedMints: state.selectedMints,
-      }),
+      version: 2,
+      migrate: migrateMintStore,
+      partialize: (state) => ({ selectedMint: state.selectedMint }),
     })
   )
 );

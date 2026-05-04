@@ -29,7 +29,6 @@ import { type PickerCandidate } from '@/features/splitBill/hooks/useSplitBillPar
 import { ParticipantRow } from '@/features/splitBill/components/ParticipantRow';
 import { useSplitBillTransactionsStore } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -108,10 +107,7 @@ export default function SplitBillParticipantsScreen() {
   const picker = useSplitBillPickerContext();
   const { sections, selected, selectedIds, toggle } = picker;
 
-  const { keys: nostrKeys } = useNostrKeysContext();
-  const activeMintUrl = useMintStore((s) =>
-    nostrKeys?.pubkey ? s.selectedMints[nostrKeys.pubkey] : undefined
-  );
+  const activeMintUrl = useMintStore((s) => s.selectedMint);
   const startGroup = useSplitBillTransactionsStore((s) => s.startGroup);
 
   // Toggle wrapper — instruments latency so logs show the gap between

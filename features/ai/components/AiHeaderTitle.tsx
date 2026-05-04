@@ -31,7 +31,7 @@ export function AiHeaderTitle() {
       return;
     }
     useRoutstrTopUpStore.getState().start(null);
-    const preferredMint = useMintStore.getState().getSelectedMint(nostrKeys.pubkey) ?? '';
+    const preferredMint = useMintStore.getState().selectedMint ?? '';
     router.navigate({
       pathname: '/(send-flow)/amount',
       params: {

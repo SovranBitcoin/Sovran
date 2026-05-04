@@ -24,7 +24,6 @@ import { type WalletContext } from 'coco-payment-ux';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, initLog, useInitMount } from '@/shared/lib/logger';
 
@@ -66,11 +65,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     [rawBalanceCtx]
   );
   const manager = useManager();
-  const { keys } = useNostrKeysContext();
-  const pubkey = keys?.pubkey;
-  const preferredMintUrl = useMintStore(
-    useCallback((state) => (pubkey ? state.selectedMints[pubkey] : undefined), [pubkey])
-  );
+  const preferredMintUrl = useMintStore((state) => state.selectedMint);
 
   const [proofAmounts, setProofAmounts] = useState<Record<string, number[]>>({});
 

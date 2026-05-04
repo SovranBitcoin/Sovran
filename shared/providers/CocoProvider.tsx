@@ -51,11 +51,7 @@ interface CocoProviderProps {
   children: ReactNode;
 }
 
-async function initializeDefaultMints(
-  manager: Manager,
-  pubkey?: string,
-  setSelectedMint?: (pubkey: string, mintUrl: string) => void
-): Promise<void> {
+async function initializeDefaultMints(manager: Manager): Promise<void> {
   try {
     log.info('coco.init_default_mints');
 
@@ -77,21 +73,17 @@ async function initializeDefaultMints(
       }
     }
 
-    if (pubkey && setSelectedMint) {
-      try {
-        const getSelectedMint = useMintStore.getState().getSelectedMint;
-        const currentSelectedMint = getSelectedMint(pubkey);
-
-        if (!currentSelectedMint) {
-          const isDefaultTrusted = await manager.mint.isTrustedMint(defaultSelectedMint);
-          if (isDefaultTrusted) {
-            setSelectedMint(pubkey, defaultSelectedMint);
-            log.info('coco.mint_selected', { pubkey });
-          }
+    try {
+      const { selectedMint, setSelectedMint } = useMintStore.getState();
+      if (!selectedMint) {
+        const isDefaultTrusted = await manager.mint.isTrustedMint(defaultSelectedMint);
+        if (isDefaultTrusted) {
+          setSelectedMint(defaultSelectedMint);
+          log.info('coco.mint_selected');
         }
-      } catch (error) {
-        log.warn('coco.mint_select_failed', { error });
       }
+    } catch (error) {
+      log.warn('coco.mint_select_failed', { error });
     }
 
     log.info('coco.init_default_mints_done');
@@ -185,12 +177,8 @@ export function CocoProvider({ children }: CocoProviderProps) {
         // immediately — neither uses the deterministic counter.
         await initPhase('Coco-bg.safeWatchers', () => CocoManager.enableSafeWatchers());
 
-        const currentPubkey = keys?.pubkey;
         bgStage.log('Initializing default mints...');
-        const currentSetSelectedMint = useMintStore.getState().setSelectedMint;
-        await initPhase('Coco-bg.defaultMints', () =>
-          initializeDefaultMints(manager, currentPubkey, currentSetSelectedMint)
-        );
+        await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(manager));
 
         // Block NPC sync + the mint-operation processor until the wallet
         // has restored its NUT-13 counter (or proven restore isn't needed).

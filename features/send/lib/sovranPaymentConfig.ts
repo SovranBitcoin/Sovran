@@ -637,10 +637,7 @@ export function createSovranNotifications(
     // ── State change notifications ──────────────────────────────────
 
     onPreferredMintChanged: ({ mintUrl }) => {
-      const pubkey = config?.getPubkey?.();
-      if (pubkey) {
-        useMintStore.getState().setSelectedMint(pubkey, mintUrl);
-      }
+      useMintStore.getState().setSelectedMint(mintUrl);
     },
 
     onNpcMintChanged: async ({ mintUrl }) => {

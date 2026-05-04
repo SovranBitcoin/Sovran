@@ -873,9 +873,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     // upfront choice popup and let the user pick at Next time. We default
     // destination to sendEcash and pass meltTarget alongside so the Lightning
     // variant is enabled on arrival.
-    const mint = nostrKeys?.pubkey
-      ? (useMintStore.getState().getSelectedMint(nostrKeys.pubkey) ?? '')
-      : '';
+    const mint = useMintStore.getState().selectedMint ?? '';
     router.navigate({
       pathname: '/(send-flow)/amount',
       params: {

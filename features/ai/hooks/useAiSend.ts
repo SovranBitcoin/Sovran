@@ -126,7 +126,7 @@ export function useAiSend() {
         return;
       }
       useRoutstrTopUpStore.getState().start(pendingMessage);
-      const preferredMint = useMintStore.getState().getSelectedMint(nostrKeys.pubkey) ?? '';
+      const preferredMint = useMintStore.getState().selectedMint ?? '';
       router.navigate({
         pathname: '/(send-flow)/amount',
         params: {

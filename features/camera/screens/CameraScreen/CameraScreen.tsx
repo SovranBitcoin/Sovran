@@ -20,7 +20,6 @@ import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import Icon from 'assets/icons';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -56,9 +55,7 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
   useLifecycleLogger('CameraScreen');
   const params = useRouteParams(ParamsSchema, { where: 'camera' });
   const unit = params?.unit;
-  const { keys } = useNostrKeysContext();
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
+  const selectedMint = useMintStore((state) => state.selectedMint);
   const walletContext = useWalletContextWithOverride(selectedMint);
   const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
