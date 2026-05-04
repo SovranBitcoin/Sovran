@@ -186,7 +186,7 @@
       "verification_note": "Re-checked at lines 305, 337-339. Counter-argument: in practice the user can only initiate one melt at a time; mint-scoped locking in coco prevents parallel melts. Partial — that's true for foreground initiations, but the coco MeltOperationService also runs background recovery for stuck quotes (sovran-app/AUDIT.md cites 'Pending-operation recovery' as part of post-mount lane step 5 in SOV-00 §7). Background rollbacks of stuck melts are exactly the case this matches incorrectly.",
       "prior_audit_id": null,
       "completion_status": "deferred",
-      "completion_note": "Variant-only matching unchanged; quoteId/operationId match needs its own behavioural change."
+      "completion_note": "Considered alongside the coco-payment-ux history-entry typing slice (commit db64864e) but kept out of scope: the audit's recommended fix (`store.active.id === operation.quoteId`) cannot land on its own — the active toast id is currently `melt-${Date.now()}` from sovranPaymentConfig.ts:445 onPaymentProcessing, and that callback fires before the melt operation exists in coco so it has no operationId/quoteId to pass through. A real fix needs the coco-payment-ux machine's onPaymentProcessing notification surface (machine/types.ts:369) widened to carry an `operationId` (or a post-prepare onPaymentInitialized event) so sovranPaymentConfig can use coco's id as the toast id; only then does the listener-side narrow have something to match against. That change crosses the package boundary and exceeds this slice."
     },
     {
       "id": "F-006",

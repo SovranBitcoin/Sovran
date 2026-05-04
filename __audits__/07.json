@@ -87,7 +87,7 @@
       "verification_note": "Listed src/schemas/ \u2014 empty. Grepped zod \u2014 zero hits. Counter-argument considered: maybe validation happens one level up in the app's apiClient \u2014 apiClient.ts does not cover LNURL, nip44 rumors, or coco history (those never traverse apiClient). The gap is real and local to this package.",
       "prior_audit_id": "F-006@06.json",
       "completion_status": "partial",
-      "completion_note": "LNURL boundary now validates pay-params + invoice via shared zod schemas + bolt11 amount assert. nip17.ts seal/rumor and defaultOperations.ts history-JSON casts are still bare."
+      "completion_note": "LNURL boundary now validates pay-params + invoice via shared zod schemas + bolt11 amount assert. Slice db64864e closes the defaultOperations.ts history-JSON arm: the three raw `JSON.parse(historyEntry)` sites at lines 220/261/786 now route through `parseHistoryEntryOnce` (shared helper from operations/historyEntry.ts), and the `(h: any) =>` filter callbacks in findSendHistoryEntryByOperationId / findReceiveHistoryEntry use `(h): h is SendHistoryEntry` / `is ReceiveHistoryEntry` guards against coco-core's typed `HistoryEntry[]` return. Synthetic-entry literals in executeSend / executeOfflineSend / executePaymentRequest collapse onto two typed builders (`buildSyntheticSendEntry`, `buildSyntheticPaymentRequestEntry`) that satisfy `SendHistoryEntry` from `@cashu/coco-core`. nip17.ts seal/rumor zod parsing remains the only un-validated arm of this finding."
     },
     {
       "id": "F-004",
