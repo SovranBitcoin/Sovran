@@ -187,8 +187,8 @@
       ],
       "verification_note": "research:neverthrow-boundary-playbook NOT actually opened in this audit — citing the slug would violate <research_integration>. Removing the citation. Counter-argument: write-token.ts is consumed by a screen-action handler that also catches; converting to ResultAsync is churn for limited gain. Held — the inconsistency between sibling files is the load-bearing finding, not the absolute neverthrow purity. Severity Medium because no funds-at-risk, just maintainability drift.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Commit b4f7e1d1 collapsed the two error shapes by converting writeTokenToNFC to throw NfcError, matching the rest of shared/lib/nfc/* (apdu.ts and adapter.ts already throw). NfcTokenWriteResult and its export are gone. The throw-vs-ResultAsync question is intentionally not addressed: neverthrow is barely used in the repo (one file: shared/lib/apiClient.ts), so introducing ResultAsync at the NFC seam alone would create a new inconsistency rather than collapse one. The local convention won — error shape is now symmetric across all of shared/lib/nfc/*."
+      "completion_status": "complete",
+      "completion_note": "Per the previous partial completion note, the throw-vs-ResultAsync question was intentionally left unaddressed (single-consumer of neverthrow in the repo). The symmetric throw shape across all of shared/lib/nfc/* — chosen as the local convention — is the resolution. No further work pending."
     },
     {
       "id": "F-006",
@@ -227,8 +227,8 @@
       "references": [],
       "verification_note": "Re-checked ndef.ts:109-126. The downstream `decodeTextRecord` call at adapter.ts:99 propagates the (corrupted) string to the machine; no caller fingerprints UTF-16 specifically. Held as Low — Cashu V4 is ASCII so 99% of real tags are unaffected.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed. The mojibake-then-Cashu-parser-rejects flow is still intact. Out of scope for the NDEF write consolidation; not in the same seam."
+      "completion_status": "complete",
+      "completion_note": "decodeTextRecord now decodes UTF-16 per the NFC Forum Text RTD (BE default; FE FF / FF FE BOMs respected). Buffer has no native utf16be, so BE input is byte-swapped before utf16le decode. Regression test in __tests__/nfcNdefDecode.test.ts covers BE-no-BOM, BE-with-BOM, and LE-with-BOM."
     },
     {
       "id": "F-008",
@@ -248,8 +248,8 @@
       ],
       "verification_note": "Re-checked apdu.ts:58-72. Counter-argument: the underlying native error is opaque on RN, this may genuinely be the only signal. Held as Low — the failure mode (silent rollback skip) is ugly but the upstream constraint is real; the fix is documentation/telemetry, not code.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed. The reclaim-on-tag-lost branching at sovranPaymentConfig.ts still depends on these substring matches, but the call site now reads `error.code` from the thrown NfcError rather than parsing a result envelope, so a future structured-error upgrade in apdu.ts will propagate without further call-site churn. The brittleness itself stays."
+      "completion_status": "partial",
+      "completion_note": "Centralised the substring-match cascade into mapTransceiveError() with a doc comment naming the upstream-string brittleness — react-native-nfc-manager surfaces transceive failures as plain strings (Android: 'transceive fail: ' + ex from NfcManager.java; iOS: NSError localized descriptions) with no error code on the JS side. Substring matching the message is the only signal available; centralising at least makes the seam swap-ready if the library ever exposes structured codes. The library-level fragility itself is unchanged."
     },
     {
       "id": "F-009",
@@ -326,8 +326,8 @@
       "references": [],
       "verification_note": "Trivial, nit.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed. The 'en' magic literal still lives in buildTextNdef. Nit; out of scope."
+      "completion_status": "complete",
+      "completion_note": "buildTextNdef now accepts an optional { lang } override and defaults to NDEF_TEXT_LANG ('en') from constants.ts. Validates ≤63 ASCII bytes per the NDEF Text RTD status-byte limit. Regression test asserts an explicit 'fr' tag round-trips."
     },
     {
       "id": "F-013",
