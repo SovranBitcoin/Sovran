@@ -27,8 +27,27 @@ import { log } from '../logger';
  * while we reset store state during a profile switch. Without this, the
  * empty reset state is written to AsyncStorage before rehydrate() can read
  * the real data — permanently destroying the stored profile data.
+ *
+ * Also used by `withSkippedPersistWrites` to keep runtime-only mutations
+ * (e.g. mock-mode demo data injection) out of the persisted blob.
  */
 let _skipPersistWrite = false;
+
+/**
+ * Run `fn` with the persist-write gate raised. Synchronous: mutations queued
+ * inside `fn` (`useStore.setState(...)`) bypass AsyncStorage; afterwards the
+ * gate drops and normal persistence resumes. Use for runtime-only injections
+ * into persisted profile-scoped stores.
+ */
+export function withSkippedPersistWrites<T>(fn: () => T): T {
+  const prev = _skipPersistWrite;
+  _skipPersistWrite = true;
+  try {
+    return fn();
+  } finally {
+    _skipPersistWrite = prev;
+  }
+}
 
 /**
  * Promise gate that blocks all profile-scoped storage operations until
@@ -135,6 +154,8 @@ async function rehydrateProfileStores(): Promise<void> {
   const { useSearchHistoryStore } = await import('@/shared/stores/profile/searchHistoryStore');
   const { useSwapTransactionsStore } =
     await import('@/shared/stores/profile/swapTransactionsStore');
+  const { useSplitBillTransactionsStore } =
+    await import('@/shared/stores/profile/splitBillTransactionsStore');
   const { useTransactionLocationStore } =
     await import('@/shared/stores/profile/transactionLocationStore');
   const { useTransactionDistributionStore } =
@@ -164,6 +185,7 @@ async function rehydrateProfileStores(): Promise<void> {
       useScanHistoryStore.setState({ entries: [] });
       useSearchHistoryStore.setState({ recentSearches: {} });
       useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });
+      useSplitBillTransactionsStore.setState({ groups: {}, quoteIdToSplitBill: {} });
       useTransactionLocationStore.setState({ locations: {} });
       useTransactionDistributionStore.setState({ distributions: {} });
       useNpcMintStore.setState({
@@ -201,6 +223,7 @@ async function rehydrateProfileStores(): Promise<void> {
     useScanHistoryStore.persist.rehydrate(),
     useSearchHistoryStore.persist.rehydrate(),
     useSwapTransactionsStore.persist.rehydrate(),
+    useSplitBillTransactionsStore.persist.rehydrate(),
     useTransactionLocationStore.persist.rehydrate(),
     useTransactionDistributionStore.persist.rehydrate(),
     useNpcMintStore.persist.rehydrate(),

@@ -39,6 +39,7 @@ const PersistedWalletLifecycleStore = z.object({
     .enum(['unknown', 'not-needed', 'pending', 'in-progress', 'complete', 'failed'])
     .default('unknown'),
   lastRestoreAt: z.number().int().nonnegative().nullable().default(null),
+  lastRestoreError: z.string().max(500).nullable().default(null),
 });
 
 export const useWalletLifecycleStore = create<WalletLifecycleState>()(
@@ -67,6 +68,7 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>()(
         seedCreatedAt: s.seedCreatedAt,
         restoreStatus: s.restoreStatus,
         lastRestoreAt: s.lastRestoreAt,
+        lastRestoreError: s.lastRestoreError,
       }),
     })
   )

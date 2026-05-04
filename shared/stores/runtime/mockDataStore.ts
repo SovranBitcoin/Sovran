@@ -6,8 +6,10 @@
  *
  * Safety:
  * - Mock history and balance are kept here (never persisted to AsyncStorage).
- * - Mock scan entries and swap groups are injected into the real persisted
- *   stores with `demo-` prefixed IDs. On deactivate they are cleanly removed.
+ * - Mock scan entries, swap groups, and locations are injected into the real
+ *   in-memory stores with `demo-` prefixed IDs, but the persist middleware is
+ *   gated off for these writes via `withSkippedPersistWrites`, so demo data
+ *   never reaches AsyncStorage.
  * - `onFinishHydration` callbacks re-inject after AsyncStorage rehydration.
  */
 
@@ -18,6 +20,7 @@ import {
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
+import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
 import type { HistoryEntry } from '@cashu/coco-core';
 
 // ---------------------------------------------------------------------------
@@ -209,50 +212,68 @@ let unsubScans: (() => void) | null = null;
 let unsubSwaps: (() => void) | null = null;
 let unsubLocations: (() => void) | null = null;
 
+// All inject/remove helpers gate the persist middleware off via
+// `withSkippedPersistWrites` so demo entries stay runtime-only and never
+// leak into AsyncStorage. A force-quit while mockMode is on therefore
+// cannot leave `demo-`-prefixed entries behind in the persisted blob.
+
 function injectScans() {
-  useScanHistoryStore.setState((state) => ({
-    entries: [...state.entries.filter((e) => !e.id.startsWith('demo-')), ...MOCK.scanEntries],
-  }));
+  withSkippedPersistWrites(() => {
+    useScanHistoryStore.setState((state) => ({
+      entries: [...state.entries.filter((e) => !e.id.startsWith('demo-')), ...MOCK.scanEntries],
+    }));
+  });
 }
 
 function injectSwaps() {
   if (MOCK.swapGroups.length === 0) return;
-  useSwapTransactionsStore.setState((state) => {
-    const merged = { ...state.groups };
-    for (const g of MOCK.swapGroups) merged[g.id] = g;
-    return { groups: merged };
+  withSkippedPersistWrites(() => {
+    useSwapTransactionsStore.setState((state) => {
+      const merged = { ...state.groups };
+      for (const g of MOCK.swapGroups) merged[g.id] = g;
+      return { groups: merged };
+    });
   });
 }
 
 function removeScans() {
-  useScanHistoryStore.setState((state) => ({
-    entries: state.entries.filter((e) => !e.id.startsWith('demo-')),
-  }));
+  withSkippedPersistWrites(() => {
+    useScanHistoryStore.setState((state) => ({
+      entries: state.entries.filter((e) => !e.id.startsWith('demo-')),
+    }));
+  });
 }
 
 function removeSwaps() {
-  useSwapTransactionsStore.setState((state) => {
-    const cleaned: Record<string, SwapGroup> = {};
-    for (const [k, v] of Object.entries(state.groups)) {
-      if (!k.startsWith('demo-')) cleaned[k] = v;
-    }
-    return { groups: cleaned };
+  withSkippedPersistWrites(() => {
+    useSwapTransactionsStore.setState((state) => {
+      const cleaned: Record<string, SwapGroup> = {};
+      for (const [k, v] of Object.entries(state.groups)) {
+        if (!k.startsWith('demo-')) cleaned[k] = v;
+      }
+      return { groups: cleaned };
+    });
   });
 }
 
 function injectLocations() {
-  useTransactionLocationStore.setState((state) => ({
-    locations: { ...state.locations, ...MOCK.locations },
-  }));
+  withSkippedPersistWrites(() => {
+    useTransactionLocationStore.setState((state) => ({
+      locations: { ...state.locations, ...MOCK.locations },
+    }));
+  });
 }
 
 function removeLocations() {
-  useTransactionLocationStore.setState((state) => {
-    const cleaned: Record<string, { latitude: number; longitude: number; createdAt: number }> = {};
-    for (const [k, v] of Object.entries(state.locations)) {
-      if (!k.startsWith('demo-')) cleaned[k] = v;
-    }
-    return { locations: cleaned };
+  withSkippedPersistWrites(() => {
+    useTransactionLocationStore.setState((state) => {
+      const cleaned: Record<string, { latitude: number; longitude: number; createdAt: number }> =
+        {};
+      for (const [k, v] of Object.entries(state.locations)) {
+        if (!k.startsWith('demo-')) cleaned[k] = v;
+      }
+      return { locations: cleaned };
+    });
   });
 }
 
