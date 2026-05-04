@@ -62,7 +62,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Re-checked at BitChatModule.ts:8 — top-level statement, no Platform.OS guard. Re-checked siblings at modules/liquid-glass-text/src/LiquidGlassText.tsx:7 and modules/liquid-glass-text-upstream/src/LiquidGlassTextUpstream.tsx:7 — both gate the require. Re-checked expo-module.config.json — `\"platforms\": [\"apple\"]` confirmed. Counter-argument considered: 'Android isn't a current production target, so this is theoretical.' Rebuttal: app.json ships Android config (versionCode 2, com.sovranbitcoin package, Android permissions block) so an Android dev/preview build is at least intended; eas.json `production` only lists iOS but `preview` and `development` are not platform-restricted. The crash is also a footgun for any contributor trying to run `npx expo run:android`. UNVERIFIED on the exact runtime symptom — the auditor cannot run an Android device — but the static code path is unambiguous and matches the canonical sibling pattern.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Platform guard + null fallbacks land in modules/bitchat-module/src/BitChatModule.ts mirroring the canonical liquid-glass-text pattern. Each native export degrades gracefully on Android: async fns reject with BitChatUnavailableError, sync fns return [] / 'unavailable', listeners return a no-op subscription."
     },
     {
       "id": "F-002",
@@ -160,7 +162,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked: grep -RnE 'nativeEncodeGeohash|nativeDecodeGeohash|getNeighbors|getClosestRelays|getClosestRelaysForGeohash' across features/, shared/, app/ — zero matches outside modules/bitchat-module itself. Counter-argument considered: 'The native geohash impl might be preserved for Swift-side use.' Rebuttal: those methods are exposed on the JS bridge interface; a Swift-internal use case doesn't need a JS bridge entry.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "The cited native geohash methods (nativeEncodeGeohash / nativeDecodeGeohash / getNeighbors) are no longer present in BitChatModule.ts — already removed in a prior change. Re-verified against the current tree before bundling."
     },
     {
       "id": "F-006",
@@ -231,7 +235,9 @@
         "skill:prompt-engineering-patterns"
       ],
       "verification_note": "Re-checked at useBitChat.ts:110. Counter-argument considered: 'BLE peer events fire infrequently; the volume is low.' Rebuttal: dev-build mesh sessions in a busy room can fire dozens of peer-update events per minute; volume isn't the gating concern, redaction is.",
-      "prior_audit_id": "F-014@04.json"
+      "prior_audit_id": "F-014@04.json",
+      "completion_status": "complete",
+      "completion_note": "ble_peer log downgraded from info to debug and redacted to { peerIdPrefix, isConnected } — nickname (PII) and full peerID (cross-session-stable identifier) no longer hit log.txt."
     },
     {
       "id": "F-009",
@@ -253,7 +259,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked the import chain: parseGeohashQuery.ts → 'bitchat-module' → modules/bitchat-module/index.ts → BitChatModule.ts (top-level requireNativeModule). Counter-argument considered: 'Metro tree-shaking might drop the unused re-export.' Rebuttal: top-level statements in the imported module are evaluated even under tree-shaking — only unused *named* exports are dropped, not module-load side effects.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "modules/bitchat-module/geohash.ts subpath added; pure-JS callers (parseGeohashQuery, useLocationTiers/encodeGeohash) migrated to bitchat-module/geohash so they don't import-trigger the native module. Combined with F-001's Platform guard, the Android crash from F-001's fix description is now impossible for pure-JS callers. Native consumers (useBitChat, useBLEPeers, BitchatBLEProvider, useSplitBillOrchestrator) still use the default 'bitchat-module' entry — the seam-contract-at-call-site benefit the audit suggests would require a 'bitchat-module/native' subpath plus migrating those four call sites; deferred to keep the slice focused on the safety + pure-JS-side fix."
     },
     {
       "id": "F-010",
