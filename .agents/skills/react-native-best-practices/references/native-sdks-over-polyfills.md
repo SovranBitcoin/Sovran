@@ -21,7 +21,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 **After (native implementations):**
 
 ```tsx
-// Hermes has native Intl.DateTimeFormat - no polyfill needed
+// Hermes has native Intl.DateTimeFormat support, so this polyfill is often unnecessary
 import { createHash } from 'react-native-quick-crypto';  // 58x faster
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 ```
@@ -37,7 +37,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 ### 1. Remove Unnecessary Intl Polyfills
 
-Hermes now supports many `Intl` APIs natively. Check your imports:
+Hermes supports many `Intl` APIs natively, but not every constructor and method combination across platforms. Audit the exact APIs and methods you use before removing polyfills:
 
 ```tsx
 // BEFORE: All these polyfills (430+ KB)
@@ -54,13 +54,13 @@ import '@formatjs/intl-relativetimeformat/locale-data/en';
 import '@formatjs/intl-displaynames/polyfill';
 ```
 
-**Hermes Support (as of 2025):**
+**Hermes Support (as of March 2026):**
 
 | API | Hermes | Keep Polyfill? |
 |-----|--------|----------------|
 | `Intl.Collator` | ✅ | No |
 | `Intl.DateTimeFormat` | ✅ | No |
-| `Intl.NumberFormat` | ✅ | No |
+| `Intl.NumberFormat` | ⚠️ Partial | Maybe |
 | `Intl.getCanonicalLocales()` | ✅ | No |
 | `Intl.supportedValuesOf()` | ✅ | No |
 | `Intl.Locale` | ❌ | Yes |
@@ -70,14 +70,23 @@ import '@formatjs/intl-displaynames/polyfill';
 | `Intl.ListFormat` | ❌ | Yes |
 | `Intl.Segmenter` | ❌ | Yes |
 
+`Intl.NumberFormat` is not fully covered on Hermes across platforms. In particular, `Intl.NumberFormat.prototype.formatToParts()` still has an iOS gap, so keep `@formatjs/intl-numberformat` if your app relies on that method.
+
 ```tsx
-// AFTER: Only needed polyfills
+// AFTER: Keep only the polyfills your app still needs
 import '@formatjs/intl-locale/polyfill';
 import '@formatjs/intl-pluralrules/polyfill';
 import '@formatjs/intl-pluralrules/locale-data/en';
 import '@formatjs/intl-relativetimeformat/polyfill';
 import '@formatjs/intl-relativetimeformat/locale-data/en';
 import '@formatjs/intl-displaynames/polyfill';
+```
+
+If you use `Intl.NumberFormat.prototype.formatToParts()` on Hermes/iOS, also keep:
+
+```tsx
+import '@formatjs/intl-numberformat/polyfill';
+import '@formatjs/intl-numberformat/locale-data/en';
 ```
 
 ### 2. Use Native Crypto
@@ -173,7 +182,7 @@ const Tabs = createNativeBottomTabNavigator();
 
 ## Common Pitfalls
 
-- **Assuming all polyfills needed**: Check Hermes compatibility first
+- **Assuming constructor support means full method coverage**: Check the specific Hermes API and methods you call
 - **Ignoring migration effort**: Native navigators have slightly different APIs
 - **Over-customizing native components**: If design requires heavy customization, JS might be better
 

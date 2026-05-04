@@ -17,6 +17,13 @@ Before applying performance optimizations, ensure:
 - React Native DevTools is available (**apply only for** profiling)
   - Press 'j' in Metro terminal or shake device → "Open DevTools"
 
+## Security Guardrails
+
+- Review shell commands before running them and prefer version-pinned tooling from trusted sources.
+- Do not pipe remote install scripts directly into a shell.
+- Treat third-party packages as normal supply-chain dependencies that require provenance and version review.
+- If using Re.Pack code splitting, only load first-party chunks from trusted HTTPS origins tied to the current release.
+
 # When to Load Reference Files
 
 Load specific reference files from `references/` based on the task:
@@ -83,11 +90,20 @@ Use this quick lookup when debugging specific issues:
 # Press 'j' in Metro, or shake device → "Open DevTools"
 ```
 
+Baseline runtime metrics should come from the target interaction itself:
+- Capture commit timeline, re-render counts, slow components, and heaviest-commit breakdown.
+- Treat component tree depth and count as supporting context only.
+
 **Common fixes:**
 - Replace ScrollView with FlatList/FlashList for lists
 - Use React Compiler for automatic memoization
 - Use atomic state (Jotai/Zustand) to reduce re-renders
 - Use `useDeferredValue` for expensive computations
+
+**Review guardrails:**
+- Check library versions before suggesting API-specific fixes. FlashList v2 deprecates `estimatedItemSize`.
+- Do not suggest `useMemo` or `useCallback` dependency changes without a reproducible correctness issue or profiling evidence.
+- Do not report stale closures unless the stale read path or repro is clear.
 
 ### Analyze Bundle Size
 ```bash
@@ -103,7 +119,7 @@ npx source-map-explorer output.js --no-border-checks
 
 **Common fixes:**
 - Avoid barrel imports (import directly from source)
-- Remove unnecessary Intl polyfills (Hermes has native support)
+- Remove unnecessary Intl polyfills only after checking Hermes API and method coverage
 - Enable tree shaking (Expo SDK 52+ or Re.Pack)
 - Enable R8 for Android native code shrinking
 

@@ -36,6 +36,12 @@ Reference these guidelines when:
 - Profiling React Native performance
 - Reviewing React Native code for performance
 
+## Security Notes
+
+- Treat shell commands in these references as local developer operations. Review them before running, prefer version-pinned tooling, and avoid piping remote scripts directly to a shell.
+- Treat third-party libraries and plugins as dependencies that still require normal supply-chain controls: pin versions, verify provenance, and update through your standard review process.
+- Treat Re.Pack code splitting as first-party artifact delivery only. Remote chunks must come from trusted HTTPS origins you control and be pinned to the current app release.
+
 ## Priority-Ordered Guidelines
 
 | Priority | Category | Impact | Prefix |
@@ -53,12 +59,19 @@ Reference these guidelines when:
 
 Follow this cycle for any performance issue: **Measure → Optimize → Re-measure → Validate**
 
-1. **Measure**: Capture baseline metrics (FPS, TTI, bundle size) before changes
+1. **Measure**: Capture baseline metrics before changes. For runtime issues, prefer commit timeline, re-render counts, slow components, heaviest-commit breakdown, and startup/TTI when available. Component tree depth or count are optional context, not substitutes.
 2. **Optimize**: Apply the targeted fix from the relevant reference
 3. **Re-measure**: Run the same measurement to get updated metrics
 4. **Validate**: Confirm improvement (e.g., FPS 45→60, TTI 3.2s→1.8s, bundle 2.1MB→1.6MB)
 
 If metrics did not improve, revert and try the next suggested fix.
+
+### Review Guardrails
+
+- Check library versions before suggesting API-specific fixes. Example: FlashList v2 deprecates `estimatedItemSize`, so do not flag it as missing there.
+- Do not suggest `useMemo` or `useCallback` dependency changes unless behavior is demonstrably incorrect or profiling shows wasted work tied to that value.
+- Do not report stale closures speculatively. Show the stale read path, a repro, or profiler evidence before calling it out.
+- When profiling a flow, measure the target interaction itself. Do not treat component tree depth or component count as the main performance evidence.
 
 ### Critical: FPS & Re-renders
 
@@ -101,7 +114,7 @@ ls -lh output.js  # e.g., After: 1.6 MB  (24% reduction)
 
 **Common fixes:**
 - Avoid barrel imports (import directly from source)
-- Remove unnecessary Intl polyfills (Hermes has native support)
+- Remove unnecessary Intl polyfills only after checking Hermes API and method coverage
 - Enable tree shaking (Expo SDK 52+ or Re.Pack)
 - Enable R8 for Android native code shrinking
 
@@ -143,6 +156,7 @@ Full documentation with code examples in [references/][references]:
 | [js-concurrent-react.md][js-concurrent-react] | HIGH | useDeferredValue, useTransition |
 | [js-react-compiler.md][js-react-compiler] | HIGH | Automatic memoization |
 | [js-animations-reanimated.md][js-animations-reanimated] | MEDIUM | Reanimated worklets |
+| [js-bottomsheet.md][js-bottomsheet] | HIGH | Bottom sheet optimization |
 | [js-uncontrolled-components.md][js-uncontrolled-components] | HIGH | TextInput optimization |
 
 ### Native (`native-*`)
@@ -197,6 +211,7 @@ grep -l "bundle" references/
 | Large app size | [bundle-analyze-app.md][bundle-analyze-app] → [bundle-r8-android.md][bundle-r8-android] |
 | Memory growing | [js-memory-leaks.md][js-memory-leaks] or [native-memory-leaks.md][native-memory-leaks] |
 | Animation drops frames | [js-animations-reanimated.md][js-animations-reanimated] |
+| Bottom sheet jank/re-renders | [js-bottomsheet.md][js-bottomsheet] → [js-animations-reanimated.md][js-animations-reanimated] |
 | List scroll jank | [js-lists-flatlist-flashlist.md][js-lists-flatlist-flashlist] |
 | TextInput lag | [js-uncontrolled-components.md][js-uncontrolled-components] |
 | Native module slow | [native-turbo-modules.md][native-turbo-modules] → [native-threading-model.md][native-threading-model] |
@@ -211,6 +226,7 @@ grep -l "bundle" references/
 [js-concurrent-react]: references/js-concurrent-react.md
 [js-react-compiler]: references/js-react-compiler.md
 [js-animations-reanimated]: references/js-animations-reanimated.md
+[js-bottomsheet]: references/js-bottomsheet.md
 [js-uncontrolled-components]: references/js-uncontrolled-components.md
 [native-turbo-modules]: references/native-turbo-modules.md
 [native-sdks-over-polyfills]: references/native-sdks-over-polyfills.md
