@@ -37,11 +37,11 @@ import { useEffect, useRef, useContext, createContext } from 'react';
 import React, { type ReactNode } from 'react';
 import { Platform } from 'react-native';
 
-// ─── Master switch ──────────────────────────────────────────────────────────
-// When true, all log output (console + ring buffer) is active.
-// Tied to __DEV__ by default so dev builds always have logging.
-// Set to false manually to silence ALL output (useful when profiling overhead).
-const SHOW_LOGS = true;
+// SHOW_LOGS is declared below, after IS_DEV. It is the master switch for all
+// logger output AND the dev-only JS-thread heartbeat. Tied to __DEV__ so
+// production builds skip the heartbeat and the per-emit caller-location stack
+// walk for warn-level entries (see emit() and the heartbeat block at the
+// bottom of this file).
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -97,7 +97,6 @@ interface LogEntry {
     name: string;
     message: string;
     stack: string[];
-    properties?: Record<string, unknown>;
   };
   /** Expo session + device metadata (only on first log or when requested) */
   device?: Record<string, unknown>;
@@ -180,6 +179,10 @@ const LEVEL_CONSOLE_METHOD: Record<LogLevel, 'debug' | 'info' | 'warn' | 'error'
 };
 
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
+
+// Master switch: dev-only by default. Production builds skip the JS-thread
+// heartbeat side-effect entirely and skip the per-emit stack walk for warn.
+const SHOW_LOGS = IS_DEV;
 
 // ─── Monotonic Clock ────────────────────────────────────────────────────────
 //
@@ -401,10 +404,18 @@ function simplifyPath(fullPath: string): string {
 // captured before a crash.
 
 type IdleCallback = (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void;
+const _idleDeadline = { didTimeout: false, timeRemaining: () => 50 };
+// Hermes has no requestIdleCallback. The earlier `setTimeout(cb, 1)` fallback
+// allocated an OS timer per async log; under sustained logging that produced
+// hundreds of pending timers. queueMicrotask runs cb on the next microtask
+// turn without a timer entry — same "off the current frame" semantics, no
+// allocation. Sync-fallback covers the (vanishing) case where neither exists.
 const scheduleIdle: (cb: IdleCallback) => void =
   typeof requestIdleCallback !== 'undefined'
     ? requestIdleCallback
-    : (cb) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 }), 1);
+    : typeof queueMicrotask !== 'undefined'
+      ? (cb) => queueMicrotask(() => cb(_idleDeadline))
+      : (cb) => cb(_idleDeadline);
 
 // ─── Ring Buffer ─────────────────────────────────────────────────────────────
 //
@@ -551,7 +562,13 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
       core.dedupCount = 1;
     }
 
-    const src = getCallerLocation(3);
+    // Stack walk is expensive (throws+parses Error.stack). Skip outside dev
+    // unless the entry is error/fatal — those are the cases where the source
+    // location is load-bearing for triage. Production warn skips the walk.
+    const src =
+      IS_DEV || logLevel === 'error' || logLevel === 'fatal'
+        ? getCallerLocation(3)
+        : { file: 'unknown', func: 'unknown', line: 0 };
 
     let errorInfo: LogEntry['error'] | undefined;
     let cleanParams: Record<string, unknown> | undefined;
@@ -560,6 +577,9 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
       cleanParams = {};
       for (const [key, val] of Object.entries(params)) {
         if (val instanceof Error) {
+          // Only standard fields. SDK errors often attach `headers`, `request`,
+          // `response`, etc. — extracting all enumerable own keys leaks those.
+          // Standard `cause` is preserved by JSON serialization elsewhere.
           errorInfo = {
             name: val.name,
             message: val.message,
@@ -569,15 +589,6 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
               .filter(Boolean)
               .slice(0, 10),
           };
-          const extraKeys = Object.keys(val).filter(
-            (k) => !['name', 'message', 'stack'].includes(k)
-          );
-          if (extraKeys.length > 0) {
-            const extras: Record<string, unknown> = {};
-            for (const ek of extraKeys)
-              extras[ek] = compactValue((val as any)[ek], core.compactOpts);
-            errorInfo.properties = extras;
-          }
         } else {
           cleanParams[key] = compactValue(val, core.compactOpts);
         }
@@ -611,8 +622,19 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
       for (const transport of core.transports) {
         try {
           transport(entry);
-        } catch {
-          /* transport errors should never crash the app */
+        } catch (transportError) {
+          // Transport errors must not crash the app, but silent swallowing
+          // means a misbehaving transport vanishes from view. Surface to the
+          // console so a transport that's chronically throwing is debuggable.
+          try {
+            const reason =
+              transportError instanceof Error
+                ? `${transportError.name}: ${transportError.message}`
+                : String(transportError);
+            console.error('[logger.transport-error]', entry.event, reason);
+          } catch {
+            /* console itself failed — give up rather than crash */
+          }
         }
       }
     };
@@ -978,7 +1000,8 @@ export function redactError(e: unknown): { name: string; message: string } {
 // duration. Logs a warning with the block length so you can correlate it with
 // whatever operation was running (recovery, crypto derivation, etc.).
 //
-// Only active in __DEV__ and when SHOW_LOGS is on, to avoid overhead in prod.
+// Active only when SHOW_LOGS is on (gated to IS_DEV at module load) — no
+// production overhead. Call stopJSThreadMonitor() to disable in tests.
 
 let _heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -1022,10 +1045,28 @@ function startJSThreadMonitor(intervalMs = 200, thresholdMs = 100): () => void {
   };
 }
 
-// Auto-start in dev builds
+// Auto-start in dev builds. Capture the stop function so tests and consumers
+// can disable the monitor — the previous implementation discarded it, leaving
+// no way to pause the heartbeat (e.g. when running perf benchmarks).
+let _heartbeatStop: (() => void) | null = null;
+let _heartbeatBootstrap: ReturnType<typeof setTimeout> | null = null;
 if (SHOW_LOGS) {
   // Delay start slightly so it doesn't fire during module evaluation
-  setTimeout(() => startJSThreadMonitor(), 1000);
+  _heartbeatBootstrap = setTimeout(() => {
+    _heartbeatStop = startJSThreadMonitor();
+  }, 1000);
+}
+
+/** Stop the JS-thread heartbeat. Idempotent. Safe to call before bootstrap. */
+export function stopJSThreadMonitor(): void {
+  if (_heartbeatBootstrap !== null) {
+    clearTimeout(_heartbeatBootstrap);
+    _heartbeatBootstrap = null;
+  }
+  if (_heartbeatStop) {
+    _heartbeatStop();
+    _heartbeatStop = null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
