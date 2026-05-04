@@ -317,7 +317,9 @@
       "fix": "Add `accessibilityRole='button'` and an `accessibilityLabel` derived from the card state — e.g. `Retry sending invoice to ${name}`, `View split bill participant ${name}, ${amount} ${unit}, ${state}`.",
       "references": [],
       "verification_note": "Re-checked at lines 138 and 236; both Pressables have only testID and onPress. WCAG 2.2 'Non-text Content'.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ParticipantCard retry CTA + view button carry accessibilityRole + label; view button reflects disabled state"
     },
     {
       "id": "F-013",

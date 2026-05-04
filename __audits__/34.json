@@ -256,7 +256,9 @@
         "skill:building-native-ui"
       ],
       "verification_note": "Re-read L183, 231, 245, 380, 392. None carry accessibility* props. Confidence high.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "AiMessageBubble Copy, Retry, BranchNav prev/next, and ThinkingHeader Pressables carry accessibilityRole + label; chevrons report disabled state"
     },
     {
       "id": "F-010",
