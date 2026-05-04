@@ -127,8 +127,6 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     closeTargetHeight,
     blurIntensity,
     closeBtnOpacity,
-    expandedWidth,
-    expandedHeight,
     expandedWidthSv,
     expandedHeightSv,
     panelHeightSv,
@@ -137,6 +135,9 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     openReplace,
     openToCenter,
   } = ctx;
+  /** Image viewport: full width, screen height minus top inset (matches provider's imageViewportHeight). */
+  const expandedWidth = screenWidth;
+  const expandedHeight = screenHeight - insets.top;
 
   const hasMultipleMedia = activeUrls.length > 1;
   const maxPagerIndex = Math.max(0, activeUrls.length - 1);

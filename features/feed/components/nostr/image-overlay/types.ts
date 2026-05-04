@@ -121,15 +121,11 @@ export type ImageOverlayContextValue = {
   blurIntensity: ReturnType<typeof useSharedValue<number>>;
   thumbnailBlurIntensity: ReturnType<typeof useDerivedValue<number>>;
   closeBtnOpacity: ReturnType<typeof useSharedValue<number>>;
-  expandedWidth: number;
-  expandedHeight: number;
   /** Shared values for layout that updates with panel drag (use in animated styles when activeOverlayPost). */
   expandedWidthSv: ReturnType<typeof useSharedValue<number>>;
   expandedHeightSv: ReturnType<typeof useSharedValue<number>>;
   panelHeightSv: ReturnType<typeof useSharedValue<number>>;
   panelContentMinHeightSv: ReturnType<typeof useSharedValue<number>>;
-  screenWidth: number;
-  screenHeight: number;
   /** Post data for overlay bottom panel; set when open(layout) is called with layout.post. */
   activeOverlayPost: ImageOverlayPost | null;
 };

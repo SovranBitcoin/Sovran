@@ -75,14 +75,8 @@ type ImageOverlayActionsValue = Omit<
   | 'activeMediaTypes'
   | 'videoFeedLayouts'
   | 'videoFeedLayoutIndex'
-  | 'expandedWidth'
-  | 'expandedHeight'
 > & {
   onSwipeUpToNextPost: ((openNext: (layout: ImageOverlayReplaceLayout) => void) => void) | null;
-  screenWidth: number;
-  screenHeight: number;
-  /** Image viewport height (screenHeight - top inset); used by hook for expandedHeight. */
-  expandedHeightFromContext: number;
 };
 
 const ImageOverlayStateContext = createContext<ImageOverlayStateValue | null>(null);
@@ -112,7 +106,7 @@ export function computeExpandedSize(
 
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?\S*)?$/i;
 
-function inferMediaType(url: string): 'image' | 'video' {
+export function inferMediaType(url: string): 'image' | 'video' {
   return VIDEO_EXT.test(url) ? 'video' : 'image';
 }
 
@@ -276,6 +270,9 @@ export function ImageOverlayProvider({
     panelContentMinHeightSv.value = 0;
     openSessionInitialLayoutRef.current = null;
     openSessionLayoutsByIndexRef.current = [];
+    // No overlay is open at clear-time, so cached thumbnail positions are
+    // unreachable. Resetting bounds the ref's lifetime (audit 58 F-004).
+    thumbnailLayoutsRef.current = {};
     if (clearUrlTimeoutRef.current) clearTimeout(clearUrlTimeoutRef.current);
     clearUrlTimeoutRef.current = setTimeout(() => {
       clearUrlTimeoutRef.current = null;
@@ -947,9 +944,6 @@ export function ImageOverlayProvider({
       expandedHeightSv,
       panelHeightSv,
       panelContentMinHeightSv,
-      screenWidth,
-      screenHeight,
-      expandedHeightFromContext: imageViewportHeight,
     };
   }, [
     scrollHandler,
@@ -986,9 +980,6 @@ export function ImageOverlayProvider({
     expandedHeightSv,
     panelHeightSv,
     panelContentMinHeightSv,
-    screenWidth,
-    screenHeight,
-    imageViewportHeight,
   ]);
 
   useAnimatedReaction(
@@ -1036,15 +1027,7 @@ export function useImageOverlay(): ImageOverlayContextValue | null {
   const actions = useContext(ImageOverlayActionsContext);
   return useMemo((): ImageOverlayContextValue | null => {
     if (!actions || !state) return null;
-    // When sheet is closed image is centered in safe area; when sheet open the reaction drives layout.
-    const expandedWidth = actions.screenWidth;
-    const expandedHeight = actions.expandedHeightFromContext;
-    return {
-      ...actions,
-      ...state,
-      expandedWidth,
-      expandedHeight,
-    };
+    return { ...actions, ...state };
   }, [state, actions]);
 }
 
