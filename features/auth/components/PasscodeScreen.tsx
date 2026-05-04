@@ -1,5 +1,11 @@
-import React, { useState, useRef } from 'react';
-import { Animated } from 'react-native';
+import React, { useState } from 'react';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import NumericKeyboard from './NumericKeyboard';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { BlurView } from 'expo-blur';
@@ -46,9 +52,14 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const profileDisplay = useProfileDisplay(nostrKeys?.pubkey || '');
   const [value, setValue] = useState('');
   const [keyIdx, setKeyIdx] = useState(0);
-  const opacity = useRef(new Animated.Value(1)).current;
-  const shake = useRef(new Animated.Value(0)).current;
+  const opacity = useSharedValue(1);
+  const shake = useSharedValue(0);
   const background = useThemeColor('background');
+
+  const containerStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateX: shake.value }],
+  }));
 
   const getDotStyle = (isActive: boolean) => ({
     backgroundColor: isActive ? 'rgb(255 255 255)' : 'transparent',
@@ -62,35 +73,18 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
     if (val.length === passcode.length) {
       if (val === passcode) {
         log.info('auth.passcode.verify_success');
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(() => onSuccess());
+        opacity.value = withTiming(0, { duration: 300 }, (finished) => {
+          'worklet';
+          if (finished) runOnJS(onSuccess)();
+        });
       } else {
         log.warn('auth.passcode.verify_failed');
-        Animated.sequence([
-          Animated.timing(shake, {
-            toValue: -10,
-            duration: 50,
-            useNativeDriver: true,
-          }),
-          Animated.timing(shake, {
-            toValue: 10,
-            duration: 50,
-            useNativeDriver: true,
-          }),
-          Animated.timing(shake, {
-            toValue: -10,
-            duration: 50,
-            useNativeDriver: true,
-          }),
-          Animated.timing(shake, {
-            toValue: 0,
-            duration: 50,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        shake.value = withSequence(
+          withTiming(-10, { duration: 50 }),
+          withTiming(10, { duration: 50 }),
+          withTiming(-10, { duration: 50 }),
+          withTiming(0, { duration: 50 })
+        );
         setTimeout(() => {
           setValue('');
           setKeyIdx((k) => k + 1);
@@ -102,12 +96,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   return (
     <Log name="PasscodeScreen">
       <BlurView className="bg-background flex-1">
-        <Animated.View
-          className="bg-background flex-1"
-          style={{
-            opacity,
-            transform: [{ translateX: shake }],
-          }}>
+        <Animated.View className="bg-background flex-1" style={containerStyle}>
           <VStack align="center" justify="center" flex={1} spacing={SPACING}>
             <AnimatedSpriteBackground backgroundColor={background} />
 

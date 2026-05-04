@@ -1,5 +1,13 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
-import { ScrollView, Animated, Easing, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
@@ -53,20 +61,16 @@ function ProgressRingComponent({
   const center = size / 2;
 
   const strokeDashoffset = circumference * (1 - progress);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useSharedValue(0);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    fadeAnim.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
   }, [fadeAnim]);
 
   return (
     <View style={{ width: size, height: size, position: 'relative' }}>
-      <Animated.View style={{ opacity: fadeAnim }}>
+      <Animated.View style={fadeStyle}>
         <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
           <Circle
             cx={center}
@@ -110,7 +114,14 @@ function AnimatedAvatarComponent({
   size?: number;
   isLoading?: boolean;
 }) {
-  const badgeAnim = useRef(new Animated.Value(0)).current;
+  const badgeAnim = useSharedValue(0);
+  const badgeStyle = useAnimatedStyle(() => ({
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    opacity: badgeAnim.value,
+    transform: [{ scale: badgeAnim.value }],
+  }));
 
   const statusBadge = useMemo(() => {
     if (!status) return null;
@@ -124,13 +135,7 @@ function AnimatedAvatarComponent({
 
   useEffect(() => {
     if (status && !isLoading) {
-      Animated.spring(badgeAnim, {
-        toValue: 1,
-        friction: 4,
-        tension: 100,
-        useNativeDriver: true,
-        delay: 300,
-      }).start();
+      badgeAnim.value = withDelay(300, withSpring(1, { damping: 8, stiffness: 100 }));
     }
   }, [status, isLoading, badgeAnim]);
 
@@ -144,14 +149,7 @@ function AnimatedAvatarComponent({
         alt={alt}
       />
       {statusBadge && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            bottom: -2,
-            right: -2,
-            opacity: badgeAnim,
-            transform: [{ scale: badgeAnim }],
-          }}>
+        <Animated.View style={badgeStyle}>
           <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={size * 0.33} />
         </Animated.View>
       )}
@@ -292,8 +290,18 @@ function RatingBarChartComponent({ score }: { score: number }) {
     'yellow-300',
   ] as const);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const barScaleAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useSharedValue(0);
+  const barScaleAnim = useSharedValue(0);
+
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value, alignItems: 'center' }));
+  const starFadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
+  const barFillStyle = useAnimatedStyle(() => ({
+    width: '100%',
+    height: '100%',
+    borderRadius: 4,
+    transform: [{ scaleX: barScaleAnim.value }],
+    transformOrigin: 'left center',
+  }));
 
   const isValidScore = score >= 0;
   const showSkeleton = !isValidScore;
@@ -308,23 +316,14 @@ function RatingBarChartComponent({ score }: { score: number }) {
     if (isValidScore && !hasAnimatedRef.current) {
       hasAnimatedRef.current = true;
 
-      fadeAnim.setValue(0);
-      barScaleAnim.setValue(0);
+      fadeAnim.value = 0;
+      barScaleAnim.value = 0;
 
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(barScaleAnim, {
-          toValue: goldPercentage,
-          duration: 800,
-          delay: 200,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
+      fadeAnim.value = withTiming(1, { duration: 400 });
+      barScaleAnim.value = withDelay(
+        200,
+        withTiming(goldPercentage, { duration: 800, easing: Easing.out(Easing.cubic) })
+      );
     }
   }, [isValidScore, goldPercentage, fadeAnim, barScaleAnim]);
 
@@ -357,7 +356,7 @@ function RatingBarChartComponent({ score }: { score: number }) {
   return (
     <HStack align="center" gap={16} className="w-full self-stretch px-4">
       <VStack align="center" className="shrink-0">
-        <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
+        <Animated.View style={fadeStyle}>
           <Text heavy size={28} style={{ color: foreground }}>
             {formattedScore}
           </Text>
@@ -373,15 +372,17 @@ function RatingBarChartComponent({ score }: { score: number }) {
           return (
             <HStack key={stars} align="center" gap={2} className="w-full min-w-0">
               <HStack gap={2} className="shrink-0">
-                {Array.from({ length: stars }).map((_, i) => (
-                  <Animated.View key={i} style={{ opacity: isTargetRow ? fadeAnim : 1 }}>
-                    <Icon
-                      name="ic:round-star"
-                      size={12}
-                      color={isTargetRow ? warning : opacity(foreground, 0.4)}
-                    />
-                  </Animated.View>
-                ))}
+                {Array.from({ length: stars }).map((_, i) =>
+                  isTargetRow ? (
+                    <Animated.View key={i} style={starFadeStyle}>
+                      <Icon name="ic:round-star" size={12} color={warning} />
+                    </Animated.View>
+                  ) : (
+                    <View key={i}>
+                      <Icon name="ic:round-star" size={12} color={opacity(foreground, 0.4)} />
+                    </View>
+                  )
+                )}
               </HStack>
               <View
                 className="min-w-0 flex-1 overflow-hidden rounded"
@@ -392,16 +393,7 @@ function RatingBarChartComponent({ score }: { score: number }) {
                   borderRadius: 4,
                 }}>
                 {isTargetRow && (
-                  <Animated.View
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      backgroundColor: warning,
-                      borderRadius: 4,
-                      transform: [{ scaleX: barScaleAnim }],
-                      transformOrigin: 'left center',
-                    }}
-                  />
+                  <Animated.View style={[barFillStyle, { backgroundColor: warning }]} />
                 )}
               </View>
             </HStack>

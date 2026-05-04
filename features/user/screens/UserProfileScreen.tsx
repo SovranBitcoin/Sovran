@@ -9,8 +9,14 @@
  * - User feed (notes)
  */
 
-import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions } from 'react-native';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
+import { StyleSheet, useWindowDimensions } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
 import { Stack, Link } from 'expo-router';
@@ -133,37 +139,11 @@ function ProfileStatsGridComponent({
     'surface-secondary',
   ] as const);
 
-  const fadeAnims = useRef([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current;
-
   const hasValidData =
     followingCount !== undefined ||
     followerCount !== undefined ||
     reputationScore !== undefined ||
     joinedDate !== undefined;
-
-  const hasAnimatedRef = useRef(false);
-  useEffect(() => {
-    if (hasValidData && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-      Animated.stagger(
-        80,
-        fadeAnims.map((anim, index) =>
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 400,
-            delay: index * 80,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          })
-        )
-      ).start();
-    }
-  }, [hasValidData, fadeAnims]);
 
   const stats = [
     {
@@ -255,7 +235,8 @@ function TopFollowersComponent({
 }) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const { width: screenWidth } = useWindowDimensions();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useSharedValue(0);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
 
   const GRID_PADDING = 32;
   const GRID_GAP = 12;
@@ -270,12 +251,7 @@ function TopFollowersComponent({
 
   useEffect(() => {
     if (followersWithProfiles.length > 0) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+      fadeAnim.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) });
     }
   }, [followersWithProfiles.length, fadeAnim]);
 
@@ -349,7 +325,7 @@ function TopFollowersComponent({
       {isLoading ? (
         <View style={styles.topFollowersGrid}>{[0, 1, 2, 3, 4, 5].map(renderSkeleton)}</View>
       ) : (
-        <Animated.View style={{ opacity: fadeAnim }}>
+        <Animated.View style={fadeStyle}>
           <View style={styles.topFollowersGrid}>{followersWithProfiles.map(renderItem)}</View>
         </Animated.View>
       )}
@@ -395,7 +371,11 @@ function BannerWithAvatarComponent({
     'surface-secondary',
     'background',
   ] as const);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useSharedValue(0);
+  const avatarStyle = useAnimatedStyle(() => ({
+    opacity: fadeAnim.value,
+    transform: [{ scale: fadeAnim.value }],
+  }));
   const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
   const fallbackIndex = useMemo(
@@ -449,12 +429,7 @@ function BannerWithAvatarComponent({
   }, [bannerUrl]);
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    fadeAnim.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) });
   }, [fadeAnim]);
 
   const avatarContent = (
@@ -572,8 +547,7 @@ function BannerWithAvatarComponent({
       </View>
 
       {/* Avatar - positioned to overlap banner */}
-      <Animated.View
-        style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
+      <Animated.View style={[styles.avatarContainer, avatarStyle]}>
         {hasStories && onAvatarPress ? (
           <Pressable activeOpacity={0.8} onPress={onAvatarPress}>
             {avatarContent}
