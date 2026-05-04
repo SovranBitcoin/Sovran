@@ -46,8 +46,12 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
   useEffect(() => {
     void refresh();
     if (!client) return;
-    const onAdded = () => void refresh();
-    const onRemoved = () => void refresh();
+    // Listener path updates the count directly. A full `refresh()` here
+    // would (a) flash isLoading on every event and disable the action
+    // button mid-bootstrap, and (b) fire one count() RPC per
+    // create() inside the bootstrap loop instead of one at the end.
+    const onAdded = () => setKeyPackageCount((c) => c + 1);
+    const onRemoved = () => setKeyPackageCount((c) => Math.max(0, c - 1));
     client.keyPackages.on('keyPackageAdded', onAdded);
     client.keyPackages.on('keyPackageRemoved', onRemoved);
     return () => {

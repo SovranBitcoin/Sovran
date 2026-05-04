@@ -1,10 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { resolveInboxRelays } from '../client/network';
+import { AsyncStorageKVBackend } from '../storage/asyncStorageBackend';
+import { WhitenoiseNamespace, whitenoisePrefix } from '../storage/namespaces';
 import { wnLog } from '@/shared/lib/logger';
 
 const GIFT_WRAP_KIND = 1059;
+const CURSOR_KEY = 'last-seen-at';
+// Seconds. NIP-01 `since` is inclusive of the boundary; one minute of
+// overlap absorbs relay clock skew without re-downloading more than a
+// negligible window.
+const CURSOR_SLACK_SECONDS = 60;
 
 /**
  * Long-running subscription that watches for incoming gift-wrapped events
@@ -22,15 +29,30 @@ const GIFT_WRAP_KIND = 1059;
  * account scope.
  */
 export function useWhitenoiseInbox() {
-  const { client, inviteReader, relays } = useWhitenoise();
+  const { client, inviteReader, relays, accountIndex } = useWhitenoise();
   const { keys } = useNostrKeysContext();
   const selfPubkey = keys?.pubkey;
+
+  // Persist the latest `created_at` we've ingested so subsequent cold
+  // starts subscribe with `since:` and don't re-download every historical
+  // gift wrap. Per-account so profile switches don't share cursors.
+  const cursorStore = useMemo(
+    () =>
+      new AsyncStorageKVBackend<number>(
+        whitenoisePrefix(accountIndex, WhitenoiseNamespace.InboxCursor)
+      ),
+    [accountIndex]
+  );
 
   useEffect(() => {
     if (!client || !inviteReader || !selfPubkey) return;
 
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
+    // Track the highest created_at seen this session so listener-side
+    // ingest events can update the persisted cursor without racing each
+    // other on the AsyncStorage write.
+    let cursorHigh = 0;
 
     (async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
@@ -38,13 +60,26 @@ export function useWhitenoiseInbox() {
       const inboxRelays = await resolveInboxRelays(client.network, selfPubkey, relays);
       if (cancelled) return;
 
+      // No cursor on first cold start: full backfill once so users with
+      // pre-cursor history don't silently drop unread invites. Subsequent
+      // starts bound the relay-to-device fetch to events we haven't seen.
+      const persistedCursor = await cursorStore.getItem(CURSOR_KEY);
+      if (cancelled) return;
+      cursorHigh = persistedCursor ?? 0;
+      const since = persistedCursor !== null ? persistedCursor - CURSOR_SLACK_SECONDS : undefined;
+
       wnLog.info('whitenoise.inbox.start', {
         relayCount: inboxRelays.length,
         self: selfPubkey.slice(0, 16),
+        since: since ?? null,
       });
 
       const sub = client.network.subscription(inboxRelays, [
-        { kinds: [GIFT_WRAP_KIND], '#p': [selfPubkey] },
+        {
+          kinds: [GIFT_WRAP_KIND],
+          '#p': [selfPubkey],
+          ...(since !== undefined ? { since } : {}),
+        },
       ]);
 
       const handle = sub.subscribe({
@@ -66,7 +101,7 @@ export function useWhitenoiseInbox() {
     })();
 
     async function handleGiftWrap(event: unknown): Promise<void> {
-      const ev = event as { id?: string; kind?: number };
+      const ev = event as { id?: string; kind?: number; created_at?: number };
       if (!ev?.id || ev.kind !== GIFT_WRAP_KIND) return;
       const reader = inviteReader;
       if (!reader) return;
@@ -76,6 +111,19 @@ export function useWhitenoiseInbox() {
       const fresh = await reader.ingestEvent(event as Parameters<typeof reader.ingestEvent>[0]);
       if (cancelled) return;
       if (!fresh) return;
+
+      // Advance the persisted cursor monotonically. created_at is seconds.
+      // Skipping the write on stale events bounds AsyncStorage churn to the
+      // narrow tail of newer gift wraps once we've caught up.
+      const createdAt = typeof ev.created_at === 'number' ? ev.created_at : 0;
+      if (createdAt > cursorHigh) {
+        cursorHigh = createdAt;
+        cursorStore.setItem(CURSOR_KEY, cursorHigh).catch((err) => {
+          wnLog.debug('whitenoise.inbox.cursor_persist_failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
 
       // Stage 2: decrypt now. Our signer is local (no hardware prompt), so
       // we don't need to wait for an explicit user action. Non-Marmot
@@ -103,5 +151,5 @@ export function useWhitenoiseInbox() {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [client, inviteReader, selfPubkey, relays]);
+  }, [client, inviteReader, selfPubkey, relays, cursorStore]);
 }

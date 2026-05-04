@@ -11,6 +11,7 @@ export enum WhitenoiseNamespace {
   InviteReceived = 'invite-received',
   InviteUnread = 'invite-unread',
   InviteSeen = 'invite-seen',
+  InboxCursor = 'inbox-cursor',
   History = 'history',
   DmIndex = 'dm-index',
 }
