@@ -13,7 +13,7 @@ import { ImageSource } from 'expo-image';
 /**
  * Dominant color extracted from an image
  */
-interface DominantColor {
+export interface DominantColor {
   hex: string;
   hue: number;
   saturation: number;
@@ -23,7 +23,7 @@ interface DominantColor {
 /**
  * HSB (Hue, Saturation, Brightness) values
  */
-interface HSB {
+export interface HSB {
   hue: number;
   saturation: number;
   brightness: number;
@@ -32,7 +32,7 @@ interface HSB {
 /**
  * Gradient color for creating CSS gradients
  */
-interface GradientColor {
+export interface GradientColor {
   hex: string;
   position: 'light' | 'mid' | 'dark';
   hsb: HSB;

@@ -3,7 +3,7 @@
  * Uses expo-router/unstable-native-tabs and liquid glass on supported devices.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   InteractionManager,
   Platform,
@@ -25,7 +25,6 @@ import { LIQUID_GLASS_ENABLED, supportsLiquidGlass } from '@/shared/lib/version'
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 
 type HeaderIconName = string;
-const INVISIBLE_TITLE_SHORT = '\u2007'.repeat(20);
 
 const ANDROID_HEADER_ICON_MAP: Partial<Record<HeaderIconName, string>> = {
   'line.3.horizontal': 'mdi:menu',
@@ -112,9 +111,6 @@ type AndroidLiquidHeaderButtonProps = {
   size?: number;
 };
 
-/** Debounce ms so one tap doesn't fire both Pressable and LiquidButtonView. */
-const LIQUID_BUTTON_DEBOUNCE_MS = 400;
-
 function AndroidLiquidHeaderButton({
   icon,
   color,
@@ -122,19 +118,11 @@ function AndroidLiquidHeaderButton({
   size = 22,
 }: AndroidLiquidHeaderButtonProps) {
   const canMountLiquid = useDeferredLiquidMount();
-  const lastPressAt = useRef(0);
-
-  const handlePress = useCallback(() => {
-    const now = Date.now();
-    if (now - lastPressAt.current < LIQUID_BUTTON_DEBOUNCE_MS) return;
-    lastPressAt.current = now;
-    onPress();
-  }, [onPress]);
 
   const androidIconName = ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu';
   return (
     <Pressable
-      onPress={handlePress}
+      onPress={onPress}
       hitSlop={HEADER_BUTTON_HIT_SLOP}
       style={{
         width: 44,
@@ -154,10 +142,7 @@ function AndroidLiquidHeaderButton({
         }}>
         {canMountLiquid ? (
           <LiquidButtonView
-            title={INVISIBLE_TITLE_SHORT}
-            enabled
             tint="transparent"
-            onPress={handlePress}
             blurRadius={2}
             lensX={12}
             lensY={24}
@@ -212,15 +197,12 @@ export function AndroidLiquidHeaderTitleButton({
       }}>
       {canMountLiquid ? (
         <LiquidButtonView
-          title={INVISIBLE_TITLE_SHORT}
-          enabled
           tint="transparent"
           useRealtimeCapture
           // lensX/lensY control lens radius, not X/Y displacement.
           blurRadius={2}
           lensX={12}
           lensY={24}
-          onPress={onPress}
           style={{ width: buttonWidth, height: buttonHeight }}
         />
       ) : (

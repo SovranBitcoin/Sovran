@@ -5,6 +5,7 @@ import { hasAndroidLiquidButtonView } from '@/navigation/nativeTabs';
 import Icon from 'assets/icons';
 import { Log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -21,22 +22,24 @@ export interface CapsuleButtonProps {
 }
 
 const DEFAULT_HEIGHT = 46;
-const INVISIBLE_TITLE = '\u2007'.repeat(12);
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   const foreground = useThemeColor('foreground');
   const { label, icon, onPress, color = foreground, height = DEFAULT_HEIGHT, testID } = props;
 
   if (hasAndroidLiquidButtonView()) {
+    // LiquidButtonView is a glass overlay only - its native module accepts no
+    // onPress/title/enabled props, so the outer Pressable owns all tap handling.
     return (
       <Log name="CapsuleButton">
-        <View testID={testID} className="w-full" style={{ height }}>
+        <Pressable
+          testID={testID}
+          onPress={onPress}
+          className="w-full"
+          style={{ height, borderRadius: height / 2, overflow: 'hidden' }}>
           <LiquidButtonView
-            title={INVISIBLE_TITLE}
-            enabled
             tint="transparent"
             blurRadius={3}
-            onPress={onPress}
             style={{ width: '100%', height, borderRadius: height / 2 }}
           />
           <View
@@ -48,7 +51,7 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
               {label}
             </Text>
           </View>
-        </View>
+        </Pressable>
       </Log>
     );
   }
