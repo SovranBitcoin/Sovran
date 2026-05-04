@@ -395,8 +395,8 @@
       ],
       "verification_note": "Re-read AnimatedEmoji.tsx:1-36. Confirmed the CDN URL, the per-emoji URL construction, the lack of any fallback other than the post-error path. Grepped for AnimatedEmoji usage — 1 external import per analyze-structure. The blast radius is bounded today; the concern is structural — the primitive is there, exposed, and future callers will import it. Counter-argument considered: 'Google's CDN is ubiquitous and the user's IP is already exposed to Google via a hundred other vectors'. Partially true but not a valid reason to add another. Confidence 0.90 — the mechanism is undisputed.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "AnimatedEmoji deleted; MarmotIcon and emojiPicker render emojis via local Text — no Google CDN fetch."
     },
     {
       "id": "F-017",

@@ -304,7 +304,8 @@
       ],
       "verification_note": "Re-checked AnimatedEmoji at lines 5-12 (NOTO_CDN constant, getAnimatedEmojiUrl helper). cachePolicy='memory-disk' confirmed at line 30. Fallback Text-emoji branch at line 22-24. Network dependency confirmed.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "MarmotIcon brand glyph now renders via local Text; AnimatedEmoji primitive removed entirely."
     },
     {
       "id": "F-015",

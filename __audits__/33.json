@@ -377,7 +377,9 @@
         "features/whitenoise/screens/WhitenoiseDMScreen.tsx:33"
       ],
       "verification_note": "Read AnimatedEmoji's contract — confirmed it uses a CDN-fetched emoji asset. Counter-argument: 'maybe AnimatedEmoji caches'. Even cached, the first load requires network.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "MarmotIcon now renders the chipmunk via local Text — no network fetch."
     },
     {
       "id": "F-015",
