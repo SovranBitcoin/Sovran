@@ -112,8 +112,8 @@
       ],
       "verification_note": "Re-read ButtonHandler.tsx end-to-end: 164 (single loading state), 186-201 (handleButtonPress flips global), 258 (`loading={loading || button.loading}`), 278 (More button also gets global). Counter-argument considered: 'this is intentional — when one action is in flight all other actions should visually indicate wait'. Rejected because (a) the ButtonHandlerButton type explicitly supports per-button loading at line 84, indicating the author expected isolation, and (b) for a wallet the convention of 'Cancel is always live during Send' is a known best practice that this implementation violates. Confidence 0.85 because the behaviour is unambiguously what the code does; the only residual uncertainty is whether product/design actively wants global loading — if so, the per-button prop should be removed to document that decision. Either direction is a real finding; the status quo is inconsistent with itself.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "The double-tap re-entry side of this finding is closed: ButtonHandler.handleButtonPress now holds a synchronous `inFlightRef` so a rapid second tap during the global loading window is dropped before re-entering `button.onPress`. The visual side (Cancel/More rendering as a spinner while Send is in flight) remains — that is a per-index loading refactor distinct from the re-entrancy guard pattern this slice targets."
+      "completion_status": "complete",
+      "completion_note": "ButtonHandler now tracks loadingIdx (number | null) instead of a global boolean; visible buttons render loading={loadingIdx === idx || button.loading} so a Send-in-flight no longer locks Cancel/More with a spinner. Re-entrancy guard from prior slice retained via inner Button useSingleFlight."
     },
     {
       "id": "F-004",
@@ -373,8 +373,8 @@
       ],
       "verification_note": "Re-read ButtonHandler.tsx:78-200 end-to-end. Confirmed close at line 92 is a typed parameter, and at line 197 an empty arrow is passed. Grepped for `button.onPress?.(` in shared/ui — only ButtonHandler is the caller. Counter-argument considered: 'the type is merely advisory; callers should just use router.back() directly'. Weak — if the type is advisory, remove it; leaving it in place creates the trap. Confidence 0.85.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "stale",
+      "completion_note": "Already resolved by a prior slice: ButtonHandlerButton.onPress no longer accepts a close arg (type is () => void | Promise<void>) and handleButtonPress invokes button.onPress?.() with no empty closure. The trap described in the audit no longer exists at line 197."
     },
     {
       "id": "F-016",

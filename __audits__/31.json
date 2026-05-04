@@ -116,7 +116,9 @@
         "skill:building-native-ui"
       ],
       "verification_note": "Grepped for `trigger.*open()` / `setTimeout.*open` across shared/ui — only these two sites. Workaround is real per the in-file comments.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Considered while editing ButtonHandler.tsx for the per-index loading slice; defer the imperative-MenuTrigger helper extraction (ButtonHandler + ActionMenuButton) to a dedicated shared/ui consolidation slice — out of scope here (extra files, distinct seam)."
     },
     {
       "id": "F-004",
