@@ -129,6 +129,7 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
     blur = false,
     blurIntensity = 70,
     blurTint = 'dark',
+    colorBlur,
     style,
     children,
     className,
@@ -165,7 +166,7 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
       ]}
       className={cleanClassName}
       {...rest}>
-      {rest.colorBlur && (
+      {colorBlur && (
         <View
           style={{
             position: 'absolute',
@@ -173,7 +174,7 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
             left: -1,
             right: -1,
             bottom: -1,
-            backgroundColor: rest.colorBlur,
+            backgroundColor: colorBlur,
           }}
         />
       )}

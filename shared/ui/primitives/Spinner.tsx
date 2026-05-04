@@ -1,4 +1,5 @@
 import React from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
@@ -9,7 +10,7 @@ export function Spinner({
   color,
 }: {
   size?: number;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
   color?: string;
 }) {
   const foreground = useThemeColor('foreground');

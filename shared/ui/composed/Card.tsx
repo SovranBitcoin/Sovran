@@ -43,42 +43,40 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
     }
   };
 
-  return (
-    <Log name="Card">
-      <Pressable onPress={onPress}>
-        <View
-          className="rounded-lg border-l-[5px] shadow-sm"
-          style={{
-            backgroundColor: surfaceSecondary,
-            borderLeftColor: getBorderColor(),
-          }}
-          blur>
-          <VStack>
-            {title && (
-              <Text
-                heavy
-                className="text-base"
-                style={{
-                  color: opacity(foreground, 0.5),
-                  paddingLeft: 16,
-                  paddingRight: 4,
-                  paddingTop: 16,
-                }}>
-                {title}
-              </Text>
-            )}
+  const body = (
+    <View
+      className="rounded-lg border-l-[5px] shadow-sm"
+      style={{
+        backgroundColor: surfaceSecondary,
+        borderLeftColor: getBorderColor(),
+      }}
+      blur>
+      <VStack>
+        {title && (
+          <Text
+            heavy
+            className="text-base"
+            style={{
+              color: opacity(foreground, 0.5),
+              paddingLeft: 16,
+              paddingRight: 4,
+              paddingTop: 16,
+            }}>
+            {title}
+          </Text>
+        )}
 
-            <HStack className="bg-transparent">
-              <Text
-                className="flex-1 text-base"
-                style={{ color: getTextColor(), padding: 16, paddingRight: 4 }}>
-                {message}
-              </Text>
-              {icon && <View style={{ padding: 16, paddingLeft: 4 }}>{icon}</View>}
-            </HStack>
-          </VStack>
-        </View>
-      </Pressable>
-    </Log>
+        <HStack className="bg-transparent">
+          <Text
+            className="flex-1 text-base"
+            style={{ color: getTextColor(), padding: 16, paddingRight: 4 }}>
+            {message}
+          </Text>
+          {icon && <View style={{ padding: 16, paddingLeft: 4 }}>{icon}</View>}
+        </HStack>
+      </VStack>
+    </View>
   );
+
+  return <Log name="Card">{onPress ? <Pressable onPress={onPress}>{body}</Pressable> : body}</Log>;
 };

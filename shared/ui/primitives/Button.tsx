@@ -257,7 +257,7 @@ interface ButtonProps {
   /** Text content or React node for the button */
   text?: string | React.ReactNode;
   /** Press event handler */
-  onPress: (event: any) => Promise<void> | void;
+  onPress: (event: GestureResponderEvent) => Promise<void> | void;
   /** Icon content for the button */
   icon?: React.ReactNode;
   /** Additional style overrides */
