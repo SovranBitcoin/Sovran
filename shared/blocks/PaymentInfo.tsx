@@ -57,7 +57,6 @@ export function PaymentInfo({
   const selectedValue = useMemo(() => {
     if (Array.isArray(data) && data.length > 0) return data[0].value;
     if (typeof data === 'string') return data;
-    if (data instanceof String) return data.valueOf();
     return '';
   }, [data]);
 

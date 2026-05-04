@@ -127,7 +127,7 @@ function LiveSheetBackground({
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel="Bottom Sheet"
-      style={[sanitized as ViewStyle, animatedStyle]}
+      style={[sanitized, animatedStyle]}
     />
   );
 }
@@ -145,7 +145,7 @@ function LiveSheetHandle({
     <View style={[style, { padding: 10 }]}>
       <Animated.View
         style={[
-          { alignSelf: 'center', width: 36, height: 4, borderRadius: 4 } as ViewStyle,
+          { alignSelf: 'center', width: 36, height: 4, borderRadius: 4 },
           indicatorStyle,
           animatedStyle,
         ]}
@@ -423,6 +423,16 @@ function SheetPopup() {
       setOpenCycle((value) => value + 1);
     }
     wasOpenRef.current = isOpen;
+    // While `isOpen` is false, the render still falls back to
+    // `lastPayloadRef` so the exit animation has content to draw.
+    // After heroui's exit animation lands (~300ms), drop the cached
+    // payload so a later re-open never flashes the previous popup.
+    if (!isOpen) {
+      const timer = setTimeout(() => {
+        lastPayloadRef.current = null;
+      }, 400);
+      return () => clearTimeout(timer);
+    }
   }, [isOpen]);
 
   useEffect(() => {

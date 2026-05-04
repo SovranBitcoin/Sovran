@@ -120,7 +120,17 @@ export interface ActionMenuButton {
    * menu via `actionMenuPopup` so the surface swaps content instead of closing.
    */
   keepOpen?: boolean;
-  /** Receives a close callback; if omitted the menu closes immediately. */
+  /**
+   * Receives a close callback; if omitted the menu closes immediately.
+   *
+   * Race note: tapping a button commits the host's "user picked" flag
+   * synchronously, before this `onPress` resolves. If the user then taps
+   * the overlay (or swipes the sheet down) while `onPress` is still
+   * pending, `ActionMenuPayload.onDismiss` does NOT fire — the host
+   * treats the in-flight selection as the terminal user action. Wire any
+   * "user explicitly dismissed mid-action" handling into the body of
+   * `onPress` itself rather than relying on `onDismiss`.
+   */
   onPress?: (close: (event?: GestureResponderEvent) => void) => void | Promise<void>;
 }
 
