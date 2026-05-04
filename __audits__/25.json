@@ -311,7 +311,9 @@
         "skill:creating-reanimated-animations"
       ],
       "verification_note": "Counter-argument: these views render infrequently and performance is not impacted — true, but the inconsistency is worth naming so future refactors see it.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Migrated MintInfoScreen from legacy RN Animated to Reanimated v4 (useSharedValue/withTiming/withSpring/withDelay + useAnimatedStyle)."
     }
   ],
   "dimensions": {

@@ -401,8 +401,8 @@
       ],
       "verification_note": "Confirmed by direct read. Counter-argument considered: maybe legacy Animated is intentional for SwiftUI interop (the BottomSheet uses @expo/ui/swift-ui). The animations in question are pure RN views, not SwiftUI bridges, so the interop concern doesn't apply.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "UserProfileScreen Animated migration is separate from UserMessagesScreen scope."
+      "completion_status": "complete",
+      "completion_note": "Migrated UserProfileScreen from legacy RN Animated to Reanimated v4. Also dropped dead staggered fade animation in ProfileStatsGridComponent (refs were animated but never wired to a rendered Animated.View)."
     },
     {
       "id": "F-016",

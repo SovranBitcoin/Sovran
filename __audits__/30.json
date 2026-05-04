@@ -214,7 +214,9 @@
         "skill:animating-react-native-expo"
       ],
       "verification_note": "Confirmed import source. The animation works correctly today via useNativeDriver: true, so this is inconsistency not a bug. Kept at Medium because the codebase is explicit about Reanimated being the convention.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Migrated PasscodeScreen from legacy RN Animated to Reanimated v4 (useSharedValue/withTiming/withSequence + runOnJS for completion callback)."
     },
     {
       "id": "F-008",
