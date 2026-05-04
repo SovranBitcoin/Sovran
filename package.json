@@ -29,6 +29,8 @@
     "submit:android": "eas submit -p android",
     "log-doctor": "npx tsx scripts/log-doctor.ts",
     "analyze-structure": "node scripts/analyze-structure.mjs --history --reach --leakage --vocab-drift",
+    "audit": "claude --dangerously-skip-permissions --append-system-prompt \"$(cat audit.md)\" 'begin a new audit'",
+    "fix": "claude --dangerously-skip-permissions --append-system-prompt \"$(cat fix.md)\" 'pick a related cluster of open audit findings and ship it'",
     "lint": "expo lint",
     "type-check": "tsc --noEmit",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
