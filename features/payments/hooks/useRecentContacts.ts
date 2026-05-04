@@ -1,42 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NDKEvent, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { paymentLog } from '@/shared/lib/logger';
+import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
-import {
-  getCachedUnwrap,
-  hydrateGiftWrapCache,
-  putUnwrap,
-} from '@/shared/lib/nostr/giftWrapCache';
+import { getCachedUnwrap, hydrateGiftWrapCache, putUnwrap } from '@/shared/lib/nostr/giftWrapCache';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { decryptNip04Events } from '../lib/decryptNip04Events';
 
-/** Pre-computed hex pubkeys — avoids runtime nip19.decode() on every mount */
-const DEFAULT_CONTACTS = [
-  {
-    pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
-    label: 'Sovran',
-  },
-  {
-    pubkey: 'c673ff0b5f228feb0abb1001882178d4c588bc4e50f857173544b5543b454f81',
-    label: 'kelbie',
-  },
-];
+const DEFAULT_CONTACTS = [{ pubkey: PUBLIC_KEYS.SUPPORT, label: 'Sovran' }] as const;
 
 interface NostrKeys {
   pubkey?: string;
   privateKey?: Uint8Array;
 }
 
-export function useRecentContacts(nostrKeys: NostrKeys | null) {
-  const defaultContactPubkeys = useMemo(
-    () =>
-      DEFAULT_CONTACTS.map((contact) => ({
-        pubkey: contact.pubkey,
-        label: contact.label,
-      })),
-    []
-  );
+export interface RecentContact {
+  type: 'contact';
+  pubkey: string;
+  dmEvent: NDKEvent | { content: string } | null | undefined;
+  nip17Content: string | undefined;
+  timestamp: number;
+  isDefault?: boolean;
+}
 
+export function useRecentContacts(nostrKeys: NostrKeys | null) {
   // NIP-04 DM subscription
   const dmFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
@@ -85,10 +72,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
           cacheHits++;
           return { ...cached, wrapId: event.id };
         }
-        const fresh = unwrapGiftWrap(
-          { content: event.content, pubkey: event.pubkey },
-          privateKey
-        );
+        const fresh = unwrapGiftWrap({ content: event.content, pubkey: event.pubkey }, privateKey);
         if (!fresh) {
           failed++;
           return null;
@@ -125,7 +109,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
     return out;
   }, [giftWrapEvents, nostrKeys?.privateKey, nostrKeys?.pubkey]);
 
-  const [decryptedContacts, setDecryptedContacts] = useState<any[]>([]);
+  const [decryptedContacts, setDecryptedContacts] = useState<RecentContact[]>([]);
 
   // Build recent activity contacts from NIP-04 and NIP-17 events
   const recentActivityContacts = useMemo(() => {
@@ -161,11 +145,11 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       }
     });
 
-    const contacts = Array.from(contactMap.entries())
+    const contacts: RecentContact[] = Array.from(contactMap.entries())
       .map(([pubkey, entry]) => ({
-        type: 'contact',
+        type: 'contact' as const,
         pubkey,
-        dmEvent: entry.type === 'nip04' ? entry.event : null,
+        dmEvent: entry.type === 'nip04' ? (entry.event ?? null) : null,
         nip17Content: entry.type === 'nip17' ? entry.dm?.content : undefined,
         timestamp: entry.timestamp,
       }))
@@ -180,22 +164,22 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
   }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
 
   // Merge default contacts with recent activity contacts
-  const contactsWithDefaults = useMemo(() => {
+  const contactsWithDefaults = useMemo<RecentContact[]>(() => {
     const existingPubkeys = new Set(recentActivityContacts.map((c) => c.pubkey));
 
-    const defaultsToAdd = defaultContactPubkeys
-      .filter((dc) => !existingPubkeys.has(dc.pubkey))
-      .map((dc) => ({
-        type: 'contact' as const,
-        pubkey: dc.pubkey,
-        dmEvent: null,
-        nip17Content: undefined as string | undefined,
-        timestamp: 0,
-        isDefault: true,
-      }));
+    const defaultsToAdd: RecentContact[] = DEFAULT_CONTACTS.filter(
+      (dc) => !existingPubkeys.has(dc.pubkey)
+    ).map((dc) => ({
+      type: 'contact',
+      pubkey: dc.pubkey,
+      dmEvent: null,
+      nip17Content: undefined,
+      timestamp: 0,
+      isDefault: true,
+    }));
 
     return [...recentActivityContacts, ...defaultsToAdd];
-  }, [recentActivityContacts, defaultContactPubkeys]);
+  }, [recentActivityContacts]);
 
   // Decrypt contact DM events
   useEffect(() => {
@@ -249,8 +233,8 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
   }, [contactsWithDefaults, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
   // Overlay decrypted message content per-pubkey when available
-  const displayContacts = useMemo(() => {
-    const decryptedByPubkey = new Map<string, any>();
+  const displayContacts = useMemo<RecentContact[]>(() => {
+    const decryptedByPubkey = new Map<string, RecentContact>();
     decryptedContacts.forEach((c) => {
       if (c.pubkey) decryptedByPubkey.set(c.pubkey, c);
     });

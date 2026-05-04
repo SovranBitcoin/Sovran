@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import type { Mint } from '@cashu/coco-core';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { paymentLog } from '@/shared/lib/logger';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { prefetchImages } from '@/shared/lib/imageCache';
@@ -11,15 +12,29 @@ interface NostrKeys {
   privateKey?: Uint8Array;
 }
 
+interface MintWithInfo {
+  mint: Mint;
+  mintInfo: GetInfoResponse;
+}
+
+export interface MintContact {
+  type: 'mint';
+  pubkey: string | null;
+  mint: Mint;
+  mintInfo: GetInfoResponse;
+  dmEvent: NDKEvent | { content: string } | undefined;
+  timestamp: number;
+}
+
 export function useMintContacts(
   nostrKeys: NostrKeys | null,
   mints: Mint[],
-  getMintInfo: (url: string) => Promise<any>,
+  getMintInfo: (url: string) => Promise<GetInfoResponse>,
   dmEvents: NDKEvent[] | null | undefined
 ) {
-  const [mintsWithInfo, setMintsWithInfo] = useState<{ mint: Mint; mintInfo: any }[]>([]);
+  const [mintsWithInfo, setMintsWithInfo] = useState<MintWithInfo[]>([]);
   const [mintInfoLoading, setMintInfoLoading] = useState(false);
-  const [decryptedMints, setDecryptedMints] = useState<any[]>([]);
+  const [decryptedMints, setDecryptedMints] = useState<MintContact[]>([]);
 
   // Load mint info and filter for those with nostr contacts
   useEffect(() => {
@@ -32,19 +47,28 @@ export function useMintContacts(
         const results = await Promise.all(
           mints.map(async (mint) => {
             try {
-              return { mint, mintInfo: await getMintInfo(mint.mintUrl) };
-            } catch {
+              const mintInfo = await getMintInfo(mint.mintUrl);
+              return { mint, mintInfo };
+            } catch (err) {
+              paymentLog.warn('payment.mint.contacts.info_failed', {
+                mintUrl: mint.mintUrl,
+                error: err instanceof Error ? err : new Error(String(err)),
+              });
               return { mint, mintInfo: null };
             }
           })
         );
         if (cancelled) return;
 
-        const withNostr = results.filter(({ mintInfo }) => {
-          if (!mintInfo?.contact) return false;
-          const nostrContact = mintInfo.contact.find((c: any) => c.method === 'nostr');
-          return nostrContact?.info?.startsWith('npub1');
-        });
+        const withNostr: MintWithInfo[] = results.filter(
+          (r): r is MintWithInfo =>
+            r.mintInfo !== null &&
+            Array.isArray(r.mintInfo.contact) &&
+            r.mintInfo.contact.some(
+              (c) =>
+                c.method === 'nostr' && typeof c.info === 'string' && c.info.startsWith('npub1')
+            )
+        );
         paymentLog.info('payment.mint.contacts.loaded', {
           totalMints: mints.length,
           withNostr: withNostr.length,
@@ -71,8 +95,8 @@ export function useMintContacts(
   }, [mintsWithInfo]);
 
   // Build mints with most recent DM metadata
-  const mintsWithMetadata = useMemo(() => {
-    const dmMap = new Map();
+  const mintsWithMetadata = useMemo<MintContact[]>(() => {
+    const dmMap = new Map<string, NDKEvent>();
     dmEvents?.forEach((event) => {
       const otherPubkey =
         event.pubkey === nostrKeys?.pubkey
@@ -81,29 +105,33 @@ export function useMintContacts(
       if (!otherPubkey) return;
 
       const existing = dmMap.get(otherPubkey);
-      if (!existing || (event.created_at && event.created_at > existing.created_at)) {
+      if (!existing || (event.created_at && event.created_at > (existing.created_at ?? 0))) {
         dmMap.set(otherPubkey, event);
       }
     });
 
     return mintsWithInfo.map(({ mint, mintInfo }) => {
-      let mintPubkey = null;
-      const nostrContact = mintInfo.contact?.find((c: any) => c.method === 'nostr');
+      let mintPubkey: string | null = null;
+      const nostrContact = mintInfo.contact?.find((c) => c.method === 'nostr');
       if (nostrContact?.info) {
         try {
           mintPubkey = npubToPubkey(nostrContact.info);
-        } catch {
-          // ignore decode failure
+        } catch (err) {
+          paymentLog.warn('payment.mint.contacts.npub_decode_failed', {
+            mintUrl: mint.mintUrl,
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
         }
       }
 
+      const dmEvent = mintPubkey ? dmMap.get(mintPubkey) : undefined;
       return {
         type: 'mint',
         pubkey: mintPubkey,
         mint,
         mintInfo,
-        dmEvent: mintPubkey ? dmMap.get(mintPubkey) : undefined,
-        timestamp: mintPubkey ? dmMap.get(mintPubkey)?.created_at || 0 : 0,
+        dmEvent,
+        timestamp: dmEvent?.created_at ?? 0,
       };
     });
   }, [mintsWithInfo, dmEvents, nostrKeys?.pubkey]);
@@ -139,8 +167,8 @@ export function useMintContacts(
   }, [mintsWithMetadata, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
   // Merge display mints
-  const displayMints = useMemo(() => {
-    const decryptedByKey = new Map<string, any>();
+  const displayMints = useMemo<MintContact[]>(() => {
+    const decryptedByKey = new Map<string, MintContact>();
     decryptedMints.forEach((m) => {
       const key = m.pubkey || m.mint?.mintUrl;
       if (key) decryptedByKey.set(key, m);

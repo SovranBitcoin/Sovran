@@ -24,6 +24,7 @@ import {
 import { ContactRow, geohashIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { navigateToContact } from '@/features/contacts/lib/navigateToProfile';
 import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
+import { CONTACT_SEARCH_MIN_LENGTH } from '@/features/payments/hooks/useContactSearch';
 import type { TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 
 type SearchResultsListProps = {
@@ -88,9 +89,9 @@ export function SearchResultsList({
 
   const showNoResults = useMemo(() => {
     const trimmed = searchQuery.trim();
-    // Mirror useContactSearch's internal rule: <2 chars doesn't trigger a
-    // real search, so don't flash "no results" at the user.
-    if (trimmed.length < 2) return false;
+    // Mirror useContactSearch's internal rule: short queries don't trigger
+    // a real search, so don't flash "no results" at the user.
+    if (trimmed.length < CONTACT_SEARCH_MIN_LENGTH) return false;
     if (loading) return false;
     return results.length === 0;
   }, [results.length, loading, searchQuery]);

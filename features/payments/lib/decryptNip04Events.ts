@@ -54,12 +54,13 @@ export async function decryptNip04Events<
           failedCount++;
           continue;
         }
-        // Positive-cache hit: skip decrypt, populate plaintext on the
-        // event so downstream code paths see the same shape they would
-        // after a fresh `decrypt()` call.
+        // Positive-cache hit: skip decrypt, return a fresh wrapper with
+        // the cached plaintext. Don't mutate caller's `item.dmEvent` —
+        // NDKEvent instances are owned by the @nostr-dev-kit subscription
+        // and seeing their content swap underfoot triggers downstream
+        // re-renders we don't own.
         const cached = eventId ? getCachedNip04Plaintext(recipientPubkey, eventId) : undefined;
         if (cached !== undefined) {
-          item.dmEvent.content = cached;
           results.push({ ...item, dmEvent: { ...item.dmEvent, content: cached } });
           cacheHitCount++;
           continue;

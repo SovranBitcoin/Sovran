@@ -25,6 +25,10 @@ const PLACEHOLDER_RESULTS: PlaceholderResult[] = Array.from({ length: 6 }, (_, i
 // to coalesce a burst, short enough that a deliberate pause feels responsive.
 const SEARCH_DEBOUNCE_MS = 250;
 
+// Mirror the server-side `SearchQuery.min(3)` in `sovran-schemas/src/nostr-api.ts`.
+// Anything shorter is rejected upstream, so suppress the request entirely.
+export const CONTACT_SEARCH_MIN_LENGTH = 3;
+
 export function useContactSearch(searchQuery: string) {
   const addSearchToHistory = useSearchHistoryStore((state) => state.addSearch);
   const seedFromSearchResults = useNostrMetadataCache((s) => s.seedFromSearchResults);
@@ -38,7 +42,7 @@ export function useContactSearch(searchQuery: string) {
   // wait because they'll be rejected by the length guard anyway.
   useEffect(() => {
     const trimmed = searchQuery.trim();
-    if (!trimmed || trimmed.length < 2) {
+    if (!trimmed || trimmed.length < CONTACT_SEARCH_MIN_LENGTH) {
       setDebouncedQuery(searchQuery);
       return;
     }
@@ -48,7 +52,7 @@ export function useContactSearch(searchQuery: string) {
 
   useEffect(() => {
     const trimmed = debouncedQuery.trim();
-    if (!trimmed || trimmed.length < 2) {
+    if (!trimmed || trimmed.length < CONTACT_SEARCH_MIN_LENGTH) {
       setHasSearched(false);
       setSearchResults([]);
       setSearchLoading(false);
@@ -78,8 +82,15 @@ export function useContactSearch(searchQuery: string) {
               let profileEventPubkey = res.pubkey;
               if (res.profileEvent) {
                 try {
-                  const parsed = JSON.parse(res.profileEvent);
-                  if (parsed?.pubkey) profileEventPubkey = parsed.pubkey;
+                  const parsed: unknown = JSON.parse(res.profileEvent);
+                  if (
+                    parsed !== null &&
+                    typeof parsed === 'object' &&
+                    'pubkey' in parsed &&
+                    typeof parsed.pubkey === 'string'
+                  ) {
+                    profileEventPubkey = parsed.pubkey;
+                  }
                 } catch {
                   // Invalid profileEvent JSON
                 }

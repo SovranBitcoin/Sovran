@@ -14,8 +14,8 @@
  *   - nostr  → nostr-dm
  *   - search → qr-only (no established DM channel)
  *
- * Search hits only appear while the searchbar has ≥2 chars (matches the
- * behaviour of `useContactSearch` itself).
+ * Search hits only appear while the searchbar has ≥3 chars (matches the
+ * server-side `SearchQuery.min(3)` enforced by `useContactSearch` itself).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

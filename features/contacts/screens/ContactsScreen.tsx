@@ -302,8 +302,7 @@ export const ContactsScreen = () => {
           byKey.set(item.pubkey, item);
         }
         for (const item of filteredDisplayContacts) {
-          const key = item.pubkey || item.mint?.mintUrl;
-          if (key) byKey.set(key, item);
+          if (item.pubkey) byKey.set(item.pubkey, item);
         }
         for (const item of filteredDisplayMints) {
           const key = item.pubkey || item.mint?.mintUrl;
