@@ -211,8 +211,8 @@
       ],
       "verification_note": "Re-checked useBitChat.ts:80-142 and grep for `transport: 'ble'` (no internal call sites pass it). log.txt grep for bitchat.hook.ble_diag: 0 hits. Counter-argument: maybe the 10s poll is load-bearing for some BLE state machine. Refuted — the diag fields are read-only and the interval body is a single log call.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "10s setInterval(getBLEDiagnostics) lifecycle is a separate pattern from logger-scope drift; the prior bitchat slice (audit 49) tracks it."
+      "completion_status": "complete",
+      "completion_note": "Diagnostic 10s setInterval(getBLEDiagnostics) and matching clearInterval removed; addBLEPeerListener already covers the events that mattered."
     },
     {
       "id": "F-007",
@@ -255,7 +255,8 @@
       ],
       "verification_note": "Re-checked LOC (`wc -l`) and structure. Counter-argument: the four branches share the listener-add / setMessages / cleanup pattern, which is exactly what the merge helper would consolidate. The refactor concentrates complexity (locality) and trims the interface to one merge function — passes the deletion test from skill:improve-codebase-architecture/DEEPENING.md.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "partial",
+      "completion_note": "4× duplicated message-merge inline blocks consolidated into a single appendChatMessage helper (covers the 'four duplicate message-merge implementations' half of the finding); full transport-branch consolidation (the 417 LOC / four near-duplicate effects half) is deferred — collapsing transport effects affects geohash leave/refcount semantics covered by F-003 and is out of this slice's hygiene/perf budget."
     },
     {
       "id": "F-009",
@@ -468,8 +469,8 @@
       ],
       "verification_note": "Re-checked at useLocationTiers.ts:98-100. Counter-argument: the comment justifies the swallow. Refuted — best-effort and silent are not the same thing.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the duplicate-helper slice (mint/lib/auditInfo + colorUtils consolidation); features/bitchat is a separate cluster."
+      "completion_status": "complete",
+      "completion_note": "Empty catch in useLocationTiers now logs bitchat.location_tiers.reverse_geocode_failed at warn."
     },
     {
       "id": "F-019",
@@ -528,8 +529,8 @@
       ],
       "verification_note": "Re-checked the four merge sites; each sorts the entire array. Counter-argument: 500 elements is small and v8/Hermes Timsort on near-sorted is O(n). Partly true; the spread allocation cost is the more measurable hit. UNVERIFIED on actual measurement.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the duplicate-helper slice (mint/lib/auditInfo + colorUtils consolidation); features/bitchat is a separate cluster."
+      "completion_status": "complete",
+      "completion_note": "Per-message sort+slice replaced with appendChatMessage helper that appends in-order (O(1)) and only sorts when an out-of-order message arrives; cap unchanged at 500."
     },
     {
       "id": "F-022",
@@ -549,8 +550,8 @@
       ],
       "verification_note": "Re-checked at useBLEPeers.ts:45. Counter-argument: trivial waste. Agreed — Low severity for completeness, not a priority.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the duplicate-helper slice (mint/lib/auditInfo + colorUtils consolidation); features/bitchat is a separate cluster."
+      "completion_status": "complete",
+      "completion_note": "connectedCount now derived via useMemo over peers."
     },
     {
       "id": "F-023",
@@ -611,8 +612,8 @@
       ],
       "verification_note": "Re-checked the 11 errors in `expo lint` output cited at the top of this audit.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the duplicate-helper slice (mint/lib/auditInfo + colorUtils consolidation); features/bitchat is a separate cluster."
+      "completion_status": "partial",
+      "completion_note": "prettier auto-fix applied to the three touched hooks files; remaining 11 prettier issues in features/bitchat/components+screens not touched by this slice."
     },
     {
       "id": "F-026",
