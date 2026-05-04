@@ -16,12 +16,6 @@ export const DISMISS_MIN_DISTANCE = 6;
  */
 export const DISMISS_ACTIVE_OFFSET_Y = 14;
 
-/**
- * Horizontal movement (px) that fails the dismiss gesture (so pager takes over).
- * Larger = easier to trigger pager with a horizontal swipe.
- */
-export const DISMISS_FAIL_OFFSET_X = 32;
-
 /** How much the image follows the finger (0–1). Higher = more direct. */
 export const DISMISS_DRAG_FOLLOW = 0.85;
 

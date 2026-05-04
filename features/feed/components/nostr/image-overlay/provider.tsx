@@ -102,6 +102,15 @@ export function computeExpandedSize(
   screenHeight: number,
   aspectRatio: number
 ): { width: number; height: number } {
+  // aspectRatio originates in relay-supplied event content; a hostile or
+  // malformed `imeta`/`dim` tag can deliver 0, negative, NaN, or Infinity.
+  // Without this guard the result poisons every downstream shared value
+  // (centerX/Y, expandedWidth/Height) with NaN/Infinity and the overlay
+  // silently renders nothing. Fall back to a square in the screen rect.
+  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+    const side = Math.min(screenWidth, screenHeight);
+    return { width: side, height: side };
+  }
   const fitByWidth = screenWidth / aspectRatio <= screenHeight;
   if (fitByWidth) {
     return { width: screenWidth, height: screenWidth / aspectRatio };
@@ -235,6 +244,15 @@ export function ImageOverlayProvider({
   const openSessionInitialIndexRef = useRef(0);
   /** Snapshot of thumbnail layouts for every pager index at open() time. Prevents wrong height when dismissing from page 2/3 (ref would otherwise be overwritten by other cards). */
   const openSessionLayoutsByIndexRef = useRef<(ThumbnailLayout | null)[]>([]);
+  /** Pending close-clear and open-panel-animation timers; cleared on unmount so we never fire setState after teardown. */
+  const clearUrlTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openPanelAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (clearUrlTimeoutRef.current) clearTimeout(clearUrlTimeoutRef.current);
+      if (openPanelAnimationTimeoutRef.current) clearTimeout(openPanelAnimationTimeoutRef.current);
+    };
+  }, []);
 
   /** 0 when overlay is aligned with thumbnail, max when displaced (open/drag). Drives thumbnail blur. */
   const thumbnailBlurIntensity = useDerivedValue(() => {
@@ -265,7 +283,11 @@ export function ImageOverlayProvider({
     panelContentMinHeightSv.value = 0;
     openSessionInitialLayoutRef.current = null;
     openSessionLayoutsByIndexRef.current = [];
-    setTimeout(() => setActiveUrls([]), CLEAR_URL_DELAY_MS);
+    if (clearUrlTimeoutRef.current) clearTimeout(clearUrlTimeoutRef.current);
+    clearUrlTimeoutRef.current = setTimeout(() => {
+      clearUrlTimeoutRef.current = null;
+      setActiveUrls([]);
+    }, CLEAR_URL_DELAY_MS);
   }, [hasPanelSv, openAnimationInProgressSv, panelHeightSv, panelContentMinHeightSv]);
 
   const finishClose = useCallback(() => {
@@ -570,13 +592,12 @@ export function ImageOverlayProvider({
       screenWidthSv.value = screenWidth;
       screenHeightSv.value = screenHeight;
       aspectRatioSv.value = aspectRatio;
+      panelHeightSv.value = 0;
       if (hasPanel) {
         hasPanelSv.value = 1;
-        panelHeightSv.value = 0;
         openAnimationInProgressSv.value = 1;
       } else {
         hasPanelSv.value = 0;
-        panelHeightSv.value = 0;
       }
 
       const targetX = centerX - expW / 2;
@@ -630,7 +651,12 @@ export function ImageOverlayProvider({
       });
 
       if (hasPanel) {
-        setTimeout(() => startOpenPanelImageAnimation(0, aspectRatio), OPEN_START_DELAY_MS);
+        if (openPanelAnimationTimeoutRef.current)
+          clearTimeout(openPanelAnimationTimeoutRef.current);
+        openPanelAnimationTimeoutRef.current = setTimeout(() => {
+          openPanelAnimationTimeoutRef.current = null;
+          startOpenPanelImageAnimation(0, aspectRatio);
+        }, OPEN_START_DELAY_MS);
       }
     },
     [

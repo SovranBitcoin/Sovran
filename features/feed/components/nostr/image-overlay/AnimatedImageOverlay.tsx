@@ -537,6 +537,16 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     }
   }, []);
 
+  // Unmount cleanup for the two cooldown timers above. Their callbacks only
+  // touch refs so they're harmless after unmount, but cancelling on teardown
+  // keeps the component from holding closures past its lifetime.
+  useEffect(() => {
+    return () => {
+      if (clearDismissPanTimeoutRef.current) clearTimeout(clearDismissPanTimeoutRef.current);
+      if (clearPagerDragTimeoutRef.current) clearTimeout(clearPagerDragTimeoutRef.current);
+    };
+  }, []);
+
   /** Max finger movement (px) for tap to count; prevents swipe-to-page from triggering toggle. */
   const TAP_MAX_DISTANCE = 12;
 

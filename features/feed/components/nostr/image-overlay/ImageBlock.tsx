@@ -99,7 +99,7 @@ export const ImageBlock = React.memo(function ImageBlock({
     const node = measureSourceRef();
     if (!node) return;
     node.measureInWindow((pageX: number, pageY: number, width: number, height: number) => {
-      imageOverlay?.registerThumbnailLayout?.(
+      imageOverlay?.registerThumbnailLayout(
         url,
         { pageX, pageY, width, height },
         overlayEvent?.id != null && layoutIndex != null
