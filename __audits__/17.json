@@ -90,8 +90,8 @@
       ],
       "verification_note": "Re-read TouchableOpacity.tsx:128-158 end-to-end. Confirmed DRAG_THRESHOLD=1 at line 151 and the filter branching at 152-156. Counter-argument 'RN passes onPress through and the 1px filter is just extra protection': rejected — 'extra' protection that is tighter than RN's own heuristic is net harmful, not net positive. Counter-argument 'the app is shipping and users tolerate it': the failure is silent (no logged event for 'dropped tap') and would manifest as a diffuse UX complaint about responsiveness rather than a point-bug, so absence of specific reports is not evidence of absence. Confidence 0.80 (not higher) because a real-device measurement across a representative tap sample would be the gold standard — I cannot prove the tap-drop rate without a log-doctor tap-event counter, which is a recommended follow-up (see refactor_plan). The structural claim (1px is below RN's own filter and below typical finger tremor) is self-evident from the code and well-established in RN guidance.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "stale",
+      "completion_note": "TouchableOpacity primitive removed; shared/ui/primitives/Pressable.tsx is the seam now and the 1px DRAG_THRESHOLD is gone."
     },
     {
       "id": "F-003",
@@ -309,8 +309,8 @@
       ],
       "verification_note": "Re-read Card.tsx end-to-end. Confirmed line 48 wraps unconditionally. Contrast with ListRow.tsx:217 which does `if (!onPress) return <View>...; return <Pressable>...`. Grepped for Card usage in app/ features/ — 52 importers, many in settings screens that plausibly pass no onPress. Confidence 0.85 — the structural claim is confirmed; the exact % of callers without onPress is not counted but the pattern is common.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "Card.tsx now gates Pressable wrapper on onPress; non-interactive Cards render as plain View, so press-feedback / tap-capture / scroll-eat all gone."
     },
     {
       "id": "F-013",
@@ -461,8 +461,8 @@
       ],
       "verification_note": "Re-read Button.tsx:264-332 (ButtonProps + signature), 533-543 (handlePress/handlePressIn) — four `any` hits confirmed. Confidence 0.90 — mechanical.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "Button onPress event narrowed from any to GestureResponderEvent; same import already in scope."
     },
     {
       "id": "F-020",
@@ -525,8 +525,8 @@
       ],
       "verification_note": "Re-read View.tsx:127-195. Confirmed `colorBlur` is NOT in the destructure (line 128-136), IS declared on ViewProps (line 57), and IS read via `rest.colorBlur` at line 168. Confidence 0.75 — the leak is mechanical; the dev-warning-emission is version-dependent on RN so the exact warning text is UNVERIFIED but the spread IS confirmed. Severity Low.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "View.tsx destructures colorBlur out of ...rest so it no longer leaks to RNView; inner read switched to the destructured local."
     }
   ],
   "dimensions": {
