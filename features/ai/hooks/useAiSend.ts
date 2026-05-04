@@ -271,7 +271,6 @@ export function useAiSend() {
             const result = await sendMessage(apiKey, apiMessages, {
               model: candidate,
               temperature: 0.7,
-              stream: true,
               signal: controller.signal,
             });
             stream = result.stream;

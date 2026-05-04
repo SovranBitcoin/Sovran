@@ -1,7 +1,6 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
-import Svg, { G, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import 'react-native-get-random-values';
 import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { PressableFeedback } from 'heroui-native';

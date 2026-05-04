@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import { z } from 'zod';
 import { apiLog } from '../logger';
 import { buildAbortSignal, isAbortError, type RequestControls } from '../apiClient';
@@ -7,11 +6,29 @@ const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
 
 /**
  * Per-request budget for routstr endpoints. The chat APIs can take longer
- * than the wallet's `DEFAULT_TIMEOUT_MS` (10s) — the OpenAI SDK already
- * uses 60s for streaming. Match that for the bare-fetch endpoints so a
- * slow upstream doesn't surface as a fake timeout.
+ * than the wallet's `DEFAULT_TIMEOUT_MS` (10s) — match the streaming-side
+ * 60s budget for the bare-fetch endpoints so a slow upstream doesn't
+ * surface as a fake timeout.
  */
 const ROUTSTR_TIMEOUT_MS = 30_000;
+
+/**
+ * Minimal shape of an OpenAI-compatible chat completion stream chunk —
+ * captures the fields useAiSend.ts actually reads (`choices[0].delta.*`).
+ * Defining locally avoids shipping the full `openai` SDK in production.
+ */
+export interface ChatCompletionChunk {
+  choices?: {
+    delta?: {
+      content?: string | null;
+      reasoning_content?: string | null;
+      reasoning?: string | null;
+      message?: { content?: string | null };
+      text?: string | null;
+    };
+    finish_reason?: string | null;
+  }[];
+}
 
 /**
  * Spine validators for the JSON envelopes routstr returns. Like
@@ -260,17 +277,6 @@ interface ModelsResponse {
   data: RoutstrModel[];
 }
 
-// ── Client ───────────────────────────────────────────────────────────────
-
-function createRoutstrClient(apiKey: string): OpenAI {
-  return new OpenAI({
-    apiKey,
-    baseURL: ROUTSTR_BASE_URL,
-    timeout: 60_000,
-    maxRetries: 2,
-  });
-}
-
 // ── Public API ───────────────────────────────────────────────────────────
 
 export async function getModels(controls: RequestControls = {}): Promise<RoutstrModel[]> {
@@ -410,9 +416,7 @@ export async function topUpBalance(
  * Parse SSE stream manually for React Native compatibility.
  * Uses ReadableStream when available, falls back to full-text parsing.
  */
-async function* parseSSEStream(
-  response: Response
-): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+async function* parseSSEStream(response: Response): AsyncGenerator<ChatCompletionChunk> {
   const hasReadableStream = response.body && typeof response.body.getReader === 'function';
   apiLog.debug('routstr.sse.start', {
     hasReadableStream,
@@ -427,16 +431,14 @@ async function* parseSSEStream(
   yield* parseSSEFromText(await response.text());
 }
 
-function tryParseSSELine(
-  line: string
-): OpenAI.Chat.Completions.ChatCompletionChunk | 'done' | null {
+function tryParseSSELine(line: string): ChatCompletionChunk | 'done' | null {
   const trimmed = line.trim();
   if (!trimmed || !trimmed.startsWith('data: ')) return null;
   const data = trimmed.slice(6).trim();
   if (data === '[DONE]') return 'done';
   if (!data) return null;
   try {
-    return JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
+    return JSON.parse(data) as ChatCompletionChunk;
   } catch {
     apiLog.warn('routstr.sse.parse_failed', { preview: data.substring(0, 100) });
     return null;
@@ -445,7 +447,7 @@ function tryParseSSELine(
 
 async function* parseSSEFromReadableStream(
   body: ReadableStream<Uint8Array>
-): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+): AsyncGenerator<ChatCompletionChunk> {
   const reader = body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
@@ -505,7 +507,7 @@ async function* parseSSEFromReadableStream(
   }
 }
 
-function* parseSSEFromText(text: string): Generator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+function* parseSSEFromText(text: string): Generator<ChatCompletionChunk> {
   for (const line of text.split('\n')) {
     const result = tryParseSSELine(line);
     if (result === 'done') return;
@@ -520,24 +522,13 @@ export async function sendMessage(
     model?: string;
     temperature?: number;
     max_tokens?: number;
-    stream?: boolean;
     signal?: AbortSignal;
   } = {}
-): Promise<{
-  response?: OpenAI.Chat.Completions.ChatCompletion;
-  stream?: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
-}> {
-  const {
-    model = 'gpt-3.5-turbo',
-    temperature = 0.7,
-    max_tokens,
-    stream = false,
-    signal,
-  } = options;
+): Promise<{ stream: AsyncIterable<ChatCompletionChunk> }> {
+  const { model = 'gpt-3.5-turbo', temperature = 0.7, max_tokens, signal } = options;
   const totalTokens = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
   apiLog.info('api.routstr.chat.start', {
     model,
-    stream,
     messageCount: messages.length,
     totalInputChars: totalTokens,
     temperature,
@@ -546,51 +537,35 @@ export async function sendMessage(
   const start = performance.now();
 
   try {
-    if (stream) {
-      const response = await fetch(`${ROUTSTR_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature,
-          ...(max_tokens != null && { max_tokens }),
-          stream: true,
-        }),
-        signal,
-      });
-      const requestId = response.headers.get('x-routstr-request-id') || undefined;
-      apiLog.debug('api.routstr.chat.response_received', {
-        status: response.status,
-        requestId,
-        duration_ms: Math.round(performance.now() - start),
-      });
-      if (!response.ok) await throwResponseError(response);
-
-      apiLog.info('api.routstr.chat.stream_started', {
+    const response = await fetch(`${ROUTSTR_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         model,
-        requestId,
-        ttfb_ms: Math.round(performance.now() - start),
-      });
-      return { stream: parseSSEStream(response) };
-    }
-
-    const client = createRoutstrClient(apiKey);
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      temperature,
-      ...(max_tokens != null && { max_tokens }),
-      stream: false,
+        messages,
+        temperature,
+        ...(max_tokens != null && { max_tokens }),
+        stream: true,
+      }),
+      signal,
     });
-    apiLog.info('api.routstr.chat.success', {
-      model,
+    const requestId = response.headers.get('x-routstr-request-id') || undefined;
+    apiLog.debug('api.routstr.chat.response_received', {
+      status: response.status,
+      requestId,
       duration_ms: Math.round(performance.now() - start),
     });
-    return { response };
+    if (!response.ok) await throwResponseError(response);
+
+    apiLog.info('api.routstr.chat.stream_started', {
+      model,
+      requestId,
+      ttfb_ms: Math.round(performance.now() - start),
+    });
+    return { stream: parseSSEStream(response) };
   } catch (error: unknown) {
     apiLog.error('api.routstr.chat.failed', {
       model,

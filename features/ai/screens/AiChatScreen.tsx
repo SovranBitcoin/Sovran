@@ -77,7 +77,9 @@ export function AiChatScreen() {
       const info = getSiblingInfo(m.id, normalized);
       if (!info) continue;
       const onPrev =
-        info.index > 1 ? () => setActiveBranch(m.parentId ?? '', info.siblings[info.index - 2].id) : undefined;
+        info.index > 1
+          ? () => setActiveBranch(m.parentId ?? '', info.siblings[info.index - 2].id)
+          : undefined;
       const onNext =
         info.index < info.total
           ? () => setActiveBranch(m.parentId ?? '', info.siblings[info.index].id)
@@ -117,7 +119,14 @@ export function AiChatScreen() {
     });
     setText('');
     void send(trimmed);
-  }, [send, text, conversationHistory.length, activeMessages.length, kbState.isVisible, kbState.height]);
+  }, [
+    send,
+    text,
+    conversationHistory.length,
+    activeMessages.length,
+    kbState.isVisible,
+    kbState.height,
+  ]);
 
   const handleRetry = useCallback(
     (messageId: string) => {
@@ -191,19 +200,22 @@ export function AiChatScreen() {
   // `useDerivedValue` runs on the UI thread (cheap); `runOnJS` schedules a
   // microtask to JS — same pattern Reanimated docs recommend for telemetry.
   const lastReportedProgress = useRef(0);
-  const reportProgress = useCallback((p: number) => {
-    aiLog.debug('ai.kav.progress_tick', {
-      progress: p,
-      paddingBottom: closedPadding + (openPadding - closedPadding) * p,
-      closedPadding,
-      openPadding,
-    });
-  }, [closedPadding, openPadding]);
+  const reportProgress = useCallback(
+    (p: number) => {
+      aiLog.debug('ai.kav.progress_tick', {
+        progress: p,
+        paddingBottom: closedPadding + (openPadding - closedPadding) * p,
+        closedPadding,
+        openPadding,
+      });
+    },
+    [closedPadding, openPadding]
+  );
   useDerivedValue(() => {
     'worklet';
     const p = progress.value;
     const rounded = Math.round(p * 20) / 20; // 0.05 buckets
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     if (rounded !== lastReportedProgress.current) {
       lastReportedProgress.current = rounded;
       runOnJS(reportProgress)(rounded);
@@ -260,26 +272,23 @@ export function AiChatScreen() {
   );
 
   const lastScrollLogRef = useRef(0);
-  const handleListScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent> | any) => {
-      const now = Date.now();
-      // Hard-throttle: at most one log per 120ms — without this the JSON
-      // dump is unreadable and we breach the 15% noise threshold immediately.
-      if (now - lastScrollLogRef.current < 120) return;
-      lastScrollLogRef.current = now;
-      const { contentOffset, contentSize, layoutMeasurement } = (
-        e as NativeSyntheticEvent<NativeScrollEvent>
-      ).nativeEvent;
-      const distFromEnd = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-      aiLog.debug('ai.list.scroll', {
-        offsetY: Math.round(contentOffset.y),
-        contentH: Math.round(contentSize.height),
-        viewportH: Math.round(layoutMeasurement.height),
-        distFromEnd: Math.round(distFromEnd),
-      });
-    },
-    []
-  );
+  const handleListScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent> | any) => {
+    const now = Date.now();
+    // Hard-throttle: at most one log per 120ms — without this the JSON
+    // dump is unreadable and we breach the 15% noise threshold immediately.
+    if (now - lastScrollLogRef.current < 120) return;
+    lastScrollLogRef.current = now;
+    const { contentOffset, contentSize, layoutMeasurement } = (
+      e as NativeSyntheticEvent<NativeScrollEvent>
+    ).nativeEvent;
+    const distFromEnd = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    aiLog.debug('ai.list.scroll', {
+      offsetY: Math.round(contentOffset.y),
+      contentH: Math.round(contentSize.height),
+      viewportH: Math.round(layoutMeasurement.height),
+      distFromEnd: Math.round(distFromEnd),
+    });
+  }, []);
 
   // Track conversation length transitions so the "weird animation when we
   // add a message" the user described is correlated with what actually

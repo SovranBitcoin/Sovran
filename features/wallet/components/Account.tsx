@@ -1,5 +1,4 @@
 import React from 'react';
-import 'react-native-get-random-values';
 
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
