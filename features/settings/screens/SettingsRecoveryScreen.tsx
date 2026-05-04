@@ -1,22 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ScrollView } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
-  interpolate,
-  Extrapolation,
-  runOnJS,
   interpolateColor,
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withRepeat,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { SlideToConfirm } from '@/shared/ui/composed/SlideToConfirm';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -301,95 +297,6 @@ declare global {
 
   var __CASHU_RECOVERY_CONFIG: RecoveryConfig | undefined;
 }
-
-// ─── Slide to recover ──────────────────────────────────────────────────────
-
-const THUMB_SIZE = 40;
-const TRACK_PADDING = 4;
-
-const SlideToRecover: React.FC<{
-  onComplete: () => void;
-  trackColor: string;
-  thumbColor: string;
-  textColor: string;
-  iconColor: string;
-  label?: string;
-}> = ({ onComplete, trackColor, thumbColor, textColor, iconColor, label }) => {
-  const { width: windowWidth } = useWindowDimensions();
-  const sliderWidth = windowWidth - 48;
-  const maxTranslate = sliderWidth - THUMB_SIZE - TRACK_PADDING * 2;
-  const translateX = useSharedValue(0);
-  const isComplete = useSharedValue(false);
-
-  const handleComplete = useCallback(() => {
-    onComplete();
-  }, [onComplete]);
-
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      if (isComplete.value) return;
-      translateX.value = Math.max(0, Math.min(event.translationX, maxTranslate));
-    })
-    .onEnd(() => {
-      if (isComplete.value) return;
-      if (translateX.value > maxTranslate * 0.9) {
-        translateX.value = withSpring(maxTranslate, { damping: 20, stiffness: 200 });
-        isComplete.value = true;
-        runOnJS(handleComplete)();
-      } else {
-        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
-      }
-    });
-
-  const thumbAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
-  const textAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, maxTranslate * 0.5], [1, 0], Extrapolation.CLAMP),
-  }));
-
-  return (
-    <GestureHandlerRootView>
-      <View style={[styles.track, { backgroundColor: trackColor, width: sliderWidth }]}>
-        <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
-          <Text size={16} medium style={{ color: textColor }}>
-            {label || 'Swipe to recover'}
-          </Text>
-        </Animated.View>
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            style={[styles.thumb, thumbAnimatedStyle, { backgroundColor: thumbColor }]}>
-            <Icon name="mdi:shield-refresh" size={24} color={iconColor} />
-          </Animated.View>
-        </GestureDetector>
-      </View>
-    </GestureHandlerRootView>
-  );
-};
-
-const styles = StyleSheet.create({
-  track: {
-    height: THUMB_SIZE + TRACK_PADDING * 2,
-    borderRadius: (THUMB_SIZE + TRACK_PADDING * 2) / 2,
-    justifyContent: 'center',
-    padding: TRACK_PADDING,
-  },
-  textContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: THUMB_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
@@ -718,8 +625,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           </VStack>
           <Switch isSelected={deepProbe} onSelectedChange={setDeepProbe} />
         </HStack>
-        <SlideToRecover
-          onComplete={handleStartRecovery}
+        <SlideToConfirm
+          onConfirm={handleStartRecovery}
+          iconName="mdi:shield-refresh"
+          label="Swipe to recover"
           trackColor={surfaceSecondary}
           thumbColor={foreground}
           textColor={foreground}
@@ -943,9 +852,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         </VStack>
 
         <VStack spacing={12} className="w-full items-center pb-6">
-          <SlideToRecover
+          <SlideToConfirm
+            onConfirm={handleStartRecovery}
+            iconName="mdi:shield-refresh"
             label="Reswipe to try again"
-            onComplete={handleStartRecovery}
             trackColor={surfaceSecondary}
             thumbColor={foreground}
             textColor={foreground}

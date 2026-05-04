@@ -1,17 +1,9 @@
 import React, { useCallback } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { ScrollView } from 'react-native';
 import { router } from 'expo-router';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, {
-  interpolate,
-  Extrapolation,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
 
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { SlideToConfirm } from '@/shared/ui/composed/SlideToConfirm';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { deleteAllProfiles } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
@@ -21,114 +13,6 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import Icon from 'assets/icons';
 import { Button, Card } from 'heroui-native';
 import opacity from 'hex-color-opacity';
-
-const THUMB_SIZE = 40;
-const TRACK_PADDING = 4;
-
-interface SlideToDeleteProps {
-  onComplete: () => void;
-  trackColor: string;
-  thumbColor: string;
-  textColor: string;
-  iconColor: string;
-}
-
-const SlideToDelete: React.FC<SlideToDeleteProps> = ({
-  onComplete,
-  trackColor,
-  thumbColor,
-  textColor,
-  iconColor,
-}) => {
-  const { width: windowWidth } = useWindowDimensions();
-  const sliderWidth = windowWidth - 48;
-  const maxTranslate = sliderWidth - THUMB_SIZE - TRACK_PADDING * 2;
-  const translateX = useSharedValue(0);
-  const isComplete = useSharedValue(false);
-
-  const handleComplete = useCallback(() => {
-    onComplete();
-  }, [onComplete]);
-
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      if (isComplete.value) return;
-      translateX.value = Math.max(0, Math.min(event.translationX, maxTranslate));
-    })
-    .onEnd(() => {
-      if (isComplete.value) return;
-
-      if (translateX.value > maxTranslate * 0.9) {
-        translateX.value = withSpring(maxTranslate, { damping: 20, stiffness: 200 });
-        isComplete.value = true;
-        runOnJS(handleComplete)();
-      } else {
-        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
-      }
-    });
-
-  const thumbAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
-  const textAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, maxTranslate * 0.5], [1, 0], Extrapolation.CLAMP),
-  }));
-
-  return (
-    <GestureHandlerRootView>
-      <View
-        style={[
-          styles.track,
-          {
-            backgroundColor: trackColor,
-            width: sliderWidth,
-          },
-        ]}>
-        <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
-          <Text size={16} medium style={{ color: textColor }}>
-            Swipe to delete →
-          </Text>
-        </Animated.View>
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            style={[
-              styles.thumb,
-              thumbAnimatedStyle,
-              {
-                backgroundColor: thumbColor,
-              },
-            ]}>
-            <Icon name="mdi:trash-can-outline" size={24} color={iconColor} />
-          </Animated.View>
-        </GestureDetector>
-      </View>
-    </GestureHandlerRootView>
-  );
-};
-
-const styles = StyleSheet.create({
-  track: {
-    height: THUMB_SIZE + TRACK_PADDING * 2,
-    borderRadius: (THUMB_SIZE + TRACK_PADDING * 2) / 2,
-    justifyContent: 'center',
-    padding: TRACK_PADDING,
-  },
-  textContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: THUMB_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
 
 export function DeleteScreen() {
   useLifecycleLogger('DeleteScreen');
@@ -201,8 +85,10 @@ export function DeleteScreen() {
           </VStack>
 
           <VStack spacing={12} className="w-full items-center pb-6">
-            <SlideToDelete
-              onComplete={handleDelete}
+            <SlideToConfirm
+              onConfirm={handleDelete}
+              iconName="mdi:trash-can-outline"
+              label="Swipe to delete →"
               trackColor={danger}
               thumbColor={foreground}
               textColor={foreground}
