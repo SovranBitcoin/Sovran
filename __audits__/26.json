@@ -293,7 +293,8 @@
       "references": [],
       "verification_note": "Verified by code reading. Low severity, no functional impact.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "createPrimalRelayClient now wires ws.onopen/onerror/onclose exactly once inside the openPromise constructor and uses an openSettled-guarded settle() that clears the open timeout. The dead pre-openPromise reassignment is gone; failAll still runs on both pre-open and post-open failure paths."
     },
     {
       "id": "F-013",
@@ -332,7 +333,8 @@
       ],
       "verification_note": "Verified by arithmetic. Downgraded from Medium — impact is theoretical at current scale.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "engagementRevision now uses a ref-counter that bumps on each useMemo recompute. Substituted the audit's 'in-store counter + persist migration' with an in-hook ref-counter to avoid a persist-shape change — same monotonic-identifier semantics, no schema bump. Bounded growth (counter increments per state change), no overflow risk."
     },
     {
       "id": "F-015",
@@ -371,7 +373,8 @@
       "references": [],
       "verification_note": "Verified call-site. Dependent on prefetchImages implementation in shared/lib/imageCache (not audited in this pass). Marked confidence 0.6 to acknowledge that.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "stale",
+      "completion_note": "features/feed/components/nostr/StoriesRow.tsx no longer exists in the tree."
     },
     {
       "id": "F-017",
@@ -392,7 +395,7 @@
       "verification_note": "Verified at :513-520 and :717-724.",
       "prior_audit_id": null,
       "completion_status": "partial",
-      "completion_note": "Both catch handlers (HomeFeed.tsx:321 + :527) now narrow the unknown error before logging: { message: error instanceof Error ? error.message : String(error) }. The redaction half of this finding is closed. The audit's secondary concern -- adding a visible retry surface distinct from EmptyFeed -- is a UX change and remains open as a deferred follow-up."
+      "completion_note": "Redaction half is closed (HomeFeed.tsx:321 and :527 narrow error before logging). The audit's secondary concern — adding a visible retry surface distinct from EmptyFeed — is a UX expansion outside this slice's scope and remains deferred."
     },
     {
       "id": "F-018",
@@ -412,7 +415,8 @@
       ],
       "verification_note": "Unverified whether React Compiler is enabled in babel.config.js. Low severity.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "deferred",
+      "completion_note": "Suggested fix is a one-line comment explaining the memo wrapper's purpose. Project convention defaults to no comments unless WHY is non-obvious; the memo's role as a render barrier is already inferable from the wrapped HomeFeedComponent shape. Defer until react-compiler is enabled (whereupon the memo can be deleted)."
     },
     {
       "id": "F-019",
@@ -432,7 +436,8 @@
       ],
       "verification_note": "Verified at :249-252. Nit-level.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Deleted the actions = useRef(useNostrSocialStore.getState()) ref and its refreshing useEffect. Inlined useNostrSocialStore.getState() at the seven call sites. Zustand 5 store-method references are stable across renders, so the ref pattern was performing a per-render no-op."
     }
   ],
   "dimensions": {
