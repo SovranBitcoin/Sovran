@@ -13,7 +13,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { truncateMiddle } from '@/shared/lib/strings';
 
-export interface DmChatHeaderProps {
+interface DmChatHeaderProps {
   /**
    * Counterparty Nostr pubkey (hex). When provided, the header shows the
    * truncated npub subtitle and a QR-share button on the right. Set

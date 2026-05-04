@@ -17,7 +17,7 @@ import { Log } from '@/shared/lib/logger';
 import BalanceDisplay, { type BalanceDisplayProps } from './BalanceDisplay';
 import { BalancePillLiquid } from './BalancePill.liquid';
 
-export interface BalancePillProps extends BalanceDisplayProps {
+interface BalancePillProps extends BalanceDisplayProps {
   /** Tap handler — opens whatever picker / flow the host wants. */
   onPress?: () => void;
   /**

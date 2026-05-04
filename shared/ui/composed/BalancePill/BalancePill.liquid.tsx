@@ -7,7 +7,7 @@ import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { Log } from '@/shared/lib/logger';
 import BalanceDisplay, { type BalanceDisplayProps } from './BalanceDisplay';
 
-export interface BalancePillLiquidProps extends BalanceDisplayProps {
+interface BalancePillLiquidProps extends BalanceDisplayProps {
   buttonWidth: number;
   onPress?: () => void;
 }

@@ -74,8 +74,6 @@ interface BTCMapState {
   placesCache: PlacesCache | null;
   placeDetailsCache: PlaceDetailsCache;
   isLoading: boolean;
-  isLoadingDetails: boolean;
-  selectedPlace: BTCMapPlaceDetails | null;
   error: string | null;
 }
 
@@ -129,8 +127,6 @@ export const useBTCMapStore = create<BTCMapStore>()(
       placesCache: null,
       placeDetailsCache: {},
       isLoading: false,
-      isLoadingDetails: false,
-      selectedPlace: null,
       error: null,
 
       getCachedPlaces: () => {
@@ -210,15 +206,11 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
         if (!forceRefresh) {
           const cached = state.getCachedPlaceDetails(id);
-          if (cached) {
-            set({ selectedPlace: cached });
-            return cached;
-          }
+          if (cached) return cached;
         }
 
         storeLog.info('store.btc_map.fetch_details.start', { id, forceRefresh });
         const startTime = performance.now();
-        set({ isLoadingDetails: true });
 
         const result = await fetchJson(
           `${SOVRAN_API_BASE}/places/${id}`,
@@ -232,7 +224,6 @@ export const useBTCMapStore = create<BTCMapStore>()(
           storeLog.error('store.btc_map.fetch_details_failed', {
             error: redactError(result.error),
           });
-          set({ isLoadingDetails: false });
           throw result.error;
         }
 
@@ -247,8 +238,6 @@ export const useBTCMapStore = create<BTCMapStore>()(
             ...s.placeDetailsCache,
             [id]: { data, timestamp: Date.now() },
           },
-          selectedPlace: data,
-          isLoadingDetails: false,
         }));
 
         return data;

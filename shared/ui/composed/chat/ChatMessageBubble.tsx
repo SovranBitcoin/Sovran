@@ -7,7 +7,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ChatBubbleMessage } from './types';
 
-export interface ChatMessageBubbleProps {
+interface ChatMessageBubbleProps {
   message: ChatBubbleMessage;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
@@ -78,8 +78,8 @@ export function ChatMessageBubble({
         justify={message.isOwn ? 'flex-end' : 'flex-start'}
         spacing={8}
         style={{ width: '100%' }}>
-        {!message.isOwn && (
-          showAvatar ? (
+        {!message.isOwn &&
+          (showAvatar ? (
             <Avatar
               state="fallback"
               size={32}
@@ -88,8 +88,7 @@ export function ChatMessageBubble({
             />
           ) : (
             <View style={{ width: 32 }} />
-          )
-        )}
+          ))}
 
         <VStack
           align={message.isOwn ? 'flex-end' : 'flex-start'}

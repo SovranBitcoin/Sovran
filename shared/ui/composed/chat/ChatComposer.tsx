@@ -7,7 +7,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog } from '@/shared/lib/logger';
 import opacity from 'hex-color-opacity';
 
-export interface ChatComposerProps {
+interface ChatComposerProps {
   value: string;
   onChangeText: (text: string) => void;
   onSend: () => void;
@@ -173,9 +173,7 @@ export function ChatComposer({
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              {leadingIconNode ?? (
-                <Icon name={leadingIcon as string} size={16} color={accent} />
-              )}
+              {leadingIconNode ?? <Icon name={leadingIcon as string} size={16} color={accent} />}
             </View>
           ) : null}
 
