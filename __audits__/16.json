@@ -180,7 +180,8 @@
         "docs/SOV-00.md §10"
       ],
       "verification_note": "Re-read profileScopedStorage.ts lines 100-209. 12 keys in the registry, 11 reset calls (mintStore, mintDistributionStore, routstrStore, scanHistoryStore, searchHistoryStore, swapTransactionsStore, transactionLocationStore, transactionDistributionStore, npcMintStore, nostrSocialStore, themeStore), 11 rehydrate() calls. split-bill-transactions-store has neither.",
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "rehydrateProfileStores now imports useSplitBillTransactionsStore, resets {groups,quoteIdToSplitBill}, and rehydrates it alongside the other 11 profile-scoped stores. The function remains unused per its current contract, but the registry-coverage gap is closed."
     },
     {
       "id": "F-008",
@@ -240,7 +241,8 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-read mockDataStore.ts lines 214-258 and settingsStore.ts lines 318-329. Confirmed setState on profile-scoped persisted stores triggers the persist middleware.",
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Mock-mode inject/remove helpers in mockDataStore now wrap setState calls in withSkippedPersistWrites so demo-prefixed entries never reach AsyncStorage. The gate reuses the existing _skipPersistWrite flag in profileScopedStorage."
     },
     {
       "id": "F-011",
@@ -279,7 +281,8 @@
         "docs/SOV-00.md §11"
       ],
       "verification_note": "Re-read walletLifecycleStore.ts lines 22-28 (state), 42-49 (setters), 54-58 (partialize). lastRestoreError is present in state, written by setRestoreStatus, and absent from partialize.",
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "lastRestoreError added to PersistedWalletLifecycleStore zod schema (string max 500, nullable, default null) and to partialize. The persisted blob now carries the failure reason across boots, satisfying SOV-00 §11."
     },
     {
       "id": "F-013",
