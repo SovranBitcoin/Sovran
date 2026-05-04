@@ -432,7 +432,8 @@
       "references": [],
       "verification_note": "Same lines as prior audit 02.json F-009.",
       "prior_audit_id": "F-009@02.json",
-      "completion_status": "deferred"
+      "completion_status": "stale",
+      "completion_note": "Cited as-any pathname casts in features/send/providers/CocoPaymentUX.tsx:286/290/295/300 and features/send/lib/sovranPaymentConfig.ts:845/955/984 no longer exist; router.navigate calls in those files now use string literals or typed Href values."
     },
     {
       "id": "F-021",

@@ -198,7 +198,8 @@
         "skill:zustand-5"
       ],
       "verification_note": "Grep `selectFollowingSet` → only the definition at nostrSocialStore.ts:416. No importers. Re-confirmed the return shape (new Set) on re-read.",
-      "completion_status": "deferred"
+      "completion_status": "stale",
+      "completion_note": "selectFollowingSet no longer exists in shared/stores/profile/nostrSocialStore.ts; only selectIsFollowingPubkey (returning a primitive boolean, already safe) remains. Latent footgun fixed by deletion before the audit was actioned."
     },
     {
       "id": "F-009",

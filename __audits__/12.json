@@ -258,8 +258,8 @@
       ],
       "verification_note": "Re-read all cited lines. Counter-argument considered: 'coco/cashu-ts types are upstream and may not be importable directly.' Both ARE directly importable — the feature/mint/hooks/useAuditedMint.ts already imports `GetInfoResponse` from `@cashu/cashu-ts` (analyze-structure output), and manager.ts imports `Manager` and related types from `@cashu/coco-core`. No missing-type blocker.",
       "prior_audit_id": "F-013@09.json",
-      "completion_status": "partial",
-      "completion_note": "mintInfoMap state (line 84) and the two (method: any) annotations (lines 94, 99) closed against GetInfoResponse / inferred SwapMethod. The remaining cashu-ts MeltQuote / Proof / prepared-melt as-any sites (lines 402, 483, 536, 907, 952, 963, 1016, 1061) are a different concrete-type cluster — separate slice."
+      "completion_status": "complete",
+      "completion_note": "Remaining cashu-ts MeltQuote / Proof / prepared-melt as-any sites in MintRebalancePlanScreen.tsx (lines 401, 482, 535, 906, 951, 962, 1015, 1060) all closed: cashu-ts Proof imported (with one nominal as Proof[] cast bridging the coco-core nested cashu-ts 3.6.4 vs top-level 3.5.0 split), createMeltQuoteBolt11 is a public typed Wallet method so the cast was unnecessary, prepared.quoteId comes from the inferred PreparedMeltOperation return type, hopPrepared now typed via Awaited<ReturnType<typeof manager.ops.melt.prepare>>."
     },
     {
       "id": "F-012",
