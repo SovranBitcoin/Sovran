@@ -281,7 +281,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Diffed both files; confirmed near-identical bodies. Two-string drift is the only divergence.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Promoted ParticipantStatusIcon to features/splitBill/components/ and participantSubtitle to features/splitBill/lib/ with a mode: 'detail' | 'summary' switch. The two-string drift is now visible in one file. Net -19 LOC."
     },
     {
       "id": "F-011",
