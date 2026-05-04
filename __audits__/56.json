@@ -94,7 +94,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Confirmed by direct grep `grep -nE \"\\\\bSHOW_LOGS\\\\b|__DEV__\" shared/lib/logger.ts` — SHOW_LOGS appears at line 45 (declaration), 494 (emit gate), 997 (auto-start gate) and is never assigned anywhere else in the tree. IS_DEV is computed at line 183 but only used for level/pretty defaults, not for SHOW_LOGS. Counter-argument considered: maybe the team wants prod logging on for diagnostics — the comments contradict that intent, so the code is wrong either way (either flip to __DEV__ or rewrite the comments to match the always-on intent and document the prod cost).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "SHOW_LOGS now ties to IS_DEV; comment-vs-code lie removed"
     },
     {
       "id": "F-003",
@@ -174,7 +176,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Re-checked: line 512 is reached for every entry past the line 495 severity filter and the line 499 dedup short-circuit. The dedup short-circuit only catches debug/info/<warn entries, so warn/error/fatal always pay the stack-walk cost. The regex match at line 376 parses 'at funcName (file:line:col)' which on minified Hermes prod stacks gives mangled identifiers. Counter-argument considered: Hermes may have optimized Error.stack capture in newer versions — log-doctor not run, so the dynamic-cost claim is upgrade-version-dependent. Marked confidence 0.85 not 0.95 to reflect this uncertainty; the structural claim ('every emit allocates an Error') is unconditional from source.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "getCallerLocation skipped for warn outside dev; only called for error/fatal in production"
     },
     {
       "id": "F-006",
@@ -219,7 +223,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Module-top-level if-block at line 997 confirmed. The cleanup function returned by startJSThreadMonitor (line 988-993) is unused. Counter-argument considered: 'auto-start makes onboarding new modules zero-config' — true, but at the cost of the import-graph contract that says importing a name should not register timers. The single explicit call at the root is one extra line to gain back the contract.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "heartbeat auto-start now gated on IS_DEV via SHOW_LOGS; production builds skip the side effect entirely"
     },
     {
       "id": "F-008",
@@ -309,7 +315,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Hermes lacks requestIdleCallback (verified per RN documentation, Hermes 0.12+). queueMicrotask is exposed as a global on Hermes since 0.10. Counter-argument considered: RN's setTimeout is well-optimized for short delays — true, but the order-of-magnitude difference between setTimeout(...,1) (bridge call) and queueMicrotask (in-thread) matters when the count is hundreds. confidence 0.85 because the actual production cost depends on Hermes version and whether Bridgeless mode is enabled (RN 0.83 has it on for new arch, which sovran-app uses).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "scheduleIdle Hermes fallback uses queueMicrotask; no per-log setTimeout allocation"
     },
     {
       "id": "F-012",
@@ -415,7 +423,9 @@
         "shared/lib/logger.ts:999"
       ],
       "verification_note": "Confirmed by re-reading line 988-999. The setTimeout callback returns void; the cleanup return is unreachable.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "stopJSThreadMonitor exported; bootstrap timeout and stop fn captured in module slots"
     },
     {
       "id": "F-017",
@@ -434,7 +444,9 @@
         "shared/lib/logger.ts:567"
       ],
       "verification_note": "Confirmed. Counter-argument considered: 'logging about logging is a footgun' — true if naive, but routing through `console.warn` directly side-steps the recursion concern.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "transport errors surfaced via console.error('[logger.transport-error]', ...) instead of being silently swallowed"
     },
     {
       "id": "F-018",
@@ -475,7 +487,9 @@
         "shared/lib/logger.ts:930"
       ],
       "verification_note": "Two parallel error-handling paths (line 520 vs line 930) is a signal that the design is split; collapsing them onto the safer one is straightforward.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Object.keys(err).filter(...) extras path removed; LogEntry.error.properties dropped from type and entries"
     }
   ],
   "dimensions": {
