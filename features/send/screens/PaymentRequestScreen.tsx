@@ -37,14 +37,12 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 interface PaymentRequestScreenProps {
   paymentRequestEntry?: SendHistoryEntry | string;
   onCancel: () => void;
-  onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
 
 export function PaymentRequestScreen({
   paymentRequestEntry,
   onCancel,
-  onMintSelected,
   onRequestMintList,
 }: PaymentRequestScreenProps) {
   useLifecycleLogger('PaymentRequestScreen');
@@ -121,8 +119,7 @@ export function PaymentRequestScreen({
             width={280}
             unit={entry.unit}
             selectedMintUrl={mintUrl}
-            onMintSelected={onMintSelected ?? (() => {})}
-            onRequestMintList={onRequestMintList ?? (() => {})}
+            onRequestMintList={onRequestMintList}
           />
         ) : mintInfo ? (
           <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />

@@ -40,14 +40,12 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 interface MeltQuoteScreenProps {
   meltHistoryEntry?: MeltHistoryEntry | string;
   onCancel: () => void;
-  onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
 
 export function MeltQuoteScreen({
   meltHistoryEntry,
   onCancel,
-  onMintSelected,
   onRequestMintList,
 }: MeltQuoteScreenProps) {
   useLifecycleLogger('MeltQuoteScreen');
@@ -129,8 +127,7 @@ export function MeltQuoteScreen({
               width={280}
               unit={entry.unit}
               selectedMintUrl={mintUrl}
-              onMintSelected={onMintSelected ?? (() => {})}
-              onRequestMintList={onRequestMintList ?? (() => {})}
+              onRequestMintList={onRequestMintList}
             />
           ) : mintInfo ? (
             <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />

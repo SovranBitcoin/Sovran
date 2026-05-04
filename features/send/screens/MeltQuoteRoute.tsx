@@ -27,15 +27,14 @@ export interface MeltQuoteRouteProps {
   /** Log scope for invalid-params telemetry; e.g. `'send-flow.meltQuote'`. */
   where: string;
   /**
-   * Mint-pill callbacks. Wired by the active send-flow wrapper through
+   * Mint-pill callback. Wired by the active send-flow wrapper through
    * `usePaymentFlowMachine`; left undefined for read-only re-entries
    * (standalone, transactions-flow).
    */
-  onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
 
-export function MeltQuoteRoute({ where, onMintSelected, onRequestMintList }: MeltQuoteRouteProps) {
+export function MeltQuoteRoute({ where, onRequestMintList }: MeltQuoteRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
 
@@ -46,7 +45,6 @@ export function MeltQuoteRoute({ where, onMintSelected, onRequestMintList }: Mel
       onCancel={() => {
         router.dismissTo('/');
       }}
-      onMintSelected={onMintSelected}
       onRequestMintList={onRequestMintList}
     />
   );

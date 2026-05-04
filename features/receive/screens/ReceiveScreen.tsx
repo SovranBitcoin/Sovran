@@ -63,64 +63,57 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
   actions,
   muted,
 }: ReceiveLightningTabProps) {
-  const showLightningAddress = Boolean(data.npcAddress && unit === 'sat');
+  const npcAddress = unit === 'sat' ? data.npcAddress : undefined;
+  if (!npcAddress) return null;
 
   return (
     <>
-      {showLightningAddress && (
-        <PaymentInfo data={data.npcAddress!.toString()} copyTarget="address" unit="sat" />
-      )}
-      {showLightningAddress && (
-        <View className="mx-4">
-          <Section title="RECEIVE ADDRESS">
-            <GradientCard>
-              <ListGroup variant="transparent">
-                <PressableFeedback
-                  animation={false}
-                  onPress={async () => {
-                    await EnhancedHaptics.copyHaptic();
-                    await actions.copy.execute({ source: 'npc' });
-                  }}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemPrefix>
-                        <Icon name="mingcute:lightning-fill" size={20} color={muted} />
-                      </ListGroup.ItemPrefix>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>
-                          {data.npcAddress?.truncate(6) ?? ''}
-                        </ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <Icon name="lets-icons:copy" size={20} color={muted} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-              </ListGroup>
-            </GradientCard>
-          </Section>
-        </View>
-      )}
-
-      {showLightningAddress && (
-        <HistoryEntryRefresh
-          mintInfo={mintInfo}
-          historyEntry={{
-            type: 'receive',
-            mintUrl: selectedMintUrl || undefined,
-          }}
-          onPress={
-            isNpcMintUpdating || !actions.changeNpcMint.available
-              ? undefined
-              : async () => {
+      <PaymentInfo data={npcAddress.toString()} copyTarget="address" unit="sat" />
+      <View className="mx-4">
+        <Section title="RECEIVE ADDRESS">
+          <GradientCard>
+            <ListGroup variant="transparent">
+              <PressableFeedback
+                animation={false}
+                onPress={async () => {
                   await EnhancedHaptics.copyHaptic();
-                  await actions.changeNpcMint.execute();
-                }
-          }
-        />
-      )}
+                  await actions.copy.execute({ source: 'npc' });
+                }}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon name="mingcute:lightning-fill" size={20} color={muted} />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{npcAddress.truncate(6)}</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Icon name="lets-icons:copy" size={20} color={muted} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
+          </GradientCard>
+        </Section>
+      </View>
+
+      <HistoryEntryRefresh
+        mintInfo={mintInfo}
+        historyEntry={{
+          type: 'receive',
+          mintUrl: selectedMintUrl || undefined,
+        }}
+        onPress={
+          isNpcMintUpdating || !actions.changeNpcMint.available
+            ? undefined
+            : async () => {
+                await EnhancedHaptics.copyHaptic();
+                await actions.changeNpcMint.execute();
+              }
+        }
+      />
     </>
   );
 });
@@ -201,6 +194,13 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
 
+  // The P2PK tab is gated behind the quickAccessP2PK setting. If the user
+  // had it open and then toggled the setting off elsewhere, snap back to
+  // Lightning so the now-hidden P2PK content stops rendering.
+  useEffect(() => {
+    if (!quickAccessP2PK && selectedTab !== 'Lightning') setSelectedTab('Lightning');
+  }, [quickAccessP2PK, selectedTab]);
+
   useEffect(() => {
     if (error) paymentLog.warn('receive.screen.error', { error });
   }, [error]);
@@ -264,7 +264,9 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         </View>
       )}
 
-      {selectedTab === 'Lightning' ? (
+      {quickAccessP2PK && selectedTab === 'P2PK' ? (
+        <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
+      ) : (
         <ReceiveLightningTab
           data={receiveEntryData}
           unit={unit}
@@ -274,8 +276,6 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           actions={actions}
           muted={muted}
         />
-      ) : (
-        <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
       )}
     </ScreenWrapper>
   );

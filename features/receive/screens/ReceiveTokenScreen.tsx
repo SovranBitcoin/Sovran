@@ -51,7 +51,7 @@ export function ReceiveTokenScreen({
     if (error) paymentLog.warn('receive.token.error', { error });
   }, [error]);
 
-  const isRedeemed = entry ? !(entry.id?.startsWith('receive-') ?? false) : false;
+  const isRedeemed = entry?.state === 'finalized';
 
   useEffect(() => {
     if (!entry) return;
@@ -114,11 +114,7 @@ export function ReceiveTokenScreen({
 
           <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
 
-          <HistoryEntryTimeline
-            historyEntry={
-              { ...entry, state: isRedeemed ? 'finalized' : 'prepared' } as ReceiveHistoryEntry
-            }
-          />
+          <HistoryEntryTimeline historyEntry={entry} />
 
           <DetailsSection
             items={[

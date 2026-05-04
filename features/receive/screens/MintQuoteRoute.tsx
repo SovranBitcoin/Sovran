@@ -28,15 +28,14 @@ export interface MintQuoteRouteProps {
   /** Log scope for invalid-params telemetry; e.g. `'receive-flow.mintQuote'`. */
   where: string;
   /**
-   * Mint-pill callbacks. Wired by the active receive-flow wrapper
+   * Mint-pill callback. Wired by the active receive-flow wrapper
    * through `usePaymentFlowMachine`; left undefined for read-only
    * re-entries (standalone, transactions-flow).
    */
-  onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
 
-export function MintQuoteRoute({ where, onMintSelected, onRequestMintList }: MintQuoteRouteProps) {
+export function MintQuoteRoute({ where, onRequestMintList }: MintQuoteRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
 
@@ -44,7 +43,6 @@ export function MintQuoteRoute({ where, onMintSelected, onRequestMintList }: Min
     <MintQuoteScreen
       key={params.mintHistoryEntry}
       mintHistoryEntry={params.mintHistoryEntry}
-      onMintSelected={onMintSelected}
       onRequestMintList={onRequestMintList}
     />
   );

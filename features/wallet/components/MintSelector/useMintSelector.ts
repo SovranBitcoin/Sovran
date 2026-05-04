@@ -17,10 +17,8 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 export interface MintSelectorProps {
   /** Mint URL to display. When omitted, reads preferredMintUrl from store. */
   selectedMintUrl?: string;
-  /** Called when user picks a mint from the quick-select dropdown. */
-  onMintSelected: (mintUrl: string) => void;
-  /** Called when user taps to open the full mint list. */
-  onRequestMintList: () => void;
+  /** Called when user taps to open the full mint list. Omit to render a non-interactive pill. */
+  onRequestMintList?: () => void;
   /** Availability info per trusted mint. Filters the dropdown. */
   trustedMints?: MintAvailability[];
   /** Unit for balance display. Default: 'sat'. */
@@ -36,7 +34,7 @@ export interface MintSelectorShared {
   balance: number;
   isLoading: boolean;
   unit: string;
-  onRequestMintList: () => void;
+  onRequestMintList: (() => void) | undefined;
   dimensions: {
     buttonWidth: number;
     contentWidth: number;

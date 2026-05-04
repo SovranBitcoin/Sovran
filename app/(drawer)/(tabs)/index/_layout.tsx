@@ -24,13 +24,6 @@ export default function HomeLayout() {
     navigation.dispatch(DrawerActions.openDrawer());
   }, [navigation]);
 
-  const handleMintSelected = useCallback(
-    (mintUrl: string) => {
-      void machine.changeMint(mintUrl);
-    },
-    [machine]
-  );
-
   const handleRequestMintList = useCallback(() => {
     void machine.requestMintSelector({ reset: true });
   }, [machine]);
@@ -52,12 +45,7 @@ export default function HomeLayout() {
             options: {
               headerTransparent: true,
               headerTitleAlign: 'center',
-              headerTitle: () => (
-                <MintSelector
-                  onMintSelected={handleMintSelected}
-                  onRequestMintList={handleRequestMintList}
-                />
-              ),
+              headerTitle: () => <MintSelector onRequestMintList={handleRequestMintList} />,
             },
           })}
         />

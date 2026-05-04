@@ -40,14 +40,12 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 interface MintQuoteScreenProps {
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
-  onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
 
 export function MintQuoteScreen({
   mintHistoryEntry,
   extraButtons = [],
-  onMintSelected,
   onRequestMintList,
 }: MintQuoteScreenProps) {
   useLifecycleLogger('MintQuoteScreen');
@@ -142,8 +140,7 @@ export function MintQuoteScreen({
               width={280}
               unit={entry.unit}
               selectedMintUrl={mintUrl}
-              onMintSelected={onMintSelected ?? (() => {})}
-              onRequestMintList={onRequestMintList ?? (() => {})}
+              onRequestMintList={onRequestMintList}
             />
           ) : mintInfo ? (
             <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />

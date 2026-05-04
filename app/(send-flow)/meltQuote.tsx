@@ -17,26 +17,10 @@ export default function ModalScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
 
-  const handleMintSelected = useCallback(
-    (mintUrl: string) => {
-      // Logged so we can tell — when investigating the NFC mint-pill bug —
-      // whether the press ended up at changeMint (auto-change, the bug) or at
-      // requestMintSelector (correct path) below.
-      cashuLog.info('melt.mint.selected', { mintUrl, source: 'pill' });
-      void machine.changeMint(mintUrl);
-    },
-    [machine]
-  );
   const handleRequestMintList = useCallback(() => {
     cashuLog.info('melt.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
   }, [machine]);
 
-  return (
-    <MeltQuoteRoute
-      where="send-flow.meltQuote"
-      onMintSelected={handleMintSelected}
-      onRequestMintList={handleRequestMintList}
-    />
-  );
+  return <MeltQuoteRoute where="send-flow.meltQuote" onRequestMintList={handleRequestMintList} />;
 }

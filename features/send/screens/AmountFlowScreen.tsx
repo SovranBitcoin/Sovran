@@ -39,14 +39,6 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   const { isExecuting } = useExecutionState(machine);
 
-  const handleMintSelected = useCallback(
-    (mintUrl: string) => {
-      paymentLog.info('send.amount_flow.mint_selected', { mintUrl });
-      void machine.changeMint(mintUrl);
-    },
-    [machine]
-  );
-
   const handleRequestMintList = useCallback(() => {
     void machine.requestMintSelector();
   }, [machine]);
@@ -74,11 +66,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
           title: 'Select Amount',
           headerTitleAlign: 'center',
           headerTitle: () => (
-            <MintSelector
-              selectedMintUrl={mintUrl}
-              onMintSelected={handleMintSelected}
-              onRequestMintList={handleRequestMintList}
-            />
+            <MintSelector selectedMintUrl={mintUrl} onRequestMintList={handleRequestMintList} />
           ),
           headerTintColor: foreground,
           headerRight:

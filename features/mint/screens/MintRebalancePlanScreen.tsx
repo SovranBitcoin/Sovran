@@ -18,7 +18,6 @@ import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
 import type { GetInfoResponse, Proof } from '@cashu/cashu-ts';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
-import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';
 
 import {
@@ -82,7 +81,11 @@ export function MintRebalancePlanScreen() {
   const liveBalances = liveBalanceCtx.byMint;
   const { getMintInfo } = useMintManagement();
   const manager = useManager();
-  const { requestLightningInvoice } = useLightningOperations();
+  const requestLightningInvoice = useCallback(
+    (mintUrl: string, amount: number) =>
+      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+    [manager]
+  );
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, GetInfoResponse | null>>({});

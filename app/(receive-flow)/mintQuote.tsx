@@ -29,12 +29,6 @@ export default function ModalScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
 
-  const handleMintSelected = useCallback(
-    (mintUrl: string) => {
-      void machine.changeMint(mintUrl);
-    },
-    [machine]
-  );
   const handleRequestMintList = useCallback(() => {
     void machine.requestMintSelector();
   }, [machine]);
@@ -42,10 +36,6 @@ export default function ModalScreen() {
   if (!params) return null;
 
   return (
-    <MintQuoteRoute
-      where="receive-flow.mintQuote"
-      onMintSelected={handleMintSelected}
-      onRequestMintList={handleRequestMintList}
-    />
+    <MintQuoteRoute where="receive-flow.mintQuote" onRequestMintList={handleRequestMintList} />
   );
 }

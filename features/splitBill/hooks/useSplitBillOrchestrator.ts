@@ -27,7 +27,6 @@ import { useManager } from '@cashu/coco-react';
 import NDK, { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
 
-import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { buildRecipientGiftWrap, buildSenderSelfCopyWrap } from '@/shared/lib/nostr/nip17';
@@ -234,7 +233,12 @@ async function sendNostrDM(
 // ---------------------------------------------------------------------------
 
 export function useSplitBillOrchestrator() {
-  const { requestLightningInvoice } = useLightningOperations();
+  const manager = useManager();
+  const requestLightningInvoice = useCallback(
+    (mintUrl: string, amount: number) =>
+      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+    [manager]
+  );
   const nickname = useBitchatNickname();
   const nicknameRef = useRef(nickname);
   nicknameRef.current = nickname;

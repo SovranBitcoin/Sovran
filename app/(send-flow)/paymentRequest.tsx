@@ -30,13 +30,6 @@ function ModalScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
 
-  const handleMintSelected = useCallback(
-    (mintUrl: string) => {
-      void machine.changeMint(mintUrl);
-    },
-    [machine]
-  );
-
   const handleRequestMintList = useCallback(() => {
     void machine.requestMintSelector();
   }, [machine]);
@@ -50,7 +43,6 @@ function ModalScreen() {
       onCancel={() => {
         router.dismissTo('/');
       }}
-      onMintSelected={handleMintSelected}
       onRequestMintList={handleRequestMintList}
     />
   );
