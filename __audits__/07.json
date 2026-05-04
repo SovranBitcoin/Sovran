@@ -15,7 +15,7 @@
       "06.json"
     ]
   },
-  "completion_status": "partial",
+  "completion_status": "complete",
   "findings": [
     {
       "id": "F-001",
@@ -86,8 +86,8 @@
       ],
       "verification_note": "Listed src/schemas/ \u2014 empty. Grepped zod \u2014 zero hits. Counter-argument considered: maybe validation happens one level up in the app's apiClient \u2014 apiClient.ts does not cover LNURL, nip44 rumors, or coco history (those never traverse apiClient). The gap is real and local to this package.",
       "prior_audit_id": "F-006@06.json",
-      "completion_status": "partial",
-      "completion_note": "LNURL boundary now validates pay-params + invoice via shared zod schemas + bolt11 amount assert. Slice db64864e closes the defaultOperations.ts history-JSON arm: the three raw `JSON.parse(historyEntry)` sites at lines 220/261/786 now route through `parseHistoryEntryOnce` (shared helper from operations/historyEntry.ts), and the `(h: any) =>` filter callbacks in findSendHistoryEntryByOperationId / findReceiveHistoryEntry use `(h): h is SendHistoryEntry` / `is ReceiveHistoryEntry` guards against coco-core's typed `HistoryEntry[]` return. Synthetic-entry literals in executeSend / executeOfflineSend / executePaymentRequest collapse onto two typed builders (`buildSyntheticSendEntry`, `buildSyntheticPaymentRequestEntry`) that satisfy `SendHistoryEntry` from `@cashu/coco-core`. nip17.ts seal/rumor zod parsing remains the only un-validated arm of this finding."
+      "completion_status": "complete",
+      "completion_note": "LNURL boundary validates pay-params + invoice via shared zod schemas + bolt11 amount assert. Slice db64864e closed the defaultOperations.ts history-JSON arm via parseHistoryEntryOnce + typed HistoryEntry guards + buildSyntheticSendEntry / buildSyntheticPaymentRequestEntry. Slice 112885f5 now closes the final un-validated arm: shared/lib/nostr/nip17.ts (the canonical nip17 implementation after the package-side delete) introduces SealEventSchema and RumorEventSchema (zod) covering Hex64 id/pubkey, Hex128 sig, bounded LooseTags (max 64 elements per tag, max 2048 tags) and ContentString (max 100KB to match the nip44 wrap cap), and routes both decrypt layers in unwrapGiftWrap through safeParse. The two `as { pubkey, content, kind }` / `as { pubkey, content, created_at, kind, tags }` blind casts at lines 402-406 and 414-420 are gone. coco-payment-ux now has zero zod-less external-input boundaries on its NIP-17/NIP-59/LNURL/coco-history seams."
     },
     {
       "id": "F-004",
@@ -109,8 +109,8 @@
       ],
       "verification_note": "Re-read nip17.ts:158-193 \u2014 confirmed no verifyEvent call and no rumor.id check. Counter-argument considered: NIP-44's HMAC provides sender auth since the conversation key is keyed on the sender's pubkey \u2014 correct for the forgery case, but does not replace the spec-mandated signature check for defence-in-depth or id integrity.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Pattern preserved on the canonical impl: shared/lib/nostr/nip17.ts:392 still skips verifyEvent(seal) and getEventHash(rumor). Slice 6df46a86 unblocks the seal-verify fix by deleting the duplicate coco-payment-ux copy \u2014 only one file needs the change now. Original call site coco-payment-ux/src/nostr/nip17.ts:158 no longer exists."
+      "completion_status": "complete",
+      "completion_note": "Slice 112885f5 lands both halves of this finding on the canonical impl (shared/lib/nostr/nip17.ts; coco-payment-ux's duplicate copy was removed in 6df46a86). After zod safeParse validates the seal shape, unwrapGiftWrap calls verifyEvent(seal as Event) from nostr-tools \u2014 a failed schnorr check returns null and emits `nostr.nip17.unwrap_gift_wrap.seal_sig_invalid`. After zod parses the rumor, getEventHash(rumor as UnsignedEvent) is recomputed and compared to rumor.id; mismatches return null and emit `nostr.nip17.unwrap_gift_wrap.rumor_id_mismatch`. The seal-pubkey === rumor-pubkey check still runs after both new gates as a third independent identity-binding check. Both layers now meet the NIP-59 spec for sender-auth and rumor integrity."
     },
     {
       "id": "F-005",
@@ -520,5 +520,5 @@
     "The shared/lib/nostr/nip17.ts (263 lines) vs coco-payment-ux/src/nostr/nip17.ts (193 lines) diff \u2014 is the 70-line delta the sig-verify logic that F-004 flags as missing, or is it orthogonal (e.g. padding/error-code handling)? Diff inspection deferred to the refactor PR.",
     "Are coco-core history rows actually storing the full cashu token in the token field for receive entries, or is that a legacy / partial-persistence path? Answer shapes F-016 \u2014 if coco already persists tokens in every receive history row, the synthetic-entry widening is negligible; if coco only sometimes persists them, the synthetic path is materially worse."
   ],
-  "completion_note": "F-001/F-005/F-006/F-007/F-009/F-014 shipped via lightning trust-boundary slice (commit f27ea8e8); F-002/F-003 partially or fully deferred to logger and nip17/history-JSON slices."
+  "completion_note": "F-001/F-005/F-006/F-007/F-009/F-014 shipped via lightning trust-boundary slice (commit f27ea8e8); F-002 logger seam in 6f3b95df; F-013 nip17 dedup in 6df46a86; F-010/F-015 history-JSON parsing in 23658223; F-003 last arm (nip17 zod parsing) and F-004 (verifyEvent + getEventHash) shipped together in 112885f5. All 18 findings closed."
 }
