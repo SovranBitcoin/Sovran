@@ -1,10 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
-import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import React, { useCallback, useState } from 'react';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { LegendList } from '@legendapp/list';
@@ -19,6 +14,7 @@ import {
   ChatComposer,
   ChatMessageBubble,
   DmChatHeader,
+  useChatSurfacePerfLogger,
   useMessageGrouping,
   type ChatBubbleMessage,
 } from '@/shared/ui/composed/chat';
@@ -79,93 +75,17 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   const bubbleMessages: ChatBubbleMessage[] = messages.map(toBubble);
   const groupingMap = useMessageGrouping(bubbleMessages);
 
-  // ─── Perf instrumentation ──────────────────────────────────────────────
   const perfSurface = 'whitenoise';
-  const kbState = useKeyboardState();
-  const kbStateRef = useRef({ isVisible: false, height: 0 });
-  useEffect(() => {
-    const prev = kbStateRef.current;
-    if (prev.isVisible === kbState.isVisible && prev.height === kbState.height) return;
-    wnLog.info('chat.kav.keyboard_state', {
-      surface: perfSurface,
-      from: { isVisible: prev.isVisible, height: prev.height },
-      to: { isVisible: kbState.isVisible, height: kbState.height },
-      headerHeight,
-    });
-    kbStateRef.current = { isVisible: kbState.isVisible, height: kbState.height };
-  }, [kbState.isVisible, kbState.height, headerHeight]);
-
-  const listLayoutRef = useRef<{ height: number; width: number } | null>(null);
-  // Typed loosely on purpose — `@legendapp/list`'s `onLayout` ships a
-  // re-export of RN's LayoutChangeEvent that doesn't unify with the one
-  // from `react-native` directly. Same story for `onScroll`.
-  const handleListLayout = useCallback((e: LayoutChangeEvent | any) => {
-    const { width, height } = (e as LayoutChangeEvent).nativeEvent.layout;
-    const last = listLayoutRef.current;
-    if (last && Math.abs(last.width - width) < 0.5 && Math.abs(last.height - height) < 0.5) {
-      return;
-    }
-    listLayoutRef.current = { width, height };
-    wnLog.info('chat.list.layout', {
-      surface: perfSurface,
-      width: Math.round(width),
-      height: Math.round(height),
-    });
-  }, []);
-
-  const listContentSizeRef = useRef<{ w: number; h: number } | null>(null);
-  const handleListContentSize = useCallback(
-    (w: number, h: number) => {
-      const last = listContentSizeRef.current;
-      if (last && Math.abs(last.w - w) < 0.5 && Math.abs(last.h - h) < 0.5) return;
-      const viewportH = listLayoutRef.current?.height ?? 0;
-      listContentSizeRef.current = { w, h };
-      wnLog.debug('chat.list.content_size', {
-        surface: perfSurface,
-        contentW: Math.round(w),
-        contentH: Math.round(h),
-        viewportH: Math.round(viewportH),
-        overflow: Math.round(h - viewportH),
-        msgsCount: bubbleMessages.length,
-      });
-    },
-    [bubbleMessages.length]
-  );
-
-  const lastScrollLogRef = useRef(0);
-  const handleListScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent> | any) => {
-    const now = Date.now();
-    if (now - lastScrollLogRef.current < 120) return;
-    lastScrollLogRef.current = now;
-    const { contentOffset, contentSize, layoutMeasurement } = (
-      e as NativeSyntheticEvent<NativeScrollEvent>
-    ).nativeEvent;
-    const distFromEnd = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-    wnLog.debug('chat.list.scroll', {
-      surface: perfSurface,
-      offsetY: Math.round(contentOffset.y),
-      contentH: Math.round(contentSize.height),
-      viewportH: Math.round(layoutMeasurement.height),
-      distFromEnd: Math.round(distFromEnd),
-    });
-  }, []);
-
-  const prevMsgRef = useRef({ count: 0, lastId: '' });
-  useEffect(() => {
-    const prev = prevMsgRef.current;
-    const last = bubbleMessages[bubbleMessages.length - 1];
-    const next = { count: bubbleMessages.length, lastId: last?.id ?? '' };
-    if (next.count === prev.count && next.lastId === prev.lastId) return;
-    wnLog.info('chat.list.history_change', {
-      surface: perfSurface,
-      prevCount: prev.count,
-      count: next.count,
-      delta: next.count - prev.count,
+  const { handleListLayout, handleListContentSize, handleListScroll } = useChatSurfacePerfLogger({
+    log: wnLog,
+    surface: perfSurface,
+    headerHeight,
+    messages: bubbleMessages,
+    historyExtras: (last) => ({
       lastIsOwn: last?.isOwn ?? null,
       lastIsPending: last?.isPending ?? null,
-    });
-    prevMsgRef.current = next;
-  }, [bubbleMessages]);
+    }),
+  });
 
   return (
     <KeyboardAvoidingView

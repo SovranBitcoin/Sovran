@@ -6,14 +6,9 @@
  * Reuses the same UI primitives for a consistent look.
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import {
-  type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router, Stack } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { LegendList } from '@legendapp/list';
@@ -35,6 +30,7 @@ import {
   ChatComposer,
   ChatMessageBubble,
   DmChatHeader,
+  useChatSurfacePerfLogger,
   useMessageGrouping,
 } from '@/shared/ui/composed/chat';
 import type { ChatMessage } from 'bitchat-module';
@@ -108,102 +104,17 @@ export function GeohashChatScreen({
     });
   }, [messages.length, isConnected, geohash, transport]);
 
-  // ─── Perf instrumentation: KAV / list / message count ──────────────────
   // Surface tag groups everything in log-doctor so a single `--event chat`
   // filter spans every chat surface, while `transport` differentiates
-  // public mesh vs DM in the same screen. Renamed from `surface` to
-  // `perfSurface` because the theme destructure on line 79 already binds
-  // `surface` (the surface color token).
+  // public mesh vs DM in the same screen. Named `perfSurface` because the
+  // theme destructure above already binds `surface` (the color token).
   const perfSurface = `bitchat-${transport}`;
-  const kbState = useKeyboardState();
-  const kbStateRef = useRef({ isVisible: false, height: 0 });
-  useEffect(() => {
-    const prev = kbStateRef.current;
-    if (prev.isVisible === kbState.isVisible && prev.height === kbState.height) return;
-    bitchatLog.info('chat.kav.keyboard_state', {
-      surface: perfSurface,
-      from: { isVisible: prev.isVisible, height: prev.height },
-      to: { isVisible: kbState.isVisible, height: kbState.height },
-      headerHeight,
-    });
-    kbStateRef.current = { isVisible: kbState.isVisible, height: kbState.height };
-  }, [kbState.isVisible, kbState.height, headerHeight, perfSurface]);
-
-  const listLayoutRef = useRef<{ height: number; width: number } | null>(null);
-  // Typed loosely on purpose — `@legendapp/list`'s onLayout/onScroll prop
-  // types ship a re-export of RN's event types that doesn't unify with the
-  // one from `react-native` direct, so the precise types fight us.
-  const handleListLayout = useCallback(
-    (e: LayoutChangeEvent | any) => {
-      const { width, height } = (e as LayoutChangeEvent).nativeEvent.layout;
-      const last = listLayoutRef.current;
-      if (last && Math.abs(last.width - width) < 0.5 && Math.abs(last.height - height) < 0.5) {
-        return;
-      }
-      listLayoutRef.current = { width, height };
-      bitchatLog.info('chat.list.layout', {
-        surface: perfSurface,
-        width: Math.round(width),
-        height: Math.round(height),
-      });
-    },
-    [perfSurface]
-  );
-
-  const listContentSizeRef = useRef<{ w: number; h: number } | null>(null);
-  const handleListContentSize = useCallback(
-    (w: number, h: number) => {
-      const last = listContentSizeRef.current;
-      if (last && Math.abs(last.w - w) < 0.5 && Math.abs(last.h - h) < 0.5) return;
-      const viewportH = listLayoutRef.current?.height ?? 0;
-      listContentSizeRef.current = { w, h };
-      bitchatLog.debug('chat.list.content_size', {
-        surface: perfSurface,
-        contentW: Math.round(w),
-        contentH: Math.round(h),
-        viewportH: Math.round(viewportH),
-        overflow: Math.round(h - viewportH),
-        msgsCount: messages.length,
-      });
-    },
-    [perfSurface, messages.length]
-  );
-
-  const lastScrollLogRef = useRef(0);
-  const handleListScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent> | any) => {
-      const now = Date.now();
-      if (now - lastScrollLogRef.current < 120) return;
-      lastScrollLogRef.current = now;
-      const { contentOffset, contentSize, layoutMeasurement } = (
-        e as NativeSyntheticEvent<NativeScrollEvent>
-      ).nativeEvent;
-      const distFromEnd = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-      bitchatLog.debug('chat.list.scroll', {
-        surface: perfSurface,
-        offsetY: Math.round(contentOffset.y),
-        contentH: Math.round(contentSize.height),
-        viewportH: Math.round(layoutMeasurement.height),
-        distFromEnd: Math.round(distFromEnd),
-      });
-    },
-    [perfSurface]
-  );
-
-  const prevMsgRef = useRef({ count: 0, lastId: '' });
-  useEffect(() => {
-    const prev = prevMsgRef.current;
-    const last = messages[messages.length - 1];
-    const next = { count: messages.length, lastId: last?.id ?? '' };
-    if (next.count === prev.count && next.lastId === prev.lastId) return;
-    bitchatLog.info('chat.list.history_change', {
-      surface: perfSurface,
-      prevCount: prev.count,
-      count: next.count,
-      delta: next.count - prev.count,
-    });
-    prevMsgRef.current = next;
-  }, [messages, perfSurface]);
+  const { handleListLayout, handleListContentSize, handleListScroll } = useChatSurfacePerfLogger({
+    log: bitchatLog,
+    surface: perfSurface,
+    headerHeight,
+    messages,
+  });
 
   // Precompute grouping: consecutive messages from the same sender form a group
   const groupingMap = useMessageGrouping(messages);

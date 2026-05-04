@@ -7,19 +7,16 @@
  * Schnorr key at the route boundary.
  */
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   ScrollView,
   StatusBar,
   ColorValue,
   InteractionManager,
   useWindowDimensions,
-  type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
 } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router, Stack } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { invalidTokenPopup, sendMessageFailedPopup } from '@/shared/lib/popup';
@@ -51,6 +48,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
 import { ChatComposer } from '@/shared/ui/composed/chat/ChatComposer';
+import { useChatSurfacePerfLogger } from '@/shared/ui/composed/chat/useChatSurfacePerfLogger';
 import { formatChatTimestamp } from '@/shared/ui/composed/chat/formatChatTimestamp';
 import { Button } from '@/shared/ui/primitives/Button';
 
@@ -419,92 +417,17 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   const [isSending, setIsSending] = useState(false);
   const [composerHeight, setComposerHeight] = useState(0);
 
-  // ─── Perf instrumentation (chat surface) ──────────────────────────────
-  // Same shape as AiChatScreen / WhitenoiseDMScreen / GeohashChatScreen so
-  // log-doctor's `--event chat.kav|chat.list|chat.send|chat.composer`
-  // filter spans every message surface uniformly.
-  const kbState = useKeyboardState();
-  const kbStateRef = useRef({ isVisible: false, height: 0 });
-  useEffect(() => {
-    const prev = kbStateRef.current;
-    if (prev.isVisible === kbState.isVisible && prev.height === kbState.height) return;
-    chatLog.info('chat.kav.keyboard_state', {
-      surface: PERF_SURFACE,
-      from: { isVisible: prev.isVisible, height: prev.height },
-      to: { isVisible: kbState.isVisible, height: kbState.height },
-      headerHeight,
-      composerHeight,
-    });
-    kbStateRef.current = { isVisible: kbState.isVisible, height: kbState.height };
-  }, [kbState.isVisible, kbState.height, headerHeight, composerHeight]);
-
-  const listLayoutRef = useRef<{ height: number; width: number } | null>(null);
-  const handleListLayout = useCallback((e: LayoutChangeEvent | any) => {
-    const { width, height } = (e as LayoutChangeEvent).nativeEvent.layout;
-    const last = listLayoutRef.current;
-    if (last && Math.abs(last.width - width) < 0.5 && Math.abs(last.height - height) < 0.5) {
-      return;
-    }
-    listLayoutRef.current = { width, height };
-    chatLog.info('chat.list.layout', {
-      surface: PERF_SURFACE,
-      width: Math.round(width),
-      height: Math.round(height),
-    });
-  }, []);
-
-  const listContentSizeRef = useRef<{ w: number; h: number } | null>(null);
-  const handleListContentSize = useCallback(
-    (w: number, h: number) => {
-      const last = listContentSizeRef.current;
-      if (last && Math.abs(last.w - w) < 0.5 && Math.abs(last.h - h) < 0.5) return;
-      const viewportH = listLayoutRef.current?.height ?? 0;
-      listContentSizeRef.current = { w, h };
-      chatLog.debug('chat.list.content_size', {
-        surface: PERF_SURFACE,
-        contentW: Math.round(w),
-        contentH: Math.round(h),
-        viewportH: Math.round(viewportH),
-        overflow: Math.round(h - viewportH),
-        msgsCount: messages.length,
-      });
-    },
-    [messages.length]
-  );
-
-  const lastScrollLogRef = useRef(0);
-  const handleListScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent> | any) => {
-    const now = Date.now();
-    if (now - lastScrollLogRef.current < 120) return;
-    lastScrollLogRef.current = now;
-    const { contentOffset, contentSize, layoutMeasurement } = (
-      e as NativeSyntheticEvent<NativeScrollEvent>
-    ).nativeEvent;
-    chatLog.debug('chat.list.scroll', {
-      surface: PERF_SURFACE,
-      offsetY: Math.round(contentOffset.y),
-      contentH: Math.round(contentSize.height),
-      viewportH: Math.round(layoutMeasurement.height),
-      distFromEnd: Math.round(contentSize.height - (contentOffset.y + layoutMeasurement.height)),
-    });
-  }, []);
-
-  const prevMsgRef = useRef({ count: 0, lastId: '' });
-  useEffect(() => {
-    const prev = prevMsgRef.current;
-    const last = messages[messages.length - 1];
-    const next = { count: messages.length, lastId: last?.id ?? '' };
-    if (next.count === prev.count && next.lastId === prev.lastId) return;
-    chatLog.info('chat.list.history_change', {
-      surface: PERF_SURFACE,
-      prevCount: prev.count,
-      count: next.count,
-      delta: next.count - prev.count,
+  const { handleListLayout, handleListContentSize, handleListScroll } = useChatSurfacePerfLogger({
+    log: chatLog,
+    surface: PERF_SURFACE,
+    headerHeight,
+    messages,
+    kbStateExtras: () => ({ composerHeight }),
+    historyExtras: (last) => ({
       lastSender: last?.sender ?? null,
       lastIsSending: last?.isSending ?? null,
-    });
-    prevMsgRef.current = next;
-  }, [messages]);
+    }),
+  });
 
   // Counterparty kind-0 metadata is served from the shared SWR cache.
   // First open of a conversation per session pays one round-trip; every
