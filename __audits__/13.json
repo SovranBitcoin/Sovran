@@ -185,7 +185,9 @@
         "skill:vercel-react-native-skills"
       ],
       "verification_note": "Re-read GeohashMessageBubble:59-162. Confirmed useThemeColor at 60-65 runs per render. Confirmed `recycleItems={false}` at :379. Confirmed renderItem at :363 is not memoised. log.txt/stats shows `render.count AnimatedBackgroundView` marked [EXCESSIVE] (36 renders in 5157s — that's background not bubbles, but confirms the theme engine fires often). Counter-argument considered: 'useThemeColor may already be a cheap selector — constant-time and cached.' Partial answer — the subscription count is the cost, not the read. And the cited dim-7 heuristic names this exact pattern. Marked 0.85 confidence because I didn't open useThemeColor to confirm its subscription shape; the structural finding is sound regardless. UNVERIFIED for the dynamic claim per AUDIT.md dim-7 perf-evidence rule — but the structural pattern (named trigger) survives Phase B on its own.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Cited symbol GeohashMessageBubble was extracted into the shared ChatMessageBubble in commit f455c53d; the line:60 useThemeColor call no longer exists at the cited path. The dynamic perf claim was UNVERIFIED in the audit; if the same per-item subscription pattern in shared ChatMessageBubble is a problem, file a fresh finding with log-doctor evidence."
     },
     {
       "id": "F-008",

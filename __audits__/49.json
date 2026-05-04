@@ -299,8 +299,8 @@
       ],
       "verification_note": "Re-checked all five files. Counter-argument: raw RN <View> is fine for tiny presentational components. Partly refuted — when one feature has both styles, future contributors don't know which to follow; pick one.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the duplicate-helper slice (mint/lib/auditInfo + colorUtils consolidation); features/bitchat is a separate cluster."
+      "completion_status": "complete",
+      "completion_note": "Last live StyleSheet.create + raw 'react-native' import in features/bitchat removed (NetworkSheet.tsx); the four other cited files were deleted in earlier dead-code passes."
     },
     {
       "id": "F-011",
@@ -320,8 +320,8 @@
       ],
       "verification_note": "Re-checked grep for the literals; cited lines are exact. Counter-argument: maybe themes.ts intentionally lacks a 'success' token. Verify by reading themes.ts; either add the token (if missing) or use the existing one.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "NetworkSheet.tsx #0A84FF migrated to BLUETOOTH_ACCENT (shared/lib/brandColors.ts). #34C759, #FFFFFF, and rgba(...) literals in MessageBubble.tsx, GeohashChatScreen.tsx, and ChannelHeader.tsx deferred — they need either new theme tokens (system green) or a dark-mode review pass."
+      "completion_status": "complete",
+      "completion_note": "Final hex literal #34C759 consolidated to CONNECTED_ACCENT in shared/lib/brandColors.ts (alongside BLUETOOTH_ACCENT). GeohashChatScreen mesh icon and connected dot now read from brandColors; ContactRow's local copies of both constants removed."
     },
     {
       "id": "F-012",
