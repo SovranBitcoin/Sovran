@@ -251,7 +251,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Counter-argument: rapid iteration warrants `any` during prototyping — fair; the fix is one hour once the feature has stabilised.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "PseudoMint.mintInfo, MintReviewsScreen review:any, MintDistributionScreen (method:any) ×3, useNostrDiscoveredMints (event:any) all retyped against GetInfoResponse / MintRecommendation / inferred NDKEvent."
     },
     {
       "id": "F-011",

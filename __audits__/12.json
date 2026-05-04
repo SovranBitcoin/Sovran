@@ -258,7 +258,8 @@
       ],
       "verification_note": "Re-read all cited lines. Counter-argument considered: 'coco/cashu-ts types are upstream and may not be importable directly.' Both ARE directly importable — the feature/mint/hooks/useAuditedMint.ts already imports `GetInfoResponse` from `@cashu/cashu-ts` (analyze-structure output), and manager.ts imports `Manager` and related types from `@cashu/coco-core`. No missing-type blocker.",
       "prior_audit_id": "F-013@09.json",
-      "completion_status": "partial"
+      "completion_status": "partial",
+      "completion_note": "mintInfoMap state (line 84) and the two (method: any) annotations (lines 94, 99) closed against GetInfoResponse / inferred SwapMethod. The remaining cashu-ts MeltQuote / Proof / prepared-melt as-any sites (lines 402, 483, 536, 907, 952, 963, 1016, 1061) are a different concrete-type cluster — separate slice."
     },
     {
       "id": "F-012",
