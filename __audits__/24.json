@@ -180,7 +180,9 @@
         "skill:upgrading-expo"
       ],
       "verification_note": "Verified by reading both files' top imports. Legacy Clipboard is the wrong API for SDK 55. Confidence 0.95.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Replaced legacy react-native Clipboard with expo-clipboard's setStringAsync; handleCopyKey is now async. Single-call-site swap."
     },
     {
       "id": "F-007",
@@ -200,7 +202,9 @@
         "skill:security-review"
       ],
       "verification_note": "Re-read handleShareDump (SettingsStorageScreen.tsx:213–224) and getFullAsyncStorageDump (storageInventory.ts:160–173). SecureStore is correctly excluded. Confidence 0.85 — whether specific stores contain raw PII depends on their persist shapes, which I didn't exhaustively trace. Audit 03 covered scan-history-store (passed dim 2) and audit 16 covered several others (passed dim 2/3); even so, shipping them as one opaque share blob is a posture concern.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Added redactStorageDump in storageInventory.ts: drops every transaction-location-store* key entirely and recursively replaces cashu-token (cashuA/B) and lightning-invoice (lnbc/lntb/lnbcrt/lnsb) string patterns with REDACTED markers. getFullAsyncStorageDump now returns the redacted shape, so SettingsStorageScreen's Share Full Dump no longer leaks bearer instruments or geolocation. Pinned by __tests__/redactStorageDump.test.ts. The audit's UX additions (typed-confirmation sheet, splitting into Keys-Inventory vs Diagnostic-Bundle) are out of scope here — the bearer-instrument and geolocation exfiltration risk is closed at the dump source, which is the load-bearing piece."
     },
     {
       "id": "F-008",

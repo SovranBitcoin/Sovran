@@ -198,7 +198,9 @@
         "features/send/screens/AmountSelector.tsx:15"
       ],
       "verification_note": "analyze-structure confirms CustomKeyboard has zero internal importers within features/auth. External importers are exactly 2, both for payment amount entry. Relocation is safe.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "features/auth has been removed from the tree; CustomKeyboard now lives at shared/ui/composed/CustomKeyboard.tsx (verified 2026-05-04 — features/auth glob returns no files)."
     },
     {
       "id": "F-007",

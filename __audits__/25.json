@@ -171,7 +171,9 @@
       "fix": "Move `Section` to `shared/ui/composed/Section.tsx` with its own test. Update the two feature imports (settings, mint) to the new path. If `Section` is essentially a thin wrapper around `ListGroup.Section` from heroui-native, delete it instead.",
       "references": [],
       "verification_note": "Confirmed by re-reading line 20 and cross-checking analyze-structure output which flags features/mint → ../settings (1 importer) and ../receive (1 importer) as anomalies. Counter-argument: maybe the import is a one-off visual alignment — still the wrong fix; promote it.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Section now lives in shared/ui/composed/Section.tsx and MintInfoScreen imports from there (verified 2026-05-04). No file in the tree imports Section from features/settings/screens/SettingsScreen."
     },
     {
       "id": "F-007",
