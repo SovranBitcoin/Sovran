@@ -147,8 +147,6 @@ interface SettingsActions {
 
   // Passcode management
   setPasscode: (passcode: string) => void;
-  getPasscode: () => string;
-  clearPasscode: () => void;
 
   // Experimental features
   setExperimental: (experimental: boolean) => void;
@@ -229,11 +227,6 @@ export const useSettingsStore = create<SettingsStore>()(
         setPasscode: (passcode: string) => {
           storeLog.info('store.settings.set_passcode');
           set({ passcode });
-        },
-        getPasscode: () => get().passcode,
-        clearPasscode: () => {
-          storeLog.info('store.settings.clear_passcode');
-          set({ passcode: '' });
         },
 
         // Experimental

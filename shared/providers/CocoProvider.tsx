@@ -6,10 +6,7 @@ import { useInitializationStage } from '@/shared/providers/InitializationProvide
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
-import {
-  getBootMorphCompleted,
-  subscribeBootMorphCompleted,
-} from '@/shared/lib/qrButtonAnchor';
+import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import {
   useWalletLifecycleStore,
   type RestoreStatus,
@@ -63,7 +60,7 @@ async function initializeDefaultMints(
     log.info('coco.init_default_mints');
 
     const defaultMints = ['https://mint.sovran.money', 'https://mint.minibits.cash/Bitcoin'];
-    const selectedMint = 'https://mint.minibits.cash/Bitcoin';
+    const defaultSelectedMint = 'https://mint.minibits.cash/Bitcoin';
 
     for (const mintUrl of defaultMints) {
       try {
@@ -86,9 +83,9 @@ async function initializeDefaultMints(
         const currentSelectedMint = getSelectedMint(pubkey);
 
         if (!currentSelectedMint) {
-          const isSovranTrusted = await manager.mint.isTrustedMint(selectedMint);
-          if (isSovranTrusted) {
-            setSelectedMint(pubkey, selectedMint);
+          const isDefaultTrusted = await manager.mint.isTrustedMint(defaultSelectedMint);
+          if (isDefaultTrusted) {
+            setSelectedMint(pubkey, defaultSelectedMint);
             log.info('coco.mint_selected', { pubkey });
           }
         }

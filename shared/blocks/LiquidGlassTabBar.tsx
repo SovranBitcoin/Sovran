@@ -23,18 +23,18 @@ function getTabIndexFromPathname(pathname: string): number | null {
 }
 
 type BottomTabsProps = {
-  selectedTabIndex?: number;
-  tabsCount?: number;
+  selectedTabIndex: number;
+  tabsCount: number;
   tabLabels?: string[];
   tabIcons?: (number | string)[];
   iconTintEnabled?: boolean;
-  onTabSelected?: (index: number) => void;
+  onTabSelected: (index: number) => void;
   style?: object;
 };
 
 function BottomTabs({
-  selectedTabIndex: controlledSelectedTabIndex,
-  tabsCount = 3,
+  selectedTabIndex,
+  tabsCount,
   tabLabels,
   tabIcons,
   iconTintEnabled = true,
@@ -42,19 +42,8 @@ function BottomTabs({
   style,
   ...props
 }: BottomTabsProps) {
-  const [internalSelectedTabIndex, setInternalSelectedTabIndex] = useState(0);
-
-  const selectedTabIndex =
-    controlledSelectedTabIndex !== undefined
-      ? controlledSelectedTabIndex
-      : internalSelectedTabIndex;
-
   const handleTabSelected = (event: { nativeEvent: { index: number } }) => {
-    const index = event.nativeEvent.index;
-    if (controlledSelectedTabIndex === undefined) {
-      setInternalSelectedTabIndex(index);
-    }
-    onTabSelected?.(index);
+    onTabSelected(event.nativeEvent.index);
   };
 
   const tabIconUris = useMemo(() => {

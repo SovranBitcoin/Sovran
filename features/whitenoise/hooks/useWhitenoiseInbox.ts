@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { wnLog } from '@/shared/lib/logger';
@@ -25,8 +25,6 @@ export function useWhitenoiseInbox() {
   const { keys } = useNostrKeysContext();
   const selfPubkey = keys?.pubkey;
 
-  const subscribedFor = useRef<string | null>(null);
-
   useEffect(() => {
     if (!client || !inviteReader || !selfPubkey) return;
 
@@ -45,7 +43,6 @@ export function useWhitenoiseInbox() {
       }
       if (cancelled) return;
 
-      subscribedFor.current = selfPubkey;
       wnLog.info('whitenoise.inbox.start', {
         relayCount: inboxRelays.length,
         self: selfPubkey.slice(0, 16),

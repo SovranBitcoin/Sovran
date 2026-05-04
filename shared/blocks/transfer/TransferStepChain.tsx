@@ -147,7 +147,6 @@ const LINE_THICKNESS = 3;
 const DOT_ANIM_MS = 300;
 const LINE_ANIM_MS = 360;
 
-const DOT_TIMING = { duration: DOT_ANIM_MS, easing: Easing.out(Easing.cubic) };
 const FAST_TIMING = { duration: 200, easing: Easing.out(Easing.cubic) };
 const LINE_TIMING = { duration: LINE_ANIM_MS, easing: Easing.inOut(Easing.cubic) };
 

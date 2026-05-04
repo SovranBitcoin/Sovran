@@ -2,16 +2,12 @@ import React from 'react';
 import 'react-native-get-random-values';
 
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Text } from '@/shared/ui/primitives/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from '@/features/wallet/components/PrimaryBalance';
 
 import { isBackgroundImageTheme } from '@/shared/stores/global/settingsStore';
 import { useUnitWallpaper } from '@/shared/providers/ProfileWallpaperProvider';
-import { NonGestureView } from './NonGestureView';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
 interface AccountData {
@@ -19,7 +15,6 @@ interface AccountData {
 }
 
 interface AccountProps {
-  accounts: AccountData[];
   account: AccountData;
   pagerHeight: number;
 }
@@ -31,8 +26,7 @@ const CURRENCY_ICONS: Record<string, React.FC> = {
   gbp: PoundMaskIcon,
 };
 
-export function Account({ accounts, account, pagerHeight }: AccountProps): React.ReactElement {
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+export function Account({ account, pagerHeight }: AccountProps): React.ReactElement {
   const theme = useUnitWallpaper(account.unit);
   const hasBackgroundImage = isBackgroundImageTheme(theme);
 
@@ -40,41 +34,21 @@ export function Account({ accounts, account, pagerHeight }: AccountProps): React
 
   return (
     <Log name="Account">
-      <NonGestureView
-        key={account.unit}
-        style={{ overflow: 'hidden', zIndex: 10, height: pagerHeight, width: '100%' }}>
+      <View
+        style={{ overflow: 'hidden', zIndex: 10, height: pagerHeight, width: '100%' }}
+        className="flex">
         {/*
          * Weighted fillers: top flex:2, bottom flex:1 pushes the primary
-         * balance + dots closer to the bottom edge of the pager so the
-         * secondary action row below (Split Bill / Soon / Soon in
-         * AccountPagerViewLayout) sits right under the balance instead of
-         * floating in empty space. Centred (flex:1/flex:1) felt too lonely
-         * after `pagerHeight` was tightened.
+         * balance closer to the bottom edge of the pager so the secondary
+         * action row below sits right under the balance instead of floating
+         * in empty space. Centred (flex:1/flex:1) felt too lonely after
+         * `pagerHeight` was tightened.
          */}
         <VStack style={{ flex: 1 }}>
           <View style={{ flex: 2 }} />
-
           <VStack align="center" gap={8}>
             <PrimaryBalance account={account} />
-            <HStack spacing={2}>
-              {accounts.map((acc, index) => {
-                const isActive = acc.unit === account.unit;
-                return (
-                  <Text
-                    key={index}
-                    weight={isActive ? 'bold' : 'regular'}
-                    size={16}
-                    style={{
-                      color: isActive ? foreground : surfaceTertiary,
-                      marginTop: 3,
-                    }}>
-                    •
-                  </Text>
-                );
-              })}
-            </HStack>
           </VStack>
-
           <View style={{ flex: 1 }} />
         </VStack>
 
@@ -83,7 +57,7 @@ export function Account({ accounts, account, pagerHeight }: AccountProps): React
             <CurrencyIcon />
           </View>
         ) : null}
-      </NonGestureView>
+      </View>
     </Log>
   );
 }

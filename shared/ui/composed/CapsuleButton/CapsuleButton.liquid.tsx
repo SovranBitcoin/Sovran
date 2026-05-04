@@ -17,7 +17,7 @@ const DEFAULT_HEIGHT = 48;
 // prop, and a wrapper RN View with pointerEvents="box-none" can leak touches
 // to siblings instead of routing them through the SwiftUI Button. The clean
 // path is to set the testID on the EXISTING parent View at the call site
-// (e.g. the `<View className="flex-1">` wrapper in AccountPagerViewLayout).
+// (e.g. the `<View className="flex-1">` wrapper around it at the call site).
 // That parent View already routes touches correctly through to the Host.
 // We accept and ignore the testID prop here so the type stays uniform with
 // the iOS / Android variants.
