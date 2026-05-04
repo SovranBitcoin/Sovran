@@ -21,8 +21,10 @@ const STORAGE_KEYS = {
 
 export interface CachedDerivedKeys {
   npub: string;
+  /** @SECRET nsec — never log or surface in error payloads */
   nsec: string;
   pubkey: string;
+  /** @SECRET raw private key hex — never log or surface in error payloads */
   privateKeyHex: string;
   mnemonicHash: string;
 }
@@ -35,6 +37,21 @@ const IOS_SECURE_OPTIONS = {
 
 const secureOptions = (): SecureStore.SecureStoreOptions =>
   Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+
+function assertAccountIndex(accountIndex: number): void {
+  if (!Number.isInteger(accountIndex) || accountIndex < 0) {
+    throw new Error(`Invalid accountIndex: ${accountIndex}`);
+  }
+}
+
+const HEX_RE = /^[0-9a-f]+$/i;
+
+function assertPubkeyHex(pubkeyHex: string): void {
+  // 32-byte schnorr/secp256k1 x-only pubkey serialised as 64 lowercase hex chars
+  if (typeof pubkeyHex !== 'string' || pubkeyHex.length !== 64 || !HEX_RE.test(pubkeyHex)) {
+    throw new Error('Invalid pubkeyHex: expected 64 hex chars');
+  }
+}
 
 async function secureGet(key: string, op: string): Promise<string | null> {
   try {
@@ -62,6 +79,26 @@ async function secureDelete(key: string, op: string): Promise<boolean> {
   } catch (error) {
     nostrLog.error(`nostr.secure.${op}_failed`, { error: redactError(error) });
     return false;
+  }
+}
+
+/**
+ * Wraps a parser of a SecureStore blob with self-heal: on parse failure or
+ * invariant violation, the corrupt blob is deleted so the next session falls
+ * through to the slow rederivation path exactly once instead of every boot.
+ */
+async function parseOrSelfHeal<T>(
+  raw: string,
+  key: string,
+  op: string,
+  parse: (raw: string) => T
+): Promise<T | null> {
+  try {
+    return parse(raw);
+  } catch (error) {
+    nostrLog.error(`nostr.secure.${op}_failed`, { error: redactError(error) });
+    await secureDelete(key, `${op}_self_heal`);
+    return null;
   }
 }
 
@@ -148,11 +185,26 @@ async function generateMnemonic(): Promise<GeneratedMnemonic> {
   }
 }
 
+// Single-flight guard: concurrent callers (boot races, legacy-bootstrap,
+// React StrictMode double-invoke) all observe the same generate+store
+// outcome instead of each generating a fresh mnemonic and racing to overwrite.
+let inflightEnsureMnemonic: Promise<string | null> | null = null;
+
 /**
  * Generates and stores a new mnemonic if none exists
  * @returns Promise<string | null> The mnemonic (existing or newly generated), or null if failed
  */
-export async function ensureMnemonicExists(): Promise<string | null> {
+export function ensureMnemonicExists(): Promise<string | null> {
+  if (inflightEnsureMnemonic) {
+    return inflightEnsureMnemonic;
+  }
+  inflightEnsureMnemonic = ensureMnemonicExistsInner().finally(() => {
+    inflightEnsureMnemonic = null;
+  });
+  return inflightEnsureMnemonic;
+}
+
+async function ensureMnemonicExistsInner(): Promise<string | null> {
   try {
     // Check if mnemonic already exists
     const existingMnemonic = await retrieveMnemonic();
@@ -165,20 +217,16 @@ export async function ensureMnemonicExists(): Promise<string | null> {
     nostrLog.info('nostr.secure.generating_mnemonic');
     const generated = await generateMnemonic();
 
-    // Store the new mnemonic
-    const stored = await storeMnemonic(generated.mnemonic);
-    if (!stored) {
-      nostrLog.error('nostr.secure.store_new_mnemonic_failed');
-      return null;
-    }
-
-    nostrLog.info('nostr.secure.mnemonic_stored', { source: generated.source });
-
-    // Only mark seedCreatedAt for *fresh* seeds (real user fresh-install path).
-    // Debug-injected seeds via EXPO_PUBLIC_DEBUG_MNEMONIC must look like a
-    // pre-existing seed so the dev environment can exercise the restore-gate
-    // flow on every clean install — same code path a production user hits
-    // after reinstall / iCloud restore / profile reset.
+    // Mark seedCreatedAt BEFORE storing the mnemonic so a crash in the narrow
+    // window between mark and store still leaves a recoverable invariant: the
+    // next boot sees no mnemonic, regenerates, and remarks. Marking after the
+    // store would risk a crash window where retrieveMnemonic succeeds but
+    // seedCreatedAt is null forever — a genuine fresh install indistinguishable
+    // from a restore.
+    //
+    // Only mark for *fresh* seeds. Debug-injected seeds via
+    // EXPO_PUBLIC_DEBUG_MNEMONIC must look like a pre-existing seed so the dev
+    // environment can exercise the restore-gate flow on every clean install.
     if (generated.source === 'fresh') {
       try {
         const { useWalletLifecycleStore } =
@@ -192,6 +240,15 @@ export async function ensureMnemonicExists(): Promise<string | null> {
         reason: 'debug_mnemonic_treated_as_pre_existing',
       });
     }
+
+    // Store the new mnemonic
+    const stored = await storeMnemonic(generated.mnemonic);
+    if (!stored) {
+      nostrLog.error('nostr.secure.store_new_mnemonic_failed');
+      return null;
+    }
+
+    nostrLog.info('nostr.secure.mnemonic_stored', { source: generated.source });
     return generated.mnemonic;
   } catch (error) {
     nostrLog.error('nostr.secure.ensure_mnemonic_failed', { error: redactError(error) });
@@ -235,10 +292,12 @@ export async function clearAllSecureData(
 // ── Derived Keys Cache ──────────────────────────────────────────
 
 function derivedKeysKey(accountIndex: number): string {
+  assertAccountIndex(accountIndex);
   return `${STORAGE_KEYS.DERIVED_KEYS_PREFIX}${accountIndex}`;
 }
 
 function cashuMnemonicKey(accountIndex: number): string {
+  assertAccountIndex(accountIndex);
   return `${STORAGE_KEYS.CASHU_MNEMONIC_PREFIX}${accountIndex}`;
 }
 
@@ -259,14 +318,10 @@ export function storeDerivedKeys(accountIndex: number, keys: CachedDerivedKeys):
 }
 
 export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedDerivedKeys | null> {
-  const raw = await secureGet(derivedKeysKey(accountIndex), 'retrieve_keys');
+  const key = derivedKeysKey(accountIndex);
+  const raw = await secureGet(key, 'retrieve_keys');
   if (!raw) return null;
-  try {
-    return JSON.parse(raw) as CachedDerivedKeys;
-  } catch (error) {
-    nostrLog.error('nostr.secure.retrieve_keys_failed', { error: redactError(error) });
-    return null;
-  }
+  return parseOrSelfHeal(raw, key, 'retrieve_keys', (s) => JSON.parse(s) as CachedDerivedKeys);
 }
 
 export function storeCashuMnemonic(
@@ -281,20 +336,22 @@ export function storeCashuMnemonic(
 export async function retrieveCashuMnemonic(
   accountIndex: number
 ): Promise<{ value: string; mnemonicHash: string } | null> {
-  const raw = await secureGet(cashuMnemonicKey(accountIndex), 'retrieve_cashu_mnemonic');
+  const key = cashuMnemonicKey(accountIndex);
+  const raw = await secureGet(key, 'retrieve_cashu_mnemonic');
   if (!raw) return null;
-  try {
-    return JSON.parse(raw) as { value: string; mnemonicHash: string };
-  } catch (error) {
-    nostrLog.error('nostr.secure.retrieve_cashu_mnemonic_failed', { error: redactError(error) });
-    return null;
-  }
+  return parseOrSelfHeal(
+    raw,
+    key,
+    'retrieve_cashu_mnemonic',
+    (s) => JSON.parse(s) as { value: string; mnemonicHash: string }
+  );
 }
 
 // ── Cashu Seed Cache ────────────────────────────────────────────
 // Caches the 64-byte PBKDF2-derived seed so we skip the ~5s derivation on warm starts.
 
 function cashuSeedKey(accountIndex: number): string {
+  assertAccountIndex(accountIndex);
   return `${STORAGE_KEYS.CASHU_SEED_PREFIX}${accountIndex}`;
 }
 
@@ -310,15 +367,20 @@ export function storeCashuSeed(
 export async function retrieveCashuSeed(
   accountIndex: number
 ): Promise<{ seed: Uint8Array; mnemonicHash: string } | null> {
-  const raw = await secureGet(cashuSeedKey(accountIndex), 'retrieve_cashu_seed');
+  const key = cashuSeedKey(accountIndex);
+  const raw = await secureGet(key, 'retrieve_cashu_seed');
   if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as { hex: string; mnemonicHash: string };
-    return { seed: hexToBytes(parsed.hex), mnemonicHash: parsed.mnemonicHash };
-  } catch (error) {
-    nostrLog.error('nostr.secure.retrieve_cashu_seed_failed', { error: redactError(error) });
-    return null;
-  }
+  return parseOrSelfHeal(raw, key, 'retrieve_cashu_seed', (s) => {
+    const parsed = JSON.parse(s) as { hex: string; mnemonicHash: string };
+    const seed = hexToBytes(parsed.hex);
+    // Cashu BIP39 seed is exactly 64 bytes; anything else is a corrupt blob.
+    // Treating short/long buffers as cache-hit would derive a plausible-but-
+    // wrong seed and strand deterministic proof counters.
+    if (seed.length !== 64) {
+      throw new Error(`cashu seed wrong length: ${seed.length}`);
+    }
+    return { seed, mnemonicHash: parsed.mnemonicHash };
+  });
 }
 
 // ── Migrations Complete Flag (per-account) ──────────────────────
@@ -357,6 +419,7 @@ export function setMigrationsComplete(accountIndex: number = 0): Promise<boolean
 // ── Imported Nsec Storage ───────────────────────────────────────
 
 function importedNsecKey(pubkeyHex: string): string {
+  assertPubkeyHex(pubkeyHex);
   return `${STORAGE_KEYS.IMPORTED_NSEC_PREFIX}${pubkeyHex}`;
 }
 
