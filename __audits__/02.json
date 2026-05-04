@@ -76,8 +76,8 @@
       ],
       "verification_note": "Verified Zustand v5 behaviour in package.json (zustand@5); confirmed the stores do not already use subscribeWithSelector by grepping their files. Counter-argument considered: listener may be cheap — but screen-actions recomputes potential-action lists, which is not free.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered alongside the coco-payment-ux react/tracker slice (commit 7e064c9f) but kept out of scope: the fix requires migrating useScanHistoryStore, useTransactionDistributionStore, and useSettingsStore to subscribeWithSelector and rewriting their consumers' subscribe(listener) calls to take a selector + equalityFn — a Zustand-discipline slice that touches sovran-side stores rather than the package boundary this commit consolidated."
+      "completion_status": "partial",
+      "completion_note": "Slice c20e3e22 wraps useScanHistoryStore, useTransactionDistributionStore, and useSettingsStore in zustand/middleware subscribeWithSelector and narrows subscribeGlobalScreenActions in CocoPaymentUX.tsx to the slices the bridge actually reads (entries, distributions, language). Settings-store-wide re-emits (mockOffline, currency, dev flags) no longer wake screen-action managers. The onEntryUpdate mintInfo/mintSelector subscribers at lines 391-413 are still broad — that's a follow-up; this slice fixed the dominant footprint."
     },
     {
       "id": "F-004",

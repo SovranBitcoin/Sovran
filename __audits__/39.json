@@ -163,8 +163,8 @@
       ],
       "verification_note": "Re-checked at line 241. Counter-argument: amount+mintUrl matching could collide if two identical receives are in flight. Acknowledged — that's a separate fragility (the matching key is non-unique), but the 50ms race is the primary failure mode. The match-by-amount issue is a follow-up worth noting in open_questions.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "50ms setTimeout still in place; replacing with history:updated subscription is a separate slice."
+      "completion_status": "complete",
+      "completion_note": "Slice c20e3e22 replaces the 50ms setTimeout + getPaginatedHistory(0, 20) race with a permanent `history:updated` subscription narrowed to type === 'receive' && state === 'finalized'. The receive-op:finalized handler still calls setConfirmed without receiveEntryId so state transitions even if history:updated lags; setConfirmed merges receiveEntryId when the typed history-entry event arrives, so the View button enriches asynchronously without timing dependency."
     },
     {
       "id": "F-005",
@@ -227,8 +227,8 @@
       ],
       "verification_note": "Re-checked at lines 97 and 243. UNVERIFIED — log.txt shows the listener was idle in the latest session, so no measured timing. Confidence 0.5 on the perf magnitude; the blocking is real (sequential EventBus is documented at EventBus.ts:78-89), but the user-visible cost is unmeasured. Severity Low for now; promote to Medium if a follow-up audit measures > 100ms gaps in the timeline.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Hot-path getPaginatedHistory still in place; coco patch / lazy lookup is a follow-up."
+      "completion_status": "complete",
+      "completion_note": "Slice c20e3e22 drops the getPaginatedHistory(0, 100) scan from the mint-op:quote-state-changed hot path; amount/unit are read directly from the event's MintOperation (MintIntentData fields are present on every state). The receive-op:finalized 20-row scan is also gone — the receiveEntryId lookup is now driven by the history:updated event subscription added for F-004. EventBus is no longer blocked by this listener on either receive path."
     }
   ],
   "dimensions": {

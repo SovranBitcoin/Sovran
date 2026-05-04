@@ -312,8 +312,8 @@
       ],
       "verification_note": "Re-read the subscription block; identical to prior audit 02.json F-003.",
       "prior_audit_id": "F-003@02.json",
-      "completion_status": "deferred",
-      "completion_note": "Same as 02#F-003 (Zustand subscribeWithSelector slice); not in the provider-tree slice."
+      "completion_status": "complete",
+      "completion_note": "Slice c20e3e22 lands the Zustand subscribeWithSelector slice referenced by 02:F-003. The three stores now expose selector-aware .subscribe(); subscribeGlobalScreenActions subscribes to (s) => s.entries / s.distributions / s.language only. Settings toggles outside the locale slice (currency, mock flags, theme) no longer wake mounted screen-action managers."
     },
     {
       "id": "F-015",
