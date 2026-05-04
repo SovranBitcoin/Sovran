@@ -291,6 +291,21 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
       return existingMnemonic;
     }
 
+    // retrieveMnemonic returns null for both "no value stored" and
+    // "value stored but BIP-39 invalid". Before falling through to
+    // generate-and-store (which SecureStore.setItemAsync semantics would
+    // overwrite the existing blob), peek at the raw entry. If a value is
+    // there but failed validation, refuse to overwrite — the user is the
+    // only holder of the seed and a silent identity replacement strands
+    // any funds derived from the corrupt mnemonic. Surface a loud failure
+    // so the user can reinstall and restore from backup with the
+    // correctly-typed mnemonic.
+    const rawExisting = await secureGet(STORAGE_KEYS.USER_MNEMONIC, 'check_mnemonic_exists');
+    if (rawExisting != null) {
+      nostrLog.error('nostr.secure.refusing_overwrite_corrupt_mnemonic');
+      return null;
+    }
+
     // Generate new mnemonic
     nostrLog.info('nostr.secure.generating_mnemonic');
     const generated = await generateMnemonic();
