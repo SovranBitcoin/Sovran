@@ -364,8 +364,8 @@
       ],
       "verification_note": "Re-checked at lines 73–104.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "MerchantDetailScreen lives under (map-flow); the deep-link zod-validation slice (commit 0dddea5f) covered the payment-flow and top-level token/quote routes only. parseInt → z.coerce.number on placeId remains a follow-up."
+      "completion_status": "stale",
+      "completion_note": "MerchantDetailScreen migrated to useRouteParams with placeId schema z.string().regex(/^\\d{1,15}$/) — the trust-boundary parse the audit asked for is in place. The leftover parseInt + isNaN at L62-63 is a now-defensive no-op and not a security concern."
     },
     {
       "id": "F-014",

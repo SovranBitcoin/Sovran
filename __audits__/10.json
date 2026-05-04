@@ -138,7 +138,9 @@
         "sovran-app/shared/lib/migrations/legacyReduxMigrations.ts:46"
       ],
       "verification_note": "Still present since 04.json. Re-read L58-79; bip39 import at L3 still available, validation still absent.",
-      "prior_audit_id": "F-004@04.json"
+      "prior_audit_id": "F-004@04.json",
+      "completion_status": "complete",
+      "completion_note": "Same finding as 04.json#F-004; closed by storeMnemonic + legacyReduxMigrations + getDebugMnemonicOverride BIP-39 validation. Read-side validation (retrieveMnemonic) intentionally not added — clearing a bad stored value would let ensureMnemonicExistsInner overwrite it with a fresh mnemonic, destroying recovery; left as deferred follow-up."
     },
     {
       "id": "F-006",

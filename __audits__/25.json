@@ -145,8 +145,8 @@
       ],
       "verification_note": "Confirmed no parse before use at MintReviewsScreen L284-304 and MintInfoScreen L420-475. Counter-argument: expo-router already types the generic — only at compile time; at runtime the param is whatever the linker injected.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "MintInfoScreen and MintReviewsScreen sit in features/mint; the deep-link zod-validation slice (commit 0dddea5f) covered (send-flow), (receive-flow), (transactions-flow), and the top-level token/quote routes only. Mint-feature routes remain a follow-up."
+      "completion_status": "stale",
+      "completion_note": "MintInfoScreen and MintReviewsScreen both migrated to useRouteParams with colocated zod schemas (mintInfoEntry: z.string().min(1).max(64_000).optional(); mintUrl: z.string().min(1).max(2048).regex(/^https?:///))."
     },
     {
       "id": "F-006",

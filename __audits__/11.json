@@ -140,7 +140,9 @@
         "sovran-app/shared/lib/migrations/legacyReduxMigrations.ts:46"
       ],
       "verification_note": "Still present since 10.json. Re-read L58-79; bip39 import at L3 still available, validation still absent.",
-      "prior_audit_id": "F-005@10.json"
+      "prior_audit_id": "F-005@10.json",
+      "completion_status": "complete",
+      "completion_note": "Same finding as 04.json#F-004; closed by storeMnemonic + legacyReduxMigrations + getDebugMnemonicOverride BIP-39 validation."
     },
     {
       "id": "F-006",

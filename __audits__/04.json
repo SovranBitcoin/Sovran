@@ -74,8 +74,8 @@
       ],
       "verification_note": "Re-read L342-359. Counter-argument considered: 'SecureStore is encrypted self-written storage; corruption is unreachable.' iOS Keychain file-system corruption is documented (CVE-2021-30855 class issues, post-iOS-update Keychain migrations). The hexToBytes swap is zero-cost and aligns with the rest of the repo. Kept High.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed at retrieveCashuSeed:340 (parseInt-based hex decode still in place). Considered as an alternative slice for this session and held back: the hex swap itself is mechanical, but pairs with the F-005 djb2 hashMnemonic change, which invalidates the cached derived-keys entry on every existing install and forces ~5s PBKDF2 re-derivation on next cold start. Needs a paired migration / cache-warming pass that the NFC seam slice did not."
+      "completion_status": "stale",
+      "completion_note": "retrieveCashuSeed already uses hexToBytes (throws on bad chars) and asserts seed.length === 64 inside parseOrSelfHeal at secureStorage.ts:367-384. Same fix already noted as complete on the re-cited 10.json#F-004 / 11.json#F-004 entries."
     },
     {
       "id": "F-004",
@@ -95,7 +95,9 @@
         "sovran-app/shared/lib/migrations/legacyReduxMigrations.ts:46"
       ],
       "verification_note": "Re-read L58-79; confirmed only length check. bip39 import at L3 makes validation free. Counter-argument considered: 'the recovery UI validates first.' features/onboarding likely does, but storeMnemonic is an exported boundary and legacyReduxMigrations is another live caller that does not validate. Keeping High.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "BIP-39 checksum + wordlist now validated in storeMnemonic before secureSet (and same gate added to legacyReduxMigrations.getLegacyReduxMnemonic + getDebugMnemonicOverride). Bad-checksum mnemonic is rejected at the write boundary."
     },
     {
       "id": "F-005",

@@ -193,8 +193,8 @@
       ],
       "verification_note": "Re-read lines 63-64 and every downstream use of `unit`. Counter-argument considered: 'there is no current injection pathway, so the zod gate is ceremonial.' True for injection; false for correctness — the rule in AUDIT.md dim-5 is about establishing a trust boundary, not about a specific exploit. Low on active risk, Medium on structural debt.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "MintRebalancePlanScreen sits in (mint-flow); the deep-link zod-validation slice (commit 0dddea5f) covered (send-flow), (receive-flow), (transactions-flow), and the top-level token/quote routes only. Mint-flow routes remain a follow-up."
+      "completion_status": "stale",
+      "completion_note": "MintRebalancePlanScreen migrated to useRouteParams with a colocated zod ParamsSchema (unit: z.string().max(16).optional()) at features/mint/screens/MintRebalancePlanScreen.tsx:56-72."
     },
     {
       "id": "F-009",
