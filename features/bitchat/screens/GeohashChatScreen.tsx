@@ -23,6 +23,7 @@ import { Hex64 } from '@sovranbitcoin/schemas';
 
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 import { Log, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { useBitChat } from '../hooks/useBitChat';
 import { useBLEPeers } from '../hooks/useBLEPeers';
@@ -213,7 +214,7 @@ export function GeohashChatScreen({
                       <Icon
                         name="mdi:broadcast"
                         size={16}
-                        color={bleConnectedCount > 0 ? '#34C759' : shade400}
+                        color={bleConnectedCount > 0 ? CONNECTED_ACCENT : shade400}
                       />
                       <Text
                         size={13}
@@ -235,7 +236,7 @@ export function GeohashChatScreen({
                         width: 8,
                         height: 8,
                         borderRadius: 4,
-                        backgroundColor: isConnected ? '#34C759' : shade400,
+                        backgroundColor: isConnected ? CONNECTED_ACCENT : shade400,
                       }}
                     />
                     <Text size={13} style={{ color: shade400 }}>

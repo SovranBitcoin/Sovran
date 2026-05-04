@@ -7,7 +7,6 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { LegendList } from '@legendapp/list';
 import { router, Stack } from 'expo-router';
@@ -113,7 +112,12 @@ export default function NetworkSheet() {
       <HStack
         align="center"
         spacing={8}
-        style={[styles.subheader, { borderBottomColor: opacity(foreground, 0.08) }]}>
+        style={{
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          borderBottomWidth: 0.5,
+          borderBottomColor: opacity(foreground, 0.08),
+        }}>
         <Icon name="mdi:bluetooth" size={18} color={BLUETOOTH_ACCENT} />
         <Text size={13} style={{ color: opacity(foreground, 0.6) }}>
           {subtitleText}
@@ -126,10 +130,19 @@ export default function NetworkSheet() {
         renderItem={({ item }) => <PeerRow peer={item} />}
         estimatedItemSize={68}
         keyboardDismissMode="on-drag"
-        style={styles.list}
-        contentContainerStyle={peers.length === 0 ? styles.emptyContainer : undefined}
+        // LegendList needs an explicit flex:1 — the Screen wrapper only makes
+        // itself flex:1, children still need to claim remaining height.
+        style={{ flex: 1 }}
+        contentContainerStyle={
+          peers.length === 0
+            ? { flexGrow: 1, justifyContent: 'center', alignItems: 'center' }
+            : undefined
+        }
         ListEmptyComponent={
-          <VStack align="center" spacing={12} style={styles.emptyStack}>
+          <VStack
+            align="center"
+            spacing={12}
+            style={{ paddingHorizontal: 40, alignItems: 'center' }}>
             <Icon name="mdi:bluetooth" size={32} color={opacity(foreground, 0.3)} />
             <Text size={16} style={{ color: opacity(foreground, 0.5) }}>
               No devices found yet
@@ -143,25 +156,3 @@ export default function NetworkSheet() {
     </Log>
   );
 }
-
-const styles = StyleSheet.create({
-  subheader: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 0.5,
-  },
-  list: {
-    // LegendList needs an explicit flex:1 — the Screen wrapper only makes
-    // itself flex:1, children still need to claim remaining height.
-    flex: 1,
-  },
-  emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyStack: {
-    paddingHorizontal: 40,
-    alignItems: 'center',
-  },
-});

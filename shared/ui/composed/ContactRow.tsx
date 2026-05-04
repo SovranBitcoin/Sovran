@@ -43,6 +43,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatCompact } from '@/shared/lib/number';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { relativeTime } from '@/shared/lib/time';
+import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 
 // ---------------------------------------------------------------------------
 // Identity types
@@ -305,8 +306,6 @@ interface ContactRowProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-const BLUETOOTH_ACCENT = '#0A84FF';
-const CONNECTED_ACCENT = '#34C759';
 const AVATAR_SIZE = 44;
 
 /**
