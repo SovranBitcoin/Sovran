@@ -121,7 +121,9 @@
         "skill:prompt-engineering-patterns"
       ],
       "verification_note": "Re-read the three call sites inside coco-payment-ux/src/operations/defaultOperations.ts and confirmed mockFailEnabled is referenced ONLY at lines 740 and 773 (both inside executePaymentRequest). grep -n in the same file for mockFail returned no other hits. Counter-argument: maybe melt failure is mocked elsewhere (e.g. in CocoPaymentUX.tsx via a manager wrapper) — refuted by the grep across coco-payment-ux/src + features/send/providers, which finds zero references to mockFailMelt or shouldMockFailMelt. The toggle is genuinely dead.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Wired shouldMockFailMelt and shouldMockFailSend through coco-payment-ux: new optional config fields on DefaultOperationsConfig (defaultOperations.ts:213-216) and CocoPaymentUXConfig (createCocoPaymentUX.ts:64-67), generalised mockFailEnabled to take a kind, gates added in executeSend (early, before prepare — send.execute is atomic, no rollback to exercise) and executeMelt (inside the existing try-block after prepare so the cancel-rescue path runs). Settings store fields and SettingsScreen UI were already wired; only the engine adapter was missing."
     },
     {
       "id": "F-004",
