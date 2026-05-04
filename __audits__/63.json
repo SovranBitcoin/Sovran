@@ -1,0 +1,350 @@
+{
+  "audit": {
+    "date": "2026-05-04",
+    "commit": "ae7c98c1",
+    "entry_point": "modules/bitchat-module/ (TS bridge: index.ts + src/BitChatModule.ts + src/types.ts + src/geohash.ts)",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Distance-from-covered-set heuristic. The TS bridge layer of bitchat-module has 0 findings across 62 prior audits, while its Swift counterpart has unfixed Critical impersonation findings (audit 13 F-001, audit 20 F-001). 470 LOC, untrusted Nostr/BLE payloads cross it, downstream callers in features/bitchat, features/splitBill, features/contacts, shared/providers. Subtree analyze-structure score 66/100 (Hygiene 30, Testability 0, type-safety hotspot in BitChatModule.ts).",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "13.json",
+      "20.json",
+      "27.json",
+      "44.json",
+      "52.json"
+    ],
+    "sov_specs_consulted": [],
+    "skills_consulted": [
+      "security-review",
+      "nostr",
+      "typescript-advanced-types",
+      "neverthrow-return-types",
+      "zod-4"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose",
+      "prompt-engineering-patterns"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "no errors in modules/bitchat-module/ subtree",
+      "lint": "not run for the subtree",
+      "knip": "all four files in modules/bitchat-module flagged as having unused exports",
+      "analyze_structure": "subtree 66/100; Hygiene 30/100; Testability 0/100; BitChatModule.ts type-safety hotspot any=2; BitChatModule.ts shallow depth=5.7 exports=28; types.ts unused-exports BitChatEventMap, ChatMessage, Participant, RelayStatus",
+      "lookalikes": "NativeModule name-collision shows canonical iOS-gate pattern in modules/liquid-glass-text and modules/liquid-glass-text-upstream; bridge's NativeModule import is the only un-gated one of the three"
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Critical",
+      "confidence": 0.85,
+      "title": "Unguarded requireNativeModule('BitChat') crashes Android JS bundle at app start",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/src/BitChatModule.ts",
+      "line": 8,
+      "symbol": "NativeModule",
+      "dimension": 9,
+      "description": "BitChatModule.ts:8 calls `requireNativeModule<BitChatNativeModule>('BitChat')` at module top level with no platform guard. modules/bitchat-module/expo-module.config.json declares `{ \"platforms\": [\"apple\"] }` so the native module is iOS-only, but app.json ships an Android target (android.versionCode 2, package com.sovranbitcoin, three Android permissions). The two sibling native modules in the same repo wrap the call with `Platform.OS === 'ios' ? requireNativeModule(...) : null;` (modules/liquid-glass-text/src/LiquidGlassText.tsx:7, modules/liquid-glass-text-upstream/src/LiquidGlassTextUpstream.tsx:7) — that is the canonical pattern. The unguarded form throws `UnavailableNativeModuleError` synchronously on Android. Worse, features/contacts/lib/parseGeohashQuery.ts:1 imports only the pure-JS helper `isValidGeohash` from 'bitchat-module', but the import resolves to index.ts which re-exports from src/BitChatModule.ts — so a pure-JS caller in the contacts surface transitively triggers the throwing native require on Android. The crash happens at JS bundle load, before any UI can render.",
+      "why_it_matters": "App is bricked on Android. The failure is at JS bundle load with no graceful UI fallback — the user sees the OS error screen on first open. Any caller that reaches the contacts tab (via features/contacts/lib/parseGeohashQuery.ts) hits this; even a hypothetical Android-only caller of `isValidGeohash` would crash.",
+      "fix": "Gate the require behind Platform.OS: `const NativeModule: BitChatNativeModule | null = Platform.OS === 'ios' ? requireNativeModule<BitChatNativeModule>('BitChat') : null;`. Each exported function then needs a null-branch behavior: promise-returning ones can `return Promise.reject(new BitChatUnavailableError())`, sync ones (`getBLEPeers`, `getBLEState`) can return empty/sentinel values, and listeners (`addBLEMessageListener` etc.) can return a no-op subscription `{ remove: () => {} }`. Strongly prefer the broader split refactor in F-009 — moving the pure-JS geohash helpers into a separate entry point so contacts-side imports never reach the native require.",
+      "references": [
+        "modules/liquid-glass-text/src/LiquidGlassText.tsx:7",
+        "modules/liquid-glass-text-upstream/src/LiquidGlassTextUpstream.tsx:7",
+        "features/contacts/lib/parseGeohashQuery.ts:1",
+        "lookalikes:3 NativeModule collisions in modules/",
+        "analyze-structure:Hygiene 30/100",
+        "skill:improve-codebase-architecture",
+        "skill:diagnose"
+      ],
+      "verification_note": "Re-checked at BitChatModule.ts:8 — top-level statement, no Platform.OS guard. Re-checked siblings at modules/liquid-glass-text/src/LiquidGlassText.tsx:7 and modules/liquid-glass-text-upstream/src/LiquidGlassTextUpstream.tsx:7 — both gate the require. Re-checked expo-module.config.json — `\"platforms\": [\"apple\"]` confirmed. Counter-argument considered: 'Android isn't a current production target, so this is theoretical.' Rebuttal: app.json ships Android config (versionCode 2, com.sovranbitcoin package, Android permissions block) so an Android dev/preview build is at least intended; eas.json `production` only lists iOS but `preview` and `development` are not platform-restricted. The crash is also a footgun for any contributor trying to run `npx expo run:android`. UNVERIFIED on the exact runtime symptom — the auditor cannot run an Android device — but the static code path is unambiguous and matches the canonical sibling pattern.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.85,
+      "title": "ChatMessage.senderPubkey overloaded with three semantically distinct identities",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/src/types.ts",
+      "line": 5,
+      "symbol": "ChatMessage.senderPubkey",
+      "dimension": 11,
+      "description": "ChatMessage.senderPubkey is typed `string` but features/bitchat/hooks/useBitChat.ts populates it from four sources with incompatible meanings: (1) `event.senderPeerID` — a 16-hex BLE upstream peer handle, for public BLE messages (useBitChat.ts:118); (2) `event.peerID` — also a 16-hex BLE handle, for BLE DMs (useBitChat.ts:178); (3) `event.senderPubkey` — a 64-hex Nostr pubkey, for public Nostr messages and Nostr DMs (useBitChat.ts:213, 271); (4) the empty string `''` for own-messages (useBitChat.ts:317, 345). The field NAME claims to be a Nostr pubkey, which is true for one of four cases. Any future code that treats `senderPubkey` as a Nostr pubkey — signature verification, profile lookup, contact resolution, NIP-05 reverse-lookup — silently misroutes 3/4 of the data path. The same field is also used as a routing key in useMessageGrouping (per the inline comment at useBitChat.ts:336-340 noting a prior bug where `dmPeerID` collided with own-messages), demonstrating the lying-name has already produced one bug.",
+      "why_it_matters": "This is a frame-coherence finding (`skill:zoom-out`): the field name names a concept it doesn't hold. Bugs caused by the rename test failing are typically silent and reach the user as 'wrong name on chat bubble' or 'avatar resolves to a stranger'. With NIP-17 in play (Nostr DMs) and Whitenoise's Nostr identity layer alongside, mishandling pubkey vs peerID at the bridge widens the blast radius of the unfixed audit-13/audit-20 impersonation Critical.",
+      "fix": "Rename `senderPubkey` to `senderId` on ChatMessage and add a discriminator `senderIdKind: 'nostr-pubkey' | 'ble-peer-id' | 'self'`. Or — preferred — split ChatMessage into `BleChatMessage` (peerID-keyed) and `NostrChatMessage` (pubkey-keyed) and have useBitChat store a discriminated union. Either way, kill the lying name. Add zod schemas for the bridge events with branded types (`Hex16PeerID`, `Hex64Pubkey`) so the validation lives at the bridge boundary, not at the consumer.",
+      "references": [
+        "features/bitchat/hooks/useBitChat.ts:118",
+        "features/bitchat/hooks/useBitChat.ts:178",
+        "features/bitchat/hooks/useBitChat.ts:213",
+        "features/bitchat/hooks/useBitChat.ts:271",
+        "features/bitchat/hooks/useBitChat.ts:317",
+        "features/bitchat/hooks/useBitChat.ts:336",
+        "nips/17.md",
+        "skill:zoom-out",
+        "skill:prompt-engineering-patterns"
+      ],
+      "verification_note": "Re-checked all five call sites — confirmed the field is populated from four distinct identity vocabularies. Counter-argument considered: 'It's just a string; consumers know which transport they're using.' Rebuttal: useMessageGrouping (called by GeohashChatScreen.tsx and the BLE DM screen) is one consumer that treats the field uniformly across transports — the inline comment at useBitChat.ts:336 documents a bug that already happened from this collapse.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Renamed ChatMessage.senderPubkey -> senderId (transport-agnostic group key); rippled to ChatBubbleMessage, useMessageGrouping, ChatMessageBubble, useBitChat, GeohashChatScreen, WhitenoiseDMScreen. NostrMessageEvent.senderPubkey / NostrPrivateMessageEvent.senderPubkey kept — those are protocol-truth pubkeys at the bridge seam."
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.7,
+      "title": "Native event payloads cross the bridge with no schema validation",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/src/BitChatModule.ts",
+      "line": 34,
+      "symbol": "BitChatNativeModule.addListener",
+      "dimension": 6,
+      "description": "BitChatModule.ts:34 declares `addListener(eventName: string, listener: (event: any) => void)` — the underlying API uses `any` for every payload. Each typed wrapper (addBLEMessageListener:202, addBLEPrivateMessageListener:184, addNostrMessageListener:249, addNostrPrivateMessageListener:255, addBLEStateListener:210) asserts the payload type at the JS boundary with no runtime check. zero zod schemas exist in modules/bitchat-module — confirmed by `grep -RnE 'zod|safeParse' modules/bitchat-module` (no matches). Per the ground rule 'treat relays, mints, and any user-generated content as untrusted input' (audit prompt §3.5), every Nostr event entering JS-land is attacker-controlled. The Swift bridge has unfixed Critical findings on the receive path (audit 13 F-001, audit 20 F-001 — NIP-17 seal.pubkey == rumor.pubkey check still missing as of audit 62), so the JS layer cannot rely on the native side to vet sender identity; the only defensive layer left is a zod parse at the bridge. Today there is none. A malicious geohash relay can ship an event with a non-hex `senderPubkey`, a 1-MB content blob, or fields entirely missing, and the JS-side state machine will key on whatever string arrives.",
+      "why_it_matters": "Two compounding risks: (1) the audit-13 impersonation Critical means every NIP-17 inbound DM may be from an attacker masquerading as a known contact, and the JS layer cannot detect this — a zod parse with a discriminated `seal_verified: true` boolean from the native side (or, better, doing the verification in JS over the raw gift wrap, since cashu-ts and `@noble/hashes` are already in the tree) is the correct seam; (2) absent payload validation is also a stability risk — a malformed event crashes the listener mid-frame and the React tree.",
+      "fix": "Declare zod schemas for each event payload in modules/bitchat-module/src/schemas.ts (BLEMessageEventSchema, BLEPrivateMessageEventSchema, NostrMessageEventSchema, NostrPrivateMessageEventSchema, BLEPeerEventSchema). Each addXListener wrapper does `.safeParse(event)` and drops the event with a `bitchatLog.warn` if it fails. For dim 2, the bridge cannot fix the audit-13 impersonation alone, but it CAN refuse to dispatch a NostrPrivateMessageEvent unless the native side annotates it with `sealVerified: true` — a contract the Swift side adopts when the audit-13 fix lands. Alternatively, JS-side seal verification using `@noble/curves/secp256k1` (already a dep via cashu-ts) is feasible and would defend the JS layer regardless of the Swift fix's status.",
+      "references": [
+        "F-001@13.json",
+        "F-001@20.json",
+        "nips/17.md",
+        "nips/44.md",
+        "skill:diagnose",
+        "skill:prompt-engineering-patterns"
+      ],
+      "verification_note": "Counter-argument considered: 'Native bridge is trusted code; payloads are sanitised in Swift.' Rebuttal: audit 13 F-001 and audit 20 F-001 both document a Critical Swift-side vuln that's *still* unfixed (deferred status as of audit 20). The native layer has demonstrably failed to vet sender identity, so the JS layer's blanket trust is unjustified. UNVERIFIED on whether a zod-side fix would actually catch the audit-13 impersonation: it would not, on its own — fix.md must call out the Swift dependency. The schema parse still defends against malformed payloads, which is independently valuable.",
+      "prior_audit_id": "F-001@13.json"
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Stale BitChatEventMap declares events the bridge never emits",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/src/types.ts",
+      "line": 78,
+      "symbol": "BitChatEventMap",
+      "dimension": 11,
+      "description": "BitChatEventMap (types.ts:78-83) declares four event keys: onMessage, onParticipantsChanged, onConnectionStateChanged, onChannelChanged. The bridge actually emits six entirely different keys: onBLEMessage, onBLEPrivateMessage, onBLEPeerUpdate, onBLEStateChanged, onNostrMessage, onNostrPrivateMessage (BitChatModule.ts:202, 187, 207, 210, 251, 257). grep confirms zero JS consumers reference any of the four BitChatEventMap keys — they only appear in types.ts itself. Two disjoint vocabularies in the same package; the type ships through index.ts:44 as part of the public surface, advertising a contract the bridge does not implement.",
+      "why_it_matters": "The lie is silent — TypeScript happily resolves `BitChatEventMap` and a future contributor reading the public types could plausibly write `addListener('onParticipantsChanged', ...)` based on the type, get an `EventSubscription`, and never receive a single event.",
+      "fix": "Delete BitChatEventMap and its index.ts re-export. If a typed event-name dispatcher is wanted (and it is — see F-006), introduce a fresh `BitChatNativeEventMap` keyed by the actual emitted names (onBLEMessage etc.), and have addListener use a generic typed by that map.",
+      "references": [
+        "modules/bitchat-module/index.ts:44",
+        "analyze-structure:unused-exports types.ts BitChatEventMap",
+        "skill:zoom-out"
+      ],
+      "verification_note": "Re-checked: grep -RnE 'BitChatEventMap|onParticipantsChanged|onConnectionStateChanged|onChannelChanged' across features/, shared/, app/ — only matches are in types.ts and (for BitChatEventMap) the index.ts re-export. The four event names occur in zero call sites.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Deleted stale BitChatEventMap, Participant, RelayStatus from types.ts (zero non-iOS callers)."
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "Two competing geohash implementations: native binding and JS reimplementation",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/src/geohash.ts",
+      "line": 3,
+      "symbol": "encodeGeohash",
+      "dimension": 12,
+      "description": "Two independent geohash encoders ship: (1) JS impl in src/geohash.ts (encodeGeohash/decodeGeohash/isValidGeohash) — used by features/bitchat/hooks/useLocationTiers.ts:77 and features/contacts/lib/parseGeohashQuery.ts:13, (2) native bindings in src/BitChatModule.ts:128-138 (nativeEncodeGeohash/nativeDecodeGeohash/getNeighbors) — zero JS callers verified by grep. Same algorithm shipped twice; only the JS one is canonical for the rest of sovran-app's import path. The native versions are part of the bridge's public surface and survive into the Android-failure path of F-001 even though they're dead.",
+      "why_it_matters": "Deletion test (`skill:improve-codebase-architecture`): deleting nativeEncodeGeohash/nativeDecodeGeohash/getNeighbors removes complexity at the bridge with zero caller cost — they earn their keep nowhere on the JS side. Risk of divergence is real: the JS impl in geohash.ts:8 returns `''` for `precision <= 0` while the native impl's behavior is undocumented. Two implementations of the same geohash algorithm will drift at edges (precision 0, lat=±90, lon=±180, malformed input), and a future caller picking the wrong one gets a subtle bug.",
+      "fix": "Delete nativeEncodeGeohash, nativeDecodeGeohash, getNeighbors from BitChatModule.ts and the matching native methods on the Swift side if no Swift consumer needs them. getClosestRelays/getClosestRelaysForGeohash also have zero JS callers but DO probably wrap valuable Swift logic (GeoRelayDirectory) — those should either get a JS consumer in features/bitchat (the geohash join screen) or move into the Swift-side join flow and be dropped from the JS surface.",
+      "references": [
+        "features/bitchat/hooks/useLocationTiers.ts:77",
+        "features/contacts/lib/parseGeohashQuery.ts:13",
+        "analyze-structure:complexity geohash.ts cognitive=45",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Re-checked: grep -RnE 'nativeEncodeGeohash|nativeDecodeGeohash|getNeighbors|getClosestRelays|getClosestRelaysForGeohash' across features/, shared/, app/ — zero matches outside modules/bitchat-module itself. Counter-argument considered: 'The native geohash impl might be preserved for Swift-side use.' Rebuttal: those methods are exposed on the JS bridge interface; a Swift-internal use case doesn't need a JS bridge entry.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "addBLEPeerListener exports `event: any` while siblings are typed",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/src/BitChatModule.ts",
+      "line": 206,
+      "symbol": "addBLEPeerListener",
+      "dimension": 1,
+      "description": "addBLEPeerListener(listener: (event: any) => void) is the only public listener exposing `any` in its signature; addBLEMessageListener:202, addBLEPrivateMessageListener:184, addBLEStateListener:210, addNostrMessageListener:249, and addNostrPrivateMessageListener:255 are all typed. The single caller (features/bitchat/hooks/useBitChat.ts:109-111) consumes the event purely to log it — `bitchatLog.info('bitchat.hook.ble_peer', event)` — which means the underlying native event shape has never been written down on the JS side, even though useBLEPeers.ts:35 also subscribes via addBLEPeerListener and simply re-fetches `getBLEPeers()` (so it doesn't care about the payload at all). Either the payload exists and should be typed, or the listener is firing solely as a refetch trigger and the payload is dead — but exporting `any` lets the question go unanswered.",
+      "why_it_matters": "Consistent with the rest of the bridge, this should be a typed BLEPeerEvent (likely `{ added: BLEPeer[]; removed: BLEPeer[] }` or just `{}`). Today, useBitChat.ts:110 logs an unbounded native object through the structured logger — see F-008.",
+      "fix": "Read the Swift bridge to find the actual event payload, declare BLEPeerEvent in types.ts, type the listener, and have useBitChat:110 log a redacted projection (peer count, not the raw payload). If the event genuinely carries no useful payload (refetch-trigger pattern), type it as `(event: Record<string, never>) => void`.",
+      "references": [
+        "features/bitchat/hooks/useBitChat.ts:109",
+        "features/bitchat/hooks/useBLEPeers.ts:35",
+        "analyze-structure:type-safety BitChatModule.ts any=2",
+        "skill:prompt-engineering-patterns"
+      ],
+      "verification_note": "Re-checked at BitChatModule.ts:206 — confirmed `event: any`. Re-checked the two consumers. Counter-argument considered: 'It's a refetch-trigger; payload doesn't matter.' Rebuttal: useBitChat:110 actively logs the payload, demonstrating that *some* consumer does care; even a `Record<string, never>` typing closes the door on `any`.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Typed addBLEPeerListener with new BLEPeerEvent in types.ts; cast at the native-bridge boundary kept narrow."
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Roughly a third of the public bridge surface is unconsumed",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/index.ts",
+      "line": 1,
+      "symbol": null,
+      "dimension": 1,
+      "description": "Verified-dead exports (grep across features/, shared/, app/ shows zero non-comment consumers): nativeEncodeGeohash, nativeDecodeGeohash, getNeighbors, getClosestRelays, getClosestRelaysForGeohash, getBLEDiagnostics, BLEDiagnostics, Participant, RelayStatus, stopBLE, stopNostr, BitChatEventMap. Twelve symbols out of ~28 in the public surface (~35%). Two interesting cases: (1) BLEDiagnostics declares 31 fine-grained Swift-side counters (announceReceivedCount, sentPrivateMessageCount, receivedNoisePayloadCount etc.) that are valuable observability data with zero JS consumer — the diagnostic surface exists in Swift but never reaches log-doctor or the wallet-health screen. (2) stopBLE/stopNostr appear only in comments documenting that they are deliberately *not* called (useBitChat.ts:130, BitchatBLEProvider.tsx:65) — two intentionally unused exports.",
+      "why_it_matters": "The package's public surface advertises a larger contract than it ships. A future contributor reading the index sees a ~30-symbol API and can't tell which surfaces are load-bearing. Knip/analyze-structure both flag this; with subtree Hygiene 30/100, dead exports are the cheapest dimension to lift.",
+      "fix": "Delete the unused exports. For BLEDiagnostics, decide: either (a) wire it into a periodic bitchatLog.debug tick in BitchatBLEProvider so the data surfaces in log-doctor, or (b) drop the type and the Swift method. For stopBLE/stopNostr, keep the Swift side (useful for OS-level lifecycle hooks) but drop the JS exports until a real consumer materialises.",
+      "references": [
+        "knip:exports",
+        "analyze-structure:unused-exports types.ts",
+        "features/bitchat/hooks/useBitChat.ts:130",
+        "shared/providers/BitchatBLEProvider.tsx:65",
+        "skill:zoom-out"
+      ],
+      "verification_note": "Each symbol grep'd individually across features/, shared/, app/. Counter-argument considered: 'The diagnostic counters might be polled by a future health screen.' Rebuttal: 'might be polled' is YAGNI — features/health/ was specifically audited (audit 45) and contains no BLE health surface; if/when one materialises, re-add the export then.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Dropped unused public surface from index.ts: nativeEncodeGeohash, nativeDecodeGeohash, getNeighbors, getClosestRelays, getClosestRelaysForGeohash, decodeGeohash, stopBLE, getBLEDiagnostics, stopNostr, BitChatEventMap, Participant, RelayStatus."
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "ble_peer log emits raw native payload at info level",
+      "repo": "sovran-app",
+      "path": "features/bitchat/hooks/useBitChat.ts",
+      "line": 110,
+      "symbol": "addBLEPeerListener.bitchatLog.info",
+      "dimension": 10,
+      "description": "useBitChat.ts:109-111 — `bitchatLog.info('bitchat.hook.ble_peer', event)` logs the entire `event: any` from the native bridge at info level, with no shape declared. The structured logger (shared/lib/logger) redacts known field names; it cannot redact what it cannot see. If the native payload includes a nickname (user-controlled, possibly PII) or a peerID prefix that's stable across sessions, log.txt accumulates these on every peer-update event for the lifetime of a BLE session.",
+      "why_it_matters": "Mirrors the dim-10 pattern from prior audits (audit 04 F-014, audit 27 F-009): bitchat-domain events should ride the scoped `bitchatLog` with a known field shape, redacted at the source. log-doctor cannot filter by structured field if the field shape is `any`.",
+      "fix": "Once F-006 types the event payload, downgrade to `bitchatLog.debug('bitchat.hook.ble_peer', { peerCount: peers.length })` — that's all the consumer (useBLEPeers refetch) actually cares about. If individual peer additions/removals are useful telemetry, log a redacted projection: `{ peerIdPrefix: peer.peerID.slice(0, 4) }`.",
+      "references": [
+        "F-014@04.json",
+        "F-009@27.json",
+        "shared/lib/logger.ts",
+        "skill:prompt-engineering-patterns"
+      ],
+      "verification_note": "Re-checked at useBitChat.ts:110. Counter-argument considered: 'BLE peer events fire infrequently; the volume is low.' Rebuttal: dev-build mesh sessions in a busy room can fire dozens of peer-update events per minute; volume isn't the gating concern, redaction is.",
+      "prior_audit_id": "F-014@04.json"
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "Re-export graph forces pure-JS callers through the native module init",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/index.ts",
+      "line": 1,
+      "symbol": null,
+      "dimension": 12,
+      "description": "index.ts re-exports the BLE/Nostr native bindings from src/BitChatModule.ts (lines 1-30) and the pure-JS geohash helpers from src/geohash.ts (line 34) in the same module. features/contacts/lib/parseGeohashQuery.ts:1 imports only `isValidGeohash`, but the import resolves to index.ts, which evaluates the BitChatModule.ts re-export — and BitChatModule.ts:8 has the unguarded top-level `requireNativeModule('BitChat')` (F-001). Result: a pure-JS contacts utility implicitly depends on the iOS native module being available. This is a depth/seam finding (`skill:improve-codebase-architecture`): the public surface of the package conflates two seams that have different cross-platform contracts. Splitting `bitchat-module` into a native entry point and a pure-JS entry point makes F-001's Android crash impossible for pure-JS callers, and gives the geohash slice an independent lifetime.",
+      "why_it_matters": "Independent of F-001, this is a hidden coupling that grows over time: any future pure-JS helper added to geohash.ts inherits the native dependency by virtue of sharing the index. The deletion test confirms the seam-split is the right shape: deleting the native re-exports from index.ts and routing native callers through `bitchat-module/native` removes the implicit native init for parseGeohashQuery.ts at zero behavioural cost.",
+      "fix": "Add subpath exports to modules/bitchat-module/package.json: `\"./geohash\": \"./src/geohash.ts\"` and `\"./native\": \"./src/BitChatModule.ts\"`. Update consumers — features/contacts/lib/parseGeohashQuery.ts and features/bitchat/hooks/useLocationTiers.ts to import from `'bitchat-module/geohash'`; features/bitchat/hooks/useBitChat.ts and shared/providers/BitchatBLEProvider.tsx to import from `'bitchat-module/native'`. The default `'bitchat-module'` entry can be deprecated or kept as a thin re-export.",
+      "references": [
+        "features/contacts/lib/parseGeohashQuery.ts:1",
+        "features/bitchat/hooks/useLocationTiers.ts:3",
+        "modules/bitchat-module/package.json:1",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Re-checked the import chain: parseGeohashQuery.ts → 'bitchat-module' → modules/bitchat-module/index.ts → BitChatModule.ts (top-level requireNativeModule). Counter-argument considered: 'Metro tree-shaking might drop the unused re-export.' Rebuttal: top-level statements in the imported module are evaluated even under tree-shaking — only unused *named* exports are dropped, not module-load side effects.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Nit",
+      "confidence": 0.9,
+      "title": "Type definitions split inconsistently between BitChatModule.ts and types.ts",
+      "repo": "sovran-app",
+      "path": "modules/bitchat-module/src/BitChatModule.ts",
+      "line": 38,
+      "symbol": "BLEPeer",
+      "dimension": 1,
+      "description": "Three event-payload / data types live in BitChatModule.ts (BLEPeer:38, BLEDiagnostics:45, BLEMessageEvent:117) while the rest live in types.ts (ChatMessage, Participant, RelayStatus, NostrMessageEvent, BLEPrivateMessageEvent, NostrPrivateMessageEvent, LocationTier, BitChatEventMap). No clear principle separates them — both files contain BLE-event shapes and types-shared-with-consumers. types.ts is named for shared types; the BLE shapes belong there.",
+      "why_it_matters": "Frame coherence (`skill:zoom-out`): a future contributor adding a new event payload has to guess which file to use. The inconsistency is small enough that fixing it costs almost nothing.",
+      "fix": "Move BLEPeer, BLEDiagnostics, BLEMessageEvent to types.ts. Keep BitChatNativeModule (the internal interface) and the Native* function bodies in BitChatModule.ts.",
+      "references": [
+        "skill:zoom-out"
+      ],
+      "verification_note": "Re-checked both files. No counter-argument worth recording.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Consolidated BLEPeer, BLEMessageEvent, BLEDiagnostics, BLEPeerEvent into types.ts; BitChatModule.ts re-exports them so callers keep importing from bitchat-module."
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "partial",
+    "3": "skipped",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "partial",
+    "7": "skipped",
+    "8": "skipped",
+    "9": "pass",
+    "10": "partial",
+    "11": "pass",
+    "12": "pass",
+    "13": "partial",
+    "14": "pass"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Split bitchat-module into two subpath entry points: 'bitchat-module/geohash' (pure JS, cross-platform) and 'bitchat-module/native' (iOS-only native bridge). Default import becomes deprecated. Closes F-009 and removes the Android crash surface for pure-JS callers (F-001).",
+      "files": [
+        "modules/bitchat-module/package.json",
+        "modules/bitchat-module/index.ts",
+        "modules/bitchat-module/src/BitChatModule.ts",
+        "modules/bitchat-module/src/geohash.ts",
+        "features/contacts/lib/parseGeohashQuery.ts",
+        "features/bitchat/hooks/useLocationTiers.ts",
+        "features/bitchat/hooks/useBitChat.ts",
+        "shared/providers/BitchatBLEProvider.tsx"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Drop unused public surface: nativeEncodeGeohash, nativeDecodeGeohash, getNeighbors, getClosestRelays, getClosestRelaysForGeohash, getBLEDiagnostics, BLEDiagnostics, Participant, RelayStatus, stopBLE, stopNostr, BitChatEventMap. ~12 of ~28 public symbols. Closes F-004, F-005, F-007.",
+      "files": [
+        "modules/bitchat-module/index.ts",
+        "modules/bitchat-module/src/BitChatModule.ts",
+        "modules/bitchat-module/src/types.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Co-locate event-payload schemas: declare zod schemas for BLEMessageEvent, BLEPrivateMessageEvent, NostrMessageEvent, NostrPrivateMessageEvent, BLEPeerEvent in modules/bitchat-module/src/schemas.ts; have each addXListener wrapper safeParse the native payload before dispatching. Renames ChatMessage.senderPubkey → senderId with a discriminator. Closes F-002, F-003, F-006.",
+      "files": [
+        "modules/bitchat-module/src/types.ts",
+        "modules/bitchat-module/src/BitChatModule.ts",
+        "features/bitchat/hooks/useBitChat.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Once F-006 types the BLEPeer event payload, replace the raw `bitchatLog.info('bitchat.hook.ble_peer', event)` with a redacted projection logged at debug level. Closes F-008.",
+      "files": [
+        "features/bitchat/hooks/useBitChat.ts"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Whether bitchat-module zod schemas should live in ../sovran-schemas (cross-repo) or co-located in modules/bitchat-module/src/schemas.ts. Argument for sovran-schemas: future api.sovran.money relay-of-record could re-validate. Argument for co-location: the bridge is sovran-app-internal, and the events never cross a repo boundary.",
+      "files": [
+        "modules/bitchat-module/src/schemas.ts",
+        "../sovran-schemas/"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does the audit-13 / audit-20 NIP-17 impersonation Critical (still 'deferred' as of audit 20) get fixed at the Swift layer, or should the JS bridge perform seal-pubkey verification independently using @noble/curves/secp256k1? F-003 leaves both options open; the fixer needs to call this.",
+    "Are getClosestRelays / getClosestRelaysForGeohash actually used by features/bitchat's geohash join flow via a native-internal path, or are they pure dead code? The grep shows no JS callers but the Swift comment in BitChatModule.ts:26 implies they wrap GeoRelayDirectory — which is referenced from joinGeohash on the Swift side. If so, the JS bridge entries can be deleted while the Swift methods stay.",
+    "Should BLEDiagnostics' 31 counters be wired into log-doctor (periodic tick → bitchatLog.debug) or surfaced in a future health-screen BLE card, or just dropped? F-007 leaves this open."
+  ]
+}
