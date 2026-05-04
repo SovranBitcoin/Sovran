@@ -5,7 +5,7 @@ import { useHandleCameraPermission } from '@/features/camera';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { log } from '@/shared/lib/logger';
+import { walletLog } from '@/shared/lib/logger';
 
 export const BUTTON_H = 48;
 export const QR_SIZE = 72;
@@ -68,15 +68,15 @@ export function useAccountPagerView({
   }, [accounts, account]);
 
   const handleReceive = useCallback(() => {
-    log.info('wallet.action.receive', { unit: account.unit });
+    walletLog.info('wallet.action.receive', { unit: account.unit });
     void machine.startReceive({ reset: true });
   }, [machine, account.unit]);
 
   const handleScanQR = useCallback(async () => {
-    log.info('wallet.action.scan_qr', { unit: account.unit });
+    walletLog.info('wallet.action.scan_qr', { unit: account.unit });
     const granted = await handlePermission();
     if (!granted) {
-      log.info('wallet.action.scan_qr_denied');
+      walletLog.info('wallet.action.scan_qr_denied');
       return;
     }
     router.navigate({
@@ -86,7 +86,7 @@ export function useAccountPagerView({
   }, [handlePermission, account.unit]);
 
   const handleSend = useCallback(async () => {
-    log.info('wallet.action.send', { unit: account.unit });
+    walletLog.info('wallet.action.send', { unit: account.unit });
     await machine.startSendEcash({ reset: true });
   }, [machine, account.unit]);
 

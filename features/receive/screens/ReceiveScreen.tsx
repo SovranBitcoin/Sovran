@@ -7,7 +7,7 @@
  * usePaymentFlowMachine after entry is available).
  */
 
-import React, { memo, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { router } from 'expo-router';
@@ -15,7 +15,7 @@ import { router } from 'expo-router';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import { useScreenActions, type UseScreenActionsResult } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import type { FormattedString } from 'coco-payment-ux';
 import { Section } from '@/shared/ui/composed/Section';
@@ -201,8 +201,11 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
 
+  useEffect(() => {
+    if (error) paymentLog.warn('receive.screen.error', { error });
+  }, [error]);
+
   if (error) {
-    log.warn('receive.screen.error', { error });
     return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
   }
 

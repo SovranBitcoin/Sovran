@@ -6,7 +6,7 @@
  * passes it to useScreenActions, and renders UI.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Stack } from 'expo-router';
 
 import { useExecutionState, useScreenActions } from 'coco-payment-ux/react';
@@ -17,7 +17,7 @@ import { useWalletContextWithOverride } from '@/shared/providers/WalletContextPr
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { View } from '@/shared/ui/primitives/View/View';
-import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 
 import { AmountSelector } from './AmountSelector';
 
@@ -34,9 +34,6 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
     'amountEntry',
     amountEntry
   );
-  if (error) {
-    log.warn('send.amount_flow.error', { error });
-  }
 
   const walletContext = useWalletContextWithOverride();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
@@ -44,7 +41,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
-      log.info('send.amount_flow.mint_selected', { mintUrl });
+      paymentLog.info('send.amount_flow.mint_selected', { mintUrl });
       void machine.changeMint(mintUrl);
     },
     [machine]
@@ -56,16 +53,9 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
 
   const canSendOffline = typeof entry?.canSendOffline === 'boolean' ? entry.canSendOffline : null;
 
-  // Diagnostic: trace suggestions and offline data flow
-  log.debug('amount.flow.state', {
-    destination: entry?.destination,
-    mintUrl,
-    canSendOffline,
-    suggestionsCount: suggestions?.length ?? 0,
-    hasMintUrl: !!mintUrl,
-    proofAmountsKeys: Object.keys(walletContext.proofAmounts ?? {}),
-    proofCount: mintUrl ? walletContext.proofAmounts?.[mintUrl]?.length ?? 0 : 0,
-  });
+  useEffect(() => {
+    if (error) paymentLog.warn('send.amount_flow.error', { error });
+  }, [error]);
 
   if (error) {
     return null;

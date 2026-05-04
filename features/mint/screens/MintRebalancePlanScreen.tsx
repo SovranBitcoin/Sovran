@@ -49,7 +49,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
-import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 // StepState is imported from components/blocks/rebalance (groupSteps.ts)
 
@@ -141,7 +141,7 @@ export function MintRebalancePlanScreen() {
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
 
   const appendDebug = useCallback((entry: Record<string, unknown>) => {
-    log.debug('mint.rebalance.step', entry);
+    cashuLog.debug('mint.rebalance.step', entry);
   }, []);
 
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
@@ -308,7 +308,7 @@ export function MintRebalancePlanScreen() {
 
     while (executionLockRef.current) {
       if (Date.now() - startTime > maxWaitMs) {
-        log.warn('mint.rebalance.lock_timeout');
+        cashuLog.warn('mint.rebalance.lock_timeout');
         return false;
       }
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -326,7 +326,7 @@ export function MintRebalancePlanScreen() {
       // Wait for any existing operation to complete instead of returning early
       const gotLock = await waitForLock();
       if (!gotLock) {
-        log.warn('mint.rebalance.lock_failed', { stepId: step.id });
+        cashuLog.warn('mint.rebalance.lock_failed', { stepId: step.id });
         return false;
       }
       if (abortRef.current || runIdRef.current !== runId) return false;
@@ -822,7 +822,7 @@ export function MintRebalancePlanScreen() {
                   await manager.mint.trustMint(url);
                   temporarilyTrusted.push(url);
                 } catch (trustErr) {
-                  log.warn('mint.rebalance.trust_failed', { url, error: trustErr });
+                  cashuLog.warn('mint.rebalance.trust_failed', { url, error: trustErr });
                 }
               }
             }
@@ -1131,7 +1131,7 @@ export function MintRebalancePlanScreen() {
             for (const url of temporarilyTrusted) {
               const bal = finalBals[url]?.total ?? 0;
               if (bal > 0) {
-                log.warn('mint.rebalance.middleman_kept', { url, balance: bal });
+                cashuLog.warn('mint.rebalance.middleman_kept', { url, balance: bal });
                 continue;
               }
               try {
@@ -1193,7 +1193,7 @@ export function MintRebalancePlanScreen() {
            *
            * We still mark the step done if the melt succeeded; eventual consistency will catch up.
            */
-          log.warn('mint.rebalance.balance_timeout');
+          cashuLog.warn('mint.rebalance.balance_timeout');
         }
 
         // Mark as done
@@ -1379,7 +1379,7 @@ export function MintRebalancePlanScreen() {
     // orchestration (the user backed out and reopened). Refuse to start a
     // second concurrent swap so coco's mint/melt services don't overlap.
     if (useSwapStatusStore.getState().active?.state === 'running') {
-      log.info('mint.rebalance.start_blocked_by_active_swap');
+      cashuLog.info('mint.rebalance.start_blocked_by_active_swap');
       return;
     }
 
@@ -1534,7 +1534,7 @@ export function MintRebalancePlanScreen() {
             await manager.mint.trustMint(url);
             temporarilyTrusted.push(url);
           } catch (err) {
-            log.warn('mint.rebalance.trust_failed', { url, error: err });
+            cashuLog.warn('mint.rebalance.trust_failed', { url, error: err });
           }
         }
       }
@@ -1599,13 +1599,13 @@ export function MintRebalancePlanScreen() {
         for (const url of temporarilyTrusted) {
           const bal = balances[url]?.total ?? 0;
           if (bal > 0) {
-            log.warn('mint.rebalance.middleman_kept', { url, balance: bal });
+            cashuLog.warn('mint.rebalance.middleman_kept', { url, balance: bal });
             continue;
           }
           try {
             await manager.mint.untrustMint(url);
           } catch (err) {
-            log.warn('mint.rebalance.untrust_failed', { url, error: err });
+            cashuLog.warn('mint.rebalance.untrust_failed', { url, error: err });
           }
         }
       }

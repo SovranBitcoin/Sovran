@@ -5,13 +5,13 @@
  * are handled by the screen-action system.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { MintSelector } from '@/features/wallet';
 import { formatAmount } from '@/shared/lib/currency';
@@ -58,22 +58,29 @@ export function MintQuoteScreen({
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
+  useEffect(() => {
+    if (error) paymentLog.warn('receive.mint_quote.error', { error });
+  }, [error]);
+
+  const isPaid = entry?.state === 'ISSUED' || entry?.state === 'PAID';
+
+  useEffect(() => {
+    if (!entry) return;
+    paymentLog.debug('receive.mint_quote.render', {
+      state: entry.state,
+      isPaid,
+      amount: entry.amount,
+      unit: entry.unit,
+    });
+  }, [entry, isPaid]);
+
   if (error) {
-    log.warn('receive.mint_quote.error', { error });
     return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
   }
 
   if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
-
-  const isPaid = entry.state === 'ISSUED' || entry.state === 'PAID';
-  log.debug('receive.mint_quote.render', {
-    state: entry.state,
-    isPaid,
-    amount: entry.amount,
-    unit: entry.unit,
-  });
 
   const bottomButtons = (
     <BottomButtons>

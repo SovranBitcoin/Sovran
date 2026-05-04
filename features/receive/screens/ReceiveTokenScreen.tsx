@@ -6,11 +6,11 @@
  * scan history linking) is handled by the receiveToken.redeem handler.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -47,17 +47,28 @@ export function ReceiveTokenScreen({
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
+  useEffect(() => {
+    if (error) paymentLog.warn('receive.token.error', { error });
+  }, [error]);
+
+  const isRedeemed = entry ? !(entry.id?.startsWith('receive-') ?? false) : false;
+
+  useEffect(() => {
+    if (!entry) return;
+    paymentLog.debug('receive.token.render', {
+      isRedeemed,
+      amount: entry.amount,
+      unit: entry.unit,
+    });
+  }, [entry, isRedeemed]);
+
   if (error) {
-    log.warn('receive.token.error', { error });
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
   }
 
   if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
-
-  const isRedeemed = !(entry.id?.startsWith('receive-') ?? false);
-  log.debug('receive.token.render', { isRedeemed, amount: entry.amount, unit: entry.unit });
 
   const bottomButtons = (
     <BottomButtons>
