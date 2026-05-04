@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Clipboard,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { Clipboard, Alert, ActivityIndicator } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, router } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -279,7 +275,11 @@ export const SettingsKeyringScreen: React.FC = () => {
           await manager.keyring.addKeyPair(decoded.data as Uint8Array);
           return true;
         }
-      } catch {}
+      } catch (error) {
+        log.warn('settings.keyring.import.nsec_decode_failed', {
+          error: (error as Error)?.message,
+        });
+      }
     }
 
     // Strategy 2: Try as raw 64-char hex (32-byte private key)
@@ -287,7 +287,11 @@ export const SettingsKeyringScreen: React.FC = () => {
       try {
         await manager.keyring.addKeyPair(hexToBytes(input));
         return true;
-      } catch {}
+      } catch (error) {
+        log.warn('settings.keyring.import.hex_decode_failed', {
+          error: (error as Error)?.message,
+        });
+      }
     }
 
     return false;
@@ -353,16 +357,10 @@ export const SettingsKeyringScreen: React.FC = () => {
           title: 'P2PK Keys',
           headerRight: () => (
             <HStack spacing={4}>
-              <Pressable
-                onPress={handleImportNsec}
-                style={{ padding: 8 }}
-                disabled={isGenerating}>
+              <Pressable onPress={handleImportNsec} style={{ padding: 8 }} disabled={isGenerating}>
                 <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
               </Pressable>
-              <Pressable
-                onPress={handleGenerateKey}
-                style={{ padding: 8 }}
-                disabled={isGenerating}>
+              <Pressable onPress={handleGenerateKey} style={{ padding: 8 }} disabled={isGenerating}>
                 {isGenerating ? (
                   <ActivityIndicator size="small" color={foreground} />
                 ) : (
@@ -395,8 +393,8 @@ export const SettingsKeyringScreen: React.FC = () => {
             <ListGroup.ItemContent>
               <ListGroup.ItemTitle>Regenerate Key on Receive</ListGroup.ItemTitle>
               <ListGroup.ItemDescription>
-                Automatically generate a new P2PK key after redeeming a locked token for
-                improved privacy
+                Automatically generate a new P2PK key after redeeming a locked token for improved
+                privacy
               </ListGroup.ItemDescription>
             </ListGroup.ItemContent>
             <ListGroup.ItemSuffix>

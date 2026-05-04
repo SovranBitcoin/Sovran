@@ -279,94 +279,94 @@ export const SettingsStorageScreen = () => {
 
   return (
     <ScreenWrapper name="SettingsStorageScreen" scroll="custom" safeArea>
-        <ScrollView
-          className="px-4"
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={() => loadSnapshot(true)} />
-          }>
-          <Card variant="secondary" className="mb-4">
-            <Card.Body className="gap-3">
-              <Text bold size={16}>
-                Storage Inventory
+      <ScrollView
+        className="px-4"
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={() => loadSnapshot(true)} />
+        }>
+        <Card variant="secondary" className="mb-4">
+          <Card.Body className="gap-3">
+            <Text bold size={16}>
+              Storage Inventory
+            </Text>
+            <Text size={12} className="text-foreground/70">
+              {subtitle}
+            </Text>
+            <Text size={11} className="text-foreground/50">
+              SecureStore cannot enumerate all keys. This probes deterministic keys from known
+              profile/account data and reports which currently exist.
+            </Text>
+            <View className="flex-row gap-2">
+              <Button variant="secondary" size="sm" onPress={() => loadSnapshot(true)}>
+                <Button.Label>Refresh</Button.Label>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                isDisabled={isSharing}
+                onPress={handleShareDump}>
+                <Button.Label>{isSharing ? 'Exporting...' : 'Share Full Dump'}</Button.Label>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                isDisabled={isCopyingLogs}
+                onPress={handleCopyDebugLogs}>
+                <Button.Label>{isCopyingLogs ? 'Copying...' : 'Copy Debug Logs'}</Button.Label>
+              </Button>
+            </View>
+            {error ? (
+              <Text size={12} className="text-danger">
+                Failed to refresh inventory: {error}
               </Text>
-              <Text size={12} className="text-foreground/70">
-                {subtitle}
-              </Text>
-              <Text size={11} className="text-foreground/50">
-                SecureStore cannot enumerate all keys. This probes deterministic keys from known
-                profile/account data and reports which currently exist.
-              </Text>
-              <View className="flex-row gap-2">
-                <Button variant="secondary" size="sm" onPress={() => loadSnapshot(true)}>
-                  <Button.Label>Refresh</Button.Label>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  isDisabled={isSharing}
-                  onPress={handleShareDump}>
-                  <Button.Label>{isSharing ? 'Exporting...' : 'Share Full Dump'}</Button.Label>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  isDisabled={isCopyingLogs}
-                  onPress={handleCopyDebugLogs}>
-                  <Button.Label>{isCopyingLogs ? 'Copying...' : 'Copy Debug Logs'}</Button.Label>
-                </Button>
-              </View>
-              {error ? (
-                <Text size={12} className="text-danger">
-                  Failed to refresh inventory: {error}
-                </Text>
-              ) : null}
-            </Card.Body>
-          </Card>
+            ) : null}
+          </Card.Body>
+        </Card>
 
-          <GroupedInventorySection
-            title="Zustand / AsyncStorage"
-            subtitle="Persisted Zustand keys grouped by storage contract."
-            groups={[
-              { label: 'Global stores', items: [...zustandGroups.existingGlobalStoreKeys].sort() },
-              {
-                label: 'Profile-scoped keys',
-                items: [...zustandGroups.existingProfileStoreKeys].sort(),
-              },
-              {
-                label: 'Legacy bare profile keys',
-                items: [...zustandGroups.existingLegacyBareProfileKeys].sort(),
-              },
-              {
-                label: 'Uncategorized known keys',
-                items: [...zustandGroups.existingUncategorizedStoreKeys].sort(),
-              },
-            ]}
-            emptyLabel="No persisted Zustand keys found."
-          />
+        <GroupedInventorySection
+          title="Zustand / AsyncStorage"
+          subtitle="Persisted Zustand keys grouped by storage contract."
+          groups={[
+            { label: 'Global stores', items: [...zustandGroups.existingGlobalStoreKeys].sort() },
+            {
+              label: 'Profile-scoped keys',
+              items: [...zustandGroups.existingProfileStoreKeys].sort(),
+            },
+            {
+              label: 'Legacy bare profile keys',
+              items: [...zustandGroups.existingLegacyBareProfileKeys].sort(),
+            },
+            {
+              label: 'Uncategorized known keys',
+              items: [...zustandGroups.existingUncategorizedStoreKeys].sort(),
+            },
+          ]}
+          emptyLabel="No persisted Zustand keys found."
+        />
 
-          <GroupedInventorySection
-            title="SecureStore"
-            subtitle={`${secureStoreMeta.existing} of ${secureStoreMeta.total} probed keys currently exist, grouped by key type.`}
-            groups={[
-              { label: 'Static keys', items: secureStoreGrouped.static },
-              { label: 'Migration flags', items: secureStoreGrouped.migrationFlags },
-              { label: 'Derived caches', items: secureStoreGrouped.derivedCaches },
-              { label: 'Imported nsec keys', items: secureStoreGrouped.importedNsec },
-              { label: 'Other keys', items: secureStoreGrouped.other },
-            ]}
-            emptyLabel="No probed SecureStore keys currently exist."
-          />
+        <GroupedInventorySection
+          title="SecureStore"
+          subtitle={`${secureStoreMeta.existing} of ${secureStoreMeta.total} probed keys currently exist, grouped by key type.`}
+          groups={[
+            { label: 'Static keys', items: secureStoreGrouped.static },
+            { label: 'Migration flags', items: secureStoreGrouped.migrationFlags },
+            { label: 'Derived caches', items: secureStoreGrouped.derivedCaches },
+            { label: 'Imported nsec keys', items: secureStoreGrouped.importedNsec },
+            { label: 'Other keys', items: secureStoreGrouped.other },
+          ]}
+          emptyLabel="No probed SecureStore keys currently exist."
+        />
 
-          <GroupedInventorySection
-            title="Coco SQLite Files"
-            subtitle="Existing wallet SQLite files grouped by main database files vs sidecars."
-            groups={[
-              { label: 'Main DB files', items: cocoGrouped.mainDbFiles },
-              { label: 'SQLite sidecars', items: cocoGrouped.sqliteSidecars },
-            ]}
-            emptyLabel="No coco database files currently exist."
-          />
-        </ScrollView>
+        <GroupedInventorySection
+          title="Coco SQLite Files"
+          subtitle="Existing wallet SQLite files grouped by main database files vs sidecars."
+          groups={[
+            { label: 'Main DB files', items: cocoGrouped.mainDbFiles },
+            { label: 'SQLite sidecars', items: cocoGrouped.sqliteSidecars },
+          ]}
+          emptyLabel="No coco database files currently exist."
+        />
+      </ScrollView>
     </ScreenWrapper>
   );
 };

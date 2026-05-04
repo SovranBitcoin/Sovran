@@ -130,114 +130,114 @@ export const SettingsProfileScreen = () => {
   return (
     <ScreenWrapper name="SettingsProfileScreen" scroll="custom" safeArea>
       <ScrollView className="px-4">
-          <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
-            Profile Details
-          </Text>
-          <Card variant="secondary" className="mb-4">
-            <Card.Body className="items-center py-5">
-              <Avatar
-                state={profilePicture ? 'image' : 'fallback'}
-                seed={nostrKeys?.pubkey || ''}
-                picture={profilePicture}
-                name={username}
-                size={72}
-              />
-              <Card.Title className="mt-3">{username}</Card.Title>
-              <Card.Description className="mt-1">
-                {nostrKeysLoading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
-              </Card.Description>
-              {chain >= 1 && (
-                <Text size={12} medium className="text-foreground/50 mt-1 uppercase tracking-wide">
-                  chain {chain}
-                </Text>
-              )}
-            </Card.Body>
-          </Card>
-
-          {renderCopyableDetail(
-            'NIP06:',
-            mnemonic || '',
-            'mnemonic',
-            'mnemonic',
-            'Your recovery phrase that gives access to all your nostr & cashu wallets. Everything is derived from this mnemonic so keep it safe and secure!',
-            mnemonicLoading
-          )}
-
-          {renderCopyableDetail(
-            'NPUB:',
-            nostrKeys?.npub || '',
-            'npub',
-            null,
-            'Your public identifier on the Nostr network.',
-            nostrKeysLoading
-          )}
-
-          {renderCopyableDetail(
-            'NSEC:',
-            nostrKeys?.nsec || '',
-            'nsec',
-            'nsec',
-            'Your private key. Never share this with anyone.',
-            nostrKeysLoading
-          )}
-
-          {renderCopyableDetail(
-            `NUT13:`,
-            cashuMnemonic || '',
-            'cashuMnemonic',
-            'cashuMnemonic',
-            'This is a mnemonic you can use in other cashu wallets to recover your funds if you ever want to stop using Sovran.',
-            cashuMnemonicLoading
-          )}
-
-          {__DEV__ && activeProfile && (
-            <View className="mt-4">
-              <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
-                Debug (dev only)
+        <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
+          Profile Details
+        </Text>
+        <Card variant="secondary" className="mb-4">
+          <Card.Body className="items-center py-5">
+            <Avatar
+              state={profilePicture ? 'image' : 'fallback'}
+              seed={nostrKeys?.pubkey || ''}
+              picture={profilePicture}
+              name={username}
+              size={72}
+            />
+            <Card.Title className="mt-3">{username}</Card.Title>
+            <Card.Description className="mt-1">
+              {nostrKeysLoading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
+            </Card.Description>
+            {chain >= 1 && (
+              <Text size={12} medium className="text-foreground/50 mt-1 uppercase tracking-wide">
+                chain {chain}
               </Text>
-              <Card variant="secondary" className="mb-3">
-                <Card.Body className="gap-3">
+            )}
+          </Card.Body>
+        </Card>
+
+        {renderCopyableDetail(
+          'NIP06:',
+          mnemonic || '',
+          'mnemonic',
+          'mnemonic',
+          'Your recovery phrase that gives access to all your nostr & cashu wallets. Everything is derived from this mnemonic so keep it safe and secure!',
+          mnemonicLoading
+        )}
+
+        {renderCopyableDetail(
+          'NPUB:',
+          nostrKeys?.npub || '',
+          'npub',
+          null,
+          'Your public identifier on the Nostr network.',
+          nostrKeysLoading
+        )}
+
+        {renderCopyableDetail(
+          'NSEC:',
+          nostrKeys?.nsec || '',
+          'nsec',
+          'nsec',
+          'Your private key. Never share this with anyone.',
+          nostrKeysLoading
+        )}
+
+        {renderCopyableDetail(
+          `NUT13:`,
+          cashuMnemonic || '',
+          'cashuMnemonic',
+          'cashuMnemonic',
+          'This is a mnemonic you can use in other cashu wallets to recover your funds if you ever want to stop using Sovran.',
+          cashuMnemonicLoading
+        )}
+
+        {__DEV__ && activeProfile && (
+          <View className="mt-4">
+            <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
+              Debug (dev only)
+            </Text>
+            <Card variant="secondary" className="mb-3">
+              <Card.Body className="gap-3">
+                <DebugRow
+                  label="Coco DB"
+                  value={
+                    activeProfile.accountIndex === 0
+                      ? 'coco.db'
+                      : `coco-${activeProfile.accountIndex}.db`
+                  }
+                />
+                <DebugRow label="Account index" value={String(activeProfile.accountIndex)} />
+                <DebugRow
+                  label="Source"
+                  value={activeProfile.source === 'imported' ? 'imported' : 'derived'}
+                />
+                <DebugRow label="External chain" value={String(chain)} />
+                <DebugRow
+                  label="Nostr path"
+                  value={
+                    activeProfile.source === 'imported'
+                      ? 'Imported nsec (no mnemonic derivation)'
+                      : `m/44'/1237'/${activeProfile.accountIndex}'/0/0`
+                  }
+                />
+                <DebugRow
+                  label="Cashu path"
+                  value={
+                    activeProfile.source === 'imported'
+                      ? `m/44'/129372'/0'/${activeProfile.accountIndex}'/1/0`
+                      : `m/44'/129372'/0'/${activeProfile.accountIndex}'/0/0`
+                  }
+                />
+                {activeProfile.source === 'imported' && (
                   <DebugRow
-                    label="Coco DB"
-                    value={
-                      activeProfile.accountIndex === 0
-                        ? 'coco.db'
-                        : `coco-${activeProfile.accountIndex}.db`
-                    }
+                    label="npubNumber (from pubkey)"
+                    value={String(pubkeyToAccountNumber(activeProfile.pubkey))}
                   />
-                  <DebugRow label="Account index" value={String(activeProfile.accountIndex)} />
-                  <DebugRow
-                    label="Source"
-                    value={activeProfile.source === 'imported' ? 'imported' : 'derived'}
-                  />
-                  <DebugRow label="External chain" value={String(chain)} />
-                  <DebugRow
-                    label="Nostr path"
-                    value={
-                      activeProfile.source === 'imported'
-                        ? 'Imported nsec (no mnemonic derivation)'
-                        : `m/44'/1237'/${activeProfile.accountIndex}'/0/0`
-                    }
-                  />
-                  <DebugRow
-                    label="Cashu path"
-                    value={
-                      activeProfile.source === 'imported'
-                        ? `m/44'/129372'/0'/${activeProfile.accountIndex}'/1/0`
-                        : `m/44'/129372'/0'/${activeProfile.accountIndex}'/0/0`
-                    }
-                  />
-                  {activeProfile.source === 'imported' && (
-                    <DebugRow
-                      label="npubNumber (from pubkey)"
-                      value={String(pubkeyToAccountNumber(activeProfile.pubkey))}
-                    />
-                  )}
-                </Card.Body>
-              </Card>
-            </View>
-          )}
-        </ScrollView>
+                )}
+              </Card.Body>
+            </Card>
+          </View>
+        )}
+      </ScrollView>
     </ScreenWrapper>
   );
 };

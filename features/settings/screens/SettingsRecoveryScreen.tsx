@@ -47,11 +47,15 @@ const SOVRAN_MINTS_API = 'https://api.sovran.money/api/cashu/mints';
 
 const parseMintList = parseWith(MintListResponse, 'cashu/mints');
 
+function normalizeMintUrl(url: string): string {
+  return url.replace(/\/$/, '').toLowerCase();
+}
+
 async function fetchDiscoveredMintUrls(
   knownUrls: string[],
   signal?: AbortSignal
 ): Promise<string[]> {
-  const known = new Set(knownUrls.map((u) => u.replace(/\/$/, '')));
+  const known = new Set(knownUrls.map(normalizeMintUrl));
   const result = await fetchJson(SOVRAN_MINTS_API, parseMintList, 'cashu/mints', undefined, {
     signal,
   });
@@ -59,7 +63,7 @@ async function fetchDiscoveredMintUrls(
   return result.value
     .filter((u) => u.startsWith('https://'))
     .map((u) => u.replace(/\/$/, ''))
-    .filter((u) => !known.has(u));
+    .filter((u) => !known.has(u.toLowerCase()));
 }
 
 type RecoveryState = 'idle' | 'recovering' | 'complete' | 'error';
@@ -344,7 +348,7 @@ const styles = StyleSheet.create({
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
-export interface SettingsRecoveryScreenProps {
+interface SettingsRecoveryScreenProps {
   /**
    * When true, renders without the Cancel button and without manipulating
    * navigation options — the screen is a forced gate (rendered inline by
@@ -372,7 +376,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     'surface-secondary',
   ] as const);
   const navigation = useNavigation();
-  const { mints, restoreMint, loadMints } = useMintManagement();
+  const { mints, loadMints } = useMintManagement();
 
   const [recoveryState, setRecoveryState] = useState<RecoveryState>('idle');
   const [currentMintIndex, setCurrentMintIndex] = useState(0);
@@ -382,7 +386,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // Deep probe: also check mints from the audit API
   const [deepProbe, setDeepProbe] = useState(false);
   const [discoveredMintUrls, setDiscoveredMintUrls] = useState<string[]>([]);
-  const [discoveryLoading, setDiscoveryLoading] = useState(false);
 
   useEffect(() => {
     if (!deepProbe) {
@@ -390,14 +393,12 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       return;
     }
     const controller = new AbortController();
-    setDiscoveryLoading(true);
     fetchDiscoveredMintUrls(
       mints.map((m) => m.mintUrl),
       controller.signal
     ).then((urls) => {
       if (controller.signal.aborted) return;
       setDiscoveredMintUrls(urls);
-      setDiscoveryLoading(false);
     });
     return () => controller.abort();
   }, [deepProbe, mints]);
@@ -613,8 +614,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
   // ─── Idle state ─────────────────────────────────────────────────────────
 
-  const totalMintCount = mints.length + (deepProbe ? discoveredMintUrls.length : 0);
-
   const renderIdleState = () => (
     <VStack spacing={24} className="flex-1 px-6 pt-12">
       <VStack spacing={24} className="flex-1 items-center justify-center">
@@ -710,7 +709,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
   // Build lookup and filter: only show known mints + discovered mints that recovered funds
   const mintsByUrl = Object.fromEntries(mints.map((m) => [m.mintUrl, m]));
-  const knownMintUrlSet = new Set(mints.map((m) => m.mintUrl));
   const visibleResults = results.filter((r) => !r.isDiscovered || r.fundsFound);
 
   // ─── Recovering + complete states (single tree) ──────────────────────────
@@ -926,18 +924,13 @@ const MintRecoveryRow: React.FC<{
   currentIndex: number;
   result?: RecoveryResult;
 }> = ({ mintUrl, mint, index, currentIndex, result }) => {
-  const [foreground, green400, red400] = useThemeColor([
-    'foreground',
-    'green-400',
-    'red-400',
-  ] as const);
+  const foreground = useThemeColor('foreground');
   const { balances: liveBalances } = useBalanceContext();
   const mintBalance = liveBalances.byMint[mintUrl]?.total || 0;
 
   const allActive = currentIndex === -1;
   const hasResult = result?.durationMs != null;
   const isActive = allActive ? !hasResult : index === currentIndex;
-  const isComplete = allActive ? hasResult : index < currentIndex;
   const isPending = allActive ? false : index > currentIndex;
 
   const displayName = mint?.mintInfo?.name || tryHostname(mintUrl);
