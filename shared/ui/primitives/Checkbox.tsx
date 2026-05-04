@@ -19,13 +19,14 @@ export const Checkbox = ({
   size = 20,
   variant = 'default',
 }: CheckboxProps) => {
-  const [foreground, muted, surface, danger, blue300, green400] = useThemeColor([
+  const [foreground, muted, surface, danger, blue300, green400, warning] = useThemeColor([
     'foreground',
     'muted',
     'surface',
     'danger',
     'blue-300',
     'green-400',
+    'warning',
   ] as const);
 
   const getVariantColors = () => {
@@ -46,8 +47,8 @@ export const Checkbox = ({
         checkmark: 'white',
       },
       warning: {
-        border: checked ? '#f59e0b' : muted,
-        background: checked ? '#f59e0b' : 'transparent',
+        border: checked ? warning : muted,
+        background: checked ? warning : 'transparent',
         checkmark: 'white',
       },
       error: {

@@ -318,7 +318,7 @@ export function ClaimUsernameScreen() {
   }));
 
   const topOffset = insets.top;
-  const accentColor = '#f59e0b';
+  const accentColor = accent;
 
   // Check availability for all domains
   const checkAvailability = useCallback(async (name: string) => {

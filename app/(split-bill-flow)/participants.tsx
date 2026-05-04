@@ -51,8 +51,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
-
-const BLUETOOTH_ACCENT = '#0A84FF';
+import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 
 const ParamsSchema = z.object({
   totalAmount: z

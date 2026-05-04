@@ -23,6 +23,7 @@ import type { BLEPeer } from 'bitchat-module';
 
 import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
 import { resolveIdentityName } from '@/shared/lib/identity';
+import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { useBLEPeers } from '../hooks/useBLEPeers';
 
 interface PeerRowProps {
@@ -113,7 +114,7 @@ export default function NetworkSheet() {
         align="center"
         spacing={8}
         style={[styles.subheader, { borderBottomColor: opacity(foreground, 0.08) }]}>
-        <Icon name="mdi:bluetooth" size={18} color="#0A84FF" />
+        <Icon name="mdi:bluetooth" size={18} color={BLUETOOTH_ACCENT} />
         <Text size={13} style={{ color: opacity(foreground, 0.6) }}>
           {subtitleText}
         </Text>

@@ -38,6 +38,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 
 const ParamsSchema = z.object({
   groupId: z.string().min(1).max(256).optional(),
@@ -224,8 +225,8 @@ export default function SplitBillSummaryScreen() {
                 p.source === 'ble'
                   ? {
                       icon: 'mdi:bluetooth',
-                      color: '#0A84FF',
-                      backgroundColor: opacity('#0A84FF', 0.12),
+                      color: BLUETOOTH_ACCENT,
+                      backgroundColor: opacity(BLUETOOTH_ACCENT, 0.12),
                     }
                   : undefined
               }
