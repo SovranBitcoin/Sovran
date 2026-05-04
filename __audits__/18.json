@@ -235,8 +235,8 @@
       ],
       "verification_note": "Captured from `npm run knip` raw output; cross-checked each symbol via grep for external importers — none found. Counter-argument considered: 'these may be used by tests.' Grepped `__tests__/` and `*.test.tsx` — no matches in sovran-app for these symbols. Counter-argument: 'knip misreports dynamic-require targets.' Not applicable to these specifically — they're plain named exports from static imports.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Five of six unused exports in scope for this slice are removed: DECK_CARD_WIDTH (deleted), ParticipantCardProps (export keyword dropped), ParticipantCardDeckProps (export keyword dropped), QuoteIdToSplitBillIndex (export keyword dropped), SplitBillStore (export keyword dropped). The sixth — UseSplitBillParticipantPickerResult — is in fact externally consumed by app/(split-bill-flow)/_layout.tsx for the PickerContext type; the audit was stale on that item."
+      "completion_status": "complete",
+      "completion_note": "All five remaining unused exports are now removed (DECK_CARD_WIDTH deleted earlier; ParticipantCardProps, ParticipantCardDeckProps, QuoteIdToSplitBillIndex, SplitBillStore previously un-exported). The sixth, UseSplitBillParticipantPickerResult, was stale per prior re-verification (externally consumed by app/(split-bill-flow)/_layout.tsx)."
     },
     {
       "id": "F-010",

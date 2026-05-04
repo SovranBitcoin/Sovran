@@ -222,7 +222,8 @@
       ],
       "verification_note": "Cross-checked each knip hit by grepping the codebase for the symbol. All five exports verified unused. Caveat: the re-exports might be intended as a public API surface for a future package extraction — if so, mark with JSDoc `@public` to document intent.",
       "prior_audit_id": null,
-      "completion_status": "partial"
+      "completion_status": "stale",
+      "completion_note": "Cited path features/whitenoise/client/index.ts:42 no longer matches the tree — that file is 37 LOC and exports only createWhitenoiseClient. The original five-public-export + seven-type-alias surface was restructured before this slice ran. Current knip-confirmed dead exports in the whitenoise subtree (e.g. WHITENOISE_STORAGE_VERSION) were folded into this slice's broader hygiene cluster instead."
     },
     {
       "id": "F-010",
