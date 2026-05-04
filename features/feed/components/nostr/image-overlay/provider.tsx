@@ -51,14 +51,6 @@ const TIMING_CONFIG = {
   easing: Easing.out(Easing.cubic),
 };
 
-// Types re-exported from ./types for backward compatibility
-export type {
-  ImageOverlayPost,
-  ImageOverlayLayout,
-  ThumbnailLayout,
-  ImageOverlayContextValue,
-} from './types';
-
 /** State that changes on open/close; separate context to keep actions context stable. */
 type ImageOverlayStateValue = Pick<
   ImageOverlayContextValue,
@@ -173,6 +165,16 @@ export function ImageOverlayProvider({
     setActiveIndexState((prev) => (index === prev ? prev : index));
   }, []);
 
+  const thumbnailLayoutsRef = useRef<Record<string, ThumbnailLayout>>({});
+  /** Layout of the image we opened from (tap-time). Used for dismiss so we don't get overwritten by registerThumbnailLayout from other cards. */
+  const openSessionInitialLayoutRef = useRef<ThumbnailLayout | null>(null);
+  const openSessionInitialIndexRef = useRef(0);
+  /** Snapshot of thumbnail layouts for every pager index at open() time. Prevents wrong height when dismissing from page 2/3 (ref would otherwise be overwritten by other cards). */
+  const openSessionLayoutsByIndexRef = useRef<(ThumbnailLayout | null)[]>([]);
+  /** Pending close-clear and open-panel-animation timers; cleared on unmount so we never fire setState after teardown. */
+  const clearUrlTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openPanelAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const registerThumbnailLayout = useCallback(
     (url: string, layout: ThumbnailLayout, options?: { eventId?: string; imageIndex?: number }) => {
       const key =
@@ -238,15 +240,6 @@ export function ImageOverlayProvider({
     safeBottomSv.value = safeBottom;
   }, [safeTop, safeBottom, safeTopSv, safeBottomSv]);
 
-  const thumbnailLayoutsRef = useRef<Record<string, ThumbnailLayout>>({});
-  /** Layout of the image we opened from (tap-time). Used for dismiss so we don't get overwritten by registerThumbnailLayout from other cards. */
-  const openSessionInitialLayoutRef = useRef<ThumbnailLayout | null>(null);
-  const openSessionInitialIndexRef = useRef(0);
-  /** Snapshot of thumbnail layouts for every pager index at open() time. Prevents wrong height when dismissing from page 2/3 (ref would otherwise be overwritten by other cards). */
-  const openSessionLayoutsByIndexRef = useRef<(ThumbnailLayout | null)[]>([]);
-  /** Pending close-clear and open-panel-animation timers; cleared on unmount so we never fire setState after teardown. */
-  const clearUrlTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const openPanelAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     return () => {
       if (clearUrlTimeoutRef.current) clearTimeout(clearUrlTimeoutRef.current);
