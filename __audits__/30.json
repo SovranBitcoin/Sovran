@@ -80,7 +80,8 @@
       ],
       "verification_note": "Re-read PasscodeGate.tsx, settingsStore.ts partialize block, and app/_layout.tsx provider stack. Counter-argument considered: could passcode be rehydrated from somewhere else? Searched the whole repo for any write to setPasscode outside features/auth/screens/PasscodeScreen.tsx — none. Counter-argument: could the feature be deliberately stubbed pending SOV-40 ratification? The provider is wired into production `_layout.tsx` (line 121), not behind a feature flag or __DEV__ guard. Evidence from log.txt (29 × no_passcode_set, 0 × locked) is dispositive. Still present at head.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "resolved by deletion of the non-functional passcode feature: PasscodeGate, both PasscodeScreen variants, NumericKeyboard, the (settings-flow)/passcode route, the passcodeNotMatchPopup, and the passcode field/setPasscode action on settingsStore. Audit option (a). A real lock-screen feature would be greenfield via SOV-XX."
     },
     {
       "id": "F-002",
@@ -102,7 +103,8 @@
       ],
       "verification_note": "Re-read the component. Counter-argument: could React re-render and re-initialise the useState on dependency change? No — useState initial value is only consumed on mount; subsequent passcode changes are ignored by useState and only handled by the useEffect, which has no false-setting branch. Still present at head.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "resolved by deletion of the non-functional passcode feature: PasscodeGate, both PasscodeScreen variants, NumericKeyboard, the (settings-flow)/passcode route, the passcodeNotMatchPopup, and the passcode field/setPasscode action on settingsStore. Audit option (a). A real lock-screen feature would be greenfield via SOV-XX."
     },
     {
       "id": "F-003",
@@ -125,7 +127,8 @@
       ],
       "verification_note": "Grep `passcode|Passcode` across features/settings — no matches. Grep for router.navigate / router.push / href patterns mentioning passcode across the app — no matches. Confirmed dead navigation surface.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "resolved by deletion of the non-functional passcode feature: PasscodeGate, both PasscodeScreen variants, NumericKeyboard, the (settings-flow)/passcode route, the passcodeNotMatchPopup, and the passcode field/setPasscode action on settingsStore. Audit option (a). A real lock-screen feature would be greenfield via SOV-XX."
     },
     {
       "id": "F-004",
@@ -146,7 +149,8 @@
       ],
       "verification_note": "Re-read handlePress. No counter, no persistence, no backoff. Finding stands independent of F-001; the fix for F-001 must include this.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "resolved by deletion of the non-functional passcode feature: PasscodeGate, both PasscodeScreen variants, NumericKeyboard, the (settings-flow)/passcode route, the passcodeNotMatchPopup, and the passcode field/setPasscode action on settingsStore. Audit option (a). A real lock-screen feature would be greenfield via SOV-XX."
     },
     {
       "id": "F-005",
@@ -170,7 +174,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-checked partialize — passcode indeed excluded. Counter-argument: 'it's just an in-memory gate, plaintext is fine' — true *today*, but the fragility is real: any future field addition to the store that copies the partialize block as a template risks including passcode. Downgraded from High to Medium because the current state is defensive-by-exclusion, not defensive-by-design.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "resolved by deletion of the non-functional passcode feature: PasscodeGate, both PasscodeScreen variants, NumericKeyboard, the (settings-flow)/passcode route, the passcodeNotMatchPopup, and the passcode field/setPasscode action on settingsStore. Audit option (a). A real lock-screen feature would be greenfield via SOV-XX."
     },
     {
       "id": "F-006",
