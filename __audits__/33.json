@@ -199,7 +199,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read handleGiftWrap. The closure captures `inviteReader` from outer scope at the moment the subscription handler was registered — when the effect re-runs (deps change), a new handler is registered with a new reader, but in-flight async calls in the OLD handler still hold the OLD reader. Cancelled flag exists at line 35 but is not consulted inside handleGiftWrap.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "handleGiftWrap now checks the closure-captured cancelled flag after each await (ingestEvent, decryptGiftWrap), so async work after subscription cleanup no longer writes to a torn-down inviteReader."
     },
     {
       "id": "F-007",

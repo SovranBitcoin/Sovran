@@ -320,8 +320,8 @@
       ],
       "verification_note": "Re-checked at 73–104; no cancellation guard.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Cancellation hygiene; distinct seam from canonical-primitive consolidation."
+      "completion_status": "complete",
+      "completion_note": "MerchantDetailScreen now creates an AbortController, threads the signal through fetchPlaceDetails (which already accepted RequestControls), gates state writes on signal.aborted, and ignores AbortError so unmount-races no longer log as fetch_failed."
     },
     {
       "id": "F-012",

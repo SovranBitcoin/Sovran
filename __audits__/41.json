@@ -328,7 +328,9 @@
         "skill:native-data-fetching"
       ],
       "verification_note": "Re-checked. Counter-argument considered: refreshCatalog is idempotent and the store handles late-arriving data. Verdict: real but Low severity, edge of the 0.4 confidence floor — kept because the fix is cheap and the pattern is repeated elsewhere.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "GalleryScreen now creates an AbortController, passes its signal to refreshCatalog (already signal-aware), and aborts on unmount."
     },
     {
       "id": "F-013",
