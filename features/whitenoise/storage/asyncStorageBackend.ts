@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseWithBytes, stringifyWithBytes } from './serialization';
 
-export const WHITENOISE_STORAGE_VERSION = 1 as const;
+const WHITENOISE_STORAGE_VERSION = 1 as const;
 
 type Envelope<T> = {
   v: typeof WHITENOISE_STORAGE_VERSION;

@@ -4,7 +4,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 
 const NOTO_CDN = 'https://fonts.gstatic.com/s/e/notoemoji/latest';
 
-export function getAnimatedEmojiUrl(emoji: string): string {
+function getAnimatedEmojiUrl(emoji: string): string {
   const codepoints = Array.from(emoji)
     .map((char) => char.codePointAt(0)!.toString(16))
     .filter((cp) => cp !== 'fe0f');

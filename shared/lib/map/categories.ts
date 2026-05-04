@@ -56,16 +56,12 @@ export const MERCHANT_CATEGORIES: readonly MerchantCategory[] = [
   },
 ];
 
-export const DEFAULT_MARKER_COLOR = '#6366f1';
+const DEFAULT_MARKER_COLOR = '#6366f1';
 export const CLUSTER_MARKER_COLOR = '#F7931A';
 
 const ICON_TO_CATEGORY: ReadonlyMap<string, MerchantCategory> = new Map(
   MERCHANT_CATEGORIES.flatMap((cat) => cat.icons.map((icon) => [icon, cat] as const))
 );
-
-export function getCategoryByIcon(icon: string): MerchantCategory | null {
-  return ICON_TO_CATEGORY.get(icon) ?? null;
-}
 
 export function getMarkerColor(icon: string): string {
   return ICON_TO_CATEGORY.get(icon)?.markerColor ?? DEFAULT_MARKER_COLOR;

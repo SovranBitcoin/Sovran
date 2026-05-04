@@ -6,18 +6,18 @@
  * deep-link input must cross a schema seam before the rest of the tree
  * sees it; that seam now lives here, not scattered across `app/**`.
  *
- * Cross-package primitives (Hex64, HexOrNpub, LightningAddress, HttpUrl)
- * are re-exported from `@sovranbitcoin/schemas` so callers can pull
- * everything from one import. The remaining shapes — `Npub`,
- * `CompressedPubkey`, `Hex16`, `Geohash`, `HttpsUrl` — are route-only
- * concerns that don't belong in the cross-repo trust-boundary package.
+ * Cross-package primitives (Hex64, LightningAddress) are re-exported
+ * from `@sovranbitcoin/schemas` so callers can pull everything from one
+ * import. The remaining shapes — `Npub`, `CompressedPubkey`, `Hex16`,
+ * `Geohash`, `HttpsUrl` — are route-only concerns that don't belong in
+ * the cross-repo trust-boundary package.
  */
 
 import { z } from 'zod';
 
-import { Hex64, HexOrNpub, HttpUrl, LightningAddress } from '@sovranbitcoin/schemas';
+import { Hex64, LightningAddress } from '@sovranbitcoin/schemas';
 
-export { Hex64, HexOrNpub, HttpUrl, LightningAddress };
+export { Hex64, LightningAddress };
 
 /** NIP-19 npub bech32 string. Loose shape — full bech32 decoding is at the call site. */
 export const Npub = z.string().regex(/^npub1[02-9ac-hj-np-z]{58,}$/, 'invalid npub');

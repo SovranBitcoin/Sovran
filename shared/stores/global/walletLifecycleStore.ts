@@ -73,18 +73,6 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>()(
 );
 
 /**
- * Resolves whether a NUT-13 wallet restore must run before minting can safely
- * use the deterministic counter on this device.
- *
- * @param mnemonicExists Whether retrieveMnemonic() found a seed in SecureStore
- * @param seedCreatedAt The persisted seedCreatedAt from this store
- * @returns true if restore is needed (seed pre-existed but this app didn't create it)
- */
-export function needsRestore(mnemonicExists: boolean, seedCreatedAt: number | null): boolean {
-  return mnemonicExists && seedCreatedAt == null;
-}
-
-/**
  * React hook returning true once the persisted lifecycle store has finished
  * rehydrating from AsyncStorage. Components that gate on `restoreStatus` /
  * `seedCreatedAt` MUST wait for this — reading those fields before hydration

@@ -46,7 +46,7 @@ export interface PersistConfigOptions<TFull, TPartial> {
 }
 
 /** Derive a snake_case log slug from the kebab-case `<name>-store` storage key. */
-export function deriveLogKey(name: string): string {
+function deriveLogKey(name: string): string {
   return name.replace(/-store$/, '').replace(/-/g, '_');
 }
 
