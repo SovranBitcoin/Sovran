@@ -7,7 +7,7 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
+import { StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -163,6 +163,9 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   const paginationOffsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(new Set<string>());
+  // Tracks the request prefix of the most recently started loadFeed/loadMoreItems
+  // — onUpdate callbacks captured by an older request bail out when this drifts.
+  const activeLoadIdRef = useRef<string | null>(null);
 
   const metricsRef = useLatestRef(metricsMap);
   const quotedRef = useLatestRef(quotedEventsMap);
@@ -209,6 +212,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
 
       const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
       const requestPrefix = Date.now().toString(36);
+      activeLoadIdRef.current = requestPrefix;
 
       try {
         // Hydrate spec with user pubkey for personalized feeds
@@ -285,6 +289,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
           phase1.quotedEventsMap,
           phase1.profilesMap,
           (updates) => {
+            if (activeLoadIdRef.current !== requestPrefix) return;
             startTransition(() => {
               if (updates.quotedEvents) {
                 setQuotedEventsMap((prev) => {
@@ -369,6 +374,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
     setIsLoadingMore(true);
     const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
     const rp = Date.now().toString(36);
+    activeLoadIdRef.current = rp;
 
     try {
       const hydratedSpec = userPubkey
@@ -488,6 +494,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
         quotedRef.current,
         profilesRef.current,
         (updates) => {
+          if (activeLoadIdRef.current !== rp) return;
           startTransition(() => {
             if (updates.quotedEvents) {
               setQuotedEventsMap((prev) => {

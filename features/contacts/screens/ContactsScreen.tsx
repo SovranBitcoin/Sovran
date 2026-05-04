@@ -508,7 +508,7 @@ export const ContactsScreen = () => {
   const renderContactsList = () => (
     <LegendList
       data={currentListData}
-      extraData={profilesMap.size}
+      extraData={profilesMap}
       estimatedItemSize={68}
       keyExtractor={(item, index) => item.pubkey || item.mint?.mintUrl || `contact-${index}`}
       renderItem={renderContactItem}

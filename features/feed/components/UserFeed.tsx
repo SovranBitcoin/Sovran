@@ -342,6 +342,9 @@ function UserFeedInner({
   const paginationOffsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(new Set<string>());
+  // Tracks the prefix of the most recent loadMoreItems request so its
+  // enrichFeedPage onUpdate cannot write into a feed reset by a later author switch.
+  const activeLoadMoreIdRef = useRef<string | null>(null);
 
   // Stable refs for renderItem — avoids re-creating renderItem on every Map update
   const metricsRef = useLatestRef(metricsMap);
@@ -378,6 +381,7 @@ function UserFeedInner({
     paginationOffsetRef.current = 0;
     feedItemIdsRef.current.clear();
     loadingMoreRef.current = false;
+    activeLoadMoreIdRef.current = null;
     deletedRepostIdsRef.current = null;
 
     const loadFeedFromPrimal = async () => {
@@ -500,6 +504,7 @@ function UserFeedInner({
     setIsLoadingMore(true);
     const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
     const rp = Date.now().toString(36);
+    activeLoadMoreIdRef.current = rp;
 
     try {
       const payload: Record<string, unknown> = {
@@ -590,6 +595,7 @@ function UserFeedInner({
         quotedRef.current,
         profilesRef.current,
         (updates) => {
+          if (activeLoadMoreIdRef.current !== rp) return;
           startTransition(() => {
             if (updates.quotedEvents) {
               setQuotedEventsMap((prev) => {
