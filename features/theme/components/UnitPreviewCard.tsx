@@ -15,6 +15,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { THEMES } from '@/shared/providers/ThemeProvider';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface UnitPreviewCardProps {
   themeName: string;
@@ -46,6 +47,10 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   const catalogEntry = useWallpaperStore((s) => s.catalog.find((w) => w.themeName === themeName));
   const bundledImage = backgroundImageThemes[themeName];
   const palette = THEMES[themeName as keyof typeof THEMES] as Record<string, string> | undefined;
+  // Selection border tracks the wallet's active theme so the picker that
+  // configures the theme reflects it, instead of a hardcoded blue that
+  // ignores the user's choice.
+  const foreground = useThemeColor('foreground');
 
   const imageSource = bundledImage
     ? bundledImage
@@ -58,7 +63,11 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   const card = (
     <View
       testID={testID}
-      style={[styles.frame, { width, height }, selected && styles.frameSelected]}>
+      style={[
+        styles.frame,
+        { width, height },
+        selected && [styles.frameSelected, { borderColor: foreground }],
+      ]}>
       {imageSource ? (
         <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
       ) : palette ? (
@@ -122,7 +131,6 @@ const styles = StyleSheet.create({
   },
   frameSelected: {
     borderWidth: 2,
-    borderColor: '#3B82F6',
   },
   chrome: {
     position: 'absolute',

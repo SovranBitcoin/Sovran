@@ -22,6 +22,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { refreshCatalog } from '@/shared/lib/wallpaperSync';
+import { STAT_COLOR_SOCIAL, STAT_ICONS } from '@/shared/ui/composed/RowStatsAccent';
 import opacity from 'hex-color-opacity';
 import { UnitPreviewCard } from '@/features/theme/components/UnitPreviewCard';
 import { useThemeDraft } from '@/features/theme/lib/themeDraft';
@@ -142,7 +143,7 @@ function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor |
             <PressableFeedback onPress={openProfile} animation={false}>
               <PressableFeedback.Scale>
                 <HStack style={{ alignItems: 'center', gap: 4, marginTop: 1 }}>
-                  <Text size={11} bold style={{ color: '#3B82F6' }}>
+                  <Text size={11} bold style={{ color: STAT_COLOR_SOCIAL }}>
                     {author.displayName}
                   </Text>
                   {author.followers ? (
@@ -151,8 +152,8 @@ function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor |
                         {'•'}
                       </Text>
                       <HStack style={{ alignItems: 'center', gap: 3 }}>
-                        <Icon name="mdi:account-group" size={12} color="#3B82F6" />
-                        <Text size={12} bold style={{ color: '#3B82F6' }}>
+                        <Icon name={STAT_ICONS.followers} size={12} color={STAT_COLOR_SOCIAL} />
+                        <Text size={12} bold style={{ color: STAT_COLOR_SOCIAL }}>
                           {author.followers.toLocaleString()}
                         </Text>
                       </HStack>

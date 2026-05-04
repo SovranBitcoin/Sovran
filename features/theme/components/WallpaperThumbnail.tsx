@@ -17,6 +17,7 @@ import Icon from 'assets/icons';
 import { THEMES } from '@/shared/providers/ThemeProvider';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import type { WallpaperCatalogEntry } from '@/shared/stores/global/wallpaperStore';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface WallpaperThumbnailProps {
   themeName: string;
@@ -42,6 +43,9 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   const paletteColors = THEMES[themeName as keyof typeof THEMES] as
     | Record<string, string>
     | undefined;
+  // Selection border tracks the wallet's active theme so the picker
+  // reflects the user's choice instead of a hardcoded blue.
+  const foreground = useThemeColor('foreground');
 
   const imageSource = downloaded
     ? { uri: downloaded.localUri }
@@ -58,7 +62,12 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
       animation={false}
       style={{ width, height }}>
       <PressableFeedback.Scale>
-        <View style={[styles.card, { width, height }, selected && styles.cardSelected]}>
+        <View
+          style={[
+            styles.card,
+            { width, height },
+            selected && [styles.cardSelected, { borderColor: foreground }],
+          ]}>
           {imageSource ? (
             <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
           ) : paletteColors ? (
@@ -109,7 +118,6 @@ const styles = StyleSheet.create({
   },
   cardSelected: {
     borderWidth: 2,
-    borderColor: '#3B82F6',
   },
   progressOverlay: {
     ...StyleSheet.absoluteFillObject,
