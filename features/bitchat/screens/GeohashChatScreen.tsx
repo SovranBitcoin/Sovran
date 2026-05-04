@@ -347,7 +347,7 @@ export function GeohashChatScreen({
                   message={{
                     id: item.id,
                     content: item.content,
-                    senderPubkey: item.senderPubkey,
+                    senderId: item.senderId,
                     sender: item.sender,
                     timestamp: item.timestamp,
                     isOwn: item.isOwn,

@@ -107,7 +107,7 @@ export function useBitChat(
       bitchatLog.info('bitchat.hook.ble_state', { state: event.state });
     });
     const peerSub = addBLEPeerListener((event) => {
-      bitchatLog.info('bitchat.hook.ble_peer', event);
+      bitchatLog.info('bitchat.hook.ble_peer', { ...event });
     });
 
     const sub = addBLEMessageListener((event: BLEMessageEvent) => {
@@ -115,7 +115,7 @@ export function useBitChat(
         id: event.id,
         content: event.content,
         sender: event.sender,
-        senderPubkey: event.senderPeerID,
+        senderId: event.senderPeerID,
         timestamp: event.timestamp,
         isPrivate: event.isPrivate,
         isOwn: false,
@@ -175,7 +175,7 @@ export function useBitChat(
         id: event.id,
         content: event.content,
         sender: event.sender,
-        senderPubkey: event.peerID,
+        senderId: event.peerID,
         timestamp: event.timestamp,
         isPrivate: true,
         isOwn: event.isOwn,
@@ -210,7 +210,7 @@ export function useBitChat(
         id: event.id,
         content: event.content,
         sender: event.sender,
-        senderPubkey: event.senderPubkey,
+        senderId: event.senderPubkey,
         timestamp: event.timestamp,
         isPrivate: false,
         isOwn: event.isOwn,
@@ -268,7 +268,7 @@ export function useBitChat(
         id: event.id,
         content: event.content,
         sender: event.sender,
-        senderPubkey: event.senderPubkey,
+        senderId: event.senderPubkey,
         timestamp: event.timestamp,
         isPrivate: true,
         isOwn: event.isOwn,
@@ -314,7 +314,7 @@ export function useBitChat(
             id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
-            senderPubkey: '',
+            senderId: '',
             timestamp: Date.now(),
             isPrivate: false,
             isOwn: true,
@@ -334,7 +334,7 @@ export function useBitChat(
         case 'ble-dm': {
           if (!dmPeerID) return;
           // Noise-encrypted DM — also no own-echo, add locally. Use an
-          // empty senderPubkey (matching the ble public path) so the shared
+          // empty senderId (matching the ble public path) so the shared
           // `useMessageGrouping` doesn't conflate own + peer runs — both
           // sides used `dmPeerID` previously, which dropped the peer's
           // first-in-group avatar/name at every side switch.
@@ -342,7 +342,7 @@ export function useBitChat(
             id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
-            senderPubkey: '',
+            senderId: '',
             timestamp: Date.now(),
             isPrivate: true,
             isOwn: true,
@@ -373,13 +373,13 @@ export function useBitChat(
         case 'nostr-dm': {
           if (!dmPeerID) return;
           // NIP-17 gift-wrap DMs don't echo back to the sender via the
-          // subscription, so add locally. Empty senderPubkey for the same
+          // subscription, so add locally. Empty senderId for the same
           // grouping reason as 'ble-dm' above.
           const ownMsg: ChatMessage = {
             id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
-            senderPubkey: '',
+            senderId: '',
             timestamp: Date.now(),
             isPrivate: true,
             isOwn: true,

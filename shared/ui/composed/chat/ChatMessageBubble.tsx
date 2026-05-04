@@ -73,8 +73,8 @@ export function ChatMessageBubble({
             <Avatar
               state="fallback"
               size={32}
-              seed={message.senderPubkey}
-              name={message.sender ?? message.senderPubkey}
+              seed={message.senderId}
+              name={message.sender ?? message.senderId}
             />
           ) : (
             <View style={{ width: 32 }} />

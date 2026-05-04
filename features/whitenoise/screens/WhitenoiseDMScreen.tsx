@@ -260,7 +260,7 @@ function toBubble(m: WhitenoiseDmMessage): ChatBubbleMessage {
   return {
     id: m.id,
     content: m.content,
-    senderPubkey: m.authorPubkey,
+    senderId: m.authorPubkey,
     timestamp: m.createdAt * 1000,
     isOwn: m.isSelf,
     isPending: m.isPending,

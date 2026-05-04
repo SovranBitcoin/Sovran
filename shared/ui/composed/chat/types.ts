@@ -7,8 +7,13 @@
 export type ChatBubbleMessage = {
   id: string;
   content: string;
-  /** Author pubkey — used as Avatar seed and the sender-grouping key. */
-  senderPubkey: string;
+  /**
+   * Stable per-sender identifier — used as Avatar seed and as the
+   * sender-grouping key. Transport-agnostic: it can be a Nostr hex pubkey, a
+   * BLE peer-id, or `''` for own messages. Not safe to use as a Nostr pubkey
+   * at the protocol layer; protocol-truth pubkeys live on the source event.
+   */
+  senderId: string;
   /** Optional display name shown above the bubble for non-own messages. */
   sender?: string;
   /** Unix epoch milliseconds. */
