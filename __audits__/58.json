@@ -65,7 +65,9 @@
         "features/feed/components/ThreadView.tsx:163"
       ],
       "verification_note": "Counter-argument: shared values from useSharedValue are stable refs, so most of the 38 deps are no-ops. Verified at provider.tsx:499-537 — but `screenWidth, screenHeight, safeTop, safeBottom, imageViewportHeight` are primitives, not refs, and `imageViewportHeight = screenHeight - safeTop` (line 146) is a fresh computation on every render. Re-checked at provider.tsx:1015-1029 — `useMemo` deps `[state, actions]` invalidate every time either changes, so consumers see a fresh object identity on every state change too.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useImageOverlay no longer carries rotation/keyboard-sensitive primitives. screenWidth, screenHeight, expandedWidth, expandedHeight, expandedHeightFromContext removed from actionsValue and the wrapper hook's return; AnimatedImageOverlay (the only internal consumer) now derives them locally from useWindowDimensions/useSafeAreaInsets. The actions context is now stable across rotation, keyboard show/hide, and safe-area changes; external feed consumers (HomeFeed, UserFeed, ThreadView, shared.tsx, ImageBlock) re-render only on actual state changes."
     },
     {
       "id": "F-002",
@@ -89,7 +91,9 @@
         "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx:106"
       ],
       "verification_note": "Counter-argument considered: maybe AnimatedImageOverlay genuinely needs every shared value, so the surface has to be wide. Checked AnimatedImageOverlay.tsx:106-140 — it does use ~20 of them. But ImageBlock.tsx:84-110 reads only `imageOverlay?.activeUrl`, `imageOverlay?.thumbnailBlurIntensity`, `imageOverlay?.registerThumbnailLayout`, `imageOverlay?.open`. Three other consumers (HomeFeed/UserFeed/ThreadView) use 1-2 fields each. The wide surface earns its keep only inside one file — that's the textbook signal for a private context.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ImageOverlayContextValue narrowed: removed expandedWidth, expandedHeight, screenWidth, screenHeight from the public type. The shared values used by AnimatedImageOverlay remain (it is internal to the package and reads them through ctx); the rotation-sensitive primitives that were leaking through to feed consumers are gone. Consumers that needed screen dims always called useWindowDimensions themselves."
     },
     {
       "id": "F-003",
@@ -138,7 +142,9 @@
         "features/feed/components/nostr/image-overlay/provider.tsx:258"
       ],
       "verification_note": "UNVERIFIED dynamic claim: no log-doctor evidence for memory growth on this specific ref (log-doctor does not surface useRef writes). Structural reasoning is provable from the source — read of every write/read site confirms no cleanup path. Severity Low because per-entry size is tiny.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "thumbnailLayoutsRef is reset to {} in clearUrlDelayed alongside the other open-session refs. By definition no overlay is open at clear-time, so cached thumbnail positions are unreachable; lifetime is now bounded to a single open-session."
     },
     {
       "id": "F-005",
@@ -213,7 +219,9 @@
         "features/feed/components/nostr/image-overlay/BottomPanel.tsx:69"
       ],
       "verification_note": "Verified by `find features/feed/components/nostr/image-overlay __tests__ -name '*image-overlay*'` returning only the source files. Counter-argument: animations are intrinsically hard to test, so absence of tests is not a finding. Defused: the four pure helpers above have nothing to do with animation — they're easy seams that no one has written.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Tests added for inferMediaType (now exported from provider) covering image vs video extensions, case-insensitivity, query strings, and mid-path negatives. computeExpandedSize coverage already landed via F-006. shouldShowInlineImagesInPanel and segmentsToBlocks remain private to BottomPanel.tsx and are deferred — extracting them widens the public surface and works against F-002."
     },
     {
       "id": "F-008",
