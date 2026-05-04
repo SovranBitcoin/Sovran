@@ -30,7 +30,7 @@ import { convertTime } from '@/shared/lib/time';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
-import { useScanHistoryStore, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
+import { useScanEntryForTransactionId, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useTransactionDistributionStore,
   DistributionSource,
@@ -85,28 +85,30 @@ const SOURCE_ICONS: Record<TransactionSource, string> = {
  * is the more specific signal.
  */
 const useTransactionSource = (historyEntry: HistoryEntry): TransactionSource | null => {
-  const fromScan = useScanHistoryStore((state) => {
-    const entry = state.entries.find((e) => e.transactionId === historyEntry.id);
-    return entry?.source ?? null;
-  });
+  const scanEntry = useScanEntryForTransactionId(historyEntry.id);
   const distKey =
     historyEntry.type === 'mint' ? (historyEntry as MintHistoryEntry).quoteId : historyEntry.id;
   const fromDistribution = useTransactionDistributionStore(
     (state) => state.distributions[distKey]?.source ?? null
   );
-  return fromScan ?? fromDistribution;
+  return scanEntry?.source ?? fromDistribution;
 };
 
 /** Returns BIP321 option kinds for a transaction, or null if not BIP321. */
 const useBip321Options = (transactionId: string): string[] | null => {
-  return useScanHistoryStore((state) => {
-    const entry = state.entries.find((e) => e.transactionId === transactionId);
-    if (entry?.container !== 'bip321' || !entry.optionKinds?.length) return null;
-    return entry.optionKinds;
-  });
+  const scanEntry = useScanEntryForTransactionId(transactionId);
+  if (scanEntry?.container !== 'bip321' || !scanEntry.optionKinds?.length) return null;
+  return scanEntry.optionKinds;
 };
 
-const useHistoryEntry = (historyEntry: HistoryEntry) => {
+/**
+ * Row-UI state for the Transaction component. Renamed from `useHistoryEntry`
+ * to avoid colliding with the canonical `useHistoryEntry` exported from
+ * `features/transactions/hooks/useHistoryEntry.ts` (different semantics:
+ * that one parses route params and subscribes to `history:updated`; this
+ * one bundles row-display state + the navigate handler).
+ */
+const useTransactionRow = (historyEntry: HistoryEntry) => {
   const isSend = isOutgoingTransaction(historyEntry);
   const isReceive = !isSend;
 
@@ -199,7 +201,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
     fiatAmount,
     handlePress: defaultHandlePress,
     displayLabel,
-  } = useHistoryEntry(historyEntry);
+  } = useTransactionRow(historyEntry);
 
   const handlePress = onPress ? () => onPress(historyEntry) : defaultHandlePress;
 

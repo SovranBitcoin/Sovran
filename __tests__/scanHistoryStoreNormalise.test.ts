@@ -60,7 +60,7 @@ describe('normaliseForDedupe', () => {
 
 describe('useScanHistoryStore.addScan', () => {
   beforeEach(() => {
-    useScanHistoryStore.setState({ entries: [] });
+    useScanHistoryStore.setState({ entries: [], entriesByTransactionId: {} });
   });
 
   it('dedupes scheme-prefixed and bare forms onto a single entry', () => {
@@ -94,6 +94,7 @@ describe('useScanHistoryStore.addScan', () => {
         source: 'qr' as const,
         scannedAt: 1_000_000 + i,
       })),
+      entriesByTransactionId: {},
     });
 
     useScanHistoryStore.getState().addScan('newest', 'unknown', 'qr');
@@ -104,5 +105,38 @@ describe('useScanHistoryStore.addScan', () => {
     // The oldest seeded entry (seed-0, scannedAt=1_000_000) was evicted.
     expect(entries.some((e) => e.id === 'seed-0')).toBe(false);
     expect(entries.some((e) => e.id === 'seed-499')).toBe(true);
+  });
+});
+
+describe('useScanHistoryStore.entriesByTransactionId', () => {
+  beforeEach(() => {
+    useScanHistoryStore.setState({ entries: [], entriesByTransactionId: {} });
+  });
+
+  it('linkTransaction populates the index for O(1) lookup by transactionId', () => {
+    const { addScan, linkTransaction } = useScanHistoryStore.getState();
+    addScan('lnbc1foo', 'lightning', 'qr');
+    linkTransaction('lnbc1foo', 'tx-123');
+
+    const { entries, entriesByTransactionId } = useScanHistoryStore.getState();
+    expect(entriesByTransactionId['tx-123']).toBe(entries[0]);
+    expect(entriesByTransactionId['tx-123'].raw).toBe('lnbc1foo');
+  });
+
+  it('addScan dedupe path keeps the index in sync with the merged entry ref', () => {
+    const { addScan, linkTransaction } = useScanHistoryStore.getState();
+    addScan('lnbc1foo', 'lightning', 'qr');
+    linkTransaction('lnbc1foo', 'tx-123');
+    addScan('lnbc1foo', 'lightning', 'nfc');
+
+    const { entries, entriesByTransactionId } = useScanHistoryStore.getState();
+    expect(entriesByTransactionId['tx-123']).toBe(entries[0]);
+    expect(entriesByTransactionId['tx-123'].source).toBe('nfc');
+  });
+
+  it('skips entries with no transactionId', () => {
+    const { addScan } = useScanHistoryStore.getState();
+    addScan('lnbc1foo', 'lightning', 'qr');
+    expect(Object.keys(useScanHistoryStore.getState().entriesByTransactionId)).toHaveLength(0);
   });
 });

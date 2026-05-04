@@ -28,7 +28,7 @@ type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'un
 /** How the data was scanned/entered */
 export type ScanSource = 'qr' | 'nfc' | 'paste' | 'deeplink';
 
-interface ScanHistoryEntry {
+export interface ScanHistoryEntry {
   /** Unique identifier for this scan */
   id: string;
   /** The raw string as scanned */
@@ -51,6 +51,25 @@ interface ScanHistoryEntry {
 
 interface ScanHistoryState {
   entries: ScanHistoryEntry[];
+  /**
+   * Indexed view of `entries` keyed by `transactionId` so row + detail
+   * selectors can resolve a scan in O(1) instead of scanning `entries`
+   * once per mounted row. Maintained by `addScan`/`linkTransaction` and
+   * rebuilt from `entries` after rehydration; not persisted. Direct
+   * `setState({ entries })` (test-only) won't refresh it — call an action
+   * or seed `entriesByTransactionId` alongside.
+   */
+  entriesByTransactionId: Record<string, ScanHistoryEntry>;
+}
+
+function buildEntriesByTransactionId(
+  entries: ScanHistoryEntry[]
+): Record<string, ScanHistoryEntry> {
+  const byTx: Record<string, ScanHistoryEntry> = {};
+  for (const entry of entries) {
+    if (entry.transactionId) byTx[entry.transactionId] = entry;
+  }
+  return byTx;
 }
 
 interface ScanHistoryActions {
@@ -103,6 +122,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
     persist(
       (set) => ({
         entries: [],
+        entriesByTransactionId: {},
 
         addScan: (
           raw: string,
@@ -120,35 +140,41 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             const existingIndex = state.entries.findIndex(
               (entry) => normaliseForDedupe(entry.raw) === key
             );
+            let nextEntries: ScanHistoryEntry[];
             if (existingIndex !== -1) {
-              const updated = [...state.entries];
-              updated[existingIndex] = {
-                ...updated[existingIndex],
+              nextEntries = [...state.entries];
+              nextEntries[existingIndex] = {
+                ...nextEntries[existingIndex],
                 source,
                 scannedAt: now,
                 ...(inputType != null && { inputType }),
                 ...(container != null && { container }),
                 ...(optionKinds != null && { optionKinds }),
               };
-              return { entries: updated };
+            } else {
+              const newEntry: ScanHistoryEntry = {
+                id: mintLocalId('scan'),
+                raw,
+                type,
+                source,
+                ...(inputType != null && { inputType }),
+                ...(container != null && { container }),
+                ...(optionKinds != null && { optionKinds }),
+                scannedAt: now,
+              };
+              const appended = [...state.entries, newEntry];
+              // Tail-evict oldest by scannedAt once the cap is breached. Stable when under cap.
+              nextEntries =
+                appended.length > MAX_SCAN_HISTORY
+                  ? [...appended]
+                      .sort((a, b) => b.scannedAt - a.scannedAt)
+                      .slice(0, MAX_SCAN_HISTORY)
+                  : appended;
             }
-            const newEntry: ScanHistoryEntry = {
-              id: mintLocalId('scan'),
-              raw,
-              type,
-              source,
-              ...(inputType != null && { inputType }),
-              ...(container != null && { container }),
-              ...(optionKinds != null && { optionKinds }),
-              scannedAt: now,
+            return {
+              entries: nextEntries,
+              entriesByTransactionId: buildEntriesByTransactionId(nextEntries),
             };
-            const appended = [...state.entries, newEntry];
-            // Tail-evict oldest by scannedAt once the cap is breached. Stable when under cap.
-            const capped =
-              appended.length > MAX_SCAN_HISTORY
-                ? [...appended].sort((a, b) => b.scannedAt - a.scannedAt).slice(0, MAX_SCAN_HISTORY)
-                : appended;
-            return { entries: capped };
           });
         },
 
@@ -159,9 +185,12 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
           set((state) => {
             const index = state.entries.findIndex((entry) => entry.raw === raw);
             if (index === -1) return state;
-            const updated = [...state.entries];
-            updated[index] = { ...updated[index], transactionId };
-            return { entries: updated };
+            const nextEntries = [...state.entries];
+            nextEntries[index] = { ...nextEntries[index], transactionId };
+            return {
+              entries: nextEntries,
+              entriesByTransactionId: buildEntriesByTransactionId(nextEntries),
+            };
           });
         },
       }),
@@ -170,7 +199,26 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         storage: profileStorage,
         schema: PersistedScanHistoryStore,
         partialize: (state) => ({ entries: state.entries }),
+        afterHydrate: (state) => {
+          if (state) {
+            state.entriesByTransactionId = buildEntriesByTransactionId(state.entries);
+          }
+        },
       })
     )
   )
 );
+
+/**
+ * O(1) selector for the scan-history entry linked to a given transaction id.
+ * Row + detail surfaces both consume this so they share one subscription
+ * shape and skip the per-render `entries.find` scan that compounds with
+ * scroll length × scan-history depth.
+ */
+export function useScanEntryForTransactionId(
+  transactionId: string | undefined
+): ScanHistoryEntry | null {
+  return useScanHistoryStore((state) =>
+    transactionId ? (state.entriesByTransactionId[transactionId] ?? null) : null
+  );
+}
