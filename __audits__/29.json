@@ -229,7 +229,9 @@
       "fix": "Remove `type?: string` from the Account interface (and any call site that passes it, if any).",
       "references": [],
       "verification_note": "grep confirms no usage of `account.type` inside the file. Counter-argument: external callers might set `type` to hint the Transactions internal logic — but none do, and the field is never read inside the file, so it's dead.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Account.type field deleted from features/transactions/components/Transactions.tsx. Confirmed no caller passes a type field on the account prop (only mockDataStore has a similarly-named lightning/ecash type field on a different shape)."
     },
     {
       "id": "F-010",

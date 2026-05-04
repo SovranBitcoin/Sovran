@@ -297,8 +297,8 @@
       ],
       "verification_note": "Verified by direct read of each declaration site. extractModelName at L423-425 is literally `return getModelDisplayName(modelId, availableModels)`.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Format.ts internals (TIER_MATRIX, DEFAULT_PROVIDER_ID, DEFAULT_TIER_ID, buildCandidateChain) unexported in commit 13fa9a3b. extractModelName already deleted previously. Remaining: BranchInfo (branching.ts), RoutstrTierId / RoutstrProviderId / RoutstrSession (routstrStore.ts), TopUpResult / TopUpFailure (topUp.ts) — deferred."
+      "completion_status": "complete",
+      "completion_note": "Final unused exports cleared: BranchInfo (branching.ts), RoutstrTierId/RoutstrProviderId/RoutstrSession (routstrStore.ts), TopUpResult/TopUpFailure (topUp.ts) — all un-exported. All knip-flagged ai/routstr unused exports from this finding are now closed."
     },
     {
       "id": "F-012",

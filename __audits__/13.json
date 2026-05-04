@@ -240,7 +240,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Re-read GeohashChatScreen.tsx:198 (declaration) and :361 (usage). grep for `listRef` in the file — only the declaration and the `ref={}` prop. Counter-argument considered: 'maybe LegendList needs a ref to internally track scroll — not reading it is fine.' Weak — LegendList does not require a ref to function. If it did, the type would not be `any`.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "listRef IS used at GeohashChatScreen.tsx:337 (ref={listRef}); only the useRef<any> cast survives — separate dim1 type-safety concern."
     },
     {
       "id": "F-011",

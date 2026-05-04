@@ -356,7 +356,9 @@
         "lint:prettier/prettier"
       ],
       "verification_note": "Reproduced via `npm run lint` — exact output quoted in tooling section.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Pressable import already removed in a prior slice (audit was stale on that part). Remaining prettier errors at _layout.tsx:60 and search.tsx:78 fixed via prettier --write. The participants.tsx exhaustive-deps warning is a logic concern, not lint hygiene; out of slice."
     },
     {
       "id": "F-015",

@@ -231,7 +231,7 @@
       "verification_note": "Confirmed the sibling screens use the primitive. Safe rename; no runtime divergence expected.",
       "prior_audit_id": null,
       "completion_status": "deferred",
-      "completion_note": "Style nit; not in this slice."
+      "completion_note": "View IS used at MeltQuoteScreen.tsx:121 and 161; the dead-import claim is wrong. The real concern (use the project primitive instead of react-native View) is a dim8 vocabulary slice, not dead-code. Out of slice."
     },
     {
       "id": "F-011",

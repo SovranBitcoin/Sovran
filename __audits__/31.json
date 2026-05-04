@@ -95,7 +95,9 @@
         "lint:unused-imports/no-unused-imports"
       ],
       "verification_note": "Grepped the file; only the primitives View on line 104 and elsewhere are used. The RN View import at line 33 has zero references below it.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Stale duplicate of 19.json F-010 — View is actually used (lines 121, 161). The 'dead View import' framing is wrong."
     },
     {
       "id": "F-003",
