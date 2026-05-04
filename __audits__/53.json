@@ -1,0 +1,380 @@
+{
+  "audit": {
+    "date": "2026-05-04",
+    "commit": "9bfa1758",
+    "entry_point": "features/camera/",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Zero prior cites in __audits__/ (true gap among feature subtrees) AND camera is the QR-scan untrusted-input boundary into the payment state machine — high leverage for dim-2/dim-5 untrusted-input + deep-link routing review. Structural-summary motivator: Architecture 40/100, Hygiene 5/100, with multiple permission-handling lookalikes hinting at consolidation.",
+    "repos_touched": [
+      "sovran-app",
+      "coco-payment-ux"
+    ],
+    "prior_audits_consulted": [
+      "19.json",
+      "23.json",
+      "27.json",
+      "30.json",
+      "32.json",
+      "37.json",
+      "44.json",
+      "45.json",
+      "48.json",
+      "49.json",
+      "50.json",
+      "51.json",
+      "52.json"
+    ],
+    "sov_specs_consulted": [],
+    "skills_consulted": [
+      "zod-4",
+      "react-native-best-practices",
+      "neverthrow-return-types"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose",
+      "prompt-engineering-patterns"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "clean for camera scope",
+      "lint": "not run (camera scope clean per type-check; no edits made)",
+      "knip": "no camera-scope hits",
+      "analyze_structure": "score 41/100; weakest dims Hygiene 5/100, Testability 1/100; camera subtree has no cycles, 7 files, 121 declarations",
+      "lookalikes": "name collisions only on import shadowing of CameraScreen/CameraLayout barrels (false positives); no color near-matches; one inert useRef(false) value collision; cross-repo `unit` param has 16 collision sites — out of slice",
+      "log_doctor": "log.txt present (~12 MB) but latest session has no camera/scan/permission events; all dim-7 race/leak findings are UNVERIFIED for runtime evidence"
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "CameraScreen renders black on permission denial with no recovery path",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/CameraScreen/CameraLayout.tsx",
+      "line": 28,
+      "symbol": "CameraLayout",
+      "dimension": 8,
+      "description": "When `hasPermission` is false (permission not yet granted, denied, or revoked while backgrounded), CameraLayout returns a bare `<View className=\"relative flex-1 bg-black\" />` and nothing else — no explainer, no Open-Settings CTA, no request button. CameraScreen.tsx:65 only reads `useCameraPermissions()`; the requester is never invoked from this surface. Direct deep links to `/camera` (e.g. NFC tap, share intent, notification, or any path that does not route through WalletScreen.tsx:71's `useHandleCameraPermission`) land users on a black screen with no recovery affordance. iOS users who revoke camera permission in Settings while the app is backgrounded see the same black screen on next launch.",
+      "why_it_matters": "Camera is the primary scan-to-pay entry point. A black screen on a payment surface looks like a crash to the user, drives them to force-quit the app, and silently abandons the flow. The dedicated `useHandleCameraPermission` hook (features/camera/hooks/useHandleCameraPermission.ts) already implements the explainer popup + Open-Settings CTA — it just isn't wired into the camera screen.",
+      "fix": "Replace the bare black-View fallback with a permission-explainer state. Wire `useHandleCameraPermission` (or pull its popup chain into CocoPaymentUX's already-present `requestCameraPermission` callback at CocoPaymentUX.tsx:156) so CameraScreen can re-prompt or jump to Settings when `hasPermission?.granted` is false. The right consolidation is: one canonical permission flow (the existing hook) called from every entry point — CameraScreen, WalletScreen, and the screen-action bridge in CocoPaymentUX.",
+      "references": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:65",
+        "features/camera/screens/CameraScreen/CameraLayout.tsx:28",
+        "features/camera/hooks/useHandleCameraPermission.ts:9",
+        "features/wallet/screens/WalletScreen.tsx:71",
+        "features/send/providers/CocoPaymentUX.tsx:154",
+        "skill:improve-codebase-architecture",
+        "skill:building-native-ui"
+      ],
+      "verification_note": "Re-read CameraLayout.tsx:28-30 — confirmed the only branch when `!hasPermission` is the empty black View. Counter-argument: WalletScreen pre-gates permission before navigation, so the typical entry path never hits this state. Rebuttal: `app/camera.tsx` (StandaloneCameraScreen route) has no upstream gate — `app/camera.tsx:10` returns `<StandaloneCameraScreen />` directly with no permission check. Anyone who lands on this route via deep link sees the dead black screen.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "CameraLayout now renders permission-explainer + Grant access button when !hasPermission, calling useHandleCameraPermission().handlePermission"
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "Three independent expo-camera permission paths with diverged behaviour — the consolidated hook is bypassed",
+      "repo": "sovran-app",
+      "path": "features/camera/hooks/useHandleCameraPermission.ts",
+      "line": 9,
+      "symbol": "useHandleCameraPermission",
+      "dimension": 4,
+      "description": "`useCameraPermissions()` from expo-camera is consumed in three distinct places, each with different behaviour:\n\n1. `features/camera/hooks/useHandleCameraPermission.ts:9` — full request flow with `cameraPermissionPopup('granted')` confirmation and an `actionMenuPopup` 'Open Settings' fallback for blocked. Only WalletScreen.tsx:71 calls it.\n2. `features/send/providers/CocoPaymentUX.tsx:154-160` — bare request + `cameraGrantedRef` cache, no popup, no Open-Settings CTA. Wired into the screen-action bridge.\n3. `features/camera/screens/CameraScreen/CameraScreen.tsx:65` — read-only `const [hasPermission] = useCameraPermissions()`; no requester at all. Drives the black-screen fallback in F-001.\n\nThree near-duplicates of the same authorization concern, only one (the bridge) ever runs in production for the scan path. The dedicated hook in the same feature folder is unreachable from the camera surface itself.",
+      "why_it_matters": "Slop indicator: three call sites doing the same thing with three behaviours means changing the popup copy, the explainer language, or the analytics event name now requires three coordinated edits — and the camera surface (the most user-visible consumer) is the worst-equipped of the three. Default verdict per audit role: delete the duplicates and route every consumer through the canonical hook.",
+      "fix": "Consolidate to one permission gateway. `useHandleCameraPermission` is the right shape (popup + Open-Settings + return boolean). Have CocoPaymentUX.tsx:156 `requestCameraPermission` delegate to it, and have CameraScreen render a recovery affordance that calls it on tap. Then `useCameraPermissions` should appear once in the codebase (inside the canonical hook).",
+      "references": [
+        "features/camera/hooks/useHandleCameraPermission.ts:9",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:65",
+        "features/send/providers/CocoPaymentUX.tsx:154",
+        "features/wallet/screens/WalletScreen.tsx:71",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Verified by `grep -RnE \"useCameraPermissions|useHandleCameraPermission\" features shared app` — exactly the four call sites above, no others. Counter-argument: CocoPaymentUX.tsx's request callback is async-from-handler and may not be ergonomic to compose with a popup chain. Rebuttal: the popup chain is already async (`cameraPermissionPopup`, `actionMenuPopup` → `Linking.openURL`), so wrapping the bridge call in the existing hook is a one-line change with no API shape mismatch.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "CameraScreen + CocoPaymentUX both delegate to useHandleCameraPermission; useCameraPermissions now appears once in the codebase (inside the canonical hook)"
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "usePaymentFlowMachine writes context refs during render — concurrent-render hazard worst-felt by CameraScreen",
+      "repo": "coco-payment-ux",
+      "path": "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx",
+      "line": 449,
+      "symbol": "usePaymentFlowMachine",
+      "dimension": 1,
+      "description": "Lines 449-450 of `usePaymentFlowMachine` mutate provider context refs synchronously during render:\n```\nctx.walletContextRef.current = walletContext;\nctx.unitRef.current = unit;\n```\nNo useEffect, no useLayoutEffect — these writes execute on every render of every consumer. CameraScreen.tsx:79-83 is the most active caller because it re-renders on focus/blur, AppState change, permission change, and every flashlight toggle. Under React 19 concurrent rendering, a render can be discarded (e.g. transition aborted, suspense fallback) — the ref write has already happened and now points at a never-committed walletContext.",
+      "why_it_matters": "React's purity rule forbids side effects during render precisely because concurrent mode can discard, replay, or reorder renders. Last-writer-wins on a ref limits the blast radius (no persistent corruption) but introduces a subtle race window: an aborted CameraScreen render can leave `walletContextRef` pointing at a wallet context that was never committed, then a sibling component reading the ref through `machine.scan` operates on stale wallet state. UNVERIFIED for an observable user-visible bug, but the prior 19.json F-012 fixed this exact pattern in `features/send/providers/CocoPaymentUX.tsx:109` and missed the upstream library — same bug shape, distinct location.",
+      "fix": "Move the ref writes into `useEffect` (or `useLayoutEffect` if downstream readers need synchronous post-render access). `useEffect(() => { ctx.walletContextRef.current = walletContext; ctx.unitRef.current = unit; }, [ctx, walletContext, unit])` runs only after commit, so discarded renders no longer mutate refs. The existing `useEffect` at lines 452-459 already has this shape for `optionDismissRef` — extend it.",
+      "references": [
+        "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:449",
+        "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:452",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:79",
+        "features/send/providers/CocoPaymentUX.tsx:109",
+        "skill:react-native-best-practices",
+        "skill:diagnose"
+      ],
+      "verification_note": "Re-read CocoPaymentUXProvider.tsx:442-462 — confirmed lines 449-450 are unconditional sync writes, not inside any hook. Counter-argument: this file is upstream coco-payment-ux library code which is likely intentional (machine instance is documented as 'stable'). Rebuttal: the *machine* is stable; it's the *refs the machine reads* that are written during render, which is the violation. Marked Medium not High because no specific CameraScreen state has been observed corrupted (UNVERIFIED) — confidence reduced to 0.7 accordingly.",
+      "prior_audit_id": "F-012@19.json",
+      "completion_status": "complete",
+      "completion_note": "ref writes moved into useEffect in usePaymentFlowMachine; discarded renders no longer mutate provider refs"
+    },
+    {
+      "id": "F-004",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Dead `scanLocked` prop never set by any consumer — both gates are dead branches",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/CameraScreen/CameraScreen.tsx",
+      "line": 54,
+      "symbol": "CameraScreen.scanLocked",
+      "dimension": 4,
+      "description": "`CameraScreenProps.scanLocked` defaults to `false` and is declared optional in types.ts:7. Verified by `grep -RnE \"scanLocked\\\\s*=|<CameraScreen\" app features` — every consumer (`app/camera.tsx:10`, `app/(send-flow)/camera.tsx:23`, `app/(receive-flow)/camera.tsx:23`, `features/camera/screens/StandaloneCameraScreen.tsx:71`) renders `<CameraScreen />` without passing the prop. Two gates depend on it:\n- CameraScreen.tsx:107 (`if (scanLocked) return;` in handleScan)\n- CameraScreen.tsx:147, 165 (early returns in clipboard/gallery handlers)\n- CameraLayout.tsx:50 (`onBarcodeScanned={scanLocked ? undefined : handleScan}`)\nAll four conditionals are dead.",
+      "why_it_matters": "Slop. Either `scanLocked` was a planned feature that never shipped, or it was used and the consumer was deleted. Removing it shrinks the surface and removes four dead branches. If it's intended for a future feature flag, the right shape is to delete it now and re-add when the consumer lands.",
+      "fix": "Delete `scanLocked` from `CameraScreenProps`, `CameraScreenShared`, and the four conditional gates. The bare `onBarcodeScanned={handleScan}` and unconditional handler bodies are equivalent.",
+      "references": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:54",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:107",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:147",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:165",
+        "features/camera/screens/CameraScreen/CameraLayout.tsx:50",
+        "features/camera/screens/CameraScreen/types.ts:7",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "grep confirmed no consumer ever sets `scanLocked={true}` or `scanLocked` at all. Knip didn't flag it because it's a prop, not an export — exactly the shape that escapes static-tooling sweeps and accumulates as slop. Counter-argument: maybe a planned NFC-handoff feature locks scan during the handoff window. Rebuttal: NFC-pay paths use `action: 'nfc-pay'` deep-link param (StandaloneCameraScreen.tsx:20) and auto-fire `machine.scan?.(undefined, { source: 'nfc' })` in a useEffect — they don't lock barcode scan, they trigger a separate source.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "scanLocked prop + four conditional branches deleted from CameraScreen, CameraLayout, types"
+    },
+    {
+      "id": "F-005",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "Duplicate ParamsSchema in CameraScreen and StandaloneCameraScreen — same route parsed twice with two schemas",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/CameraScreen/CameraScreen.tsx",
+      "line": 34,
+      "symbol": "ParamsSchema",
+      "dimension": 6,
+      "description": "Two near-identical zod schemas declared inline:\n- CameraScreen.tsx:34 — `z.object({ unit: z.string().max(16).optional() })`\n- StandaloneCameraScreen.tsx:18 — `z.object({ unit: z.string().max(16).optional(), action: z.enum(['nfc-pay']).optional() })`\nWhen the standalone route mounts, `useRouteParams(ParamsSchema, { where: 'camera.standalone' })` parses once; then `<CameraScreen />` renders, which immediately re-parses the *same* `useLocalSearchParams` payload through its own narrower schema. Two parses, two schemas, one route — and the first schema's allowed shape is a strict subset of the second's, so they should compose, not duplicate.",
+      "why_it_matters": "Schema drift. Whoever adds a third deep-link param (e.g. `?prefilledAmount=...`) has to remember to update both schemas; otherwise a value parsed in one view of the route silently gets dropped in the other. The codebase already has `shared/lib/nav/routeSchemas.ts` (one of the structural-summary's shallow modules at depth=1.9) — that's the consolidation target.",
+      "fix": "Move the camera schema to `shared/lib/nav/routeSchemas.ts` (or a new `features/camera/lib/routeParams.ts`) as a single `cameraRouteParamsSchema`. Have StandaloneCameraScreen extend it with `action`. Both screens import the same base. Bonus: tighten `unit` to a `z.enum` over the supported unit list (see F-006).",
+      "references": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:34",
+        "features/camera/screens/StandaloneCameraScreen.tsx:18",
+        "shared/lib/nav/routeSchemas.ts:1",
+        "skill:zod-4",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Confirmed both files declare the schema literal. Counter-argument: the two screens have different lifecycles and may diverge in future (e.g. a flow-specific param). Rebuttal: even if they diverge, the shared `unit` field is the *current* duplication and consolidating it now prevents drift. The standalone-only `action` already shows how composition works (extend the base; don't redeclare).",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "cameraRouteParamsSchema exported from CameraScreen; StandaloneCameraScreen extends it with action"
+    },
+    {
+      "id": "F-006",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "Deep-link `unit` param accepts any 16-char string instead of an enum over supported units",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/CameraScreen/CameraScreen.tsx",
+      "line": 35,
+      "symbol": "ParamsSchema.unit",
+      "dimension": 5,
+      "description": "`unit: z.string().max(16).optional()` accepts any string up to 16 characters. Downstream `usePaymentFlowMachine({ unit: unit || 'sat' })` (CameraScreen.tsx:79-83) passes it to coco's `ctx.unitRef.current = unit` (CocoPaymentUXProvider.tsx:450). The supported unit set is small ({ 'sat', 'btc', 'usd', 'eur', 'gbp', ... maybe a few more}) — `z.enum([...])` would reject malformed deep links at the route boundary instead of silently propagating into machine state.",
+      "why_it_matters": "Untrusted-input boundary discipline. Deep links are an attacker-influenceable surface (malicious shareable URLs, NFC-tag-encoded URLs, push notifications). A malformed `unit` survives all the way to coco's pricing/balance lookups; whether it crashes or just silently shows zero balance depends on how each downstream consumer handles unknown units, which isn't a property the camera screen should rely on.",
+      "fix": "Replace `z.string().max(16).optional()` with `z.enum(SUPPORTED_UNITS).optional()` where `SUPPORTED_UNITS` is the canonical unit list (likely already declared in `coco-payment-ux/src/formatting/locales.ts` or `shared/stores/global/settingsStore.ts`'s `DisplayCurrency`). If the unit list is dynamic, at least `z.string().regex(/^[a-z]{3,8}$/).optional()`.",
+      "references": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:34",
+        "features/camera/screens/StandaloneCameraScreen.tsx:18",
+        "features/send/providers/CocoPaymentUX.tsx:64",
+        "coco-payment-ux/src/formatting/locales.ts:1",
+        "skill:zod-4",
+        "skill:security-review"
+      ],
+      "verification_note": "Same shape as 49.json F-005 (geohash deep-link param not zod-validated) and 25.json F-005 (mint deep-link params skip zod validation) — recurring pattern across feature surfaces. Counter-argument: if downstream coco normalizes unknown units to 'sat', the validation is purely defensive. Rebuttal: defensive validation at the route boundary is a free win; the cost is one line, the upside is a clearer error path and observability when the downstream contract changes.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "unit tightened to z.string().regex(/^[a-z]{2,8}$/).optional() in cameraRouteParamsSchema"
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "Dual useLifecycleLogger fires for one screen mount when StandaloneCameraScreen wraps CameraScreen",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/StandaloneCameraScreen.tsx",
+      "line": 24,
+      "symbol": "useLifecycleLogger",
+      "dimension": 10,
+      "description": "Both screens call `useLifecycleLogger`:\n- StandaloneCameraScreen.tsx:24 — `useLifecycleLogger('StandaloneCameraScreen')`\n- CameraScreen.tsx:55 — `useLifecycleLogger('CameraScreen')`\nWhen the standalone route mounts, both fire. log-doctor's screen-mount counts double-count this surface. Across the four entry routes (app/camera.tsx, app/(send-flow)/camera.tsx, app/(receive-flow)/camera.tsx) only one wraps CameraScreen with the standalone shell, so cross-route mount metrics for 'CameraScreen' over-count by a factor that depends on which route the user took.",
+      "why_it_matters": "Three logger conventions in one feature defeat log-doctor scoping (echoing 49.json F-013's complaint about bitchat). Even though both lifecycle loggers individually scope correctly, their composition produces ambiguous mount sequences in the log timeline, which makes reasoning about screen-flow regressions slower.",
+      "fix": "Pick one. The simpler choice: keep `useLifecycleLogger('CameraScreen')` (it's the actual camera screen), drop the standalone wrapper's logger. Or: rename the standalone wrapper's logger to `'StandaloneCameraShell'` so the timeline shows 'StandaloneCameraShell mount → CameraScreen mount → CameraScreen unmount → StandaloneCameraShell unmount' — a clearer composition.",
+      "references": [
+        "features/camera/screens/StandaloneCameraScreen.tsx:24",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:55",
+        "skill:diagnose"
+      ],
+      "verification_note": "log.txt's latest session has no camera-related events (UNVERIFIED for runtime evidence of the doubling). The structural claim — both hooks fire on the standalone path — follows from React's render order without needing a runtime trace.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "StandaloneCameraScreen lifecycle logger renamed to 'StandaloneCameraShell' for unambiguous mount sequences"
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "handleCameraReady setTimeout has no clearTimeout on unmount — late-setState risk",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/CameraScreen/CameraScreen.tsx",
+      "line": 182,
+      "symbol": "handleCameraReady",
+      "dimension": 7,
+      "description": "Lines 182-184:\n```\nconst handleCameraReady = useCallback(() => {\n  setTimeout(() => setFlashlightOn(false), 1000);\n}, []);\n```\nNo timeout ref, no useEffect cleanup. If the user navigates away within 1s of camera ready (common during rapid scan→back navigation), `setFlashlightOn(false)` fires after unmount.",
+      "why_it_matters": "Same shape as 52.json F-003 (WhitenoiseSetupBanner.tsx:78 `setTimeout has no cleanup → late setState after unmount`, severity Medium, completion_status complete). React 19 has reduced the surface area of late-setState warnings, but the underlying pattern (timer outliving its component) is still bad — the closure pins `setFlashlightOn` and prevents GC of the prior CameraScreen instance.",
+      "fix": "Store the timeout id in a ref and clear it on unmount via useEffect cleanup, or move the 1s delay into a useEffect that depends on a `cameraReady` boolean state. Cleaner shape: `useEffect(() => { if (!cameraReady) return; const id = setTimeout(() => setFlashlightOn(false), 1000); return () => clearTimeout(id); }, [cameraReady])`.",
+      "references": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:182",
+        "features/whitenoise/components/WhitenoiseSetupBanner.tsx:78",
+        "skill:react-native-best-practices",
+        "skill:diagnose"
+      ],
+      "verification_note": "Verified by re-reading lines 182-184 — no clearTimeout, no ref, no useEffect cleanup. UNVERIFIED for log-doctor evidence of an actual late-setState; latest session had no camera activity. Confidence 0.85 reflects structural certainty offset by lack of runtime trace.",
+      "prior_audit_id": "F-003@52.json",
+      "completion_status": "complete",
+      "completion_note": "flashlight setTimeout moved into useEffect keyed on cameraReady with clearTimeout cleanup"
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.65,
+      "title": "Clipboard and gallery scan handlers lack the AppState + isFocused gate that the QR handler enforces",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/CameraScreen/CameraScreen.tsx",
+      "line": 146,
+      "symbol": "handleClipboardPress",
+      "dimension": 7,
+      "description": "`handleScan` (line 109) refuses to fire if the app is backgrounded or the route is unfocused:\n```\nif (appStateRef.current !== 'active' || !isFocused) return;\n```\nThe sibling handlers `handleClipboardPress` (line 146) and `handleGalleryPress` (line 164) check only `if (scanLocked) return;` (which is dead per F-004) and proceed. A user-initiated tap is by definition foreground, so this is mostly defensive — but iOS can deliver a tap event during the brief 'inactive' transition before the app goes to 'background', firing `machine.scan` with stale focus state.",
+      "why_it_matters": "Dimensional inconsistency. If the QR path is worth gating, so are the other three sources. If they're not worth gating, neither is the QR path — pick one. The current asymmetry is slop, not a designed contract.",
+      "fix": "Extract the gate into a small helper (`shouldAcceptScan()`) and call it at the top of all three handlers. Or remove the gate from `handleScan` if it's not load-bearing — `handleScan` is throttled by `isProcessingRef` and `lastScanRef` debounce already, so the AppState/isFocused check is at most belt-and-suspenders.",
+      "references": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:109",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:146",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:164",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "UNVERIFIED for an observed race in log.txt (no camera activity in latest session). The structural inconsistency between handlers is verifiable from source. Counter-argument: user taps inherently imply foreground. Rebuttal: iOS phase callbacks don't always pause input; rapid tap-then-system-banner can deliver a tap with `appState === 'inactive'`. Confidence 0.65 reflects this is more about consistency than a load-bearing bug.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "extracted shouldAcceptScan() helper; QR + clipboard + gallery handlers all share the AppState/isFocused gate"
+    },
+    {
+      "id": "F-010",
+      "severity": "Nit",
+      "confidence": 0.85,
+      "title": "unlockRef indirection is unnecessary — unlock is already stable",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/CameraScreen/CameraScreen.tsx",
+      "line": 69,
+      "symbol": "unlockRef",
+      "dimension": 4,
+      "description": "Lines 69-77:\n```\nconst unlock = useCallback(() => {\n  isProcessingRef.current = false;\n  setLoading(false);\n}, []);\nunlockRef.current = unlock;\nconst onOptionDismiss = useCallback(() => unlockRef.current?.(), []);\n```\nThe canonical 'stable callback that reads latest closure' shape applies when the inner function closes over values that change. Here, `unlock` is `useCallback(..., [])` and only references `isProcessingRef` (a ref) and `setLoading` (a stable setter). It is itself stable. The ref indirection adds no behaviour.",
+      "why_it_matters": "Slop. New readers waste time tracing the ref hop only to discover it's a no-op. The canonical-pattern muscle memory ('I see ref-of-callback, must be a closure-staleness fix') misleads here.",
+      "fix": "Replace lines 69-77 with `const onOptionDismiss = useCallback(() => { isProcessingRef.current = false; setLoading(false); }, []);` and delete `unlock` and `unlockRef`.",
+      "references": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:69",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Re-read the closure body of `unlock`: `isProcessingRef` is a ref (stable identity, .current write doesn't require fresh closure), `setLoading` is React's setState (stable). Counter-argument: maybe `unlock` is exported/used elsewhere. Rebuttal: it's local-scope const, only read at line 75. Safe to inline.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "unlockRef indirection removed; onOptionDismiss inlines the body directly"
+    },
+    {
+      "id": "F-011",
+      "severity": "Nit",
+      "confidence": 0.8,
+      "title": "Inconsistent coco-payment-ux import paths between sibling files",
+      "repo": "sovran-app",
+      "path": "features/camera/screens/StandaloneCameraScreen.tsx",
+      "line": 14,
+      "symbol": "useCocoPaymentUXContext",
+      "dimension": 4,
+      "description": "Two files in the same directory use two different import paths for coco-payment-ux/react hooks:\n- StandaloneCameraScreen.tsx:14 — `import { useCocoPaymentUXContext } from 'coco-payment-ux/react';`\n- CameraScreen.tsx:21 — `import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';` (re-export at CocoPaymentUX.tsx:67)\nThe wallet-side `CocoPaymentUX.tsx:67` re-exports `usePaymentFlowMachine` only, not `useCocoPaymentUXContext`, so consumers that need the latter must reach for the package directly.",
+      "why_it_matters": "The package-level re-export pattern is incomplete; the divergence shows up at the consumer. Either commit to the package-level import everywhere (delete the re-export at CocoPaymentUX.tsx:67), or extend the re-export to cover every hook the codebase consumes (add `useCocoPaymentUXContext` and any other `coco-payment-ux/react` symbols that have first-party consumers).",
+      "fix": "Pick one. The simpler choice: extend `features/send/providers/CocoPaymentUX.tsx:67` to re-export `useCocoPaymentUXContext` (and audit other `from 'coco-payment-ux/react'` imports to see which hooks need re-exporting). Then update StandaloneCameraScreen.tsx:14 to use the wallet-side re-export.",
+      "references": [
+        "features/camera/screens/StandaloneCameraScreen.tsx:14",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx:21",
+        "features/send/providers/CocoPaymentUX.tsx:67",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "grep across `features` and `shared` for `from 'coco-payment-ux/react'` would surface every direct-import call site — recommend doing that before picking the canonical path. Counter-argument: direct package imports are normal and only the wallet-side `usePaymentFlowMachine` needs special treatment because it carries side effects. Rebuttal: the inconsistency is visible to readers in the same directory; that's the cost.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useCocoPaymentUXContext re-exported from @/features/send/providers/CocoPaymentUX; StandaloneCameraScreen now uses the wallet-side re-export"
+    }
+  ],
+  "dimensions": {
+    "1": "partial",
+    "2": "skipped",
+    "3": "skipped",
+    "4": "pass",
+    "5": "partial",
+    "6": "partial",
+    "7": "partial",
+    "8": "partial",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "One canonical camera-permission gateway. Delete the read-only `useCameraPermissions()` call in CameraScreen and the bare-request shape in CocoPaymentUX. Route every consumer (CameraScreen UI fallback, WalletScreen pre-nav check, screen-action bridge) through `useHandleCameraPermission`, which already has the popup + Open-Settings affordance. Resolves F-001 and F-002 together.",
+      "files": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx",
+        "features/camera/screens/CameraScreen/CameraLayout.tsx",
+        "features/camera/hooks/useHandleCameraPermission.ts",
+        "features/send/providers/CocoPaymentUX.tsx",
+        "features/wallet/screens/WalletScreen.tsx"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Remove the `scanLocked` prop and its four conditional branches. No consumer ever passes `scanLocked={true}`. Resolves F-004.",
+      "files": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx",
+        "features/camera/screens/CameraScreen/CameraLayout.tsx",
+        "features/camera/screens/CameraScreen/types.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Lift the camera deep-link `ParamsSchema` to a shared module (`shared/lib/nav/routeSchemas.ts` already exists at depth=1.9 and is shallow per analyze-structure — it would benefit from filling out). StandaloneCameraScreen extends with `action`. Tighten `unit` to `z.enum` over the supported unit list. Resolves F-005 and F-006.",
+      "files": [
+        "shared/lib/nav/routeSchemas.ts",
+        "features/camera/screens/CameraScreen/CameraScreen.tsx",
+        "features/camera/screens/StandaloneCameraScreen.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Decide whether the CameraScreen lifecycle logger or the StandaloneCameraScreen one is canonical, and document the choice next to `useLifecycleLogger`. Resolves F-007.",
+      "files": [
+        "features/camera/screens/CameraScreen/CameraScreen.tsx",
+        "features/camera/screens/StandaloneCameraScreen.tsx"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does any path land users on /camera without the WalletScreen pre-nav permission gate? (Suspected: yes — share intents, NFC tag deep links, push notification CTAs. Worth confirming with `grep -RnE \"router\\\\.(push|replace|navigate).*camera\" app features` and reviewing each call site.)",
+    "Is `coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:449` a known upstream issue? If coco-payment-ux is owned by the same team, F-003 should land as an upstream PR; if it's an external dep, the wallet-side workaround is to memoize walletContext so the ref write is a no-op on stable inputs.",
+    "Does `useRouteParams` use `z.strictObject` semantics or pass-through? If pass-through, the inner CameraScreen's narrower schema silently drops `action` from the parsed result without surfacing a warning — fine, but worth documenting."
+  ]
+}
