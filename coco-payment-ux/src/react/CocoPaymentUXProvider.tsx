@@ -10,7 +10,14 @@
 //   - actions: post-terminal screen action handlers for useScreenActions
 // ---------------------------------------------------------------------------
 
-import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react';
 
 import { useLatestRef } from './useLatestRef';
 import { registerLocale } from '../formatting/locales';
@@ -29,6 +36,13 @@ import type { ScreenActionHandlerMap, ScreenType } from '../screen-actions/types
 import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
 import type { Detectors, WalletContext } from '../types';
 import type { CocoPaymentUXInstance } from '../core/createCocoPaymentUX';
+
+/**
+ * Defence-in-depth cap on deep-link host length. The OS typically caps intent
+ * URL length around a few KB; this keeps a malicious app from inducing
+ * unbounded scan-pipeline work via a prepared intent.
+ */
+const DEEP_LINK_HOST_MAX_LENGTH = 16384;
 
 // ---------------------------------------------------------------------------
 // ScreenActionsBridge — optional wallet hooks for useScreenActions
@@ -270,12 +284,6 @@ export function CocoPaymentUXProvider({
   const writeClipboardRef = useLatestRef(writeClipboard);
   const shareContentRef = useLatestRef(shareContent);
 
-  if (translations) {
-    for (const [lang, dict] of Object.entries(translations)) {
-      registerLocale(lang, dict);
-    }
-  }
-
   const getOfflineRef = useLatestRef(getOffline);
   const getBtcPriceRef = useLatestRef(getBtcPrice);
   const getDisplayCurrencyRef = useLatestRef(getDisplayCurrency);
@@ -286,39 +294,18 @@ export function CocoPaymentUXProvider({
   const handlersRef = useRef<StepHandlerMap>({});
   const machineRef = useRef<PaymentMachine | null>(null);
 
-  const propsRef = useRef({
-    handlersFactory,
-    operations,
-    notifications,
-    detectors,
-    createURDecoder,
-    scanSources,
-    getOffline,
-    actions,
-    screenActionsBridge,
-  });
-  propsRef.current = {
-    handlersFactory,
-    operations,
-    notifications,
-    detectors,
-    createURDecoder,
-    scanSources,
-    getOffline,
-    actions,
-    screenActionsBridge,
-  };
+  // Translations register on a module-level locale map. Run as an effect so
+  // the side effect happens after commit (StrictMode double-invoke of render
+  // would otherwise duplicate the work and re-allocate Object.entries each
+  // render).
+  useEffect(() => {
+    if (!translations) return;
+    for (const [lang, dict] of Object.entries(translations)) {
+      registerLocale(lang, dict);
+    }
+  }, [translations]);
 
   if (!machineRef.current) {
-    const {
-      handlersFactory: factory,
-      operations: ops,
-      notifications: notes,
-      detectors: det,
-      createURDecoder: ur,
-      scanSources: sources,
-    } = propsRef.current;
-
     machineRef.current = createPaymentMachine({
       handlers: new Proxy(
         {},
@@ -326,7 +313,7 @@ export function CocoPaymentUXProvider({
           get: (_target, key: string) => (handlersRef.current as Record<string, unknown>)[key],
         }
       ) as StepHandlerMap,
-      detectors: det,
+      detectors,
       getContext: instance
         ? () => instance.tracker.getContext()
         : () => {
@@ -338,17 +325,27 @@ export function CocoPaymentUXProvider({
       getUnit: () => unitRef.current,
       getOffline: () => getOfflineRef.current?.() ?? false,
       getLocale: () => getLocaleRef.current?.() ?? 'en',
-      operations: ops as MachineOperations | undefined,
-      notifications: notes,
-      createURDecoder: ur,
-      scanSources: sources,
+      operations: operations as MachineOperations | undefined,
+      notifications,
+      createURDecoder,
+      scanSources,
       nfcAdapter,
     });
 
-    handlersRef.current = factory(machineRef.current, {
+    handlersRef.current = handlersFactory(machineRef.current, {
       getOptionDismiss: () => optionDismissRef.current,
     });
   }
+
+  // Re-bind handlers when the factory identity changes. Runs in
+  // useLayoutEffect so the next event handled by the machine sees the
+  // updated handler map without a render gap.
+  useLayoutEffect(() => {
+    if (!machineRef.current) return;
+    handlersRef.current = handlersFactory(machineRef.current, {
+      getOptionDismiss: () => optionDismissRef.current,
+    });
+  }, [handlersFactory]);
 
   // Deep link processing
   useEffect(() => {
@@ -374,6 +371,12 @@ export function CocoPaymentUXProvider({
 
     const ignored = new Set(deepLinks.ignoredHosts ?? []);
     if (ignored.has(host)) return;
+
+    if (host.length > DEEP_LINK_HOST_MAX_LENGTH) {
+      logger.warn('deepLink.host.too_long', { length: host.length });
+      deepLinks.onError?.(new Error('DEEP_LINK_TOO_LONG'));
+      return;
+    }
 
     machineRef.current.scan(host, { source: 'deeplink' }).catch((err) => {
       logger.warn('deepLink.scan.failed', { host, error: errField(err) });

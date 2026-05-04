@@ -34,6 +34,12 @@ export interface WalletContextTracker {
   dispose: () => void;
 }
 
+// After this many consecutive top-level refresh failures we stop scheduling
+// the next retry. The tracker stays alive (so a future Manager event can
+// reset the counter and resume), but a poisoned state — disposed manager,
+// gone DB — no longer spins the JS thread or floods logs.
+const MAX_CONSECUTIVE_REFRESH_FAILURES = 5;
+
 export function createWalletContextTracker(
   manager: Manager,
   config?: WalletContextTrackerConfig
@@ -45,12 +51,15 @@ export function createWalletContextTracker(
   const listeners = new Set<() => void>();
   let refreshing = false;
   let pendingRefresh = false;
+  let consecutiveFailures = 0;
+  let disposed = false;
 
   function emit() {
     listeners.forEach((fn) => fn());
   }
 
   async function refresh() {
+    if (disposed) return;
     if (refreshing) {
       pendingRefresh = true;
       return;
@@ -63,31 +72,46 @@ export function createWalletContextTracker(
         manager.wallet.balances.byMint(),
       ]);
 
-      const amounts: Record<string, number[]> = {};
-
-      for (const mint of trustedMints) {
-        try {
-          const proofs = await getReadyProofs(manager, (mint as any).mintUrl);
-          amounts[(mint as any).mintUrl] = proofs.map((p) => p.amount).sort((a, b) => a - b);
-        } catch (e) {
-          logger.warn('walletContextTracker.getReadyProofs.failed', {
-            mintUrl: (mint as any).mintUrl,
-            error: errField(e),
-          });
-          amounts[(mint as any).mintUrl] = [];
-        }
-      }
+      const amounts: Record<string, number[]> = Object.fromEntries(
+        await Promise.all(
+          trustedMints.map(async (mint) => {
+            const mintUrl = (mint as any).mintUrl as string;
+            try {
+              const proofs = await getReadyProofs(manager, mintUrl);
+              return [mintUrl, proofs.map((p) => p.amount).sort((a, b) => a - b)] as const;
+            } catch (e) {
+              logger.warn('walletContextTracker.getReadyProofs.failed', {
+                mintUrl,
+                error: errField(e),
+              });
+              return [mintUrl, []] as const;
+            }
+          })
+        )
+      );
 
       trustedMintUrls = trustedMints.map((m: any) => m.mintUrl);
       mintBalances = Object.fromEntries(
         Object.entries(balancesByMint).map(([url, snap]) => [url, snap.total])
       );
       proofAmounts = amounts;
+      consecutiveFailures = 0;
 
       emit();
+    } catch (e) {
+      consecutiveFailures += 1;
+      logger.warn('walletContextTracker.refresh.failed', {
+        consecutiveFailures,
+        error: errField(e),
+      });
+      // Drop any queued retry on persistent failure so we don't re-enter the
+      // loop; the next Manager event still scheduled new work via .on().
+      if (consecutiveFailures >= MAX_CONSECUTIVE_REFRESH_FAILURES) {
+        pendingRefresh = false;
+      }
     } finally {
       refreshing = false;
-      if (pendingRefresh) {
+      if (pendingRefresh && consecutiveFailures < MAX_CONSECUTIVE_REFRESH_FAILURES && !disposed) {
         pendingRefresh = false;
         void refresh();
       }
@@ -107,6 +131,10 @@ export function createWalletContextTracker(
 
   const unsubscribes = eventNames.map((eventName) =>
     manager.on(eventName as any, () => {
+      // A new Manager event is a fresh signal — reset the failure budget so
+      // a previously-poisoned tracker can recover once the underlying issue
+      // (e.g. DB rehydration finishing) is resolved.
+      consecutiveFailures = 0;
       void refresh();
     })
   );
@@ -128,6 +156,7 @@ export function createWalletContextTracker(
     },
     refresh,
     dispose: () => {
+      disposed = true;
       unsubscribes.forEach((unsub) => unsub());
       listeners.clear();
     },
