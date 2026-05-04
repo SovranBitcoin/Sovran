@@ -18,7 +18,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import * as Location from 'expo-location';
-import { AppleMaps, GoogleMaps } from 'expo-maps';
+import { AppleMaps, GoogleMaps, type CameraPosition } from 'expo-maps';
 import {
   Host,
   Button as SwiftUIButton,
@@ -242,8 +242,14 @@ export function MapScreen() {
   // Category filter
   const [category, setCategory] = useState<CategoryFilter>('all');
 
-  // Map ref allows "uncontrolled" camera updates (keeps dragging smooth)
-  const mapRef = useRef<any>(null);
+  // Map ref allows "uncontrolled" camera updates (keeps dragging smooth).
+  // Typed structurally with the only method we call so the same ref accepts
+  // either platform's view type — both AppleMaps.MapView and GoogleMaps.MapView
+  // expose setCameraPosition with a compatible signature.
+  type MapViewRef = {
+    setCameraPosition: (config?: CameraPosition & { duration?: number }) => void;
+  };
+  const mapRef = useRef<MapViewRef | null>(null);
 
   // Camera refs (do not store in React state — avoids rerenders while panning)
   const cameraRef = useRef({ lat: DEFAULT_LAT, lon: DEFAULT_LON, zoom: DEFAULT_ZOOM });
@@ -251,16 +257,23 @@ export function MapScreen() {
   const setMapCamera = useCallback((next: { lat: number; lon: number; zoom: number }) => {
     cameraRef.current = next;
 
-    const config: any =
-      Platform.OS === 'android'
-        ? {
-            coordinates: { latitude: next.lat, longitude: next.lon },
-            zoom: next.zoom,
-            duration: 250,
-          }
-        : { coordinates: { latitude: next.lat, longitude: next.lon }, zoom: next.zoom };
-
-    mapRef.current?.setCameraPosition?.(config);
+    // Android's GoogleMaps.View.setCameraPosition accepts an optional `duration`
+    // for animated camera moves; AppleMaps.View ignores duration on iOS, so we
+    // branch the config rather than passing duration cross-platform.
+    if (Platform.OS === 'android') {
+      const config: CameraPosition & { duration?: number } = {
+        coordinates: { latitude: next.lat, longitude: next.lon },
+        zoom: next.zoom,
+        duration: 250,
+      };
+      mapRef.current?.setCameraPosition?.(config);
+    } else {
+      const config: CameraPosition = {
+        coordinates: { latitude: next.lat, longitude: next.lon },
+        zoom: next.zoom,
+      };
+      mapRef.current?.setCameraPosition?.(config);
+    }
   }, []);
 
   // Debounce marker updates (markers prop updates are expensive for native maps)
@@ -451,6 +464,11 @@ export function MapScreen() {
       if (clusterMarker.type === 'cluster' && clusterMarker.clusterId !== undefined) {
         const manager = clusterManagerRef.current;
         if (manager) {
+          // Supercluster's getClusterExpansionZoom returns the zoom at which
+          // this cluster's children become individually visible. We zoom one
+          // step past that so the children actually separate in the viewport
+          // instead of re-clustering at the threshold; capped at 18 to stay
+          // within Supercluster's maxZoom + 1.
           const expansionZoom = manager.getClusterExpansionZoom(clusterMarker.clusterId);
           const newZoom = Math.min(expansionZoom + 1, 18);
           setMapCamera({
@@ -562,7 +580,6 @@ export function MapScreen() {
     [updateMarkersForCamera, aspectRatio]
   );
 
-  const MapComponent = Platform.OS === 'ios' ? AppleMaps : GoogleMaps;
   const mapUnavailableOnAndroid = Platform.OS === 'android' && !HAS_ANDROID_GOOGLE_MAPS_KEY;
 
   if (error || mapUnavailableOnAndroid) {
@@ -599,10 +616,31 @@ export function MapScreen() {
         </View>
       )}
 
-      {/* Render map only after initial transition */}
-      {isMapReady && (
-        <MapComponent.View
-          ref={mapRef}
+      {/* Render map only after initial transition. Platform-branched so the
+          ref typechecks against each view's concrete type instead of forcing
+          an `any` cast at the union seam. */}
+      {isMapReady && Platform.OS === 'ios' && (
+        <AppleMaps.View
+          ref={(instance) => {
+            mapRef.current = instance;
+          }}
+          style={StyleSheet.absoluteFillObject}
+          cameraPosition={{
+            coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
+            zoom: DEFAULT_ZOOM,
+          }}
+          properties={{ isMyLocationEnabled: false }}
+          uiSettings={{ compassEnabled: true, myLocationButtonEnabled: false }}
+          markers={markers}
+          onMarkerClick={handleMarkerClick}
+          onCameraMove={handleCameraChange}
+        />
+      )}
+      {isMapReady && Platform.OS === 'android' && (
+        <GoogleMaps.View
+          ref={(instance) => {
+            mapRef.current = instance;
+          }}
           style={StyleSheet.absoluteFillObject}
           cameraPosition={{
             coordinates: { latitude: DEFAULT_LAT, longitude: DEFAULT_LON },
