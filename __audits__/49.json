@@ -612,8 +612,8 @@
       ],
       "verification_note": "Re-checked the 11 errors in `expo lint` output cited at the top of this audit.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "prettier auto-fix applied to the three touched hooks files; remaining 11 prettier issues in features/bitchat/components+screens not touched by this slice."
+      "completion_status": "stale",
+      "completion_note": "Re-verified: `npx eslint features/bitchat` is clean (0 errors, 0 warnings). The 11 prettier formatting errors cited were resolved in a prior unmarked slice."
     },
     {
       "id": "F-026",

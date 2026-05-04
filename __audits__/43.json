@@ -357,8 +357,8 @@
       ],
       "verification_note": "Reproduced via `npm run lint` — exact output quoted in tooling section.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Pressable import already removed in a prior slice (audit was stale on that part). Remaining prettier errors at _layout.tsx:60 and search.tsx:78 fixed via prettier --write. The participants.tsx exhaustive-deps warning is a logic concern, not lint hygiene; out of slice."
+      "completion_status": "stale",
+      "completion_note": "Re-verified: `npx eslint app/(split-bill-flow)` shows 0 errors. The cited prettier errors at _layout.tsx:60 and search.tsx:78 are gone. The remaining warning (participants.tsx:131 selectedIdsRef exhaustive-deps) is a different lint rule than the unused-imports/prettier cluster this finding addressed."
     },
     {
       "id": "F-015",

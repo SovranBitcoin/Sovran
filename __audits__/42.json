@@ -156,8 +156,8 @@
       ],
       "verification_note": "Re-ran `npm run analyze-structure -- shared/lib/popup` — confirmed 15/15 popups → engine.tsx and 3/4 popups → bridge.ts. Counter-argument considered: maybe engine/bridge are a public API exposed at root for third-party-style consumption — checked, neither is imported anywhere outside shared/lib/popup/ except via the index.ts barrel. The root location is purely vestigial.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Pure relocation — out of scope for the wrapper-collapse slice. After F-002's partial fix the popups/ folder also gained factory.ts, which would move alongside engine + bridge if this is picked up later."
+      "completion_status": "complete",
+      "completion_note": "Slice 6bcb5960 moved engine.tsx and bridge.ts into shared/lib/popup/popups/. Five popups/* importers updated to './engine' / './bridge'; the parent shared/lib/popup/index.ts barrel now re-exports through ./popups/engine and ./popups/bridge. analyze-structure no longer attributes engine/bridge to the popup root, so the MOVE candidate signal is gone."
     },
     {
       "id": "F-007",

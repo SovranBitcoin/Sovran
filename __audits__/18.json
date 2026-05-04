@@ -192,8 +192,8 @@
       ],
       "verification_note": "Re-ran `npm run lint` scoped to the subtree — output captured verbatim in the audit's `tooling_run.lint` field. Confirmed by line-for-line inspection that every cited rule ID fires on the cited line. Counter-argument considered: 'prettier errors are cosmetic, not substantive.' Partially true for the 9 pure-formatting ones, but the 2 exhaustive-deps warnings and the 2 unused-import/variable errors are substantive (potential stale-closure bugs and incomplete-refactor signals). Severity Medium because the exhaustive-deps hits are named dim-7 heuristics for stale closures.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Lint baseline cleanup is out of scope for the type-narrowing slice."
+      "completion_status": "stale",
+      "completion_note": "Re-verified: app/(user-flow)/splitBill/ no longer exists in the tree. The cited 12 errors + 9 warnings audit was against a deleted directory — current split-bill flow lives at app/(split-bill-flow)/, which has 0 errors and 1 unrelated warning."
     },
     {
       "id": "F-008",
