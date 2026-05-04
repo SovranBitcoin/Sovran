@@ -10,8 +10,8 @@ import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
-import { useRecentContacts } from '@/features/payments/hooks/useRecentContacts';
-import { useMintContacts } from '@/features/payments/hooks/useMintContacts';
+import { useRecentContacts, type RecentContact } from '@/features/payments/hooks/useRecentContacts';
+import { useMintContacts, type MintContact } from '@/features/payments/hooks/useMintContacts';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -42,6 +42,26 @@ import type { NostrProfileMetadata } from '@/shared/stores/global/nostrMetadataC
 
 type TopTab = 'contacts' | 'groups';
 
+interface WhitenoiseRequestRow {
+  type: 'request';
+  pubkey: string;
+  request: WhitenoiseRequest;
+}
+
+type ContactsListItem = RecentContact | MintContact | WhitenoiseRequestRow;
+
+// Hostname extraction for mint URL search. Pure; hoisted so the reference is
+// stable across renders (each list filter pass would otherwise allocate a
+// fresh closure).
+function mintHost(url: string | undefined): string {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return url.toLowerCase();
+  }
+}
+
 function GeohashJumpRow({ geohash }: { geohash: string }) {
   const router = useGuardedRouter();
   return (
@@ -58,7 +78,7 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: { geohash },
-        } as any);
+        });
       }}
       testID={`contact-row:geohash:${geohash}`}
     />
@@ -89,7 +109,7 @@ function GroupsTierRow({ tier }: { tier: TierEntry }) {
             tierLabel: tier.label,
             transport: tier.transport,
           },
-        } as any);
+        });
       }}
       testID={`contact-row:geohash:${tier.geohash}`}
     />
@@ -208,17 +228,6 @@ export const ContactsScreen = () => {
     });
   }, [displayContacts, profilesMap, lowerQuery, matchesProfileQuery]);
 
-  // Extract a mint URL's hostname for matching. Falls back to the raw string
-  // on parse failure so a mint isn't accidentally unsearchable.
-  const mintHost = (url: string | undefined): string => {
-    if (!url) return '';
-    try {
-      return new URL(url).hostname.toLowerCase();
-    } catch {
-      return url.toLowerCase();
-    }
-  };
-
   // Only surface mints whose nostr-contact kind-0 profile has actually landed.
   // A mint with a valid npub but no profile metadata yet renders as a bare
   // URL with no picture / nip05 / reputation — reads as "no contact info" to
@@ -240,10 +249,10 @@ export const ContactsScreen = () => {
     });
   }, [mintsWithProfile, profilesMap, lowerQuery, matchesProfileQuery]);
 
-  const requestRows = useMemo(
+  const requestRows = useMemo<WhitenoiseRequestRow[]>(
     () =>
       whitenoiseRequests.map((r) => ({
-        type: 'request' as const,
+        type: 'request',
         pubkey: r.fromPubkey,
         request: r,
       })),
@@ -254,13 +263,13 @@ export const ContactsScreen = () => {
   // useRecentContacts entries so renderContactItem (and search filtering)
   // treats them identically. timestamp 0 keeps them below entries with
   // genuine recent activity until we wire group-history reads.
-  const whitenoiseContactRows = useMemo(
+  const whitenoiseContactRows = useMemo<RecentContact[]>(
     () =>
       whitenoiseDmEntries.map((e) => ({
-        type: 'contact' as const,
+        type: 'contact',
         pubkey: e.pubkey,
         dmEvent: null,
-        nip17Content: undefined as string | undefined,
+        nip17Content: undefined,
         timestamp: 0,
       })),
     [whitenoiseDmEntries]
@@ -274,13 +283,13 @@ export const ContactsScreen = () => {
     });
   }, [whitenoiseContactRows, profilesMap, lowerQuery, matchesProfileQuery]);
 
-  const currentListData = useMemo(() => {
+  const currentListData = useMemo<ContactsListItem[]>(() => {
     switch (activeFilter) {
       case 'Recent': {
         // Merge NIP-17/NIP-04 recent contacts with accepted Marmot DM
         // counterparties, deduped by pubkey (NIP-17 entries win — they
         // carry actual lastMessage previews).
-        const byKey = new Map<string, any>();
+        const byKey = new Map<string, ContactsListItem>();
         for (const item of filteredWhitenoiseContacts) byKey.set(item.pubkey, item);
         for (const item of filteredDisplayContacts) {
           if (item.pubkey) byKey.set(item.pubkey, item);
@@ -292,7 +301,7 @@ export const ContactsScreen = () => {
       case 'Requests':
         return requestRows;
       default: {
-        const byKey = new Map<string, any>();
+        const byKey = new Map<string, ContactsListItem>();
         for (const item of filteredWhitenoiseContacts) {
           byKey.set(item.pubkey, item);
         }
@@ -321,12 +330,12 @@ export const ContactsScreen = () => {
   }, []);
 
   const renderContactItem = useCallback(
-    ({ item }: { item: any }) => {
+    ({ item }: { item: ContactsListItem }) => {
       // White Noise pending invite — keep it in this list so the empty/
       // loading/scrolling behaviour is the same as the other pills, but
       // swap the trailing slot for accept/decline buttons.
       if (item.type === 'request') {
-        const req: WhitenoiseRequest = item.request;
+        const req = item.request;
         const profile = profilesMap.get(req.fromPubkey);
         // Strangers' kind-0 metadata may simply not be on the user's
         // default relay set — that's the whole point of a "request". So
@@ -358,7 +367,8 @@ export const ContactsScreen = () => {
       }
 
       const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
-      const lastMessage = item.dmEvent?.content as string | undefined;
+      const lastMessage =
+        typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
       // Don't drive the avatar's loading skeleton off "profile is missing":
       // for strangers (Marmot DM accept, Requests pill) kind-0 may simply
       // not be on our relay set, so missing IS the steady state. With
@@ -366,7 +376,7 @@ export const ContactsScreen = () => {
       // avatar plus deterministic word-pair name renders immediately —
       // no skeleton-forever rows.
       const isLoadingProfile = false;
-      const mintUrl: string | undefined = item.mint?.mintUrl;
+      const mintUrl = item.type === 'mint' ? item.mint?.mintUrl : undefined;
 
       // Layered identity: mint-type items also have a nostr contact key
       // (NIP-87 / NUT-06), so render the mint avatar/name with the nostr
@@ -503,7 +513,9 @@ export const ContactsScreen = () => {
       data={currentListData}
       extraData={profilesMap}
       estimatedItemSize={68}
-      keyExtractor={(item, index) => item.pubkey || item.mint?.mintUrl || `contact-${index}`}
+      keyExtractor={(item, index) =>
+        item.pubkey || (item.type === 'mint' ? item.mint?.mintUrl : undefined) || `contact-${index}`
+      }
       renderItem={renderContactItem}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="always"

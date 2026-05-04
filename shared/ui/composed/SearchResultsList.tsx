@@ -50,7 +50,7 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: { geohash },
-        } as any);
+        });
       }}
       testID={`contact-row:geohash:${geohash}`}
     />
@@ -80,7 +80,7 @@ function TierRow({ tier }: { tier: TierEntry }) {
             tierLabel: tier.label,
             transport: tier.transport,
           },
-        } as any);
+        });
       }}
       testID={`contact-row:geohash:${tier.geohash}`}
     />
