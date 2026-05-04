@@ -7,7 +7,7 @@ import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen'
 import { log, Log, initLog, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
 
 initLog('Module', 'AppGate loaded');
-import { retrieveCashuSeed, retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
+import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 import {
   useWalletLifecycleStore,
   useWalletLifecycleHydrated,
@@ -20,6 +20,14 @@ type ReinstallState = 'checking' | 'none' | 'detected';
  * Detects whether the user is a returning user whose app was reinstalled.
  * SecureStore persists across reinstalls on iOS, but AsyncStorage (settings) is wiped.
  * If a seed exists in SecureStore but onboarding hasn't been seen → reinstall.
+ *
+ * Probes the master mnemonic at `user_mnemonic`, not the per-account
+ * derived seed cache: SOV-00 §5 defines the reinstall signal as "seed in
+ * enclave + onboarding not seen", and the enclave's authoritative seed
+ * record is the master mnemonic. The derived `cashu_seed_0` cache is only
+ * written after Coco runs against account 0 — so import-nsec-only prior
+ * installs and fresh debug-mnemonic dev clients (SOV-00 §4.1 D5) miss it
+ * and incorrectly land on the new-user carousel.
  *
  * Backward-compatible: existing users upgrading will have hasSeenOnboarding=true
  * from their persisted settingsStore, so they'll never trigger this path.
@@ -37,9 +45,9 @@ function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
     let cancelled = false;
     (async () => {
       try {
-        const cached = await retrieveCashuSeed(0);
+        const mnemonic = await retrieveMnemonic();
         if (cancelled) return;
-        if (cached?.seed) {
+        if (mnemonic != null) {
           log.info('gate.reinstall.detected', { seedExists: true });
           setState('detected');
         } else {
@@ -49,7 +57,9 @@ function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
         if (!cancelled) setState('none');
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [hasSeenOnboarding]);
 
   return state;

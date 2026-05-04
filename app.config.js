@@ -23,10 +23,24 @@ module.exports = ({ config }) => {
   const androidGoogleMapsApiKey =
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 
+  // Inject DEBUG_MNEMONIC into `extra.debugMnemonic` ONLY for the
+  // `development` build profile (stricter than `isDevelopment`, which also
+  // includes `preview` — internal beta builds must not carry the debug
+  // seed). The non-`EXPO_PUBLIC_*` prefix prevents Expo's automatic
+  // build-time env inlining; gating on buildProfile structurally keeps the
+  // literal out of preview/production bundles even if a developer's shell
+  // still exports the var. See SOV-00 §4.1 and
+  // shared/lib/nostr/secureStorage.ts:getDebugMnemonicOverride.
+  const debugMnemonic = buildProfile === 'development' ? process.env.DEBUG_MNEMONIC : undefined;
+
   // Spread the static config from app.json and override only what's needed
   return {
     ...config,
     icon: appIcon,
+    extra: {
+      ...config.extra,
+      ...(debugMnemonic ? { debugMnemonic } : {}),
+    },
     plugins: [
       ...(config.plugins || []),
       'expo-maps',

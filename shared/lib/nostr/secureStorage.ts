@@ -155,24 +155,51 @@ async function parseOrSelfHeal<T>(
   }
 }
 
+/**
+ * Reads the dev-only debug mnemonic from `Constants.expoConfig.extra.debugMnemonic`.
+ *
+ * The value is injected by `app.config.js` exclusively for the `development`
+ * EAS build profile (and `expo start`/dev-client launches) from a non-`EXPO_PUBLIC_*`
+ * env var. EXPO_PUBLIC_* vars are inlined verbatim into every JS bundle that
+ * builds with them set — so any production EAS build kicked from a shell that
+ * happened to export the var would ship a known 12-word seed in the bundle
+ * (SOV-00 §4.1 D5; audits 04/10/11). Routing through `extra` instead means
+ * preview/production bundles never observe the value: app.config.js refuses
+ * to write it unless buildProfile is 'development'. The `__DEV__` gate then
+ * dead-strips the read in release minification as a second layer.
+ */
 function getDebugMnemonicOverride(): string | null {
   if (!__DEV__) {
     return null;
   }
 
-  const mnemonic = process.env.EXPO_PUBLIC_DEBUG_MNEMONIC?.trim();
+  let raw: unknown;
+  try {
+    const Constants = require('expo-constants').default;
+    raw = Constants.expoConfig?.extra?.debugMnemonic;
+  } catch {
+    // expo-constants not available (e.g. tests or non-Expo RN). The unit
+    // test for this function exercises this branch.
+    return null;
+  }
+
+  if (typeof raw !== 'string') {
+    return null;
+  }
+
+  const mnemonic = raw.trim();
   if (!mnemonic) {
     return null;
   }
 
   const words = mnemonic.split(/\s+/);
   if (words.length !== 12) {
-    throw new Error('EXPO_PUBLIC_DEBUG_MNEMONIC must be exactly 12 words');
+    throw new Error('extra.debugMnemonic must be exactly 12 words');
   }
 
   const normalized = words.join(' ');
   if (!bip39.validateMnemonic(normalized, wordlist)) {
-    throw new Error('EXPO_PUBLIC_DEBUG_MNEMONIC failed BIP-39 validation');
+    throw new Error('extra.debugMnemonic failed BIP-39 validation');
   }
 
   return normalized;
@@ -317,9 +344,9 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
     // seedCreatedAt is null forever — a genuine fresh install indistinguishable
     // from a restore.
     //
-    // Only mark for *fresh* seeds. Debug-injected seeds via
-    // EXPO_PUBLIC_DEBUG_MNEMONIC must look like a pre-existing seed so the dev
-    // environment can exercise the restore-gate flow on every clean install.
+    // Only mark for *fresh* seeds. Debug-injected seeds via the
+    // `extra.debugMnemonic` override must look like a pre-existing seed so the
+    // dev environment can exercise the restore-gate flow on every clean install.
     if (generated.source === 'fresh') {
       try {
         const { useWalletLifecycleStore } =
