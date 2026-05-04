@@ -71,7 +71,9 @@
         "git:04f04469"
       ],
       "verification_note": "Re-ran `npm run type-check` and captured the 8 errors verbatim. Verified via grep that all 8 call sites are through `manager.` (not through an alternate alias). Confirmed against `node_modules/@cashu/coco-core/dist/index.d.ts` that the Manager class still declares these fields private. Counter-argument considered: 'maybe these errors are tolerated while the patch is in transition'. Not in `tsconfig.json` — no exclude path covers this file. The prior audit's refactor_plan explicitly proposed the index.d.ts patch; the fact that 8 new sites have appeared in this file since then indicates the recommendation was not picked up. Regression severity under `<audit_storage>` rule (resolved-then-reappearing = High on its own) does not apply cleanly because 09.json F-002 was not marked resolved — it's still open. Filed as the same finding spreading, with `prior_audit_id: F-002@09.json`.",
-      "prior_audit_id": "F-002@09.json"
+      "prior_audit_id": "F-002@09.json",
+      "completion_status": "stale",
+      "completion_note": "8 TS2341 errors no longer present — file already routes proofService/walletService through shared/lib/cashu/managerInternals seam introduced for 09 F-002 / 24 F-003 / 36 F-008. npx tsc --noEmit reports no manager.proofService / manager.walletService matches in MintRebalancePlanScreen.tsx."
     },
     {
       "id": "F-003",

@@ -134,7 +134,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read api.ts:459-486 (fetch call), 329-422 (parseSSEStream), and useAiSend.ts:247-282 (candidate-chain loop), 308-390 (chunk consumer). Confirmed: no AbortController, no signal, no cleanup. The retry path has the same shape.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Hook-scoped AbortController; signal threaded through sendMessage to fetch; cleanup useEffect aborts on unmount; AbortError caught both in connect-loop and outer catch and treated as silent lifecycle (placeholder removed, span tagged 'aborted')."
     },
     {
       "id": "F-004",
@@ -153,7 +155,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Re-read L164 (balanceBeforeMsats snapshot), L447-500 (fire-and-forget then). Confirmed both flows snapshot independently from the same store value. Race window is narrow (~150ms) but reachable on retry-immediately scenarios. Confidence intentionally below 0.7 because the impact is UX, not funds.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Balance refresh tracked in balancePromiseRef; each new streamIntoPlaceholder awaits the prior balance promise before snapshotting balanceBeforeMsats, so retry-during-balance-refresh sees the post-prior-send balance and computes the correct cost diff. checkBalance also forwards the new flow's signal."
     },
     {
       "id": "F-005",
@@ -332,7 +336,9 @@
       "fix": "Tighten the condition to `if (!fullContent && !fullReasoning && chunkCount > 0)` for the placeholder text. When reasoning is present without content, persist `content: ''` (empty) and let the bubble's `hasContent` check at L287 handle the no-body render. Optionally add a short marker like '(reasoning only)' if product wants explicit signposting.",
       "references": [],
       "verification_note": "Re-read L418-429. Confirmed `fullReasoning` is referenced in the success branch (L427) but not in the placeholder branch. The bubble's logic at L287-352 already gracefully handles `hasContent=false` with `hasReasoning=true`.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Inline finalize logic extracted to features/ai/lib/finalize.ts pickFinalizeMessage helper with regression tests (__tests__/aiFinalize.test.ts). Reasoning-only streams now persist {content:'', reasoningContent} so the bubble's hasContent check renders the reasoning section without the apologetic '(No response received)' body. Cost-stamp finalize re-uses the same payload to avoid overwriting it."
     },
     {
       "id": "F-014",
@@ -371,7 +377,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read L72-88, 130-142, 341. The trigger frequency is lower than I initially feared (not per-chunk, only per-message-finalisation). Confidence dropped to 0.55. Keeping as Low because the pattern is real and worth flagging for the next perf pass.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Rejected from this slice — different file (AiChatScreen.tsx), different shape: branchNavById Map stability requires component-level refactor (BubbleHost extraction or React.memo with custom comparator), not the streaming-lifecycle pattern that bundled F-003/F-004/F-013."
     }
   ],
   "dimensions": {
