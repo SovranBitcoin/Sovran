@@ -23,7 +23,7 @@
       "analyze_structure": "9 files, 806 LOC code, 0 cycles, 6 'orphans' (all confirmed externally-imported), 3 colocate suggestions"
     }
   },
-  "completion_status": "deferred",
+  "completion_status": "partial",
   "findings": [
     {
       "id": "F-001",
@@ -49,7 +49,9 @@
         "git:e26c8f9a"
       ],
       "verification_note": "Counter-argument considered: the 5 cycles at cold start could be intentional during initial mint-keyset sync. Rejected — log-doctor shows the same 6-mint waterfall fires again at 742874ms long after cold start, after the user did nothing related to mints. Even if cold-start cycling is acceptable, the runtime cycling is not. Demoted to High (not Critical) because no funds are at risk; the cost is JS-thread blocks and battery.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. Requires changes to shared/lib/cashu/useMintManagement.ts (surgical splice on mint:* events instead of full loadMints) and a stable dep signature in useMintContacts. Not picked for this slice — would expand scope past one seam."
     },
     {
       "id": "F-002",
@@ -70,7 +72,9 @@
         "git:90f1326a"
       ],
       "verification_note": "Verified by reading the schema at node_modules/@sovranbitcoin/schemas/src/nostr-api.ts:64 alongside useContactSearch.ts:41/51 and SearchResultsList.tsx:93. Server behaviour itself was not exercised in this audit (audit 22 covered api.sovran.money/src/nostr.ts); the schema is the contract.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Introduced exported CONTACT_SEARCH_MIN_LENGTH = 3 in useContactSearch and aligned both guards. SearchResultsList now imports the constant; useSplitBillParticipantPicker comment updated to mirror the server-side rule."
     },
     {
       "id": "F-003",
@@ -90,7 +94,9 @@
         "git:38797b50"
       ],
       "verification_note": "Grep confirmed both file paths reference the same 64-char hex literal at useRecentContacts.ts:16 and shared/lib/constants.ts:4. Counter-argument: literal duplication is harmless if no rotation occurs — kept Low rather than Medium for that reason.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "DEFAULT_CONTACTS now references PUBLIC_KEYS.SUPPORT instead of duplicating the hex literal."
     },
     {
       "id": "F-004",
@@ -111,7 +117,9 @@
         "git:38797b50"
       ],
       "verification_note": "Verified by grepping the literal across the repo (only useRecentContacts.ts contains it). Counter-argument: 'this is the dev's own pubkey, the dev controls the binary, no security risk' — accepted in part, demoted from Medium to Low. The remaining concern is reviewability: a future auditor reading PUBLIC_KEYS gets a complete picture of well-known identities; today they have to grep features/* to find this one.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Removed the personal 'kelbie' default contact entirely. Did not promote it to PUBLIC_KEYS or gate behind __DEV__ (the audit's alternative remedies) — the right answer for a default-contact policy is a curated SOV spec, not a personal npub baked into the binary."
     },
     {
       "id": "F-005",
@@ -132,7 +140,9 @@
         "git:7d53b318"
       ],
       "verification_note": "Verified by reading lines 60-72 against NDKEvent semantics. Counter-argument: NDKEvent is a class with an internal cache and content mutation is normal NDK behaviour, plus the only current caller (useRecentContacts) rebuilds its memo every pass. Accepted, demoted from Medium to Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Cache-hit path no longer mutates item.dmEvent.content (the explicit assignment was removed). The decrypt-API path still relies on NDKEvent.decrypt() writing in place — that's an NDK library behaviour the wallet cannot change without the clone-via-serialize approach the audit suggested. Flagged as partial."
     },
     {
       "id": "F-006",
@@ -153,7 +163,9 @@
         "node_modules/@sovranbitcoin/schemas/src/nostr-api.ts:25"
       ],
       "verification_note": "Verified by reading the schema (profileEvent is `z.string().max(262_144).optional()`) and the consumer block. Counter-argument: the field appears to be the kind-0 raw event from the DVM enrichment, server-controlled, so trust is high. Accepted in part — kept Low rather than dropped because boundary discipline is the explicit goal of the shared schemas package.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Inline narrowing added: parsed.pubkey must be a string before promoting it. The audit's option (b) — moving the JSON.parse + Hex64-shape check into a NostrEventCodec inside @sovranbitcoin/schemas — is the right end state but is out of scope for a sovran-app slice."
     },
     {
       "id": "F-007",
@@ -221,8 +233,8 @@
       ],
       "verification_note": "Verified by knip + grep (the four importers all use deep paths).",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered as Slice B (knip orphan-export sweep). Not picked. Real and unfixed."
+      "completion_status": "complete",
+      "completion_note": "features/payments/index.ts deleted. Every existing caller already used deep imports, so no consumer migration was needed. Audit's option (a)."
     },
     {
       "id": "F-010",
@@ -263,7 +275,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Verified by grep across features/payments — two forms within the same component family.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Aligned NoResultsFound to bare 'assets/icons' (the dominant repo-wide convention — 103 callers vs 4 for '@/assets/icons'). Codifying the choice in folder-structure.mdc remains out of scope."
     },
     {
       "id": "F-012",
@@ -283,7 +297,9 @@
         "skill:neverthrow-wrap-exceptions"
       ],
       "verification_note": "Verified by reading lines 34-38 and 93-97. Counter-argument: silent fallback is the correct UX (don't surface mint outages mid-render). Accepted — the fix isn't 'show an error to the user', it's 'log it for the developer'.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Both empty catches replaced with paymentLog.warn calls (`payment.mint.contacts.info_failed` and `payment.mint.contacts.npub_decode_failed`). User UX unchanged; log-doctor stats now picks up recurring mint outages."
     },
     {
       "id": "F-013",
@@ -303,7 +319,9 @@
         "lint:@typescript-eslint/no-explicit-any (would fire if the rule were on for this file)"
       ],
       "verification_note": "Verified by reading both files. Counter-argument: this is feature code with limited blast radius and the types stabilise around the picker render. Accepted — kept Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Introduced exported RecentContact / MintContact / MintWithInfo types; useMintContacts now consumes GetInfoResponse from @cashu/cashu-ts. The any[] state is gone. Bonus: the type tightening exposed a dead `item.mint?.mintUrl` fallback in ContactsScreen's dedupe map (RecentContact has no mint field) — simplified that to item.pubkey alone."
     },
     {
       "id": "F-014",
@@ -323,7 +341,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Verified by reading the full apiClient.ts:78-102 fetchParsed signature (no `init` consumer for the AbortController) and the useContactSearch effect cleanup. Marked UNVERIFIED for runtime impact since log.txt does not include a search session — kept Low because the fix is mechanical and the code is paint-by-numbers wrong.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Already fixed before this session. apiClient.searchUsers and fetchJson both accept signal; useContactSearch creates a per-effect AbortController and calls controller.abort() in cleanup. The cancelled flag is also gone."
     }
   ],
   "dimensions": {
