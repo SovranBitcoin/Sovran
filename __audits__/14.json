@@ -165,7 +165,8 @@
       ],
       "verification_note": "Re-read L373-377. Confirmed no validation of the rehydrated state; only logs on parse error. Counter-argument considered: 'zustand v5 shallow merge is forgiving; missing fields get initial-state defaults.' True for top-level fields but not for array-elements — a message without `role` will be shallow-merged as-is and downstream consumers crash on access. Confidence 0.6 because the practical incidence is low (no active version-bump on the message schema today), not 0.8 — strictly a defence-in-depth finding.",
       "prior_audit_id": null,
-      "completion_status": "stale"
+      "completion_status": "complete",
+      "completion_note": "routstrStore now uses persistConfig({ schema: PersistedRoutstrStore, ... }); onRehydrateStorage chains through persistConfig's default warn-and-fall-back path so a corrupted blob falls back to defaults instead of being silently folded into runtime state. Verified pre-existing."
     },
     {
       "id": "F-007",

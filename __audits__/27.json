@@ -76,7 +76,9 @@
       "fix": "Compute `total` in useMemo (pure). Move the previous-balance comparison and the walletLog.info call into a useEffect that depends on `total`. This is the canonical 'derive in render, notify in effect' pattern. Keep `prevBalance` as a ref inside the effect, not inside the memo.",
       "references": ["skill:react-native-best-practices", "skill:zustand-5"],
       "verification_note": "Confirmed React Compiler is on (Metro transform URL `transform.reactCompiler=true` in log.txt). Counter-argument: in pure production renders with no Strict Mode and no Suspense boundary around this hook, useMemo is called once and the bug is invisible — but the app ships Strict Mode (Expo 55 default) and uses Suspense in multiple surfaces per coco-react. Keep.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useAppBalance split into a pure useMemo (`total`) and a useEffect that owns the prevBalance ref and walletLog.info notification. The memo body no longer mutates refs or calls the logger, so StrictMode/Suspense double-invokes can no longer fire phantom wallet.balance.changed events. Done in c8c9fb55."
     },
     {
       "id": "F-004",
@@ -182,7 +184,9 @@
       "fix": "Import `walletLog` from '@/shared/lib/logger' and replace the four `log.info` calls with `walletLog.info`. Keep the event names unchanged.",
       "references": [],
       "verification_note": "Confirmed in useAccountPagerView.ts (line 8 import, 65/71/73/83 calls) and in AccountPagerViewLayout.tsx (line 15 imports walletLog). Straight consistency fix.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useAccountPagerView now imports walletLog and routes its 4 wallet.action.* events through it, matching siblings AccountPagerViewLayout.tsx and PrimaryBalance.tsx. Done in c8c9fb55."
     },
     {
       "id": "F-010",

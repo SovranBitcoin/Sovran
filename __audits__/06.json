@@ -161,8 +161,8 @@
       ],
       "verification_note": "Re-read settingsStore.ts:53,56-62,311-330 — confirmed partialize persists middlemanRouting as-is; no merge strategy, no rehydrate-time defaults. The rule doc at zustand-persistence-review.md §8 explicitly calls out middlemanRouting as the canonical example of this hazard. Counter-argument considered: the rule doc is documentation, not a fix — true, which is why the hazard still ships.",
       "prior_audit_id": null,
-      "completion_status": "stale",
-      "completion_note": "settingsStore now uses createMergeWithSchema with a zod-validated PersistedSettings shape; nested defaults are filled via the schema, not shallow merge. Ratified by commits 95c14ea3 and 520c57a1."
+      "completion_status": "partial",
+      "completion_note": "settingsStore now goes through persistConfig with PersistedSettings schema, so schema drift is logged and rejected. The deep-merge concern for nested defaults (middlemanRouting) is mitigated by schema validation but not eliminated — a `version` bump + explicit `migrate` is still required when a nested-default is added. Verified pre-existing wrapper adoption in this session's scan."
     },
     {
       "id": "F-008",
@@ -205,7 +205,8 @@
       ],
       "verification_note": "Re-read splitBillTransactionsStore.ts:55-80 (participant/group types) and 408-420 (persist config). Confirmed no merge strategy. Counter-argument considered: existing users won't have split-bill groups yet — true today, but the feature is live on the feat branch and any persisted data from here forward is exposed to the hazard.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "splitBillTransactionsStore now uses persistConfig({ schema: PersistedSplitBillStore, logKey: 'split_bill', ... }); deeply-nested groups + quoteIdToSplitBill are runtime-validated on rehydrate via createMergeWithSchema. Verified pre-existing in this session's scan."
     },
     {
       "id": "F-010",
@@ -227,7 +228,8 @@
       ],
       "verification_note": "Re-read three store persist configs. None of them runs schema validation on rehydrate. Counter-argument considered: server never changes these shapes — not a guarantee, and the whole point is forward compatibility.",
       "prior_audit_id": null,
-      "completion_status": "stale"
+      "completion_status": "complete",
+      "completion_note": "pricelistStore, btcMapStore, and wallpaperStore now all go through persistConfig with their own Persisted*Store zod schemas — server-side shape drift is rejected on rehydrate via createMergeWithSchema. Verified pre-existing."
     },
     {
       "id": "F-011",

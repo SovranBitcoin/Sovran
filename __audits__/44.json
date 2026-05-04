@@ -123,8 +123,8 @@
       ],
       "verification_note": "Re-checked at lines 293–305; confirmed no version, no migrate, only AsyncStorage-error handling in onRehydrateStorage.",
       "prior_audit_id": null,
-      "completion_status": "stale",
-      "completion_note": "Already addressed by commits 95c14ea3/520c57a1 (btcMapStore has version + migrate + zod merge)."
+      "completion_status": "complete",
+      "completion_note": "btcMapStore now uses persistConfig({ name: 'btcmap-store', schema: PersistedBtcMapStore, logKey: 'btc_map', ... }); rehydrate-time schema validation rejects drift. Verified pre-existing."
     },
     {
       "id": "F-003",

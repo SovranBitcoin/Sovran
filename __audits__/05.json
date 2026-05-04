@@ -1,0 +1,226 @@
+{
+  "audit": {
+    "date": "2026-04-18",
+    "commit": "f797ae15",
+    "entry_point": "sovran-app/shared/stores/profile/mintStore.ts",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json"
+    ]
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "selectedMints is double-scoped — keyed by pubkey inside a store already scoped by the active profile's pubkey",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/mintStore.ts",
+      "line": 10,
+      "symbol": "MintState.selectedMints",
+      "dimension": 3,
+      "description": "Line 10 declares `selectedMints: Record<string, string | undefined>` keyed by pubkey. The store persists through `createProfileScopedStorage()` (line 7) which already writes to `mint-store:profile:{pubkey}` — so for any given profile the inner record contains at most one entry, keyed by that same profile's own pubkey. Every call site threads the active pubkey in (CocoProvider.tsx:56-57, CocoPaymentUX.tsx:157, WalletContextProvider.tsx:59-61, useMintSelector.ts:60-61, CameraScreen.tsx:53-54, participants.tsx:55-57, UserMessagesScreen.tsx:1420,1968, sovranPaymentConfig.ts:661) even though there is no value in distinguishing between pubkeys when the storage layer has already done the partitioning. `.cursor/rules/secure-storage-key-derivation.mdc:147` documents the pattern but predates the profile-scoped-storage migration (evidenced by the registry in profileScopedStorage.ts:101-113 which is the newer layer).",
+      "why_it_matters": "Three concrete costs. (1) Every caller must pass `nostrKeys?.pubkey` and handle the `undefined` case, which is redundant — the presence of a row in the store already implies the active profile. (2) If a future code path accidentally writes `setSelectedMint(otherPubkey, url)` (wrong pubkey), the store accepts it silently and that entry persists in the current profile's AsyncStorage blob, leaking across profiles once a profile switch reloads the same key; the schema offers no guardrail. (3) Hydration deserializes an object map on every cold start when a scalar would do.",
+      "fix": "Collapse to `selectedMint: string | undefined` with `setSelectedMint: (mintUrl: string) => void` and `clearSelectedMint: () => void`. Callers drop the pubkey arg and read the scalar directly: `useMintStore((s) => s.selectedMint)`. Add a one-shot migration helper (run once from a Zustand persist `migrate`, bumping version 0 → 1, or from `shared/lib/migrations/globalMigrations.ts`) that reads the legacy record, picks `record[activePubkey]` if present or the first value otherwise, and writes the scalar. Update the rule note in `.cursor/rules/secure-storage-key-derivation.mdc:137,147` to remove the `selectedMints[pubkey]` callout once the code changes. Note: this DOES change the persist shape, so the migration is mandatory per `.cursor/rules/zustand-persistence-review.md` §7 and `<ground_rules>` item 8.",
+      "references": [
+        "sovran-app/.cursor/rules/secure-storage-key-derivation.mdc:137,147",
+        "sovran-app/.cursor/rules/zustand-store-scoping.mdc:72-82",
+        "sovran-app/shared/lib/cashu/profileScopedStorage.ts:73-98"
+      ],
+      "verification_note": "Re-read mintStore.ts:9-22 and every one of the 8 call sites. Counter-argument considered: 'the pattern is documented in the secure-storage rule.' True, but documentation does not imply optimality — the rule text describes behaviour, not rationale. The profile-scoped storage layer supersedes the need for an inner pubkey index. Kept Medium because the fix requires a persist-version bump and a migrator, and must not ship without both.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Three exported actions have zero call sites — getAllSelectedMints, clearSelectedMint, clearAllData",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/mintStore.ts",
+      "line": 17,
+      "symbol": "getAllSelectedMints|clearSelectedMint|clearAllData",
+      "dimension": 1,
+      "description": "`getAllSelectedMints` (declared L17, implemented L45) — grep across sovran-app finds only the declaration and definition, no callers. `clearSelectedMint` (L16/L37) — same: zero callers. `clearAllData` (L18/L47) — declared on every store as a boilerplate convention but no call site invokes `.clearAllData()` anywhere in the app tree (profile reset goes through a full app restart via profileSessionOrchestrator, not per-store clearAllData). Three of the five exported actions on this store are dead.",
+      "why_it_matters": "Dead code forces every future reader to reason about their behaviour (in particular, whether `clearAllData`'s `removeItem`+`set` dance is load-bearing — it is not, see F-003). Inflates the store's public API surface and invites imperative-usage drift at call sites that should be reactive.",
+      "fix": "Delete `getAllSelectedMints` and `clearSelectedMint` from both the type and the implementation — they are not used anywhere. For `clearAllData`, either delete it (and the typings convention across sibling stores in a separate pass) or leave it as a deliberate cross-store convention — document which. A consolidated cross-store audit of the clearAllData convention should decide once for the whole shared/stores tree.",
+      "references": [
+        "sovran-app/shared/stores/profile/mintStore.ts:16-18,37,45,47"
+      ],
+      "verification_note": "Grepped for `getAllSelectedMints`, `clearSelectedMint`, and `\\.clearAllData\\(\\)` across sovran-app — zero live invocations for all three. Counter-argument considered: 'these actions are part of a shared convention.' The convention applies to clearAllData (every store declares it); it does NOT apply to getAllSelectedMints or clearSelectedMint (neither exists on sibling stores). Kept Low.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All three deleted. mintStore now exposes only setSelectedMint and getSelectedMint."
+    },
+    {
+      "id": "F-003",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "clearAllData's removeItem is immediately undone by set() via the persist middleware — the delete is cosmetic, and a concurrent setSelectedMint can be clobbered",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/mintStore.ts",
+      "line": 47,
+      "symbol": "clearAllData",
+      "dimension": 1,
+      "description": "L47-55: `await profileStorage.removeItem('mint-store')` is followed by `set({ selectedMints: {} })`. Zustand's `persist` middleware subscribes to store mutations and issues a fresh `storage.setItem(name, serialized)` after every `set`. The net effect is that the AsyncStorage key `mint-store:profile:{pubkey}` ends up as `{\"state\":{\"selectedMints\":{}},\"version\":0}` rather than absent — so the removeItem is pointless. Worse, any `setSelectedMint` that lands between the `await removeItem` and the subsequent `set({})` (e.g. a CocoProvider Phase-2 default-mint write racing a user tapping 'Delete All') is overwritten by the reset. This pattern is copy-pasted across every store in shared/stores (searchHistoryStore:130-137, mintDistributionStore:501-509, etc.), so this is a codebase-wide convention, not mintStore-specific — but this file is the audit's entry point.",
+      "why_it_matters": "Low today because F-002 established `clearAllData` has no caller. If a caller is added, the race window is real. A true 'wipe' action should stop the persist middleware (or use `useMintStore.persist.clearStorage()`), not remove-then-reset.",
+      "fix": "Replace with `useMintStore.persist.clearStorage()` (Zustand's built-in, which handles the storage+state reset atomically) and drop the manual `removeItem`+`set` pair. Alternatively, if the codebase wants to keep the convention, at minimum flip the order — `set({ selectedMints: {} })` first (lets persist write the empty state), then `await profileStorage.removeItem('mint-store')` — which makes removeItem the authoritative final state. Either is strictly better than the current order. The same fix applies to every sibling store's clearAllData and should be addressed in a consolidated follow-up.",
+      "references": [
+        "sovran-app/shared/stores/profile/searchHistoryStore.ts:130-137",
+        "sovran-app/shared/stores/profile/mintDistributionStore.ts:501-509",
+        "https://docs.pmnd.rs/zustand/integrations/persisting-store-data#api"
+      ],
+      "verification_note": "Re-read L47-55. Persist middleware write-on-mutation behaviour verified against Zustand v5 docs. Counter-argument considered: 'the removeItem is defence against a failed setItem from the persist middleware.' Fair, but then the order is wrong — if setItem fails after a successful removeItem, the key is gone (good); if setItem succeeds, the key is re-created (bad, since the removeItem was redundant). Kept Low; annotated as a codebase-wide pattern so the fix can be consolidated.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Race window closed by deletion: clearAllData removed from every persisted store and from the orphaned shared helper. The pattern no longer exists in the codebase."
+    },
+    {
+      "id": "F-004",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "onRehydrateStorage logs on error only — a rehydrate failure silently loses the user's preferred mint and CocoProvider Phase-2 overwrites it with Minibits",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/mintStore.ts",
+      "line": 63,
+      "symbol": "onRehydrateStorage",
+      "dimension": 3,
+      "description": "L63-67 warns on error then returns. A rehydration error (storage read throws, JSON.parse fails on corrupted blob) leaves the store at the initial-state default `selectedMints: {}`. Downstream, CocoProvider's Phase-2 `initializeDefaultMints` (CocoProvider.tsx:54-69) checks `getSelectedMint(pubkey)` → undefined → sets `https://mint.minibits.cash/Bitcoin` as the selected mint (CocoProvider.tsx:37,62). The user's actual preference (e.g. their self-hosted mint) is silently replaced. No recovery UX; no telemetry beyond the single `store.mint.rehydrate_failed` warn.",
+      "why_it_matters": "Silent preference loss. Mint selection is a trust decision — a user who deliberately moved off Minibits onto their own mint and then hits a rehydrate error finds themselves back on Minibits with no notification. Future payments default to the wrong mint. Re-choosing is cheap, but the silent nature of the swap is wrong for a trust-sensitive wallet setting.",
+      "fix": "On rehydrate failure, additionally emit a higher-severity signal and skip the default-mint fallback until the user explicitly re-chooses. Concretely: set a transient `rehydrationFailed: true` field on the store (non-persisted); CocoProvider.tsx:59 gates the `setSelectedMint(pubkey, selectedMint)` line on `!rehydrationFailed`. Surface a one-time toast 'Your preferred mint couldn't be restored — please re-select it' via the popup helpers in shared/lib/popup. Log `store.mint.rehydrate_failed` at error level, not warn, so log-doctor's `errors` mode catches it.",
+      "references": [
+        "sovran-app/shared/providers/CocoProvider.tsx:28-75",
+        "sovran-app/.cursor/rules/popup-toast-sheet-guidelines.mdc"
+      ],
+      "verification_note": "Re-read mintStore.ts:63-67 and CocoProvider.tsx:54-69 — confirmed. Counter-argument considered: 'rehydrate errors are very rare.' True — but F-003 (clearAllData race) and F-001 (pubkey drift) both surface identical symptoms (empty `selectedMints`) that would trigger the same silent-Minibits overwrite. Defence in depth at the boundary. Kept Low because actual incidence is low.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "mintStore now uses persistConfig({ schema: PersistedMintStore, ... }) so onRehydrateStorage logs failures via storeLog and createMergeWithSchema validates the rehydrated blob, rejecting drift instead of silently losing it. Verified pre-existing in this session's scan; not changed here."
+    },
+    {
+      "id": "F-005",
+      "severity": "Low",
+      "confidence": 0.65,
+      "title": "Logger usage drifts from scoped convention — catch emits raw `{ error }` and rehydrate uses generic `log` instead of `storeLog`",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/mintStore.ts",
+      "line": 3,
+      "symbol": "log|storeLog",
+      "dimension": 10,
+      "description": "L3 imports both `log` and `storeLog`. `setSelectedMint` (L29) and `clearSelectedMint` (L38) correctly use `storeLog.info`. But `clearAllData` catch at L52 emits `log.error('store.mint.clear_failed', { error })` and `onRehydrateStorage` at L65 emits `log.warn('store.mint.rehydrate_failed', { error })` — both use the generic logger and both pass the raw error object through (no narrowing to `{ name, message }`). Mirrors the pattern flagged in 04.json F-014 for secureStorage.ts and 02.json F-004 for CocoPaymentUX.tsx. The `{ error }` spread allows any future throw site that embeds sensitive context in the error message (e.g. an AsyncStorage quota-full error that echoes the value attempted to be written) to leak into the ring buffer — defence-in-depth concern raised in 04.json F-010.",
+      "why_it_matters": "Observability consistency + defence-in-depth. `log-doctor -- timeline --event 'store\\.mint'` currently returns zero matches in the captured session even though the events emit (confirmed: current session has no mint-store mutations to test against — see log-doctor stats output showing zero store.mint.* entries). The scope column stays blank for the generic-log calls, weakening log-doctor's scope-based filters. The raw error spread is the same class of issue 03.json F-001 shipped as a Critical elsewhere.",
+      "fix": "Swap both `log.error` at L52 and `log.warn` at L65 to `storeLog.error` / `storeLog.warn`. Narrow the catch to `{ error: err instanceof Error ? { name: err.name, message: err.message } : String(err) }`. Refactor applies trivially to every sibling profile-scoped store (searchHistoryStore.ts:135, scanHistoryStore.ts, etc.) — a three-line grep-and-replace. Separately, promote the logger field-name redactor proposed in 03.json and 04.json refactor plans into `shared/lib/logger.ts` so future throw sites inherit the protection.",
+      "references": [
+        "sovran-app/__audits__/02.json (F-004)",
+        "sovran-app/__audits__/03.json (F-001, refactor_plan)",
+        "sovran-app/__audits__/04.json (F-010, F-014)",
+        "sovran-app/shared/lib/logger.ts:833-839"
+      ],
+      "verification_note": "Re-read mintStore.ts:3,52,65. Confirmed `log` and `storeLog` both imported; only `storeLog` used for the happy-path info emits; generic `log` used on both error paths. Counter-argument considered: 'no current throw site leaks secrets via the error message.' True for today's code; the finding is strictly defence-in-depth, and the prior audits have already established this as a codebase-wide follow-up. Kept Low.",
+      "prior_audit_id": "F-004@02.json",
+      "completion_status": "complete",
+      "completion_note": "20662da9 fixed mintStore + 21 sibling stores in one sweep: redactError(unknown) helper added to logger.ts, both error paths in mintStore.ts now use storeLog with redacted shape. The codebase-wide follow-up flagged in this finding has shipped."
+    },
+    {
+      "id": "F-006",
+      "severity": "Nit",
+      "confidence": 0.5,
+      "title": "Record<string, string | undefined> — the `| undefined` is vestigial",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/mintStore.ts",
+      "line": 10,
+      "symbol": "MintState.selectedMints",
+      "dimension": 1,
+      "description": "No code path ever writes `undefined` into the record. `setSelectedMint` (L14) types `mintUrl: string`; `clearSelectedMint` (L37-43) deletes the key via rest spread. With `noUncheckedIndexedAccess` off (tsconfig.json does not enable it), `Record<string, string>[key]` already returns `string` at the type level even when runtime is undefined — so the `| undefined` neither enables new safety nor reflects a possible runtime state that isn't already a missing key. A future `noUncheckedIndexedAccess: true` migration would make this correct automatically.",
+      "why_it_matters": "Type precision drift. Readers see `string | undefined` and think a stored value can literally be undefined (vs the key just not existing), which subtly shifts the mental model. No runtime consequence today.",
+      "fix": "Either (a) drop the `| undefined` and use `Record<string, string>` — simplest; or (b) enable `noUncheckedIndexedAccess: true` in tsconfig.json and drop `| undefined`, which buys stricter checks everywhere else in the repo at some migration cost. If F-001 is accepted, this entire field disappears in the collapse to `selectedMint: string | undefined`, and this finding resolves automatically.",
+      "references": [
+        "sovran-app/tsconfig.json:1-30"
+      ],
+      "verification_note": "Re-read L10 and L14, L37-43. Confirmed no write path produces a literal undefined. tsconfig.json confirmed not to enable noUncheckedIndexedAccess. Kept as Nit at 0.5 — purely a stylistic/correctness nuance.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "skipped",
+    "7": "partial",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Collapse the pubkey-keyed record to a scalar. Change state to `selectedMint: string | undefined`, actions to `setSelectedMint(mintUrl)` / `clearSelectedMint()`. Bump persist version 0 -> 1 and write a `migrate` that reads the legacy `selectedMints` map, picks the active pubkey's entry (or the first non-undefined entry as a fallback), and returns the new scalar shape. Update all 8 call sites (CocoProvider.tsx:56-57,167-168, CocoPaymentUX.tsx:157, WalletContextProvider.tsx:59-61, useMintSelector.ts:60-61, CameraScreen.tsx:53-54, participants.tsx:55-57, UserMessagesScreen.tsx:1420,1968, sovranPaymentConfig.ts:661) to drop the pubkey arg. Update `.cursor/rules/secure-storage-key-derivation.mdc:137,147` to remove the stale `selectedMints[pubkey]` callout. This is a persist-shape change — it MUST ship with the migrator, not without (per ground_rules item 8).",
+      "files": [
+        "sovran-app/shared/stores/profile/mintStore.ts",
+        "sovran-app/shared/providers/CocoProvider.tsx",
+        "sovran-app/shared/providers/WalletContextProvider.tsx",
+        "sovran-app/features/send/providers/CocoPaymentUX.tsx",
+        "sovran-app/features/send/lib/sovranPaymentConfig.ts",
+        "sovran-app/features/wallet/components/MintSelector/useMintSelector.ts",
+        "sovran-app/features/camera/screens/CameraScreen/CameraScreen.tsx",
+        "sovran-app/app/(user-flow)/splitBill/participants.tsx",
+        "sovran-app/features/user/screens/UserMessagesScreen.tsx",
+        "sovran-app/.cursor/rules/secure-storage-key-derivation.mdc"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Delete `getAllSelectedMints` (L17/L45) and `clearSelectedMint` (L16/L37-43) from mintStore.ts — zero call sites across sovran-app. If F-001 lands, `clearSelectedMint` would be re-introduced as the scalar-shape equivalent (and wired to whatever callsite motivates it), but today there is none. Keep `clearAllData` pending a separate cross-store audit of the convention (see next item).",
+      "files": [
+        "sovran-app/shared/stores/profile/mintStore.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Cross-store audit of the `clearAllData` convention. Every store in shared/stores/ implements it (mintStore, searchHistoryStore, mintDistributionStore, scanHistoryStore, swapTransactionsStore, transactionLocationStore, nostrSocialStore, splitBillTransactionsStore, transactionDistributionStore, routstrStore, npcMintStore, and every global store) but a grep for `.clearAllData()` shows no live invocation. Decide once for the whole tree: either delete the convention (profile reset already goes through app restart via profileSessionOrchestrator), or preserve it but fix the `removeItem` + `set` order (per F-003) so the delete is authoritative. If kept, prefer `useFoo.persist.clearStorage()` over the hand-rolled removeItem/set pair. Out of scope for this entry point but surfaced here because mintStore is the prompt's focus and the pattern is repeated verbatim 15+ times.",
+      "files": [
+        "sovran-app/shared/stores/profile/mintStore.ts",
+        "sovran-app/shared/stores/profile/searchHistoryStore.ts",
+        "sovran-app/shared/stores/profile/mintDistributionStore.ts",
+        "sovran-app/shared/stores/profile/scanHistoryStore.ts",
+        "sovran-app/shared/stores/profile/swapTransactionsStore.ts",
+        "sovran-app/shared/stores/profile/transactionLocationStore.ts",
+        "sovran-app/shared/stores/profile/nostrSocialStore.ts",
+        "sovran-app/shared/stores/profile/splitBillTransactionsStore.ts",
+        "sovran-app/shared/stores/profile/transactionDistributionStore.ts",
+        "sovran-app/shared/stores/profile/routstrStore.ts",
+        "sovran-app/shared/stores/profile/npcMintStore.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Route the two error-path emits in mintStore.ts (L52, L65) through `storeLog` instead of the generic `log`, and narrow the error spread to `{ name, message }`. Parallel changes apply across every sibling profile-scoped store — same two-line drift. Carry-forward of 02.json F-004 and 04.json F-014. Separately, land the field-name redactor proposed in 03.json / 04.json refactor plans so future throw sites cannot leak secrets via an Error message body.",
+      "files": [
+        "sovran-app/shared/stores/profile/mintStore.ts",
+        "sovran-app/shared/stores/profile/searchHistoryStore.ts",
+        "sovran-app/shared/stores/profile/mintDistributionStore.ts",
+        "sovran-app/shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Propose a `log-doctor -- stores` mode that groups `store.*` events by scope+mutator, counts mutations per session, and flags any mutation storm (>10 writes to the same store in <1s) — would make the F-003-class concurrent-write races diagnosable in production. Low urgency; revisit after the scoped-logger consolidation above ships and enough store.* traces accumulate in log.txt.",
+      "files": [
+        "sovran-app/scripts/log-doctor/",
+        "sovran-app/.claude/rules/log-doctor.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Was the pubkey-keyed `selectedMints` design a pre-profile-scoped-storage artefact that nobody simplified after the profileScopedStorage layer landed, or an intentional future-proofing for multi-profile-in-one-store scenarios? A quick `git log -p -- shared/stores/profile/mintStore.ts shared/lib/cashu/profileScopedStorage.ts` would date the two commits and answer it.",
+    "Does any test suite (Jest, tests/*.sov) invoke `useMintStore.getState().clearAllData()` or `clearSelectedMint`? Grep scope was sovran-app source; a broader pass including tests/ and scripts/ would close F-002.",
+    "Do existing installs have residual bare `mint-store` AsyncStorage keys from the pre-profile-scoped era (see profileScopedStorage.ts:79 'Falls back to bare `{name}` only during first-launch bootstrap')? A phone-tree inspection of `AsyncStorage.getAllKeys()` on a long-running device would confirm whether a cleanup pass is warranted alongside the F-001 migration."
+  ]
+}

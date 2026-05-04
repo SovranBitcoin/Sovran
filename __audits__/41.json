@@ -119,8 +119,8 @@
       ],
       "verification_note": "Re-checked themeStore.ts:207-234. Counter-argument considered: the `merge` + safeParse pattern is a deliberate 'forward-compat-only' policy. Verdict: even if intentional, that policy is undocumented and the silent-reset behaviour is not what the next contributor will expect. The systemic absence of `version:` across all profile/global stores (grep confirmed) makes this codebase-wide, not theme-specific.",
       "prior_audit_id": null,
-      "completion_status": "stale",
-      "completion_note": "Already addressed by commits 95c14ea3/520c57a1 (themeStore now has version + migrate + zod merge)."
+      "completion_status": "complete",
+      "completion_note": "themeStore now goes through persistConfig({ name: 'theme-store', schema: PersistedThemeStore, ... }) — explicit version (default 1), identity migrate, and createMergeWithSchema rehydrate validation. Verified pre-existing."
     },
     {
       "id": "F-003",

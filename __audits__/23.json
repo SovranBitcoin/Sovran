@@ -133,8 +133,8 @@
       ],
       "verification_note": "Log-doctor timeline confirms: `receive.mint_quote.render state=\"UNPAID\" ...` fires with inter-delta of 161ms, 31ms, 32ms per mount (3-4 renders per visit). Evidence cited verbatim in the markdown report.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Render-body logging is its own pattern (also in 19#F-004) — not addressed by the provider-tree slice."
+      "completion_status": "complete",
+      "completion_note": "All five render-body log calls (MintQuoteScreen 62/71, ReceiveScreen 205, ReceiveTokenScreen 51/60) hoisted into useEffects keyed on the values they report; bare log → paymentLog throughout the receive flow. Done in c8c9fb55."
     },
     {
       "id": "F-005",

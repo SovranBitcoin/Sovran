@@ -95,8 +95,8 @@
       ],
       "verification_note": "Re-checked at line 428-440: persist config has only {name, storage, partialize, onRehydrateStorage}. Confirmed via grep that swapTransactionsStore has the same gap (project-wide). Counter-argument: 'no field has changed yet, so no migration is needed' — but the rule is to ship the boilerplate before the first change forces a heroic migration, not after.",
       "prior_audit_id": null,
-      "completion_status": "stale",
-      "completion_note": "Already addressed by commits 95c14ea3/520c57a1 (splitBillTransactionsStore has version + migrate + zod merge)."
+      "completion_status": "complete",
+      "completion_note": "splitBillTransactionsStore now uses persistConfig({ schema: PersistedSplitBillStore, logKey: 'split_bill', ... }); explicit version + identity migrate + schema validation are now in place. Verified pre-existing."
     },
     {
       "id": "F-002",
