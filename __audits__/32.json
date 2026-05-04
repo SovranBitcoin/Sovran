@@ -79,7 +79,9 @@
         "skill:nostr"
       ],
       "verification_note": "Re-read imageCache.ts:35-50 and ContactsScreen.tsx:188 — no validation present at either layer. Counter-argument: `expo-image` may sanitise URLs internally — UNVERIFIED, but expo-image's contract is to fetch any URI passed; sanitisation is the caller's responsibility. Counter-argument: trust at the kind-0 ingest layer. Looked at parseRawMetadata (shared/hooks/useNostrProfileMetadata.ts:84-100) — only JSON.parses the content, no URL field validation. Finding holds.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "shared/lib/imageCache.ts already validates URL schemes via isSafeImageUrl (rejects javascript:/data:/file:/chrome:); prefetchImages routes every URL through prefetchImage which gates on the scheme check. The audit-cited prefetchImages call site in ContactsScreen.tsx is therefore safe at the imageCache seam, not at the call site."
     },
     {
       "id": "F-002",
@@ -121,8 +123,8 @@
       ],
       "verification_note": "Re-confirmed lines 70, 96. Cross-checked navigateToProfile.ts:21. Receivers verified at app/(user-flow)/geohashChat.tsx and app/(user-flow)/profile.tsx (the latter just re-exports UserProfileScreen with no validation visible at the route level).",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "router.push as-any casts belong to Slice B (typed-routes hygiene); not in this PR."
+      "completion_status": "complete",
+      "completion_note": "Dropped 'as any' casts on router.push calls to /(user-flow)/geohashChat in ContactsScreen.tsx (2 sites) and SearchResultsList.tsx (2 sites). Typed routes are enabled (app.json:117) and the route's Zod schema accepts geohash + optional tierLabel/transport, so the typed Href form compiles cleanly. Same-pattern in-passing fix expanded scope to SearchResultsList.tsx since the audit cited the pattern, not just the call site."
     },
     {
       "id": "F-004",
@@ -161,7 +163,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-checked lines 217-245. Function is pure with no captures.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Hoisted mintHost from inline arrow inside ContactsScreen body to module-scope function. Reference is now stable across renders; each list-filter pass no longer allocates a fresh closure."
     },
     {
       "id": "F-006",
@@ -181,7 +185,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Counted 10 `: any` annotations at lines 198, 209, 232, 238, 287, 299, 304, 307, 329, 359 (re-read each).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Replaced 'item: any' on renderContactItem and 'Map<string, any>' in currentListData with a precise ContactsListItem discriminated union over RecentContact | MintContact | WhitenoiseRequestRow. Mint-only field accesses (item.mint, item.mintInfo) now type-narrow through 'item.type === \"mint\"'. navigateToProfile signature widened to string | null | undefined to match MintContact.pubkey nullability — the function already early-returned on falsy."
     },
     {
       "id": "F-007",
@@ -282,7 +288,9 @@
         "lint:prettier/prettier"
       ],
       "verification_note": "ESLint output: `49:39 error Replace ⏎····?·trimmed.slice(1).toLowerCase()⏎··· with ·?·trimmed.slice(1).toLowerCase() prettier/prettier`, `98:21 error Delete , prettier/prettier`.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Prettier --check now passes on features/contacts/hooks/useAllSearchResults.ts; the formatting drift was fixed in an earlier slice and the audit was not updated."
     },
     {
       "id": "F-012",
@@ -340,7 +348,9 @@
       "fix": "Extract `parseGeohashQuery` and `matchTiers` to features/contacts/lib/searchMatchers.ts. Import from both consumers.",
       "references": [],
       "verification_note": "Diffed both implementations — line-for-line equivalent matching logic. Confidence 0.95.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "parseGeohashQuery and matchTiers already extracted to features/contacts/lib/parseGeohashQuery.ts and features/contacts/lib/matchTiers.ts; both ContactsScreen.tsx and useAllSearchResults.ts import them. No duplicate left to consolidate."
     }
   ],
   "dimensions": {
