@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useSharedValue } from 'react-native-reanimated';
@@ -122,18 +122,25 @@ export function MintDistributionScreen() {
     }
   }, [selectedCurrency, mintUrls, initializeDistribution]);
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     const loadMintInfo = async () => {
+      const settled = await Promise.allSettled(
+        trustedMints.map((mint) => getMintInfo(mint.mintUrl))
+      );
+      if (!mountedRef.current) return;
       const infoMap: Record<string, any> = {};
-      for (const mint of trustedMints) {
-        try {
-          const info = await getMintInfo(mint.mintUrl);
-          infoMap[mint.mintUrl] = info;
-        } catch {
-          // Use mint's stored info as fallback
-          infoMap[mint.mintUrl] = mint.mintInfo || null;
-        }
-      }
+      trustedMints.forEach((mint, i) => {
+        const r = settled[i];
+        infoMap[mint.mintUrl] = r && r.status === 'fulfilled' ? r.value : mint.mintInfo || null;
+      });
       setMintInfoMap(infoMap);
     };
     loadMintInfo();
