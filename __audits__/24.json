@@ -259,7 +259,9 @@
         "skill:animating-react-native-expo"
       ],
       "verification_note": "Verified against RNGH v2 documentation. Low because the screens may still work — the effect is a posture/performance concern, not a correctness bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "SlideToDelete and SlideToRecover extracted into shared/ui/composed/SlideToConfirm; redundant inner GestureHandlerRootView removed (root layout already provides one)."
     },
     {
       "id": "F-011",
@@ -361,7 +363,9 @@
         ".cursor/rules/folder-structure.mdc"
       ],
       "verification_note": "Verified by reading the style blocks in both files.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "StyleSheet.create blocks removed from both DeleteScreen and SettingsRecoveryScreen via SlideToConfirm extraction; remaining static styling is Uniwind className."
     },
     {
       "id": "F-016",
@@ -523,8 +527,8 @@
       ],
       "verification_note": "Verified by running expo lint.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Stale on DeleteScreen + SettingsRecoveryScreen (already prettier-clean). Remaining drift across SettingsRoutingScreen, SettingsKeyringScreen, SettingsProfileScreen, SettingsStorageScreen swept with prettier --write."
+      "completion_status": "complete",
+      "completion_note": "Files re-formatted; both DeleteScreen and SettingsRecoveryScreen end the slice prettier-clean."
     }
   ],
   "dimensions": {
