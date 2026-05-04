@@ -140,8 +140,8 @@
       ],
       "verification_note": "Re-checked PaymentInfo.tsx:104-119; the only redacting field already there is 'dataType' / 'isArray' for the empty branch. The render branch leaks the head of the value.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "PaymentInfo is in the shared/blocks/ subtree but the leak is a logging/redaction concern, not gate scaffolding. Belongs in a payment-leak-sweep slice alongside other paymentLog redaction follow-ups."
+      "completion_status": "complete",
+      "completion_note": "Dropped preview field at PaymentInfo.tsx:118 and migrated the file's three log.{info,debug} calls onto paymentLog (already exported from shared/lib/logger.ts:1022). The preview was bypassing the logger's redaction seam: summarizeString skips its SECRET_STRING_PATTERNS guard for any string <= maxStringLength (default 120), so the 30-char prefix of a cashuB token / bolt11 invoice was passing through unredacted. Fixed pattern at the sister site shared/ui/composed/QRCode.tsx:124 in the same slice (same shape, not in audits)."
     },
     {
       "id": "F-004",

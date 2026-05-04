@@ -391,7 +391,8 @@
       ],
       "verification_note": "Verified at :513-520 and :717-724.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "partial",
+      "completion_note": "Both catch handlers (HomeFeed.tsx:321 + :527) now narrow the unknown error before logging: { message: error instanceof Error ? error.message : String(error) }. The redaction half of this finding is closed. The audit's secondary concern -- adding a visible retry surface distinct from EmptyFeed -- is a UX change and remains open as a deferred follow-up."
     },
     {
       "id": "F-018",
