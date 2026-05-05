@@ -56,9 +56,9 @@ import {
   getFollowersWithProfiles,
   getFollowerDisplayName,
   getFollowerPicture,
-  TopFollower,
-  UserFeed,
-} from '@/features/feed';
+  type TopFollower,
+} from '@/shared/hooks/useNostrProfile';
+import { UserFeed } from '@/features/feed';
 import { formatDate } from '@/shared/lib/time';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
