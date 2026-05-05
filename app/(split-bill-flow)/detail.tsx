@@ -10,8 +10,9 @@
  * Tapping a row snaps the deck to that card. Tapping a failed row re-fires
  * the per-participant delivery via `retryDelivery`.
  *
- * `useSplitBillPaymentWatcher` keeps `paymentState` fresh; once a
- * participant pays, their card dims + a ✓ chip overlays.
+ * The app-root `<SplitBillPaymentReconciler />` keeps `paymentState` fresh
+ * via coco's `history:updated` events; once a participant pays, their card
+ * dims + a ✓ chip overlays.
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -23,10 +24,7 @@ import { useManager } from '@cashu/coco-react';
 import { z } from 'zod';
 import opacity from 'hex-color-opacity';
 
-import {
-  useSplitBillOrchestrator,
-  useSplitBillPaymentWatcher,
-} from '@/features/splitBill/hooks/useSplitBillOrchestrator';
+import { useSplitBillOrchestrator } from '@/features/splitBill/hooks/useSplitBillOrchestrator';
 import {
   useSplitBillTransactionsStore,
   type SplitBillParticipant,
@@ -69,7 +67,6 @@ export default function SplitBillDetailScreen() {
 
   const group = useSplitBillTransactionsStore((s) => (groupId ? s.groups[groupId] : undefined));
   const { retryDelivery } = useSplitBillOrchestrator();
-  useSplitBillPaymentWatcher(groupId);
 
   const deckRef = useRef<ParticipantCardDeckRef>(null);
   const listRef = useRef<LegendListRef>(null);
@@ -159,7 +156,7 @@ export default function SplitBillDetailScreen() {
   // (not a component factory) so React reconciles the same instance
   // across parent re-renders — the deck's internal ScrollView scroll
   // position therefore survives live `paymentState` updates from
-  // `useSplitBillPaymentWatcher`.
+  // the app-root SplitBillPaymentReconciler.
   const listHeader = useMemo(
     () =>
       group ? (

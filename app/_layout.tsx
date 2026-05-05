@@ -53,6 +53,7 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
 import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
+import { useSplitBillPaymentReconciler } from '@/features/splitBill/hooks/useSplitBillOrchestrator';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
@@ -205,6 +206,12 @@ function SwapStatusListener() {
   return null;
 }
 
+/** Subscribes to coco history:updated events and flips split-bill participant payment state. */
+function SplitBillPaymentReconciler() {
+  useSplitBillPaymentReconciler();
+  return null;
+}
+
 /** Invisible component that syncs the live balance to the profile store for the active profile */
 function ProfileBalanceSync() {
   const balance = useAppBalance();
@@ -325,6 +332,7 @@ function RootLayoutContent() {
       <KeyDerivationRegistrar />
       <PaymentStatusListener />
       <SwapStatusListener />
+      <SplitBillPaymentReconciler />
       <ProfileBalanceSync />
       <ProfileMetadataSync />
       <StatusBar

@@ -18,10 +18,7 @@ import { useGuardedRouter as useRouter } from '@/shared/hooks/useGuardedRouter';
 import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
-import {
-  useSplitBillOrchestrator,
-  useSplitBillPaymentWatcher,
-} from '@/features/splitBill/hooks/useSplitBillOrchestrator';
+import { useSplitBillOrchestrator } from '@/features/splitBill/hooks/useSplitBillOrchestrator';
 import { useSplitBillTransactionsStore } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -60,7 +57,6 @@ export default function SplitBillSummaryScreen() {
 
   const group = useSplitBillTransactionsStore((s) => (groupId ? s.groups[groupId] : undefined));
   const { confirm } = useSplitBillOrchestrator();
-  useSplitBillPaymentWatcher(groupId);
 
   const [confirming, setConfirming] = useState(false);
   const hasStarted = group ? group.state !== 'draft' : false;
