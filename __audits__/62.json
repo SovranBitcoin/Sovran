@@ -67,7 +67,9 @@
         "lookalikes:18 cached collisions in chat/DM/payments"
       ],
       "verification_note": "Re-checked at UserMessagesScreen.tsx:864-888 (only meltTarget+selectedMintUrl forwarded). Re-checked enterAmount step shape at coco-payment-ux/src/machine/types.ts:58-67 — no recipient field. Re-checked sendComplete handler at sovranPaymentConfig.ts:765-806 — unconditional /(send-flow)/sendToken navigation. Counter-argument: 'PaymentRequest already has the NIP-17 transport for nostr fulfillment' — but that path is reached only when the *counterparty* sent a NUT-18 payment request; it does not cover the sender-initiated Send-Money-from-chat case, which is the user's brief.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "recipientPubkey now plumbed through coco-payment-ux machine context (FlowContext.recipientPubkey, AMOUNT_ENTERED event, navigateToMeltPreview/navigateToPaymentRequest/sendComplete step data) into preview/post-execution history-entry metadata"
     },
     {
       "id": "F-002",
@@ -91,7 +93,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked grep for recipientProfile across features — only HistoryEntryHeader.tsx self-references. The branch sits behind a tiny conditional guard so deleting it has no behavioural impact today; the cost of leaving it is dim-12 frame-coherence drift, not correctness. Counter-argument: 'maybe a downstream package consumes it' — refuted, only sovran-app imports HistoryEntryHeader.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "HistoryEntryHeader.recipientProfile prop replaced with recipientPubkey; resolved internally via useNostrProfileMetadata; now wired by MeltQuoteScreen, PaymentRequestScreen, SendTokenScreen — real adapter"
     },
     {
       "id": "F-003",
@@ -117,7 +121,9 @@
         "skill:zoom-out"
       ],
       "verification_note": "Re-checked NIP-61 §'P2PK-lock' (`Clients MUST prefix the public key they P2PK-lock with '02'`) and §'Sending a nutzap' (`mints listed in kind:10019`) against extractCashuToken at line 100 — Sovran's current path satisfies neither. UNVERIFIED: did not check whether coco-cashu-plugin-npc covers any nutzap-shaped flow. Counter-argument: 'NIP-17-DM-with-token works today and is simpler' — true, but the user explicitly asked about standards, and the receiver-only extractCashuToken is dim-13 (no log-doctor visibility into whether tokens silently fail to extract).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "NIP-61 (Nutzap) protocol replacement is substantial new implementation — out of slice scope; F-001/F-005 close the identity-loss seam, leaving NIP-04/17 transport in place"
     },
     {
       "id": "F-004",
@@ -143,7 +149,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked transactionLocationStore at lines 16-89 — sufficient template, including the zod-validated PersistedTransactionLocationStore at line 42 which is the right pattern (audit 06#F-007/F-009/F-010 set the precedent for rehydrate-time schema validation on all profile-scoped persisted stores). Counter-argument: 'just store the recipient on historyEntry.metadata via coco' — refuted: coco's metadata is a string-string Record (per ReceiveHistoryEntry / SendHistoryEntry shapes) and does not provide queryable indexes; the per-pubkey lookup wants a sovran-side store anyway.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "transactionRecipientStore deferred — best built after F-001/F-002/F-005 land (they did, this slice). Outgoing-payment-bubble rendering is a follow-up slice."
     },
     {
       "id": "F-005",
@@ -166,7 +174,9 @@
         "skill:zoom-out"
       ],
       "verification_note": "Re-checked counterpartyMetadata source — useNostrProfileMetadata(pubkey) at line 528 gives picture/name/lud16, all available at handleSendMoney call time. The lud16 gate is the only thing blocking lud16-less recipients from Send Money. Counter-argument: 'maybe lud16 is required by downstream' — refuted: AmountSelector's Next variants (line 103-119 of AmountSelector.tsx) drop the Lightning variant when meltTarget is empty, but the ecash variant is independent.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "handleSendMoney now packs recipientPubkey into amountEntry JSON; defaultHandlers.amountEntry.next forwards via machine.enterAmount({ recipientPubkey })"
     },
     {
       "id": "F-006",
@@ -191,7 +201,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked ChatComposer.tsx:165 — the spacing gap when actionsLeading is present is the existing 6pt marginTop, an order of magnitude tighter than the current 42pt floating gap. Counter-argument: 'the floating button stays visible across the full chat' — accepted, but actionsLeading does too; the chip is anchored to the composer which is already always visible. Audit 20.json#F-002 partial flagged the chat surfaces' parallel implementations — moving Send Money into actionsLeading rather than authoring a new floating layer is consistent with the consolidation direction.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Floating Send Money button removed; replaced with a 32-tall pill in ChatComposer.actionsLeading"
     },
     {
       "id": "F-007",
@@ -239,7 +251,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Re-checked log.txt for `chat.send.dispatch` and `user.messages.send_money` — neither carry a correlation id. Counter-argument: 'add the id only when something breaks' — refuted by the diagnose skill: the time to instrument the seam is before the bug, and the seam is small (one UUID per tap). UNVERIFIED that the proposed sessionId scheme survives JSON.parse round-trips on amountEntry — but follows the existing meltTarget plumbing pattern.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "log-doctor chat→amount→melt instrumentation is orthogonal to the identity-loss fix; defer"
     }
   ],
   "dimensions": {
