@@ -140,8 +140,8 @@
       ],
       "verification_note": "Re-checked CocoProvider.tsx:25-37; the race is theoretical given current Zustand v5 synchronous semantics, but the recheck pattern is canonical. Confidence held at 0.55.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "TOCTOU on `awaitRestoreReady` lives in `shared/providers/CocoProvider.tsx`, not InitializationProvider; out of scope for this slice."
+      "completion_status": "complete",
+      "completion_note": "Same fix as 28.json F-004: subscribe-then-getState ordering removes the TOCTOU window between getState() and subscribe(). The function moved out of CocoProvider to shared/providers/awaitRestoreReady.ts with the store passed in as a parameter, which gave it a real test seam (__tests__/awaitRestoreReady.test.ts covers already-ready, future-transition, ignored-non-ready-changes, synchronous-fire-during-subscribe, and post-subscribe-hydration cases)."
     },
     {
       "id": "F-004",

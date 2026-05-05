@@ -140,7 +140,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Confirmed useWalletLifecycleHydrated exists at walletLifecycleStore.ts:85 and is used in AppGate but not here.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "awaitRestoreReady extracted to shared/providers/awaitRestoreReady.ts; subscribe-then-getState ordering removes the pre-hydration race (a hydration setState that lands before the post-subscribe getState() check is caught by the registered subscriber, and a state already 'complete'/'not-needed' at the post-subscribe check resolves immediately)."
     },
     {
       "id": "F-005",
@@ -182,7 +184,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Confirmed behaviour by reading the effect and cleanup. Counter-argument: D12 holds in production. Kept Medium because fragility is real and the cleanup fire still runs spuriously.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Phase 1 useEffect cleanup now resets hasStarted.current=false (and clears manager + isReady state) so a deps-change re-run on keys.pubkey can re-init for the new identity. CocoManager.initialize is idempotent under in-flight cleanup (manager.ts:117 awaits this.pendingCleanup before deciding whether to return existing instance). Also reset bgStarted.current symmetrically so Phase 2 re-runs NPC sync + recovery for the new manager."
     },
     {
       "id": "F-007",
