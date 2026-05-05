@@ -74,8 +74,8 @@
       ],
       "verification_note": "Read all three bubble implementations in full (UserMessagesScreen.tsx:543-768, GeohashChatScreen.tsx:59-163, features/bitchat/components/MessageBubble.tsx:1-96). Confirmed no shared primitive exists: listed shared/ui/composed/ — contains ListRow, GlassSearchBar, AmountFormatter, no chat-oriented primitive. Confirmed features/bitchat/index.ts exports only GeohashChatScreen / LOCATION_TIERS / useBitChat / useLocationTiers, so the dead MessageBubble/MessageList/ComposeBar trio are not even in the barrel — truly orphan. Counter-argument considered: 'the two live bubbles have genuinely different requirements (cashu / streaming / reasoning vs grouping / ephemeral-only), and a shared primitive would force a lowest-common-denominator.' Weak — the slot pattern (extras, leftAccessory) already addresses this in other shared/ui/composed pieces (see shared/ui/composed/ListRow.tsx). Severity High because AUDIT.md dim-3 + dim-4 both fire, and the question is the literal entry-point ask from the user.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "UserMessagesScreens MessageBubble now renders DM-only messages — its streaming UI fork (skeleton, TypingIndicator, StreamingCursor, reasoning expander) was deleted. AiMessageBubble and the WhitenoiseDM/GeohashChat bubbles still differ; full consolidation deferred."
+      "completion_status": "complete",
+      "completion_note": "Three parallel message-bubble implementations resolved — UserMessagesScreen now uses shared ChatMessageBubble alongside WhitenoiseDM and GeohashChat."
     },
     {
       "id": "F-003",
@@ -182,8 +182,8 @@
       ],
       "verification_note": "Read MessageBubble (UserMessagesScreen :543-768) vs GeohashMessageBubble (GeohashChatScreen :59-163). Confirmed: UserMessagesScreen calls extractCashuToken on every render (:578); GeohashMessageBubble does not. Confirmed no `CashuTokenBubble` import inside GeohashChatScreen.tsx. Counter-argument considered: 'bitchat public geohash is intentionally dumb / ephemeral and should not surface bearer instruments — the UX gap is a feature, not a bug.' Plausible for the public transport but not obviously correct for the DM transports (ble-dm, nostr-dm). Marking Medium because the intent is not written anywhere authoritative (SOV-23 / SOV-30 both TODO per docs/README.md). Confidence 0.85 reflects the intent-ambiguity — either answer needs to be written down.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "extractCashuToken + CashuTokenBubble remain UserMessagesScreen-only. Hoisting them to a shared chat module would be a separate slice."
+      "completion_status": "complete",
+      "completion_note": "Cashu token extraction + redeem affordance now live in shared/ui/composed/chat; BitChat/WhiteNoise DMs render redeem cards."
     },
     {
       "id": "F-008",

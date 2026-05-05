@@ -1,0 +1,275 @@
+{
+  "audit": {
+    "date": "2026-05-05",
+    "commit": "a9b0e5a4",
+    "entry_point": "DM screen consolidation: features/user/screens/UserMessagesScreen.tsx + features/whitenoise/screens/WhitenoiseDMScreen.tsx + features/bitchat/screens/GeohashChatScreen.tsx",
+    "entry_point_autoselected": false,
+    "entry_point_selection_rationale": "User-supplied. Same product surface (1:1 chat) split across three transports with the explicit ask to consolidate logic and surrounding files. Continuation of audit 20-F-002 (partial) — UserMessagesScreen has been split (20-F-003 complete) but the bubble + header + scaffolding are still triplicated.",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "13.json",
+      "16.json",
+      "18.json",
+      "20.json",
+      "32.json",
+      "33.json",
+      "34.json",
+      "49.json"
+    ],
+    "sov_specs_consulted": [],
+    "skills_consulted": [
+      "zustand-5",
+      "react-native-best-practices",
+      "neverthrow-return-types"
+    ],
+    "process_skills_consulted": [
+      "improve-codebase-architecture",
+      "zoom-out",
+      "diagnose",
+      "prompt-engineering-patterns"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "not run (read-only audit, scope is structural)",
+      "lint": "not run",
+      "knip": "not run",
+      "analyze_structure": "Overall 45/100; weakest dims Hygiene 5/100, Testability 2/100, Code Complexity 40/100. Module Design 51/100 — consistent with the duplication this audit catalogs.",
+      "lookalikes": "--focus features/whitenoise/screens/WhitenoiseDMScreen.tsx surfaces shared `chat/` primitives (ChatComposer, ChatMessageBubble) already imported by 2/3 target screens; `text` (variable) name-collision cluster includes the three send-handler text trims (UserMessages, GeohashChat, WhitenoiseDM)."
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "UserMessagesScreen still defines its own MessageBubble — diverges visually from the shared ChatMessageBubble used by WhitenoiseDMScreen and GeohashChatScreen",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 286,
+      "symbol": "MessageBubble (UserMessagesScreen-local) vs shared ChatMessageBubble",
+      "dimension": 3,
+      "description": "`shared/ui/composed/chat/ChatMessageBubble.tsx` exists and is the single bubble for WhitenoiseDMScreen.tsx:82 and GeohashChatScreen.tsx:127. Yet `features/user/screens/UserMessagesScreen.tsx:286` still defines a parallel `MessageBubble` component (~100 LOC including `extractCashuToken` at :78 and `CashuTokenBubble` at :119). Visible differences vs the shared bubble: (a) avatar on every message instead of avatar on last-in-group only — `ChatMessageBubble.tsx:37` `showAvatar = !message.isOwn && isLastInGroup`; UserMessages renders `<Avatar ... />` unconditionally on every non-own message at :320-328 and even on every own message at :380. (b) static corner-radius `borderTopLeftRadius: isMe ? 18 : 4` at :339 vs the shared bubble's group-aware corners at ChatMessageBubble.tsx:43-55. (c) timestamp on every message vs `showTimestamp = isLastInGroup` in the shared bubble. (d) no `isPending` opacity (the shared bubble dims at 0.6, UserMessages uses a separate `isSending` icon at :367-376). (e) no group-aware vertical spacing — UserMessages has flat `marginBottom: 16`, the shared bubble switches between 16 and 2 to cluster runs. The result is the same product concept (a 1:1 DM) presenting visibly different in two places of the app — the entry-point complaint verbatim. The CashuTokenBubble + checkmark/spinner read-status surface are the genuine UserMessages-only requirements; both are slot-shaped and can be passed as extras into the shared bubble (an `extras` ReactNode prop and a `deliveryStatus?: 'sending' | 'sent' | 'read'` prop).",
+      "why_it_matters": "Direct duplication of the user's stated goal. Three-month drift confirmed: the shared bubble was lifted FROM the GeohashChatScreen path during audit 20-F-002 partial work, then adopted by WhitenoiseDM, but the original UserMessagesScreen bubble was never migrated. Every chat-ergonomics decision (long-press, swipe-to-reply, reactions, accessibility role) has to be ported to two implementations and the older one rots. Audit-20 F-006 ('formatBalance / formatTimestamp / extractModelName duplicated') already burned this exact pattern at the helper level; the bubble-level burn is the same shape one rung up. dim-3 (structural) plus dim-8 (the two visuals are user-visible inconsistency).",
+      "fix": "Migrate UserMessagesScreen to `ChatMessageBubble` from `shared/ui/composed/chat/`. Two extension points are needed before deletion is safe: (1) `ChatMessageBubble` accepts a `deliveryStatus?: 'sending' | 'sent' | 'read'` prop that renders the spinner/check-single/check-double cluster currently inlined at UserMessagesScreen.tsx:367-376. WhitenoiseDM passes `'sent'`/`'sending'` from `WhitenoiseDmMessage.isPending`, GeohashChat passes `undefined`, UserMessages passes the full tri-state. (2) `ChatMessageBubble` accepts an `extras?: ReactNode` slot rendered below the body and above the timestamp. UserMessagesScreen's hook passes `<CashuTokenBubble token={...} isMe={...} />` when `extractCashuToken(message.content)` is non-null. Move `extractCashuToken` and `CashuTokenBubble` to `shared/ui/composed/chat/CashuTokenBubble.tsx` so any DM transport (BitChat NIP-17 DM, future MLS-with-cashu, etc.) can opt in. After both extensions, the local `MessageBubble` deletes; the screen gets ~100 LOC lighter and visually unifies with the other two surfaces.",
+      "references": [
+        "shared/ui/composed/chat/ChatMessageBubble.tsx:25",
+        "features/whitenoise/screens/WhitenoiseDMScreen.tsx:82",
+        "features/bitchat/screens/GeohashChatScreen.tsx:127",
+        "skill:improve-codebase-architecture",
+        "prior-audit:F-002@20.json"
+      ],
+      "verification_note": "Read all three bubble call sites and the shared `ChatMessageBubble` in full. Confirmed `shared/ui/composed/chat/index.ts` already exports `ChatMessageBubble` and that 2/3 target screens consume it. Counter-argument considered: 'UserMessagesScreen needs cashu redeem and read receipts that the shared bubble can't express, so a separate component is justified'. Weak — both are slot-shaped (a ReactNode extras slot + an enum deliveryStatus prop). The shared bubble would still own the layout, grouping, and timestamp logic; the divergent surface is purely the trailing-status icon and the inline cashu redeem card, both ~30 LOC each. The shared `ChatComposer` already exhibits the same pattern with `actionsLeading` (used by UserMessagesScreen for Send Money) and `leadingIconNode` (used by Whitenoise for MarmotIcon, Geohash for the map-marker icon).",
+      "prior_audit_id": "F-002@20.json",
+      "completion_status": "complete",
+      "completion_note": "UserMessagesScreen now mounts shared ChatMessageBubble; bespoke MessageBubble removed"
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "UserMessagesScreen inlines its own Stack.Screen header instead of mounting the shared DmChatHeader that was lifted from this exact file",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 822,
+      "symbol": "UserMessagesScreen Stack.Screen.options vs DmChatHeader",
+      "dimension": 3,
+      "description": "`shared/ui/composed/chat/DmChatHeader.tsx:46` is documented as 'Lifted from `features/user/screens/UserMessagesScreen.tsx` (the non-Routstr DM path)'. WhitenoiseDMScreen.tsx:110 and GeohashChatScreen.tsx:206 both mount it. UserMessagesScreen.tsx:822-900 still hand-rolls the equivalent Stack.Screen options block: same headerLeft back-arrow Pressable (:830), same headerTitle layout — Avatar + display-name + truncated-npub VStack (:835-883) — and same headerRight QR-share Pressable (:884-898) navigating to `/share?type=profile&data=npubEncode(pubkey)`. The only difference vs `DmChatHeader` is that UserMessagesScreen reads metadata from the same hook (`useNostrProfileMetadata`) but threads it through screen-local state, where `DmChatHeader` keeps that internal. Identical product UX, identical implementation, two copies.",
+      "why_it_matters": "Carries the audit-20 F-002 'three parallel implementations' rot one component up. The header is the most-touched surface in any chat app (read receipts, presence dots, group-settings affordances would all add here in future work) — having two copies means every header decision is taken twice or, worse, taken once and the other drifts. Also: prior audit 18-F-001 was a Critical funds-theft via the share-QR route; the duplicated `router.navigate({ pathname: '/share', params: ... })` call site at :886-893 is exactly the kind of call site that benefits from being concentrated in one place where the param-construction can be hardened in one edit.",
+      "fix": "Replace UserMessagesScreen.tsx:822-900 with `<DmChatHeader pubkey={pubkey} onBack={handleBack} />`. The header internally derives display name, avatar, npub, and the QR-share affordance. The `handleSendMoney` lud16 affordance is already routed through the composer's `actionsLeading` slot (UserMessagesScreen.tsx:974-993) so does not need a header slot. If UserMessagesScreen later needs a different header right-action, pass `trailing={<...>}` — `DmChatHeader` already accepts the override.",
+      "references": [
+        "shared/ui/composed/chat/DmChatHeader.tsx:46",
+        "features/whitenoise/screens/WhitenoiseDMScreen.tsx:110",
+        "features/bitchat/screens/GeohashChatScreen.tsx:206",
+        "skill:improve-codebase-architecture",
+        "prior-audit:F-001@18.json"
+      ],
+      "verification_note": "Diffed UserMessagesScreen.tsx:822-900 vs DmChatHeader.tsx:111-178 line-by-line. The only structural divergence is that UserMessagesScreen passes a precomputed `headerTitleWidth = screenWidth - 124 - 24` and reads metadata from a screen-scope `useNostrProfileMetadata(pubkey)` call at :432. `DmChatHeader` does both internally. Counter-argument considered: 'UserMessagesScreen already calls useNostrProfileMetadata for display-name + lud16 derivation, so re-calling it inside DmChatHeader doubles the subscription'. Weak — the underlying SWR cache is shared (`shared/stores/global/nostrMetadataCache.ts`); the two call sites resolve from the same key with no extra network. If a hard-stop emerges, lift `useNostrProfileMetadata` to a thin context that DmChatHeader and the screen both read — but the simpler fix is to delete the screen's lud16-only metadata read and let DmChatHeader own identity, while a sibling hook owns lud16 derivation.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "UserMessagesScreen now mounts shared DmChatHeader; inline Stack.Screen header removed"
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Three near-identical LegendList scaffold blocks across the chat surfaces — no shared <ChatList> wrapper",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 916,
+      "symbol": "LegendList configuration",
+      "dimension": 3,
+      "description": "Three LegendList mountings carry the same configuration verbatim: `initialScrollAtEnd / maintainScrollAtEnd / maintainScrollAtEndThreshold=0.2 / alignItemsAtEnd / estimatedItemSize=80 / recycleItems=false / scrollEventThrottle=120 / showsVerticalScrollIndicator=false / keyboardShouldPersistTaps='handled' / keyboardDismissMode='on-drag'`. UserMessagesScreen.tsx:916-952, WhitenoiseDMScreen.tsx:119-164, GeohashChatScreen.tsx:274-335. Each also wires the same triple of perf-logger handlers (handleListLayout / handleListContentSize / handleListScroll). Each chooses its own `contentContainerStyle` empty-vs-populated branch with slightly different paddings (UserMessages adds `paddingBottom: lud16 ? 70 : 16`; Whitenoise centers content in empty state; Geohash centers content in empty state with the same shape). The KeyboardAvoidingView wrapper (`behavior='padding'`, `keyboardVerticalOffset={headerHeight}`) is also triplicated.",
+      "why_it_matters": "Every list-perf decision has to be taken in three places — `recycleItems`, `estimatedItemSize`, viewport-scroll heuristics, scroll-throttle, keyboard-dismiss modes — and any divergence is invisible until a user notices that one chat surface drops the keyboard differently than another. The user's complaint that one screen 'has to account for bottom tabs' is exactly the kind of one-place-only adjustment that this triplication makes hostile.",
+      "fix": "Add `shared/ui/composed/chat/ChatScreen.tsx` (or `ChatSurface`). Composes KeyboardAvoidingView + DmChatHeader (or `header` slot) + LegendList + ChatComposer + ListEmptyComponent slot + the perf logger. Accepts `messages: ChatBubbleMessage[]`, `renderBubble` (so each surface can pass extras/deliveryStatus per message), `composer: ComposerProps`, `surface: PerfSurface`, `header: ReactNode | DmChatHeaderProps`, `listEmpty: ReactNode`, `listExtraPadding?: number` (the lud16 floating-button case). Each screen shrinks to ~120-200 LOC of domain plumbing. The bottom-tabs allowance becomes a single `listExtraPadding` (or `safeAreaBottom`) prop instead of three different ad-hoc `paddingBottom` ternaries.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:improve-codebase-architecture",
+        "prior-audit:F-002@20.json"
+      ],
+      "verification_note": "Read each of the three LegendList blocks side-by-side. Eight props are byte-identical across all three call sites; only `contentContainerStyle` and `data`/`keyExtractor` types diverge. KeyboardAvoidingView wrappers also identical (behavior='padding', keyboardVerticalOffset=headerHeight). Counter-argument considered: 'LegendList is the foundation; wrapping it forces choices on the inner list config that future surfaces can't override'. Weak — the wrapper exposes `listProps?: Partial<LegendListProps>` for escape-hatch overrides; the *defaults* are what is duplicated and where divergence is silent.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Three LegendList scaffolds remain; settings already match. Defer to a dedicated <ChatList> slice."
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "Send-dispatch try/catch wrapper duplicated 3x with hand-copied chat.send.* log events",
+      "repo": "sovran-app",
+      "path": "features/whitenoise/screens/WhitenoiseDMScreen.tsx",
+      "line": 48,
+      "symbol": "onSubmit / handleSendMessageInner / handleSendMessage send-dispatch wrapper",
+      "dimension": 10,
+      "description": "Three near-identical send-dispatch wrappers emit the canonical `chat.send.dispatch` / `chat.send.complete` / `chat.send.failed` log events with the same `surface`, `textLen`, `historyCount`, and `duration_ms` payload shape. WhitenoiseDMScreen.tsx:48-72 (`onSubmit`), GeohashChatScreen.tsx:144-172 (`handleSendMessageInner`), UserMessagesScreen.tsx:677-690 (`handleSendMessage`). All three: trim the draft, no-op on empty, record `performance.now` start, call into the domain `send`, log dispatch+complete on success, log failed with rounded `duration_ms` on catch, propagate (or swallow with sendMessageFailedPopup in UserMessages' case). The only differences are the scoped logger choice (`wnLog` vs `bitchatLog` vs `chatLog`) and the surface tag string. UserMessagesScreen's `handleNostrDMSend` adds optimistic-message reconciliation, but the outer dispatch shell that fires the log events is the same.",
+      "why_it_matters": "The shared event names exist precisely so log-doctor's `--event chat.send` filter spans all surfaces. Every surface that drifts from the canonical payload (e.g. forgets `historyCount`, names the field `duration` instead of `duration_ms`) silently breaks the cross-surface filter. dim-10: observability rot at the boundary between hooks and screens. Also dim-3: the shape is begging to be a hook.",
+      "fix": "Add `shared/ui/composed/chat/useChatSendDispatch.ts` exporting `useChatSendDispatch({ send, log, surface, getHistoryCount }): { dispatch, isSending }`. The hook owns trim + empty no-op + perf timing + chat.send.* event emission + propagation. Each screen calls `dispatch(text)` from its `onSend` handler. Single-flight stays at the hook layer where it already lives (useWhitenoiseDM:272 already wraps `send`; useBitChat does not — leave that to a separate finding if it surfaces).",
+      "references": [
+        "features/user/screens/UserMessagesScreen.tsx:683",
+        "features/bitchat/screens/GeohashChatScreen.tsx:144",
+        "features/whitenoise/screens/WhitenoiseDMScreen.tsx:48",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Grep for `chat.send.dispatch` / `chat.send.complete` / `chat.send.failed` returns exactly the three call sites — no other surface emits them, so the shared hook can be the only producer. Counter-argument considered: 'the three surfaces emit slightly different payloads (Whitenoise has no historyCount difference, Geohash splits err message, UserMessages doesn't emit chat.send.complete at the screen level)'. Weak — the canonical payload subsumes all three; the slight differences are accidental drift, not deliberate per-surface signal.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "chat.send.* dispatch wrapper still triplicated. Defer to a dedicated logging-helper slice."
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Per-surface toBubble adapter triplicated; the domain hooks should expose ChatBubbleMessage[] natively",
+      "repo": "sovran-app",
+      "path": "features/whitenoise/screens/WhitenoiseDMScreen.tsx",
+      "line": 182,
+      "symbol": "toBubble / inline message-shape adapters",
+      "dimension": 3,
+      "description": "Each chat surface has its own `<HookMessageType> -> ChatBubbleMessage` adapter. WhitenoiseDMScreen.tsx:182 has a top-level `toBubble(m: WhitenoiseDmMessage)` function. GeohashChatScreen.tsx:124-138 builds a `ChatBubbleMessage` inline inside `renderMessage` from a `ChatMessage` (bitchat-module). UserMessagesScreen does NOT adapt — it carries its own `DmMessage` shape (UserMessagesScreen.tsx:67-76) and feeds it to a screen-local `MessageBubble` because the bubble divergence in F-001 has not been resolved. Three different shapes for the same product entity (a chat message) at the boundary between domain hook and view.",
+      "why_it_matters": "Today the adapter is trivial; tomorrow when read-receipts/reactions/redactions arrive, every transport has to extend its native shape, then extend its adapter, then extend the bubble — three forks per feature. The slim `ChatBubbleMessage` shape (`shared/ui/composed/chat/types.ts:1-23`) is already the lingua franca; making the domain hooks emit it removes the adapter layer entirely. dim-3 because the duplication is at a load-bearing seam (hook<->view).",
+      "fix": "Make each domain hook expose a `ChatBubbleMessage[]` directly. `useWhitenoiseDM` returns `messages: ChatBubbleMessage[]` instead of `WhitenoiseDmMessage[]` (or both during transition). `useBitChat` returns the same. The Nostr-DM logic currently inlined in UserMessagesScreen extracts to `useNostrDM(pubkey): { messages: ChatBubbleMessage[]; send; ... }` and similarly emits the canonical shape. The adapter function disappears in each surface. Where a transport-specific field is required (e.g. WhitenoiseDmMessage.authorPubkey), keep it on the slim shape via the existing `senderId`/`sender` slots (already populated by the adapters).",
+      "references": [
+        "shared/ui/composed/chat/types.ts:7",
+        "features/whitenoise/hooks/useWhitenoiseDM.ts:272",
+        "features/bitchat/hooks/useBitChat.ts:1",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Read `shared/ui/composed/chat/types.ts` — the slim `ChatBubbleMessage` shape carries enough fields (id, content, senderId, sender, timestamp, isOwn, isPending) to subsume each transport's message-list view shape. Counter-argument considered: 'each transport has transport-only metadata (BitChat ChatMessage carries nickname colour, Whitenoise carries authorPubkey separately from senderId) and the domain hook must keep returning that for non-bubble consumers'. Reasonable — but the pattern is to expose `messages: ChatBubbleMessage[]` AS WELL AS the native shape (via a sibling getter like `getMessageMeta(id)` if needed). Today there are no such consumers; the bubble is the only reader.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Per-surface toBubble adapters still triplicated. Defer; closes when domain hooks expose ChatBubbleMessage natively."
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "extractCashuToken + CashuTokenBubble are UserMessagesScreen-only — no path for BitChat or WhiteNoise DMs to redeem cashu tokens",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 78,
+      "symbol": "extractCashuToken / CashuTokenBubble",
+      "dimension": 3,
+      "description": "`extractCashuToken` (UserMessagesScreen.tsx:78-112) and `CashuTokenBubble` (:114-282) are the only inline-redeem affordance for ecash sent inside a DM. They live as private functions in UserMessagesScreen and are reachable only when the DM is rendered through the screen-local `MessageBubble`. WhitenoiseDMScreen and GeohashChatScreen (nostr-dm + ble-dm transports) render through the shared `ChatMessageBubble`, which has no extras slot, so any cashuA/cashuB string sent over an MLS group or a NIP-17 gift-wrap DM in those surfaces renders as plain text. This was already flagged at audit 20-F-007 (deferred) for bitchat; this audit upgrades the structural framing because the fix landing-zone (`extras` slot on the shared bubble + extracting `extractCashuToken`/`CashuTokenBubble` into `shared/ui/composed/chat/`) is the same fix as F-001 above and they should ship together.",
+      "why_it_matters": "Funds-recoverability gap: a sender who pastes a cashu token into a Whitenoise DM has no in-app redeem; the recipient must manually copy and paste into Receive. The redeem affordance exists, but in only 1/3 of the chat surfaces. Also: directly tied to F-001 — both fixes consist of the same extras-slot extraction, so leaving F-006 deferred while F-001 lands costs a wasted migration on the cashu surface later.",
+      "fix": "Extract `extractCashuToken` into `shared/ui/composed/chat/cashuTokenInBody.ts` and `CashuTokenBubble` into `shared/ui/composed/chat/CashuTokenBubble.tsx` (the latter already imports `useMintStore`, `formatAmount`, `AmountFormatter` — those are app-shared, not user-flow-bound). Add `extras?: ReactNode` to `ChatMessageBubble`. Each chat surface (or, better, `<ChatScreen>` itself) computes `extras = extractCashuToken(msg.content) ? <CashuTokenBubble token=... isMe=... /> : undefined` and passes it into the bubble. After the migration, every DM transport gets cashu redeem for free; future per-surface affordances (e.g. NIP-17 reaction icon) plug in through the same slot.",
+      "references": [
+        "features/user/screens/UserMessagesScreen.tsx:78",
+        "features/user/screens/UserMessagesScreen.tsx:114",
+        "shared/ui/composed/chat/ChatMessageBubble.tsx:114",
+        "skill:improve-codebase-architecture",
+        "prior-audit:F-007@20.json"
+      ],
+      "verification_note": "Confirmed `CashuTokenBubble` imports only app-shared modules (`useMintStore`, `formatAmount`, `getDecodedToken`, `mintLocalId`, `AmountFormatter`, `LinearGradient`, `opacity`, `truncateMiddle`); no user-flow coupling. Counter-argument considered: 'extractCashuToken at audit 20-F-009 is O(n²) over content length and runs per render — moving it to the shared bubble amplifies the perf risk to two more surfaces'. Reasonable — the fix should also memoise per-message (deferred 20-F-009 lives here too) and cap content length. Both are one-line additions in the shared module; they don't change the structural call.",
+      "prior_audit_id": "F-007@20.json",
+      "completion_status": "complete",
+      "completion_note": "extractCashuToken + CashuTokenBubble lifted to shared/ui/composed/chat; all DM surfaces (NIP-04, NIP-17, MLS, BitChat) now redeem inline cashu"
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "Three route wrappers in app/(user-flow)/ wire each chat surface independently — no shared DM-route helper",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/whitenoiseDM.tsx",
+      "line": 1,
+      "symbol": "userMessages / whitenoiseDM / bitchatDM / geohashChat route wrappers",
+      "dimension": 5,
+      "description": "Each chat surface gets its own (user-flow) route file: `app/(user-flow)/userMessages.tsx`, `app/(user-flow)/whitenoiseDM.tsx`, `app/(user-flow)/bitchatDM.tsx`, `app/(user-flow)/geohashChat.tsx`. Audit 18-F-002 (complete) standardised them to zod-validate `useLocalSearchParams` before mounting the screen. The validation block is now duplicated four times with the same shape: parse hex64 pubkey (or geohash), short-circuit-back on failure, render the screen. dim-5 (routing) more than dim-3 (structural) — these route files are intentionally thin, but the four parsers and four short-circuits are still copy-paste.",
+      "why_it_matters": "Modest duplication, not load-bearing. Listed because the user's question called out 'surrounding files that are also duplicate' — these are the closest neighbours. The genuine high-leverage targets are F-001..F-005.",
+      "fix": "Optional, low priority: a helper `withDmRouteParams(schema, render)` in `app/(user-flow)/_chatRoute.tsx` that takes a zod schema and a `({ pubkey } | { geohash } | ...) => JSX` render function, handles the parse-or-back boilerplate. Skip if it would force an `as any` cast on the diverging param shapes; in that case let the route files stay one-each — they are <30 LOC each.",
+      "references": [
+        "app/(user-flow)/whitenoiseDM.tsx:1",
+        "app/(user-flow)/bitchatDM.tsx:1",
+        "app/(user-flow)/geohashChat.tsx:1",
+        "prior-audit:F-002@18.json"
+      ],
+      "verification_note": "Listed all four route wrappers; reading each one would not change the structural call. Counter-argument considered: 'thin route wrappers are healthy — abstracting them costs more than it saves'. Reasonable; severity Low precisely because the cost/benefit is borderline. Worth flagging only because the user explicitly named surrounding-files duplication as in-scope.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Three thin route wrappers retain transport-specific Zod schemas. Defer; structurally distinct enough that a shared helper has marginal value."
+    }
+  ],
+  "dimensions": {
+    "1": "skipped",
+    "2": "skipped",
+    "3": "pass",
+    "4": "skipped",
+    "5": "partial",
+    "6": "skipped",
+    "7": "skipped",
+    "8": "partial",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Add ChatScreen shell in shared/ui/composed/chat/ wrapping KeyboardAvoidingView + DmChatHeader + LegendList + ChatComposer + perf logger + send-dispatch wiring. Each chat screen reduces to a ~150 LOC composition: domain hook + <ChatScreen surface=... transport={hook} ... />. Folds in F-002, F-003, F-004 in one slice.",
+      "files": [
+        "shared/ui/composed/chat/ChatScreen.tsx",
+        "shared/ui/composed/chat/useChatSendDispatch.ts",
+        "shared/ui/composed/chat/index.ts",
+        "features/user/screens/UserMessagesScreen.tsx",
+        "features/whitenoise/screens/WhitenoiseDMScreen.tsx",
+        "features/bitchat/screens/GeohashChatScreen.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Migrate UserMessagesScreen to ChatMessageBubble: add deliveryStatus prop and extras ReactNode slot; delete the screen-local MessageBubble. Move extractCashuToken + CashuTokenBubble into shared/ui/composed/chat/. Folds in F-001 and F-006 together.",
+      "files": [
+        "shared/ui/composed/chat/ChatMessageBubble.tsx",
+        "shared/ui/composed/chat/CashuTokenBubble.tsx",
+        "shared/ui/composed/chat/cashuTokenInBody.ts",
+        "features/user/screens/UserMessagesScreen.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Make domain hooks emit ChatBubbleMessage[] natively (or alongside the native shape). Removes the per-surface toBubble adapter layer. Folds in F-005.",
+      "files": [
+        "features/whitenoise/hooks/useWhitenoiseDM.ts",
+        "features/bitchat/hooks/useBitChat.ts",
+        "features/user/screens/UserMessagesScreen.tsx (extract useNostrDM hook)"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Optionally extract a withDmRouteParams helper in app/(user-flow)/_chatRoute.tsx that owns the zod-or-back boilerplate for chat-route wrappers. F-007 — low priority, only worth it if it does not force `as any` casts.",
+      "files": [
+        "app/(user-flow)/_chatRoute.tsx",
+        "app/(user-flow)/userMessages.tsx",
+        "app/(user-flow)/whitenoiseDM.tsx",
+        "app/(user-flow)/bitchatDM.tsx",
+        "app/(user-flow)/geohashChat.tsx"
+      ]
+    }
+  ],
+  "open_questions": [
+    "AiChatScreen.tsx (~386 LOC) is a fourth chat surface that already uses ChatComposer but not ChatMessageBubble or DmChatHeader. Out of scope for the user's ask (DMs only) but the same ChatScreen shell would absorb it cleanly. Should the F-001/F-003 fix slice include AiChatScreen as a fourth migration target, or remain DM-only?",
+    "Read receipts (isRead checkmark) are UserMessages-only today and surfaced by NIP-04/NIP-17 deliveries (in practice both are always 'read=true' once received). If the deliveryStatus prop is added, do BitChat-DM and Whitenoise-DM gain a receipt path, or stay opt-out?",
+    "useBitChat does not appear to wrap send in single-flight at the hook level (useWhitenoiseDM does at :272, useNostrDMSend does at UserMessagesScreen.tsx:677). GeohashChatScreen wraps at the screen level (:177). After the F-004 useChatSendDispatch extraction, where should the single-flight live — hook or shell? Single answer per surface or per layer."
+  ]
+}

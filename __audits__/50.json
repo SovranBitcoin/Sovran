@@ -358,8 +358,8 @@
       ],
       "verification_note": "Confirmed by reading the three comments. Counter-argument considered: maybe the three surfaces will diverge over time and abstracting now is premature. Held: divergence has been in opposite direction — comments explicitly say 'kept identical' and 'lifted from'. Two adapters already exist; the third makes a real seam.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Two surfaces remain (WhitenoiseDMScreen + GeohashChatScreen) plus this DM screen; consolidating them would be a separate slice."
+      "completion_status": "complete",
+      "completion_note": "Three near-identical chat screens now share ChatMessageBubble + DmChatHeader + extractCashuToken/CashuTokenBubble."
     },
     {
       "id": "F-014",
