@@ -202,6 +202,35 @@ describe('logger redaction safety (audit 56.json F-001 / F-008 / F-012)', () => 
     expect(typeof p.preview).toBe('string');
   });
 
+  it('startSpan respects warnAtMs/errorAtMs opts so long-running ops do not log as ERROR (audit 34 F-005)', () => {
+    const log = createLogger({ level: 'debug', async: false, transports: [], pretty: false });
+    const baseNow = performance.now;
+    let fakeNow = 0;
+    (performance as { now: () => number }).now = () => fakeNow;
+    try {
+      // Default thresholds: 6s end → ERROR
+      fakeNow = 0;
+      const defaultSpan = log.startSpan('test.default');
+      fakeNow = 6000;
+      defaultSpan.end();
+      const defaultEnd = log.getRecentLogs().find((e) => e.event === 'test.default.end');
+      expect(defaultEnd?.level).toBe('error');
+
+      // Raised thresholds: 6s end with errorAtMs:60_000 → debug
+      log.clearRecentLogs();
+      fakeNow = 0;
+      const aiSpan = log.startSpan('ai.send', undefined, { warnAtMs: 15_000, errorAtMs: 60_000 });
+      fakeNow = 6000;
+      aiSpan.end();
+      const aiEnd = log.getRecentLogs().find((e) => e.event === 'ai.send.end');
+      expect(aiEnd?.level).toBe('debug');
+      // _slow only when above warnAtMs
+      expect(aiEnd?.params?._slow).toBeUndefined();
+    } finally {
+      (performance as { now: () => number }).now = baseNow;
+    }
+  });
+
   it('dedup never mutates an entry already pushed to the ring buffer (F-008)', () => {
     const log = createLogger({
       level: 'debug',

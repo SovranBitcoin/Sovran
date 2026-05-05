@@ -213,15 +213,22 @@ export function useAiSend() {
       // candidate we were last attempting when the request failed.
       let modelToUse = primaryModel;
 
-      const span = aiLog.startSpan('ai.send', {
-        flowId,
-        tier: tier.id,
-        provider: provider.id,
-        model: primaryModel,
-        candidateCount: candidateChain.length,
-        balanceSats,
-        retried: params.retriedFromMessageId ?? null,
-      });
+      // AI completions routinely run multiple seconds; keep the span's
+      // slow-escalation thresholds well above the default 1s/5s so a normal
+      // success doesn't log as ERROR (audit 34 F-005).
+      const span = aiLog.startSpan(
+        'ai.send',
+        {
+          flowId,
+          tier: tier.id,
+          provider: provider.id,
+          model: primaryModel,
+          candidateCount: candidateChain.length,
+          balanceSats,
+          retried: params.retriedFromMessageId ?? null,
+        },
+        { warnAtMs: 15_000, errorAtMs: 60_000 }
+      );
 
       try {
         const apiInputChars = apiMessages.reduce((n, m) => n + m.content.length, 0);
