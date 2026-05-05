@@ -204,8 +204,8 @@
       ],
       "verification_note": "Verified consumer at app/(transactions-flow)/transactions.tsx:101 (JSON.parse with no validation). Account today is `{ unit: 'sat' }` from WalletScreen.tsx:22 — low blast radius. Keep Low.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Different pattern from this slice: param-shape laundering via JSON.stringify/parse, not router-arg `as any`. Belongs with the route-param zod-validation slice already in flight (audit 18.json#F-002 et al.)."
+      "completion_status": "complete",
+      "completion_note": "Removed the redundant account JSON.stringify/parse round-trip end-to-end. Two callers (PrimaryBalance.tsx, Transactions.tsx) now pass filterCurrency: account.unit instead of the JSON blob (Transactions.tsx call also corrected from the dead tab key to filterStatus to match ParamsSchema). The route schema drops account, the consumer drops the JSON.parse and the initialAccount prop on TransactionsScreen, and selectedCurrency collapses to filterCurrency || 'sat'. No remaining JSON.stringify route blobs in this code path; the history-entry JSON.stringify pattern in app/(transactions-flow)/transactions.tsx and similar callers is a separate slice (audit 18.json#F-002 et al.)."
     },
     {
       "id": "F-008",
