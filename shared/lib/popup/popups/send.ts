@@ -2,12 +2,6 @@ import { makeStaticPopup, makeParamPopup } from './factory';
 
 const ALERT_ICON = 'icon:mdi:alert-circle-outline';
 
-export const invalidPaymentRequestPopup = makeStaticPopup({
-  message: 'Invalid payment request',
-  icon: ALERT_ICON,
-  type: 'error',
-});
-
 export const sendPaymentFailedPopup = makeStaticPopup({
   message: 'Failed to send payment',
   icon: 'icon:mdi:send',
@@ -45,37 +39,6 @@ export const operationInvalidStatePopup = makeParamPopup<{ state: string }>(({ s
   icon: ALERT_ICON,
   type: 'error',
 }));
-
-export const invalidNostrTransportPopup = makeStaticPopup({
-  message: 'Invalid payment request',
-  text: 'No Nostr transport found.',
-  icon: 'icon:feather:wifi',
-  type: 'error',
-});
-
-export const invalidRecipientPopup = makeStaticPopup({
-  message: 'Invalid recipient in payment request',
-  icon: 'icon:mdi:alert-circle',
-  type: 'error',
-});
-
-export const noLightningAddressPopup = makeStaticPopup({
-  message: 'No lightning address provided',
-  icon: 'icon:mingcute:lightning-fill',
-  type: 'error',
-});
-
-export const quoteCreationFailedPopup = makeStaticPopup({
-  message: 'Failed to create quote',
-  icon: ALERT_ICON,
-  type: 'error',
-});
-
-export const noPaymentRequestPopup = makeStaticPopup({
-  message: 'No payment request provided',
-  icon: ALERT_ICON,
-  type: 'error',
-});
 
 /** For coco-payment-ux NO_AMOUNT. */
 export const noAmountPopup = makeStaticPopup({

@@ -1,19 +1,5 @@
 import { makeStaticPopup, makeParamPopup } from './factory';
 
-export const notImplementedPopup = makeStaticPopup({
-  message: 'Not Implemented',
-  text: 'This feature is not yet implemented.',
-  icon: 'icon:mdi:hammer-wrench',
-  type: 'info',
-});
-
-export const comingSoonPopup = makeStaticPopup({
-  message: 'Coming Soon',
-  text: 'This feature is currently under development.',
-  icon: 'icon:mdi:hammer-wrench',
-  type: 'info',
-});
-
 export const generalErrorPopup = makeStaticPopup({
   message: 'Error Occurred',
   text: 'Something went wrong. Please try again.',

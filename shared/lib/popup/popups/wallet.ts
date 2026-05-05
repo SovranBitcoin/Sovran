@@ -1,17 +1,6 @@
-import { makeStaticPopup, makeParamPopup } from './factory';
+import { makeStaticPopup } from './factory';
 
 const WALLET_ICON = 'icon:solar:wallet-bold';
-
-export const insufficientBalancePopup = makeParamPopup<{
-  amount: number;
-  unit: string;
-  fee: number;
-}>(({ amount, unit, fee }) => ({
-  message: 'Insufficient Balance',
-  text: `Not enough funds to send ${amount} ${unit} with a fee of ${fee} ${unit}.`,
-  icon: WALLET_ICON,
-  type: 'error',
-}));
 
 /** For coco-payment-ux INSUFFICIENT_BALANCE / NO_BALANCE when amount/unit/fee are not available. */
 export const balanceTooLowPopup = makeStaticPopup({
@@ -20,13 +9,6 @@ export const balanceTooLowPopup = makeStaticPopup({
   icon: WALLET_ICON,
   type: 'error',
 });
-
-export const invalidAddressPopup = makeParamPopup<{ address: string }>(({ address }) => ({
-  message: 'Invalid Address',
-  text: `The address "${address}" is not a valid Ecash or Lightning address.`,
-  icon: 'icon:lucide:link',
-  type: 'error',
-}));
 
 export const noClipboardAddressPopup = makeStaticPopup({
   message: 'No Address Found',

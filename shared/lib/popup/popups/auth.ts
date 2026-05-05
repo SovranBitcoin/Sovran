@@ -31,10 +31,3 @@ export const keyImportFailedPopup = makeStaticPopup({
   icon: KEY_ICON,
   type: 'error',
 });
-
-export const invalidKeyFormatPopup = makeStaticPopup({
-  message: 'Invalid Key Format',
-  text: 'Enter nsec or 64-character hex key.',
-  icon: KEY_ICON,
-  type: 'error',
-});

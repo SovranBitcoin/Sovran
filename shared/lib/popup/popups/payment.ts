@@ -75,28 +75,6 @@ export function swapStatusPopup(): void {
   });
 }
 
-export const sendSuccessPopup = makeStaticPopup({
-  message: 'Funds Sent',
-  text: 'Funds have been sent successfully.',
-  icon: 'icon:mdi:send',
-  type: 'success',
-});
-
-export const receiveSuccessPopup = makeParamPopup<{ amount: number; unit: string }>(
-  ({ amount, unit }) => ({
-    message: 'Funds Received',
-    text: `${amount} ${unit} has been added to your wallet.`,
-    icon: 'icon:mdi:check-circle',
-    type: 'success',
-  })
-);
-
-export const nostrPaymentSentPopup = makeStaticPopup({
-  message: 'Payment sent successfully via Nostr',
-  icon: 'icon:mdi:send',
-  type: 'success',
-});
-
 export const paymentCancelledPopup = makeStaticPopup({
   message: 'Payment cancelled',
   text: 'Reserved proofs have been freed.',

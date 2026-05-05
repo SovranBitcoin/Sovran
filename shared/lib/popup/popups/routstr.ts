@@ -14,16 +14,6 @@ export const routstrWalletCreatedPopup = makeParamPopup<{ balance: string }>(({ 
   type: 'success',
 }));
 
-export const routstrInitializedPopup = makeParamPopup<{ balance?: string } | undefined>(
-  (params) => ({
-    message: params?.balance
-      ? `AI wallet initialized! Balance: ${params.balance}`
-      : 'AI wallet initialized! You can now chat with the AI.',
-    icon: 'icon:mingcute:lightning-fill',
-    type: 'success',
-  })
-);
-
 export const routstrTransactionFailedPopup = makeStaticPopup({
   message: 'AI transaction failed',
   icon: 'icon:mdi:alert-circle',

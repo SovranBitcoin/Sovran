@@ -8,12 +8,6 @@ export const receiveFailedPopup = makeStaticPopup({
   type: 'error',
 });
 
-export const noUnitSetPopup = makeStaticPopup({
-  message: 'No unit set',
-  icon: 'icon:mdi:alert-circle',
-  type: 'error',
-});
-
 export const unsupportedTokenUnitPopup = makeParamPopup<{ unit: string }>(({ unit }) => ({
   message: 'Unsupported Token Unit',
   text: `"${unit}" tokens cannot be redeemed. Only sat tokens are supported.`,

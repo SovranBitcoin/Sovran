@@ -28,26 +28,8 @@ export const sendMessageFailedPopup = makeStaticPopup({
   type: 'error',
 });
 
-export const balanceRefreshedPopup = makeParamPopup<{ balance: string }>(({ balance }) => ({
-  message: `Balance refreshed: ${balance}`,
-  icon: WALLET_ICON,
-  type: 'success',
-}));
-
-export const balanceRefreshFailedPopup = makeStaticPopup({
-  message: 'Failed to refresh balance',
-  icon: WALLET_ICON,
-  type: 'error',
-});
-
 export const modelSwitchedPopup = makeParamPopup<{ modelName: string }>(({ modelName }) => ({
   message: `Switched to ${modelName}`,
   icon: 'icon:mdi:robot',
   type: 'success',
 }));
-
-export const photoPickerComingSoonPopup = makeStaticPopup({
-  message: 'Photo picker coming soon',
-  icon: 'icon:mdi:camera',
-  type: 'info',
-});
