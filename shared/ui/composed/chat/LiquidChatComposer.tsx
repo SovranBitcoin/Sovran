@@ -297,7 +297,13 @@ export function LiquidChatComposer({
                       its own. */}
                   <SwiftUIButton
                     modifiers={[
-                      buttonStyle('glass'),
+                      // `plain` strips SwiftUI's default button styling so
+                      // there's a single circle — just our `glassEffect`
+                      // modifier paints the visual. With the default
+                      // `glass` button style stacked on top of the explicit
+                      // `glassEffect`, the button reads as two concentric
+                      // circles (background ring + scaled-on-press content).
+                      buttonStyle('plain'),
                       frame({ width: BUTTON_SIZE, height: BUTTON_SIZE }),
                       // `interactive: false` on the GLASS MATERIAL turns off
                       // the touch-down brightening glow (Apple's "interactive
@@ -351,7 +357,13 @@ export function LiquidChatComposer({
                       the button is collapsed. */}
                   <SwiftUIButton
                     modifiers={[
-                      buttonStyle('glass'),
+                      // `plain` strips SwiftUI's default button styling so
+                      // there's a single circle — just our `glassEffect`
+                      // modifier paints the visual. With the default
+                      // `glass` button style stacked on top of the explicit
+                      // `glassEffect`, the button reads as two concentric
+                      // circles (background ring + scaled-on-press content).
+                      buttonStyle('plain'),
                       frame({
                         width: trimmedHasText ? BUTTON_SIZE : 0,
                         height: BUTTON_SIZE,
