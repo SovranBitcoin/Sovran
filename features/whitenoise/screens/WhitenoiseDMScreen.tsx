@@ -12,6 +12,7 @@ import {
   extractCashuToken,
   type ChatBubbleMessage,
 } from '@/shared/ui/composed/chat';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { useWhitenoiseDM, type WhitenoiseDmMessage } from '../hooks/useWhitenoiseDM';
 import { MarmotIcon } from '../components/MarmotIcon';
 
@@ -35,45 +36,47 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   const bubbleMessages = useMemo<ChatBubbleMessage[]>(() => messages.map(toBubble), [messages]);
 
   return (
-    <ChatScreen
-      surface={SURFACE}
-      log={wnLog}
-      header={<DmChatHeader pubkey={pubkey} onBack={() => router.back()} />}
-      messages={bubbleMessages}
-      onSend={send}
-      composerDisabled={!isClientReady || isCreatingGroup}
-      composerPlaceholder={isCreatingGroup ? 'Creating encrypted group…' : 'Write here'}
-      composerTestID="whitenoise-dm-input"
-      banner={
-        error ? (
-          <Text size={13} style={{ color: danger, padding: 12 }}>
-            {error}
-          </Text>
-        ) : null
-      }
-      isLoading={false}
-      historyExtras={(last) => ({
-        lastIsOwn: last?.isOwn ?? null,
-        lastDeliveryStatus: last?.deliveryStatus ?? null,
-      })}
-      emptyContent={
-        <VStack align="center" spacing={12}>
-          <MarmotIcon size={48} />
-          <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
-            {!isClientReady
-              ? 'White Noise is not available yet.'
-              : isLoading
-                ? 'Loading…'
-                : !hasGroup
-                  ? `Start an MLS-encrypted chat with ${peerName}.`
-                  : `No messages yet. Say hi to ${peerName}!`}
-          </Text>
-          <Text size={13} style={{ color: shade500, textAlign: 'center' }}>
-            End-to-end encrypted via the Marmot Protocol (MLS).
-          </Text>
-        </VStack>
-      }
-    />
+    <Screen name="WhitenoiseDMScreen" scroll="none">
+      <DmChatHeader pubkey={pubkey} onBack={() => router.back()} />
+      <ChatScreen
+        surface={SURFACE}
+        log={wnLog}
+        messages={bubbleMessages}
+        onSend={send}
+        composerDisabled={!isClientReady || isCreatingGroup}
+        composerPlaceholder={isCreatingGroup ? 'Creating encrypted group…' : 'Write here'}
+        composerTestID="whitenoise-dm-input"
+        banner={
+          error ? (
+            <Text size={13} style={{ color: danger, padding: 12 }}>
+              {error}
+            </Text>
+          ) : null
+        }
+        isLoading={false}
+        historyExtras={(last) => ({
+          lastIsOwn: last?.isOwn ?? null,
+          lastDeliveryStatus: last?.deliveryStatus ?? null,
+        })}
+        emptyContent={
+          <VStack align="center" spacing={12}>
+            <MarmotIcon size={48} />
+            <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
+              {!isClientReady
+                ? 'White Noise is not available yet.'
+                : isLoading
+                  ? 'Loading…'
+                  : !hasGroup
+                    ? `Start an MLS-encrypted chat with ${peerName}.`
+                    : `No messages yet. Say hi to ${peerName}!`}
+            </Text>
+            <Text size={13} style={{ color: shade500, textAlign: 'center' }}>
+              End-to-end encrypted via the Marmot Protocol (MLS).
+            </Text>
+          </VStack>
+        }
+      />
+    </Screen>
   );
 }
 

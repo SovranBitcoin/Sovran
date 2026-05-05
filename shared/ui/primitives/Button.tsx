@@ -224,6 +224,59 @@ const useRipple = ({ enabled, config }: UseRippleOptions) => {
 type ButtonVariant = 'primary' | 'secondary' | 'dangerous';
 
 /**
+ * Button size variant.
+ *
+ * - `default` is the chunky CTA used in modal sheets / page footers.
+ * - `compact` is for inline chips that sit alongside other UI (chat
+ *   composer action row, top bars). Smaller minimum height, tighter
+ *   padding, no auto-margin so siblings stay flush.
+ */
+type ButtonSize = 'default' | 'compact';
+
+/**
+ * Per-size layout tokens. The Button rendering paths read from this map so
+ * adding a new size means adding one entry — no scattered conditionals.
+ *
+ * `iconOnlyDimension` is the square fallback for an icon-only button (no
+ * text); `iconTextSpacing` is the gap between icon and text inside the
+ * HStack when both are present.
+ */
+const SIZES: Record<
+  ButtonSize,
+  {
+    paddingVertical: number;
+    paddingHorizontal: number;
+    minHeight: number;
+    iconOnlyDimension: number;
+    iconTextSpacing: number;
+    fontSize: number;
+    margin: number;
+    marginBottom: number;
+  }
+> = {
+  default: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 48,
+    iconOnlyDimension: 52,
+    iconTextSpacing: 8,
+    fontSize: 14,
+    margin: 4,
+    marginBottom: 8,
+  },
+  compact: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 36,
+    iconOnlyDimension: 40,
+    iconTextSpacing: 6,
+    fontSize: 13,
+    margin: 0,
+    marginBottom: 0,
+  },
+};
+
+/**
  * Configuration for blur effects
  *
  * @interface BlurConfig
@@ -254,6 +307,8 @@ interface ButtonProps {
   loading?: boolean;
   /** Button variant determining visual style */
   variant?: ButtonVariant;
+  /** Button size — `default` for CTA buttons, `compact` for inline chips. */
+  size?: ButtonSize;
   /** Text content or React node for the button */
   text?: string | React.ReactNode;
   /** Press event handler */
@@ -310,6 +365,7 @@ export const Button = ({
   disabled = false,
   loading = false,
   variant = 'primary',
+  size = 'default',
   text,
   onPress,
   icon,
@@ -321,6 +377,7 @@ export const Button = ({
   accessibilityLabel,
   accessibilityHint,
 }: ButtonProps) => {
+  const sz = SIZES[size];
   // Derive a sensible default label from `text` when it's a string so the
   // common case ("primary CTA with visible copy") needs no extra prop.
   // Icon-only and ReactNode-text callers must supply `accessibilityLabel`
@@ -378,15 +435,22 @@ export const Button = ({
    * // With blur=true: Returns base styles without border
    */
   const getButtonStyles = () => {
-    // Standard Button styling
+    // Padding lives on the outer container so all three rendering modes
+    // (icon-only, text-only, icon+text) share the same horizontal/vertical
+    // breathing room. Inner content (icon, text) renders without its own
+    // padding, and the HStack's `spacing` controls the icon↔text gap. This
+    // is what makes the icon+text layout look balanced — previously the
+    // text wrapper carried its own paddingHorizontal while the icon had
+    // none, so the icon was always pulled to one side.
     const base = {
-      margin: 4, // m-1, but 0 if noPadding
-      marginBottom: 8, // mb-2, but 0 if noPadding
+      margin: sz.margin,
+      marginBottom: sz.marginBottom,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
-      paddingVertical: 4, // py-1
-      borderRadius: 9999, // rounded-full
-      borderWidth: 0.33, // border-[0.33px]
+      paddingVertical: sz.paddingVertical,
+      paddingHorizontal: sz.paddingHorizontal,
+      borderRadius: 9999,
+      borderWidth: 0.33,
       overflow: 'hidden' as const,
       opacity: disabled || loading ? 0.5 : 1,
     };
@@ -496,7 +560,9 @@ export const Button = ({
     );
   }
 
-  // Icon only button (no text) - fixed size with centered content
+  // Icon-only: a fixed square. Override the outer paddings to 0 because the
+  // dimension *is* the visual size — extra padding would push the icon off-
+  // center and grow the hit area beyond what's drawn.
   if (!text && icon) {
     return (
       <Pressable
@@ -509,7 +575,17 @@ export const Button = ({
         hitSlop={BUTTON_HIT_SLOP}
         {...a11yProps}>
         <View
-          style={[getButtonStyles(), { width: 52, height: 52, position: 'relative' }, style]}
+          style={[
+            getButtonStyles(),
+            {
+              width: sz.iconOnlyDimension,
+              height: sz.iconOnlyDimension,
+              paddingVertical: 0,
+              paddingHorizontal: 0,
+              position: 'relative',
+            },
+            style,
+          ]}
           blur={shouldUseBlur}
           blurIntensity={intensity}
           blurTint={tint}>
@@ -535,7 +611,11 @@ export const Button = ({
     );
   }
 
-  // Text button (with optional icon) - flexible width with proper spacing
+  // Text-only or icon+text. Padding is on the outer container (via
+  // `getButtonStyles`); the inner HStack is responsible only for the gap
+  // between icon and text. ReactNode `text` renders inline (no wrapper)
+  // so things like the ModelChip's `<HStack>label + chevron</HStack>`
+  // sit flush against the icon at the right `iconTextSpacing`.
   return (
     <Pressable
       testID={testID}
@@ -547,15 +627,16 @@ export const Button = ({
       hitSlop={BUTTON_HIT_SLOP}
       {...a11yProps}>
       <View
-        style={[getButtonStyles(), { position: 'relative', minHeight: 48 }, style]}
+        style={[getButtonStyles(), { position: 'relative', minHeight: sz.minHeight }, style]}
         blur={shouldUseBlur}
         blurIntensity={intensity}
         blurTint={tint}>
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
-        {/* Content layout with proper spacing */}
-        <HStack align="center" justify="center" spacing={text && icon && !loading ? 8 : 0}>
-          {/* Loading state or content */}
+        <HStack
+          align="center"
+          justify="center"
+          spacing={text && icon && !loading ? sz.iconTextSpacing : 0}>
           {loading ? (
             <Icon
               name="ant-design:loading-outlined"
@@ -569,26 +650,20 @@ export const Button = ({
             />
           ) : (
             <>
-              {/* Icon content */}
               {icon}
-              {/* Text content — string gets the default OxygenBold wrapper;
-                  ReactNode renders inline so callers can drop in custom
-                  primitives like AmountFormatter without triggering a
-                  View-in-Text nesting error on Android. */}
-              {text &&
+              {text != null &&
                 (typeof text === 'string' ? (
                   <Text
                     style={{
                       color: getTextColor(),
                       fontFamily: 'OxygenBold',
-                      paddingVertical: 12,
                       textAlign: 'center',
                     }}
-                    size={14}>
+                    size={sz.fontSize}>
                     {text}
                   </Text>
                 ) : (
-                  <View style={{ paddingVertical: 12 }}>{text}</View>
+                  text
                 ))}
             </>
           )}

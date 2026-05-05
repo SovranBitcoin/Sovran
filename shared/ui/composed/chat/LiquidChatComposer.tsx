@@ -60,13 +60,6 @@ interface LiquidChatComposerProps {
    */
   onPlusPress?: () => void;
   /**
-   * Tap handler for the money icon rendered INSIDE the input on the right
-   * (only visible while the input is empty). Hidden when undefined — e.g.
-   * BitChat ble-dm has no Lightning identity for the peer so the affordance
-   * is omitted.
-   */
-  onMoneyPress?: () => void;
-  /**
    * Tap handler for the voice icon rendered INSIDE the input. Currently a
    * placeholder for future voice messaging — no surface implements it yet.
    * Hidden when undefined.
@@ -125,9 +118,8 @@ const MAX_ROW_HEIGHT = 140;
  * mounts/unmounts. The fallback keeps its content-driven row height
  * because RN's `TextInput` has no intrinsic vertical sizing without it.
  *
- * Used by the bitchat / nostr-DM / whitenoise screens via `ChatScreen`.
- * The AI tab mounts `ChatComposer` directly and is intentionally not
- * affected by this design.
+ * Used by every chat surface (BitChat, Nostr DM, WhiteNoise, AI) via
+ * `ChatScreen`, which mounts this composer inside its `renderInputToolbar`.
  */
 export function LiquidChatComposer({
   value,
@@ -136,7 +128,6 @@ export function LiquidChatComposer({
   disabled,
   placeholder = 'Write here',
   onPlusPress,
-  onMoneyPress,
   onVoicePress,
   bottomPadding = 12,
   testID,
@@ -347,22 +338,11 @@ export function LiquidChatComposer({
                     ]}
                   />
 
-                  {/* Inline money / voice affordances, only while empty.
-                      Conditional unmount is fine here — these aren't part of
-                      the matched-geometry namespace, so there's no glass
-                      morph to break. `buttonStyle('plain')` strips the
-                      default tint/halo so the SF symbol sits flush. */}
-                  {isEmpty && onMoneyPress ? (
-                    <SwiftUIButton
-                      modifiers={[buttonStyle('plain'), padding({ trailing: 4 })]}
-                      onPress={onMoneyPress}>
-                      <SwiftUIImage
-                        systemName={'bolt.fill' as never}
-                        size={ICON_SIZE}
-                        color={shade400}
-                      />
-                    </SwiftUIButton>
-                  ) : null}
+                  {/* Inline voice affordance, only while empty. Conditional
+                      unmount is fine here — not part of the matched-geometry
+                      namespace, so there's no glass morph to break.
+                      `buttonStyle('plain')` strips the default tint/halo so
+                      the SF symbol sits flush. */}
                   {isEmpty && onVoicePress ? (
                     <SwiftUIButton
                       modifiers={[buttonStyle('plain'), padding({ trailing: 12 })]}
@@ -427,26 +407,15 @@ export function LiquidChatComposer({
   // No SwiftUI morph here; the [→] simply mounts/unmounts. The RN multiline
   // TextInput drives `fallbackRowHeight` so the bubble grows with content.
   const insideIcons =
-    isEmpty && (onMoneyPress || onVoicePress) ? (
+    isEmpty && onVoicePress ? (
       <HStack align="center" spacing={8} style={{ paddingRight: 4 }}>
-        {onMoneyPress ? (
-          <Pressable
-            onPress={onMoneyPress}
-            hitSlop={6}
-            accessibilityLabel="Send money"
-            testID={testID ? `${testID}-money` : undefined}>
-            <Icon name="mingcute:lightning-fill" size={20} color={shade400} />
-          </Pressable>
-        ) : null}
-        {onVoicePress ? (
-          <Pressable
-            onPress={onVoicePress}
-            hitSlop={6}
-            accessibilityLabel="Voice message"
-            testID={testID ? `${testID}-voice` : undefined}>
-            <Icon name="mdi:microphone" size={20} color={shade400} />
-          </Pressable>
-        ) : null}
+        <Pressable
+          onPress={onVoicePress}
+          hitSlop={6}
+          accessibilityLabel="Voice message"
+          testID={testID ? `${testID}-voice` : undefined}>
+          <Icon name="mdi:microphone" size={20} color={shade400} />
+        </Pressable>
       </HStack>
     ) : null;
 

@@ -4,6 +4,19 @@
  * this type before rendering. Keeps the bubble transport-agnostic without
  * forcing every surface to share a deeper data model.
  */
+/**
+ * Args passed to a ChatScreen `renderBubble` override. Lets a surface take
+ * over rendering of an individual message while keeping the shared grouping
+ * metadata that the default bubble would have used. AI uses this to render
+ * assistant replies bubble-less while still getting first/last grouping for
+ * its own user-pill bubble.
+ */
+export type ChatBubbleRenderArgs = {
+  message: ChatBubbleMessage;
+  isFirstInGroup: boolean;
+  isLastInGroup: boolean;
+};
+
 export type ChatBubbleMessage = {
   id: string;
   content: string;

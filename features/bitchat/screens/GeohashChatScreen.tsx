@@ -30,6 +30,7 @@ import {
   extractCashuToken,
   type ChatBubbleMessage,
 } from '@/shared/ui/composed/chat';
+import { Screen } from '@/shared/ui/composed/Screen';
 import type { ChatMessage } from 'bitchat-module';
 
 interface GeohashChatScreenProps {
@@ -185,42 +186,44 @@ export function GeohashChatScreen({
   );
 
   return (
-    <ChatScreen
-      surface={surface}
-      log={bitchatLog}
-      header={header}
-      messages={bubbleMessages}
-      onSend={sendMessage}
-      composerPlaceholder="Write here"
-      emptyContent={
-        <VStack align="center" spacing={12}>
-          <Icon
-            name={isDM ? 'mdi:account-group' : 'mdi:map-marker-radius'}
-            size={32}
-            color={shade400}
-          />
-          <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
-            {isConnected
-              ? isDM
-                ? `No messages yet. Say hi to ${title}!`
-                : 'No messages yet. Start the conversation!'
-              : transport === 'ble' || transport === 'ble-dm'
-                ? 'Scanning for nearby devices...'
-                : 'Connecting to relays...'}
-          </Text>
-          <Text size={13} style={{ color: shade500, textAlign: 'center' }}>
-            {transport === 'ble-dm'
-              ? 'Private chat over encrypted Bluetooth mesh'
-              : transport === 'nostr-dm'
-                ? 'Private chat over Nostr gift-wrap (NIP-17)'
-                : transport === 'ble'
-                  ? 'Chat with people nearby via Bluetooth mesh'
-                  : tierLabel
-                    ? `Chat with people in your ${tierLabel.toLowerCase()}`
-                    : `Geohash channel #${geohash}`}
-          </Text>
-        </VStack>
-      }
-    />
+    <Screen name="GeohashChatScreen" scroll="none">
+      {header}
+      <ChatScreen
+        surface={surface}
+        log={bitchatLog}
+        messages={bubbleMessages}
+        onSend={sendMessage}
+        composerPlaceholder="Write here"
+        emptyContent={
+          <VStack align="center" spacing={12}>
+            <Icon
+              name={isDM ? 'mdi:account-group' : 'mdi:map-marker-radius'}
+              size={32}
+              color={shade400}
+            />
+            <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
+              {isConnected
+                ? isDM
+                  ? `No messages yet. Say hi to ${title}!`
+                  : 'No messages yet. Start the conversation!'
+                : transport === 'ble' || transport === 'ble-dm'
+                  ? 'Scanning for nearby devices...'
+                  : 'Connecting to relays...'}
+            </Text>
+            <Text size={13} style={{ color: shade500, textAlign: 'center' }}>
+              {transport === 'ble-dm'
+                ? 'Private chat over encrypted Bluetooth mesh'
+                : transport === 'nostr-dm'
+                  ? 'Private chat over Nostr gift-wrap (NIP-17)'
+                  : transport === 'ble'
+                    ? 'Chat with people nearby via Bluetooth mesh'
+                    : tierLabel
+                      ? `Chat with people in your ${tierLabel.toLowerCase()}`
+                      : `Geohash channel #${geohash}`}
+            </Text>
+          </VStack>
+        }
+      />
+    </Screen>
   );
 }

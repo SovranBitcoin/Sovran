@@ -135,8 +135,8 @@ function BannerCard({
     'accent',
     // One shade darker than the card (`surface-secondary`) but not as
     // deep as `background`. In heroui's token scale this is the base
-    // surface — gives the chipmunk a subtle inset without going pitch-
-    // black on dark mode.
+    // surface — gives the marmot glyph a subtle inset without going
+    // pitch-black on dark mode.
     'surface',
     'separator-secondary',
   ] as const);

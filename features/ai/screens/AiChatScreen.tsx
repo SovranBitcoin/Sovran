@@ -1,24 +1,10 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { Keyboard, View as RNView, type LayoutChangeEvent } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { useKeyboardState } from 'react-native-keyboard-controller';
+import React, { useCallback, useMemo } from 'react';
+import { Keyboard } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
-import {
-  GiftedChat,
-  type IMessage,
-  type InputToolbarProps,
-} from 'react-native-gifted-chat';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useRoutstrStore, type RoutstrMessage } from '@/shared/stores/profile/routstrStore';
-import { ChatComposer } from '@/shared/ui/composed/chat/ChatComposer';
-import { useChatKeyboardAnimationLogger } from '@/shared/ui/composed/chat/useChatSurfacePerfLogger';
-import { View } from '@/shared/ui/primitives/View/View';
-import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
+import { ChatScreen, type ChatBubbleMessage } from '@/shared/ui/composed/chat';
 import { aiLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { ModelChip } from '../components/ModelChip';
 import { AiEmptyState } from '../components/AiEmptyState';
@@ -26,29 +12,31 @@ import { AiMessageBubble, type BranchNav } from '../components/AiMessageBubble';
 import { useAiSend } from '../hooks/useAiSend';
 import { deriveActivePath, getSiblingInfo, withSynthesisedParents } from '../lib/branching';
 
-const BG_CONFIG = { blurMode: 'full' as const };
+const SURFACE = 'ai';
 
-const OWN_USER_ID = 'me';
-const ASSISTANT_USER_ID = 'assistant';
-
-type AiGiftedMessage = IMessage & { __routstr: RoutstrMessage };
-
+/**
+ * AI tab chat surface. Wraps the shared `<ChatScreen />` so the GiftedChat
+ * list, liquid-glass composer, keyboard avoidance, and perf logging are
+ * identical to the DM surfaces (BitChat, WhiteNoise, Nostr DM). The AI-
+ * specific concerns — streaming, branching, retry, the bubble-less assistant
+ * presentation — live in `<AiMessageBubble />`, which we mount via the
+ * `renderBubble` override.
+ */
 export function AiChatScreen() {
   useLifecycleLogger('AiChatScreen');
-  useBackgroundConfig(BG_CONFIG);
 
-  const headerHeight = useHeaderHeight();
+  // iOS NativeTabs is a real `UITabBarController`, so the system already
+  // grows the screen's bottom safe-area inset to cover the tab bar +
+  // home-indicator. Reading `insets.bottom` gives us exactly the offset
+  // the composer needs to clear the tab bar — adding `useTabBarBottomPadding`
+  // on top of this would double-count and float the composer ~50pt above
+  // the bar instead of flush.
+  const bottomInset = useSafeAreaInsets().bottom;
+  // The AI tab's stack header is `headerTransparent: true` (the BalancePill
+  // floats over the chat). Pad the chat list down by the header's height so
+  // the topmost bubble doesn't slide under the pill on first paint.
+  const topInset = useHeaderHeight();
 
-  const [text, setText] = useState('');
-
-  // Composer height measured at runtime so the FlatList content can
-  // pad underneath it — bubbles bleed under the composer's translucent
-  // glass on scroll-up, matching the DM surfaces.
-  const [composerHeight, setComposerHeight] = useState(0);
-  const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
-    const next = e.nativeEvent.layout.height;
-    setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
-  }, []);
   const conversationHistory = useRoutstrStore((s) => s.conversationHistory);
   const activeChildren = useRoutstrStore((s) => s.activeChildren);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
@@ -59,6 +47,15 @@ export function AiChatScreen() {
     () => deriveActivePath(conversationHistory, activeChildren),
     [conversationHistory, activeChildren]
   );
+
+  // Lookup-by-id from the bubble shape back to the source RoutstrMessage —
+  // needed inside `renderBubble`, which only sees `ChatBubbleMessage`. The
+  // ChatScreen's id matches the RoutstrMessage id by construction.
+  const routstrById = useMemo(() => {
+    const map = new Map<string, RoutstrMessage>();
+    for (const m of activeMessages) map.set(m.id, m);
+    return map;
+  }, [activeMessages]);
 
   const branchNavById = useMemo(() => {
     const map = new Map<string, BranchNav>();
@@ -80,40 +77,21 @@ export function AiChatScreen() {
     return map;
   }, [activeMessages, conversationHistory, setActiveBranch]);
 
-  const kbState = useKeyboardState();
-  const kbStateRef = useRef({ isVisible: false, height: 0 });
-  useEffect(() => {
-    const prev = kbStateRef.current;
-    if (prev.isVisible === kbState.isVisible && prev.height === kbState.height) return;
-    aiLog.info('ai.kav.keyboard_state', {
-      from: { isVisible: prev.isVisible, height: prev.height },
-      to: { isVisible: kbState.isVisible, height: kbState.height },
-    });
-    kbStateRef.current = { isVisible: kbState.isVisible, height: kbState.height };
-  }, [kbState.isVisible, kbState.height]);
-
-  useChatKeyboardAnimationLogger({ log: aiLog, surface: 'ai' });
-
-  const handleSend = useCallback(() => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    aiLog.info('ai.send.dispatch', {
-      textLen: trimmed.length,
-      historyCount: conversationHistory.length,
-      activeCount: activeMessages.length,
-      kbVisible: kbState.isVisible,
-      kbHeight: kbState.height,
-    });
-    setText('');
-    void send(trimmed);
-  }, [
-    send,
-    text,
-    conversationHistory.length,
-    activeMessages.length,
-    kbState.isVisible,
-    kbState.height,
-  ]);
+  // RoutstrMessage[] -> ChatBubbleMessage[] adapter. The shared bubble shape
+  // doesn't carry assistant-only fields (reasoning, cost, branch) — those
+  // stay on the RoutstrMessage and are read back inside `renderBubble`.
+  const bubbleMessages = useMemo<ChatBubbleMessage[]>(
+    () =>
+      activeMessages.map((m) => ({
+        id: m.id,
+        content: m.content,
+        senderId: m.role === 'user' ? '' : 'assistant',
+        timestamp: m.timestamp,
+        isOwn: m.role === 'user',
+        deliveryStatus: m.role === 'user' ? (m.pending ? 'sending' : 'sent') : undefined,
+      })),
+    [activeMessages]
+  );
 
   const handleRetry = useCallback(
     (messageId: string) => {
@@ -123,120 +101,68 @@ export function AiChatScreen() {
     [retry]
   );
 
-  // Map RoutstrMessage[] -> IMessage[], newest first (GiftedChat is inverted).
-  const giftedMessages = useMemo<AiGiftedMessage[]>(() => {
-    const out: AiGiftedMessage[] = [];
-    for (let i = activeMessages.length - 1; i >= 0; i--) {
-      const m = activeMessages[i];
-      out.push({
-        _id: m.id,
-        text: m.content,
-        createdAt: m.timestamp,
-        user: { _id: m.role === 'user' ? OWN_USER_ID : ASSISTANT_USER_ID },
-        __routstr: m,
+  const handleSend = useCallback(
+    async (text: string) => {
+      aiLog.info('ai.send.dispatch', {
+        textLen: text.length,
+        historyCount: conversationHistory.length,
+        activeCount: activeMessages.length,
       });
-    }
-    return out;
-  }, [activeMessages]);
+      await send(text);
+    },
+    [send, conversationHistory.length, activeMessages.length]
+  );
 
-  const renderMessage = useCallback(
-    ({ currentMessage }: { currentMessage: AiGiftedMessage }) => {
-      const message = currentMessage.__routstr;
+  // Bubble-less assistant + filled-pill user, exactly the previous look —
+  // just plumbed through ChatScreen's renderBubble seam instead of a
+  // hand-rolled GiftedChat config.
+  const renderBubble = useCallback(
+    ({ message }: { message: ChatBubbleMessage }) => {
+      const source = routstrById.get(message.id);
+      if (!source) return null;
       return (
-        <RNView style={{ paddingHorizontal: 16 }}>
-          <AiMessageBubble
-            message={message}
-            isStreaming={message.id === streamingMessageId}
-            onRetry={isSending ? undefined : handleRetry}
-            branchNav={branchNavById.get(message.id)}
-          />
-        </RNView>
+        <AiMessageBubble
+          message={source}
+          isStreaming={source.id === streamingMessageId}
+          onRetry={isSending ? undefined : handleRetry}
+          branchNav={branchNavById.get(source.id)}
+        />
       );
     },
-    [streamingMessageId, isSending, handleRetry, branchNavById]
+    [routstrById, streamingMessageId, isSending, handleRetry, branchNavById]
   );
 
-  const renderInputToolbar = useCallback(
-    (_props: InputToolbarProps<AiGiftedMessage>) => (
-      <RNView
-        onLayout={handleComposerLayout}
-        style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-        <ChatComposer
-          value={text}
-          onChangeText={setText}
-          onSend={handleSend}
-          disabled={isSending}
-          placeholder="Ask anything"
-          actionsLeading={<ModelChip />}
-          testID="ai-input"
-          surface="ai"
-        />
-      </RNView>
+  // Tap-to-dismiss-keyboard on the empty placeholder mirrors the previous
+  // behaviour. Wrapping inside ChatScreen's `emptyContent` is enough — the
+  // composer stays mounted underneath, ready to accept the first message.
+  const emptyContent = useMemo(
+    () => (
+      <Pressable
+        onPress={Keyboard.dismiss}
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        accessible={false}
+        importantForAccessibility="no">
+        <AiEmptyState />
+      </Pressable>
     ),
-    [text, handleSend, isSending, handleComposerLayout]
+    []
   );
-
-  const isEmpty = activeMessages.length === 0;
-
-  // Stack header is `headerTransparent: true`, so we still pad the chat area
-  // by the measured header height to keep content from clipping under the
-  // floating header.
-  const listPaddingTop = headerHeight + 8;
 
   return (
-    <View style={{ flex: 1 }} testID="screen-ai-chat">
-      {isEmpty ? (
-        <RNView style={{ flex: 1 }}>
-          <Pressable
-            onPress={Keyboard.dismiss}
-            style={{ flex: 1, paddingTop: listPaddingTop }}
-            accessible={false}
-            importantForAccessibility="no">
-            <AiEmptyState />
-          </Pressable>
-          <ChatComposer
-            value={text}
-            onChangeText={setText}
-            onSend={handleSend}
-            disabled={isSending}
-            placeholder="Ask anything"
-            actionsLeading={<ModelChip />}
-            testID="ai-input"
-            surface="ai"
-          />
-        </RNView>
-      ) : (
-        <GiftedChat<AiGiftedMessage>
-          messages={giftedMessages}
-          user={{ _id: OWN_USER_ID }}
-          renderMessage={renderMessage}
-          renderInputToolbar={renderInputToolbar}
-          renderAvatar={null}
-          renderDay={() => null}
-          renderTime={() => null}
-          renderUsername={() => null}
-          isUsernameVisible={false}
-          isDayAnimationEnabled={false}
-          messagesContainerStyle={{ paddingTop: listPaddingTop }}
-          minInputToolbarHeight={0}
-          messageIdGenerator={() => `ai-${Date.now()}`}
-          // Inverted FlatList: contentContainerStyle.paddingTop is the
-          // *visual bottom* padding — it lifts the newest bubble above
-          // the absolute composer so it isn't hidden behind it.
-          listProps={{
-            contentContainerStyle: {
-              paddingTop: composerHeight + 16,
-              paddingBottom: 10,
-            },
-          }}
-          keyboardAvoidingViewProps={{
-            behavior: 'padding',
-            automaticOffset: true,
-            keyboardVerticalOffset: 0,
-          }}
-          onSend={() => {}}
-        />
-      )}
-    </View>
+    <ChatScreen
+      surface={SURFACE}
+      log={aiLog}
+      messages={bubbleMessages}
+      onSend={handleSend}
+      composerDisabled={isSending}
+      composerPlaceholder="Ask anything"
+      composerActions={<ModelChip />}
+      composerTestID="ai-input"
+      bottomInset={bottomInset}
+      topInset={topInset}
+      renderBubble={renderBubble}
+      counterpartyAvatar={null}
+      emptyContent={emptyContent}
+    />
   );
 }

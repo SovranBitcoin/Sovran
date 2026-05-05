@@ -30,6 +30,7 @@ import {
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
+import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -41,11 +42,11 @@ import {
 } from '@/shared/ui/composed/chat';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { LightningAddress } from '@sovranbitcoin/schemas';
+import { Screen } from '@/shared/ui/composed/Screen';
 
 const SURFACE = 'nostr-dm' as const;
 
@@ -69,7 +70,7 @@ interface UserMessagesScreenProps {
 export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
 
-  const shade400 = useThemeColor('shade-400');
+  const [shade400, background] = useThemeColor(['shade-400', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
   const { ndk } = useNDK();
 
@@ -147,9 +148,6 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   // error inside LNURL resolution.
   const rawLud16 = counterpartyMetadata?.lud16;
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
-  const myProfile = useProfileDisplay(nostrKeys?.pubkey || '');
-  const myName = myProfile.displayName;
-
   const bubbleMessages = useMemo<ChatBubbleMessage[]>(
     () =>
       messages.map((m) => ({
@@ -176,19 +174,6 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       />
     ),
     [userPicture, pubkey, displayName]
-  );
-
-  const ownAvatar = useMemo(
-    () => (
-      <Avatar
-        state={myProfile.picture ? 'image' : 'fallback'}
-        size={32}
-        picture={myProfile.picture}
-        seed={nostrKeys?.pubkey}
-        name={myName}
-      />
-    ),
-    [myProfile.picture, nostrKeys?.pubkey, myName]
   );
 
   const handleBack = useCallback(() => {
@@ -466,37 +451,43 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   };
 
   return (
-    <ChatScreen
-      surface={SURFACE}
-      log={chatLog}
-      header={<DmChatHeader pubkey={pubkey} onBack={handleBack} />}
-      messages={bubbleMessages}
-      onSend={handleNostrDMSend}
-      composerPlaceholder="Write here"
-      composerOnMoneyPress={lud16 ? handleSendMoney : undefined}
-      composerActions={
-        lud16 ? (
-          <Button text="Send Money" variant="primary" onPress={handleSendMoney} />
-        ) : null
-      }
-      contentBottomPadding={16}
-      counterpartyAvatar={counterpartyAvatar}
-      ownAvatar={ownAvatar}
-      isLoading={isLoading}
-      loadingContent={
-        <Text size={16} style={{ color: shade400, textAlign: 'center', paddingTop: 50 }}>
-          Loading messages...
-        </Text>
-      }
-      emptyContent={
-        <Text size={16} style={{ color: shade400 }}>
-          No messages yet. Start the conversation!
-        </Text>
-      }
-      historyExtras={(last) => ({
-        lastIsOwn: last?.isOwn ?? null,
-        lastDeliveryStatus: last?.deliveryStatus ?? null,
-      })}
-    />
+    <Screen name="UserMessagesScreen" scroll="none">
+      <DmChatHeader pubkey={pubkey} onBack={handleBack} />
+      <ChatScreen
+        surface={SURFACE}
+        log={chatLog}
+        messages={bubbleMessages}
+        onSend={handleNostrDMSend}
+        composerPlaceholder="Write here"
+        composerActions={
+          lud16 ? (
+            <Button
+              text="Send Money"
+              variant="primary"
+              size="compact"
+              icon={<Icon name="mingcute:lightning-fill" size={16} color={background} />}
+              onPress={handleSendMoney}
+            />
+          ) : null
+        }
+        // contentBottomPadding={16}
+        counterpartyAvatar={counterpartyAvatar}
+        isLoading={isLoading}
+        loadingContent={
+          <Text size={16} style={{ color: shade400, textAlign: 'center', paddingTop: 50 }}>
+            Loading messages...
+          </Text>
+        }
+        emptyContent={
+          <Text size={16} style={{ color: shade400 }}>
+            No messages yet. Start the conversation!
+          </Text>
+        }
+        historyExtras={(last) => ({
+          lastIsOwn: last?.isOwn ?? null,
+          lastDeliveryStatus: last?.deliveryStatus ?? null,
+        })}
+      />
+    </Screen>
   );
 }

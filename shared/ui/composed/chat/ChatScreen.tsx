@@ -1,12 +1,19 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View as RNView, type LayoutChangeEvent } from 'react-native';
+import {
+  ScrollView,
+  useWindowDimensions,
+  View as RNView,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GiftedChat, type IMessage, type InputToolbarProps } from 'react-native-gifted-chat';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { Log } from '@/shared/lib/logger';
 import type { Logger } from '@/shared/lib/logger';
 
 import { LiquidChatComposer } from './LiquidChatComposer';
@@ -16,25 +23,28 @@ import {
   useChatSurfacePerfLogger,
 } from './useChatSurfacePerfLogger';
 import { useMessageGrouping } from './useMessageGrouping';
-import type { ChatBubbleMessage } from './types';
+import type { ChatBubbleMessage, ChatBubbleRenderArgs } from './types';
 
 interface ChatScreenProps {
   surface: string;
   log: Logger;
-  header: React.ReactNode;
+  /**
+   * Optional in-screen header (e.g. `<DmChatHeader />`). Surfaces that mount
+   * their header via the navigation Stack (e.g. AI tab's `<AiHeaderTitle />`
+   * inside `Stack.Screen.headerTitle`) leave this `undefined`.
+   */
+  header?: React.ReactNode;
   messages: ChatBubbleMessage[];
   onSend: (text: string) => Promise<unknown> | unknown;
   composerDisabled?: boolean;
   composerPlaceholder?: string;
   composerOnPlusPress?: () => void;
-  composerOnMoneyPress?: () => void;
   composerOnVoicePress?: () => void;
   /**
    * Optional row of action buttons rendered ABOVE the LiquidChatComposer
    * inside the same sticky container — so it rides up with the keyboard
-   * exactly like the input. The consumer decides what to render; pass any
-   * number of `<Button>`s (or a single one) and they'll lay out in a
-   * horizontal scroll view that doesn't dismiss the keyboard on tap.
+   * exactly like the input. Pass any number of `<Button>`s; they lay out in
+   * a horizontal scroll view that doesn't dismiss the keyboard on tap.
    * Use for surface-level shortcuts like "Send Money", "Attach", etc.
    */
   composerActions?: React.ReactNode;
@@ -43,24 +53,56 @@ interface ChatScreenProps {
   isLoading?: boolean;
   loadingContent?: React.ReactNode;
   emptyContent?: React.ReactNode;
-  contentBottomPadding?: number;
-  ownAvatar?: React.ReactNode;
+  /**
+   * Extra inset between the composer and the bottom edge of the screen, used
+   * by surfaces sitting underneath a translucent system tab bar (the AI
+   * tab's NativeTabs). The composer is shifted up by this much, and the
+   * GiftedChat list grows its content padding to match so the newest bubble
+   * still rests just above the composer.
+   */
+  bottomInset?: number;
+  /**
+   * Extra inset between the chat list and the top edge of the screen, used
+   * by surfaces with a transparent floating navigation header (AI tab) so
+   * the topmost bubble doesn't slide *under* the header on initial paint.
+   * Surfaces that render their own in-area header (DmChatHeader) leave this 0.
+   */
+  topInset?: number;
+  /**
+   * Render override for individual messages. Default is `ChatMessageBubble`
+   * (sender/own colored bubble pair). The AI surface passes its own renderer
+   * to keep assistant replies bubble-less while user pills stay bubbled.
+   */
+  renderBubble?: (args: ChatBubbleRenderArgs) => React.ReactNode;
+  /**
+   * Avatar override for non-own messages. Pass `null` to hide the avatar
+   * column entirely (e.g. ephemeral group chats with no identity). Ignored
+   * when `renderBubble` is supplied.
+   */
   counterpartyAvatar?: React.ReactNode | null;
   historyExtras?: (last: ChatBubbleMessage | undefined) => Record<string, unknown>;
   kbStateExtras?: () => Record<string, unknown>;
 }
 
 const OWN_USER_ID = 'me';
+/** Visual gap between the composer's outer bottom edge and the keyboard top
+ *  when focused. Intentionally tighter than the closed-state gap (which is
+ *  the bottom safe-area inset, ~34pt on iPhone) — the keyboard already
+ *  provides plenty of breathing room above its keys, so a smaller gap reads
+ *  as "the composer is sitting on the keyboard" instead of floating mid-air. */
+const COMPOSER_FOCUSED_BOTTOM_GAP = 0;
 
 type GiftedMessage = IMessage & { __bubble: ChatBubbleMessage };
 
 /**
- * Shared chat surface backed by `react-native-gifted-chat`. The list, keyboard
- * avoidance, and inverted scroll behaviour come from GiftedChat; we keep our
- * `LiquidChatComposer` (mounted via `renderInputToolbar`) and our
- * `ChatMessageBubble` (mounted via `renderMessage`) so each surface looks
- * identical to before. Public props are unchanged — the three DM consumers
- * (BitChat, WhiteNoise, Nostr DM) need no edits.
+ * Shared chat surface backed by `react-native-gifted-chat`. The list,
+ * keyboard avoidance, and inverted scroll behaviour come from GiftedChat;
+ * `LiquidChatComposer` (mounted via `renderInputToolbar`) and
+ * `ChatMessageBubble` (mounted via `renderMessage`) keep every consumer
+ * (BitChat, WhiteNoise, Nostr DM, AI) visually consistent.
+ *
+ * Each surface is responsible for mapping its native event into
+ * `ChatBubbleMessage[]`; everything below that is shared.
  */
 export function ChatScreen({
   surface,
@@ -71,7 +113,6 @@ export function ChatScreen({
   composerDisabled,
   composerPlaceholder,
   composerOnPlusPress,
-  composerOnMoneyPress,
   composerOnVoicePress,
   composerActions,
   composerTestID,
@@ -79,29 +120,68 @@ export function ChatScreen({
   isLoading,
   loadingContent,
   emptyContent,
-  ownAvatar,
+  bottomInset = 0,
+  topInset = 0,
+  renderBubble,
   counterpartyAvatar,
   historyExtras,
   kbStateExtras,
 }: ChatScreenProps) {
   const headerHeight = useHeaderHeight();
+  const { height: windowHeight } = useWindowDimensions();
+  const safeAreaInsets = useSafeAreaInsets();
   const surfaceColor = useThemeColor('surface');
+
+  // ChatScreen owns its own safe-area handling so the KAV always measures a
+  // full-screen frame and `keyboardVerticalOffset: 0` Just Works. Wrapping
+  // ChatScreen in `<Screen safeArea>` (or any layer that pads the bottom by
+  // the home-indicator inset) shifts the KAV's measured bottom up by that
+  // amount, which makes the keyboard math undershoot — the composer ends up
+  // flush against the keys with no breathing room. Use `<Screen scroll="none">`
+  // (no `safeArea`) for chat surfaces.
+  //
+  // `bottomInset` defaults to the bottom safe-area inset so the composer
+  // clears the home indicator out of the box. The AI tab passes its own
+  // inset (NativeTabs reports tab-bar + home-indicator together) and that
+  // override wins. `topInset` falls back to `insets.top` only when there's
+  // no nav header above (since a real `headerHeight` already includes the
+  // status-bar inset; doubling them up pushes content too far down).
+  const resolvedBottomInset = bottomInset > 0 ? bottomInset : safeAreaInsets.bottom;
+  const resolvedTopInset = topInset > 0 ? topInset : headerHeight > 0 ? 0 : safeAreaInsets.top;
 
   const [draft, setDraft] = useState('');
 
   // Measured composer height. Used to pad the FlatList's content so the
-  // newest bubble rests just above the composer's top edge, while the
-  // composer itself is absolutely positioned over the chat — older
-  // bubbles slide *under* the composer's translucent glass on scroll-up
-  // (the iMessage / Telegram bleed-under-input look).
+  // newest bubble rests just above the composer's top edge while the
+  // composer itself is absolutely positioned over the chat — older bubbles
+  // slide *under* the composer's translucent glass on scroll-up (the
+  // iMessage / Telegram bleed-under-input look).
   const [composerHeight, setComposerHeight] = useState(0);
   const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
     const next = e.nativeEvent.layout.height;
     setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
   }, []);
 
-  // Keep emitting the canonical chat.kav.keyboard_state / chat.list.history_change
-  // events. List-layout / scroll handlers aren't wired because GiftedChat's
+  // Composer rides the keyboard via two complementary mechanisms:
+  //   1. The KAV (below) animates `paddingBottom` from 0 → keyboardHeight
+  //      while opening, which lifts the composer's natural anchor at
+  //      `bottom: resolvedBottomInset` of the KAV's padding box. That
+  //      lands the composer exactly `resolvedBottomInset` above the
+  //      keyboard top — *too* much breathing room for a focused chat.
+  //   2. We layer a `translateY` (interpolated by keyboard progress)
+  //      that *closes* the gap from `resolvedBottomInset` down to
+  //      `COMPOSER_FOCUSED_BOTTOM_GAP` (8pt) by the time the keyboard
+  //      is fully open. Translate (not `bottom`) so the work stays on
+  //      the UI thread — no Yoga re-layout per frame.
+  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
+  const composerTranslateStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: keyboardProgress.value * (resolvedBottomInset - COMPOSER_FOCUSED_BOTTOM_GAP) },
+    ],
+  }));
+
+  // Canonical chat.kav.keyboard_state / chat.list.history_change emits.
+  // List-layout / scroll handlers aren't wired because GiftedChat's
   // FlatList doesn't expose those hooks publicly.
   useChatSurfacePerfLogger({
     log,
@@ -115,7 +195,9 @@ export function ChatScreen({
 
   const groupingMap = useMessageGrouping(messages);
 
-  // GiftedChat expects newest-first. Source array is oldest-first.
+  // GiftedChat expects newest-first; source array is oldest-first. Stash
+  // the original `ChatBubbleMessage` on `__bubble` so renderMessage can
+  // hand it back to the bubble component without re-deriving anything.
   const giftedMessages = useMemo<GiftedMessage[]>(() => {
     const out: GiftedMessage[] = [];
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -159,23 +241,25 @@ export function ChatScreen({
     if (!text) return;
     setDraft('');
     void dispatchSend(text).catch(() => {
-      // Errors are already logged by dispatchSend; consumer's onSend is
+      // Errors already logged by dispatchSend; consumer's onSend is
       // expected to surface user-visible feedback (popups/banners).
     });
   }, [draft, dispatchSend]);
 
+  // Composer is absolute over the chat body so messages can scroll *under*
+  // its translucent glass instead of clipping at a hard cut-off. The
+  // wrapper has no backgroundColor of its own — only the
+  // LiquidChatComposer's inner glass capsules do — so messages bleed
+  // through the gaps. Optional action row sits inside the same wrapper so
+  // it rides the keyboard animation in lock-step with the input bubble.
   const renderInputToolbar = useCallback(
     (_props: InputToolbarProps<GiftedMessage>) => (
-      // Absolute over the chat body so messages can scroll *under* the
-      // composer's translucent glass instead of clipping at a hard
-      // cut-off line above it. The wrapper has no backgroundColor of
-      // its own — only the LiquidChatComposer's inner glass capsules
-      // do — so messages bleed through the gaps between them. Optional
-      // action row sits inside this container so it rides the keyboard
-      // animation in lock-step with the input bubble.
-      <RNView
+      <Reanimated.View
         onLayout={handleComposerLayout}
-        style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
+        style={[
+          { position: 'absolute', left: 0, right: 0, bottom: resolvedBottomInset },
+          composerTranslateStyle,
+        ]}>
         {composerActions ? (
           <ScrollView
             horizontal
@@ -197,12 +281,11 @@ export function ChatScreen({
           disabled={composerDisabled}
           placeholder={composerPlaceholder}
           onPlusPress={composerOnPlusPress}
-          onMoneyPress={composerOnMoneyPress}
           onVoicePress={composerOnVoicePress}
           testID={composerTestID}
           surface={surface}
         />
-      </RNView>
+      </Reanimated.View>
     ),
     [
       draft,
@@ -212,98 +295,152 @@ export function ChatScreen({
       composerDisabled,
       composerPlaceholder,
       composerOnPlusPress,
-      composerOnMoneyPress,
       composerOnVoicePress,
       composerTestID,
       surface,
+      resolvedBottomInset,
+      composerTranslateStyle,
     ]
   );
 
-  // GiftedChat's `renderMessage` wraps the bubble with its own padding. We
-  // reach into __bubble for the original ChatBubbleMessage so grouping +
-  // cashu-token + delivery-status logic stays untouched.
+  // Reach into `__bubble` for the original `ChatBubbleMessage` so grouping
+  // + cashu-token + delivery-status logic stays untouched. Surfaces that
+  // need a different bubble shape (AI's bubble-less assistant) provide
+  // `renderBubble` and we hand them the same grouping metadata.
   const renderMessage = useCallback(
     ({ currentMessage }: { currentMessage: GiftedMessage }) => {
       const bubble = currentMessage.__bubble;
       const group = groupingMap.get(bubble.id);
+      const isFirstInGroup = group?.isFirst ?? true;
+      const isLastInGroup = group?.isLast ?? true;
       return (
         <RNView style={{ paddingHorizontal: 16 }}>
-          <ChatMessageBubble
-            message={bubble}
-            isFirstInGroup={group?.isFirst ?? true}
-            isLastInGroup={group?.isLast ?? true}
-            counterpartyAvatar={counterpartyAvatar}
-            ownAvatar={ownAvatar}
-          />
+          {renderBubble ? (
+            renderBubble({ message: bubble, isFirstInGroup, isLastInGroup })
+          ) : (
+            <ChatMessageBubble
+              message={bubble}
+              isFirstInGroup={isFirstInGroup}
+              isLastInGroup={isLastInGroup}
+              counterpartyAvatar={counterpartyAvatar}
+            />
+          )}
         </RNView>
       );
     },
-    [groupingMap, counterpartyAvatar, ownAvatar]
+    [groupingMap, counterpartyAvatar, renderBubble]
+  );
+
+  // Inverted FlatList applies `transform: scaleY(-1)` to its empty slot;
+  // counter-rotate so the placeholder isn't upside-down. Mounted alongside
+  // the composer so the user can start typing without an explicit branch
+  // in the surface above.
+  const renderChatEmpty = useCallback(
+    () =>
+      emptyContent ? (
+        <RNView
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+            transform: [{ scaleY: -1 }],
+          }}>
+          {emptyContent}
+        </RNView>
+      ) : null,
+    [emptyContent]
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: surfaceColor }}>
-      <Log name={`ChatScreen:${surface}`}>
-        {header}
-        <View style={{ flex: 1 }}>
-          {banner}
-          {isLoading ? (
-            (loadingContent ?? null)
-          ) : messages.length === 0 && emptyContent ? (
-            <View
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 16,
-              }}>
-              {emptyContent}
-            </View>
-          ) : (
-            <GiftedChat<GiftedMessage>
-              messages={giftedMessages}
-              user={{ _id: OWN_USER_ID }}
-              renderInputToolbar={renderInputToolbar}
-              renderMessage={renderMessage}
-              renderAvatar={null}
-              renderDay={() => null}
-              renderTime={() => null}
-              renderUsername={() => null}
-              isUsernameVisible={false}
-              isDayAnimationEnabled={false}
-              minInputToolbarHeight={0}
-              messageIdGenerator={() => `gc-${Date.now()}`}
-              // The list is inverted, so `contentContainerStyle.paddingTop`
-              // is the *visual bottom* padding — i.e. the gap between the
-              // newest bubble and the composer's top edge. Without this,
-              // the newest message would sit hidden behind the absolute
-              // composer.
-              listProps={{
-                contentContainerStyle: {
-                  paddingTop: composerHeight + 16,
-                  paddingBottom: 10,
-                },
-              }}
-              // GiftedChat's default KAV uses `behavior='translate-with-padding'`,
-              // which translates the content up during the keyboard animation
-              // and then swaps to `paddingTop` at `onEnd`. Combined with the
-              // outer `overflow:'hidden'`, that swap leaves a visible ghost
-              // band above the composer on focus/unfocus. Plain `padding`
-              // just grows `paddingBottom` to the keyboard height — no
-              // translate, no swap, no residual artifact.
-              // `automaticOffset` lets the KAV measure its own screen
-              // position via `viewPositionInWindow` so the navigation header
-              // is accounted for.
-              keyboardAvoidingViewProps={{
-                behavior: 'padding',
-                automaticOffset: true,
-                keyboardVerticalOffset: 0,
-              }}
-              onSend={() => {}}
-            />
-          )}
-        </View>
-      </Log>
+    <View style={{ backgroundColor: surfaceColor, flex: 1 }}>
+      {banner}
+      {isLoading ? (
+        (loadingContent ?? null)
+      ) : (
+        <GiftedChat<GiftedMessage>
+          messages={giftedMessages}
+          messagesContainerStyle={{
+            height: 400,
+          }}
+          user={{ _id: OWN_USER_ID }}
+          renderInputToolbar={renderInputToolbar}
+          renderMessage={renderMessage}
+          renderChatEmpty={renderChatEmpty}
+          renderAvatar={null}
+          renderDay={() => null}
+          renderTime={() => null}
+          renderUsername={() => null}
+          isUsernameVisible={false}
+          isDayAnimationEnabled={false}
+          minInputToolbarHeight={0}
+          messageIdGenerator={() => `gc-${Date.now()}`}
+          listProps={{
+            // Transparent so our outer `surfaceColor` shows through —
+            // iOS FlatList defaults to `systemBackground` (≈ #1C1C1E
+            // in dark mode), which leaks a tinted rectangle behind
+            // bubble-less renderers like the AI assistant text.
+            style: { flex: 1, backgroundColor: 'transparent' },
+            // iOS 13+ defaults to `contentInsetAdjustmentBehavior:
+            // 'automatic'`, which makes UIScrollView push content out
+            // from under translucent navigation/tab bars AND apply a
+            // vibrancy material to the area "behind" them. Our list
+            // is `inverted`; UIKit doesn't know about the scaleY
+            // transform, so it applies the vibrancy zone to the
+            // wrong half. We layer our own padding via
+            // `topInset` / `bottomInset`, so opting out is safe.
+            contentInsetAdjustmentBehavior: 'never',
+            // Auto-adjust gives us the right *bottom* inset out of the
+            // box (lifts the indicator above the home indicator / tab
+            // bar so it aligns with the composer top). On the top side,
+            // UIKit adds a header inset even though our wrapper is
+            // already sized to `windowHeight - headerHeight` and the
+            // FlatList's true top edge is below the Stack header — so
+            // we pass a negative `top` to cancel out exactly that
+            // double-count. iOS adds `scrollIndicatorInsets` on top of
+            // the auto-adjusted ones, so a negative value here
+            // subtracts from the auto inset and lands the indicator's
+            // top right at the FlatList's actual edge.
+            automaticallyAdjustsScrollIndicatorInsets: true,
+            scrollIndicatorInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+            // Inverted list: `paddingTop` = visual BOTTOM clearance,
+            // `paddingBottom` = visual TOP clearance. Padding the
+            // contentContainer (rather than wrapping the list in a
+            // padded View) keeps the FlatList full-screen, so
+            // bubbles bleed under the floating header / composer
+            // during scroll but settle at the right edges at rest.
+            //
+            // No magic-number breathing room on the top edge: when a
+            // header is present, `resolvedTopInset` is 0 and the
+            // header's own bottom edge gives the visual separation.
+            // When there's no header, `resolvedTopInset === insets.top`
+            // and the topmost bubble already clears the status bar.
+            // Adding extra px here just makes the rest position float
+            // lower than it should.
+            contentContainerStyle: {
+              paddingTop: composerHeight + resolvedBottomInset + 16,
+              paddingBottom: resolvedTopInset,
+            },
+          }}
+          // Plain `padding` grows `paddingBottom` to the keyboard
+          // height — no translate, no swap, no ghost band on
+          // focus/unfocus. `automaticOffset` lets the KAV measure
+          // its own screen position via `viewPositionInWindow` so
+          // the navigation header is accounted for. With `safeArea`
+          // owned inside ChatScreen (composer at
+          // `bottom: resolvedBottomInset`), the KAV measures a
+          // full-screen frame and `keyboardVerticalOffset: 0` lands
+          // the composer exactly `resolvedBottomInset` above the
+          // keyboard top — same gap as below the composer when the
+          // keyboard is closed.
+          keyboardAvoidingViewProps={{
+            behavior: 'padding',
+            // automaticOffset: true,
+            keyboardVerticalOffset: 0,
+          }}
+          onSend={() => {}}
+        />
+      )}
     </View>
   );
 }

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Keyboard } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { getModels, type RoutstrModel } from '@/shared/lib/routstr/api';
 import { modelPickerPopup } from '@/shared/lib/popup';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import {
@@ -21,8 +21,6 @@ import {
 } from '../lib/format';
 import { aiLog } from '@/shared/lib/logger';
 import opacity from 'hex-color-opacity';
-
-const ACTION_HEIGHT = 32;
 
 /**
  * Inline pill chip showing the current AI tier + provider + the model the
@@ -45,11 +43,7 @@ const ACTION_HEIGHT = 32;
  *     half-faded with the gap shown as the row description.
  */
 export function ModelChip() {
-  const [foreground, surfaceTertiary, accent] = useThemeColor([
-    'foreground',
-    'surface-tertiary',
-    'accent',
-  ] as const);
+  const [background, accent] = useThemeColor(['background', 'accent'] as const);
 
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
@@ -144,28 +138,25 @@ export function ModelChip() {
     modelPickerPopup();
   }, []);
 
+  // Routed through the shared `Button` primitive (variant="primary") so the
+  // chip and the DM Send Money button share one visual contract — same fill,
+  // same height, same padding scale. The ReactNode `text` slot gives us a
+  // trailing chevron the Button primitive doesn't model directly.
   return (
-    <Pressable
-      onPress={onPress}
+    <Button
       testID="ai-model-chip"
-      style={{
-        height: ACTION_HEIGHT,
-        paddingHorizontal: 12,
-        borderRadius: ACTION_HEIGHT / 2,
-        backgroundColor: surfaceTertiary,
-        justifyContent: 'center',
-      }}>
-      <HStack align="center" spacing={6}>
-        <Icon
-          name={currentTier.icon}
-          size={14}
-          color={selectedTier === 'auto' ? accent : foreground}
-        />
-        <Text size={13} style={{ color: foreground, fontWeight: '500' }}>
-          {chipLabel}
-        </Text>
-        <Icon name="mdi:chevron-down" size={12} color={opacity(foreground, 0.6)} />
-      </HStack>
-    </Pressable>
+      variant="primary"
+      size="compact"
+      onPress={onPress}
+      icon={<Icon name={currentProvider.icon} size={16} color={background} />}
+      text={
+        <HStack align="center" spacing={4}>
+          <Text size={13} style={{ color: background, fontFamily: 'OxygenBold' }}>
+            {chipLabel}
+          </Text>
+          <Icon name="mdi:chevron-down" size={12} color={opacity(background, 0.7)} />
+        </HStack>
+      }
+    />
   );
 }
