@@ -258,8 +258,8 @@
       "references": [],
       "verification_note": "Read all three mintQuote.tsx wrappers and all three receiveToken.tsx wrappers. Confirmed divergence. This finding is separate from F-002 (security) — consolidating fixes F-002 as a side effect but is worth noting structurally.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Validation drift across the three mintQuote / receiveToken wrappers is closed: each route declares the same min(1).max(64_000) zod schema and routes invalid params back via useRouteParams (commit 0dddea5f). Structural consolidation of the duplicated wrappers themselves was out of scope for this slice."
+      "completion_status": "stale",
+      "completion_note": "Re-verified at audit time: app/{,(receive-flow)/,(transactions-flow)/}{mintQuote,receiveToken}.tsx are now ~3-line wrappers delegating to a single canonical {Mint,Receive}TokenRoute; no JSON.parse remains; the only intentional divergence is (receive-flow)/mintQuote which threads the active payment-machine mint-pill callbacks. The drift the finding called out is gone."
     },
     {
       "id": "F-011",

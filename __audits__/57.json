@@ -197,8 +197,8 @@
         "lookalikes:1 mixed-type SEARCH_FILTERS_HEIGHT collision in features/contacts"
       ],
       "verification_note": "Read the 1-line file and both consumers. Counter-argument: 'lib/constants is a forward-looking organising pattern'. Rejected per skill:improve-codebase-architecture: speculative scaffolds for future constants are not earned; deletion concentrates nothing of value.",
-      "completion_status": "deferred",
-      "completion_note": "rejected — finding misapplies the deletion test: SEARCH_FILTERS_HEIGHT has 4 callers across features/contacts and features/feed (FeedScreen, FeedFilters, ContactsScreen, SearchFilters). Inlining the literal 56 would scatter a layout invariant rather than collapse complexity, so the file is earning its keep, not failing the deletion test"
+      "completion_status": "complete",
+      "completion_note": "Inlined SEARCH_FILTERS_HEIGHT into SearchFilters.tsx and FeedFilters.tsx as sibling exports; deleted features/contacts/lib/constants/styles.ts and the now-empty constants/ directory; ContactsScreen and FeedScreen import the constant from the filter component that owns the layout. Side benefit: closes the feed -> contacts cross-feature import for this constant. Net delta -3 LOC across 5 files."
     },
     {
       "id": "F-007",

@@ -395,8 +395,8 @@
       ],
       "verification_note": "Re-checked all three shim files. Counter-argument considered: maybe expo-router doesn't import them statically. Checked `app/_layout.tsx` for Stack.Screen registrations — yes, they're registered. The analyzer just doesn't model that.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered as Slice C (parallel-route-wrapper consolidation). Not picked. Real and unfixed; analyze-structure tooling fix is the cleaner path than route-shim consolidation."
+      "completion_status": "stale",
+      "completion_note": "analyze-structure already recognises the app/**/*.tsx Expo Router convention (index.mjs:1743 'if (rel.startsWith(\"app/\")) continue; // routes' and the Entry-points classification at line 1041). Re-running analyze-structure --llm shows ThemePreviewScreen / GalleryScreen / BackgroundScreen are not in the orphan list; the only theme-flow signal that survives is a benign BackgroundScreen 2-file lookalike (the route shim itself, expected)."
     }
   ],
   "dimensions": {
