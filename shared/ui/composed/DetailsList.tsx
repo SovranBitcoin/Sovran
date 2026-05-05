@@ -12,6 +12,7 @@ import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
+import { formatDisplayValue } from '@/shared/lib/format/displayValue';
 
 interface ItemTitle {
   id?: string;
@@ -88,7 +89,6 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
     </Log>
   );
 
-  // Helper function to render the appropriate value content based on the item type
   function renderValueContent(item: DetailsListItem, titleText: string, special?: boolean) {
     if (React.isValidElement(item.value)) {
       return (
@@ -104,104 +104,72 @@ export function DetailsList({ items, style, camera = false, special, gradient }:
       );
     }
 
-    // Email address format (@example)
-    if (typeof item.value === 'string' && item.value?.includes?.('@') && special) {
-      const [username, domain] = item.value.split('@');
-      return (
-        <VStack align="center" className="flex-1" justify="center">
-          <Text
-            size={18}
-            color={opacity(foreground, 0.9)}
-            style={{
-              textAlign: 'center',
-            }}>
-            {truncateMiddle(username, 8)}
-          </Text>
-          <Pressable className="flex-row items-center">
-            <StyledText
-              primary
-              size={24}
-              heavy
-              className="text-shade-200"
+    const layout = formatDisplayValue(item.value, special === true);
+
+    switch (layout.kind) {
+      case 'email':
+        return (
+          <VStack align="center" className="flex-1" justify="center">
+            <Text size={18} color={opacity(foreground, 0.9)} style={{ textAlign: 'center' }}>
+              {truncateMiddle(layout.username, 8)}
+            </Text>
+            <Pressable className="flex-row items-center">
+              <StyledText
+                primary
+                size={24}
+                heavy
+                className="text-shade-200"
+                style={{
+                  textAlign: 'center',
+                  textShadowColor: 'rgba(0, 0, 0, 0.75)',
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 8,
+                  padding: 4,
+                }}>
+                @{layout.domain}
+              </StyledText>
+            </Pressable>
+            {titleText !== '' && <Spacer size={8} />}
+          </VStack>
+        );
+
+      case 'prefix-split':
+        return renderPrefixedValue(layout.prefix, layout.body, titleText);
+
+      case 'bitcoin-uri':
+        return (
+          <VStack align="center" className="flex-1" justify="center">
+            <Text
+              bold
+              size={12}
+              color={opacity(foreground, 0.9)}
               style={{
-                textAlign: 'center',
-                textShadowColor: 'rgba(0, 0, 0, 0.75)',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 8,
-                padding: 4,
+                textAlign: 'left',
+                wordBreak: 'break-all',
               }}>
-              @{domain}
-            </StyledText>
-          </Pressable>
-          {titleText !== '' && <Spacer size={8} />}
-        </VStack>
-      );
-    }
+              {layout.value}
+            </Text>
+            {titleText !== '' && <Spacer size={8} />}
+          </VStack>
+        );
 
-    // Handle npub format
-    if (typeof item.value === 'string' && item.value?.startsWith?.('npub') && special) {
-      return renderPrefixedValue('npub', item.value.split('npub')[1], titleText);
+      case 'plain':
+      default:
+        return (
+          <View>
+            <Text
+              weight={titleText === '' ? 'regular' : 'bold'}
+              size={titleText === '' ? 12 : 16}
+              color={foreground}
+              style={{
+                textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
+                flex: 1,
+              }}>
+              {layout.value}
+            </Text>
+          </View>
+        );
     }
-
-    // Handle creqA format
-    if (typeof item.value === 'string' && item.value?.startsWith?.('creqA')) {
-      return renderPrefixedValue('creqA', item.value.split('creqA')[1], titleText);
-    }
-
-    // Handle lnbc1 format
-    if (typeof item.value === 'string' && item.value?.startsWith?.('lnbc1') && special) {
-      return renderPrefixedValue('lnbc1', item.value.split('lnbc1')[1], titleText);
-    }
-
-    // Handle cashu format
-    if (
-      typeof item.value === 'string' &&
-      (item.value?.startsWith?.('cashuB') || item.value?.startsWith?.('cashuA')) &&
-      special
-    ) {
-      const prefix = item.value.startsWith('cashuA') ? 'cashuA' : 'cashuB';
-      const value = item.value.split(prefix)[1];
-      return renderPrefixedValue(prefix, value, titleText);
-    }
-
-    // Handle bitcoin lightning+cashu format
-    if (
-      typeof item.value === 'string' &&
-      item.value?.startsWith?.('bitcoin:?lightning=') &&
-      item.value.includes('&cashu=')
-    ) {
-      return (
-        <VStack align="center" className="flex-1" justify="center">
-          <Text
-            bold
-            size={12}
-            color={opacity(foreground, 0.9)}
-            style={{
-              textAlign: 'left',
-              wordBreak: 'break-all',
-            }}>
-            {item.value}
-          </Text>
-          {titleText !== '' && <Spacer size={8} />}
-        </VStack>
-      );
-    }
-
-    // Default case - regular text
-    return (
-      <View>
-        <Text
-          weight={titleText === '' ? 'regular' : 'bold'}
-          size={titleText === '' ? 12 : 16}
-          color={foreground}
-          style={{
-            textAlign: titleText === '' ? 'left' : item.align === 'left' ? 'left' : 'right',
-            flex: 1,
-          }}>
-          {String(item.value)}
-        </Text>
-      </View>
-    );
   }
 
   // Helper function to render prefixed values (npub, creqA, etc.)
