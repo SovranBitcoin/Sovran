@@ -1,6 +1,7 @@
 export { ChatScreen } from './ChatScreen';
 export { ChatMessageBubble } from './ChatMessageBubble';
 export { ChatComposer } from './ChatComposer';
+export { LiquidChatComposer } from './LiquidChatComposer';
 export { DmChatHeader } from './DmChatHeader';
 export { CashuTokenBubble } from './CashuTokenBubble';
 export { extractCashuToken } from './extractCashuToken';

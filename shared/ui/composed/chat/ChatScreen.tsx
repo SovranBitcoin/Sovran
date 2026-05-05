@@ -9,7 +9,7 @@ import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { Log } from '@/shared/lib/logger';
 import type { Logger } from '@/shared/lib/logger';
 
-import { ChatComposer } from './ChatComposer';
+import { LiquidChatComposer } from './LiquidChatComposer';
 import { ChatMessageBubble } from './ChatMessageBubble';
 import { useChatSurfacePerfLogger } from './useChatSurfacePerfLogger';
 import { useMessageGrouping } from './useMessageGrouping';
@@ -51,9 +51,12 @@ interface ChatScreenProps {
    */
   composerDisabled?: boolean;
   composerPlaceholder?: string;
-  composerLeadingIcon?: string;
-  composerLeadingIconNode?: React.ReactNode;
-  composerActionsLeading?: React.ReactNode;
+  /** Tap handler for the leading [+] glass button on the composer. */
+  composerOnPlusPress?: () => void;
+  /** Tap handler for the money icon inside the composer (visible while empty). */
+  composerOnMoneyPress?: () => void;
+  /** Tap handler for the voice icon inside the composer (visible while empty). */
+  composerOnVoicePress?: () => void;
   composerTestID?: string;
   /** Banner content rendered inside the list area, above the LegendList. */
   banner?: React.ReactNode;
@@ -89,9 +92,9 @@ export function ChatScreen({
   onSend,
   composerDisabled,
   composerPlaceholder,
-  composerLeadingIcon,
-  composerLeadingIconNode,
-  composerActionsLeading,
+  composerOnPlusPress,
+  composerOnMoneyPress,
+  composerOnVoicePress,
   composerTestID,
   banner,
   isLoading,
@@ -210,15 +213,15 @@ export function ChatScreen({
             />
           )}
 
-          <ChatComposer
+          <LiquidChatComposer
             value={draft}
             onChangeText={setDraft}
             onSend={handleSubmit}
             disabled={composerDisabled}
             placeholder={composerPlaceholder}
-            leadingIcon={composerLeadingIcon}
-            leadingIconNode={composerLeadingIconNode}
-            actionsLeading={composerActionsLeading}
+            onPlusPress={composerOnPlusPress}
+            onMoneyPress={composerOnMoneyPress}
+            onVoicePress={composerOnVoicePress}
             testID={composerTestID}
             surface={surface}
           />

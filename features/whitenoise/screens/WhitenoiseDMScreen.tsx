@@ -42,8 +42,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
       messages={bubbleMessages}
       onSend={send}
       composerDisabled={!isClientReady || isCreatingGroup}
-      composerPlaceholder={isCreatingGroup ? 'Creating encrypted group…' : 'Encrypted message'}
-      composerLeadingIconNode={<MarmotIcon size={20} />}
+      composerPlaceholder={isCreatingGroup ? 'Creating encrypted group…' : 'Write here'}
       composerTestID="whitenoise-dm-input"
       banner={
         error ? (

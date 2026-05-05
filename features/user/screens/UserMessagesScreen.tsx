@@ -9,7 +9,6 @@
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { InteractionManager } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { router } from 'expo-router';
 import { sendMessageFailedPopup } from '@/shared/lib/popup';
 import {
@@ -33,7 +32,6 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import Icon from 'assets/icons';
 import {
   ChatScreen,
   DmChatHeader,
@@ -70,11 +68,7 @@ interface UserMessagesScreenProps {
 export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
 
-  const [foreground, shade400, surfaceTertiary] = useThemeColor([
-    'foreground',
-    'shade-400',
-    'surface-tertiary',
-  ] as const);
+  const shade400 = useThemeColor('shade-400');
   const { keys: nostrKeys } = useNostrKeysContext();
   const { ndk } = useNDK();
 
@@ -477,29 +471,9 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       header={<DmChatHeader pubkey={pubkey} onBack={handleBack} />}
       messages={bubbleMessages}
       onSend={handleNostrDMSend}
-      composerPlaceholder="Type a message..."
-      composerLeadingIconNode={ownAvatar}
-      composerActionsLeading={
-        lud16 ? (
-          <Pressable
-            onPress={handleSendMoney}
-            style={{
-              height: 32,
-              borderRadius: 16,
-              paddingHorizontal: 12,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              backgroundColor: surfaceTertiary,
-            }}>
-            <Icon name="mingcute:lightning-fill" size={16} color={foreground} />
-            <Text size={13} style={{ color: foreground }} bold>
-              Send Money
-            </Text>
-          </Pressable>
-        ) : null
-      }
-      contentBottomPadding={lud16 ? 70 : 16}
+      composerPlaceholder="Write here"
+      composerOnMoneyPress={lud16 ? handleSendMoney : undefined}
+      contentBottomPadding={16}
       counterpartyAvatar={counterpartyAvatar}
       ownAvatar={ownAvatar}
       isLoading={isLoading}

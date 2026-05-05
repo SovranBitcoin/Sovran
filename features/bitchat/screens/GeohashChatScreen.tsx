@@ -191,7 +191,7 @@ export function GeohashChatScreen({
       header={header}
       messages={bubbleMessages}
       onSend={sendMessage}
-      composerLeadingIcon="mdi:map-marker"
+      composerPlaceholder="Write here"
       emptyContent={
         <VStack align="center" spacing={12}>
           <Icon
