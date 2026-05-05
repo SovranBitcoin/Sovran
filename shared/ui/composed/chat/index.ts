@@ -1,3 +1,4 @@
+export { ChatScreen } from './ChatScreen';
 export { ChatMessageBubble } from './ChatMessageBubble';
 export { ChatComposer } from './ChatComposer';
 export { DmChatHeader } from './DmChatHeader';

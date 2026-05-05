@@ -8,11 +8,9 @@
  */
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { StatusBar, InteractionManager } from 'react-native';
+import { InteractionManager } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { sendMessageFailedPopup } from '@/shared/lib/popup';
 import {
   NDKEvent,
@@ -30,33 +28,27 @@ import {
   markNip04Failed,
   putNip04Plaintext,
 } from '@/shared/lib/nostr/nip04Cache';
-import { LegendList } from '@legendapp/list';
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
-import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
 import {
-  ChatComposer,
-  ChatMessageBubble,
+  ChatScreen,
   DmChatHeader,
   extractCashuToken,
-  useChatSurfacePerfLogger,
-  useMessageGrouping,
   type ChatBubbleMessage,
 } from '@/shared/ui/composed/chat';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
-import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { chatLog, Log, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { chatLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 
-const PERF_SURFACE = 'nostr-dm' as const;
+const SURFACE = 'nostr-dm' as const;
 
 /** Internal DM record. Maps to ChatBubbleMessage at render time. */
 interface DmMessage {
@@ -77,12 +69,9 @@ interface UserMessagesScreenProps {
 
 export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
-  const headerHeight = useHeaderHeight();
 
-  const [foreground, surfaceSecondary, surface, shade400, surfaceTertiary] = useThemeColor([
+  const [foreground, shade400, surfaceTertiary] = useThemeColor([
     'foreground',
-    'surface-secondary',
-    'surface',
     'shade-400',
     'surface-tertiary',
   ] as const);
@@ -90,28 +79,13 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   const { ndk } = useNDK();
 
   const [messages, setMessages] = useState<DmMessage[]>([]);
-  const [messageText, setMessageText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isSending, setIsSending] = useState(false);
-  const [composerHeight, setComposerHeight] = useState(0);
-
-  const { handleListLayout, handleListContentSize, handleListScroll } = useChatSurfacePerfLogger({
-    log: chatLog,
-    surface: PERF_SURFACE,
-    headerHeight,
-    messages,
-    kbStateExtras: () => ({ composerHeight }),
-    historyExtras: (last) => ({
-      lastIsOwn: last?.isOwn ?? null,
-      lastIsSending: last?.isSending ?? null,
-    }),
-  });
 
   // Counterparty kind-0 metadata is served from the shared SWR cache.
   // First open of a conversation per session pays one round-trip; every
-  // subsequent open is instant because the cache is shared across
-  // surfaces (this screen, contact picker, feed reactions, etc.) and
-  // persists across app launches via profile-scoped AsyncStorage.
+  // subsequent open is instant because the cache is shared across surfaces
+  // (this screen, contact picker, feed reactions, etc.) and persists across
+  // app launches via profile-scoped AsyncStorage.
   const { metadata: counterpartyMetadata } = useNostrProfileMetadata(pubkey);
 
   const dmFilters = useMemo(() => {
@@ -203,8 +177,6 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     [messages, displayName]
   );
 
-  const groupingMap = useMessageGrouping(bubbleMessages);
-
   const counterpartyAvatar = useMemo(
     () => (
       <Avatar
@@ -229,22 +201,6 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       />
     ),
     [myProfile.picture, nostrKeys?.pubkey, myName]
-  );
-
-  const renderMessage = useCallback(
-    ({ item }: { item: ChatBubbleMessage }) => {
-      const group = groupingMap.get(item.id);
-      return (
-        <ChatMessageBubble
-          message={item}
-          isFirstInGroup={group?.isFirst ?? true}
-          isLastInGroup={group?.isLast ?? true}
-          counterpartyAvatar={counterpartyAvatar}
-          ownAvatar={ownAvatar}
-        />
-      );
-    },
-    [groupingMap, counterpartyAvatar, ownAvatar]
   );
 
   const handleBack = useCallback(() => {
@@ -401,119 +357,103 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     setIsLoading(false);
   }, [unwrappedGiftWrapMessages, nostrKeys?.pubkey]);
 
-  // `isSending` is React state — a rapid double-tap on the composer's send
-  // button reads the stale `false` and lands twice into `handleNostrDMSend`,
-  // publishing two NIP-17 gift-wraps and emitting two `pending-${Date.now()}`
-  // optimistic bubbles (audit 33#F-005). Wrap the dispatch in single-flight
-  // so the duplicate is dropped before either branch publishes.
-  const handleSendMessage = useSingleFlight(async () => {
-    if (!messageText.trim() || isSending) return;
-
-    const text = messageText.trim();
-    setMessageText('');
-
-    chatLog.info('chat.send.dispatch', {
-      surface: PERF_SURFACE,
-      textLen: text.length,
-      historyCount: messages.length,
-    });
-
-    await handleNostrDMSend(text);
-  });
-
-  const handleNostrDMSend = async (text: string) => {
-    const dmStart = performance.now();
-    log.info('dm.send.start', { messageLength: text.length, hasNdk: !!ndk, hasPubkey: !!pubkey });
-    if (!ndk || !nostrKeys?.privateKey || !nostrKeys?.pubkey || !pubkey) {
-      log.error('dm.send.missing_data', {
+  const handleNostrDMSend = useCallback(
+    async (text: string) => {
+      const dmStart = performance.now();
+      log.info('dm.send.start', {
+        messageLength: text.length,
         hasNdk: !!ndk,
-        hasPrivateKey: !!nostrKeys?.privateKey,
         hasPubkey: !!pubkey,
       });
-      sendMessageFailedPopup();
-      return;
-    }
+      if (!ndk || !nostrKeys?.privateKey || !nostrKeys?.pubkey || !pubkey) {
+        log.error('dm.send.missing_data', {
+          hasNdk: !!ndk,
+          hasPrivateKey: !!nostrKeys?.privateKey,
+          hasPubkey: !!pubkey,
+        });
+        sendMessageFailedPopup();
+        return;
+      }
 
-    setIsSending(true);
-    const timestamp = Math.floor(Date.now() / 1000);
-    const tempMessageId = `temp-${timestamp}`;
+      const timestamp = Math.floor(Date.now() / 1000);
+      const tempMessageId = `temp-${timestamp}`;
 
-    const optimisticMessage: DmMessage = {
-      id: tempMessageId,
-      content: text,
-      isOwn: true,
-      isRead: false,
-      isSending: true,
-      created_at: timestamp,
-      pubkey: nostrKeys.pubkey,
-    };
-    setMessages((prev) => [...prev, optimisticMessage]);
-
-    try {
-      // Build NIP-17 gift-wrapped DM pair: one for the recipient, one self-copy.
-      // Both share the same rumor (with the counterparty in the `p` tag) per NIP-17.
-      const { recipientWrap, senderWrap } = buildGiftWrappedDMPair({
+      const optimisticMessage: DmMessage = {
+        id: tempMessageId,
         content: text,
-        senderPrivateKey: nostrKeys.privateKey,
-        recipientPublicKey: pubkey,
-      });
+        isOwn: true,
+        isRead: false,
+        isSending: true,
+        created_at: timestamp,
+        pubkey: nostrKeys.pubkey,
+      };
+      setMessages((prev) => [...prev, optimisticMessage]);
 
-      const wrapEvent = new NDKEvent(ndk);
-      wrapEvent.kind = recipientWrap.kind;
-      wrapEvent.content = recipientWrap.content;
-      wrapEvent.tags = recipientWrap.tags;
-      wrapEvent.created_at = recipientWrap.created_at;
-      wrapEvent.pubkey = recipientWrap.pubkey;
-      wrapEvent.id = recipientWrap.id;
-      wrapEvent.sig = recipientWrap.sig;
+      try {
+        // Build NIP-17 gift-wrapped DM pair: one for the recipient, one self-copy.
+        // Both share the same rumor (with the counterparty in the `p` tag) per NIP-17.
+        const { recipientWrap, senderWrap } = buildGiftWrappedDMPair({
+          content: text,
+          senderPrivateKey: nostrKeys.privateKey,
+          recipientPublicKey: pubkey,
+        });
 
-      processedEventIds.current.add(wrapEvent.id);
+        const wrapEvent = new NDKEvent(ndk);
+        wrapEvent.kind = recipientWrap.kind;
+        wrapEvent.content = recipientWrap.content;
+        wrapEvent.tags = recipientWrap.tags;
+        wrapEvent.created_at = recipientWrap.created_at;
+        wrapEvent.pubkey = recipientWrap.pubkey;
+        wrapEvent.id = recipientWrap.id;
+        wrapEvent.sig = recipientWrap.sig;
 
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === tempMessageId ? { ...msg, id: wrapEvent.id } : msg))
-      );
+        processedEventIds.current.add(wrapEvent.id);
 
-      await wrapEvent.publish();
+        setMessages((prev) =>
+          prev.map((msg) => (msg.id === tempMessageId ? { ...msg, id: wrapEvent.id } : msg))
+        );
 
-      log.info('dm.send.published', {
-        eventId: wrapEvent.id,
-        duration_ms: Math.round(performance.now() - dmStart),
-      });
+        await wrapEvent.publish();
 
-      // Publish the self-copy so we can retrieve our own sent messages later.
-      const selfWrapEvent = new NDKEvent(ndk);
-      selfWrapEvent.kind = senderWrap.kind;
-      selfWrapEvent.content = senderWrap.content;
-      selfWrapEvent.tags = senderWrap.tags;
-      selfWrapEvent.created_at = senderWrap.created_at;
-      selfWrapEvent.pubkey = senderWrap.pubkey;
-      selfWrapEvent.id = senderWrap.id;
-      selfWrapEvent.sig = senderWrap.sig;
+        log.info('dm.send.published', {
+          eventId: wrapEvent.id,
+          duration_ms: Math.round(performance.now() - dmStart),
+        });
 
-      processedEventIds.current.add(selfWrapEvent.id);
+        // Publish the self-copy so we can retrieve our own sent messages later.
+        const selfWrapEvent = new NDKEvent(ndk);
+        selfWrapEvent.kind = senderWrap.kind;
+        selfWrapEvent.content = senderWrap.content;
+        selfWrapEvent.tags = senderWrap.tags;
+        selfWrapEvent.created_at = senderWrap.created_at;
+        selfWrapEvent.pubkey = senderWrap.pubkey;
+        selfWrapEvent.id = senderWrap.id;
+        selfWrapEvent.sig = senderWrap.sig;
 
-      await selfWrapEvent.publish().catch((err: unknown) => {
-        log.warn('dm.send.self_copy_failed', { error: err });
-      });
+        processedEventIds.current.add(selfWrapEvent.id);
 
-      log.info('dm.send.complete', {
-        eventId: wrapEvent.id,
-        total_ms: Math.round(performance.now() - dmStart),
-      });
+        await selfWrapEvent.publish().catch((err: unknown) => {
+          log.warn('dm.send.self_copy_failed', { error: err });
+        });
 
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === wrapEvent.id ? { ...msg, isRead: true, isSending: false } : msg
-        )
-      );
-    } catch (error) {
-      log.error('dm.send.failed', { error, total_ms: Math.round(performance.now() - dmStart) });
-      setMessages((prev) => prev.filter((msg) => msg.id !== tempMessageId));
-      sendMessageFailedPopup();
-    } finally {
-      setIsSending(false);
-    }
-  };
+        log.info('dm.send.complete', {
+          eventId: wrapEvent.id,
+          total_ms: Math.round(performance.now() - dmStart),
+        });
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === wrapEvent.id ? { ...msg, isRead: true, isSending: false } : msg
+          )
+        );
+      } catch (error) {
+        log.error('dm.send.failed', { error, total_ms: Math.round(performance.now() - dmStart) });
+        setMessages((prev) => prev.filter((msg) => msg.id !== tempMessageId));
+        sendMessageFailedPopup();
+      }
+    },
+    [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey]
+  );
 
   const handleSendMoney = () => {
     log.debug('user.messages.send_money', {
@@ -543,100 +483,52 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
-      keyboardVerticalOffset={headerHeight}>
-      <Log name="UserMessagesScreen">
-        <DmChatHeader pubkey={pubkey} onBack={handleBack} />
-        <StatusBar barStyle="light-content" backgroundColor={surfaceSecondary} />
-        <View style={{ flex: 1, backgroundColor: surface }}>
-          {isLoading ? (
-            <View
-              style={{
-                flex: 1,
-                justifyContent: 'center',
-                alignItems: 'center',
-                paddingTop: 50,
-              }}>
-              <Text size={16} style={{ color: shade400 }}>
-                Loading messages...
-              </Text>
-            </View>
-          ) : (
-            <LegendList
-              data={bubbleMessages}
-              onLayout={handleListLayout}
-              onContentSizeChange={handleListContentSize}
-              onScroll={handleListScroll}
-              scrollEventThrottle={120}
-              renderItem={renderMessage}
-              keyExtractor={(item: ChatBubbleMessage) => item.id}
-              initialScrollAtEnd
-              maintainScrollAtEnd
-              maintainScrollAtEndThreshold={0.2}
-              alignItemsAtEnd
-              estimatedItemSize={80}
-              recycleItems={false}
-              style={{ flex: 1 }}
-              contentContainerStyle={{
-                padding: 16,
-                paddingBottom: lud16 ? 70 : 16,
-              }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              ListEmptyComponent={
-                <View
-                  style={{
-                    flex: 1,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    paddingTop: 50,
-                  }}>
-                  <Text size={16} style={{ color: shade400 }}>
-                    No messages yet. Start the conversation!
-                  </Text>
-                </View>
-              }
-            />
-          )}
-
-          <View
-            onLayout={(e) => setComposerHeight(e.nativeEvent.layout.height)}
-            collapsable={false}>
-            <ChatComposer
-              value={messageText}
-              onChangeText={setMessageText}
-              onSend={handleSendMessage}
-              disabled={isSending}
-              placeholder="Type a message..."
-              surface={PERF_SURFACE}
-              leadingIconNode={ownAvatar}
-              actionsLeading={
-                lud16 ? (
-                  <Pressable
-                    onPress={handleSendMoney}
-                    style={{
-                      height: 32,
-                      borderRadius: 16,
-                      paddingHorizontal: 12,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      backgroundColor: surfaceTertiary,
-                    }}>
-                    <Icon name="mingcute:lightning-fill" size={16} color={foreground} />
-                    <Text size={13} style={{ color: foreground }} bold>
-                      Send Money
-                    </Text>
-                  </Pressable>
-                ) : null
-              }
-            />
-          </View>
-        </View>
-      </Log>
-    </KeyboardAvoidingView>
+    <ChatScreen
+      surface={SURFACE}
+      log={chatLog}
+      header={<DmChatHeader pubkey={pubkey} onBack={handleBack} />}
+      messages={bubbleMessages}
+      onSend={handleNostrDMSend}
+      composerPlaceholder="Type a message..."
+      composerLeadingIconNode={ownAvatar}
+      composerActionsLeading={
+        lud16 ? (
+          <Pressable
+            onPress={handleSendMoney}
+            style={{
+              height: 32,
+              borderRadius: 16,
+              paddingHorizontal: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: surfaceTertiary,
+            }}>
+            <Icon name="mingcute:lightning-fill" size={16} color={foreground} />
+            <Text size={13} style={{ color: foreground }} bold>
+              Send Money
+            </Text>
+          </Pressable>
+        ) : null
+      }
+      contentBottomPadding={lud16 ? 70 : 16}
+      counterpartyAvatar={counterpartyAvatar}
+      ownAvatar={ownAvatar}
+      isLoading={isLoading}
+      loadingContent={
+        <Text size={16} style={{ color: shade400, textAlign: 'center', paddingTop: 50 }}>
+          Loading messages...
+        </Text>
+      }
+      emptyContent={
+        <Text size={16} style={{ color: shade400 }}>
+          No messages yet. Start the conversation!
+        </Text>
+      }
+      historyExtras={(last) => ({
+        lastIsOwn: last?.isOwn ?? null,
+        lastIsPending: last?.isPending ?? null,
+      })}
+    />
   );
 }
