@@ -302,9 +302,14 @@ export function LiquidChatComposer({
                     modifiers={[
                       buttonStyle('glass'),
                       frame({ width: BUTTON_SIZE, height: BUTTON_SIZE }),
+                      // `interactive: false` on the GLASS MATERIAL turns off
+                      // the touch-down brightening glow (Apple's "interactive
+                      // glass" effect). The button remains tappable via the
+                      // SwiftUIButton's onPress; only the cosmetic material
+                      // reaction is suppressed.
                       glassEffect({
                         shape: 'circle',
-                        glass: { variant: 'regular', tint: accentTint, interactive: true },
+                        glass: { variant: 'regular', tint: accentTint, interactive: false },
                       }),
                       glassEffectId('plus', namespaceId),
                       animation(SEND_SPRING, trimmedHasText),
@@ -361,7 +366,9 @@ export function LiquidChatComposer({
                         glass: {
                           variant: 'regular',
                           tint: accentTint,
-                          interactive: canSend,
+                          // See [+] above — turning off interactive glass
+                          // suppresses the touch-down brightening glow.
+                          interactive: false,
                         },
                       }),
                       glassEffectId('send', namespaceId),
