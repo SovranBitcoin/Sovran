@@ -176,7 +176,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Confirmed by direct read of logger.ts:799-805 (auto-escalation logic) and useAiSend.ts:197 (startSpan call) and 506 (span.end on success). Log evidence quoted verbatim from log-doctor timeline output. Severity Medium because it doesn't change behaviour, only observability quality.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "startSpan now accepts { warnAtMs, errorAtMs } opts (defaults preserved at 1s/5s). aiLog.startSpan('ai.send', ...) call site in features/ai/hooks/useAiSend.ts passes 15s/60s thresholds so a normal AI completion no longer logs as ERROR. Regression test in __tests__/loggerChild.test.ts pins the behaviour."
     },
     {
       "id": "F-006",

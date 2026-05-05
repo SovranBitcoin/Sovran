@@ -155,7 +155,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-read each section to confirm the concerns are independent: initPhase imports nothing from the React subsystem; the JS thread monitor doesn't reference logger internals beyond `log.warn`; deferWork uses runtime require('react-native') so it can already live in any file; Log uses React.createContext + useRef + useEffect + React.createElement and is not depended on by any other section of logger.ts. Counter-argument considered: 'these all belong to instrumentation, the file is the instrumentation namespace' — but the user-visible cost is that pulling cashuLog drags React; the namespace argument doesn't justify the import-graph weight.",
-      "prior_audit_id": "F-012@50.json"
+      "prior_audit_id": "F-012@50.json",
+      "completion_status": "complete",
+      "completion_note": "logger.ts split into 5 single-purpose modules behind sibling files (loggerCore, loggerJsThread, loggerDefer, loggerHooks, loggerUI). Public barrel @/shared/lib/logger preserves the existing API; 268 import sites unchanged. JS-thread heartbeat side effect armed via barrel import './loggerJsThread'."
     },
     {
       "id": "F-005",
@@ -392,8 +394,8 @@
       ],
       "verification_note": "Counted: 7 `as any` and 1 `: any` site in the file. analyze-structure top-list does not name logger.ts in the type-safety hotspots (top entries are redux/store/store.deprecated.ts at any=29 and HistoryEntryTimeline at as=53), so the cast density is moderate not extreme — Low not Medium.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "redaction-path (v as any)._kind cast at kvParams replaced with hasKind type guard; remaining as any in ndjson dump (line 797) and React DevTools displayName resolution (lines ~1214–1244, 1244 style) deferred — non-redaction paths"
+      "completion_status": "complete",
+      "completion_note": "Remaining as-any casts cleared as part of the F-004 split: ndjson dump no longer mutates a typed compact (rest-spread + Record<string, unknown>); React DevTools displayName resolution now goes through ReactComponentLike + readStringField type-guards in loggerUI.tsx; Log style prop typed as StyleProp<ViewStyle>."
     },
     {
       "id": "F-015",
