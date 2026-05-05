@@ -122,8 +122,8 @@
       ],
       "verification_note": "Re-read manager.ts:247-279 (enableSafeWatchers — no finally, latch set line 251 never cleared in this method), manager.ts:289-331 (enableNpcSyncAndProcessor — sets false line 327 only on success path reaching that line), manager.ts:368-375 (isReadyForCleanup reads `!isBackgroundRunning`), profileSessionOrchestrator.ts:122-127 (bails switch on not-ready), CocoProvider.tsx:219-222 (phase-2 catch doesn't reset). Counter-argument considered: 'awaitRestoreReady always resolves eventually.' Not in SOV-00 §6.1 failure modes — 'every mint fails restore' is an open question with the recommendation to 'hold the gate; surface a support path instead' (SOV-00 §13 item 3), which implies the gate can persist indefinitely. Log-doctor stats --latest does show `cashu.manager.safe_watchers.start` ran but not the `.done` event in the latest filtered 65-entry session, which is consistent with the flag being live longer than either phase's nominal duration.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed. isBackgroundRunning pair-bound-latch race belongs to the manager-lifecycle slice (refactor_plan #2 in this audit, alongside F-005/F-006); not in scope for the dead-code slice."
+      "completion_status": "complete",
+      "completion_note": "enableSafeWatchers + enableNpcSyncAndProcessor now wrap their bodies in try/finally clearing isBackgroundRunning. The latch is no longer held across the awaitRestoreReady gap (defaultMints + RestoreGate); profile switches out of RestoreGate are now possible. Latch is re-set by enableNpcSyncAndProcessor and cleared in its finally so a phase-2 throw cannot strand it."
     },
     {
       "id": "F-005",
@@ -144,8 +144,8 @@
       ],
       "verification_note": "Re-read manager.ts:380-452 and CocoProvider.tsx:163-167. Confirmed the fire-and-forget call. Counter-argument considered: 'React's useEffect cleanup on hot reload is synchronous from React's POV, so the second call can't happen before the first returns.' But the first call only assigns `pendingCleanup` and returns an awaited promise — it doesn't block the reducer. A subsequent orchestrator call that fires from a Settings action is a different React dispatch and can arrive mid-teardown.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed. Concurrent cleanup() overwrite-on-second-call belongs to the manager-lifecycle slice (refactor_plan #2)."
+      "completion_status": "complete",
+      "completion_note": "cleanup() now short-circuits when this.pendingCleanup is non-null (returns the existing promise) instead of overwriting it. Concurrent cleanups dedup to one shared teardown — initialize() awaiters can no longer skip a still-running first teardown."
     },
     {
       "id": "F-006",
@@ -165,8 +165,8 @@
       ],
       "verification_note": "Re-read manager.ts:129-138 and the surrounding try/finally at :144-239. Confirmed no reset of isInitializing by the timing-out caller. log-doctor startup --latest shows `coco` stage taking <1ms on a warm start but `coco-bg` taking 365ms; neither exercised the pathological case, so this is structural reasoning, not measured. Counter-argument considered: 'double-initialize rarely happens in practice.' True under normal flows, but the existing pendingCleanup machinery (line 119-122) explicitly exists because the author considered concurrent init/teardown. The polling loop is the weaker half of the same design.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed. initialize() polling timeout belongs to the manager-lifecycle slice (refactor_plan #2)."
+      "completion_status": "complete",
+      "completion_note": "Replaced isInitializing boolean + 5s polling loop with a stored pendingInit: Promise<Manager> field, mirroring the existing pendingCleanup shape. Concurrent callers await the in-flight promise; no spurious 'Manager initialization timeout' throws. isInitializing field removed. isReadyForCleanup() and completeReset() updated to use pendingInit."
     },
     {
       "id": "F-007",
