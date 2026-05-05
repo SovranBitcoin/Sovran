@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback, useEffect } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { ScrollView, useWindowDimensions } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -177,18 +177,21 @@ export function ThemePreviewScreen() {
         <Text
           size={14}
           medium
-          style={[styles.albumLabel, { color: album ? foreground : 'transparent' }]}>
+          className="mb-4 mt-1 text-center"
+          style={{ color: album ? foreground : 'transparent' }}>
           {album?.displayName ?? '—'}
         </Text>
 
-        <View style={styles.actionRow}>
+        <View className="mt-1 flex-row items-center justify-center gap-12">
           <PressableFeedback
             onPress={() => router.push('/(theme-flow)/gallery')}
             animation={false}
             testID="theme-preview-theme-button">
             <PressableFeedback.Scale>
               <VStack align="center" spacing={6}>
-                <View style={[styles.actionButton, { backgroundColor: muted }]}>
+                <View
+                  className="h-12 w-12 items-center justify-center rounded-3xl"
+                  style={{ backgroundColor: muted }}>
                   <Icon name="mdi:palette" size={22} color={foreground} />
                 </View>
                 <Text size={12} medium style={{ color: foreground }}>
@@ -202,25 +205,3 @@ export function ThemePreviewScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  albumLabel: {
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 48,
-    marginTop: 4,
-  },
-  actionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -30,7 +30,7 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
       log.info('theme.background.album.tab', { album: tab });
       onSelect(tab);
     },
-    [onSelect],
+    [onSelect]
   );
 
   return (
@@ -38,20 +38,15 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.content}>
-        <View style={styles.row}>
+        contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 16 }}>
+        <View className="flex-row items-center gap-1.5">
           {tabs.map((tab) => {
             const isSelected = selectedTab === tab;
             return (
-              <Pressable
-                key={tab}
-                onPress={() => handlePress(tab)}
-                activeOpacity={0.7}>
+              <Pressable key={tab} onPress={() => handlePress(tab)} activeOpacity={0.7}>
                 <View
-                  style={[
-                    styles.pill,
-                    { backgroundColor: isSelected ? surfaceTertiary : surface },
-                  ]}>
+                  className="rounded-2xl px-3.5 py-2"
+                  style={{ backgroundColor: isSelected ? surfaceTertiary : surface }}>
                   <Text
                     style={{
                       fontFamily: 'OxygenBold',
@@ -69,20 +64,3 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
     </Log>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-});

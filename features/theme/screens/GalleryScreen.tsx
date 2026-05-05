@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback, useEffect } from 'react';
-import { FlatList, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { FlatList, ScrollView, useWindowDimensions } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { PressableFeedback } from 'heroui-native';
@@ -79,19 +79,19 @@ export function GalleryScreen() {
           contentContainerStyle={{ paddingBottom: 40, paddingTop: headerHeight + 8 }}
           showsVerticalScrollIndicator={false}>
           {byTopic.length === 0 ? (
-            <Text size={13} style={[styles.empty, { color: foreground }]}>
+            <Text size={13} className="mt-12 text-center opacity-50" style={{ color: foreground }}>
               Loading albums…
             </Text>
           ) : null}
           {byTopic.map((group) => (
-            <View key={group.key} style={styles.section}>
+            <View key={group.key} className="mt-5">
               <SectionHeader topic={group.topic} author={group.author} />
               <FlatList
                 horizontal
                 data={group.albums}
                 keyExtractor={(a) => a.slug}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.albumsRow}
+                contentContainerStyle={{ paddingHorizontal: SECTION_PADDING }}
                 renderItem={({ item }) => (
                   <AlbumCard
                     album={item}
@@ -122,14 +122,16 @@ function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor |
   }, [author?.pubkey]);
 
   return (
-    <HStack style={styles.sectionHeader}>
+    <HStack
+      className="mb-3 items-center justify-between"
+      style={{ paddingHorizontal: SECTION_PADDING }}>
       <HStack style={{ alignItems: 'center', gap: 10, flex: 1 }}>
         {author?.picture ? (
           <PressableFeedback onPress={openProfile} animation={false}>
             <PressableFeedback.Scale>
               <Image
                 source={{ uri: author.picture }}
-                style={styles.publisherAvatar}
+                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#333' }}
                 contentFit="cover"
               />
             </PressableFeedback.Scale>
@@ -201,29 +203,3 @@ function AlbumCard({
     </VStack>
   );
 }
-
-const styles = StyleSheet.create({
-  empty: {
-    textAlign: 'center',
-    marginTop: 48,
-    opacity: 0.5,
-  },
-  section: {
-    marginTop: 20,
-  },
-  sectionHeader: {
-    paddingHorizontal: SECTION_PADDING,
-    marginBottom: 12,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  publisherAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#333',
-  },
-  albumsRow: {
-    paddingHorizontal: SECTION_PADDING,
-  },
-});

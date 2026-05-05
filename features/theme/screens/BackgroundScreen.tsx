@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, useWindowDimensions } from 'react-native';
+import { FlatList, useWindowDimensions } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -117,8 +117,8 @@ export function BackgroundScreen() {
     <>
       <Stack.Screen options={{ title: 'Background' }} />
       <Screen name="BackgroundScreen" scroll="custom">
-        <View style={{ flex: 1, paddingTop: headerHeight }}>
-          <View style={styles.tabsWrap}>
+        <View className="flex-1" style={{ paddingTop: headerHeight }}>
+          <View className="justify-center" style={{ height: TABS_AREA_HEIGHT }}>
             <AlbumPillTabs
               tabs={tabLabels}
               selectedTab={selectedTabLabel}
@@ -147,7 +147,7 @@ export function BackgroundScreen() {
               ))}
             </PagerView>
           ) : (
-            <Text size={13} style={styles.empty}>
+            <Text size={13} className="mt-8 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
               Loading albums…
             </Text>
           )}
@@ -200,7 +200,7 @@ const AlbumPage = React.memo(function AlbumPage({
   );
 
   return (
-    <View key={slug} style={{ flex: 1 }}>
+    <View key={slug} className="flex-1">
       <FlatList
         data={themeNames}
         keyExtractor={(n) => n}
@@ -212,7 +212,7 @@ const AlbumPage = React.memo(function AlbumPage({
           paddingBottom: 48,
         }}
         ListEmptyComponent={
-          <Text size={13} style={styles.empty}>
+          <Text size={13} className="mt-8 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
             No wallpapers in this album yet.
           </Text>
         }
@@ -220,16 +220,4 @@ const AlbumPage = React.memo(function AlbumPage({
       />
     </View>
   );
-});
-
-const styles = StyleSheet.create({
-  tabsWrap: {
-    height: TABS_AREA_HEIGHT,
-    justifyContent: 'center',
-  },
-  empty: {
-    color: 'rgba(255,255,255,0.4)',
-    textAlign: 'center',
-    marginTop: 32,
-  },
 });

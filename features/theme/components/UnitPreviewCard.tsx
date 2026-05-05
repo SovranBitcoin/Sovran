@@ -63,11 +63,8 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   const card = (
     <View
       testID={testID}
-      style={[
-        styles.frame,
-        { width, height },
-        selected && [styles.frameSelected, { borderColor: foreground }],
-      ]}>
+      className="overflow-hidden rounded-3xl bg-[#1a1a1a]"
+      style={[{ width, height }, selected && { borderWidth: 2, borderColor: foreground }]}>
       {imageSource ? (
         <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
       ) : palette ? (
@@ -86,15 +83,15 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
       )}
 
       {/* Phone-frame chrome mocks */}
-      <VStack style={styles.chrome} spacing={12}>
-        <View style={styles.notch} />
+      <VStack className="absolute left-4 right-4 top-4 items-center" spacing={12}>
+        <View className="h-[10px] w-[72px] rounded-[5px] bg-white/35" />
         {label ? (
-          <View style={styles.labelWrap}>
-            <Text size={13} bold style={styles.label}>
+          <View className="items-center gap-0.5">
+            <Text size={13} bold style={{ color: '#fff' }}>
               {label}
             </Text>
             {sublabel ? (
-              <Text size={10} style={styles.sublabel}>
+              <Text size={10} style={{ color: 'rgba(255,255,255,0.7)' }}>
                 {sublabel}
               </Text>
             ) : null}
@@ -102,10 +99,10 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
         ) : null}
       </VStack>
 
-      <View style={styles.bottomBar} />
+      <View className="absolute bottom-4 left-4 right-4 h-14 rounded-xl bg-black/25" />
 
       {badge ? (
-        <View style={styles.badge}>
+        <View className="absolute right-2.5 top-2.5 rounded-[10px] bg-[#EF4444] px-2 py-[3px]">
           <Text size={10} bold style={{ color: '#fff' }}>
             {badge}
           </Text>
@@ -121,56 +118,4 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
       <PressableFeedback.Scale>{card}</PressableFeedback.Scale>
     </PressableFeedback>
   );
-});
-
-const styles = StyleSheet.create({
-  frame: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-  },
-  frameSelected: {
-    borderWidth: 2,
-  },
-  chrome: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    alignItems: 'center',
-  },
-  notch: {
-    width: 72,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  labelWrap: {
-    alignItems: 'center',
-    gap: 2,
-  },
-  label: {
-    color: '#fff',
-  },
-  sublabel: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
-  badge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    backgroundColor: '#EF4444',
-  },
 });

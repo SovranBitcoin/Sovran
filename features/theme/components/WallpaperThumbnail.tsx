@@ -63,11 +63,8 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
       style={{ width, height }}>
       <PressableFeedback.Scale>
         <View
-          style={[
-            styles.card,
-            { width, height },
-            selected && [styles.cardSelected, { borderColor: foreground }],
-          ]}>
+          className="overflow-hidden rounded-2xl bg-[#1a1a1a]"
+          style={[{ width, height }, selected && { borderWidth: 2, borderColor: foreground }]}>
           {imageSource ? (
             <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
           ) : paletteColors ? (
@@ -86,7 +83,7 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
           )}
 
           {inProgress && (
-            <View style={styles.progressOverlay}>
+            <View className="absolute inset-0 items-center justify-center bg-black/60">
               <Text size={14} bold style={{ color: '#fff' }}>
                 {Math.round((activeDownloadProgress ?? 0) * 100)}%
               </Text>
@@ -94,13 +91,13 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
           )}
 
           {showPlayBadge && !inProgress && (
-            <View style={styles.playBadge}>
+            <View className="absolute bottom-2 right-2 h-7 w-7 items-center justify-center rounded-[14px] bg-black/55">
               <Icon name="mdi:play" size={16} color="#fff" />
             </View>
           )}
 
           {!downloaded && entry && !inProgress && (
-            <View style={styles.downloadBadge}>
+            <View className="absolute right-2 top-2 h-6 w-6 items-center justify-center rounded-xl bg-black/50">
               <Icon name="mdi:cloud-download-outline" size={12} color="#fff" />
             </View>
           )}
@@ -108,43 +105,4 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
       </PressableFeedback.Scale>
     </PressableFeedback>
   );
-});
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-  },
-  cardSelected: {
-    borderWidth: 2,
-  },
-  progressOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  downloadBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });
