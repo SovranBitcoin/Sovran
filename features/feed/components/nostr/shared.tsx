@@ -21,6 +21,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { nip19 } from 'nostr-tools';
 import { Metadata, ShortTextNote, Repost, GenericRepost } from 'nostr-tools/kinds';
+import { decode as bolt11Decode } from '@gandlaf21/bolt11-decode';
 import { log } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
 import { openLinkFailedPopup } from '@/shared/lib/popup/popups/general';
@@ -89,7 +90,7 @@ export type RelayMessage =
 // Constants
 // ============================================================================
 
-export const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
+const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
 export const DEFAULT_METRICS: NoteMetrics = Object.freeze({
   likeCount: 0,
   repostCount: 0,
@@ -102,13 +103,22 @@ export const PRIMAL_KIND_NOTE_STATS = 10000100;
 export const PRIMAL_KIND_MENTIONS = 10000107;
 export const PRIMAL_KIND_FEED_RANGE = 10000113;
 
-export const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i;
-export const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?.*)?$/i;
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i;
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?.*)?$/i;
 
-const LIGHTNING_INVOICE_REGEX = /\b(lnbc[a-z0-9]{20,})\b/gi;
-const HASHTAG_REGEX = /#([a-zA-Z][a-zA-Z0-9_]*)/g;
-const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi;
-const NOSTR_URI_REGEX = /nostr:(npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]+/gi;
+// Bounded quantifiers protect parseContent against adversarial relay content
+// allocating arbitrarily large match strings: bolt11 invoices never exceed
+// ~700 chars in practice, URLs cap at 2KB, hashtags at 32 chars.
+const LIGHTNING_INVOICE_REGEX = /\b(lnbc[a-z0-9]{20,700})\b/gi;
+const HASHTAG_REGEX = /#([a-zA-Z][a-zA-Z0-9_]{0,31})/g;
+const URL_REGEX = /https?:\/\/[^\s<>"')\]]{1,2048}/gi;
+const NOSTR_URI_REGEX = /nostr:(npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]{1,512}/gi;
+
+// Sanity ceiling on raw note content. Public Nostr DM limits and the Primal
+// pipeline already drop oversize events; this is the defensive client-side
+// bound that keeps parseContent and _contentCache from retaining hostile
+// inputs beyond the cap.
+const MAX_FEED_CONTENT_LEN = 32_768;
 
 // ============================================================================
 // Utility functions
@@ -161,6 +171,9 @@ const _CONTENT_CACHE_MAX = 300;
 const _npubCache = new Map<string, string>();
 
 export function parseContent(raw: string): ContentSegment[] {
+  if (raw.length > MAX_FEED_CONTENT_LEN) {
+    return [{ kind: 'text', text: raw.slice(0, MAX_FEED_CONTENT_LEN) }];
+  }
   const cached = _contentCache.get(raw);
   if (cached) return cached;
   const result = _parseContentInner(raw);
@@ -377,11 +390,16 @@ export function normalizeFeedEvent(value: unknown): FeedEvent | null {
     return null;
   }
 
+  const content =
+    input.content.length > MAX_FEED_CONTENT_LEN
+      ? input.content.slice(0, MAX_FEED_CONTENT_LEN) + '…'
+      : input.content;
+
   return {
     id: input.id,
     kind: input.kind,
     pubkey: input.pubkey,
-    content: input.content,
+    content,
     created_at: input.created_at,
     tags: input.tags.filter(Array.isArray) as string[][],
   };
@@ -710,6 +728,22 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
 
 export const VideoBlock = VideoBlockInner;
 
+// Decode the bolt11 once at memo time. A meltTarget that fails decoding is
+// rendered as a non-tappable "Invalid Lightning invoice" chip so a relay-
+// supplied lnbc-shaped string can never reach `machine.execute`. When decode
+// succeeds, the chip surfaces the amount so the user knows what they're
+// tapping into before the payment machine takes over.
+function decodeFeedInvoice(invoice: string): { amountSat: number | null } | null {
+  try {
+    const decoded = bolt11Decode(invoice);
+    const msats = decoded?.sections?.find((s: { name?: string }) => s?.name === 'amount')?.value;
+    const sats = typeof msats === 'string' ? Number(msats) / 1000 : Number(msats ?? 0) / 1000;
+    return { amountSat: Number.isFinite(sats) && sats > 0 ? sats : null };
+  } catch {
+    return null;
+  }
+}
+
 export const LightningBlock = React.memo(function LightningBlock({
   meltTarget,
 }: {
@@ -722,6 +756,34 @@ export const LightningBlock = React.memo(function LightningBlock({
   ] as const);
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
+  const decoded = useMemo(() => decodeFeedInvoice(meltTarget), [meltTarget]);
+
+  if (!decoded) {
+    return (
+      <View
+        style={[
+          sharedStyles.mediaCard,
+          { backgroundColor: surface, borderColor: surfaceTertiary },
+        ]}>
+        <HStack align="center" gap={8}>
+          <Icon name="mingcute:lightning-fill" size={20} color={opacity(foreground, 0.2)} />
+          <VStack style={sharedStyles.flex1}>
+            <Text bold size={13} style={{ color: opacity(foreground, 0.4) }}>
+              Invalid Lightning invoice
+            </Text>
+            <Text size={11} numberOfLines={1} style={{ color: opacity(foreground, 0.25) }}>
+              {meltTarget.slice(0, 30)}…
+            </Text>
+          </VStack>
+        </HStack>
+      </View>
+    );
+  }
+
+  const subtitle =
+    decoded.amountSat !== null
+      ? `${decoded.amountSat.toLocaleString()} sats`
+      : `${meltTarget.slice(0, 30)}…`;
 
   return (
     <Pressable
@@ -736,7 +798,7 @@ export const LightningBlock = React.memo(function LightningBlock({
             Lightning Invoice
           </Text>
           <Text size={11} numberOfLines={1} style={{ color: opacity(foreground, 0.33) }}>
-            {meltTarget.slice(0, 30)}…
+            {subtitle}
           </Text>
         </VStack>
         <Icon name="mdi:chevron-right" size={18} color={opacity(foreground, 0.33)} />
@@ -1403,7 +1465,7 @@ export interface FeedParseResult {
 // Shared feed helpers
 // ============================================================================
 
-export function getEmbeddedRepostEvent(
+function getEmbeddedRepostEvent(
   repostEvent: FeedEvent,
   expectedEventId?: string
 ): FeedEvent | undefined {
