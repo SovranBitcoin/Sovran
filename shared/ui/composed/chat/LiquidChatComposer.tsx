@@ -19,9 +19,12 @@ import {
   Animation,
   animation,
   buttonStyle,
+  disabled as disabledModifier,
   frame,
   glassEffect,
   glassEffectId,
+  opacity as swiftOpacity,
+  scaleEffect,
 } from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 
@@ -70,6 +73,14 @@ interface LiquidChatComposerProps {
 const BUTTON_SIZE = 44;
 const ICON_SIZE = 20;
 const GAP = 8;
+/**
+ * Spring tuned to match SwiftUI's `.bouncy(duration: 0.4, extraBounce: 0.15)`.
+ * `bounce: 0.45` is the iOS-17+ name for the spring's overshoot, which is
+ * what produces the "appears small and grows" feel on the trailing send
+ * button. A heavily-damped spring (`dampingFraction: 0.8`, ≈ `.smooth`)
+ * lands without any overshoot, which is why the previous version felt flat.
+ */
+const SEND_SPRING = Animation.spring({ duration: 0.4, bounce: 0.45 });
 /** Vertical padding inside the input bubble (top + bottom together). */
 const INPUT_VPAD = 12;
 /** Floor for the row height — keeps the input the same height as the
@@ -265,24 +276,21 @@ export function LiquidChatComposer({
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
             matchContents={false}>
             <Namespace id={namespaceId}>
-              <GlassEffectContainer spacing={GAP}>
+              {/* spacing > HStack gap so neighboring glass shapes are within
+                  the merge threshold and SwiftUI can blend them when the
+                  trailing [→] grows in. */}
+              <GlassEffectContainer spacing={20}>
                 <SwiftUIHStack
                   alignment="bottom"
                   spacing={GAP}
-                  modifiers={[
-                    frame({ maxWidth: Infinity, maxHeight: Infinity }),
-                    // SwiftUI's GlassEffectContainer + glassEffectId only
-                    // morph between glass shapes when the parent has an
-                    // animation context keyed to the toggling state. Without
-                    // this the conditional [→] mount/unmount snaps instantly.
-                    // Spring matches the WWDC25 demo cadence for the
-                    // composer-style send-button morph.
-                    animation(
-                      Animation.spring({ response: 0.45, dampingFraction: 0.8 }),
-                      trimmedHasText
-                    ),
-                  ]}>
-                  {/* Leading [+] glass button */}
+                  modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity })]}>
+                  {/* Leading [+] glass button. The animation modifier is
+                      attached to every glass child watching the same boolean
+                      so they all re-evaluate inside the same animated
+                      transaction — this is the @expo/ui equivalent of
+                      SwiftUI's `withAnimation { state.toggle() }` since the
+                      JS-side state change can't span an animation block on
+                      its own. */}
                   <SwiftUIButton
                     modifiers={[
                       buttonStyle('glass'),
@@ -292,6 +300,7 @@ export function LiquidChatComposer({
                         glass: { variant: 'regular', tint: accentTint, interactive: true },
                       }),
                       glassEffectId('plus', namespaceId),
+                      animation(SEND_SPRING, trimmedHasText),
                     ]}
                     onPress={disabled ? () => {} : handlePlusPress}>
                     <SwiftUIHStack
@@ -314,46 +323,61 @@ export function LiquidChatComposer({
                         glass: { variant: 'regular', tint: inputTint, interactive: false },
                       }),
                       glassEffectId('input', namespaceId),
+                      animation(SEND_SPRING, trimmedHasText),
                     ]}>
                     <SwiftUISpacer />
                   </SwiftUIHStack>
 
-                  {/* Trailing [→] — mounted only when text exists; SwiftUI
-                      morphs the glass surface in/out automatically thanks
-                      to the shared GlassEffectContainer + glassEffectId. */}
-                  {trimmedHasText ? (
-                    <SwiftUIButton
+                  {/* Trailing [→] glass button. ALWAYS rendered — toggling
+                      its presence via React unmount bypasses SwiftUI's
+                      animation transaction and you get a hard pop instead
+                      of the bounce-in. Instead we collapse it to width=0,
+                      scale=0, opacity=0 when the input is empty, and let
+                      the bouncy spring (`bounce: 0.45`) drive the scale +
+                      width interpolation so the button "appears small and
+                      gets bigger" the way Apple's Messages composer does.
+                      The matched-geometry seam to the input capsule comes
+                      from sharing a GlassEffectContainer + glassEffectId
+                      namespace; the `disabledModifier` blocks taps while
+                      the button is collapsed. */}
+                  <SwiftUIButton
+                    modifiers={[
+                      buttonStyle('glass'),
+                      frame({
+                        width: trimmedHasText ? BUTTON_SIZE : 0,
+                        height: BUTTON_SIZE,
+                      }),
+                      scaleEffect(trimmedHasText ? 1 : 0),
+                      swiftOpacity(trimmedHasText ? 1 : 0),
+                      glassEffect({
+                        shape: 'circle',
+                        glass: {
+                          variant: 'regular',
+                          tint: accentTint,
+                          interactive: canSend,
+                        },
+                      }),
+                      glassEffectId('send', namespaceId),
+                      disabledModifier(!canSend),
+                      animation(SEND_SPRING, trimmedHasText),
+                    ]}
+                    onPress={canSend ? handleSendPress : () => {}}>
+                    <SwiftUIHStack
+                      alignment="center"
                       modifiers={[
-                        buttonStyle('glass'),
-                        frame({ width: BUTTON_SIZE, height: BUTTON_SIZE }),
-                        glassEffect({
-                          shape: 'circle',
-                          glass: {
-                            variant: 'regular',
-                            tint: accentTint,
-                            interactive: canSend,
-                          },
+                        frame({
+                          maxWidth: Infinity,
+                          maxHeight: Infinity,
+                          alignment: 'center',
                         }),
-                        glassEffectId('send', namespaceId),
-                      ]}
-                      onPress={canSend ? handleSendPress : () => {}}>
-                      <SwiftUIHStack
-                        alignment="center"
-                        modifiers={[
-                          frame({
-                            maxWidth: Infinity,
-                            maxHeight: Infinity,
-                            alignment: 'center',
-                          }),
-                        ]}>
-                        <SwiftUIImage
-                          systemName={'arrow.up' as never}
-                          size={ICON_SIZE}
-                          color="#FFFFFF"
-                        />
-                      </SwiftUIHStack>
-                    </SwiftUIButton>
-                  ) : null}
+                      ]}>
+                      <SwiftUIImage
+                        systemName={'arrow.up' as never}
+                        size={ICON_SIZE}
+                        color="#FFFFFF"
+                      />
+                    </SwiftUIHStack>
+                  </SwiftUIButton>
                 </SwiftUIHStack>
               </GlassEffectContainer>
             </Namespace>
