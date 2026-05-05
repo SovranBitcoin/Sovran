@@ -374,8 +374,8 @@
       ],
       "verification_note": "Confirmed via npm run lint output: 11 import/first violations across the subtree.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "InitializationGate.tsx places its initLog calls inside the function body (no import/first violation). The three rewritten gate wrappers (LegacyMigrationGate, GlobalMigrationGate, MigrationGate) still keep the legacy `initLog('Module', 'X loaded')` after-imports placement so that grep-for-Module log channel coverage doesn't change shape mid-refactor. AppGate, ActionMenuHost, PopupHost still violate; out of scope for this slice."
+      "completion_status": "complete",
+      "completion_note": "Closes the AppGate / ActionMenuHost / PopupHost follow-up that the prior slice flagged out-of-scope. Side-effect statement (initLog or log.child) moved below the import block in every remaining offender; ActionMenuHost's prettier-driven SectionAnchorList consolidation rolled in passively. PopupHost was already clean from a prior slice."
     },
     {
       "id": "F-015",
