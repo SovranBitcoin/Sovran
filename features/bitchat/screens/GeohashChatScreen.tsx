@@ -120,6 +120,27 @@ export function GeohashChatScreen({
   // Precompute grouping: consecutive messages from the same sender form a group
   const groupingMap = useMessageGrouping(messages);
 
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatMessage }) => {
+      const group = groupingMap.get(item.id);
+      return (
+        <ChatMessageBubble
+          message={{
+            id: item.id,
+            content: item.content,
+            senderId: item.senderId,
+            sender: item.sender,
+            timestamp: item.timestamp,
+            isOwn: item.isOwn,
+          }}
+          isFirstInGroup={group?.isFirst ?? true}
+          isLastInGroup={group?.isLast ?? true}
+        />
+      );
+    },
+    [groupingMap]
+  );
+
   const handleSendMessageInner = useCallback(async () => {
     const text = messageText.trim();
     if (!text || isSending) return;
@@ -257,23 +278,7 @@ export function GeohashChatScreen({
             onContentSizeChange={handleListContentSize}
             onScroll={handleListScroll}
             scrollEventThrottle={120}
-            renderItem={({ item }: { item: ChatMessage }) => {
-              const group = groupingMap.get(item.id);
-              return (
-                <ChatMessageBubble
-                  message={{
-                    id: item.id,
-                    content: item.content,
-                    senderId: item.senderId,
-                    sender: item.sender,
-                    timestamp: item.timestamp,
-                    isOwn: item.isOwn,
-                  }}
-                  isFirstInGroup={group?.isFirst ?? true}
-                  isLastInGroup={group?.isLast ?? true}
-                />
-              );
-            }}
+            renderItem={renderMessage}
             keyExtractor={(item: ChatMessage) => item.id}
             initialScrollAtEnd
             maintainScrollAtEnd

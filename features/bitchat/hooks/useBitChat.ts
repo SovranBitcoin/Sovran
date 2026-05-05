@@ -215,13 +215,18 @@ export function useBitChat(
   //  Nostr public chat — transport === 'nostr'
   // ===========================================================
 
+  // `nickname` is deliberately not in this effect's deps: the public-nostr
+  // setup path does not pass it to startNostr/joinGeohash, and it's only
+  // stamped on outbound messages by sendMessage. Including it would tear
+  // down and rebuild the subscription on every kind:0 metadata refresh,
+  // wiping the visible message buffer.
   useEffect(() => {
     if (transport !== 'nostr') return;
     if (!geohash) return;
 
     let cancelled = false;
 
-    bitchatLog.info('bitchat.hook.setup', { geohash, hasNickname: !!nickname });
+    bitchatLog.info('bitchat.hook.setup', { geohash });
 
     const sub = addNostrMessageListener((event: NostrMessageEvent) => {
       if (event.geohash !== geohash) return;
@@ -264,7 +269,7 @@ export function useBitChat(
       // leaveGeohash() during teardown.
       setIsConnected(false);
     };
-  }, [geohash, transport, nickname]);
+  }, [geohash, transport]);
 
   // ===========================================================
   //  Nostr DM — transport === 'nostr-dm'
@@ -321,7 +326,8 @@ export function useBitChat(
       // Don't leave the geohash — other screens may be using it.
       setIsConnected(false);
     };
-  }, [transport, dmPeerID, geohash, nickname]);
+    // `nickname` is omitted for the same reason as the public-nostr effect.
+  }, [transport, dmPeerID, geohash]);
 
   // ===========================================================
   //  Send

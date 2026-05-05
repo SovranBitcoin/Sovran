@@ -7,7 +7,7 @@
  * Schnorr key at the route boundary.
  */
 
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   ScrollView,
   StatusBar,
@@ -506,6 +506,20 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   const myName = myProfile.displayName;
   const shouldShowAvatarLoading = isMetadataLoading && !counterpartyMetadata;
 
+  const renderMessage = useCallback(
+    ({ item }: { item: DmMessage }) => (
+      <MessageBubble
+        message={item}
+        isMe={item.sender === 'me'}
+        userPicture={item.sender === 'other' ? userPicture : undefined}
+        userName={displayName}
+        myName={myName}
+        isLoadingMetadata={shouldShowAvatarLoading}
+      />
+    ),
+    [userPicture, displayName, myName, shouldShowAvatarLoading]
+  );
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -912,16 +926,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
               onContentSizeChange={handleListContentSize}
               onScroll={handleListScroll}
               scrollEventThrottle={120}
-              renderItem={({ item }: { item: DmMessage }) => (
-                <MessageBubble
-                  message={item}
-                  isMe={item.sender === 'me'}
-                  userPicture={item.sender === 'other' ? userPicture : undefined}
-                  userName={displayName}
-                  myName={myName}
-                  isLoadingMetadata={shouldShowAvatarLoading}
-                />
-              )}
+              renderItem={renderMessage}
               keyExtractor={(item: DmMessage) => item.id}
               initialScrollAtEnd
               maintainScrollAtEnd

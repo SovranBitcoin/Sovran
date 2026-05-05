@@ -75,6 +75,20 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   const bubbleMessages: ChatBubbleMessage[] = messages.map(toBubble);
   const groupingMap = useMessageGrouping(bubbleMessages);
 
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatBubbleMessage }) => {
+      const group = groupingMap.get(item.id);
+      return (
+        <ChatMessageBubble
+          message={item}
+          isFirstInGroup={group?.isFirst ?? true}
+          isLastInGroup={group?.isLast ?? true}
+        />
+      );
+    },
+    [groupingMap]
+  );
+
   const perfSurface = 'whitenoise';
   const { handleListLayout, handleListContentSize, handleListScroll } = useChatSurfacePerfLogger({
     log: wnLog,
@@ -108,16 +122,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
             onContentSizeChange={handleListContentSize}
             onScroll={handleListScroll}
             scrollEventThrottle={120}
-            renderItem={({ item }: { item: ChatBubbleMessage }) => {
-              const group = groupingMap.get(item.id);
-              return (
-                <ChatMessageBubble
-                  message={item}
-                  isFirstInGroup={group?.isFirst ?? true}
-                  isLastInGroup={group?.isLast ?? true}
-                />
-              );
-            }}
+            renderItem={renderMessage}
             keyExtractor={(item: ChatBubbleMessage) => item.id}
             initialScrollAtEnd
             maintainScrollAtEnd
