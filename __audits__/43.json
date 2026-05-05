@@ -307,8 +307,8 @@
       "references": [],
       "verification_note": "Greps confirm 5 sites for #0A84FF (3 in splitBill, 2 in detail/summary), 1 site for #F7931A in ParticipantCard. The ParticipantCard comment explicitly notes the cross-file duplication exists.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "BLUETOOTH_ACCENT consolidated into shared/lib/brandColors.ts and imported across participants/detail/summary. BTC_ORANGE left as a local named constant in ParticipantCard.tsx — the existing fileoverview comment justifies the literal (legibility on seeded gradients) and the value matches orange-300."
+      "completion_status": "complete",
+      "completion_note": "BITCOIN_ACCENT added to shared/lib/brandColors.ts; map feature (MerchantDetail/MapScreen/StatsCard/categories.ts) and ParticipantCard now import the token. No raw '#F7931A' literals remain in the slice subtree."
     },
     {
       "id": "F-012",
