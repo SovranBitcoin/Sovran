@@ -1,4 +1,4 @@
-import React, { useCallback, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   Platform,
   TextInput,
@@ -11,19 +11,31 @@ import {
   Button as SwiftUIButton,
   HStack as SwiftUIHStack,
   Image as SwiftUIImage,
-  Spacer as SwiftUISpacer,
+  TextField as SwiftUITextField,
+  type TextFieldRef,
   Namespace,
   GlassEffectContainer,
 } from '@expo/ui/swift-ui';
 import {
   Animation,
   animation,
+  autocorrectionDisabled as swiftAutocorrectionDisabled,
   buttonStyle,
+  contentShape,
   disabled as disabledModifier,
+  font,
+  foregroundStyle,
   frame,
+  glassEffect,
   glassEffectId,
+  onSubmit as onSubmitModifier,
+  onTapGesture,
   opacity as swiftOpacity,
+  padding,
   scaleEffect,
+  shapes,
+  submitLabel,
+  textInputAutocapitalization,
 } from '@expo/ui/swift-ui/modifiers';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -41,10 +53,10 @@ interface LiquidChatComposerProps {
   placeholder?: string;
   /**
    * Tap handler for the leading [+] glass button. The glyph is fixed
-   * (`mdi:plus`) — the action varies per surface (UserMessages can open an
-   * attachment picker; BitChat / WhiteNoise can attach a Cashu token, etc.).
-   * When omitted the button still renders so the visual stays consistent
-   * across surfaces, but pressing it is a no-op.
+   * (`mdi:plus` / SF `plus`) — the action varies per surface (UserMessages
+   * can open an attachment picker; BitChat / WhiteNoise can attach a Cashu
+   * token, etc.). When omitted the button still renders so the visual stays
+   * consistent across surfaces, but pressing it is a no-op.
    */
   onPlusPress?: () => void;
   /**
@@ -75,13 +87,16 @@ const GAP = 10;
  * `bounce: 0.45` is the iOS-17+ name for the spring's overshoot, which is
  * what produces the "appears small and grows" feel on the trailing send
  * button. A heavily-damped spring (`dampingFraction: 0.8`, ≈ `.smooth`)
- * lands without any overshoot, which is why the previous version felt flat.
+ * lands without any overshoot, which is why earlier revs felt flat.
  */
 const SEND_SPRING = Animation.spring({ duration: 0.4, bounce: 0.45 });
-/** Vertical padding inside the input bubble (top + bottom together). */
+
+// Fallback-only constants. The SwiftUI `TextField` handles its own intrinsic
+// sizing, so the iOS 26+ path doesn't need a content-driven row height — the
+// bubble is fixed at `BUTTON_SIZE` (single-line input). Multi-line growth on
+// the SwiftUI path can be added later via `axis="vertical"` + `lineLimit` and
+// switching the Host to `matchContents`.
 const INPUT_VPAD = 12;
-/** Floor for the row height — keeps the input the same height as the
- *  buttons when the TextInput is empty / single-line. */
 const MIN_ROW_HEIGHT = BUTTON_SIZE;
 const MAX_ROW_HEIGHT = 140;
 
@@ -89,20 +104,26 @@ const MAX_ROW_HEIGHT = 140;
  * Liquid-glass DM-surface composer. Three glass shapes laid out
  * left-to-right — leading [+] circle, middle text input capsule,
  * trailing [→] circle (visible only while the input has content).
- * Plain regular-glass material on all three (no tint) — tinting the
- * material colorizes the entire shape, which gives Apple's stock
- * messaging composer its washed-out look. Money + voice icons render
- * inside the input on the right while the input is empty.
  *
- * On iOS 26+ all three glass shapes live inside a single SwiftUI `Host`
- * wrapped in `Namespace` + `GlassEffectContainer`, with `glassEffectId`
- * per shape. SwiftUI animates the morph automatically when the trailing
- * [→] mounts/unmounts on text-empty toggles. The RN `TextInput` overlays
- * the middle region only — taps in the button regions fall through to
- * the SwiftUI buttons below.
+ * **iOS 26+ path** is pure SwiftUI: the input bubble is a real
+ * `SwiftUI.TextField` rendered inside the same `Host` as the [+] / [→]
+ * buttons, all wrapped in `Namespace` + `GlassEffectContainer` so the
+ * morph between empty and "has text" animates via matched-geometry. No
+ * RN `TextInput` overlay, no row-height feedback loop, no placeholder
+ * baseline mismatch — SwiftUI handles its own placeholder rendering,
+ * focus, and submit. Padding-edge taps focus the field via a capsule
+ * `contentShape` + `onTapGesture` on the bubble.
  *
- * Older iOS / Android fall back to the standard `<View blur />` primitive
- * (no morph; buttons are RN Pressables).
+ * The SwiftUI `TextField` is *uncontrolled* (it reads `defaultValue`
+ * only at mount). To keep it in sync with the parent's `value` prop we
+ * watch for divergence between the prop and the last value SwiftUI
+ * reported, and bump a `key` to remount the field on external clears
+ * (typically: parent calls `onSend` then resets `value` to `''`).
+ *
+ * **Older iOS / Android** fall back to an RN multiline `TextInput`
+ * overlaid on a `View blur` capsule. No glass morph; [→] simply
+ * mounts/unmounts. The fallback keeps its content-driven row height
+ * because RN's `TextInput` has no intrinsic vertical sizing without it.
  *
  * Used by the bitchat / nostr-DM / whitenoise screens via `ChatScreen`.
  * The AI tab mounts `ChatComposer` directly and is intentionally not
@@ -133,33 +154,58 @@ export function LiquidChatComposer({
   const isEmpty = value.length === 0;
   const useNativeGlass = Platform.OS === 'ios' && supportsLiquidGlass();
 
-  // Stable namespace id — required by SwiftUI's `glassEffectId(_:in:)` so
-  // the system can match shapes across renders and animate the morph.
-  // `useId` gives one per component instance; remounts get a fresh id,
-  // which is exactly what we want.
+  // Stable namespace id for `glassEffectId(_:in:)` matched-geometry. `useId`
+  // gives one per component instance; a fresh id on remount is the desired
+  // behavior (no morph carry-over between mounts).
   const namespaceId = useId();
 
-  // Content-driven height: the multiline `TextInput` reports its intrinsic
-  // height via `onContentSizeChange`. Empty input ≈ one line — we clamp to
-  // `MIN_ROW_HEIGHT` so the input bubble matches the button height. Filled
-  // input grows up to `MAX_ROW_HEIGHT`. Without this the wrapper used
-  // `minHeight: 44` and the multiline default intrinsic height drew the
-  // bubble TALLER than the buttons.
+  // SwiftUI `TextField` sync. The native field is uncontrolled — it reads
+  // `defaultValue` only at mount and reports edits via `onValueChange`. We
+  // mirror its current text in a ref and bump `resetKey` whenever the prop
+  // diverges from the last reported value, which remounts the field with a
+  // fresh `defaultValue`. Internal keystrokes update the ref synchronously
+  // before the `onChangeText` round-trip lands, so the resulting prop
+  // change is a no-op (`value === lastSwiftValueRef.current`) and the key
+  // doesn't bump on every character.
+  const lastSwiftValueRef = useRef(value);
+  const [resetKey, setResetKey] = useState(0);
+  useEffect(() => {
+    if (value !== lastSwiftValueRef.current) {
+      lastSwiftValueRef.current = value;
+      setResetKey((k) => k + 1);
+    }
+  }, [value]);
+  const handleSwiftValueChange = useCallback(
+    (text: string) => {
+      lastSwiftValueRef.current = text;
+      onChangeText(text);
+    },
+    [onChangeText]
+  );
+
+  // Imperative ref so taps on the capsule's padding edges (outside the
+  // TextField's intrinsic content rect) can focus the field — see the
+  // `onTapGesture(focusTextField)` on the bubble below.
+  const textFieldRef = useRef<TextFieldRef>(null);
+  const focusTextField = useCallback(() => {
+    textFieldRef.current?.focus();
+  }, []);
+
+  // Fallback-only state: the RN multiline `TextInput` reports its intrinsic
+  // height via `onContentSizeChange`. We clamp to `MIN_ROW_HEIGHT` so the
+  // bubble matches the buttons when empty / single-line, and cap at
+  // `MAX_ROW_HEIGHT` for very long input. The SwiftUI path doesn't use this.
   const [contentHeight, setContentHeight] = useState(0);
   const handleContentSizeChange = useCallback(
     (e: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
-      const h = e.nativeEvent.contentSize.height;
-      // Round to nearest pt to avoid sub-pixel re-layout loops on iOS.
-      setContentHeight(Math.round(h));
+      setContentHeight(Math.round(e.nativeEvent.contentSize.height));
     },
     []
   );
-  const rowHeight = Math.min(Math.max(contentHeight + INPUT_VPAD, MIN_ROW_HEIGHT), MAX_ROW_HEIGHT);
-
-  const textInputRef = useRef<TextInput>(null);
-  const focusTextInput = useCallback(() => {
-    textInputRef.current?.focus();
-  }, []);
+  const fallbackRowHeight = Math.min(
+    Math.max(contentHeight + INPUT_VPAD, MIN_ROW_HEIGHT),
+    MAX_ROW_HEIGHT
+  );
 
   const lastLayoutRef = useRef<{ height: number; width: number } | null>(null);
   const handleLayout = useCallback(
@@ -194,6 +240,187 @@ export function LiquidChatComposer({
     onPlusPress?.();
   }, [surface, onPlusPress]);
 
+  if (useNativeGlass) {
+    return (
+      <View
+        onLayout={handleLayout}
+        style={{
+          paddingHorizontal: 12,
+          paddingTop: 8,
+          paddingBottom: bottomPadding,
+        }}>
+        <Host
+          style={{ width: '100%', height: BUTTON_SIZE }}
+          matchContents={false}>
+          <Namespace id={namespaceId}>
+            {/* `spacing={0}` is the glass *merge threshold* — when the
+                nearest edges of two glass shapes are closer than this, the
+                system blends them into a single liquid-metaball blob. We
+                want the [+] / input / [→] visually distinct in steady
+                state, so spacing=0; the bounce-in / morph still animates
+                because that's driven by `glassEffectId` matched-geometry,
+                not by the blend threshold. */}
+            <GlassEffectContainer spacing={0}>
+              <SwiftUIHStack
+                alignment="center"
+                spacing={GAP}
+                modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity })]}>
+                {/* Leading [+] glass button. `buttonStyle('glass')` provides
+                    BOTH the visible glass material AND the built-in liquid
+                    press animation — stacking an explicit `glassEffect()`
+                    on top draws a doubled concentric ring on press, so we
+                    don't. The shared `animation(SEND_SPRING, trimmedHasText)`
+                    on every glass child re-evaluates inside one transaction
+                    when the boolean flips, which is the @expo/ui equivalent
+                    of `withAnimation { state.toggle() }` in SwiftUI. */}
+                <SwiftUIButton
+                  modifiers={[
+                    buttonStyle('glass'),
+                    frame({ width: BUTTON_SIZE, height: BUTTON_SIZE }),
+                    glassEffectId('plus', namespaceId),
+                    animation(SEND_SPRING, trimmedHasText),
+                  ]}
+                  onPress={disabled ? () => {} : handlePlusPress}>
+                  <SwiftUIHStack
+                    alignment="center"
+                    modifiers={[
+                      frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
+                    ]}>
+                    <SwiftUIImage
+                      systemName={'plus' as never}
+                      size={ICON_SIZE}
+                      color="#FFFFFF"
+                    />
+                  </SwiftUIHStack>
+                </SwiftUIButton>
+
+                {/* Middle input — glass capsule HStack containing a real
+                    SwiftUI `TextField`. The capsule itself is NOT a button:
+                    `buttonStyle('glass')` adds intrinsic padding around its
+                    content that won't compress when the frame width is
+                    flexible, which previously blew the bubble up to ~110pt.
+                    `glassEffect()` directly on the HStack gives us the same
+                    material with the frame `height: BUTTON_SIZE` honored,
+                    and `glass.interactive: true` opts the shape into Apple's
+                    liquid press feedback — the exact same morph animation
+                    `buttonStyle('glass')` runs internally — without the
+                    button-style sizing semantics. Padding-edge taps focus
+                    the field via `contentShape` + `onTapGesture` (without
+                    `contentShape` only the visible glyph areas would be
+                    hit-testable). */}
+                <SwiftUIHStack
+                  alignment="center"
+                  spacing={6}
+                  modifiers={[
+                    frame({ maxWidth: Infinity, height: BUTTON_SIZE, alignment: 'center' }),
+                    glassEffect({
+                      shape: 'capsule',
+                      glass: { variant: 'regular', interactive: true },
+                    }),
+                    glassEffectId('input', namespaceId),
+                    contentShape(shapes.capsule()),
+                    onTapGesture(focusTextField),
+                    animation(SEND_SPRING, trimmedHasText),
+                  ]}>
+                  <SwiftUITextField
+                    key={resetKey}
+                    ref={textFieldRef}
+                    defaultValue={value}
+                    placeholder={placeholder}
+                    onValueChange={handleSwiftValueChange}
+                    axis="horizontal"
+                    modifiers={[
+                      frame({ maxWidth: Infinity, alignment: 'leading' }),
+                      padding({ leading: 16, trailing: 4 }),
+                      foregroundStyle(foreground),
+                      font({ size: 16 }),
+                      submitLabel('send'),
+                      onSubmitModifier(handleSendPress),
+                      swiftAutocorrectionDisabled(false),
+                      textInputAutocapitalization('sentences'),
+                      disabledModifier(!!disabled),
+                    ]}
+                  />
+
+                  {/* Inline money / voice affordances, only while empty.
+                      Conditional unmount is fine here — these aren't part of
+                      the matched-geometry namespace, so there's no glass
+                      morph to break. `buttonStyle('plain')` strips the
+                      default tint/halo so the SF symbol sits flush. */}
+                  {isEmpty && onMoneyPress ? (
+                    <SwiftUIButton
+                      modifiers={[buttonStyle('plain'), padding({ trailing: 4 })]}
+                      onPress={onMoneyPress}>
+                      <SwiftUIImage
+                        systemName={'bolt.fill' as never}
+                        size={ICON_SIZE}
+                        color={shade400}
+                      />
+                    </SwiftUIButton>
+                  ) : null}
+                  {isEmpty && onVoicePress ? (
+                    <SwiftUIButton
+                      modifiers={[buttonStyle('plain'), padding({ trailing: 12 })]}
+                      onPress={onVoicePress}>
+                      <SwiftUIImage
+                        systemName={'mic.fill' as never}
+                        size={ICON_SIZE}
+                        color={shade400}
+                      />
+                    </SwiftUIButton>
+                  ) : null}
+                </SwiftUIHStack>
+
+                {/* Trailing [→] glass button. ALWAYS rendered — toggling
+                    its presence via React unmount bypasses SwiftUI's
+                    animation transaction and produces a hard pop. Instead
+                    collapse to width=0 + scale=0 + opacity=0 when empty
+                    and let the bouncy spring drive the interpolation, so
+                    the button "appears small and gets bigger" the way
+                    Apple's Messages composer does. The matched-geometry
+                    seam to the input capsule comes from sharing the
+                    GlassEffectContainer + glassEffectId namespace. */}
+                <SwiftUIButton
+                  modifiers={[
+                    buttonStyle('glass'),
+                    frame({
+                      width: trimmedHasText ? BUTTON_SIZE : 0,
+                      height: BUTTON_SIZE,
+                    }),
+                    scaleEffect(trimmedHasText ? 1 : 0),
+                    swiftOpacity(trimmedHasText ? 1 : 0),
+                    glassEffectId('send', namespaceId),
+                    disabledModifier(!canSend),
+                    animation(SEND_SPRING, trimmedHasText),
+                  ]}
+                  onPress={canSend ? handleSendPress : () => {}}>
+                  <SwiftUIHStack
+                    alignment="center"
+                    modifiers={[
+                      frame({
+                        maxWidth: Infinity,
+                        maxHeight: Infinity,
+                        alignment: 'center',
+                      }),
+                    ]}>
+                    <SwiftUIImage
+                      systemName={'arrow.up' as never}
+                      size={ICON_SIZE}
+                      color="#FFFFFF"
+                    />
+                  </SwiftUIHStack>
+                </SwiftUIButton>
+              </SwiftUIHStack>
+            </GlassEffectContainer>
+          </Namespace>
+        </Host>
+      </View>
+    );
+  }
+
+  // Fallback — three RN Pressables/Views with the existing blur primitive.
+  // No SwiftUI morph here; the [→] simply mounts/unmounts. The RN multiline
+  // TextInput drives `fallbackRowHeight` so the bubble grows with content.
   const insideIcons =
     isEmpty && (onMoneyPress || onVoicePress) ? (
       <HStack align="center" spacing={8} style={{ paddingRight: 4 }}>
@@ -218,210 +445,6 @@ export function LiquidChatComposer({
       </HStack>
     ) : null;
 
-  // Visible TextInput + inside icons. `pointerEvents="box-none"` on the
-  // wrapper lets taps in the [+] / [→] regions (which sit OUTSIDE this
-  // wrapper's bounds via `left` / `right` insets) fall through to the
-  // SwiftUI buttons in the Host below.
-  const renderRnOverlay = () => (
-    <View
-      pointerEvents="box-none"
-      style={{
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        left: BUTTON_SIZE + GAP,
-        right: trimmedHasText ? BUTTON_SIZE + GAP : 0,
-      }}>
-      {/* `pointerEvents="box-none"` on the row so taps in the input
-          padding (left / right of the TextInput, and the top / bottom
-          gaps if the bubble is taller than the text line) fall through
-          to the SwiftUI input button beneath, firing its press
-          animation. Without this, this HStack defaults to `auto` and
-          absorbs every tap in the input region — even where there's
-          no RN child to claim it — so the SwiftUI button never sees a
-          touch and never animates. The TextInput itself still catches
-          taps within its visible bounds (so cursor placement / select
-          / paste keep working as normal). */}
-      <HStack
-        pointerEvents="box-none"
-        align="center"
-        spacing={8}
-        style={{ flex: 1, paddingHorizontal: 16 }}>
-        <TextInput
-          ref={textInputRef}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={shade500}
-          editable={!disabled}
-          multiline
-          maxLength={1000}
-          returnKeyType="send"
-          onSubmitEditing={handleSendPress}
-          onContentSizeChange={handleContentSizeChange}
-          style={{
-            flex: 1,
-            color: foreground,
-            fontSize: 16,
-            lineHeight: 22,
-            padding: 0,
-            margin: 0,
-          }}
-          testID={testID}
-        />
-        {insideIcons}
-      </HStack>
-    </View>
-  );
-
-  if (useNativeGlass) {
-    return (
-      <View
-        onLayout={handleLayout}
-        style={{
-          paddingHorizontal: 12,
-          paddingTop: 8,
-          paddingBottom: bottomPadding,
-        }}>
-        <View style={{ height: rowHeight, position: 'relative' }}>
-          {/* SwiftUI side: all three glass shapes in one Host, wrapped in
-              Namespace + GlassEffectContainer with glassEffectId per shape
-              so the system animates the morph when the [→] mounts /
-              unmounts. */}
-          <Host
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-            matchContents={false}>
-            <Namespace id={namespaceId}>
-              {/* `spacing` is the *merge threshold* — when the nearest edges
-                  of two glass shapes sit closer than `spacing`, the system
-                  blends them into one liquid-metaball blob. Setting it to 0
-                  keeps the [+] / input / [→] visually separated in steady
-                  state. The bounce-in / morph still animates because that's
-                  driven by `glassEffectId` (matched-geometry), not by the
-                  blend threshold. A non-zero `spacing` is what produced the
-                  permanent gooey bridges between the three shapes in the
-                  earlier rev — the HStack gap (8pt) was less than the 20pt
-                  threshold, so they were always inside the merge zone. */}
-              <GlassEffectContainer spacing={0}>
-                <SwiftUIHStack
-                  alignment="bottom"
-                  spacing={GAP}
-                  modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity })]}>
-                  {/* Leading [+] glass button. The animation modifier is
-                      attached to every glass child watching the same boolean
-                      so they all re-evaluate inside the same animated
-                      transaction — this is the @expo/ui equivalent of
-                      SwiftUI's `withAnimation { state.toggle() }` since the
-                      JS-side state change can't span an animation block on
-                      its own. */}
-                  <SwiftUIButton
-                    modifiers={[
-                      // `buttonStyle('glass')` provides BOTH the visible
-                      // glass material AND the built-in liquid press / morph
-                      // animation. Stacking an explicit `glassEffect()`
-                      // modifier on top draws a second concentric glass
-                      // ring (visible on press as a doubled circle) and
-                      // overrides the implicit animation, so we don't.
-                      // `glassEffectId` still works alongside the button
-                      // style — it just registers the matched-geometry id
-                      // in the surrounding Namespace.
-                      buttonStyle('glass'),
-                      frame({ width: BUTTON_SIZE, height: BUTTON_SIZE }),
-                      glassEffectId('plus', namespaceId),
-                      animation(SEND_SPRING, trimmedHasText),
-                    ]}
-                    onPress={disabled ? () => {} : handlePlusPress}>
-                    <SwiftUIHStack
-                      alignment="center"
-                      modifiers={[
-                        frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
-                      ]}>
-                      <SwiftUIImage systemName={'plus' as never} size={ICON_SIZE} color="#FFFFFF" />
-                    </SwiftUIHStack>
-                  </SwiftUIButton>
-
-                  {/* Middle input — also a `buttonStyle('glass')` button
-                      so the same press animation as [+] / [→] fires when
-                      the user taps the bubble's padding edges (taps inside
-                      the TextInput's visible area still focus directly via
-                      RN; both paths land at "input is focused" since the
-                      button's onPress focuses the TextInput via ref). The
-                      inner HStack with `frame(maxWidth/maxHeight: Infinity)`
-                      is load-bearing — without an inner view that fills,
-                      Apple's glass button style collapses to its content's
-                      intrinsic size and the bubble renders as a tiny pill. */}
-                  <SwiftUIButton
-                    modifiers={[
-                      buttonStyle('glass'),
-                      frame({ maxWidth: Infinity, height: rowHeight }),
-                      glassEffectId('input', namespaceId),
-                      animation(SEND_SPRING, trimmedHasText),
-                    ]}
-                    onPress={focusTextInput}>
-                    <SwiftUIHStack modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity })]}>
-                      <SwiftUISpacer />
-                    </SwiftUIHStack>
-                  </SwiftUIButton>
-
-                  {/* Trailing [→] glass button. ALWAYS rendered — toggling
-                      its presence via React unmount bypasses SwiftUI's
-                      animation transaction and you get a hard pop instead
-                      of the bounce-in. Instead we collapse it to width=0,
-                      scale=0, opacity=0 when the input is empty, and let
-                      the bouncy spring (`bounce: 0.45`) drive the scale +
-                      width interpolation so the button "appears small and
-                      gets bigger" the way Apple's Messages composer does.
-                      The matched-geometry seam to the input capsule comes
-                      from sharing a GlassEffectContainer + glassEffectId
-                      namespace; the `disabledModifier` blocks taps while
-                      the button is collapsed. */}
-                  <SwiftUIButton
-                    modifiers={[
-                      // `plain` strips SwiftUI's default button styling so
-                      // See [+] above — `buttonStyle('glass')` owns the
-                      // visual + native animation; we don't stack an
-                      // explicit `glassEffect()` on top.
-                      buttonStyle('glass'),
-                      frame({
-                        width: trimmedHasText ? BUTTON_SIZE : 0,
-                        height: BUTTON_SIZE,
-                      }),
-                      scaleEffect(trimmedHasText ? 1 : 0),
-                      swiftOpacity(trimmedHasText ? 1 : 0),
-                      glassEffectId('send', namespaceId),
-                      disabledModifier(!canSend),
-                      animation(SEND_SPRING, trimmedHasText),
-                    ]}
-                    onPress={canSend ? handleSendPress : () => {}}>
-                    <SwiftUIHStack
-                      alignment="center"
-                      modifiers={[
-                        frame({
-                          maxWidth: Infinity,
-                          maxHeight: Infinity,
-                          alignment: 'center',
-                        }),
-                      ]}>
-                      <SwiftUIImage
-                        systemName={'arrow.up' as never}
-                        size={ICON_SIZE}
-                        color="#FFFFFF"
-                      />
-                    </SwiftUIHStack>
-                  </SwiftUIButton>
-                </SwiftUIHStack>
-              </GlassEffectContainer>
-            </Namespace>
-          </Host>
-
-          {renderRnOverlay()}
-        </View>
-      </View>
-    );
-  }
-
-  // Fallback — three RN Pressables/Views with the existing blur primitive.
-  // No SwiftUI morph here; the [→] simply mounts/unmounts.
   return (
     <View
       onLayout={handleLayout}
@@ -455,7 +478,7 @@ export function LiquidChatComposer({
         <View
           style={{
             flex: 1,
-            height: rowHeight,
+            height: fallbackRowHeight,
             position: 'relative',
             justifyContent: 'center',
           }}>
@@ -470,7 +493,7 @@ export function LiquidChatComposer({
               left: 0,
               right: 0,
               bottom: 0,
-              borderRadius: rowHeight / 2,
+              borderRadius: fallbackRowHeight / 2,
               overflow: 'hidden',
               backgroundColor: surfaceTertiary,
             }}
