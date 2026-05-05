@@ -181,7 +181,9 @@
         "skill:building-native-ui"
       ],
       "verification_note": "Re-read ActionMenuHost.tsx (70 lines) and ActionMenuButton.tsx (278 lines) to confirm the Menu-based pattern's expressiveness. Menu.Item with HStack{ icon + VStack{ItemTitle, ItemDescription} } covers label + subtitle. Amount suffix is missing from the current ActionMenuVariant shape — that's the one real extension the migration requires. The initial audit pass logged F-006 as 'no legacy to delete' because the sheets were already HeroUI-primitive based; that answer missed the deeper question the user asked, which is consistency with the branch's new canonical pattern.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Re-verification: shared/lib/popup/sheets/{payment-options,payment-fallback,proof-selector}/ no longer exist. The three popup helpers (paymentOptionsPopup / paymentFallbackPopup / proofSelectorPopup at shared/lib/popup/popups/actionSheets.tsx:273-359) already route through actionMenuPopup; the legacy BottomSheet+ListGroup path is gone. The audit's deletion target landed before this slice."
     },
     {
       "id": "F-007",
@@ -200,7 +202,9 @@
         "git:88439b80"
       ],
       "verification_note": "Re-read first 40 lines of docs/contact-row.md to confirm it is descriptive documentation, not a design rationale or SOV-XX-style spec. Low confidence on whether the user requested it — if they did, the finding is void.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Re-verification: docs/contact-row.md no longer exists in the tree (and docs/ is empty). The unrequested-doc finding has nothing to act on."
     }
   ],
   "dimensions": {

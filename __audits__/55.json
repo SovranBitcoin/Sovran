@@ -170,7 +170,9 @@
         "skill:prompt-engineering-patterns"
       ],
       "verification_note": "Cross-checked by re-reading ActionMenuHost.tsx:382-410 and confirming there is no row-level background applied for danger variant. Counter-argument: heroui's Menu.Item danger variant might paint a background on a future heroui release — fine, but the audit is for the current state and the visual gap is observable today.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ActionMenuHost.renderActionButton wraps the failed Menu.Item in a bg-danger/10 rounded-2xl View so the entire row reads red, mirroring BottomButtons 'dangerous' visual weight. Description prefix kept for screen readers (colour alone is not an a11y signal). variant='danger' on the Menu.Item is preserved so the title/description still tint."
     },
     {
       "id": "F-006",

@@ -224,7 +224,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Confirmed imports at line 28 (reservedProofsFreedPopup, reservedProofsFailedPopup used) and line 2 (Alert, Platform from react-native). Pattern is inconsistent within the same function.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "PrimaryBalance.handleReservedPressInner now dispatches actionMenuPopup({title:'Reserved Proofs', buttons:[{text:'Recover Pending Operations',...}], onDismiss}) instead of Alert.alert — recovery picker now uses the canonical heroui Menu surface, theme-aware and visually consistent with paymentOptionsPopup / paymentFallbackPopup. Alert import dropped, Platform retained for the liquid-glass branch."
     },
     {
       "id": "F-009",
