@@ -208,7 +208,8 @@
       ],
       "verification_note": "Re-read GeohashChatScreen:360-393 (LegendList props). Confirmed renderItem is an inline arrow. Confirmed recycleItems={false}. Confirmed keyExtractor is also inline at :373 (same class of issue, lower impact because keyExtractor is called less often). Counter-argument considered: 'LegendList may not actually use renderItem reference equality — it may call it every render anyway.' Even if so, the closure allocation is measurable on hot paths; the AUDIT.md dim-7 heuristic names this exactly. Confidence 0.95 because this is a canonical, well-documented anti-pattern.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Wrapped renderItem in useCallback in GeohashChatScreen, UserMessagesScreen, and WhitenoiseDMScreen — the audit cited geohash but the same inline-closure shape lived in all three chat surfaces."
     },
     {
       "id": "F-009",
@@ -271,8 +272,8 @@
       ],
       "verification_note": "Re-read useBitChat.ts:102-111 and confirmed with log-doctor latest-session timeline that one `bitchat.hook.ble_diag` fired at +7.6s from ble-start (see log-doctor output: `+7.6s INFO bitchat.hook.ble_diag …+19 more`). Session was only 32s long so only one fire; extrapolated cadence is 1 per 10s. Counter-argument considered: 'diagnostics are valuable for field debugging.' Fine — DEBUG level retains the data, just off by default.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Battery cost of a 10s setInterval at INFO level is a separate pattern from scope-mismatched logger drift."
+      "completion_status": "stale",
+      "completion_note": "setInterval(getBLEDiagnostics, 10s) and the bitchat.hook.ble_diag log line are no longer present in useBitChat.ts."
     },
     {
       "id": "F-012",
