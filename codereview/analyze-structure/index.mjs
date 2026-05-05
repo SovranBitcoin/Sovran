@@ -1,46 +1,39 @@
 #!/usr/bin/env node
 
 /**
- * codereview/analyze-structure
+ * analyze-structure.mjs
  *
- * Two modes share one entry:
+ * Walks the project tree and produces:
+ *   - Annotated tree of files with their exports and imports.
+ *   - Structural reports: fan-in, coupling, cycles, orphans, colocate, boundary.
+ *   - Module-depth reports: shallow modules, pass-through suspects, hub-spoke
+ *     coordinators, instability, re-export depth, importer reach.
+ *   - Code-quality reports: cognitive-complexity hotspots, type-safety smells
+ *     (any/!/as/@ts-*), React-component smells (large components, hook count,
+ *     boolean-state soup, inline subcomponents, useEffect dependency density,
+ *     StyleSheet size).
+ *   - Symbol-level reports: duplicate export names, unused exports,
+ *     default+named clashes, test colocation.
+ *   - Conceptual reports: information-leakage clusters, concept locality
+ *     (CONTEXT.md), vocabulary drift.
+ *   - Architecture-rule violations (when .architecture.json is present).
+ *   - History-based reports (opt-in `--history`): churn × complexity, temporal
+ *     coupling, stale files.
+ *   - LLM-friendly compact summary (`--llm`).
  *
- *   1. (default) Structural analysis. Walks the project tree and produces
- *      structural / depth / quality / symbol / concept reports plus an
- *      LLM-friendly compact summary (`--llm`).
- *
- *   2. `lookalikes` subcommand. Cross-file declaration similarity reports:
- *      name collisions, value collisions, color near-matches, name
- *      similarities, focus / by-name / by-value / inventory lookups.
- *      Implementation lives in `lookalikes-mode.mjs` and is dispatched
- *      to from this file.
- *
- * Common usage:
- *   node codereview/analyze-structure/index.mjs                       # default reports
- *   node codereview/analyze-structure/index.mjs app                   # subtree
- *   node codereview/analyze-structure/index.mjs --json                # machine-readable
- *   node codereview/analyze-structure/index.mjs --llm                 # compact LLM summary
- *   node codereview/analyze-structure/index.mjs --history --since 6   # last 6 months of git
- *   node codereview/analyze-structure/index.mjs --architecture        # use .architecture.json
- *   node codereview/analyze-structure/index.mjs --focus shared/foo.ts # full pass, filter to one file
- *
- *   node codereview/analyze-structure/index.mjs lookalikes            # default lookalikes
- *   node codereview/analyze-structure/index.mjs lookalikes features/x # subtree
- *   node codereview/analyze-structure/index.mjs lookalikes --by-name red
- *   node codereview/analyze-structure/index.mjs lookalikes --focus shared/theme.ts
- *
- * `--focus` (structural mode) does a full-repo scan and filters every section
- * down to rows that mention the focused file. Sections without per-file rows
- * (Score, totals, Instability per folder) pass through unchanged. A section
- * with per-file rows but none mentioning the focus is dropped entirely so
- * silence means "no signal," not "ran on zero files." Terminal and `--llm`
- * modes apply the filter; `--json` is left unfiltered (consume programmatically).
- *
- * Default structural reports run unless suppressed with `--no-<name>`.
+ * Default reports run unless suppressed with `--no-<name>`.
  * Opt-in (off by default): --history, --reach, --leakage, --concept,
  *   --vocab-drift, --architecture, --boundary, --llm.
  *
- * Tuning flags (structural mode, with defaults):
+ * Common usage:
+ *   node scripts/analyze-structure.mjs                  # full default report
+ *   node scripts/analyze-structure.mjs app              # subtree
+ *   node scripts/analyze-structure.mjs --json           # machine-readable
+ *   node scripts/analyze-structure.mjs --llm            # compact LLM-friendly summary
+ *   node scripts/analyze-structure.mjs --history --since 6   # last 6 months of git
+ *   node scripts/analyze-structure.mjs --architecture        # use .architecture.json
+ *
+ * Tuning flags (with defaults):
  *   --fanin-min 1
  *   --coupling-depth 1
  *   --colocate-threshold 0.7
@@ -62,24 +55,6 @@ import { execSync } from 'child_process';
 
 import { IGNORE_DIRS, IGNORE_FILES, TS_EXTS } from '../shared/ignore.mjs';
 import { stripCodeNoise, findMatchingBrace } from '../shared/source.mjs';
-import {
-  countLines,
-  computeComplexity,
-  countTypeSmells,
-  analyzeReactComponents,
-  detectPassThrough,
-  computeModuleDepth,
-} from './metrics.mjs';
-import {
-  extractIdentifiers,
-  extractExports as extractExportsRaw,
-  extractImports,
-} from './extract.mjs';
-
-// extractExports closes over the CLI flag `hideTypes` in the pre-split file;
-// after extraction it takes the flag explicitly. This thin wrapper keeps the
-// call sites unchanged.
-const extractExports = (src) => extractExportsRaw(src, { hideTypes });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
@@ -97,20 +72,6 @@ const RESOLVE_EXTS = [
   '/index.js',
   '/index.jsx',
 ];
-
-// ─── Subcommand dispatch ─────────────────────────────────────────────────────
-// Routes `analyze-structure lookalikes [...]` to lookalikes-mode.mjs and exits.
-// process.argv is mutated to drop the subcommand word so the delegated module's
-// own arg parser sees a clean argv (it predates the subcommand convention and
-// uses positional path / flag pattern as before).
-{
-  const sub = process.argv[2];
-  if (sub === 'lookalikes') {
-    process.argv = [process.argv[0], process.argv[1], ...process.argv.slice(3)];
-    await import('./lookalikes-mode.mjs');
-    process.exit(0);
-  }
-}
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
 
@@ -220,7 +181,6 @@ const flagsWithValue = new Set([
   '--leakage-threshold',
   '--reach-top',
   '--architecture',
-  '--focus',
 ]);
 const allFlags = new Set([
   '--json',
@@ -277,84 +237,6 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 const targetDir = targetArg ? join(ROOT, targetArg) : ROOT;
-
-// ─── Focus filter ────────────────────────────────────────────────────────────
-// `--focus <file>` runs every report against the full target tree, then
-// trims the rendered output to rows that mention the focused file. The
-// filter operates on already-rendered lines so we never have to teach each
-// report to handle a single-file case — the data pass is unchanged.
-const focusIdx = args.indexOf('--focus');
-let focusAbs = null;
-let focusRel = null;
-if (focusIdx !== -1) {
-  const next = args[focusIdx + 1];
-  if (!next || next.startsWith('--')) {
-    console.error('Error: --focus requires a file path, e.g. --focus shared/lib/foo.ts');
-    process.exit(1);
-  }
-  focusAbs = resolve(ROOT, next);
-  if (!existsSync(focusAbs)) {
-    console.error(`--focus: file not found: ${next} (looked at ${focusAbs})`);
-    process.exit(1);
-  }
-  focusRel = relative(targetDir, focusAbs);
-}
-
-/**
- * Drop sections that have per-file rows but none mention the focus file.
- *
- * A line is a "data row" if it references a file path (`*.tsx?`, `*.jsx?`,
- * `*.[mc][jt]s`, `*.json`, `*.md(x)`). A section runs from one header
- * (`══ ... ══`, `## ...`, `# ...`) to the next or EOF. Within a section:
- *
- *   - If there are no data rows at all → keep verbatim (Score, totals,
- *     Instability per folder, and similar all pass through unchanged).
- *   - If at least one data row mentions the focus file → keep header +
- *     matching data rows + non-data context (separators, "…and N more"
- *     trailers). Non-matching data rows are dropped so the kept rows are
- *     visible in isolation.
- *   - If data rows exist but none mention the focus → drop the whole
- *     section so silence reads as "no signal in this dimension."
- */
-function applyFocus(lines, rel) {
-  if (!rel) return lines;
-  const PATH_RE = /[A-Za-z0-9_\-./()[\]]+\.(?:tsx?|jsx?|m[jt]s|c[jt]s|json|mdx?)\b/;
-  const HEADER_RE = /══.*══|^##\s+|^#\s+/;
-  const tagged = lines.map((line) => {
-    const stripped = line.replace(/\x1b\[[0-9;]*m/g, '');
-    if (HEADER_RE.test(stripped)) return { kind: 'header', line };
-    if (PATH_RE.test(stripped)) return { kind: 'data', line, hasFocus: line.includes(rel) };
-    return { kind: 'other', line };
-  });
-  const out = [];
-  let i = 0;
-  // Pre-section preamble: keep meta lines, drop unmatched data rows.
-  while (i < tagged.length && tagged[i].kind !== 'header') {
-    const t = tagged[i];
-    if (t.kind !== 'data' || t.hasFocus) out.push(t.line);
-    i++;
-  }
-  // Per-section processing.
-  while (i < tagged.length) {
-    let j = i + 1;
-    while (j < tagged.length && tagged[j].kind !== 'header') j++;
-    const section = tagged.slice(i, j);
-    const dataRows = section.filter((t) => t.kind === 'data');
-    if (dataRows.length === 0) {
-      for (const t of section) out.push(t.line);
-    } else if (dataRows.some((t) => t.hasFocus)) {
-      for (const t of section) {
-        if (t.kind !== 'data' || t.hasFocus) out.push(t.line);
-      }
-    }
-    i = j;
-  }
-  return out;
-}
-
-function emit(lines) {
-  console.log(applyFocus(lines, focusRel).join('\n'));
-}
 
 // Whether any analysis mode is active (controls whether to build the dep graph)
 const anyAnalysis =
@@ -424,6 +306,364 @@ function isFile(p) {
 // Source utilities (stripCodeNoise, findMatchingBrace) imported from
 // ../shared/source.mjs — see top of file.
 
+// ─── LOC counting (cloc-style) ───────────────────────────────────────────────
+
+function countLines(src) {
+  const lines = src.split('\n');
+  let blank = 0,
+    comment = 0,
+    code = 0;
+  let inBlock = false;
+
+  for (const raw of lines) {
+    const t = raw.trim();
+    if (t === '') {
+      blank++;
+      continue;
+    }
+    if (inBlock) {
+      comment++;
+      if (t.includes('*/')) inBlock = false;
+      continue;
+    }
+    if (t.startsWith('/*') || t.startsWith('*')) {
+      comment++;
+      const closeIdx = t.indexOf('*/');
+      if (closeIdx === -1) inBlock = true;
+      continue;
+    }
+    if (t.startsWith('//')) {
+      comment++;
+      continue;
+    }
+    code++;
+    const openIdx = t.indexOf('/*');
+    if (openIdx !== -1) {
+      const closeIdx = t.indexOf('*/', openIdx + 2);
+      if (closeIdx === -1) inBlock = true;
+    }
+  }
+  return { total: lines.length, code, blank, comment };
+}
+
+// ─── Cognitive / cyclomatic complexity (regex/scanner approximation) ─────────
+
+const COMPLEXITY_KEYWORDS = new Set(['if', 'for', 'while', 'switch', 'catch']);
+
+function computeComplexity(src) {
+  const code = stripCodeNoise(src);
+  let cognitive = 0;
+  let cyclomatic = 1;
+  let nesting = 0;
+  let nestingMax = 0;
+  const len = code.length;
+  let i = 0;
+  while (i < len) {
+    const ch = code[i];
+    if (ch === '{') {
+      nesting++;
+      if (nesting > nestingMax) nestingMax = nesting;
+      i++;
+      continue;
+    }
+    if (ch === '}') {
+      if (nesting > 0) nesting--;
+      i++;
+      continue;
+    }
+    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch === '_') {
+      let j = i;
+      while (j < len && /[\w]/.test(code[j])) j++;
+      const word = code.slice(i, j);
+      if (COMPLEXITY_KEYWORDS.has(word)) {
+        cognitive += 1 + nesting;
+        cyclomatic++;
+      } else if (word === 'case') {
+        cognitive++;
+        cyclomatic++;
+      }
+      i = j;
+      continue;
+    }
+    if (ch === '&' && code[i + 1] === '&') {
+      cognitive++;
+      cyclomatic++;
+      i += 2;
+      continue;
+    }
+    if (ch === '|' && code[i + 1] === '|') {
+      cognitive++;
+      cyclomatic++;
+      i += 2;
+      continue;
+    }
+    if (ch === '?' && code[i + 1] !== '.' && code[i + 1] !== '?') {
+      cognitive++;
+      cyclomatic++;
+      i++;
+      continue;
+    }
+    i++;
+  }
+  return { cognitive, cyclomatic, nestingMax };
+}
+
+// ─── Type-safety smell counts ────────────────────────────────────────────────
+
+function countTypeSmells(src) {
+  const code = stripCodeNoise(src);
+  const anyMatches =
+    code.match(
+      /(?::\s*any\b)|(?:\bas\s+any\b)|(?:<\s*any\s*[>,])|(?:\bany\[\])|(?:\bArray<\s*any\s*>)/g
+    ) || [];
+  const bangs = code.match(/[\w\)\]][!](?=[.\[\)\;\,\s])/g) || [];
+  const allCasts = code.match(/\bas\s+[A-Za-z_][\w<>.,\s|&]*/g) || [];
+  const casts = allCasts.filter((m) => !/^as\s+const\b/.test(m) && !/^as\s+unknown\b/.test(m));
+  const ignores = src.match(/@ts-(?:ignore|expect-error|nocheck)/g) || [];
+  return {
+    any: anyMatches.length,
+    bangs: bangs.length,
+    casts: casts.length,
+    tsIgnore: ignores.length,
+  };
+}
+
+// ─── React component analysis (regex + brace matching) ───────────────────────
+
+const HOOK_RE = /\buse[A-Z]\w*\s*\(/g;
+const USESTATE_BOOL_RE = /useState\s*<\s*boolean\s*>|useState\s*\(\s*(?:true|false)\s*[,\)]/g;
+const INLINE_COMP_RE = /(?:^|\n)\s*(?:const|function)\s+([A-Z]\w*)\s*[=:(<]/g;
+const USEEFFECT_DEPS_RE = /useEffect\s*\([\s\S]*?,\s*\[([^\]]*)\]\s*\)/g;
+
+function analyzeReactComponents(src) {
+  const code = stripCodeNoise(src);
+
+  const defs = [];
+  // function ComponentName(<args>) {
+  for (const m of code.matchAll(
+    /(?:^|\n)\s*(?:export\s+(?:default\s+)?)?function\s+([A-Z]\w*)\s*\(([^)]*)\)/g
+  )) {
+    defs.push({ name: m[1], paramStr: m[2], idx: m.index });
+  }
+  // const ComponentName = (...) =>
+  for (const m of code.matchAll(
+    /(?:^|\n)\s*(?:export\s+(?:default\s+)?)?const\s+([A-Z]\w*)\s*(?::\s*[^=]+)?=\s*\(([^)]*)\)\s*(?::\s*[^=]+)?=>/g
+  )) {
+    defs.push({ name: m[1], paramStr: m[2], idx: m.index });
+  }
+  // const ComponentName = memo|forwardRef(<...>)
+  for (const m of code.matchAll(
+    /(?:^|\n)\s*(?:export\s+(?:default\s+)?)?const\s+([A-Z]\w*)\s*=\s*(?:React\.)?(?:memo|forwardRef)\s*\(/g
+  )) {
+    defs.push({ name: m[1], paramStr: '', idx: m.index, wrapped: true });
+  }
+
+  const seen = new Set();
+  const dedup = defs.filter((d) => {
+    if (seen.has(d.name)) return false;
+    seen.add(d.name);
+    return true;
+  });
+
+  const components = [];
+  for (const def of dedup) {
+    const after = code.slice(def.idx);
+    // Find first `{` at the function-body level (skip type annotations etc.)
+    let openIdx = after.indexOf('{');
+    if (openIdx === -1) continue;
+    const closeIdx = findMatchingBrace(after, openIdx);
+    if (closeIdx === -1) continue;
+    const body = after.slice(openIdx, closeIdx + 1);
+
+    // Props: look at paramStr first; for wrapped (memo/forwardRef) peek past `(`.
+    let propStr = def.paramStr || '';
+    if (def.wrapped) {
+      const wrapBody = code.slice(def.idx, def.idx + 600);
+      const m = wrapBody.match(/\(\s*\(([^)]*)\)/);
+      if (m) propStr = m[1];
+    }
+    let propCount = 0;
+    const destruct = propStr.match(/\{([^}]*)\}/);
+    if (destruct) {
+      propCount = destruct[1].split(',').filter((p) => p.trim().length > 0).length;
+    } else if (propStr.trim() && /\bprops\b/.test(propStr)) {
+      propCount = 1;
+    }
+
+    const hookCount = [...body.matchAll(HOOK_RE)].length;
+    const booleanStates = [...body.matchAll(USESTATE_BOOL_RE)].length;
+    const inlineComponents = [...body.matchAll(INLINE_COMP_RE)]
+      .map((m) => m[1])
+      .filter((n) => n !== def.name).length;
+    const effects = [...body.matchAll(USEEFFECT_DEPS_RE)];
+    const effectDepCounts = effects.map(
+      (e) => e[1].split(',').filter((s) => s.trim().length > 0).length
+    );
+    const maxEffectDeps = effectDepCounts.length ? Math.max(...effectDepCounts) : 0;
+    const lineCount = body.split('\n').length;
+
+    components.push({
+      name: def.name,
+      propCount,
+      hookCount,
+      booleanStates,
+      inlineComponents,
+      maxEffectDeps,
+      lineCount,
+    });
+  }
+
+  // StyleSheet.create size
+  let styleSheetSize = 0;
+  const ssMatch = code.match(/StyleSheet\.create\s*\(\s*\{/);
+  if (ssMatch) {
+    const open = ssMatch.index + ssMatch[0].length - 1;
+    const close = findMatchingBrace(code, open);
+    if (close > open) styleSheetSize = code.slice(open, close + 1).split('\n').length;
+  }
+
+  return { components, styleSheetSize };
+}
+
+// ─── Identifier extraction (for vocab drift / concept locality) ──────────────
+
+const JS_KEYWORDS = new Set([
+  'var',
+  'let',
+  'const',
+  'function',
+  'if',
+  'else',
+  'return',
+  'for',
+  'while',
+  'switch',
+  'case',
+  'break',
+  'continue',
+  'do',
+  'try',
+  'catch',
+  'finally',
+  'throw',
+  'new',
+  'this',
+  'typeof',
+  'instanceof',
+  'in',
+  'of',
+  'class',
+  'extends',
+  'super',
+  'import',
+  'export',
+  'from',
+  'as',
+  'default',
+  'async',
+  'await',
+  'static',
+  'public',
+  'private',
+  'protected',
+  'readonly',
+  'interface',
+  'type',
+  'enum',
+  'namespace',
+  'declare',
+  'true',
+  'false',
+  'null',
+  'undefined',
+  'void',
+  'any',
+  'never',
+  'unknown',
+  'string',
+  'number',
+  'boolean',
+  'object',
+  'symbol',
+  'yield',
+  'with',
+  'package',
+  'implements',
+  'abstract',
+]);
+
+function extractIdentifiers(src) {
+  const code = stripCodeNoise(src);
+  const set = new Set();
+  for (const m of code.matchAll(/\b([A-Za-z_][A-Za-z0-9_]{2,})\b/g)) {
+    const w = m[1];
+    if (!JS_KEYWORDS.has(w)) set.add(w);
+  }
+  return set;
+}
+
+// ─── Pass-through detection ──────────────────────────────────────────────────
+
+function detectPassThrough(src, exports) {
+  if (!exports || exports.length === 0) return { isPassThrough: false, ratio: 0 };
+  if (exports.every((e) => e.kind === 'reexport' || e.tag === 'reexport')) {
+    return { isPassThrough: true, ratio: 1 };
+  }
+  const code = stripCodeNoise(src);
+  let shortBodies = 0;
+  let inspected = 0;
+  for (const exp of exports) {
+    if (exp.kind === 'type' || exp.kind === 'reexport') continue;
+    inspected++;
+    const namePat = exp.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(
+      `(?:^|\\n)\\s*export\\s+(?:default\\s+)?(?:async\\s+)?(?:function\\s+|const\\s+|class\\s+|let\\s+|var\\s+)?${namePat}\\b`
+    );
+    const m = code.match(re);
+    if (!m) continue;
+    const idx = m.index + m[0].length;
+    const after = code.slice(idx, idx + 800);
+    const openBrace = after.indexOf('{');
+    const arrowIdx = after.indexOf('=>');
+    let body = '';
+    if (openBrace !== -1 && (arrowIdx === -1 || openBrace < arrowIdx + 5)) {
+      const close = findMatchingBrace(after, openBrace);
+      if (close !== -1) body = after.slice(openBrace + 1, close);
+    } else if (arrowIdx !== -1) {
+      const semi = after.indexOf(';', arrowIdx);
+      body = after.slice(arrowIdx + 2, semi === -1 ? arrowIdx + 200 : semi);
+    } else {
+      const semi = after.indexOf(';');
+      body = after.slice(0, semi === -1 ? 200 : semi);
+    }
+    const codeLines = body.split('\n').filter((l) => l.trim().length > 0).length;
+    if (codeLines > 0 && codeLines <= 3) shortBodies++;
+  }
+  if (inspected === 0) return { isPassThrough: false, ratio: 0 };
+  const ratio = shortBodies / inspected;
+  return { isPassThrough: ratio >= 0.7 && inspected >= 2, ratio };
+}
+
+// ─── Module depth (Ousterhout-style) ─────────────────────────────────────────
+
+function computeModuleDepth(fileNode) {
+  const exps = (fileNode.exports || []).filter(
+    (e) => e.kind !== 'reexport' && e.tag !== 'reexport'
+  );
+  if (exps.length === 0) return null;
+  // Surface weight: 1 per export (regex parse can't see real surface area).
+  // Components add a bit more for each prop, types add for each member -- but
+  // we don't have those here, so weight==exportCount is a fair approximation.
+  const weight = exps.length;
+  const impl = fileNode.loc?.code || 0;
+  return {
+    surface: weight,
+    impl,
+    depth: impl / weight,
+    exportCount: exps.length,
+  };
+}
+
 // ─── Test colocation helper ──────────────────────────────────────────────────
 
 function hasColocatedTest(fileNode) {
@@ -448,6 +688,148 @@ function hasColocatedTest(fileNode) {
     join(ROOT, '__tests__', `${base}.test.jsx`),
   ];
   return candidates.some((c) => existsSync(c));
+}
+
+// ─── Export extraction ───────────────────────────────────────────────────────
+
+function extractExports(src) {
+  const results = [];
+  const stripped = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*/g, '');
+  const add = (kind, name, tag) => results.push({ kind, name, tag });
+
+  for (const m of stripped.matchAll(/export\s+default\s+(?:async\s+)?function\s*\*?\s*(\w+)/g)) {
+    add('default', m[1], classify(m[1], 'fn'));
+  }
+  for (const m of stripped.matchAll(/export\s+default\s+class\s+(\w+)/g)) {
+    add('default', m[1], 'class');
+  }
+  for (const m of stripped.matchAll(/export\s+default\s+([\w.]+)\((\w+)\)\s*;?/g)) {
+    add('default', `${m[1]}(${m[2]})`, classify(m[2], 'wrapped'));
+  }
+  for (const m of stripped.matchAll(/export\s+default\s+(?!function|class|async|new)(\w+)\s*;/g)) {
+    if (!results.some((r) => r.kind === 'default' && r.name.endsWith(m[1] + ')'))) {
+      add('default', m[1], classify(m[1], 'value'));
+    }
+  }
+
+  for (const m of stripped.matchAll(/^export\s+(?:async\s+)?function\s+(\w+)/gm)) {
+    add('named', m[1], classify(m[1], 'fn'));
+  }
+  for (const m of stripped.matchAll(/^export\s+(?:const|let|var)\s+(\w+)/gm)) {
+    const idx = m.index + m[0].length;
+    const rest = stripped.slice(idx, idx + 120);
+    const isArrowComponent =
+      /=\s*(?:React\.memo\(|React\.forwardRef\(|\([\w,\s:={}[\]]*\)\s*(?::\s*\w[\w.<>|&, ]*?)?\s*=>)/.test(
+        rest
+      );
+    add('named', m[1], classify(m[1], isArrowComponent ? 'fn' : 'const'));
+  }
+  for (const m of stripped.matchAll(/^export\s+class\s+(\w+)/gm)) {
+    add('named', m[1], 'class');
+  }
+
+  if (!hideTypes) {
+    for (const m of stripped.matchAll(/^export\s+type\s+(\w+)/gm)) {
+      add('type', m[1], 'type');
+    }
+    for (const m of stripped.matchAll(/^export\s+interface\s+(\w+)/gm)) {
+      add('type', m[1], 'interface');
+    }
+    for (const m of stripped.matchAll(/^export\s+type\s+\{([^}]+)\}/gm)) {
+      for (const name of m[1]
+        .split(',')
+        .map((s) =>
+          s
+            .trim()
+            .replace(/\s+as\s+\w+/, '')
+            .trim()
+        )
+        .filter(Boolean)) {
+        add('type', name, 'type');
+      }
+    }
+  }
+
+  for (const m of stripped.matchAll(/^export\s+\{([^}]+)\}/gm)) {
+    for (const chunk of m[1].split(',')) {
+      const parts = chunk.trim().split(/\s+as\s+/);
+      const name = (parts[parts.length - 1] || '').trim();
+      if (name && /^\w+$/.test(name)) {
+        add('named', name, classify(name, 'reexport'));
+      }
+    }
+  }
+
+  for (const m of stripped.matchAll(/^export\s+\*\s+from\s+['"]([^'"]+)['"]/gm)) {
+    add('reexport', `* from '${m[1]}'`, 'reexport');
+  }
+
+  const seen = new Set();
+  return results.filter((r) => {
+    const key = `${r.kind}:${r.name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// ─── Import extraction ───────────────────────────────────────────────────────
+
+function extractImports(src) {
+  const stripped = src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length))
+    .replace(/\/\/.*/g, '');
+
+  const byModule = new Map();
+  const RE = /^import\s+(type\s+)?([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/gm;
+
+  for (const m of stripped.matchAll(RE)) {
+    const isType = !!m[1];
+    const clause = m[2].replace(/\s+/g, ' ').trim();
+    const mod = m[3];
+    const isExternal = !mod.startsWith('.') && !mod.startsWith('@/');
+
+    if (!byModule.has(mod)) {
+      byModule.set(mod, { module: mod, names: [], isType, isExternal });
+    }
+    const entry = byModule.get(mod);
+    if (isType) entry.isType = true;
+
+    const starMatch = clause.match(/^\*\s+as\s+(\w+)$/);
+    if (starMatch) {
+      entry.names.push(`* as ${starMatch[1]}`);
+      continue;
+    }
+
+    const braceOpen = clause.indexOf('{');
+    const braceClose = clause.lastIndexOf('}');
+
+    const beforeBrace = (braceOpen === -1 ? clause : clause.slice(0, braceOpen))
+      .replace(/,\s*$/, '')
+      .trim();
+
+    if (beforeBrace) entry.names.push(beforeBrace);
+
+    if (braceOpen !== -1 && braceClose !== -1) {
+      const inside = clause.slice(braceOpen + 1, braceClose);
+      for (const chunk of inside.split(',')) {
+        const parts = chunk.trim().split(/\s+as\s+/);
+        const name = (parts[parts.length - 1] || '').trim();
+        if (name) entry.names.push(name);
+      }
+    }
+  }
+
+  return [...byModule.values()];
+}
+
+function classify(name, hint) {
+  if (!name) return hint;
+  if (name.startsWith('use') && /^use[A-Z]/.test(name)) return 'hook';
+  if (/^[A-Z]/.test(name)) return 'component';
+  if (hint === 'fn' || hint === 'wrapped') return hint;
+  if (name === name.toUpperCase() && name.length > 1) return 'constant';
+  return hint;
 }
 
 // ─── Formatting ───────────────────────────────────────────────────────────────
@@ -2548,20 +2930,11 @@ function computeScores(allFiles, dep, totals) {
 
     if (archV !== null) {
       const aD = clampDed(archV.length * 3, 50);
-      breakdown.push({
-        metric: 'architecture rule violations',
-        value: archV.length,
-        deduction: aD,
-      });
+      breakdown.push({ metric: 'architecture rule violations', value: archV.length, deduction: aD });
       d += aD;
     }
 
-    cats.push({
-      name: 'Architecture',
-      weight: 20,
-      score: Math.round(clampDed(100 - d, 100)),
-      breakdown,
-    });
+    cats.push({ name: 'Architecture', weight: 20, score: Math.round(clampDed(100 - d, 100)), breakdown });
   }
 
   // ─── Module Design ─────────────────────────────────────────────────────
@@ -2581,19 +2954,10 @@ function computeScores(allFiles, dep, totals) {
     d += ptD;
 
     const rxD = clampDed(per100(rxDeep.length) * 5, 30);
-    breakdown.push({
-      metric: 're-export depth ≥2 (barrel hops)',
-      value: rxDeep.length,
-      deduction: rxD,
-    });
+    breakdown.push({ metric: 're-export depth ≥2 (barrel hops)', value: rxDeep.length, deduction: rxD });
     d += rxD;
 
-    cats.push({
-      name: 'Module Design',
-      weight: 15,
-      score: Math.round(clampDed(100 - d, 100)),
-      breakdown,
-    });
+    cats.push({ name: 'Module Design', weight: 15, score: Math.round(clampDed(100 - d, 100)), breakdown });
   }
 
   // ─── Code Complexity ───────────────────────────────────────────────────
@@ -2609,14 +2973,12 @@ function computeScores(allFiles, dep, totals) {
       name: 'Code Complexity',
       weight: 15,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [
-        {
-          metric: `complexity hotspots (cognitive ≥ ${complexityThreshold})`,
-          value: cx.length,
-          deduction: d,
-          detail: `weighted severity: ${severity}`,
-        },
-      ],
+      breakdown: [{
+        metric: `complexity hotspots (cognitive ≥ ${complexityThreshold})`,
+        value: cx.length,
+        deduction: d,
+        detail: `weighted severity: ${severity}`,
+      }],
     });
   }
 
@@ -2630,14 +2992,12 @@ function computeScores(allFiles, dep, totals) {
       name: 'Type Safety',
       weight: 10,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [
-        {
-          metric: 'type-safety smells (any / ! / as / @ts-*)',
-          value: total,
-          deduction: d,
-          detail: `${perKLoc.toFixed(1)} weighted smells per kLOC`,
-        },
-      ],
+      breakdown: [{
+        metric: 'type-safety smells (any / ! / as / @ts-*)',
+        value: total,
+        deduction: d,
+        detail: `${perKLoc.toFixed(1)} weighted smells per kLOC`,
+      }],
     });
   }
 
@@ -2652,14 +3012,12 @@ function computeScores(allFiles, dep, totals) {
       name: 'Component Health',
       weight: 10,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [
-        {
-          metric: 'flagged components',
-          value: smells.length,
-          deduction: d,
-          detail: `${rate.toFixed(1)}% of ${totalComps} components`,
-        },
-      ],
+      breakdown: [{
+        metric: 'flagged components',
+        value: smells.length,
+        deduction: d,
+        detail: `${rate.toFixed(1)}% of ${totalComps} components`,
+      }],
     });
   }
 
@@ -2692,19 +3050,10 @@ function computeScores(allFiles, dep, totals) {
     d += dpD;
 
     const cD = clampDed(dup.defaultPlusNamed.length * 5, 20);
-    breakdown.push({
-      metric: 'default+named clashes',
-      value: dup.defaultPlusNamed.length,
-      deduction: cD,
-    });
+    breakdown.push({ metric: 'default+named clashes', value: dup.defaultPlusNamed.length, deduction: cD });
     d += cD;
 
-    cats.push({
-      name: 'Hygiene',
-      weight: 15,
-      score: Math.round(clampDed(100 - d, 100)),
-      breakdown,
-    });
+    cats.push({ name: 'Hygiene', weight: 15, score: Math.round(clampDed(100 - d, 100)), breakdown });
   }
 
   // ─── Testability ───────────────────────────────────────────────────────
@@ -2725,14 +3074,12 @@ function computeScores(allFiles, dep, totals) {
       name: 'Testability',
       weight: 10,
       score: Math.round(clampDed(coverage, 100)),
-      breakdown: [
-        {
-          metric: 'colocated test coverage',
-          value: covered,
-          deduction: Math.round(100 - coverage),
-          detail: `${covered}/${testable} testable files have a colocated test`,
-        },
-      ],
+      breakdown: [{
+        metric: 'colocated test coverage',
+        value: covered,
+        deduction: Math.round(100 - coverage),
+        detail: `${covered}/${testable} testable files have a colocated test`,
+      }],
     });
   }
 
@@ -2760,12 +3107,7 @@ function computeScores(allFiles, dep, totals) {
       d += sD;
     }
     if (breakdown.length > 0) {
-      cats.push({
-        name: 'Conceptual Cohesion',
-        weight: 5,
-        score: Math.round(clampDed(100 - d, 100)),
-        breakdown,
-      });
+      cats.push({ name: 'Conceptual Cohesion', weight: 5, score: Math.round(clampDed(100 - d, 100)), breakdown });
     }
   }
 
@@ -2777,7 +3119,7 @@ function computeScores(allFiles, dep, totals) {
 function scoreColor(score) {
   if (score >= 90) return '\x1b[32m'; // green
   if (score >= 50) return '\x1b[33m'; // yellow
-  return '\x1b[31m'; // red
+  return '\x1b[31m';                  // red
 }
 
 function scoreBar(score, width = 30) {
@@ -2962,57 +3304,44 @@ if (showJson) {
 } else if (showLlm) {
   // ── LLM compact mode ─────────────────────────────────────────────────────
   if (!dep) dep = buildDependencyGraph(allFiles);
-  const llmOut = renderLlm(allFiles, dep, totals, historyResult);
-  if (focusRel) {
-    console.log(`> Focused on ${focusRel}. Sections with no row mentioning this file are hidden.`);
-    console.log('');
-    console.log(applyFocus(llmOut.split('\n'), focusRel).join('\n'));
-  } else {
-    console.log(llmOut);
-  }
+  console.log(renderLlm(allFiles, dep, totals, historyResult));
 } else {
   // ── Terminal mode ────────────────────────────────────────────────────────
-  if (focusRel) {
-    console.log(
-      `\x1b[1;33m▸ Focused on ${focusRel}\x1b[0m  ${'\x1b[2m'}Sections with no row mentioning this file are hidden; tree view skipped.\x1b[0m`
-    );
-    console.log('');
-  } else {
-    console.log(label);
-    console.log(renderTree(nodes).join('\n'));
-  }
+  console.log(label);
+  console.log(renderTree(nodes).join('\n'));
   console.log(renderSummary(totals));
 
   if (anyAnalysis && dep) {
     const { faninMap, fanoutMap, edges, fileToFolder, pathToNode, importedNamesByTarget } = dep;
 
-    if (showFanin) emit(renderFanin(faninMap, fileToFolder));
-    if (showCoupling) emit(renderCoupling(edges, fileToFolder));
-    if (showCycles) emit(renderCycles(edges));
-    if (showOrphans) emit(renderOrphans(allFiles, faninMap));
-    if (showColocate) emit(renderColocate(faninMap, fileToFolder, pathToNode));
-    if (showShallow) emit(renderShallow(allFiles));
-    if (showPassthrough) emit(renderPassThrough(allFiles, faninMap, fanoutMap));
-    if (showHubSpoke) emit(renderHubSpoke(allFiles, faninMap, fanoutMap));
-    if (showInstability) emit(renderInstability(edges, fileToFolder));
-    if (showReexportDepth) emit(renderReexportDepth(allFiles, edges));
-    if (showComplexity) emit(renderComplexity(allFiles));
-    if (showTypesafety) emit(renderTypesafety(allFiles));
-    if (showComponent) emit(renderComponent(allFiles));
-    if (showDupExports) emit(renderDupExports(allFiles));
-    if (showUnusedExports) emit(renderUnusedExports(allFiles, importedNamesByTarget));
-    if (showTestColocation) emit(renderTestColocation(allFiles));
-    if (showLeakage) emit(renderLeakage(allFiles));
-    if (showConcept) emit(renderConcept(allFiles));
-    if (showVocabDrift) emit(renderVocabDrift(allFiles));
-    if (showReach) emit(renderReach(allFiles, fanoutMap));
-    if (showArchitecture) emit(renderArchitecture(edges));
-    if (boundaryA && boundaryB) emit(renderBoundary(edges, boundaryA, boundaryB));
+    if (showFanin) console.log(renderFanin(faninMap, fileToFolder).join('\n'));
+    if (showCoupling) console.log(renderCoupling(edges, fileToFolder).join('\n'));
+    if (showCycles) console.log(renderCycles(edges).join('\n'));
+    if (showOrphans) console.log(renderOrphans(allFiles, faninMap).join('\n'));
+    if (showColocate) console.log(renderColocate(faninMap, fileToFolder, pathToNode).join('\n'));
+    if (showShallow) console.log(renderShallow(allFiles).join('\n'));
+    if (showPassthrough) console.log(renderPassThrough(allFiles, faninMap, fanoutMap).join('\n'));
+    if (showHubSpoke) console.log(renderHubSpoke(allFiles, faninMap, fanoutMap).join('\n'));
+    if (showInstability) console.log(renderInstability(edges, fileToFolder).join('\n'));
+    if (showReexportDepth) console.log(renderReexportDepth(allFiles, edges).join('\n'));
+    if (showComplexity) console.log(renderComplexity(allFiles).join('\n'));
+    if (showTypesafety) console.log(renderTypesafety(allFiles).join('\n'));
+    if (showComponent) console.log(renderComponent(allFiles).join('\n'));
+    if (showDupExports) console.log(renderDupExports(allFiles).join('\n'));
+    if (showUnusedExports)
+      console.log(renderUnusedExports(allFiles, importedNamesByTarget).join('\n'));
+    if (showTestColocation) console.log(renderTestColocation(allFiles).join('\n'));
+    if (showLeakage) console.log(renderLeakage(allFiles).join('\n'));
+    if (showConcept) console.log(renderConcept(allFiles).join('\n'));
+    if (showVocabDrift) console.log(renderVocabDrift(allFiles).join('\n'));
+    if (showReach) console.log(renderReach(allFiles, fanoutMap).join('\n'));
+    if (showArchitecture) console.log(renderArchitecture(edges).join('\n'));
+    if (boundaryA && boundaryB) console.log(renderBoundary(edges, boundaryA, boundaryB).join('\n'));
     if (showHistory) {
       const r = renderHistory(allFiles);
       const lines = Array.isArray(r) ? r : r.lines;
-      emit(lines);
+      console.log(lines.join('\n'));
     }
-    if (showScore) emit(renderScores(computeScores(allFiles, dep, totals)));
+    if (showScore) console.log(renderScores(computeScores(allFiles, dep, totals)).join('\n'));
   }
 }

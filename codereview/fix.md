@@ -107,49 +107,10 @@ from "fix the audit findings" alone.
    can't perceive, merge them. When the difference is intentional and
    load-bearing, leave them. Use judgment; context usually makes the
    call obvious.
-6. **Boy-scout rule on touched files.** Every file the slice opens for
-   edit — for any reason, including unrelated dimension fixes — gets a
-   fast structural check before the slice closes. If the file appears
-   in `analyze-structure`'s complexity/type-safety/component/hub-spoke/
-   shallow/pass-through/unused-export hotspot lists, in a `lookalikes`
-   collision the file participates in, or in the lowest-scoring
-   sub-dimension's hotspot rows for either package, fold a _small_
-   structural improvement into the slice. **The bar is "the file's
-   score moves because we were here," not "the file's score is
-   fixed."** One small fix per touched file is enough; bundling more
-   risks overflowing the slice budget. Skip a file only when its
-   structural cost genuinely doesn't fit in the remaining budget — and
-   record why in the Phase 4 plan so the deferred work is visible. This
-   is the standing rule that turns unrelated edits into compounding
-   structural-score gains; it complements the Phase 1 cross-link rule
-   (which picks the slice from the score) by acting on files the slice
-   already pulled in.
-
-   **The improvement choice is driven by the Matt Pocock process
-   skills already loaded at Phase 0 — they're the architecture lens
-   for this rule, not an ad-hoc list of fix shapes.** Pick the lens
-   from the file's tail signal:
-
-   | Tail signal on the touched file                                                                                                                                                                                                                       | Lens skill (already in context)                                      | Shape of the one-small improvement                                                                                                                                                            |
-   | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-   | File-name / symbol-name doesn't match the file's job; vocabulary leaks across layers; one file doing two jobs                                                                                                                                         | `skill:zoom-out` (dim 11 — Frame coherence)                          | Apply the rename test — rename the symbol/file to what it really does, fix the imports the rename forces, _or_ split the second job out.                                                      |
-   | Shallow module, pass-through, hub-spoke, hypothetical seam, interface that reveals implementation, `any[]`/`unknown` on a public type                                                                                                                 | `skill:improve-codebase-architecture` (dim 12 — Module depth & seam) | Apply the deletion test — if removing the module would collapse complexity, inline it; if interface ≈ implementation, collapse the wrapper; replace the escape-hatch type with a precise one. |
-   | Silent no-op fallback (context default swallowing missing provider, `try/catch` returning `null` without logging, `as any` cast hiding a type error), missing instrumentation a `log-doctor` mode would need, hidden coupling that prevents bisection | `skill:diagnose` (dim 13 — Diagnosability)                           | Restore the feedback loop — turn the silent fallback into a typed `Result.err` with a scoped logger line, or pin the random/time seam, or add the instrumentation the next debugger needs.    |
-   | Function signature hides failure modes (throws across a seam, returns `T \| null` for ≥2 distinct failure cases), error envelope loses the cause, raw `string` where a brand or `z.enum` belongs, schema missing `.strictObject` / `.max()`           | `skill:prompt-engineering-patterns` (dim 14 — API legibility)        | Tighten the surface — return `Result<T, E>` per `neverthrow-return-types`, brand the type, narrow the union, add the missing zod constraint.                                                  |
-
-   When more than one lens fits a file, pick the one whose skill best
-   names the _root cause_ (zoom-out for naming/frame, architecture for
-   shape/seam, diagnose for observability, prompt-engineering for
-   surface/types) and record the chosen skill on the snapshot row.
-   `skill:tdd` doesn't pick the fix here, but if the chosen
-   improvement changes runtime behaviour in a testable way, the
-   regression test follows the same `tdd` rule that already governs
-   Phase 5.
 
 ## 2. Inheritance from audit.md
 
 This prompt **inherits** from `audit.md`:
-
 - §2 Repos in scope (incl. `../coco`, `../cashu-ts`, `../nuts`, `../nips`,
   `../luds`, `../sovran-schemas`)
 - §3 Ground rules
@@ -262,13 +223,12 @@ bun run codereview/analyze-structure/index.mjs --llm | sed -n '/^Overall:/,/^# R
 bun run codereview/analyze-structure/index.mjs coco-payment-ux --llm | sed -n '/^Overall:/,/^# Repo/p'
 
 # 4.9a Lookalikes — duplicate names / values / colors / near-matches.
-#      Subcommand of analyze-structure. Run after picking a candidate
-#      slice; collisions in that subtree should be folded into the
-#      slice (consolidate-shaped fix).
-bun run codereview/analyze-structure/index.mjs lookalikes <subtree>                # default reports
-bun run codereview/analyze-structure/index.mjs lookalikes --focus <hub-spoke-file> # filter to one file
-bun run codereview/analyze-structure/index.mjs lookalikes --by-name <ident>        # every definition, <500 tokens
-bun run codereview/analyze-structure/index.mjs lookalikes --by-value '<literal>'   # every binding, <500 tokens
+#      Run after picking a candidate slice; collisions in that subtree
+#      should be folded into the slice (consolidate-shaped fix).
+bun run codereview/lookalikes/index.mjs <subtree>                  # default reports
+bun run codereview/lookalikes/index.mjs --focus <hub-spoke-file>   # full reports filtered to one file
+bun run codereview/lookalikes/index.mjs --by-name <ident>          # every definition of an ident, <500 tokens
+bun run codereview/lookalikes/index.mjs --by-value '<literal>'     # every binding to a value, <500 tokens
 
 # 4.10 Skill index + topic search
 for d in .agents/skills/*/; do n=$(basename "$d"); desc=$(awk -F': ' '/^description:/{sub(/^[[:space:]]+/,"",$2); print $2; exit}' "$d/SKILL.md" 2>/dev/null); echo "$n :: $desc"; done
@@ -296,30 +256,18 @@ npx eslint <changed files>
 npx prettier --write <changed files>
 npm run knip                  # run only when slice claims dead-code removal
 
-# 4.13a Jest — ALWAYS pass --forceExit. The test environment imports modules
-#       that leak open handles (timers, websockets, native bridges) which keep
-#       the worker alive after every test passes; without --forceExit the
-#       process hangs at the end and only exits on Ctrl-C. Locally that's a
-#       keystroke; in an agent shell it's a 10-minute timeout. Run a single
-#       test file at a time during a slice — the suite has hundreds of
-#       integration snapshots that aren't relevant to per-slice gates.
-npx jest <testfile> --forceExit
-# Stash the project-wide test for the rare case where it's actually needed:
-# npx jest --forceExit --silent
-
 # 4.14 Type-check noise floor (compare against main so unrelated baseline errors don't block)
 git stash -u && npm run type-check 2>&1 | tee /tmp/baseline.txt; git stash pop; npm run type-check 2>&1 | tee /tmp/current.txt; diff /tmp/baseline.txt /tmp/current.txt
-# Caution: `git stash pop` will apply the topmost EXISTING stash if there are
-# no local changes to stash. Always check `git stash list` first; if HEAD has
-# no working-tree diff, just run type-check directly — HEAD is the baseline.
 ```
 
 If a command's output is too large to think with, pipe through `head` and
 narrow with grep. Never paste raw 100k-line output into the plan.
 
-All three tools live under `codereview/<name>/index.*` — there are no
-`scripts/` shims. See `codereview/README.md` for the full param surface
-and per-mode token estimates.
+`scripts/analyze-structure.mjs`, `scripts/lookalikes.mjs`, and
+`scripts/log-doctor.ts` are thin shims over `codereview/<name>/index.*`
+— `npm run analyze-structure` / `npm run log-doctor` keep working. The
+cheatsheet uses the canonical paths. See `codereview/README.md` for the
+full param surface and per-mode token estimates.
 
 ## 5. Workflow
 
@@ -329,11 +277,12 @@ Before Phase 1, read every Matt Pocock process skill listed in §6.1 from
 disk. If any required-phase skill is missing, **stop** and tell the user
 to run `npx skills add mattpocock/skills --all -y` — do not proceed
 without them. Record every skill actually loaded under
-`Process skills consulted` in the Phase 4 plan. The self-check (§8 item 13) blocks the slice if this list is empty.
+`Process skills consulted` in the Phase 4 plan. The self-check (§8 item
+13) blocks the slice if this list is empty.
 
 This phase is the fixer's analogue of `audit.process_skills_consulted`
-in `audit.md` §10 item 9. The Matt Pocock set governs _how_ the fixer
-reasons, not _which dimension_ it covers — load them every run regardless
+in `audit.md` §10 item 9. The Matt Pocock set governs *how* the fixer
+reasons, not *which dimension* it covers — load them every run regardless
 of slice.
 
 ### Phase 1 — Cluster open findings
@@ -366,7 +315,7 @@ findings (untagged / partial / deferred). Group by:
   `lookalikes` name-collision, value-collision, or color-near-match
   reports. These are pure consolidation slices — the auditor often
   doesn't cite the duplicates that surround a finding, but folding
-  them into the same slice closes the audit _and_ shrinks the repo.
+  them into the same slice closes the audit *and* shrinks the repo.
 - **partial findings with unfinished `coco-payment-ux/` side** — a
   finding marked `partial` because one half landed in `sovran-app/`
   and the `coco-payment-ux/` half wasn't done. These are high-leverage
@@ -387,19 +336,6 @@ budget allows it: bundling a duplicate-merge or a dead-export removal
 into an audit fix is the canonical "net-negative diff" outcome §1b
 calls for. The Phase 4 plan must name the structural signal that was
 folded in (or note its absence).
-
-**Touched-file health snapshot (mandatory, for the §1b principle 6
-boy-scout rule).** Once the candidate file list is stable, run
-`analyze-structure --llm` once for each package the slice touches and
-`lookalikes --focus <file>` for each candidate file (cap by skipping
-files clearly outside the structural-hotspot tail). For every
-candidate file that appears in any hotspot / lookalikes / lowest-dim
-row, record the matched signal — the Phase 4 plan's
-"Touched-file health snapshot" line lists `<file> :: <signal>` for
-each, plus the _one_ small structural improvement that file will
-receive in this slice (or `defer — <reason>`). This snapshot is the
-input to the Phase 5 boy-scout pass; an empty snapshot is allowed
-only when none of the candidate files are in the tail.
 
 ### Phase 2 — Pick a slice
 
@@ -501,14 +437,6 @@ Write a short brief inline (markdown). Structure:
 - <path 2>
 - ...
 
-## Touched-file health snapshot (boy-scout rule, §1b principle 6)
-- <path 1> :: <analyze-structure signal | lookalikes signal | "clean">
-  · lens: <skill:zoom-out | skill:improve-codebase-architecture |
-           skill:diagnose | skill:prompt-engineering-patterns | "n/a — clean">
-  → <one small structural improvement to land in this slice | "defer — <reason>">
-- <path 2> :: <signal> · lens: <skill> → <improvement | defer reason>
-- ...
-
 ## Fix approach
 <2–4 sentences. Reference the controlling skill + protocol spec by path.>
 
@@ -537,13 +465,6 @@ Edit the files. Run gates after meaningful steps:
 - `npx eslint <changed files>`
 - `npx prettier --write <changed files>`
 - `npm run knip` — when the slice claims dead-code removal.
-- `npx jest <testfile> --forceExit` — when the slice adds or changes a test.
-  **Always pass `--forceExit`.** The jest-expo preset imports modules that
-  leak open handles (timers, websockets, native bridges) and the worker
-  hangs after the last test reports `passed`. Without `--forceExit` the
-  agent waits 10 minutes for nothing; with it, you see the result in
-  under a second. Don't run the full suite during a slice — it has
-  hundreds of irrelevant integration snapshots; pin the file you wrote.
 
 Conventions (non-negotiable):
 
@@ -577,32 +498,6 @@ Apply §1b principles in passing:
   `nuts/`, `nips/`, `luds/`, `../sovran-schemas/`). Inside
   `coco-payment-ux/`, rename sovran-borrowed names to UI-agnostic
   vocabulary.
-- **Boy-scout the touched files (§1b principle 6).** Walk the
-  Phase 4 "Touched-file health snapshot" and land the recorded
-  one-small-improvement on every entry that wasn't deferred. The
-  _kind_ of improvement is determined by the snapshot's `lens` —
-  one of the four Matt Pocock process skills already loaded at
-  Phase 0 — not by an ad-hoc list:
-  - `skill:zoom-out` lens → apply the rename test (rename file/symbol
-    to what it really does; or split a file doing two jobs).
-  - `skill:improve-codebase-architecture` lens → apply the deletion
-    test (collapse pass-throughs / shallow modules; replace `any[]`
-    / `unknown` on public types with precise types).
-  - `skill:diagnose` lens → restore the feedback loop (turn silent
-    no-op fallbacks into typed `Result.err` + scoped log; add the
-    instrumentation a debugger would need; pin time/random seams).
-  - `skill:prompt-engineering-patterns` lens → tighten the API
-    surface (`Result<T, E>` per `neverthrow-return-types`; brand a
-    raw `string`; add `.strictObject` / `.max()`).
-    Each improvement must (a) be small enough to add ≈≤30 lines / ≈0
-    net additions and (b) move at least one `analyze-structure` or
-    `lookalikes` row off the next snapshot for that file. Note each
-    boy-scout fix in the commit body with
-    `Boy-scout (<lens-skill>): <file> — <one line>` so reviewers see
-    both the change and the architecture rule that made it. If a
-    candidate file's bad-score signal genuinely cannot be addressed in
-    budget, the Phase 4 snapshot's `defer — <reason>` carries forward;
-    do not silently skip.
 
 Stop and ask the user when:
 
@@ -680,7 +575,7 @@ scopes per `commitlint.config.cjs`. **No `Co-Authored-By:`.**
 
 ### 6.1 Process skills (Matt Pocock set — MANDATORY load every run)
 
-These govern _how_ the fixer reasons, not _which_ dimension it covers.
+These govern *how* the fixer reasons, not *which* dimension it covers.
 Loaded at Phase 0 from `.agents/skills/` — every run, regardless of
 slice. A required skill missing from disk halts the fixer (Phase 0).
 Every skill here MUST appear under "Process skills consulted" in the
@@ -688,13 +583,13 @@ Phase 4 plan with a one-line note on what it shaped, even if its note
 is "non-logic refactor — tdd not engaged" or similar. The §8 self-check
 blocks the slice if any required skill is absent from the plan.
 
-| Skill                                 | Phase that requires it                    | What it shapes                                                                |
-| ------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------- |
-| `skill:zoom-out`                      | Phase 1                                   | Broaden frame; the slice comes from clustering, not the first finding read.   |
-| `skill:improve-codebase-architecture` | Phase 2                                   | Slice must be named in depth/seam/leverage vocabulary.                        |
-| `skill:diagnose`                      | Phase 3 (Critical/High only)              | Reproduce → minimise → hypothesise → instrument → fix → regression-test loop. |
-| `skill:tdd`                           | Phase 5 (when slice writes/changes logic) | Test-first for non-trivial logic; regression test before fix lands.           |
-| `skill:prompt-engineering-patterns`   | Phase 4 + Phase 6 commit body             | Plan and commit body stay specific, terse, structured.                        |
+| Skill | Phase that requires it | What it shapes |
+|---|---|---|
+| `skill:zoom-out` | Phase 1 | Broaden frame; the slice comes from clustering, not the first finding read. |
+| `skill:improve-codebase-architecture` | Phase 2 | Slice must be named in depth/seam/leverage vocabulary. |
+| `skill:diagnose` | Phase 3 (Critical/High only) | Reproduce → minimise → hypothesise → instrument → fix → regression-test loop. |
+| `skill:tdd` | Phase 5 (when slice writes/changes logic) | Test-first for non-trivial logic; regression test before fix lands. |
+| `skill:prompt-engineering-patterns` | Phase 4 + Phase 6 commit body | Plan and commit body stay specific, terse, structured. |
 
 (The fixer differs from `audit.md` here on `tdd`: `audit.md` excludes it
 because the auditor is read-only; the fixer writes code so `tdd` is
@@ -752,7 +647,7 @@ SHAs: <feature-sha>, <audit-status-sha>.
    commit body.
 3. Every rejected overlapping finding has a one-line reason in the plan
    (`stale | superseded by research:<slug> | superseded by skill:<name> |
-out-of-scope | dim mismatch`).
+   out-of-scope | dim mismatch`).
 4. No persist-shape change was made without `version` bump + `migrate`.
 5. No upstream edit (`coco/`, `cashu-ts/`, `nuts/`, `nips/`, `luds/`,
    `coco-cashu-plugin-npc/`, `sovran-schemas/`). Wallet-side coco changes
@@ -772,32 +667,16 @@ out-of-scope | dim mismatch`).
     `coco-payment-ux/`", "leaks sovran-app assumptions") were searched
     via §4.11 even if the slice is named elsewhere; if hits exist, the
     plan says whether they were folded in or deferred and why.
-    10a. The §1b principles were applied: any in-passing intent-vs-behavior
+10a. The §1b principles were applied: any in-passing intent-vs-behavior
     bugs in the slice's neighborhood are fixed (with an `Also:` line in
     the commit body), library-against-its-grain usage is migrated when
     obvious, and rename drift inside the touched files is closed.
-    10b. **Structural cross-link** (Phase 1 mandate). The Phase 4 plan's
+10b. **Structural cross-link** (Phase 1 mandate). The Phase 4 plan's
     "Structural signal folded in" line is filled in. Either it cites
     a concrete `analyze-structure` weakest-dim score / hotspot or a
     `lookalikes` collision count from the slice's subtree, OR it
     explicitly says "none — slice is purely audit-driven, no structural
     overlap" with the §4.9 + §4.9a outputs proving the absence.
-    10c. **Touched-file boy-scout pass** (§1b principle 6). The
-    Phase 4 "Touched-file health snapshot" was completed for every
-    candidate file with a §4.8/§4.9/§4.9a hit, every non-deferred row
-    names one of the four Matt Pocock lens skills (`skill:zoom-out`,
-    `skill:improve-codebase-architecture`, `skill:diagnose`,
-    `skill:prompt-engineering-patterns`) as the architecture rule
-    driving its fix, and Phase 5 landed the recorded
-    one-small-improvement for each non-deferred entry (each with a
-    `Boy-scout (<lens-skill>): <file> — <one line>` note in the commit
-    body that names the same lens skill). Deferrals carry an explicit
-    `defer — <reason>`. An empty snapshot is acceptable only when none
-    of the candidate files appeared in any structural-tail row; this
-    must be stated explicitly with the §4.8 / §4.9 / §4.9a outputs
-    proving the absence. A blank snapshot without that proof, any
-    non-deferred row missing its lens skill, or any non-deferred row
-    that didn't land its boy-scout fix, blocks the slice.
 11. Schemas added or changed live in `../sovran-schemas/src` unless
     app-only was explicitly justified in the plan.
 12. Final summary cites both commit SHAs.

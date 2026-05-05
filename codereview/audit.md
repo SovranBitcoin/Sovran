@@ -36,21 +36,19 @@ caller-side simplification instead.
 CWD is `sovran-app/`. All paths below are relative to it unless noted.
 
 **First-party (editable, audit target):**
-
 - `sovran-app/` — Expo SDK 55, RN 0.83.2, React 19, TS 5.9 strict, expo-router,
   Uniwind (Tailwind v4 for RN), Zustand v5 + AsyncStorage persist, legacy
   Redux + redux-persist (migrating), `@cashu/coco-*`, `@nostr-dev-kit/ndk-mobile`,
   Reanimated v4, Gesture Handler v2, neverthrow, zod v4, Jest.
 - `coco-payment-ux/` (file: dep at `sovran-app/coco-payment-ux/`) —
   first-party, UI-agnostic payment-flow engine. Inspired by state machines,
-  _not_ a finished one. Hunt: ad-hoc payment flows in sovran-app that
+  *not* a finished one. Hunt: ad-hoc payment flows in sovran-app that
   bypass it; sovran-specific leaks across its public API (sovran components,
   sovran nav, sovran theme tokens, sovran data shapes).
 - `../api.sovran.money/` (Bun + Hono + Supabase RLS) — touched only when
   ENTRY explicitly targets it.
 
 **Read-only references (cite, never edit):**
-
 - `../coco/`, `../cashu-ts/` — wallet implementations. Cite by `path:line`.
 - `../nuts/NN.md` — Cashu protocol (NUT-00..20+).
 - `../nips/NN.md` — Nostr protocol (NIP-01/04/44/60/65, etc.).
@@ -64,7 +62,6 @@ CWD is `sovran-app/`. All paths below are relative to it unless noted.
   (Critical if it touches funds, keys, or RLS).
 
 **Persisted artefacts:**
-
 - `__audits__/*.json` — append-only audit log. Read every file before
   starting; the next audit is `NN.json` where `NN` = max + 1, zero-padded.
 - `__research__/*.md` — exploratory notes with YAML frontmatter. Authority
@@ -94,34 +91,6 @@ CWD is `sovran-app/`. All paths below are relative to it unless noted.
    substantially the same thing, two schemas validating the same shape,
    two helpers with overlapping APIs, and dead exports flagged by `knip`
    are first-class findings even when no other dimension flags them.
-9. **Cross-cite structural overlaps on every finding, with the Matt
-   Pocock lens named.** For each finding's `path`, check the §4
-   `analyze-structure` hotspot lists (complexity, type-safety,
-   components, hub-spoke, shallow, pass-through, unused-export) and
-   the `lookalikes` collisions for the surrounding subtree. Whenever
-   the cited file appears in any of those rows, append a reference
-   token of the form
-   `analyze-structure:<dim-or-list> <score-or-rank>` or
-   `lookalikes:<count> in <subtree>` to the finding's `references`,
-   **plus a `skill:<lens-name>` token naming whichever Matt Pocock
-   process skill best owns the structural shape** —
-   `skill:zoom-out` (dim 11 — frame coherence: name/job mismatch,
-   vocabulary leaks, file doing two jobs);
-   `skill:improve-codebase-architecture` (dim 12 — depth/seam:
-   shallow module, pass-through, hub-spoke, hypothetical seam,
-   `any[]`/`unknown` escape hatch);
-   `skill:diagnose` (dim 13 — diagnosability: silent fallback,
-   missing instrumentation, hidden coupling);
-   `skill:prompt-engineering-patterns` (dim 14 — API legibility:
-   throws-across-seam, lossy `T | null`, lossy error envelope, schema
-   missing `.strictObject` / `.max()`). These tokens are the
-   pre-computed signal that arms `fix.md`'s touched-file boy-scout
-   rule (`fix.md` §1b principle 6 + Phase 5): when the fixer ships an
-   unrelated dimension fix on the same file, the cross-cite tells it
-   the file's score is in the tail _and which architecture skill's
-   lens to apply when picking the one-small improvement_. This is
-   recording existing signal, not a separate finding; no Pass 0 work
-   is required because the Matt Pocock skills are already loaded.
 
 ## 4. Pre-flight cheatsheet — paste verbatim, never re-derive
 
@@ -158,18 +127,17 @@ bun run codereview/analyze-structure/index.mjs coco-payment-ux --llm       # pay
 bun run codereview/analyze-structure/index.mjs --llm | head -180
 
 # ── Lookalikes (duplicate names / values / colors / near-matches) ────
-# Subcommand of analyze-structure. Default reports — run when the slice
-# picks a duplication-prone area.
-bun run codereview/analyze-structure/index.mjs lookalikes                   # whole repo
-bun run codereview/analyze-structure/index.mjs lookalikes features/payments # subtree
+# Default reports — run when the slice picks a duplication-prone area.
+bun run codereview/lookalikes/index.mjs                                    # whole repo
+bun run codereview/lookalikes/index.mjs features/payments                  # subtree
 
 # Targeted lookups (each <500 tokens). Use when an existing finding cites
 # a literal value or identifier and you want to know where else it lives.
-bun run codereview/analyze-structure/index.mjs lookalikes --by-name red
-bun run codereview/analyze-structure/index.mjs lookalikes --by-value '#FF0000'
+bun run codereview/lookalikes/index.mjs --by-name red
+bun run codereview/lookalikes/index.mjs --by-value '#FF0000'
 
 # Focus mode — full reports filtered to pairs involving one file.
-bun run codereview/analyze-structure/index.mjs lookalikes --focus shared/theme.ts
+bun run codereview/lookalikes/index.mjs --focus shared/theme.ts
 
 # Find files inside coco-payment-ux that import from sovran-app/* (leak hunt)
 grep -RnE "from ['\"](@/|features/|shared/|navigation/|app/)" coco-payment-ux/src 2>/dev/null
@@ -184,23 +152,6 @@ for d in .agents/skills/*/; do n=$(basename "$d"); desc=$(awk -F': ' '/^descript
 # Find skills relevant to a topic (case-insensitive across SKILL.md bodies)
 TOPIC="zustand persist"
 grep -rli "$TOPIC" .agents/skills/*/SKILL.md
-
-# ── Mandatory process-skill load (Matt Pocock set) ───────────────────
-# Read each file with the Read tool BEFORE any other survey step. Skimming
-# the index above is not loading. The §9.1 markdown report's "Process
-# skills" section requires a one-line paraphrase from each — that
-# paraphrase is the load-verification artifact and can only come from
-# reading the body. If a file is missing, halt and report.
-ls .agents/skills/zoom-out/SKILL.md \
-   .agents/skills/improve-codebase-architecture/SKILL.md \
-   .agents/skills/diagnose/SKILL.md \
-   .agents/skills/prompt-engineering-patterns/SKILL.md
-# Then: Read .agents/skills/zoom-out/SKILL.md
-#       Read .agents/skills/improve-codebase-architecture/SKILL.md
-#       Read .agents/skills/diagnose/SKILL.md
-#       Read .agents/skills/prompt-engineering-patterns/SKILL.md
-# (Use the Read tool for each. Bash `cat` does not count — file content
-# must enter the assistant's context window via Read.)
 
 # Static tooling
 npm run type-check          # tsc --noEmit; cite TS error codes (TS2322 etc.)
@@ -226,42 +177,14 @@ npx tsx codereview/log-doctor/index.ts errors --token-budget 8000     # auto-pru
 If a command's output is too large to think with, pipe through `head -200`
 and narrow with grep — never paste raw 100k-line output into a finding.
 
-All three tools live under `codereview/<name>/index.*` — there are no
-`scripts/` shims. `npm run analyze-structure` and `npm run log-doctor`
-invoke them by their canonical paths.
+`scripts/analyze-structure.mjs`, `scripts/lookalikes.mjs`, and
+`scripts/log-doctor.ts` are thin shims over `codereview/<name>/index.*`,
+so existing habits (`npm run analyze-structure`, `npm run log-doctor`)
+keep working. The cheatsheet uses the canonical paths.
 
 ## 5. Workflow
 
-### Pass 0 — Mandatory skill load (non-negotiable)
-
-Before Pass 1, **read every Matt Pocock process skill listed in §8.1 from
-disk via the Read tool, end-to-end**. The four mandatory paths:
-
-- `.agents/skills/zoom-out/SKILL.md`
-- `.agents/skills/improve-codebase-architecture/SKILL.md`
-- `.agents/skills/diagnose/SKILL.md`
-- `.agents/skills/prompt-engineering-patterns/SKILL.md`
-
-If any required-phase skill is missing from disk, **stop** and tell the
-user to run `npx skills add mattpocock/skills --all -y` — do not proceed
-without them. Bash `cat`, the §4 `awk` index, and the SKILL.md _frontmatter
-description_ line all do **not** count as loading; the body must enter the
-assistant's context window via the Read tool.
-
-Record every skill actually loaded under **Process skills consulted** in
-the §9.1 markdown report, each with a one-line paraphrase / note
-demonstrating the body was read. Self-check §10 item 9 blocks the audit
-if this list is empty or contains skills without a non-empty note.
-
-This phase is the auditor's analogue of `fix.md` §5 Phase 0. The Matt
-Pocock set governs _how_ the auditor reasons, not _which_ dimension is
-covered — load them every run regardless of ENTRY.
-
 ### Pass 1 — Survey (read everything cheap before opening files)
-
-Apply `skill:zoom-out` first — the prior-audit list is the broadest
-frame; the ENTRY must come from the distance-from-covered-set heuristic
-in Pass 2, not from latching onto the first finding read.
 
 1. Run the **prior audits**, **open findings**, and **covered subtrees**
    queries from §4. Memorise the open-pattern map.
@@ -276,26 +199,19 @@ in Pass 2, not from latching onto the first finding read.
    slop/consolidation findings — they're often invisible to skill-based
    audits and account for many of the "default verdict: delete" cases the
    role description points at.
-4. Skim the rest of `.agents/skills/` via the index command in §4. Defer
-   domain skills until a finding's dimension is active — load them with
-   the Read tool the same way Pass 0 loads process skills, only when their
-   dimension fires.
+4. Skim `.agents/skills/`. Always load the **process skills** below
+   (Matt Pocock set, mandatory). Defer domain skills until a finding's
+   dimension is active.
 5. List `__research__/`, read `__research__/README.md`, open any note whose
    tags / `dim-N` overlap the likely entry.
 6. List `../docs/`. If ENTRY's band has a Ratified SOV-XX, read it.
 
 ### Pass 2 — Pick an ENTRY
 
-Apply `skill:improve-codebase-architecture` here — the ENTRY must be
-named in its **depth/seam/leverage** vocabulary, not in ad-hoc terms.
-"Audit the storage seam in `features/whitenoise/`" is right; "look at
-whitenoise" is not.
-
 **If user supplied one:** use it.
 
 **If empty / "auto" / "find something":** synthesise per "distance from
 covered set" — pick a depth-2 slice that:
-
 - doesn't appear in `audit-covered subtrees` query output, OR
 - is the lowest-scoring dimension in `analyze-structure --llm`, OR
 - has fresh `lookalikes` collisions / color near-matches that no prior
@@ -309,7 +225,6 @@ which structural signal motivated it (e.g. "Module Design 49/100, top
 complexity hotspot lives here, lookalikes shows 6 color collisions").
 
 Two named patterns are **always in scope** regardless of slice choice:
-
 - "coco payment flow bypasses `coco-payment-ux/`" — grep `features shared`
   for ad-hoc Cashu/Lightning flows that don't route through the package.
 - "`coco-payment-ux/` leaks `sovran-app/`-specific assumptions" — grep
@@ -318,17 +233,8 @@ Two named patterns are **always in scope** regardless of slice choice:
 
 ### Pass 3 — Investigate
 
-Apply `skill:diagnose` for any candidate Critical/High correctness
-finding — narrate the investigation using its
-reproduce → minimise → hypothesise → instrument → fix → regression-test
-loop. The auditor is read-only, so the loop terminates at "fix" as a
-description (the downstream fixer writes the actual fix); the trail must
-still be recorded in the finding's `description` and `verification_note`
-so the fixer can resume.
-
-Apply the fourteen review dimensions (§6) to the ENTRY's blast radius. For each
+Apply the ten review dimensions (§6) to the ENTRY's blast radius. For each
 candidate finding:
-
 - Open the file. Quote the relevant tokens. Cite `path:line`.
 - Construct the strongest counter-argument before recording.
 - Cite the relevant skill, NUT/NIP/LUD, and lint/TS/knip rule.
@@ -341,7 +247,6 @@ log-doctor evidence + no self-evident structural race ⇒ drop in Phase B.
 ### Pass 4 — Verify and prune
 
 For every Phase A finding:
-
 - Re-open the cited line; confirm the claim still holds.
 - Drop if confidence < 0.4 unless severity ≥ High.
 - Re-check whether a prior audit already covered it (cite `prior_audit_id`).
@@ -349,24 +254,12 @@ For every Phase A finding:
 
 ### Pass 5 — Emit
 
-Apply `skill:prompt-engineering-patterns` to keep the report and JSON
-specific, terse, and structured — both are prompts for downstream
-review/fix agents.
-
 Markdown report inline (§9.1). Strict-JSON file at `__audits__/NN.json`
 (§9.2). Do nothing else on disk.
 
-## 6. Review dimensions (14)
+## 6. Review dimensions (10)
 
 Compact reference; consult the cited skills and protocol files for full rules.
-
-Dimensions 1–10 are **domain dimensions**: they fire when the slice touches a
-specific technical surface (Cashu, Nostr, Zustand, Reanimated, Zod, etc.) and
-are skipped otherwise. Dimensions 11–14 are **process dimensions** derived
-from the Matt Pocock skills loaded at Pass 0 — they are evaluated on every
-slice, because the skills they map to are mandatory loads. A process
-dimension is `skipped` only when the slice genuinely produced no findings of
-that shape, not when the auditor forgot to look.
 
 1. **Correctness & invariants** — logic bugs, broken state machines. Wallets:
    proof state UNSPENT→PENDING→SPENT must be atomic and unique-keyed on
@@ -433,68 +326,6 @@ that shape, not when the auditor forgot to look.
     parse/reject tests. Critical state-machine transitions integration-tested.
     Logs use scoped loggers from `shared/lib/logger` with redaction; no
     secrets/seeds/full proofs. Skills: `jest-react-testing`.
-    **Running tests** — always `npx jest <testfile> --forceExit`. The
-    jest-expo preset imports modules that leak open handles (timers,
-    websockets, native bridges); without `--forceExit` jest hangs after
-    the last test reports `passed`. Locally users Ctrl-C; in an agent
-    shell it just times out at 10 min. Pin the file — don't run the
-    whole suite during an audit.
-11. **Frame coherence (zoom-out)** — does the module sit at the right level of
-    abstraction? File or symbol name doesn't match what it actually does (a
-    file called `utils.ts` that owns a state machine; a hook named
-    `useFoo` that returns a side-effect-free pure value). Vocabulary leaks
-    across layers (UI components naming protocol-level concepts, or vice
-    versa). One file doing two unrelated jobs. Module is named in the
-    vocabulary of its caller rather than its own concern. Apply the rename
-    test: if you rename the file/symbol to what it really does, does any
-    other file need to change? If yes, the original name is the finding.
-    Cross-cutting: payment flows that bypass `coco-payment-ux/` and
-    `coco-payment-ux/` files that leak `sovran-app/`-specific assumptions
-    are dim-11 findings (in addition to whatever else they trip).
-    Skill: `zoom-out`.
-12. **Module depth & seam quality (improve-codebase-architecture)** — apply
-    the deletion test: imagine deleting the module. If complexity vanishes,
-    it was a pass-through. If the same complexity reappears in N callers,
-    the module was earning its keep. Shallow modules (interface ≈
-    implementation; check `analyze-structure` Top shallow modules), pass-
-    throughs (ratio=1, fanout=0), hypothetical seams (one adapter only —
-    real seams need two), interfaces that reveal implementation (private
-    state held in React context, exported types that surface secret
-    fields without a SECRET marker, public types with `any[]` or `unknown`
-    escape hatches). Cache maps held in `useState` instead of `useRef`,
-    which propagate identity churn through context, are dim-12. Findings
-    that consolidate or delete code are higher-leverage than findings
-    that propose new code. Skill: `improve-codebase-architecture`.
-13. **Diagnosability & feedback-loop seams (diagnose)** — can a future
-    debugger build a fast deterministic feedback loop against this code?
-    Silent no-op fallbacks (a context default that swallows missing
-    providers; a `try/catch` that returns `null` without logging; an
-    `as any` cast that hides a type error) destroy the feedback loop and
-    are dim-13. Missing instrumentation that would let `log-doctor` see
-    a perf spike or race (cf. dim 7's "log-doctor evidence or
-    `UNVERIFIED`") is dim-13 when the gap is _observability_, not
-    _behaviour_. Test seams that are too shallow to exercise the real
-    bug (a unit test of a pure function whose bugs only manifest at
-    multi-caller integration) are dim-13: "the codebase architecture is
-    preventing the bug from being locked down" is itself a finding. Hidden
-    coupling that prevents bisection (global mutable state, module-load
-    side effects, time/random not pinned) is dim-13. Skill: `diagnose`.
-14. **API legibility & structured surfaces (prompt-engineering-patterns)** —
-    public function signatures that hide their failure modes (throw
-    instead of returning a `Result<T, E>` per `neverthrow-return-types`;
-    return `T | null` where the null branch encodes ≥2 distinct failure
-    cases). Types that don't document their constraints (raw `string`
-    where a branded `Hex32` or `Npub` would prevent mis-routing; loose
-    string unions that should be `z.enum`). Error envelopes that lose the
-    cause (raw `Error` thrown across a seam where `{ kind, message,
-cause }` would let the caller branch). For LLM-facing code (prompt
-    builders, tool-use schemas, structured-output parsers): prompts that
-    are vague/verbose where they should be specific/terse/structured;
-    Pydantic-equivalent (zod) schemas missing `.strictObject` or
-    `.max()`; example selection that doesn't match the target task.
-    Dim-14 overlaps with dim 1 (neverthrow) and dim 6 (zod) — file the
-    finding under whichever skill produced the strongest reason, and
-    `references` may include both. Skill: `prompt-engineering-patterns`.
 
 ## 7. Severity rubric
 
@@ -515,40 +346,22 @@ confidence < 0.4 in Phase B.
 
 ## 8. Skills to consult
 
-### 8.1 Process skills (Matt Pocock set — MANDATORY load every run)
+### 8.1 Process skills (Matt Pocock set — always loaded)
 
-**"Loaded" means "read end-to-end via the Read tool, with the body in
-the assistant's context window."** Listing the skill name in
-`audit.process_skills_consulted` is _not_ loading. Bash `cat`, the §4
-`awk` index, and the SKILL.md frontmatter description line all do **not**
-count.
+Run before declaring blast radius / filing the first finding. Cite in
+`audit.process_skills_consulted`.
 
-These govern _how_ the auditor reasons, not _which_ dimension it covers.
-Loaded at Pass 0 from `.agents/skills/` — every run, regardless of ENTRY.
-A required skill missing from disk halts the auditor (Pass 0). Every
-skill here MUST appear under "Process skills consulted" in the §9.1
-markdown report with a non-empty one-line note on what it shaped, even
-if the note is "no Critical/High in slice — diagnose loop deferred" or
-similar. The §10 self-check item 9 blocks the audit if any required
-skill is absent from the report or has an empty note.
-
-| Skill                                 | Pass that requires it         | Dim | What it shapes                                                                                                              |
-| ------------------------------------- | ----------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------- |
-| `skill:zoom-out`                      | Pass 1                        | 11  | Broaden frame; ENTRY comes from distance-from-covered-set, not first hit. Drives dim-11 (Frame coherence) findings.         |
-| `skill:improve-codebase-architecture` | Pass 2                        | 12  | ENTRY named in depth/seam/leverage vocabulary; refactor-plan items cite this. Drives dim-12 (Module depth & seam) findings. |
-| `skill:diagnose`                      | Pass 3 (Critical/High only)   | 13  | Reproduce → minimise → hypothesise → instrument → fix loop, recorded in trail. Drives dim-13 (Diagnosability) findings.     |
-| `skill:prompt-engineering-patterns`   | Pass 5 (markdown + JSON emit) | 14  | Report + JSON stay specific, terse, structured — both are downstream prompts. Drives dim-14 (API legibility) findings.      |
-
-Skill paths (verbatim, for the Read tool):
-
-- `.agents/skills/zoom-out/SKILL.md`
-- `.agents/skills/improve-codebase-architecture/SKILL.md`
-- `.agents/skills/diagnose/SKILL.md`
-- `.agents/skills/prompt-engineering-patterns/SKILL.md`
-
-(The auditor differs from `fix.md` here on `tdd`: `fix.md` includes it
-because the fixer writes code; the auditor is read-only so `tdd` is
-out-of-set.)
+- `skill:zoom-out` — broaden the frame before declaring blast radius.
+- `skill:improve-codebase-architecture` — depth/seam/leverage vocabulary;
+  refactor candidates use this language exclusively. Findings of
+  `kind: refactor` cite this skill.
+- `skill:diagnose` — narrate every Critical/High correctness finding using
+  its reproduce → minimise → hypothesise → instrument → fix → regression
+  loop (the auditor doesn't write the fix; it leaves a downstream-readable
+  trail).
+- `skill:prompt-engineering-patterns` — the auditor's output is itself a
+  prompt for downstream review/fix agents; apply specificity, structured
+  output, and token efficiency.
 
 ### 8.2 Domain skills (load when matching dimension is active)
 
@@ -576,17 +389,6 @@ report it; the user can `npx skills add mattpocock/skills --all -y`.
 ## Entry point
 <path / slug>. Autoselected? <yes/no>. Blast radius: <N files>.
 
-## Process skills consulted (Matt Pocock set — required)
-- skill:zoom-out — <one line on what it shifted in the ENTRY choice>
-- skill:improve-codebase-architecture — <seam named, leverage estimate>
-- skill:diagnose — <which Critical/High the loop was applied to, or
-  "no Critical/High in slice — loop deferred">
-- skill:prompt-engineering-patterns — applied to report + JSON
-
-(Each note must paraphrase a specific instruction or vocabulary item from
-the loaded SKILL.md — the paraphrase is the load-verification artifact.
-See §8.1 and §10 item 9.)
-
 ## Summary
 <1 paragraph; counts by severity; top 3 risks named>
 
@@ -606,7 +408,7 @@ helper modes, proposed research notes. **No code patches.**
 
 ## Dimensions covered
 | Dim | Status |
-| 1 | pass | ... | 10 | partial | 11 | pass | 12 | partial | 13 | pass | 14 | skipped |
+| 1 | pass | ... | 10 | partial |
 
 ## Static tooling evidence
 Trimmed output that grounded findings, captioned with the command.
@@ -641,12 +443,7 @@ those later when work lands.
     "prior_audits_consulted": ["52.json"],
     "sov_specs_consulted": ["docs/SOV-00.md"],
     "skills_consulted": ["zustand-5", "zod-4"],
-    "process_skills_consulted": [
-      "zoom-out",
-      "improve-codebase-architecture",
-      "diagnose",
-      "prompt-engineering-patterns"
-    ],
+    "process_skills_consulted": ["zoom-out", "improve-codebase-architecture", "diagnose", "prompt-engineering-patterns"],
     "research_consulted": ["zustand-zod-playbook"],
     "tooling_run": {
       "type_check": "clean",
@@ -675,33 +472,17 @@ those later when work lands.
       "prior_audit_id": null
     }
   ],
-  "dimensions": {
-    "1": "pass",
-    "2": "pass",
-    "3": "skipped",
-    "4": "skipped",
-    "5": "skipped",
-    "6": "partial",
-    "7": "partial",
-    "8": "skipped",
-    "9": "skipped",
-    "10": "partial",
-    "11": "pass",
-    "12": "partial",
-    "13": "pass",
-    "14": "skipped"
-  },
-  "refactor_plan": [{ "type": "consolidate", "description": "...", "files": ["..."] }],
+  "dimensions": { "1": "pass", "2": "pass", "3": "skipped", "4": "skipped", "5": "skipped", "6": "partial", "7": "partial", "8": "skipped", "9": "skipped", "10": "partial" },
+  "refactor_plan": [
+    { "type": "consolidate", "description": "...", "files": ["..."] }
+  ],
   "open_questions": ["..."]
 }
 ```
 
 **Enums** (other values are self-check failures):
-
 - `severity`: `Critical | High | Medium | Low | Nit`
-- `dimension`: integer 1–14 (1–10 are domain dimensions, skipped when not
-  touched by the slice; 11–14 are process dimensions and are evaluated
-  every run because the Matt Pocock skills they map to are mandatory loads)
+- `dimension`: integer 1–10
 - `dimensions.*`: `pass | partial | skipped`
 - `refactor_plan.type`: `consolidate | relocate | dead-code | log-helper | research-note`
 - `confidence`: 0.0–1.0
@@ -711,12 +492,7 @@ those later when work lands.
 classify):
 `nuts/NN.md[:L]`, `nips/NN.md[:L]`, `luds/NN.md[:L]`, `docs/SOV-XX.md §N`,
 `skill:<name>`, `lint:<rule-id>`, `ts:<error-code>`, `knip:<category>`,
-`git:<sha>`, `gh:<pr>`, `research:<slug>[#section]`, plain `path:line`,
-`analyze-structure:<dim-or-list> <score-or-rank>` (e.g.
-`analyze-structure:complexity rank3`, `analyze-structure:Module-Design 49/100`),
-`lookalikes:<count> in <subtree>` (e.g. `lookalikes:6 collisions in features/payments`).
-The last two are the cross-cite tokens that arm `fix.md`'s boy-scout
-rule on touched files (see §3 ground rule 9 and §10 item 13).
+`git:<sha>`, `gh:<pr>`, `research:<slug>[#section]`, plain `path:line`.
 
 ## 10. Self-check (run before emitting)
 
@@ -729,15 +505,7 @@ rule on touched files (see §3 ground rule 9 and §10 item 13).
 6. Enums match §9.2 exactly.
 7. No patches, no edits except `__audits__/NN.json`.
 8. No persist-shape change is proposed without `version` bump + `migrate`.
-9. **Process skills consulted (Matt Pocock set)** — Pass 0 ran. Every
-   skill in §8.1's table appears under "Process skills consulted" in the
-   §9.1 markdown report with a non-empty note that paraphrases a specific
-   instruction or vocabulary item from the loaded SKILL.md (the
-   paraphrase is the load-verification artifact and can only come from
-   reading the body). The same list appears in
-   `audit.process_skills_consulted` in the §9.2 JSON. An empty list, any
-   required skill missing, or any skill listed without a non-empty
-   paraphrase note blocks the audit and triggers a re-run from Pass 0.
+9. Matt Pocock process skills loaded are listed in `audit.process_skills_consulted`.
 10. If `log.txt` absent, dependent findings are `UNVERIFIED`; if present,
     grounded lines are quoted in the markdown report.
 11. The two named cross-cutting patterns ("bypasses `coco-payment-ux/`",
@@ -745,17 +513,3 @@ rule on touched files (see §3 ground rule 9 and §10 item 13).
     elsewhere.
 12. Schemas in sovran-app or coco-payment-ux duplicating
     `../sovran-schemas` are flagged.
-13. **Structural overlap cross-cited with Matt Pocock lens (§3 ground
-    rule 9).** For every finding, the auditor checked the finding's
-    `path` against `analyze-structure` hotspot lists and `lookalikes`
-    collisions for the surrounding subtree. If the file is in any
-    tail row, the finding's `references` carries both (a) the
-    structural token (`analyze-structure:<dim-or-list> <…>` or
-    `lookalikes:<count> in <subtree>`) and (b) a `skill:<lens-name>`
-    token from the Matt Pocock set (`zoom-out`,
-    `improve-codebase-architecture`, `diagnose`,
-    `prompt-engineering-patterns`) naming whichever skill best owns
-    the structural shape per §3 ground rule 9. A finding whose path
-    is a known structural hotspot but lacks either token blocks the
-    audit until both are added — without the lens, the fixer's
-    boy-scout rule can't pick the right architecture skill to apply.

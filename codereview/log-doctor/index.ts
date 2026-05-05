@@ -19,7 +19,7 @@
  *   analyzed, reducing the number of tokens."
  *
  * USAGE:
- *   npx tsx codereview/log-doctor/index.ts <mode> [options] < log.txt
+ *   npx tsx scripts/log-doctor.ts <mode> [options] < log.txt
  *   npm run log-doctor -- <mode> [options]
  *
  * MODES:
@@ -63,11 +63,20 @@ import { spawn, spawnSync } from 'child_process';
 
 // Test DSL — parser, executor, discovery, verification metadata writer.
 // These power the `phone test ...` subcommand.
-import { discoverTests, findMatrix, findTest, formatTestList } from './test-dsl/discovery';
+import {
+  discoverTests,
+  findMatrix,
+  findTest,
+  formatTestList,
+} from './test-dsl/discovery';
 import type { RunnerEvent } from './test-dsl/events';
 import { executeMatrix, executeTest } from './test-dsl/executor';
 import { parseSuite } from './test-dsl/parser';
-import { createTtyReporter, isInteractiveTty, type TtyReporter } from './test-dsl/tty-reporter';
+import {
+  createTtyReporter,
+  isInteractiveTty,
+  type TtyReporter,
+} from './test-dsl/tty-reporter';
 import { writeMatrixResultTable, writeVerifiedComment } from './test-dsl/verification';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1691,28 +1700,17 @@ function modeGC(entries: LogEntry[], _opts: Options): string {
 function modeCrypto(entries: LogEntry[], opts: Options): string {
   // Crypto ops come from __CASHU_PERF or native_crypto events
   const cryptoOps = [
-    'hashToCurve',
-    'hash_e',
-    'blindMessage',
-    'unblind',
-    'constructProof',
-    'schnorr.sign',
-    'schnorr.verify',
-    'dleq.verify',
-    'dleq.verifyReblind',
-    'derive_deprecated',
-    'deriveBoth',
-    'createDeterministicData_batch',
-    'createRandomData',
-    'createSingleRandomData',
-    'outputData.toProof',
-    'encodeToken',
-    'decodeToken',
-    'wallet.checkProofsStates',
+    'hashToCurve', 'hash_e', 'blindMessage', 'unblind', 'constructProof',
+    'schnorr.sign', 'schnorr.verify', 'dleq.verify', 'dleq.verifyReblind',
+    'derive_deprecated', 'deriveBoth', 'createDeterministicData_batch',
+    'createRandomData', 'createSingleRandomData', 'outputData.toProof',
+    'encodeToken', 'decodeToken', 'wallet.checkProofsStates',
   ];
 
   // Find cashu.native_crypto events
-  const nativeCryptoEntries = entries.filter((e) => e.event === 'cashu.native_crypto.enabled');
+  const nativeCryptoEntries = entries.filter(
+    (e) => e.event === 'cashu.native_crypto.enabled'
+  );
 
   // Find coco perf entries with crypto timing
   const perfEntries = entries.filter((e) => {
@@ -1747,17 +1745,7 @@ function modeCrypto(entries: LogEntry[], opts: Options): string {
   lines.push('');
 
   // Aggregate perf entries by operation type
-  const byOp = new Map<
-    string,
-    {
-      count: number;
-      totalMs: number;
-      minMs: number;
-      maxMs: number;
-      native: number;
-      jsCount: number;
-    }
-  >();
+  const byOp = new Map<string, { count: number; totalMs: number; minMs: number; maxMs: number; native: number; jsCount: number }>();
   for (const e of perfEntries) {
     const params = e.params as Record<string, unknown>;
     // Try to extract op from event name
@@ -1766,14 +1754,7 @@ function modeCrypto(entries: LogEntry[], opts: Options): string {
 
     const ms = params.ms as number;
     const isNative = params.native === true;
-    const existing = byOp.get(op) ?? {
-      count: 0,
-      totalMs: 0,
-      minMs: Infinity,
-      maxMs: 0,
-      native: 0,
-      jsCount: 0,
-    };
+    const existing = byOp.get(op) ?? { count: 0, totalMs: 0, minMs: Infinity, maxMs: 0, native: 0, jsCount: 0 };
     existing.count++;
     existing.totalMs += ms;
     existing.minMs = Math.min(existing.minMs, ms);
@@ -1859,12 +1840,9 @@ function modeOps(entries: LogEntry[], opts: Options): string {
       byPhase.set(phase, existing);
     }
 
-    for (const [phase, stats] of [...byPhase.entries()].sort(
-      (a, b) => b[1].totalMs - a[1].totalMs
-    )) {
+    for (const [phase, stats] of [...byPhase.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs)) {
       const avg = stats.count > 0 ? stats.totalMs / stats.count : 0;
-      const msStr =
-        stats.totalMs > 0 ? ` (${stats.totalMs.toFixed(1)}ms total, ${avg.toFixed(1)}ms avg)` : '';
+      const msStr = stats.totalMs > 0 ? ` (${stats.totalMs.toFixed(1)}ms total, ${avg.toFixed(1)}ms avg)` : '';
       lines.push(`  ${phase.padEnd(25)} ${String(stats.count).padStart(3)}x${msStr}`);
     }
     lines.push('');
@@ -1872,11 +1850,7 @@ function modeOps(entries: LogEntry[], opts: Options): string {
 
   // Show wallet-level operations (wallet.send, wallet.receive, etc. from cashu-ts __CASHU_PERF)
   const walletOps = entries.filter((e) => {
-    return (
-      e.event.startsWith('wallet.action.') ||
-      e.event.startsWith('payment.step.') ||
-      e.event.startsWith('payment.processing')
-    );
+    return e.event.startsWith('wallet.action.') || e.event.startsWith('payment.step.') || e.event.startsWith('payment.processing');
   });
   if (walletOps.length > 0) {
     lines.push('WALLET ACTIONS:');
@@ -1888,15 +1862,8 @@ function modeOps(entries: LogEntry[], opts: Options): string {
       const delta = prevT !== null ? t - prevT : 0;
       prevT = t;
       const params = e.params as Record<string, unknown> | undefined;
-      const paramsStr = params
-        ? Object.entries(params)
-            .filter(([k]) => k !== '_t' && k !== '_dedup')
-            .map(([k, v]) => `${k}=${v}`)
-            .join(' ')
-        : '';
-      lines.push(
-        `${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(35).slice(0, 35)} ${paramsStr}`
-      );
+      const paramsStr = params ? Object.entries(params).filter(([k]) => k !== '_t' && k !== '_dedup').map(([k, v]) => `${k}=${v}`).join(' ') : '';
+      lines.push(`${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(35).slice(0, 35)} ${paramsStr}`);
     }
     lines.push(footer);
   }
@@ -1927,13 +1894,7 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
   >();
   for (const e of perfEntries) {
     const ms = (e.params as Record<string, unknown>).ms as number;
-    const existing = byEvent.get(e.event) ?? {
-      count: 0,
-      totalMs: 0,
-      minMs: Infinity,
-      maxMs: 0,
-      samples: [],
-    };
+    const existing = byEvent.get(e.event) ?? { count: 0, totalMs: 0, minMs: Infinity, maxMs: 0, samples: [] };
     existing.count++;
     existing.totalMs += ms;
     existing.minMs = Math.min(existing.minMs, ms);
@@ -1947,9 +1908,7 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
 
   lines.push('BOTTLENECK RANKING (by total time):');
   lines.push('');
-  lines.push(
-    '  Event                                  Count   Total ms   Avg ms   Min ms   Max ms   P95 ms'
-  );
+  lines.push('  Event                                  Count   Total ms   Avg ms   Min ms   Max ms   P95 ms');
   lines.push('  ' + '-'.repeat(100));
 
   for (const [event, stats] of sorted) {
@@ -1963,15 +1922,11 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
   lines.push('');
 
   // Show entries with ms > 500 (slow operations)
-  const slowOps = perfEntries.filter(
-    (e) => ((e.params as Record<string, unknown>).ms as number) > 500
-  );
+  const slowOps = perfEntries.filter((e) => ((e.params as Record<string, unknown>).ms as number) > 500);
   if (slowOps.length > 0) {
     lines.push(`SLOW OPERATIONS (>500ms): ${slowOps.length}`);
     lines.push('');
-    for (const e of slowOps
-      .sort((a, b) => ((b.params as any).ms as number) - ((a.params as any).ms as number))
-      .slice(0, 20)) {
+    for (const e of slowOps.sort((a, b) => ((b.params as any).ms as number) - ((a.params as any).ms as number)).slice(0, 20)) {
       const params = e.params as Record<string, unknown>;
       const ms = params.ms as number;
       const extra = Object.entries(params)
@@ -1984,9 +1939,7 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
   }
 
   // Network vs compute breakdown
-  const withNetwork = perfEntries.filter(
-    (e) => (e.params as Record<string, unknown>).networkMs !== undefined
-  );
+  const withNetwork = perfEntries.filter((e) => (e.params as Record<string, unknown>).networkMs !== undefined);
   if (withNetwork.length > 0) {
     lines.push('NETWORK vs COMPUTE BREAKDOWN:');
     lines.push('');
@@ -2288,7 +2241,9 @@ async function wdaRequest(
     } catch (err) {
       transportErr = err;
       if (attempt === 0) {
-        emitRecoveryLine(`▸ WDA request failed (${(err as Error).message}) — attempting recovery…`);
+        emitRecoveryLine(
+          `▸ WDA request failed (${(err as Error).message}) — attempting recovery…`
+        );
         try {
           await recoverWDA();
           emitRecoveryLine(`▸ WDA recovered, retrying ${method} ${path}`);
@@ -2336,9 +2291,7 @@ async function wdaRequest(
   try {
     parsed = text ? JSON.parse(text) : {};
   } catch {
-    throw new Error(
-      `WDA returned non-JSON ${res.status} for ${method} ${path}: ${text.slice(0, 200)}`
-    );
+    throw new Error(`WDA returned non-JSON ${res.status} for ${method} ${path}: ${text.slice(0, 200)}`);
   }
   if (!res.ok) {
     const value = (parsed as { value?: { message?: string } }).value;
@@ -2437,7 +2390,9 @@ function formatNodeLine(n: FlatNode): string {
   const id = n.identifier ? `[${n.identifier}] ` : '';
   const labelOrName = n.label || n.name || '';
   const text = labelOrName ? `"${ellipsis(labelOrName, 60)}" ` : '';
-  const at = n.rect ? `@${n.centerX},${n.centerY} ${n.rect.width}x${n.rect.height}` : '';
+  const at = n.rect
+    ? `@${n.centerX},${n.centerY} ${n.rect.width}x${n.rect.height}`
+    : '';
   return `${t} ${id}${text}${at}`.trimEnd();
 }
 
@@ -2448,7 +2403,8 @@ function formatTreeOutput(nodes: FlatNode[], showAll: boolean): string {
   const withId = nodes.filter((n) => n.hasIdent);
   const withText = nodes.filter((n) => !n.hasIdent && n.hasText);
   const rest = nodes.filter((n) => !n.hasIdent && !n.hasText);
-  const positionSort = (a: FlatNode, b: FlatNode) => a.centerY - b.centerY || a.centerX - b.centerX;
+  const positionSort = (a: FlatNode, b: FlatNode) =>
+    a.centerY - b.centerY || a.centerX - b.centerX;
   withId.sort(positionSort);
   withText.sort(positionSort);
   rest.sort(positionSort);
@@ -2839,7 +2795,8 @@ export async function preflightDismissDevMenu(): Promise<void> {
       // blocking all interaction underneath. Must be dismissed first.
       const allowPaste = flat.find(
         (n) =>
-          (n.label === 'Allow Paste' || n.name === 'Allow Paste') && n.rect && n.rect.width > 30
+          (n.label === 'Allow Paste' || n.name === 'Allow Paste') &&
+          n.rect && n.rect.width > 30
       );
       if (allowPaste && allowPaste.rect) {
         await tapXY(allowPaste.centerX, allowPaste.centerY);
@@ -2859,7 +2816,9 @@ export async function preflightDismissDevMenu(): Promise<void> {
       const switcher = flat.find((n) => n.identifier === 'SBSwitcherWindow:Main');
       if (switcher) {
         const card = flat.find(
-          (n) => n.identifier && n.identifier.startsWith('card:com.sovranbitcoin.dev:sceneID')
+          (n) =>
+            n.identifier &&
+            n.identifier.startsWith('card:com.sovranbitcoin.dev:sceneID')
         );
         if (card && card.rect) {
           await tapXY(card.centerX, card.centerY);
@@ -2888,7 +2847,9 @@ export async function preflightDismissDevMenu(): Promise<void> {
       // and use a slower move duration so iOS recognises it as a
       // standard banner dismiss drag, not a system-edge flick.
       const notification = flat.find(
-        (n) => n.identifier === 'NotificationShortLookView' || n.identifier === 'ShortLook.Platter'
+        (n) =>
+          n.identifier === 'NotificationShortLookView' ||
+          n.identifier === 'ShortLook.Platter'
       );
       if (notification && notification.rect) {
         const r = notification.rect;
@@ -2981,6 +2942,7 @@ function buildCoordTapNudge(x: number, y: number): string {
 
 const STEP_TIMEOUT_MS = 90_000;
 
+
 /**
  * Read the iOS clipboard via WDA. iOS 14+ blocks pasteboard reads from
  * background apps, so we have to briefly bring the WDA runner to the
@@ -3072,6 +3034,7 @@ export async function writeClipboard(
   });
 }
 
+
 async function pollFor<T>(
   fn: () => Promise<T | null>,
   timeoutMs: number,
@@ -3099,7 +3062,8 @@ export async function captureElementLabel(accessibilityId: string): Promise<stri
       using: 'accessibility id',
       value: accessibilityId,
     });
-    const eid: string | undefined = findRes.value?.ELEMENT || findRes.value?.element;
+    const eid: string | undefined =
+      findRes.value?.ELEMENT || findRes.value?.element;
     if (!eid) return null;
     // Try label first, then name.
     for (const attr of ['label', 'name']) {
@@ -3125,7 +3089,8 @@ export async function tapByID(id: string): Promise<void> {
       using: 'accessibility id',
       value: id,
     });
-    const eid: string | undefined = findRes.value?.ELEMENT || findRes.value?.element;
+    const eid: string | undefined =
+      findRes.value?.ELEMENT || findRes.value?.element;
     if (eid) {
       const rectRes = await wdaRequest('GET', `/session/${sid}/element/${eid}/rect`);
       const r = rectRes.value;
@@ -3172,7 +3137,12 @@ export async function tapByID(id: string): Promise<void> {
   if (!node.rect) throw new Error(`element [${id}] has no rect`);
 
   const { width, height } = await getWindowSize();
-  if (node.centerX < 0 || node.centerX > width || node.centerY < 0 || node.centerY > height) {
+  if (
+    node.centerX < 0 ||
+    node.centerX > width ||
+    node.centerY < 0 ||
+    node.centerY > height
+  ) {
     throw new Error(
       `element [${id}] is off-screen (center ${node.centerX},${node.centerY} outside ${width}x${height} viewport). ` +
         `Use \`scroll until #${id} visible\` before tapping — XCUITest will otherwise route the injected touch to whatever's at the visible edge.`
@@ -3239,7 +3209,10 @@ export async function scrollUntilVisible(
     if (!node.rect) return false;
     const r = node.rect;
     return (
-      r.x >= 0 && r.y >= viewportTop && r.x + r.width <= width && r.y + r.height <= viewportBottom
+      r.x >= 0 &&
+      r.y >= viewportTop &&
+      r.x + r.width <= width &&
+      r.y + r.height <= viewportBottom
     );
   };
 
@@ -3455,7 +3428,8 @@ export async function tapByText(text: string): Promise<{ node: FlatNode; nudge: 
       using: '-ios predicate string',
       value: `label == '${escaped}' OR name == '${escaped}'`,
     });
-    const eid: string | undefined = findRes.value?.ELEMENT || findRes.value?.element;
+    const eid: string | undefined =
+      findRes.value?.ELEMENT || findRes.value?.element;
     if (eid) {
       const rectRes = await wdaRequest('GET', `/session/${sid}/element/${eid}/rect`);
       const r = rectRes.value;
@@ -3466,19 +3440,7 @@ export async function tapByText(text: string): Promise<{ node: FlatNode; nudge: 
         // Can't determine nudge without the full tree — assume no nudge
         // on the fast path (the element was found by text, so it likely
         // lacks a testID, but we skip the nudge to avoid the tree fetch).
-        return {
-          node: {
-            identifier: '',
-            label: text,
-            name: text,
-            type: '',
-            rect: r,
-            centerX: cx,
-            centerY: cy,
-            hasIdent: false,
-          },
-          nudge: true,
-        };
+        return { node: { identifier: '', label: text, name: text, type: '', rect: r, centerX: cx, centerY: cy, hasIdent: false }, nudge: true };
       }
     }
   } catch (err: unknown) {
@@ -3524,7 +3486,10 @@ export async function tapKeypadDigit(digit: string): Promise<void> {
   // text "1" elsewhere on screen.
   const candidates = flat.filter(
     (n) =>
-      n.rect && (n.label === digit || n.name === digit) && n.rect.width >= 40 && n.rect.height >= 40
+      n.rect &&
+      (n.label === digit || n.name === digit) &&
+      n.rect.width >= 40 &&
+      n.rect.height >= 40
   );
   if (candidates.length === 0) {
     throw new Error(
@@ -3533,7 +3498,7 @@ export async function tapKeypadDigit(digit: string): Promise<void> {
     );
   }
   // Pick the largest match (the keypad button, not any incidental text).
-  candidates.sort((a, b) => b.rect!.width * b.rect!.height - a.rect!.width * a.rect!.height);
+  candidates.sort((a, b) => (b.rect!.width * b.rect!.height) - (a.rect!.width * a.rect!.height));
   await tapXY(candidates[0].centerX, candidates[0].centerY);
   // Tiny post-tap settle so subsequent steps see the updated amount/state.
   await sleep(150);
@@ -3558,8 +3523,7 @@ function treeHasObstruction(flat: FlatNode[]): boolean {
       n.identifier === 'NotificationShortLookView' ||
       n.identifier === 'ShortLook.Platter' ||
       n.identifier === 'xmark' ||
-      n.label === 'Allow Paste' ||
-      n.name === 'Allow Paste'
+      n.label === 'Allow Paste' || n.name === 'Allow Paste'
   );
 }
 
@@ -3612,12 +3576,16 @@ export async function waitForID(id: string, timeoutMs: number = STEP_TIMEOUT_MS)
                 using: '-ios predicate string',
                 value: `label == 'Allow Paste'`,
               });
-              const btnEid: string | undefined = btnRes.value?.ELEMENT || btnRes.value?.element;
+              const btnEid: string | undefined =
+                btnRes.value?.ELEMENT || btnRes.value?.element;
               if (btnEid) {
                 const rectRes = await wdaRequest('GET', `/session/${sid}/element/${btnEid}/rect`);
                 const r = rectRes.value;
                 if (r && typeof r.x === 'number') {
-                  await tapXY(Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2));
+                  await tapXY(
+                    Math.round(r.x + r.width / 2),
+                    Math.round(r.y + r.height / 2)
+                  );
                 }
               }
             } catch {
@@ -3654,19 +3622,12 @@ export async function waitForID(id: string, timeoutMs: number = STEP_TIMEOUT_MS)
 
   throw new Error(
     `timeout after ${timeoutMs}ms\n` +
-      `Verify the testID "${id}" exists in the app:\n` +
-      `  rg 'testID.*${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\|name=.*${id
-        .replace('screen-', '')
-        .split('-')
-        .map((w) => w[0].toUpperCase() + w.slice(1))
-        .join('')}' --type tsx --type ts`
+    `Verify the testID "${id}" exists in the app:\n` +
+    `  rg 'testID.*${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\|name=.*${id.replace('screen-', '').split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('')}' --type tsx --type ts`
   );
 }
 
-export async function waitForText(
-  text: string,
-  timeoutMs: number = STEP_TIMEOUT_MS
-): Promise<void> {
+export async function waitForText(text: string, timeoutMs: number = STEP_TIMEOUT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   const FAST_POLL_MS = 80;
   const OBSTRUCTION_INTERVAL_MS = 2_000;
@@ -3705,18 +3666,20 @@ export async function waitForText(
                 using: '-ios predicate string',
                 value: `label == 'Allow Paste'`,
               });
-              const btnEid: string | undefined = btnRes.value?.ELEMENT || btnRes.value?.element;
+              const btnEid: string | undefined =
+                btnRes.value?.ELEMENT || btnRes.value?.element;
               if (btnEid) {
                 const rectRes = await wdaRequest('GET', `/session/${sid}/element/${btnEid}/rect`);
                 const r = rectRes.value;
                 if (r && typeof r.x === 'number') {
-                  await tapXY(Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2));
+                  await tapXY(
+                    Math.round(r.x + r.width / 2),
+                    Math.round(r.y + r.height / 2)
+                  );
                 }
               }
             } catch {
-              try {
-                await wdaRequest('POST', `/session/${sid}/alert/accept`);
-              } catch {}
+              try { await wdaRequest('POST', `/session/${sid}/alert/accept`); } catch {}
             }
             await sleep(500);
             lastObstructionCheck = Date.now();
@@ -3763,7 +3726,9 @@ export function findByTestIDPrefix(nodes: FlatNode[], prefix: string): FlatNode 
   // logical screen is ~390×844 on iPhone 12-15, larger on Pro Max). We
   // accept y in [0, 900] as "visible enough" — anything beyond that is
   // almost certainly off-screen in the scroll view.
-  const visible = all.filter((n) => n.rect && n.rect.y >= 0 && n.rect.y < 900 && n.rect.height > 0);
+  const visible = all.filter(
+    (n) => n.rect && n.rect.y >= 0 && n.rect.y < 900 && n.rect.height > 0
+  );
   if (visible.length > 0) {
     // Return the visually topmost (lowest y) — for date-sorted lists
     // this is the newest entry.
@@ -3802,7 +3767,12 @@ export function findAllByTestIDPrefix(nodes: FlatNode[], prefix: string): FlatNo
  */
 export function findByTestIDPrefixFirst(nodes: FlatNode[], prefix: string): FlatNode | null {
   for (const n of nodes) {
-    if (n.identifier.startsWith(prefix) && n.rect && n.rect.width > 0 && n.rect.height > 0) {
+    if (
+      n.identifier.startsWith(prefix) &&
+      n.rect &&
+      n.rect.width > 0 &&
+      n.rect.height > 0
+    ) {
       return n;
     }
   }
@@ -3850,6 +3820,7 @@ export async function assertIDPrefix(prefix: string): Promise<FlatNode> {
   }
   return node;
 }
+
 
 export async function detectDeviceLabel(): Promise<string> {
   try {
@@ -3953,11 +3924,7 @@ async function ensureWDAReady(): Promise<void> {
         // Surface every wda log line live — no filtering. Users want to
         // see what's happening, especially when it's not happening.
         for (const line of chunk.split('\n')) {
-          if (
-            line.startsWith('[wda]') ||
-            line.startsWith('[wda:runner]') ||
-            line.startsWith('[wda:tunnel]')
-          ) {
+          if (line.startsWith('[wda]') || line.startsWith('[wda:runner]') || line.startsWith('[wda:tunnel]')) {
             emitRecoveryLine(`  ${line}`);
           }
         }
@@ -4146,9 +4113,12 @@ async function modePhoneTest(args: string[]): Promise<string> {
       if (matrixResult.ok) pass++;
       else fail++;
       try {
-        writeMatrixResultTable(foundMatrix.file, foundMatrix.matrix, matrixResult, {
-          label: await detectDeviceLabel(),
-        });
+        writeMatrixResultTable(
+          foundMatrix.file,
+          foundMatrix.matrix,
+          matrixResult,
+          { label: await detectDeviceLabel() }
+        );
       } catch {
         /* best effort */
       }
@@ -4211,7 +4181,9 @@ async function modePhoneTest(args: string[]): Promise<string> {
   // a given key resolves to exactly one runnable.
   const foundMatrix = findMatrix(result, name);
   if (!foundMatrix) {
-    throw new Error(`no test or matrix named '${name}'.\n\nAvailable:\n${formatTestList(result)}`);
+    throw new Error(
+      `no test or matrix named '${name}'.\n\nAvailable:\n${formatTestList(result)}`
+    );
   }
   await ensureWDAReady();
   const cellCount = foundMatrix.matrix.stages.reduce(
@@ -4233,9 +4205,12 @@ async function modePhoneTest(args: string[]): Promise<string> {
   if (streamEvent) matrixOpts.onEvent = streamEvent;
   const matrixResult = await executeMatrix(foundMatrix.matrix, matrixOpts);
   try {
-    writeMatrixResultTable(foundMatrix.file, foundMatrix.matrix, matrixResult, {
-      label: await detectDeviceLabel(),
-    });
+    writeMatrixResultTable(
+      foundMatrix.file,
+      foundMatrix.matrix,
+      matrixResult,
+      { label: await detectDeviceLabel() }
+    );
   } catch {
     /* best effort */
   }
@@ -4584,15 +4559,16 @@ async function main() {
   console.log(output);
 }
 
-// Only run main() when invoked directly as a CLI — not when imported as
-// a module by the test-dsl executor (or any other consumer). ESM-equivalent
-// of `require.main === module`.
+// Only run main() when invoked directly as a CLI — not when imported as a
+// module by the test-dsl executor (or any other consumer). The entry can
+// be the real index, or the back-compat shim at scripts/log-doctor.ts that
+// just imports this file.
 const __thisFile = url.fileURLToPath(import.meta.url);
-if (process.argv[1] === __thisFile) {
+const __entryFile = process.argv[1] ? nodePath.resolve(process.argv[1]) : '';
+const __isShimEntry = __entryFile.endsWith(`${nodePath.sep}scripts${nodePath.sep}log-doctor.ts`);
+if (__entryFile === __thisFile || __isShimEntry) {
   // Best-effort cleanup of the cached WDA session on exit.
-  process.on('exit', () => {
-    invalidateCachedSession();
-  });
+  process.on('exit', () => { invalidateCachedSession(); });
   main().catch((err) => {
     console.error(err instanceof Error ? err.stack || err.message : String(err));
     process.exit(1);
