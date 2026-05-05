@@ -482,8 +482,8 @@
       ],
       "verification_note": "Re-read Section.tsx:78-190 end-to-end. Confirmed six protocol-specific branches, all driven by `item.value?.startsWith?.('prefix')`. Confirmed the same primitive also wraps `<TouchableOpacity>` at line 106 inside the email branch with no onPress handler — the branch is cosmetic but makes the email look tappable (small dim-1 correlate; rolled into this finding). Confidence 0.80 — the structural claim is mechanical; severity Low because no user-visible failure today.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "Extracted protocol-prefix branching out of the UI primitive into a pure parser at shared/lib/format/displayValue.ts with a colocated test (__tests__/formatDisplayValue.test.ts, 14 cases). Audit cited Section.tsx:78-190 but the code had moved to DetailsList.tsx:92-205 since the audit was written; same shape, same fix. The new parser also closes two latent bugs: (a) bare prefixes like 'npub' or 'cashuB my shop' no longer match (regression-tested), and (b) cashuA/B body extraction now uses slice(prefix.length) instead of split(prefix)[1], so a body that contains the prefix again survives intact."
     },
     {
       "id": "F-021",
