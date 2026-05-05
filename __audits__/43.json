@@ -116,7 +116,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Confirmed via grep: useSplitBillPaymentWatcher has 3 references — definition + summary.tsx + detail.tsx. log-doctor timeline --event split_bill returned 0 events in the latest session, so this is unverified at runtime, but the static argument is conclusive: no mount point outside the flow exists.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Replaced per-screen polling watcher with app-root SplitBillPaymentReconciler subscribed to manager.on('history:updated'); reconciles regardless of which screen is mounted."
     },
     {
       "id": "F-003",
@@ -221,7 +223,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Static — confirmed limit at line 689. Counter-argument: 'paginated read with offset is enough; users won't have > 200 entries within a bill's lifetime' — possible for low-volume users, but the spec doesn't promise a low-volume audience and a Bitcoin wallet's history grows. UNVERIFIED.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Direct quoteId lookup via quoteIdToSplitBill reverse index per event payload — pagination window no longer relevant."
     },
     {
       "id": "F-008",
@@ -262,7 +266,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "LOC counts come from `npm run analyze-structure -- features/splitBill`. The 'five distinct modules' claim is based on the documented blocks in the file (each with a banner comment). Counter-argument: 'comments inflate the count' — true, but code count alone is 526/484, both still over 400.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Polling watcher (~80 LOC) removed and replaced with thin event handler; orchestrator file dropped 749→738 LOC. Two-hook split + module decomposition deferred."
     },
     {
       "id": "F-010",
@@ -338,7 +344,9 @@
       "fix": "Subscribe to `AppState`; pause the interval when state !== 'active' and resume on next 'active' (with one immediate tick to catch up). Alternatively use `useFocusEffect` to bind to screen focus when the watcher stays per-screen.",
       "references": [],
       "verification_note": "Re-checked at line 737. UNVERIFIED at runtime — would need a `log-doctor gc --latest` over a backgrounded session to measure. Static argument is conservative.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "No polling — event-driven listener has no setInterval to gate."
     },
     {
       "id": "F-014",
@@ -379,7 +387,9 @@
         "skill:security-review"
       ],
       "verification_note": "Re-checked at lines 202-229. Counter-argument: 'closure captures the key reference, not the key data, and React/JS GC will reclaim it once the timer resolves' — true, but the same logic accepts orphan unhandled state changes that the rest of the wallet rejects (cf. AbortController patterns in coco-payment-ux). Confidence dropped to 0.7 because no current-day attack surface exists; this is a pattern-drift finding.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Self-copy timer ids tracked in pendingTimersRef; cleared on hook unmount so the closure (and captured Uint8Array) becomes GC-reachable immediately."
     },
     {
       "id": "F-016",
