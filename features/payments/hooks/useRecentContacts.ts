@@ -55,6 +55,19 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
     }
   }, [nostrKeys?.pubkey]);
 
+  // NDK's useSubscribe returns a fresh `giftWrapEvents` array reference on
+  // every relay flush even when no new wraps arrived. Key the unwrap memo on
+  // the sorted id-set so the loop below does not re-run (and re-emit the
+  // unwrap_pass log) on unchanged relay output.
+  const giftWrapEventsKey = useMemo(
+    () =>
+      giftWrapEvents
+        ?.map((e) => e.id)
+        .sort()
+        .join(',') ?? '',
+    [giftWrapEvents]
+  );
+
   const unwrappedDMs = useMemo(() => {
     const privateKey = nostrKeys?.privateKey;
     const recipientPubkey = nostrKeys?.pubkey;
@@ -107,9 +120,22 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       duration_ms: Math.round((performance.now() - t0) * 100) / 100,
     });
     return out;
-  }, [giftWrapEvents, nostrKeys?.privateKey, nostrKeys?.pubkey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giftWrapEventsKey, nostrKeys?.privateKey, nostrKeys?.pubkey]);
 
   const [decryptedContacts, setDecryptedContacts] = useState<RecentContact[]>([]);
+
+  // NIP-04 NDK subscription churns its array reference on every relay flush
+  // too. Same id-set key trick as giftWrapEventsKey — keeps the contact-map
+  // build (and the downstream decrypt) from re-running per flush.
+  const dmEventsKey = useMemo(
+    () =>
+      dmEvents
+        ?.map((e) => e.id)
+        .sort()
+        .join(',') ?? '',
+    [dmEvents]
+  );
 
   // Build recent activity contacts from NIP-04 and NIP-17 events
   const recentActivityContacts = useMemo(() => {
@@ -161,7 +187,8 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       nip17Events: unwrappedDMs.length,
     });
     return contacts;
-  }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dmEventsKey, unwrappedDMs, nostrKeys?.pubkey]);
 
   // Merge default contacts with recent activity contacts
   const contactsWithDefaults = useMemo<RecentContact[]>(() => {

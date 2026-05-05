@@ -36,6 +36,19 @@ export function useMintContacts(
   const [mintInfoLoading, setMintInfoLoading] = useState(false);
   const [decryptedMints, setDecryptedMints] = useState<MintContact[]>([]);
 
+  // Coco's mint:* event cascade replaces the `mints` array reference on every
+  // event (mint:added / mint:updated / mint:trusted / mint:untrusted), even
+  // when the trusted-set is unchanged. Key the load on the sorted url-set so a
+  // no-op refresh does not retrigger the Promise.all(getMintInfo) waterfall.
+  const mintUrlsKey = useMemo(
+    () =>
+      mints
+        .map((m) => m.mintUrl)
+        .sort()
+        .join('|'),
+    [mints]
+  );
+
   // Load mint info and filter for those with nostr contacts
   useEffect(() => {
     if (mints.length === 0) return;
@@ -87,12 +100,28 @@ export function useMintContacts(
     return () => {
       cancelled = true;
     };
-  }, [mints, getMintInfo]);
+    // mintUrlsKey + getMintInfo are the real inputs; the closed-over `mints`
+    // is value-stable when the key is unchanged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mintUrlsKey, getMintInfo]);
 
   // Prefetch mint icons
   useEffect(() => {
     prefetchImages(mintsWithInfo.map(({ mintInfo }) => mintInfo?.icon_url));
   }, [mintsWithInfo]);
+
+  // NDK's useSubscribe returns a fresh `dmEvents` array reference on every
+  // relay flush even when the event-id set is unchanged. Key the metadata
+  // memo on the sorted id-set so unchanged relay output does not cascade
+  // into a fresh decryption pass downstream.
+  const dmEventsKey = useMemo(
+    () =>
+      dmEvents
+        ?.map((e) => e.id)
+        .sort()
+        .join(',') ?? '',
+    [dmEvents]
+  );
 
   // Build mints with most recent DM metadata
   const mintsWithMetadata = useMemo<MintContact[]>(() => {
@@ -134,7 +163,8 @@ export function useMintContacts(
         timestamp: dmEvent?.created_at ?? 0,
       };
     });
-  }, [mintsWithInfo, dmEvents, nostrKeys?.pubkey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mintsWithInfo, dmEventsKey, nostrKeys?.pubkey]);
 
   // Decrypt mint DM events
   useEffect(() => {
