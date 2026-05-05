@@ -575,8 +575,8 @@ export const Transactions = React.memo(
                         href={{
                           pathname: '/transactions',
                           params: {
-                            account: JSON.stringify(account),
-                            tab: 'Confirmed',
+                            filterCurrency: account.unit,
+                            filterStatus: 'Confirmed',
                           },
                         }}
                         asChild>

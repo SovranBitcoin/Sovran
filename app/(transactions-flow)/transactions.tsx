@@ -6,9 +6,8 @@
  * Uses native header with liquid glass buttons.
  * Includes filter button in header right that opens filter sheet.
  *
- * Validates the deep-link `account` (JSON-encoded) and `filter*` params
- * at the route boundary per AUDIT.md dim-5 — `account` is fed to
- * JSON.parse, the filter strings are downcast to closed unions.
+ * Validates the deep-link `filter*` params at the route boundary per
+ * AUDIT.md dim-5 — strings are downcast to closed unions.
  */
 
 import React, { useCallback } from 'react';
@@ -25,7 +24,6 @@ import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import opacity from 'hex-color-opacity';
 
 const ParamsSchema = z.object({
-  account: z.string().min(1).max(64_000).optional(),
   filterCurrency: z.string().max(16).optional(),
   filterPaymentType: z.enum(['all', 'lightning', 'ecash']).optional(),
   filterDirection: z.enum(['all', 'incoming', 'outgoing']).optional(),
@@ -154,8 +152,6 @@ function TransactionsRoute() {
 
   if (!params) return null;
 
-  const initialAccount = params.account ? JSON.parse(params.account) : undefined;
-
   return (
     <>
       {/* Native header - transparent with filter button */}
@@ -169,7 +165,6 @@ function TransactionsRoute() {
       />
 
       <TransactionsScreen
-        initialAccount={initialAccount}
         initialTab={status}
         onTransactionPress={handleTransactionPress}
         filterCurrency={currency}

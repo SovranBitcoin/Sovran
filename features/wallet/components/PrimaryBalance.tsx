@@ -210,7 +210,6 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     router.navigate({
       pathname: '/transactions',
       params: {
-        account: JSON.stringify(account),
         filterCurrency: account.unit,
         filterPaymentType: 'ecash',
         filterDirection: 'outgoing',
@@ -218,7 +217,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         filterMintUrl: 'all',
       },
     });
-  }, [router, account]);
+  }, [router, account.unit]);
 
   // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
   // dropped by `useSingleFlight` until the first interaction settles.

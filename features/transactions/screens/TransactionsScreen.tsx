@@ -36,7 +36,6 @@ type Direction = 'all' | 'incoming' | 'outgoing';
 const MONTH_SELECTOR_HEIGHT = 48;
 
 interface TransactionsScreenProps {
-  initialAccount?: { unit: string };
   initialTab?: StatusTab;
   /** Called when a transaction is tapped - used for flow-aware navigation */
   onTransactionPress?: (historyEntry: HistoryEntry) => void;
@@ -55,7 +54,6 @@ interface TransactionsScreenProps {
 }
 
 export function TransactionsScreen({
-  initialAccount,
   initialTab = 'All',
   onTransactionPress,
   filterCurrency,
@@ -68,7 +66,7 @@ export function TransactionsScreen({
   useLifecycleLogger('TransactionsScreen');
   const manager = useManager();
 
-  const selectedCurrency = filterCurrency || initialAccount?.unit || 'sat';
+  const selectedCurrency = filterCurrency || 'sat';
   const paymentType = filterPaymentType;
   const direction = filterDirection;
   const tab = initialTab;
