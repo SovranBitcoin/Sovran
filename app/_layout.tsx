@@ -10,8 +10,6 @@ import 'react-native-reanimated';
 
 import { useFonts } from '@/shared/hooks/useFonts';
 import { initLog, useInitMount } from '@/shared/lib/logger';
-
-initLog('Module', '_layout loaded');
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Dimensions, Image, LogBox, StyleSheet, Platform, View } from 'react-native';
@@ -72,6 +70,8 @@ import {
   subscribeQRButtonAnchor,
   type QRButtonAnchor,
 } from '@/shared/lib/qrButtonAnchor';
+
+initLog('Module', '_layout loaded');
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',

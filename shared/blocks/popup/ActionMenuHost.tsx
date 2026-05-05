@@ -26,12 +26,7 @@ import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-
-const hostLog = log.child({ module: 'actionMenuHost' });
-import {
-  SectionAnchorList,
-  type AnchorSection,
-} from '@/shared/ui/composed/SectionAnchorList';
+import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import {
   dismissActionMenuPopup,
   useActionMenuPayload,
@@ -41,6 +36,8 @@ import {
   type ActionMenuSection,
 } from '@/shared/lib/popup/popups/actionMenu';
 import Icon from 'assets/icons';
+
+const hostLog = log.child({ module: 'actionMenuHost' });
 
 function buildInitialValues(inputs: ActionMenuInput[] | undefined): Record<string, string> {
   if (!inputs) return {};
@@ -643,9 +640,7 @@ export function ActionMenuHost() {
               renderItem={(button, sectionId) =>
                 renderActionButton(button, `${sectionId}-${button.testID ?? button.text}`)
               }
-              keyExtractor={(button, sectionId) =>
-                `${sectionId}-${button.testID ?? button.text}`
-              }
+              keyExtractor={(button, sectionId) => `${sectionId}-${button.testID ?? button.text}`}
               // Profile rows are ~58px (avatar 36 + paddingVertical from
               // Menu.Item). 60 is a safe estimate that overshoots
               // slightly so LegendList doesn't under-allocate the

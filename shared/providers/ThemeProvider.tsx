@@ -5,10 +5,10 @@ import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStor
 import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
-
-initLog('Module', 'ThemeProvider loaded');
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
 import { Uniwind } from 'uniwind';
+
+initLog('Module', 'ThemeProvider loaded');
 
 interface ThemeContextValue {
   currentTheme: string;

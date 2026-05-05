@@ -5,14 +5,14 @@ import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAnd
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen';
 import { log, Log, initLog, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
-
-initLog('Module', 'AppGate loaded');
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 import {
   useWalletLifecycleStore,
   useWalletLifecycleHydrated,
 } from '@/shared/stores/global/walletLifecycleStore';
 import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsRecoveryScreen';
+
+initLog('Module', 'AppGate loaded');
 
 type ReinstallState = 'checking' | 'none' | 'detected';
 
