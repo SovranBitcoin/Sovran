@@ -537,13 +537,24 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       globalThis.__CASHU_RECOVERY_CONFIG = undefined;
 
       if (knownFailureCount === 0) {
-        recoverySuccessPopup({ mintCount: successCount, durationSec: (totalMs / 1000).toFixed(1) });
+        // Gate-mode owns its own UI through to AppGate's transition (SOV-00 §8).
+        // The runtime popupStore survives a gate→app remount, so a toast pushed
+        // here would render over the freshly-mounted wallet. The inline
+        // `renderCompleteState` already provides feedback in gate mode.
+        if (!gateMode) {
+          recoverySuccessPopup({
+            mintCount: successCount,
+            durationSec: (totalMs / 1000).toFixed(1),
+          });
+        }
         setRecoveryState('complete');
       } else {
-        if (successCount > 0) {
-          recoveryPartialPopup({ successCount, failureCount: knownFailureCount });
-        } else {
-          recoveryFailedPopup();
+        if (!gateMode) {
+          if (successCount > 0) {
+            recoveryPartialPopup({ successCount, failureCount: knownFailureCount });
+          } else {
+            recoveryFailedPopup();
+          }
         }
         setRecoveryState('error');
       }
@@ -552,10 +563,12 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       globalThis.__CASHU_RECOVERY_CONFIG = undefined;
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       setErrorMessage(errorMsg);
-      recoveryFailedPopup({ text: errorMsg });
+      if (!gateMode) {
+        recoveryFailedPopup({ text: errorMsg });
+      }
       setRecoveryState('error');
     }
-  }, [mints, deepProbe, discoveredMintUrls, loadMints]);
+  }, [mints, deepProbe, discoveredMintUrls, loadMints, gateMode]);
 
   const handleClose = useCallback(() => router.back(), []);
 
@@ -566,7 +579,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       <Card.Body>
         <VStack spacing={12}>
           {mints.map((mint) => {
-            const displayName = mint.mintInfo?.name || tryHostname(mint.mintUrl);
+            const displayName = getMintDisplayName(mint, mint.mintUrl);
             return (
               <HStack key={mint.mintUrl} spacing={12} className="items-center">
                 <Avatar
@@ -817,7 +830,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                 <VStack spacing={12}>
                   {visibleResults.map((result, index) => {
                     const mint = mintsByUrl[result.mint];
-                    const displayName = mint?.mintInfo?.name || tryHostname(result.mint);
+                    const displayName = getMintDisplayName(mint, result.mint);
                     return (
                       <HStack key={index} spacing={12} className="items-center">
                         <Avatar
@@ -894,6 +907,10 @@ function tryHostname(url: string): string {
   }
 }
 
+function getMintDisplayName(mint: Mint | undefined, fallbackUrl: string): string {
+  return mint?.mintInfo?.name || tryHostname(fallbackUrl);
+}
+
 const MintRecoveryRow: React.FC<{
   mintUrl: string;
   mint?: Mint;
@@ -910,7 +927,7 @@ const MintRecoveryRow: React.FC<{
   const isActive = allActive ? !hasResult : index === currentIndex;
   const isPending = allActive ? false : index > currentIndex;
 
-  const displayName = mint?.mintInfo?.name || tryHostname(mintUrl);
+  const displayName = getMintDisplayName(mint, mintUrl);
 
   return (
     <HStack spacing={12} className="items-center">

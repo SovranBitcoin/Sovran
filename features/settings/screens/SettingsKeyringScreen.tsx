@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert, ActivityIndicator } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, router } from 'expo-router';
@@ -14,9 +14,9 @@ import { useManager } from '@cashu/coco-react';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
+  actionMenuPopup,
   keysLoadFailedPopup,
   keyGenerateFailedPopup,
-  invalidKeyFormatPopup,
   keyGeneratedPopup,
   keyImportedPopup,
   keyImportFailedPopup,
@@ -302,45 +302,65 @@ export const SettingsKeyringScreen: React.FC = () => {
   /**
    * Imports an existing private key (nsec or hex format). The single-flight
    * guard wraps the whole prompt → submit → addKeyPair lifecycle so a
-   * double-tap on the Import row before the alert renders cannot stack two
-   * `addKeyPair` writes against the same nsec.
+   * double-tap on the Import row before the menu renders cannot stack two
+   * `addKeyPair` writes against the same nsec. Uses the canonical
+   * `actionMenuPopup` surface (mirrors profile-switcher's nsec import) so
+   * the flow renders cross-platform — `Alert.prompt` is iOS-only.
    */
   const handleImportNsec = useSingleFlight(
     () =>
       new Promise<void>((resolve) => {
-        Alert.prompt(
-          'Import Private Key',
-          'Enter your nsec or hex private key',
-          [
-            { text: 'Cancel', style: 'cancel', onPress: () => resolve() },
+        let didFinalize = false;
+        const finalize = () => {
+          if (didFinalize) return;
+          didFinalize = true;
+          resolve();
+        };
+        actionMenuPopup({
+          title: 'Import Private Key',
+          inputs: [
             {
-              text: 'Import',
-              onPress: async (value: string | undefined) => {
-                if (!value || !manager) {
-                  resolve();
-                  return;
-                }
-                try {
-                  const trimmedValue = value.trim();
-                  const success = await tryImportKey(trimmedValue);
-
-                  if (success) {
-                    keyImportedPopup();
-                    await loadKeypairs();
-                  } else {
-                    invalidKeyFormatPopup();
-                  }
-                } catch (error) {
-                  log.error('settings.keyring.import_failed', { error });
-                  keyImportFailedPopup();
-                } finally {
-                  resolve();
-                }
-              },
+              id: 'key',
+              placeholder: 'nsec1... or 64-char hex',
+              secureTextEntry: true,
+              autoCapitalize: 'none',
+              autoCorrect: false,
+              description: 'Paste an existing P2PK key — nsec or 64-character hex.',
             },
           ],
-          'secure-text'
-        );
+          primaryAction: {
+            text: 'Import',
+            loadingText: 'Importing...',
+            icon: 'mdi:key-arrow-right',
+            testID: 'keyring-import-submit',
+            isDisabled: (v) => !v.key.trim(),
+            onPress: async (values, { setError, close }) => {
+              if (!manager) {
+                setError('Wallet not ready.');
+                return;
+              }
+              const trimmedValue = values.key.trim();
+              try {
+                const success = await tryImportKey(trimmedValue);
+                if (!success) {
+                  setError('Enter nsec or 64-character hex key.');
+                  return;
+                }
+                keyImportedPopup();
+                await loadKeypairs();
+              } catch (error) {
+                log.error('settings.keyring.import_failed', { error });
+                keyImportFailedPopup();
+              } finally {
+                // Host suppresses `onDismiss` once an action commits, so
+                // release the single-flight guard explicitly here.
+                finalize();
+                close();
+              }
+            },
+          },
+          onDismiss: finalize,
+        });
       })
   );
 
@@ -356,7 +376,11 @@ export const SettingsKeyringScreen: React.FC = () => {
           title: 'P2PK Keys',
           headerRight: () => (
             <HStack spacing={4}>
-              <Pressable onPress={handleImportNsec} style={{ padding: 8 }} disabled={isGenerating}>
+              <Pressable
+                onPress={handleImportNsec}
+                style={{ padding: 8 }}
+                disabled={isGenerating}
+                testID="keyring-import-trigger">
                 <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
               </Pressable>
               <Pressable onPress={handleGenerateKey} style={{ padding: 8 }} disabled={isGenerating}>
