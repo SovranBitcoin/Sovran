@@ -26,8 +26,6 @@ import {
   opacity as swiftOpacity,
   scaleEffect,
 } from '@expo/ui/swift-ui/modifiers';
-import opacity from 'hex-color-opacity';
-
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -90,10 +88,12 @@ const MAX_ROW_HEIGHT = 140;
 
 /**
  * Liquid-glass DM-surface composer. Three glass shapes laid out
- * left-to-right — leading [+] (accent-tinted circle), middle text input
- * (capsule, regular tint), trailing [→] (accent-tinted circle, mounted
- * only while the input has content). Money + voice icons render inside
- * the input on the right while the input is empty.
+ * left-to-right — leading [+] circle, middle text input capsule,
+ * trailing [→] circle (visible only while the input has content).
+ * Plain regular-glass material on all three (no tint) — tinting the
+ * material colorizes the entire shape, which gives Apple's stock
+ * messaging composer its washed-out look. Money + voice icons render
+ * inside the input on the right while the input is empty.
  *
  * On iOS 26+ all three glass shapes live inside a single SwiftUI `Host`
  * wrapped in `Namespace` + `GlassEffectContainer`, with `glassEffectId`
@@ -122,9 +122,8 @@ export function LiquidChatComposer({
   testID,
   surface,
 }: LiquidChatComposerProps) {
-  const [foreground, accent, surfaceTertiary, shade400, shade500] = useThemeColor([
+  const [foreground, surfaceTertiary, shade400, shade500] = useThemeColor([
     'foreground',
-    'accent',
     'surface-tertiary',
     'shade-400',
     'shade-500',
@@ -134,8 +133,6 @@ export function LiquidChatComposer({
   const canSend = trimmedHasText && !disabled;
   const isEmpty = value.length === 0;
   const useNativeGlass = Platform.OS === 'ios' && supportsLiquidGlass();
-  const accentTint = opacity(accent, 0.6);
-  const inputTint = opacity(foreground, 0.08);
 
   // Stable namespace id — required by SwiftUI's `glassEffectId(_:in:)` so
   // the system can match shapes across renders and animate the morph.
@@ -309,7 +306,7 @@ export function LiquidChatComposer({
                       // reaction is suppressed.
                       glassEffect({
                         shape: 'circle',
-                        glass: { variant: 'regular', tint: accentTint, interactive: false },
+                        glass: { variant: 'regular', interactive: false },
                       }),
                       glassEffectId('plus', namespaceId),
                       animation(SEND_SPRING, trimmedHasText),
@@ -332,7 +329,7 @@ export function LiquidChatComposer({
                       frame({ maxWidth: Infinity, height: rowHeight }),
                       glassEffect({
                         shape: 'capsule',
-                        glass: { variant: 'regular', tint: inputTint, interactive: false },
+                        glass: { variant: 'regular', interactive: false },
                       }),
                       glassEffectId('input', namespaceId),
                       animation(SEND_SPRING, trimmedHasText),
@@ -365,7 +362,6 @@ export function LiquidChatComposer({
                         shape: 'circle',
                         glass: {
                           variant: 'regular',
-                          tint: accentTint,
                           // See [+] above — turning off interactive glass
                           // suppresses the touch-down brightening glow.
                           interactive: false,
@@ -430,7 +426,6 @@ export function LiquidChatComposer({
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
-              backgroundColor: accentTint,
             }}>
             <Icon name="mdi:plus" size={ICON_SIZE} color="#FFFFFF" />
           </View>
@@ -503,7 +498,6 @@ export function LiquidChatComposer({
                 alignItems: 'center',
                 justifyContent: 'center',
                 overflow: 'hidden',
-                backgroundColor: accentTint,
               }}>
               <Icon name="iconamoon:send-fill" size={ICON_SIZE} color="#FFFFFF" />
             </View>
