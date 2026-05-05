@@ -10,7 +10,12 @@ type CacheEntry = {
 };
 
 const CACHE = new Map<string, CacheEntry>();
-const MAX_ENTRIES = 3; // keep small to avoid unbounded memory growth
+// 8 covers the categorical filter set (food, lodging, retail, services,
+// entertainment, transport, atm, other) + the unfiltered "all" view —
+// users actively cycling tabs no longer pay a 100 ms+ rebuild on every
+// switch. Each entry holds a Supercluster index over ~5–40k points;
+// 8 × ~3 MB worst-case stays comfortably under the heap budget.
+const MAX_ENTRIES = 8;
 
 function evictIfNeeded() {
   if (CACHE.size <= MAX_ENTRIES) return;
@@ -34,6 +39,9 @@ export function getOrBuildBTCMapClusterManager(
 ): ClusterManager {
   const existing = CACHE.get(cacheKey);
   if (existing && existing.pointsCount === points.length && existing.manager.isLoaded()) {
+    // Touch on hit so the LRU eviction in `evictIfNeeded` actually drops
+    // the least-recently-used entry, not the oldest-built one.
+    existing.createdAt = Date.now();
     return existing.manager;
   }
 

@@ -23,6 +23,7 @@ import { restartApp } from '@/shared/lib/profile/appRestart';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 
 // ── AsyncStorage-based transition guard ──────────────────────────
 const TRANSITION_KEY = 'profile-transition-in-progress';
@@ -306,6 +307,11 @@ export async function deleteAllProfiles(opts?: {
       profiles: [],
       cocoMigrationComplete: {},
     });
+    // btcMapStore holds an in-flight 2–3s places fetch that would otherwise
+    // resolve between AsyncStorage.clear() above and restartApp() below,
+    // re-populating cleared storage with stale data. reset() bumps an epoch
+    // the in-flight closure rechecks before commit.
+    useBTCMapStore.getState().reset();
 
     const restarted = await teardownAndRestart();
     if (!restarted) {
