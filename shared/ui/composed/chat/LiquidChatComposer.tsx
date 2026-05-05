@@ -276,10 +276,17 @@ export function LiquidChatComposer({
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
             matchContents={false}>
             <Namespace id={namespaceId}>
-              {/* spacing > HStack gap so neighboring glass shapes are within
-                  the merge threshold and SwiftUI can blend them when the
-                  trailing [→] grows in. */}
-              <GlassEffectContainer spacing={20}>
+              {/* `spacing` is the *merge threshold* — when the nearest edges
+                  of two glass shapes sit closer than `spacing`, the system
+                  blends them into one liquid-metaball blob. Setting it to 0
+                  keeps the [+] / input / [→] visually separated in steady
+                  state. The bounce-in / morph still animates because that's
+                  driven by `glassEffectId` (matched-geometry), not by the
+                  blend threshold. A non-zero `spacing` is what produced the
+                  permanent gooey bridges between the three shapes in the
+                  earlier rev — the HStack gap (8pt) was less than the 20pt
+                  threshold, so they were always inside the merge zone. */}
+              <GlassEffectContainer spacing={0}>
                 <SwiftUIHStack
                   alignment="bottom"
                   spacing={GAP}
