@@ -112,6 +112,7 @@ export function useAiSend() {
   const currentSessionId = useRoutstrStore((s) => s.currentSessionId);
   const createSession = useRoutstrStore((s) => s.createSession);
   const addMessage = useRoutstrStore((s) => s.addMessage);
+  const setMessagePending = useRoutstrStore((s) => s.setMessagePending);
   const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
@@ -645,6 +646,7 @@ export function useAiSend() {
         role: 'user',
         content: trimmed,
         timestamp,
+        pending: true,
       });
       addMessage({
         id: assistantMessageId,
@@ -668,14 +670,30 @@ export function useAiSend() {
           content: m.content,
         }));
 
-      await streamIntoPlaceholder({
-        assistantMessageId,
-        apiMessages,
-        flowId,
-        pendingUserMessageForTopUp: trimmed,
-      });
+      try {
+        await streamIntoPlaceholder({
+          assistantMessageId,
+          apiMessages,
+          flowId,
+          pendingUserMessageForTopUp: trimmed,
+        });
+      } finally {
+        // The user message's optimistic spinner clears the moment the
+        // streaming round-trip resolves — success or error, the request
+        // left our hands. Errors surface via the assistant placeholder /
+        // popup, not the user bubble's check.
+        setMessagePending(userMessageId, false);
+      }
     },
-    [apiKey, isAnonymous, currentSessionId, createSession, addMessage, streamIntoPlaceholder]
+    [
+      apiKey,
+      isAnonymous,
+      currentSessionId,
+      createSession,
+      addMessage,
+      setMessagePending,
+      streamIntoPlaceholder,
+    ]
   );
 
   // `isSending` (React state) only blocks subsequent sends after the first

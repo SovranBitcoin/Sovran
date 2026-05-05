@@ -19,16 +19,18 @@ export type ChatBubbleMessage = {
   /** Unix epoch milliseconds. */
   timestamp: number;
   isOwn: boolean;
-  /** Sender-side optimistic flag (e.g. "sending…"). */
-  isPending?: boolean;
   /**
-   * Read-receipt state for own messages. `'sending'` shows a spinner,
-   * `'sent'` an empty check, `'read'` a double-check at lower opacity.
-   * Non-own messages ignore this field. Distinct from `isPending` so that
-   * surfaces with no read-receipt model (BitChat, MLS) can leave it unset
-   * and still get optimistic-send visuals via `isPending`.
+   * Delivery state for own messages, modelled on the standard chat-app
+   * sending → sent vocabulary:
+   *  - `'sending'` — optimistic dispatch in flight (spinner glyph + bubble
+   *    dimmed to 60%).
+   *  - `'sent'` — transport ack received (single-check glyph).
+   * Non-own messages leave this field unset. None of the underlying
+   * protocols (NIP-04, NIP-17, MLS, BitChat) expose a read-receipt, so the
+   * vocabulary deliberately stops at 'sent' rather than introducing a
+   * misleading 'read' state.
    */
-  deliveryStatus?: 'sending' | 'sent' | 'read';
+  deliveryStatus?: 'sending' | 'sent';
   /**
    * Pre-extracted cashu token (cashuA…/cashuB…) found inside `content`. When
    * present, the bubble strips it from the rendered text and shows a

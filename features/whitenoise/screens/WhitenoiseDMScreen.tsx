@@ -55,7 +55,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
       isLoading={false}
       historyExtras={(last) => ({
         lastIsOwn: last?.isOwn ?? null,
-        lastIsPending: last?.isPending ?? null,
+        lastDeliveryStatus: last?.deliveryStatus ?? null,
       })}
       emptyContent={
         <VStack align="center" spacing={12}>
@@ -85,7 +85,7 @@ function toBubble(m: WhitenoiseDmMessage): ChatBubbleMessage {
     senderId: m.authorPubkey,
     timestamp: m.createdAt * 1000,
     isOwn: m.isSelf,
-    isPending: m.isPending,
+    deliveryStatus: m.isSelf ? (m.isPending ? 'sending' : 'sent') : undefined,
     cashuToken: extractCashuToken(m.content) ?? undefined,
   };
 }

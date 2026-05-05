@@ -23,6 +23,13 @@ export interface ChatMessage {
   timestamp: number;
   isPrivate: boolean;
   isOwn: boolean;
+  /**
+   * Sender-side optimistic flag: `true` between dispatch and transport ack
+   * (BLE acked from native, or `sendGeohashMessage`/`sendGeohashPrivateMessage`
+   * resolves on the JS side). Cleared once the send succeeds; the optimistic
+   * row is removed on failure. Non-own messages leave it unset.
+   */
+  isPending?: boolean;
 }
 
 export interface LocationTier {

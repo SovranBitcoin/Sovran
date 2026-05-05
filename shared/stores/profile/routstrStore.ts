@@ -45,6 +45,15 @@ export interface RoutstrMessage {
    * messages from before the cost-tracking change shipped.
    */
   costSats?: number;
+  /**
+   * Optimistic dispatch flag for user messages — `true` between submit and
+   * the moment the streaming round-trip resolves (success or error).
+   * `UserBubble` renders a spinner/check accordingly so the AI surface
+   * matches the chat-app sending → sent vocabulary used by the DM screens.
+   * Transient: cleared on rehydrate so a crashed mid-send doesn't leave a
+   * stuck spinner on next launch (see `routstrStore.afterHydrate`).
+   */
+  pending?: boolean;
 }
 
 interface RoutstrSession {
@@ -124,6 +133,10 @@ interface RoutstrActions {
   addMessage: (message: RoutstrMessage) => void;
   clearConversation: () => void;
   updateMessage: (id: string, content: string) => void;
+  /** Toggle a message's transient `pending` flag. Used by `useAiSend` to
+   *  flip the user-bubble spinner → check once the streaming round-trip
+   *  resolves. Transient — never persisted as `true` (see `afterHydrate`). */
+  setMessagePending: (id: string, pending: boolean) => void;
   /** Persist the final assistant payload (content + reasoning + thinking
    *  duration + cost) in one atomic write, replacing the placeholder body
    *  added at stream open. Preserves `id`, `parentId`, `role`, and
@@ -177,6 +190,7 @@ const PersistedRoutstrMessage = z.looseObject({
   thinkingDurationSec: z.number().nonnegative().optional(),
   reasoningContent: z.string().max(65_536).optional(),
   costSats: z.number().int().nonnegative().optional(),
+  pending: z.boolean().optional(),
 });
 
 const PersistedRoutstrSession = z.looseObject({
@@ -269,6 +283,26 @@ export const useRoutstrStore = create<RoutstrStore>()(
             return { conversationHistory: filtered, sessions: updatedSessions };
           }
           return { conversationHistory: filtered };
+        });
+      },
+
+      setMessagePending: (id: string, pending: boolean) => {
+        set((state) => {
+          const apply = (msg: RoutstrMessage): RoutstrMessage =>
+            msg.id === id ? { ...msg, pending } : msg;
+          const updatedHistory = state.conversationHistory.map(apply);
+          if (state.isAnonymousMode) {
+            return { conversationHistory: updatedHistory };
+          }
+          if (state.currentSessionId) {
+            const updatedSessions = state.sessions.map((session) =>
+              session.id === state.currentSessionId
+                ? { ...session, messages: session.messages.map(apply) }
+                : session
+            );
+            return { conversationHistory: updatedHistory, sessions: updatedSessions };
+          }
+          return { conversationHistory: updatedHistory };
         });
       },
 
@@ -510,7 +544,17 @@ export const useRoutstrStore = create<RoutstrStore>()(
         currentSessionId: state.currentSessionId,
       }),
       afterHydrate: (state) => {
-        if (state) restoreActiveSessionView(state);
+        if (!state) return;
+        // Drop transient `pending: true` flags — any user message marked
+        // pending at persist time (e.g. app killed mid-send) resolves to
+        // "not in flight" on the next launch so the user sees a static
+        // check rather than a stuck spinner.
+        for (const session of state.sessions ?? []) {
+          for (const m of session.messages) {
+            if (m.pending) m.pending = false;
+          }
+        }
+        restoreActiveSessionView(state);
       },
     })
   )

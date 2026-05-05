@@ -115,6 +115,7 @@ export function GeohashChatScreen({
         sender: m.sender,
         timestamp: m.timestamp,
         isOwn: m.isOwn,
+        deliveryStatus: m.isOwn ? (m.isPending ? 'sending' : 'sent') : undefined,
         cashuToken: extractCashuToken(m.content) ?? undefined,
       })),
     [messages]

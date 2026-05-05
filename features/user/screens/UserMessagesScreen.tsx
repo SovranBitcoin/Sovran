@@ -55,7 +55,7 @@ interface DmMessage {
   id: string;
   content: string;
   isOwn: boolean;
-  isRead: boolean;
+  /** True only on optimistic bubbles between dispatch and publish ack. */
   isSending?: boolean;
   created_at: number;
   pubkey: string;
@@ -164,14 +164,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         sender: m.isOwn ? undefined : displayName,
         timestamp: m.created_at * 1000,
         isOwn: m.isOwn,
-        isPending: m.isSending,
-        deliveryStatus: m.isOwn
-          ? m.isSending
-            ? 'sending'
-            : m.isRead
-              ? 'read'
-              : 'sent'
-          : undefined,
+        deliveryStatus: m.isOwn ? (m.isSending ? 'sending' : 'sent') : undefined,
         cashuToken: extractCashuToken(m.content) ?? undefined,
       })),
     [messages, displayName]
@@ -267,7 +260,6 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
                 id: event.id,
                 content: event.content,
                 isOwn,
-                isRead: true,
                 created_at: event.created_at || 0,
                 pubkey: senderPubkey,
               } satisfies DmMessage;
@@ -329,7 +321,6 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         id: dm.wrapId,
         content: dm.content,
         isOwn,
-        isRead: true,
         created_at: dm.created_at,
         pubkey: dm.senderPubkey,
       };
@@ -382,7 +373,6 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         id: tempMessageId,
         content: text,
         isOwn: true,
-        isRead: false,
         isSending: true,
         created_at: timestamp,
         pubkey: nostrKeys.pubkey,
@@ -442,9 +432,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         });
 
         setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === wrapEvent.id ? { ...msg, isRead: true, isSending: false } : msg
-          )
+          prev.map((msg) => (msg.id === wrapEvent.id ? { ...msg, isSending: false } : msg))
         );
       } catch (error) {
         log.error('dm.send.failed', { error, total_ms: Math.round(performance.now() - dmStart) });
@@ -527,7 +515,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       }
       historyExtras={(last) => ({
         lastIsOwn: last?.isOwn ?? null,
-        lastIsPending: last?.isPending ?? null,
+        lastDeliveryStatus: last?.deliveryStatus ?? null,
       })}
     />
   );

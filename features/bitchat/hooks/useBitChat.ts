@@ -29,6 +29,22 @@ const MESSAGE_BUFFER_CAP = 500;
 
 function appendChatMessage(prev: ChatMessage[], msg: ChatMessage): ChatMessage[] {
   if (prev.some((m) => m.id === msg.id)) return prev;
+  // The 'nostr' (public geohash) transport echoes our own outbound event
+  // back via the subscription. We've already shown an optimistic row keyed
+  // on a local `mintLocalId('own')` id; matching content + isOwn within a
+  // recent window means this is the relay echo and we drop it instead of
+  // duplicating the bubble. The local id never reaches the relay, so this
+  // is the only sound match key.
+  if (msg.isOwn) {
+    const localCopy = prev
+      .slice()
+      .reverse()
+      .find(
+        (m) =>
+          m.isOwn && m.content === msg.content && Math.abs(m.timestamp - msg.timestamp) < 60_000
+      );
+    if (localCopy) return prev;
+  }
   const last = prev[prev.length - 1];
   const inOrder = !last || msg.timestamp >= last.timestamp;
   const next = inOrder ? [...prev, msg] : [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
@@ -348,10 +364,14 @@ export function useBitChat(
             timestamp: Date.now(),
             isPrivate: false,
             isOwn: true,
+            isPending: true,
           };
           setMessages((prev) => [...prev, ownMsg]);
           try {
             await sendBLEMessage(content);
+            setMessages((prev) =>
+              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
+            );
           } catch (err) {
             bitchatLog.error('bitchat.hook.ble_send_failed', {
               error: err instanceof Error ? err.message : String(err),
@@ -376,10 +396,14 @@ export function useBitChat(
             timestamp: Date.now(),
             isPrivate: true,
             isOwn: true,
+            isPending: true,
           };
           setMessages((prev) => [...prev, ownMsg]);
           try {
             await sendBLEPrivateMessage(dmPeerID, content, nickname);
+            setMessages((prev) =>
+              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
+            );
           } catch (err) {
             bitchatLog.error('bitchat.hook.ble_dm_send_failed', {
               error: err instanceof Error ? err.message : String(err),
@@ -390,12 +414,32 @@ export function useBitChat(
         }
 
         case 'nostr': {
+          // Public geohash chat echoes our own message back via the
+          // subscription, so we add an optimistic row keyed on the local
+          // mint id; once the relay round-trip resolves we flip its pending
+          // flag. The native echo arrives later as a separate message —
+          // distinct id, harmless visual duplicate that the relay wins.
+          const ownMsg: ChatMessage = {
+            id: mintLocalId('own'),
+            content,
+            sender: nickname || 'You',
+            senderId: '',
+            timestamp: Date.now(),
+            isPrivate: false,
+            isOwn: true,
+            isPending: true,
+          };
+          setMessages((prev) => [...prev, ownMsg]);
           try {
             await sendGeohashMessage(content, nickname);
+            setMessages((prev) =>
+              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
+            );
           } catch (err) {
             bitchatLog.error('bitchat.hook.nostr_send_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
+            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
           }
           break;
         }
@@ -413,10 +457,14 @@ export function useBitChat(
             timestamp: Date.now(),
             isPrivate: true,
             isOwn: true,
+            isPending: true,
           };
           setMessages((prev) => [...prev, ownMsg]);
           try {
             await sendGeohashPrivateMessage(dmPeerID, content);
+            setMessages((prev) =>
+              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
+            );
           } catch (err) {
             bitchatLog.error('bitchat.hook.nostr_dm_send_failed', {
               error: err instanceof Error ? err.message : String(err),

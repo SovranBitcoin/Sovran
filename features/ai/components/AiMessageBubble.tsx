@@ -10,6 +10,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { popup } from '@/shared/lib/popup';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { formatChatTimestamp } from '@/shared/ui/composed/chat';
 import {
   useStreamingContent,
   useStreamingReasoning,
@@ -194,25 +195,39 @@ function ThinkingHeader({
 }
 
 function UserBubble({ message }: { message: RoutstrMessage }) {
-  const [foreground, surfaceSecondary] = useThemeColor([
+  const [foreground, surfaceSecondary, shade400, shade500] = useThemeColor([
     'foreground',
     'surface-secondary',
+    'shade-400',
+    'shade-500',
   ] as const);
+  const isSending = message.pending === true;
   return (
-    <View
-      style={{
-        alignSelf: 'flex-end',
-        maxWidth: '85%',
-        marginVertical: 6,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 18,
-        backgroundColor: surfaceSecondary,
-      }}>
-      <Text size={16} style={{ color: foreground, lineHeight: 22 }}>
-        {message.content}
-      </Text>
-    </View>
+    <VStack align="flex-end" spacing={2} style={{ alignSelf: 'flex-end', maxWidth: '85%' }}>
+      <View
+        style={{
+          marginVertical: 6,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          borderRadius: 18,
+          backgroundColor: surfaceSecondary,
+          opacity: isSending ? 0.6 : 1,
+        }}>
+        <Text size={16} style={{ color: foreground, lineHeight: 22 }}>
+          {message.content}
+        </Text>
+      </View>
+      <HStack align="center" spacing={4} style={{ marginRight: 4, marginBottom: 4 }}>
+        <Text size={11} style={{ color: shade400 }}>
+          {formatChatTimestamp(message.timestamp)}
+        </Text>
+        <Icon
+          name={isSending ? 'ant-design:loading-outlined' : 'simple-line-icons:check'}
+          size={12}
+          color={shade500}
+        />
+      </HStack>
+    </VStack>
   );
 }
 

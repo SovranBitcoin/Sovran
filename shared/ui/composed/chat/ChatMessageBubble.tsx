@@ -1,6 +1,5 @@
 import React from 'react';
 import { View } from 'react-native';
-import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -43,6 +42,7 @@ export function ChatMessageBubble({
   const showAvatar = !message.isOwn && isLastInGroup;
   const showName = !message.isOwn && isFirstInGroup;
   const showTimestamp = isLastInGroup;
+  const isSending = message.deliveryStatus === 'sending';
 
   const marginBottom = isLastInGroup ? 16 : 2;
 
@@ -121,7 +121,7 @@ export function ChatMessageBubble({
                 paddingHorizontal: 14,
                 paddingVertical: 10,
                 alignSelf: message.isOwn ? 'flex-end' : 'flex-start',
-                opacity: message.isPending ? 0.6 : 1,
+                opacity: isSending ? 0.6 : 1,
               }}>
               <Text
                 size={16}
@@ -142,22 +142,14 @@ export function ChatMessageBubble({
               spacing={4}
               style={{ alignSelf: message.isOwn ? 'flex-end' : 'flex-start', marginTop: 2 }}>
               <Text size={11} style={{ color: shade400 }}>
-                {message.isPending ? 'sending…' : formatChatTimestamp(message.timestamp)}
+                {formatChatTimestamp(message.timestamp)}
               </Text>
               {message.isOwn && message.deliveryStatus ? (
-                message.deliveryStatus === 'sending' ? (
-                  <Icon name="ant-design:loading-outlined" size={12} color={shade500} />
-                ) : (
-                  <Icon
-                    name={
-                      message.deliveryStatus === 'read'
-                        ? 'ion:checkmark-done'
-                        : 'simple-line-icons:check'
-                    }
-                    size={12}
-                    color={message.deliveryStatus === 'read' ? opacity(foreground, 0.4) : shade500}
-                  />
-                )
+                <Icon
+                  name={isSending ? 'ant-design:loading-outlined' : 'simple-line-icons:check'}
+                  size={12}
+                  color={shade500}
+                />
               ) : null}
             </HStack>
           ) : null}
