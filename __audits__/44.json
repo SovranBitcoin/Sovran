@@ -233,8 +233,8 @@
       ],
       "verification_note": "analyze-structure reports MapScreen.tsx 794 total / 649 code lines. Each split target is independently coherent.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "MapScreen shrank from ~794 to ~617 LOC after FloatingActionButtons inlining was replaced and CATEGORIES + dead styles dropped. The orchestrator + StatsCard + camera/marker hook split is still pending."
+      "completion_status": "complete",
+      "completion_note": "MapScreen.tsx split into orchestrator (365 LOC) + StatsCard component + useMapCamera hook + useMapMarkers hook. Orchestrator now wiring + render only; camera ref/setter/gesture+debounce machinery owns useMapCamera, cluster build + marker diff/filter owns useMapMarkers. FloatingActionButtons inlined as three CircleActionButton calls per the audit fix. Behaviour preserved: marker dedup, debounce window, deferWork integration, InteractionManager cancellation, platform-branched mapRef typing."
     },
     {
       "id": "F-008",
