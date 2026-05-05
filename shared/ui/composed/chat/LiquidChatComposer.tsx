@@ -232,7 +232,21 @@ export function LiquidChatComposer({
         left: BUTTON_SIZE + GAP,
         right: trimmedHasText ? BUTTON_SIZE + GAP : 0,
       }}>
-      <HStack align="center" spacing={8} style={{ flex: 1, paddingHorizontal: 16 }}>
+      {/* `pointerEvents="box-none"` on the row so taps in the input
+          padding (left / right of the TextInput, and the top / bottom
+          gaps if the bubble is taller than the text line) fall through
+          to the SwiftUI input button beneath, firing its press
+          animation. Without this, this HStack defaults to `auto` and
+          absorbs every tap in the input region — even where there's
+          no RN child to claim it — so the SwiftUI button never sees a
+          touch and never animates. The TextInput itself still catches
+          taps within its visible bounds (so cursor placement / select
+          / paste keep working as normal). */}
+      <HStack
+        pointerEvents="box-none"
+        align="center"
+        spacing={8}
+        style={{ flex: 1, paddingHorizontal: 16 }}>
         <TextInput
           ref={textInputRef}
           value={value}
