@@ -73,7 +73,9 @@
         "git:a1716f39"
       ],
       "verification_note": "Confirmed by `find features/wallet/components/MintSelector -type f` (returns only .ios.tsx, .liquid.tsx, index.ts, useMintSelector.ts) and Metro's default resolver order. Counter-argument considered: EAS production-submit is iOS-only per eas.json:23 — but the repo still ships Android config, meaning any Android build (including dev) breaks.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Renamed MintSelector.ios.tsx → MintSelector.tsx; the file delegates entirely to the platform-aware BalancePill and has no iOS-specific imports, so a generic file is the right shape. Also dropped the unused 'default' re-export from MintSelector/index.ts (no consumer uses default-import)."
     },
     {
       "id": "F-002",
