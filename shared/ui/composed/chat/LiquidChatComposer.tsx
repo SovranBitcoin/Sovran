@@ -297,23 +297,17 @@ export function LiquidChatComposer({
                       its own. */}
                   <SwiftUIButton
                     modifiers={[
-                      // `plain` strips SwiftUI's default button styling so
-                      // there's a single circle — just our `glassEffect`
-                      // modifier paints the visual. With the default
-                      // `glass` button style stacked on top of the explicit
-                      // `glassEffect`, the button reads as two concentric
-                      // circles (background ring + scaled-on-press content).
-                      buttonStyle('plain'),
+                      // `buttonStyle('glass')` provides BOTH the visible
+                      // glass material AND the built-in liquid press / morph
+                      // animation. Stacking an explicit `glassEffect()`
+                      // modifier on top draws a second concentric glass
+                      // ring (visible on press as a doubled circle) and
+                      // overrides the implicit animation, so we don't.
+                      // `glassEffectId` still works alongside the button
+                      // style — it just registers the matched-geometry id
+                      // in the surrounding Namespace.
+                      buttonStyle('glass'),
                       frame({ width: BUTTON_SIZE, height: BUTTON_SIZE }),
-                      // `interactive: false` on the GLASS MATERIAL turns off
-                      // the touch-down brightening glow (Apple's "interactive
-                      // glass" effect). The button remains tappable via the
-                      // SwiftUIButton's onPress; only the cosmetic material
-                      // reaction is suppressed.
-                      glassEffect({
-                        shape: 'circle',
-                        glass: { variant: 'regular', interactive: false },
-                      }),
                       glassEffectId('plus', namespaceId),
                       animation(SEND_SPRING, trimmedHasText),
                     ]}
@@ -358,27 +352,16 @@ export function LiquidChatComposer({
                   <SwiftUIButton
                     modifiers={[
                       // `plain` strips SwiftUI's default button styling so
-                      // there's a single circle — just our `glassEffect`
-                      // modifier paints the visual. With the default
-                      // `glass` button style stacked on top of the explicit
-                      // `glassEffect`, the button reads as two concentric
-                      // circles (background ring + scaled-on-press content).
-                      buttonStyle('plain'),
+                      // See [+] above — `buttonStyle('glass')` owns the
+                      // visual + native animation; we don't stack an
+                      // explicit `glassEffect()` on top.
+                      buttonStyle('glass'),
                       frame({
                         width: trimmedHasText ? BUTTON_SIZE : 0,
                         height: BUTTON_SIZE,
                       }),
                       scaleEffect(trimmedHasText ? 1 : 0),
                       swiftOpacity(trimmedHasText ? 1 : 0),
-                      glassEffect({
-                        shape: 'circle',
-                        glass: {
-                          variant: 'regular',
-                          // See [+] above — turning off interactive glass
-                          // suppresses the touch-down brightening glow.
-                          interactive: false,
-                        },
-                      }),
                       glassEffectId('send', namespaceId),
                       disabledModifier(!canSend),
                       animation(SEND_SPRING, trimmedHasText),
