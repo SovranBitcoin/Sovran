@@ -13,7 +13,7 @@
  * `useScreenActions`.
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Stack, router } from 'expo-router';
 import { z } from 'zod';
 
@@ -40,7 +40,10 @@ function ReceiveMintSelectRoute() {
 
   const { entry, actions } = useScreenActions('mintSelector', params?.mintSelectorEntry);
 
-  const items: MintListItem[] = Array.isArray(entry?.items) ? (entry.items as MintListItem[]) : [];
+  const items = useMemo<MintListItem[]>(
+    () => (Array.isArray(entry?.items) ? (entry.items as MintListItem[]) : []),
+    [entry?.items]
+  );
 
   useEffect(() => {
     const available = items.filter((i) => i.status === 'available').length;
