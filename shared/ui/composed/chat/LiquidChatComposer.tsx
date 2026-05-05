@@ -15,7 +15,14 @@ import {
   Namespace,
   GlassEffectContainer,
 } from '@expo/ui/swift-ui';
-import { buttonStyle, frame, glassEffect, glassEffectId } from '@expo/ui/swift-ui/modifiers';
+import {
+  Animation,
+  animation,
+  buttonStyle,
+  frame,
+  glassEffect,
+  glassEffectId,
+} from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
@@ -262,7 +269,19 @@ export function LiquidChatComposer({
                 <SwiftUIHStack
                   alignment="bottom"
                   spacing={GAP}
-                  modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity })]}>
+                  modifiers={[
+                    frame({ maxWidth: Infinity, maxHeight: Infinity }),
+                    // SwiftUI's GlassEffectContainer + glassEffectId only
+                    // morph between glass shapes when the parent has an
+                    // animation context keyed to the toggling state. Without
+                    // this the conditional [→] mount/unmount snaps instantly.
+                    // Spring matches the WWDC25 demo cadence for the
+                    // composer-style send-button morph.
+                    animation(
+                      Animation.spring({ response: 0.45, dampingFraction: 0.8 }),
+                      trimmedHasText
+                    ),
+                  ]}>
                   {/* Leading [+] glass button */}
                   <SwiftUIButton
                     modifiers={[
