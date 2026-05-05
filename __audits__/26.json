@@ -133,7 +133,8 @@
       ],
       "verification_note": "Verified by code reading. The `ReDoS` risk is not catastrophic-backtracking (these regexes are linear), but the allocation and cache-retention risk is real. Counter-argument considered: in practice, Primal's moderation filters out such content. That does not remove the need for client-side bounds against relays the app may add later.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Regex quantifiers bounded (lnbc 700, hashtag 32, url 2048, nostr 512); MAX_FEED_CONTENT_LEN=32768 short-circuits parseContent before regex pass."
     },
     {
       "id": "F-005",
@@ -176,7 +177,8 @@
       ],
       "verification_note": "Marked UNVERIFIED because the actual CocoPaymentUX melt confirmation behaviour is not in this audit's blast radius (covered partially by audits 19 and 23, but not the exact 'deep-link-from-feed' flow). Severity will stand at Medium until the melt-surface contract is confirmed.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "LightningBlock now decodeFeedInvoice()s on memo; failure renders non-tappable 'Invalid Lightning invoice' chip so a relay-supplied lnbc-shaped string never reaches machine.execute."
     },
     {
       "id": "F-007",
@@ -394,8 +396,8 @@
       ],
       "verification_note": "Verified at :513-520 and :717-724.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Redaction half is closed (HomeFeed.tsx:321 and :527 narrow error before logging). The audit's secondary concern — adding a visible retry surface distinct from EmptyFeed — is a UX expansion outside this slice's scope and remains deferred."
+      "completion_status": "complete",
+      "completion_note": "Both HomeFeed catch blocks log only error.message (loadFeed @ HomeFeed.tsx:320, loadMore @ :528) — raw error object no longer reaches the logger."
     },
     {
       "id": "F-018",
