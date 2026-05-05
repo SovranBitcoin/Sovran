@@ -221,7 +221,7 @@
       "verification_note": "Counted: popups/index.ts ends at line 130 (per `wc -l`: 129 — close enough). Counter-argument considered: explicit barrels give precise control over public API shape — true, but only meaningful when the surface intentionally hides some symbols; here it exposes every symbol from every wrapper file. Drop to Nit because today's burden is small.",
       "prior_audit_id": null,
       "completion_status": "partial",
-      "completion_note": "F-002's chosen partial fix (factory + per-domain modules) preserves named exports, so popups/index.ts still mirrors them one-for-one. Collapsing the barrel would require switching call sites to a registry-key API — out of scope here.\n\nSlice ca2ecf15 trimmed popups/index.ts from 130 to 122 lines by removing the four unused ActionMenu* barrel re-exports (knip-confirmed). The full registry-pattern collapse the finding contemplates remains a separate refactor — it depends on F-002 landing first, since a single `popups({...})` dispatcher is the natural shape only after the per-popup wrappers consolidate onto the factory pattern."
+      "completion_note": "Slice b524deb1 trimmed popups/index.ts from 122 to 91 lines by deleting 30 zero-callsite popup helpers across 11 popup module files (-259 LOC, +6). Surviving call-sites grep clean. The full registry-pattern collapse the finding contemplates remains a separate refactor — depends on F-002 landing first, since a single popups({...}) dispatcher is the natural shape only after the per-popup wrappers consolidate onto the factory pattern."
     }
   ],
   "dimensions": {
