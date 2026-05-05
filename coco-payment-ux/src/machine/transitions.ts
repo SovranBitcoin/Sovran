@@ -163,6 +163,7 @@ function handleAmountEntered(
         destination: event.destination,
         offline: event.offline,
         meltTarget: event.meltTarget,
+        recipientPubkey: event.recipientPubkey,
       }
     : {
         ...currentCtx,
@@ -171,6 +172,7 @@ function handleAmountEntered(
         destination: event.destination ?? currentCtx.destination,
         offline: event.offline ?? currentCtx.offline,
         meltTarget: event.meltTarget ?? currentCtx.meltTarget,
+        recipientPubkey: event.recipientPubkey ?? currentCtx.recipientPubkey,
       };
 
   if (!ctx.intent) {
@@ -237,7 +239,13 @@ function handleProofsChosen(
     return {
       step: 'navigateToPaymentRequest',
       context: ctx,
-      data: { mintUrl, paymentRequest: ctx.paymentRequest, unit: ctx.unit, amount: event.amount },
+      data: {
+        mintUrl,
+        paymentRequest: ctx.paymentRequest,
+        unit: ctx.unit,
+        amount: event.amount,
+        recipientPubkey: ctx.recipientPubkey,
+      },
     };
   }
 
@@ -245,7 +253,13 @@ function handleProofsChosen(
     return {
       step: 'navigateToMeltPreview',
       context: ctx,
-      data: { mintUrl, meltTarget: ctx.meltTarget, unit: ctx.unit, amount: event.amount },
+      data: {
+        mintUrl,
+        meltTarget: ctx.meltTarget,
+        unit: ctx.unit,
+        amount: event.amount,
+        recipientPubkey: ctx.recipientPubkey,
+      },
     };
   }
 
@@ -428,7 +442,11 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
         data: {
           unit,
           preselectedMintUrl: mintUrl ?? walletCtx.preferredMintUrl,
-          constraints: { destination, meltTarget: ctx.meltTarget },
+          constraints: {
+            destination,
+            meltTarget: ctx.meltTarget,
+            recipientPubkey: ctx.recipientPubkey,
+          },
         },
       };
     }
@@ -438,7 +456,13 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
       return {
         step: 'navigateToMeltPreview',
         context: { ...ctx, destination },
-        data: { mintUrl, meltTarget: ctx.meltTarget, unit, amount },
+        data: {
+          mintUrl,
+          meltTarget: ctx.meltTarget,
+          unit,
+          amount,
+          recipientPubkey: ctx.recipientPubkey,
+        },
       };
     }
   }
@@ -455,6 +479,7 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
           destination,
           paymentRequest: ctx.paymentRequest,
           meltTarget: ctx.meltTarget,
+          recipientPubkey: ctx.recipientPubkey,
         },
       },
     };
@@ -501,7 +526,13 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
       return {
         step: 'navigateToPaymentRequest',
         context: { ...ctx, destination },
-        data: { mintUrl, paymentRequest: ctx.paymentRequest, unit, amount },
+        data: {
+          mintUrl,
+          paymentRequest: ctx.paymentRequest,
+          unit,
+          amount,
+          recipientPubkey: ctx.recipientPubkey,
+        },
       };
     }
     return {

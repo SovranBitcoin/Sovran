@@ -138,7 +138,7 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
     mintUrl: ctx.mintUrl,
     amount: ctx.amount,
   });
-  const { mintUrl, amount, unit, meltTarget } = ctx;
+  const { mintUrl, amount, unit, meltTarget, recipientPubkey } = ctx;
 
   switch (destination) {
     case 'mintQuote':
@@ -149,12 +149,24 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
     case 'meltQuote':
       return {
         step: 'navigateToMeltPreview',
-        data: { mintUrl: mintUrl!, meltTarget: meltTarget!, unit, amount: amount! },
+        data: {
+          mintUrl: mintUrl!,
+          meltTarget: meltTarget!,
+          unit,
+          amount: amount!,
+          recipientPubkey,
+        },
       };
     case 'paymentRequest':
       return {
         step: 'navigateToPaymentRequest',
-        data: { mintUrl: mintUrl!, paymentRequest: ctx.paymentRequest!, amount: amount!, unit },
+        data: {
+          mintUrl: mintUrl!,
+          paymentRequest: ctx.paymentRequest!,
+          amount: amount!,
+          unit,
+          recipientPubkey,
+        },
       };
     case 'sendEcash':
       return {

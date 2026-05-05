@@ -762,8 +762,11 @@ export function createSovranHandlers({
       });
     },
 
-    sendComplete: async ({ historyEntry, mintWasOffline }) => {
-      paymentLog.info('payment.step.send_complete', { mintWasOffline: !!mintWasOffline });
+    sendComplete: async ({ historyEntry, mintWasOffline, recipientPubkey }) => {
+      paymentLog.info('payment.step.send_complete', {
+        mintWasOffline: !!mintWasOffline,
+        recipientPubkeyPresent: !!recipientPubkey,
+      });
 
       // Routstr top-up: intercept the token and send it to the Routstr API
       const topUpState = useRoutstrTopUpStore.getState();
@@ -796,17 +799,29 @@ export function createSovranHandlers({
         return;
       }
 
+      // Inject recipientPubkey into the executed history entry's metadata
+      // so SendTokenScreen can render the recipient identity. Operations
+      // build the entry; we attach identity at the screen-handler seam.
+      const enrichedHistoryEntry = recipientPubkey
+        ? injectRecipientPubkey(historyEntry, recipientPubkey)
+        : historyEntry;
+
       router.navigate({
         pathname: '/(send-flow)/sendToken',
         params: {
-          sendHistoryEntry: historyEntry,
+          sendHistoryEntry: enrichedHistoryEntry,
           ...(mintWasOffline ? { mintWasOffline: 'true' } : {}),
         },
       });
     },
 
-    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit }) => {
-      paymentLog.info('payment.step.navigate_payment_request', { mintUrl, amount, unit });
+    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit, recipientPubkey }) => {
+      paymentLog.info('payment.step.navigate_payment_request', {
+        mintUrl,
+        amount,
+        unit,
+        recipientPubkeyPresent: !!recipientPubkey,
+      });
       const entry = {
         id: mintLocalId('pr-preview'),
         type: 'send',
@@ -815,7 +830,11 @@ export function createSovranHandlers({
         amount,
         unit,
         state: 'prepared',
-        metadata: { paymentRequest, phase: 'preview' },
+        metadata: {
+          paymentRequest,
+          phase: 'preview',
+          ...(recipientPubkey ? { recipientPubkey } : {}),
+        },
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
@@ -825,8 +844,13 @@ export function createSovranHandlers({
       });
     },
 
-    navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit }) => {
-      paymentLog.info('payment.step.navigate_melt_preview', { mintUrl, amount, unit });
+    navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit, recipientPubkey }) => {
+      paymentLog.info('payment.step.navigate_melt_preview', {
+        mintUrl,
+        amount,
+        unit,
+        recipientPubkeyPresent: !!recipientPubkey,
+      });
       const entry: MeltHistoryEntry = {
         id: mintLocalId('melt-preview'),
         type: 'melt',
@@ -836,7 +860,11 @@ export function createSovranHandlers({
         quoteId: '',
         state: 'UNPAID',
         amount,
-        metadata: { phase: 'preview', meltTarget },
+        metadata: {
+          phase: 'preview',
+          meltTarget,
+          ...(recipientPubkey ? { recipientPubkey } : {}),
+        },
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
@@ -985,6 +1013,22 @@ export function createSovranHandlers({
 // =============================================================================
 
 type Ctx<E> = ScreenActionContext<E> & { manager: Manager };
+
+/**
+ * Re-serialize a JSON-encoded coco history entry with `recipientPubkey`
+ * added to its metadata. Returns the input unchanged if it can't be parsed
+ * — operations build the entry, this only attaches identity at the seam.
+ */
+function injectRecipientPubkey(historyEntry: string, recipientPubkey: string): string {
+  try {
+    const parsed = JSON.parse(historyEntry) as { metadata?: Record<string, unknown> };
+    parsed.metadata = { ...(parsed.metadata ?? {}), recipientPubkey };
+    return JSON.stringify(parsed);
+  } catch {
+    paymentLog.warn('payment.recipient_pubkey.inject_failed');
+    return historyEntry;
+  }
+}
 
 function sendCtx(ctx: ScreenActionContext): Ctx<SendHistoryEntry> {
   return ctx as Ctx<SendHistoryEntry>;

@@ -225,7 +225,14 @@ export function SendTokenScreen({
        */}
       <View testID={`send-token-id-${entry.id}`}>
         <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} />
+          <HistoryEntryHeader
+            historyEntry={entry}
+            recipientPubkey={
+              typeof entry.metadata?.recipientPubkey === 'string'
+                ? entry.metadata.recipientPubkey
+                : undefined
+            }
+          />
 
           {mintWasOffline && (
             <Alert status="warning" className="bg-surface-secondary">

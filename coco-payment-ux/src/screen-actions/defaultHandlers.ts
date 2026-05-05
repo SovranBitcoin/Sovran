@@ -491,6 +491,7 @@ export function createDefaultScreenActionHandlers(
         // "Send Money" DM path where both ecash and lightning are available).
         const variantId = typeof ctx.variantId === 'string' ? ctx.variantId : undefined;
         const meltTargetFromEntry = typeof entry.meltTarget === 'string' ? entry.meltTarget : '';
+        const recipientPubkey = getString(entry, 'recipientPubkey');
 
         let destination: Destination = entryDestination;
         let meltTarget: string | undefined;
@@ -525,9 +526,14 @@ export function createDefaultScreenActionHandlers(
           destination,
           variantId: variantId ?? null,
           meltTargetPreview: meltTarget ? meltTarget.slice(0, 30) + '…' : null,
+          recipientPubkeyPresent: !!recipientPubkey,
         });
         try {
-          await machine.enterAmount(effectiveSat, mintUrl, { destination, meltTarget });
+          await machine.enterAmount(effectiveSat, mintUrl, {
+            destination,
+            meltTarget,
+            recipientPubkey,
+          });
           logger.info('screenAction.amountEntry.next.resolved');
         } catch (err) {
           logger.warn('screenAction.amountEntry.next.threw', { error: errField(err) });

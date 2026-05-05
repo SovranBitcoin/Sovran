@@ -112,6 +112,11 @@ export function PaymentRequestScreen({
       <VStack gap={12}>
         <HistoryEntryHeader
           pendingData={{ amount: entry.amount, unit: entry.unit, type: 'send' }}
+          recipientPubkey={
+            typeof entry.metadata?.recipientPubkey === 'string'
+              ? entry.metadata.recipientPubkey
+              : undefined
+          }
         />
 
         {isPreview ? (

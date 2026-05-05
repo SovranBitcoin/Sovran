@@ -118,7 +118,14 @@ export function MeltQuoteScreen({
     <Screen name="MeltQuoteScreen" contentPadding={0} footer={bottomButtons}>
       <View testID={`melt-quote-id-${entry.id}`}>
         <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} />
+          <HistoryEntryHeader
+            historyEntry={entry}
+            recipientPubkey={
+              typeof entry.metadata?.recipientPubkey === 'string'
+                ? entry.metadata.recipientPubkey
+                : undefined
+            }
+          />
 
           {entry.state === 'PAID' && <TransactionLocationSection transactionId={entry.id} />}
 

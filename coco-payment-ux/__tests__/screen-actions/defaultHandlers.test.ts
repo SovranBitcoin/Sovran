@@ -691,6 +691,26 @@ describe('amountEntry default handlers', () => {
       await mgr.execute('next');
       expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
         destination: 'sendEcash',
+        meltTarget: undefined,
+        recipientPubkey: undefined,
+      });
+    });
+
+    it('forwards recipientPubkey from the entry to machine.enterAmount', async () => {
+      const { handlers, machine } = createMockConfig();
+      const recipientPubkey = 'a'.repeat(64);
+      const { mgr } = createManager('amountEntry', handlers, {
+        effectiveSatAmount: 100,
+        selectedMintUrl: MINT1,
+        destination: 'sendEcash',
+        recipientPubkey,
+      });
+
+      await mgr.execute('next');
+      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+        destination: 'sendEcash',
+        meltTarget: undefined,
+        recipientPubkey,
       });
     });
 

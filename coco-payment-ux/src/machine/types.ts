@@ -63,6 +63,7 @@ export interface StepDataMap {
       supportedMintUrls?: string[];
       paymentRequest?: string;
       meltTarget?: string;
+      recipientPubkey?: string;
     };
   };
   selectMint: {
@@ -72,6 +73,7 @@ export interface StepDataMap {
     unit: string;
     paymentRequest?: string;
     meltTarget?: string;
+    recipientPubkey?: string;
     destination?: Destination;
     /** Pre-computed mint list items (populated when machine operations are provided). */
     mintListItems?: MintListItem[];
@@ -83,6 +85,7 @@ export interface StepDataMap {
     amount: number;
     paymentRequest?: string;
     meltTarget?: string;
+    recipientPubkey?: string;
     unit: string;
     proofAmounts: number[];
     suggestions?: {
@@ -92,12 +95,17 @@ export interface StepDataMap {
   };
   receiveToken: { token: string };
   confirmSend: { mintUrl: string; amount: number };
-  sendComplete: { historyEntry: string; mintWasOffline?: boolean };
+  sendComplete: {
+    historyEntry: string;
+    mintWasOffline?: boolean;
+    recipientPubkey?: string;
+  };
   navigateToMeltPreview: {
     mintUrl: string;
     meltTarget: string;
     unit: string;
     amount: number;
+    recipientPubkey?: string;
     /** Populated after a successful melt so the screen can link to the new transaction. */
     historyEntry?: string;
   };
@@ -106,6 +114,7 @@ export interface StepDataMap {
     paymentRequest: string;
     amount: number;
     unit: string;
+    recipientPubkey?: string;
     /** Populated after a successful payment request send. */
     historyEntry?: string;
   };
@@ -161,6 +170,13 @@ export interface FlowContext {
   unit: string;
   paymentRequest?: string;
   meltTarget?: string;
+  /**
+   * Nostr pubkey (hex) of the recipient when this flow was launched from a
+   * chat surface. Set on AMOUNT_ENTERED (or on the initial `enterAmount`
+   * constraints) and propagated to terminal navigation step data so consumer
+   * UIs can render recipient identity on payment-confirmation screens.
+   */
+  recipientPubkey?: string;
   supportedMintUrls?: string[];
   /**
    * When true, force the proof selector for ecash sends instead of attempting
@@ -265,6 +281,8 @@ export type FlowEvent =
        * + meltTarget so the machine can route to navigateToMeltPreview.
        */
       meltTarget?: string;
+      /** See `FlowContext.recipientPubkey` — chat-launched flows seed this. */
+      recipientPubkey?: string;
     }
   | {
       type: 'MINT_SELECTED';
@@ -801,7 +819,12 @@ export interface PaymentMachine {
   enterAmount: (
     amount: number,
     mintUrl: string,
-    opts?: { destination?: Destination; offline?: boolean; meltTarget?: string }
+    opts?: {
+      destination?: Destination;
+      offline?: boolean;
+      meltTarget?: string;
+      recipientPubkey?: string;
+    }
   ) => Promise<void>;
   /** User selected one of multiple payment options (e.g. from chooseOption step). */
   chooseOption: (option: PaymentOption) => Promise<void>;

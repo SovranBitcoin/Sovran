@@ -688,7 +688,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               });
             }
 
-            setStep('sendComplete', { historyEntry: nfcSendResult.historyEntry });
+            setStep('sendComplete', {
+              historyEntry: nfcSendResult.historyEntry,
+              recipientPubkey: flowCtx.recipientPubkey,
+            });
           } catch (err) {
             // Write-back or send failed — rollback if token was created
             let rolledBack = false;
@@ -732,7 +735,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         try {
           const result = await operations.executeSend(data.mintUrl, data.amount);
           logger.info('machine.send.success');
-          setStep('sendComplete', { historyEntry: result.historyEntry });
+          setStep('sendComplete', {
+            historyEntry: result.historyEntry,
+            recipientPubkey: flowCtx.recipientPubkey,
+          });
 
           const parsed = parseHistoryEntryOnce(result.historyEntry);
           if (parsed?.id) {
@@ -766,6 +772,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                 setStep('sendComplete', {
                   historyEntry: result.historyEntry,
                   mintWasOffline: true,
+                  recipientPubkey: flowCtx.recipientPubkey,
                 });
 
                 const parsed = parseHistoryEntryOnce(result.historyEntry);
@@ -1089,7 +1096,12 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   const enterAmount = (
     amount: number,
     mintUrl: string,
-    opts?: { destination?: Destination; offline?: boolean; meltTarget?: string }
+    opts?: {
+      destination?: Destination;
+      offline?: boolean;
+      meltTarget?: string;
+      recipientPubkey?: string;
+    }
   ) =>
     send({
       type: 'AMOUNT_ENTERED',
@@ -1098,6 +1110,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       destination: opts?.destination,
       offline: opts?.offline,
       meltTarget: opts?.meltTarget,
+      recipientPubkey: opts?.recipientPubkey,
     });
 
   const chooseOption = (option: PaymentOption) => send({ type: 'OPTION_CHOSEN', option });

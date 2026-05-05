@@ -118,6 +118,14 @@ export type ResolvedIntent =
 export interface AmountEntryConstraints {
   paymentRequest?: string;
   meltTarget?: string;
+  /**
+   * Nostr pubkey (32-byte hex) of the recipient when this amount-entry was
+   * launched from a chat surface. UI-agnostic identity — consumers resolve to
+   * a profile (picture, displayName) via their own metadata cache. Threaded
+   * through `FlowContext` and surfaced on `navigateToMeltPreview` /
+   * `navigateToPaymentRequest` / `sendComplete` step data.
+   */
+  recipientPubkey?: string;
   destination: 'paymentRequest' | 'meltQuote' | 'sendEcash' | 'mintQuote';
 }
 

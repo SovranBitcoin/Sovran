@@ -8,13 +8,7 @@
  */
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import {
-  ScrollView,
-  StatusBar,
-  ColorValue,
-  InteractionManager,
-  useWindowDimensions,
-} from 'react-native';
+import { StatusBar, ColorValue, InteractionManager, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { router, Stack } from 'expo-router';
@@ -50,8 +44,6 @@ import Icon from 'assets/icons';
 import { ChatComposer } from '@/shared/ui/composed/chat/ChatComposer';
 import { useChatSurfacePerfLogger } from '@/shared/ui/composed/chat/useChatSurfacePerfLogger';
 import { formatChatTimestamp } from '@/shared/ui/composed/chat/formatChatTimestamp';
-import { Button } from '@/shared/ui/primitives/Button';
-
 import { isValidEcashToken } from '@/shared/lib/cashu/utils';
 import { mintLocalId } from '@/shared/lib/id';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -403,11 +395,12 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   const { width: screenWidth } = useWindowDimensions();
   const listRef = useRef<any>(null);
 
-  const [foreground, surfaceSecondary, surface, shade400] = useThemeColor([
+  const [foreground, surfaceSecondary, surface, shade400, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface-secondary',
     'surface',
     'shade-400',
+    'surface-tertiary',
   ] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
   const { ndk } = useNDK();
@@ -812,6 +805,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
           unit: 'sat',
           selectedMintUrl: mint,
           meltTarget: lud16,
+          recipientPubkey: pubkey,
         }),
       },
     });
@@ -977,39 +971,28 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
                   name={myName}
                 />
               }
+              actionsLeading={
+                lud16 ? (
+                  <Pressable
+                    onPress={handleSendMoney}
+                    style={{
+                      height: 32,
+                      borderRadius: 16,
+                      paddingHorizontal: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      backgroundColor: surfaceTertiary,
+                    }}>
+                    <Icon name="mingcute:lightning-fill" size={16} color={foreground} />
+                    <Text size={13} style={{ color: foreground }} bold>
+                      Send Money
+                    </Text>
+                  </Pressable>
+                ) : null
+              }
             />
           </View>
-
-          {/* Floating Send Money button — `composerHeight + 8` keeps the
-              row 8pt above whatever the composer measures right now
-              (single-line ≈ 96pt, multi-line grows). */}
-          {composerHeight > 0 && lud16 && (
-            <View
-              pointerEvents="box-none"
-              style={{
-                position: 'absolute',
-                bottom: composerHeight + 8,
-                left: 0,
-                right: 0,
-              }}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 6,
-                  gap: 12,
-                }}>
-                <Button
-                  variant="primary"
-                  text="Send Money"
-                  icon={<Icon name="mingcute:lightning-fill" size={20} color={surface} />}
-                  onPress={handleSendMoney}
-                  style={{ paddingHorizontal: 16 }}
-                />
-              </ScrollView>
-            </View>
-          )}
         </View>
       </Log>
     </KeyboardAvoidingView>
