@@ -204,7 +204,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Static argument is clean — the code structurally constructs a fresh object every render of search results. Marked as Medium not High because the search modal is short-lived and per-keystroke reconciliation of <20 rows is not catastrophic. UNVERIFIED at runtime.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "searchCandidateCache ref mirrors nostrCandidateCache: keyed on pubkey, compares (r.profile, relayProfile, score, followers, follows) by Object.is + scalar equality, GCs entries that drop out of the result set, emits a 'reused' counter alongside the existing debug log."
     },
     {
       "id": "F-007",
