@@ -31,6 +31,7 @@ import {
   ChatComposer,
   ChatMessageBubble,
   DmChatHeader,
+  extractCashuToken,
   useChatSurfacePerfLogger,
   useMessageGrouping,
 } from '@/shared/ui/composed/chat';
@@ -132,6 +133,7 @@ export function GeohashChatScreen({
             sender: item.sender,
             timestamp: item.timestamp,
             isOwn: item.isOwn,
+            cashuToken: extractCashuToken(item.content) ?? undefined,
           }}
           isFirstInGroup={group?.isFirst ?? true}
           isLastInGroup={group?.isLast ?? true}

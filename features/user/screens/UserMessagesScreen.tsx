@@ -8,13 +8,12 @@
  */
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { StatusBar, ColorValue, InteractionManager, useWindowDimensions } from 'react-native';
+import { StatusBar, InteractionManager } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { invalidTokenPopup, sendMessageFailedPopup } from '@/shared/lib/popup';
-import { nip19 } from 'nostr-tools';
+import { sendMessageFailedPopup } from '@/shared/lib/popup';
 import {
   NDKEvent,
   NDKPrivateKeySigner,
@@ -35,25 +34,20 @@ import { LegendList } from '@legendapp/list';
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
-import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
-import { ChatComposer } from '@/shared/ui/composed/chat/ChatComposer';
-import { useChatSurfacePerfLogger } from '@/shared/ui/composed/chat/useChatSurfacePerfLogger';
-import { formatChatTimestamp } from '@/shared/ui/composed/chat/formatChatTimestamp';
-import { isValidEcashToken } from '@/shared/lib/cashu/utils';
-import { mintLocalId } from '@/shared/lib/id';
+import {
+  ChatComposer,
+  ChatMessageBubble,
+  DmChatHeader,
+  extractCashuToken,
+  useChatSurfacePerfLogger,
+  useMessageGrouping,
+  type ChatBubbleMessage,
+} from '@/shared/ui/composed/chat';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { getDecodedToken, ReceiveHistoryEntry } from '@cashu/coco-core';
-import { Proof } from '@cashu/cashu-ts';
-import { formatAmount } from '@/shared/lib/currency';
-import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { LinearGradient } from 'expo-linear-gradient';
-import opacity from 'hex-color-opacity';
-import { truncateMiddle } from '@/shared/lib/strings';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -64,323 +58,15 @@ import { LightningAddress } from '@sovranbitcoin/schemas';
 
 const PERF_SURFACE = 'nostr-dm' as const;
 
+/** Internal DM record. Maps to ChatBubbleMessage at render time. */
 interface DmMessage {
   id: string;
   content: string;
-  sender: 'me' | 'other';
-  timestamp: string;
+  isOwn: boolean;
   isRead: boolean;
   isSending?: boolean;
   created_at: number;
   pubkey: string;
-}
-
-function extractCashuToken(content: string): string | null {
-  if (!content || typeof content !== 'string') return null;
-
-  const lowerContent = content.toLowerCase();
-  const cashuAIndex = lowerContent.indexOf('cashua');
-  const cashuBIndex = lowerContent.indexOf('cashub');
-
-  let tokenStartIndex = -1;
-  if (cashuAIndex !== -1 && (cashuBIndex === -1 || cashuAIndex < cashuBIndex)) {
-    tokenStartIndex = cashuAIndex;
-  } else if (cashuBIndex !== -1) {
-    tokenStartIndex = cashuBIndex;
-  }
-
-  if (tokenStartIndex === -1) return null;
-
-  const remainingText = content.slice(tokenStartIndex);
-  let token = '';
-  const maxTokenLength = 5000;
-
-  for (let i = 6; i <= Math.min(remainingText.length, maxTokenLength); i++) {
-    const candidate = remainingText.slice(0, i);
-    if (isValidEcashToken(candidate)) {
-      token = candidate;
-    } else if (token) {
-      break;
-    }
-
-    if (/\s/.test(remainingText[i]) && !token) {
-      break;
-    }
-  }
-
-  return token || null;
-}
-
-interface CashuTokenBubbleProps {
-  token: string;
-  isMe: boolean;
-}
-
-function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
-  const [foreground, defaultColor, surfaceTertiary, surfaceSecondary, surface, shade200, shade300] =
-    useThemeColor([
-      'foreground',
-      'default',
-      'surface-tertiary',
-      'surface-secondary',
-      'surface',
-      'shade-200',
-      'shade-300',
-    ] as const);
-
-  let decoded;
-  let amount = 0;
-  let unit = '';
-  let mintUrl = '';
-  let isValid = false;
-
-  try {
-    decoded = getDecodedToken(token);
-    amount = decoded.proofs.reduce((sum: number, proof: Proof) => sum + proof.amount, 0);
-    unit = decoded.unit || 'sats';
-    mintUrl = decoded.mint || '';
-    isValid = true;
-  } catch (error) {
-    log.error('user.messages.cashu_decode_failed', { error });
-    isValid = false;
-  }
-
-  const usdAmount = isValid
-    ? formatAmount({ amount, unit }, { displayAs: 'usd', currencyDisplay: 'symbol' })
-    : '';
-
-  const handlePress = () => {
-    if (!isValid) {
-      invalidTokenPopup();
-      return;
-    }
-
-    const decodedToken = getDecodedToken(token);
-    const receiveHistoryEntry: ReceiveHistoryEntry = {
-      id: mintLocalId('receive'),
-      type: 'receive',
-      amount,
-      unit,
-      mintUrl,
-      createdAt: Date.now(),
-      metadata: {},
-      state: 'prepared',
-      token: decodedToken,
-    };
-
-    router.navigate({
-      pathname: '/receiveToken',
-      params: {
-        receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
-      },
-    });
-  };
-
-  if (!isValid) {
-    return null;
-  }
-
-  const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isMe
-    ? [shade200, shade300]
-    : [defaultColor, surfaceTertiary];
-
-  const innerGradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isMe
-    ? [opacity(foreground, 0.2), opacity(foreground, 0.175)]
-    : [surfaceSecondary, surface];
-
-  return (
-    <View
-      style={{
-        marginTop: 8,
-        marginBottom: 8,
-        alignSelf: isMe ? 'flex-end' : 'flex-start',
-        maxWidth: '85%',
-      }}>
-      <Pressable onPress={handlePress}>
-        <LinearGradient
-          colors={gradientColors}
-          style={{
-            borderRadius: 18,
-            padding: 12,
-            minWidth: 200,
-          }}>
-          <VStack spacing={8}>
-            {mintUrl && (
-              <Text
-                size={12}
-                style={{
-                  color: foreground,
-                  opacity: 0.75,
-                }}>
-                {mintUrl}
-              </Text>
-            )}
-
-            <LinearGradient
-              colors={innerGradientColors}
-              style={{
-                borderRadius: 18,
-                margin: 0,
-              }}>
-              <VStack spacing={4} justify="center" align="center" className="p-5">
-                <AmountFormatter
-                  amount={amount}
-                  unit={unit}
-                  size={32}
-                  weight="heavy"
-                  color={foreground}
-                />
-                {usdAmount && (
-                  <Text
-                    size={14}
-                    style={{
-                      color: foreground,
-                      opacity: 0.9,
-                    }}>
-                    {usdAmount}
-                  </Text>
-                )}
-              </VStack>
-            </LinearGradient>
-
-            <Pressable
-              onPress={handlePress}
-              style={{
-                marginTop: 8,
-                paddingVertical: 10,
-                paddingHorizontal: 16,
-                backgroundColor: foreground,
-                borderRadius: 8,
-                alignItems: 'center',
-              }}>
-              <HStack align="center" spacing={6}>
-                {!isMe && (
-                  <Icon name="material-symbols:arrow-downward" size={16} color={defaultColor} />
-                )}
-                <Text
-                  size={14}
-                  bold
-                  style={{
-                    color: defaultColor,
-                  }}>
-                  {isMe ? 'Cancel' : 'Redeem'}
-                </Text>
-              </HStack>
-            </Pressable>
-          </VStack>
-        </LinearGradient>
-      </Pressable>
-    </View>
-  );
-}
-
-interface MessageBubbleProps {
-  message: DmMessage;
-  isMe: boolean;
-  userPicture?: string;
-  userName: string;
-  myName: string;
-  isLoadingMetadata?: boolean;
-}
-
-function MessageBubble({
-  message,
-  isMe,
-  userPicture,
-  userName,
-  myName,
-  isLoadingMetadata,
-}: MessageBubbleProps) {
-  const [foreground, defaultColor, surfaceTertiary, shade400, shade500] = useThemeColor([
-    'foreground',
-    'default',
-    'surface-tertiary',
-    'shade-400',
-    'shade-500',
-  ] as const);
-
-  const content = message.content;
-  const cashuToken = extractCashuToken(content);
-  const displayContent = cashuToken ? content.replace(cashuToken, '').trim() : content;
-
-  return (
-    <VStack
-      align={isMe ? 'flex-end' : 'flex-start'}
-      spacing={0}
-      style={{
-        marginBottom: 16,
-        maxWidth: '85%',
-        alignSelf: isMe ? 'flex-end' : 'flex-start',
-      }}>
-      <HStack
-        align="flex-start"
-        justify={isMe ? 'flex-end' : 'flex-start'}
-        spacing={8}
-        style={{ width: '100%' }}>
-        {!isMe && (
-          <Avatar
-            state={isLoadingMetadata ? 'loading' : userPicture ? 'image' : 'fallback'}
-            size={32}
-            picture={userPicture}
-            seed={message.pubkey}
-            name={userName}
-          />
-        )}
-
-        <VStack
-          align={isMe ? 'flex-end' : 'flex-start'}
-          spacing={4}
-          style={{ flex: 1, maxWidth: '85%' }}>
-          {displayContent.length > 0 && (
-            <View
-              style={{
-                backgroundColor: isMe ? defaultColor : surfaceTertiary,
-                borderRadius: 18,
-                borderTopLeftRadius: isMe ? 18 : 4,
-                borderTopRightRadius: isMe ? 4 : 18,
-                alignSelf: isMe ? 'flex-end' : 'flex-start',
-              }}>
-              <Text
-                size={16}
-                style={{
-                  color: foreground,
-                  lineHeight: 20,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                }}>
-                {displayContent}
-              </Text>
-            </View>
-          )}
-
-          {cashuToken && <CashuTokenBubble token={cashuToken} isMe={isMe} />}
-
-          <HStack align="center" spacing={4}>
-            <Text
-              size={12}
-              style={{
-                color: shade400,
-                marginLeft: isMe ? 0 : 8,
-              }}>
-              {message.timestamp}
-            </Text>
-            {isMe &&
-              (message.isSending ? (
-                <Icon name="ant-design:loading-outlined" size={14} color={shade500} />
-              ) : (
-                <Icon
-                  name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
-                  size={14}
-                  color={message.isRead ? opacity(foreground, 0.4) : shade500}
-                />
-              ))}
-          </HStack>
-        </VStack>
-
-        {isMe && <Avatar state="fallback" size={32} seed={message.pubkey} name={myName} />}
-      </HStack>
-    </VStack>
-  );
 }
 
 interface UserMessagesScreenProps {
@@ -392,8 +78,6 @@ interface UserMessagesScreenProps {
 export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
   const headerHeight = useHeaderHeight();
-  const { width: screenWidth } = useWindowDimensions();
-  const listRef = useRef<any>(null);
 
   const [foreground, surfaceSecondary, surface, shade400, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -418,7 +102,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     messages,
     kbStateExtras: () => ({ composerHeight }),
     historyExtras: (last) => ({
-      lastSender: last?.sender ?? null,
+      lastIsOwn: last?.isOwn ?? null,
       lastIsSending: last?.isSending ?? null,
     }),
   });
@@ -428,8 +112,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   // subsequent open is instant because the cache is shared across
   // surfaces (this screen, contact picker, feed reactions, etc.) and
   // persists across app launches via profile-scoped AsyncStorage.
-  const { metadata: counterpartyMetadata, isLoading: isMetadataLoading } =
-    useNostrProfileMetadata(pubkey);
+  const { metadata: counterpartyMetadata } = useNostrProfileMetadata(pubkey);
 
   const dmFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
@@ -497,29 +180,80 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
   const myProfile = useProfileDisplay(nostrKeys?.pubkey || '');
   const myName = myProfile.displayName;
-  const shouldShowAvatarLoading = isMetadataLoading && !counterpartyMetadata;
 
-  const renderMessage = useCallback(
-    ({ item }: { item: DmMessage }) => (
-      <MessageBubble
-        message={item}
-        isMe={item.sender === 'me'}
-        userPicture={item.sender === 'other' ? userPicture : undefined}
-        userName={displayName}
-        myName={myName}
-        isLoadingMetadata={shouldShowAvatarLoading}
-      />
-    ),
-    [userPicture, displayName, myName, shouldShowAvatarLoading]
+  const bubbleMessages = useMemo<ChatBubbleMessage[]>(
+    () =>
+      messages.map((m) => ({
+        id: m.id,
+        content: m.content,
+        senderId: m.isOwn ? '' : m.pubkey,
+        sender: m.isOwn ? undefined : displayName,
+        timestamp: m.created_at * 1000,
+        isOwn: m.isOwn,
+        isPending: m.isSending,
+        deliveryStatus: m.isOwn
+          ? m.isSending
+            ? 'sending'
+            : m.isRead
+              ? 'read'
+              : 'sent'
+          : undefined,
+        cashuToken: extractCashuToken(m.content) ?? undefined,
+      })),
+    [messages, displayName]
   );
 
-  const handleBack = () => {
+  const groupingMap = useMessageGrouping(bubbleMessages);
+
+  const counterpartyAvatar = useMemo(
+    () => (
+      <Avatar
+        state={userPicture ? 'image' : 'fallback'}
+        size={32}
+        picture={userPicture}
+        seed={pubkey}
+        name={displayName}
+      />
+    ),
+    [userPicture, pubkey, displayName]
+  );
+
+  const ownAvatar = useMemo(
+    () => (
+      <Avatar
+        state={myProfile.picture ? 'image' : 'fallback'}
+        size={32}
+        picture={myProfile.picture}
+        seed={nostrKeys?.pubkey}
+        name={myName}
+      />
+    ),
+    [myProfile.picture, nostrKeys?.pubkey, myName]
+  );
+
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatBubbleMessage }) => {
+      const group = groupingMap.get(item.id);
+      return (
+        <ChatMessageBubble
+          message={item}
+          isFirstInGroup={group?.isFirst ?? true}
+          isLastInGroup={group?.isLast ?? true}
+          counterpartyAvatar={counterpartyAvatar}
+          ownAvatar={ownAvatar}
+        />
+      );
+    },
+    [groupingMap, counterpartyAvatar, ownAvatar]
+  );
+
+  const handleBack = useCallback(() => {
     if (onBack) {
       onBack();
     } else {
       router.back();
     }
-  };
+  }, [onBack]);
 
   const processedEventIds = useRef<Set<string>>(new Set());
 
@@ -568,16 +302,15 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
                 await event.decrypt(counterparty, signer);
                 putNip04Plaintext(myPubkey, event.id, event.content);
               }
-              const isMe = event.pubkey === myPubkey;
-              const senderPubkey = isMe ? myPubkey : event.pubkey;
+              const isOwn = event.pubkey === myPubkey;
+              const senderPubkey = isOwn ? myPubkey : event.pubkey;
 
               processedEventIds.current.add(event.id);
 
               return {
                 id: event.id,
                 content: event.content,
-                sender: (isMe ? 'me' : 'other') as 'me' | 'other',
-                timestamp: formatChatTimestamp((event.created_at || 0) * 1000),
+                isOwn,
                 isRead: true,
                 created_at: event.created_at || 0,
                 pubkey: senderPubkey,
@@ -598,12 +331,12 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         setMessages((prev) => {
           const existingIds = new Set(prev.map((m) => m.id));
           const existingContentKeys = new Set(
-            prev.map((m) => `${m.content}-${m.created_at}-${m.sender}`)
+            prev.map((m) => `${m.content}-${m.created_at}-${m.isOwn}`)
           );
 
           const uniqueNewMessages = validNewMessages.filter((m) => {
             if (existingIds.has(m.id)) return false;
-            const contentKey = `${m.content}-${m.created_at}-${m.sender}`;
+            const contentKey = `${m.content}-${m.created_at}-${m.isOwn}`;
             if (existingContentKeys.has(contentKey)) return false;
             return true;
           });
@@ -634,13 +367,12 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
 
     const formatted: DmMessage[] = newMessages.map((dm) => {
       processedEventIds.current.add(dm.wrapId);
-      const isMe = dm.senderPubkey === nostrKeys.pubkey;
+      const isOwn = dm.senderPubkey === nostrKeys.pubkey;
 
       return {
         id: dm.wrapId,
         content: dm.content,
-        sender: isMe ? 'me' : 'other',
-        timestamp: formatChatTimestamp(dm.created_at * 1000),
+        isOwn,
         isRead: true,
         created_at: dm.created_at,
         pubkey: dm.senderPubkey,
@@ -650,12 +382,12 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     setMessages((prev) => {
       const existingIds = new Set(prev.map((m) => m.id));
       const existingContentKeys = new Set(
-        prev.map((m) => `${m.content}-${m.created_at}-${m.sender}`)
+        prev.map((m) => `${m.content}-${m.created_at}-${m.isOwn}`)
       );
 
       const uniqueNewMessages = formatted.filter((m) => {
         if (existingIds.has(m.id)) return false;
-        const contentKey = `${m.content}-${m.created_at}-${m.sender}`;
+        const contentKey = `${m.content}-${m.created_at}-${m.isOwn}`;
         if (existingContentKeys.has(contentKey)) return false;
         return true;
       });
@@ -709,8 +441,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     const optimisticMessage: DmMessage = {
       id: tempMessageId,
       content: text,
-      sender: 'me',
-      timestamp: formatChatTimestamp(timestamp * 1000),
+      isOwn: true,
       isRead: false,
       isSending: true,
       created_at: timestamp,
@@ -811,93 +542,13 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     });
   };
 
-  const headerTitleWidth = screenWidth - 124 - 24;
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior="padding"
       keyboardVerticalOffset={headerHeight}>
       <Log name="UserMessagesScreen">
-        <Stack.Screen
-          options={{
-            headerShown: true,
-            headerTransparent: false,
-            headerStyle: { backgroundColor: surfaceSecondary },
-            headerShadowVisible: false,
-            headerBackVisible: false,
-            headerTintColor: foreground,
-            headerLeft: () => (
-              <Pressable onPress={handleBack} style={{ padding: 8 }}>
-                <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
-              </Pressable>
-            ),
-            headerTitle: () => (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  width: headerTitleWidth,
-                  height: 48,
-                }}>
-                <Avatar
-                  state={shouldShowAvatarLoading ? 'loading' : userPicture ? 'image' : 'fallback'}
-                  size={40}
-                  picture={userPicture}
-                  seed={pubkey}
-                  name={displayName}
-                />
-                <VStack
-                  spacing={2}
-                  style={{
-                    marginLeft: 8,
-                    flex: 1,
-                    minWidth: 0,
-                    justifyContent: 'flex-start',
-                    alignItems: 'flex-start',
-                  }}>
-                  <Text
-                    loading={shouldShowAvatarLoading}
-                    placeholder="Display Name"
-                    size={16}
-                    bold
-                    style={{
-                      color: foreground,
-                      textAlign: 'left',
-                    }}
-                    numberOfLines={1}>
-                    {displayName}
-                  </Text>
-                  <Text
-                    size={12}
-                    style={{
-                      color: shade400,
-                      marginTop: 2,
-                      textAlign: 'left',
-                    }}
-                    numberOfLines={1}>
-                    {truncateMiddle(nip19.npubEncode(pubkey), 8)}
-                  </Text>
-                </VStack>
-              </View>
-            ),
-            headerRight: () => (
-              <Pressable
-                onPress={() =>
-                  router.navigate({
-                    pathname: '/share',
-                    params: {
-                      type: 'profile',
-                      data: nip19.npubEncode(pubkey),
-                    },
-                  })
-                }
-                style={{ padding: 8 }}>
-                <Icon name="stash:qr-code" size={20} color={foreground} />
-              </Pressable>
-            ),
-          }}
-        />
+        <DmChatHeader pubkey={pubkey} onBack={handleBack} />
         <StatusBar barStyle="light-content" backgroundColor={surfaceSecondary} />
         <View style={{ flex: 1, backgroundColor: surface }}>
           {isLoading ? (
@@ -914,14 +565,13 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
             </View>
           ) : (
             <LegendList
-              ref={listRef}
-              data={messages}
+              data={bubbleMessages}
               onLayout={handleListLayout}
               onContentSizeChange={handleListContentSize}
               onScroll={handleListScroll}
               scrollEventThrottle={120}
               renderItem={renderMessage}
-              keyExtractor={(item: DmMessage) => item.id}
+              keyExtractor={(item: ChatBubbleMessage) => item.id}
               initialScrollAtEnd
               maintainScrollAtEnd
               maintainScrollAtEndThreshold={0.2}
@@ -962,15 +612,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
               disabled={isSending}
               placeholder="Type a message..."
               surface={PERF_SURFACE}
-              leadingIconNode={
-                <Avatar
-                  state={myProfile.picture ? 'image' : 'fallback'}
-                  size={32}
-                  seed={nostrKeys?.pubkey}
-                  picture={myProfile.picture}
-                  name={myName}
-                />
-              }
+              leadingIconNode={ownAvatar}
               actionsLeading={
                 lud16 ? (
                   <Pressable

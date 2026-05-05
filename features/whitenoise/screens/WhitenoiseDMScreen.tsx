@@ -14,6 +14,7 @@ import {
   ChatComposer,
   ChatMessageBubble,
   DmChatHeader,
+  extractCashuToken,
   useChatSurfacePerfLogger,
   useMessageGrouping,
   type ChatBubbleMessage,
@@ -187,5 +188,6 @@ function toBubble(m: WhitenoiseDmMessage): ChatBubbleMessage {
     timestamp: m.createdAt * 1000,
     isOwn: m.isSelf,
     isPending: m.isPending,
+    cashuToken: extractCashuToken(m.content) ?? undefined,
   };
 }

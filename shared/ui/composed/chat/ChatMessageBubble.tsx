@@ -1,37 +1,43 @@
 import React from 'react';
 import { View } from 'react-native';
+import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatChatTimestamp } from './formatChatTimestamp';
+import { CashuTokenBubble } from './CashuTokenBubble';
 import type { ChatBubbleMessage } from './types';
 
 interface ChatMessageBubbleProps {
   message: ChatBubbleMessage;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
+  /**
+   * Avatar override for non-own messages. When the surface has counterparty
+   * profile metadata (kind:0 picture / display name) it can supply a richer
+   * avatar than the default identicon-from-`senderId`. Pass `null` to hide
+   * the avatar slot entirely (e.g. ephemeral group chats with no identity).
+   */
+  ownAvatar?: React.ReactNode;
+  counterpartyAvatar?: React.ReactNode | null;
 }
 
-/**
- * Single chat-message bubble shared across BitChat (geohash + DM) and White
- * Noise DMs. Lifted verbatim from `GeohashMessageBubble` in
- * `features/bitchat/screens/GeohashChatScreen.tsx` so the visual treatment
- * stays consistent. UserMessagesScreen has its own richer bubble
- * (Cashu-token redeem, streaming, reasoning) and is intentionally not
- * unified here — see audit 20-F-002 for the eventual full consolidation.
- */
 export function ChatMessageBubble({
   message,
   isFirstInGroup,
   isLastInGroup,
+  ownAvatar,
+  counterpartyAvatar,
 }: ChatMessageBubbleProps) {
-  const [foreground, defaultColor, surfaceTertiary, shade400] = useThemeColor([
+  const [foreground, defaultColor, surfaceTertiary, shade400, shade500] = useThemeColor([
     'foreground',
     'default',
     'surface-tertiary',
     'shade-400',
+    'shade-500',
   ] as const);
 
   const showAvatar = !message.isOwn && isLastInGroup;
@@ -54,6 +60,24 @@ export function ChatMessageBubble({
     borderBottomLeftRadius = isLastInGroup ? radius : tightRadius;
   }
 
+  const cashuToken = message.cashuToken;
+  const displayContent = cashuToken
+    ? message.content.replace(cashuToken, '').trim()
+    : message.content;
+  const hasText = displayContent.length > 0;
+
+  const counterpartyAvatarNode =
+    counterpartyAvatar === null ? null : counterpartyAvatar !== undefined ? (
+      counterpartyAvatar
+    ) : (
+      <Avatar
+        state="fallback"
+        size={32}
+        seed={message.senderId}
+        name={message.sender ?? message.senderId}
+      />
+    );
+
   return (
     <VStack
       align={message.isOwn ? 'flex-end' : 'flex-start'}
@@ -68,17 +92,13 @@ export function ChatMessageBubble({
         justify={message.isOwn ? 'flex-end' : 'flex-start'}
         spacing={8}
         style={{ width: '100%' }}>
-        {!message.isOwn &&
-          (showAvatar ? (
-            <Avatar
-              state="fallback"
-              size={32}
-              seed={message.senderId}
-              name={message.sender ?? message.senderId}
-            />
+        {!message.isOwn && counterpartyAvatarNode !== null ? (
+          showAvatar ? (
+            counterpartyAvatarNode
           ) : (
             <View style={{ width: 32 }} />
-          ))}
+          )
+        ) : null}
 
         <VStack
           align={message.isOwn ? 'flex-end' : 'flex-start'}
@@ -90,40 +110,60 @@ export function ChatMessageBubble({
             </Text>
           ) : null}
 
-          <View
-            style={{
-              backgroundColor: message.isOwn ? defaultColor : surfaceTertiary,
-              borderTopLeftRadius,
-              borderBottomLeftRadius,
-              borderTopRightRadius,
-              borderBottomRightRadius,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              alignSelf: message.isOwn ? 'flex-end' : 'flex-start',
-              opacity: message.isPending ? 0.6 : 1,
-            }}>
-            <Text
-              size={16}
+          {hasText ? (
+            <View
               style={{
-                color: message.isOwn ? '#FFFFFF' : foreground,
-                lineHeight: 22,
+                backgroundColor: message.isOwn ? defaultColor : surfaceTertiary,
+                borderTopLeftRadius,
+                borderBottomLeftRadius,
+                borderTopRightRadius,
+                borderBottomRightRadius,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                alignSelf: message.isOwn ? 'flex-end' : 'flex-start',
+                opacity: message.isPending ? 0.6 : 1,
               }}>
-              {message.content}
-            </Text>
-          </View>
+              <Text
+                size={16}
+                style={{
+                  color: message.isOwn ? '#FFFFFF' : foreground,
+                  lineHeight: 22,
+                }}>
+                {displayContent}
+              </Text>
+            </View>
+          ) : null}
+
+          {cashuToken ? <CashuTokenBubble token={cashuToken} isOwn={message.isOwn} /> : null}
 
           {showTimestamp ? (
-            <Text
-              size={11}
-              style={{
-                color: shade400,
-                alignSelf: message.isOwn ? 'flex-end' : 'flex-start',
-                marginTop: 2,
-              }}>
-              {message.isPending ? 'sending…' : formatChatTimestamp(message.timestamp)}
-            </Text>
+            <HStack
+              align="center"
+              spacing={4}
+              style={{ alignSelf: message.isOwn ? 'flex-end' : 'flex-start', marginTop: 2 }}>
+              <Text size={11} style={{ color: shade400 }}>
+                {message.isPending ? 'sending…' : formatChatTimestamp(message.timestamp)}
+              </Text>
+              {message.isOwn && message.deliveryStatus ? (
+                message.deliveryStatus === 'sending' ? (
+                  <Icon name="ant-design:loading-outlined" size={12} color={shade500} />
+                ) : (
+                  <Icon
+                    name={
+                      message.deliveryStatus === 'read'
+                        ? 'ion:checkmark-done'
+                        : 'simple-line-icons:check'
+                    }
+                    size={12}
+                    color={message.deliveryStatus === 'read' ? opacity(foreground, 0.4) : shade500}
+                  />
+                )
+              ) : null}
+            </HStack>
           ) : null}
         </VStack>
+
+        {message.isOwn && ownAvatar ? ownAvatar : null}
       </HStack>
     </VStack>
   );
