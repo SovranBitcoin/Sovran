@@ -7,31 +7,10 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
-import {
-  useWalletLifecycleStore,
-  type RestoreStatus,
-} from '@/shared/stores/global/walletLifecycleStore';
+import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
+import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 
 initLog('Module', 'CocoProvider loaded');
-
-/**
- * Resolves once the wallet-lifecycle restoreStatus is 'complete' or 'not-needed'
- * — the safe-to-mint signal. Used to gate NPC sync + the mint-operation
- * processor so they don't fire on a counter the mint already signed.
- */
-function awaitRestoreReady(): Promise<void> {
-  const isReady = (s: RestoreStatus) => s === 'complete' || s === 'not-needed';
-  const initial = useWalletLifecycleStore.getState().restoreStatus;
-  if (isReady(initial)) return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    const unsubscribe = useWalletLifecycleStore.subscribe((state, prev) => {
-      if (state.restoreStatus !== prev.restoreStatus && isReady(state.restoreStatus)) {
-        unsubscribe();
-        resolve();
-      }
-    });
-  });
-}
 
 interface CocoContextValue {
   manager: Manager | null;
@@ -155,6 +134,13 @@ export function CocoProvider({ children }: CocoProviderProps) {
     initializeCoco();
 
     return () => {
+      // Reset the start-guard so a deps change (e.g. profile switch flipping
+      // keys.pubkey) re-runs init for the new identity. Without this, the
+      // cleanup tears down the singleton but the re-run sees hasStarted=true
+      // and bails out, leaving the new profile without a manager.
+      hasStarted.current = false;
+      setManager(null);
+      setIsReady(false);
       CocoManager.cleanup().catch((error) => {
         log.error('coco.cleanup_failed', { error });
       });
@@ -184,7 +170,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
         // has restored its NUT-13 counter (or proven restore isn't needed).
         // RestoreGate routes the user to /restore when this is pending.
         bgStage.log('Waiting for wallet restore...');
-        await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady());
+        await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady(useWalletLifecycleStore));
         bgStage.log('Starting NPC sync...');
         await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());
 
@@ -246,6 +232,11 @@ export function CocoProvider({ children }: CocoProviderProps) {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       unsubscribe?.();
       deferHandle?.cancel();
+      // Symmetric to Phase 1: a deps change (profile switch via keys.pubkey,
+      // or a re-init that produced a fresh manager) must allow the bg work
+      // to re-run for the new identity. Without this, the new manager never
+      // gets NPC sync + recovery.
+      bgStarted.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bgStage.canStart, manager, keys?.pubkey]);
