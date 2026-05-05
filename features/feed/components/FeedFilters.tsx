@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import FilterItem from '@/features/contacts/components/search/SearchFilterItem';
-import { SEARCH_FILTERS_HEIGHT } from '@/features/contacts/lib/constants/styles';
 import { PRIMAL_FEED_SPECS, categoryToLabel } from './HomeFeed';
 import { CATEGORY_PUBKEYS } from './nostr/categoryNpubs';
 import { feedLog, Log } from '@/shared/lib/logger';
+
+export const SEARCH_FILTERS_HEIGHT = 56;
 
 const SEARCH_FILTERS = ['People'] as const;
 

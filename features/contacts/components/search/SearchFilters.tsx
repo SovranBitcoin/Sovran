@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import FilterItem from './SearchFilterItem';
-import { SEARCH_FILTERS_HEIGHT } from '../../lib/constants/styles';
 import { Log } from '@/shared/lib/logger';
+
+export const SEARCH_FILTERS_HEIGHT = 56;
 
 export type ContactsFilter = 'All' | 'Recent' | 'Requests' | 'Mints' | 'Groups';
 

@@ -27,14 +27,17 @@ import {
 } from '@/shared/ui/composed/ContactRow';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { navigateToProfile } from '../lib/navigateToProfile';
-import { SearchFilters, type ContactsFilter } from '../components/search/SearchFilters';
+import {
+  SearchFilters,
+  SEARCH_FILTERS_HEIGHT,
+  type ContactsFilter,
+} from '../components/search/SearchFilters';
 import {
   useWhitenoiseRequests,
   type WhitenoiseRequest,
 } from '@/features/whitenoise/hooks/useWhitenoiseRequests';
 import { useWhitenoiseDmContacts } from '@/features/whitenoise/hooks/useWhitenoiseDmContacts';
 import { RequestActions } from '@/features/whitenoise/components/RequestActions';
-import { SEARCH_FILTERS_HEIGHT } from '../lib/constants/styles';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 import { parseGeohashQuery } from '../lib/parseGeohashQuery';
 import { matchTiers } from '../lib/matchTiers';
