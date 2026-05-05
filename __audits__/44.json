@@ -277,8 +277,8 @@
       ],
       "verification_note": "Confirmed lines 69–74, 244–251, 296–299. No eviction.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Cache-eviction / persist-shape concern; not part of the canonical-primitive consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "placeDetailsCache bounded at MAX_PLACE_DETAILS_ENTRIES=200 with oldest-timestamp eviction inside the fetchPlaceDetails set() reducer; AsyncStorage write per detail-fetch is unchanged in cadence but the persisted blob is now bounded."
     },
     {
       "id": "F-010",
@@ -298,8 +298,8 @@
       ],
       "verification_note": "clearAllData is currently unused (see F-006), so the practical race window is zero today. Kept Medium because removing dead code without fixing the race risks reintroducing it at the next wipe-sweeper feature.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Race-condition concern; outside the canonical-primitive consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "fetchPlaces now captures storeEpoch at start and discards its set() commit if the epoch advanced mid-flight. New btcMapStore.reset() bumps the epoch + nulls inflight + zeros in-memory state; deleteAllProfiles calls it at orchestrator step 5 next to the profileStore reset, so an in-flight 2-3s places fetch resolving between AsyncStorage.clear() and restartApp() no longer re-populates cleared storage."
     },
     {
       "id": "F-011",
@@ -429,8 +429,8 @@
       ],
       "verification_note": "Confirmed line 11; mapClustering.ts:118–126 confirms sync load with thread-block warning.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Cluster-cache sizing/perf; not part of the canonical-primitive consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "MAX_ENTRIES raised from 3 to 8 (covers the 8 categorical filter tabs); cache hit now refreshes createdAt so evictIfNeeded drops least-recently-used rather than oldest-built."
     },
     {
       "id": "F-017",
@@ -513,8 +513,8 @@
       ],
       "verification_note": "Confirmed via Grep on `MapMarker`.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Renamed BitcoinNearYou's local interface to NearbyMapMarker to remove the name collision and added a comment noting the shape difference (nested `coordinates` vs the clustering MapMarker's flat lat/lon — distinct on purpose because the wallet teaser feeds the AppleMaps/GoogleMaps `markers` prop directly). Importing the clustering MapMarker would change the prop shape, so the deeper unification stays as follow-up."
+      "completion_status": "stale",
+      "completion_note": "Already addressed before this slice: BitcoinNearYou.tsx uses NearbyMapMarker (lines 49-57) with an explicit comment distinguishing it from the clustering MapMarker in shared/lib/map/mapClustering. No drift remaining."
     },
     {
       "id": "F-021",
@@ -534,8 +534,8 @@
       ],
       "verification_note": "Inferred from persist semantics; not directly confirmed via log-doctor (no map session in current log.txt).",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Persist/perf concern; not part of the canonical-primitive consolidation slice."
+      "completion_status": "stale",
+      "completion_note": "Version part is stale — persistConfig() applies DEFAULT_VERSION=1 implicitly when version is omitted, so btcMapStore is already on version 1. AsyncStorage-write-per-detail-fetch part is subsumed by F-009's MAX_PLACE_DETAILS_ENTRIES bound (the persisted blob no longer grows unbounded)."
     },
     {
       "id": "F-022",
