@@ -635,8 +635,8 @@
       ],
       "verification_note": "Re-checked the cross-references at UserMessagesScreen.tsx:959,981 and WhitenoiseDMScreen.tsx:36. Counter-argument: maybe the four screens differ enough that an abstraction would be a leaky one. The current divergence is tactical (KAV strategy, perf tag) not structural (the message-list-with-composer pattern is universal); the abstraction holds. Skill:improve-codebase-architecture's 'two adapters = real seam' rule is satisfied (4 adapters in evidence).",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the duplicate-helper slice (mint/lib/auditInfo + colorUtils consolidation); features/bitchat is a separate cluster."
+      "completion_status": "complete",
+      "completion_note": "ChatScreen wrapper now consolidates three near-identical chat surfaces; KeyboardAvoidingView + LegendList + ChatComposer + perf-logger + send-dispatch single-flight + chat.send.* logging all owned centrally."
     }
   ],
   "dimensions": {

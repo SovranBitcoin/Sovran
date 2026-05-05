@@ -110,8 +110,8 @@
       ],
       "verification_note": "Read each of the three LegendList blocks side-by-side. Eight props are byte-identical across all three call sites; only `contentContainerStyle` and `data`/`keyExtractor` types diverge. KeyboardAvoidingView wrappers also identical (behavior='padding', keyboardVerticalOffset=headerHeight). Counter-argument considered: 'LegendList is the foundation; wrapping it forces choices on the inner list config that future surfaces can't override'. Weak — the wrapper exposes `listProps?: Partial<LegendListProps>` for escape-hatch overrides; the *defaults* are what is duplicated and where divergence is silent.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Three LegendList scaffolds remain; settings already match. Defer to a dedicated <ChatList> slice."
+      "completion_status": "complete",
+      "completion_note": "Three LegendList scaffold blocks merged into ChatScreen; settings owned in one place."
     },
     {
       "id": "F-004",
@@ -134,8 +134,8 @@
       ],
       "verification_note": "Grep for `chat.send.dispatch` / `chat.send.complete` / `chat.send.failed` returns exactly the three call sites — no other surface emits them, so the shared hook can be the only producer. Counter-argument considered: 'the three surfaces emit slightly different payloads (Whitenoise has no historyCount difference, Geohash splits err message, UserMessages doesn't emit chat.send.complete at the screen level)'. Weak — the canonical payload subsumes all three; the slight differences are accidental drift, not deliberate per-surface signal.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "chat.send.* dispatch wrapper still triplicated. Defer to a dedicated logging-helper slice."
+      "completion_status": "complete",
+      "completion_note": "chat.send.dispatch/complete/failed wrapper now lives in ChatScreen; consumer onSend just publishes."
     },
     {
       "id": "F-005",
