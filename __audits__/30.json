@@ -265,7 +265,9 @@
         "features/auth/components/PasscodeScreen.tsx:72-97"
       ],
       "verification_note": "Confirmed no cleanup. Given F-001 means this codepath doesn't fire in practice, kept at Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "features/auth/components/PasscodeScreen.tsx no longer exists — features/auth was removed in prior work. PasscodeScreen had no successor under features/* at the time of this slice."
     },
     {
       "id": "F-010",
@@ -306,7 +308,9 @@
         "shared/lib/popup/popups/auth.ts:58-65"
       ],
       "verification_note": "Minor. Kept because the popup is part of features/auth's user-visible surface.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "passcodeNotMatchPopup no longer exists in shared/lib/popup/popups/auth.ts (file is 41 lines and only carries P2PK key popups). Removed alongside the auth feature directory."
     }
   ],
   "dimensions": {

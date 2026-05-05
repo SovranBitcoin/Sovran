@@ -160,7 +160,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read line 311 and React Native's Alert docs. Alert.prompt has no Android implementation. Counter-argument considered: app may be iOS-only per SOV-00, so Android parity might not be a regression. Rejected — package.json and app.config.js both show Android targets are built. Medium severity because feature is missing, not broken in a funds-losing way.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Replaced iOS-only Alert.prompt with the canonical actionMenuPopup({ inputs, primaryAction }) surface (mirrors openProfileImportMenu in actionSheets.tsx). Cross-platform on iOS+Android. Inline setError surfaces invalid format inside the sheet — invalidKeyFormatPopup wrapper is no longer needed at this call site. Added testID keyring-import-trigger / keyring-import-submit so phone-test can regress the flow."
     },
     {
       "id": "F-006",
@@ -223,7 +225,9 @@
         "docs/SOV-00.md §8"
       ],
       "verification_note": "UNVERIFIED — the timing claim depends on popupStore behavior (audit 15's ENTRY) which I didn't re-examine in this audit. Flagged Medium with confidence 0.7 because the failure mode is visual-only and a deterministic fix is cheap.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Guarded the three recovery toasts (recoverySuccessPopup / recoveryPartialPopup / recoveryFailedPopup ×2) behind !gateMode. In gate mode the inline renderCompleteState already provides feedback; per SOV-00 §8 the gate must own its own UI through to AppGate's transition. Added gateMode to the handleStartRecovery useCallback dep list so the guard captures the prop correctly."
     },
     {
       "id": "F-009",
