@@ -31,6 +31,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
@@ -231,7 +232,7 @@ export function MapScreen() {
       {/* Show a placeholder background immediately while map loads */}
       {!isMapReady && (
         <View style={[StyleSheet.absoluteFillObject, styles.mapSkeleton]}>
-          <ActivityIndicator size="large" color="#F7931A" />
+          <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: '#fff', marginTop: 16, opacity: 0.8 }}>
             Loading map...
           </Text>
@@ -283,7 +284,7 @@ export function MapScreen() {
           exiting={FadeOut.duration(200)}
           style={styles.loadingOverlay}>
           <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color="#F7931A" />
+            <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
             <Text size={14} style={{ color: '#fff', marginTop: 12 }}>
               Loading merchants...
             </Text>

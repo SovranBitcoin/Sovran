@@ -42,15 +42,11 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
+import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import type {
   SplitBillGroup,
   SplitBillParticipant,
 } from '@/shared/stores/profile/splitBillTransactionsStore';
-// `#F7931A` — bitcoin orange, already used in `shared/lib/themeEngine.ts`
-// as `orange-300` and in `shared/lib/map/mapClustering.ts` for the same
-// semantic cue ("bitcoin-accepting spot"). Using the raw hex keeps the
-// pill legible on any seeded gradient regardless of theme.
-const BTC_ORANGE = '#F7931A';
 
 interface ParticipantCardProps {
   group: SplitBillGroup;
@@ -317,7 +313,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: BTC_ORANGE,
+    backgroundColor: BITCOIN_ACCENT,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',

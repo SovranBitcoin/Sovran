@@ -7,6 +7,8 @@
  * one edit here; previously took three edits across drifting tables.
  */
 
+import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
+
 export type MerchantCategoryId = 'food' | 'retail' | 'atm' | 'accommodation' | 'services';
 
 export interface MerchantCategory {
@@ -33,7 +35,7 @@ export const MERCHANT_CATEGORIES: readonly MerchantCategory[] = [
     id: 'atm',
     label: 'ATMs & Exchange',
     icons: ['local_atm', 'currency_exchange'],
-    markerColor: '#F7931A',
+    markerColor: BITCOIN_ACCENT,
   },
   {
     id: 'accommodation',
@@ -57,7 +59,7 @@ export const MERCHANT_CATEGORIES: readonly MerchantCategory[] = [
 ];
 
 const DEFAULT_MARKER_COLOR = '#6366f1';
-export const CLUSTER_MARKER_COLOR = '#F7931A';
+export const CLUSTER_MARKER_COLOR = BITCOIN_ACCENT;
 
 const ICON_TO_CATEGORY: ReadonlyMap<string, MerchantCategory> = new Map(
   MERCHANT_CATEGORIES.flatMap((cat) => cat.icons.map((icon) => [icon, cat] as const))

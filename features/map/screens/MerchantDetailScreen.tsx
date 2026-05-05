@@ -24,6 +24,7 @@ import opacity from 'hex-color-opacity';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
+import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { openExternalUrl } from '@/shared/lib/url';
 import { openLinkFailedPopup } from '@/shared/lib/popup/popups/general';
@@ -182,7 +183,7 @@ export function MerchantDetailScreen() {
     return (
       <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F7931A" />
+          <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
@@ -243,7 +244,7 @@ export function MerchantDetailScreen() {
               {supportsOnchain && (
                 <ListGroup.Item>
                   <ListGroup.ItemPrefix>
-                    <Icon name="mdi:bitcoin" size={20} color="#F7931A" />
+                    <Icon name="mdi:bitcoin" size={20} color={BITCOIN_ACCENT} />
                   </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
                     <ListGroup.ItemTitle>On-chain</ListGroup.ItemTitle>
@@ -256,7 +257,7 @@ export function MerchantDetailScreen() {
               {supportsLightning && (
                 <ListGroup.Item>
                   <ListGroup.ItemPrefix>
-                    <Icon name="mingcute:lightning-fill" size={20} color="#F7931A" />
+                    <Icon name="mingcute:lightning-fill" size={20} color={BITCOIN_ACCENT} />
                   </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
                     <ListGroup.ItemTitle>Lightning</ListGroup.ItemTitle>
@@ -269,7 +270,7 @@ export function MerchantDetailScreen() {
               {supportsContactless && (
                 <ListGroup.Item>
                   <ListGroup.ItemPrefix>
-                    <Icon name="ph:contactless-payment-fill" size={20} color="#F7931A" />
+                    <Icon name="ph:contactless-payment-fill" size={20} color={BITCOIN_ACCENT} />
                   </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
                     <ListGroup.ItemTitle>Contactless</ListGroup.ItemTitle>

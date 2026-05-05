@@ -12,6 +12,7 @@ import { font, foregroundStyle, frame, glassEffect, padding } from '@expo/ui/swi
 import { StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { liquidGlassModifiers } from '@/shared/lib/version';
+import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { MERCHANT_CATEGORIES, type MerchantCategoryId } from '@/shared/lib/map/categories';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -85,7 +86,11 @@ export const StatsCard = memo(function StatsCard({
                     frame({ maxWidth: Infinity, height: 60, alignment: 'leading' }),
                     padding({ horizontal: 16 }),
                   ]}>
-                  <SwiftUIImage systemName="bitcoinsign.circle.fill" size={24} color="#F7931A" />
+                  <SwiftUIImage
+                    systemName="bitcoinsign.circle.fill"
+                    size={24}
+                    color={BITCOIN_ACCENT}
+                  />
                   <SwiftUIVStack alignment="leading" spacing={2}>
                     <SwiftUIText
                       modifiers={[font({ size: 18, weight: 'bold' }), foregroundStyle(foreground)]}>
