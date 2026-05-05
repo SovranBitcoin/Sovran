@@ -21,7 +21,6 @@ import {
   buttonStyle,
   disabled as disabledModifier,
   frame,
-  glassEffect,
   glassEffectId,
   opacity as swiftOpacity,
   scaleEffect,
@@ -70,7 +69,7 @@ interface LiquidChatComposerProps {
 
 const BUTTON_SIZE = 44;
 const ICON_SIZE = 20;
-const GAP = 8;
+const GAP = 10;
 /**
  * Spring tuned to match SwiftUI's `.bouncy(duration: 0.4, extraBounce: 0.15)`.
  * `bounce: 0.45` is the iOS-17+ name for the spring's overshoot, which is
@@ -157,6 +156,11 @@ export function LiquidChatComposer({
   );
   const rowHeight = Math.min(Math.max(contentHeight + INPUT_VPAD, MIN_ROW_HEIGHT), MAX_ROW_HEIGHT);
 
+  const textInputRef = useRef<TextInput>(null);
+  const focusTextInput = useCallback(() => {
+    textInputRef.current?.focus();
+  }, []);
+
   const lastLayoutRef = useRef<{ height: number; width: number } | null>(null);
   const handleLayout = useCallback(
     (e: LayoutChangeEvent) => {
@@ -230,6 +234,7 @@ export function LiquidChatComposer({
       }}>
       <HStack align="center" spacing={8} style={{ flex: 1, paddingHorizontal: 16 }}>
         <TextInput
+          ref={textInputRef}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
@@ -321,21 +326,28 @@ export function LiquidChatComposer({
                     </SwiftUIHStack>
                   </SwiftUIButton>
 
-                  {/* Middle input — empty SwiftUI HStack with a capsule
-                      glass background. RN TextInput overlays this region. */}
-                  <SwiftUIHStack
-                    alignment="center"
+                  {/* Middle input — also a `buttonStyle('glass')` button
+                      so the same press animation as [+] / [→] fires when
+                      the user taps the bubble's padding edges (taps inside
+                      the TextInput's visible area still focus directly via
+                      RN; both paths land at "input is focused" since the
+                      button's onPress focuses the TextInput via ref). The
+                      inner HStack with `frame(maxWidth/maxHeight: Infinity)`
+                      is load-bearing — without an inner view that fills,
+                      Apple's glass button style collapses to its content's
+                      intrinsic size and the bubble renders as a tiny pill. */}
+                  <SwiftUIButton
                     modifiers={[
+                      buttonStyle('glass'),
                       frame({ maxWidth: Infinity, height: rowHeight }),
-                      glassEffect({
-                        shape: 'capsule',
-                        glass: { variant: 'regular', interactive: false },
-                      }),
                       glassEffectId('input', namespaceId),
                       animation(SEND_SPRING, trimmedHasText),
-                    ]}>
-                    <SwiftUISpacer />
-                  </SwiftUIHStack>
+                    ]}
+                    onPress={focusTextInput}>
+                    <SwiftUIHStack modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity })]}>
+                      <SwiftUISpacer />
+                    </SwiftUIHStack>
+                  </SwiftUIButton>
 
                   {/* Trailing [→] glass button. ALWAYS rendered — toggling
                       its presence via React unmount bypasses SwiftUI's
