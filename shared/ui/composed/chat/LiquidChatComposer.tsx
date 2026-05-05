@@ -251,7 +251,12 @@ export function LiquidChatComposer({
         }}>
         <Host
           style={{ width: '100%', height: BUTTON_SIZE }}
-          matchContents={false}>
+          matchContents={false}
+          // §7a: stop the SwiftUI hosting controller from applying its own
+          // keyboard safe-area inset. RN keyboard-controller now drives the
+          // composer position from the JS side via KeyboardStickyView; if
+          // SwiftUI also avoids the keyboard the composer double-jumps.
+          ignoreSafeArea="keyboard">
           <Namespace id={namespaceId}>
             {/* `spacing={0}` is the glass *merge threshold* — when the
                 nearest edges of two glass shapes are closer than this, the

@@ -1,7 +1,7 @@
-import React, { useCallback, useState } from 'react';
-import { LegendList } from '@legendapp/list';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ScrollView, View as RNView, type LayoutChangeEvent } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { GiftedChat, type IMessage, type InputToolbarProps } from 'react-native-gifted-chat';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -11,78 +11,56 @@ import type { Logger } from '@/shared/lib/logger';
 
 import { LiquidChatComposer } from './LiquidChatComposer';
 import { ChatMessageBubble } from './ChatMessageBubble';
-import { useChatSurfacePerfLogger } from './useChatSurfacePerfLogger';
+import {
+  useChatKeyboardAnimationLogger,
+  useChatSurfacePerfLogger,
+} from './useChatSurfacePerfLogger';
 import { useMessageGrouping } from './useMessageGrouping';
 import type { ChatBubbleMessage } from './types';
 
 interface ChatScreenProps {
-  /**
-   * Diagnostic name for the wrapping `<Log>` boundary and the perf-logger
-   * `surface` tag. log-doctor `--event chat.*` filters use this to split
-   * timings per transport (`nostr-dm`, `whitenoise`, `bitchat-nostr`, …).
-   */
   surface: string;
-  /** Scoped logger that owns this surface's chat.* events. */
   log: Logger;
-  /**
-   * Header rendered above the message list. DM surfaces pass
-   * `<DmChatHeader …/>`; non-DM surfaces (e.g. geohash public) pass their
-   * own `<Stack.Screen options=…/>`. Either way ChatScreen does not enforce
-   * a header shape — the only contract is that the consumer paints the
-   * navigation header before the list mounts.
-   */
   header: React.ReactNode;
-  /**
-   * Bubble messages already adapted from the surface's domain shape. Same
-   * array drives both the LegendList and the message-grouping map.
-   */
   messages: ChatBubbleMessage[];
-  /**
-   * Send dispatcher. Receives the trimmed message text. ChatScreen wraps
-   * this in `useSingleFlight` and emits the canonical `chat.send.dispatch
-   * / .complete / .failed` events automatically — the consumer only owns
-   * the publish/optimistic-bubble/error-popup logic.
-   */
   onSend: (text: string) => Promise<unknown> | unknown;
-  /**
-   * Disable the send button (and ignore Enter taps). Use for transports
-   * that have a transient unavailable state (e.g. White Noise group not
-   * yet created, BitChat scanning).
-   */
   composerDisabled?: boolean;
   composerPlaceholder?: string;
-  /** Tap handler for the leading [+] glass button on the composer. */
   composerOnPlusPress?: () => void;
-  /** Tap handler for the money icon inside the composer (visible while empty). */
   composerOnMoneyPress?: () => void;
-  /** Tap handler for the voice icon inside the composer (visible while empty). */
   composerOnVoicePress?: () => void;
+  /**
+   * Optional row of action buttons rendered ABOVE the LiquidChatComposer
+   * inside the same sticky container — so it rides up with the keyboard
+   * exactly like the input. The consumer decides what to render; pass any
+   * number of `<Button>`s (or a single one) and they'll lay out in a
+   * horizontal scroll view that doesn't dismiss the keyboard on tap.
+   * Use for surface-level shortcuts like "Send Money", "Attach", etc.
+   */
+  composerActions?: React.ReactNode;
   composerTestID?: string;
-  /** Banner content rendered inside the list area, above the LegendList. */
   banner?: React.ReactNode;
-  /** Loading placeholder rendered in place of the LegendList when truthy. */
   isLoading?: boolean;
   loadingContent?: React.ReactNode;
-  /** Empty-state node for the LegendList. */
   emptyContent?: React.ReactNode;
-  /** Bottom padding when the list has content. Defaults to 16. */
   contentBottomPadding?: number;
-  /** Avatar slots threaded into every ChatMessageBubble. */
   ownAvatar?: React.ReactNode;
   counterpartyAvatar?: React.ReactNode | null;
-  /** Optional historyExtras / kbStateExtras passed straight to the perf logger. */
   historyExtras?: (last: ChatBubbleMessage | undefined) => Record<string, unknown>;
   kbStateExtras?: () => Record<string, unknown>;
 }
 
+const OWN_USER_ID = 'me';
+
+type GiftedMessage = IMessage & { __bubble: ChatBubbleMessage };
+
 /**
- * Screen-shaped wrapper that consolidates the chat surface scaffolding
- * (KeyboardAvoidingView, message-list, perf-logger, single-flight,
- * `chat.send.*` logging, composer). Three near-identical screens
- * (UserMessagesScreen, WhitenoiseDMScreen, GeohashChatScreen) used to
- * duplicate this block. Per audit 49-F-026 / 64-F-003 / 64-F-004 the seams
- * the consumer actually owns are the data hook, the bubble adapter, the
- * header, and a few composer slots — everything else lives here.
+ * Shared chat surface backed by `react-native-gifted-chat`. The list, keyboard
+ * avoidance, and inverted scroll behaviour come from GiftedChat; we keep our
+ * `LiquidChatComposer` (mounted via `renderInputToolbar`) and our
+ * `ChatMessageBubble` (mounted via `renderMessage`) so each surface looks
+ * identical to before. Public props are unchanged — the three DM consumers
+ * (BitChat, WhiteNoise, Nostr DM) need no edits.
  */
 export function ChatScreen({
   surface,
@@ -95,12 +73,12 @@ export function ChatScreen({
   composerOnPlusPress,
   composerOnMoneyPress,
   composerOnVoicePress,
+  composerActions,
   composerTestID,
   banner,
   isLoading,
   loadingContent,
   emptyContent,
-  contentBottomPadding = 16,
   ownAvatar,
   counterpartyAvatar,
   historyExtras,
@@ -111,7 +89,21 @@ export function ChatScreen({
 
   const [draft, setDraft] = useState('');
 
-  const { handleListLayout, handleListContentSize, handleListScroll } = useChatSurfacePerfLogger({
+  // Measured composer height. Used to pad the FlatList's content so the
+  // newest bubble rests just above the composer's top edge, while the
+  // composer itself is absolutely positioned over the chat — older
+  // bubbles slide *under* the composer's translucent glass on scroll-up
+  // (the iMessage / Telegram bleed-under-input look).
+  const [composerHeight, setComposerHeight] = useState(0);
+  const handleComposerLayout = useCallback((e: LayoutChangeEvent) => {
+    const next = e.nativeEvent.layout.height;
+    setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
+  }, []);
+
+  // Keep emitting the canonical chat.kav.keyboard_state / chat.list.history_change
+  // events. List-layout / scroll handlers aren't wired because GiftedChat's
+  // FlatList doesn't expose those hooks publicly.
+  useChatSurfacePerfLogger({
     log,
     surface,
     headerHeight,
@@ -119,28 +111,26 @@ export function ChatScreen({
     historyExtras,
     kbStateExtras,
   });
+  useChatKeyboardAnimationLogger({ log, surface });
 
   const groupingMap = useMessageGrouping(messages);
 
-  const renderMessage = useCallback(
-    ({ item }: { item: ChatBubbleMessage }) => {
-      const group = groupingMap.get(item.id);
-      return (
-        <ChatMessageBubble
-          message={item}
-          isFirstInGroup={group?.isFirst ?? true}
-          isLastInGroup={group?.isLast ?? true}
-          counterpartyAvatar={counterpartyAvatar}
-          ownAvatar={ownAvatar}
-        />
-      );
-    },
-    [groupingMap, counterpartyAvatar, ownAvatar]
-  );
+  // GiftedChat expects newest-first. Source array is oldest-first.
+  const giftedMessages = useMemo<GiftedMessage[]>(() => {
+    const out: GiftedMessage[] = [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      out.push({
+        _id: m.id,
+        text: m.content,
+        createdAt: m.timestamp,
+        user: { _id: m.isOwn ? OWN_USER_ID : m.senderId || 'peer', name: m.sender },
+        __bubble: m,
+      });
+    }
+    return out;
+  }, [messages]);
 
-  // Single-flight guards a rapid double-tap on the composer (the consumer's
-  // `composerDisabled` is React state and can be stale by one frame). Same
-  // pattern the three screens used to repeat individually.
   const dispatchSend = useSingleFlight(async (text: string) => {
     const sendStart = performance.now();
     log.info('chat.send.dispatch', {
@@ -174,59 +164,146 @@ export function ChatScreen({
     });
   }, [draft, dispatchSend]);
 
+  const renderInputToolbar = useCallback(
+    (_props: InputToolbarProps<GiftedMessage>) => (
+      // Absolute over the chat body so messages can scroll *under* the
+      // composer's translucent glass instead of clipping at a hard
+      // cut-off line above it. The wrapper has no backgroundColor of
+      // its own — only the LiquidChatComposer's inner glass capsules
+      // do — so messages bleed through the gaps between them. Optional
+      // action row sits inside this container so it rides the keyboard
+      // animation in lock-step with the input bubble.
+      <RNView
+        onLayout={handleComposerLayout}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
+        {composerActions ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{
+              paddingHorizontal: 12,
+              gap: 8,
+              alignItems: 'center',
+            }}
+            style={{ flexGrow: 0 }}>
+            {composerActions}
+          </ScrollView>
+        ) : null}
+        <LiquidChatComposer
+          value={draft}
+          onChangeText={setDraft}
+          onSend={handleSubmit}
+          disabled={composerDisabled}
+          placeholder={composerPlaceholder}
+          onPlusPress={composerOnPlusPress}
+          onMoneyPress={composerOnMoneyPress}
+          onVoicePress={composerOnVoicePress}
+          testID={composerTestID}
+          surface={surface}
+        />
+      </RNView>
+    ),
+    [
+      draft,
+      handleSubmit,
+      handleComposerLayout,
+      composerActions,
+      composerDisabled,
+      composerPlaceholder,
+      composerOnPlusPress,
+      composerOnMoneyPress,
+      composerOnVoicePress,
+      composerTestID,
+      surface,
+    ]
+  );
+
+  // GiftedChat's `renderMessage` wraps the bubble with its own padding. We
+  // reach into __bubble for the original ChatBubbleMessage so grouping +
+  // cashu-token + delivery-status logic stays untouched.
+  const renderMessage = useCallback(
+    ({ currentMessage }: { currentMessage: GiftedMessage }) => {
+      const bubble = currentMessage.__bubble;
+      const group = groupingMap.get(bubble.id);
+      return (
+        <RNView style={{ paddingHorizontal: 16 }}>
+          <ChatMessageBubble
+            message={bubble}
+            isFirstInGroup={group?.isFirst ?? true}
+            isLastInGroup={group?.isLast ?? true}
+            counterpartyAvatar={counterpartyAvatar}
+            ownAvatar={ownAvatar}
+          />
+        </RNView>
+      );
+    },
+    [groupingMap, counterpartyAvatar, ownAvatar]
+  );
+
   return (
-    <KeyboardAvoidingView
-      behavior="padding"
-      keyboardVerticalOffset={headerHeight}
-      style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: surfaceColor }}>
       <Log name={`ChatScreen:${surface}`}>
         {header}
-        <View style={{ flex: 1, backgroundColor: surfaceColor }}>
+        <View style={{ flex: 1 }}>
           {banner}
           {isLoading ? (
             (loadingContent ?? null)
+          ) : messages.length === 0 && emptyContent ? (
+            <View
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 16,
+              }}>
+              {emptyContent}
+            </View>
           ) : (
-            <LegendList
-              data={messages}
-              onLayout={handleListLayout}
-              onContentSizeChange={handleListContentSize}
-              onScroll={handleListScroll}
-              scrollEventThrottle={120}
-              renderItem={renderMessage}
-              keyExtractor={(item: ChatBubbleMessage) => item.id}
-              initialScrollAtEnd
-              maintainScrollAtEnd
-              maintainScrollAtEndThreshold={0.2}
-              alignItemsAtEnd
-              estimatedItemSize={80}
-              recycleItems={false}
-              style={{ flex: 1 }}
-              contentContainerStyle={
-                messages.length === 0
-                  ? { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }
-                  : { padding: 16, paddingBottom: contentBottomPadding }
-              }
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              ListEmptyComponent={emptyContent ? <>{emptyContent}</> : null}
+            <GiftedChat<GiftedMessage>
+              messages={giftedMessages}
+              user={{ _id: OWN_USER_ID }}
+              renderInputToolbar={renderInputToolbar}
+              renderMessage={renderMessage}
+              renderAvatar={null}
+              renderDay={() => null}
+              renderTime={() => null}
+              renderUsername={() => null}
+              isUsernameVisible={false}
+              isDayAnimationEnabled={false}
+              minInputToolbarHeight={0}
+              messageIdGenerator={() => `gc-${Date.now()}`}
+              // The list is inverted, so `contentContainerStyle.paddingTop`
+              // is the *visual bottom* padding — i.e. the gap between the
+              // newest bubble and the composer's top edge. Without this,
+              // the newest message would sit hidden behind the absolute
+              // composer.
+              listProps={{
+                contentContainerStyle: {
+                  paddingTop: composerHeight + 16,
+                  paddingBottom: 10,
+                },
+              }}
+              // GiftedChat's default KAV uses `behavior='translate-with-padding'`,
+              // which translates the content up during the keyboard animation
+              // and then swaps to `paddingTop` at `onEnd`. Combined with the
+              // outer `overflow:'hidden'`, that swap leaves a visible ghost
+              // band above the composer on focus/unfocus. Plain `padding`
+              // just grows `paddingBottom` to the keyboard height — no
+              // translate, no swap, no residual artifact.
+              // `automaticOffset` lets the KAV measure its own screen
+              // position via `viewPositionInWindow` so the navigation header
+              // is accounted for.
+              keyboardAvoidingViewProps={{
+                behavior: 'padding',
+                automaticOffset: true,
+                keyboardVerticalOffset: 0,
+              }}
+              onSend={() => {}}
             />
           )}
-
-          <LiquidChatComposer
-            value={draft}
-            onChangeText={setDraft}
-            onSend={handleSubmit}
-            disabled={composerDisabled}
-            placeholder={composerPlaceholder}
-            onPlusPress={composerOnPlusPress}
-            onMoneyPress={composerOnMoneyPress}
-            onVoicePress={composerOnVoicePress}
-            testID={composerTestID}
-            surface={surface}
-          />
         </View>
       </Log>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

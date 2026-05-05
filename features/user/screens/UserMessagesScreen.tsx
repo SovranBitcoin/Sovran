@@ -32,6 +32,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Button } from '@/shared/ui/primitives/Button';
 import {
   ChatScreen,
   DmChatHeader,
@@ -473,6 +474,11 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       onSend={handleNostrDMSend}
       composerPlaceholder="Write here"
       composerOnMoneyPress={lud16 ? handleSendMoney : undefined}
+      composerActions={
+        lud16 ? (
+          <Button text="Send Money" variant="primary" onPress={handleSendMoney} />
+        ) : null
+      }
       contentBottomPadding={16}
       counterpartyAvatar={counterpartyAvatar}
       ownAvatar={ownAvatar}
