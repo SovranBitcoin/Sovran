@@ -50,7 +50,9 @@ class NsecSigner implements Signer {
 export class CocoManager {
   private static instance: Manager | null = null;
   private static db: SQLite.SQLiteDatabase | null = null;
-  private static isInitializing = false;
+  /** Tracks an in-flight initialize() call so concurrent callers can await it
+   *  rather than polling a boolean. Cleared in the initializer's finally. */
+  private static pendingInit: Promise<Manager> | null = null;
   /** True while enableSafeWatchers / recovery / default mint init are running. */
   private static isBackgroundRunning = false;
   /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
@@ -130,123 +132,122 @@ export class CocoManager {
       return this.instance;
     }
 
-    if (this.isInitializing) {
-      initLog('CocoManager', 'initialization in progress, waiting...');
-      let attempts = 0;
-      while (this.isInitializing && attempts < 50) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        attempts++;
-      }
-      if (this.instance) return this.instance;
-      if (attempts >= 50) throw new Error('Manager initialization timeout');
+    if (this.pendingInit) {
+      initLog('CocoManager', 'initialization in progress, awaiting in-flight promise');
+      return this.pendingInit;
     }
 
-    this.isInitializing = true;
     this.instance = null;
     const initStart = performance.now();
+    const doInitialize = async (): Promise<Manager> => {
+      try {
+        // 1. SQLite database (async to avoid blocking JS thread during profile switch)
+        const dbName = this.getDbName();
+        const db = await initPhase(`CocoManager.openDB[${dbName}]`, () =>
+          SQLite.openDatabaseAsync(dbName)
+        );
+        this.db = db;
+        const repositories = new ExpoSqliteRepositories({ database: db });
+        await initPhase('CocoManager.reposInit', () => repositories.init());
 
-    try {
-      // 1. SQLite database (async to avoid blocking JS thread during profile switch)
-      const dbName = this.getDbName();
-      const db = await initPhase(`CocoManager.openDB[${dbName}]`, () =>
-        SQLite.openDatabaseAsync(dbName)
-      );
-      this.db = db;
-      const repositories = new ExpoSqliteRepositories({ database: db });
-      await initPhase('CocoManager.reposInit', () => repositories.init());
+        // 2. Seed getter (lazy — no crypto work until first call, cached after)
+        // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
+        const accountIndex = this.accountIndex;
+        const isImported = this.isImportedProfile;
+        let cachedSeed: Uint8Array | null = null;
+        const seedGetter = async (): Promise<Uint8Array> => {
+          if (cachedSeed) return cachedSeed;
 
-      // 2. Seed getter (lazy — no crypto work until first call, cached after)
-      // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
-      const accountIndex = this.accountIndex;
-      const isImported = this.isImportedProfile;
-      let cachedSeed: Uint8Array | null = null;
-      const seedGetter = async (): Promise<Uint8Array> => {
-        if (cachedSeed) return cachedSeed;
-
-        // Fast path: check SecureStore for a previously derived seed
-        const mnemonicForHash = this.cashuMnemonic ?? (await retrieveMnemonic());
-        const mHash = mnemonicForHash ? hashMnemonic(mnemonicForHash) : null;
-        if (mHash) {
-          const cached = await retrieveCashuSeed(accountIndex);
-          if (cached && cached.mnemonicHash === mHash) {
-            initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
-            cachedSeed = cached.seed;
-            return cached.seed;
+          // Fast path: check SecureStore for a previously derived seed
+          const mnemonicForHash = this.cashuMnemonic ?? (await retrieveMnemonic());
+          const mHash = mnemonicForHash ? hashMnemonic(mnemonicForHash) : null;
+          if (mHash) {
+            const cached = await retrieveCashuSeed(accountIndex);
+            if (cached && cached.mnemonicHash === mHash) {
+              initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
+              cachedSeed = cached.seed;
+              return cached.seed;
+            }
           }
-        }
 
-        // Slow path: derive via PBKDF2
-        let seed: Uint8Array;
-        if (this.cashuMnemonic) {
-          seed = deriveCashuWalletSeed(this.cashuMnemonic);
-        } else {
-          const mnemonic = mnemonicForHash ?? (await retrieveMnemonic());
-          if (!mnemonic) throw new Error('No mnemonic found in secure storage');
-          if (isImported) {
-            seed = deriveCashuWalletSeedForImported(mnemonic, accountIndex);
+          // Slow path: derive via PBKDF2
+          let seed: Uint8Array;
+          if (this.cashuMnemonic) {
+            seed = deriveCashuWalletSeed(this.cashuMnemonic);
           } else {
-            seed = deriveCashuWalletSeedFromRoot(mnemonic, accountIndex);
+            const mnemonic = mnemonicForHash ?? (await retrieveMnemonic());
+            if (!mnemonic) throw new Error('No mnemonic found in secure storage');
+            if (isImported) {
+              seed = deriveCashuWalletSeedForImported(mnemonic, accountIndex);
+            } else {
+              seed = deriveCashuWalletSeedFromRoot(mnemonic, accountIndex);
+            }
           }
+          cachedSeed = seed;
+
+          // Persist for next cold start (fire-and-forget)
+          if (mHash) {
+            storeCashuSeed(accountIndex, seed, mHash).catch((e) =>
+              cashuLog.warn('cashu.manager.seed_cache_store_failed', { error: e })
+            );
+          }
+
+          return seed;
+        };
+
+        this.seedGetter = seedGetter;
+
+        // 3. NPC plugin (constructor only — no network call)
+        // The Plugin type comes from @cashu/coco-core; NPCPlugin implements
+        // the same shape via coco-cashu-plugin-npc's bundled (older) coco
+        // types, so we bridge with a single nominal cast at the seam — far
+        // narrower than a per-callsite `any`.
+        const plugins: Plugin[] = [];
+        const nsecSigner = await initPhase('CocoManager.getSigner', () =>
+          this.getCurrentProfileSigner()
+        );
+        initLog('CocoManager', `signer created: ${!!nsecSigner}`);
+
+        if (nsecSigner) {
+          // NpcSigner is `(t: EventTemplate) => Promise<SignedEvent>` from
+          // npubcash-sdk; the underlying NsecSigner.signEvent is the same
+          // shape via nostr-tools, so we re-type the param at the boundary.
+          const signerFunction: NpcSigner = (eventTemplate) =>
+            nsecSigner.signEvent(eventTemplate as EventTemplate);
+          this.npcPlugin = new NPCPlugin('https://npubx.cash', signerFunction, {
+            syncIntervalMs: 30000,
+            useWebsocket: true,
+          });
+          plugins.push(this.npcPlugin as unknown as Plugin);
+          initLog('CocoManager', 'NPC plugin created');
         }
-        cachedSeed = seed;
 
-        // Persist for next cold start (fire-and-forget)
-        if (mHash) {
-          storeCashuSeed(accountIndex, seed, mHash).catch((e) =>
-            cashuLog.warn('cashu.manager.seed_cache_store_failed', { error: e })
-          );
-        }
-
-        return seed;
-      };
-
-      this.seedGetter = seedGetter;
-
-      // 3. NPC plugin (constructor only — no network call)
-      // The Plugin type comes from @cashu/coco-core; NPCPlugin implements
-      // the same shape via coco-cashu-plugin-npc's bundled (older) coco
-      // types, so we bridge with a single nominal cast at the seam — far
-      // narrower than a per-callsite `any`.
-      const plugins: Plugin[] = [];
-      const nsecSigner = await initPhase('CocoManager.getSigner', () =>
-        this.getCurrentProfileSigner()
-      );
-      initLog('CocoManager', `signer created: ${!!nsecSigner}`);
-
-      if (nsecSigner) {
-        // NpcSigner is `(t: EventTemplate) => Promise<SignedEvent>` from
-        // npubcash-sdk; the underlying NsecSigner.signEvent is the same
-        // shape via nostr-tools, so we re-type the param at the boundary.
-        const signerFunction: NpcSigner = (eventTemplate) =>
-          nsecSigner.signEvent(eventTemplate as EventTemplate);
-        this.npcPlugin = new NPCPlugin('https://npubx.cash', signerFunction, {
-          syncIntervalMs: 30000,
-          useWebsocket: true,
+        // 4. Create Manager
+        initLog('CocoManager', 'creating Manager instance...');
+        this.instance = new Manager(
+          repositories,
+          seedGetter,
+          new CocoLogger('manager'),
+          undefined,
+          plugins
+        );
+        initLog('CocoManager', 'Manager created');
+        cashuLog.info('cashu.manager.initialized', {
+          duration_ms: Math.round((performance.now() - initStart) * 100) / 100,
         });
-        plugins.push(this.npcPlugin as unknown as Plugin);
-        initLog('CocoManager', 'NPC plugin created');
+
+        return this.instance;
+      } catch (error) {
+        cashuLog.error('cashu.manager.init_failed', { error });
+        throw error;
       }
+    };
 
-      // 4. Create Manager
-      initLog('CocoManager', 'creating Manager instance...');
-      this.instance = new Manager(
-        repositories,
-        seedGetter,
-        new CocoLogger('manager'),
-        undefined,
-        plugins
-      );
-      initLog('CocoManager', 'Manager created');
-      cashuLog.info('cashu.manager.initialized', {
-        duration_ms: Math.round((performance.now() - initStart) * 100) / 100,
-      });
-
-      return this.instance;
-    } catch (error) {
-      cashuLog.error('cashu.manager.init_failed', { error });
-      throw error;
+    this.pendingInit = doInitialize();
+    try {
+      return await this.pendingInit;
     } finally {
-      this.isInitializing = false;
+      this.pendingInit = null;
     }
   }
 
@@ -263,28 +264,35 @@ export class CocoManager {
     const t0 = performance.now();
     cashuLog.info('cashu.manager.safe_watchers.start');
 
-    if (this.seedGetter) {
-      await initPhase('CocoManager.seedCacheWarm', () => this.seedGetter!());
-    }
-
     try {
-      await initPhase('CocoManager.enableProofWatcher', () =>
-        this.instance!.enableProofStateWatcher()
-      );
-    } catch (error) {
-      cashuLog.warn('cashu.manager.proof_watcher_failed', { error });
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        await this.instance.enableProofStateWatcher();
-        initLog('CocoManager', 'proof state watcher enabled on retry');
-      } catch (retryError) {
-        cashuLog.error('cashu.manager.proof_watcher_retry_failed', { error: retryError });
+      if (this.seedGetter) {
+        await initPhase('CocoManager.seedCacheWarm', () => this.seedGetter!());
       }
-    }
 
-    cashuLog.info('cashu.manager.safe_watchers.done', {
-      duration_ms: Math.round((performance.now() - t0) * 100) / 100,
-    });
+      try {
+        await initPhase('CocoManager.enableProofWatcher', () =>
+          this.instance!.enableProofStateWatcher()
+        );
+      } catch (error) {
+        cashuLog.warn('cashu.manager.proof_watcher_failed', { error });
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await this.instance.enableProofStateWatcher();
+          initLog('CocoManager', 'proof state watcher enabled on retry');
+        } catch (retryError) {
+          cashuLog.error('cashu.manager.proof_watcher_retry_failed', { error: retryError });
+        }
+      }
+
+      cashuLog.info('cashu.manager.safe_watchers.done', {
+        duration_ms: Math.round((performance.now() - t0) * 100) / 100,
+      });
+    } finally {
+      // Latch is paired with the matching set in enableNpcSyncAndProcessor —
+      // clear here so that an exception or unmount mid-phase can't strand
+      // the flag and permanently block profile switches.
+      this.isBackgroundRunning = false;
+    }
   }
 
   /**
@@ -299,44 +307,48 @@ export class CocoManager {
     if (!this.instance) {
       throw new Error('Manager not initialized. Call initialize() first.');
     }
+    this.isBackgroundRunning = true;
     const t0 = performance.now();
     cashuLog.info('cashu.manager.npc_sync_and_processor.start');
 
-    const npcPromise = this.npcPlugin
-      ? this.npcPlugin.sync().then(
-          () => initLog('CocoManager', 'NPC sync done'),
-          (error) => cashuLog.warn('cashu.manager.npc_sync_failed', { error })
-        )
-      : Promise.resolve();
-    initLog('CocoManager', 'NPC sync starting...');
-
-    await npcPromise;
-
     try {
-      initLog('CocoManager', 'enabling mint quote watcher...');
-      await this.instance.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
-      initLog('CocoManager', 'mint quote watcher enabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
-    }
+      const npcPromise = this.npcPlugin
+        ? this.npcPlugin.sync().then(
+            () => initLog('CocoManager', 'NPC sync done'),
+            (error) => cashuLog.warn('cashu.manager.npc_sync_failed', { error })
+          )
+        : Promise.resolve();
+      initLog('CocoManager', 'NPC sync starting...');
 
-    try {
-      initLog('CocoManager', 'enabling mint quote processor...');
-      await this.instance.enableMintOperationProcessor({
-        processIntervalMs: 5000,
-        maxRetries: 3,
-        baseRetryDelayMs: 1000,
-        initialEnqueueDelayMs: 2000,
+      await npcPromise;
+
+      try {
+        initLog('CocoManager', 'enabling mint quote watcher...');
+        await this.instance.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
+        initLog('CocoManager', 'mint quote watcher enabled');
+      } catch (error) {
+        cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
+      }
+
+      try {
+        initLog('CocoManager', 'enabling mint quote processor...');
+        await this.instance.enableMintOperationProcessor({
+          processIntervalMs: 5000,
+          maxRetries: 3,
+          baseRetryDelayMs: 1000,
+          initialEnqueueDelayMs: 2000,
+        });
+        initLog('CocoManager', 'mint quote processor enabled');
+      } catch (error) {
+        cashuLog.warn('cashu.manager.quote_processor_failed', { error });
+      }
+
+      cashuLog.info('cashu.manager.npc_sync_and_processor.done', {
+        duration_ms: Math.round((performance.now() - t0) * 100) / 100,
       });
-      initLog('CocoManager', 'mint quote processor enabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.quote_processor_failed', { error });
+    } finally {
+      this.isBackgroundRunning = false;
     }
-
-    this.isBackgroundRunning = false;
-    cashuLog.info('cashu.manager.npc_sync_and_processor.done', {
-      duration_ms: Math.round((performance.now() - t0) * 100) / 100,
-    });
   }
 
   /**
@@ -364,7 +376,7 @@ export class CocoManager {
   static isReadyForCleanup(): boolean {
     return (
       this.instance !== null &&
-      !this.isInitializing &&
+      !this.pendingInit &&
       !this.pendingCleanup &&
       !this.isBackgroundRunning
     );
@@ -378,6 +390,14 @@ export class CocoManager {
    * racing against an in-flight teardown.
    */
   static async cleanup(): Promise<void> {
+    // Dedup concurrent cleanups: a second call returns the existing promise
+    // rather than overwriting it. Without this, an initialize() awaiter that
+    // sampled `pendingCleanup` only sees the second teardown and can race the
+    // still-running first one (db.closeAsync / repository teardown).
+    if (this.pendingCleanup) {
+      return this.pendingCleanup;
+    }
+
     const doCleanup = async () => {
       if (!this.instance) {
         this.clearSensitiveRuntimeState();
@@ -551,7 +571,7 @@ export class CocoManager {
     try {
       await this.disableWatchers();
       this.instance = null;
-      this.isInitializing = false;
+      this.pendingInit = null;
 
       const dbNames = new Set<string>();
       for (const i of accountIndexes) {
