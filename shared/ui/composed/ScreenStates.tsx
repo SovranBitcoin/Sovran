@@ -20,7 +20,12 @@ export function ScreenErrorState({ message, title, onGoBack }: ScreenErrorStateP
 
   return (
     <Screen name="ScreenErrorState" scroll="none">
-      <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        accessible
+        accessibilityRole="alert"
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={title ? `${title}. ${message}` : message}
+        style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
         {title ? (
           <>
             <Text
@@ -70,7 +75,12 @@ export function ScreenLoadingState({ message }: ScreenLoadingStateProps) {
 
   return (
     <Screen name="ScreenLoadingState" scroll="none">
-      <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+      <VStack
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={message}
+        accessibilityState={{ busy: true }}
+        style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Spinner size={32} />
         <Text size={16} style={{ color: opacity(foreground, 0.5), marginTop: 16 }}>
           {message}

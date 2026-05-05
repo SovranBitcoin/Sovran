@@ -49,7 +49,10 @@ export function DetailsSection({
         <Pressable
           onPress={() => setExpanded((v) => !v)}
           style={styles.toggle}
-          hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityState={{ expanded }}>
           <HStack align="center" gap={6}>
             <Icon
               name={expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}

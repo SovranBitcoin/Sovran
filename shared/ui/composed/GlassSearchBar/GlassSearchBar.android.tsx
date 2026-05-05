@@ -75,6 +75,8 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           onChangeText={handleTextChange}
           placeholder={placeholder}
           placeholderTextColor={opacity(foreground, 0.33)}
+          accessibilityLabel={placeholder}
+          accessibilityRole="search"
           style={{
             flex: 1,
             color: foreground,

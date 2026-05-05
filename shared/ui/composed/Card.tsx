@@ -14,9 +14,21 @@ interface CardProps {
   variant: 'warning' | 'info';
   onPress?: () => void;
   icon?: React.ReactNode;
+  /** VoiceOver/TalkBack label. Defaults to `title` (or `message` when no title). */
+  accessibilityLabel?: string;
+  /** Optional VoiceOver hint describing the tap outcome. */
+  accessibilityHint?: string;
 }
 
-export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
+export const Card = ({
+  title,
+  message,
+  variant,
+  icon,
+  onPress,
+  accessibilityLabel,
+  accessibilityHint,
+}: CardProps) => {
   const [foreground, surfaceSecondary, danger] = useThemeColor([
     'foreground',
     'surface-secondary',
@@ -78,5 +90,21 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
     </View>
   );
 
-  return <Log name="Card">{onPress ? <Pressable onPress={onPress}>{body}</Pressable> : body}</Log>;
+  const a11yLabel = accessibilityLabel ?? title ?? message;
+
+  return (
+    <Log name="Card">
+      {onPress ? (
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={a11yLabel}
+          accessibilityHint={accessibilityHint}>
+          {body}
+        </Pressable>
+      ) : (
+        body
+      )}
+    </Log>
+  );
 };

@@ -10,6 +10,10 @@ interface CheckboxProps {
   disabled?: boolean;
   size?: number;
   variant?: 'default' | 'primary' | 'success' | 'warning' | 'error';
+  /** VoiceOver/TalkBack label naming the option this checkbox toggles. */
+  accessibilityLabel?: string;
+  /** Optional VoiceOver hint describing the toggle outcome. */
+  accessibilityHint?: string;
 }
 
 export const Checkbox = ({
@@ -18,6 +22,8 @@ export const Checkbox = ({
   disabled = false,
   size = 20,
   variant = 'default',
+  accessibilityLabel,
+  accessibilityHint,
 }: CheckboxProps) => {
   const [foreground, muted, surface, danger, blue300, green400, warning] = useThemeColor([
     'foreground',
@@ -70,6 +76,10 @@ export const Checkbox = ({
       checked={checked}
       onCheckedChange={onCheckedChange}
       disabled={disabled}
+      accessibilityRole="checkbox"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ checked, disabled }}
       style={{
         height: size,
         width: size,

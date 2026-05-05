@@ -54,12 +54,12 @@ function SearchHeaderRight() {
   const iconColor = useThemeColor('foreground');
 
   return (
-    <Pressable onPress={isSearching ? onCloseSearch : onOpenSearch} style={{ padding: 8 }}>
-      <IconSymbol
-        name={isSearching ? 'xmark' : 'magnifyingglass'}
-        size={20}
-        color={iconColor}
-      />
+    <Pressable
+      onPress={isSearching ? onCloseSearch : onOpenSearch}
+      style={{ padding: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={isSearching ? 'Close search' : 'Open search'}>
+      <IconSymbol name={isSearching ? 'xmark' : 'magnifyingglass'} size={20} color={iconColor} />
     </Pressable>
   );
 }

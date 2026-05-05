@@ -67,10 +67,9 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           keyboardType={keyboardType}
           autoCorrect={false}
           autoFocus={autoFocus}
-          style={[
-            styles.input,
-            { backgroundColor: surfaceSecondary, color: foreground },
-          ]}
+          accessibilityLabel={placeholder}
+          accessibilityRole="search"
+          style={[styles.input, { backgroundColor: surfaceSecondary, color: foreground }]}
         />
       </View>
     </Log>

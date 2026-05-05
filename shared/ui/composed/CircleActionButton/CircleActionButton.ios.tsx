@@ -49,6 +49,11 @@ interface CircleActionButtonProps {
   /** Override for the icon tint. Defaults to `foreground`. */
   color?: string;
   testID?: string;
+  /** VoiceOver/TalkBack label. Defaults to `label`; required for icon-only
+   *  buttons (no `label`) since the glyph carries no name. */
+  accessibilityLabel?: string;
+  /** Optional VoiceOver hint describing the action's outcome. */
+  accessibilityHint?: string;
 }
 
 const CIRCLE_SIZE = 52;
@@ -62,15 +67,18 @@ export function CircleActionButton({
   disabled = false,
   color,
   testID,
+  accessibilityLabel,
+  accessibilityHint,
 }: CircleActionButtonProps): React.ReactElement {
   const [foreground] = useThemeColor(['foreground'] as const);
   const iconColor = color ?? foreground;
   const interactive = !disabled && !!onPress;
+  const a11yLabel = accessibilityLabel ?? label;
+  const a11yState = { disabled: !interactive };
 
   // iOS 26+ with a matching SF Symbol → native glass material. Mirrors
   // the CameraScreen.tsx iOS toolbar (buttonStyle('glass') + glassEffect).
-  const useNativeGlass =
-    Platform.OS === 'ios' && supportsLiquidGlass() && !!systemIcon;
+  const useNativeGlass = Platform.OS === 'ios' && supportsLiquidGlass() && !!systemIcon;
 
   const circle = useNativeGlass ? (
     <Host style={{ height: CIRCLE_SIZE, width: CIRCLE_SIZE }} matchContents={false}>
@@ -119,6 +127,11 @@ export function CircleActionButton({
       <View
         testID={testID}
         pointerEvents={interactive ? 'auto' : 'none'}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={a11yLabel}
+        accessibilityHint={accessibilityHint}
+        accessibilityState={a11yState}
         style={[styles.wrapper, { opacity: disabled ? 0.4 : 1 }]}>
         {circle}
         {label ? (
