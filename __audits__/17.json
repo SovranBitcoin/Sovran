@@ -134,8 +134,8 @@
       ],
       "verification_note": "Grepped shared/ui for `accessibilityLabel|accessibilityRole|accessibilityState` — matches only in Avatar.tsx (accessibilityRole='image' + label on the View fallback), GlassSearchBar types, and nowhere else. Re-read each cited file's interactive element. Counter-argument considered: 'rn-primitives auto-injects a11y'. Partial truth — CheckboxPrimitive.Root from @rn-primitives/checkbox does forward accessibilityState.checked when given `checked`, but it does NOT supply a label from context; Checkbox.tsx never passes one. For TouchableOpacity and Pressable there is no auto-injection. Severity High (not Critical) because WCAG 2.2 is not legally mandatory for self-custodial wallets in most jurisdictions, but it is load-bearing for a meaningful subset of users and the fix cost is near-zero. Confidence 0.90 — the claim is mechanical and verifiable by grep.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Primitives Button + ListRow now derive accessibilityLabel from text/title and default role='button'; remaining sub-cases (SwiftUI CircleActionButton, Checkbox via rn-primitives, GlassSearchBar, ScreenStates as alert) deferred to a future a11y slice"
+      "completion_status": "complete",
+      "completion_note": "Punch list from prior partial closed: Card derives label from title/message; DetailsSection toggle is role=button with accessibilityState.expanded; SearchLayout search-toggle is labeled; CircleActionButton wrapper is role=button with disabled state and label-derived-from-prop; GlassSearchBar (iOS+Android) TextInput has accessibilityLabel + role=search; Checkbox is role=checkbox with checked/disabled state; ScreenErrorState announces as alert/live-region, ScreenLoadingState as progressbar."
     },
     {
       "id": "F-005",
