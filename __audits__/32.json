@@ -144,7 +144,9 @@
         "nips/17.md"
       ],
       "verification_note": "Log evidence verified via `npm run log-doctor -- timeline --event 'contact|whitenoise|ContactsScreen' --limit 40` (showed 7+ recent/decrypt cycles with stable contactCount). Confidence 0.65 because this finding is in an upstream hook not the audited file; the screen is a consumer.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Stabilised the recentActivityContacts memo and the unwrappedDMs memo by keying both on a sorted event-id signature instead of the NDK useSubscribe array reference. Relay flushes that bring no new event ids no longer cascade into a re-decrypt pass. The decrypt useEffect at line 233 inherits stability from contactsWithDefaults, which is now reference-stable when the underlying id-set is unchanged."
     },
     {
       "id": "F-005",

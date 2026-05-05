@@ -95,8 +95,8 @@
       ],
       "verification_note": "Counter-argument considered: the 5 cycles at cold start could be intentional during initial mint-keyset sync. Rejected — log-doctor shows the same 6-mint waterfall fires again at 742874ms long after cold start, after the user did nothing related to mints. Even if cold-start cycling is acceptable, the runtime cycling is not. Demoted to High (not Critical) because no funds are at risk; the cost is JS-thread blocks and battery.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed. Requires changes to shared/lib/cashu/useMintManagement.ts (surgical splice on mint:* events instead of full loadMints) and a stable dep signature in useMintContacts. Not picked for this slice — would expand scope past one seam."
+      "completion_status": "partial",
+      "completion_note": "Stable-dep sub-fix landed: useMintContacts mint-info loadMintInfo useEffect now keys on a sorted mintUrls signature instead of the mints array reference (which coco's mint:* event cascade replaces wholesale even on no-op refreshes), and the mintsWithMetadata memo keys on a sorted dmEvents id-set instead of the NDK array reference. Both halves of the fix described in the audit's (a)/(b) recommendation are landed inside this hook. The upstream cascade-trim in shared/lib/cashu/useMintManagement.ts (loadMints replace-vs-splice on mint:updated) is the remaining piece — deferred to a future slice that owns that seam."
     },
     {
       "id": "F-002",
