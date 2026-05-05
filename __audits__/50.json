@@ -253,7 +253,7 @@
       "verification_note": "Confirmed via direct import grep. The folder-structure rule that previously discouraged feature-to-feature imports (`.cursor/rules/folder-structure.mdc`) was deleted in this branch (per gitStatus). The deletion does not retire the architectural concern — it just removed the documentation of the convention.",
       "prior_audit_id": null,
       "completion_status": "partial",
-      "completion_note": "Lift candidate (1) done: `Section` was lifted from `features/settings/screens/SettingsScreen.tsx` to `shared/ui/composed/Section.tsx`, the items-list component that previously held that name in `shared` was renamed to `DetailsList` to retire the vocabulary collision, and the `Section` re-export was removed from the `features/settings` barrel — collapsing seven cross-feature reach sites onto the canonical shared seam. Lift candidates (2) `useNostrProfile`/`TopFollower`/`getFollowers*` and (3) `UserFeed` consumption shape remain deferred; SendMessageMenu's bitchat/whitenoise reach was already accepted as the cross-transport surface."
+      "completion_note": "Lift candidate (1) Section: shipped previously. Lift candidate (2) useNostrProfile + getFollowers* + TopFollower: now in shared/hooks/useNostrProfile.ts; the only consumer (UserProfileScreen) imports through the canonical shared seam, and features/feed no longer re-exports it. Lift candidate (3) UserFeed consumption shape and SendMessageMenu's bitchat/whitenoise reach (already accepted as the cross-transport surface) remain deferred."
     },
     {
       "id": "F-009",
