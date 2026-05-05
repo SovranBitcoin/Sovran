@@ -383,25 +383,33 @@ export function ActionMenuHost() {
       : isDisabled
         ? button.reason
         : button.description;
+    const item = (
+      <Menu.Item
+        testID={button.testID}
+        isDisabled={isDisabled}
+        variant={isDanger ? 'danger' : 'default'}
+        onPress={() => handleItemPress(button)}>
+        <HStack align="center" gap={10} style={{ flex: 1 }}>
+          {button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
+          <View style={{ flex: 1 }}>
+            <Menu.ItemTitle>{button.text}</Menu.ItemTitle>
+            {descriptionText ? (
+              <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
+            ) : null}
+          </View>
+          {button.suffix ? <View>{button.suffix}</View> : null}
+        </HStack>
+      </Menu.Item>
+    );
     return (
       <React.Fragment key={key}>
         {button.separator ? <View className="bg-foreground/10 mx-3 my-1 h-px" /> : null}
-        <Menu.Item
-          testID={button.testID}
-          isDisabled={isDisabled}
-          variant={isDanger ? 'danger' : 'default'}
-          onPress={() => handleItemPress(button)}>
-          <HStack align="center" gap={10} style={{ flex: 1 }}>
-            {button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
-            <View style={{ flex: 1 }}>
-              <Menu.ItemTitle>{button.text}</Menu.ItemTitle>
-              {descriptionText ? (
-                <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
-              ) : null}
-            </View>
-            {button.suffix ? <View>{button.suffix}</View> : null}
-          </HStack>
-        </Menu.Item>
+        {/* heroui's `variant="danger"` only tints the title/description text; a
+            failed payment row needs the whole row red so it reads "tried,
+            broke" at a glance instead of competing visually with neighbouring
+            "Recommended" items. The description prefix ("Failed: ...") stays
+            for screen readers — colour alone is not an accessibility signal. */}
+        {button.isFailed ? <View className="bg-danger/10 mx-1 rounded-2xl">{item}</View> : item}
       </React.Fragment>
     );
   };

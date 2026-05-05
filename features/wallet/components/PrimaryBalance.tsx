@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -26,7 +26,11 @@ import { liquidGlassModifiers, supportsLiquidGlass } from '@/shared/lib/version'
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/shared/lib/popup';
+import {
+  actionMenuPopup,
+  reservedProofsFreedPopup,
+  reservedProofsFailedPopup,
+} from '@/shared/lib/popup';
 import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -216,9 +220,8 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     });
   }, [router, account]);
 
-  // Wrap the alert in a promise that resolves when the user closes it so a
-  // rapid second tap on the Reserved pill is dropped by `useSingleFlight`
-  // (otherwise React Native happily stacks two alerts on top of each other).
+  // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
+  // dropped by `useSingleFlight` until the first interaction settles.
   const handleReservedPressInner = useCallback(async () => {
     const recoverPending = async () => {
       walletLog.info('wallet.reserved.recovery_start', { reservedTotal });
@@ -245,13 +248,17 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     };
 
     await new Promise<void>((resolve) => {
-      Alert.alert(
-        'Reserved Proofs',
-        'Choose a recovery action.',
-        [
-          { text: 'Close', style: 'cancel', onPress: () => resolve() },
+      actionMenuPopup({
+        title: 'Reserved Proofs',
+        // Fires on overlay-tap / swipe-down (no item picked); the picked
+        // path resolves from the button's onPress finally-block instead.
+        onDismiss: () => resolve(),
+        buttons: [
           {
+            testID: 'reserved-proofs-recover',
             text: 'Recover Pending Operations',
+            description: 'Checks pending send and melt operations',
+            icon: 'mdi:wrench',
             onPress: async () => {
               try {
                 await recoverPending();
@@ -261,9 +268,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             },
           },
         ],
-        // Android only — iOS always fires one of the buttons on dismiss.
-        { onDismiss: () => resolve() }
-      );
+      });
     });
   }, [reservedTotal]);
 
