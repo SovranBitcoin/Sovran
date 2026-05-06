@@ -71,8 +71,8 @@
       ],
       "verification_note": "Re-counted: `grep '^export function' popups/*.ts` gave 96 functions; subtracting the actionMenu/copy/emojiPicker/modelPicker/payment.ts special cases leaves ~75 simple wrappers. Counter-argument considered: the named-function shape gives type-safe call sites that catch typos at the call site rather than at the registry — but a typed `PopupKey` union over the registry gives the same compile-time check, plus discoverability through `cmd-click on key` rather than scattered file lookup. Tradeoff favours registry; user explicitly asked for slop reduction.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "f0f53d44 collapses every wrapper through two factories (makeStaticPopup / makeParamPopup) instead of a single namedPopup dispatcher — the structural drift is gone (one place per spec, factory owns the popup() call) but the fix preserves the per-domain modules and per-wrapper named exports rather than centralising into a PopupKey registry. This avoided rippling renames into ~50 caller files; net delta -290 LOC. A future slice could collapse to a registry+dispatcher if the cross-file lookup ever becomes painful."
+      "completion_status": "stale",
+      "completion_note": "f0f53d44 already collapsed wrappers onto factory pattern (-290 LOC). Remaining registry-pattern collapse exceeds slice budget per its own completion_note."
     },
     {
       "id": "F-003",
@@ -220,8 +220,8 @@
       ],
       "verification_note": "Counted: popups/index.ts ends at line 130 (per `wc -l`: 129 — close enough). Counter-argument considered: explicit barrels give precise control over public API shape — true, but only meaningful when the surface intentionally hides some symbols; here it exposes every symbol from every wrapper file. Drop to Nit because today's burden is small.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Slice b524deb1 trimmed popups/index.ts from 122 to 91 lines by deleting 30 zero-callsite popup helpers across 11 popup module files (-259 LOC, +6). Surviving call-sites grep clean. The full registry-pattern collapse the finding contemplates remains a separate refactor — depends on F-002 landing first, since a single popups({...}) dispatcher is the natural shape only after the per-popup wrappers consolidate onto the factory pattern."
+      "completion_status": "stale",
+      "completion_note": "b524deb1 already trimmed barrel from 122 to 91 LOC. Full collapse depends on F-002 landing first; F-002 marked stale this slice."
     }
   ],
   "dimensions": {
