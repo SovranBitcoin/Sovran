@@ -19,15 +19,7 @@
 // Side-effect import: must run on barrel load so the dev heartbeat starts.
 import './loggerJsThread';
 
-export type {
-  Logger,
-  LogLevel,
-  LogEntry,
-  LoggerOptions,
-  Span,
-  SpanOptions,
-  DumpOptions,
-} from './loggerCore';
+export type { Logger } from './loggerCore';
 
 export {
   createLogger,

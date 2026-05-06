@@ -27,7 +27,7 @@ import { Platform } from 'react-native';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
-export interface LoggerOptions {
+interface LoggerOptions {
   /** Minimum level to emit. Default: 'debug' in __DEV__, 'warn' in production */
   level?: LogLevel;
   /** Static fields merged into every log entry */
@@ -164,8 +164,7 @@ const LEVEL_CONSOLE_METHOD: Record<LogLevel, 'debug' | 'info' | 'warn' | 'error'
   fatal: 'error',
 };
 
-export const IS_DEV =
-  typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
+const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 
 // Master switch: dev-only by default. Production builds skip the JS-thread
 // heartbeat side-effect entirely and skip the per-emit stack walk for warn.

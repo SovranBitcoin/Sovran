@@ -7,7 +7,7 @@ export const SEARCH_FILTERS_HEIGHT = 56;
 
 export type ContactsFilter = 'All' | 'Recent' | 'Requests' | 'Mints' | 'Groups';
 
-export const BASE_FILTERS: readonly ContactsFilter[] = ['All', 'Recent', 'Requests', 'Mints'];
+const BASE_FILTERS: readonly ContactsFilter[] = ['All', 'Recent', 'Requests', 'Mints'];
 
 type SearchFiltersProps = {
   activeFilter: ContactsFilter;

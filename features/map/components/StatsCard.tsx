@@ -20,12 +20,12 @@ export type CategoryFilter = 'all' | MerchantCategoryId;
 
 const ALL_CATEGORY_LABEL = 'All Merchants';
 
-export function categoryLabel(filter: CategoryFilter): string {
+function categoryLabel(filter: CategoryFilter): string {
   if (filter === 'all') return ALL_CATEGORY_LABEL;
   return MERCHANT_CATEGORIES.find((c) => c.id === filter)?.label ?? filter;
 }
 
-export const CATEGORY_FILTERS: readonly CategoryFilter[] = [
+const CATEGORY_FILTERS: readonly CategoryFilter[] = [
   'all',
   ...MERCHANT_CATEGORIES.map((c) => c.id),
 ];
