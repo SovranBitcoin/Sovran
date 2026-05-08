@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 import { Platform, RefreshControl, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   useHistoryWithMelts,
@@ -20,8 +19,6 @@ import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { QRButton } from '@/shared/ui/composed/QRButton';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { isAndroidLiquidHeaderSupported } from '@/navigation/nativeTabs';
-import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
@@ -48,11 +45,6 @@ export function WalletScreen() {
   useBackgroundConfig({ blurMode: 'partial' });
 
   const { height: windowHeight } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-
-  const androidHeaderPadding = isAndroidLiquidHeaderSupported()
-    ? insets.top + HEADER_LAYOUT.ANDROID_OVERLAY_OFFSET + HEADER_LAYOUT.ANDROID_BUTTON_SIZE
-    : 0;
 
   // Tighter than the original 0.30/250 — trims the vertical dead space
   // between the header and the secondary action row while still leaving
@@ -107,7 +99,7 @@ export function WalletScreen() {
       <LayoutDebugWrapper
         onContentSizeChange={onContentSizeChange}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
-        contentContainerStyle={{ padding: 0, paddingTop: androidHeaderPadding }}>
+        contentContainerStyle={{ padding: 0 }}>
         <Log name="WalletScreen">
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
@@ -179,6 +171,7 @@ export function WalletScreen() {
                   label="Receive"
                   icon="lucide:arrow-down-left"
                   systemIcon={RECEIVE_SYSTEM_ICON}
+                  roundedSide="left"
                   onPress={handleReceive}
                 />
               </View>
@@ -187,6 +180,7 @@ export function WalletScreen() {
                   label="Send"
                   icon="lucide:arrow-up-right"
                   systemIcon={SEND_SYSTEM_ICON}
+                  roundedSide="right"
                   onPress={handleSend}
                 />
               </View>

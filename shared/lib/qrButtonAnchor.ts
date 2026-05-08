@@ -47,6 +47,7 @@ const morphListeners = new Set<() => void>();
 // splash and being invisible to the user.
 let bootSplashHandoff = false;
 const handoffListeners = new Set<() => void>();
+const ANCHOR_EPSILON = 0.5;
 
 export function setQRButtonAnchor(anchor: QRButtonAnchor | null): void {
   // Dedupe identical publishes — QRButton publishes from both the worklet
@@ -62,12 +63,16 @@ function anchorsEqual(a: QRButtonAnchor | null, b: QRButtonAnchor | null): boole
   if (a === b) return true;
   if (!a || !b) return false;
   return (
-    a.x === b.x &&
-    a.y === b.y &&
-    a.width === b.width &&
-    a.height === b.height &&
-    a.borderRadius === b.borderRadius
+    nearlyEqual(a.x, b.x) &&
+    nearlyEqual(a.y, b.y) &&
+    nearlyEqual(a.width, b.width) &&
+    nearlyEqual(a.height, b.height) &&
+    nearlyEqual(a.borderRadius, b.borderRadius)
   );
+}
+
+function nearlyEqual(a: number, b: number): boolean {
+  return Math.abs(a - b) <= ANCHOR_EPSILON;
 }
 
 // Subscribe to boot-morph-completion transitions. Used by the wallet's
@@ -85,9 +90,7 @@ export function getQRButtonAnchor(): QRButtonAnchor | null {
   return currentAnchor;
 }
 
-export function subscribeQRButtonAnchor(
-  cb: (anchor: QRButtonAnchor | null) => void
-): () => void {
+export function subscribeQRButtonAnchor(cb: (anchor: QRButtonAnchor | null) => void): () => void {
   anchorListeners.add(cb);
   return () => {
     anchorListeners.delete(cb);

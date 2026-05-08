@@ -45,7 +45,7 @@ const ChatCompletionChunkSpine = z
   })
   .passthrough();
 
-export type ChatCompletionChunk = z.infer<typeof ChatCompletionChunkSpine>;
+type ChatCompletionChunk = z.infer<typeof ChatCompletionChunkSpine>;
 
 /**
  * Spine validators for the JSON envelopes routstr returns. Like

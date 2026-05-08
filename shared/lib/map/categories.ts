@@ -11,7 +11,7 @@ import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 
 export type MerchantCategoryId = 'food' | 'retail' | 'atm' | 'accommodation' | 'services';
 
-export interface MerchantCategory {
+interface MerchantCategory {
   readonly id: MerchantCategoryId;
   readonly label: string;
   readonly icons: readonly string[];

@@ -5,13 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
-export type RestoreStatus =
-  | 'unknown'
-  | 'not-needed'
-  | 'pending'
-  | 'in-progress'
-  | 'complete'
-  | 'failed';
+type RestoreStatus = 'unknown' | 'not-needed' | 'pending' | 'in-progress' | 'complete' | 'failed';
 
 interface WalletLifecycleState {
   /**

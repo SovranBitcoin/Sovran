@@ -3,7 +3,7 @@ import React, { ReactNode, useEffect, useRef, useState } from 'react';
 import { initLog, log, Log, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 
-export interface InitializationGateProps {
+interface InitializationGateProps {
   /** Component name — used for mount/lifecycle logs and the children Log wrapper. */
   tag: string;
   /** Stage id registered with the InitializationProvider; must be unique. */

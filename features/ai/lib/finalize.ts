@@ -11,13 +11,13 @@
  * Returns `null` when nothing should be persisted (no chunks received at
  * all — typically a connect-time bail-out handled upstream).
  */
-export interface FinalizeInput {
+interface FinalizeInput {
   fullContent: string;
   fullReasoning: string;
   chunkCount: number;
 }
 
-export interface FinalizePayload {
+interface FinalizePayload {
   content: string;
   reasoningContent?: string;
 }

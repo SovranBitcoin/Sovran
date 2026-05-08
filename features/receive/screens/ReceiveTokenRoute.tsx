@@ -22,7 +22,7 @@ const ParamsSchema = z.object({
   receiveHistoryEntry: z.string().min(1).max(64_000),
 });
 
-export interface ReceiveTokenRouteProps {
+interface ReceiveTokenRouteProps {
   /** Log scope for invalid-params telemetry; e.g. `'receive-flow.receiveToken'`. */
   where: string;
 }

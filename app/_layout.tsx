@@ -14,7 +14,7 @@ import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Dimensions, Image, LogBox, StyleSheet, Platform, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import Animated, { cubicBezier } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 
@@ -369,10 +369,9 @@ const SPLASH_SQUARE = Math.max(SCREEN.width, SCREEN.height);
 const SPLASH_INITIAL_LEFT = (SCREEN.width - SPLASH_SQUARE) / 2;
 const SPLASH_INITIAL_TOP = (SCREEN.height - SPLASH_SQUARE) / 2;
 const MORPH_DURATION_MS = 750;
-// `easeOutExpo` — fast initial movement, long graceful settle. Feels more
-// deliberate than the default `ease-out` for the splash → QR-button morph.
-// (Material Design "decelerate" / iOS-style "snappy out".)
-const MORPH_TIMING = cubicBezier(0.16, 1, 0.3, 1);
+// Reanimated CSS transitions on Android only accept predefined timing names.
+// `ease-out` keeps the splash → QR-button morph soft without tripping runtime validation.
+const MORPH_TIMING = 'ease-out';
 const MORPH_FALLBACK_TIMEOUT = 1500; // ms to wait for QR anchor before fading
 // Stability window for the QR-button anchor before kicking off the morph.
 // The morph effect re-arms this timer every time the anchor changes, so
@@ -385,24 +384,39 @@ const LAYOUT_SETTLE_DELAY = 500;
 // the store dedupes redundant anchor publishes via field-level equality.
 const LAYOUT_POLL_INTERVAL = 100;
 
+// Linear phase machine for the boot splash → QR-button handoff.
+//   await_init    — splash visible; waiting for init to complete + root layout
+//   await_anchor  — native splash hidden; waiting for a stable QR-button anchor
+//                   (or MORPH_FALLBACK_TIMEOUT, whichever comes first)
+//   morphing      — animating the overlay to the QR-button position
+//   fading        — animating the overlay to opacity 0 (no anchor available)
+//   done          — animation complete; brief hold before unmount
+//   unmounted     — overlay fully gone; real QR button takes over
+//
+// Each phase owns exactly one effect that drives its own forward transition,
+// so there is no way to wedge: every phase either advances on a condition or
+// on a fixed timer, with a hard upper bound of ~2.5s after init completes.
+type SplashPhase = 'await_init' | 'await_anchor' | 'morphing' | 'fading' | 'done' | 'unmounted';
+
 function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   useInitMount('NativeSplashLayoutGate');
   const { isInitializing } = useInitializationState();
   const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
-  const hasRootLaidOut = useRef(false);
-  const hasBeenInitializing = useRef(false);
   const rootViewRef = useRef<View>(null);
   const splashOverlayRef = useRef<View>(null);
-  const [hasHiddenSplash, setHasHiddenSplash] = useState(false);
-  const [overlayMounted, setOverlayMounted] = useState(true);
+  // We require having seen `isInitializing === true` at least once before we
+  // accept `false` as 'init complete' — the provider can momentarily report
+  // false on first render while it's still bootstrapping.
+  const hasBeenInitializing = useRef(false);
+
+  const [phase, setPhase] = useState<SplashPhase>('await_init');
   const [anchor, setAnchor] = useState<QRButtonAnchor | null>(getQRButtonAnchor());
+  const [hasRootLaidOut, setHasRootLaidOut] = useState(false);
   // Window-relative offset of the splash overlay's parent View. The QRButton
   // publishes its anchor in window coords (pageX/pageY); to position the
   // overlay at that exact spot we need to subtract our own window offset
   // (a parent View further up may not start at window (0,0)).
   const [parentOffset, setParentOffset] = useState({ x: 0, y: 0 });
-  const [morphPhase, setMorphPhase] = useState<'idle' | 'morphing' | 'fading' | 'done'>('idle');
-  const showSplash = overlayMounted;
 
   useEffect(() => {
     const unsub = subscribeQRButtonAnchor((next) => {
@@ -412,121 +426,131 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
-  const maybeHideNativeSplash = useCallback(() => {
-    if (
-      isInitializing ||
-      !hasBeenInitializing.current ||
-      !hasRootLaidOut.current ||
-      hasHiddenSplash
-    )
-      return;
-
-    setHasHiddenSplash(true);
-    initLog('NativeSplashLayoutGate', 'root laid out + init complete — hiding native splash');
-    SplashScreen.hideAsync();
-  }, [isInitializing, hasHiddenSplash]);
+  useEffect(() => {
+    if (isInitializing) hasBeenInitializing.current = true;
+  }, [isInitializing]);
 
   const onLayoutRootView = useCallback(() => {
-    hasRootLaidOut.current = true;
+    setHasRootLaidOut(true);
     rootViewRef.current?.measureInWindow((x, y) => {
       setParentOffset((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
       initLog('SplashMorph', `parent offset measured — x=${x} y=${y}`);
     });
-    maybeHideNativeSplash();
-  }, [maybeHideNativeSplash]);
+  }, []);
 
-  useEffect(() => {
-    if (isInitializing) {
-      hasBeenInitializing.current = true;
-    }
-  }, [isInitializing]);
-
-  useEffect(() => {
-    maybeHideNativeSplash();
-  }, [maybeHideNativeSplash]);
-
-  // Reset state when init restarts (profile switch).
+  // Reset the machine on a profile switch. We only honor a reset AFTER we've
+  // unmounted from a prior cycle — during the initial boot, `isInitializing`
+  // can flicker true/false as each provider in the chain bootstraps, and we
+  // do NOT want those flickers to snap us back to `await_init` (which would
+  // re-call hideAsync and restart the await_anchor timer in a loop).
   useEffect(() => {
     if (!isInitializing) return;
+    if (phase !== 'unmounted') return;
     setBootMorphCompleted(false);
     setBootSplashHandoff(false);
-    setMorphPhase('idle');
-    setOverlayMounted(true);
-  }, [isInitializing]);
+    setPhase('await_init');
+  }, [isInitializing, phase]);
 
-  // Flip the global splash-handoff signal as soon as the morph (or fade)
-  // begins. Destination screens listen via `useBootSplashHandoff()` to
-  // time their entrance animation to overlap the splash retreat — without
-  // this, an entrance triggered earlier would complete behind the still-
-  // opaque splash and be invisible to the user.
+  // Phase 1 — await_init: hide the native splash once init has completed and
+  // our root view has laid out. Advance to await_anchor.
   useEffect(() => {
-    if (morphPhase === 'morphing' || morphPhase === 'fading') {
-      setBootSplashHandoff(true);
-    }
-  }, [morphPhase]);
+    if (phase !== 'await_init') return;
+    if (!hasRootLaidOut || !hasBeenInitializing.current || isInitializing) return;
+    initLog('SplashMorph', 'root laid out + init complete — hiding native splash');
+    SplashScreen.hideAsync();
+    setPhase('await_anchor');
+  }, [phase, hasRootLaidOut, isInitializing]);
 
-  // Kick off the morph once init is done + native splash hidden + anchor known.
+  // Phase 2 — await_anchor: wait for the QR button to publish a stable
+  // anchor. We poll `measureInWindow` for `LAYOUT_SETTLE_DELAY` ms because
+  // ancestor layout (safe-area, wallpaper image load) can shift the button's
+  // window position without firing a fresh `onLayout` on the button itself.
+  // If we still have no anchor after `MORPH_FALLBACK_TIMEOUT`, fall back to
+  // a plain fade so we never strand the user on the splash.
   useEffect(() => {
-    if (isInitializing || !hasHiddenSplash || morphPhase !== 'idle') return;
+    if (phase !== 'await_anchor') return;
 
-    if (anchor) {
-      // Layout-settle gate: the QR button's WINDOW position changes
-      // asynchronously as ancestor layout settles (iOS `contentInset
-      // AdjustmentBehavior`, safe-area, wallpaper image load, etc.) — but
-      // its LOCAL layout doesn't, so `onLayout` never fires for those
-      // shifts. We've seen the real position arrive ~1s after the first
-      // anchor publish.
-      //
-      // Strategy: poll `measureInWindow` (via `requestQRButtonRemeasure`)
-      // every `LAYOUT_POLL_INTERVAL` ms. Each poll publishes a fresh
-      // anchor; if it differs, the store notifies, this effect re-runs,
-      // and the settle timer restarts. Once the position has been stable
-      // for `LAYOUT_SETTLE_DELAY` ms, fire the morph.
+    let cancelled = false;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearSettleTimer = () => {
+      if (!settleTimer) return;
+      clearTimeout(settleTimer);
+      settleTimer = null;
+    };
+
+    const startAnchorSettle = (reason: 'initial' | 'polled') => {
+      if (cancelled || settleTimer) return;
       requestQRButtonRemeasure();
+      initLog('SplashMorph', `anchor ${reason} — settling ${LAYOUT_SETTLE_DELAY}ms before morph`);
+
+      settleTimer = setTimeout(() => {
+        if (cancelled) return;
+        const latest = getQRButtonAnchor();
+        if (latest) {
+          initLog(
+            'SplashMorph',
+            `morph start — target=${JSON.stringify(latest)} screen=${SCREEN.width}x${SCREEN.height}`
+          );
+          setAnchor(latest);
+          setPhase('morphing');
+          return;
+        }
+        initLog('SplashMorph', 'anchor disappeared during settle — fading out');
+        setPhase('fading');
+      }, LAYOUT_SETTLE_DELAY);
+    };
+
+    const initialAnchor = getQRButtonAnchor();
+    if (initialAnchor) {
+      setAnchor(initialAnchor);
+      startAnchorSettle('initial');
+    } else {
       initLog(
         'SplashMorph',
-        `morph start — target=${JSON.stringify(anchor)} screen=${SCREEN.width}x${SCREEN.height}`
+        `init done but no anchor yet — waiting up to ${MORPH_FALLBACK_TIMEOUT}ms`
       );
-      const poll = setInterval(requestQRButtonRemeasure, LAYOUT_POLL_INTERVAL);
-      let raf = -1;
-      const settle = setTimeout(() => {
-        clearInterval(poll);
-        requestQRButtonRemeasure();
-        raf = requestAnimationFrame(() => setMorphPhase('morphing'));
-      }, LAYOUT_SETTLE_DELAY);
-      return () => {
-        clearInterval(poll);
-        clearTimeout(settle);
-        if (raf !== -1) cancelAnimationFrame(raf);
-      };
     }
 
-    initLog(
-      'SplashMorph',
-      `init done but no anchor yet — waiting up to ${MORPH_FALLBACK_TIMEOUT}ms`
-    );
+    const poll = setInterval(() => {
+      requestQRButtonRemeasure();
+      if (getQRButtonAnchor()) startAnchorSettle('polled');
+    }, LAYOUT_POLL_INTERVAL);
+
     const fallback = setTimeout(() => {
+      if (cancelled || settleTimer) return;
       const latest = getQRButtonAnchor();
       if (latest) {
         initLog('SplashMorph', `late anchor — morphing to ${JSON.stringify(latest)}`);
+        clearInterval(poll);
+        requestQRButtonRemeasure();
         setAnchor(latest);
-        setMorphPhase('morphing');
+        setPhase('morphing');
       } else {
         initLog('SplashMorph', 'no anchor — fading out');
-        setMorphPhase('fading');
+        clearInterval(poll);
+        setPhase('fading');
       }
     }, MORPH_FALLBACK_TIMEOUT);
-    return () => clearTimeout(fallback);
-  }, [isInitializing, hasHiddenSplash, anchor, morphPhase]);
 
-  // CSS transitions don't fire a callback in Reanimated 4 — time it off the
-  // same duration the transition uses. When the morph ends, reveal the
-  // QRButton (it fades in at the same position).
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+      clearTimeout(fallback);
+      clearSettleTimer();
+    };
+  }, [phase]);
+
+  // Phase 3 — morphing | fading: signal the handoff (so destination screens
+  // can start their own entrance animation), then advance to `done` after
+  // the CSS transition's own duration. Reanimated 4 CSS Transitions don't
+  // fire a completion callback, so we mirror the duration with a setTimeout.
+  // Deps are `phase` only — this timer does NOT restart if `anchor` changes
+  // mid-animation.
   useEffect(() => {
-    if (morphPhase !== 'morphing' && morphPhase !== 'fading') return;
+    if (phase !== 'morphing' && phase !== 'fading') return;
+    setBootSplashHandoff(true);
     const id = setTimeout(() => {
-      // Measure where the splash overlay actually landed, in window coords,
-      // so we can compare against the QR button's measured position.
       const node = splashOverlayRef.current as unknown as {
         measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
       } | null;
@@ -537,21 +561,22 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
         );
       });
       setBootMorphCompleted(true);
-      setMorphPhase('done');
+      setPhase('done');
     }, MORPH_DURATION_MS + 30);
     return () => clearTimeout(id);
-  }, [morphPhase]);
+  }, [phase]);
 
-  // Hold the splash overlay one short beat after the QRButton has faded in,
-  // then unmount it so the real button takes over.
+  // Phase 4 — done: hold one short beat so the real QR button has time to
+  // fade in at the same position, then unmount.
   useEffect(() => {
-    if (morphPhase !== 'done') return;
-    const id = setTimeout(() => setOverlayMounted(false), 200);
+    if (phase !== 'done') return;
+    const id = setTimeout(() => setPhase('unmounted'), 200);
     return () => clearTimeout(id);
-  }, [morphPhase]);
+  }, [phase]);
 
-  const isMorphing = morphPhase === 'morphing' || morphPhase === 'done';
-  const isFading = morphPhase === 'fading' || morphPhase === 'done';
+  const showSplash = phase !== 'unmounted';
+  const isMorphing = phase === 'morphing' || phase === 'done';
+  const isFading = phase === 'fading' || phase === 'done';
 
   // Build the splash container style. Reanimated 4 CSS Transitions tween the
   // listed properties on the UI thread whenever their values change.
@@ -694,11 +719,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
           {/* QR icon. Fades in (delayed) so it's visible by the time the
               swap happens to the real button. */}
           <Animated.View pointerEvents="none" style={qrIconLayerStyle}>
-            <Icon
-              name="stash:qr-code"
-              size={Platform.OS === 'ios' ? 38 : 24}
-              color={surfaceTertiary}
-            />
+            <Icon name="stash:qr-code" size={38} color={surfaceTertiary} />
           </Animated.View>
         </Animated.View>
       ) : null}

@@ -287,7 +287,7 @@ export interface UseSplitBillParticipantPickerResult {
   searchLoading: boolean;
 }
 
-export interface UseSplitBillParticipantPickerOptions {
+interface UseSplitBillParticipantPickerOptions {
   /**
    * When `false`, all expensive subscriptions short-circuit: NDK relay
    * subscriptions never go out, NIP-17 unwrapping is skipped, kind-0

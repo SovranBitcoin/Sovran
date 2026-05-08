@@ -147,7 +147,9 @@
         "skill:prompt-engineering-patterns"
       ],
       "verification_note": "Re-read annotate.ts:26-94 and confirmed that mints:[] takes the trustedMintUrls fallback path and lights up the 'recommended' rule. Counter-argument: maybe the receiver mint accepts arbitrary cashu and the swap-to-preferred-mint isn't free for them either — irrelevant to the cost analysis on the SENDER's side, but noted as 'UNVERIFIED' for the absolute cost claim because we don't have BIP321/NUT-18 protocol guarantees about receiver behaviour. The relative ordering (lightning ≤ cashu-then-melt) holds even if the absolute cost number doesn't.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Fixed by making BIP-321 payment requests without mint hints yield to Lightning options in annotateOptions; added focused annotate coverage and consolidated duplicate QuickSend type exports."
     },
     {
       "id": "F-005",

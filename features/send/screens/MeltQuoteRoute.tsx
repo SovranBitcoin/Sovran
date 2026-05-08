@@ -23,7 +23,7 @@ const ParamsSchema = z.object({
   meltHistoryEntry: z.string().min(1).max(64_000).optional(),
 });
 
-export interface MeltQuoteRouteProps {
+interface MeltQuoteRouteProps {
   /** Log scope for invalid-params telemetry; e.g. `'send-flow.meltQuote'`. */
   where: string;
   /**

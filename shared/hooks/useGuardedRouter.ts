@@ -30,7 +30,7 @@ function shouldSuppress(signature: string): boolean {
   return false;
 }
 
-export interface GuardedRouter {
+interface GuardedRouter {
   push: (typeof router)['push'];
   navigate: (typeof router)['navigate'];
   replace: (typeof router)['replace'];

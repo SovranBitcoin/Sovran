@@ -27,7 +27,7 @@ const ParamsSchema = z.object({
   mintWasOffline: z.string().max(16).optional(),
 });
 
-export interface SendTokenRouteProps {
+interface SendTokenRouteProps {
   /** Log scope for invalid-params telemetry; e.g. `'send-flow.sendToken'`. */
   where: string;
 }

@@ -8,7 +8,7 @@
  * These fields are no longer persisted standalone (audit 14.json F-003) —
  * `sessions[currentSessionId].messages` is the canonical source of truth.
  */
-export interface RestoreActiveSessionViewState<TMessage, TActiveChildren> {
+interface RestoreActiveSessionViewState<TMessage, TActiveChildren> {
   currentSessionId: string | null;
   sessions: readonly {
     id: string;

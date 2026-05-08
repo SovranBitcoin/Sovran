@@ -18,7 +18,7 @@ import * as fs from 'fs';
 import type { MatrixDef, Test } from './ast';
 import type { ExecuteMatrixResult } from './executor';
 
-export interface DeviceInfo {
+interface DeviceInfo {
   /** Free-text device label (e.g. "iphone (iOS 26.1)"). */
   label: string;
 }
@@ -199,8 +199,7 @@ function formatMatrixResultLines(
     // mis-behaving upstream emitting a multi-line string and corrupting
     // the comment block in the source file — which WOULD then break
     // parse on the next run.
-    const errorSuffix =
-      !cell.ok && cell.error ? ` — ${sanitizeStampValue(cell.error)}` : '';
+    const errorSuffix = !cell.ok && cell.error ? ` — ${sanitizeStampValue(cell.error)}` : '';
     return `${indent}#   ${tag} ${labelPadded}${errorSuffix}`;
   });
 
@@ -214,11 +213,7 @@ function formatMatrixResultLines(
  * to be single-line so the rewriter can't poison the .sov file.
  */
 function sanitizeStampValue(raw: string): string {
-  const cleaned = raw
-    .replace(/\r\n?/g, '\n')
-    .replace(/\n+/g, ' ↩ ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const cleaned = raw.replace(/\r\n?/g, '\n').replace(/\n+/g, ' ↩ ').replace(/\s+/g, ' ').trim();
   const max = 140;
   if (cleaned.length <= max) return cleaned;
   return cleaned.slice(0, max - 1) + '…';

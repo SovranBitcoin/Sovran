@@ -138,8 +138,8 @@ export function useMapMarkers({
   );
 
   // Initialize/update cluster manager when points change — DEFERRED.
-  // On category switches, keep old markers visible while rebuilding; only show
-  // the loading overlay on initial load (no markers yet).
+  // On category switches, keep old markers visible while rebuilding; only mark
+  // loading on initial load (no markers yet).
   useEffect(() => {
     if (!isMapReady) return;
 
@@ -156,7 +156,7 @@ export function useMapMarkers({
       setIsClusteringReady(false);
     }
 
-    // Yield to the event loop so the map + loading overlay paint before
+    // Yield to the event loop so the map + loading state paint before
     // Supercluster's synchronous k-d tree build blocks the JS thread.
     const handle = deferWork(
       'map.cluster_build',

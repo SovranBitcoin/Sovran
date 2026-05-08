@@ -1,13 +1,9 @@
 import { Tabs } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { BackgroundProvider } from '@/shared/providers/BackgroundProvider';
-import { DynamicColorIOS, Platform, StyleSheet, View } from 'react-native';
+import { DynamicColorIOS, Platform, View } from 'react-native';
 import type { SFSymbol } from 'expo-symbols';
-import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
-import {
-  GlobalLiquidGlassTabsOverlay,
-  isLiquidGlassTabBarAvailable,
-} from '@/shared/blocks/LiquidGlassTabBar';
+import Icon from 'assets/icons';
+import { SovranTabBar } from '@/shared/blocks/SovranTabBar';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { WhitenoiseSetupBanner } from '@/features/whitenoise/components/WhitenoiseSetupBanner';
 
@@ -20,26 +16,41 @@ type TabName = 'feed' | 'index' | 'contacts' | 'ai';
 type TabDef = {
   name: TabName;
   title: string;
-  /** SF Symbol pair for iOS native tabs. `default` doubles as the icon name on the fallback Tabs path. */
+  /** SF Symbol pair for iOS 26+ liquid-glass NativeTabs. */
   sf: { default: SFSymbol; selected: SFSymbol };
+  /** Monicon (Iconify) pair for the cross-platform JS tab bar. */
+  monicon: { default: string; selected: string };
 };
 
 const TAB_DEFS: readonly TabDef[] = [
-  { name: 'feed', title: 'Feed', sf: { default: 'house', selected: 'house.fill' } },
-  { name: 'index', title: 'Wallet', sf: { default: 'wallet.bifold', selected: 'wallet.bifold' } },
-  { name: 'contacts', title: 'Contacts', sf: { default: 'person.2', selected: 'person.2.fill' } },
-  { name: 'ai', title: 'AI', sf: { default: 'brain', selected: 'brain' } },
+  {
+    name: 'feed',
+    title: 'Feed',
+    sf: { default: 'house', selected: 'house.fill' },
+    monicon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
+  },
+  {
+    name: 'index',
+    title: 'Wallet',
+    sf: { default: 'wallet.bifold', selected: 'wallet.bifold' },
+    monicon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
+  },
+  {
+    name: 'contacts',
+    title: 'Contacts',
+    sf: { default: 'person.2', selected: 'person.2.fill' },
+    monicon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
+  },
+  {
+    name: 'ai',
+    title: 'AI',
+    sf: { default: 'brain', selected: 'brain' },
+    monicon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
+  },
 ];
 
-// Fallback tab bar background for pre-liquid glass devices
-const TabBarBackground = () => (
-  <BlurView tint="dark" intensity={75} style={[StyleSheet.absoluteFill, { borderRadius: 8 }]} />
-);
-
 export default function TabLayout() {
-  const hasAndroidLiquidGlass = Platform.OS === 'android' && isLiquidGlassTabBarAvailable();
-
-  // Use wrapped NativeTabs for iOS liquid-glass devices.
+  // iOS 26+ uses native liquid-glass tabs.
   if (isExpo55NativeTabsSupported()) {
     return (
       <BackgroundProvider>
@@ -73,39 +84,30 @@ export default function TabLayout() {
     );
   }
 
-  // Fallback for pre-iOS 26 and Android
+  // Everything else (pre-iOS-26 + Android) uses the X-style custom JS tab bar.
   return (
     <BackgroundProvider>
       <View style={{ flex: 1 }}>
         <Tabs
-          screenOptions={{
-            headerShown: false,
-            ...(!hasAndroidLiquidGlass && { tabBarBackground: () => <TabBarBackground /> }),
-            tabBarStyle: hasAndroidLiquidGlass
-              ? { display: 'none' }
-              : {
-                  position: 'absolute',
-                  backgroundColor: 'transparent',
-                  borderTopColor: 'transparent',
-                  elevation: 0,
-                },
-            tabBarActiveTintColor: '#fff',
-            tabBarInactiveTintColor: '#ECEDEE',
-          }}>
+          screenOptions={{ headerShown: false }}
+          tabBar={(props) => <SovranTabBar {...props} />}>
           {TAB_DEFS.map((tab) => (
             <Tabs.Screen
               key={tab.name}
               name={tab.name}
               options={{
                 title: tab.title,
-                tabBarIcon: ({ color }) => (
-                  <IconSymbol name={tab.sf.default} color={color} size={24} />
+                tabBarIcon: ({ focused, color }) => (
+                  <Icon
+                    name={focused ? tab.monicon.selected : tab.monicon.default}
+                    color={color}
+                    size={26}
+                  />
                 ),
               }}
             />
           ))}
         </Tabs>
-        {hasAndroidLiquidGlass ? <GlobalLiquidGlassTabsOverlay /> : null}
         <WhitenoiseSetupBanner />
       </View>
     </BackgroundProvider>

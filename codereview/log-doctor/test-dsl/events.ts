@@ -22,7 +22,7 @@
 
 // ─── Base shape ────────────────────────────────────────────────────────────
 
-export interface BaseEvent {
+interface BaseEvent {
   /** Wall-clock timestamp in ms since epoch. Used for duration math. */
   t: number;
 }

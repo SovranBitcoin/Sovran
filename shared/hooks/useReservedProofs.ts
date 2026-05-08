@@ -6,7 +6,7 @@ import { getReservedProofs } from '@/shared/lib/cashu/managerInternals';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { walletLog } from '@/shared/lib/logger';
 
-export interface ReservedProofsResult {
+interface ReservedProofsResult {
   reservedTotal: number;
   reservedProofs: CoreProof[];
 }

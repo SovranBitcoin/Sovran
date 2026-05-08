@@ -77,7 +77,7 @@ function evictIfOverCap(byPubkey: Record<string, NostrProfileMetadata>): void {
 /** Subset of `UserProfile` from `@sovranbitcoin/schemas` we read off
  *  search results. Declared narrowly here to keep the store decoupled
  *  from the API client's full schema. */
-export interface SearchResultLike {
+interface SearchResultLike {
   pubkey: string;
   profile: MetadataPartial;
 }
@@ -127,7 +127,6 @@ export const Kind0MetadataSchema = z.looseObject({
   website: z.string().max(2048).optional(),
   about: z.string().max(4096).optional(),
 });
-export type Kind0Metadata = z.infer<typeof Kind0MetadataSchema>;
 
 const PersistedNostrMetadataEntry = z.looseObject({
   displayName: z.string().max(512).optional(),

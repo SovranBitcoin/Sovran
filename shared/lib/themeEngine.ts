@@ -5,7 +5,7 @@ import {
   isBackgroundImageTheme,
 } from '@/config/backgroundImageThemes';
 
-export type SemanticVars = Record<string, string>;
+type SemanticVars = Record<string, string>;
 
 const SHADE_300_HEX = '#3B82F6';
 

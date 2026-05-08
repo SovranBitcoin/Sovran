@@ -8,33 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { composeFiat, composeSatoshis } from '../offline';
-import type { AmountInputMode } from './types';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface QuickSendSuggestion {
-  /** Display label: "$5" or "1,000 sats" */
-  label: string;
-  /** Raw input value to set on tap */
-  inputValue: string;
-  /** Input mode to switch to on tap */
-  inputMode: AmountInputMode;
-  /** Exact sat amount this resolves to (offline-composable) */
-  satoshis: number;
-  /** When true, this suggestion represents the full wallet balance. */
-  sendAll?: boolean;
-}
-
-export interface QuickSendConfig {
-  /** Fiat amounts to try (default: broad range from $0.10 to $100) */
-  fiatTargets?: number[];
-  /** Sat amounts to try (default: broad range from 21 to 100,000) */
-  satTargets?: number[];
-  /** Max suggestions to pick per category (default: 3) */
-  limit?: number;
-}
+import type { QuickSendConfig, QuickSendSuggestion } from './types';
 
 // ---------------------------------------------------------------------------
 // Defaults

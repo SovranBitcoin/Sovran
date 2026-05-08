@@ -30,7 +30,6 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -277,21 +276,6 @@ export function MapScreen() {
         />
       )}
 
-      {/* Show loading overlay while fetching data (after map is visible) */}
-      {isMapReady && loading && (
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(200)}
-          style={styles.loadingOverlay}>
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
-            <Text size={14} style={{ color: '#fff', marginTop: 12 }}>
-              Loading merchants...
-            </Text>
-          </View>
-        </Animated.View>
-      )}
-
       <StatsCard
         visibleCount={visibleCount}
         totalCount={totalCount}
@@ -345,18 +329,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  loadingCard: {
-    padding: 24,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center',
   },
   floatingButtons: {
     position: 'absolute',

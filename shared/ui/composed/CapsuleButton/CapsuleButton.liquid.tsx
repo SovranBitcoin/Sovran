@@ -9,7 +9,7 @@ import {
 import { buttonStyle, font, foregroundStyle, frame, padding } from '@expo/ui/swift-ui/modifiers';
 
 import { Log } from '@/shared/lib/logger';
-import type { CapsuleButtonProps } from './CapsuleButton';
+import type { CapsuleButtonProps } from './CapsuleButton.fallback';
 
 const DEFAULT_HEIGHT = 48;
 

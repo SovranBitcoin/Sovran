@@ -18,7 +18,7 @@ import * as nodePath from 'path';
 import { type Define, type MatrixDef, type Suite, type Test } from './ast';
 import { parseSuite } from './parser';
 
-export interface DiscoveredTest {
+interface DiscoveredTest {
   /** The Test AST node. */
   test: Test;
   /** The Suite the test came from (used for `run` define resolution). */
@@ -29,7 +29,7 @@ export interface DiscoveredTest {
   displayName: string;
 }
 
-export interface DiscoveredMatrix {
+interface DiscoveredMatrix {
   /** The Matrix AST node. */
   matrix: MatrixDef;
   /** The Suite the matrix came from (used for variant define resolution). */
@@ -40,7 +40,7 @@ export interface DiscoveredMatrix {
   displayName: string;
 }
 
-export interface DiscoveryResult {
+interface DiscoveryResult {
   /**
    * Map keyed by display name (kebab-cased test name, optionally
    * `file::` prefixed). Only holds hand-written `test` blocks —
@@ -191,10 +191,7 @@ function nameToKey(name: string): string {
  * Find a single test by its key. Returns undefined if not found. Used by
  * `phone test <name>` — the caller renders the available list on miss.
  */
-export function findTest(
-  result: DiscoveryResult,
-  name: string
-): DiscoveredTest | undefined {
+export function findTest(result: DiscoveryResult, name: string): DiscoveredTest | undefined {
   return result.tests.get(name) ?? result.tests.get(nameToKey(name));
 }
 
@@ -204,10 +201,7 @@ export function findTest(
  * tries test first then falls back to matrix, which matches the common
  * case of adding a matrix to a file that already has unit tests).
  */
-export function findMatrix(
-  result: DiscoveryResult,
-  name: string
-): DiscoveredMatrix | undefined {
+export function findMatrix(result: DiscoveryResult, name: string): DiscoveredMatrix | undefined {
   return result.matrices.get(name) ?? result.matrices.get(nameToKey(name));
 }
 
@@ -229,9 +223,7 @@ export function formatTestList(result: DiscoveryResult): string {
   }
   for (const [key, m] of result.matrices) {
     const v = m.matrix.verification;
-    const verified = v
-      ? `verified ${v.date}${v.device ? ` — ${v.device}` : ''}`
-      : '(unverified)';
+    const verified = v ? `verified ${v.date}${v.device ? ` — ${v.device}` : ''}` : '(unverified)';
     const file = nodePath.relative(process.cwd(), m.file);
     const cellCount = m.matrix.stages.reduce(
       (n, stage) => n * (stage.variantKind === 'bundleOf' ? 1 : stage.variants.length),

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { InteractionManager, Platform } from 'react-native';
 import type { CameraPosition } from 'expo-maps';
 
-export type MapCamera = { lat: number; lon: number; zoom: number };
+type MapCamera = { lat: number; lon: number; zoom: number };
 
 type MapViewRef = {
   setCameraPosition: (config?: CameraPosition & { duration?: number }) => void;

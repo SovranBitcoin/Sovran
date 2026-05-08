@@ -10,7 +10,7 @@ type EventSignerLike = {
   };
 };
 
-export type WhitenoiseSigner = EventSignerLike & {
+type WhitenoiseSigner = EventSignerLike & {
   /**
    * Zeros the signer's owned copy of the private key and trips a guard so
    * subsequent sign / nip44 calls throw. Defense-in-depth on profile switch

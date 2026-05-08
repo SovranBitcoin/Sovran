@@ -51,7 +51,7 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
  */
 export type DistributionSource = 'copy' | 'share' | 'airdrop' | 'displayed';
 
-export interface DistributionEntry {
+interface DistributionEntry {
   source: DistributionSource;
   recordedAt: number;
 }

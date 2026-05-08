@@ -44,9 +44,23 @@ import {
   formatStrandedRoutingDetail,
   type TransferStep,
   type RebalancePlan,
-  type StepStatus,
   type StepState,
 } from '@/features/mint/components/rebalance';
+import {
+  PENDING_STEP_STATE,
+  applyInsertedChainStates,
+  computeInitialTransferAmount,
+  computeRebalanceStepCounts,
+  countRunnableSteps,
+  createChainSteps,
+  createInitialStepStates,
+  createMiddlemanCandidateRoutes,
+  formatCandidateRoutingDetail,
+  insertStepsAfter,
+  mergeStepState,
+  normalizeRebalanceTransferError,
+  resetFailedStepStates,
+} from '@/features/mint/lib/rebalanceRunState';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -62,6 +76,8 @@ import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),
 });
+
+type RebalanceRunStatus = 'idle' | 'running' | 'finished' | 'cancelled';
 
 export function MintRebalancePlanScreen() {
   useLifecycleLogger('MintRebalancePlanScreen');
@@ -153,7 +169,7 @@ export function MintRebalancePlanScreen() {
   const [runPlan, setRunPlan] = useState<RebalancePlan | null>(null);
   const [stepStates, setStepStates] = useState<Record<string, StepState>>({});
   const stepStatesRef = useRef<Record<string, StepState>>({});
-  const [runStatus, setRunStatus] = useState<'idle' | 'running' | 'finished' | 'cancelled'>('idle');
+  const [runStatus, setRunStatus] = useState<RebalanceRunStatus>('idle');
   const [, setCurrentStepId] = useState<string | null>(null);
 
   const runIdRef = useRef(0);
@@ -186,45 +202,13 @@ export function MintRebalancePlanScreen() {
     return isAlreadyBalanced(plan.currentBalances, plan.targetBalances, minTransferThreshold);
   }, [plan, minTransferThreshold]);
 
-  const stepCounts = useMemo(() => {
-    let completed = 0;
-    let failed = 0;
-    let skipped = 0;
-    let executing = false;
-    for (const step of plan.steps) {
-      const s = stepStates[step.id]?.status;
-      if (s === 'done') completed++;
-      else if (s === 'failed') failed++;
-      else if (s === 'skipped') skipped++;
-      else if (
-        s === 'creatingInvoice' ||
-        s === 'invoiceReady' ||
-        s === 'melting' ||
-        s === 'verifying' ||
-        s === 'routing'
-      )
-        executing = true;
-    }
-    const terminal = completed + failed + skipped;
-    return {
-      completed,
-      failed,
-      skipped,
-      executing,
-      allComplete: runPlan ? terminal === plan.steps.length : false,
-      progressPct:
-        !runPlan || plan.steps.length === 0
-          ? 0
-          : Math.max(0, Math.min(1, terminal / plan.steps.length)),
-      hasFailedStep: failed > 0,
-    };
-  }, [plan.steps, stepStates, runPlan]);
+  const stepCounts = useMemo(
+    () => computeRebalanceStepCounts(plan.steps, stepStates, !!runPlan),
+    [plan.steps, stepStates, runPlan]
+  );
 
   const updateStepState = useCallback((stepId: string, update: Partial<StepState>) => {
-    setStepStates((prev) => ({
-      ...prev,
-      [stepId]: { ...prev[stepId], ...update },
-    }));
+    setStepStates((prev) => mergeStepState(prev, stepId, update));
   }, []);
 
   const fetchAudit = useCallback(async (mintUrl: string): Promise<AuditMintResponse | null> => {
@@ -460,16 +444,21 @@ export function MintRebalancePlanScreen() {
           // Fallback to static headroom if proof query fails
         }
 
-        // ── Early skip: source balance too low ──
-        // This commonly happens when a prior step's middleman routing already
-        // swept the funds from this mint to the destination.  Rather than
-        // reporting an error, we skip the step gracefully.
-        if (sourceBalance < minTransferThreshold + feeHeadroom) {
+        const initialAmountDecision = computeInitialTransferAmount({
+          requestedAmount: originalAmount,
+          sourceBalance,
+          minTransferThreshold,
+          feeHeadroom,
+        });
+
+        if (initialAmountDecision.status === 'skip') {
+          // This commonly happens when a prior step's middleman routing already
+          // swept the funds from this mint to the destination.
           appendDebug({
             event: 'step_skipped_low_balance',
             stepId: id,
             sourceBalance,
-            minRequired: minTransferThreshold + feeHeadroom,
+            minRequired: initialAmountDecision.minRequired,
           });
           updateStepState(id, { status: 'skipped' });
           useSwapStatusStore.getState().setLegSkipped(id);
@@ -480,32 +469,20 @@ export function MintRebalancePlanScreen() {
         updateStepState(id, { status: 'creatingInvoice', errorMessage: undefined });
         setLegLocalStatus('creatingInvoice');
 
-        let transferAmount = originalAmount;
+        let transferAmount = initialAmountDecision.amount;
         let finalAutoRouteStepId: string | null = null;
         let invoice: string;
         let preparedMeltOp: { id: string } | null = null;
 
-        // ── Fee headroom ──
-        // prepareMeltBolt11 internally selects proofs for (invoiceAmount + fee_reserve).
-        // If the planned transfer is close to the full balance, that sum exceeds what's
-        // available and throws "Not enough proofs to send" before we can adjust.
-        // Pre-cap the amount to leave room for fees (fee_reserve + input fees).
-        if (transferAmount + feeHeadroom > sourceBalance) {
-          const capped = sourceBalance - feeHeadroom;
-          if (capped < minTransferThreshold) {
-            throw new Error(
-              `Insufficient balance after fee headroom: ${sourceBalance} sats, need at least ${minTransferThreshold + feeHeadroom}`
-            );
-          }
+        if (initialAmountDecision.status === 'capped') {
           appendDebug({
             event: 'amount_capped',
             stepId: id,
-            original: transferAmount,
-            capped,
+            original: originalAmount,
+            capped: transferAmount,
             sourceBalance,
             feeHeadroom,
           });
-          transferAmount = capped;
         }
 
         // Helper: create invoice + tag the leg. When called with a previous
@@ -778,18 +755,7 @@ export function MintRebalancePlanScreen() {
           // 2. If BFS finds nothing, fall back to local history candidates: mints we know
           //    have successfully swapped TO the destination. We "just try" each one —
           //    if a hop fails, we move to the next candidate.
-          type CandidateRoute = { path: string[]; pathNames: string[]; source: string };
-          const candidateRoutes: CandidateRoute[] = [];
-
           const suggestion = await computeRouteSuggestion(fromMintUrl, toMintUrl);
-
-          if (suggestion?.path && suggestion.path.length >= 3) {
-            candidateRoutes.push({
-              path: suggestion.path,
-              pathNames: suggestion.pathNames ?? suggestion.path.map(extractDomain),
-              source: 'graph',
-            });
-          }
 
           // Even if BFS found a path, also add local history candidates as fallbacks
           // (in case the BFS-scored path fails at runtime)
@@ -799,24 +765,13 @@ export function MintRebalancePlanScreen() {
             toMintUrl,
             fromMintUrl
           );
-
-          for (const candidateUrl of localFallbacks) {
-            // Skip if this candidate is already part of the BFS path
-            const alreadyInBfs = candidateRoutes.some(
-              (r) => r.source === 'graph' && r.path.includes(candidateUrl)
-            );
-            if (alreadyInBfs) continue;
-
-            candidateRoutes.push({
-              path: [fromMintUrl, candidateUrl, toMintUrl],
-              pathNames: [
-                mintInfoMap[fromMintUrl]?.name || extractDomain(fromMintUrl),
-                mintInfoMap[candidateUrl]?.name || extractDomain(candidateUrl),
-                mintInfoMap[toMintUrl]?.name || extractDomain(toMintUrl),
-              ],
-              source: 'local_history',
-            });
-          }
+          const candidateRoutes = createMiddlemanCandidateRoutes({
+            fromMintUrl,
+            toMintUrl,
+            suggestion,
+            localFallbackMintUrls: localFallbacks,
+            getMintName: (mintUrl) => mintInfoMap[mintUrl]?.name || extractDomain(mintUrl),
+          });
 
           appendDebug({
             event: 'routing_candidates',
@@ -855,10 +810,11 @@ export function MintRebalancePlanScreen() {
 
             updateStepState(id, {
               routeSuggestion: { status: 'found', path: chainPath, pathNames: chainPathNames },
-              routingDetail:
-                candidateRoutes.length > 1
-                  ? `Trying route ${candidateIdx + 1}/${candidateRoutes.length}: via ${chainPathNames.slice(1, -1).join(' → ')}…`
-                  : `Routing via ${chainPathNames.slice(1, -1).join(' → ')}…`,
+              routingDetail: formatCandidateRoutingDetail({
+                routeIndex: candidateIdx,
+                routeCount: candidateRoutes.length,
+                pathNames: chainPathNames,
+              }),
             });
 
             // Trust intermediary mints temporarily
@@ -879,45 +835,26 @@ export function MintRebalancePlanScreen() {
 
             // Insert one visible row per hop immediately (swap-like grouped chain UX)
             const chainId = mintLocalId('chain');
-            const autoRouteSteps: TransferStep[] = [];
-            for (let i = 0; i < chainPath.length - 1; i++) {
-              autoRouteSteps.push({
-                ...step,
-                id: mintLocalId(`auto-route-${id}-${candidateIdx}-${i}`),
-                fromMintUrl: chainPath[i],
-                toMintUrl: chainPath[i + 1],
-                chainId,
-                chainPath,
-                chainHopIndex: i,
-              });
-            }
+            const autoRouteSteps = createChainSteps({
+              baseStep: step,
+              chainPath,
+              chainId,
+              idPrefix: `auto-route-${id}-${candidateIdx}`,
+              makeId: mintLocalId,
+            });
 
             setRunPlan((prev) => {
               if (!prev) return prev;
-              const idx = prev.steps.findIndex((s) => s.id === id);
-              if (idx === -1) return prev;
-              return {
-                ...prev,
-                steps: [
-                  ...prev.steps.slice(0, idx + 1),
-                  ...autoRouteSteps,
-                  ...prev.steps.slice(idx + 1),
-                ],
-              };
+              return { ...prev, steps: insertStepsAfter(prev.steps, id, autoRouteSteps) };
             });
 
-            const nextStates = { ...stepStatesRef.current };
-            nextStates[id] = {
-              ...nextStates[id],
-              status: 'skipped',
-              routingDetail:
-                candidateRoutes.length > 1
-                  ? `Trying route ${candidateIdx + 1}/${candidateRoutes.length}: via ${chainPathNames.slice(1, -1).join(' → ')}…`
-                  : `Routing via ${chainPathNames.slice(1, -1).join(' → ')}…`,
-            };
-            for (const hopStep of autoRouteSteps) {
-              nextStates[hopStep.id] = { status: 'pending' };
-            }
+            const nextStates = applyInsertedChainStates(stepStatesRef.current, id, autoRouteSteps, {
+              routingDetail: formatCandidateRoutingDetail({
+                routeIndex: candidateIdx,
+                routeCount: candidateRoutes.length,
+                pathNames: chainPathNames,
+              }),
+            });
             stepStatesRef.current = nextStates;
             setStepStates(nextStates);
 
@@ -1282,24 +1219,7 @@ export function MintRebalancePlanScreen() {
           errorObject: String(error),
         });
 
-        let errorMessage = error instanceof Error ? error.message : 'Transfer failed';
-
-        // Parse and improve error messages for common Lightning/mint errors
-        if (errorMessage.includes('lnd is not ready') || errorMessage.includes('not ready for')) {
-          errorMessage =
-            'Mint Lightning node is not ready. The mint may be starting up or syncing. Try again in a few minutes.';
-        } else if (
-          errorMessage.toLowerCase().includes('no_route') ||
-          errorMessage.toLowerCase().includes('ran out of routes')
-        ) {
-          errorMessage = 'No Lightning route found. No middleman route available either.';
-        } else if (errorMessage.includes('FAILURE_REASON_TIMEOUT')) {
-          errorMessage = 'Lightning payment timed out. The mint may be slow to respond.';
-        } else if (errorMessage.includes('invoice expired') || errorMessage.includes('EXPIRED')) {
-          errorMessage = 'Invoice expired before payment could complete. Please retry.';
-        } else if (errorMessage.includes('insufficient')) {
-          errorMessage = 'Insufficient balance or liquidity for this transfer.';
-        }
+        const errorMessage = normalizeRebalanceTransferError(error);
 
         updateStepState(id, {
           status: 'failed',
@@ -1335,10 +1255,7 @@ export function MintRebalancePlanScreen() {
       // cost end to end. Per-step timing comes from the appendDebug
       // step_start/step_end pairs already in `executeStep`.
       const batchT0 = performance.now();
-      const stepsToRun = steps.filter((s) => {
-        const cur = stepStatesRef.current[s.id]?.status;
-        return cur !== 'done' && cur !== 'skipped';
-      }).length;
+      const stepsToRun = countRunnableSteps(steps, stepStatesRef.current);
       cashuLog.info('swap.batch.start', {
         legCount: stepsToRun,
         totalSteps: steps.length,
@@ -1435,10 +1352,7 @@ export function MintRebalancePlanScreen() {
       .startGroup({ unit, title: 'Swap' });
 
     // Initialize states for frozen steps
-    const initial: Record<string, StepState> = {};
-    for (const step of snapshot.steps) {
-      initial[step.id] = { status: 'pending' };
-    }
+    const initial = createInitialStepStates(snapshot.steps);
     setStepStates(initial);
     setRunStatus('running');
     setCurrentStepId(null);
@@ -1516,20 +1430,7 @@ export function MintRebalancePlanScreen() {
     setRunStatus('running');
 
     // Reset only failed steps to pending
-    setStepStates((prev) => {
-      const next = { ...prev };
-      for (const step of runPlan.steps) {
-        if (next[step.id]?.status === 'failed') {
-          next[step.id] = {
-            ...next[step.id],
-            status: 'pending',
-            errorMessage: undefined,
-            routeSuggestion: undefined,
-          };
-        }
-      }
-      return next;
-    });
+    setStepStates((prev) => resetFailedStepStates(prev, runPlan.steps));
 
     await runStepsSequentially(runPlan.steps, runId);
   }, [runPlan, runStatus, runStepsSequentially]);
@@ -1571,27 +1472,15 @@ export function MintRebalancePlanScreen() {
       const afterId = step.id;
       const chainId = mintLocalId('chain');
 
-      // Create one TransferStep per hop in the path
-      const rerouteSteps: TransferStep[] = [];
-      for (let i = 0; i < chainPath.length - 1; i++) {
-        rerouteSteps.push({
-          ...step,
-          id: mintLocalId(`reroute-${afterId}-${i}`),
-          fromMintUrl: chainPath[i],
-          toMintUrl: chainPath[i + 1],
-          chainId,
-          chainPath,
-          chainHopIndex: i,
-        });
-      }
+      const rerouteSteps = createChainSteps({
+        baseStep: step,
+        chainPath,
+        chainId,
+        idPrefix: `reroute-${afterId}`,
+        makeId: mintLocalId,
+      });
 
-      const insertAfter = (arr: TransferStep[], id: string, toInsert: TransferStep[]) => {
-        const idx = arr.findIndex((s) => s.id === id);
-        if (idx === -1) return arr;
-        return [...arr.slice(0, idx + 1), ...toInsert, ...arr.slice(idx + 1)];
-      };
-
-      const nextSteps = insertAfter(runPlan.steps, afterId, rerouteSteps);
+      const nextSteps = insertStepsAfter(runPlan.steps, afterId, rerouteSteps);
       setRunPlan((prev) => (prev ? { ...prev, steps: nextSteps } : prev));
 
       /**
@@ -1600,11 +1489,7 @@ export function MintRebalancePlanScreen() {
        *
        * Important: update `stepStatesRef` immediately so the runner (which reads the ref) sees the new steps.
        */
-      const nextStates = { ...stepStatesRef.current };
-      nextStates[afterId] = { ...nextStates[afterId], status: 'skipped' };
-      for (const rs of rerouteSteps) {
-        nextStates[rs.id] = { status: 'pending' };
-      }
+      const nextStates = applyInsertedChainStates(stepStatesRef.current, afterId, rerouteSteps);
       stepStatesRef.current = nextStates;
       setStepStates(nextStates);
 
@@ -1862,8 +1747,8 @@ export function MintRebalancePlanScreen() {
 
               const step = group.steps[0];
               const state = runPlan
-                ? stepStates[step.id] || { status: 'pending' }
-                : { status: 'pending' as StepStatus };
+                ? stepStates[step.id] || PENDING_STEP_STATE
+                : PENDING_STEP_STATE;
               return (
                 <RebalanceStepRow
                   key={step.id}

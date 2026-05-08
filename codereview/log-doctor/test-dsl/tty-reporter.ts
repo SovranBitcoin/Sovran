@@ -162,7 +162,7 @@ interface ReporterState {
 
 // ─── Public API ────────────────────────────────────────────────────────────
 
-export interface TtyReporterOptions {
+interface TtyReporterOptions {
   stream?: NodeJS.WriteStream;
   /** Sidecar log path for the full transcript. */
   sidecarLogPath?: string;
@@ -361,7 +361,11 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
     // separator here — the live header below will draw its own
     // dividing rule as the join between scrollback and live.
     const kindTag =
-      event.kind === 'matrix' ? c.magenta('[matrix]') : event.kind === 'all' ? c.cyan('[all]') : c.cyan('[test]');
+      event.kind === 'matrix'
+        ? c.magenta('[matrix]')
+        : event.kind === 'all'
+          ? c.cyan('[all]')
+          : c.cyan('[test]');
     const unitSuffix = event.totalUnits
       ? c.dim(`  (${event.totalUnits} unit${event.totalUnits === 1 ? '' : 's'})`)
       : '';
@@ -533,9 +537,7 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
     if (event.ok) {
       commit([`  ${c.green('✓')} cell ${event.cellIndex} passed  ${c.dim(dur)}`]);
     } else {
-      const errSuffix = event.error
-        ? `\n    ${c.red('╰ ' + truncatePlain(event.error, 140))}`
-        : '';
+      const errSuffix = event.error ? `\n    ${c.red('╰ ' + truncatePlain(event.error, 140))}` : '';
       commit([`  ${c.red('✗')} cell ${event.cellIndex} failed  ${c.dim(dur)}${errSuffix}`]);
     }
   }
@@ -624,8 +626,7 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
 
     let etaStr = '';
     if (total > 0 && done > 0 && done < total && state.recentDurations.length > 0) {
-      const avg =
-        state.recentDurations.reduce((s, v) => s + v, 0) / state.recentDurations.length;
+      const avg = state.recentDurations.reduce((s, v) => s + v, 0) / state.recentDurations.length;
       const remainingMs = (total - done) * avg;
       const prefix = state.recentDurations.length < 3 ? '~' : '';
       etaStr = `  ETA ${prefix}${formatDuration(remainingMs)}`;
@@ -642,7 +643,8 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
     const statsLine = `${c.green(`✓ ${state.passed}`)}  ${
       state.failed > 0 ? c.red(`✗ ${state.failed}`) : c.dim(`✗ ${state.failed}`)
     }  ${c.dim(`⏱ ${elapsed}`)}`;
-    const stepLine = `step ${state.completedSteps}` +
+    const stepLine =
+      `step ${state.completedSteps}` +
       (state.unitSteps > 0 ? c.dim(` (${state.unitSteps} in current)`) : '');
 
     return [
@@ -704,9 +706,7 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
     if (input.durationMs !== undefined) {
       const ms = input.durationMs;
       const formatted = ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
-      dur = ms >= 2000
-        ? `  ${c.yellow(formatted)}`
-        : `  ${c.dim(formatted)}`;
+      dur = ms >= 2000 ? `  ${c.yellow(formatted)}` : `  ${c.dim(formatted)}`;
     }
 
     return `${indent}${glyph} ${idx} ${verb}${tail}${dur}`;
@@ -837,9 +837,9 @@ export function createTtyReporter(opts: TtyReporterOptions = {}): TtyReporter {
 export function isInteractiveTty(stream: NodeJS.WriteStream = process.stdout): boolean {
   return Boolean(
     stream.isTTY &&
-      stream.columns &&
-      stream.columns > 40 &&
-      typeof stream.moveCursor === 'function' &&
-      typeof stream.clearScreenDown === 'function'
+    stream.columns &&
+    stream.columns > 40 &&
+    typeof stream.moveCursor === 'function' &&
+    typeof stream.clearScreenDown === 'function'
   );
 }

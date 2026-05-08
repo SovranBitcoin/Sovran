@@ -8,19 +8,19 @@
  * outcome; the live hook just discards the value.
  */
 
-export interface ReconcilerStore {
+interface ReconcilerStore {
   quoteIdToSplitBill: Record<string, { groupId: string; participantId: string }>;
   markPaymentPaidByQuoteId: (quoteId: string) => void;
   markPaymentExpiredByQuoteId: (quoteId: string) => void;
 }
 
-export interface ReconcilerEntry {
+interface ReconcilerEntry {
   type: string;
   quoteId?: string;
   state?: string;
 }
 
-export type ReconcilerOutcome = 'paid' | 'expired' | 'ignored';
+type ReconcilerOutcome = 'paid' | 'expired' | 'ignored';
 
 export function reconcileSplitBillHistoryUpdate(
   entry: ReconcilerEntry,

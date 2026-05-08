@@ -6,7 +6,7 @@ import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchem
 
 const DEFAULT_VERSION = 1;
 
-export interface PersistConfigOptions<TFull, TPartial> {
+interface PersistConfigOptions<TFull, TPartial> {
   /** Kebab-case AsyncStorage key (e.g. `'theme-store'`). */
   name: string;
   /** Backing storage adapter — typically `AsyncStorage`, `profileStorage`, or `createProfileScopedStorage()`. */

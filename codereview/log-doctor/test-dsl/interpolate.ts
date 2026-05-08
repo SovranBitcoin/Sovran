@@ -18,7 +18,7 @@ const VAR_REFERENCE_RE = /\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
  * an entire AST argument structure (e.g. an `assert-eq` object form
  * with `a` / `b` keys) without the caller having to know the shape.
  */
-export function interpolate(value: unknown, vars: Record<string, string>): unknown {
+function interpolate(value: unknown, vars: Record<string, string>): unknown {
   if (typeof value === 'string') {
     return value.replace(VAR_REFERENCE_RE, (_match, name) => {
       if (!(name in vars)) {

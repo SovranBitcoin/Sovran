@@ -50,15 +50,6 @@ export type Selector =
 // ─── Modifiers (shared across taps/waits/asserts) ───────────────────────────
 
 /**
- * Optional `within Ns` clause appended to a wait/assert. Stored as
- * milliseconds for the executor; defaults to the runner's standard
- * step timeout if absent.
- */
-export interface WithinModifier {
-  withinMs: number;
-}
-
-/**
  * Optional `when visible` clause on a `tap`, which makes the tap poll for
  * the target before acting (rather than failing immediately if missing).
  */
@@ -434,9 +425,7 @@ interface WalletStep_ {
 }
 
 /** A single positional arg in a wallet command. */
-export type WalletArg =
-  | { kind: 'literal'; value: string }
-  | { kind: 'var'; name: string };
+export type WalletArg = { kind: 'literal'; value: string } | { kind: 'var'; name: string };
 
 // ─── Verified comment ──────────────────────────────────────────────────────
 

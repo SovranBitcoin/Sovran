@@ -165,7 +165,7 @@ function extractCandidates(res: any): (string | undefined)[] {
 // useExtractedColors
 // ---------------------------------------------------------------------------
 
-export interface ExtractedColors {
+interface ExtractedColors {
   baseColor: string;
   gradientColors: readonly [string, string];
   borderColor: string;
@@ -248,7 +248,7 @@ export function useExtractedColors(
 // useDominantColor
 // ---------------------------------------------------------------------------
 
-export interface DominantColorResult {
+interface DominantColorResult {
   baseColors: string[];
   baseColor: string;
   hasLoaded: boolean;

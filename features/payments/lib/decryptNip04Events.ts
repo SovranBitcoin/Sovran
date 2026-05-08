@@ -7,7 +7,7 @@ import {
   putNip04Plaintext,
 } from '@/shared/lib/nostr/nip04Cache';
 
-export interface DecryptNip04EventsOptions {
+interface DecryptNip04EventsOptions {
   privateKey: Uint8Array;
   /** Active profile pubkey — scopes the persistent plaintext cache. */
   recipientPubkey: string;

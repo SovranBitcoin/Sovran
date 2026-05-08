@@ -24,7 +24,7 @@ const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),
 });
 
-export interface MintQuoteRouteProps {
+interface MintQuoteRouteProps {
   /** Log scope for invalid-params telemetry; e.g. `'receive-flow.mintQuote'`. */
   where: string;
   /**

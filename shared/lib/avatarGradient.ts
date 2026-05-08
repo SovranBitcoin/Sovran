@@ -1,6 +1,6 @@
 type GradientPoint = { x: number; y: number };
 
-export type SeededGradientTheme = {
+type SeededGradientTheme = {
   primaryColors: readonly [string, string, string];
   overlayColors: readonly [string, string, string];
   primaryStart: GradientPoint;

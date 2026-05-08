@@ -1,28 +1,17 @@
 /**
  * Native tab bar and header components for Expo Router.
- * Uses expo-router/unstable-native-tabs and liquid glass on supported devices.
+ * Uses expo-router/unstable-native-tabs and liquid glass on supported iOS devices.
  */
 
-import React, { useEffect, useState } from 'react';
-import {
-  InteractionManager,
-  Platform,
-  StyleProp,
-  Text,
-  UIManager,
-  View,
-  ViewStyle,
-  StyleSheet,
-} from 'react-native';
+import React from 'react';
+import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { LiquidButtonView } from 'expo-liquid-glass-native';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
-import { LIQUID_GLASS_ENABLED, supportsLiquidGlass } from '@/shared/lib/version';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { supportsLiquidGlass } from '@/shared/lib/version';
 
 type HeaderIconName = string;
 
@@ -32,32 +21,7 @@ const ANDROID_HEADER_ICON_MAP: Partial<Record<HeaderIconName, string>> = {
   xmark: 'material-symbols:close-rounded',
 };
 
-export const hasAndroidLiquidButtonView = () => {
-  if (!LIQUID_GLASS_ENABLED) return false;
-  const config = UIManager?.getViewManagerConfig?.('LiquidButtonView');
-  const hasConfig = (UIManager as any)?.hasViewManagerConfig?.('LiquidButtonView');
-  return Boolean(config || hasConfig);
-};
-
-export const isAndroidLiquidHeaderSupported = () =>
-  Platform.OS === 'android' && hasAndroidLiquidButtonView();
-
-function useDeferredLiquidMount() {
-  const [canMountLiquid, setCanMountLiquid] = useState(false);
-
-  useEffect(() => {
-    // ComposeView can crash if measured before being attached to a window.
-    // Wait until navigation interactions complete, then mount on the next frame.
-    const interaction = InteractionManager.runAfterInteractions(() => {
-      requestAnimationFrame(() => {
-        setCanMountLiquid(true);
-      });
-    });
-    return () => interaction.cancel();
-  }, []);
-
-  return canMountLiquid;
-}
+export const isAndroidLiquidHeaderSupported = () => false;
 
 type HeaderIconButtonProps = {
   icon: HeaderIconName;
@@ -104,189 +68,6 @@ function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButto
   );
 }
 
-type AndroidLiquidHeaderButtonProps = {
-  icon: HeaderIconName;
-  color: string;
-  onPress: () => void;
-  size?: number;
-};
-
-function AndroidLiquidHeaderButton({
-  icon,
-  color,
-  onPress,
-  size = 22,
-}: AndroidLiquidHeaderButtonProps) {
-  const canMountLiquid = useDeferredLiquidMount();
-
-  const androidIconName = ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu';
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={HEADER_BUTTON_HIT_SLOP}
-      style={{
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        overflow: 'hidden',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      <View
-        style={{
-          ...StyleSheet.absoluteFillObject,
-          overflow: 'hidden',
-          borderRadius: 22,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        {canMountLiquid ? (
-          <LiquidButtonView
-            tint="transparent"
-            blurRadius={2}
-            lensX={12}
-            lensY={24}
-            style={StyleSheet.absoluteFillObject}
-          />
-        ) : (
-          <View
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              backgroundColor: 'rgba(255,255,255,0.12)',
-            }}
-          />
-        )}
-      </View>
-      <View pointerEvents="none" style={{ elevation: 1 }}>
-        <Icon name={androidIconName} size={size} color={color} />
-      </View>
-    </Pressable>
-  );
-}
-
-type AndroidLiquidHeaderTitleButtonProps = {
-  width: number;
-  lineOneText: string;
-  lineTwoText: string;
-  avatarName?: string;
-  avatarPicture?: string;
-  onPress?: () => void;
-};
-
-export function AndroidLiquidHeaderTitleButton({
-  width,
-  lineOneText,
-  lineTwoText,
-  avatarName,
-  avatarPicture,
-  onPress,
-}: AndroidLiquidHeaderTitleButtonProps) {
-  const canMountLiquid = useDeferredLiquidMount();
-  const buttonWidth = Math.max(120, width);
-  const buttonHeight = 44;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        width: buttonWidth,
-        height: buttonHeight,
-        borderRadius: buttonHeight / 2,
-        overflow: 'hidden',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      {canMountLiquid ? (
-        <LiquidButtonView
-          tint="transparent"
-          useRealtimeCapture
-          // lensX/lensY control lens radius, not X/Y displacement.
-          blurRadius={2}
-          lensX={12}
-          lensY={24}
-          style={{ width: buttonWidth, height: buttonHeight }}
-        />
-      ) : (
-        <View
-          style={{
-            width: buttonWidth,
-            height: buttonHeight,
-            backgroundColor: 'rgba(255,255,255,0.12)',
-          }}
-        />
-      )}
-      <View pointerEvents="none" style={[styles.titleContent, { elevation: 1 }]}>
-        <View style={styles.titleRow}>
-          <View style={styles.titleAvatarWrap}>
-            <Avatar
-              state={avatarPicture ? 'image' : 'fallback'}
-              size={20}
-              name={avatarName}
-              picture={avatarPicture}
-            />
-          </View>
-          <View style={styles.titleTextGroup}>
-            <Text numberOfLines={1} style={styles.titleTextPrimary}>
-              {lineOneText}
-            </Text>
-            <Text numberOfLines={1} style={styles.titleTextSecondary}>
-              {lineTwoText}
-            </Text>
-          </View>
-          <View style={styles.titleChevronWrap}>
-            <Icon name="fluent:chevron-down-12-filled" size={12} color="#FFFFFF" />
-          </View>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-type AndroidLiquidHeaderOverlayProps = {
-  topInset: number;
-  iconColor: string;
-  leftIcon: HeaderIconName;
-  onLeftPress: () => void;
-  rightIcon: HeaderIconName;
-  onRightPress: () => void;
-  center?: React.ReactNode;
-  centerWidth?: number;
-};
-
-export function AndroidLiquidHeaderOverlay({
-  topInset,
-  iconColor,
-  leftIcon,
-  onLeftPress,
-  rightIcon,
-  onRightPress,
-  center,
-  centerWidth,
-}: AndroidLiquidHeaderOverlayProps) {
-  if (!isAndroidLiquidHeaderSupported()) return null;
-
-  return (
-    <View pointerEvents="box-none" style={[styles.overlay, { top: topInset + 8 }]}>
-      <View style={styles.overlayRow}>
-        <AndroidLiquidHeaderButton
-          icon={leftIcon}
-          color={iconColor}
-          onPress={onLeftPress}
-          size={24}
-        />
-        <View style={[styles.overlayCenter, centerWidth ? { width: centerWidth } : null]}>
-          {center}
-        </View>
-        <AndroidLiquidHeaderButton
-          icon={rightIcon}
-          color={iconColor}
-          onPress={onRightPress}
-          size={20}
-        />
-      </View>
-    </View>
-  );
-}
-
 type ExpoRouterHeaderScreenProps = {
   name: string;
   options?: NativeStackNavigationOptions;
@@ -303,7 +84,7 @@ type ExpoRouterHeaderScreenProps = {
   headerRightStyle?: StyleProp<ViewStyle>;
 };
 
-export type ExpoRouterHeaderOptionsInput = Omit<ExpoRouterHeaderScreenProps, 'name'>;
+type ExpoRouterHeaderOptionsInput = Omit<ExpoRouterHeaderScreenProps, 'name'>;
 
 /**
  * Build Stack.Screen options with Android-safe headerLeft/headerRight behavior.
@@ -330,6 +111,7 @@ export function buildExpoRouterHeaderOptions({
 
   if (Platform.OS === 'android') {
     nextOptions.headerShadowVisible = nextOptions.headerShadowVisible ?? false;
+    nextOptions.headerTitleAlign = nextOptions.headerTitleAlign ?? 'center';
     nextOptions.headerStyle = {
       ...(nextOptions.headerStyle || {}),
       backgroundColor: 'transparent',
@@ -390,61 +172,4 @@ function Expo55NativeTabsRoot(props: Expo55NativeTabsProps) {
 
 export const Expo55NativeTabs = Object.assign(Expo55NativeTabsRoot, {
   Trigger: NativeTabs.Trigger,
-});
-
-const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 2000,
-  },
-  overlayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  overlayCenter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleContent: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    paddingHorizontal: 10,
-    justifyContent: 'center',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  titleAvatarWrap: {
-    marginLeft: 8,
-  },
-  titleTextGroup: {
-    flex: 1,
-    justifyContent: 'center',
-    marginHorizontal: 6,
-  },
-  titleChevronWrap: {
-    marginRight: 8,
-  },
-  titleTextPrimary: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 14,
-  },
-  titleTextSecondary: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    opacity: 0.9,
-    fontWeight: '600',
-    lineHeight: 13,
-  },
 });

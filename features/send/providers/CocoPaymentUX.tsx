@@ -18,23 +18,11 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 
 import { useManager } from '@cashu/coco-react';
 
-import type {
-  MachineOperations,
-  MeltOperationLike,
-  MintReviewInfo,
-  NavigationCallbacks,
-  ScreenType,
-} from 'coco-payment-ux';
-import {
-  createCocoPaymentUX,
-  meltOperationToScreenActionEntry,
-  shouldApplyEntryUpdate as defaultShouldApply,
-  mergeEntryUpdate as defaultMerge,
-} from 'coco-payment-ux';
+import type { MachineOperations, NavigationCallbacks } from 'coco-payment-ux';
+import { createCocoPaymentUX } from 'coco-payment-ux';
 import {
   CocoPaymentUXProvider as PaymentUXProviderBase,
   type DeepLinkConfig,
-  type ScreenActionsBridge,
 } from 'coco-payment-ux/react';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
@@ -48,95 +36,23 @@ import {
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
+import {
+  createSovranScreenActionsBridge,
+  getSovranMintEnrichment,
+} from '@/features/send/lib/createSovranScreenActionsBridge';
 import { createNfcAdapter } from '@/shared/lib/nfc';
 import { deeplinkFailedPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
-import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
-import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
-import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
-import { normalizeMintUrlKey } from '@/shared/lib/url';
 
 export { usePaymentFlowMachine, useCocoPaymentUXContext } from 'coco-payment-ux/react';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
-
-// Screens whose entry corresponds to a coco history-entry type. Used to
-// narrow the `history:updated` subscription so a mint-quote screen doesn't
-// recompute on every melt/send/receive mutation. Screens absent from this
-// map (mintSelector, mintInfo, amountEntry) carry non-history entries and
-// don't subscribe at all.
-const HISTORY_TYPE_BY_SCREEN: Partial<Record<ScreenType, string>> = {
-  meltQuote: 'melt',
-  mintQuote: 'mint',
-  paymentRequest: 'send',
-  receive: 'receive',
-  receiveToken: 'receive',
-  sendToken: 'send',
-};
-
-type EntryRecord = Record<string, unknown>;
-
-/**
- * Per-mint enrichment for the trust-review screen — reads detailed audit
- * data (swap-by-swap timing, error breakdown) from the local stores that
- * `useAuditedMint` / `MintReviewsScreen` populate when the user navigates
- * into a mint's detail view. The Select-Mint list path goes through
- * `getMintCatalog` instead and never calls this.
- */
-function getMintEnrichment(mintUrl: string): Partial<MintReviewInfo> {
-  const normalized = normalizeMintUrlKey(mintUrl);
-  const audit = useAuditMintStore.getState().getCached(normalized);
-  const kym = useKYMMintStore.getState().getCached(normalized);
-
-  const enrichment: Partial<MintReviewInfo> = {};
-  if (kym) {
-    enrichment.kymScore = kym.score;
-    enrichment.reviewCount = kym.recommendations?.length;
-  }
-  const profile = useMintProfileStore.getState().getCached(normalized);
-  if (profile) {
-    enrichment.contactFollowers = profile.followers;
-    enrichment.contactReputation = Math.round(profile.reputation);
-  }
-  if (audit) {
-    const swaps = audit.auditData.swaps ?? [];
-    const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
-    const swapTotal = swaps.length;
-    // Prefer server-side aggregates so the score lights up even when the
-    // auditor hasn't run swaps recently — same logic as the mint-add screen.
-    const totalOps = (audit.auditData.n_mints ?? 0) + (audit.auditData.n_melts ?? 0);
-    const aggregateSuccessRate =
-      totalOps > 0
-        ? Math.max(0, Math.min(1, 1 - (audit.auditData.n_errors ?? 0) / totalOps))
-        : undefined;
-    const swapSuccessRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
-    const successRate = aggregateSuccessRate ?? swapSuccessRate;
-    enrichment.auditScore = typeof successRate === 'number' ? successRate * 5 : undefined;
-    enrichment.auditState = audit.auditData.state;
-    enrichment.successRate = successRate;
-    enrichment.swapSuccess = swapSuccess;
-    enrichment.swapTotal = swapTotal;
-    enrichment.totalMints = audit.auditData.n_mints;
-    enrichment.totalMelts = audit.auditData.n_melts;
-
-    const successfulTimes = swaps
-      .filter((s) => s.state === 'OK' && typeof s.time_taken === 'number' && s.time_taken > 0)
-      .map((s) => s.time_taken);
-    enrichment.avgTimeMs =
-      successfulTimes.length > 0
-        ? successfulTimes.reduce((sum, t) => sum + t, 0) / successfulTimes.length
-        : undefined;
-  }
-  return enrichment;
-}
 
 export function CocoPaymentUXProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
@@ -145,7 +61,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || contextOffline;
   const offlineRef = useLatestRef(isOffline);
-  const getOffline = useCallback(() => offlineRef.current, []);
+  const getOffline = useCallback(() => offlineRef.current, [offlineRef]);
 
   // Camera permission lives here rather than behind a (receive-flow)-scoped
   // context provider so it's reachable from this provider's navigation /
@@ -167,7 +83,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   // a modal pushed before the prior screen unmounts — each see the refresh
   // instead of clobbering the prior subscriber's slot.
   const p2pkKeyRefreshedSubscribers = useRef(new Set<(newKey: string | null) => void>());
-  const getNpub = useCallback(() => npubRef.current, []);
+  const getNpub = useCallback(() => npubRef.current, [npubRef]);
 
   const getBtcPrice = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency;
@@ -210,13 +126,13 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           getMintCatalog(mintUrls, (url) => manager.mint.getMintInfo(url)),
         // Trust-review screen still pulls per-mint detail (swap-by-swap timing)
         // from the local audit / KYM caches populated by `useAuditedMint`.
-        enrichMintReviewInfo: getMintEnrichment,
+        enrichMintReviewInfo: getSovranMintEnrichment,
         shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
         shouldMockFailMelt: () => useSettingsStore.getState().mockFailMelt,
         shouldMockFailSend: () => useSettingsStore.getState().mockFailSend,
         logger: paymentLog,
       }),
-    [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency]
+    [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency, privateKeyRef]
   );
 
   useEffect(() => {
@@ -323,348 +239,15 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     [deepLinkUrl, keys?.pubkey]
   );
 
-  const screenActionsBridge = useMemo<ScreenActionsBridge>(() => {
-    // Closure state for async mint-info fetches triggered from mergeEntryUpdate.
-    let mintInfoCallback: ((entry: EntryRecord) => void) | null = null;
-    let mintInfoFetchingUrl: string | null = null;
-
-    return {
-      getExtraContext: () => ({
+  const screenActionsBridge = useMemo(
+    () =>
+      createSovranScreenActionsBridge({
         manager,
         requestCameraPermission,
+        p2pkKeyRefreshedSubscribers,
       }),
-      onEntryUpdate: (screenType, callback) => {
-        const unsubscribes: (() => void)[] = [];
-
-        // Only screens whose entry maps to a coco history-entry type get the
-        // history:updated firehose; the rest (mintSelector, mintInfo, and the
-        // pre-flow amountEntry keypad) carry their own non-history entries
-        // and would just defaultShouldApply-reject every dispatch downstream.
-        // Narrowing here also avoids a per-update wakeup on every mint /
-        // melt / send / receive history mutation regardless of screen type.
-        const expectedHistoryType = HISTORY_TYPE_BY_SCREEN[screenType];
-        if (expectedHistoryType !== undefined) {
-          unsubscribes.push(
-            manager.on('history:updated', ({ entry: updated }: { mintUrl: string; entry: any }) => {
-              if (updated?.type !== expectedHistoryType) return;
-              paymentLog.info('send.entry_updated', {
-                screenType,
-                type: updated?.type,
-                id: updated?.id,
-                state: updated?.state,
-                quoteId: updated?.quoteId,
-              });
-              callback(updated as unknown as EntryRecord);
-            })
-          );
-        }
-
-        if (screenType === 'meltQuote') {
-          const subscribeMeltOperation = (
-            eventName: 'melt-op:prepared' | 'melt-op:pending' | 'melt-op:finalized'
-          ) =>
-            manager.on(
-              eventName,
-              ({ operation }: { mintUrl: string; operation: MeltOperationLike }) => {
-                const updatedEntry = meltOperationToScreenActionEntry(operation);
-                if (updatedEntry) {
-                  callback(updatedEntry);
-                }
-              }
-            );
-          unsubscribes.push(subscribeMeltOperation('melt-op:prepared'));
-          unsubscribes.push(subscribeMeltOperation('melt-op:pending'));
-          unsubscribes.push(subscribeMeltOperation('melt-op:finalized'));
-        }
-
-        if (screenType === 'mintQuote') {
-          // Subscribe to mint operation state changes (UNPAID → PAID → ISSUED).
-          // Must include type:'mint' so defaultShouldApply can match by type+quoteId.
-          unsubscribes.push(
-            manager.on(
-              'mint-op:quote-state-changed',
-              ({
-                operationId,
-                quoteId,
-                state,
-              }: {
-                mintUrl: string;
-                operationId: string;
-                quoteId: string;
-                state: string;
-              }) => {
-                paymentLog.info('send.mint_quote_state_changed', {
-                  screenType,
-                  operationId,
-                  quoteId,
-                  state,
-                });
-                callback({ type: 'mint', quoteId, state, operationId } as unknown as EntryRecord);
-              }
-            )
-          );
-          unsubscribes.push(
-            manager.on(
-              'mint-op:finalized',
-              ({ operationId }: { mintUrl: string; operationId: string }) => {
-                paymentLog.info('send.mint_op_finalized', { screenType, operationId });
-                callback({ type: 'mint', operationId, state: 'ISSUED' } as unknown as EntryRecord);
-              }
-            )
-          );
-        }
-
-        if (screenType === 'receive') {
-          // Narrow the NPC subscription to `mintUrl` so transient `isSyncing`
-          // / `isUpdating` flips during a refresh don't trigger duplicate
-          // `_npcMintUpdate` recomputations on the receive screen.
-          unsubscribes.push(
-            useNpcMintStore.subscribe(
-              (s) => s.mintUrl,
-              () => {
-                callback({ _npcMintUpdate: true } as EntryRecord);
-              }
-            )
-          );
-          const subscriber = (newKey: string | null) => {
-            callback({ _p2pkKeyUpdate: true, p2pkKey: newKey } as EntryRecord);
-          };
-          p2pkKeyRefreshedSubscribers.current.add(subscriber);
-          unsubscribes.push(() => {
-            p2pkKeyRefreshedSubscribers.current.delete(subscriber);
-          });
-        }
-
-        // The mint-info (trust review) screen still pulls per-mint detail
-        // (swap timing, full review list) from the local audit / KYM / profile
-        // caches — populated by `useAuditedMint` and friends when the user
-        // navigates into a mint detail view. Subscribe so already-cached data
-        // and any in-flight fetches refresh the screen.
-        if (screenType === 'mintInfo') {
-          const pushEnrichment = () => {
-            callback({ _mintEnrichment: true } as EntryRecord);
-          };
-          // Scope to the cache slice for the mint currently being shown. The
-          // selector closes over `mintInfoFetchingUrl`, so cache writes for
-          // unrelated mints (and any non-cache state mutation) don't fire the
-          // listener; the screen only wakes when its mint's data updates.
-          const cacheSliceForCurrentMint = <T,>(cache: Record<string, T>): T | undefined =>
-            mintInfoFetchingUrl ? cache[mintInfoFetchingUrl] : undefined;
-          unsubscribes.push(
-            useAuditMintStore.subscribe((s) => cacheSliceForCurrentMint(s.cache), pushEnrichment)
-          );
-          unsubscribes.push(
-            useKYMMintStore.subscribe((s) => cacheSliceForCurrentMint(s.cache), pushEnrichment)
-          );
-          unsubscribes.push(
-            useMintProfileStore.subscribe((s) => cacheSliceForCurrentMint(s.cache), pushEnrichment)
-          );
-
-          mintInfoCallback = callback;
-          unsubscribes.push(() => {
-            mintInfoCallback = null;
-            mintInfoFetchingUrl = null;
-          });
-          pushEnrichment();
-        }
-
-        if (screenType === 'mintSelector') {
-          // Live-update the open selector when a mint is added. Catalog data
-          // for the new mint is unavailable on the API immediately so the row
-          // shows up without score / audit pills until the next list build.
-          unsubscribes.push(
-            manager.on('mint:added', ({ mint }: { mint: { mintUrl: string } }) => {
-              const mintUrl = mint.mintUrl;
-              (async () => {
-                try {
-                  const [info, balances] = await Promise.all([
-                    manager.mint.getMintInfo(mintUrl).catch(() => null),
-                    manager.wallet.balances
-                      .byMint({ mintUrls: [mintUrl] })
-                      .catch(
-                        () => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>
-                      ),
-                  ]);
-                  callback({
-                    _mintItemAdded: true,
-                    _newMintItem: {
-                      mintUrl,
-                      displayName: info?.name ?? mintUrl,
-                      iconUrl: info?.icon_url,
-                      balance: balances[mintUrl]?.total ?? 0,
-                      unit: 'sat',
-                      status: 'available',
-                      reason: null,
-                      isPreferred: false,
-                    },
-                  } as EntryRecord);
-                } catch {
-                  callback({
-                    _mintItemAdded: true,
-                    _newMintItem: {
-                      mintUrl,
-                      displayName: mintUrl,
-                      balance: 0,
-                      unit: 'sat',
-                      status: 'available',
-                      reason: null,
-                      isPreferred: false,
-                    },
-                  } as EntryRecord);
-                }
-              })();
-            })
-          );
-        }
-
-        return () => {
-          unsubscribes.forEach((unsubscribe) => unsubscribe());
-        };
-      },
-      shouldApplyEntryUpdate: (current, updated) => {
-        if (!current) return false;
-        if (updated?._npcMintUpdate && current.type === 'receive') return true;
-        if (updated?._p2pkKeyUpdate && current.type === 'receive') return true;
-        if (updated?._mintEnrichment && typeof current.mintUrl === 'string') return true;
-        if (updated?._mintInfoFetched && typeof current.mintUrl === 'string') return true;
-        if (updated?._mintItemAdded && Array.isArray(current.items)) return true;
-        return defaultShouldApply(current, updated);
-      },
-      mergeEntryUpdate: (current, updated) => {
-        if (!current) return updated;
-        if (updated._npcMintUpdate && current.type === 'receive') {
-          const npcMintUrl = useNpcMintStore.getState().getActiveMintUrl();
-          return { ...current, selectedMintUrl: npcMintUrl, mintUrl: npcMintUrl ?? '' };
-        }
-        if (updated._p2pkKeyUpdate && current.type === 'receive') {
-          return { ...current, p2pkKey: updated.p2pkKey ?? undefined };
-        }
-        if (updated._mintEnrichment && typeof current.mintUrl === 'string') {
-          const enrichment = getMintEnrichment(current.mintUrl as string);
-          const merged = { ...current, ...enrichment };
-
-          // Bare entry (e.g. navigated from user profile with only mintUrl) —
-          // kick off an async fetch of full mint info from the mint API.
-          const mintUrl = current.mintUrl as string;
-          if (
-            !current.displayName &&
-            !current._mintInfoFetched &&
-            mintInfoCallback &&
-            mintInfoFetchingUrl !== mintUrl
-          ) {
-            mintInfoFetchingUrl = mintUrl;
-            const cb = mintInfoCallback;
-            (async () => {
-              try {
-                const [mintInfo, isTrusted] = await Promise.all([
-                  manager.mint.getMintInfo(mintUrl).catch(() => undefined),
-                  manager.mint.isTrustedMint(mintUrl).catch(() => false),
-                ]);
-                cb({
-                  _mintInfoFetched: true,
-                  displayName: mintInfo?.name ?? mintUrl,
-                  iconUrl: mintInfo?.icon_url,
-                  description: mintInfo?.description,
-                  longDescription: mintInfo?.description_long,
-                  motd: mintInfo?.motd,
-                  contact: mintInfo?.contact,
-                  isTrusted,
-                } as EntryRecord);
-              } catch (e) {
-                paymentLog.warn('send.mint_info_fetch_failed', {
-                  mintUrl,
-                  error: e instanceof Error ? e : new Error(String(e)),
-                });
-              }
-            })();
-          }
-
-          return merged;
-        }
-        if (updated._mintInfoFetched && typeof current?.mintUrl === 'string') {
-          const { _mintInfoFetched, ...rest } = updated;
-          return { ...current, ...rest, _mintInfoFetched: true };
-        }
-        if (updated._mintItemAdded && updated._newMintItem && Array.isArray(current.items)) {
-          const newItem = updated._newMintItem as EntryRecord;
-          const exists = (current.items as EntryRecord[]).some(
-            (item) => item.mintUrl === newItem.mintUrl
-          );
-          if (exists) return current;
-
-          // Determine status based on the flow's destination/scope
-          const destination = current.destination as string | undefined;
-          const scope = current.scope as string | undefined;
-          const needsBalance =
-            destination === 'paymentRequest' ||
-            destination === 'meltQuote' ||
-            destination === 'sendEcash';
-          const skipBalance = !needsBalance || scope === 'selected' || scope === 'npc';
-          if (!skipBalance && ((newItem.balance as number) ?? 0) <= 0) {
-            newItem.status = 'disabled';
-            newItem.reason = { code: 'NO_BALANCE', message: 'No balance' };
-          }
-
-          return { ...current, items: [...(current.items as EntryRecord[]), newItem] };
-        }
-        return defaultMerge(current, updated);
-      },
-      getLocale: () => useSettingsStore.getState().language || 'en',
-      subscribeGlobalScreenActions: (listener) => {
-        // Only subscribe to the slices the screen-actions bridge actually
-        // reads (scan entries, distribution map, locale). Subscribing to the
-        // whole settings store re-fired the listener on every unrelated
-        // toggle (mock flags, currency, dev settings) and forced every
-        // mounted screen-action manager to re-derive availability.
-        const unScan = useScanHistoryStore.subscribe((s) => s.entries, listener);
-        const unDistribution = useTransactionDistributionStore.subscribe(
-          (s) => s.distributions,
-          listener
-        );
-        const unSettings = useSettingsStore.subscribe((s) => s.language, listener);
-        return () => {
-          unScan();
-          unDistribution();
-          unSettings();
-        };
-      },
-      getSourceLabel: (entry) => {
-        const entryId = entry && typeof entry.id === 'string' ? entry.id : undefined;
-        if (!entryId) return null;
-        // Inbound source (scan history) takes precedence — those are user
-        // actions that brought data INTO the wallet. Outbound distribution
-        // is the fallback for transactions where the user shared data OUT
-        // (currently only Lightning mint quotes).
-        const scan = useScanHistoryStore
-          .getState()
-          .entries.find((e) => e.transactionId === entryId);
-        // Distribution store is keyed by `quoteId` for mint entries (the
-        // deterministic identifier from the lightning quote) and by entry.id
-        // for everything else. Mirror this in `useTransactionSource` in
-        // Transaction.tsx — both readers must use the same key.
-        const distKey =
-          entry?.type === 'mint' && typeof entry?.quoteId === 'string'
-            ? (entry.quoteId as string)
-            : entryId;
-        const distribution = useTransactionDistributionStore.getState().distributions[distKey];
-        const source = scan?.source ?? distribution?.source ?? null;
-        if (!source) return null;
-        const labels: Record<string, string> = {
-          // Inbound (scan history)
-          qr: 'QR Code',
-          nfc: 'NFC',
-          paste: 'Clipboard',
-          deeplink: 'Deep Link',
-          // Outbound (transaction distribution)
-          copy: 'Copied',
-          share: 'Shared',
-          airdrop: 'AirDrop',
-          displayed: 'QR Code',
-        };
-        return labels[source] ?? null;
-      },
-    };
-  }, [manager, requestCameraPermission]);
+    [manager, requestCameraPermission]
+  );
 
   return (
     <PaymentUXProviderBase

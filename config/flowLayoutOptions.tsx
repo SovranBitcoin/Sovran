@@ -45,6 +45,7 @@ const FlowHeaderButton = ({
 const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOptions => ({
   headerShown: true,
   headerTransparent: true,
+  headerTitleAlign: 'center',
   headerStyle: {
     backgroundColor: 'transparent',
   },
@@ -92,6 +93,7 @@ export const getBaseModalHeaderOptions = (
   foreground: string,
   backgroundColor: string
 ): NativeStackNavigationOptions => ({
+  headerTitleAlign: 'center',
   headerTitleStyle: {
     color: foreground,
   },

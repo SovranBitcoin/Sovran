@@ -5,7 +5,10 @@ import {
   Platform,
   RefreshControlProps,
   ScrollView,
+  StyleProp,
+  StyleSheet,
   View,
+  ViewStyle,
 } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,7 +82,7 @@ interface LayoutDebugWrapperProps {
    * Custom content container style for the ScrollView (only used when scrollable=true)
    * @default { padding: 16 }
    */
-  contentContainerStyle?: object;
+  contentContainerStyle?: StyleProp<ViewStyle>;
   /**
    * Callback when content size changes (useful for ScrollableGradientOverlay)
    * Only called when scrollable=true
@@ -123,6 +126,19 @@ export function LayoutDebugWrapper({
   const actualBottomInset = adjustedInsets.bottom;
   const estimatedBottomArea = TAB_BAR_HEIGHT + insets.bottom;
   const bottomArea = actualBottomInset > 0 ? actualBottomInset : estimatedBottomArea;
+  const flattenedContentStyle = StyleSheet.flatten(contentContainerStyle) ?? {};
+  const baseTopPadding =
+    typeof flattenedContentStyle.paddingTop === 'number'
+      ? flattenedContentStyle.paddingTop
+      : typeof flattenedContentStyle.paddingVertical === 'number'
+        ? flattenedContentStyle.paddingVertical
+        : typeof flattenedContentStyle.padding === 'number'
+          ? flattenedContentStyle.padding
+          : 0;
+  const scrollContentStyle =
+    Platform.OS === 'android' && headerHeight > 0
+      ? [contentContainerStyle, { paddingTop: baseTopPadding + headerHeight }]
+      : contentContainerStyle;
 
   const renderDebugOverlays = () => {
     if (!debug) return null;
@@ -232,7 +248,7 @@ export function LayoutDebugWrapper({
           scrollEventThrottle={16}
           onScroll={debug ? handleScroll : undefined}
           onContentSizeChange={onContentSizeChange}
-          contentContainerStyle={contentContainerStyle}
+          contentContainerStyle={scrollContentStyle}
           refreshControl={refreshControl}>
           {renderDebugInfoCard()}
           {children}

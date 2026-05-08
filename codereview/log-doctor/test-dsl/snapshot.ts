@@ -35,7 +35,7 @@
  * shape of WDA's `/source` endpoint). Kept here as a duplicate definition
  * so this module is independent of log-doctor.ts.
  */
-export interface InputAXNode {
+interface InputAXNode {
   type?: string;
   label?: string | null;
   name?: string | null;
@@ -52,7 +52,7 @@ export interface InputAXNode {
  * The canonical, comparable shape of one node in a snapshot. Sorted keys,
  * no coordinates, no booleans we don't care about. Children recurse.
  */
-export interface SnapshotNode {
+interface SnapshotNode {
   type: string;
   /** Empty string when absent — keeps JSON output stable. */
   testID: string;
@@ -127,7 +127,10 @@ export function loadSnapshotIgnores(filePath: string): void {
       let re: RegExp;
       const slashMatch = /^\/(.*)\/([gimsuy]*)$/.exec(line);
       if (slashMatch) {
-        re = new RegExp(slashMatch[1], slashMatch[2].includes('g') ? slashMatch[2] : slashMatch[2] + 'g');
+        re = new RegExp(
+          slashMatch[1],
+          slashMatch[2].includes('g') ? slashMatch[2] : slashMatch[2] + 'g'
+        );
       } else {
         re = new RegExp(line, 'g');
       }
@@ -390,7 +393,7 @@ export function deserializeSnapshot(s: string): SnapshotNode {
  *   -     label: "Pending"
  *   +     label: "Confirmed"
  */
-export type DiffEntry =
+type DiffEntry =
   | { kind: 'context'; depth: number; line: string }
   | { kind: 'remove'; depth: number; line: string }
   | { kind: 'add'; depth: number; line: string };
@@ -442,13 +445,7 @@ function diffNode(a: SnapshotNode, b: SnapshotNode, depth: number, out: DiffEntr
   }
 }
 
-function pushFieldDiff(
-  out: DiffEntry[],
-  depth: number,
-  field: string,
-  a: string,
-  b: string
-): void {
+function pushFieldDiff(out: DiffEntry[], depth: number, field: string, a: string, b: string): void {
   if (a === b) return;
   out.push({ kind: 'remove', depth, line: `${field}: ${JSON.stringify(a)}` });
   out.push({ kind: 'add', depth, line: `${field}: ${JSON.stringify(b)}` });

@@ -5,7 +5,7 @@
  */
 
 import React, { ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { NativeScrollEvent, ScrollView, StyleSheet, View } from 'react-native';
+import { NativeScrollEvent, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
@@ -140,6 +140,9 @@ export function ModalLayoutWrapper({
     onHeaderHeightChange?.(totalHeaderHeight);
   }, [totalHeaderHeight, onHeaderHeightChange]);
 
+  const shouldRenderAndroidHeaderSpacer =
+    Platform.OS === 'android' && !disableHeaderSpacer && totalHeaderHeight > 0;
+
   const scrollContentStyle = {
     paddingHorizontal: contentPadding,
     paddingBottom: bottomPadding,
@@ -212,6 +215,7 @@ export function ModalLayoutWrapper({
             scrollEventThrottle={16}
             onScroll={handleScroll}
             contentContainerStyle={scrollContentStyle}>
+            {shouldRenderAndroidHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
             {children}
           </ScrollView>
         )}

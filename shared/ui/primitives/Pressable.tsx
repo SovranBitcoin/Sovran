@@ -42,8 +42,6 @@ interface SharedPressableProps extends Omit<RNPressableProps, 'style'> {
   style?: StyleProp<ViewStyle> | ((state: PressableStateCallbackType) => StyleProp<ViewStyle>);
 }
 
-export type PressableProps = SharedPressableProps;
-
 const DEFAULT_HAPTIC: Required<HapticConfig> = {
   type: 'selection',
   impactStyle: 'medium',

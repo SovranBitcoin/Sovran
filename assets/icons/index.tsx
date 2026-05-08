@@ -150,6 +150,7 @@ export const icons: string[] = [
   'material-symbols:currency-bitcoin',
   'material-symbols-light:currency-bitcoin',
   'fluent:wallet-20-filled',
+  'fluent:wallet-20-regular',
   'majesticons:coins',
   'solar:card-bold',
   'material-symbols:arrow-back-rounded',
@@ -197,6 +198,7 @@ export const icons: string[] = [
   'mdi:anonymous',
   'ph:coins',
   'mingcute:home-4-fill',
+  'mingcute:home-4-line',
 
   // Explore page icons
   'mdi:chevron-left',
@@ -342,6 +344,10 @@ export const icons: string[] = [
   'mdi:delete-outline',
   'mdi:sync',
   'mdi:brush',
+
+  // Drawer and bottom tab bar route icons — selected/unselected pairs
+  'mdi:account-group-outline',
+  'mdi:robot-outline',
 ];
 
 export function BitcoinMaskIcon() {

@@ -19,7 +19,7 @@ type WhitenoiseClientOptions = {
   fallbackRelays: readonly string[];
 };
 
-export type WhitenoiseClientHandle = {
+type WhitenoiseClientHandle = {
   client: MarmotClient<WhitenoiseGroupHistory>;
   disposeSigner: () => void;
 };

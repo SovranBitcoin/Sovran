@@ -30,7 +30,7 @@ export interface TimelineItem {
   info?: string;
 }
 
-export interface BuildTimelineInput {
+interface BuildTimelineInput {
   historyEntry: HistoryEntry;
   meltQuote?: MeltQuoteBolt11Response;
   currentTime: number;
@@ -555,7 +555,7 @@ export function getStatusHeader(timeline: TimelineItem[]): string {
   return timeline[timeline.length - 1]?.displayLabel.toUpperCase() || '';
 }
 
-export type StatusColorType = 'default' | 'success' | 'error' | 'warning';
+type StatusColorType = 'default' | 'success' | 'error' | 'warning';
 
 export function getStatusColorType(timeline: TimelineItem[]): StatusColorType {
   const hasExpired = timeline.some((item) => item.stepType === 'expired');

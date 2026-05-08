@@ -41,12 +41,7 @@ module.exports = ({ config }) => {
       ...config.extra,
       ...(debugMnemonic ? { debugMnemonic } : {}),
     },
-    plugins: [
-      ...(config.plugins || []),
-      'expo-maps',
-      'expo-liquid-glass-native',
-      './plugins/withLiquidGlassMainApplication',
-    ],
+    plugins: [...(config.plugins || []), 'expo-maps'],
     ios: {
       ...config.ios,
       bundleIdentifier: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',

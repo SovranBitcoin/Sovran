@@ -8,7 +8,7 @@ export type RestoreReadyStatus =
 
 const isReady = (s: RestoreReadyStatus) => s === 'complete' || s === 'not-needed';
 
-export interface RestoreReadyStore {
+interface RestoreReadyStore {
   getState: () => { restoreStatus: RestoreReadyStatus };
   subscribe: (
     listener: (

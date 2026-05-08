@@ -155,7 +155,7 @@ function findPrefixNode(
 
 // ─── Public API ────────────────────────────────────────────────────────────
 
-export interface ExecuteOptions {
+interface ExecuteOptions {
   /** Where to drop step screenshots. Defaults to .screenshots/<artefactPath>/. */
   screenshotDir?: string;
   /** Pretty test name used in the leading log line. */
@@ -218,7 +218,7 @@ export interface ExecuteOptions {
   syntheticTest?: boolean;
 }
 
-export interface ExecuteResult {
+interface ExecuteResult {
   ok: boolean;
   log: string[];
 }
@@ -335,7 +335,7 @@ export async function executeTest(test: Test, opts: ExecuteOptions): Promise<Exe
  * exists as its own interface so the runner can thread matrix-level
  * context (title, mode, sink) independent of per-cell options.
  */
-export interface ExecuteMatrixOptions {
+interface ExecuteMatrixOptions {
   /** Source suite the matrix came from — used to resolve variants. */
   suite: Suite;
   /** Cross-suite define fallback (from `_shared/` etc). */
@@ -396,7 +396,9 @@ export async function executeMatrix(
   const cells = expandMatrix(matrix);
   const emit = opts.onLog ?? ((): void => {});
 
-  emit(`▶ matrix: ${matrix.title}  (${matrix.mode} × ${cells.length} cell${cells.length === 1 ? '' : 's'})`);
+  emit(
+    `▶ matrix: ${matrix.title}  (${matrix.mode} × ${cells.length} cell${cells.length === 1 ? '' : 's'})`
+  );
 
   opts.onEvent?.({
     type: 'matrix.begin',
@@ -471,7 +473,10 @@ export async function executeMatrix(
       // onLog so the caller sees it; this is just for the stamp.
       const failLine = exec.log.find((l) => /\s✗\s/.test(l) || /✗ /.test(l));
       if (failLine) {
-        result.error = failLine.replace(/^\s+/, '').replace(/^.*?✗\s*/, '').slice(0, 120);
+        result.error = failLine
+          .replace(/^\s+/, '')
+          .replace(/^.*?✗\s*/, '')
+          .slice(0, 120);
       }
     }
     results.push(result);
@@ -518,14 +523,16 @@ export async function executeMatrix(
  * rules (tuple count, ordering, cell names, capture-isolation wrapping)
  * without touching WDA or the real executor.
  */
-export function expandMatrix(matrix: MatrixDef): SynthesizedCell[] {
+function expandMatrix(matrix: MatrixDef): SynthesizedCell[] {
   // Per-stage "choice lists": each stage contributes a list of
   // alternatives, and each alternative is a tuple `{ label, steps }`
   // — `steps` is the list of Steps that stage contributes to ONE cell
   // if this alternative is picked. Cartesian product of the choice
   // lists gives us every cell.
   type Choice = { label: string; steps: Step[] };
-  const stageChoices: Choice[][] = matrix.stages.map((stage) => stageChoicesFor(stage, matrix.mode));
+  const stageChoices: Choice[][] = matrix.stages.map((stage) =>
+    stageChoicesFor(stage, matrix.mode)
+  );
 
   // Cartesian product.
   const cells: SynthesizedCell[] = [];
@@ -533,9 +540,7 @@ export function expandMatrix(matrix: MatrixDef): SynthesizedCell[] {
 
   function recurse(stageIdx: number): void {
     if (stageIdx === matrix.stages.length) {
-      const tupleLabel = matrix.stages
-        .map((s, i) => `${s.name}=${tuple[i].label}`)
-        .join(' ');
+      const tupleLabel = matrix.stages.map((s, i) => `${s.name}=${tuple[i].label}`).join(' ');
       const cellName = `${matrix.title} [${tupleLabel}]`;
 
       const body: Step[] = [];
@@ -558,16 +563,13 @@ export function expandMatrix(matrix: MatrixDef): SynthesizedCell[] {
   return cells;
 }
 
-export interface SynthesizedCell {
+interface SynthesizedCell {
   cellName: string;
   tupleLabel: string;
   body: Step[];
 }
 
-function stageChoicesFor(
-  stage: StageDef,
-  mode: MatrixMode
-): { label: string; steps: Step[] }[] {
+function stageChoicesFor(stage: StageDef, mode: MatrixMode): { label: string; steps: Step[] }[] {
   switch (stage.variantKind) {
     case 'oneOf': {
       const picks = mode === 'quick' ? [stage.variants[0]] : stage.variants;
@@ -905,13 +907,22 @@ async function executeStep(step: Step, ctx: ExecCtx): Promise<void> {
   // change what's on screen, so their post-step tree fetch is wasted
   // (~5-15s per step on dense screens).
   const VISUAL_KINDS = new Set([
-    'launch', 'home', 'back',
-    'tap', 'type', 'keypad', 'swipe', 'scrollUntil', 'dismiss',
-    'waitFor', 'screenshot', 'wallet',
+    'launch',
+    'home',
+    'back',
+    'tap',
+    'type',
+    'keypad',
+    'swipe',
+    'scrollUntil',
+    'dismiss',
+    'waitFor',
+    'screenshot',
+    'wallet',
   ]);
   const isVisual = VISUAL_KINDS.has(step.kind);
   if (isVisual) await sleep(150);
-  if ((isVisual || caught !== null)) {
+  if (isVisual || caught !== null) {
     try {
       await takeScreenshot(screenshotPath(ctx, idx, src));
     } catch {
@@ -929,7 +940,7 @@ async function executeStep(step: Step, ctx: ExecCtx): Promise<void> {
   // Failure path: emit the step.end event + the visible error line(s),
   // then re-throw so `executeTest`'s outer catch short-circuits the
   // rest of the body.
-  const fmtStepDur = (ms: number) => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+  const fmtStepDur = (ms: number) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
   if (caught !== null) {
     const err = caught;
     const msg = err instanceof Error ? err.message : String(err);
@@ -1303,9 +1314,7 @@ async function performTap(
       const flat = flattenAll(tree);
       const node = findPrefixNode(flat, sel);
       if (!node || !node.rect) {
-        throw new Error(
-          `tap ${describeSelector(sel)}: no matching element on the current screen`
-        );
+        throw new Error(`tap ${describeSelector(sel)}: no matching element on the current screen`);
       }
       await tapXY(node.centerX, node.centerY);
       return;
@@ -1449,9 +1458,7 @@ async function execAssertNotVisible(step: AssertNotVisibleStep, ctx: ExecCtx): P
   if (sel.kind === 'id') found = findByTestID(flat, sel.id) !== null;
   else if (sel.kind === 'text') {
     // findByText returns a TextMatch object, null if no match.
-    found = flat.some(
-      (n) => n.label === sel.text || n.name === sel.text
-    );
+    found = flat.some((n) => n.label === sel.text || n.name === sel.text);
   } else found = findPrefixNode(flat, sel) !== null;
 
   if (found) {
@@ -1772,15 +1779,11 @@ async function execRepeat(step: RepeatStep, ctx: ExecCtx): Promise<StepResult> {
 async function execStable(step: StableStep, ctx: ExecCtx): Promise<StepResult> {
   const sel = resolveSelector(step.selector, readVars(ctx));
   if (sel.kind !== 'id') {
-    throw new Error(
-      `stable <${describeSelector(sel)}>: only #testID selectors are supported`
-    );
+    throw new Error(`stable <${describeSelector(sel)}>: only #testID selectors are supported`);
   }
   const before = await snapshotForDiff(sel);
   if (!before) {
-    throw new Error(
-      `failed to capture initial snapshot (selector did not match)`
-    );
+    throw new Error(`failed to capture initial snapshot (selector did not match)`);
   }
   const beforeSerialized = serializeSnapshot(before);
 
@@ -1812,9 +1815,7 @@ async function execStable(step: StableStep, ctx: ExecCtx): Promise<StepResult> {
     // that was used in the header, we still compare the same target.
     const after = await snapshotForDiff(sel);
     if (!after) {
-      throw new Error(
-        `failed to capture final snapshot (selector did not match after body)`
-      );
+      throw new Error(`failed to capture final snapshot (selector did not match after body)`);
     }
     const diff = diffSnapshots(before, after);
     if (diff.length > 0) {
@@ -1849,7 +1850,10 @@ async function execRun(step: RunStep, ctx: ExecCtx): Promise<StepResult> {
   if (!def) {
     const local = Array.from(ctx.suite.defines.keys());
     const global = ctx.globalDefines ? Array.from(ctx.globalDefines.keys()) : [];
-    const known = Array.from(new Set([...local, ...global])).sort().join(', ') || 'none';
+    const known =
+      Array.from(new Set([...local, ...global]))
+        .sort()
+        .join(', ') || 'none';
     throw new Error(`run ${name}: undefined define (known: ${known})`);
   }
 
@@ -1917,10 +1921,7 @@ async function execRun(step: RunStep, ctx: ExecCtx): Promise<StepResult> {
  * their original value restored; keys introduced by the probe are
  * deleted.
  */
-async function execScopedBundle(
-  step: ScopedBundleStep,
-  ctx: ExecCtx
-): Promise<StepResult> {
+async function execScopedBundle(step: ScopedBundleStep, ctx: ExecCtx): Promise<StepResult> {
   const outerSnapshot = { ...ctx.vars };
   try {
     // Wrap the whole bundle in a nested dir. Inner variants are
@@ -2082,8 +2083,7 @@ function describeStep(step: Step): string {
     case 'assertNotVisible':
       return `assert ${describeSelector(step.selector)} not visible`;
     case 'assertVar': {
-      const rhs =
-        step.rhs.kind === 'literal' ? `"${step.rhs.value}"` : `$${step.rhs.name}`;
+      const rhs = step.rhs.kind === 'literal' ? `"${step.rhs.value}"` : `$${step.rhs.name}`;
       return `assert $${step.varName} ${step.op} ${rhs}`;
     }
     case 'assertScreenEq':
@@ -2103,8 +2103,7 @@ function describeStep(step: Step): string {
     case 'if':
       return `if ${step.negated ? 'not ' : ''}visible ${describeSelector(step.selector)}`;
     case 'ifVar': {
-      const rhs =
-        step.rhs.kind === 'literal' ? `"${step.rhs.value}"` : `$${step.rhs.name}`;
+      const rhs = step.rhs.kind === 'literal' ? `"${step.rhs.value}"` : `$${step.rhs.name}`;
       return `if ${step.negated ? 'not ' : ''}$${step.varName} ${step.op} ${rhs}`;
     }
     case 'repeat':
@@ -2125,9 +2124,7 @@ function describeStep(step: Step): string {
       // see WHAT cocod is being asked to do, not just WHICH subcommand.
       // `$var` refs render as `$var` (not their resolved value) — the
       // tail line shows the final resolved arg list.
-      const argsText = step.args
-        .map((a) => (a.kind === 'var' ? `$${a.name}` : a.value))
-        .join(' ');
+      const argsText = step.args.map((a) => (a.kind === 'var' ? `$${a.name}` : a.value)).join(' ');
       return `wallet ${step.command.join(' ')}${argsText ? ` ${argsText}` : ''}`;
     }
   }
@@ -2139,7 +2136,10 @@ function preview(s: string, max = 60): string {
 }
 
 function sanitizeForFile(s: string): string {
-  return s.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+  return s
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
 }
 
 /**

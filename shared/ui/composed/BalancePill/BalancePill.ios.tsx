@@ -78,7 +78,16 @@ export default function BalancePill({
 
   return (
     <Log name="BalancePill">
-      <View style={[styles.card, { borderColor, height: cardHeight, borderRadius: cardRadius }]}>
+      <View
+        style={[
+          styles.card,
+          {
+            borderColor,
+            width: dimensions.buttonWidth,
+            height: cardHeight,
+            borderRadius: cardRadius,
+          },
+        ]}>
         <BlurCardFrame accentColor={muted}>
           <PressableFeedback
             animation={false}
@@ -118,6 +127,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
+    alignSelf: 'center',
     borderRadius: 20,
     borderCurve: 'continuous',
     overflow: 'hidden',

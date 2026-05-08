@@ -28,7 +28,7 @@ type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'un
 /** How the data was scanned/entered */
 export type ScanSource = 'qr' | 'nfc' | 'paste' | 'deeplink';
 
-export interface ScanHistoryEntry {
+interface ScanHistoryEntry {
   /** Unique identifier for this scan */
   id: string;
   /** The raw string as scanned */

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image as ExpoImage, type ImageProps as ExpoImageProps } from 'expo-image';
 
-export type ImageProps = ExpoImageProps;
+type ImageProps = ExpoImageProps;
 
 /**
  * Wallpaper-friendly defaults over `expo-image`: aggressive memory+disk caching,

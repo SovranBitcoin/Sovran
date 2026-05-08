@@ -72,7 +72,7 @@ async function resolveNostrProfile(
  * is passed in so this module stays standalone (callable from React hooks
  * and from coco-payment-ux's machine-driven code path).
  */
-export type MintInfoLookup = (mintUrl: string) => Promise<GetInfoResponse | null>;
+type MintInfoLookup = (mintUrl: string) => Promise<GetInfoResponse | null>;
 
 async function fetchEntry(
   mintUrl: string,

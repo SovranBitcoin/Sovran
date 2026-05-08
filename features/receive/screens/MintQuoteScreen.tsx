@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect } from 'react';
+import { useWindowDimensions } from 'react-native';
 
 import { router } from 'expo-router';
 
@@ -37,6 +38,8 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
+const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
+
 interface MintQuoteScreenProps {
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
@@ -49,6 +52,7 @@ export function MintQuoteScreen({
   onRequestMintList,
 }: MintQuoteScreenProps) {
   useLifecycleLogger('MintQuoteScreen');
+  const { width: windowWidth } = useWindowDimensions();
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'mintQuote',
     mintHistoryEntry
@@ -61,6 +65,7 @@ export function MintQuoteScreen({
   }, [error]);
 
   const isPaid = entry?.state === 'ISSUED' || entry?.state === 'PAID';
+  const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
 
   useEffect(() => {
     if (!entry) return;
@@ -137,7 +142,7 @@ export function MintQuoteScreen({
 
           {!isPaid ? (
             <MintSelector
-              width={280}
+              width={quoteCardWidth}
               unit={entry.unit}
               selectedMintUrl={mintUrl}
               onRequestMintList={onRequestMintList}

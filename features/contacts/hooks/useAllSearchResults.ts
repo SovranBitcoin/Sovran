@@ -34,7 +34,7 @@ export type AllSearchResult =
       score: number;
     };
 
-export interface UseAllSearchResultsResult {
+interface UseAllSearchResultsResult {
   results: AllSearchResult[];
   loading: boolean;
 }

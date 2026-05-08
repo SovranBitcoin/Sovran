@@ -12,6 +12,7 @@
  */
 
 import React from 'react';
+import { useWindowDimensions, View } from 'react-native';
 
 import type { MeltHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
@@ -30,12 +31,13 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { View } from 'react-native';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+
+const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 
 interface MeltQuoteScreenProps {
   meltHistoryEntry?: MeltHistoryEntry | string;
@@ -49,6 +51,7 @@ export function MeltQuoteScreen({
   onRequestMintList,
 }: MeltQuoteScreenProps) {
   useLifecycleLogger('MeltQuoteScreen');
+  const { width: windowWidth } = useWindowDimensions();
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'meltQuote',
     meltHistoryEntry
@@ -67,6 +70,7 @@ export function MeltQuoteScreen({
 
   const isPreview = !entry.quoteId;
   const anyLoading = actions.pay.loading || actions.cancel.loading;
+  const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
   log.debug('send.melt_quote.render', {
     state: entry.state,
     isPreview,
@@ -131,7 +135,7 @@ export function MeltQuoteScreen({
 
           {entry.state === 'UNPAID' ? (
             <MintSelector
-              width={280}
+              width={quoteCardWidth}
               unit={entry.unit}
               selectedMintUrl={mintUrl}
               onRequestMintList={onRequestMintList}

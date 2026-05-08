@@ -168,7 +168,7 @@ const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !
 
 // Master switch: dev-only by default. Production builds skip the JS-thread
 // heartbeat side-effect entirely and skip the per-emit stack walk for warn.
-export const SHOW_LOGS = IS_DEV;
+export const SHOW_LOGS = true;
 
 // ─── Monotonic Clock ────────────────────────────────────────────────────────
 //

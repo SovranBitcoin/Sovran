@@ -28,10 +28,16 @@ type MenuRoute =
   | '/(drawer)/(tabs)/feed'
   | '/(drawer)/(tabs)/index'
   | '/(drawer)/(tabs)/contacts'
+  | '/(drawer)/(tabs)/ai'
   | '/(settings-flow)';
 
+type MenuIconPair = {
+  default: string;
+  selected: string;
+};
+
 type MenuItem = {
-  icon: string;
+  icon: MenuIconPair;
   label: string;
   route: MenuRoute;
   /** Segment-prefix that, when matched against `useSegments()`, marks this menu item active. */
@@ -40,25 +46,34 @@ type MenuItem = {
 
 const MENU_ITEMS: MenuItem[] = [
   {
-    icon: 'mingcute:home-4-fill',
+    icon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
     label: 'Feed',
     route: '/(drawer)/(tabs)/feed',
     activeSegments: ['(drawer)', '(tabs)', 'feed'],
   },
   {
-    icon: 'fluent:wallet-20-filled',
+    icon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
     label: 'Wallet',
     route: '/(drawer)/(tabs)/index',
     activeSegments: ['(drawer)', '(tabs)', 'index'],
   },
   {
-    icon: 'ph:user-bold',
+    icon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
     label: 'Contacts',
     route: '/(drawer)/(tabs)/contacts',
     activeSegments: ['(drawer)', '(tabs)', 'contacts'],
   },
   {
-    icon: 'material-symbols:settings-rounded',
+    icon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
+    label: 'AI',
+    route: '/(drawer)/(tabs)/ai',
+    activeSegments: ['(drawer)', '(tabs)', 'ai'],
+  },
+  {
+    icon: {
+      default: 'material-symbols:settings-rounded',
+      selected: 'material-symbols:settings-rounded',
+    },
     label: 'Settings',
     route: '/(settings-flow)',
     activeSegments: ['(settings-flow)'],
@@ -89,7 +104,7 @@ function MenuButton({
   onPress,
   isActive,
 }: {
-  icon: string;
+  icon: MenuIconPair;
   label: string;
   onPress: () => void;
   isActive: boolean;
@@ -102,7 +117,11 @@ function MenuButton({
       onPress={onPress}
       style={({ pressed }) => [styles.menuButton, pressed && { opacity: 0.6 }]}>
       <HStack align="center" spacing={12}>
-        <Icon name={icon} color={isActive ? foreground : opacity(foreground, 0.5)} size={24} />
+        <Icon
+          name={isActive ? icon.selected : icon.default}
+          color={isActive ? foreground : opacity(foreground, 0.5)}
+          size={24}
+        />
         <Text size={18} bold style={{ color: isActive ? foreground : opacity(foreground, 0.5) }}>
           {label}
         </Text>

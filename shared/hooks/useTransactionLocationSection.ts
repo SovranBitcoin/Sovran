@@ -16,7 +16,7 @@ import {
 } from '@/shared/stores/profile/transactionLocationStore';
 import { getLocationForTransaction } from '@/shared/hooks/useTransactionLocation';
 
-export interface UseTransactionLocationSectionResult {
+interface UseTransactionLocationSectionResult {
   location: TransactionLocation | null;
   isRevealed: boolean;
   reveal: () => void;

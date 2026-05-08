@@ -10,9 +10,9 @@ interface SectionProps {
 }
 
 /**
- * iOS Settings-style section: an uppercase title above a rounded content card.
- * Used as the standard container for grouped rows on settings, profile, share,
- * receive, mint info, and merchant detail screens.
+ * iOS Settings-style section: an uppercase title above grouped content.
+ * Children own their surface/radius so HeroUI ListGroup and GradientCard
+ * corners are not clipped by an extra wrapper radius.
  */
 export const Section: React.FC<SectionProps> = ({ title, children, isDanger }) => {
   const danger = useThemeColor('danger');
@@ -26,7 +26,7 @@ export const Section: React.FC<SectionProps> = ({ title, children, isDanger }) =
         style={isDanger ? { color: danger } : undefined}>
         {title}
       </Text>
-      <View className="overflow-hidden rounded-xl">{children}</View>
+      <View>{children}</View>
     </View>
   );
 };

@@ -62,7 +62,7 @@ export const SHARE_CONFIGS = {
 
 export type ShareType = keyof typeof SHARE_CONFIGS;
 
-export interface ShareScreenProps {
+interface ShareScreenProps {
   /** The type of data being shared */
   type: ShareType;
   /** The main data string to share (npub, p2pk key, etc.) */

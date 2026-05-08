@@ -18,7 +18,7 @@ const STALE_TTL_MS = 24 * 60 * 60 * 1000;
 // ("Maximum update depth exceeded"). Module-level constant fixes it.
 const SUBSCRIBE_OPTS = { closeOnEose: true } as const;
 
-export interface UseNostrProfileMetadataResult {
+interface UseNostrProfileMetadataResult {
   metadata: NostrProfileMetadata | undefined;
   isLoading: boolean;
 }
@@ -81,7 +81,7 @@ function parseRawMetadata(content: string): Omit<NostrProfileMetadata, 'fetchedA
   };
 }
 
-export interface UseNostrProfileMetadataManyResult {
+interface UseNostrProfileMetadataManyResult {
   /** Cached metadata for every pubkey we know about. Pubkeys still
    *  loading on first paint are absent from the map — callers can use
    *  `metadata.has(pubkey)` to drive loading skeletons. */

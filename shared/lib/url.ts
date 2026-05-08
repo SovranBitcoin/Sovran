@@ -5,7 +5,7 @@
 import { err, errAsync, ok, Result, ResultAsync } from 'neverthrow';
 import { Linking } from 'react-native';
 
-export type OpenUrlError =
+type OpenUrlError =
   | { type: 'invalid-url'; raw: string }
   | { type: 'unsupported-scheme'; scheme: string }
   | { type: 'open-failed'; cause: unknown };

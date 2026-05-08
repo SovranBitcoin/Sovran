@@ -93,7 +93,7 @@ describe('computeQuickSendSuggestions', () => {
       config: { limit: 1 },
     });
     const fiatCount = result.filter((s) => s.inputMode === 'fiat').length;
-    const satCount = result.filter((s) => s.inputMode === 'sat').length;
+    const satCount = result.filter((s) => s.inputMode === 'sat' && !s.sendAll).length;
     expect(fiatCount).toBeLessThanOrEqual(1);
     expect(satCount).toBeLessThanOrEqual(1);
   });

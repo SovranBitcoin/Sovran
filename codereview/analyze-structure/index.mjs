@@ -2905,6 +2905,34 @@ function clampDed(n, max) {
   return Math.max(0, Math.min(max, n));
 }
 
+// Pull up to N representative file paths out of a heterogeneous array of
+// rows. Handles the various shapes used by the metric computers above:
+//   - row.file          (most reports)
+//   - row.path          (history hotspots)
+//   - row[0]            (cycle SCCs are arrays of full paths)
+//   - row.files[0]      (duplicate-export rows)
+function pickExamples(rows, n = 3) {
+  if (!Array.isArray(rows)) return [];
+  const out = [];
+  for (const r of rows) {
+    if (out.length >= n) break;
+    let f = null;
+    if (typeof r === 'string') f = r;
+    else if (Array.isArray(r) && r.length > 0) f = r[0];
+    else if (r && typeof r === 'object') {
+      if (typeof r.file === 'string') f = r.file;
+      else if (typeof r.path === 'string') f = r.path;
+      else if (typeof r.fullPath === 'string') f = r.fullPath;
+      else if (Array.isArray(r.files) && r.files.length > 0) f = r.files[0];
+    }
+    if (!f) continue;
+    // Normalize absolute paths back to repo-relative.
+    if (f.startsWith('/')) f = relative(targetDir, f);
+    if (!out.includes(f)) out.push(f);
+  }
+  return out;
+}
+
 function computeScores(allFiles, dep, totals) {
   if (!dep || totals.files === 0) return null;
   const { faninMap, fanoutMap, edges, importedNamesByTarget } = dep;
@@ -2921,20 +2949,40 @@ function computeScores(allFiles, dep, totals) {
     let d = 0;
 
     const cyD = clampDed(cycles.length * 15, 60);
-    breakdown.push({ metric: 'circular dependencies', value: cycles.length, deduction: cyD });
+    breakdown.push({
+      metric: 'circular dependencies',
+      value: cycles.length,
+      deduction: cyD,
+      examples: pickExamples(cycles),
+    });
     d += cyD;
 
     const hubD = clampDed(per100(hub.length) * 8, 30);
-    breakdown.push({ metric: 'hub-spoke god modules', value: hub.length, deduction: hubD });
+    breakdown.push({
+      metric: 'hub-spoke god modules',
+      value: hub.length,
+      deduction: hubD,
+      examples: pickExamples(hub),
+    });
     d += hubD;
 
     if (archV !== null) {
       const aD = clampDed(archV.length * 3, 50);
-      breakdown.push({ metric: 'architecture rule violations', value: archV.length, deduction: aD });
+      breakdown.push({
+        metric: 'architecture rule violations',
+        value: archV.length,
+        deduction: aD,
+        examples: pickExamples(archV.map((v) => v.source || v.target || v.file)),
+      });
       d += aD;
     }
 
-    cats.push({ name: 'Architecture', weight: 20, score: Math.round(clampDed(100 - d, 100)), breakdown });
+    cats.push({
+      name: 'Architecture',
+      weight: 20,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown,
+    });
   }
 
   // ─── Module Design ─────────────────────────────────────────────────────
@@ -2946,18 +2994,38 @@ function computeScores(allFiles, dep, totals) {
     let d = 0;
 
     const sD = clampDed(per100(shallow.length) * 4, 50);
-    breakdown.push({ metric: 'shallow modules', value: shallow.length, deduction: sD });
+    breakdown.push({
+      metric: 'shallow modules',
+      value: shallow.length,
+      deduction: sD,
+      examples: pickExamples(shallow),
+    });
     d += sD;
 
     const ptD = clampDed(per100(pt.length) * 6, 40);
-    breakdown.push({ metric: 'pass-through suspects', value: pt.length, deduction: ptD });
+    breakdown.push({
+      metric: 'pass-through suspects',
+      value: pt.length,
+      deduction: ptD,
+      examples: pickExamples(pt),
+    });
     d += ptD;
 
     const rxD = clampDed(per100(rxDeep.length) * 5, 30);
-    breakdown.push({ metric: 're-export depth ≥2 (barrel hops)', value: rxDeep.length, deduction: rxD });
+    breakdown.push({
+      metric: 're-export depth ≥2 (barrel hops)',
+      value: rxDeep.length,
+      deduction: rxD,
+      examples: pickExamples(rxDeep),
+    });
     d += rxD;
 
-    cats.push({ name: 'Module Design', weight: 15, score: Math.round(clampDed(100 - d, 100)), breakdown });
+    cats.push({
+      name: 'Module Design',
+      weight: 15,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown,
+    });
   }
 
   // ─── Code Complexity ───────────────────────────────────────────────────
@@ -2973,12 +3041,15 @@ function computeScores(allFiles, dep, totals) {
       name: 'Code Complexity',
       weight: 15,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [{
-        metric: `complexity hotspots (cognitive ≥ ${complexityThreshold})`,
-        value: cx.length,
-        deduction: d,
-        detail: `weighted severity: ${severity}`,
-      }],
+      breakdown: [
+        {
+          metric: `complexity hotspots (cognitive ≥ ${complexityThreshold})`,
+          value: cx.length,
+          deduction: d,
+          detail: `weighted severity: ${severity}`,
+          examples: pickExamples(cx),
+        },
+      ],
     });
   }
 
@@ -2992,12 +3063,15 @@ function computeScores(allFiles, dep, totals) {
       name: 'Type Safety',
       weight: 10,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [{
-        metric: 'type-safety smells (any / ! / as / @ts-*)',
-        value: total,
-        deduction: d,
-        detail: `${perKLoc.toFixed(1)} weighted smells per kLOC`,
-      }],
+      breakdown: [
+        {
+          metric: 'type-safety smells (any / ! / as / @ts-*)',
+          value: total,
+          deduction: d,
+          detail: `${perKLoc.toFixed(1)} weighted smells per kLOC`,
+          examples: pickExamples(ts),
+        },
+      ],
     });
   }
 
@@ -3012,12 +3086,15 @@ function computeScores(allFiles, dep, totals) {
       name: 'Component Health',
       weight: 10,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [{
-        metric: 'flagged components',
-        value: smells.length,
-        deduction: d,
-        detail: `${rate.toFixed(1)}% of ${totalComps} components`,
-      }],
+      breakdown: [
+        {
+          metric: 'flagged components',
+          value: smells.length,
+          deduction: d,
+          detail: `${rate.toFixed(1)}% of ${totalComps} components`,
+          examples: pickExamples(smells),
+        },
+      ],
     });
   }
 
@@ -3038,22 +3115,47 @@ function computeScores(allFiles, dep, totals) {
     let d = 0;
 
     const oD = clampDed(per100(orphans.length) * 5, 40);
-    breakdown.push({ metric: 'dead orphan files', value: orphans.length, deduction: oD });
+    breakdown.push({
+      metric: 'dead orphan files',
+      value: orphans.length,
+      deduction: oD,
+      examples: pickExamples(orphans.map((o) => relative(targetDir, o.fullPath))),
+    });
     d += oD;
 
     const uD = clampDed(per100(unused.length) * 4, 30);
-    breakdown.push({ metric: 'files with unused exports', value: unused.length, deduction: uD });
+    breakdown.push({
+      metric: 'files with unused exports',
+      value: unused.length,
+      deduction: uD,
+      examples: pickExamples(unused),
+    });
     d += uD;
 
     const dpD = clampDed(per100(dup.dupRows.length) * 6, 25);
-    breakdown.push({ metric: 'duplicate export names', value: dup.dupRows.length, deduction: dpD });
+    breakdown.push({
+      metric: 'duplicate export names',
+      value: dup.dupRows.length,
+      deduction: dpD,
+      examples: pickExamples(dup.dupRows),
+    });
     d += dpD;
 
     const cD = clampDed(dup.defaultPlusNamed.length * 5, 20);
-    breakdown.push({ metric: 'default+named clashes', value: dup.defaultPlusNamed.length, deduction: cD });
+    breakdown.push({
+      metric: 'default+named clashes',
+      value: dup.defaultPlusNamed.length,
+      deduction: cD,
+      examples: pickExamples(dup.defaultPlusNamed),
+    });
     d += cD;
 
-    cats.push({ name: 'Hygiene', weight: 15, score: Math.round(clampDed(100 - d, 100)), breakdown });
+    cats.push({
+      name: 'Hygiene',
+      weight: 15,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown,
+    });
   }
 
   // ─── Testability ───────────────────────────────────────────────────────
@@ -3067,19 +3169,23 @@ function computeScores(allFiles, dep, totals) {
     return true;
   }).length;
   if (testable > 0) {
-    const gaps = computeTestColocation(allFiles).length;
+    const gapRows = computeTestColocation(allFiles);
+    const gaps = gapRows.length;
     const covered = testable - gaps;
     const coverage = (covered / testable) * 100;
     cats.push({
       name: 'Testability',
       weight: 10,
       score: Math.round(clampDed(coverage, 100)),
-      breakdown: [{
-        metric: 'colocated test coverage',
-        value: covered,
-        deduction: Math.round(100 - coverage),
-        detail: `${covered}/${testable} testable files have a colocated test`,
-      }],
+      breakdown: [
+        {
+          metric: 'colocated test coverage',
+          value: covered,
+          deduction: Math.round(100 - coverage),
+          detail: `${covered}/${testable} testable files have a colocated test`,
+          examples: pickExamples(gapRows),
+        },
+      ],
     });
   }
 
@@ -3107,7 +3213,12 @@ function computeScores(allFiles, dep, totals) {
       d += sD;
     }
     if (breakdown.length > 0) {
-      cats.push({ name: 'Conceptual Cohesion', weight: 5, score: Math.round(clampDed(100 - d, 100)), breakdown });
+      cats.push({
+        name: 'Conceptual Cohesion',
+        weight: 5,
+        score: Math.round(clampDed(100 - d, 100)),
+        breakdown,
+      });
     }
   }
 
@@ -3119,7 +3230,7 @@ function computeScores(allFiles, dep, totals) {
 function scoreColor(score) {
   if (score >= 90) return '\x1b[32m'; // green
   if (score >= 50) return '\x1b[33m'; // yellow
-  return '\x1b[31m';                  // red
+  return '\x1b[31m'; // red
 }
 
 function scoreBar(score, width = 30) {
@@ -3156,6 +3267,10 @@ function renderScores(scores) {
       const colored = dRaw > 0 ? `\x1b[33m${padded}\x1b[0m` : `\x1b[2m${padded}\x1b[0m`;
       const detail = b.detail ? ` \x1b[2m— ${b.detail}\x1b[0m` : '';
       lines.push(`    ${colored}  ${b.metric.padEnd(40)} value: ${b.value}${detail}`);
+      if (dRaw > 0 && Array.isArray(b.examples) && b.examples.length > 0) {
+        // Files to look into — dim/gray, indented under the metric line.
+        lines.push(`           \x1b[90m└─ look into: ${b.examples.join(', ')}\x1b[0m`);
+      }
     }
     lines.push('');
   }

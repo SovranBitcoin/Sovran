@@ -22,7 +22,7 @@ import { log } from '@/shared/lib/logger';
 // Capture bundled theme names at module load (before any dynamic registration)
 const BUNDLED_THEME_NAMES = new Set(Object.keys(THEMES));
 
-export interface DownloadedThemeData {
+interface DownloadedThemeData {
   themeName: string;
   displayName: string;
   localUri: string;

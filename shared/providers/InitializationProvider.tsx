@@ -45,7 +45,7 @@ initLog('Module', 'InitializationProvider loaded');
 type StageStatus = 'pending' | 'loading' | 'complete' | 'error';
 
 /** Configuration passed when registering a new initialization stage. */
-export interface StageConfig {
+interface StageConfig {
   /** Human-readable message — captured into init logs only. */
   message?: string;
   /** IDs of stages that must complete before this one can start. */

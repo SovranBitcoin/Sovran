@@ -5,7 +5,7 @@
  * it without re-implementing prefix detection.
  */
 
-export type DisplayValueLayout =
+type DisplayValueLayout =
   | { kind: 'prefix-split'; prefix: 'npub' | 'lnbc1' | 'cashuA' | 'cashuB' | 'creqA'; body: string }
   | { kind: 'email'; username: string; domain: string }
   | { kind: 'bitcoin-uri'; value: string }

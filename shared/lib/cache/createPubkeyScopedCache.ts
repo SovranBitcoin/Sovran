@@ -19,7 +19,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Logger } from '@/shared/lib/logger';
 
-export interface PubkeyScopedCacheOpts<T> {
+interface PubkeyScopedCacheOpts<T> {
   /** Storage prefix for the positive blob. Final key: `{prefix}:{scope}`. */
   storagePrefix: string;
   /** Storage prefix for the negative blob. Omit to disable negative cache. */
@@ -40,7 +40,7 @@ export interface PubkeyScopedCacheOpts<T> {
   validate?: (value: unknown) => value is T;
 }
 
-export interface PubkeyScopedCache<T> {
+interface PubkeyScopedCache<T> {
   hydrate(scope: string): Promise<void>;
   get(scope: string, key: string): T | undefined;
   put(scope: string, key: string, value: T): void;
@@ -68,9 +68,7 @@ interface PerScopeCache<T> {
   flushTimer: ReturnType<typeof setTimeout> | null;
 }
 
-export function createPubkeyScopedCache<T>(
-  opts: PubkeyScopedCacheOpts<T>,
-): PubkeyScopedCache<T> {
+export function createPubkeyScopedCache<T>(opts: PubkeyScopedCacheOpts<T>): PubkeyScopedCache<T> {
   const maxEntries = opts.maxEntries ?? 1000;
   const maxNegEntries = opts.maxNegEntries ?? 200;
   const flushDebounceMs = opts.flushDebounceMs ?? 1000;
@@ -253,9 +251,7 @@ export function createPubkeyScopedCache<T>(
         s.dirty = false;
         s.dirtyNeg = false;
       }
-      const removes: Promise<void>[] = [
-        AsyncStorage.removeItem(`${opts.storagePrefix}:${scope}`),
-      ];
+      const removes: Promise<void>[] = [AsyncStorage.removeItem(`${opts.storagePrefix}:${scope}`)];
       if (opts.storagePrefixNeg) {
         removes.push(AsyncStorage.removeItem(`${opts.storagePrefixNeg}:${scope}`));
       }
