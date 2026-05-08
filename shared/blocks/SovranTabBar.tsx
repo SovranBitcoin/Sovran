@@ -1,23 +1,38 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import opacity from 'hex-color-opacity';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 
-const ACTIVE_COLOR = '#FFFFFF';
-const INACTIVE_COLOR = 'rgba(255, 255, 255, 0.55)';
 const BAR_HEIGHT = 52;
 
 export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const [foreground, surface, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface',
+    'surface-secondary',
+  ] as const);
+
+  const activeColor = foreground;
+  const inactiveColor = opacity(foreground, 0.5);
+  const dividerColor = opacity(foreground, 0.12);
+  const pressedColor = opacity(foreground, 0.08);
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-      <View style={styles.divider} />
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: surface, paddingBottom: Math.max(insets.bottom, 8) },
+      ]}>
+      <View style={[styles.divider, { backgroundColor: dividerColor }]} />
       <View style={styles.row}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const focused = state.index === index;
-          const color = focused ? ACTIVE_COLOR : INACTIVE_COLOR;
+          const color = focused ? activeColor : inactiveColor;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -47,7 +62,12 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
               testID={options.tabBarButtonTestID}
               onPress={onPress}
               onLongPress={onLongPress}
-              style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]}
+              style={({ pressed }) => [
+                styles.tab,
+                focused && { backgroundColor: surfaceSecondary },
+                pressed && { backgroundColor: pressedColor },
+              ]}
+              activeOpacity={1}
               hitSlop={8}>
               {tabBarIcon ? tabBarIcon({ focused, color, size: 26 }) : null}
             </Pressable>
@@ -60,26 +80,28 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#000',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   row: {
     flexDirection: 'row',
     height: BAR_HEIGHT,
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
+    gap: 4,
   },
   tab: {
     flex: 1,
-    height: BAR_HEIGHT,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tabPressed: {
-    opacity: 0.6,
+    borderRadius: 14,
+    borderCurve: 'continuous',
   },
 });
