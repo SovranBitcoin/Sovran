@@ -58,7 +58,11 @@ interface ChatScreenProps {
    * by surfaces sitting underneath a translucent system tab bar (the AI
    * tab's NativeTabs). The composer is shifted up by this much, and the
    * GiftedChat list grows its content padding to match so the newest bubble
-   * still rests just above the composer.
+   * still rests just above the composer. When omitted, falls back to the
+   * bottom safe-area inset so standalone surfaces (DMs) clear the home
+   * indicator. An explicit `0` is honored — surfaces above a JS tab bar
+   * that already absorbs the home indicator pass `0` so the composer sits
+   * flush against the bar instead of floating above it.
    */
   bottomInset?: number;
   /**
@@ -120,7 +124,7 @@ export function ChatScreen({
   isLoading,
   loadingContent,
   emptyContent,
-  bottomInset = 0,
+  bottomInset,
   topInset = 0,
   renderBubble,
   counterpartyAvatar,
@@ -142,11 +146,14 @@ export function ChatScreen({
   //
   // `bottomInset` defaults to the bottom safe-area inset so the composer
   // clears the home indicator out of the box. The AI tab passes its own
-  // inset (NativeTabs reports tab-bar + home-indicator together) and that
-  // override wins. `topInset` falls back to `insets.top` only when there's
-  // no nav header above (since a real `headerHeight` already includes the
-  // status-bar inset; doubling them up pushes content too far down).
-  const resolvedBottomInset = bottomInset > 0 ? bottomInset : safeAreaInsets.bottom;
+  // inset (NativeTabs reports tab-bar + home-indicator together; the
+  // SovranTabBar path passes an explicit 0 because the bar already absorbs
+  // the home indicator). `undefined` is the "not provided" sentinel so an
+  // explicit 0 is honored instead of falling through to `insets.bottom`.
+  // `topInset` falls back to `insets.top` only when there's no nav header
+  // above (since a real `headerHeight` already includes the status-bar
+  // inset; doubling them up pushes content too far down).
+  const resolvedBottomInset = bottomInset !== undefined ? bottomInset : safeAreaInsets.bottom;
   const resolvedTopInset = topInset > 0 ? topInset : headerHeight > 0 ? 0 : safeAreaInsets.top;
 
   const [draft, setDraft] = useState('');

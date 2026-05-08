@@ -6,6 +6,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useRoutstrStore, type RoutstrMessage } from '@/shared/stores/profile/routstrStore';
 import { ChatScreen, type ChatBubbleMessage } from '@/shared/ui/composed/chat';
 import { aiLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 import { ModelChip } from '../components/ModelChip';
 import { AiEmptyState } from '../components/AiEmptyState';
 import { AiMessageBubble, type BranchNav } from '../components/AiMessageBubble';
@@ -25,13 +26,19 @@ const SURFACE = 'ai';
 export function AiChatScreen() {
   useLifecycleLogger('AiChatScreen');
 
-  // iOS NativeTabs is a real `UITabBarController`, so the system already
-  // grows the screen's bottom safe-area inset to cover the tab bar +
-  // home-indicator. Reading `insets.bottom` gives us exactly the offset
-  // the composer needs to clear the tab bar — adding `useTabBarBottomPadding`
-  // on top of this would double-count and float the composer ~50pt above
-  // the bar instead of flush.
-  const bottomInset = useSafeAreaInsets().bottom;
+  // Two tab-bar paths, two different bottom-inset shapes:
+  //   • NativeTabs (iOS 26+ liquid glass): real `UITabBarController` grows
+  //     the screen's bottom safe-area inset to cover tab bar + home-indicator
+  //     together (~83pt on iPhone). The composer sits at `bottom: insets.bottom`
+  //     over a full-screen frame and lands flush above the bar.
+  //   • SovranTabBar (older iOS / Android): JS tab bar that already absorbs
+  //     the home-indicator inset itself, and the screen frame ends at the
+  //     bar's top. `insets.bottom` here still reports the window-level home
+  //     indicator (~34pt), so using it would float the composer above the
+  //     tab bar instead of flush against it. Pass 0 on this path — ChatScreen
+  //     honors explicit 0 and skips its `safeAreaInsets.bottom` fallback.
+  const insets = useSafeAreaInsets();
+  const bottomInset = isExpo55NativeTabsSupported() ? insets.bottom : 0;
   // The AI tab's stack header is `headerTransparent: true` (the BalancePill
   // floats over the chat). Pad the chat list down by the header's height so
   // the topmost bubble doesn't slide under the pill on first paint.
