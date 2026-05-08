@@ -4,7 +4,7 @@ import {
   GestureHandlerRootView,
   Pressable as GesturePressable,
 } from 'react-native-gesture-handler';
-import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { router, useSegments } from 'expo-router';
 import { DrawerContentComponentProps } from '@react-navigation/drawer';
 import opacity from 'hex-color-opacity';
@@ -194,7 +194,9 @@ function DrawerContentInner({
   }, []);
 
   return (
-    <AnimatedBackgroundView>
+    <AnimatedBackgroundView
+      showBackgroundImage={Platform.OS !== 'android'}
+      useMeshGradient={Platform.OS === 'android'}>
       <ScrollableGradientOverlay contentHeight={contentHeight} />
       <View style={[styles.drawerCardBorder, { borderColor: opacity(muted, 0.3) }]}>
         <View style={styles.drawerCardClip}>

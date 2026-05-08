@@ -1,18 +1,19 @@
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MeshGradientView } from 'expo-mesh-gradient';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import React, { memo, ReactNode, useMemo } from 'react';
-import { StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useTheme } from '@/shared/providers/ThemeProvider';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
-import AnimatedSpriteBackground from './SpriteView';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { supportsBlur } from '@/shared/lib/version';
 import { Log, log, useRenderLogger } from '@/shared/lib/logger';
+import AnimatedSpriteBackground from './SpriteView';
 
 type BlurTint =
   | 'light'
@@ -35,6 +36,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+const BACKGROUND_MESH_POINTS = [
+  [0, 0],
+  [0.5, 0],
+  [1, 0],
+  [0, 0.5],
+  [0.5, 0.5],
+  [1, 0.5],
+  [0, 1],
+  [0.5, 1],
+  [1, 1],
+];
+const BACKGROUND_MESH_RESOLUTION = { x: 48, y: 48 };
+const SCROLL_OVERLAY_MESH_COLUMNS = 3;
+const SCROLL_OVERLAY_MESH_ROWS = 4;
+const SCROLL_OVERLAY_MESH_RESOLUTION = { x: 24, y: 64 };
+
+function getMeshGradientColors(
+  gradientColors: Record<'100' | '200' | '300', string> | null | undefined,
+  fallbackColor: string
+) {
+  const light = gradientColors?.['100'] || fallbackColor;
+  const mid = gradientColors?.['200'] || fallbackColor;
+  const dark = gradientColors?.['300'] || fallbackColor;
+
+  return [mid, light, mid, dark, mid, light, dark, dark, mid];
+}
+
+function getScrollableOverlayMeshPoints(start: number, end: number) {
+  const resolvedStart = Math.max(0, Math.min(start, 1));
+  const resolvedEnd = Math.max(resolvedStart, Math.min(end, 1));
+
+  return [0, resolvedStart, resolvedEnd, 1].flatMap((y) => [
+    [0, y],
+    [0.5, y],
+    [1, y],
+  ]);
+}
+
+function getScrollableOverlayMeshColors({
+  top,
+  mid,
+  bottom,
+}: {
+  top: string;
+  mid: string;
+  bottom: string;
+}) {
+  return [top, top, top, top, top, top, mid, mid, mid, bottom, bottom, bottom];
+}
 
 // ============================================================================
 // ScrollableGradientOverlay - Place inside ScrollView for scroll-synced blur
@@ -138,6 +189,42 @@ function ScrollableGradientOverlayComponent({
   }, [viewportHeight, contentHeight, blurGradientStart, blurGradientEnd]);
 
   const overlayHeight = contentHeight || viewportHeight;
+  const androidMeshPoints = useMemo(
+    () =>
+      getScrollableOverlayMeshPoints(
+        gradientLocations.overlayLocations[0],
+        gradientLocations.overlayLocations[1]
+      ),
+    [gradientLocations.overlayLocations]
+  );
+  const androidThemeMeshColors = useMemo(() => {
+    if (!gradientColors) return null;
+
+    const color = gradientColors['300'];
+    return getScrollableOverlayMeshColors({
+      top: opacity(color, 0),
+      mid: opacity(color, gradientOverlayOpacity),
+      bottom: opacity(color, gradientOverlayOpacity),
+    });
+  }, [gradientColors, gradientOverlayOpacity]);
+  const androidBackgroundMeshColors = useMemo(
+    () =>
+      getScrollableOverlayMeshColors({
+        top: opacity(primaryColor950, 0),
+        mid: opacity(primaryColor950, gradientOverlayOpacity),
+        bottom: primaryColor950,
+      }),
+    [primaryColor950, gradientOverlayOpacity]
+  );
+  const androidMaskMeshColors = useMemo(
+    () =>
+      getScrollableOverlayMeshColors({
+        top: 'transparent',
+        mid: primaryColor950,
+        bottom: primaryColor950,
+      }),
+    []
+  );
 
   return (
     <Log name="ScrollableGradientOverlay">
@@ -150,36 +237,75 @@ function ScrollableGradientOverlayComponent({
           height: overlayHeight,
         }}
         pointerEvents="none">
-        <MaskedView
-          style={StyleSheet.absoluteFillObject}
-          maskElement={
-            <LinearGradient
-              colors={['transparent', 'transparent', 'black', 'black']}
-              locations={gradientLocations.maskLocations}
-              style={StyleSheet.absoluteFillObject}
-            />
-          }>
-          <BlurView
-            intensity={blurIntensity}
-            tint={blurTint}
+        {Platform.OS === 'android' ? (
+          <MeshGradientView
+            columns={SCROLL_OVERLAY_MESH_COLUMNS}
+            rows={SCROLL_OVERLAY_MESH_ROWS}
+            colors={androidMaskMeshColors}
+            points={androidMeshPoints}
+            resolution={SCROLL_OVERLAY_MESH_RESOLUTION}
+            smoothsColors
             style={StyleSheet.absoluteFillObject}
           />
-        </MaskedView>
-        {showGradientOverlay && gradientColors && (
+        ) : (
+          <MaskedView
+            style={StyleSheet.absoluteFillObject}
+            maskElement={
+              <LinearGradient
+                colors={['transparent', 'transparent', 'black', 'black']}
+                locations={gradientLocations.maskLocations}
+                style={StyleSheet.absoluteFillObject}
+              />
+            }>
+            <BlurView
+              intensity={blurIntensity}
+              tint={blurTint}
+              style={StyleSheet.absoluteFillObject}
+            />
+          </MaskedView>
+        )}
+        {showGradientOverlay && gradientColors && Platform.OS !== 'android' && (
           <LinearGradient
             colors={[
               opacity(gradientColors?.['300'], 0),
               opacity(gradientColors?.['300'], gradientOverlayOpacity),
             ]}
             locations={gradientLocations.overlayLocations}
+            dither
             style={StyleSheet.absoluteFillObject}
           />
         )}
-        <LinearGradient
-          colors={[opacity(primaryColor950, 0), opacity(primaryColor950, gradientOverlayOpacity)]}
-          locations={gradientLocations.overlayLocations}
-          style={StyleSheet.absoluteFillObject}
-        />
+        {Platform.OS === 'android' ? (
+          <>
+            {showGradientOverlay && androidThemeMeshColors && (
+              <MeshGradientView
+                columns={SCROLL_OVERLAY_MESH_COLUMNS}
+                rows={SCROLL_OVERLAY_MESH_ROWS}
+                colors={androidThemeMeshColors}
+                points={androidMeshPoints}
+                resolution={SCROLL_OVERLAY_MESH_RESOLUTION}
+                smoothsColors
+                style={StyleSheet.absoluteFillObject}
+              />
+            )}
+            <MeshGradientView
+              columns={SCROLL_OVERLAY_MESH_COLUMNS}
+              rows={SCROLL_OVERLAY_MESH_ROWS}
+              colors={androidBackgroundMeshColors}
+              points={androidMeshPoints}
+              resolution={SCROLL_OVERLAY_MESH_RESOLUTION}
+              smoothsColors
+              style={StyleSheet.absoluteFillObject}
+            />
+          </>
+        ) : (
+          <LinearGradient
+            colors={[opacity(primaryColor950, 0), opacity(primaryColor950, gradientOverlayOpacity)]}
+            locations={gradientLocations.overlayLocations}
+            dither
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
       </View>
     </Log>
   );
@@ -217,6 +343,17 @@ interface AnimatedBackgroundViewProps {
    * gradient dark color (scale '300').
    */
   gradientColor?: string;
+  /**
+   * Render the active wallpaper image behind the gradient overlay.
+   * @default true
+   */
+  showBackgroundImage?: boolean;
+  /**
+   * Render the theme gradient as a native mesh. Useful for Android
+   * surfaces where linear gradients show banding.
+   * @default false
+   */
+  useMeshGradient?: boolean;
 }
 
 /**
@@ -240,6 +377,8 @@ function AnimatedBackgroundViewComponent({
   staticBlurIntensity,
   gradientTopOpacity = 0,
   gradientColor,
+  showBackgroundImage = true,
+  useMeshGradient = false,
 }: AnimatedBackgroundViewProps) {
   useRenderLogger('AnimatedBackgroundView');
   const surface = useThemeColor('surface');
@@ -252,6 +391,10 @@ function AnimatedBackgroundViewComponent({
     }
     return null;
   }, [currentTheme]);
+  const meshGradientColors = useMemo(
+    () => getMeshGradientColors(gradientColors, gradientColor || surface),
+    [gradientColors, gradientColor, surface]
+  );
 
   log.debug('bg.view.render', {
     theme: currentTheme,
@@ -294,19 +437,32 @@ function AnimatedBackgroundViewComponent({
 
         {/* Animated background image or solid color - with configurable opacity */}
         <Animated.View style={[StyleSheet.absoluteFillObject, backgroundAnimatedStyle]}>
-          <AnimatedSpriteBackground backgroundColor={surface} />
+          {showBackgroundImage && <AnimatedSpriteBackground backgroundColor={surface} />}
 
-          {/* Gradient overlay for image themes */}
-          {(gradientColors || gradientColor) && (
-            <LinearGradient
-              colors={[
-                opacity(gradientColor || gradientColors!['300'], gradientTopOpacity),
-                opacity(gradientColor || gradientColors!['300'], 1),
-              ]}
-              locations={[0, 1]}
+          {useMeshGradient ? (
+            <MeshGradientView
+              columns={3}
+              rows={3}
+              colors={meshGradientColors}
+              points={BACKGROUND_MESH_POINTS}
+              resolution={BACKGROUND_MESH_RESOLUTION}
+              smoothsColors
               style={StyleSheet.absoluteFillObject}
-              pointerEvents="none"
             />
+          ) : (
+            /* Gradient overlay for image themes */
+            (gradientColors || gradientColor) && (
+              <LinearGradient
+                colors={[
+                  opacity(gradientColor || gradientColors!['300'], gradientTopOpacity),
+                  opacity(gradientColor || gradientColors!['300'], 1),
+                ]}
+                locations={[0, 1]}
+                dither
+                style={StyleSheet.absoluteFillObject}
+                pointerEvents="none"
+              />
+            )
           )}
         </Animated.View>
 
