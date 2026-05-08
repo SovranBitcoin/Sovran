@@ -1117,9 +1117,17 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   const chooseProofs = (amount: number) => send({ type: 'PROOFS_CHOSEN', amount });
 
-  const startSendEcash = (opts?: { reset?: boolean }) => {
+  const startSendEcash = (opts?: {
+    reset?: boolean;
+    meltTarget?: string;
+    recipientPubkey?: string;
+  }) => {
     if (opts?.reset) resetInternal();
-    return send({ type: 'START_SEND_ECASH' });
+    return send({
+      type: 'START_SEND_ECASH',
+      ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
+      ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
+    });
   };
 
   const startReceiveLightning = () => send({ type: 'START_RECEIVE_LIGHTNING' });

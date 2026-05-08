@@ -40,13 +40,14 @@ import {
   extractCashuToken,
   type ChatBubbleMessage,
 } from '@/shared/ui/composed/chat';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 const SURFACE = 'nostr-dm' as const;
 
@@ -67,12 +68,22 @@ interface UserMessagesScreenProps {
   onBack?: () => void;
 }
 
+type SendMoneyPaymentMachine = {
+  startSendEcash: (opts?: {
+    reset?: boolean;
+    meltTarget?: string;
+    recipientPubkey?: string;
+  }) => Promise<void>;
+};
+
 export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
 
   const [shade400, background] = useThemeColor(['shade-400', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
   const { ndk } = useNDK();
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
 
   const [messages, setMessages] = useState<DmMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -423,32 +434,23 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey]
   );
 
-  const handleSendMoney = () => {
+  const handleSendMoney = useCallback(() => {
     log.debug('user.messages.send_money', {
       lud16,
       userName: counterpartyMetadata?.name,
     });
     if (!lud16 || !counterpartyMetadata) return;
 
-    // The amount screen's Next button now exposes an ecash/lightning/onchain
-    // menu via coco-payment-ux amountEntry.next variants — so we skip the
-    // upfront choice popup and let the user pick at Next time. We default
-    // destination to sendEcash and pass meltTarget alongside so the Lightning
-    // variant is enabled on arrival.
-    const mint = useMintStore.getState().selectedMint ?? '';
-    router.navigate({
-      pathname: '/(send-flow)/amount',
-      params: {
-        amountEntry: JSON.stringify({
-          destination: 'sendEcash',
-          unit: 'sat',
-          selectedMintUrl: mint,
-          meltTarget: lud16,
-          recipientPubkey: pubkey,
-        }),
-      },
+    // Enter through coco-payment-ux's normal Send entrypoint so no-balance
+    // and multi-mint selection behavior stays identical to the wallet Send
+    // button. The chat-specific fields are carried into amount entry so the
+    // Lightning variant remains available at Next time.
+    void (machine as SendMoneyPaymentMachine).startSendEcash({
+      reset: true,
+      meltTarget: lud16,
+      recipientPubkey: pubkey,
     });
-  };
+  }, [counterpartyMetadata, lud16, machine, pubkey]);
 
   return (
     <Screen name="UserMessagesScreen" scroll="none">

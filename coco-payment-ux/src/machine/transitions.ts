@@ -225,7 +225,7 @@ function handleMintSelected(
 function handleProofsChosen(
   event: FlowEvent & { type: 'PROOFS_CHOSEN' },
   currentCtx: FlowContext,
-  walletCtx: WalletContext
+  _walletCtx: WalletContext
 ): TransitionResult {
   const ctx: FlowContext = { ...currentCtx, amount: event.amount };
   const destination = ctx.destination ?? 'sendEcash';
@@ -318,10 +318,22 @@ function handleMintSelectorRequested(
 function handleStartSendEcash(
   walletCtx: WalletContext,
   unit: string,
-  offline?: boolean
+  offline?: boolean,
+  opts?: { meltTarget?: string; recipientPubkey?: string }
 ): TransitionResult {
-  logger.info('transitions.startSendEcash', { unit, offline: offline ?? false });
-  const ctx: FlowContext = { unit, destination: 'sendEcash', offline };
+  logger.info('transitions.startSendEcash', {
+    unit,
+    offline: offline ?? false,
+    hasMeltTarget: !!opts?.meltTarget,
+    recipientPubkeyPresent: !!opts?.recipientPubkey,
+  });
+  const ctx: FlowContext = {
+    unit,
+    destination: 'sendEcash',
+    offline,
+    ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
+    ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
+  };
   const selection = selectMint(walletCtx);
   logger.info('transitions.mintSelection.result', {
     selectionType: selection.type,
@@ -337,7 +349,11 @@ function handleStartSendEcash(
         data: {
           unit,
           preselectedMintUrl: selection.mintUrl,
-          constraints: { destination: 'sendEcash' },
+          constraints: {
+            destination: 'sendEcash',
+            ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
+            ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
+          },
         },
       };
     case 'selectionNeeded':
@@ -348,6 +364,8 @@ function handleStartSendEcash(
           candidates: selection.validMints,
           unit,
           destination: 'sendEcash',
+          ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
+          ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
         },
       };
     case 'noValidMint':
@@ -582,7 +600,12 @@ export function transition(
     case 'REQUEST_MINT_SELECTOR':
       return stamp(handleMintSelectorRequested(event, currentCtx, walletCtx));
     case 'START_SEND_ECASH':
-      return stamp(handleStartSendEcash(walletCtx, unit, offline));
+      return stamp(
+        handleStartSendEcash(walletCtx, unit, offline, {
+          ...(event.meltTarget ? { meltTarget: event.meltTarget } : {}),
+          ...(event.recipientPubkey ? { recipientPubkey: event.recipientPubkey } : {}),
+        })
+      );
     case 'START_RECEIVE_LIGHTNING':
       return stamp(handleStartReceiveLightning(walletCtx, unit));
     case 'START_RECEIVE':

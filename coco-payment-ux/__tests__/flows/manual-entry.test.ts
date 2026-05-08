@@ -30,7 +30,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTestMachine, runScenario } from '../_harness';
-import { WALLETS, MINT1, MINT2 } from '../_harness/fixtures';
+import { WALLETS, MINT1 } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
 
 // ---------------------------------------------------------------------------
@@ -77,6 +77,64 @@ describe('manual entry — startSendEcash', () => {
     const tm = createTestMachine({ wallet: WALLETS.noBalance });
     await tm.machine.startSendEcash();
     tm.assertStep('error');
+  });
+
+  it('chat send-money: reuses send guard while seeding lightning target', async () => {
+    const recipientPubkey = 'a'.repeat(64);
+    const tm = createTestMachine();
+
+    await tm.machine.startSendEcash({
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+
+    tm.assertStep('enterAmount');
+    tm.assertContext({
+      destination: 'sendEcash',
+      mintUrl: MINT1,
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'enterAmount',
+      data: {
+        preselectedMintUrl: MINT1,
+        constraints: {
+          destination: 'sendEcash',
+          meltTarget: 'alice@example.com',
+          recipientPubkey,
+        },
+      },
+    });
+  });
+
+  it('chat send-money: keeps lightning target when mint selection is required', async () => {
+    const recipientPubkey = 'b'.repeat(64);
+    const tm = createTestMachine({
+      wallet: { ...WALLETS.default, preferredMintUrl: undefined },
+    });
+
+    await tm.machine.startSendEcash({
+      meltTarget: 'bob@example.com',
+      recipientPubkey,
+    });
+
+    tm.assertStep('selectMint');
+    tm.assertContext({
+      destination: 'sendEcash',
+      meltTarget: 'bob@example.com',
+      recipientPubkey,
+    });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'selectMint',
+      data: {
+        destination: 'sendEcash',
+        meltTarget: 'bob@example.com',
+        recipientPubkey,
+      },
+    });
   });
 });
 

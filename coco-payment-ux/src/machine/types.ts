@@ -296,7 +296,17 @@ export type FlowEvent =
     }
   | { type: 'PROOFS_CHOSEN'; amount: number }
   | { type: 'REQUEST_MINT_SELECTOR'; scope?: 'npc' | 'selected' }
-  | { type: 'START_SEND_ECASH' }
+  | {
+      type: 'START_SEND_ECASH';
+      /**
+       * Optional Lightning target to carry into amount entry. Chat surfaces
+       * can start with the same ecash-send mint guard while still enabling
+       * the Lightning variant from the amount screen.
+       */
+      meltTarget?: string;
+      /** See `FlowContext.recipientPubkey` — chat-launched flows seed this. */
+      recipientPubkey?: string;
+    }
   | { type: 'START_RECEIVE_LIGHTNING' }
   | { type: 'START_RECEIVE' }
   | { type: 'REVIEW_MINT'; mintUrl: string; token: string }
@@ -842,7 +852,11 @@ export interface PaymentMachine {
    */
   requestMintSelector: (opts?: { reset?: boolean; scope?: 'npc' | 'selected' }) => Promise<void>;
   /** Start a send ecash flow. Auto-selects mint, opens amount screen. */
-  startSendEcash: (opts?: { reset?: boolean }) => Promise<void>;
+  startSendEcash: (opts?: {
+    reset?: boolean;
+    meltTarget?: string;
+    recipientPubkey?: string;
+  }) => Promise<void>;
   /** Start a receive lightning flow. Opens amount screen for mint quote. */
   startReceiveLightning: () => Promise<void>;
   /** Open the receive hub screen (Lightning address, P2PK). */
