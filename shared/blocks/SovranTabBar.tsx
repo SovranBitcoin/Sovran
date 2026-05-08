@@ -22,11 +22,7 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const pressedColor = opacity(foreground, 0.08);
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: surface, paddingBottom: Math.max(insets.bottom, 8) },
-      ]}>
+    <View style={{ backgroundColor: surface, paddingBottom: Math.max(insets.bottom, 8) }}>
       <View style={[styles.divider, { backgroundColor: dividerColor }]} />
       <View style={styles.row}>
         {state.routes.map((route, index) => {
@@ -79,12 +75,6 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
 }
 
 const styles = StyleSheet.create({
-  container: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-  },
   divider: {
     height: StyleSheet.hairlineWidth,
   },

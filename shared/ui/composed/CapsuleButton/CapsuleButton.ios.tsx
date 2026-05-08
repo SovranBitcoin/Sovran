@@ -12,9 +12,9 @@ const DEFAULT_HEIGHT = 46;
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
-  const { color = foreground, height = DEFAULT_HEIGHT, roundedSide = 'all' } = props;
+  const { color = foreground, height = DEFAULT_HEIGHT } = props;
 
-  if (roundedSide === 'all' && supportsLiquidGlass()) {
+  if (supportsLiquidGlass()) {
     return (
       <Log name="CapsuleButton">
         <CapsuleButtonLiquid {...props} color={color} />

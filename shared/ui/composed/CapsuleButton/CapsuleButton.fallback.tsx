@@ -48,7 +48,6 @@ export function CapsuleButtonFallback({
           styles.card,
           cornerStyle,
           {
-            borderColor: opacity(accentColor, 0.3),
             minHeight: height,
             maxWidth: 140,
             alignSelf: 'center',
@@ -72,6 +71,17 @@ export function CapsuleButtonFallback({
             <PressableFeedback.Ripple />
           </PressableFeedback>
         </BlurCardFrame>
+        {/* Border drawn on top of the blur so the rounded corners aren't
+            eaten by the absolute-filled iOS blur layer underneath. */}
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFillObject,
+            cornerStyle,
+            styles.borderOverlay,
+            { borderColor: opacity(accentColor, 0.3) },
+          ]}
+        />
       </View>
     </Log>
   );
@@ -82,7 +92,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderCurve: 'continuous',
     overflow: 'hidden',
-    borderWidth: 1,
   },
   pressable: {
     width: '100%',
@@ -91,6 +100,10 @@ const styles = StyleSheet.create({
   content: {
     width: '100%',
     paddingHorizontal: 12,
+  },
+  borderOverlay: {
+    borderWidth: 1,
+    borderCurve: 'continuous',
   },
 });
 

@@ -64,7 +64,9 @@ import {
   Animated,
   LayoutChangeEvent,
   GestureResponderEvent,
+  Platform,
 } from 'react-native';
+import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
@@ -435,6 +437,7 @@ export const Button = ({
    * // With blur=true: Returns base styles without border
    */
   const getButtonStyles = () => {
+    const isAndroid = Platform.OS === 'android';
     // Padding lives on the outer container so all three rendering modes
     // (icon-only, text-only, icon+text) share the same horizontal/vertical
     // breathing room. Inner content (icon, text) renders without its own
@@ -450,7 +453,7 @@ export const Button = ({
       paddingVertical: sz.paddingVertical,
       paddingHorizontal: sz.paddingHorizontal,
       borderRadius: 9999,
-      borderWidth: 0.33,
+      borderWidth: isAndroid ? 1 : 0.33,
       overflow: 'hidden' as const,
       opacity: disabled || loading ? 0.5 : 1,
     };
@@ -476,13 +479,13 @@ export const Button = ({
         return {
           ...base,
           backgroundColor: foreground,
-          borderColor: surfaceForeground,
+          borderColor: isAndroid ? opacity(foregroundSecondary, 0.3) : surfaceForeground,
         };
       case 'secondary':
         return {
           ...base,
           backgroundColor: surfaceTertiary,
-          borderColor: foregroundSecondary,
+          borderColor: isAndroid ? opacity(foregroundSecondary, 0.3) : foregroundSecondary,
         };
       case 'dangerous':
         return {
@@ -513,6 +516,10 @@ export const Button = ({
    * // With variant="secondary": Returns light color for dark background
    */
   const getTextColor = () => {
+    if (Platform.OS === 'android' && variant === 'secondary') {
+      return foreground;
+    }
+
     switch (variant) {
       case 'primary':
         return background;

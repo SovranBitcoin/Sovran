@@ -577,7 +577,7 @@ export const ContactsScreen = () => {
     activeTab === 'contacts' && activeFilter === 'All' && isSearching && trimmedQuery.length > 0;
 
   return (
-    <Log name="ContactsScreen" style={styles.root}>
+    <Log name="ContactsScreen" style={[styles.root, { backgroundColor: surface }]}>
       {/* Outer tabs — hidden while searching; search scope is the pill bar below. */}
       {!isSearching && (
         <View

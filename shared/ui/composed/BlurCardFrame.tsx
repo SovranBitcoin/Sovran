@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, type ColorValue, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
-import { MeshGradientView } from 'expo-mesh-gradient';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Log } from '@/shared/lib/logger';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
 
 /** Size of the gradient container box (pixels) */
@@ -16,19 +17,13 @@ const GLOW_END_PX = 40; // Where glow fully fades out
 const pxToLocation = (px: number) => px / (GLOW_BOX_SIZE * Math.SQRT2);
 
 /** Pre-calculated locations based on pixel distances */
-const GLOW_MID_LOCATION = pxToLocation(GLOW_MID_PX);
-const GLOW_END_LOCATION = pxToLocation(GLOW_END_PX);
-const MESH_EDGE_POINTS = [
+const LOCATIONS: [number, number, number] = [
   0,
-  Math.min(GLOW_MID_LOCATION * 2, 1),
-  Math.min(GLOW_END_LOCATION * 2, 1),
-  1,
+  pxToLocation(GLOW_MID_PX),
+  pxToLocation(GLOW_END_PX),
 ];
-const MESH_POINTS = MESH_EDGE_POINTS.flatMap((y) => MESH_EDGE_POINTS.map((x) => [x, y]));
-const MESH_RESOLUTION = { x: 24, y: 24 };
 
 type GlowVariant = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'diagonal' | 'right';
-type GlowCorner = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
 
 interface BlurCardFrameProps {
   /** Accent color for the corner highlights */
@@ -47,64 +42,6 @@ interface BlurCardFrameProps {
   variant?: GlowVariant;
 }
 
-function getCornerLocation(corner: GlowCorner, x: number, y: number) {
-  switch (corner) {
-    case 'topLeft':
-      return (x + y) / 2;
-    case 'topRight':
-      return (1 - x + y) / 2;
-    case 'bottomLeft':
-      return (x + (1 - y)) / 2;
-    case 'bottomRight':
-      return (1 - x + (1 - y)) / 2;
-  }
-}
-
-function getGlowAlpha(location: number, peakAlpha: number) {
-  if (location <= GLOW_MID_LOCATION) {
-    const progress = location / GLOW_MID_LOCATION;
-    return peakAlpha + (0.1 - peakAlpha) * progress;
-  }
-
-  if (location <= GLOW_END_LOCATION) {
-    const progress = (location - GLOW_MID_LOCATION) / (GLOW_END_LOCATION - GLOW_MID_LOCATION);
-    return 0.1 * (1 - progress);
-  }
-
-  return 0;
-}
-
-function getGlowColors(corner: GlowCorner, accentColor: string, peakAlpha: number): ColorValue[] {
-  return MESH_POINTS.map(([x, y]) =>
-    opacity(accentColor, getGlowAlpha(getCornerLocation(corner, x, y), peakAlpha))
-  );
-}
-
-function CornerGlow({
-  accentColor,
-  corner,
-  peakAlpha = 0.6,
-  style,
-}: {
-  accentColor: string;
-  corner: GlowCorner;
-  peakAlpha?: number;
-  style: StyleProp<ViewStyle>;
-}) {
-  return (
-    <MeshGradientView
-      columns={MESH_EDGE_POINTS.length}
-      rows={MESH_EDGE_POINTS.length}
-      colors={getGlowColors(corner, accentColor, peakAlpha)}
-      points={MESH_POINTS}
-      resolution={MESH_RESOLUTION}
-      smoothsColors
-      style={style}
-      pointerEvents="none"
-    />
-  );
-}
-
 /**
  * A reusable blur card frame with corner highlight gradients.
  * Use this for cards, active states, and containers that need
@@ -114,6 +51,17 @@ function CornerGlow({
  * Children are rendered alongside to establish the container's height.
  */
 export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: BlurCardFrameProps) {
+  const androidSurface = useThemeColor('surface-secondary');
+
+  if (Platform.OS === 'android') {
+    return (
+      <Log name="BlurCardFrame">
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: androidSurface }]} />
+        {children}
+      </Log>
+    );
+  }
+
   return (
     <Log name="BlurCardFrame">
       {/* Base blur background */}
@@ -121,23 +69,46 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
 
       {/* Render gradients based on variant - fixed size boxes with pixel-based fade */}
       {(variant === 'topLeft' || variant === 'diagonal') && (
-        <CornerGlow accentColor={accentColor} corner="topLeft" style={styles.topLeft} />
+        <LinearGradient
+          colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
+          locations={LOCATIONS}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.topLeft}
+          pointerEvents="none"
+        />
       )}
 
       {(variant === 'topRight' || variant === 'diagonal' || variant === 'right') && (
-        <CornerGlow accentColor={accentColor} corner="topRight" style={styles.topRight} />
+        <LinearGradient
+          colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
+          locations={LOCATIONS}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.topRight}
+          pointerEvents="none"
+        />
       )}
 
       {variant === 'bottomLeft' && (
-        <CornerGlow accentColor={accentColor} corner="bottomLeft" style={styles.bottomLeft} />
+        <LinearGradient
+          colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
+          locations={LOCATIONS}
+          start={{ x: 0, y: 1 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.bottomLeft}
+          pointerEvents="none"
+        />
       )}
 
       {(variant === 'bottomRight' || variant === 'diagonal' || variant === 'right') && (
-        <CornerGlow
-          accentColor={accentColor}
-          corner="bottomRight"
-          peakAlpha={0.45}
+        <LinearGradient
+          colors={[opacity(accentColor, 0.45), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
+          locations={LOCATIONS}
+          start={{ x: 1, y: 1 }}
+          end={{ x: 0, y: 0 }}
           style={styles.bottomRight}
+          pointerEvents="none"
         />
       )}
 

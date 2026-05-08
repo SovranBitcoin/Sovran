@@ -112,10 +112,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
             // centered inside the same pill so the header doesn't reflow
             // when the user tops up and the layout swaps back to the
             // standard two-line balance row.
-            <Text
-              size={14}
-              bold
-              style={{ color: foreground }}>
+            <Text size={14} bold style={{ color: foreground }}>
               {ctaLabel}
             </Text>
           ) : (

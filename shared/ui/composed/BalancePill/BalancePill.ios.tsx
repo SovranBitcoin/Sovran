@@ -29,6 +29,8 @@ interface BalancePillProps extends BalanceDisplayProps {
   width?: number;
 }
 
+const FALLBACK_HORIZONTAL_PADDING = 12;
+
 /**
  * Full-pill balance + label header chrome shared by the wallet tab's mint
  * selector and the AI tab's Routstr balance pill. Picks the SwiftUI
@@ -75,6 +77,8 @@ export default function BalancePill({
   const cardHeight = HEADER_LAYOUT.BUTTON_HEIGHT;
   const verticalPadding = (cardHeight - dimensions.contentHeight) / 2;
   const cardRadius = cardHeight / 2;
+  const fallbackContentWidth =
+    contentWidthOverride ?? Math.max(0, dimensions.buttonWidth - FALLBACK_HORIZONTAL_PADDING * 2);
 
   return (
     <Log name="BalancePill">
@@ -99,12 +103,12 @@ export default function BalancePill({
                 height: cardHeight,
                 borderRadius: cardRadius,
                 paddingVertical: verticalPadding,
-                paddingHorizontal: 8,
+                paddingHorizontal: FALLBACK_HORIZONTAL_PADDING,
               },
             ]}>
             <BalanceDisplay
               {...display}
-              contentWidth={dimensions.contentWidth}
+              contentWidth={fallbackContentWidth}
               contentHeight={dimensions.contentHeight}
               style={styles.fullWidth}
             />

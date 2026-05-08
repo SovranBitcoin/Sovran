@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { Platform, ScrollView, StyleSheet } from 'react-native';
 import { Log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -19,7 +19,11 @@ interface TabProps {
 }
 
 function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps) {
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const [foreground, muted, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'muted',
+    'surface-tertiary',
+  ] as const);
 
   const handlePress = useCallback(() => {
     onPress(tab, index);
@@ -36,9 +40,12 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
         {/* Active state - solid background */}
         {isSelected && (
           <View
-            blur
+            blur={Platform.OS !== 'android'}
             blurTint="light"
-            style={[StyleSheet.absoluteFillObject, { backgroundColor: muted }]}
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: Platform.OS === 'android' ? surfaceTertiary : muted },
+            ]}
           />
         )}
 

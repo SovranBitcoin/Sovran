@@ -9,8 +9,9 @@
  */
 
 import React, { useCallback, useEffect } from 'react';
-import { ScrollView, useWindowDimensions } from 'react-native';
+import { Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { Stack, router } from 'expo-router';
+import opacity from 'hex-color-opacity';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -79,8 +80,12 @@ export function ThemePreviewScreen() {
   useLifecycleLogger('ThemePreviewScreen');
 
   const { width: screenWidth } = useWindowDimensions();
-  const foreground = useThemeColor('foreground');
-  const muted = useThemeColor('muted');
+  const [foreground, muted, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'muted',
+    'surface-secondary',
+  ] as const);
+  const themeButtonBackground = Platform.OS === 'android' ? surfaceSecondary : muted;
 
   const cardWidth = Math.min(CARD_MAX_WIDTH, screenWidth * CARD_SCREEN_RATIO);
   const cardHeight = cardWidth * CARD_RATIO;
@@ -191,7 +196,11 @@ export function ThemePreviewScreen() {
               <VStack align="center" spacing={6}>
                 <View
                   className="h-12 w-12 items-center justify-center rounded-3xl"
-                  style={{ backgroundColor: muted }}>
+                  style={{
+                    backgroundColor: themeButtonBackground,
+                    borderWidth: Platform.OS === 'android' ? 1 : 0,
+                    borderColor: opacity(muted, 0.3),
+                  }}>
                   <Icon name="mdi:palette" size={22} color={foreground} />
                 </View>
                 <Text size={12} medium style={{ color: foreground }}>

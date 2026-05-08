@@ -1,14 +1,26 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
+import { PressableFeedback } from 'heroui-native';
+import opacity from 'hex-color-opacity';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { CapsuleButtonFallback, type CapsuleButtonProps } from './CapsuleButton.fallback';
+import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
+import { Text } from '@/shared/ui/primitives/Text';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { View } from '@/shared/ui/primitives/View/View';
+import type { CapsuleButtonProps } from './CapsuleButton.fallback';
 
 export type { CapsuleButtonProps } from './CapsuleButton.fallback';
 
 const DEFAULT_HEIGHT = 46;
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const [foreground, surfaceSecondary, muted] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'muted',
+  ] as const);
   const {
     label,
     icon,
@@ -16,19 +28,88 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
     color = foreground,
     height = DEFAULT_HEIGHT,
     testID,
-    roundedSide,
+    roundedSide = 'all',
   } = props;
 
+  const cornerStyle = getCornerStyle(roundedSide);
+
   return (
-    <CapsuleButtonFallback
-      label={label}
-      icon={icon}
-      onPress={onPress}
-      color={color}
-      height={height}
-      testID={testID}
-      roundedSide={roundedSide}
-      accentColor={muted}
-    />
+    <Log name="CapsuleButton">
+      <View
+        testID={testID}
+        style={[
+          styles.card,
+          cornerStyle,
+          {
+            minHeight: height,
+            maxWidth: 140,
+            alignSelf: 'center',
+            backgroundColor: surfaceSecondary,
+            borderColor: opacity(muted, 0.3),
+          },
+        ]}>
+        <PressableFeedback
+          animation={false}
+          onPress={onPress}
+          style={[styles.pressable, { minHeight: height }]}>
+          <HStack
+            align="center"
+            justify="center"
+            spacing={8}
+            style={[styles.content, { minHeight: height }]}>
+            <Icon name={icon} size={16} color={color} />
+            <Text size={14} bold style={{ color }}>
+              {label}
+            </Text>
+          </HStack>
+          <PressableFeedback.Ripple />
+        </PressableFeedback>
+      </View>
+    </Log>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    width: '100%',
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  pressable: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  content: {
+    width: '100%',
+    paddingHorizontal: 12,
+  },
+});
+
+function getCornerStyle(roundedSide: NonNullable<CapsuleButtonProps['roundedSide']>) {
+  switch (roundedSide) {
+    case 'left':
+      return cornerStyles.leftCorners;
+    case 'right':
+      return cornerStyles.rightCorners;
+    case 'all':
+    default:
+      return cornerStyles.allCorners;
+  }
+}
+
+const CORNER_RADIUS = 24;
+
+const cornerStyles = StyleSheet.create({
+  allCorners: {
+    borderRadius: CORNER_RADIUS,
+  },
+  leftCorners: {
+    borderTopLeftRadius: CORNER_RADIUS,
+    borderBottomLeftRadius: CORNER_RADIUS,
+  },
+  rightCorners: {
+    borderTopRightRadius: CORNER_RADIUS,
+    borderBottomRightRadius: CORNER_RADIUS,
+  },
+});

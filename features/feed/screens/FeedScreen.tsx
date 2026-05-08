@@ -33,7 +33,7 @@ export function FeedScreen() {
   const showSearchPrompt = isSearching && !hasSearchQuery;
 
   return (
-    <Log name="FeedScreen" style={styles.root}>
+    <Log name="FeedScreen" style={[styles.root, { backgroundColor: surface }]}>
       <View
         style={[
           styles.filtersRow,

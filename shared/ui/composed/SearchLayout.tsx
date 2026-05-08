@@ -73,6 +73,7 @@ type SearchLayoutProps = {
 
 export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
   const iconColor = useThemeColor('foreground');
+  const surface = useThemeColor('surface');
   const navigation = useNavigation();
   const search = useHeaderSearch();
 
@@ -99,10 +100,11 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
         headerRight,
         options: {
           title,
+          headerStyle: { backgroundColor: surface },
           ...(search.isSearching ? { headerTitle: searchBarTitle } : {}),
         },
       }),
-    [iconColor, openDrawer, headerRight, title, search.isSearching, searchBarTitle]
+    [iconColor, openDrawer, headerRight, surface, title, search.isSearching, searchBarTitle]
   );
 
   const contextValue: SearchContextValue = useMemo(
@@ -126,7 +128,7 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
 
   return (
     <SearchContext.Provider value={contextValue}>
-      <Stack screenOptions={{ contentStyle: { backgroundColor: 'transparent' } }}>
+      <Stack screenOptions={{ contentStyle: { backgroundColor: surface } }}>
         <Stack.Screen name="index" options={screenOptions} />
       </Stack>
     </SearchContext.Provider>

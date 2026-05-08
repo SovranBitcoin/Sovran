@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
+import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
@@ -12,6 +13,7 @@ import type { NativeStackNavigationOptions } from '@react-navigation/native-stac
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
 import { supportsLiquidGlass } from '@/shared/lib/version';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 type HeaderIconName = string;
 
@@ -35,6 +37,8 @@ type HeaderIconButtonProps = {
 const HEADER_BUTTON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
 function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButtonProps) {
+  const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
+
   if (Platform.OS === 'android') {
     const androidIconName = ANDROID_HEADER_ICON_MAP[icon];
     return (
@@ -46,7 +50,9 @@ function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButto
             width: 44,
             height: 44,
             borderRadius: 22,
-            backgroundColor: 'rgba(255,255,255,0.12)',
+            backgroundColor: flatSurface,
+            borderWidth: 1,
+            borderColor: opacity(muted, 0.3),
             alignItems: 'center',
             justifyContent: 'center',
           },
@@ -112,9 +118,11 @@ export function buildExpoRouterHeaderOptions({
   if (Platform.OS === 'android') {
     nextOptions.headerShadowVisible = nextOptions.headerShadowVisible ?? false;
     nextOptions.headerTitleAlign = nextOptions.headerTitleAlign ?? 'center';
+    const headerStyle = nextOptions.headerStyle || {};
     nextOptions.headerStyle = {
-      ...(nextOptions.headerStyle || {}),
-      backgroundColor: 'transparent',
+      ...headerStyle,
+      backgroundColor:
+        'backgroundColor' in headerStyle ? headerStyle.backgroundColor : 'transparent',
     };
     if (!nextOptions.headerTitle && !nextOptions.title) {
       nextOptions.headerTitle = '';

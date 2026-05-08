@@ -78,7 +78,10 @@ const LIQUID_GLASS_BALANCE_TINT_ALPHA = 0.75;
 // Stretching the touchable to fill the row and giving it a comfortable min
 // height makes the whole balance area tap-to-cycle-unit again, matching
 // the old behaviour before we switched to liquid glass.
-const BALANCE_TAP_HEIGHT = 48;
+const BALANCE_TEXT_SIZE = 42;
+const BALANCE_TEXT_LINE_HEIGHT = 54;
+const BALANCE_TAP_HEIGHT = 60;
+const BALANCE_SECTION_GAP = 18;
 
 // ---------------------------------------------------------------------------
 // Shared ecash status pill (pending / reserved / etc.)
@@ -275,7 +278,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   return (
     <Log name="PrimaryBalance">
-      <VStack align="center" gap={8} className="z-9">
+      <VStack align="center" gap={BALANCE_SECTION_GAP} className="z-9">
         <FiatCurrencyPill displayText={displayText} textSize={12} />
         <Pressable
           onPress={toggleUnit}
@@ -288,6 +291,8 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           <AmountFormatter
             amount={balance}
             unit={account.unit}
+            size={BALANCE_TEXT_SIZE}
+            lineHeight={BALANCE_TEXT_LINE_HEIGHT}
             weight="heavy"
             liquid
             glassVariant={LIQUID_GLASS_BALANCE_VARIANT}

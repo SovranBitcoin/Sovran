@@ -58,6 +58,9 @@ interface CircleActionButtonProps {
 
 const CIRCLE_SIZE = 52;
 const ICON_SIZE = 22;
+const LABEL_TOP_MARGIN = 6;
+const LABEL_LINE_HEIGHT = 18;
+const LABELED_BUTTON_MIN_HEIGHT = CIRCLE_SIZE + LABEL_TOP_MARGIN + LABEL_LINE_HEIGHT;
 
 export function CircleActionButton({
   icon,
@@ -132,7 +135,11 @@ export function CircleActionButton({
         accessibilityLabel={a11yLabel}
         accessibilityHint={accessibilityHint}
         accessibilityState={a11yState}
-        style={[styles.wrapper, { opacity: disabled ? 0.4 : 1 }]}>
+        style={[
+          styles.wrapper,
+          label ? styles.labeledWrapper : null,
+          { opacity: disabled ? 0.4 : 1 },
+        ]}>
         {circle}
         {label ? (
           <Text
@@ -152,6 +159,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  labeledWrapper: {
+    minHeight: LABELED_BUTTON_MIN_HEIGHT,
+  },
   blurPressable: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -162,7 +172,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   label: {
+    lineHeight: LABEL_LINE_HEIGHT,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: LABEL_TOP_MARGIN,
   },
 });

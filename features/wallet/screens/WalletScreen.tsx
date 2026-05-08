@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Platform, RefreshControl, useWindowDimensions } from 'react-native';
+import { Platform, RefreshControl, StyleSheet } from 'react-native';
 
 import {
   useHistoryWithMelts,
@@ -12,7 +12,6 @@ import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { Account } from '@/features/wallet/components/Account';
 import { BitcoinNearYou } from '@/features/wallet/components/BitcoinNearYou';
 import { BootEntrance } from '@/shared/ui/composed/BootEntrance';
-import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -25,17 +24,13 @@ import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
+import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 
 const ACCOUNT = { unit: 'sat' } as const;
 
-const BUTTON_H = 48;
-const QR_SIZE = 72;
-// Lock the secondary action row height so the QR button below it lands at a
-// deterministic Y on first paint. Without this, the SwiftUI Host children
-// inside CircleActionButtons take a frame or two to settle their intrinsic
-// size, shifting the QR button down and breaking the boot-splash → QR morph
-// alignment. Value: circle (52) + label margin-top (6) + label line height (~18).
-const SECONDARY_ACTION_ROW_HEIGHT = 76;
+const QR_BUTTON_SIZE = 64;
+const WALLET_TOP_SECTION_GAP = 18;
+const WALLET_HEADER_TO_BALANCE_GAP = 24;
 
 const RECEIVE_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.down.left' : undefined;
 const SEND_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.up.right' : undefined;
@@ -43,13 +38,6 @@ const SEND_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.up.right' : undefined;
 export function WalletScreen() {
   useLifecycleLogger('WalletScreen');
   useBackgroundConfig({ blurMode: 'partial' });
-
-  const { height: windowHeight } = useWindowDimensions();
-
-  // Tighter than the original 0.30/250 — trims the vertical dead space
-  // between the header and the secondary action row while still leaving
-  // enough headroom for the primary balance.
-  const pagerHeight = Math.max(windowHeight * 0.22, 200);
 
   const [contentHeight, setContentHeight] = useState(0);
 
@@ -99,104 +87,87 @@ export function WalletScreen() {
       <LayoutDebugWrapper
         onContentSizeChange={onContentSizeChange}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
-        contentContainerStyle={{ padding: 0 }}>
-        <Log name="WalletScreen">
+        contentContainerStyle={styles.scrollContent}>
+        <Log name="WalletScreen" style={styles.screen}>
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
-          <View className="w-full" style={{ height: pagerHeight }}>
-            <Account account={ACCOUNT} pagerHeight={pagerHeight} />
-          </View>
+          <View style={styles.topArea}>
+            <Account account={ACCOUNT} />
 
-          {/*
-           * Secondary action row — sits above the primary Receive/QR/Send capsule row.
-           * Hosts [Split Bill] [Swap] [Theme]. The Swap action navigates to the
-           * mint-flow `distribution` screen, whose title is "Balance split".
-           */}
-          <HStack
-            justify="space-around"
-            style={{ marginTop: 4, paddingHorizontal: 32, height: SECONDARY_ACTION_ROW_HEIGHT }}>
-            <CircleActionButton
-              icon="mdi:silverware-fork-knife"
-              systemIcon="fork.knife"
-              label="Split Bill"
-              testID="wallet-split-bill"
-              disabled={isSwapping}
-              onPress={() => {
-                walletLog.info('wallet.split_bill.tap');
-                router.push('/(split-bill-flow)/amount');
-              }}
-            />
-            <CircleActionButton
-              icon="mdi:swap-horizontal"
-              systemIcon="arrow.left.arrow.right"
-              label="Swap"
-              testID="wallet-swap"
-              disabled={isSwapping}
-              onPress={() => {
-                walletLog.info('wallet.swap.tap', { unit: ACCOUNT.unit });
-                router.navigate({
-                  pathname: '/(mint-flow)/distribution',
-                  params: { unit: ACCOUNT.unit },
-                });
-              }}
-            />
-            <CircleActionButton
-              icon="mdi:palette"
-              systemIcon="paintpalette"
-              label="Theme"
-              testID="wallet-action-theme"
-              onPress={() => {
-                walletLog.info('wallet.theme.tap');
-                router.push('/(theme-flow)/preview');
-              }}
-            />
-          </HStack>
+            <HStack justify="space-around" style={styles.secondaryActions}>
+              <CircleActionButton
+                icon="mdi:silverware-fork-knife"
+                systemIcon="fork.knife"
+                label="Split Bill"
+                testID="wallet-split-bill"
+                disabled={isSwapping}
+                onPress={() => {
+                  walletLog.info('wallet.split_bill.tap');
+                  router.push('/(split-bill-flow)/amount');
+                }}
+              />
+              <CircleActionButton
+                icon="mdi:swap-horizontal"
+                systemIcon="arrow.left.arrow.right"
+                label="Swap"
+                testID="wallet-swap"
+                disabled={isSwapping}
+                onPress={() => {
+                  walletLog.info('wallet.swap.tap', { unit: ACCOUNT.unit });
+                  router.navigate({
+                    pathname: '/(mint-flow)/distribution',
+                    params: { unit: ACCOUNT.unit },
+                  });
+                }}
+              />
+              <CircleActionButton
+                icon="mdi:palette"
+                systemIcon="paintpalette"
+                label="Theme"
+                testID="wallet-action-theme"
+                onPress={() => {
+                  walletLog.info('wallet.theme.tap');
+                  router.push('/(theme-flow)/preview');
+                }}
+              />
+            </HStack>
 
-          {/* Wrap the Receive / Send / QR row in a single pointerEvents=none
-              shroud while swapping. CapsuleButton and QRButton don't accept a
-              `disabled` prop, so the cheapest correct gate is to short-circuit
-              touches at the parent and reduce opacity to match
-              CircleActionButton's disabled treatment (0.4). */}
-          <View
-            pointerEvents={isSwapping ? 'none' : 'auto'}
-            className="relative w-full justify-center px-3"
-            style={{
-              marginTop: 8,
-              height: Math.max(QR_SIZE, BUTTON_H),
-              opacity: isSwapping ? 0.4 : 1,
-            }}>
-            <View className="flex-row gap-3">
-              <View testID="wallet-receive" className="flex-1">
-                <CapsuleButton
-                  label="Receive"
-                  icon="lucide:arrow-down-left"
-                  systemIcon={RECEIVE_SYSTEM_ICON}
-                  roundedSide="left"
-                  onPress={handleReceive}
-                />
+            {/* Wrap the Receive / Send / QR row in a single pointerEvents=none
+                shroud while swapping. CapsuleButton and QRButton don't accept a
+                `disabled` prop, so the cheapest correct gate is to short-circuit
+                touches at the parent and reduce opacity to match
+                CircleActionButton's disabled treatment (0.4). */}
+            <View
+              pointerEvents={isSwapping ? 'none' : 'auto'}
+              style={[styles.primaryActions, { opacity: isSwapping ? 0.4 : 1 }]}>
+              <View style={styles.capsuleRow}>
+                <View testID="wallet-receive" style={styles.capsuleSlot}>
+                  <CapsuleButton
+                    label="Receive"
+                    icon="lucide:arrow-down-left"
+                    systemIcon={RECEIVE_SYSTEM_ICON}
+                    roundedSide="left"
+                    onPress={handleReceive}
+                  />
+                </View>
+                <View testID="wallet-send" style={styles.capsuleSlot}>
+                  <CapsuleButton
+                    label="Send"
+                    icon="lucide:arrow-up-right"
+                    systemIcon={SEND_SYSTEM_ICON}
+                    roundedSide="right"
+                    onPress={handleSend}
+                  />
+                </View>
               </View>
-              <View testID="wallet-send" className="flex-1">
-                <CapsuleButton
-                  label="Send"
-                  icon="lucide:arrow-up-right"
-                  systemIcon={SEND_SYSTEM_ICON}
-                  roundedSide="right"
-                  onPress={handleSend}
-                />
-              </View>
-            </View>
 
-            <View pointerEvents="box-none" className="absolute inset-x-0 z-[1000] items-center">
-              <QRButton onPress={handleScanQR} />
+              <View pointerEvents="box-none" style={styles.qrAnchor}>
+                <QRButton onPress={handleScanQR} size={QR_BUTTON_SIZE} />
+              </View>
             </View>
           </View>
 
-          <View
-            className="p-4 pb-24 pt-4"
-            style={{
-              minHeight: windowHeight - windowHeight * 0.5 - 88,
-              gap: 16,
-            }}>
+          <View style={styles.content}>
             <Transactions account={ACCOUNT} showMore={true} history={history} hideExpired={true} />
             <SpentThisMonth history={history} unit={ACCOUNT.unit} />
             <ReceivedThisMonth history={history} unit={ACCOUNT.unit} />
@@ -207,3 +178,53 @@ export function WalletScreen() {
     </BootEntrance>
   );
 }
+
+const styles = StyleSheet.create({
+  scrollContent: {
+    flexGrow: 1,
+    padding: 0,
+  },
+  screen: {
+    flexGrow: 1,
+  },
+  topArea: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    gap: WALLET_TOP_SECTION_GAP,
+    paddingBottom: 16,
+    paddingTop: WALLET_HEADER_TO_BALANCE_GAP,
+  },
+  secondaryActions: {
+    alignItems: 'flex-start',
+    paddingHorizontal: 32,
+  },
+  primaryActions: {
+    justifyContent: 'center',
+    minHeight: QR_BUTTON_SIZE,
+    paddingHorizontal: 12,
+    position: 'relative',
+    width: '100%',
+  },
+  capsuleRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  capsuleSlot: {
+    flex: 1,
+  },
+  qrAnchor: {
+    alignItems: 'center',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 1000,
+  },
+  content: {
+    gap: 16,
+    paddingBottom: 96,
+    paddingHorizontal: 16,
+    paddingTop: 2,
+  },
+});

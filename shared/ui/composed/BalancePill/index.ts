@@ -1,1 +1,1 @@
-export { default } from './BalancePill.ios';
+export { default } from './BalancePill';

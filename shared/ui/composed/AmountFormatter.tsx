@@ -40,6 +40,7 @@ interface AmountFormatterProps {
   amount: number;
   unit: CurrencyUnit;
   size?: number;
+  lineHeight?: number;
   weight?: FontWeight;
   /**
    * Text color (non-liquid) / glass tint (liquid).
@@ -82,6 +83,7 @@ export function AmountFormatter({
   amount,
   unit,
   size = 42,
+  lineHeight,
   weight = 'heavy',
   color,
   style,
@@ -130,7 +132,10 @@ export function AmountFormatter({
             <View>
               <RNText
                 allowFontScaling={false}
-                style={[plainTextStyle(size, weight, null, centered), { color: 'transparent' }]}>
+                style={[
+                  plainTextStyle(size, lineHeight, weight, null, centered),
+                  { color: 'transparent' },
+                ]}>
                 {text}
               </RNText>
               <LiquidGlassText
@@ -149,7 +154,7 @@ export function AmountFormatter({
           ) : (
             <RNText
               allowFontScaling={false}
-              style={plainTextStyle(size, weight, resolvedColor, centered)}>
+              style={plainTextStyle(size, lineHeight, weight, resolvedColor, centered)}>
               {text}
             </RNText>
           )}
@@ -174,6 +179,7 @@ function decorate(formatted: string, unit: CurrencyUnit, displayBtc: number): st
 
 function plainTextStyle(
   size: number,
+  lineHeight: number | undefined,
   weight: FontWeight,
   color: string | null,
   centered: boolean
@@ -181,6 +187,7 @@ function plainTextStyle(
   return {
     fontFamily: FONT_FAMILY[weight],
     fontSize: size,
+    lineHeight,
     // The plain path has no glass surface, so a null tint collapses to the
     // theme foreground — `RNText` can't render `color: null`.
     color: color ?? undefined,
