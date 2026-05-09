@@ -10,6 +10,7 @@ export const IGNORE_DIRS = new Set([
   'dist',
   '.git',
   'coco',
+  'codereview',
   'sovran.money',
   'targets',
   '.expo',
