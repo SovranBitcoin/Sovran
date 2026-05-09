@@ -779,12 +779,24 @@ function extractExports(src) {
     }
   }
 
-  for (const m of stripped.matchAll(/^export\s+\{([^}]+)\}/gm)) {
-    for (const chunk of m[1].split(',')) {
+  for (const m of stripped.matchAll(/^export\s+(type\s+)?\{([^}]+)\}(\s+from\s+['"][^'"]+['"])?/gm)) {
+    const isFromReexport = !!m[3];
+    const isTypeOnly = !!m[1];
+    for (const chunk of m[2].split(',')) {
       const parts = chunk.trim().split(/\s+as\s+/);
-      const name = (parts[parts.length - 1] || '').trim();
+      const name = (parts[parts.length - 1] || '').trim().replace(/^type\s+/, '');
       if (name && /^\w+$/.test(name)) {
-        add('named', name, classify(name, 'reexport'));
+        // `export { Foo } from './x'` is a re-export, not a definition — mark
+        // both kind AND tag so downstream dup-detection skips it. Without the
+        // explicit kind, barrel files look like they define every name they
+        // forward.
+        if (isFromReexport) {
+          add('reexport', name, 'reexport');
+        } else if (isTypeOnly) {
+          add('type', name, 'type');
+        } else {
+          add('named', name, classify(name, 'reexport'));
+        }
       }
     }
   }
@@ -829,7 +841,10 @@ function extractImports(src) {
     entry.isReexport = true;
     for (const chunk of namesRaw.split(',')) {
       const parts = chunk.trim().split(/\s+as\s+/);
-      const name = (parts[parts.length - 1] || '').trim();
+      // Take the SOURCE name (`Foo` in `Foo as Bar`) since the upstream file
+      // exports that, not the re-exported alias. Strip a per-specifier `type`
+      // keyword so `export { type Foo } from './x'` records `Foo`.
+      const name = (parts[0] || '').trim().replace(/^type\s+/, '');
       if (name && /^\w+$/.test(name)) entry.names.push(name);
     }
   }
@@ -877,7 +892,13 @@ function extractImports(src) {
       const inside = clause.slice(braceOpen + 1, braceClose);
       for (const chunk of inside.split(',')) {
         const parts = chunk.trim().split(/\s+as\s+/);
-        const name = (parts[parts.length - 1] || '').trim();
+        // For `Foo as Bar` we need the SOURCE name (`Foo`) — that's what the
+        // exporting file actually exports. Take the LEFT side, not the right.
+        // Strip a leading per-specifier `type` keyword so inline-type imports
+        // like `import { type Foo, Bar }` resolve back to the bare name.
+        // Otherwise the unused-export detector treats `type Foo` as a literal
+        // identifier and reports `Foo` as never imported.
+        const name = (parts[0] || '').trim().replace(/^type\s+/, '');
         if (name) entry.names.push(name);
       }
     }
