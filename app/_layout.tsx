@@ -33,6 +33,7 @@ import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/Nostr
 import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
 import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
+import { CapabilityProvider } from '@/shared/ui/capability';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -123,6 +124,7 @@ const OuterProviders = compose([
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,
+  CapabilityProvider,
   HeroUINativeProvider,
   HeroTransitionProvider,
   OfflineStatusProvider,
