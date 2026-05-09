@@ -373,7 +373,14 @@ const MORPH_DURATION_MS = 750;
 // Reanimated CSS transitions on Android only accept predefined timing names.
 // `ease-out` keeps the splash → QR-button morph soft without tripping runtime validation.
 const MORPH_TIMING = 'ease-out';
-const MORPH_FALLBACK_TIMEOUT = 1500; // ms to wait for QR anchor before fading
+// Generous wait for the QR anchor to publish. The morph overlay covers the
+// screen for the entire window, so the user sees a continuous splash — this
+// budget just bounds how long we hold before falling back to a plain fade
+// when the user lands on a non-wallet screen (e.g. onboarding) where no QR
+// button will ever publish. Sized to comfortably cover cold-start init on a
+// first launch (legacy migration + global migration + nostr + coco) plus
+// WalletScreen mount.
+const MORPH_FALLBACK_TIMEOUT = 8000;
 // Stability window for the QR-button anchor before kicking off the morph.
 // The morph effect re-arms this timer every time the anchor changes, so
 // the morph only fires once the position has been STABLE for this long.
@@ -386,8 +393,8 @@ const LAYOUT_SETTLE_DELAY = 500;
 const LAYOUT_POLL_INTERVAL = 100;
 
 // Linear phase machine for the boot splash → QR-button handoff.
-//   await_init    — splash visible; waiting for init to complete + root layout
-//   await_anchor  — native splash hidden; waiting for a stable QR-button anchor
+//   await_init    — splash visible; waiting for our root view to lay out
+//   await_anchor  — native splash hidden; waiting for the QR-button anchor
 //                   (or MORPH_FALLBACK_TIMEOUT, whichever comes first)
 //   morphing      — animating the overlay to the QR-button position
 //   fading        — animating the overlay to opacity 0 (no anchor available)
@@ -396,7 +403,18 @@ const LAYOUT_POLL_INTERVAL = 100;
 //
 // Each phase owns exactly one effect that drives its own forward transition,
 // so there is no way to wedge: every phase either advances on a condition or
-// on a fixed timer, with a hard upper bound of ~2.5s after init completes.
+// on a fixed timer.
+//
+// IMPORTANT: we do NOT gate `await_init` on `useInitializationState`'s
+// `isInitializing`. The InitializationGate chain registers stages one-at-a-
+// time as each prior gate completes, so `isInitializing` flickers true→false
+// between every gate handoff. Watching for the first false would have us
+// hide the native splash before WalletScreen has even mounted, leaving the
+// morph overlay to fade out over a black screen while the rest of the gate
+// chain unrolls. The overlay covers the viewport for the whole `await_*`
+// window, so it is always safe to hide the native splash once our own
+// layout is ready — the QR anchor IS the "WalletScreen ready" signal we
+// want to wait on.
 type SplashPhase = 'await_init' | 'await_anchor' | 'morphing' | 'fading' | 'done' | 'unmounted';
 
 function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
@@ -405,10 +423,6 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
   const rootViewRef = useRef<View>(null);
   const splashOverlayRef = useRef<View>(null);
-  // We require having seen `isInitializing === true` at least once before we
-  // accept `false` as 'init complete' — the provider can momentarily report
-  // false on first render while it's still bootstrapping.
-  const hasBeenInitializing = useRef(false);
 
   const [phase, setPhase] = useState<SplashPhase>('await_init');
   const [anchor, setAnchor] = useState<QRButtonAnchor | null>(getQRButtonAnchor());
@@ -427,10 +441,6 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
-  useEffect(() => {
-    if (isInitializing) hasBeenInitializing.current = true;
-  }, [isInitializing]);
-
   const onLayoutRootView = useCallback(() => {
     setHasRootLaidOut(true);
     rootViewRef.current?.measureInWindow((x, y) => {
@@ -439,11 +449,12 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Reset the machine on a profile switch. We only honor a reset AFTER we've
-  // unmounted from a prior cycle — during the initial boot, `isInitializing`
-  // can flicker true/false as each provider in the chain bootstraps, and we
-  // do NOT want those flickers to snap us back to `await_init` (which would
-  // re-call hideAsync and restart the await_anchor timer in a loop).
+  // Reset the machine on a profile switch. Only honored AFTER we've unmounted
+  // from a prior cycle — during boot the same `isInitializing=true` signal
+  // fires (gates registering) and we don't want it to bounce us back to
+  // await_init from a later phase. Profile switches go through resetStages()
+  // which sets forceReinitialize=true, so the unmount→isInitializing=true
+  // transition is the unambiguous "switch happened" signal.
   useEffect(() => {
     if (!isInitializing) return;
     if (phase !== 'unmounted') return;
@@ -452,15 +463,19 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     setPhase('await_init');
   }, [isInitializing, phase]);
 
-  // Phase 1 — await_init: hide the native splash once init has completed and
-  // our root view has laid out. Advance to await_anchor.
+  // Phase 1 — await_init: hide the native splash as soon as our root view
+  // has laid out. The morph overlay is rendered the same frame, covering the
+  // viewport, so the visual transition from native splash → overlay is
+  // seamless. Do NOT gate on `isInitializing` here — see the SplashPhase
+  // type comment for why; the QR anchor in await_anchor is the real
+  // "WalletScreen ready" signal.
   useEffect(() => {
     if (phase !== 'await_init') return;
-    if (!hasRootLaidOut || !hasBeenInitializing.current || isInitializing) return;
-    initLog('SplashMorph', 'root laid out + init complete — hiding native splash');
+    if (!hasRootLaidOut) return;
+    initLog('SplashMorph', 'root laid out — hiding native splash');
     SplashScreen.hideAsync();
     setPhase('await_anchor');
-  }, [phase, hasRootLaidOut, isInitializing]);
+  }, [phase, hasRootLaidOut]);
 
   // Phase 2 — await_anchor: wait for the QR button to publish a stable
   // anchor. We poll `measureInWindow` for `LAYOUT_SETTLE_DELAY` ms because

@@ -15,12 +15,18 @@ interface AccountData {
 
 interface AccountProps {
   account: AccountData;
+  // Pinned, deterministic height for the header pager. Set by the wallet so
+  // the action rows below sit at a stable Y on first paint — the boot-splash
+  // → QR morph reads the QR button's window position, and a flex-driven
+  // height would let async layout (history, wallpaper image, safe-area)
+  // shift it after the splash has already locked onto a target rect.
+  pagerHeight: number;
 }
 
-export function Account({ account }: AccountProps): React.ReactElement {
+export function Account({ account, pagerHeight }: AccountProps): React.ReactElement {
   return (
     <Log name="Account">
-      <View style={styles.container}>
+      <View style={[styles.container, { height: pagerHeight }]}>
         <VStack style={styles.balanceSlot}>
           <VStack align="center" gap={8}>
             <PrimaryBalance account={account} />
@@ -33,9 +39,6 @@ export function Account({ account }: AccountProps): React.ReactElement {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
-    flexShrink: 1,
-    minHeight: 144,
     overflow: 'hidden',
     width: '100%',
     zIndex: 10,
