@@ -3,9 +3,9 @@ import { create } from 'zustand';
 import { parsePaymentError } from '@/shared/lib/popup/parsePaymentError';
 import { paymentLog } from '@/shared/lib/logger';
 
-export type PaymentStatusState = 'processing' | 'delivered' | 'confirmed' | 'failed';
+type PaymentStatusState = 'processing' | 'delivered' | 'confirmed' | 'failed';
 
-export interface ActivePaymentStatus {
+interface ActivePaymentStatus {
   variant: 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
   /** quoteId (receive) or operationId (send) or receiveHistoryEntry.id (receive-ecash) */
   id: string;

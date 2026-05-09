@@ -9,8 +9,6 @@ import type { ActionSheetPayloads } from '../actionSheetTypes';
 import { CompactToast } from '../CompactToast';
 import type { LiveSheetConfig } from '../liveSheetTypes';
 
-export type { ActionSheetPayloads } from '../actionSheetTypes';
-
 /** Best-effort first stack frame outside the popup module — gives "where did this come from" without a full trace. */
 function getCallerFrame(): string | undefined {
   const stack = new Error().stack;

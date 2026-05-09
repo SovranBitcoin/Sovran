@@ -10,7 +10,7 @@
 
 export { popup } from './popups/engine';
 export { registerToast, setPopupDuration, showActionSheet, showCustomToast } from './popups/bridge';
-export type { ActionSheetPayloads } from './popups/bridge';
+export type { ActionSheetPayloads } from './actionSheetTypes';
 export { fmt, isAmountSegment } from './format';
 export { parsePaymentError } from './parsePaymentError';
 export type { PopupTextSegment } from './format';

@@ -30,7 +30,7 @@ import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/Sect
 import {
   dismissActionMenuPopup,
   useActionMenuPayload,
-  type ActionMenuButton,
+  type ActionMenuItem,
   type ActionMenuInput,
   type ActionMenuPrimaryAction,
   type ActionMenuSection,
@@ -289,7 +289,7 @@ export function ActionMenuHost() {
     if (!picked && onDismiss) onDismiss();
   }, []);
 
-  const handleItemPress = useCallback((button: ActionMenuButton): void => {
+  const handleItemPress = useCallback((button: ActionMenuItem): void => {
     if (button.disabled || button.isFailed) return;
     selectedRef.current = true;
     if (button.keepOpen) {
@@ -375,7 +375,7 @@ export function ActionMenuHost() {
     payload?.snapPoint ??
     (useSections ? '60%' : payload?.footerButtons?.length ? '60%' : hasFooter ? '40%' : undefined);
 
-  const renderActionButton = (button: ActionMenuButton, key: React.Key): React.ReactNode => {
+  const renderActionButton = (button: ActionMenuItem, key: React.Key): React.ReactNode => {
     const isDisabled = button.disabled === true || button.isFailed === true;
     const isDanger = button.variant === 'dangerous' || button.isFailed === true;
     const descriptionText = button.isFailed
@@ -471,7 +471,7 @@ export function ActionMenuHost() {
     </>
   ) : null;
 
-  // Map ActionMenuSection[] → AnchorSection<ActionMenuButton>[] for
+  // Map ActionMenuSection[] → AnchorSection<ActionMenuItem>[] for
   // SectionAnchorList. Two shapes:
   //   - Sections with `buttons` use the standard data + renderItem
   //     path so each profile row virtualizes individually (LegendList
@@ -480,7 +480,7 @@ export function ActionMenuHost() {
   //   - Sections with `renderBody` (custom non-button content, e.g.
   //     emoji grids when this lane is used for them) render through
   //     `renderHeader` with empty `data` — same as before.
-  const sectionsForList = useMemo<AnchorSection<ActionMenuButton>[]>(() => {
+  const sectionsForList = useMemo<AnchorSection<ActionMenuItem>[]>(() => {
     const list = payload?.sections;
     if (!list?.length) return [];
     return list.map((section: ActionMenuSection) => {
@@ -488,7 +488,7 @@ export function ActionMenuHost() {
         return {
           id: section.id,
           anchor: section.anchor,
-          data: [] as ActionMenuButton[],
+          data: [] as ActionMenuItem[],
           renderHeader: () => section.renderBody!(),
         };
       }
@@ -638,9 +638,9 @@ export function ActionMenuHost() {
             // background. `contentBottomInset` clears the gorhom
             // `BottomSheetFooter` slot so the last row isn't hidden
             // beneath sticky footer buttons.
-            <SectionAnchorList<ActionMenuButton>
+            <SectionAnchorList<ActionMenuItem>
               sections={sectionsForList}
-              // Each section's `data` is its `ActionMenuButton[]` (see
+              // Each section's `data` is its `ActionMenuItem[]` (see
               // `sectionsForList`); we render one Menu.Item per button.
               // LegendList virtualizes the row stream so even a long
               // profile list (or future >100-item picker) only mounts

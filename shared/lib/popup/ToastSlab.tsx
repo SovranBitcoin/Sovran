@@ -13,7 +13,7 @@ import { supportsBlur } from '@/shared/lib/version';
  * the row content.
  */
 
-export const BLUR_INTENSITY = 60;
+const BLUR_INTENSITY = 60;
 // Semi-transparent tint over the BlurView gives the toast its theme-tinted
 // hue without flattening the frosted-glass look. On platforms without blur
 // support (Android < 12, iOS < 13) the BlurView wrapper renders null and

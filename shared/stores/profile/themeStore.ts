@@ -23,7 +23,6 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 const profileStorage = createProfileScopedStorage();
 
 export type UnitId = string;
-export type ThemeName = string;
 export type { ThemeMode };
 
 const DEFAULT_MODE: ThemeMode = 'dark';
@@ -31,13 +30,13 @@ const DEFAULT_MODE: ThemeMode = 'dark';
 interface ThemeState {
   _hasHydrated: boolean;
   activeAlbumSlug: string | null;
-  unitWallpapers: Record<UnitId, ThemeName>;
+  unitWallpapers: Record<UnitId, string>;
   mode: ThemeMode;
 }
 
 interface ThemeActions {
   /** Set a single unit's wallpaper override (any theme from any album). */
-  setUnitWallpaper: (unitId: UnitId, theme: ThemeName) => void;
+  setUnitWallpaper: (unitId: UnitId, theme: string) => void;
 }
 
 type ThemeStore = ThemeState & ThemeActions;

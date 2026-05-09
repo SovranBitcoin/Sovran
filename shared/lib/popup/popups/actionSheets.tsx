@@ -18,7 +18,7 @@ import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
 import type { ProfileSwitcherAction } from '../actionSheetTypes';
-import { actionMenuPopup, type ActionMenuButton, type ActionMenuSection } from './actionMenu';
+import { actionMenuPopup, type ActionMenuItem, type ActionMenuSection } from './actionMenu';
 
 // ---------------------------------------------------------------------------
 // Profile switcher — dispatched through `actionMenuPopup` so each profile +
@@ -40,7 +40,7 @@ export function profileSwitcherPopup(payload: ProfileSwitcherPopupPayload): void
   const profiles = state.profiles;
   const activeIndex = state.activeAccountIndex;
 
-  const buildProfileButton = (profile: (typeof profiles)[number]): ActionMenuButton => {
+  const buildProfileButton = (profile: (typeof profiles)[number]): ActionMenuItem => {
     const isActive = profile.accountIndex === activeIndex;
     const displayName = resolveIdentityName({
       pubkey: profile.pubkey,
@@ -240,7 +240,7 @@ function buildOptionButton(
   unit: string,
   machine: PaymentMachine,
   extras?: { isFailed?: boolean; failedReason?: string }
-): ActionMenuButton {
+): ActionMenuItem {
   const { option, status } = annotated;
   const amount = getOptionAmount(option);
   const hasAmount = amount != null && amount > 0;
@@ -306,7 +306,7 @@ type ProofSelectorPopupPayload = StepDataMap['chooseProofs'] & {
 
 export function proofSelectorPopup(payload: ProofSelectorPopupPayload): void {
   const { suggestions, unit, machine } = payload;
-  const buttons: ActionMenuButton[] = [];
+  const buttons: ActionMenuItem[] = [];
 
   if (suggestions?.roundUp != null) {
     buttons.push({

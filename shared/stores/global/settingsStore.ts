@@ -13,7 +13,7 @@ interface TermsAccepted {
 
 export type DisplayCurrency = 'usd' | 'eur' | 'gbp';
 
-export type MiddlemanTrustMode = 'trusted_only' | 'allow_untrusted';
+type MiddlemanTrustMode = 'trusted_only' | 'allow_untrusted';
 
 export interface MiddlemanRoutingSettings {
   /** Maximum number of intermediary mints in a route (1 = A→via→B, 2 = A→via1→via2→B). */

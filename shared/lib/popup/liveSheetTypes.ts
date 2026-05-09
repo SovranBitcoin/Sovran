@@ -5,7 +5,7 @@ import type { PopupTextSegment } from './format';
 export type LiveSheetStatus = 'pending' | 'confirmed' | 'failed';
 
 /** Return type for LiveSheetConfig.get() — partial sheet display values. */
-export type LiveSheetGetResult = Partial<{
+type LiveSheetGetResult = Partial<{
   submessage: ReactNode | PopupTextSegment[];
   icon: PopupIcon;
   message: string;

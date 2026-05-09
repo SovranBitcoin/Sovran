@@ -27,7 +27,7 @@ import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const CURRENCY_TABS_HEIGHT = 48;
 
-export interface MintListScreenProps {
+interface MintListScreenProps {
   /** Pre-built mint rows from buildMintListItems(). Already sorted and availability-annotated. */
   items: MintListItem[];
   /** When true, all rows show a global loading state (a handler is executing). */

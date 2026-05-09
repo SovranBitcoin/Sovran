@@ -2,7 +2,7 @@ import { nip19 } from 'nostr-tools';
 
 import { isNostrPubkeyHex } from './secureStorage';
 
-export type MintContactEntry = { method: string; info: string };
+type MintContactEntry = { method: string; info: string };
 export type MintInfoForNostr = { contact?: readonly MintContactEntry[] } | null | undefined;
 
 /**

@@ -9,8 +9,6 @@ import BalancePillFlat from './BalancePill.flat';
 import BalancePillLiquid from './BalancePill.liquid';
 import type { BalancePillProps } from './BalancePill.types';
 
-export type { BalancePillProps } from './BalancePill.types';
-
 const BalancePill = defineVariants<BalancePillProps>('BalancePill', {
   liquid: BalancePillLiquid,
   blur: BalancePillBlur,

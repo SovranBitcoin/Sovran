@@ -39,13 +39,13 @@ export type SplitBillParticipantSource = 'nostr' | 'ble' | 'search' | 'self';
 export type SplitBillDeliveryChannel = 'nostr-dm' | 'ble-dm' | 'qr-only' | 'self';
 
 /** Delivery status per participant. */
-export type SplitBillDeliveryState = 'pending' | 'sent' | 'failed';
+type SplitBillDeliveryState = 'pending' | 'sent' | 'failed';
 
 /** Payment status per participant (independent of delivery). */
-export type SplitBillPaymentState = 'pending' | 'paid' | 'expired';
+type SplitBillPaymentState = 'pending' | 'paid' | 'expired';
 
 /** Top-level group lifecycle. */
-export type SplitBillGroupState =
+type SplitBillGroupState =
   | 'draft'
   | 'awaiting'
   | 'partially-paid'

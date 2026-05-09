@@ -18,7 +18,6 @@ import {
   type NostrProfileResponse as NostrProfileResponseType,
   type UserProfile,
   type ParseError,
-  type TopFollower,
 } from '@sovranbitcoin/schemas';
 
 // Local relaxation: the auditor returns `info` in several shapes depending
@@ -54,7 +53,6 @@ export type {
   MintSearchResult,
   NostrProfileResponseType as NostrProfileResponse,
   UserProfile,
-  TopFollower,
 };
 
 // Re-export coco-payment-ux's cancellable-fetch primitives so existing

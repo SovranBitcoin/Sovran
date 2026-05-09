@@ -19,7 +19,7 @@ import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
-export type SwapGroupState = 'running' | 'finished' | 'cancelled';
+type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
 export type SwapLegLocalStatus =
   | 'pending'

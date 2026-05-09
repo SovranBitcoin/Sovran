@@ -13,7 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
-import { THEMES } from '@/shared/providers/ThemeProvider';
+import { THEMES } from '@/themes';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 

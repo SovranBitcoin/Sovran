@@ -94,7 +94,7 @@ import { log } from '@/shared/lib/logger';
 
 const actionMenuLog = log.child({ module: 'actionMenu' });
 
-export interface ActionMenuButton {
+export interface ActionMenuItem {
   text: string;
   icon?: string;
   /** Custom leading glyph node (takes precedence over `icon`). Use when the
@@ -155,7 +155,7 @@ export interface ActionMenuPrimaryAction {
   text: string;
   /** Label shown while the async onPress is pending. Defaults to `text`. */
   loadingText?: string;
-  /** Optional leading icon (matches the icon convention on `ActionMenuButton`). */
+  /** Optional leading icon (matches the icon convention on `ActionMenuItem`). */
   icon?: string;
   testID?: string;
   isDisabled?: (values: Record<string, string>) => boolean;
@@ -178,7 +178,7 @@ export interface ActionMenuPrimaryAction {
 export interface ActionMenuSection {
   id: string;
   anchor: { icon?: React.ReactNode; label: string; testID?: string };
-  buttons?: ActionMenuButton[];
+  buttons?: ActionMenuItem[];
   renderBody?: () => React.ReactNode;
 }
 
@@ -199,7 +199,7 @@ interface ActionMenuPayload {
   title?: string;
   /** Custom content rendered between the title and any items / inputs. */
   header?: React.ReactNode;
-  buttons?: ActionMenuButton[];
+  buttons?: ActionMenuItem[];
   /**
    * Buttons pinned at the bottom of the sheet (with a gradient/blur fade
    * above them so the scrollable content visibly disappears beneath).
@@ -211,7 +211,7 @@ interface ActionMenuPayload {
    * When set, the menu's body becomes a scroll container capped at ~85%
    * of the viewport. When unset, the menu auto-fits content as before.
    */
-  footerButtons?: ActionMenuButton[];
+  footerButtons?: ActionMenuItem[];
   /** Form inputs rendered above the primary action. */
   inputs?: ActionMenuInput[];
   /** Submit button for `inputs`. Required when `inputs` is set. */

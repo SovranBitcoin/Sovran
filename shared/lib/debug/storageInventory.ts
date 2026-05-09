@@ -43,12 +43,12 @@ export interface ZustandInventory {
   existingUncategorizedStoreKeys: string[];
 }
 
-export interface SecureStoreInventoryEntry {
+interface SecureStoreInventoryEntry {
   key: string;
   exists: boolean;
 }
 
-export interface StorageInventorySnapshot {
+interface StorageInventorySnapshot {
   zustand: ZustandInventory;
   secureStore: SecureStoreInventoryEntry[];
   cocoDatabases: string[];

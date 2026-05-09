@@ -11,7 +11,7 @@
 
 import type { Manager } from '@cashu/coco-core';
 import { createPaymentMachine } from '../machine/createMachine';
-import { setLogger, type Logger } from '../logger';
+import { setLogger, type CocoLogger } from '../logger';
 import type {
   MachineOperations,
   NfcIOAdapter,
@@ -79,7 +79,7 @@ export interface CocoPaymentUXConfig {
    * `paymentLog` so coco-payment-ux events flow through the same
    * structured pipeline as the rest of the app.
    */
-  logger?: Logger;
+  logger?: CocoLogger;
 }
 
 // ---------------------------------------------------------------------------

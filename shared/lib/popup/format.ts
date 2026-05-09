@@ -1,6 +1,6 @@
 import { formatAmount } from '@/shared/lib/currency';
 
-export type AmountSegment = { amount: number; unit: string };
+type AmountSegment = { amount: number; unit: string };
 export type PopupTextSegment = string | AmountSegment;
 
 export function isAmountSegment(value: unknown): value is AmountSegment {

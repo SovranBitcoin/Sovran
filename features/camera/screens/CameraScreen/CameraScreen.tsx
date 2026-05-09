@@ -29,8 +29,6 @@ import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { CameraLayout } from './CameraLayout';
 import type { ScanningData } from './types';
 
-export type { ScanningData } from './types';
-
 /**
  * Canonical schema for /camera deep-link params. StandaloneCameraScreen
  * extends with `action`. Tightening `unit` to a short lowercase token shape

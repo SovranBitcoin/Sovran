@@ -85,7 +85,7 @@ function mergeRawEvents(
   return { foundNewNote };
 }
 
-export type UseThreadResult = {
+type UseThreadResult = {
   items: ThreadItem[];
   hiddenReplyCount: number;
   isLoading: boolean;

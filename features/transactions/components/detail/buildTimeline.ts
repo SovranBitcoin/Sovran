@@ -10,7 +10,7 @@ import {
 } from '@/shared/lib/paymentCopy';
 import { meltQuoteExpired, mintHistoryEntryExpired } from '@/shared/lib/utils';
 
-export const EXPIRED_STATE = 'expired';
+const EXPIRED_STATE = 'expired';
 
 export type TimelineStepType =
   | 'complete'

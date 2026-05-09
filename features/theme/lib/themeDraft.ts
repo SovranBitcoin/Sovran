@@ -9,7 +9,7 @@
  */
 
 import { create } from 'zustand';
-import type { UnitId, ThemeName, ThemeMode } from '@/shared/stores/profile/themeStore';
+import type { UnitId, ThemeMode } from '@/shared/stores/profile/themeStore';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { PROFILE_PRIMARY_UNIT_ID } from '@/shared/lib/theme/builtinAlbums';
 import {
@@ -22,7 +22,7 @@ import { log } from '@/shared/lib/logger';
 interface ThemeDraftState {
   active: boolean;
   activeAlbumSlug: string | null;
-  unitWallpapers: Record<UnitId, ThemeName>;
+  unitWallpapers: Record<UnitId, string>;
   mode: ThemeMode;
 }
 
@@ -32,14 +32,14 @@ interface ThemeDraftActions {
   /** Replace the album and re-randomise unit wallpapers from its pool. */
   setAlbum: (albumSlug: string, unitIds: UnitId[]) => void;
   /** Override a single unit in the draft. */
-  setUnitWallpaper: (unitId: UnitId, theme: ThemeName) => void;
+  setUnitWallpaper: (unitId: UnitId, theme: string) => void;
   /** Flip light/dark mode in the draft. */
   setMode: (mode: ThemeMode) => void;
   /**
    * Resolve the theme to render for `unitId`: draft override first, then
    * the main themeStore resolver (which walks album → fallback).
    */
-  resolveUnitTheme: (unitId: UnitId) => ThemeName;
+  resolveUnitTheme: (unitId: UnitId) => string;
   /** Revert draft to committed themeStore state. */
   resetDraft: () => void;
   /** Drop the draft entirely. */
@@ -65,7 +65,7 @@ function snapshotFromStore(): Pick<ThemeDraftState, 'activeAlbumSlug' | 'unitWal
   };
 }
 
-function distributeFromAlbum(albumSlug: string, unitIds: UnitId[]): Record<UnitId, ThemeName> {
+function distributeFromAlbum(albumSlug: string, unitIds: UnitId[]): Record<UnitId, string> {
   const catalog = useWallpaperStore.getState().catalog;
   const pool = getCatalogThemesForAlbum(catalog, albumSlug);
 
@@ -77,7 +77,7 @@ function distributeFromAlbum(albumSlug: string, unitIds: UnitId[]): Record<UnitI
   // Take the first N wallpapers (newest-first) and hand one to each unit
   // in order. If the pool is smaller than the unit count, cycle. This is
   // deterministic — same album always produces the same assignment.
-  const assigned: Record<UnitId, ThemeName> = {};
+  const assigned: Record<UnitId, string> = {};
   for (let i = 0; i < unitIds.length; i++) {
     assigned[unitIds[i]] = pool[i % pool.length];
   }

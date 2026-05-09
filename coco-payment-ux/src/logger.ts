@@ -3,7 +3,7 @@
 //
 // Internal modules log through `logger` instead of reaching for `console.*`
 // directly. The default implementation is a no-op so the package stays
-// runtime- and consumer-agnostic; consumers inject a real `Logger` (e.g.
+// runtime- and consumer-agnostic; consumers inject a real `CocoLogger` (e.g.
 // sovran-app's `paymentLog`) by passing `logger` to `createCocoPaymentUX`,
 // which forwards the value to `setLogger`.
 //
@@ -12,28 +12,28 @@
 // this a real seam, not pass-through indirection.
 // ---------------------------------------------------------------------------
 
-export interface Logger {
+export interface CocoLogger {
   debug(event: string, fields?: Record<string, unknown>): void;
   info(event: string, fields?: Record<string, unknown>): void;
   warn(event: string, fields?: Record<string, unknown>): void;
   error(event: string, fields?: Record<string, unknown>): void;
 }
 
-const noopLogger: Logger = {
+const noopLogger: CocoLogger = {
   debug: () => {},
   info: () => {},
   warn: () => {},
   error: () => {},
 };
 
-let current: Logger = noopLogger;
+let current: CocoLogger = noopLogger;
 
 /**
  * Replace the package-wide logger. Pass `null` to reset to the no-op
  * default. Intended to be called once at boot from the consumer; a host
  * with multiple concurrent payment surfaces would clobber prior wiring.
  */
-export function setLogger(next: Logger | null): void {
+export function setLogger(next: CocoLogger | null): void {
   current = next ?? noopLogger;
 }
 
@@ -41,7 +41,7 @@ export function setLogger(next: Logger | null): void {
  * Package-wide logger. Always read through this binding so swapping the
  * underlying implementation via `setLogger` takes effect for every caller.
  */
-export const logger: Logger = {
+export const logger: CocoLogger = {
   debug: (event, fields) => current.debug(event, fields),
   info: (event, fields) => current.info(event, fields),
   warn: (event, fields) => current.warn(event, fields),

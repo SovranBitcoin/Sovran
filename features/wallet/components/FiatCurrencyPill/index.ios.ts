@@ -11,8 +11,6 @@ import { FiatCurrencyPillFlat } from './FiatCurrencyPill.flat';
 import { FiatCurrencyPillLiquid } from './FiatCurrencyPill.liquid';
 import type { FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
-export type { FiatCurrencyPillProps } from './useFiatCurrencyPill';
-
 export const FiatCurrencyPill = defineVariants<FiatCurrencyPillProps>('FiatCurrencyPill', {
   liquid: FiatCurrencyPillLiquid,
   blur: FiatCurrencyPillBlur,

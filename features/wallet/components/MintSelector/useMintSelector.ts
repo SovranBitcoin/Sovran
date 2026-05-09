@@ -27,7 +27,7 @@ export interface MintSelectorProps {
   width?: number;
 }
 
-export interface MintSelectorShared {
+interface MintSelectorShared {
   mintUrl: string | undefined;
   mintName: string | undefined;
   mintIconUrl: string | undefined;

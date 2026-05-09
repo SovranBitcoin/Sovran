@@ -69,7 +69,7 @@ function evictIfOverCap(byMintUrl: Record<string, MintInfoCacheEntry>): void {
   });
 }
 
-export const useMintInfoCache = create<MintInfoCacheState>()(
+const useMintInfoCache = create<MintInfoCacheState>()(
   persist(
     (set) => ({
       byMintUrl: {},
@@ -110,11 +110,6 @@ export const useMintInfoCache = create<MintInfoCacheState>()(
 
 /** Module-level promise dedupe so concurrent miss/refresh fetches collapse to one HTTP. */
 const inflight = new Map<string, Promise<GetInfoResponse>>();
-
-/** Sync read for non-React contexts (operations bridges, machine handlers). */
-export function getCachedMintInfoSync(mintUrl: string): GetInfoResponse | undefined {
-  return useMintInfoCache.getState().byMintUrl[normalizeMintUrlKey(mintUrl)]?.info;
-}
 
 /**
  * SWR fetch:

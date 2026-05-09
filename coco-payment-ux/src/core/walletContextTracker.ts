@@ -23,7 +23,7 @@ function getReadyProofs(manager: Manager, mintUrl: string): Promise<CoreProof[]>
   ).proofService.getReadyProofs(mintUrl);
 }
 
-export interface WalletContextTrackerConfig {
+interface WalletContextTrackerConfig {
   getPreferredMintUrl?: () => string | undefined;
 }
 

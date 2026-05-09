@@ -11,8 +11,6 @@ import { CapsuleButtonFlat } from './CapsuleButton.flat';
 import { CapsuleButtonLiquid } from './CapsuleButton.liquid';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
 
-export type { CapsuleButtonProps } from './CapsuleButton.types';
-
 export const CapsuleButton = defineVariants<CapsuleButtonProps>('CapsuleButton', {
   liquid: CapsuleButtonLiquid,
   blur: CapsuleButtonBlur,

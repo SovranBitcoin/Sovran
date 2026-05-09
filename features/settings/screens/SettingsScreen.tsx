@@ -3,22 +3,17 @@ import { ScrollView, Linking, Alert } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
-import { Link, router, type Href } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
 import * as Application from 'expo-application';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { View } from '@/shared/ui/primitives/View/View';
-import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { devModePopup } from '@/shared/lib/popup';
-import opacity from 'hex-color-opacity';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -60,91 +55,6 @@ const ProfileButton = () => {
         <PressableFeedback.Ripple />
       </PressableFeedback>
     </ListGroup>
-  );
-};
-
-export const ROW_ICON_SIZE = 20;
-
-export const RowButton: React.FC<{
-  label: string;
-  value?: string;
-  onPress?: () => void;
-  href?: Href;
-  isFirst?: boolean;
-  isLast?: boolean;
-  isDanger?: boolean;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
-}> = ({ label, value, onPress, href, isFirst, isLast, isDanger, leftIcon, rightIcon }) => {
-  const [foreground, surfaceSecondary, surfaceTertiary, danger] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'surface-tertiary',
-    'danger',
-  ] as const);
-
-  const content = (
-    <View
-      className={`p-3 ${isFirst ? 'rounded-t-xl' : ''} ${isLast ? 'rounded-b-xl' : ''} bg-transparent`}
-      style={{
-        backgroundColor: surfaceSecondary,
-        borderColor: surfaceTertiary,
-        borderTopWidth: !isFirst ? 1 : 0,
-      }}>
-      <HStack align="center" gap={8} className="pr-1">
-        {leftIcon}
-        <Text
-          className="tracking-tight"
-          size={ROW_ICON_SIZE - 5}
-          bold
-          style={{
-            flex: 1,
-            color: isDanger ? danger : foreground,
-            includeFontPadding: false,
-            lineHeight: ROW_ICON_SIZE - 4,
-          }}>
-          {label}
-        </Text>
-        {value && (
-          <Text
-            className="tracking-tight"
-            bold
-            size={ROW_ICON_SIZE}
-            style={{
-              color: isDanger ? danger : opacity(foreground, 0.4),
-              includeFontPadding: false,
-              lineHeight: ROW_ICON_SIZE,
-            }}>
-            {value}
-          </Text>
-        )}
-        {onPress || href ? (
-          (rightIcon ?? (
-            <Icon
-              name="fa6-solid:chevron-right"
-              color={isDanger ? danger : opacity(foreground, 0.4)}
-              size={ROW_ICON_SIZE}
-            />
-          ))
-        ) : (
-          <Spacer size={4} />
-        )}
-      </HStack>
-    </View>
-  );
-
-  if (href) {
-    return (
-      <Link href={href} asChild>
-        <Pressable>{content}</Pressable>
-      </Link>
-    );
-  }
-
-  return (
-    <Pressable onPress={onPress} disabled={!onPress}>
-      {content}
-    </Pressable>
   );
 };
 

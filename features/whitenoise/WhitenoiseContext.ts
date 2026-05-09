@@ -2,7 +2,7 @@ import { createContext, useContext } from 'react';
 import type { InviteReader, MarmotClient } from '@internet-privacy/marmot-ts';
 import type { WhitenoiseGroupHistory } from './storage/groupHistory';
 
-export type WhitenoiseClient = MarmotClient<WhitenoiseGroupHistory>;
+type WhitenoiseClient = MarmotClient<WhitenoiseGroupHistory>;
 
 export type WhitenoiseContextValue = {
   client: WhitenoiseClient | null;

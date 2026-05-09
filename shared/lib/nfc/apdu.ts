@@ -8,14 +8,14 @@ import { NfcError } from './errors';
 import { STATUS_CODES, STATUS_OK } from './constants';
 import { nfcLog } from '../logger';
 
-export interface ApduResponse {
+interface ApduResponse {
   ok: boolean;
   raw: number[];
   payload: number[];
   sw: string;
 }
 
-export function hex(bytes: number[]): string {
+function hex(bytes: number[]): string {
   return Buffer.from(bytes).toString('hex').toUpperCase();
 }
 

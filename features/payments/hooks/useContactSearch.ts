@@ -5,7 +5,7 @@ import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStor
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import { Hex64 } from '@sovranbitcoin/schemas';
 
-export interface SearchResultData {
+interface SearchResultData {
   pubkey: string;
   profile: UserProfile;
 }

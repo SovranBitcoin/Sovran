@@ -11,8 +11,6 @@ import { CircleActionButtonFlat } from './CircleActionButton.flat';
 import { CircleActionButtonLiquid } from './CircleActionButton.liquid';
 import type { CircleActionButtonProps } from './CircleActionButton.types';
 
-export type { CircleActionButtonProps } from './CircleActionButton.types';
-
 export const CircleActionButton = defineVariants<CircleActionButtonProps>(
   'CircleActionButton',
   (caps, props) => {

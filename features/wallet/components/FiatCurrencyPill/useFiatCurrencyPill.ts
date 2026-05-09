@@ -17,7 +17,7 @@ export interface FiatCurrencyPillProps {
   enableCurrencyMenu?: boolean;
 }
 
-export interface FiatCurrencyPillShared {
+interface FiatCurrencyPillShared {
   success: string;
   green400: string;
   green500: string;

@@ -100,7 +100,7 @@ export interface ButtonHandlerButton {
   condition?: boolean;
 }
 
-export type ButtonHandlerActionButton = ButtonHandlerButton;
+type ButtonHandlerActionButton = ButtonHandlerButton;
 
 /**
  * Props for the ButtonHandler component

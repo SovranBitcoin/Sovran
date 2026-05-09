@@ -1426,7 +1426,7 @@ export const CATEGORIES: EmojiCategory[] = [
   },
 ];
 
-export const ALL_EMOJIS: EmojiEntry[] = CATEGORIES.flatMap((c) => c.emojis);
+const ALL_EMOJIS: EmojiEntry[] = CATEGORIES.flatMap((c) => c.emojis);
 
 export function searchEmojis(query: string): EmojiEntry[] {
   const q = query.toLowerCase().trim();

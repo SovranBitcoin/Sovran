@@ -16,15 +16,15 @@ import { create } from 'zustand';
 
 import { paymentLog } from '@/shared/lib/logger';
 
-type SwapLegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
+type SwapStatusLegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 
 export type SwapState = 'running' | 'done' | 'failed' | 'cancelled';
 
-export interface SwapLeg {
+export interface SwapStatusLeg {
   id: string;
   /** Optional human label, e.g. "Mint A → Mint B" — used in the toast subtitle. */
   label?: string;
-  status: SwapLegStatus;
+  status: SwapStatusLegStatus;
   errorMessage?: string;
 }
 
@@ -34,7 +34,7 @@ interface ActiveSwap {
   startedAt: number;
   state: SwapState;
   unit: string;
-  legs: SwapLeg[];
+  legs: SwapStatusLeg[];
   /** Total amount being swapped, in `unit`. Optional — shown in the header when present. */
   totalAmount?: number;
   /** Last failure text, set when state flips to 'failed'. */

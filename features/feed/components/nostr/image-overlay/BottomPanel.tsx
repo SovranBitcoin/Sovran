@@ -367,7 +367,7 @@ export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBott
 });
 
 /** Options when opening the sheet from the absolute bar. */
-export type ImageOverlayOpenSheetOptions = { expandContent?: boolean };
+type ImageOverlayOpenSheetOptions = { expandContent?: boolean };
 
 /** Absolute overlay bar when sheet is closed: pfp, truncated content, show more, metric buttons. Tapping comment or show more opens the sheet. */
 export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteBar({
@@ -504,7 +504,7 @@ const absoluteBarStyles = StyleSheet.create({
   },
 });
 
-export const styles = StyleSheet.create({
+const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: BOTTOM_PANEL_PADDING_HORIZONTAL,
     paddingTop: BOTTOM_PANEL_PADDING_TOP,

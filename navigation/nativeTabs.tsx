@@ -23,8 +23,6 @@ const ANDROID_HEADER_ICON_MAP: Partial<Record<HeaderIconName, string>> = {
   xmark: 'material-symbols:close-rounded',
 };
 
-export const isAndroidLiquidHeaderSupported = () => false;
-
 type HeaderIconButtonProps = {
   icon: HeaderIconName;
   color: string;

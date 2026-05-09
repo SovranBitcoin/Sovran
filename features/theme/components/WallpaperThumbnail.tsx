@@ -14,7 +14,7 @@ import { Image } from '@/shared/ui/primitives/Image';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
-import { THEMES } from '@/shared/providers/ThemeProvider';
+import { THEMES } from '@/themes';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import type { WallpaperCatalogEntry } from '@/shared/stores/global/wallpaperStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
