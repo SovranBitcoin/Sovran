@@ -37,7 +37,7 @@ import { LiquidGlassText } from 'liquid-glass-text';
 
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { ScrollEdgeFade } from '@/shared/ui/composed/ScrollEdgeFade';
-import { supportsLiquidGlass } from '@/shared/lib/version';
+import { useCapabilities } from '@/shared/ui/capability';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import { HistoryEntryHeader } from '@/features/transactions';
 import Icon from 'assets/icons';
@@ -388,7 +388,8 @@ interface GlassTextProps {
  * is promoted to visible and the overlay is skipped.
  */
 function GlassText({ text, fontFamily, fontSize, color }: GlassTextProps) {
-  if (!supportsLiquidGlass()) {
+  const { liquidGlass } = useCapabilities();
+  if (!liquidGlass) {
     return (
       <Text size={fontSize} allowFontScaling={false} style={{ fontFamily, color }}>
         {text}

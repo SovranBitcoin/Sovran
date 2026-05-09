@@ -12,11 +12,10 @@ import { useFonts } from '@/shared/hooks/useFonts';
 import { initLog, useInitMount } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Dimensions, Image, LogBox, StyleSheet, Platform, View } from 'react-native';
+import { Dimensions, Image, LogBox, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supportsLiquidGlass } from '@/shared/lib/version';
 
 import AppGate from '@/shared/blocks/AppGate';
 import GlobalMigrationGate from '@/shared/blocks/GlobalMigrationGate';
@@ -33,7 +32,7 @@ import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/Nostr
 import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
 import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
-import { CapabilityProvider } from '@/shared/ui/capability';
+import { CapabilityProvider, useCapabilities } from '@/shared/ui/capability';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -326,8 +325,8 @@ function RootLayoutContent() {
   };
 
   // For iOS 26+ with Liquid Glass, use transparent background to enable glass effects
-  const useLiquidGlass = Platform.OS === 'ios' && supportsLiquidGlass();
-  const contentBackgroundColor = useLiquidGlass ? 'transparent' : background;
+  const { liquidGlass } = useCapabilities();
+  const contentBackgroundColor = liquidGlass ? 'transparent' : background;
 
   return (
     <NavigationThemeProvider value={DarkTheme}>
