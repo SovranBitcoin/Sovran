@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Mint } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
 import { log } from '@/shared/lib/logger';
+import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 
 // Module-level in-flight dedupe. Multiple components that use this hook
 // (ContactsScreen, settings recovery, mint screens) each kick off their
@@ -53,7 +54,11 @@ export function useMintManagement() {
   const getMintInfo = useCallback(
     async (mintUrl: string) => {
       try {
-        const info = await manager.mint.getMintInfo(mintUrl);
+        // SWR through `mintInfoCache`: cached fresh resolves instantly, stale
+        // resolves with the prior value and refreshes in the background, miss
+        // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
+        // its own 5-minute window has expired).
+        const info = await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
         log.debug('mint.info.fetch.success', { mintUrl });
         return info;
       } catch (err) {

@@ -14,6 +14,7 @@ import { useManager } from '@cashu/coco-react';
 import type { MintCatalogEntry } from 'coco-payment-ux';
 
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
+import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 
 export function useMintCatalog(mintUrls: string[]): Record<string, MintCatalogEntry> {
   const manager = useManager();
@@ -30,7 +31,7 @@ export function useMintCatalog(mintUrls: string[]): Record<string, MintCatalogEn
     }
 
     let cancelled = false;
-    getMintCatalog(mintUrls, (url) => manager.mint.getMintInfo(url))
+    getMintCatalog(mintUrls, (url) => getCachedMintInfo((u) => manager.mint.getMintInfo(u), url))
       .then((result) => {
         if (!cancelled) setCatalog(result);
       })

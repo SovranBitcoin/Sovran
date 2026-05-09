@@ -12,6 +12,7 @@ import { paymentLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
+import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
@@ -287,7 +288,7 @@ export function createSovranScreenActionsBridge({
             (async () => {
               try {
                 const [info, balances] = await Promise.all([
-                  manager.mint.getMintInfo(mintUrl).catch(() => null),
+                  getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch(() => null),
                   manager.wallet.balances.byMint({ mintUrls: [mintUrl] }).catch(() => ({})),
                 ]);
                 const balancesByMint = balances as Record<string, { total?: number } | undefined>;
@@ -353,7 +354,9 @@ export function createSovranScreenActionsBridge({
           (async () => {
             try {
               const [mintInfo, isTrusted] = await Promise.all([
-                manager.mint.getMintInfo(mintUrl).catch(() => undefined),
+                getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch(
+                  () => undefined
+                ),
                 manager.mint.isTrustedMint(mintUrl).catch(() => false),
               ]);
               cb({

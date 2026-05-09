@@ -47,6 +47,7 @@ import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
+import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 
@@ -123,7 +124,9 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         // Awaited inside coco-payment-ux's buildMintListItems so rows reach
         // the screen with score / audit / followers already set.
         fetchMintCatalog: (mintUrls) =>
-          getMintCatalog(mintUrls, (url) => manager.mint.getMintInfo(url)),
+          getMintCatalog(mintUrls, (url) =>
+            getCachedMintInfo((u) => manager.mint.getMintInfo(u), url)
+          ),
         // Trust-review screen still pulls per-mint detail (swap-by-swap timing)
         // from the local audit / KYM caches populated by `useAuditedMint`.
         enrichMintReviewInfo: getSovranMintEnrichment,

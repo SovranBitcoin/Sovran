@@ -4,6 +4,7 @@ import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { attachMintInfoCacheToManager } from '@/shared/stores/global/mintInfoCache';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
 import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
@@ -240,6 +241,17 @@ export function CocoProvider({ children }: CocoProviderProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bgStage.canStart, manager, keys?.pubkey]);
+
+  // Keep the mint-info SWR cache in sync with coco's DB. mint:updated /
+  // mint:added fire from recovery, addMintByUrl, and the per-mint refresh
+  // inside ensureUpdatedMint — paths that don't necessarily route through
+  // `getCachedMintInfo`. Without this subscription, those refreshes would
+  // sit in coco's DB while our cache served stale data until its 24h SWR
+  // window elapsed.
+  useEffect(() => {
+    if (!manager) return;
+    return attachMintInfoCacheToManager(manager);
+  }, [manager]);
 
   const contextValue: CocoContextValue = {
     manager,
