@@ -160,7 +160,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Raw wc -l confirms 1822. Function boundary confirmed by reading lines 309 and 1278. Counter-argument considered: 'extraction adds indirection; the runner is a coherent narrative.' The narrative would survive extraction because each phase has a clear before/after state — the extracted functions would simply name the phases. Not counted against dim-3: this file was touched in commit 04f04469 'fix: audit fixes — security, correctness, performance' (2026-04-08) which added rather than removed logic; the 1822-LOC size is the current working state, not a snapshot from before the prior audit cycle.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Screen side of the finding is complete: MintRebalancePlanScreen.tsx dropped from 1820 LOC / cognitive=793 / 41 hooks to 447 LOC / cognitive ~70 / 19 hooks; the 900-LOC executeStep callback was lifted into a new useMintRebalanceOrchestrator hook (features/mint/hooks/useMintRebalanceOrchestrator.ts). The hook itself still carries the unsplit executeStep with no extraction between invoice/prepare/melt/middleman-route/verify phases — that internal phase extraction is deferred (closure-mutability of transferAmount/mintQuote/invoice/preparedMeltOp would force a real refactor of funds-flow code)."
     },
     {
       "id": "F-007",
