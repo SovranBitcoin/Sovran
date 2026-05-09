@@ -57,6 +57,7 @@
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 import * as fs from 'fs';
+import { createRequire } from 'module';
 import * as nodePath from 'path';
 import * as url from 'url';
 import { spawn, spawnSync } from 'child_process';
@@ -70,7 +71,15 @@ import {
   formatTestList,
 } from './test-dsl/discovery';
 import type { RunnerEvent } from './test-dsl/events';
-import { executeMatrix, executeTest } from './test-dsl/executor';
+// `executor.ts` imports the WDA primitives defined further down in this file.
+// A static `import` here would form a cycle (`index.ts` ↔ `executor.ts`) that
+// `analyze-structure` flags. Loading the executor through `createRequire`
+// breaks the static edge — runtime behaviour is unchanged because the executor
+// is only invoked from CLI command branches that run after this module is
+// fully evaluated.
+const { executeMatrix, executeTest } = createRequire(import.meta.url)(
+  './test-dsl/executor',
+) as typeof import('./test-dsl/executor');
 import { parseSuite } from './test-dsl/parser';
 import {
   createTtyReporter,
