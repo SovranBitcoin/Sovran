@@ -610,13 +610,9 @@ export function retrieveImportedNsec(pubkeyHex: string): Promise<string | null> 
   return secureGet(importedNsecKey(pubkeyHex), 'retrieve_nsec');
 }
 
-export function deleteImportedNsec(pubkeyHex: string): Promise<boolean> {
-  return secureDelete(importedNsecKey(pubkeyHex), 'delete_nsec');
-}
-
 // ── Hooks ───────────────────────────────────────────────────────
 
-export interface UseMnemonicReturn {
+interface UseMnemonicReturn {
   value: string | null;
   loading: boolean;
   error: string | null;

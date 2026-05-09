@@ -25,7 +25,7 @@ import { Platform } from 'react-native';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
 interface LoggerOptions {
   /** Minimum level to emit. Default: 'debug' in __DEV__, 'warn' in production */
@@ -63,7 +63,7 @@ interface LoggerOptions {
   dedupWindowMs?: number;
 }
 
-export interface LogEntry {
+interface LogEntry {
   ts: string;
   /** Monotonic ms since app start via performance.now(). Subtract any two _t values
    *  to find the gap — immune to clock skew, sub-ms precision. */
@@ -91,17 +91,17 @@ export interface LogEntry {
  * such as AI completions should pass higher values so a normal completion
  * does not log as ERROR (audit 34 F-005).
  */
-export interface SpanOptions {
+interface SpanOptions {
   warnAtMs?: number;
   errorAtMs?: number;
 }
 
-export interface Span {
+interface Span {
   /** End the span. Logs `${event}.end` with duration_ms. Auto-escalates by threshold. */
   end(params?: Record<string, unknown>): void;
 }
 
-export interface DumpOptions {
+interface DumpOptions {
   /** Output format. 'json' emits NDJSON (default), 'yaml' uses inline YAML,
    *  'md' uses a pipe-delimited table — ~40% fewer tokens than JSON. */
   format?: 'json' | 'yaml' | 'md';

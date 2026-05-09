@@ -146,7 +146,7 @@ export interface ActionMenuInput {
   description?: string;
 }
 
-export interface ActionMenuPrimaryActionContext {
+interface ActionMenuPrimaryActionContext {
   setError: (message: string | null) => void;
   close: () => void;
 }
