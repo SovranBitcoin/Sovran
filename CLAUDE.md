@@ -53,3 +53,4 @@ Non-negotiable from `fix.md`, called out here so they survive even if `fix.md` i
 Topical rules live in `__rules__/`. Read the relevant file before writing code that matches the trigger.
 
 - **Implementing a component that varies by platform or by feature support (Liquid Glass, blur, etc.)** — read [`__rules__/capability-variants.md`](./__rules__/capability-variants.md). Tells you when to use `defineVariants`, when inline `useCapabilities()` is enough, when the sync helpers in `shared/lib/version.ts` are correct, and when a `.ios.tsx`/`.android.tsx` split is the right answer.
+- **Sizing UI for screens between iPhone SE and iPad Pro** — read [`__rules__/responsive-scaling.md`](./__rules__/responsive-scaling.md). The three pillars (`useWindowDimensions`, `PixelRatio`, flex/`aspectRatio`) and the anti-patterns to avoid (module-scope `Dimensions.get`, hardcoded reference widths, `borderWidth: 0.5`).
