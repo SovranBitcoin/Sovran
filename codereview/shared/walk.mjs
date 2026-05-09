@@ -6,7 +6,7 @@
 import { readdirSync, statSync } from 'fs';
 import { join, extname } from 'path';
 
-import { IGNORE_DIRS, IGNORE_FILES, TS_EXTS, isTestPath } from './ignore.mjs';
+import { IGNORE_DIRS, IGNORE_FILES, IGNORE_PATH_PATTERNS, TS_EXTS, isTestPath } from './ignore.mjs';
 
 /**
  * Walk a directory and collect every TypeScript/JavaScript source file.
@@ -35,7 +35,10 @@ export function walkFiles(dir, opts = {}, out = []) {
     } catch {
       continue;
     }
-    if (st.isDirectory()) walkFiles(full, opts, out);
+    if (st.isDirectory()) {
+      if (IGNORE_PATH_PATTERNS.some((re) => re.test(full))) continue;
+      walkFiles(full, opts, out);
+    }
     else if (TS_EXTS.has(extname(entry))) {
       if (!includeTests && isTestPath(full)) continue;
       out.push(full);

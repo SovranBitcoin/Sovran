@@ -53,7 +53,7 @@ import { join, extname, basename, relative, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 
-import { IGNORE_DIRS, IGNORE_FILES, TS_EXTS } from '../shared/ignore.mjs';
+import { IGNORE_DIRS, IGNORE_FILES, IGNORE_PATH_PATTERNS, TS_EXTS } from '../shared/ignore.mjs';
 import { stripCodeNoise, findMatchingBrace } from '../shared/source.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -983,6 +983,7 @@ function walk(dirPath, prefix = '') {
     }
 
     if (stat.isDirectory()) {
+      if (IGNORE_PATH_PATTERNS.some((re) => re.test(fullPath))) return;
       const children = walk(fullPath, childPfx);
       nodes.push({ type: 'dir', name: entry, connector, prefix, children });
     } else if (TS_EXTS.has(extname(entry))) {
