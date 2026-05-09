@@ -136,7 +136,7 @@ import {
   typeKeys,
   waitForID,
   waitForText,
-} from '../index';
+} from '../wda';
 
 /**
  * Prefix-lookup dispatch: picks either the topmost-visible heuristic
