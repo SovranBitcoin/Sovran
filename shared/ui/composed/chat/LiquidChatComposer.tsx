@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
-  Platform,
   TextInput,
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
@@ -42,7 +41,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { supportsLiquidGlass } from '@/shared/lib/version';
+import { useCapabilities } from '@/shared/ui/capability';
 import { chatLog } from '@/shared/lib/logger';
 
 interface LiquidChatComposerProps {
@@ -143,7 +142,7 @@ export function LiquidChatComposer({
   const trimmedHasText = value.trim().length > 0;
   const canSend = trimmedHasText && !disabled;
   const isEmpty = value.length === 0;
-  const useNativeGlass = Platform.OS === 'ios' && supportsLiquidGlass();
+  const { liquidGlass: useNativeGlass } = useCapabilities();
 
   // Stable namespace id for `glassEffectId(_:in:)` matched-geometry. `useId`
   // gives one per component instance; a fresh id on remount is the desired

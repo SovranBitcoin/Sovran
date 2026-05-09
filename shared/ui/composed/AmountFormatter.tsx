@@ -15,7 +15,7 @@ import type { GlassVariant } from 'liquid-glass-text';
 import { formatAmount } from '@/shared/lib/currency';
 import { Log } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/utils';
-import { supportsLiquidGlass } from '@/shared/lib/version';
+import { useCapabilities } from '@/shared/ui/capability';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -115,7 +115,8 @@ export function AmountFormatter({
     danger,
   });
 
-  const useGlass = liquid && supportsLiquidGlass();
+  const { liquidGlass } = useCapabilities();
+  const useGlass = liquid && liquidGlass;
   const containerClass = centered ? 'items-center justify-center' : 'flex-row items-center';
 
   return (

@@ -11,7 +11,7 @@ import {
 import { font, foregroundStyle, frame, glassEffect, padding } from '@expo/ui/swift-ui/modifiers';
 import { StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { liquidGlassModifiers } from '@/shared/lib/version';
+import { useLiquidGlassModifiers } from '@/shared/ui/capability';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { MERCHANT_CATEGORIES, type MerchantCategoryId } from '@/shared/lib/map/categories';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -48,6 +48,12 @@ export const StatsCard = memo(function StatsCard({
   cardWidth,
 }: StatsCardProps) {
   const foreground = useThemeColor('foreground');
+  const glassCardModifiers = useLiquidGlassModifiers(
+    glassEffect({
+      shape: 'capsule',
+      glass: { variant: 'regular', interactive: true },
+    })
+  );
 
   const visibleText = loading ? '...' : `${visibleCount.toLocaleString()} visible`;
   const totalText = loading
@@ -72,12 +78,7 @@ export const StatsCard = memo(function StatsCard({
               <SwiftUIButton
                 modifiers={[
                   frame({ width: cardWidth, height: 60, alignment: 'center' }),
-                  ...liquidGlassModifiers(
-                    glassEffect({
-                      shape: 'capsule',
-                      glass: { variant: 'regular', interactive: true },
-                    })
-                  ),
+                  ...glassCardModifiers,
                 ]}>
                 <SwiftUIHStack
                   alignment="center"

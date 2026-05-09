@@ -1,5 +1,4 @@
 import React, { useCallback } from 'react';
-import { Platform } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -22,7 +21,7 @@ import {
   Text as SwiftUIText,
 } from '@expo/ui/swift-ui';
 import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
-import { liquidGlassModifiers, supportsLiquidGlass } from '@/shared/lib/version';
+import { useCapabilities, useLiquidGlassModifiers } from '@/shared/ui/capability';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -109,25 +108,27 @@ function EcashStatusPill({
 }: EcashStatusPillProps): React.ReactElement | null {
   const [foreground] = useThemeColor(['foreground'] as const);
   const tint = tintColor ?? foreground;
+  const { liquidGlass } = useCapabilities();
+  const glassPillModifiers = useLiquidGlassModifiers(
+    glassEffect({
+      shape: 'capsule',
+      glass: { tint: opacity(tint, 0.15), variant: 'regular', interactive: false },
+    })
+  );
 
   if (totalAmount <= 0) return null;
 
   const text = `${label}: ${totalAmount.toLocaleString()} ${unit.toUpperCase()}`;
   const iosWidth = Math.max(72, Math.round(text.length * (PILL_TEXT_SIZE * 0.62) + 28 + 17));
 
-  if (Platform.OS === 'ios' && supportsLiquidGlass()) {
+  if (liquidGlass) {
     return (
       <Host matchContents>
         <SwiftUIButton
           onPress={onPress}
           modifiers={[
             frame({ height: PILL_IOS_HEIGHT, width: iosWidth, alignment: 'center' }),
-            ...liquidGlassModifiers(
-              glassEffect({
-                shape: 'capsule',
-                glass: { tint: opacity(tint, 0.15), variant: 'regular', interactive: false },
-              })
-            ),
+            ...glassPillModifiers,
           ]}>
           <SwiftUIHStack
             alignment="center"
