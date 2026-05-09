@@ -3,24 +3,18 @@ import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
-import { Log } from '@/shared/lib/logger';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import type { CapsuleButtonProps } from './CapsuleButton.fallback';
-
-export type { CapsuleButtonProps } from './CapsuleButton.fallback';
+import type { CapsuleButtonProps } from './CapsuleButton.types';
 
 const DEFAULT_HEIGHT = 46;
 
-export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
-  const [foreground, surfaceSecondary, muted] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'muted',
-  ] as const);
+export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement {
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const {
     label,
     icon,
@@ -30,24 +24,22 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
     testID,
     roundedSide = 'all',
   } = props;
-
+  const accentColor = muted;
   const cornerStyle = getCornerStyle(roundedSide);
 
   return (
-    <Log name="CapsuleButton">
-      <View
-        testID={testID}
-        style={[
-          styles.card,
-          cornerStyle,
-          {
-            minHeight: height,
-            maxWidth: 140,
-            alignSelf: 'center',
-            backgroundColor: surfaceSecondary,
-            borderColor: opacity(muted, 0.3),
-          },
-        ]}>
+    <View
+      testID={testID}
+      style={[
+        styles.card,
+        cornerStyle,
+        {
+          minHeight: height,
+          maxWidth: 140,
+          alignSelf: 'center',
+        },
+      ]}>
+      <BlurCardFrame accentColor={accentColor}>
         <PressableFeedback
           animation={false}
           onPress={onPress}
@@ -64,8 +56,19 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
           </HStack>
           <PressableFeedback.Ripple />
         </PressableFeedback>
-      </View>
-    </Log>
+      </BlurCardFrame>
+      {/* Border drawn on top of the blur so the rounded corners aren't
+          eaten by the absolute-filled iOS blur layer underneath. */}
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFillObject,
+          cornerStyle,
+          styles.borderOverlay,
+          { borderColor: opacity(accentColor, 0.3) },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -74,7 +77,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderCurve: 'continuous',
     overflow: 'hidden',
-    borderWidth: 1,
   },
   pressable: {
     width: '100%',
@@ -83,6 +85,10 @@ const styles = StyleSheet.create({
   content: {
     width: '100%',
     paddingHorizontal: 12,
+  },
+  borderOverlay: {
+    borderWidth: 1,
+    borderCurve: 'continuous',
   },
 });
 
