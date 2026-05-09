@@ -62,13 +62,7 @@ export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo
     const swaps = audit.auditData.swaps ?? [];
     const swapSuccess = swaps.reduce((acc, swap) => acc + (swap.state === 'OK' ? 1 : 0), 0);
     const swapTotal = swaps.length;
-    const totalOps = (audit.auditData.n_mints ?? 0) + (audit.auditData.n_melts ?? 0);
-    const aggregateSuccessRate =
-      totalOps > 0
-        ? Math.max(0, Math.min(1, 1 - (audit.auditData.n_errors ?? 0) / totalOps))
-        : undefined;
-    const swapSuccessRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
-    const successRate = aggregateSuccessRate ?? swapSuccessRate;
+    const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
     const successfulTimes = swaps
       .filter((swap) => swap.state === 'OK' && typeof swap.time_taken === 'number')
       .map((swap) => swap.time_taken)

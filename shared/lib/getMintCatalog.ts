@@ -23,6 +23,7 @@
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { MintCatalogEntry } from 'coco-payment-ux';
 
+import { transformAuditData } from '@/features/mint/lib/auditInfo';
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
 import {
   extractMintNostrPubkey,
@@ -39,13 +40,6 @@ function isMintInfoObject(value: unknown): value is Record<string, unknown> {
     !Array.isArray(value) &&
     Object.keys(value as Record<string, unknown>).length > 0
   );
-}
-
-function deriveAuditScore(n_mints: number, n_melts: number, n_errors: number): number | undefined {
-  const totalOps = n_mints + n_melts;
-  if (totalOps <= 0) return undefined;
-  const successRate = 1 - n_errors / totalOps;
-  return Math.max(0, Math.min(1, successRate)) * 5;
 }
 
 async function resolveNostrProfile(
@@ -90,7 +84,8 @@ async function fetchEntry(
   // Audit data + info from the audit endpoint when available …
   if (auditRes && auditRes.isOk()) {
     const audit = auditRes.value;
-    entry.auditScore = deriveAuditScore(audit.n_mints, audit.n_melts, audit.n_errors);
+    const { score } = transformAuditData(audit);
+    entry.auditScore = score;
     entry.auditState = audit.state;
     entry.auditTotalOps = audit.n_mints + audit.n_melts;
     // The auditor returns `info` in inconsistent shapes (object, null, "")

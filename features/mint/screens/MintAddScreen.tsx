@@ -243,10 +243,13 @@ const MintItem = memo(function MintItem({
     [mint.url, mint.mintInfo]
   );
 
-  // Translate server-side `serverStats` (mint/melt ops + error count) into
-  // the 0–5 audit-score scale `ContactRow` expects, so the audit pill
-  // renders identically whether the signal came from a `MintListItem` or
-  // from the Mint Add search enrichment.
+  // Search-result preview only: the search endpoint returns `serverStats`
+  // (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't
+  // route through `transformAuditData` like the catalog/info paths do. The
+  // resulting score is an ops-aggregate approximation; it can disagree with
+  // the swap-based score the user sees once the mint is opened. That's
+  // accepted — this pill is best-effort during search; authoritative scores
+  // come from `getMintCatalog` and `MintInfoScreen`.
   const { auditScore, auditTotalOps } = useMemo<{
     auditScore: number | undefined;
     auditTotalOps: number | undefined;
