@@ -110,103 +110,90 @@ interface PaymentFlowRefs {
 }
 
 // ---------------------------------------------------------------------------
-// Flat provider props (see README)
+// Provider props — grouped by concern (see README)
 // ---------------------------------------------------------------------------
+
+/**
+ * Wallet engine wiring. Supplies the engine instance produced by
+ * `createCocoPaymentUX()` along with optional overrides for the operations
+ * map and any custom protocol detectors.
+ *
+ * The instance is the recommended path for non-trivial consumers — it
+ * carries the operations map, wallet-context tracker, and (via
+ * `instance.config`) the runtime getters and platform adapters too.
+ * `operations` and `detectors` here override the corresponding instance
+ * fields when both are present.
+ */
+interface EngineConfig {
+  instance?: CocoPaymentUXInstance;
+  operations?: MachineOperations;
+  detectors?: Detectors;
+}
+
+/**
+ * Behavior callbacks — error/validation notifications, post-terminal
+ * screen-action handlers, and the optional bridge for `useScreenActions`
+ * extras (history subscriptions, decoration, scan provenance).
+ */
+interface CallbackConfig {
+  notifications?: NotificationHandlerMap;
+  actions?: ScreenActionHandlerMap;
+  screenActionsBridge?: ScreenActionsBridge;
+}
+
+/**
+ * Runtime values read on each machine event (current offline state, BTC
+ * price, display currency, locale) plus localization translation
+ * dictionaries.
+ *
+ * The getters are read through `useLatestRef`, so updating any of them
+ * does not trigger a render — the latest value is observed at the next
+ * machine event. Each getter falls back to the matching field on
+ * `engine.instance.config` when omitted; `getLocale` defaults to `'en'`.
+ *
+ * `translations` is registered against the module-level locale map on
+ * mount and on every change; missing keys fall back to English.
+ */
+interface RuntimeConfig {
+  getOffline?: () => boolean;
+  getBtcPrice?: () => number;
+  getDisplayCurrency?: () => { code: string; symbol: string } | null;
+  getLocale?: () => string;
+  translations?: Record<string, Record<string, string>>;
+}
+
+/**
+ * Platform integrations — clipboard write, share sheet, NFC adapter,
+ * URDecoder factory, scan sources, deep-link config, and navigation
+ * callbacks. Each may also be supplied via
+ * `engine.instance.config.platform`; the top-level value wins when both
+ * are set.
+ */
+interface PlatformConfig {
+  writeClipboard?: (text: string) => Promise<void>;
+  shareContent?: (content: { message: string; url?: string }) => Promise<void>;
+  nfcAdapter?: NfcIOAdapter;
+  createURDecoder?: () => URDecoderLike;
+  scanSources?: ScanSources;
+  deepLinks?: DeepLinkConfig;
+  navigation?: NavigationCallbacks;
+}
 
 interface CocoPaymentUXProviderProps {
   children: React.ReactNode;
   /**
-   * Optional CocoPaymentUXInstance from `createCocoPaymentUX()`.
-   * When provided, supplies built-in operations and wallet context tracking.
-   * The machine uses the instance's tracker for wallet context instead of
-   * requiring `walletContextRef` and `usePaymentFlowMachine({ walletContext })`.
-   */
-  instance?: CocoPaymentUXInstance;
-  /**
-   * Factory called once after the machine is created. Returns the
-   * `StepHandlerMap` for the machine.
+   * Required step-handler factory. Called once after the machine is
+   * created — returns the `StepHandlerMap` it will use.
    */
   handlers: (machine: PaymentMachine, refs: PaymentFlowRefs) => StepHandlerMap;
-  /** Async wallet operations (send, mint quote, build mint list). */
-  operations?: MachineOperations;
-  /** Error/validation notification handlers. */
-  notifications?: NotificationHandlerMap;
-  /** Custom protocol detectors. Falls back to built-in detectors. */
-  detectors?: Detectors;
-  /**
-   * Factory that creates a URDecoder for animated QR assembly.
-   */
-  createURDecoder?: () => URDecoderLike;
-  /** Platform-injected sources for scan() when no data is passed. */
-  scanSources?: ScanSources;
-  /**
-   * Device offline (or mock-offline). Used when `enterAmount` omits `offline`;
-   * read on each machine event via getter.
-   */
-  getOffline?: () => boolean;
-  /**
-   * Returns current BTC price in the user's display currency.
-   * Used by the amount entry screen to resolve fiat ↔ sat conversions.
-   */
-  getBtcPrice?: () => number;
-  /**
-   * Returns the user's display fiat currency. When non-null, enables the
-   * fiat toggle on amount entry screens for send flows.
-   */
-  getDisplayCurrency?: () => { code: string; symbol: string } | null;
-  /**
-   * Post-terminal screen action handlers (copy, share, pay, …).
-   * Registered on context for `useScreenActions(screenType, entry)`.
-   */
-  actions?: ScreenActionHandlerMap;
-  /**
-   * Returns the current locale (e.g. 'en', 'ar', 'de').
-   * Used for localized reason messages, date formatting, and RTL truncation.
-   * Also used by `screenActionsBridge` when `screenActionsBridge.getLocale`
-   * is not set. Defaults to `'en'`.
-   */
-  getLocale?: () => string;
-  /**
-   * Custom locale translations. Keys are language codes, values are
-   * translation dictionaries mapping reason codes to localized strings.
-   * Merged on mount — missing keys fall back to English.
-   */
-  translations?: Record<string, Record<string, string>>;
-  /**
-   * Platform clipboard write. When provided, built-in `copy` actions work
-   * out of the box — the wallet only needs to handle `onCopied` in
-   * `notifications` to show UI feedback.
-   */
-  writeClipboard?: (text: string) => Promise<void>;
-  /**
-   * Platform share sheet. When provided, built-in `share` actions work
-   * out of the box. Tokens include a `cashu://` URL; other content passes
-   * the raw text as `message`.
-   */
-  shareContent?: (content: { message: string; url?: string }) => Promise<void>;
-  /**
-   * Optional wallet wiring for `useScreenActions` (extra context, history
-   * subscriptions, decoration, scan provenance).
-   */
-  screenActionsBridge?: ScreenActionsBridge;
-  /**
-   * Deep link configuration. When provided, the provider automatically
-   * processes incoming deep links via the machine's scan() method.
-   * `cashu://` is always accepted; pass additional schemes via customSchemes.
-   */
-  deepLinks?: DeepLinkConfig;
-  /**
-   * NFC I/O adapter for POS payment flows. When provided,
-   * `scan(undefined, { source: 'nfc' })` uses the adapter for read/write
-   * and auto-resolves interactive steps without user prompts.
-   */
-  nfcAdapter?: NfcIOAdapter;
-  /**
-   * Navigation callbacks for built-in default screen action handlers.
-   * When provided alongside operations, screen actions like scanQr, mintInfo,
-   * addMint, and goBack work out of the box.
-   */
-  navigation?: NavigationCallbacks;
+  /** Engine wiring (instance + operations override + custom detectors). */
+  engine?: EngineConfig;
+  /** Behavior callbacks (notifications, screen actions, screen-actions bridge). */
+  callbacks?: CallbackConfig;
+  /** Runtime values + locale (getters + translations). */
+  runtime?: RuntimeConfig;
+  /** Platform integrations (clipboard, share, NFC, scan, deep-links, navigation). */
+  platform?: PlatformConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -244,27 +231,35 @@ const EMPTY_SCREEN_ACTIONS = {} as ScreenActionHandlerMap;
 
 export function CocoPaymentUXProvider({
   children,
-  instance,
   handlers: handlersFactory,
-  operations: operationsProp,
-  notifications,
-  detectors,
-  createURDecoder: createURDecoderProp,
-  scanSources: scanSourcesProp,
-  getLocale: getLocaleProp,
-  translations,
-  getOffline: getOfflineProp,
-  getBtcPrice: getBtcPriceProp,
-  getDisplayCurrency: getDisplayCurrencyProp,
-  writeClipboard: writeClipboardProp,
-  shareContent: shareContentProp,
-  actions,
-  screenActionsBridge,
-  deepLinks,
-  nfcAdapter: nfcAdapterProp,
-  navigation,
+  engine,
+  callbacks,
+  runtime,
+  platform,
 }: CocoPaymentUXProviderProps) {
-  // Resolve props from instance.config when not explicitly provided
+  // Pull individual fields out of each group, then fall back to the engine
+  // instance's config (`createCocoPaymentUX(...).config`) where the package
+  // already structures the same values. The top-level prop wins when both
+  // are set.
+  const { instance, operations: operationsProp, detectors } = engine ?? {};
+  const { notifications, actions, screenActionsBridge } = callbacks ?? {};
+  const {
+    getOffline: getOfflineProp,
+    getBtcPrice: getBtcPriceProp,
+    getDisplayCurrency: getDisplayCurrencyProp,
+    getLocale: getLocaleProp,
+    translations,
+  } = runtime ?? {};
+  const {
+    writeClipboard: writeClipboardProp,
+    shareContent: shareContentProp,
+    nfcAdapter: nfcAdapterProp,
+    createURDecoder: createURDecoderProp,
+    scanSources: scanSourcesProp,
+    deepLinks,
+    navigation,
+  } = platform ?? {};
+
   const ic = instance?.config;
   const getLocale = getLocaleProp ?? ic?.getLocale;
   const getOffline = getOfflineProp ?? ic?.getOffline;

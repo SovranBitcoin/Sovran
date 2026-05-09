@@ -254,8 +254,6 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
 
   return (
     <PaymentUXProviderBase
-      instance={instance}
-      operations={operationsOverride}
       handlers={(machine, refs) =>
         createSovranHandlers({
           machine,
@@ -264,20 +262,28 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           getNpub,
         })
       }
-      notifications={createSovranNotifications({
-        getPubkey: () => pubkeyRef.current,
-        getPrivateKey: () => privateKeyRef.current,
-        getManager: () => manager,
-        onP2pkKeyRefreshed: (newKey) => {
-          for (const subscriber of p2pkKeyRefreshedSubscribers.current) {
-            subscriber(newKey);
-          }
-        },
-      })}
-      actions={actions}
-      screenActionsBridge={screenActionsBridge}
-      deepLinks={deepLinks}
-      navigation={navigation}>
+      engine={{
+        instance,
+        operations: operationsOverride,
+      }}
+      callbacks={{
+        notifications: createSovranNotifications({
+          getPubkey: () => pubkeyRef.current,
+          getPrivateKey: () => privateKeyRef.current,
+          getManager: () => manager,
+          onP2pkKeyRefreshed: (newKey) => {
+            for (const subscriber of p2pkKeyRefreshedSubscribers.current) {
+              subscriber(newKey);
+            }
+          },
+        }),
+        actions,
+        screenActionsBridge,
+      }}
+      platform={{
+        deepLinks,
+        navigation,
+      }}>
       {children}
     </PaymentUXProviderBase>
   );
