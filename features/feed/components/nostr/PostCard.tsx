@@ -20,16 +20,12 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import {
-  type FeedEvent,
-  type NoteMetrics,
-  type ProfileInfo,
-  formatTimestamp,
-  tryNpubEncode,
-  NoteContent,
-  MetricsFooter,
-  sharedStyles,
-} from './shared';
+import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
+import { formatTimestamp } from './feedFormat';
+import { tryNpubEncode } from './feedParse';
+import { NoteContent } from './NoteContent';
+import { MetricsFooter } from './MetricsFooter';
+import { sharedStyles } from './feedStyles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 

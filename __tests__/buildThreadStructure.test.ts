@@ -1,7 +1,7 @@
 import { ShortTextNote } from 'nostr-tools/kinds';
 
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
-import type { FeedEvent } from '@/features/feed/components/nostr/shared';
+import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 
 function note(
   id: string,

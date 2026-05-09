@@ -4,19 +4,23 @@ import { Metadata, ShortTextNote } from 'nostr-tools/kinds';
 
 import {
   collectReferencedIds,
-  createPrimalRelayClient,
   normalizeFeedEvent,
   parseJson,
   parseNoteMetrics,
   parseProfileFromRaw,
+} from '@/features/feed/components/nostr/feedParse';
+import {
+  createPrimalRelayClient,
   PRIMAL_CACHE_RELAY_URL,
   PRIMAL_KIND_MENTIONS,
   PRIMAL_KIND_NOTE_STATS,
-  type FeedEvent,
-  type NoteMetrics,
-  type ProfileInfo,
-  type RawPrimalEvent,
-} from '@/features/feed/components/nostr/shared';
+} from '@/features/feed/components/nostr/primalRelay';
+import type {
+  FeedEvent,
+  NoteMetrics,
+  ProfileInfo,
+  RawPrimalEvent,
+} from '@/features/feed/components/nostr/feedTypes';
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import { feedLog } from '@/shared/lib/logger';
 

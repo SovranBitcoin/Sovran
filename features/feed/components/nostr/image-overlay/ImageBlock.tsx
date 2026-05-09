@@ -11,7 +11,7 @@ import Reanimated, { useAnimatedProps, useSharedValue } from 'react-native-reani
 import { Image } from 'expo-image';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { View } from '@/shared/ui/primitives/View/View';
-import type { FeedEvent, NoteMetrics, ProfileInfo } from '../shared';
+import type { FeedEvent, NoteMetrics, ProfileInfo } from '../feedTypes';
 import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType } from './types';
 import { Log } from '@/shared/lib/logger';

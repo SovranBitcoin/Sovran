@@ -52,23 +52,23 @@ import Reanimated, {
 // Shared module — types, constants, utils, rendering components
 // ============================================================================
 
+import type {
+  FeedEvent,
+  FeedItem,
+  NoteMetrics,
+  ProfileInfo,
+  RawPrimalEvent,
+  VideoPostRecord,
+} from './nostr/feedTypes';
+import { DEFAULT_METRICS } from './nostr/feedTypes';
+import { createPrimalRelayClient, PRIMAL_CACHE_RELAY_URL } from './nostr/primalRelay';
 import {
-  type FeedEvent,
-  type FeedItem,
-  type NoteMetrics,
-  type ProfileInfo,
-  type RawPrimalEvent,
-  DEFAULT_METRICS,
-  PRIMAL_CACHE_RELAY_URL,
-  MAX_VIDEO_FEED_PAGES,
-  createPrimalRelayClient,
   buildVideoOverlayLayout,
   computeFeedIndicesWithVideo,
-  enrichFeedPage,
-  parseFeedPage,
   buildDedupedVideoPosts,
-  type VideoPostRecord,
-} from './nostr/shared';
+  MAX_VIDEO_FEED_PAGES,
+} from './nostr/videoLayout';
+import { enrichFeedPage, parseFeedPage } from './nostr/parseFeedPage';
 
 import { PostCard } from './nostr/PostCard';
 import {

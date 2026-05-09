@@ -8,4 +8,4 @@ export { ThreadView } from './components/ThreadView';
 export { UserFeed } from './components/UserFeed';
 export { StoriesCarousel, type StoryUser } from './components/nostr/StoriesCarousel';
 export { useNostrEngagement } from './hooks/useNostrEngagement';
-export type { VideoPostRecord } from './components/nostr/shared';
+export type { VideoPostRecord } from './components/nostr/feedTypes';

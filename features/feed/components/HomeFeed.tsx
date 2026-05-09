@@ -21,23 +21,20 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
+import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feedTypes';
+import { DEFAULT_METRICS } from './nostr/feedTypes';
 import {
-  type FeedEvent,
-  type FeedItem,
-  type NoteMetrics,
-  type ProfileInfo,
-  DEFAULT_METRICS,
+  createPrimalRelayClient,
   PRIMAL_CACHE_RELAY_URL,
   PRIMAL_KIND_FEED_RANGE,
-  MAX_VIDEO_FEED_PAGES,
-  createPrimalRelayClient,
-  parseJson,
-  tryNpubEncode,
+} from './nostr/primalRelay';
+import { parseJson, tryNpubEncode } from './nostr/feedParse';
+import {
   buildVideoOverlayLayout,
   computeFeedIndicesWithVideo,
-  enrichFeedPage,
-  parseFeedPage,
-} from './nostr/shared';
+  MAX_VIDEO_FEED_PAGES,
+} from './nostr/videoLayout';
+import { enrichFeedPage, parseFeedPage } from './nostr/parseFeedPage';
 import { CATEGORY_PUBKEYS } from './nostr/categoryNpubs';
 
 import { PostCard } from './nostr/PostCard';

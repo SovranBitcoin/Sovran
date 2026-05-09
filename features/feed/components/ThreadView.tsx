@@ -16,7 +16,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 
-import { type NoteMetrics, DEFAULT_METRICS } from './nostr/shared';
+import { type NoteMetrics, DEFAULT_METRICS } from './nostr/feedTypes';
 import { PostCard } from './nostr/PostCard';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 

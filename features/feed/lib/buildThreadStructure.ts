@@ -1,6 +1,6 @@
 import { ShortTextNote } from 'nostr-tools/kinds';
 
-import type { FeedEvent } from '@/features/feed/components/nostr/shared';
+import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 
 type ParentMarker = 'reply' | 'root';
 type ReplyMarker = 'reply' | 'root' | 'mention';

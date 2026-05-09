@@ -28,7 +28,7 @@ import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { useScrollViewOffset } from '@/features/feed/hooks/useScrollViewOffset';
 import type { EngagementViewState } from '@/features/feed/hooks/useNostrEngagement';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import type { NoteMetrics } from '../shared';
+import type { NoteMetrics } from '../feedTypes';
 import {
   BOTTOM_PANEL_STIFF_DURATION_MS,
   CLEAR_URL_DELAY_MS,

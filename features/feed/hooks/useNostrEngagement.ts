@@ -4,7 +4,7 @@ import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
 import { useShallow } from 'zustand/shallow';
 
-import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/shared';
+import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/feedTypes';
 import { log } from '@/shared/lib/logger';
 import { paramPopup } from '@/shared/lib/popup';
 import { useKeyedSingleFlight } from '@/shared/hooks/useSingleFlight';
