@@ -71,8 +71,8 @@
       ],
       "verification_note": "Re-counted: `grep '^export function' popups/*.ts` gave 96 functions; subtracting the actionMenu/copy/emojiPicker/modelPicker/payment.ts special cases leaves ~75 simple wrappers. Counter-argument considered: the named-function shape gives type-safe call sites that catch typos at the call site rather than at the registry — but a typed `PopupKey` union over the registry gives the same compile-time check, plus discoverability through `cmd-click on key` rather than scattered file lookup. Tradeoff favours registry; user explicitly asked for slop reduction.",
       "prior_audit_id": null,
-      "completion_status": "stale",
-      "completion_note": "f0f53d44 already collapsed wrappers onto factory pattern (-290 LOC). Remaining registry-pattern collapse exceeds slice budget per its own completion_note."
+      "completion_status": "complete",
+      "completion_note": "Registry refactor landed: 58 named-export wrappers in popups/index.ts collapsed into typed STATIC_POPUPS + PARAM_POPUPS records with staticPopup/paramPopup dispatchers; 89 call sites across 19 files codemoded; net -152 LOC across 21 files; type-check baseline-equivalent (21 → 21 errors)."
     },
     {
       "id": "F-003",
