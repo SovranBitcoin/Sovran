@@ -171,14 +171,16 @@ After amount and mint are resolved, the machine runs [`operations.executeMintQuo
 
 ```tsx
 <CocoPaymentUXProvider
-  operations={{
-    // ...
-    executeMintQuote: async (mintUrl, amount, unit) => {
-      const quote = await manager.quotes.createMintQuote(mintUrl, amount);
-      const entry = await findMintEntryByQuoteId(quote.quote);
-      return { historyEntry: JSON.stringify(entry) };
+  engine={{
+    operations: {
+      // ...
+      executeMintQuote: async (mintUrl, amount, unit) => {
+        const quote = await manager.quotes.createMintQuote(mintUrl, amount);
+        const entry = await findMintEntryByQuoteId(quote.quote);
+        return { historyEntry: JSON.stringify(entry) };
+      },
+      // ...
     },
-    // ...
   }}
 />
 ```
@@ -289,32 +291,36 @@ function MintQuoteScreen({ mintHistoryEntry }) {
 | `copy` *  | State is not `ISSUED` or `PAID` | Copy the Lightning invoice (BOLT11) to clipboard |
 | `share` * | Same as copy                    | Platform share sheet with the invoice string     |
 
-\* Built-in — works automatically when `writeClipboard` / `shareContent` are provided on the provider. No handler needed.
+\* Built-in — works automatically when `platform.writeClipboard` / `platform.shareContent` are provided on the provider. No handler needed.
 
 ### Action handlers
 
-Both `copy` and `share` are **built-in** — when `writeClipboard` and `shareContent` are provided on the provider, they work automatically. The `onCopied` / `onShared` notification fires with `target` set to `'paymentRequest'`.
+Both `copy` and `share` are **built-in** — when `platform.writeClipboard` and `platform.shareContent` are provided on the provider, they work automatically. The `onCopied` / `onShared` notification fires with `target` set to `'paymentRequest'`.
 
 ```tsx
 <CocoPaymentUXProvider
-  writeClipboard={(text) => Clipboard.setStringAsync(text)}
-  shareContent={(content) => Share.share({ message: content.message, url: content.url })}
+  platform={{
+    writeClipboard: (text) => Clipboard.setStringAsync(text),
+    shareContent: (content) => Share.share({ message: content.message, url: content.url }),
+  }}
   // No mintQuote action handlers needed — copy and share are built-in
 />
 ```
 
 ### Live updates
 
-The screen subscribes to quote state changes via [`screenActionsBridge.onEntryUpdate`](/guide/architecture#live-updates). When the payer pays the invoice, the entry updates reactively — `state` changes from `UNPAID` to `PAID` to `ISSUED`, and action availability recomputes automatically.
+The screen subscribes to quote state changes via [`callbacks.screenActionsBridge.onEntryUpdate`](/guide/architecture#live-updates). When the payer pays the invoice, the entry updates reactively — `state` changes from `UNPAID` to `PAID` to `ISSUED`, and action availability recomputes automatically.
 
 ```tsx
 <CocoPaymentUXProvider
-  screenActionsBridge={{
-    onEntryUpdate: (screenType, callback) => {
-      const unsub = manager.on('history:updated', ({ entry }) => {
-        callback(entry);
-      });
-      return () => unsub();
+  callbacks={{
+    screenActionsBridge: {
+      onEntryUpdate: (screenType, callback) => {
+        const unsub = manager.on('history:updated', ({ entry }) => {
+          callback(entry);
+        });
+        return () => unsub();
+      },
     },
   }}
 />

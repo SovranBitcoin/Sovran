@@ -318,14 +318,16 @@ Once amount and mint are resolved (and proofs compose if offline), the machine r
 
 ```tsx
 <CocoPaymentUXProvider
-  operations={{
-    // ...
-    executeSend: async (mintUrl, amount) => {
-      await manager.wallet.send(mintUrl, amount);
-      const entry = await findLatestSendEntry(mintUrl);
-      return { historyEntry: JSON.stringify(entry) };
+  engine={{
+    operations: {
+      // ...
+      executeSend: async (mintUrl, amount) => {
+        await manager.wallet.send(mintUrl, amount);
+        const entry = await findLatestSendEntry(mintUrl);
+        return { historyEntry: JSON.stringify(entry) };
+      },
+      // ...
     },
-    // ...
   }}
 />
 ```
@@ -445,43 +447,49 @@ function SendCashuScreen({ sendHistoryEntry }) {
 | `checkStatus` | State is `pending`                        | Check if token has been redeemed       |
 | `cancel`      | Has `operationId` and not finalized       | Rollback operation, destroy proofs     |
 
-\* Built-in — works automatically when `writeClipboard` / `shareContent` are provided on the provider. No handler needed.
+\* Built-in — works automatically when `platform.writeClipboard` / `platform.shareContent` are provided on the provider. No handler needed.
 
 ### Action handlers
 
-Both `copy` and `share` are **built-in** — when `writeClipboard` and `shareContent` are provided on the provider, they work automatically for all screen types. The library extracts the correct text per screen type (encoded token V4 for `sendToken`, payment request for `mintQuote`, address for `receive`, mint URL for `mintInfo`). Tokens are shared with a `cashu://` URL for deep link support.
+Both `copy` and `share` are **built-in** — when `platform.writeClipboard` and `platform.shareContent` are provided on the provider, they work automatically for all screen types. The library extracts the correct text per screen type (encoded token V4 for `sendToken`, payment request for `mintQuote`, address for `receive`, mint URL for `mintInfo`). Tokens are shared with a `cashu://` URL for deep link support.
 
 ```tsx
 <CocoPaymentUXProvider
-  writeClipboard={(text) => Clipboard.setStringAsync(text)}
-  shareContent={(content) => Share.share({ message: content.message, url: content.url })}
-  notifications={{
-    onCopied: (target) => toast.success(`Copied ${target}`),
-    onShared: (target) => toast.success(`Shared ${target}`),
+  platform={{
+    writeClipboard: (text) => Clipboard.setStringAsync(text),
+    shareContent: (content) => Share.share({ message: content.message, url: content.url }),
   }}
-  actions={{
-    sendToken: {
-      // copy and share are built-in — no handlers needed
-      nfc: async (ctx) => {
-        await writeTokenToNFC(ctx.entry);
-      },
-      cancel: async (ctx) => {
-        await ctx.manager.wallet.rollback(ctx.entry.operationId);
-        router.back();
+  callbacks={{
+    notifications: {
+      onCopied: (target) => toast.success(`Copied ${target}`),
+      onShared: (target) => toast.success(`Shared ${target}`),
+    },
+    actions: {
+      sendToken: {
+        // copy and share are built-in — no handlers needed
+        nfc: async (ctx) => {
+          await writeTokenToNFC(ctx.entry);
+        },
+        cancel: async (ctx) => {
+          await ctx.manager.wallet.rollback(ctx.entry.operationId);
+          router.back();
+        },
       },
     },
   }}
 />
 ```
 
-Custom action handlers receive `notify(event, ...args)` in their context, which dispatches to the wallet's `notifications` handlers. Use this instead of inline popups:
+Custom action handlers receive `notify(event, ...args)` in their context, which dispatches to the wallet's `callbacks.notifications` handlers. Use this instead of inline popups:
 
 ```tsx
-actions={{
-  sendToken: {
-    nfc: async (ctx) => {
-      await writeTokenToNFC(ctx.entry);
-      ctx.notify('onShared', 'token', ctx.entry.tokenString);
+callbacks={{
+  actions: {
+    sendToken: {
+      nfc: async (ctx) => {
+        await writeTokenToNFC(ctx.entry);
+        ctx.notify('onShared', 'token', ctx.entry.tokenString);
+      },
     },
   },
 }}

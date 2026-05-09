@@ -277,18 +277,20 @@ function MeltQuoteScreen({ meltHistoryEntry }) {
 
 ```tsx
 <CocoPaymentUXProvider
-  actions={{
-    meltQuote: {
-      pay: async (ctx) => {
-        if (!ctx.entry.quoteId) {
-          await ctx.manager.wallet.prepareMeltBolt11(ctx.entry.mintUrl, ctx.entry.meltTarget);
-          return;
-        }
-        await ctx.manager.wallet.executeMelt(ctx.entry);
-      },
-      cancel: async (ctx) => {
-        await ctx.manager.wallet.rollbackMelt(ctx.entry);
-        router.back();
+  callbacks={{
+    actions: {
+      meltQuote: {
+        pay: async (ctx) => {
+          if (!ctx.entry.quoteId) {
+            await ctx.manager.wallet.prepareMeltBolt11(ctx.entry.mintUrl, ctx.entry.meltTarget);
+            return;
+          }
+          await ctx.manager.wallet.executeMelt(ctx.entry);
+        },
+        cancel: async (ctx) => {
+          await ctx.manager.wallet.rollbackMelt(ctx.entry);
+          router.back();
+        },
       },
     },
   }}
@@ -440,22 +442,24 @@ function PaymentRequestScreen({ paymentRequestEntry }) {
 
 ```tsx
 <CocoPaymentUXProvider
-  actions={{
-    paymentRequest: {
-      confirm: async (ctx) => {
-        const info = ctx.entry.paymentRequestInfo;
-        const transport = info.transports?.find((t) => t.type === 'post') ?? info.transports?.[0];
+  callbacks={{
+    actions: {
+      paymentRequest: {
+        confirm: async (ctx) => {
+          const info = ctx.entry.paymentRequestInfo;
+          const transport = info.transports?.find((t) => t.type === 'post') ?? info.transports?.[0];
 
-        const token = await ctx.manager.wallet.preparePaymentRequestTransaction(ctx.entry);
+          const token = await ctx.manager.wallet.preparePaymentRequestTransaction(ctx.entry);
 
-        if (transport?.type === 'nostr') {
-          await ctx.sendDirectMessage(transport.target, token);
-        } else if (transport?.type === 'post') {
-          await fetch(transport.target, { method: 'POST', body: token });
-        }
-      },
-      cancel: async (ctx) => {
-        router.back();
+          if (transport?.type === 'nostr') {
+            await ctx.sendDirectMessage(transport.target, token);
+          } else if (transport?.type === 'post') {
+            await fetch(transport.target, { method: 'POST', body: token });
+          }
+        },
+        cancel: async (ctx) => {
+          router.back();
+        },
       },
     },
   }}

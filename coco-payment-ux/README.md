@@ -41,7 +41,7 @@ Optional overrides (names illustrative): **`createURDecoder`**, **`scanSources`*
 
 Screens should not import Expo clipboard, camera, or image-picker for these flows unless overriding—the provider injects them at the boundary.
 
-**Implementation status:** coco-payment-ux ships **`CocoPaymentUXProvider`** with **flat props** (`handlers`, `operations`, `notifications`, `actions`, optional **`screenActionsBridge`**, `savePreferredMint`, `saveNpcMint`, `onNpcMintSync`, `walletContextRef`, `createURDecoder`, `scanSources`, `detectors`, `getOffline`). The old nested `config={{ … }}` API is removed.
+**Implementation status:** coco-payment-ux ships **`CocoPaymentUXProvider`** with **grouped props** — top-level `handlers` and `children`, plus four typed config groups: **`engine`** (`instance`, `operations`, `detectors`), **`callbacks`** (`notifications`, `actions`, `screenActionsBridge`), **`runtime`** (`getOffline`, `getBtcPrice`, `getDisplayCurrency`, `getLocale`, `translations`), and **`platform`** (`writeClipboard`, `shareContent`, `nfcAdapter`, `createURDecoder`, `scanSources`, `deepLinks`, `navigation`).
 
 ### Naming & legacy exports
 
@@ -203,7 +203,7 @@ The flow **amount** route (send/receive) uses the same **screen-actions** patter
 **Wallet wiring:** You register implementations once (e.g. `createSovranScreenActionHandlers()`), keyed by screen type and action name, and pass them as the provider **`actions`** prop. Each handler receives **`ScreenActionContext`** (`entry`, `manager`, plus merged **sources** and extras—`shareSource`, `paymentMachine`, etc.).
 
 ```ts
-// Pseudocode — pass as <CocoPaymentUXProvider actions={walletActions} shareSource={...} />
+// Pseudocode — pass as <CocoPaymentUXProvider callbacks={{ actions: walletActions }} shareSource={...} />
 const walletActions = {
   sendToken: {
     copy: async (ctx) => {
@@ -282,9 +282,13 @@ const { isExecuting } = useExecutionState(machine);
 ```tsx
 <CocoPaymentUXProvider
   handlers={walletStepHandlers}
-  operations={walletOperations}
-  notifications={walletNotifications}
-  actions={walletActions}
+  engine={{
+    operations: walletOperations,
+  }}
+  callbacks={{
+    notifications: walletNotifications,
+    actions: walletActions,
+  }}
   savePreferredMint={(mintUrl) => mintStore.setSelectedMint(pubkey, mintUrl)}
   saveNpcMint={async (mintUrl) => {
     await npcMintStore.updateServerMint(mintUrl, privateKey);

@@ -4,16 +4,18 @@ Every user-facing string returned from `coco-payment-ux` is localized. Reason co
 
 ## Setup
 
-Set [`getLocale`](/guide/getting-started#provider) on the provider. The library reads it whenever it builds a user-facing message:
+Set [`runtime.getLocale`](/guide/getting-started#provider) on the provider. The library reads it whenever it builds a user-facing message:
 
 ```ts
 <CocoPaymentUXProvider
-  getLocale={() => i18n.language}
+  runtime={{
+    getLocale: () => i18n.language,
+  }}
   // ... other props
 >
 ```
 
-When `getLocale` is not provided, all messages default to `'en'`.
+When `runtime.getLocale` is not provided, all messages default to `'en'`.
 
 The locale also flows to [formatting](/methods/formatting#locale) — [`FormattedTimestamp`](/methods/formatting#formattedtimestamp) dates and [`FormattedString`](/methods/formatting#formattedstring) RTL truncation both use the same locale.
 
@@ -123,30 +125,32 @@ All translated strings and their values across the built-in locales:
 
 ## Adding a language
 
-Pass a [`translations`](/guide/getting-started#provider) prop to the provider with your custom locale dictionaries:
+Pass [`runtime.translations`](/guide/getting-started#provider) on the provider with your custom locale dictionaries:
 
 ```tsx
 <CocoPaymentUXProvider
-  getLocale={() => i18n.language}
-  translations={{
-    fr: {
-      INSUFFICIENT_BALANCE: 'Solde insuffisant',
-      NO_BALANCE: 'Pas de solde',
-      NOT_IN_PAYMENT_REQUEST: 'Pas dans la demande de paiement',
-      UNSUPPORTED_FOR_FLOW: 'Non pris en charge pour ce flux',
-      OPTION_SELECTION_REQUIRED: 'Une option doit être sélectionnée',
-      NO_AMOUNT: 'Le montant est requis',
-      MINT_SELECTION_REQUIRED: 'Un mint doit être sélectionné',
-      PROOF_SELECTION_REQUIRED: 'Une preuve doit être sélectionnée',
-      NO_VALID_MINT: 'Aucun mint valide disponible',
-      ALL_OPTIONS_DISABLED: 'Toutes les options de paiement sont désactivées',
-      UNSUPPORTED_INPUT: 'Entrée non prise en charge',
-      SEND_FAILED: 'Échec de la création du jeton',
-      MINT_QUOTE_FAILED: 'Échec de la création du devis',
-      LOAD_MINTS_FAILED: 'Échec du chargement des mints',
-      NO_ALLOWED_MINT_TRUSTED: "Aucun mint autorisé n'est de confiance",
-      INSUFFICIENT_BALANCE_ALLOWED: 'Solde insuffisant sur les mints autorisés',
-      NO_MINT_SUFFICIENT_BALANCE: 'Aucun mint avec un solde suffisant',
+  runtime={{
+    getLocale: () => i18n.language,
+    translations: {
+      fr: {
+        INSUFFICIENT_BALANCE: 'Solde insuffisant',
+        NO_BALANCE: 'Pas de solde',
+        NOT_IN_PAYMENT_REQUEST: 'Pas dans la demande de paiement',
+        UNSUPPORTED_FOR_FLOW: 'Non pris en charge pour ce flux',
+        OPTION_SELECTION_REQUIRED: 'Une option doit être sélectionnée',
+        NO_AMOUNT: 'Le montant est requis',
+        MINT_SELECTION_REQUIRED: 'Un mint doit être sélectionné',
+        PROOF_SELECTION_REQUIRED: 'Une preuve doit être sélectionnée',
+        NO_VALID_MINT: 'Aucun mint valide disponible',
+        ALL_OPTIONS_DISABLED: 'Toutes les options de paiement sont désactivées',
+        UNSUPPORTED_INPUT: 'Entrée non prise en charge',
+        SEND_FAILED: 'Échec de la création du jeton',
+        MINT_QUOTE_FAILED: 'Échec de la création du devis',
+        LOAD_MINTS_FAILED: 'Échec du chargement des mints',
+        NO_ALLOWED_MINT_TRUSTED: "Aucun mint autorisé n'est de confiance",
+        INSUFFICIENT_BALANCE_ALLOWED: 'Solde insuffisant sur les mints autorisés',
+        NO_MINT_SUFFICIENT_BALANCE: 'Aucun mint avec un solde suffisant',
+      },
     },
   }}
 >
@@ -155,10 +159,12 @@ Pass a [`translations`](/guide/getting-started#provider) prop to the provider wi
 Partial translations work — missing keys fall back to English:
 
 ```tsx
-translations={{
-  fr: {
-    INSUFFICIENT_BALANCE: 'Solde insuffisant',
-    NO_BALANCE: 'Pas de solde',
+runtime={{
+  translations: {
+    fr: {
+      INSUFFICIENT_BALANCE: 'Solde insuffisant',
+      NO_BALANCE: 'Pas de solde',
+    },
   },
 }}
 ```
@@ -166,9 +172,11 @@ translations={{
 You can also override built-in locales the same way:
 
 ```tsx
-translations={{
-  en: {
-    INSUFFICIENT_BALANCE: 'Not enough funds',
+runtime={{
+  translations: {
+    en: {
+      INSUFFICIENT_BALANCE: 'Not enough funds',
+    },
   },
 }}
 ```

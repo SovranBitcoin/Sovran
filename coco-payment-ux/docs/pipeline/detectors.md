@@ -75,16 +75,18 @@ The machine uses this to constrain mint selection and determine delivery transpo
 
 ## Custom Detectors
 
-Override via the `detectors` prop on `CocoPaymentUXProvider`:
+Override via `engine.detectors` on `CocoPaymentUXProvider`:
 
 ```tsx
 <CocoPaymentUXProvider
-  detectors={{
-    ...defaultDetectors,
-    // Custom ecash detection
-    isValidEcashToken: (v) => myCustomTokenCheck(v),
-    // Support additional invoice formats
-    isLightningInvoice: (v) => defaultDetectors.isLightningInvoice(v) || isBolt12(v),
+  engine={{
+    detectors: {
+      ...defaultDetectors,
+      // Custom ecash detection
+      isValidEcashToken: (v) => myCustomTokenCheck(v),
+      // Support additional invoice formats
+      isLightningInvoice: (v) => defaultDetectors.isLightningInvoice(v) || isBolt12(v),
+    },
   }}
 />
 ```

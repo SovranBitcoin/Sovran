@@ -252,30 +252,34 @@ function QuickReceiveScreen({ receiveEntry, unit }) {
 | `scanQr`        | Hub loaded                                 | Navigate to camera for QR scanning                                                                                             |
 | `changeNpcMint` | Hub loaded, has NPC address, unit is `sat` | [`machine.requestMintSelector({ scope: 'npc' })`](/flows/mint-selector) — change the NPC mint                                  |
 
-\* Built-in — works automatically when `writeClipboard` / `shareContent` are provided on the provider. No handler needed.
+\* Built-in — works automatically when `platform.writeClipboard` / `platform.shareContent` are provided on the provider. No handler needed.
 
 ### Action handlers
 
-Both `copy` and `share` are **built-in** — when `writeClipboard` and `shareContent` are provided on the provider, they automatically extract the NPC address or P2PK key from the entry (based on the `source` param). The `onCopied` / `onShared` notification fires with `target` set to `'address'` or `'p2pk'`.
+Both `copy` and `share` are **built-in** — when `platform.writeClipboard` and `platform.shareContent` are provided on the provider, they automatically extract the NPC address or P2PK key from the entry (based on the `source` param). The `onCopied` / `onShared` notification fires with `target` set to `'address'` or `'p2pk'`.
 
 ```tsx
 <CocoPaymentUXProvider
-  writeClipboard={(text) => Clipboard.setStringAsync(text)}
-  shareContent={(content) => Share.share({ message: content.message, url: content.url })}
-  actions={{
-    receive: {
-      // copy and share are built-in — no handlers needed
-      paste: async (ctx) => {
-        await ctx.paymentMachine?.scan?.(undefined, { source: 'clipboard' });
-      },
-      fixedAmount: async (ctx) => {
-        await ctx.paymentMachine?.startReceiveLightning?.();
-      },
-      scanQr: async (ctx) => {
-        router.push('/(receive-flow)/camera');
-      },
-      changeNpcMint: async (ctx) => {
-        await ctx.paymentMachine?.requestMintSelector?.({ scope: 'npc' });
+  platform={{
+    writeClipboard: (text) => Clipboard.setStringAsync(text),
+    shareContent: (content) => Share.share({ message: content.message, url: content.url }),
+  }}
+  callbacks={{
+    actions: {
+      receive: {
+        // copy and share are built-in — no handlers needed
+        paste: async (ctx) => {
+          await ctx.paymentMachine?.scan?.(undefined, { source: 'clipboard' });
+        },
+        fixedAmount: async (ctx) => {
+          await ctx.paymentMachine?.startReceiveLightning?.();
+        },
+        scanQr: async (ctx) => {
+          router.push('/(receive-flow)/camera');
+        },
+        changeNpcMint: async (ctx) => {
+          await ctx.paymentMachine?.requestMintSelector?.({ scope: 'npc' });
+        },
       },
     },
   }}

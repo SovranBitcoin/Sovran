@@ -128,22 +128,24 @@ const onGallery = () => {
 
 ## Configuration
 
-Clipboard and gallery sources are injected via the [`scanSources`](/guide/getting-started#provider) prop on the provider. Each source returns a [`ScanSourceResult`](#scansourceresult):
+Clipboard and gallery sources are injected via [`platform.scanSources`](/guide/getting-started#provider) on the provider. Each source returns a [`ScanSourceResult`](#scansourceresult):
 
 ```tsx
 <CocoPaymentUXProvider
-  scanSources={{
-    clipboard: async () => {
-      const text = await Clipboard.getStringAsync();
-      if (!text) return { empty: true };
-      return { data: text };
-    },
-    gallery: async () => {
-      const result = await ImagePicker.launchImageLibraryAsync();
-      if (result.canceled) return { canceled: true };
-      const decoded = await decodeQRFromImage(result.assets[0].uri);
-      if (!decoded) return { empty: true };
-      return { data: decoded };
+  platform={{
+    scanSources: {
+      clipboard: async () => {
+        const text = await Clipboard.getStringAsync();
+        if (!text) return { empty: true };
+        return { data: text };
+      },
+      gallery: async () => {
+        const result = await ImagePicker.launchImageLibraryAsync();
+        if (result.canceled) return { canceled: true };
+        const decoded = await decodeQRFromImage(result.assets[0].uri);
+        if (!decoded) return { empty: true };
+        return { data: decoded };
+      },
     },
   }}
 />
@@ -168,12 +170,14 @@ The machine dispatches scan-related notifications for the wallet to present howe
 
 ```tsx
 <CocoPaymentUXProvider
-  notifications={{
-    onScanEmpty: (source) => {
-      toast.info(`Nothing found from ${source}`);
-    },
-    onScanError: (source, err) => {
-      toast.error(`Scan failed: ${err.message}`);
+  callbacks={{
+    notifications: {
+      onScanEmpty: (source) => {
+        toast.info(`Nothing found from ${source}`);
+      },
+      onScanError: (source, err) => {
+        toast.error(`Scan failed: ${err.message}`);
+      },
     },
   }}
 />
@@ -185,7 +189,7 @@ The machine dispatches scan-related notifications for the wallet to present howe
 | `onScanError` | Source returned `{ error }` or threw | `source`, `err` — the Error object                                              |
 
 ::: tip Animated QR codes
-For UR-encoded animated QR codes (common in hardware wallet communication and large ecash tokens via NUT-16), provide a [`createURDecoder`](/guide/getting-started#provider) factory. The machine assembles frames incrementally — `scan()` returns `{ urInProgress: true, progress: 0.5 }` for partial frames and processes the final result when assembly is complete.
+For UR-encoded animated QR codes (common in hardware wallet communication and large ecash tokens via NUT-16), provide a [`platform.createURDecoder`](/guide/getting-started#provider) factory. The machine assembles frames incrementally — `scan()` returns `{ urInProgress: true, progress: 0.5 }` for partial frames and processes the final result when assembly is complete.
 :::
 
 ::: info Animated QR scanning UI

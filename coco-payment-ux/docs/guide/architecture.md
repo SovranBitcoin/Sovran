@@ -7,9 +7,9 @@
 │  Layer 2: CocoPaymentUXProvider (React)                 │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │  handlers (navigation)                            │  │
-│  │  notifications (UI popups + state persistence)    │  │
-│  │  screenActionsBridge (app-specific subscriptions) │  │
-│  │  deepLinks, navigation, actions                   │  │
+│  │  callbacks.notifications (UI + state)             │  │
+│  │  callbacks.screenActionsBridge (subscriptions)    │  │
+│  │  callbacks.actions, platform.deepLinks/navigation │  │
 │  └───────────────────────────────────────────────────┘  │
 ├─────────────────────────────────────────────────────────┤
 │  Layer 1: createCocoPaymentUX (TypeScript core)         │
