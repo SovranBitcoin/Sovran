@@ -408,14 +408,6 @@ export function invalidateCachedSession(): void {
   }
 }
 
-export async function destroyCachedSession(): Promise<void> {
-  const old = _cachedSessionId;
-  _cachedSessionId = null;
-  if (old) {
-    await wdaRequest('DELETE', `/session/${old}`).catch(() => {});
-  }
-}
-
 // ─── Fast element finders ───────────────────────────────────────────────────
 //
 // These use the W3C WebDriver `POST /session/{sid}/element` endpoint which
@@ -896,12 +888,6 @@ export async function readClipboard(targetBundleId = 'com.sovranbitcoin.dev'): P
  * Write to the iOS clipboard via WDA. Same foreground dance as
  * readClipboard — iOS blocks pasteboard writes from background apps.
  */
-/**
- * Set by writeClipboard, cleared after the next alert/accept succeeds.
- * Tells the fast-path polling to check for the iOS paste dialog.
- */
-export let _clipboardWritePending = false;
-
 export async function writeClipboard(
   text: string,
   targetBundleId = 'com.sovranbitcoin.dev'
@@ -921,7 +907,6 @@ export async function writeClipboard(
         content: b64,
         contentType: 'plaintext',
       });
-      _clipboardWritePending = true;
     } finally {
       try {
         await wdaRequest('POST', `/session/${sid}/wda/apps/activate`, {
@@ -932,21 +917,6 @@ export async function writeClipboard(
       }
     }
   });
-}
-
-async function pollFor<T>(
-  fn: () => Promise<T | null>,
-  timeoutMs: number,
-  intervalMs = 400
-): Promise<T> {
-  const start = Date.now();
-  let last: T | null = null;
-  while (Date.now() - start < timeoutMs) {
-    last = await fn();
-    if (last) return last;
-    await sleep(intervalMs);
-  }
-  throw new Error(`timeout after ${timeoutMs}ms`);
 }
 
 /**
@@ -1635,10 +1605,6 @@ export function findByTestIDPrefix(nodes: FlatNode[], prefix: string): FlatNode 
   return all[0];
 }
 
-export function findAllByTestIDPrefix(nodes: FlatNode[], prefix: string): FlatNode[] {
-  return nodes.filter((n) => n.identifier.startsWith(prefix));
-}
-
 /**
  * Find the first node whose testID starts with `prefix` in tree
  * traversal order, skipping nodes with a zero-sized rect (which are
@@ -1671,14 +1637,6 @@ export function findByTestIDPrefixFirst(nodes: FlatNode[], prefix: string): Flat
   return null;
 }
 
-export async function waitForIDPrefix(prefix: string): Promise<FlatNode> {
-  return await pollFor(async () => {
-    const tree = await getCurrentTree();
-    const flat = flattenAll(tree);
-    return findByTestIDPrefix(flat, prefix);
-  }, STEP_TIMEOUT_MS);
-}
-
 export async function assertID(id: string): Promise<void> {
   const tree = await getCurrentTree();
   const flat = flattenAll(tree);
@@ -1693,24 +1651,6 @@ export async function assertText(text: string): Promise<void> {
   if (!findByText(flat, text)) {
     throw new Error(`assert-text failed: "${text}" not on screen`);
   }
-}
-
-export async function assertIDPrefix(prefix: string): Promise<FlatNode> {
-  const tree = await getCurrentTree();
-  const flat = flattenAll(tree);
-  const node = findByTestIDPrefix(flat, prefix);
-  if (!node) {
-    const visible = flat
-      .filter((n) => n.hasIdent)
-      .map((n) => `  ${n.identifier}`)
-      .slice(0, 30)
-      .join('\n');
-    throw new Error(
-      `assert-id-prefix failed: no element with testID starting "${prefix}" on screen.\n` +
-        (visible ? `visible testIDs:\n${visible}` : '(no testIDs visible)')
-    );
-  }
-  return node;
 }
 
 export async function detectDeviceLabel(): Promise<string> {

@@ -20,10 +20,7 @@ export interface DominantColor {
   lightness: number;
 }
 
-/**
- * HSB (Hue, Saturation, Brightness) values
- */
-export interface HSB {
+interface HSB {
   hue: number;
   saturation: number;
   brightness: number;
