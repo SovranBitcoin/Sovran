@@ -16,7 +16,7 @@
 import * as fs from 'fs';
 
 import type { MatrixDef, Test } from './ast';
-import type { ExecuteMatrixResult } from './executor';
+import type { ExecuteMatrixResult } from './types';
 
 interface DeviceInfo {
   /** Free-text device label (e.g. "iphone (iOS 26.1)"). */

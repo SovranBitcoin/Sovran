@@ -61,16 +61,45 @@ const ROOT = join(__dirname, '..', '..');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
+// Order matters: bare extensions first, then platform variants (.ios.* before
+// .android.* matches Metro's preference on iOS-targeted dev), then `/index.*`
+// fallbacks for directory imports. Without the platform variants the resolver
+// misses any module whose only files are `.ios.tsx` / `.android.tsx`, and every
+// such file shows up as an orphan even though Metro happily imports it.
 const RESOLVE_EXTS = [
   '.ts',
   '.tsx',
   '.js',
   '.jsx',
   '.mjs',
+  '.ios.ts',
+  '.ios.tsx',
+  '.ios.js',
+  '.ios.jsx',
+  '.android.ts',
+  '.android.tsx',
+  '.android.js',
+  '.android.jsx',
+  '.native.ts',
+  '.native.tsx',
+  '.native.js',
+  '.native.jsx',
+  '.web.ts',
+  '.web.tsx',
+  '.web.js',
+  '.web.jsx',
   '/index.ts',
   '/index.tsx',
   '/index.js',
   '/index.jsx',
+  '/index.ios.ts',
+  '/index.ios.tsx',
+  '/index.android.ts',
+  '/index.android.tsx',
+  '/index.native.ts',
+  '/index.native.tsx',
+  '/index.web.ts',
+  '/index.web.tsx',
 ];
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
@@ -781,6 +810,40 @@ function extractImports(src) {
     .replace(/\/\/.*/g, '');
 
   const byModule = new Map();
+  // `export ... from '...'` is a re-export edge, semantically identical to
+  // `import + export` for graph-reachability purposes. Without it, every file
+  // imported only via a barrel (`features/foo/index.ts: export { Bar } from './Bar'`)
+  // looks orphaned. Tag the re-exports as `isType` only when they are
+  // `export type ...` so we still know they are erased at runtime.
+  const REEXPORT_NAMED = /^export\s+(type\s+)?\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"]/gm;
+  const REEXPORT_STAR = /^export\s+(type\s+)?\*\s+(?:as\s+\w+\s+)?from\s+['"]([^'"]+)['"]/gm;
+  for (const m of stripped.matchAll(REEXPORT_NAMED)) {
+    const isType = !!m[1];
+    const namesRaw = m[2];
+    const mod = m[3];
+    const isExternal = !mod.startsWith('.') && !mod.startsWith('@/');
+    if (!byModule.has(mod)) {
+      byModule.set(mod, { module: mod, names: [], isType, isExternal, isReexport: true });
+    }
+    const entry = byModule.get(mod);
+    entry.isReexport = true;
+    for (const chunk of namesRaw.split(',')) {
+      const parts = chunk.trim().split(/\s+as\s+/);
+      const name = (parts[parts.length - 1] || '').trim();
+      if (name && /^\w+$/.test(name)) entry.names.push(name);
+    }
+  }
+  for (const m of stripped.matchAll(REEXPORT_STAR)) {
+    const isType = !!m[1];
+    const mod = m[2];
+    const isExternal = !mod.startsWith('.') && !mod.startsWith('@/');
+    if (!byModule.has(mod)) {
+      byModule.set(mod, { module: mod, names: [], isType, isExternal, isReexport: true });
+    }
+    byModule.get(mod).isReexport = true;
+    byModule.get(mod).names.push('*');
+  }
+
   const RE = /^import\s+(type\s+)?([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/gm;
 
   for (const m of stripped.matchAll(RE)) {
@@ -1104,6 +1167,32 @@ function isLikelyBarrelFile(fileNode) {
   return (fileNode.exports || []).length > 0;
 }
 
+function isThinReExportProxy(fileNode) {
+  // A few-LOC file whose only export is an alias of something it imported —
+  // typically the Expo Router pattern: `import { Screen } from '@/features/x';`
+  // followed by `export default Screen;`. Counting these as duplicate
+  // definitions of `Screen` is a false positive — the name has one source of
+  // truth and the proxy file is a routing alias.
+  if (!fileNode) return false;
+  const code = fileNode.loc?.code || 0;
+  if (code === 0 || code > 5) return false;
+  const exports = fileNode.exports || [];
+  if (exports.length === 0) return false;
+  const importedNames = new Set();
+  for (const imp of fileNode.imports || []) {
+    for (const n of imp.names || []) {
+      if (n.startsWith('* as ')) importedNames.add(n.slice(5));
+      else importedNames.add(n);
+    }
+  }
+  // Every export's name (or its `<name>(arg)` wrapper form) must trace back to
+  // an imported binding for the file to qualify as a pure proxy.
+  return exports.every((e) => {
+    const baseName = e.name.split('(')[0];
+    return importedNames.has(baseName) || importedNames.has(e.name);
+  });
+}
+
 function isLikelyCompatibilitySurface(fileNode) {
   if (!fileNode) return false;
   const exports = fileNode.exports || [];
@@ -1140,10 +1229,19 @@ function buildDependencyGraph(allFiles) {
       }
 
       if (!faninMap.has(resolved)) faninMap.set(resolved, []);
-      faninMap.get(resolved).push({ importer: f.fullPath, names: imp.names });
+      faninMap.get(resolved).push({
+        importer: f.fullPath,
+        names: imp.names,
+        isReexport: !!imp.isReexport,
+      });
 
-      if (!fanoutMap.has(f.fullPath)) fanoutMap.set(f.fullPath, new Set());
-      fanoutMap.get(f.fullPath).add(resolved);
+      // Re-exports inflate fanout for barrels (`features/foo/index.ts` re-exports
+      // from every screen in the folder). Counting them makes every barrel look
+      // like a hub-spoke god module. Keep fanout to value-imports only.
+      if (!imp.isReexport) {
+        if (!fanoutMap.has(f.fullPath)) fanoutMap.set(f.fullPath, new Set());
+        fanoutMap.get(f.fullPath).add(resolved);
+      }
 
       if (!importedNamesByTarget.has(resolved)) importedNamesByTarget.set(resolved, new Set());
       const set = importedNamesByTarget.get(resolved);
@@ -1153,11 +1251,87 @@ function buildDependencyGraph(allFiles) {
         else set.add(n);
       }
 
-      edges.push({ source: f.fullPath, target: resolved, names: imp.names });
+      edges.push({
+        source: f.fullPath,
+        target: resolved,
+        names: imp.names,
+        isReexport: !!imp.isReexport,
+      });
     }
   }
 
+  // Metro resolves `import './Foo'` to whichever of `Foo.ios.tsx` / `Foo.android.tsx`
+  // / `Foo.tsx` it picks per-platform — and a `.types.ts` companion is part of the
+  // same logical module. The static resolver above only finds one variant, so the
+  // siblings look orphaned. Propagate fan-in / imported-names across `(dir, strippedBase)`
+  // groups so all platform/companion variants share the membership of the import that
+  // hit any one of them.
+  propagatePlatformSiblings({
+    allFiles,
+    faninMap,
+    fanoutMap,
+    importedNamesByTarget,
+  });
+
   return { faninMap, fanoutMap, edges, fileToFolder, pathToNode, importedNamesByTarget };
+}
+
+function propagatePlatformSiblings({ allFiles, faninMap, fanoutMap, importedNamesByTarget }) {
+  // Group files by `dirname + strippedBase` (the latter folds `.ios`/`.android`/
+  // `.native`/`.web`/`.types`/`.styles`/`.constants` and the file extension).
+  const groups = new Map();
+  for (const f of allFiles) {
+    const key = `${dirname(f.fullPath)} ${strippedBase(f.name)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(f.fullPath);
+  }
+
+  for (const paths of groups.values()) {
+    if (paths.length < 2) continue;
+
+    // Union the inbound importers across all variants, dedup by importer path.
+    const seenImporter = new Map(); // importer → names[]
+    for (const p of paths) {
+      const fans = faninMap.get(p);
+      if (!fans) continue;
+      for (const entry of fans) {
+        if (!seenImporter.has(entry.importer)) {
+          seenImporter.set(entry.importer, [...entry.names]);
+        }
+      }
+    }
+    if (seenImporter.size === 0) continue;
+    const unionFans = [...seenImporter.entries()].map(([importer, names]) => ({
+      importer,
+      names,
+    }));
+
+    // Union the imported-name sets across all variants.
+    const unionNames = new Set();
+    for (const p of paths) {
+      const s = importedNamesByTarget.get(p);
+      if (s) for (const n of s) unionNames.add(n);
+    }
+
+    // Stamp the union back onto every variant so each appears imported in
+    // orphan / fan-in / unused-export passes.
+    for (const p of paths) {
+      faninMap.set(p, unionFans.slice());
+      if (unionNames.size > 0) {
+        if (!importedNamesByTarget.has(p)) importedNamesByTarget.set(p, new Set());
+        const tgt = importedNamesByTarget.get(p);
+        for (const n of unionNames) tgt.add(n);
+      }
+    }
+
+    // Mirror on the importer side so fanout includes all sibling targets — keeps
+    // hub-spoke / coupling counts consistent with what Metro would actually link.
+    for (const importer of seenImporter.keys()) {
+      const out = fanoutMap.get(importer);
+      if (!out) continue;
+      for (const p of paths) out.add(p);
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1264,9 +1438,16 @@ function renderCoupling(edges, fileToFolder) {
 // ─── 3. Cycles ───────────────────────────────────────────────────────────────
 
 function detectCycles(edges) {
+  // Re-export edges (`export { X } from './X'`) form barrel↔leaf "cycles" that
+  // are idiomatic in any module organised around an `index.ts`: the leaf
+  // imports a sibling type from the barrel, the barrel re-exports the leaf.
+  // These are not architectural cycles in the runtime sense — the re-export
+  // path is name-only and erases under bundlers — so excluding them keeps
+  // `detectCycles` focused on real value-import cycles.
   const adj = new Map();
   const allNodes = new Set();
-  for (const { source, target } of edges) {
+  for (const { source, target, isReexport } of edges) {
+    if (isReexport) continue;
     allNodes.add(source);
     allNodes.add(target);
     if (!adj.has(source)) adj.set(source, []);
@@ -1536,10 +1717,31 @@ function renderBoundary(edges, folderA, folderB) {
 
 // ─── Shallow modules (Ousterhout depth) ──────────────────────────────────────
 
+function buildSiblingGroupSet(allFiles) {
+  // Set of fullPaths that share a `(dirname, strippedBase)` key with another
+  // file — i.e. they are one variant of a multi-file logical module. Used to
+  // suppress false "shallow / pass-through" flags on `.types.ts` companions
+  // and platform-split siblings: those files are facets of a single module,
+  // not standalone modules with their own depth/coupling story.
+  const groups = new Map();
+  for (const f of allFiles) {
+    const key = `${dirname(f.fullPath)} ${strippedBase(f.name)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(f.fullPath);
+  }
+  const out = new Set();
+  for (const paths of groups.values()) {
+    if (paths.length >= 2) for (const p of paths) out.add(p);
+  }
+  return out;
+}
+
 function computeShallow(allFiles) {
+  const siblings = buildSiblingGroupSet(allFiles);
   const rows = [];
   for (const f of allFiles) {
     if (isLikelyBarrelFile(f)) continue; // barrels are known-shallow on purpose
+    if (siblings.has(f.fullPath)) continue; // companion of a sibling — not standalone
     const d = computeModuleDepth(f);
     if (!d) continue;
     if (d.exportCount < shallowMinExports) continue;
@@ -1582,12 +1784,18 @@ function renderShallow(allFiles) {
 // ─── Pass-through suspects ───────────────────────────────────────────────────
 
 function computePassThrough(allFiles, faninMap, fanoutMap) {
+  const siblings = buildSiblingGroupSet(allFiles);
   const rows = [];
   for (const f of allFiles) {
     if (!f.metrics?.passthrough) continue;
     if (!f.metrics.passthrough.isPassThrough) continue;
     if (isLikelyBarrelFile(f)) continue; // already understood as barrel
-    const fanin = faninMap.get(f.fullPath)?.length || 0;
+    if (siblings.has(f.fullPath)) continue; // companion of a sibling — not standalone
+    // Re-export edges don't make a file a pass-through — barrels routinely
+    // re-export every leaf, so counting that fanin here would flag every
+    // small leaf with `isPassThrough` as a pass-through suspect.
+    const fanin =
+      (faninMap.get(f.fullPath) || []).filter((e) => !e.isReexport).length;
     const fanout = fanoutMap.get(f.fullPath)?.size || 0;
     if (fanin === 0) continue; // also an orphan — covered by the Orphans report
     rows.push({
@@ -1963,10 +2171,15 @@ function renderReexportDepth(allFiles, edges) {
 
 function strippedBase(filename) {
   // Strip platform variant (.ios.tsx, .android.tsx, .web.tsx, .native.tsx) and extension.
+  // Also fold colocated companion suffixes (.types, .styles, .constants) so a
+  // component folder like `Foo/Foo.types.ts` + `Foo/index.ios.tsx` collapses to
+  // a single logical module — those are not "duplicate exports", they are one
+  // component split across the conventional sibling files.
   return filename
     .replace(/\.(ios|android|web|native|web\.native)\.[jt]sx?$/, '')
     .replace(/\.[jt]sx?$/, '')
-    .replace(/\.m?js$/, '');
+    .replace(/\.m?js$/, '')
+    .replace(/\.(types|styles|constants)$/, '');
 }
 
 function computeDupExports(allFiles) {
@@ -1977,7 +2190,10 @@ function computeDupExports(allFiles) {
     fileByPath.set(relative(targetDir, f.fullPath), f);
     const exps = f.exports || [];
     // Barrel files re-export from siblings — their "exports" are not definitions.
-    const isBarrel = isLikelyBarrelFile(f);
+    // Treat thin route/proxy files (e.g. Expo Router `app/foo/bar.tsx` doing
+    // `export default Foo;` after a single import) the same way: their export
+    // is an alias for another file's definition, not a duplicate of it.
+    const isBarrel = isLikelyBarrelFile(f) || isThinReExportProxy(f);
     const identifierByKind = new Map();
     for (const e of exps) {
       if (!/^[A-Za-z_]\w*$/.test(e.name)) continue;
@@ -2010,13 +2226,51 @@ function computeDupExports(allFiles) {
     const allBarrels = locs.every((l) => isLikelyBarrelFile(l.fileNode));
     if (allBarrels) continue;
 
-    // Skip platform-twin duplicates: every file's stripped basename is identical.
+    // Skip component-folder twin sets: a component dir conventionally holds
+    // `index.ios.tsx` + `index.android.tsx` + `<Name>.types.ts` (and friends),
+    // which all legitimately re-declare the same Props / hook / type. Pure
+    // platform pairs strip to one base; companion + index pairs strip to two
+    // bases (e.g. `BalancePill` and `index`) but still share a single dir, so
+    // accept either signal.
     const strippedBases = new Set(locs.map((l) => strippedBase(l.fileNode.name)));
+    const dirs = new Set(locs.map((l) => dirname(l.file)));
+    const allCompanionShapes = locs.every((l) => {
+      const stripped = strippedBase(l.fileNode.name);
+      // Index file (resolves to the dir) or matches the dir's basename
+      // (the conventional `<Component>/<Component>.types.ts` shape).
+      return stripped === 'index' || stripped === basename(dirname(l.file));
+    });
+    // When every loc lives in one component directory and the duplicate name
+    // mentions that directory's basename (`FiatCurrencyPillProps` inside a
+    // `FiatCurrencyPill/` folder), the colocation makes the "duplicate" a
+    // single component's surface area redeclared across its convention files
+    // (`index.ios`, `useFiatCurrencyPill`, `*.types`, etc).
+    const componentNamedSibling =
+      dirs.size === 1 && locs.length <= 5 && (() => {
+        const dirBase = basename([...dirs][0]);
+        return dirBase && name.toLowerCase().includes(dirBase.toLowerCase());
+      })();
     const sameSibling =
-      strippedBases.size === 1 &&
-      new Set(locs.map((l) => dirname(l.file))).size <= 2 &&
-      locs.length <= 4;
+      (strippedBases.size === 1 && dirs.size <= 2 && locs.length <= 4) ||
+      (dirs.size === 1 && allCompanionShapes && locs.length <= 5) ||
+      componentNamedSibling;
     if (sameSibling) continue;
+
+    // Expo Router convention: every modal route names its default-exported
+    // component `ModalScreen` (and similar boilerplate names) — those are not
+    // duplicate definitions of one symbol but routing entry points that share
+    // a conventional name. If every loc lives under `app/**`, treat as a
+    // routing-name convention rather than a duplicate.
+    const allUnderApp = locs.every((l) => /^app[/\\]/.test(l.file));
+    if (allUnderApp) continue;
+
+    // A name shared between an app source and its build-time generator script
+    // (e.g. `config/backgroundImageThemes.ts` + `scripts/build-background-themes.js`)
+    // is a generation pipeline, not a real duplicate. Drop tooling-only locs;
+    // if fewer than 2 app-side locs remain, the duplicate doesn't exist in
+    // shipping code.
+    const appLocs = locs.filter((l) => !/^scripts[/\\]|^codereview[/\\]/.test(l.file));
+    if (appLocs.length < 2) continue;
 
     dupRows.push({ name, files: [...fileSet] });
   }
@@ -2062,7 +2316,16 @@ function computeUnusedExports(allFiles, importedNamesByTarget) {
   const rows = [];
   for (const f of allFiles) {
     if (isLikelyBarrelFile(f)) continue;
-    if (/^app[/\\]/.test(relative(targetDir, f.fullPath))) continue; // entry-point routes
+    const rel = relative(targetDir, f.fullPath);
+    if (/^app[/\\]/.test(rel)) continue; // entry-point routes
+    // Tooling/test scaffolding live outside the production graph: their
+    // exports are consumed by Jest / DSL parsers / npm scripts that don't
+    // appear as `import` statements. Counting them as "unused" would punish
+    // the score for healthy tooling surface area.
+    if (/^codereview[/\\]/.test(rel)) continue;
+    if (/^scripts[/\\]/.test(rel)) continue;
+    if (/(?:^|[/\\])__tests__[/\\]/.test(rel)) continue;
+    if (/\.(test|spec)\.[mc]?[jt]sx?$/.test(rel)) continue;
     const usedNames = importedNamesByTarget.get(f.fullPath) || new Set();
     if (usedNames.has('*')) continue; // namespace import — opaque
     const exps = f.exports || [];
@@ -3104,7 +3367,24 @@ function computeScores(allFiles, dep, totals) {
     const orphans = allFiles.filter((f) => {
       if (importedPaths.has(f.fullPath)) return false;
       const rel = relative(targetDir, f.fullPath);
+      // Tool-discovered entry points: Jest finds tests by glob, package.json
+      // runs scripts directly, the build chain pulls config files / type
+      // declarations / Metro polyfills without a static `import` ever appearing
+      // in another file. Penalising them as "dead" misrepresents the codebase.
       if (/^app[/\\]/.test(rel)) return false;
+      if (/(?:^|[/\\])__tests__[/\\]/.test(rel)) return false;
+      if (/^scripts[/\\]/.test(rel)) return false;
+      // Tooling lives in `codereview/` and `modules/<x>/scripts/` and is invoked
+      // directly by npm scripts / hooks, never imported.
+      if (/^codereview[/\\]/.test(rel)) return false;
+      if (/^modules[/\\][^/\\]+[/\\]scripts[/\\]/.test(rel)) return false;
+      if (/^packages[/\\][^/\\]+[/\\]scripts[/\\]/.test(rel)) return false;
+      if (/\.(config|test|spec)\.[mc]?[jt]sx?$/.test(rel)) return false;
+      if (/\.d\.ts$/.test(rel)) return false;
+      if (/\.mjs$/.test(rel)) return false; // Bun-only entry scripts
+      if (/^(polyfills|shim|index|app-env|nativewind-env|expo-env)\.[jt]sx?$/.test(rel)) {
+        return false;
+      }
       if (isLikelyBarrelFile(f)) return false;
       if (isLikelyCompatibilitySurface(f)) return false;
       return true;

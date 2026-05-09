@@ -70,6 +70,7 @@ import {
   loadSnapshotIgnores,
 } from './snapshot';
 import { executeWallet, pingCocod } from './wallet';
+import type { ExecuteMatrixResult, MatrixCellResult } from './types';
 
 // All test artefacts live under `tests/`. Three sibling subdirs, ALL
 // dot-prefixed so they stay grouped-and-hidden from `ls` but still
@@ -350,26 +351,6 @@ interface ExecuteMatrixOptions {
    * events still pass through for every cell.
    */
   onEvent?: RunnerEventEmitter;
-}
-
-/** One cell's execution outcome plus its tuple description. */
-export interface MatrixCellResult {
-  /** Human display name used for the synthesized `Test`, screenshots, snapshot dir. */
-  cellName: string;
-  /** Compact per-stage picks, e.g. `mint=mint-no-fees amount=via-keypad bundle teardown=dismiss`. */
-  tupleLabel: string;
-  /** Pass/fail. */
-  ok: boolean;
-  /** First error message if the cell failed, suitable for a one-line stamp. */
-  error?: string;
-}
-
-export interface ExecuteMatrixResult {
-  ok: boolean;
-  cells: MatrixCellResult[];
-  mode: MatrixMode;
-  /** Wall-clock start time, used by the stamping writer. */
-  startedAt: Date;
 }
 
 /**
