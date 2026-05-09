@@ -1,11 +1,6 @@
 import { NDKEvent, NDKPrivateKeySigner, NDKUser } from '@nostr-dev-kit/ndk-mobile';
 import { nostrLog } from '@/shared/lib/logger';
-import {
-  getCachedNip04Plaintext,
-  isKnownFailedNip04,
-  markNip04Failed,
-  putNip04Plaintext,
-} from '@/shared/lib/nostr/nip04Cache';
+import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 
 interface DecryptNip04EventsOptions {
   privateKey: Uint8Array;
@@ -49,7 +44,7 @@ export async function decryptNip04Events<
         const eventId = item.dmEvent.id;
         // Negative-cache hit: known-bad event, render as encrypted
         // placeholder without burning the ECDH + AES-CBC cost again.
-        if (eventId && isKnownFailedNip04(recipientPubkey, eventId)) {
+        if (eventId && nip04Cache.isKnownFailed(recipientPubkey, eventId)) {
           results.push({ ...item, dmEvent: { ...item.dmEvent, content: '[Encrypted message]' } });
           failedCount++;
           continue;
@@ -59,7 +54,7 @@ export async function decryptNip04Events<
         // NDKEvent instances are owned by the @nostr-dev-kit subscription
         // and seeing their content swap underfoot triggers downstream
         // re-renders we don't own.
-        const cached = eventId ? getCachedNip04Plaintext(recipientPubkey, eventId) : undefined;
+        const cached = eventId ? nip04Cache.get(recipientPubkey, eventId) : undefined;
         if (cached !== undefined) {
           results.push({ ...item, dmEvent: { ...item.dmEvent, content: cached } });
           cacheHitCount++;
@@ -68,7 +63,7 @@ export async function decryptNip04Events<
         if (!signer) signer = new NDKPrivateKeySigner(privateKey);
         const counterparty = new NDKUser({ pubkey: item.pubkey });
         await item.dmEvent.decrypt(counterparty, signer);
-        if (eventId) putNip04Plaintext(recipientPubkey, eventId, item.dmEvent.content);
+        if (eventId) nip04Cache.put(recipientPubkey, eventId, item.dmEvent.content);
         results.push({ ...item, dmEvent: { ...item.dmEvent, content: item.dmEvent.content } });
         decryptedCount++;
       } else {
@@ -78,7 +73,7 @@ export async function decryptNip04Events<
     } catch (error) {
       nostrLog.warn('nostr.nip04.decrypt.item_failed', { pubkey: item.pubkey?.slice(0, 8), error });
       const eventId = (item.dmEvent as NDKEvent | undefined)?.id;
-      if (eventId) markNip04Failed(recipientPubkey, eventId);
+      if (eventId) nip04Cache.markFailed(recipientPubkey, eventId);
       results.push({ ...item, dmEvent: { ...item.dmEvent, content: '[Encrypted message]' } });
       failedCount++;
     }

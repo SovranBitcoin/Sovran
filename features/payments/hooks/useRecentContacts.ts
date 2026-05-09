@@ -3,7 +3,7 @@ import { NDKEvent, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { paymentLog } from '@/shared/lib/logger';
 import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
-import { getCachedUnwrap, hydrateGiftWrapCache, putUnwrap } from '@/shared/lib/nostr/giftWrapCache';
+import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { decryptNip04Events } from '../lib/decryptNip04Events';
 
@@ -47,11 +47,11 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
   // active. The cache hydrates from AsyncStorage in the background — by
   // the time `unwrappedDMs` runs (after the first relay tick), most or
   // all entries are in memory, so the loop below short-circuits to
-  // `getCachedUnwrap` for previously-seen wraps and only pays the
+  // `giftWrapCache.cache.get` for previously-seen wraps and only pays the
   // secp256k1 ECDH cost on genuinely new wraps.
   useEffect(() => {
     if (nostrKeys?.pubkey) {
-      void hydrateGiftWrapCache(nostrKeys.pubkey);
+      void giftWrapCache.cache.hydrate(nostrKeys.pubkey);
     }
   }, [nostrKeys?.pubkey]);
 
@@ -80,7 +80,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
     const out = giftWrapEvents
       .map((event) => {
         // L1 hit: skip the two NIP-44 decrypts entirely.
-        const cached = getCachedUnwrap(recipientPubkey, event.id);
+        const cached = giftWrapCache.cache.get(recipientPubkey, event.id);
         if (cached) {
           cacheHits++;
           return { ...cached, wrapId: event.id };
@@ -93,7 +93,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
         // Persist for the next session — the same wraps will keep
         // arriving from relays on every `useSubscribe`, and we don't
         // want to pay the unwrap cost again next launch.
-        putUnwrap(recipientPubkey, event.id, fresh);
+        giftWrapCache.cache.put(recipientPubkey, event.id, fresh);
         unwrapped++;
         return { ...fresh, wrapId: event.id };
       })

@@ -20,13 +20,8 @@ import {
 } from '@nostr-dev-kit/ndk-mobile';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { buildGiftWrappedDMPair } from '@/shared/lib/nostr/nip17';
-import { unwrapGiftWrapCached } from '@/shared/lib/nostr/giftWrapCache';
-import {
-  getCachedNip04Plaintext,
-  isKnownFailedNip04,
-  markNip04Failed,
-  putNip04Plaintext,
-} from '@/shared/lib/nostr/nip04Cache';
+import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
+import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
@@ -131,7 +126,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
 
     return giftWrapEvents
       .map((event) => {
-        const unwrapped = unwrapGiftWrapCached(nostrKeys.pubkey, event, nostrKeys.privateKey);
+        const unwrapped = giftWrapCache.unwrap(nostrKeys.pubkey, event, nostrKeys.privateKey);
         if (!unwrapped) return null;
 
         const isFromCounterparty =
@@ -229,18 +224,18 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         const processedMessages = await Promise.all(
           newEvents.map(async (event) => {
             try {
-              if (isKnownFailedNip04(myPubkey, event.id)) {
+              if (nip04Cache.isKnownFailed(myPubkey, event.id)) {
                 processedEventIds.current.add(event.id);
                 return null;
               }
-              const cached = getCachedNip04Plaintext(myPubkey, event.id);
+              const cached = nip04Cache.get(myPubkey, event.id);
               if (cached !== undefined) {
                 event.content = cached;
               } else {
                 const counterparty = new NDKUser({ pubkey: pubkey });
                 const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
                 await event.decrypt(counterparty, signer);
-                putNip04Plaintext(myPubkey, event.id, event.content);
+                nip04Cache.put(myPubkey, event.id, event.content);
               }
               const isOwn = event.pubkey === myPubkey;
               const senderPubkey = isOwn ? myPubkey : event.pubkey;
@@ -256,7 +251,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
               } satisfies DmMessage;
             } catch (error) {
               log.error('user.messages.nip04_decrypt_failed', { error });
-              markNip04Failed(nostrKeys.pubkey, event.id);
+              nip04Cache.markFailed(nostrKeys.pubkey, event.id);
               processedEventIds.current.add(event.id);
               return null;
             }
