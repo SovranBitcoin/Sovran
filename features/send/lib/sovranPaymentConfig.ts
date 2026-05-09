@@ -86,7 +86,7 @@ import {
   routstrTopUpSuccessPopup,
   routstrWalletCreatedPopup,
   routstrTransactionFailedPopup,
-} from '@/shared/lib/popup/popups/routstr';
+} from '@/shared/lib/popup/popups';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';

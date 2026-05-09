@@ -24,7 +24,7 @@ import { Metadata, ShortTextNote, Repost, GenericRepost } from 'nostr-tools/kind
 import { decode as bolt11Decode } from '@gandlaf21/bolt11-decode';
 import { log } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
-import { openLinkFailedPopup } from '@/shared/lib/popup/popups/general';
+import { openLinkFailedPopup } from '@/shared/lib/popup/popups';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';

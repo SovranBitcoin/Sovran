@@ -53,7 +53,7 @@ import {
 } from '@/features/ai/lib/format';
 
 import { showActionSheet } from './bridge';
-import { modelSwitchedPopup } from './messages';
+import { modelSwitchedPopup } from './';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
 

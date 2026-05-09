@@ -27,7 +27,7 @@ import { getMarkerColor } from '@/shared/lib/map/categories';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { openExternalUrl } from '@/shared/lib/url';
-import { openLinkFailedPopup } from '@/shared/lib/popup/popups/general';
+import { openLinkFailedPopup } from '@/shared/lib/popup/popups';
 
 const ParamsSchema = z.object({
   placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
