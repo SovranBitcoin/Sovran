@@ -4,51 +4,56 @@ import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { buttonStyle, frame } from '@expo/ui/swift-ui/modifiers';
 
 import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
-import { Log } from '@/shared/lib/logger';
-import BalanceDisplay, { type BalanceDisplayProps } from './BalanceDisplay';
-
-interface BalancePillLiquidProps extends BalanceDisplayProps {
-  buttonWidth: number;
-  onPress?: () => void;
-}
+import BalanceDisplay from './BalanceDisplay';
+import type { BalancePillProps } from './BalancePill.types';
+import { useBalancePillDimensions } from './useBalancePillDimensions';
 
 /**
  * Liquid-glass variant — wraps `<BalanceDisplay />` in a SwiftUI
  * `buttonStyle('glass')` `Host`. Mirrors `MintSelectorLiquid` so the wallet
  * tab and the AI tab render byte-identical chrome; only the props differ.
  */
-export function BalancePillLiquid({
-  buttonWidth,
+export default function BalancePillLiquid({
   onPress,
+  width,
+  contentWidth: contentWidthOverride,
+  contentHeight: contentHeightOverride,
   ...display
-}: BalancePillLiquidProps): React.ReactElement {
+}: BalancePillProps): React.ReactElement {
+  const dimensions = useBalancePillDimensions({
+    width,
+    contentWidth: contentWidthOverride,
+    contentHeight: contentHeightOverride,
+  });
   const h = HEADER_LAYOUT.BUTTON_HEIGHT;
 
   const buttonModifiers = [
     buttonStyle('glass'),
     frame({
       height: h,
-      width: buttonWidth,
+      width: dimensions.buttonWidth,
       alignment: 'center',
     }),
   ];
 
   return (
-    <Log name="BalancePillLiquid">
-      <View
-        style={{
-          alignSelf: 'center',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: buttonWidth,
-          height: h,
-        }}>
-        <Host style={{ zIndex: 10, height: h, width: buttonWidth }} matchContents>
-          <SwiftUIButton modifiers={buttonModifiers} onPress={onPress}>
-            <BalanceDisplay {...display} />
-          </SwiftUIButton>
-        </Host>
-      </View>
-    </Log>
+    <View
+      style={{
+        alignSelf: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: dimensions.buttonWidth,
+        height: h,
+      }}>
+      <Host style={{ zIndex: 10, height: h, width: dimensions.buttonWidth }} matchContents>
+        <SwiftUIButton modifiers={buttonModifiers} onPress={onPress}>
+          <BalanceDisplay
+            {...display}
+            contentWidth={dimensions.contentWidth}
+            contentHeight={dimensions.contentHeight}
+          />
+        </SwiftUIButton>
+      </Host>
+    </View>
   );
 }

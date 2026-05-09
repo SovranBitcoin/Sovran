@@ -3,20 +3,21 @@ import { Host, Menu, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/
 import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 
-import type { FiatCurrencyPillShared } from './useFiatCurrencyPill';
-import { Log } from '@/shared/lib/logger';
+import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
-export function FiatCurrencyPillLiquid({
-  success,
-  green500,
-  handleSelectCurrency,
-  text,
-  iosHeight,
-  iosWidth,
-  onPress,
-  enableCurrencyMenu,
-  textSize,
-}: FiatCurrencyPillShared): React.ReactElement {
+export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
+  const {
+    success,
+    green500,
+    handleSelectCurrency,
+    text,
+    iosHeight,
+    iosWidth,
+    onPress,
+    enableCurrencyMenu,
+    textSize,
+  } = useFiatCurrencyPill(props);
+
   const glassModifiers = [
     frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
     glassEffect({
@@ -59,12 +60,10 @@ export function FiatCurrencyPillLiquid({
   }
 
   return (
-    <Log name="FiatCurrencyPillLiquid">
-      <Host style={{ zIndex: 10 }} matchContents>
-        <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
-          <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
-        </SwiftUIButton>
-      </Host>
-    </Log>
+    <Host style={{ zIndex: 10 }} matchContents>
+      <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
+        <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
+      </SwiftUIButton>
+    </Host>
   );
 }
