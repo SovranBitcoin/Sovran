@@ -16,7 +16,7 @@ import { create } from 'zustand';
 
 import { paymentLog } from '@/shared/lib/logger';
 
-export type SwapLegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
+type SwapLegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 
 export type SwapState = 'running' | 'done' | 'failed' | 'cancelled';
 
@@ -28,7 +28,7 @@ export interface SwapLeg {
   errorMessage?: string;
 }
 
-export interface ActiveSwap {
+interface ActiveSwap {
   /** Stable id used to correlate updates with the toast. */
   id: string;
   startedAt: number;
@@ -44,7 +44,7 @@ export interface ActiveSwap {
   groupId?: string;
 }
 
-export interface SwapStatusStore {
+interface SwapStatusStore {
   active: ActiveSwap | null;
   start: (params: {
     id: string;

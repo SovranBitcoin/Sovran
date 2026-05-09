@@ -22,7 +22,7 @@ import type { RoutstrModel } from '@/shared/lib/routstr/api';
  */
 
 export type AiProviderId = 'openai' | 'claude' | 'grok';
-export type AiTierId = 'auto' | 'pro' | 'max';
+type AiTierId = 'auto' | 'pro' | 'max';
 
 export interface AiProvider {
   id: AiProviderId;

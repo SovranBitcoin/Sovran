@@ -105,7 +105,7 @@ export interface ScreenActionsBridge {
  * Live refs exposed to the handler factory so handlers can read
  * values that change after creation (e.g. option dismiss callback).
  */
-export interface PaymentFlowRefs {
+interface PaymentFlowRefs {
   getOptionDismiss: () => (() => void) | undefined;
 }
 
@@ -113,7 +113,7 @@ export interface PaymentFlowRefs {
 // Flat provider props (see README)
 // ---------------------------------------------------------------------------
 
-export interface CocoPaymentUXProviderProps {
+interface CocoPaymentUXProviderProps {
   children: React.ReactNode;
   /**
    * Optional CocoPaymentUXInstance from `createCocoPaymentUX()`.
@@ -213,7 +213,7 @@ export interface CocoPaymentUXProviderProps {
 // Context
 // ---------------------------------------------------------------------------
 
-export interface CocoPaymentUXContextValue {
+interface CocoPaymentUXContextValue {
   machine: PaymentMachine;
   walletContextRef: React.MutableRefObject<WalletContext | null>;
   unitRef: React.MutableRefObject<string>;
@@ -429,7 +429,7 @@ function usePaymentFlowContext(): CocoPaymentUXContextValue {
 // Hooks
 // ---------------------------------------------------------------------------
 
-export interface UsePaymentFlowMachineConfig {
+interface UsePaymentFlowMachineConfig {
   walletContext: WalletContext;
   unit?: string;
   onOptionDismiss?: () => void;

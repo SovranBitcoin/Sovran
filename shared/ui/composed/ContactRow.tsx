@@ -64,7 +64,7 @@ interface NostrProfileLike {
   follows?: number;
 }
 
-export interface NostrIdentity {
+interface NostrIdentity {
   kind: 'nostr';
   pubkey: string;
   profile?: NostrProfileLike;
@@ -96,7 +96,7 @@ interface MintStatFields {
   contactReputation?: number;
 }
 
-export interface MintIdentity {
+interface MintIdentity {
   kind: 'mint';
   mintUrl: string;
   displayName: string;
@@ -104,7 +104,7 @@ export interface MintIdentity {
   stats?: MintStatFields;
 }
 
-export interface BleIdentity {
+interface BleIdentity {
   kind: 'ble';
   peerID: string;
   nickname?: string;
@@ -113,7 +113,7 @@ export interface BleIdentity {
   lastSeen?: number;
 }
 
-export interface GeohashIdentity {
+interface GeohashIdentity {
   kind: 'geohash';
   geohash: string;
   label?: string;
@@ -124,7 +124,7 @@ export interface GeohashIdentity {
   icon?: string;
 }
 
-export interface SelfIdentity {
+interface SelfIdentity {
   kind: 'self';
   pubkey: string;
   nickname: string;

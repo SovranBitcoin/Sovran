@@ -5,7 +5,7 @@ import type { PopupIcon, PopupTextSegment } from '@/shared/lib/popup';
 import type { LiveSheetConfig, LiveSheetStatus } from '@/shared/lib/popup/liveSheetTypes';
 import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
 
-export type SheetButton = {
+type SheetButton = {
   text: string;
   page?: string;
   onPress?: () => void;
@@ -16,7 +16,7 @@ export type SheetButton = {
  * sheet opened on top before this one was closed. `destroyed` = forced teardown
  * (e.g. profile transition; PopupHost unmounts the native overlay).
  */
-export type SheetCloseReason = 'dismiss' | 'replaced' | 'destroyed';
+type SheetCloseReason = 'dismiss' | 'replaced' | 'destroyed';
 
 export type SheetCloseEvent = { reason: SheetCloseReason };
 
@@ -35,12 +35,12 @@ export type StandardSheetPayload = {
 };
 
 /** Custom action sheet: sheetId + typed payload */
-export type CustomSheetPayload<K extends keyof ActionSheetPayloads = keyof ActionSheetPayloads> = {
+type CustomSheetPayload<K extends keyof ActionSheetPayloads = keyof ActionSheetPayloads> = {
   sheetId: K;
   payload: ActionSheetPayloads[K];
 };
 
-export type SheetPayload = StandardSheetPayload | CustomSheetPayload;
+type SheetPayload = StandardSheetPayload | CustomSheetPayload;
 
 export function isCustomSheetPayload(p: SheetPayload | null): p is CustomSheetPayload {
   return p != null && 'sheetId' in p && 'payload' in p;

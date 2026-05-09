@@ -79,7 +79,7 @@ export type ContentSegment =
   | { kind: 'note'; eventId: string }
   | { kind: 'naddr'; identifier: string };
 
-export type RelayMessage =
+type RelayMessage =
   | ['EVENT', string, unknown]
   | ['EVENTS', string, unknown[]]
   | ['EOSE', string]
@@ -566,7 +566,7 @@ export function createPrimalRelayClient(url: string) {
 // Inline renderers
 // ============================================================================
 
-export const InlineMention = React.memo(function InlineMention({
+const InlineMention = React.memo(function InlineMention({
   pubkey,
   bech32,
   profiles,
@@ -598,7 +598,7 @@ export const InlineMention = React.memo(function InlineMention({
   );
 });
 
-export const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }) {
+const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }) {
   const foreground = useThemeColor('foreground');
   return (
     <Text bold size={15} style={{ color: opacity(foreground, 0.5) }}>
@@ -607,7 +607,7 @@ export const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: s
   );
 });
 
-export const InlineLink = React.memo(function InlineLink({
+const InlineLink = React.memo(function InlineLink({
   url,
   onPressIn,
   onPressOut,
@@ -638,9 +638,6 @@ export const InlineLink = React.memo(function InlineLink({
 // ============================================================================
 // Block renderers
 // ============================================================================
-
-// ImageBlock is now in ./image-overlay/ImageBlock.tsx — re-exported via the import above.
-export { ImageBlock };
 
 const VideoBlockInner = React.memo(function VideoBlockInner({
   url,
@@ -726,7 +723,7 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
   return content;
 });
 
-export const VideoBlock = VideoBlockInner;
+const VideoBlock = VideoBlockInner;
 
 // Decode the bolt11 once at memo time. A meltTarget that fails decoding is
 // rendered as a non-tappable "Invalid Lightning invoice" chip so a relay-
@@ -744,11 +741,7 @@ function decodeFeedInvoice(invoice: string): { amountSat: number | null } | null
   }
 }
 
-export const LightningBlock = React.memo(function LightningBlock({
-  meltTarget,
-}: {
-  meltTarget: string;
-}) {
+const LightningBlock = React.memo(function LightningBlock({ meltTarget }: { meltTarget: string }) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -955,7 +948,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
 // QuotedPostCard
 // ============================================================================
 
-export const QuotedPostCard = React.memo(function QuotedPostCard({
+const QuotedPostCard = React.memo(function QuotedPostCard({
   event,
   profiles,
   getMetrics,
@@ -1450,7 +1443,7 @@ export type FeedItem =
       timestamp: number;
     };
 
-export interface FeedParseResult {
+interface FeedParseResult {
   orderedFeedItems: FeedItem[];
   metricsMap: Map<string, NoteMetrics>;
   profilesMap: Map<string, ProfileInfo>;
@@ -1590,7 +1583,7 @@ export function computeFeedIndicesWithVideo(feedItems: FeedItem[]): number[] {
 /**
  * Options for {@link parseFeedPage}. Both predicates default to "include all".
  */
-export interface ParseFeedPageOptions {
+interface ParseFeedPageOptions {
   /** When provided, only text notes for which this returns true are included. */
   includeNote?: (event: FeedEvent) => boolean;
   /** When provided, only reposts for which this returns true are included. */

@@ -7,12 +7,8 @@ export {
   CocoPaymentUXProvider,
   useCocoPaymentUXContext,
   usePaymentFlowMachine,
-  type CocoPaymentUXContextValue,
-  type CocoPaymentUXProviderProps,
   type DeepLinkConfig,
-  type PaymentFlowRefs,
   type ScreenActionsBridge,
-  type UsePaymentFlowMachineConfig,
 } from './CocoPaymentUXProvider';
 
 // Scan types (machine.scan uses these)

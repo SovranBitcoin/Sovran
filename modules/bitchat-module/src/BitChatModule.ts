@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import { requireNativeModule, type EventSubscription } from 'expo-modules-core';
 import type {
-  BLEDiagnostics,
   BLEMessageEvent,
   BLEPeer,
   BLEPeerEvent,
@@ -37,7 +36,7 @@ interface BitChatNativeModule {
 const NativeModule: BitChatNativeModule | null =
   Platform.OS === 'ios' ? requireNativeModule<BitChatNativeModule>('BitChat') : null;
 
-export class BitChatUnavailableError extends Error {
+class BitChatUnavailableError extends Error {
   constructor() {
     super('BitChat native module is unavailable on this platform');
     this.name = 'BitChatUnavailableError';
@@ -161,7 +160,3 @@ export function addNostrPrivateMessageListener(
   if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onNostrPrivateMessage', listener as (e: unknown) => void);
 }
-
-// Re-export the BLE payload types so callers can keep importing from
-// 'bitchat-module' without reaching into ./src/types directly.
-export type { BLEDiagnostics, BLEMessageEvent, BLEPeer, BLEPeerEvent };
