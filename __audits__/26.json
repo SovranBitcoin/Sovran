@@ -71,7 +71,8 @@
       ],
       "verification_note": "Verified: the URL is a module-level string literal at shared.tsx:98; user_pubkey attachment confirmed at HomeFeed.tsx:451, HomeFeed.tsx:605, StoriesRow.tsx:141. Counter-argument considered: this is Primal's documented architecture, which users implicitly accept by using the app. That does not substitute for an explicit consent surface when a wallet pubkey is the leaked identifier.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "deferred",
+      "completion_note": "Status unchanged. Note: the cited code (createPrimalRelayClient) moved during the structural split of features/feed/components/nostr/shared.tsx — the pubkey-leak path is now at features/feed/components/nostr/primalRelay.ts (not shared.tsx:98). The security finding itself is unaddressed by this slice."
     },
     {
       "id": "F-002",
@@ -198,7 +199,8 @@
       ],
       "verification_note": "Verified at :157-166 and :343-346. Log-doctor could not directly attribute perf.js_thread_blocked entries to parseContent since no explicit instrumentation exists on parseContent — a follow-up would wrap parseContent with feedLog.measure or add paymentLog-style timing events to quantify.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "deferred",
+      "completion_note": "Status unchanged. Note: parseContent and the _contentCache/_npubCache LRU now live at features/feed/components/nostr/feedParse.ts (not shared.tsx:157). The perf finding itself is unaddressed by this slice."
     },
     {
       "id": "F-008",
