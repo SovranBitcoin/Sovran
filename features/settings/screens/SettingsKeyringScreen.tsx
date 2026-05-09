@@ -13,15 +13,7 @@ import Icon from 'assets/icons';
 import { useManager } from '@cashu/coco-react';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
-import {
-  actionMenuPopup,
-  keysLoadFailedPopup,
-  keyGenerateFailedPopup,
-  keyGeneratedPopup,
-  keyImportedPopup,
-  keyImportFailedPopup,
-  copyPopup,
-} from '@/shared/lib/popup';
+import { actionMenuPopup, copyPopup, staticPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Section } from '@/shared/ui/composed/Section';
 import type { Keypair } from '@cashu/coco-core';
@@ -232,7 +224,7 @@ export const SettingsKeyringScreen: React.FC = () => {
       setKeypairs(allKeys);
     } catch (error) {
       log.error('settings.keyring.load_failed', { error });
-      keysLoadFailedPopup();
+      staticPopup('keys-load-failed');
     } finally {
       setIsLoading(false);
     }
@@ -253,11 +245,11 @@ export const SettingsKeyringScreen: React.FC = () => {
     try {
       setIsGenerating(true);
       await manager.keyring.generateKeyPair();
-      keyGeneratedPopup();
+      staticPopup('key-generated');
       await loadKeypairs();
     } catch (error) {
       log.error('settings.keyring.generate_failed', { error });
-      keyGenerateFailedPopup();
+      staticPopup('key-generate-failed');
     } finally {
       setIsGenerating(false);
     }
@@ -346,11 +338,11 @@ export const SettingsKeyringScreen: React.FC = () => {
                   setError('Enter nsec or 64-character hex key.');
                   return;
                 }
-                keyImportedPopup();
+                staticPopup('key-imported');
                 await loadKeypairs();
               } catch (error) {
                 log.error('settings.keyring.import_failed', { error });
-                keyImportFailedPopup();
+                staticPopup('key-import-failed');
               } finally {
                 // Host suppresses `onDismiss` once an action commits, so
                 // release the single-flight guard explicitly here.

@@ -53,7 +53,7 @@ import {
 } from '@/features/ai/lib/format';
 
 import { showActionSheet } from './bridge';
-import { modelSwitchedPopup } from './';
+import { paramPopup } from './';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
 
@@ -85,14 +85,7 @@ interface TierRowProps {
  * neither Trigger, Portal, nor Content is required because Menu.Root
  * just renders its children inline through a context Provider.
  */
-function TierRow({
-  tier,
-  provider,
-  models,
-  balanceSats,
-  isCurrent,
-  onPress,
-}: TierRowProps) {
+function TierRow({ tier, provider, models, balanceSats, isCurrent, onPress }: TierRowProps) {
   const modelId = modelIdForSlot(provider.id, tier.id);
   const reservationCeiling = maxCostSats(modelId, models);
   const typicalCost = estimateTurnCostSats(modelId, models);
@@ -148,10 +141,7 @@ function TierRow({
                    one line of layout height regardless of flex math.
               The rest of heroui's typography
               (`text-base font-medium text-foreground`) is preserved. */}
-          <Menu.ItemTitle
-            className="flex-none"
-            numberOfLines={1}
-            style={{ flex: 0 }}>
+          <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
             {labelText}
           </Menu.ItemTitle>
           <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
@@ -178,10 +168,7 @@ interface ModelPickerContentProps extends CustomSheetSharedProps {
  * profile / emoji pickers, which scroll between sections).
  */
 export function ModelPickerContent({ close }: ModelPickerContentProps) {
-  const [foreground, surfaceTertiary] = useThemeColor([
-    'foreground',
-    'surface-tertiary',
-  ] as const);
+  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
@@ -192,9 +179,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
   // Open onto the user's currently-selected provider tab — they almost
   // always come here to swap *tier*, not provider, so the active tab
   // matching their current selection is the right default.
-  const [activeProviderTab, setActiveProviderTab] = useState<AiProviderId>(
-    () => selectedProvider
-  );
+  const [activeProviderTab, setActiveProviderTab] = useState<AiProviderId>(() => selectedProvider);
 
   useEffect(() => {
     pickerLog.info('modelPicker.mount', {
@@ -221,7 +206,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
         tier: tier.id,
       });
       setSelectedSlot({ provider: activeProvider.id, tier: tier.id });
-      modelSwitchedPopup({ modelName: `${activeProvider.label} ${tier.label}` });
+      paramPopup('model-switched', { modelName: `${activeProvider.label} ${tier.label}` });
       close();
     },
     [activeProvider.id, activeProvider.label, setSelectedSlot, close]
@@ -294,9 +279,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
               provider={activeProvider}
               models={models}
               balanceSats={balanceSats}
-              isCurrent={
-                selectedProvider === activeProvider.id && selectedTier === tier.id
-              }
+              isCurrent={selectedProvider === activeProvider.id && selectedTier === tier.id}
               onPress={() => handleSelect(tier)}
             />
           ))}

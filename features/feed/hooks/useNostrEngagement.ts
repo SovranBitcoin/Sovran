@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/shallow';
 
 import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/shared';
 import { log } from '@/shared/lib/logger';
-import { engagementUpdateFailedPopup } from '@/shared/lib/popup';
+import { paramPopup } from '@/shared/lib/popup';
 import { useKeyedSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -220,7 +220,7 @@ async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
     } else {
       clearOptimistic(eventId);
     }
-    engagementUpdateFailedPopup(label as 'follow' | 'like' | 'repost');
+    paramPopup('engagement-update-failed', label as 'follow' | 'like' | 'repost');
   }
 }
 
@@ -435,7 +435,7 @@ export function useNostrEngagement(
   const toggleLikeInner = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
-        engagementUpdateFailedPopup('like');
+        paramPopup('engagement-update-failed', 'like');
         return;
       }
       const state = getEngagementState(target.id);
@@ -470,7 +470,7 @@ export function useNostrEngagement(
   const toggleRepostInner = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
-        engagementUpdateFailedPopup('repost');
+        paramPopup('engagement-update-failed', 'repost');
         return;
       }
       const state = getEngagementState(target.id);

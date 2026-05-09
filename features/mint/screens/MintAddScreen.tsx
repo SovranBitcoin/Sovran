@@ -21,12 +21,7 @@ import {
   normalizeUrlForApi,
 } from '@/shared/lib/url';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import {
-  noMintsSelectedPopup,
-  managerNotInitializedPopup,
-  mintsAddFailedPopup,
-  mintsAddedPopup,
-} from '@/shared/lib/popup';
+import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
@@ -469,7 +464,7 @@ export function MintAddScreen() {
 
   const handleSave = useCallback(async () => {
     if (selectedMints.size === 0) {
-      noMintsSelectedPopup();
+      staticPopup('no-mints-selected');
       return;
     }
     if (isAdding) return;
@@ -479,7 +474,7 @@ export function MintAddScreen() {
     try {
       if (!CocoManager.isInitialized()) {
         log.error('mint.add.batch.manager_not_initialized');
-        managerNotInitializedPopup();
+        staticPopup('manager-not-initialized');
         setIsAdding(false);
         return;
       }
@@ -539,17 +534,17 @@ export function MintAddScreen() {
       // background tick.
       await new Promise((resolve) => setTimeout(resolve, 50));
       if (errors.length === 0) {
-        mintsAddedPopup({ added: results.length });
+        paramPopup('mints-added', { added: results.length });
         router.back();
       } else if (results.length > 0) {
-        mintsAddedPopup({ added: results.length, failed: errors.length });
+        paramPopup('mints-added', { added: results.length, failed: errors.length });
         router.back();
       } else {
-        mintsAddFailedPopup();
+        staticPopup('mints-add-failed');
       }
     } catch {
       log.error('mint.add.batch.unexpected_error');
-      mintsAddFailedPopup();
+      staticPopup('mints-add-failed');
     } finally {
       setIsAdding(false);
     }

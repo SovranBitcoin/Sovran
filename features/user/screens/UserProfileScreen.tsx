@@ -44,13 +44,7 @@ import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
-import {
-  copyPopup,
-  copyFailedPopup,
-  openLinkFailedPopup,
-  engagementUpdateFailedPopup,
-  type CopyTarget,
-} from '@/shared/lib/popup';
+import { copyPopup, type CopyTarget, staticPopup, paramPopup } from '@/shared/lib/popup';
 import {
   useNostrProfile,
   getFollowersWithProfiles,
@@ -796,7 +790,7 @@ export function UserProfileScreen() {
         target,
         error: e instanceof Error ? e : new Error(String(e)),
       });
-      copyFailedPopup();
+      staticPopup('copy-failed');
     }
   }, []);
 
@@ -806,7 +800,7 @@ export function UserProfileScreen() {
     const result = await openExternalUrl(fullUrl);
     if (result.isErr()) {
       nostrLog.error('user.profile.open_link.failed', { url, reason: result.error.type });
-      openLinkFailedPopup();
+      staticPopup('open-link-failed');
     }
   }, []);
 
@@ -817,7 +811,7 @@ export function UserProfileScreen() {
         hasNostrKeys: !!nostrKeys?.pubkey,
         hasNdk: !!ndk,
       });
-      engagementUpdateFailedPopup('follow');
+      paramPopup('engagement-update-failed', 'follow');
       return;
     }
     if (nostrKeys.pubkey === pubkey || followInFlight) return;
@@ -849,7 +843,7 @@ export function UserProfileScreen() {
         error: e instanceof Error ? e : new Error(String(e)),
       });
       clearFollowOptimistic(pubkey);
-      engagementUpdateFailedPopup('follow');
+      paramPopup('engagement-update-failed', 'follow');
     }
   }, [
     pubkey,

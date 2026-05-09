@@ -22,12 +22,7 @@ import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import {
-  keyImportFailedPopup,
-  profileSwitcherPopup,
-  walletStillLoadingPopup,
-  type ProfileSwitcherAction,
-} from '@/shared/lib/popup';
+import { profileSwitcherPopup, type ProfileSwitcherAction, staticPopup } from '@/shared/lib/popup';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import {
   createAndSwitchProfile,
@@ -69,7 +64,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
           const switched = await switchToExistingProfile({ accountIndex: action.accountIndex });
           if (!switched) {
             switchingRef.current = false;
-            walletStillLoadingPopup();
+            staticPopup('wallet-still-loading');
           }
           break;
         }
@@ -80,13 +75,15 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
         }
         case 'import': {
           if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
-            keyImportFailedPopup({ text: 'This identity already exists as a profile.' });
+            staticPopup('key-import-failed', {
+              text: 'This identity already exists as a profile.',
+            });
             return;
           }
 
           const stored = await storeImportedNsec(action.pubkeyHex, action.nsec);
           if (!stored) {
-            keyImportFailedPopup({ text: 'Failed to store nsec securely.' });
+            staticPopup('key-import-failed', { text: 'Failed to store nsec securely.' });
             return;
           }
 
@@ -99,7 +96,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
           const imported = await switchToImportedProfile({ accountIndex: action.accountIndex });
           if (!imported) {
             switchingRef.current = false;
-            walletStillLoadingPopup();
+            staticPopup('wallet-still-loading');
           }
           break;
         }

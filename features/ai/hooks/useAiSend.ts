@@ -7,13 +7,7 @@ import { router } from 'expo-router';
 import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { pickFinalizeMessage } from '../lib/finalize';
-import {
-  actionMenuPopup,
-  modelSwitchedPopup,
-  noApiKeyPopup,
-  noWalletAvailablePopup,
-  sendMessageFailedPopup,
-} from '@/shared/lib/popup';
+import { actionMenuPopup, staticPopup, paramPopup } from '@/shared/lib/popup';
 import { aiLog } from '@/shared/lib/logger';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
@@ -141,7 +135,7 @@ export function useAiSend() {
   const navigateToTopUp = useCallback(
     (pendingMessage: string) => {
       if (!nostrKeys?.pubkey) {
-        noWalletAvailablePopup();
+        staticPopup('no-wallet-available');
         return;
       }
       useRoutstrTopUpStore.getState().start(pendingMessage);
@@ -176,7 +170,7 @@ export function useAiSend() {
     }) => {
       const { assistantMessageId, apiMessages, flowId, pendingUserMessageForTopUp } = params;
       if (!apiKey) {
-        noApiKeyPopup();
+        staticPopup('no-api-key');
         return;
       }
 
@@ -580,7 +574,7 @@ export function useAiSend() {
                     provider: provider.id,
                     tier: 'auto',
                   });
-                  modelSwitchedPopup({ modelName: `${provider.label} Auto` });
+                  paramPopup('model-switched', { modelName: `${provider.label} Auto` });
                   close();
                 },
               },
@@ -595,7 +589,7 @@ export function useAiSend() {
             ],
           });
         } else {
-          sendMessageFailedPopup({ text: err?.error?.message ?? err?.message });
+          staticPopup('send-message-failed', { text: err?.error?.message ?? err?.message });
         }
       } finally {
         clearStreaming();
@@ -620,7 +614,7 @@ export function useAiSend() {
       if (!trimmed) return;
 
       if (!apiKey) {
-        noApiKeyPopup();
+        staticPopup('no-api-key');
         return;
       }
 
@@ -713,7 +707,7 @@ export function useAiSend() {
   const retryInner = useCallback(
     async (messageId: string) => {
       if (!apiKey) {
-        noApiKeyPopup();
+        staticPopup('no-api-key');
         return;
       }
       const stateNow = useRoutstrStore.getState();

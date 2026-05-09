@@ -4,7 +4,7 @@ import * as Application from 'expo-application';
 import semver from 'semver';
 
 import { getLatestVersion } from '@/shared/lib/apiClient';
-import { newVersionPopup } from '@/shared/lib/popup';
+import { paramPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 
@@ -52,7 +52,7 @@ export const useVersionCheck = () => {
           currentVersion,
           latestVersion: payload.version,
         });
-        newVersionPopup({ version: payload.version });
+        paramPopup('new-version', { version: payload.version });
       } else {
         log.debug('hook.version_check.up_to_date', { currentVersion });
       }

@@ -27,7 +27,7 @@ import { getMarkerColor } from '@/shared/lib/map/categories';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { openExternalUrl } from '@/shared/lib/url';
-import { openLinkFailedPopup } from '@/shared/lib/popup/popups';
+import { staticPopup } from '@/shared/lib/popup';
 
 const ParamsSchema = z.object({
   placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
@@ -103,7 +103,7 @@ export function MerchantDetailScreen() {
     const result = await openExternalUrl(url);
     if (result.isErr()) {
       log.warn('map.merchant.open_link.failed', { url, reason: result.error.type });
-      openLinkFailedPopup();
+      staticPopup('open-link-failed');
     }
   }, []);
 

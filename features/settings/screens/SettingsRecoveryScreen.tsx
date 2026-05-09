@@ -29,11 +29,7 @@ import { deleteMintOperation } from '@/shared/lib/cashu/managerInternals';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
-import {
-  recoverySuccessPopup,
-  recoveryPartialPopup,
-  recoveryFailedPopup,
-} from '@/shared/lib/popup';
+import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { fetchJson } from '@/shared/lib/apiClient';
 import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
 
@@ -388,7 +384,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     const allMintUrls = [...knownMintUrls, ...probeMintUrls];
 
     if (allMintUrls.length === 0) {
-      recoveryFailedPopup({ text: 'No mints found to recover from. Add a mint first.' });
+      staticPopup('recovery-failed', { text: 'No mints found to recover from. Add a mint first.' });
       return;
     }
 
@@ -542,7 +538,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         // here would render over the freshly-mounted wallet. The inline
         // `renderCompleteState` already provides feedback in gate mode.
         if (!gateMode) {
-          recoverySuccessPopup({
+          paramPopup('recovery-success', {
             mintCount: successCount,
             durationSec: (totalMs / 1000).toFixed(1),
           });
@@ -551,9 +547,9 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       } else {
         if (!gateMode) {
           if (successCount > 0) {
-            recoveryPartialPopup({ successCount, failureCount: knownFailureCount });
+            paramPopup('recovery-partial', { successCount, failureCount: knownFailureCount });
           } else {
-            recoveryFailedPopup();
+            staticPopup('recovery-failed');
           }
         }
         setRecoveryState('error');
@@ -564,7 +560,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       setErrorMessage(errorMsg);
       if (!gateMode) {
-        recoveryFailedPopup({ text: errorMsg });
+        staticPopup('recovery-failed', { text: errorMsg });
       }
       setRecoveryState('error');
     }

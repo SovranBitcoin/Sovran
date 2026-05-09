@@ -43,50 +43,21 @@ import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
 import { writeTokenToNFC, NfcError } from '@/shared/lib/nfc';
 import {
-  allOptionsDisabledPopup,
-  balanceTooLowPopup,
-  cancelTransactionFailedPopup,
   copyPopup,
-  couldNotCancelPopup,
   emojiPickerPopup,
-  generalErrorPopup,
-  mintUnreachablePopup,
-  missingMeltTargetPopup,
   nfcConnectionLostPopup,
   nfcEcashSharedPopup,
-  nfcErrorPopup,
   nfcSendFailedPopup,
-  noAmountPopup,
-  noMintSelectedPopup,
-  noClipboardAddressPopup,
-  noQrCodeFoundPopup,
-  noValidMintPopup,
-  operationInvalidStatePopup,
-  operationNotFoundPopup,
   paymentCancelledPopup,
   paymentFallbackPopup,
   paymentOptionsPopup,
   paymentStatusPopup,
   proofSelectorPopup,
-  qrScanFailedPopup,
-  receiveFailedPopup,
-  receiveMintUpdatedPopup,
-  receiveMintUpdateFailedPopup,
-  sendPaymentFailedPopup,
-  tokenPendingNotRedeemedPopup,
-  tokenRedeemedByRecipientPopup,
-  transactionAlreadyCancelledPopup,
-  transactionCancelledPopup,
-  unsupportedInputPopup,
-  unsupportedTokenUnitPopup,
+  staticPopup,
+  paramPopup,
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
-import {
-  routstrTopUpSuccessPopup,
-  routstrWalletCreatedPopup,
-  routstrTransactionFailedPopup,
-} from '@/shared/lib/popup/popups';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
@@ -379,60 +350,60 @@ export function createSovranNotifications(
   return {
     NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
       paymentLog.warn('payment.notification.no_amount');
-      noAmountPopup();
+      staticPopup('no-amount');
     },
     NO_VALID_MINT: ({ code: _code, message, data: _data }) => {
-      noValidMintPopup({ text: message });
+      staticPopup('no-valid-mint', { text: message });
     },
     INSUFFICIENT_BALANCE: ({ code: _code, message, data: _data }) => {
-      balanceTooLowPopup({ text: message });
+      staticPopup('balance-too-low', { text: message });
     },
     NO_BALANCE: ({ code: _code, message, data: _data }) => {
-      balanceTooLowPopup({ text: message });
+      staticPopup('balance-too-low', { text: message });
     },
     UNSUPPORTED_INPUT: ({ code: _code, message, data: _data }) => {
-      unsupportedInputPopup({ text: message });
+      staticPopup('unsupported-input', { text: message });
     },
     ALL_OPTIONS_DISABLED: ({ code: _code, message: _message, data: _data }) => {
-      allOptionsDisabledPopup();
+      staticPopup('all-options-disabled');
     },
     MISSING_MELT_TARGET: ({ code: _code, message: _message, data: _data }) => {
-      missingMeltTargetPopup();
+      staticPopup('missing-melt-target');
     },
     SEND_FAILED: ({ code: _code, message, data }) => {
       paymentLog.error('payment.notification.send_failed', { message });
       if (data?.mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        generalErrorPopup({ text: message });
+        staticPopup('general-error', { text: message });
       }
     },
     MINT_QUOTE_FAILED: ({ code: _code, message, data }) => {
       if (data?.mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        generalErrorPopup({ text: message });
+        staticPopup('general-error', { text: message });
       }
     },
     MELT_FAILED: ({ code: _code, message, data }) => {
       paymentLog.error('payment.notification.melt_failed', { message });
       if (data?.mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        generalErrorPopup({ text: message });
+        staticPopup('general-error', { text: message });
       }
     },
     PAYMENT_REQUEST_FAILED: ({ code: _code, message, data: _data }) => {
-      sendPaymentFailedPopup({ text: message });
+      staticPopup('send-payment-failed', { text: message });
     },
     NFC_WRITE_FAILED: ({ code: _code, message, data: _data }) => {
-      nfcErrorPopup({ title: 'NFC Write Failed', message });
+      paramPopup('nfc-error', { title: 'NFC Write Failed', message });
     },
     NFC_SESSION_LOST: ({ code: _code, message, data: _data }) => {
-      nfcErrorPopup({ title: 'NFC Connection Lost', message });
+      paramPopup('nfc-error', { title: 'NFC Connection Lost', message });
     },
     NFC_READ_FAILED: ({ code: _code, message, data: _data }) => {
-      nfcErrorPopup({ title: 'NFC Read Failed', message });
+      paramPopup('nfc-error', { title: 'NFC Read Failed', message });
     },
     onPaymentProcessing: (data) => {
       paymentLog.info('payment.processing', {
@@ -489,15 +460,15 @@ export function createSovranNotifications(
       }
     },
     onScanEmpty: (source) => {
-      if (source === 'clipboard') noClipboardAddressPopup();
-      else if (source === 'gallery') noQrCodeFoundPopup();
+      if (source === 'clipboard') staticPopup('no-clipboard-address');
+      else if (source === 'gallery') staticPopup('no-qr-code-found');
     },
     onScanError: (source, err) => {
-      if (source === 'gallery') qrScanFailedPopup();
-      else generalErrorPopup({ text: err.message });
+      if (source === 'gallery') staticPopup('qr-scan-failed');
+      else staticPopup('general-error', { text: err.message });
     },
     onMissingMintForAmount: () => {
-      noMintSelectedPopup();
+      staticPopup('no-mint-selected');
     },
     onCopied: (target) => {
       copyPopup(target as Parameters<typeof copyPopup>[0]);
@@ -530,34 +501,34 @@ export function createSovranNotifications(
     },
     onNfcWriteFailed: ({ message, rolledBack }) => {
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
-      nfcErrorPopup({ title: 'NFC Write Failed', message: errorMsg });
+      paramPopup('nfc-error', { title: 'NFC Write Failed', message: errorMsg });
     },
 
     // ── Screen action notifications ─────────────────────────────────
 
     onSendStatusChecked: ({ operationId: _operationId, state, redeemed }) => {
       if (redeemed || state === 'finalized') {
-        tokenRedeemedByRecipientPopup();
+        staticPopup('token-redeemed-by-recipient');
       } else if (state === 'rolled_back') {
-        transactionAlreadyCancelledPopup();
+        staticPopup('transaction-already-cancelled');
       } else if (state === 'not_found') {
-        operationNotFoundPopup();
+        staticPopup('operation-not-found');
       } else if (state !== 'pending') {
-        operationInvalidStatePopup({ state });
+        paramPopup('operation-invalid-state', { state });
       } else {
-        tokenPendingNotRedeemedPopup();
+        staticPopup('token-pending-not-redeemed');
       }
     },
 
     onSendCancelled: (_data) => {
-      transactionCancelledPopup();
+      staticPopup('transaction-cancelled');
     },
 
     onSendCancelFailed: ({ message, mintUnreachable }) => {
       if (mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        cancelTransactionFailedPopup({ text: message });
+        staticPopup('cancel-transaction-failed', { text: message });
       }
     },
 
@@ -606,7 +577,7 @@ export function createSovranNotifications(
       if (store.active?.id === id && store.active?.state === 'processing') {
         store.setFailed(id, new Error(message));
       } else {
-        receiveFailedPopup({ text: message });
+        staticPopup('receive-failed', { text: message });
       }
     },
 
@@ -616,14 +587,14 @@ export function createSovranNotifications(
 
     onMeltCancelFailed: ({ message, mintUnreachable }) => {
       if (mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        couldNotCancelPopup({ text: message });
+        staticPopup('could-not-cancel', { text: message });
       }
     },
 
     onUnsupportedTokenUnit: ({ unit }) => {
-      unsupportedTokenUnitPopup({ unit });
+      paramPopup('unsupported-token-unit', { unit });
     },
 
     onMintTrustedFromScreen: ({ fromAccepter }) => {
@@ -644,8 +615,8 @@ export function createSovranNotifications(
       const pk = config?.getPrivateKey?.();
       if (pk) {
         const ok = await useNpcMintStore.getState().updateServerMint(mintUrl, pk);
-        if (ok) receiveMintUpdatedPopup();
-        else receiveMintUpdateFailedPopup();
+        if (ok) staticPopup('receive-mint-updated');
+        else staticPopup('receive-mint-update-failed');
       }
     },
 
@@ -779,20 +750,20 @@ export function createSovranHandlers({
           if (result.success) {
             const balanceStr = formatRoutstrBalance(result.balance);
             if (result.isNewWallet) {
-              routstrWalletCreatedPopup({ balance: balanceStr });
+              paramPopup('routstr-wallet-created', { balance: balanceStr });
             } else {
-              routstrTopUpSuccessPopup({ balance: balanceStr });
+              paramPopup('routstr-top-up-success', { balance: balanceStr });
             }
             useRoutstrTopUpStore.getState().complete('success');
           } else {
-            routstrTransactionFailedPopup({ text: result.error });
+            staticPopup('routstr-transaction-failed', { text: result.error });
             useRoutstrTopUpStore.getState().complete('failed');
           }
         } catch (e) {
           paymentLog.error('payment.routstr_topup.error', {
             error: e instanceof Error ? e.message : String(e),
           });
-          routstrTransactionFailedPopup({ text: 'Failed to process top-up' });
+          staticPopup('routstr-transaction-failed', { text: 'Failed to process top-up' });
           useRoutstrTopUpStore.getState().complete('failed');
         }
         router.dismiss();

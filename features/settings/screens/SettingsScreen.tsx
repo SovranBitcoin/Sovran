@@ -13,7 +13,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { devModePopup } from '@/shared/lib/popup';
+import { paramPopup } from '@/shared/lib/popup';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -145,7 +145,7 @@ export const SettingsScreen = () => {
       const newMode = !devMode;
       log.info('settings.dev_mode.toggle', { enabled: newMode });
       setDevMode(newMode);
-      devModePopup(newMode);
+      paramPopup('dev-mode', newMode);
     }
   }, [devMode, setDevMode]);
 

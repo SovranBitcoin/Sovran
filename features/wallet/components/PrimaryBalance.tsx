@@ -25,11 +25,7 @@ import { useCapabilities, useLiquidGlassModifiers } from '@/shared/ui/capability
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import {
-  actionMenuPopup,
-  reservedProofsFreedPopup,
-  reservedProofsFailedPopup,
-} from '@/shared/lib/popup';
+import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
 import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -234,7 +230,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         await manager.ops.send.recovery.run();
         await manager.ops.melt.recovery.run();
         walletLog.info('wallet.reserved.recovery_complete');
-        reservedProofsFreedPopup({
+        staticPopup('reserved-proofs-freed', {
           text:
             'Recovery completed.\n' +
             'Checked pending send and melt operations.\n' +
@@ -244,7 +240,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         walletLog.error('wallet.reserved.recovery_failed', {
           error: error instanceof Error ? error : new Error(String(error)),
         });
-        reservedProofsFailedPopup({
+        staticPopup('reserved-proofs-failed', {
           text: error instanceof Error ? error.message : 'Unknown error',
         });
       }

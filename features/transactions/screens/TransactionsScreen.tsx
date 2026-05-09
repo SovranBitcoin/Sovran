@@ -23,7 +23,7 @@ import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWit
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { rollbackPartialPopup, rollbackSuccessPopup } from '@/shared/lib/popup';
+import { paramPopup } from '@/shared/lib/popup';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useManager } from '@cashu/coco-react';
 import { attemptRollback } from '@/shared/lib/cashu/utils';
@@ -124,9 +124,9 @@ export function TransactionsScreen({
     log.info('transactions.pending.sweep.visible.complete', { success, failed });
 
     if (failed === 0) {
-      rollbackSuccessPopup({ count: success });
+      paramPopup('rollback-success', { count: success });
     } else {
-      rollbackPartialPopup({ success, failed, total: targets.length });
+      paramPopup('rollback-partial', { success, failed, total: targets.length });
     }
   }, [isSweeping, visiblePendingEcash, reclaimOne]);
 

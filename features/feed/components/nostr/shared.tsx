@@ -24,7 +24,7 @@ import { Metadata, ShortTextNote, Repost, GenericRepost } from 'nostr-tools/kind
 import { decode as bolt11Decode } from '@gandlaf21/bolt11-decode';
 import { log } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
-import { openLinkFailedPopup } from '@/shared/lib/popup/popups';
+import { staticPopup } from '@/shared/lib/popup';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
 import { usePaymentFlowMachine } from 'coco-payment-ux/react';
@@ -627,7 +627,7 @@ const InlineLink = React.memo(function InlineLink({
         const result = await openExternalUrl(url);
         if (result.isErr()) {
           log.warn('feed.inline_link.open_failed', { reason: result.error.type });
-          openLinkFailedPopup();
+          staticPopup('open-link-failed');
         }
       }}>
       {prettifyUrl(url)}
@@ -659,7 +659,7 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
     const result = await openExternalUrl(url);
     if (result.isErr()) {
       log.warn('feed.video.open_failed', { reason: result.error.type });
-      openLinkFailedPopup();
+      staticPopup('open-link-failed');
     }
   }, [url]);
   const player = useVideoPlayer(url, (p) => {

@@ -16,7 +16,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatAmount } from '@/shared/lib/currency';
 import { mintLocalId } from '@/shared/lib/id';
-import { invalidTokenPopup } from '@/shared/lib/popup';
+import { staticPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 
 interface CashuTokenBubbleProps {
@@ -64,7 +64,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
 
   const handlePress = () => {
     if (!isValid) {
-      invalidTokenPopup();
+      staticPopup('invalid-token');
       return;
     }
 

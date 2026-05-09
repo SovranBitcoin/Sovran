@@ -10,7 +10,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { InteractionManager } from 'react-native';
 import { router } from 'expo-router';
-import { sendMessageFailedPopup } from '@/shared/lib/popup';
+import { staticPopup } from '@/shared/lib/popup';
 import {
   NDKEvent,
   NDKPrivateKeySigner,
@@ -348,7 +348,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
           hasPrivateKey: !!nostrKeys?.privateKey,
           hasPubkey: !!pubkey,
         });
-        sendMessageFailedPopup();
+        staticPopup('send-message-failed');
         return;
       }
 
@@ -423,7 +423,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       } catch (error) {
         log.error('dm.send.failed', { error, total_ms: Math.round(performance.now() - dmStart) });
         setMessages((prev) => prev.filter((msg) => msg.id !== tempMessageId));
-        sendMessageFailedPopup();
+        staticPopup('send-message-failed');
       }
     },
     [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey]

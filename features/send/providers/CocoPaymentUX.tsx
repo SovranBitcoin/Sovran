@@ -41,7 +41,7 @@ import {
   getSovranMintEnrichment,
 } from '@/features/send/lib/createSovranScreenActionsBridge';
 import { createNfcAdapter } from '@/shared/lib/nfc';
-import { deeplinkFailedPopup } from '@/shared/lib/popup';
+import { staticPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -235,7 +235,7 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
       url: keys?.pubkey ? deepLinkUrl : null,
       customSchemes: ['sovran'],
       ignoredHosts: ['camera', 'expo-development-client'],
-      onError: (err) => deeplinkFailedPopup({ text: err.message }),
+      onError: (err) => staticPopup('deeplink-failed', { text: err.message }),
     }),
     [deepLinkUrl, keys?.pubkey]
   );

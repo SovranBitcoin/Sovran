@@ -7,7 +7,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
-import { noWalletAvailablePopup } from '@/shared/lib/popup';
+import { staticPopup } from '@/shared/lib/popup';
 import BalancePill from '@/shared/ui/composed/BalancePill';
 
 /**
@@ -27,7 +27,7 @@ export function AiHeaderTitle() {
 
   const onPress = useCallback(() => {
     if (!nostrKeys?.pubkey) {
-      noWalletAvailablePopup();
+      staticPopup('no-wallet-available');
       return;
     }
     useRoutstrTopUpStore.getState().start(null);
