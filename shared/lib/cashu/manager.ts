@@ -1,6 +1,6 @@
 import { Manager, type Plugin } from '@cashu/coco-core';
 import { initNativeCrypto } from './nativeCrypto';
-import { CocoLogger } from './cocoLogger';
+import { CocoCoreLogger } from './cocoLogger';
 import { ExpoSqliteRepositories } from '@cashu/coco-expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 import {
@@ -227,7 +227,7 @@ export class CocoManager {
         this.instance = new Manager(
           repositories,
           seedGetter,
-          new CocoLogger('manager'),
+          new CocoCoreLogger('manager'),
           undefined,
           plugins
         );

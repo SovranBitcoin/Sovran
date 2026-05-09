@@ -58,7 +58,7 @@ export type {
 // Re-export coco-payment-ux's cancellable-fetch primitives so existing
 // `@/shared/lib/apiClient` consumers don't have to learn the new import
 // path. `coco-payment-ux/safeFetch` is the canonical implementation.
-export { isAbortError, type RequestControls };
+export { isAbortError };
 
 type FetchOrParseError = Error | ParseError;
 

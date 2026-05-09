@@ -764,22 +764,14 @@ function extractExports(src) {
     for (const m of stripped.matchAll(/^export\s+interface\s+(\w+)/gm)) {
       add('type', m[1], 'interface');
     }
-    for (const m of stripped.matchAll(/^export\s+type\s+\{([^}]+)\}/gm)) {
-      for (const name of m[1]
-        .split(',')
-        .map((s) =>
-          s
-            .trim()
-            .replace(/\s+as\s+\w+/, '')
-            .trim()
-        )
-        .filter(Boolean)) {
-        add('type', name, 'type');
-      }
-    }
+    // The brace form `export type { X }` (with or without `from '...'`) is
+    // handled by the combined regex below — it dispatches to the right kind
+    // (type/reexport) so we don't double-count.
   }
 
-  for (const m of stripped.matchAll(/^export\s+(type\s+)?\{([^}]+)\}(\s+from\s+['"][^'"]+['"])?/gm)) {
+  for (const m of stripped.matchAll(
+    /^export\s+(type\s+)?\{([^}]+)\}(\s+from\s+['"][^'"]+['"])?/gm
+  )) {
     const isFromReexport = !!m[3];
     const isTypeOnly = !!m[1];
     for (const chunk of m[2].split(',')) {
@@ -793,7 +785,7 @@ function extractExports(src) {
         if (isFromReexport) {
           add('reexport', name, 'reexport');
         } else if (isTypeOnly) {
-          add('type', name, 'type');
+          if (!hideTypes) add('type', name, 'type');
         } else {
           add('named', name, classify(name, 'reexport'));
         }
@@ -1816,8 +1808,7 @@ function computePassThrough(allFiles, faninMap, fanoutMap) {
     // Re-export edges don't make a file a pass-through — barrels routinely
     // re-export every leaf, so counting that fanin here would flag every
     // small leaf with `isPassThrough` as a pass-through suspect.
-    const fanin =
-      (faninMap.get(f.fullPath) || []).filter((e) => !e.isReexport).length;
+    const fanin = (faninMap.get(f.fullPath) || []).filter((e) => !e.isReexport).length;
     const fanout = fanoutMap.get(f.fullPath)?.size || 0;
     if (fanin === 0) continue; // also an orphan — covered by the Orphans report
     rows.push({
@@ -2268,7 +2259,9 @@ function computeDupExports(allFiles) {
     // single component's surface area redeclared across its convention files
     // (`index.ios`, `useFiatCurrencyPill`, `*.types`, etc).
     const componentNamedSibling =
-      dirs.size === 1 && locs.length <= 5 && (() => {
+      dirs.size === 1 &&
+      locs.length <= 5 &&
+      (() => {
         const dirBase = basename([...dirs][0]);
         return dirBase && name.toLowerCase().includes(dirBase.toLowerCase());
       })();
@@ -3006,6 +2999,8 @@ function renderLlm(allFiles, dep, totals, historyResult) {
   }
 
   const cycles = detectCycles(edges);
+  // Header total only — unfiltered, includes Expo Router entries / tests / configs.
+  // Score impact comes from the Hygiene block's filtered set, not this count.
   const orphans = allFiles.filter((f) => !faninMap.has(f.fullPath));
   const shallow = computeShallow(allFiles);
   const passthrough = computePassThrough(allFiles, faninMap, fanoutMap);

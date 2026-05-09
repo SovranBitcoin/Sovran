@@ -10,7 +10,8 @@ import {
   BtcMapPlacesResponse,
   parseWith,
 } from '@sovranbitcoin/schemas';
-import { fetchJson, type RequestControls } from '@/shared/lib/apiClient';
+import { fetchJson } from '@/shared/lib/apiClient';
+import { type RequestControls } from 'coco-payment-ux';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // Upstream BTCMap exposes colon-keyed `osm:*` properties under the schema's

@@ -134,26 +134,28 @@ export function extractExports(src, { hideTypes = false } = {}) {
     for (const m of stripped.matchAll(/^export\s+interface\s+(\w+)/gm)) {
       add('type', m[1], 'interface');
     }
-    for (const m of stripped.matchAll(/^export\s+type\s+\{([^}]+)\}/gm)) {
-      for (const name of m[1]
-        .split(',')
-        .map((s) =>
-          s
-            .trim()
-            .replace(/\s+as\s+\w+/, '')
-            .trim()
-        )
-        .filter(Boolean)) {
-        add('type', name, 'type');
-      }
-    }
   }
 
-  for (const m of stripped.matchAll(/^export\s+\{([^}]+)\}/gm)) {
-    for (const chunk of m[1].split(',')) {
+  // Combined regex for `export { ... }`, `export type { ... }`,
+  // `export { ... } from '...'`, and `export type { ... } from '...'`.
+  // The `from` clause distinguishes a re-export from a same-file definition;
+  // downstream dup-detection skips kind='reexport' so barrel re-exports don't
+  // get flagged as duplicate definitions of the names they forward.
+  for (const m of stripped.matchAll(
+    /^export\s+(type\s+)?\{([^}]+)\}(\s+from\s+['"][^'"]+['"])?/gm
+  )) {
+    const isFromReexport = !!m[3];
+    const isTypeOnly = !!m[1];
+    if (isTypeOnly && hideTypes && !isFromReexport) continue;
+    for (const chunk of m[2].split(',')) {
       const parts = chunk.trim().split(/\s+as\s+/);
-      const name = (parts[parts.length - 1] || '').trim();
-      if (name && /^\w+$/.test(name)) {
+      const name = (parts[parts.length - 1] || '').trim().replace(/^type\s+/, '');
+      if (!name || !/^\w+$/.test(name)) continue;
+      if (isFromReexport) {
+        add('reexport', name, 'reexport');
+      } else if (isTypeOnly) {
+        if (!hideTypes) add('type', name, 'type');
+      } else {
         add('named', name, classify(name, 'reexport'));
       }
     }

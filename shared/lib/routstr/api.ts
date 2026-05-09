@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { apiLog } from '../logger';
-import { buildAbortSignal, isAbortError, type RequestControls } from '../apiClient';
+import { buildAbortSignal, isAbortError } from '../apiClient';
+import { type RequestControls } from 'coco-payment-ux';
 
 const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
 

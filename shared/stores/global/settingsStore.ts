@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { isBackgroundImageTheme } from 'config/backgroundImageThemes';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
@@ -350,6 +349,3 @@ export const useSettingsStore = create<SettingsStore>()(
     )
   )
 );
-
-// Re-export background image helpers from the config file
-export { isBackgroundImageTheme };
