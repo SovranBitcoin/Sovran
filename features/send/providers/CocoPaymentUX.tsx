@@ -51,11 +51,9 @@ import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 
-export { usePaymentFlowMachine, useCocoPaymentUXContext } from 'coco-payment-ux/react';
-
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
 
-export function CocoPaymentUXProvider({ children }: { children: React.ReactNode }) {
+export function SovranPaymentUXProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
   const { keys } = useNostrKeysContext();
   const { isOffline: contextOffline } = useOfflineStatus();

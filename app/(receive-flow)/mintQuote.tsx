@@ -10,7 +10,7 @@ import React, { useCallback } from 'react';
 import { z } from 'zod';
 
 import { MintQuoteRoute } from '@/features/receive';
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 

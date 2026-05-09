@@ -27,7 +27,7 @@ import { openExternalUrl } from '@/shared/lib/url';
 import { openLinkFailedPopup } from '@/shared/lib/popup/popups';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 

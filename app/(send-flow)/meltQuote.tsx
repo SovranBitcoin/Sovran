@@ -9,7 +9,7 @@
 import React, { useCallback } from 'react';
 
 import { MeltQuoteRoute } from '@/features/send';
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { cashuLog } from '@/shared/lib/logger';
 

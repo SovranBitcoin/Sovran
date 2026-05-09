@@ -11,7 +11,7 @@ import { Stack } from 'expo-router';
 
 import { useExecutionState, useScreenActions } from 'coco-payment-ux/react';
 
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

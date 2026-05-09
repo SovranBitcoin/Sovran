@@ -21,7 +21,7 @@ import { useScreenActions } from 'coco-payment-ux/react';
 import type { MintListItem } from 'coco-payment-ux';
 
 import { MintListScreen } from '@/features/mint';
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';

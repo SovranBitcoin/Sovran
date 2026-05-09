@@ -16,7 +16,7 @@ import { router } from 'expo-router';
 import { z } from 'zod';
 
 import { PaymentRequestScreen } from '@/features/send';
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 

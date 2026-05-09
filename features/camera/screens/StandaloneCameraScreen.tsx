@@ -12,7 +12,7 @@ import Icon from 'assets/icons';
 import { CameraScreen } from '@/features/camera';
 import { cameraRouteParamsSchema } from './CameraScreen/CameraScreen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useCocoPaymentUXContext } from '@/features/send/providers/CocoPaymentUX';
+import { useCocoPaymentUXContext } from 'coco-payment-ux/react';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
