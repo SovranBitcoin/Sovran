@@ -203,10 +203,24 @@ module.exports = defineConfig([
         // `#RRGGBBAA`. Exempted in the canonical color homes via the
         // override block below.
         {
-          selector:
-            "Literal[value=/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/]",
+          selector: 'Literal[value=/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/]',
           message:
             "Hardcoded hex colors bypass the theme system. For theme-aware values use `useThemeColor` from '@/shared/hooks/useThemeColor'; for cross-theme brand constants (Bitcoin orange, BLE blue, connected green) import from '@/shared/lib/brandColors' (BITCOIN_ACCENT / BLUETOOTH_ACCENT / CONNECTED_ACCENT). If you need a new cross-theme constant, add a named export to `shared/lib/brandColors.ts` rather than inlining the hex.",
+        },
+        // `Date#toLocaleDateString` / `Date#toLocaleTimeString` bypass the
+        // canonical date pipeline in `shared/lib/date.ts` (rule:
+        // `__rules__/dates.md`). The shared `formatDate(input, style)` and
+        // `formatRelative(input, style)` resolve locale automatically
+        // (in-app language override → device locale → `'en'`) and lock the
+        // style names so screens stay consistent. Bare `.toLocale*String`
+        // bakes in the system locale per call, drifts on style, and
+        // ignores the user's in-app language override. Number formatting
+        // via `.toLocaleString()` is unaffected — only Date-specific
+        // method names are matched.
+        {
+          selector: 'MemberExpression[property.name=/^toLocale(Date|Time)String$/]',
+          message:
+            "Use `formatDate(input, style)` from '@/shared/lib/date' (or `formatRelative` for relative timestamps). The shared helpers resolve locale automatically and lock the style vocabulary. See __rules__/dates.md for the catalog of styles.",
         },
       ],
     },

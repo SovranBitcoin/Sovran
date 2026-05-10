@@ -187,9 +187,6 @@
   "eslint.config.js": {
     "no-undef": {
       "count": 1
-    },
-    "prettier/prettier": {
-      "count": 1
     }
   },
   "expo-env.d.ts": {
