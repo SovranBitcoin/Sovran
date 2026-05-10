@@ -753,6 +753,9 @@
     },
     "@typescript-eslint/no-explicit-any": {
       "count": 1
+    },
+    "no-restricted-globals": {
+      "count": 4
     }
   },
   "shared/lib/typedUpdate.ts": {

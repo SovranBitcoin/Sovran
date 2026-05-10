@@ -108,6 +108,48 @@ module.exports = defineConfig([
       // transports). Exempted in the logger's own transport-fallback site
       // and at the pre-logger bootstrap layer (app.config.js, polyfills.js).
       'no-console': 'error',
+      // Raw `fetch(...)` bypasses the `fetchJson` wrapper in
+      // `shared/lib/apiClient.ts`, which handles: AbortSignal threading,
+      // default timeouts, query/URL redaction in logs, zod-validated
+      // response envelopes, and consistent error mapping. Slices that
+      // kept hitting this: `route raw fetches through fetchJson + abort +
+      // zod`, `route fetchMintInfo through fetchJson`. Streaming
+      // responses (Server-Sent Events / `stream: true`) genuinely need
+      // raw fetch — exempt those at the call site with an inline disable
+      // and a one-line note explaining the stream consumer.
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message:
+            "Use `fetchJson` from '@/shared/lib/apiClient' (handles AbortSignal, timeout, URL redaction, zod-validated envelopes). Streaming responses are the one legitimate exception — keep raw `fetch` but disable this rule inline with a one-line note.",
+        },
+      ],
+      // Defensive — same wrapper requirement when fetch is accessed via
+      // window/global/globalThis (e.g. for type-narrowing or to avoid
+      // identifier shadowing). No current call sites, but blocks the
+      // bypass.
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'fetch',
+          message:
+            "Use `fetchJson` from '@/shared/lib/apiClient' instead of reaching for `window.fetch`.",
+        },
+        {
+          object: 'globalThis',
+          property: 'fetch',
+          message:
+            "Use `fetchJson` from '@/shared/lib/apiClient' instead of reaching for `globalThis.fetch`.",
+        },
+        {
+          object: 'global',
+          property: 'fetch',
+          message:
+            "Use `fetchJson` from '@/shared/lib/apiClient' instead of reaching for `global.fetch`.",
+        },
+      ],
       // Remove unused imports
       'unused-imports/no-unused-imports': 'error',
       // Remove unused variables but allow prefix `_` to ignore
@@ -199,6 +241,17 @@ module.exports = defineConfig([
     files: ['app/_layout.tsx', 'features/splitBill/components/ParticipantCardDeck.tsx'],
     rules: {
       'no-restricted-syntax': 'off',
+    },
+  },
+  // The fetch-wrapper files ARE the legitimate callers of raw `fetch`.
+  //   - shared/lib/apiClient.ts hosts the canonical `fetchJson` used by
+  //     the rest of the app.
+  //   - coco-payment-ux/src/safeFetch.ts is the equivalent wrapper inside
+  //     the coco-payment-ux file-dep (adds timeout + abort).
+  {
+    files: ['shared/lib/apiClient.ts', 'coco-payment-ux/src/safeFetch.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
     },
   },
   // `no-console` exemptions — three legitimate sites:
