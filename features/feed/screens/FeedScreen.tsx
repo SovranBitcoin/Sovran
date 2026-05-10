@@ -110,7 +110,7 @@ export function FeedScreen() {
           {
             backgroundColor: surface,
             paddingHorizontal: 20,
-            borderBottomWidth: 0.5,
+            borderBottomWidth: StyleSheet.hairlineWidth,
             borderBottomColor: separator,
           },
         ]}>

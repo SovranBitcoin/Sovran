@@ -238,10 +238,21 @@ module.exports = defineConfig([
         // scheme, malformed URL, OS rejection) surface instead of being
         // silently swallowed.
         {
-          selector:
-            "CallExpression[callee.object.name='Linking'][callee.property.name='openURL']",
+          selector: "CallExpression[callee.object.name='Linking'][callee.property.name='openURL']",
           message:
             "Use `openExternalUrl(raw)` from '@/shared/lib/url'. It enforces an http/https/mailto/tel scheme allowlist and returns a `ResultAsync` so rejection paths surface. Raw `Linking.openURL` opens any scheme the OS recognises — `javascript:`, `file:`, `intent:` — which is a privilege-escalation surface for untrusted input.",
+        },
+        // `borderWidth: 0.5` (and the directional variants) rounds DOWN
+        // to 0 on DPR=1 devices — the border vanishes. Documented in
+        // `__rules__/responsive-scaling.md`. Use `StyleSheet.hairlineWidth`
+        // (== `1 / PixelRatio.get()`, guaranteed to render as exactly
+        // one physical pixel on every density). 1pt is also fine if the
+        // design wants something visibly thicker than a hairline.
+        {
+          selector:
+            "Property[key.name=/^border(Top|Bottom|Left|Right|Start|End)?Width$/][value.type='Literal'][value.value=0.5]",
+          message:
+            '`borderWidth: 0.5` rounds to 0 on DPR=1 devices and the border disappears. Use `StyleSheet.hairlineWidth` (1 physical pixel on every density) or a literal `1`. See __rules__/responsive-scaling.md.',
         },
         // `Date#toLocaleDateString` / `Date#toLocaleTimeString` bypass the
         // canonical date pipeline in `shared/lib/date.ts` (rule:

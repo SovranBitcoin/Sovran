@@ -585,7 +585,7 @@ export const ContactsScreen = () => {
             styles.tabBar,
             {
               backgroundColor: surface,
-              borderBottomWidth: 0.5,
+              borderBottomWidth: StyleSheet.hairlineWidth,
               borderBottomColor: separator,
             },
           ]}>
@@ -605,7 +605,7 @@ export const ContactsScreen = () => {
             {
               backgroundColor: surface,
               paddingHorizontal: 20,
-              borderBottomWidth: 0.5,
+              borderBottomWidth: StyleSheet.hairlineWidth,
               borderBottomColor: separator,
             },
           ]}>

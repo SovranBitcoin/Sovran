@@ -8,6 +8,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { router, Stack } from 'expo-router';
 
@@ -115,7 +116,7 @@ export default function NetworkSheet() {
         style={{
           paddingHorizontal: 20,
           paddingVertical: 10,
-          borderBottomWidth: 0.5,
+          borderBottomWidth: StyleSheet.hairlineWidth,
           borderBottomColor: opacity(foreground, 0.08),
         }}>
         <Icon name="mdi:bluetooth" size={18} color={BLUETOOTH_ACCENT} />
