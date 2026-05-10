@@ -14,6 +14,9 @@ module.exports = defineConfig([
       'vendor/**',
       // Compiled package output. `packages/*/src` stays in scope.
       'packages/*/lib/**',
+      // Per-package build-time scripts (e.g. nutpatch/scripts/check-patch-
+      // compat.ts) — same shape as top-level scripts/, Node-only tooling.
+      'packages/*/scripts/**',
       // coco-payment-ux is a file-dep with its own docs site (Vitepress) +
       // vendored reference apps. `src/` and `__tests__/` are still linted.
       'coco-payment-ux/docs/**',
@@ -92,6 +95,19 @@ module.exports = defineConfig([
     },
     rules: {
       'no-empty': 0,
+      // Raw `console.*` calls bypass the scoped-logger registry, escape
+      // log redaction (secret/PII scrubbing), don't get tagged with the
+      // calling module/profile, and ship as production hot-path overhead.
+      // Slices that kept hitting this: `inject logger at coco-payment-ux
+      // seam, drop raw console`, `scope domain logs through the registered
+      // child loggers`, `drop render-body log calls from screen
+      // components`, `drop module-load side effects`. Use the scoped
+      // logger from `@/shared/lib/logger` (or its child via
+      // `logger.child({ scope: '...' })`) instead. No allow-list — `warn`
+      // and `error` route through the logger too (it has level-aware
+      // transports). Exempted in the logger's own transport-fallback site
+      // and at the pre-logger bootstrap layer (app.config.js, polyfills.js).
+      'no-console': 'error',
       // Remove unused imports
       'unused-imports/no-unused-imports': 'error',
       // Remove unused variables but allow prefix `_` to ignore
@@ -183,6 +199,21 @@ module.exports = defineConfig([
     files: ['app/_layout.tsx', 'features/splitBill/components/ParticipantCardDeck.tsx'],
     rules: {
       'no-restricted-syntax': 'off',
+    },
+  },
+  // `no-console` exemptions — three legitimate sites:
+  //   - shared/lib/loggerCore.ts: transport-fallback escape hatch. When
+  //     the logger's own transport throws, it falls through to
+  //     `console.error` rather than swallow the failure (F-017).
+  //   - app.config.js: build-time Expo config script, runs in Node before
+  //     the app starts.
+  //   - polyfills.js: runtime bootstrap that loads BEFORE the logger
+  //     module exists; can't route through a logger that hasn't been
+  //     initialised yet.
+  {
+    files: ['shared/lib/loggerCore.ts', 'app.config.js', 'polyfills.js'],
+    rules: {
+      'no-console': 'off',
     },
   },
   // Canonical hex-color homes — these files ARE the theme/brand-token

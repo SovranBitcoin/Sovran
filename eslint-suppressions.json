@@ -570,11 +570,6 @@
       "count": 1
     }
   },
-  "packages/nutpatch/scripts/check-patch-compat.ts": {
-    "prettier/prettier": {
-      "count": 16
-    }
-  },
   "packages/nutpatch/src/crypto/NUT12.ts": {
     "prettier/prettier": {
       "count": 5
