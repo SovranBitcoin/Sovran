@@ -9,7 +9,7 @@ import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
 
-interface MonthItem {
+export interface MonthItem {
   key: string;
   label: string;
   fullLabel: string;
@@ -70,13 +70,19 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
 }
 
 interface MonthSelectorProps {
-  history: HistoryEntry[];
+  /**
+   * Either pass a precomputed `months` array (preferred when the parent also
+   * needs to render per-month pages) or pass `history` and let this component
+   * derive months internally (backwards-compatible legacy mode).
+   */
+  months?: MonthItem[];
+  history?: HistoryEntry[];
   selectedMonth: string | null;
   onMonthChange: (monthKey: string | null) => void;
   showYear?: boolean;
 }
 
-function extractMonthsFromHistory(history: HistoryEntry[]): MonthItem[] {
+export function extractMonthsFromHistory(history: HistoryEntry[]): MonthItem[] {
   const monthsMap = new Map<string, MonthItem>();
 
   for (const entry of history) {
@@ -103,6 +109,7 @@ function extractMonthsFromHistory(history: HistoryEntry[]): MonthItem[] {
 }
 
 export function MonthSelector({
+  months: monthsProp,
   history,
   selectedMonth,
   onMonthChange,
@@ -111,19 +118,18 @@ export function MonthSelector({
   const scrollViewRef = useRef<ScrollView>(null);
   const itemPositions = useRef<Map<string, number>>(new Map());
 
-  const months = useMemo(() => extractMonthsFromHistory(history), [history]);
+  // Prefer the explicit prop; fall back to deriving from history so existing
+  // callers that pass `history` keep working.
+  const months = useMemo(() => {
+    if (monthsProp) return monthsProp;
+    return extractMonthsFromHistory(history ?? []);
+  }, [monthsProp, history]);
 
   const showYear = useMemo(() => {
     if (showYearProp !== undefined) return showYearProp;
     const years = new Set(months.map((m) => m.year));
     return years.size > 1;
   }, [months, showYearProp]);
-
-  useEffect(() => {
-    if (selectedMonth === null && months.length > 0) {
-      onMonthChange(months[0].key);
-    }
-  }, [months, selectedMonth, onMonthChange]);
 
   const handleItemLayout = useCallback(
     (monthKey: string) => (event: LayoutChangeEvent) => {
