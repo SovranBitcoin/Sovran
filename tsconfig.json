@@ -2,6 +2,12 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    // Requires class methods that override a base implementation to be
+    // marked with `override`. Catches drift when a base method is
+    // renamed or removed — the override silently becomes a fresh method
+    // instead of a compile error. Free to enable here (zero current
+    // violations).
+    "noImplicitOverride": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
     "moduleSuffixes": [".ios", ".android", ""],
