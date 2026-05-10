@@ -1,5 +1,6 @@
 import React from 'react';
 import opacity from 'hex-color-opacity';
+import { alpha } from '@/shared/styles/tokens';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -74,8 +75,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   onActionPressOut?: () => void;
 }) {
   const repostedColor = useThemeColor('success');
-  const iconColor = opacity(borderColor, 0.57);
-  const textColor = opacity(borderColor, 0.57);
+  const iconColor = opacity(borderColor, alpha.disabled);
+  const textColor = opacity(borderColor, alpha.disabled);
   const likedColor = '#ff5a7a';
   const iconSize = compact ? 13 : 16;
   const textSize = compact ? 11 : 13;

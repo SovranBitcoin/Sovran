@@ -11,6 +11,7 @@ import { prefetchImage } from '@/shared/lib/imageCache';
 import { log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Badge } from './Badge';
+import { zIndex } from '@/shared/styles/tokens';
 
 export type AvatarState = 'loading' | 'fallback' | 'image';
 
@@ -108,7 +109,7 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
         position: 'absolute',
         bottom: -2,
         right: -2,
-        zIndex: 50,
+        zIndex: zIndex.dropdown,
       }}>
       {statusBadge.badge ? (
         <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={statusIconSize} />

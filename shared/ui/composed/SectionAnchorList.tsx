@@ -62,6 +62,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useRenderLogger } from '@/shared/lib/logger';
+import { zIndex } from '@/shared/styles/tokens';
 
 const sectionListLog = log.child({ module: 'sectionAnchorList' });
 
@@ -535,7 +536,7 @@ export function SectionAnchorList<T>({
           color={topFadeColor}
           zIndex={0}
         />
-        <View pointerEvents="box-none" style={{ zIndex: 1 }}>
+        <View pointerEvents="box-none" style={{ zIndex: zIndex.raised }}>
           {aboveAnchors != null && (
             <View onLayout={handleAboveAnchorsLayout}>{aboveAnchors}</View>
           )}
@@ -590,7 +591,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 20,
+    zIndex: zIndex.sticky,
   },
   anchorBarOuter: {
     paddingTop: 12,

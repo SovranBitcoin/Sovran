@@ -18,6 +18,7 @@ import { ScrollEdgeFade } from './ScrollEdgeFade';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { zIndex } from '@/shared/styles/tokens';
 
 const DebugRow = ({
   label,
@@ -276,6 +277,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    zIndex: 99,
+    zIndex: zIndex.dropdown,
   },
 });

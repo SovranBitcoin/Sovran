@@ -4,6 +4,7 @@ import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/mod
 import opacity from 'hex-color-opacity';
 
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
+import { zIndex } from '@/shared/styles/tokens';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
   const {
@@ -34,7 +35,7 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
 
   if (enableCurrencyMenu) {
     return (
-      <Host style={{ zIndex: 10 }} matchContents>
+      <Host style={{ zIndex: zIndex.sticky }} matchContents>
         <Menu
           onPrimaryAction={onPress}
           label={<SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>}
@@ -60,7 +61,7 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
   }
 
   return (
-    <Host style={{ zIndex: 10 }} matchContents>
+    <Host style={{ zIndex: zIndex.sticky }} matchContents>
       <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
         <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
       </SwiftUIButton>

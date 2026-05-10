@@ -11,6 +11,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import type { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { zIndex } from '@/shared/styles/tokens';
 import { Log } from '@/shared/lib/logger';
 
 // ---------------------------------------------------------------------------
@@ -417,7 +418,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     gap: 8,
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
   header: {
     flexDirection: 'row',

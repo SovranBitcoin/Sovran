@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
 import { measureInWindowAsync, rafAsync } from './measure';
 import type { HeroId, Rect, HeroRole } from './types';
+import { zIndex } from '@/shared/styles/tokens';
 
 type HeroTransitionPhase =
   | { state: 'idle' }
@@ -273,7 +274,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
             style={[
               overlayStyle,
               {
-                zIndex: 9999,
+                zIndex: zIndex.overlay,
                 borderWidth: 1,
                 borderColor: overlayBorderColor,
               },
@@ -296,7 +297,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
               style={[
                 overlayStyle,
                 {
-                  zIndex: 9999,
+                  zIndex: zIndex.overlay,
                   borderWidth: 1,
                   borderColor: overlayBorderColor,
                 },

@@ -6,6 +6,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { PrimaryBalance } from '@/features/wallet/components/PrimaryBalance';
 
 import { Log } from '@/shared/lib/logger';
+import { zIndex } from '@/shared/styles/tokens';
 
 const BALANCE_BOTTOM_INSET = 24;
 
@@ -41,7 +42,7 @@ const styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
     width: '100%',
-    zIndex: 10,
+    zIndex: zIndex.sticky,
   },
   balanceSlot: {
     flex: 1,

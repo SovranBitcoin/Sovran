@@ -11,6 +11,7 @@ import {
 import { font, foregroundStyle, frame, glassEffect, padding } from '@expo/ui/swift-ui/modifiers';
 import { StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { zIndex } from '@/shared/styles/tokens';
 import { useLiquidGlassModifiers } from '@/shared/ui/capability';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { MERCHANT_CATEGORIES, type MerchantCategoryId } from '@/shared/lib/map/categories';
@@ -62,7 +63,7 @@ export const StatsCard = memo(function StatsCard({
 
   return (
     <View style={styles.statsContainer}>
-      <Host style={{ zIndex: 10, height: 60, width: cardWidth }} matchContents>
+      <Host style={{ zIndex: zIndex.sticky, height: 60, width: cardWidth }} matchContents>
         <ContextMenu>
           <ContextMenu.Items>
             {CATEGORY_FILTERS.map((cat) => (

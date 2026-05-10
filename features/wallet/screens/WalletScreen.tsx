@@ -14,6 +14,7 @@ import { BitcoinNearYou } from '@/features/wallet/components/BitcoinNearYou';
 import { BootEntrance } from '@/shared/ui/composed/BootEntrance';
 import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
+import { zIndex } from '@/shared/styles/tokens';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { QRButton } from '@/shared/ui/composed/QRButton';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
-    zIndex: 1000,
+    zIndex: zIndex.modal,
   },
   content: {
     gap: 16,

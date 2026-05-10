@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { zIndex } from '@/shared/styles/tokens';
 import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
 import { useWhitenoise } from '../WhitenoiseContext';
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    zIndex: 10,
+    zIndex: zIndex.sticky,
     elevation: 10,
   },
   cardWrap: {

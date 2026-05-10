@@ -29,6 +29,7 @@ import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { duration, zIndex } from '@/shared/styles/tokens';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import {
   useSwapTransactionsStore,
@@ -501,7 +502,7 @@ export const Transactions = React.memo(
               size={32}
               color={opacity(foreground, 0.33)}
               spin={{
-                duration: 1000,
+                duration: duration.spin,
                 outputRange: ['0deg', '360deg'],
                 delay: 0,
                 easing: 'linear',
@@ -653,7 +654,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   content: {
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
   sectionHeader: {
     paddingHorizontal: 16,
@@ -669,13 +670,13 @@ const styles = StyleSheet.create({
   viewAllContent: {
     padding: 12,
     alignItems: 'center',
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
   emptyState: {
     paddingVertical: 48,
     paddingHorizontal: 24,
     alignItems: 'center',
     gap: 8,
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
 });

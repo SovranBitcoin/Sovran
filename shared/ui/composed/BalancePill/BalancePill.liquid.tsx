@@ -7,6 +7,7 @@ import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import BalanceDisplay from './BalanceDisplay';
 import type { BalancePillProps } from './BalancePill.types';
 import { useBalancePillDimensions } from './useBalancePillDimensions';
+import { zIndex } from '@/shared/styles/tokens';
 
 /**
  * Liquid-glass variant — wraps `<BalanceDisplay />` in a SwiftUI
@@ -45,7 +46,7 @@ export default function BalancePillLiquid({
         width: dimensions.buttonWidth,
         height: h,
       }}>
-      <Host style={{ zIndex: 10, height: h, width: dimensions.buttonWidth }} matchContents>
+      <Host style={{ zIndex: zIndex.sticky, height: h, width: dimensions.buttonWidth }} matchContents>
         <SwiftUIButton modifiers={buttonModifiers} onPress={onPress}>
           <BalanceDisplay
             {...display}

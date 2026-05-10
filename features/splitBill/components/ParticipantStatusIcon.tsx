@@ -10,6 +10,7 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import type { SplitBillParticipant } from '@/shared/stores/profile/splitBillTransactionsStore';
+import { duration } from '@/shared/styles/tokens';
 
 interface Props {
   participant: SplitBillParticipant;
@@ -34,7 +35,7 @@ export function ParticipantStatusIcon({ participant, foreground, danger, success
         name="ant-design:loading-outlined"
         size={22}
         color={opacity(foreground, 0.4)}
-        spin={{ duration: 1000, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
+        spin={{ duration: duration.spin, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
       />
     );
   }

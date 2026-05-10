@@ -35,6 +35,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { finalizeEvent } from 'nostr-tools';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
+import { alpha, duration, zIndex } from '@/shared/styles/tokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useAnimatedStyle,
@@ -142,21 +143,21 @@ function UsernameInput({
       style={[
         styles.inputContainer,
         {
-          backgroundColor: opacity(accentColor, 0.06),
-          borderColor: value.length > 0 ? opacity(accentColor, 0.65) : opacity(accentColor, 0.25),
+          backgroundColor: opacity(accentColor, alpha.faint),
+          borderColor: value.length > 0 ? opacity(accentColor, alpha.strong) : opacity(accentColor, 0.25),
         },
       ]}>
       <TextInput
         value={value}
         onChangeText={handleChange}
         placeholder="username"
-        placeholderTextColor={opacity(accentColor, 0.45)}
-        style={[styles.input, { color: opacity(foreground, 0.9) }]}
+        placeholderTextColor={opacity(accentColor, alpha.muted)}
+        style={[styles.input, { color: opacity(foreground, alpha.prominent) }]}
         autoCorrect={false}
         autoCapitalize="none"
         autoFocus
       />
-      <Text size={18} style={{ color: opacity(accentColor, 0.9) }}>
+      <Text size={18} style={{ color: opacity(accentColor, alpha.prominent) }}>
         @{selectedDomain}
       </Text>
       {isChecking && (
@@ -191,7 +192,7 @@ function DomainOption({
   const getStatusInfo = () => {
     if (!availabilityResult) return null;
     if (availabilityResult.loading)
-      return { color: opacity(foreground, 0.33), text: 'Checking...' };
+      return { color: opacity(foreground, alpha.soft), text: 'Checking...' };
     if (availabilityResult.error)
       return { color: danger, text: availabilityResult.error, icon: 'mdi:close-circle' };
     if (availabilityResult.available === true)
@@ -225,14 +226,14 @@ function DomainOption({
           <Icon
             name="mingcute:lightning-fill"
             size={16}
-            color={isSelected ? opacity(foreground, 0.4) : opacity(foreground, 0.33)}
+            color={isSelected ? opacity(foreground, 0.4) : opacity(foreground, alpha.soft)}
           />
         </View>
         <Text
           size={15}
           heavy={isSelected}
           style={{
-            color: isSelected ? opacity(foreground, 0.9) : opacity(foreground, 0.5),
+            color: isSelected ? opacity(foreground, alpha.prominent) : opacity(foreground, 0.5),
           }}>
           @{domain.label}
         </Text>
@@ -336,8 +337,8 @@ export function ClaimUsernameScreen() {
 
   useEffect(() => {
     if (!isHeroTransitioning) {
-      contentOpacity.value = withDelay(120, withTiming(1, { duration: 220 }));
-      contentTranslateY.value = withDelay(120, withTiming(0, { duration: 220 }));
+      contentOpacity.value = withDelay(120, withTiming(1, { duration: duration.quick }));
+      contentTranslateY.value = withDelay(120, withTiming(0, { duration: duration.quick }));
     } else {
       contentOpacity.value = 0;
       contentTranslateY.value = 20;
@@ -533,7 +534,7 @@ export function ClaimUsernameScreen() {
             style={[
               styles.heroCard,
               {
-                borderColor: opacity(accentColor, 0.3),
+                borderColor: opacity(accentColor, alpha.soft),
                 opacity: hero.isHidden('claimUsername', 'destination') ? 0 : 1,
                 marginTop: -topOffset,
                 paddingTop: 52 + topOffset * 2,
@@ -543,17 +544,17 @@ export function ClaimUsernameScreen() {
               accentColor={accentColor}
               backgroundColor={background}
               highlightColor={surfaceForeground}>
-              <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: 1 }}>
+              <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: zIndex.raised }}>
                 <HStack align="center" style={{ marginBottom: 14 }}>
                   <View
                     style={[styles.heroSmallIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
                     <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
                   </View>
                   <VStack style={{ flex: 1, marginLeft: 12 }}>
-                    <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
+                    <Text size={18} heavy style={{ color: opacity(foreground, alpha.prominent) }}>
                       Claim Your Address
                     </Text>
-                    <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
+                    <Text size={12} style={{ color: opacity(accentColor, alpha.strong) }}>
                       Get a memorable Lightning URL
                     </Text>
                   </VStack>
@@ -581,7 +582,7 @@ export function ClaimUsernameScreen() {
                   size={12}
                   heavy
                   style={{
-                    color: opacity(foreground, 0.33),
+                    color: opacity(foreground, alpha.soft),
                     marginLeft: 4,
                     marginBottom: 4,
                   }}>
@@ -615,7 +616,7 @@ export function ClaimUsernameScreen() {
                       { text: 'No spaces or special characters', icon: 'mdi:check' },
                     ].map((item, index) => (
                       <HStack key={index} align="center">
-                        <Icon name={item.icon} size={16} color={opacity(foreground, 0.33)} />
+                        <Icon name={item.icon} size={16} color={opacity(foreground, alpha.soft)} />
                         <Text size={13} style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
                           {item.text}
                         </Text>
@@ -639,7 +640,7 @@ export function ClaimUsernameScreen() {
                     size={11}
                     heavy
                     style={{
-                      color: opacity(foreground, 0.33),
+                      color: opacity(foreground, alpha.soft),
                       marginBottom: 8,
                       letterSpacing: 1,
                     }}>
@@ -648,7 +649,7 @@ export function ClaimUsernameScreen() {
                   <Text
                     size={18}
                     heavy
-                    style={{ color: opacity(foreground, 0.9), fontFamily: 'monospace' }}>
+                    style={{ color: opacity(foreground, alpha.prominent), fontFamily: 'monospace' }}>
                     {username}@{selectedDomainLabel}
                   </Text>
                 </View>

@@ -7,6 +7,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { zIndex } from '@/shared/styles/tokens';
 import opacity from 'hex-color-opacity';
 
 interface TabProps {
@@ -49,7 +50,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
           />
         )}
 
-        <HStack align="center" spacing={4} style={{ zIndex: 1 }}>
+        <HStack align="center" spacing={4} style={{ zIndex: zIndex.raised }}>
           <Text
             className="text-center text-sm"
             style={{
@@ -131,7 +132,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
               style={{
                 width: isScrollable ? undefined : '100%',
                 minWidth: isScrollable ? undefined : '100%',
-                zIndex: 1,
+                zIndex: zIndex.raised,
               }}>
               {tabs.map((tab, index) => (
                 <Tab

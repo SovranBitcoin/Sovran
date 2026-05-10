@@ -36,6 +36,7 @@ import type { ImageOverlayContextValue } from './types';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './provider';
 import { MemoizedMediaPagerPage } from './MediaPagerPage';
 import { OverlayDot } from './PagerDots';
+import { duration, zIndex } from '@/shared/styles/tokens';
 import {
   ImageOverlayBottomPanelContent,
   ImageOverlayBottomPanelReply,
@@ -206,13 +207,13 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   /** Fade absolute overlay bar in when sheet is closed, out when sheet opens or overlay closes. */
   useEffect(() => {
     if (!activeOverlayPost) {
-      absoluteOverlayOpacitySv.value = withTiming(0, { duration: 150 });
+      absoluteOverlayOpacitySv.value = withTiming(0, { duration: duration.instant });
       return;
     }
     if (sheetOpen) {
-      absoluteOverlayOpacitySv.value = withTiming(0, { duration: 180 });
+      absoluteOverlayOpacitySv.value = withTiming(0, { duration: duration.quick });
     } else {
-      absoluteOverlayOpacitySv.value = withTiming(1, { duration: 220 });
+      absoluteOverlayOpacitySv.value = withTiming(1, { duration: duration.quick });
     }
   }, [activeOverlayPost, sheetOpen, absoluteOverlayOpacitySv]);
 
@@ -1092,7 +1093,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
 
   return (
     <View
-      style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
+      style={[StyleSheet.absoluteFill, { zIndex: zIndex.overlay }]}
       pointerEvents={activeUrl ? 'auto' : 'none'}>
       <Animated.View style={[StyleSheet.absoluteFill, rSwipeUpWrapperStyle]}>
         <GestureDetector gesture={composed}>
@@ -1361,7 +1362,7 @@ const overlayStyles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    zIndex: 1,
+    zIndex: zIndex.raised,
     justifyContent: 'flex-end',
     backgroundColor: 'transparent',
   },
@@ -1370,13 +1371,13 @@ const overlayStyles = StyleSheet.create({
     left: 0,
     right: 0,
     top: 0,
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
   bottomPanel: {
     position: 'absolute',
     left: 0,
     right: 0,
-    zIndex: 2,
+    zIndex: zIndex.raised,
     backgroundColor: PANEL_BG,
     borderTopLeftRadius: BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,
     borderTopRightRadius: BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,
