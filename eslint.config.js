@@ -21,6 +21,11 @@ module.exports = defineConfig([
       'modules/**',
       // Tooling scripts run under Node, not the app TS project.
       'codereview/**',
+      'scripts/**',
+      // Native iOS app extension targets (widget, etc) — Swift + plist
+      // plus a `expo-target.config.js` that legitimately holds hex
+      // colors for the native side.
+      'targets/**',
       // ios/android build dirs (defensive — usually gitignored).
       'ios/**',
       'android/**',
@@ -131,6 +136,20 @@ module.exports = defineConfig([
           message:
             "Use `useWindowDimensions()` from 'react-native' inside components, or accept a `windowWidth` parameter in helpers. `Dimensions.get(...)` snapshots the viewport once and won't react to rotation, foldables, or split-screen.",
         },
+        // Hardcoded hex colors drift away from the theme system and survive
+        // theme flips (light/dark/custom palettes). Slices that kept hitting
+        // this: `kill module-scope and hardcoded colors that survive theme
+        // flips`, `consolidate raw '#F7931A' into BITCOIN_ACCENT token`,
+        // `drop hardcoded #3B82F6 in theme picker`, `replace hardcoded
+        // brand hexes with theme tokens`. Match `#RGB`, `#RGBA`, `#RRGGBB`,
+        // `#RRGGBBAA`. Exempted in the canonical color homes via the
+        // override block below.
+        {
+          selector:
+            "Literal[value=/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/]",
+          message:
+            "Hardcoded hex colors bypass the theme system. For theme-aware values use `useThemeColor` from '@/shared/hooks/useThemeColor'; for cross-theme brand constants (Bitcoin orange, BLE blue, connected green) import from '@/shared/lib/brandColors' (BITCOIN_ACCENT / BLUETOOTH_ACCENT / CONNECTED_ACCENT). If you need a new cross-theme constant, add a named export to `shared/lib/brandColors.ts` rather than inlining the hex.",
+        },
       ],
     },
     ignores: [
@@ -162,6 +181,29 @@ module.exports = defineConfig([
   //     deps to thread through the SharedValue path, out of scope here.
   {
     files: ['app/_layout.tsx', 'features/splitBill/components/ParticipantCardDeck.tsx'],
+    rules: {
+      'no-restricted-syntax': 'off',
+    },
+  },
+  // Canonical hex-color homes — these files ARE the theme/brand-token
+  // source of truth, so hex literals here are the answer, not the
+  // problem. Disabling `no-restricted-syntax` wholesale (vs. selector-
+  // by-selector) is acceptable because none of these files touch
+  // `Dimensions.get(...)` either.
+  //   - themes.ts: the theme palette table.
+  //   - shared/lib/themeEngine.ts: palette generation / OKLCH math.
+  //   - shared/lib/brandColors.ts: cross-theme brand constants
+  //     (BITCOIN_ACCENT etc).
+  //   - shared/lib/colorExtraction.ts: image-to-palette color math.
+  //   - config/backgroundImageThemes.ts: art-directed gradient stops.
+  {
+    files: [
+      'themes.ts',
+      'shared/lib/themeEngine.ts',
+      'shared/lib/brandColors.ts',
+      'shared/lib/colorExtraction.ts',
+      'config/backgroundImageThemes.ts',
+    ],
     rules: {
       'no-restricted-syntax': 'off',
     },

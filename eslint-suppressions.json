@@ -4,6 +4,11 @@
       "count": 2
     }
   },
+  "app/(drawer)/(tabs)/_layout.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
   "app/(drawer)/_layout.tsx": {
     "prettier/prettier": {
       "count": 1
@@ -16,6 +21,11 @@
   },
   "app/(split-bill-flow)/detail.tsx": {
     "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "app/(stories-flow)/_layout.tsx": {
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -169,8 +179,16 @@
       "count": 1
     }
   },
+  "config/modalScreens.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "eslint.config.js": {
     "no-undef": {
+      "count": 1
+    },
+    "prettier/prettier": {
       "count": 1
     }
   },
@@ -219,6 +237,11 @@
       "count": 2
     }
   },
+  "features/feed/components/nostr/MetricsFooter.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "features/feed/components/nostr/PostCard.tsx": {
     "prettier/prettier": {
       "count": 1
@@ -226,6 +249,24 @@
   },
   "features/feed/components/nostr/StoriesCarousel.tsx": {
     "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "features/feed/components/nostr/StoryProgressBar.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/feed/components/nostr/image-overlay/BottomPanel.tsx": {
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -245,6 +286,9 @@
     }
   },
   "features/map/screens/MapScreen.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    },
     "prettier/prettier": {
       "count": 1
     }
@@ -252,6 +296,9 @@
   "features/map/screens/MerchantDetailScreen.tsx": {
     "@typescript-eslint/no-floating-promises": {
       "count": 6
+    },
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "features/mint/components/distribution/DistributionBar.tsx": {
@@ -384,12 +431,20 @@
       "count": 1
     }
   },
+  "features/settings/screens/SettingsRoutingScreen.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
   "features/settings/screens/SettingsScreen.tsx": {
     "@typescript-eslint/no-floating-promises": {
       "count": 2
     }
   },
   "features/splitBill/components/ParticipantCard.tsx": {
+    "no-restricted-syntax": {
+      "count": 10
+    },
     "prettier/prettier": {
       "count": 1
     }
@@ -409,8 +464,21 @@
       "count": 1
     }
   },
+  "features/theme/components/UnitPreviewCard.tsx": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "features/theme/components/WallpaperThumbnail.tsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
   "features/theme/screens/GalleryScreen.tsx": {
     "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -422,6 +490,11 @@
   "features/transactions/components/SwipeableRow.tsx": {
     "@typescript-eslint/no-floating-promises": {
       "count": 2
+    }
+  },
+  "features/transactions/components/TransactionLocationSection.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "features/transactions/hooks/useHistoryWithMelts.ts": {
@@ -441,6 +514,9 @@
     "@typescript-eslint/no-floating-promises": {
       "count": 2
     },
+    "no-restricted-syntax": {
+      "count": 1
+    },
     "prettier/prettier": {
       "count": 167
     }
@@ -458,6 +534,9 @@
   "features/wallet/components/BitcoinNearYou.tsx": {
     "@typescript-eslint/no-floating-promises": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "features/whitenoise/client/network.ts": {
@@ -465,6 +544,11 @@
       "count": 1
     },
     "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "features/whitenoise/components/WhitenoiseSetupBanner.tsx": {
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -480,6 +564,9 @@
   },
   "navigation/nativeTabs.tsx": {
     "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -528,67 +615,6 @@
       "count": 29
     }
   },
-  "scripts/analyze-dark-colors.js": {
-    "no-undef": {
-      "count": 1
-    }
-  },
-  "scripts/analyze-palettes.js": {
-    "no-undef": {
-      "count": 1
-    }
-  },
-  "scripts/build-background-themes.js": {
-    "no-undef": {
-      "count": 3
-    }
-  },
-  "scripts/extract-dominant-colors.js": {
-    "no-undef": {
-      "count": 2
-    }
-  },
-  "scripts/extract-gradient-colors.js": {
-    "no-undef": {
-      "count": 2
-    }
-  },
-  "scripts/extract-image-colors.js": {
-    "no-undef": {
-      "count": 2
-    }
-  },
-  "scripts/gen-og-sovran-account.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 3
-    },
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
-  "scripts/generate-palette.js": {
-    "no-undef": {
-      "count": 1
-    }
-  },
-  "scripts/resize-screenshots.js": {
-    "no-undef": {
-      "count": 2
-    }
-  },
-  "scripts/sync-altstore.mjs": {
-    "no-undef": {
-      "count": 3
-    },
-    "prettier/prettier": {
-      "count": 6
-    }
-  },
-  "scripts/sync-screenshots.mjs": {
-    "no-undef": {
-      "count": 1
-    }
-  },
   "shared/blocks/AppGate.tsx": {
     "@typescript-eslint/no-floating-promises": {
       "count": 2
@@ -623,6 +649,16 @@
       "count": 1
     }
   },
+  "shared/blocks/transfer/TransferEntryRow.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "shared/blocks/transfer/TransferSeparator.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
   "shared/hooks/useNostrProfile.ts": {
     "@typescript-eslint/no-floating-promises": {
       "count": 1
@@ -630,6 +666,11 @@
   },
   "shared/hooks/useReservedProofs.ts": {
     "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "shared/hooks/useThemeColor.ts": {
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -668,6 +709,11 @@
       "count": 2
     }
   },
+  "shared/lib/map/categories.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
   "shared/lib/map/mapClustering.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 3
@@ -691,6 +737,9 @@
   "shared/lib/popup/ToastSlab.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "shared/lib/popup/animatedStatusShapes.ts": {
@@ -747,6 +796,9 @@
     },
     "@typescript-eslint/no-misused-promises": {
       "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
     }
   },
   "shared/providers/hero-transition/measure.ts": {
@@ -832,9 +884,22 @@
       "count": 3
     }
   },
+  "shared/ui/composed/QRButton/QRButton.android.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
   "shared/ui/composed/QRButton/QRButton.ios.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    },
     "prettier/prettier": {
       "count": 1
+    }
+  },
+  "shared/ui/composed/RowStatsAccent.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
     }
   },
   "shared/ui/composed/ScrollEdgeFade.tsx": {
@@ -847,9 +912,17 @@
       "count": 1
     }
   },
+  "shared/ui/composed/chat/ChatMessageBubble.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "shared/ui/composed/chat/LiquidChatComposer.tsx": {
     "@typescript-eslint/no-floating-promises": {
       "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
     },
     "prettier/prettier": {
       "count": 1
@@ -865,12 +938,20 @@
       "count": 1
     }
   },
+  "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "shared/ui/primitives/SelectableCheck/index.tsx": {
     "prettier/prettier": {
       "count": 1
     }
   },
   "shared/ui/primitives/Text.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    },
     "prettier/prettier": {
       "count": 2
     }
