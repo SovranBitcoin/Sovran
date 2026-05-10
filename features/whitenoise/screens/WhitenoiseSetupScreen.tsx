@@ -7,7 +7,6 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
-import { MarmotIcon } from '../components/MarmotIcon';
 
 export function WhitenoiseSetupScreen() {
   const router = useRouter();
@@ -45,7 +44,7 @@ export function WhitenoiseSetupScreen() {
   return (
     <Screen name="WhitenoiseSetupScreen" contentPadding={24} footer={bottomButtons}>
       <View style={styles.iconCircle}>
-        <MarmotIcon size={64} />
+        <Icon name="internal:whitenoise" size={64} />
       </View>
 
       <Text style={[styles.title, { color: foreground }]}>White Noise</Text>

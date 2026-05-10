@@ -6,7 +6,7 @@ import {
 } from '@/shared/ui/composed/ActionMenuButton';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
 import { useWhitenoiseSetup } from '@/features/whitenoise/hooks/useWhitenoiseSetup';
-import { MarmotIcon } from '@/features/whitenoise/components/MarmotIcon';
+import Icon from 'assets/icons';
 import { nostrLog } from '@/shared/lib/logger';
 
 type Props = {
@@ -60,7 +60,7 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
         description: whitenoiseReady
           ? 'MLS encrypted via Marmot'
           : 'Tap to set up MLS encrypted messaging',
-        iconNode: <MarmotIcon size={20} />,
+        iconNode: <Icon name="internal:whitenoise" size={20} />,
         testID: 'send-message-menu-whitenoise',
         onPress: () => {
           nostrLog.info('user.profile.send_message', {

@@ -9,7 +9,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
 import { useWhitenoise } from '../WhitenoiseContext';
-import { MarmotIcon } from './MarmotIcon';
+import Icon from 'assets/icons';
 
 /**
  * Floating call-to-action card that nudges the user to publish key
@@ -162,7 +162,7 @@ function BannerCard({
       ]}>
       <View style={styles.body}>
         <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-          <MarmotIcon size={32} />
+          <Icon name="internal:whitenoise" size={32} />
         </View>
         <View style={styles.copy}>
           <Text size={16} bold style={{ color: foreground }} numberOfLines={1}>

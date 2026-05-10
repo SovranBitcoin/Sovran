@@ -14,7 +14,7 @@ import {
 } from '@/shared/ui/composed/chat';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useWhitenoiseDM, type WhitenoiseDmMessage } from '../hooks/useWhitenoiseDM';
-import { MarmotIcon } from '../components/MarmotIcon';
+import Icon from 'assets/icons';
 
 const SURFACE = 'whitenoise' as const;
 
@@ -60,7 +60,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
         })}
         emptyContent={
           <VStack align="center" spacing={12}>
-            <MarmotIcon size={48} />
+            <Icon name="internal:whitenoise" size={48} />
             <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
               {!isClientReady
                 ? 'White Noise is not available yet.'

@@ -30,6 +30,7 @@ const ts = require('typescript');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'assets', 'icons', 'index.tsx');
+const INTERNAL_DIR = path.join(ROOT, 'assets', 'icons', 'internal');
 const OUT_DIR = path.join(ROOT, '.monicon');
 const OUT_FILE = path.join(OUT_DIR, 'icons.js');
 const API_BASE = 'https://api.iconify.design';
@@ -140,6 +141,46 @@ function formatSvg(body, viewBoxW, viewBoxH) {
   return `<svg viewBox="0 0 ${viewBoxW} ${viewBoxH}" width="1em" height="1em" >${body}</svg>`;
 }
 
+function parseInternalSvg(text, name) {
+  // Internal SVGs are authored as a single <svg viewBox="...">…body…</svg>.
+  // Strip the wrapper and lift the viewBox so we can re-emit in the same shape
+  // the iconify pipeline produces. Color must be `currentColor` so the runtime
+  // `color` prop flows through unchanged.
+  const svgMatch = text.match(/<svg\b([^>]*)>([\s\S]*)<\/svg>/i);
+  if (!svgMatch) throw new Error(`[internal:${name}] missing <svg> root`);
+  const attrs = svgMatch[1];
+  const inner = svgMatch[2].trim();
+  const viewBoxMatch = attrs.match(/viewBox\s*=\s*"([^"]+)"/i);
+  if (!viewBoxMatch) throw new Error(`[internal:${name}] missing viewBox attribute`);
+  const parts = viewBoxMatch[1].trim().split(/\s+/).map(Number);
+  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) {
+    throw new Error(`[internal:${name}] viewBox must be "minX minY width height"`);
+  }
+  return { body: inner, width: parts[2], height: parts[3] };
+}
+
+function loadInternalIcons() {
+  // Scan assets/icons/internal/*.svg. Each file's basename becomes the
+  // `internal:<basename>` registry key. Disk presence is the source of truth —
+  // no parallel allowlist to maintain.
+  if (!fs.existsSync(INTERNAL_DIR)) return [];
+  const files = fs
+    .readdirSync(INTERNAL_DIR)
+    .filter((f) => f.endsWith('.svg'))
+    .sort();
+  const entries = [];
+  for (const file of files) {
+    const name = path.basename(file, '.svg');
+    const text = fs.readFileSync(path.join(INTERNAL_DIR, file), 'utf-8');
+    const { body, width, height } = parseInternalSvg(text, name);
+    entries.push([
+      `internal:${name}`,
+      { svg: formatSvg(body, width, height), width: 16, height: 16 },
+    ]);
+  }
+  return entries;
+}
+
 function serialize(entries) {
   // Produce a stable, pretty CJS blob that matches the committed file's
   // indentation (2-space JSON with outer `module.exports = { ... }`).
@@ -167,7 +208,11 @@ function serialize(entries) {
   console.log(`Found ${icons.length} icons in ${path.relative(ROOT, SRC)}`);
 
   const byPrefix = groupByPrefix(icons);
-  console.log(`Grouped into ${byPrefix.size} prefix(es)`);
+  // The `internal:` prefix is resolved locally from
+  // assets/icons/internal/*.svg — skip it in the iconify API loop. (If the
+  // icons array doesn't list any internal:* entries, this is a no-op.)
+  byPrefix.delete('internal');
+  console.log(`Grouped into ${byPrefix.size} iconify prefix(es)`);
 
   const entries = [];
   for (const [prefix, names] of byPrefix) {
@@ -204,9 +249,22 @@ function serialize(entries) {
     }
   }
 
-  // Stable ordering: follow the source array's order, not fetch order.
+  const internalEntries = loadInternalIcons();
+  if (internalEntries.length > 0) {
+    console.log(`[internal] bundled ${internalEntries.length} custom icon(s)`);
+  }
+  entries.push(...internalEntries);
+
+  // Stable ordering: follow the source array's order for iconify entries,
+  // then internal:* alphabetically at the end (they fall through to the 1e9
+  // bucket because they aren't required to be listed in the icons array).
   const order = new Map(icons.map((name, idx) => [name, idx]));
-  entries.sort((a, b) => (order.get(a[0]) ?? 1e9) - (order.get(b[0]) ?? 1e9));
+  entries.sort((a, b) => {
+    const ao = order.get(a[0]) ?? 1e9;
+    const bo = order.get(b[0]) ?? 1e9;
+    if (ao !== bo) return ao - bo;
+    return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+  });
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(OUT_FILE, serialize(entries), 'utf-8');
