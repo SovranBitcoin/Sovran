@@ -73,6 +73,7 @@ type SemanticToken =
   | 'warning-soft-foreground'
   | 'segment'
   | 'segment-foreground'
+  | 'skeleton'
   | 'border'
   | 'separator'
   | 'separator-secondary'

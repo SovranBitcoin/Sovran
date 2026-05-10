@@ -13,6 +13,7 @@ import opacity from 'hex-color-opacity';
 import Svg, { Circle } from 'react-native-svg';
 
 import { Log } from '@/shared/lib/logger';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import Animated, {
   cancelAnimation,
@@ -176,7 +177,8 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
   const redBorder = useMemo(() => opacity(redColor, 0.32), [redColor]);
   const orangeBg = useMemo(() => opacity(orangeColor, 0.18), [orangeColor]);
   const orangeBorder = useMemo(() => opacity(orangeColor, 0.32), [orangeColor]);
-  const clockColor = useMemo(() => opacity('#FFFFFF', 0.7), []);
+  const foreground = useThemeColor('foreground');
+  const clockColor = useMemo(() => opacity(foreground, 0.7), [foreground]);
 
   return (
     <Log name="AnimatedCheckpointDot">

@@ -238,16 +238,17 @@ function AnimatedLabel({
 
 export const TransferStepChain = React.memo(
   ({ status, routingDetail, middleLabel = 'Send' }: TransferStepChainProps) => {
-    const [foreground, muted, successColor, dangerColor] = useThemeColor([
+    const [foreground, muted, successColor, dangerColor, warningColor] = useThemeColor([
       'foreground',
       'muted',
       'success',
       'danger',
+      'warning',
     ] as const);
 
     const greenColor = successColor;
     const redColor = dangerColor;
-    const orangeColor = '#fb923c';
+    const orangeColor = warningColor;
     const greyColor = muted;
     const labelColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
     const dimLabelColor = useMemo(() => opacity(foreground, 0.25), [foreground]);

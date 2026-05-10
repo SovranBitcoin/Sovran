@@ -50,10 +50,11 @@ const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KE
 
 export function MapScreen() {
   useLifecycleLogger('MapScreen');
-  const [foreground, accent, background] = useThemeColor([
+  const [foreground, accent, background, skeleton] = useThemeColor([
     'foreground',
     'accent',
     'background',
+    'skeleton',
   ] as const);
 
   // Reactive viewport dimensions — bbox math and the stats card both depend on
@@ -230,9 +231,10 @@ export function MapScreen() {
     <Log name="MapScreen" style={styles.container}>
       {/* Show a placeholder background immediately while map loads */}
       {!isMapReady && (
-        <View style={[StyleSheet.absoluteFillObject, styles.mapSkeleton]}>
+        <View
+          style={[StyleSheet.absoluteFillObject, styles.mapSkeleton, { backgroundColor: skeleton }]}>
           <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
-          <Text size={14} style={{ color: '#fff', marginTop: 16, opacity: 0.8 }}>
+          <Text size={14} style={{ color: opacity(foreground, 0.8), marginTop: 16 }}>
             Loading map...
           </Text>
         </View>
@@ -314,7 +316,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mapSkeleton: {
-    backgroundColor: '#1a1a2e',
     alignItems: 'center',
     justifyContent: 'center',
   },
