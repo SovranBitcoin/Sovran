@@ -34,6 +34,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import Icon from 'assets/icons';
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -124,7 +125,7 @@ export function SendTokenScreen({
           <View style={{ width: 1, height: 1 }} />
         </Menu.Trigger>
         <Menu.Portal>
-          <Menu.Overlay />
+          <MenuScrim />
           <Menu.Content presentation="bottom-sheet">
             <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
               Copy token

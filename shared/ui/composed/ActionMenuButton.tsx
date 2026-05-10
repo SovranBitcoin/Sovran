@@ -31,6 +31,7 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon from 'assets/icons';
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
 export interface ActionMenuVariant {
   /** Stable id — e.g. 'text' | 'emoji' | 'ecash' | 'lightning' | 'offlineEcash' | 'onchain'. */
@@ -246,7 +247,7 @@ function renderMenuPortal(
 
   return (
     <Menu.Portal>
-      <Menu.Overlay />
+      <MenuScrim />
       <Menu.Content {...contentProps}>
         {title ? (
           <Menu.Label className="text-lg font-bold text-foreground ml-3 -mt-2 mb-2">

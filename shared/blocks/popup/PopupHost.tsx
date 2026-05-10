@@ -35,6 +35,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { alpha } from '@/shared/styles/tokens';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
@@ -593,7 +594,10 @@ function SheetPopup() {
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
       <BottomSheet.Portal>
-        <BottomSheet.Overlay isCloseOnPress={standardPayload?.dismissable ?? true} />
+        <BottomSheet.Overlay
+          isCloseOnPress={standardPayload?.dismissable ?? true}
+          style={{ backgroundColor: `rgba(0,0,0,${alpha.strong})` }}
+        />
         <BottomSheet.Content
           accessible={false}
           detached={!isCustom}

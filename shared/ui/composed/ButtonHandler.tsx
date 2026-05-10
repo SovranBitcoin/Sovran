@@ -63,6 +63,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from '@/assets/icons';
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
 /**
  * Configuration for individual buttons in ButtonHandler
@@ -261,7 +262,7 @@ export function ButtonHandler({
                 <View style={{ width: 1, height: 1 }} />
               </Menu.Trigger>
               <Menu.Portal>
-                <Menu.Overlay />
+                <MenuScrim />
                 <Menu.Content presentation="bottom-sheet">
                   <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
                     Select option

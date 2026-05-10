@@ -1,21 +1,14 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
   Pressable as GesturePressable,
 } from 'react-native-gesture-handler';
-import { Platform, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { router, useSegments } from 'expo-router';
 import { DrawerContentComponentProps } from '@react-navigation/drawer';
-import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import {
-  AnimatedBackgroundView,
-  ScrollableGradientOverlay,
-} from '@/shared/ui/composed/BackgroundView';
-import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
-import { BackgroundProvider, useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -23,6 +16,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { DrawerProfileChrome } from '@/shared/blocks/DrawerProfileChrome';
+import { alpha, iconSize, radius, spacing } from '@/shared/styles/tokens';
 
 type MenuRoute =
   | '/(drawer)/(tabs)/feed'
@@ -115,14 +109,10 @@ function MenuButton({
     <GesturePressable
       disabled={isActive}
       onPress={onPress}
-      style={({ pressed }) => [styles.menuButton, pressed && { opacity: 0.6 }]}>
-      <HStack align="center" spacing={12}>
-        <Icon
-          name={isActive ? icon.selected : icon.default}
-          color={isActive ? foreground : opacity(foreground, 0.5)}
-          size={24}
-        />
-        <Text size={18} bold style={{ color: isActive ? foreground : opacity(foreground, 0.5) }}>
+      style={({ pressed }) => [styles.menuButton, pressed && { opacity: alpha.strong }]}>
+      <HStack align="center" spacing={spacing.md}>
+        <Icon name={isActive ? icon.selected : icon.default} color={foreground} size={iconSize.xl} />
+        <Text size={18} bold style={{ color: foreground }}>
           {label}
         </Text>
       </HStack>
@@ -160,70 +150,30 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
     [isRouteActive, props.navigation]
   );
 
-  return (
-    <BackgroundProvider>
-      <DrawerContentInner
-        closeDrawer={() => props.navigation.closeDrawer()}
-        isRouteActive={isRouteActive}
-        handleNavigation={handleNavigation}
-      />
-    </BackgroundProvider>
-  );
-}
-
-/** Inner component so useBackgroundContext can read the provider above. */
-function DrawerContentInner({
-  closeDrawer,
-  isRouteActive,
-  handleNavigation,
-}: {
-  closeDrawer: () => void;
-  isRouteActive: (route: MenuRoute) => boolean;
-  handleNavigation: (route: MenuRoute) => void;
-}) {
-  const { setConfig } = useBackgroundContext();
-  const muted = useThemeColor('muted');
-  const [contentHeight, setContentHeight] = useState(0);
-
-  useEffect(() => {
-    setConfig({ blurMode: 'full' });
-  }, [setConfig]);
-
-  const onContentSizeChange = useCallback((_width: number, height: number) => {
-    setContentHeight(height);
-  }, []);
+  const surface = useThemeColor('surface');
+  const closeDrawer = useCallback(() => props.navigation.closeDrawer(), [props.navigation]);
 
   return (
-    <AnimatedBackgroundView
-      showBackgroundImage={Platform.OS !== 'android'}
-      useMeshGradient={Platform.OS === 'android'}>
-      <ScrollableGradientOverlay contentHeight={contentHeight} />
-      <View style={[styles.drawerCardBorder, { borderColor: opacity(muted, 0.3) }]}>
-        <View style={styles.drawerCardClip}>
-          <BlurCardFrame accentColor={muted} variant="right">
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              style={{ flex: 1, zIndex: 1 }}
-              contentContainerStyle={styles.scrollContent}
-              onContentSizeChange={onContentSizeChange}>
-              <DrawerProfileChrome closeDrawer={closeDrawer} />
-              <VStack spacing={0} style={{ marginTop: -16 }}>
-                {MENU_ITEMS.map((item, index) => (
-                  <MenuButton
-                    key={index}
-                    icon={item.icon}
-                    label={item.label}
-                    onPress={() => handleNavigation(item.route)}
-                    isActive={isRouteActive(item.route)}
-                  />
-                ))}
-              </VStack>
-              <Spacer size={48} />
-            </ScrollView>
-          </BlurCardFrame>
-        </View>
-      </View>
-    </AnimatedBackgroundView>
+    <View style={{ flex: 1, backgroundColor: surface }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}>
+        <DrawerProfileChrome closeDrawer={closeDrawer} />
+        <VStack spacing={0}>
+          {MENU_ITEMS.map((item, index) => (
+            <MenuButton
+              key={index}
+              icon={item.icon}
+              label={item.label}
+              onPress={() => handleNavigation(item.route)}
+              isActive={isRouteActive(item.route)}
+            />
+          ))}
+        </VStack>
+        <Spacer size={spacing['4xl']} />
+      </ScrollView>
+    </View>
   );
 }
 
@@ -239,16 +189,16 @@ export default function DrawerLayout() {
           drawerStyle: {
             width: drawerWidth,
             backgroundColor: 'transparent',
-            borderTopRightRadius: 20,
-            borderBottomRightRadius: 20,
+            borderTopRightRadius: radius['2xl'],
+            borderBottomRightRadius: radius['2xl'],
             overflow: 'hidden',
           },
           sceneStyle: {
-            borderTopLeftRadius: 20,
-            borderBottomLeftRadius: 20,
+            borderTopLeftRadius: radius['2xl'],
+            borderBottomLeftRadius: radius['2xl'],
             overflow: 'hidden',
           },
-          overlayColor: 'rgba(0,0,0,0.6)',
+          overlayColor: `rgba(0,0,0,${alpha.strong})`,
           swipeEdgeWidth: 40,
           swipeMinDistance: 10,
         }}
@@ -269,23 +219,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  drawerCardBorder: {
-    flex: 1,
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-  },
-  drawerCardClip: {
-    flex: 1,
-    borderTopRightRadius: 19,
-    borderBottomRightRadius: 19,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-  },
   menuButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing['2xl'],
   },
   scrollContent: {
     flexGrow: 1,

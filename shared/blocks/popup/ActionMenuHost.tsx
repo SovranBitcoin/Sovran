@@ -36,6 +36,7 @@ import {
   type ActionMenuSection,
 } from '@/shared/lib/popup/popups/actionMenu';
 import Icon from 'assets/icons';
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
 const hostLog = log.child({ module: 'actionMenuHost' });
 
@@ -569,7 +570,7 @@ export function ActionMenuHost() {
        * which uses FWO and works fine — see `actionSheetTypes.ts`.
        */}
       <Menu.Portal disableFullWindowOverlay>
-        <Menu.Overlay />
+        <MenuScrim />
         <Menu.Content
           presentation="bottom-sheet"
           // `interactive` lifts the sheet by the keyboard height — works with

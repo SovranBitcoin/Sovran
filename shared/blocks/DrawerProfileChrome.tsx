@@ -1,13 +1,17 @@
 /**
- * Drawer profile chrome: the profile selector row + active-profile header card
- * that sits at the top of the drawer's content. Owns its own profile-domain
- * wiring (profileStore reads, profileSwitcherPopup, profileSessionOrchestrator,
- * imported-nsec persistence) so the drawer route file only orchestrates routes.
+ * Drawer profile chrome: the top-of-drawer header. A single row with the
+ * active-profile avatar on the left and the profile-switcher buttons on
+ * the right, followed by display name / handle / follow counts. Owns its
+ * own profile-domain wiring (profileStore reads, profileSwitcherPopup,
+ * profileSessionOrchestrator, imported-nsec persistence) so the drawer
+ * route file only orchestrates routes.
  */
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { nip19 } from 'nostr-tools';
+import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -20,16 +24,21 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
+import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
+import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { profileSwitcherPopup, type ProfileSwitcherAction, staticPopup } from '@/shared/lib/popup';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
+import { truncateMiddle } from '@/shared/lib/strings';
 import {
   createAndSwitchProfile,
   switchToExistingProfile,
   switchToImportedProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
+import { alpha, hitSlop, iconSize, radius, spacing } from '@/shared/styles/tokens';
 
 const DRAWER_CLOSE_SETTLE_MS = 300;
 
@@ -37,13 +46,12 @@ function waitForDrawerClose(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, DRAWER_CLOSE_SETTLE_MS));
 }
 
-function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
-  const [foreground, defaultColor, shade400] = useThemeColor([
-    'foreground',
-    'default',
-    'shade-400',
-  ] as const);
-  const profiles = useProfileStore((s) => s.profiles);
+function formatNip05Handle(nip05: string): string {
+  if (nip05.startsWith('_@')) return `@${nip05.slice(2)}`;
+  return `@${nip05}`;
+}
+
+function useProfileSwitcher(closeDrawer: () => void) {
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
   const switchingRef = useRef(false);
 
@@ -105,129 +113,183 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
     [closeDrawer, activeAccountIndex]
   );
 
-  const handleOpenProfileSheet = useCallback(() => {
+  const openSheet = useCallback(() => {
     profileSwitcherPopup({
       onRequestAction: executeProfileAction,
     });
   }, [executeProfileAction]);
 
+  return { executeProfileAction, openSheet };
+}
+
+// Container for the dots / "more profiles" button. The inactive avatar
+// pressables don't use this — they sit bare in the row.
+const dotsButtonStyle = {
+  borderRadius: radius.pill,
+  padding: 2,
+  borderWidth: 2,
+  borderColor: 'transparent',
+} as const;
+
+function ProfileSwitcherButtons({
+  executeProfileAction,
+  openSheet,
+}: {
+  executeProfileAction: (action: ProfileSwitcherAction) => Promise<void>;
+  openSheet: () => void;
+}) {
+  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
+  const profiles = useProfileStore((s) => s.profiles);
+  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+
   if (profiles.length === 0) return null;
 
   return (
-    <HStack
-      align="center"
-      spacing={4}
-      style={{
-        marginBottom: 16,
-        paddingHorizontal: 4,
-        paddingVertical: 4,
-        borderRadius: 20,
-        justifyContent: 'flex-end',
-      }}>
+    <HStack align="center" spacing={spacing.md}>
       {profiles
         .filter((profile: ProfileEntry) => profile.accountIndex !== activeAccountIndex)
         .sort((a, b) => (a.source === 'imported' ? 0 : 1) - (b.source === 'imported' ? 0 : 1))
-        .slice(0, 3)
-        .map((profile: ProfileEntry) => {
-          const isActive = profile.accountIndex === activeAccountIndex;
-          return (
-            <Pressable
-              key={profile.accountIndex}
-              onPress={() => {
-                if (profile.accountIndex === activeAccountIndex) return;
-                void executeProfileAction({
-                  type: 'switch',
-                  accountIndex: profile.accountIndex,
-                });
-              }}
-              style={[
-                profileAvatarButtonStyle,
-                isActive && {
-                  borderColor: shade400,
-                  borderWidth: 2,
-                },
-              ]}>
-              <Avatar
-                state={profile.cachedPicture ? 'image' : 'fallback'}
-                seed={profile.pubkey}
-                picture={profile.cachedPicture}
-                name={resolveIdentityName({
-                  pubkey: profile.pubkey,
-                  overrideName: profile.cachedDisplayName,
-                })}
-                size={30}
-              />
-            </Pressable>
-          );
-        })}
+        .slice(0, 2)
+        .map((profile: ProfileEntry) => (
+          <Pressable
+            key={profile.accountIndex}
+            onPress={() => {
+              void executeProfileAction({
+                type: 'switch',
+                accountIndex: profile.accountIndex,
+              });
+            }}>
+            <Avatar
+              state={profile.cachedPicture ? 'image' : 'fallback'}
+              seed={profile.pubkey}
+              picture={profile.cachedPicture}
+              name={resolveIdentityName({
+                pubkey: profile.pubkey,
+                overrideName: profile.cachedDisplayName,
+              })}
+              size={30}
+            />
+          </Pressable>
+        ))}
       <Pressable
-        onPress={handleOpenProfileSheet}
+        onPress={openSheet}
         style={[
-          profileAvatarButtonStyle,
-          {
-            borderColor: defaultColor,
-            borderWidth: 2,
-            backgroundColor: defaultColor,
-          },
+          dotsButtonStyle,
+          { borderColor: defaultColor, backgroundColor: defaultColor },
         ]}>
-        <Icon name="tabler:dots" size={24} color={foreground} />
+        <Icon name="tabler:dots" size={iconSize.xl} color={foreground} />
       </Pressable>
     </HStack>
   );
 }
 
-const profileAvatarButtonStyle = {
-  borderRadius: 18,
-  padding: 2,
-  borderWidth: 2,
-  borderColor: 'transparent',
-  backgroundColor: 'rgba(255,255,255,0.05)',
-} as const;
-
 export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }) {
   const { keys: nostrKeys } = useNostrKeysContext();
   const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
-  const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
-  const { isOffline } = useOfflineStatus();
-
-  const handlePress = useCallback(() => {
-    if (nostrKeys?.pubkey) {
-      closeDrawer();
-      router.navigate({
-        pathname: '/(user-flow)/profile',
-        params: {
-          pubkey: nostrKeys.pubkey,
-        },
-      });
+  const pubkey = nostrKeys?.pubkey ?? '';
+  const { displayName, picture } = useProfileDisplay(pubkey);
+  const { metadata, isLoading: metaLoading } = useNostrProfileMetadata(pubkey || undefined);
+  const { data: socialData, isLoading: socialLoading } = useNostrProfile(pubkey || null);
+  // Mirror UserProfileScreen: own following count comes from the local kind-3
+  // contacts store (with optimistic adjustments), not from the backend's
+  // `follows` field — the backend's view of the wallet's own follows can lag.
+  const ownFollowingCount = useNostrSocialStore((state) => {
+    let count = Object.keys(state.followingPubkeys).length;
+    for (const [followedPubkey, optimistic] of Object.entries(state.optimisticFollowsByPubkey)) {
+      const baseIsFollowing = !!state.followingPubkeys[followedPubkey];
+      if (optimistic.value === baseIsFollowing) continue;
+      count += optimistic.value ? 1 : -1;
     }
+    return Math.max(0, count);
+  });
+  const { isOffline } = useOfflineStatus();
+  const { executeProfileAction, openSheet } = useProfileSwitcher(closeDrawer);
+
+  const handleLine = useMemo(() => {
+    if (metadata?.nip05) return formatNip05Handle(metadata.nip05);
+    if (pubkey) return truncateMiddle(nip19.npubEncode(pubkey), 8);
+    return '';
+  }, [metadata?.nip05, pubkey]);
+
+  const mutedColor = opacity(foreground, alpha.disabled);
+
+  const handleAvatarPress = useCallback(() => {
+    if (!nostrKeys?.pubkey) return;
+    closeDrawer();
+    router.navigate({
+      pathname: '/(user-flow)/profile',
+      params: { pubkey: nostrKeys.pubkey },
+    });
   }, [nostrKeys, closeDrawer]);
 
+  if (!nostrKeys?.pubkey) {
+    return <View style={{ paddingTop: isOffline ? 0 : insets.top }} />;
+  }
+
   return (
-    <View style={{ padding: 16, paddingTop: isOffline ? 0 : insets.top }}>
-      <View style={{ backgroundColor: 'transparent' }}>
-        <ProfileSelector closeDrawer={closeDrawer} />
-        <Pressable style={{ alignItems: 'center' }} onPress={handlePress}>
-          {nostrKeys?.pubkey && (
-            <VStack align="center" spacing={16}>
-              <Avatar
-                state={picture ? 'image' : 'fallback'}
-                seed={nostrKeys?.pubkey}
-                picture={picture}
-                name={displayName}
-                size={64}
-              />
-              <VStack align="center" spacing={8}>
-                <Text bold size={20} style={{ textAlign: 'center', color: foreground }}>
-                  {displayName}
-                </Text>
-                <Icon size={42} name="stash:qr-code" color={foreground} />
-              </VStack>
-            </VStack>
-          )}
+    <View
+      style={{
+        paddingHorizontal: spacing['2xl'],
+        paddingTop: (isOffline ? 0 : insets.top) + spacing.sm,
+        paddingBottom: spacing.lg,
+      }}>
+      <HStack align="flex-start" justify="space-between">
+        <Pressable onPress={handleAvatarPress} hitSlop={hitSlop.default}>
+          <Avatar
+            state={picture ? 'image' : 'fallback'}
+            seed={nostrKeys.pubkey}
+            picture={picture}
+            name={displayName}
+            size={56}
+          />
         </Pressable>
-      </View>
-      <Spacer size={58} />
+        <ProfileSwitcherButtons
+          executeProfileAction={executeProfileAction}
+          openSheet={openSheet}
+        />
+      </HStack>
+      <Spacer size={spacing.md} />
+      <Pressable onPress={handleAvatarPress}>
+        <VStack align="flex-start" spacing={spacing.xs}>
+          <Text bold size={20} style={{ color: foreground }}>
+            {displayName}
+          </Text>
+          <Text
+            size={14}
+            loading={metaLoading && !handleLine}
+            placeholder="npub1abcdef…xyz"
+            style={{ color: mutedColor }}
+            numberOfLines={1}>
+            {handleLine}
+          </Text>
+        </VStack>
+      </Pressable>
+      <Spacer size={spacing.md} />
+      <HStack align="center" spacing={spacing.lg}>
+        <HStack align="baseline" spacing={spacing.xs}>
+          <Text bold size={14} style={{ color: foreground }}>
+            {ownFollowingCount.toLocaleString()}
+          </Text>
+          <Text size={14} style={{ color: mutedColor }}>
+            Following
+          </Text>
+        </HStack>
+        <HStack align="baseline" spacing={spacing.xs}>
+          <Text
+            bold
+            size={14}
+            loading={socialLoading && !socialData}
+            placeholder="0000"
+            style={{ color: foreground }}>
+            {socialData ? socialData.followers.toLocaleString() : ''}
+          </Text>
+          <Text size={14} style={{ color: mutedColor }}>
+            Followers
+          </Text>
+        </HStack>
+      </HStack>
+      <Spacer size={spacing.lg} />
     </View>
   );
 }
