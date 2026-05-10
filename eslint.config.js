@@ -207,6 +207,23 @@ module.exports = defineConfig([
           message:
             "Hardcoded hex colors bypass the theme system. For theme-aware values use `useThemeColor` from '@/shared/hooks/useThemeColor'; for cross-theme brand constants (Bitcoin orange, BLE blue, connected green) import from '@/shared/lib/brandColors' (BITCOIN_ACCENT / BLUETOOTH_ACCENT / CONNECTED_ACCENT). If you need a new cross-theme constant, add a named export to `shared/lib/brandColors.ts` rather than inlining the hex.",
         },
+        // `Linking.openURL(raw)` from `react-native` accepts any string —
+        // `javascript:`, `file:`, `intent:`, custom schemes — and opens
+        // whatever the OS resolves it to. When `raw` comes from
+        // untrusted input (BTCMap merchant fields, mint-operator contact
+        // metadata, Nostr relay note content, etc.) this is a privilege-
+        // escalation surface. Slice: `fix(security): scheme-validate
+        // untrusted Linking.openURL inputs`. Use `openExternalUrl(raw)`
+        // from `@/shared/lib/url`, which enforces an http/https/mailto/tel
+        // allowlist and returns a `ResultAsync` so failures (denied
+        // scheme, malformed URL, OS rejection) surface instead of being
+        // silently swallowed.
+        {
+          selector:
+            "CallExpression[callee.object.name='Linking'][callee.property.name='openURL']",
+          message:
+            "Use `openExternalUrl(raw)` from '@/shared/lib/url'. It enforces an http/https/mailto/tel scheme allowlist and returns a `ResultAsync` so rejection paths surface. Raw `Linking.openURL` opens any scheme the OS recognises — `javascript:`, `file:`, `intent:` — which is a privilege-escalation surface for untrusted input.",
+        },
         // `Date#toLocaleDateString` / `Date#toLocaleTimeString` bypass the
         // canonical date pipeline in `shared/lib/date.ts` (rule:
         // `__rules__/dates.md`). The shared `formatDate(input, style)` and
@@ -281,6 +298,16 @@ module.exports = defineConfig([
     files: ['shared/lib/loggerCore.ts', 'app.config.js', 'polyfills.js'],
     rules: {
       'no-console': 'off',
+    },
+  },
+  // `openExternalUrl` lives in shared/lib/url.ts — the wrapper IS the
+  // legitimate caller of raw `Linking.openURL`. It does the scheme-
+  // allowlist check first, then forwards. Only that one file is allowed
+  // to break the rule above.
+  {
+    files: ['shared/lib/url.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
     },
   },
   // Canonical hex-color homes — these files ARE the theme/brand-token

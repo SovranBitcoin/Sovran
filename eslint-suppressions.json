@@ -187,6 +187,9 @@
   "eslint.config.js": {
     "no-undef": {
       "count": 1
+    },
+    "prettier/prettier": {
+      "count": 1
     }
   },
   "expo-env.d.ts": {
@@ -211,6 +214,11 @@
   },
   "features/bitchat/hooks/useLocationTiers.ts": {
     "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "features/camera/hooks/useHandleCameraPermission.ts": {
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -373,6 +381,9 @@
     "@typescript-eslint/no-floating-promises": {
       "count": 2
     },
+    "no-restricted-syntax": {
+      "count": 1
+    },
     "prettier/prettier": {
       "count": 2
     }
@@ -435,6 +446,9 @@
   },
   "features/settings/screens/SettingsScreen.tsx": {
     "@typescript-eslint/no-floating-promises": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
       "count": 2
     }
   },
