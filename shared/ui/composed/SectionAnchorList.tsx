@@ -138,6 +138,14 @@ interface SectionAnchorListProps<T> {
    * own inset. Merged with this component's own paddingTop/paddingBottom.
    */
   listContentContainerStyle?: StyleProp<ViewStyle>;
+  /**
+   * External state that affects how rows render but isn't part of `sections`.
+   * LegendList recycles rows; with `recycleItems` on, it skips re-invoking
+   * `renderItem` for already-mounted rows when the `data` ref is unchanged.
+   * Pass anything that should force a re-render here (selection sets,
+   * filter flags, etc.) — same convention as FlatList / FlashList.
+   */
+  extraData?: unknown;
 }
 
 const PROGRAMMATIC_SCROLL_SUPPRESS_MS = 400;
@@ -166,6 +174,7 @@ export function SectionAnchorList<T>({
   estimatedItemSize = 60,
   estimatedHeaderSize = 0,
   listContentContainerStyle,
+  extraData,
 }: SectionAnchorListProps<T>) {
   // Track render count + per-render timing so a stress run shows up as
   // either lots of renders (state churn) or as a slow single render
@@ -491,6 +500,7 @@ export function SectionAnchorList<T>({
           getItemType={getItemType}
           getEstimatedItemSize={getEstimatedItemSize}
           recycleItems
+          extraData={extraData}
           // Tuned down from 250 → 150 after a stress test showed that
           // continuous fast scroll across many sections caused 6s+ JS
           // thread blocks: the bigger the over-render buffer, the more

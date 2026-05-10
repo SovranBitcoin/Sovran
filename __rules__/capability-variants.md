@@ -18,7 +18,7 @@ export const CapsuleButton = defineVariants<CapsuleButtonProps>('CapsuleButton',
 - Layout: `Component/{Name}.{liquid,blur,flat}.tsx` + `index.ios.ts` (all variants) + `index.android.ts` (flat only — keeps `@expo/ui/swift-ui` off the Android bundle).
 - `flat` is required (TS-enforced floor). `liquid`/`blur` are optional.
 - Variant files MUST NOT include their own `<Log name>` — `defineVariants` adds it.
-- For prop-gated dispatch (e.g. `liquid` is a per-call prop), use the **selector overload**: `defineVariants(name, (caps, props) => Component)`.
+- For prop-gated dispatch (e.g. `liquid` is a per-call prop), use the **selector overload**: `defineVariants(name, (caps, props) => Component)`. Reserve this for axes that combine a per-call prop with a real device capability — for a pure design axis with no capability dimension, use a plain inline switch (see `SelectableCheck`). `defineVariants` always wraps in `<Log>` and runs `extractVisibleContent` on every render; that's worth paying for capability dispatch but pure overhead in a hot list-row primitive.
 
 ## 2. Inline — `useCapabilities()`
 

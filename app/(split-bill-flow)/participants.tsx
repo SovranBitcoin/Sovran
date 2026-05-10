@@ -311,6 +311,7 @@ export default function SplitBillParticipantsScreen() {
           sections={anchorSections}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          extraData={selectedIds}
           aboveAnchors={
             <HistoryEntryHeader pendingData={{ amount: totalAmount, unit, type: 'receive' }} />
           }

@@ -24,7 +24,7 @@ import type { MintListItem } from 'coco-payment-ux';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Checkbox } from '@/shared/ui/primitives/Checkbox';
+import { SelectableCheck } from '@/shared/ui/primitives/SelectableCheck';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -703,28 +703,13 @@ export function ContactRow({
   const chevronNode = <Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />;
 
   const selectionNode = selectable ? (
-    selectionVariant === 'checkbox' ? (
-      <Checkbox
-        checked={selected}
-        onCheckedChange={() => onToggle?.()}
-        size={24}
-        variant="success"
-      />
-    ) : (
-      <View
-        style={{
-          width: 24,
-          height: 24,
-          borderRadius: 12,
-          borderWidth: 1.5,
-          borderColor: selected ? accent : opacity(foreground, 0.25),
-          backgroundColor: selected ? accent : 'transparent',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        {selected ? <Icon name="mdi:check" size={16} color="#FFFFFF" /> : null}
-      </View>
-    )
+    <SelectableCheck
+      style={selectionVariant === 'checkbox' ? 'square' : 'circle'}
+      selected={selected ?? false}
+      onChange={selectionVariant === 'checkbox' ? () => onToggle?.() : undefined}
+      size={24}
+      variant="success"
+    />
   ) : null;
 
   const inspectNode = onInspectPress ? (
