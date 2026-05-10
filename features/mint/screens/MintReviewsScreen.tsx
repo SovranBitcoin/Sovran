@@ -21,6 +21,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 import { useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { formatDate } from '@/shared/lib/date';
 
 const ParamsSchema = z.object({
   mintUrl: z
@@ -74,11 +75,7 @@ const ReviewItem = React.memo(function ReviewItem({
   const { displayName } = useIdentityName(review.pubkey);
 
   const formattedDate = review.created_at
-    ? new Date(review.created_at * 1000).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
+    ? formatDate(review.created_at * 1000, 'short-date')
     : null;
 
   return (

@@ -24,7 +24,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { formatDate } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
 import { log, Log } from '@/shared/lib/logger';
@@ -319,7 +319,9 @@ export const Transactions = React.memo(
       const t0 = performance.now();
       const createSections = (items: TimelineItem[], prefix: string) => {
         // Group by date string for display, but keep track of the original date for sorting
-        const groupedByDate = _.groupBy(items, (item) => formatDate(getTimelineCreatedAt(item)));
+        const groupedByDate = _.groupBy(items, (item) =>
+          formatDate(getTimelineCreatedAt(item), 'long-date')
+        );
 
         // Create an array of {dateString, originalDate} pairs for proper sorting
         const dateEntries = Object.keys(groupedByDate).map((dateString) => {

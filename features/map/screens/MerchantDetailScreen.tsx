@@ -28,6 +28,7 @@ import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
+import { formatDate } from '@/shared/lib/date';
 
 const ParamsSchema = z.object({
   placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
@@ -132,13 +133,7 @@ export function MerchantDetailScreen() {
   const instagram = place?.['osm:contact:instagram'] || place?.instagram;
   const twitter = place?.['osm:contact:twitter'] || place?.twitter;
 
-  const verifiedDate = place?.verified_at
-    ? new Date(place.verified_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    : null;
+  const verifiedDate = place?.verified_at ? formatDate(place.verified_at, 'short-date') : null;
 
   const contactItems = useMemo(() => {
     const items: { method: string; info: string; icon: string; fullInfo?: string }[] = [];
@@ -344,7 +339,7 @@ export function MerchantDetailScreen() {
 
         <View style={styles.sourceInfo}>
           <Text size={11} style={{ color: defaultColor, textAlign: 'center' }}>
-            Data from BTCMap.org • Last updated {new Date(place.updated_at).toLocaleDateString()}
+            Data from BTCMap.org • Last updated {formatDate(place.updated_at, 'short-date')}
           </Text>
         </View>
       </ScrollView>

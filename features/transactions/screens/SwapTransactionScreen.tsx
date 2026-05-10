@@ -44,7 +44,7 @@ import {
   TransferCard,
   TransferErrorBanner,
 } from '@/shared/blocks/transfer';
-import { convertTime } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import { formatAmount } from '@/shared/lib/currency';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintManagement } from '@/features/mint';
@@ -139,7 +139,7 @@ function buildSwapEntryRowProps(
     amount: historyEntry.amount,
     unit: historyEntry.unit,
     subtitle: historyEntry.createdAt
-      ? convertTime(new Date(historyEntry.createdAt))
+      ? formatDate(historyEntry.createdAt, 'short-date-time')
       : 'Unconfirmed',
     secondarySubtitle: fiatAmount,
     onPress: handlePress,
@@ -574,7 +574,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                 : []),
               {
                 title: 'Date',
-                value: convertTime(new Date(group.createdAt)),
+                value: formatDate(group.createdAt, 'short-date-time'),
               },
             ]}
           />

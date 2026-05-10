@@ -6,7 +6,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { formatChatTimestamp } from './formatChatTimestamp';
+import { formatRelative } from '@/shared/lib/date';
 import { CashuTokenBubble } from './CashuTokenBubble';
 import type { ChatBubbleMessage } from './types';
 
@@ -142,7 +142,7 @@ export function ChatMessageBubble({
               spacing={4}
               style={{ alignSelf: message.isOwn ? 'flex-end' : 'flex-start', marginTop: 2 }}>
               <Text size={11} style={{ color: shade400 }}>
-                {formatChatTimestamp(message.timestamp)}
+                {formatRelative(message.timestamp, 'chat-bubble')}
               </Text>
               {message.isOwn && message.deliveryStatus ? (
                 <Icon

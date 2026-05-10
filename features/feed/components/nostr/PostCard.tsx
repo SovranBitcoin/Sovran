@@ -21,7 +21,7 @@ import Reanimated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
-import { formatTimestamp } from './feedFormat';
+import { formatDate, formatRelative } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
 import { NoteContent } from './NoteContent';
 import { MetricsFooter } from './MetricsFooter';
@@ -98,7 +98,7 @@ export const PostCard = React.memo(function PostCard({
   // `fallback` prop so the name never flashes through a pubkey placeholder.
   const displayName = profile?.name;
   const nameFallback = `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
-  const shortTime = event.created_at ? formatTimestamp(event.created_at) : '';
+  const shortTime = event.created_at ? formatRelative(event.created_at * 1000, 'compact') : '';
 
   const isTarget = variant === 'thread-target';
   const isThread = variant === 'thread-reply';
@@ -174,13 +174,7 @@ export const PostCard = React.memo(function PostCard({
   // ── Thread target: stacked layout (no gutter) ──
   if (isTarget) {
     const fullDate = event.created_at
-      ? new Date(event.created_at * 1000).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-        })
+      ? formatDate(event.created_at * 1000, 'short-date-time')
       : '';
     const truncatedNpub = `${tryNpubEncode(event.pubkey).slice(0, 16)}…`;
 

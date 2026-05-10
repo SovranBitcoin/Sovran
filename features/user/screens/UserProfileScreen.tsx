@@ -53,7 +53,7 @@ import {
   type TopFollower,
 } from '@/shared/hooks/useNostrProfile';
 import { UserFeed } from '@/features/feed';
-import { formatDate } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -712,7 +712,7 @@ export function UserProfileScreen() {
 
   const followerCount = profileData?.followers;
   const reputationScore = profileData?.score;
-  const joinedDate = formatDate((profileData?.created_at || 0) * 1000);
+  const joinedDate = formatDate((profileData?.created_at || 0) * 1000, 'long-date');
 
   const latestContactListEvent = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;

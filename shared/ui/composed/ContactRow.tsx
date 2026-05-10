@@ -42,7 +42,7 @@ import {
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatCompact } from '@/shared/lib/number';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { relativeTime } from '@/shared/lib/time';
+import { formatRelative } from '@/shared/lib/date';
 import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 
 // ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ function deriveSubtitle(ids: Identity[]): string | undefined {
     if (ble.isConnected === undefined) return undefined;
     const suffix = ble.isConnected
       ? 'connected'
-      : `seen ${typeof ble.lastSeen === 'number' ? relativeTime(ble.lastSeen) : 'recently'}`;
+      : `seen ${typeof ble.lastSeen === 'number' ? formatRelative(ble.lastSeen, 'verbose') : 'recently'}`;
     return `#${ble.peerID.slice(0, 8)} · ${suffix}`;
   }
   const geohash = find(ids, 'geohash');
@@ -548,7 +548,7 @@ function buildStats(
             value: ble.isConnected
               ? 'Connected'
               : typeof ble.lastSeen === 'number'
-                ? relativeTime(ble.lastSeen)
+                ? formatRelative(ble.lastSeen, 'verbose')
                 : 'Offline',
             color: ble.isConnected ? CONNECTED_ACCENT : STAT_COLOR_SOCIAL,
           });

@@ -23,7 +23,7 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ContentSegment, FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
 import { parseContent, prettifyUrl, tryNpubEncode } from './feedParse';
-import { formatTimestamp } from './feedFormat';
+import { formatRelative } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
 
 const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
@@ -316,7 +316,7 @@ const QuotedPostCard = React.memo(function QuotedPostCard({
     );
   }
 
-  const timestamp = event.created_at ? formatTimestamp(event.created_at) : '';
+  const timestamp = event.created_at ? formatRelative(event.created_at * 1000, 'compact') : '';
   const profile = profiles.get(event.pubkey);
   const displayName = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
 

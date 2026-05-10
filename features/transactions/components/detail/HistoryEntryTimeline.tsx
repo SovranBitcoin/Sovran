@@ -21,7 +21,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { convertTime } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import {
   meltQuoteExpired,
   getMeltQuoteTimeUntilExpiry,
@@ -328,7 +328,7 @@ export function HistoryEntryTimeline({
                     </Text>
                     {item.timestamp && (
                       <Text size={13} style={{ color: foreground66 }}>
-                        {convertTime(new Date(item.timestamp))}
+                        {formatDate(item.timestamp, 'iso')}
                       </Text>
                     )}
                     {item.info && (

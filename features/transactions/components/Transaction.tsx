@@ -26,7 +26,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
-import { convertTime } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
@@ -264,7 +264,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
             <HStack align="center" spacing={4}>
               <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
                 {historyEntry?.createdAt
-                  ? convertTime(new Date(historyEntry.createdAt))
+                  ? formatDate(historyEntry.createdAt, 'short-date-time')
                   : 'Unconfirmed'}
               </UntranslatedText>
               {transactionSource && (

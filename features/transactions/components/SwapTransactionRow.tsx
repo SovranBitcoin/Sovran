@@ -8,7 +8,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { convertTime } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import type { SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
@@ -61,7 +61,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
 
             <HStack justify="space-between" align="center">
               <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
-                {convertTime(new Date(group.createdAt))}
+                {formatDate(group.createdAt, 'short-date-time')}
               </UntranslatedText>
               <UntranslatedText bold size={10} color={opacity(foreground, 0.8)}>
                 {group.legs.length} {group.legs.length === 1 ? 'step' : 'steps'}

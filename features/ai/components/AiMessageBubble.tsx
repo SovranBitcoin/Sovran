@@ -10,7 +10,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { popup } from '@/shared/lib/popup';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { formatChatTimestamp } from '@/shared/ui/composed/chat';
+import { formatRelative } from '@/shared/lib/date';
 import {
   useStreamingContent,
   useStreamingReasoning,
@@ -219,7 +219,7 @@ function UserBubble({ message }: { message: RoutstrMessage }) {
       </View>
       <HStack align="center" spacing={4} style={{ marginRight: 4, marginBottom: 4 }}>
         <Text size={11} style={{ color: shade400 }}>
-          {formatChatTimestamp(message.timestamp)}
+          {formatRelative(message.timestamp, 'chat-bubble')}
         </Text>
         <Icon
           name={isSending ? 'ant-design:loading-outlined' : 'simple-line-icons:check'}

@@ -15,7 +15,8 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { formatTimestamp, formatCount, formatSats } from '../feedFormat';
+import { formatRelative } from '@/shared/lib/date';
+import { formatCount, formatSats } from '../feedFormat';
 import { parseContent } from '../feedParse';
 import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
@@ -204,7 +205,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   }, [initialContentExpanded, onConsumedExpand]);
   const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
-  const shortTime = formatTimestamp(event.created_at);
+  const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
 
   const { blocks, showInlineImages } = useMemo(() => {
@@ -382,7 +383,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   const repostedColor = useThemeColor('success');
   const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
-  const shortTime = formatTimestamp(event.created_at);
+  const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
   const contentPreview = fullContent.slice(0, 120);
   const contentTruncated = fullContent.length > 120;
