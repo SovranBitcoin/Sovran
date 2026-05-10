@@ -179,6 +179,25 @@ module.exports = defineConfig([
               message:
                 "Import { Pressable } from '@/shared/ui/primitives/Pressable' instead. The shared primitive auto-guards onPress against rapid double-tap re-entry; importing the raw RN names bypasses that guard. The legacy `TouchableOpacity` shape is preserved via Pressable's `activeOpacity` prop.",
             },
+            // Legacy `Animated` runs on the JS thread (driver: false) or
+            // the UI thread via a serialised native driver (driver: true)
+            // — either way it can't worklet-link to gestures or shared
+            // values, can't interpolate colours, and is significantly
+            // slower than Reanimated v4. Slice:
+            // `refactor(animation): migrate three feature screens from
+            // legacy RN Animated to Reanimated v4`. Use the
+            // `react-native-reanimated` API (`useSharedValue`,
+            // `useAnimatedStyle`, `withTiming`, `withSpring`, etc).
+            //
+            // `Easing` from `react-native` is also blocked because it
+            // pairs with Animated; Reanimated ships its own `Easing` at
+            // `react-native-reanimated`.
+            {
+              name: 'react-native',
+              importNames: ['Animated', 'Easing'],
+              message:
+                "Use `react-native-reanimated` (Reanimated v4): `useSharedValue`, `useAnimatedStyle`, `withTiming`, `withSpring`, `Easing`. Legacy `Animated` from 'react-native' runs JS-thread (or via a serialised native driver) — it can't worklet-link to gestures, can't interpolate colours, and is materially slower than Reanimated.",
+            },
           ],
         },
       ],

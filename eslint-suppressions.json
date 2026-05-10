@@ -37,6 +37,9 @@
   "assets/icons/index.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
+    },
+    "no-restricted-imports": {
+      "count": 1
     }
   },
   "coco-payment-ux/__tests__/_harness/createTestMachine.ts": {
@@ -263,6 +266,11 @@
   "features/feed/components/nostr/StoryProgressBar.tsx": {
     "no-restricted-syntax": {
       "count": 1
+    }
+  },
+  "features/feed/components/nostr/easeGradient.ts": {
+    "no-restricted-imports": {
+      "count": 2
     }
   },
   "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": {
@@ -850,6 +858,11 @@
       "count": 1
     }
   },
+  "shared/ui/composed/AmountFormatter.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
   "shared/ui/composed/BalancePill/BalancePill.liquid.tsx": {
     "prettier/prettier": {
       "count": 1
@@ -921,6 +934,11 @@
       "count": 1
     }
   },
+  "shared/ui/composed/SpriteView.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
   "shared/ui/composed/chat/ChatMessageBubble.tsx": {
     "no-restricted-syntax": {
       "count": 1
@@ -944,6 +962,11 @@
   },
   "shared/ui/primitives/Avatar.tsx": {
     "@typescript-eslint/no-floating-promises": {
+      "count": 1
+    }
+  },
+  "shared/ui/primitives/Button.tsx": {
+    "no-restricted-imports": {
       "count": 1
     }
   },
