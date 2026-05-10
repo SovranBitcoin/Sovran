@@ -224,9 +224,31 @@ module.exports = defineConfig([
           paths: [
             {
               name: 'react-native',
-              importNames: ['Pressable', 'TouchableOpacity'],
+              importNames: [
+                'Pressable',
+                'TouchableOpacity',
+                'TouchableHighlight',
+                'TouchableWithoutFeedback',
+              ],
               message:
-                "Import { Pressable } from '@/shared/ui/primitives/Pressable' instead. The shared primitive auto-guards onPress against rapid double-tap re-entry; importing the raw RN names bypasses that guard. The legacy `TouchableOpacity` shape is preserved via Pressable's `activeOpacity` prop.",
+                "Import { Pressable } from '@/shared/ui/primitives/Pressable' instead. The shared primitive auto-guards onPress against rapid double-tap re-entry; importing the raw RN tap primitives bypasses that guard. `TouchableOpacity`'s opacity behaviour is preserved via Pressable's `activeOpacity` prop; `TouchableHighlight` / `TouchableWithoutFeedback` map to Pressable with `unstable_pressDelay` / a no-op highlight.",
+            },
+            // Legacy clipboard libraries. The canonical home for
+            // clipboard reads/writes is `expo-clipboard`, which handles
+            // both platforms uniformly and integrates with the secure-
+            // copy permission flow. Slice: `redact bearer instruments +
+            // geolocation from storage dump and swap legacy clipboard`.
+            // Currently no call sites — pure regression guard against a
+            // future install of the deprecated package.
+            {
+              name: '@react-native-community/clipboard',
+              message:
+                "Use `expo-clipboard` instead. The community package is deprecated and doesn't integrate with the project's secure-copy permission flow.",
+            },
+            {
+              name: '@react-native-clipboard/clipboard',
+              message:
+                "Use `expo-clipboard` instead. The community package is deprecated and doesn't integrate with the project's secure-copy permission flow.",
             },
             // Legacy `Animated` runs on the JS thread (driver: false) or
             // the UI thread via a serialised native driver (driver: true)
