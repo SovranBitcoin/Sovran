@@ -3,8 +3,74 @@ const expoConfig = require('eslint-config-expo/flat');
 const eslintPluginPrettierRecommended = require('eslint-plugin-prettier/recommended');
 
 module.exports = defineConfig([
+  // Global ignores — apply to every config below. Listed first because a
+  // flat-config block with only `ignores` (no `files`) is treated as a
+  // global ignore by ESLint v9.
+  {
+    ignores: [
+      'dist/**',
+      // Vendored build output (`@internet-privacy/marmot-ts` is a file-dep
+      // pointing at vendor/marmot-ts/dist).
+      'vendor/**',
+      // Compiled package output. `packages/*/src` stays in scope.
+      'packages/*/lib/**',
+      // coco-payment-ux is a file-dep with its own docs site (Vitepress) +
+      // vendored reference apps. `src/` and `__tests__/` are still linted.
+      'coco-payment-ux/docs/**',
+      // Native module subprojects — not part of the JS lint surface.
+      'modules/**',
+      // Tooling scripts run under Node, not the app TS project.
+      'codereview/**',
+      // ios/android build dirs (defensive — usually gitignored).
+      'ios/**',
+      'android/**',
+      // Subagent skill template files — outside the TS project, parser
+      // can't resolve them. Not part of the runtime surface.
+      '.agents/**',
+    ],
+  },
   expoConfig,
   eslintPluginPrettierRecommended,
+  // Type-aware linting for the TS/TSX project. `projectService: true` lets
+  // typescript-eslint pick up `tsconfig.json` without us hand-maintaining a
+  // `parserOptions.project` array. Required for any rule that needs type
+  // info (`no-floating-promises`, `no-misused-promises`, `no-unsafe-*`, etc.).
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: __dirname,
+      },
+    },
+    rules: {
+      // Catches every `any`-typed value at the seam — the exact shape we
+      // keep paying for in audit slices ("drop type-laundering casts",
+      // "drop operation:any casts", "narrow Button/Spinner any").
+      '@typescript-eslint/no-explicit-any': 'error',
+      // Override eslint-config-expo's `warn` + `allow` to `error` + `never`,
+      // banning both `<T>x` style and `{ ... } as T` object-literal casts.
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        { assertionStyle: 'as', objectLiteralTypeAssertions: 'never' },
+      ],
+      // Catches un-awaited promises — the shape behind the "cancel async
+      // writes on effect cleanup" and "thread AbortSignal through apiClient"
+      // slices. Allow `void promise` as the explicit fire-and-forget escape.
+      '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: true }],
+      // Catches async functions passed where a sync callback is expected
+      // (e.g. `onPress={async () => ...}` — fine, but `useEffect(async ...)`
+      // — not fine). Allow void-returning attribute handlers, ban only the
+      // ones that genuinely break (return-position promise-as-boolean,
+      // spread, etc.).
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        {
+          checksVoidReturn: { attributes: false, arguments: false },
+        },
+      ],
+    },
+  },
   {
     plugins: {
       'unused-imports': require('eslint-plugin-unused-imports'),
