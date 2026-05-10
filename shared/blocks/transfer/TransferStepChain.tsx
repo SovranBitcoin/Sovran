@@ -169,13 +169,13 @@ function nodeTypeToCheckpointDotType(type: NodeType): CheckpointDotType {
 function AnimatedChainLine({
   filled,
   delayMs,
-  greenColor,
-  greyColor,
+  successColor,
+  mutedColor,
 }: {
   filled: boolean;
   delayMs: number;
-  greenColor: string;
-  greyColor: string;
+  successColor: string;
+  mutedColor: string;
 }) {
   const fillWidth = useSharedValue(filled ? 1 : 0);
 
@@ -188,9 +188,9 @@ function AnimatedChainLine({
   }));
 
   return (
-    <View style={[styles.line, { backgroundColor: greyColor }]}>
+    <View style={[styles.line, { backgroundColor: mutedColor }]}>
       <Animated.View
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: greenColor }, fillStyle]}
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: successColor }, fillStyle]}
       />
     </View>
   );
@@ -238,7 +238,7 @@ function AnimatedLabel({
 
 export const TransferStepChain = React.memo(
   ({ status, routingDetail, middleLabel = 'Send' }: TransferStepChainProps) => {
-    const [foreground, muted, successColor, dangerColor, warningColor] = useThemeColor([
+    const [foreground, mutedColor, successColor, dangerColor, warningColor] = useThemeColor([
       'foreground',
       'muted',
       'success',
@@ -246,10 +246,6 @@ export const TransferStepChain = React.memo(
       'warning',
     ] as const);
 
-    const greenColor = successColor;
-    const redColor = dangerColor;
-    const orangeColor = warningColor;
-    const greyColor = muted;
     const labelColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
     const dimLabelColor = useMemo(() => opacity(foreground, 0.25), [foreground]);
 
@@ -318,10 +314,10 @@ export const TransferStepChain = React.memo(
                     <AnimatedCheckpointDot
                       type={nodeTypeToCheckpointDotType(node.type)}
                       delayMs={nodeDelays[idx]}
-                      greenColor={greenColor}
-                      redColor={redColor}
-                      orangeColor={orangeColor}
-                      greyColor={greyColor}
+                      successColor={successColor}
+                      dangerColor={dangerColor}
+                      warningColor={warningColor}
+                      mutedColor={mutedColor}
                     />
                     <AnimatedLabel
                       label={node.label}
@@ -337,8 +333,8 @@ export const TransferStepChain = React.memo(
                     <AnimatedChainLine
                       filled={lineFilled}
                       delayMs={lineDelays[idx]}
-                      greenColor={greenColor}
-                      greyColor={greyColor}
+                      successColor={successColor}
+                      mutedColor={mutedColor}
                     />
                   )}
                 </React.Fragment>

@@ -59,19 +59,19 @@ type TimelineLineType = 'complete' | 'future' | 'expired-gradient' | 'rolled-bac
 interface AnimatedTimelineLineProps {
   lineType: TimelineLineType;
   delayMs?: number;
-  greenColor: string;
-  redColor: string;
-  orangeColor: string;
-  greyColor: string;
+  successColor: string;
+  dangerColor: string;
+  warningColor: string;
+  mutedColor: string;
 }
 
 const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
   lineType,
   delayMs = 0,
-  greenColor,
-  redColor,
-  orangeColor,
-  greyColor,
+  successColor,
+  dangerColor,
+  warningColor,
+  mutedColor,
 }: AnimatedTimelineLineProps) {
   const isComplete = lineType === 'complete';
   const fillHeight = useSharedValue(isComplete ? 1 : 0);
@@ -89,12 +89,12 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
   }));
 
   if (lineType === 'expired-gradient' || lineType === 'rolled-back-gradient') {
-    const endColor = lineType === 'expired-gradient' ? redColor : orangeColor;
+    const endColor = lineType === 'expired-gradient' ? dangerColor : warningColor;
     return (
       <Svg width={LINE_WIDTH} height={LINE_HEIGHT} style={{ marginVertical: 4 }}>
         <Defs>
           <LinearGradient id={`gradient-${lineType}`} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={greenColor} />
+            <Stop offset="0%" stopColor={successColor} />
             <Stop offset="100%" stopColor={endColor} />
           </LinearGradient>
         </Defs>
@@ -116,7 +116,7 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
       style={{
         width: LINE_WIDTH,
         height: LINE_HEIGHT,
-        backgroundColor: greyColor,
+        backgroundColor: mutedColor,
         borderRadius: LINE_WIDTH / 2,
         marginVertical: 4,
         overflow: 'hidden',
@@ -125,7 +125,7 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
         style={[
           {
             width: LINE_WIDTH,
-            backgroundColor: greenColor,
+            backgroundColor: successColor,
             borderRadius: LINE_WIDTH / 2,
           },
           fillStyle,
@@ -145,7 +145,7 @@ export function HistoryEntryTimeline({
   tokenCreated,
   nostrSent,
 }: HistoryEntryTimelineProps) {
-  const [foreground, muted, greenColor, redColor, orangeColor] = useThemeColor([
+  const [foreground, mutedColor, successColor, dangerColor, warningColor] = useThemeColor([
     'foreground',
     'muted',
     'success',
@@ -154,7 +154,6 @@ export function HistoryEntryTimeline({
   ] as const);
   const [currentTime, setCurrentTime] = useState(Date.now());
 
-  const greyColor = muted;
   const foreground66 = opacity(foreground, 0.66);
   const foreground50 = opacity(foreground, 0.5);
 
@@ -227,11 +226,11 @@ export function HistoryEntryTimeline({
   const getStatusHeaderColor = () => {
     switch (statusColorType) {
       case 'success':
-        return greenColor;
+        return successColor;
       case 'error':
-        return redColor;
+        return dangerColor;
       case 'warning':
-        return orangeColor;
+        return warningColor;
       default:
         return foreground66;
     }
@@ -239,9 +238,9 @@ export function HistoryEntryTimeline({
 
   const getStateTextColor = (stepType: TimelineStepType, isFuture: boolean) => {
     if (isFuture) return foreground50;
-    if (stepType === 'expired') return redColor;
-    if (stepType === 'already-spent') return orangeColor;
-    if (stepType === 'rolled-back') return orangeColor;
+    if (stepType === 'expired') return dangerColor;
+    if (stepType === 'already-spent') return warningColor;
+    if (stepType === 'rolled-back') return warningColor;
     return foreground;
   };
 
@@ -294,19 +293,19 @@ export function HistoryEntryTimeline({
                     <AnimatedCheckpointDot
                       type={timelineStepTypeToCheckpointDotType(item.stepType)}
                       delayMs={dotDelay}
-                      greenColor={greenColor}
-                      redColor={redColor}
-                      orangeColor={orangeColor}
-                      greyColor={greyColor}
+                      successColor={successColor}
+                      dangerColor={dangerColor}
+                      warningColor={warningColor}
+                      mutedColor={mutedColor}
                     />
                     {lineType && (
                       <AnimatedTimelineLine
                         lineType={lineType}
                         delayMs={lineDelay}
-                        greenColor={greenColor}
-                        redColor={redColor}
-                        orangeColor={orangeColor}
-                        greyColor={greyColor}
+                        successColor={successColor}
+                        dangerColor={dangerColor}
+                        warningColor={warningColor}
+                        mutedColor={mutedColor}
                       />
                     )}
                   </VStack>

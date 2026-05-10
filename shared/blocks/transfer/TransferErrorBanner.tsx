@@ -21,14 +21,14 @@ interface TransferErrorBannerProps {
 }
 
 export const TransferErrorBanner = React.memo(({ message }: TransferErrorBannerProps) => {
-  const redColor = useThemeColor('red-400');
+  const dangerColor = useThemeColor('danger');
 
   return (
     <Log name="TransferErrorBanner">
-      <View style={[styles.errorBanner, { backgroundColor: opacity(redColor, 0.15) }]}>
+      <View style={[styles.errorBanner, { backgroundColor: opacity(dangerColor, 0.15) }]}>
         <HStack spacing={8} align="center">
-          <Icon name="mdi:alert-circle" size={16} color={redColor} />
-          <UntranslatedText size={11} bold color={redColor} style={styles.message}>
+          <Icon name="mdi:alert-circle" size={16} color={dangerColor} />
+          <UntranslatedText size={11} bold color={dangerColor} style={styles.message}>
             {message}
           </UntranslatedText>
         </HStack>

@@ -283,7 +283,7 @@ const StatsGrid = React.memo(StatsGridComponent);
 
 /** Score with staggered star rows and distribution bars to the edge. */
 function RatingBarChartComponent({ score }: { score: number }) {
-  const [foreground, defaultColor, surfaceTertiary, warning] = useThemeColor([
+  const [foreground, defaultColor, surfaceTertiary, starColor] = useThemeColor([
     'foreground',
     'default',
     'surface-tertiary',
@@ -375,7 +375,7 @@ function RatingBarChartComponent({ score }: { score: number }) {
                 {Array.from({ length: stars }).map((_, i) =>
                   isTargetRow ? (
                     <Animated.View key={i} style={starFadeStyle}>
-                      <Icon name="ic:round-star" size={12} color={warning} />
+                      <Icon name="ic:round-star" size={12} color={starColor} />
                     </Animated.View>
                   ) : (
                     <View key={i}>
@@ -393,7 +393,7 @@ function RatingBarChartComponent({ score }: { score: number }) {
                   borderRadius: 4,
                 }}>
                 {isTargetRow && (
-                  <Animated.View style={[barFillStyle, { backgroundColor: warning }]} />
+                  <Animated.View style={[barFillStyle, { backgroundColor: starColor }]} />
                 )}
               </View>
             </HStack>
@@ -408,7 +408,7 @@ const RatingBarChart = React.memo(RatingBarChartComponent);
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const [danger, success, warning] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
+  const [danger, success, starColor] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
   const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
   const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
@@ -461,7 +461,7 @@ export function MintInfoScreen() {
                     }}
                     asChild>
                     <Pressable style={{ padding: 8 }}>
-                      <Icon name="ic:round-star" size={24} color={warning} />
+                      <Icon name="ic:round-star" size={24} color={starColor} />
                     </Pressable>
                   </Link>
                 ),

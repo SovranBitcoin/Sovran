@@ -44,10 +44,14 @@ export type CheckpointDotType =
 interface AnimatedCheckpointDotProps {
   type: CheckpointDotType;
   delayMs?: number;
-  greenColor: string;
-  redColor: string;
-  orangeColor: string;
-  greyColor: string;
+  /** Theme `success` color — drives complete/current dot fill + checkmark glyph. */
+  successColor: string;
+  /** Theme `danger` color — drives failed dot fill + cross glyph. */
+  dangerColor: string;
+  /** Theme `warning` color — drives rolled-back / already-spent dot fill. */
+  warningColor: string;
+  /** Theme `muted` color — drives future/pending dot fill + neutral track. */
+  mutedColor: string;
 }
 
 const DOT_CONTAINER = 20;
@@ -74,10 +78,10 @@ function timed(
 export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
   type,
   delayMs = 0,
-  greenColor,
-  redColor,
-  orangeColor,
-  greyColor,
+  successColor,
+  dangerColor,
+  warningColor,
+  mutedColor,
 }: AnimatedCheckpointDotProps) {
   const isFuture = type === 'future' || type === 'future-small';
   const isComplete = type === 'complete' || type === 'success';
@@ -169,14 +173,14 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
     strokeDashoffset: SPINNER_DASH_OFFSET,
   }));
 
-  const greenBg = useMemo(() => opacity(greenColor, 0.18), [greenColor]);
-  const greenBorder = useMemo(() => opacity(greenColor, 0.32), [greenColor]);
-  const greyBg = useMemo(() => opacity(greyColor, 0.18), [greyColor]);
-  const greyBorder = useMemo(() => opacity(greyColor, 0.32), [greyColor]);
-  const redBg = useMemo(() => opacity(redColor, 0.18), [redColor]);
-  const redBorder = useMemo(() => opacity(redColor, 0.32), [redColor]);
-  const orangeBg = useMemo(() => opacity(orangeColor, 0.18), [orangeColor]);
-  const orangeBorder = useMemo(() => opacity(orangeColor, 0.32), [orangeColor]);
+  const successBg = useMemo(() => opacity(successColor, 0.18), [successColor]);
+  const successBorder = useMemo(() => opacity(successColor, 0.32), [successColor]);
+  const mutedBg = useMemo(() => opacity(mutedColor, 0.18), [mutedColor]);
+  const mutedBorder = useMemo(() => opacity(mutedColor, 0.32), [mutedColor]);
+  const dangerBg = useMemo(() => opacity(dangerColor, 0.18), [dangerColor]);
+  const dangerBorder = useMemo(() => opacity(dangerColor, 0.32), [dangerColor]);
+  const warningBg = useMemo(() => opacity(warningColor, 0.18), [warningColor]);
+  const warningBorder = useMemo(() => opacity(warningColor, 0.32), [warningColor]);
   const foreground = useThemeColor('foreground');
   const clockColor = useMemo(() => opacity(foreground, 0.7), [foreground]);
 
@@ -186,7 +190,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
         <Animated.View
           style={[
             styles.dotLayer,
-            { borderRadius: DOT_CONTAINER, backgroundColor: greyColor },
+            { borderRadius: DOT_CONTAINER, backgroundColor: mutedColor },
             futureStyle,
           ]}
         />
@@ -194,7 +198,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
           style={[
             styles.dotLayer,
             styles.dot,
-            { backgroundColor: greyBg, borderColor: greyBorder },
+            { backgroundColor: mutedBg, borderColor: mutedBorder },
             pendingStyle,
           ]}
         />
@@ -202,7 +206,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
           style={[
             styles.dotLayer,
             styles.dot,
-            { backgroundColor: greenBg, borderColor: greenBorder },
+            { backgroundColor: successBg, borderColor: successBorder },
             completeStyle,
           ]}
         />
@@ -210,7 +214,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
           style={[
             styles.dotLayer,
             styles.dot,
-            { backgroundColor: greenBg, borderColor: greenBorder },
+            { backgroundColor: successBg, borderColor: successBorder },
             currentStyle,
           ]}
         />
@@ -218,7 +222,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
           style={[
             styles.dotLayer,
             styles.dot,
-            { backgroundColor: redBg, borderColor: redBorder },
+            { backgroundColor: dangerBg, borderColor: dangerBorder },
             failedStyle,
           ]}
         />
@@ -226,7 +230,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
           style={[
             styles.dotLayer,
             styles.dot,
-            { backgroundColor: orangeBg, borderColor: orangeBorder },
+            { backgroundColor: warningBg, borderColor: warningBorder },
             rolledBackStyle,
           ]}
         />
@@ -234,7 +238,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
           style={[
             styles.dotLayer,
             styles.dot,
-            { backgroundColor: orangeBg, borderColor: orangeBorder },
+            { backgroundColor: warningBg, borderColor: warningBorder },
             alreadySpentStyle,
           ]}
         />
@@ -255,7 +259,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
           </Svg>
         </Animated.View>
         <Animated.View style={[styles.iconLayer, completeStyle]}>
-          <Icon name="fluent:checkmark-16-filled" color={greenColor} size={ICON_SIZE} />
+          <Icon name="fluent:checkmark-16-filled" color={successColor} size={ICON_SIZE} />
         </Animated.View>
         <Animated.View style={[styles.iconLayer, spinnerStyle]}>
           <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 14 14">
@@ -264,7 +268,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
               cy={7}
               r={5}
               fill="none"
-              stroke={greenColor}
+              stroke={successColor}
               strokeWidth={1.5}
               strokeLinecap="round"
               strokeDasharray={SPINNER_CIRCUMFERENCE}
@@ -273,13 +277,13 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
           </Svg>
         </Animated.View>
         <Animated.View style={[styles.iconLayer, failedStyle]}>
-          <Icon name="material-symbols:close-rounded" color={redColor} size={ICON_SIZE} />
+          <Icon name="material-symbols:close-rounded" color={dangerColor} size={ICON_SIZE} />
         </Animated.View>
         <Animated.View style={[styles.iconLayer, rolledBackStyle]}>
-          <Icon name="ic:round-refresh" color={orangeColor} size={ICON_SIZE} />
+          <Icon name="ic:round-refresh" color={warningColor} size={ICON_SIZE} />
         </Animated.View>
         <Animated.View style={[styles.iconLayer, alreadySpentStyle]}>
-          <Icon name="mdi:alert-circle" color={orangeColor} size={ICON_SIZE} />
+          <Icon name="mdi:alert-circle" color={warningColor} size={ICON_SIZE} />
         </Animated.View>
       </Animated.View>
     </Log>
