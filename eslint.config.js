@@ -79,6 +79,28 @@ module.exports = defineConfig([
       ],
     },
   },
+  // React Compiler ESLint rule. Flags components and effects that the
+  // compiler can't auto-memoize: render-body mutations, prop mutations,
+  // refs misuse, conditional hooks, derived collections that aren't
+  // stable across renders, etc. Direct payoff for the perf-slice cluster
+  // (`stabilize derived collections in mintSelect`, `narrow zustand
+  // selectors and store subscriptions`, `stabilise relay-flush re-fire
+  // in contact-discovery hooks`, `drop redundant React.memo wrappers`,
+  // `stop stale derived state from polluting virtualised lists`, etc.).
+  //
+  // Set at `warn` initially — the rule is precise but the warning floor
+  // is unknown and we want the perf signal in PR review before failing
+  // CI on it. Promote to `error` once the warning floor is at zero (a
+  // future audit-fix slice). Warnings don't appear in
+  // `eslint-suppressions.json`; they show up in the lint output and
+  // surface in editor integrations.
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    plugins: { 'react-compiler': require('eslint-plugin-react-compiler') },
+    rules: {
+      'react-compiler/react-compiler': 'warn',
+    },
+  },
   {
     plugins: {
       'unused-imports': require('eslint-plugin-unused-imports'),
