@@ -186,7 +186,7 @@ export const SettingsScreen = () => {
             <SettingsListActionItem
               title="Contact the Developer"
               onPress={() => {
-                void openExternalUrl('https://x.com/KevinKelbie');
+                void openExternalUrl('https://x.com/SovranBitcoin');
               }}
             />
           </ListGroup>
