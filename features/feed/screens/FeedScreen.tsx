@@ -118,13 +118,9 @@ export function FeedScreen() {
       </View>
 
       <ScreenContainer>
-        {/* HomeFeed stays mounted to preserve scroll position and cached data */}
-        <View style={[styles.flex1, isSearching && styles.hidden]}>
-          <HomeFeed activeFilter={activeFilter} />
-        </View>
-
-        {showSearchResults && <SearchResultsList searchQuery={searchQuery} />}
-        {showSearchPrompt && (
+        {showSearchResults ? (
+          <SearchResultsList searchQuery={searchQuery} />
+        ) : showSearchPrompt ? (
           <VStack spacing={24} align="center" className="mt-3 px-4" style={styles.flex1}>
             <VStack
               justify="center"
@@ -141,6 +137,8 @@ export function FeedScreen() {
               </Text>
             </VStack>
           </VStack>
+        ) : (
+          <HomeFeed activeFilter={activeFilter} />
         )}
       </ScreenContainer>
     </Log>
@@ -156,8 +154,5 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
-  },
-  hidden: {
-    display: 'none' as const,
   },
 });

@@ -566,15 +566,21 @@ export const ContactsScreen = () => {
     );
   };
 
-  // Decide which body to render. Groups view wins if either the outer tab
-  // is Groups OR the Contacts-tab filter pill is 'Groups' (which is only
-  // selectable during search). Otherwise on Contacts tab: All-search when
-  // there's a query, otherwise the filtered local list.
+  // While searching, the outer Groups tab is folded into the Contacts
+  // search flow — same pill bar, same unified SearchResultsList. The user
+  // never sees a separate "Groups search". `activeTab` itself is left
+  // alone so closing the search restores the original outer tab.
+  const effectiveTab: TopTab = isSearching ? 'contacts' : activeTab;
+
+  // Decide which body to render. Groups view wins if either the (effective)
+  // outer tab is Groups OR the Contacts-tab filter pill is 'Groups' (which
+  // is only selectable during search). Otherwise on Contacts tab: All-search
+  // when there's a query, otherwise the filtered local list.
   const showGroupsBody =
-    activeTab === 'groups' || (activeTab === 'contacts' && activeFilter === 'Groups');
+    effectiveTab === 'groups' || (effectiveTab === 'contacts' && activeFilter === 'Groups');
 
   const showAllSearch =
-    activeTab === 'contacts' && activeFilter === 'All' && isSearching && trimmedQuery.length > 0;
+    effectiveTab === 'contacts' && activeFilter === 'All' && isSearching && trimmedQuery.length > 0;
 
   return (
     <Log name="ContactsScreen" style={[styles.root, { backgroundColor: surface }]}>
@@ -594,10 +600,12 @@ export const ContactsScreen = () => {
         </View>
       )}
 
-      {/* Pill bar — only on Contacts tab. Groups tab owns its own filtering
-          (matching tiers + geohash header) without needing pills.
-          The `Groups` pill is added to the SearchFilters only while searching. */}
-      {activeTab === 'contacts' && (
+      {/* Pill bar — shown on the Contacts tab and during search (when the
+          outer Groups tab is folded into the Contacts search flow). Groups
+          tab in its idle state owns its own filtering (matching tiers +
+          geohash header) without needing pills. The `Groups` pill is added
+          to the SearchFilters only while searching. */}
+      {effectiveTab === 'contacts' && (
         <Animated.View
           entering={FadeIn.duration(200)}
           style={[
