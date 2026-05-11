@@ -43,7 +43,7 @@ Non-negotiable from `fix.md`, called out here so they survive even if `fix.md` i
 - **Phase 1 cross-link** — run `bun run codereview/analyze-structure/index.mjs --llm | sed -n '/^Overall:/,/^# Repo/p'` and `bun run codereview/analyze-structure/index.mjs lookalikes --focus <candidate-file>` before settling on a slice. The Phase 4 plan must cite the structural signal that was folded in (or explicitly say "none" with proof).
 - **Phase 1 hunts** — also run the bypass / leak greps (§4.11) and schema-duplication grep (§4.12) every time, regardless of slice.
 - **Phase 4 plan** — write the structured brief (Process skills consulted / Domain skills consulted / Cluster / Files modified / Fix approach / Risks / Acceptance gates) before editing.
-- **Phase 6 commits** — two commits, in order: feature commit, then `chore(audits): annotate completion status`. Use the §4.6 `update_audit` helper (it writes the slice-local manifest) and `git add -f` for audit files (`__audits__/` is gitignored but most files are tracked anyway — see §4.7a).
+- **Phase 6 commit** — one commit per slice: the feature commit. Use the §4.6 `update_audit` helper to annotate `completion_status` locally; `__audits__/` is gitignored and untracked, so annotations stay on disk and are not committed.
 - **Self-check** — run §8 items 1–13 before the final summary; items 10b (structural cross-link cited) and 13 (process skills loaded) block the slice if missing.
 
 `codereview/audit.md` is the read-only counterpart for producing audits. The same Phase 0 skill load applies.
