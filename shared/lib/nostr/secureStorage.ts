@@ -36,10 +36,14 @@ export interface CachedDerivedKeys {
   mnemonicHash: string;
 }
 
-// iOS-specific options for enhanced security
+// iOS keychain options. `requireAuthentication: false` writes items under the
+// `app:no-auth` keychain service alias (expo-secure-store v55) so reads are
+// silent. We do NOT want a biometric gate on boot — multiple providers
+// (AppGate, NostrKeysProvider, MigrationGate, CocoManager) hit SecureStore in
+// parallel and each prompt is per-call, so flipping this to `true` would show
+// a cascade of FaceID sheets every cold start.
 const IOS_SECURE_OPTIONS = {
-  requireAuthentication: true,
-  authenticatePrompt: 'Authenticate to access your Sovran wallet',
+  requireAuthentication: false,
 } as const;
 
 const secureOptions = (): SecureStore.SecureStoreOptions =>
