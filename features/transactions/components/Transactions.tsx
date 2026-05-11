@@ -29,7 +29,7 @@ import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { duration, zIndex } from '@/shared/styles/tokens';
+import { duration, spacing, zIndex } from '@/shared/styles/tokens';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import {
   useSwapTransactionsStore,
@@ -604,10 +604,16 @@ export const Transactions = React.memo(
         );
       };
 
+      const hasPending = sections.pending.length > 0;
+      const hasExpired = sections.expired.length > 0;
+      const hasConfirmed = sections.confirmed.length > 0;
+
       return (
         <View className="w-full">
           {renderStatus('Pending', sections.pending)}
+          {hasPending && (hasExpired || hasConfirmed) && <Spacer size={spacing['sm']} />}
           {renderStatus('Expired', sections.expired)}
+          {hasExpired && hasConfirmed && <Spacer size={spacing['sm']} />}
           {renderStatus('Confirmed', sections.confirmed)}
         </View>
       );
