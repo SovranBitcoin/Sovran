@@ -197,6 +197,18 @@ export interface DefaultOperationsConfig {
    */
   fetchMintCatalog?: (mintUrls: string[]) => Promise<Record<string, MintCatalogEntry>>;
   /**
+   * Per-mint NUT-06 fetcher used by `buildMintListItems` to resolve name/icon.
+   *
+   * Defaults to `mgr.mint.getMintInfo`, which always hits coco's 5-min TTL and
+   * exposes the list to coco's per-mint HTTP timeout — one slow/dead mint can
+   * gate the Select Mint screen on every cold open. The wallet should inject a
+   * cached + deadline-bounded fetcher so the list renders from last-known info
+   * while the network refresh happens in the background. Returning `null` (or
+   * throwing) yields the same `displayName: mintUrl` fallback as the direct
+   * call would.
+   */
+  fetchMintInfo?: (mintUrl: string) => Promise<MintInfo | null>;
+  /**
    * Optional per-mint enrichment for the trust-review screen. Synchronous,
    * read from local caches the wallet already populated (e.g. a screen that
    * needed the same audit data earlier in the session).
@@ -357,11 +369,15 @@ export function createDefaultOperations(
       // Fetch NUT-06 mint info for each mint in parallel.
       // getAllTrustedMints() returns stored records without display metadata;
       // getMintInfo() returns the NUT-06 info with name/icon_url.
+      // When the wallet injects `config.fetchMintInfo`, it can route through
+      // its own SWR cache + per-mint deadline so a dead mint doesn't gate the
+      // whole list.
+      const fetchInfo = config.fetchMintInfo ?? ((url: string) => mgr.mint.getMintInfo(url));
       const mintInfoMap = new Map<string, MintInfo>();
       await Promise.all(
         allTrustedMints.map(async (mint) => {
           try {
-            const info = await mgr.mint.getMintInfo(mint.mintUrl);
+            const info = await fetchInfo(mint.mintUrl);
             if (info) {
               mintInfoMap.set(mint.mintUrl, info);
               logger.info('operations.buildMintListItems.getMintInfo.ok', {

@@ -67,6 +67,18 @@ interface ListRowProps {
   /** Optional third line — stats rows, inline amounts, etc. */
   accent?: ReactNode;
 
+  /**
+   * Where the `accent` slot renders relative to the main row.
+   *   - `'inline'` (default) — third line inside the text column, sharing
+   *     vertical center with leading + trailing.
+   *   - `'below'` — accent moves out of the text column into a sibling row
+   *     beneath the main HStack, indented past the leading width so the
+   *     leading + trailing slots can align with just the title + subtitle
+   *     band. Used by the Select Mint row where stats sit visually
+   *     decoupled from the avatar / inspect button.
+   */
+  accentPosition?: 'inline' | 'below';
+
   /** Trailing slot — chevron, icon, checkbox, spinner, button. */
   trailing?: ReactNode;
 
@@ -114,6 +126,7 @@ export function ListRow({
   title,
   subtitle,
   accent,
+  accentPosition = 'inline',
   trailing,
   onPress,
   disabled = false,
@@ -207,16 +220,49 @@ export function ListRow({
 
   // ----- Row content -----
 
-  const body = (
-    <HStack align="center" style={{ paddingHorizontal: 20, paddingVertical, gap: ROW_GAP }}>
+  // When `accentPosition='below'`, pull the accent out of the text column so the
+  // leading + trailing slots align with just the title/subtitle band. The accent
+  // renders as a sibling row beneath, indented past the leading width so it
+  // hangs under the title rather than restarting at the row edge.
+  const accentBelow = accentPosition === 'below' && accent != null;
+  const leadingWidth =
+    avatar?.size ?? iconCircle?.size ?? (leading != null ? DEFAULT_AVATAR_SIZE : 0);
+  const accentInsetLeft = leadingEl ? 20 + leadingWidth + ROW_GAP : 20;
+
+  const mainRow = (
+    <HStack
+      align="center"
+      style={{
+        paddingHorizontal: 20,
+        paddingTop: paddingVertical,
+        paddingBottom: accentBelow ? 0 : paddingVertical,
+        gap: ROW_GAP,
+      }}>
       {leadingEl}
       <VStack style={styles.textCol} spacing={2}>
         {titleEl}
         {subtitleEl}
-        {accent}
+        {accentBelow ? null : accent}
       </VStack>
       {trailing}
     </HStack>
+  );
+
+  const body = accentBelow ? (
+    <VStack>
+      {mainRow}
+      <View
+        style={{
+          paddingLeft: accentInsetLeft,
+          paddingRight: 20,
+          paddingTop: 4,
+          paddingBottom: paddingVertical,
+        }}>
+        {accent}
+      </View>
+    </VStack>
+  ) : (
+    mainRow
   );
 
   // ----- Pressable wrapper (only if onPress), disabled dim, press-feedback -----

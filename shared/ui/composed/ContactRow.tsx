@@ -286,6 +286,10 @@ interface ContactRowProps {
   onToggle?: () => void;
   selectionVariant?: 'circle-check' | 'checkbox';
 
+  /** Forwarded to ListRow. `'below'` moves the stats row beneath the
+   *  main HStack, indented past the avatar — used by the Select Mint row. */
+  accentPosition?: 'inline' | 'below';
+
   /** Full trailing override; beats every variant / kind default. */
   trailing?: ReactNode;
   trailingVariant?: 'chevron' | 'spinner' | 'none';
@@ -573,6 +577,7 @@ export function ContactRow({
   selected = false,
   onToggle,
   selectionVariant = 'circle-check',
+  accentPosition,
   trailing: trailingOverride,
   trailingVariant,
   onInspectPress,
@@ -778,6 +783,7 @@ export function ContactRow({
       subtitle={subtitleNode}
       subtitlePlaceholder={subtitlePlaceholder}
       accent={accentNode}
+      accentPosition={accentPosition}
       trailing={trailingNode}
       onPress={effectivePress}
       loading={resolvedLoading}

@@ -40,6 +40,17 @@ interface BlurCardFrameProps {
    * - 'right': Glows on the two right corners only
    */
   variant?: GlowVariant;
+  /**
+   * Whether to render the corner-accent gradients. Defaults to `true`.
+   *
+   * Set `false` on small containers (≲ 60 px on the short side). The glow
+   * geometry is fixed at 70×70 with the fade calibrated to 40 px diagonal
+   * from each corner — on a container smaller than that, two opposite
+   * gradients overlap across the whole face and the 0.6-alpha corner pixel
+   * reads as a hotspot instead of a soft accent. With `glow={false}` the
+   * frame degrades to blur + caller-supplied border only.
+   */
+  glow?: boolean;
 }
 
 /**
@@ -50,7 +61,12 @@ interface BlurCardFrameProps {
  * Renders absolute-positioned backgrounds as a fragment.
  * Children are rendered alongside to establish the container's height.
  */
-export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: BlurCardFrameProps) {
+export function BlurCardFrame({
+  accentColor,
+  children,
+  variant = 'diagonal',
+  glow = true,
+}: BlurCardFrameProps) {
   const androidSurface = useThemeColor('surface-secondary');
 
   if (Platform.OS === 'android') {
@@ -68,7 +84,7 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
       <View blur style={StyleSheet.absoluteFillObject} />
 
       {/* Render gradients based on variant - fixed size boxes with pixel-based fade */}
-      {(variant === 'topLeft' || variant === 'diagonal') && (
+      {glow && (variant === 'topLeft' || variant === 'diagonal') && (
         <LinearGradient
           colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
           locations={LOCATIONS}
@@ -79,7 +95,7 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
         />
       )}
 
-      {(variant === 'topRight' || variant === 'diagonal' || variant === 'right') && (
+      {glow && (variant === 'topRight' || variant === 'diagonal' || variant === 'right') && (
         <LinearGradient
           colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
           locations={LOCATIONS}
@@ -90,7 +106,7 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
         />
       )}
 
-      {variant === 'bottomLeft' && (
+      {glow && variant === 'bottomLeft' && (
         <LinearGradient
           colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
           locations={LOCATIONS}
@@ -101,7 +117,7 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
         />
       )}
 
-      {(variant === 'bottomRight' || variant === 'diagonal' || variant === 'right') && (
+      {glow && (variant === 'bottomRight' || variant === 'diagonal' || variant === 'right') && (
         <LinearGradient
           colors={[opacity(accentColor, 0.45), opacity(accentColor, 0.1), opacity(accentColor, 0)]}
           locations={LOCATIONS}

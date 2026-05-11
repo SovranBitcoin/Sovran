@@ -19,7 +19,7 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 import { useManager } from '@cashu/coco-react';
 
 import type { MachineOperations, NavigationCallbacks } from 'coco-payment-ux';
-import { createCocoPaymentUX } from 'coco-payment-ux';
+import { createCocoPaymentUX, withTimeout } from 'coco-payment-ux';
 import {
   CocoPaymentUXProvider as PaymentUXProviderBase,
   type DeepLinkConfig,
@@ -52,6 +52,11 @@ import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
+
+// Per-mint NUT-06 deadline used by `fetchMintInfo` below. Only matters on a
+// true cache miss; SWR hits resolve synchronously. Kept well under coco's
+// 10s `updateMint` timeout so one dead mint can't visibly gate the list.
+const FIRST_OPEN_DEADLINE_MS = 3000;
 
 export function SovranPaymentUXProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
@@ -125,6 +130,19 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
           getMintCatalog(mintUrls, (url) =>
             getCachedMintInfo((u) => manager.mint.getMintInfo(u), url)
           ),
+        // Per-mint NUT-06 fetcher for the Select Mint list. Routes through the
+        // 24h SWR cache so a dead mint can't gate the screen — cached entries
+        // resolve synchronously, and even a true cold miss is bounded to
+        // FIRST_OPEN_DEADLINE_MS so the slowest mint doesn't pin the list.
+        // Coco's 10s `updateMint` timeout (patches/@cashu+coco-core+...patch)
+        // still backstops the underlying HTTP; the background refresh continues
+        // after the deadline and writes through via attachMintInfoCacheToManager.
+        fetchMintInfo: (url) =>
+          withTimeout(
+            getCachedMintInfo((u) => manager.mint.getMintInfo(u), url),
+            FIRST_OPEN_DEADLINE_MS,
+            'buildMintListItems.getMintInfo'
+          ).catch(() => null),
         // Trust-review screen still pulls per-mint detail (swap-by-swap timing)
         // from the local audit / KYM caches populated by `useAuditedMint`.
         enrichMintReviewInfo: getSovranMintEnrichment,
