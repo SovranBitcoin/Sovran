@@ -78,7 +78,6 @@ function probeNative(): void {
   if (_nativeProbed) return;
   _nativeProbed = true;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const nutpatch = require('nutpatch') as NutpatchExports;
     if (typeof nutpatch.nip44Ecdh === 'function') {
       _nativeEcdh = nutpatch.nip44Ecdh;

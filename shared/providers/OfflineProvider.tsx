@@ -111,21 +111,21 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
     };
 
     log.debug('provider.offline.init', { pollIntervalMs: CONNECTIVITY_POLL_MS });
-    runConnectivityCheck();
+    void runConnectivityCheck();
     networkSubscription = Network.addNetworkStateListener(applyState);
     interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
 
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         log.debug('provider.offline.app_foregrounded', { reason: 'app_state_active' });
-        runConnectivityCheck();
+        void runConnectivityCheck();
       }
     });
 
     const onWebOnline = () => {
       log.info('provider.offline.web_event', { event: 'online' });
       setNetworkOffline(false);
-      runConnectivityCheck();
+      void runConnectivityCheck();
     };
 
     const onWebOffline = () => {

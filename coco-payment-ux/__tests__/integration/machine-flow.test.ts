@@ -117,7 +117,7 @@ describe('createMachineFromInstance — real Manager', () => {
       getLocale: () => 'en',
     });
 
-    machine.changeMint(TEST_MINT, { persist: true });
+    void machine.changeMint(TEST_MINT, { persist: true });
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     expect(onPreferredMintChanged).toHaveBeenCalledWith(

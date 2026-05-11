@@ -270,8 +270,7 @@ export function useChatKeyboardAnimationLogger({
       // closing, target>0 means opening.
       const target = startHeightVal;
       const direction = target > 0 ? 'open' : 'close';
-      const movesPerSec =
-        durationMs > 0 ? Math.round((moves / durationMs) * 1000 * 10) / 10 : 0;
+      const movesPerSec = durationMs > 0 ? Math.round((moves / durationMs) * 1000 * 10) / 10 : 0;
       const progressTicksPerSec =
         durationMs > 0 ? Math.round((progressTicks / durationMs) * 1000 * 10) / 10 : 0;
       log.info('chat.kb.anim.end', {

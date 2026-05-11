@@ -231,7 +231,7 @@ export const SettingsKeyringScreen: React.FC = () => {
   }, [manager]);
 
   useEffect(() => {
-    loadKeypairs();
+    void loadKeypairs();
   }, [loadKeypairs]);
 
   /**

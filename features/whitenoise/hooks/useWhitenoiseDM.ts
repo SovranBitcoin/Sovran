@@ -93,7 +93,7 @@ export function useWhitenoiseDM(counterpartyPubkey: string): UseWhitenoiseDMStat
       return;
     }
     let cancelled = false;
-    (async () => {
+    void (async () => {
       setIsLoading(true);
       try {
         await client.loadAllGroups();

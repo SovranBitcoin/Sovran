@@ -46,7 +46,9 @@ export default function BalancePillLiquid({
         width: dimensions.buttonWidth,
         height: h,
       }}>
-      <Host style={{ zIndex: zIndex.sticky, height: h, width: dimensions.buttonWidth }} matchContents>
+      <Host
+        style={{ zIndex: zIndex.sticky, height: h, width: dimensions.buttonWidth }}
+        matchContents>
         <SwiftUIButton modifiers={buttonModifiers} onPress={onPress}>
           <BalanceDisplay
             {...display}

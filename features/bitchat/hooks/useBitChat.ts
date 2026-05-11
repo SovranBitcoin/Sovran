@@ -258,7 +258,7 @@ export function useBitChat(
       setMessages((prev) => appendChatMessage(prev, msg));
     });
 
-    (async () => {
+    void (async () => {
       try {
         await startNostr();
         if (cancelled) return;
@@ -322,7 +322,7 @@ export function useBitChat(
       setMessages((prev) => appendChatMessage(prev, msg));
     });
 
-    (async () => {
+    void (async () => {
       try {
         await startNostr();
         if (cancelled) return;

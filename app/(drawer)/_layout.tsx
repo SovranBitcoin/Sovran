@@ -111,7 +111,11 @@ function MenuButton({
       onPress={onPress}
       style={({ pressed }) => [styles.menuButton, pressed && { opacity: alpha.strong }]}>
       <HStack align="center" spacing={spacing.md}>
-        <Icon name={isActive ? icon.selected : icon.default} color={foreground} size={iconSize.xl} />
+        <Icon
+          name={isActive ? icon.selected : icon.default}
+          color={foreground}
+          size={iconSize.xl}
+        />
         <Text size={18} bold style={{ color: foreground }}>
           {label}
         </Text>

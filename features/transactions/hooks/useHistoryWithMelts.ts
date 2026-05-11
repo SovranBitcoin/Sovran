@@ -91,7 +91,7 @@ export function useHistoryWithMelts(pageSize = 100) {
 
   // Initial fetch
   useEffect(() => {
-    fetchMeltOps();
+    void fetchMeltOps();
   }, [fetchMeltOps]);
 
   // Re-fetch when melt-op events fire so the list stays in sync

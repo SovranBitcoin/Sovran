@@ -19,7 +19,6 @@ import {
   downloadWallpaper as downloadWallpaperFile,
   deleteWallpaper as deleteWallpaperFile,
   isWallpaperDownloaded,
-  getWallpaperUri,
   cleanupOrphanedFiles,
 } from '@/shared/lib/wallpaperStorage';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';

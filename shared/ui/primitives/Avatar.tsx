@@ -68,7 +68,7 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
   const loadingColor = useMemo(() => opacity(foreground, 0.15), [foreground]);
 
   useEffect(() => {
-    prefetchImage(picture);
+    void prefetchImage(picture);
   }, [picture]);
 
   const [imageStatus, setImageStatus] = useState<ImageStatus>('loading');

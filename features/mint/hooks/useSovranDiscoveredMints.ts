@@ -162,7 +162,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
       }
     };
 
-    fetchMints();
+    void fetchMints();
     return () => controller.abort();
   }, [retryCount]);
 

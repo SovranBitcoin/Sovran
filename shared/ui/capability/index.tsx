@@ -37,7 +37,10 @@ export function CapabilityProvider({
   children,
 }: CapabilityProviderProps): React.ReactElement {
   const mockNoGlass = useSettingsStore((s) => s.mockNoGlass);
-  const detected = useMemo(() => value ?? detectCapabilities({ mockNoGlass }), [value, mockNoGlass]);
+  const detected = useMemo(
+    () => value ?? detectCapabilities({ mockNoGlass }),
+    [value, mockNoGlass]
+  );
   return <CapabilityContext.Provider value={detected}>{children}</CapabilityContext.Provider>;
 }
 

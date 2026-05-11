@@ -196,7 +196,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
 
     let cancelled = false;
 
-    (async () => {
+    void (async () => {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== 'granted') return;

@@ -646,7 +646,7 @@ export function useMnemonic(autoLoad: boolean = true): UseMnemonicReturn {
 
   useEffect(() => {
     if (autoLoad) {
-      refresh();
+      void refresh();
     }
   }, [autoLoad, refresh]);
 

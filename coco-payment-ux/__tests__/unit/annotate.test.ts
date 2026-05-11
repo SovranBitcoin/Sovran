@@ -37,8 +37,8 @@
 import { describe, it, expect } from 'vitest';
 import { annotateOptions } from '../../src/annotate';
 import { defaultDetectors } from '../../src/detectors';
-import { WALLETS, MINT1, MINT2, UNTRUSTED_MINT } from '../_harness/fixtures';
-import type { PaymentOption, WalletContext } from '../../src/types';
+import { WALLETS, MINT1, UNTRUSTED_MINT } from '../_harness/fixtures';
+import type { PaymentOption } from '../../src/types';
 
 /**
  * Helper to create a minimal PaymentOption for testing. The `source`

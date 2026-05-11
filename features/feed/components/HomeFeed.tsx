@@ -340,13 +340,13 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     if (currentSpec === prevSpecRef.current && userPubkey === prevPubkeyRef.current) return;
     prevSpecRef.current = currentSpec;
     prevPubkeyRef.current = userPubkey;
-    loadFeed(activeSpecIndex);
+    void loadFeed(activeSpecIndex);
   }, [activeSpecIndex, currentSpec, userPubkey, loadFeed]);
 
   const handleRefresh = useCallback(() => {
     if (!currentSpec) return;
     setIsRefreshing(true);
-    loadFeed(activeSpecIndex, true);
+    void loadFeed(activeSpecIndex, true);
   }, [activeSpecIndex, currentSpec, loadFeed]);
 
   // Reset feed items when the active filter changes
@@ -535,7 +535,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   }, [currentSpec, userPubkey, startTransition]);
 
   const handleEndReached = useCallback(() => {
-    loadMoreItems();
+    void loadMoreItems();
   }, [loadMoreItems]);
 
   // ── Derived data ──

@@ -17,11 +17,10 @@ import React, { useEffect, useMemo } from 'react';
 import { Stack, router } from 'expo-router';
 import { z } from 'zod';
 
-import { useScreenActions } from 'coco-payment-ux/react';
+import { useScreenActions, usePaymentFlowMachine } from 'coco-payment-ux/react';
 import type { MintListItem } from 'coco-payment-ux';
 
 import { MintListScreen } from '@/features/mint';
-import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';

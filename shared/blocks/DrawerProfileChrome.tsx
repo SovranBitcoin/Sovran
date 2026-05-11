@@ -115,7 +115,9 @@ function useProfileSwitcher(closeDrawer: () => void) {
 
   const openSheet = useCallback(() => {
     profileSwitcherPopup({
-      onRequestAction: executeProfileAction,
+      onRequestAction: (action) => {
+        void executeProfileAction(action);
+      },
     });
   }, [executeProfileAction]);
 
@@ -173,10 +175,7 @@ function ProfileSwitcherButtons({
         ))}
       <Pressable
         onPress={openSheet}
-        style={[
-          dotsButtonStyle,
-          { borderColor: defaultColor, backgroundColor: defaultColor },
-        ]}>
+        style={[dotsButtonStyle, { borderColor: defaultColor, backgroundColor: defaultColor }]}>
         <Icon name="tabler:dots" size={iconSize.xl} color={foreground} />
       </Pressable>
     </HStack>
@@ -244,10 +243,7 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
             size={56}
           />
         </Pressable>
-        <ProfileSwitcherButtons
-          executeProfileAction={executeProfileAction}
-          openSheet={openSheet}
-        />
+        <ProfileSwitcherButtons executeProfileAction={executeProfileAction} openSheet={openSheet} />
       </HStack>
       <Spacer size={spacing.md} />
       <Pressable onPress={handleAvatarPress}>

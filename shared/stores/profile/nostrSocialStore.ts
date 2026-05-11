@@ -61,11 +61,11 @@ interface NostrSocialActions {
 
   syncLikesFromRelay: (
     targetEventIds: string[],
-    likes: Array<{ targetEventId: string; reactionEventId: string; createdAt: number }>
+    likes: { targetEventId: string; reactionEventId: string; createdAt: number }[]
   ) => void;
   syncRepostsFromRelay: (
     targetEventIds: string[],
-    reposts: Array<{ targetEventId: string; repostEventId: string; createdAt: number }>
+    reposts: { targetEventId: string; repostEventId: string; createdAt: number }[]
   ) => void;
 
   setLikeOptimistic: (

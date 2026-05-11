@@ -90,7 +90,7 @@ export function ModelChip() {
   // match send-time behaviour is debuggable from logs alone.
   useEffect(() => {
     if (models.length === 0) return;
-    const cellSnapshots: Array<Record<string, unknown>> = [];
+    const cellSnapshots: Record<string, unknown>[] = [];
     for (const tier of AI_TIERS) {
       for (const provider of AI_PROVIDERS) {
         const modelId = modelIdForSlot(provider.id, tier.id);

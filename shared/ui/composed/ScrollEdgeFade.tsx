@@ -126,9 +126,7 @@ export function ScrollEdgeFade({
     const transparent = opacity(fillColor, 0);
     const mid = opacity(fillColor, 0.75);
     const solid = fillColor;
-    return isTop
-      ? ([solid, mid, transparent] as const)
-      : ([transparent, mid, solid] as const);
+    return isTop ? ([solid, mid, transparent] as const) : ([transparent, mid, solid] as const);
   }, [fillColor, isTop]);
 
   const colorGradientLocations = useMemo(() => {

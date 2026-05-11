@@ -529,7 +529,7 @@ export function useSplitBillParticipantPicker(
   // triggers the image fetch inline and the PFP appears to "pop in" a beat
   // after the row mounts.
   useEffect(() => {
-    prefetchImages(Array.from(profilesByPubkey.values()).map((p) => p?.picture));
+    void prefetchImages(Array.from(profilesByPubkey.values()).map((p) => p?.picture));
   }, [profilesByPubkey]);
 
   // --- Build candidates per source. Dedup across sources by pubkey / peerID. ---

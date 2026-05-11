@@ -279,7 +279,7 @@ export function createSovranScreenActionsBridge({
         unsubscribes.push(
           manager.on('mint:added', ({ mint }: { mint: { mintUrl: string } }) => {
             const mintUrl = mint.mintUrl;
-            (async () => {
+            void (async () => {
               try {
                 const [info, balances] = await Promise.all([
                   getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch(() => null),
@@ -345,7 +345,7 @@ export function createSovranScreenActionsBridge({
         ) {
           mintInfoFetchingUrl = mintUrl;
           const cb = mintInfoCallback;
-          (async () => {
+          void (async () => {
             try {
               const [mintInfo, isTrusted] = await Promise.all([
                 getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch(

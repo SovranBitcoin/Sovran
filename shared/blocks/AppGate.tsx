@@ -43,7 +43,7 @@ function useReinstallDetection(hasSeenOnboarding: boolean): ReinstallState {
     }
 
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const mnemonic = await retrieveMnemonic();
         if (cancelled) return;
@@ -171,7 +171,7 @@ const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
     // restoreStatus === 'unknown' or 'failed' → resolve now.
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const mnemonic = await retrieveMnemonic();
         if (cancelled) return;

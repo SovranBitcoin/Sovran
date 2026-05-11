@@ -44,6 +44,10 @@ export function useHandleCameraPermission() {
           icon: 'material-symbols:settings-rounded',
           variant: 'primary',
           onPress: async () => {
+            // `app-settings:` is the iOS deep link to the app's own Settings
+            // page — not in the http/https/mailto/tel allowlist enforced by
+            // openExternalUrl, but safe here because the scheme is a constant.
+            // eslint-disable-next-line no-restricted-syntax
             await Linking.openURL('app-settings:');
           },
         },

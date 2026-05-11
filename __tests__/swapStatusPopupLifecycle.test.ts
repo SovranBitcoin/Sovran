@@ -9,6 +9,9 @@
  *        useSwapStatusListener.
  */
 
+import { isSwapStatusToastMounted, swapStatusPopup } from '@/shared/lib/popup/popups/payment';
+import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
+
 type ShowCustomToastOptions = { onHide?: () => void };
 
 const mockShowCustomToast = jest.fn<string, [ShowCustomToastOptions]>(() => 'toast-id');
@@ -59,9 +62,6 @@ jest.mock('@/shared/lib/popup/SwapStatusToast', () => ({
 jest.mock('@/shared/lib/popup/PaymentStatusToast', () => ({
   PaymentStatusToast: () => null,
 }));
-
-import { isSwapStatusToastMounted, swapStatusPopup } from '@/shared/lib/popup/popups/payment';
-import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 
 function lastOnHide(): () => void {
   const opts = mockShowCustomToast.mock.calls.at(-1)?.[0];

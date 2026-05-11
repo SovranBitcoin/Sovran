@@ -14,10 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { PROFILE_SCOPED_STORE_KEYS } from '@/shared/lib/cashu/profileScopedStorage';
-import {
-  PROFILE_PRIMARY_UNIT_ID,
-  isBuiltinColorTheme,
-} from '@/shared/lib/theme/builtinAlbums';
+import { PROFILE_PRIMARY_UNIT_ID, isBuiltinColorTheme } from '@/shared/lib/theme/builtinAlbums';
 import { log } from '../logger';
 
 const GLOBAL_MIGRATIONS_COMPLETED_KEY = 'global-migrations-completed';
@@ -113,10 +110,8 @@ async function migrateLegacyGlobalThemeToProfile(): Promise<void> {
       const profileParsed = JSON.parse(profileRaw);
       const profiles: { accountIndex: number; pubkey: string }[] =
         profileParsed?.state?.profiles ?? [];
-      const activeIndex: number | undefined =
-        profileParsed?.state?.activeAccountIndex;
-      const activeProfile =
-        profiles.find((p) => p.accountIndex === activeIndex) ?? profiles[0];
+      const activeIndex: number | undefined = profileParsed?.state?.activeAccountIndex;
+      const activeProfile = profiles.find((p) => p.accountIndex === activeIndex) ?? profiles[0];
 
       if (activeProfile?.pubkey && !isBuiltinColorTheme(legacyTheme)) {
         const themeStoreKey = `theme-store:profile:${activeProfile.pubkey}`;

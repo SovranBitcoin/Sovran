@@ -112,7 +112,7 @@ export function useLocationTiers() {
       }
     }
 
-    compute();
+    void compute();
     return () => {
       cancelled = true;
     };

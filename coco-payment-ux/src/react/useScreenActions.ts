@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useSyncExternalStore } from 'react';
 
 import { useLatestRef } from './useLatestRef';
-import type { CreateAmountActionManagerConfig } from '../amount-actions/types';
+import type { CreateAmountActionManagerConfig , QuickSendSuggestion } from '../amount-actions/types';
 import {
   createScreenActionManager,
   shouldApplyEntryUpdate as defaultShouldApply,
@@ -25,7 +25,6 @@ import {
   decorateEntry as defaultDecorate,
 } from '../screen-actions/createManager';
 import { createDefaultScreenActionHandlers } from '../screen-actions/defaultHandlers';
-import type { QuickSendSuggestion } from '../amount-actions/types';
 import type {
   ActionState,
   DecoratedEntryFields,

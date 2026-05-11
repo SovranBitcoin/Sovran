@@ -65,7 +65,7 @@ export function InitializationGate({
     if (hasStarted.current) return;
     hasStarted.current = true;
 
-    (async () => {
+    void (async () => {
       try {
         stage.log(message);
         initLog(tag, 'starting');

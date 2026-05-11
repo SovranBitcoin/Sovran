@@ -80,8 +80,7 @@ export function resolveIdentityName(input: IdentityNameInputs): string {
   if (input.overrideName?.trim()) return input.overrideName.trim();
   if (input.mintName?.trim()) return input.mintName.trim();
   const nostrDisplay =
-    input.nostrProfile?.display_name?.trim() ||
-    input.nostrProfile?.displayName?.trim();
+    input.nostrProfile?.display_name?.trim() || input.nostrProfile?.displayName?.trim();
   if (nostrDisplay) return nostrDisplay;
   const nostrName = input.nostrProfile?.name?.trim();
   if (nostrName) return nostrName;

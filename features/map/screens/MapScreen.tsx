@@ -232,7 +232,11 @@ export function MapScreen() {
       {/* Show a placeholder background immediately while map loads */}
       {!isMapReady && (
         <View
-          style={[StyleSheet.absoluteFillObject, styles.mapSkeleton, { backgroundColor: skeleton }]}>
+          style={[
+            StyleSheet.absoluteFillObject,
+            styles.mapSkeleton,
+            { backgroundColor: skeleton },
+          ]}>
           <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: opacity(foreground, 0.8), marginTop: 16 }}>
             Loading map...

@@ -12,7 +12,7 @@ import { cashuLog } from '@/shared/lib/logger';
  * - Falls back to an async fetch only if the mint isn't in the local list yet.
  * - Does NOT throw on network errors; silently falls back to null.
  */
-export function useMintInfo(mintUrl: string | String | undefined | null): MintInfo | null {
+export function useMintInfo(mintUrl: string | string | undefined | null): MintInfo | null {
   const { mints, getMintInfo } = useMintManagement();
   // Coerce to primitive string — FormattedString (extends String) breaks === comparisons
   const normalizedUrl = mintUrl ? `${mintUrl}` : null;

@@ -480,7 +480,7 @@ export function UserFeed({
     };
 
     const task = InteractionManager.runAfterInteractions(() => {
-      loadFeedFromPrimal();
+      void loadFeedFromPrimal();
     });
 
     return () => {
@@ -634,7 +634,7 @@ export function UserFeed({
   }, [pubkey, authorName, authorPicture, isOwnProfile, startTransition]);
 
   const handleEndReached = useCallback(() => {
-    loadMoreItems();
+    void loadMoreItems();
   }, [loadMoreItems]);
 
   const getMetrics = useCallback(

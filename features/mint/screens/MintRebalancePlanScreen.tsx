@@ -111,7 +111,7 @@ export function MintRebalancePlanScreen() {
       }
       setMintInfoMap(infoMap);
     };
-    loadMintInfo();
+    void loadMintInfo();
     return () => {
       cancelled = true;
     };

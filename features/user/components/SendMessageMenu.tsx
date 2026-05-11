@@ -1,9 +1,6 @@
 import React, { useMemo } from 'react';
 import { router } from 'expo-router';
-import {
-  ActionMenuButton,
-  type ActionMenuVariant,
-} from '@/shared/ui/composed/ActionMenuButton';
+import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
 import { useWhitenoiseSetup } from '@/features/whitenoise/hooks/useWhitenoiseSetup';
 import Icon from 'assets/icons';
@@ -33,9 +30,7 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
     if (!displayName) return undefined;
     const lower = displayName.trim().toLowerCase();
     if (!lower) return undefined;
-    return peers.find(
-      (p) => p.isConnected && p.nickname.trim().toLowerCase() === lower
-    );
+    return peers.find((p) => p.isConnected && p.nickname.trim().toLowerCase() === lower);
   }, [peers, displayName]);
 
   const variants: ActionMenuVariant[] = useMemo(() => {
@@ -86,9 +81,7 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
           : 'Bluetooth mesh',
         icon: 'mdi:bluetooth',
         isDisabled: !bitchatPeer,
-        reason: bitchatPeer
-          ? undefined
-          : 'No nearby BLE peer matches this contact',
+        reason: bitchatPeer ? undefined : 'No nearby BLE peer matches this contact',
         testID: 'send-message-menu-bitchat',
         onPress: () => {
           if (!bitchatPeer) return;

@@ -158,7 +158,7 @@ export function CameraScreen() {
 
   const handleBarcodeScanned = useCallback(
     (result: { data?: string }) => {
-      if (result?.data) handleScan({ data: result.data, type: 'qr' });
+      if (result?.data) void handleScan({ data: result.data, type: 'qr' });
     },
     [handleScan]
   );

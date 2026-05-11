@@ -251,7 +251,7 @@ export function useThread(eventId: string): UseThreadResult {
     };
 
     const task = InteractionManager.runAfterInteractions(() => {
-      fetchThread();
+      void fetchThread();
     });
 
     return () => {

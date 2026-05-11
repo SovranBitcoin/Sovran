@@ -5,11 +5,7 @@ import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
-import {
-  CIRCLE_SIZE,
-  ICON_SIZE,
-  type CircleActionButtonProps,
-} from './CircleActionButton.types';
+import { CIRCLE_SIZE, ICON_SIZE, type CircleActionButtonProps } from './CircleActionButton.types';
 import { CircleActionButtonShell } from './CircleActionButtonShell';
 
 export function CircleActionButtonBlur(props: CircleActionButtonProps): React.ReactElement {

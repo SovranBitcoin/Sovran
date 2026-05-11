@@ -16,7 +16,11 @@ export interface Crypto extends HybridObject<{
   hashE(pubkeys: ArrayBuffer[]): ArrayBuffer
 
   schnorrSign(seckey: ArrayBuffer, msg: ArrayBuffer): ArrayBuffer
-  schnorrVerify(sig: ArrayBuffer, msg: ArrayBuffer, xonlyPubkey: ArrayBuffer): boolean
+  schnorrVerify(
+    sig: ArrayBuffer,
+    msg: ArrayBuffer,
+    xonlyPubkey: ArrayBuffer
+  ): boolean
 
   seckeyGenerate(): ArrayBuffer
   createBlindSignature(B_: ArrayBuffer, seckey: ArrayBuffer): ArrayBuffer
@@ -102,7 +106,7 @@ export interface Crypto extends HybridObject<{
     key: ArrayBuffer,
     nonce: ArrayBuffer,
     counter: number,
-    data: ArrayBuffer,
+    data: ArrayBuffer
   ): ArrayBuffer
 
   /**
@@ -129,6 +133,6 @@ export interface Crypto extends HybridObject<{
     password: ArrayBuffer,
     salt: ArrayBuffer,
     iterations: number,
-    dkLen: number,
+    dkLen: number
   ): ArrayBuffer
 }

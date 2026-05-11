@@ -20,7 +20,8 @@ export const STATUS_PATH = {
   /** Full 24x24 viewBox. Stroke-dasharray of `STATUS_LENGTH.circle` lets
    *  the circle draw from `STATUS_OFFSET.pendingCircle` (visible quarter)
    *  to 0 (fully drawn). */
-  circle: 'M3 12c0 -4.97 4.03 -9 9 -9c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9Z',
+  circle:
+    'M3 12c0 -4.97 4.03 -9 9 -9c4.97 0 9 4.03 9 9c0 4.97 -4.03 9 -9 9c-4.97 0 -9 -4.03 -9 -9Z',
   checkmark: 'M8 12l3 3l5 -5',
   cross: 'M12 12l4 4M12 12l-4 -4M12 12l-4 4M12 12l4 -4',
 } as const;

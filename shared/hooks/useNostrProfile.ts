@@ -52,7 +52,7 @@ export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchProfile(controller.signal);
+    void fetchProfile(controller.signal);
     return () => controller.abort();
   }, [fetchProfile]);
 

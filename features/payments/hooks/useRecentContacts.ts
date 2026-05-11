@@ -253,7 +253,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       }
     };
 
-    run();
+    void run();
     return () => {
       cancelled = true;
     };

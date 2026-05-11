@@ -97,7 +97,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
       debounceTimeoutRef.current = setTimeout(() => {
-        validateUrl(mintUrl);
+        void validateUrl(mintUrl);
       }, debounceMs);
     },
     [validateUrl, debounceMs]

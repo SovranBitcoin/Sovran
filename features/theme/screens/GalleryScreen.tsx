@@ -55,7 +55,7 @@ export function GalleryScreen() {
   // grouped sections automatically when new albums arrive.
   useEffect(() => {
     const controller = new AbortController();
-    refreshCatalog(controller.signal);
+    void refreshCatalog(controller.signal);
     return () => controller.abort();
   }, []);
 

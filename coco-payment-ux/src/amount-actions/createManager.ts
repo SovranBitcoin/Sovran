@@ -12,8 +12,7 @@
 import { logger } from '../logger';
 import { resolveAmount, resolutionEqual } from './resolve';
 import { computeQuickSendSuggestions } from './suggestions';
-import type { QuickSendSuggestion } from './types';
-import type {
+import type { QuickSendSuggestion ,
   AmountActionManager,
   AmountInputMode,
   AmountResolution,

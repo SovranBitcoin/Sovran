@@ -200,18 +200,20 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
 
   const navigation = useMemo<NavigationCallbacks>(
     () => ({
-      scanQr: async ({ unit, context }) => {
-        if (context === 'receive') {
-          const granted = await requestCameraPermission();
-          paymentLog.info('receive.scan.permission', { granted });
-          if (!granted) return;
-          router.navigate({
-            pathname: '/(receive-flow)/camera',
-            params: { unit },
-          });
-        } else {
-          router.navigate({ pathname: '/camera', params: { unit } });
-        }
+      scanQr: ({ unit, context }) => {
+        void (async () => {
+          if (context === 'receive') {
+            const granted = await requestCameraPermission();
+            paymentLog.info('receive.scan.permission', { granted });
+            if (!granted) return;
+            router.navigate({
+              pathname: '/(receive-flow)/camera',
+              params: { unit },
+            });
+          } else {
+            router.navigate({ pathname: '/camera', params: { unit } });
+          }
+        })();
       },
       mintInfo: (mintInfoEntry) => {
         router.navigate({

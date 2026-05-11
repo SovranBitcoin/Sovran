@@ -72,7 +72,7 @@ export function useMintManagement() {
 
   useEffect(() => {
     if (!manager) return;
-    loadMints();
+    void loadMints();
 
     // Stay reactive to mint changes that happen outside this hook —
     // notably during recovery, where the coco patch refreshes mint info
@@ -85,7 +85,7 @@ export function useMintManagement() {
     // disappeared") and known mints keep stale mintInfo if it was
     // refreshed under them.
     const refresh = () => {
-      loadMints();
+      void loadMints();
     };
     manager.on('mint:added', refresh);
     manager.on('mint:updated', refresh);

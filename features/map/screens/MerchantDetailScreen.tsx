@@ -90,7 +90,7 @@ export function MerchantDetailScreen() {
       }
     };
 
-    loadDetails();
+    void loadDetails();
     return () => controller.abort();
   }, [placeId, fetchPlaceDetails, getCachedPlaceDetails]);
 
@@ -154,20 +154,20 @@ export function MerchantDetailScreen() {
     (method: string, info: string, fullInfo?: string) => {
       switch (method) {
         case 'phone':
-          handleCall(info);
+          void handleCall(info);
           break;
         case 'website':
           const url = fullInfo || info;
-          handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
+          void handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
           break;
         case 'email':
-          handleEmail(info);
+          void handleEmail(info);
           break;
         case 'instagram':
-          handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
+          void handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
           break;
         case 'twitter':
-          handleOpenURL(`https://x.com/${info.replace('@', '')}`);
+          void handleOpenURL(`https://x.com/${info.replace('@', '')}`);
           break;
       }
     },

@@ -250,7 +250,7 @@ function renderMenuPortal(
       <MenuScrim />
       <Menu.Content {...contentProps}>
         {title ? (
-          <Menu.Label className="text-lg font-bold text-foreground ml-3 -mt-2 mb-2">
+          <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
             {title}
           </Menu.Label>
         ) : null}

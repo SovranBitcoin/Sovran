@@ -54,10 +54,7 @@ export function CircleActionButtonShell({
       ]}>
       {children}
       {label ? (
-        <Text
-          size={12}
-          weight="medium"
-          style={[styles.label, { color: opacity(foreground, 0.7) }]}>
+        <Text size={12} weight="medium" style={[styles.label, { color: opacity(foreground, 0.7) }]}>
           {label}
         </Text>
       ) : null}

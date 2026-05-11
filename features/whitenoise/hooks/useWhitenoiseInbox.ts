@@ -54,7 +54,7 @@ export function useWhitenoiseInbox() {
     // other on the AsyncStorage write.
     let cursorHigh = 0;
 
-    (async () => {
+    void (async () => {
       // Prefer the user's published kind-10051 inbox relays if any; fall
       // back to the default app relay set.
       const inboxRelays = await resolveInboxRelays(client.network, selfPubkey, relays);

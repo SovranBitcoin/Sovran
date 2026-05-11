@@ -4,11 +4,7 @@ import { SelectableCheckCircle } from './SelectableCheck.circle';
 import { SelectableCheckSquare } from './SelectableCheck.square';
 import type { SelectableCheckProps } from './types';
 
-export type {
-  SelectableCheckProps,
-  SelectableCheckStyle,
-  SelectableCheckVariant,
-} from './types';
+export type { SelectableCheckProps, SelectableCheckStyle, SelectableCheckVariant } from './types';
 
 /**
  * Selection mark for "is this option selected?" UI. Two styles:

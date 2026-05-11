@@ -190,10 +190,7 @@ export const minTouchTarget = 44;
 // Color is intentionally NOT baked in — pass it from the call site so it
 // adapts to theme.
 
-type Shadow = Pick<
-  ViewStyle,
-  'shadowOffset' | 'shadowOpacity' | 'shadowRadius' | 'elevation'
->;
+type Shadow = Pick<ViewStyle, 'shadowOffset' | 'shadowOpacity' | 'shadowRadius' | 'elevation'>;
 
 export const shadow: Record<'sm' | 'md' | 'lg', Shadow> = {
   /** Subtle card lift. */

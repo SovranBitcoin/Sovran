@@ -653,9 +653,7 @@ function SheetPopup() {
             // its own bottom inset via `contentBottomInset` so the last
             // row clears the iOS home indicator without the wrapper
             // forcing a visible padding band beneath the BlurView.
-            isCustom && layoutConfig?.mode === 'snapPoints'
-              ? 'h-full px-0 pt-0 pb-0'
-              : undefined
+            isCustom && layoutConfig?.mode === 'snapPoints' ? 'h-full px-0 pt-0 pb-0' : undefined
           }
           // Patched flag (see patches/heroui-native+1.0.2.patch): swap
           // heroui's `BottomSheetView` wrapper for a plain RN `View` so

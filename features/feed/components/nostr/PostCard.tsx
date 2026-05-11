@@ -173,9 +173,7 @@ export const PostCard = React.memo(function PostCard({
 
   // ── Thread target: stacked layout (no gutter) ──
   if (isTarget) {
-    const fullDate = event.created_at
-      ? formatDate(event.created_at * 1000, 'short-date-time')
-      : '';
+    const fullDate = event.created_at ? formatDate(event.created_at * 1000, 'short-date-time') : '';
     const truncatedNpub = `${tryNpubEncode(event.pubkey).slice(0, 16)}…`;
 
     return (

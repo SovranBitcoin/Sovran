@@ -10,14 +10,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  TextInput,
-  ActivityIndicator,
-  Keyboard,
-  StyleSheet,
-  Linking,
-  View as RNView,
-} from 'react-native';
+import { TextInput, ActivityIndicator, Keyboard, StyleSheet, View as RNView } from 'react-native';
+import { openExternalUrl } from '@/shared/lib/url';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -144,7 +138,8 @@ function UsernameInput({
         styles.inputContainer,
         {
           backgroundColor: opacity(accentColor, alpha.faint),
-          borderColor: value.length > 0 ? opacity(accentColor, alpha.strong) : opacity(accentColor, 0.25),
+          borderColor:
+            value.length > 0 ? opacity(accentColor, alpha.strong) : opacity(accentColor, 0.25),
         },
       ]}>
       <TextInput
@@ -427,7 +422,7 @@ export function ClaimUsernameScreen() {
     }
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      checkAvailability(username, controller.signal);
+      void checkAvailability(username, controller.signal);
     }, 400);
 
     return () => {
@@ -476,7 +471,7 @@ export function ClaimUsernameScreen() {
     // Navigate to local server with nostr auth as query parameter
     const localUrl = `http://localhost:8080/api/npubcash-server/username?nostr:authorization=${encodedAuth}`;
 
-    Linking.openURL(localUrl);
+    void openExternalUrl(localUrl);
   }, [nostrKeys?.privateKey, username, selectedDomain]);
 
   const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)!.value;
@@ -649,7 +644,10 @@ export function ClaimUsernameScreen() {
                   <Text
                     size={18}
                     heavy
-                    style={{ color: opacity(foreground, alpha.prominent), fontFamily: 'monospace' }}>
+                    style={{
+                      color: opacity(foreground, alpha.prominent),
+                      fontFamily: 'monospace',
+                    }}>
                     {username}@{selectedDomainLabel}
                   </Text>
                 </View>

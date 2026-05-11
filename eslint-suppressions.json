@@ -1,17 +1,7 @@
 {
-  "__tests__/themeMigration.test.ts": {
-    "prettier/prettier": {
-      "count": 2
-    }
-  },
   "app/(drawer)/(tabs)/_layout.tsx": {
     "no-restricted-syntax": {
       "count": 4
-    }
-  },
-  "app/(drawer)/_layout.tsx": {
-    "prettier/prettier": {
-      "count": 1
     }
   },
   "app/(mint-flow)/list.tsx": {
@@ -19,19 +9,9 @@
       "count": 1
     }
   },
-  "app/(split-bill-flow)/detail.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "app/(stories-flow)/_layout.tsx": {
     "no-restricted-syntax": {
       "count": 1
-    }
-  },
-  "app/_layout.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
     }
   },
   "assets/icons/index.tsx": {
@@ -45,48 +25,10 @@
   "coco-payment-ux/__tests__/_harness/createTestMachine.ts": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
-    },
-    "unused-imports/no-unused-imports": {
-      "count": 1
     }
   },
   "coco-payment-ux/__tests__/_harness/mockOperations.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/__tests__/_harness/types.ts": {
-    "unused-imports/no-unused-imports": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/__tests__/flows/ecash-send.test.ts": {
-    "unused-imports/no-unused-imports": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/__tests__/flows/execute-routing.test.ts": {
-    "unused-imports/no-unused-imports": {
-      "count": 2
-    }
-  },
-  "coco-payment-ux/__tests__/flows/interruptions.test.ts": {
-    "unused-imports/no-unused-imports": {
-      "count": 2
-    }
-  },
-  "coco-payment-ux/__tests__/flows/payment-request.test.ts": {
-    "unused-imports/no-unused-imports": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/__tests__/flows/receive-token.test.ts": {
-    "unused-imports/no-unused-imports": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/__tests__/integration/machine-flow.test.ts": {
-    "@typescript-eslint/no-floating-promises": {
       "count": 1
     }
   },
@@ -105,11 +47,6 @@
       "count": 6
     }
   },
-  "coco-payment-ux/__tests__/unit/annotate.test.ts": {
-    "unused-imports/no-unused-imports": {
-      "count": 2
-    }
-  },
   "coco-payment-ux/__tests__/unit/core-factory.test.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 4
@@ -122,11 +59,6 @@
   },
   "coco-payment-ux/__tests__/unit/guards.test.ts": {
     "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/__tests__/unit/mint-selection.test.ts": {
-    "unused-imports/no-unused-imports": {
       "count": 1
     }
   },
@@ -143,9 +75,6 @@
   "coco-payment-ux/src/machine/createMachine.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    },
-    "@typescript-eslint/no-floating-promises": {
-      "count": 4
     }
   },
   "coco-payment-ux/src/machine/transitions.ts": {
@@ -187,68 +116,13 @@
       "count": 1
     }
   },
-  "eslint.config.js": {
-    "no-undef": {
-      "count": 1
-    }
-  },
-  "expo-env.d.ts": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
   "features/ai/hooks/useAiSend.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 6
     }
   },
-  "features/ai/lib/format.ts": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "features/bitchat/hooks/useBitChat.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    }
-  },
-  "features/bitchat/hooks/useLocationTiers.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/camera/hooks/useHandleCameraPermission.ts": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "features/camera/screens/CameraScreen/CameraScreen.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/contacts/screens/ContactsScreen.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/feed/components/HomeFeed.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 3
-    }
-  },
-  "features/feed/components/UserFeed.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    }
-  },
   "features/feed/components/nostr/MetricsFooter.tsx": {
     "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "features/feed/components/nostr/PostCard.tsx": {
-    "prettier/prettier": {
       "count": 1
     }
   },
@@ -285,39 +159,18 @@
       "count": 3
     }
   },
-  "features/feed/hooks/useThread.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/feed/screens/StoriesScreen.tsx": {
-    "unused-imports/no-unused-imports": {
-      "count": 1
-    }
-  },
   "features/map/screens/MapScreen.tsx": {
     "no-restricted-syntax": {
-      "count": 1
-    },
-    "prettier/prettier": {
       "count": 1
     }
   },
   "features/map/screens/MerchantDetailScreen.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 6
-    },
     "no-restricted-syntax": {
       "count": 1
     }
   },
   "features/mint/components/distribution/DistributionBar.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "features/mint/components/distribution/DistributionSlider.tsx": {
-    "@typescript-eslint/no-floating-promises": {
       "count": 1
     }
   },
@@ -331,49 +184,13 @@
       "count": 1
     }
   },
-  "features/mint/hooks/useAuditedMint.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/mint/hooks/useAuditedMints.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 3
-    }
-  },
-  "features/mint/hooks/useDebouncedMintValidation.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/mint/hooks/useMintManagement.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    }
-  },
-  "features/mint/hooks/useMintRebalanceOrchestrator.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/mint/hooks/useSovranDiscoveredMints.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "features/mint/screens/MintDistributionScreen.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
-    },
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
     }
   },
   "features/mint/screens/MintRebalancePlanScreen.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-floating-promises": {
       "count": 1
     }
   },
@@ -382,47 +199,13 @@
       "count": 1
     }
   },
-  "features/onboarding/screens/ClaimUsernameScreen.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    },
-    "no-restricted-syntax": {
-      "count": 1
-    },
-    "prettier/prettier": {
-      "count": 2
-    }
-  },
-  "features/payments/hooks/useContactSearch.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/payments/hooks/useMintContacts.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 3
-    }
-  },
-  "features/payments/hooks/useRecentContacts.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "features/payments/lib/decryptNip04Events.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },
-  "features/send/lib/createSovranScreenActionsBridge.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    }
-  },
   "features/send/providers/CocoPaymentUX.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    },
-    "@typescript-eslint/no-misused-promises": {
       "count": 1
     }
   },
@@ -431,16 +214,8 @@
       "count": 1
     }
   },
-  "features/settings/screens/SettingsKeyringScreen.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "features/settings/screens/SettingsRecoveryScreen.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    },
-    "@typescript-eslint/no-floating-promises": {
       "count": 1
     }
   },
@@ -449,35 +224,9 @@
       "count": 2
     }
   },
-  "features/settings/screens/SettingsScreen.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    },
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
   "features/splitBill/components/ParticipantCard.tsx": {
     "no-restricted-syntax": {
       "count": 10
-    },
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "features/splitBill/components/ParticipantCardDeck.tsx": {
-    "prettier/prettier": {
-      "count": 6
-    }
-  },
-  "features/splitBill/components/ParticipantStatusIcon.tsx": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "features/splitBill/hooks/useSplitBillParticipantPicker.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
     }
   },
   "features/theme/components/UnitPreviewCard.tsx": {
@@ -491,9 +240,6 @@
     }
   },
   "features/theme/screens/GalleryScreen.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    },
     "no-restricted-syntax": {
       "count": 1
     }
@@ -503,18 +249,8 @@
       "count": 1
     }
   },
-  "features/transactions/components/SwipeableRow.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    }
-  },
   "features/transactions/components/TransactionLocationSection.tsx": {
     "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "features/transactions/hooks/useHistoryWithMelts.ts": {
-    "@typescript-eslint/no-floating-promises": {
       "count": 1
     }
   },
@@ -527,30 +263,11 @@
     "@typescript-eslint/no-explicit-any": {
       "count": 2
     },
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    },
     "no-restricted-syntax": {
       "count": 1
-    },
-    "prettier/prettier": {
-      "count": 167
-    }
-  },
-  "features/user/components/SendMessageMenu.tsx": {
-    "prettier/prettier": {
-      "count": 3
-    }
-  },
-  "features/user/screens/UserProfileScreen.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 4
     }
   },
   "features/wallet/components/BitcoinNearYou.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    },
     "no-restricted-syntax": {
       "count": 1
     }
@@ -558,23 +275,10 @@
   "features/whitenoise/client/network.ts": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
-    },
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
     }
   },
   "features/whitenoise/components/WhitenoiseSetupBanner.tsx": {
     "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "features/whitenoise/hooks/useWhitenoiseDM.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "features/whitenoise/hooks/useWhitenoiseInbox.ts": {
-    "@typescript-eslint/no-floating-promises": {
       "count": 1
     }
   },
@@ -584,26 +288,6 @@
     },
     "no-restricted-syntax": {
       "count": 1
-    }
-  },
-  "packages/nutpatch/src/crypto/NUT12.ts": {
-    "prettier/prettier": {
-      "count": 5
-    }
-  },
-  "packages/nutpatch/src/crypto/core.ts": {
-    "prettier/prettier": {
-      "count": 29
-    }
-  },
-  "packages/nutpatch/src/crypto/utils.ts": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "packages/nutpatch/src/specs/Crypto.nitro.ts": {
-    "prettier/prettier": {
-      "count": 3
     }
   },
   "redux/cashu/types.deprecated.ts": {
@@ -626,24 +310,6 @@
       "count": 29
     }
   },
-  "shared/blocks/AppGate.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 2
-    }
-  },
-  "shared/blocks/DrawerProfileChrome.tsx": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    },
-    "prettier/prettier": {
-      "count": 2
-    }
-  },
-  "shared/blocks/InitializationGate.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "shared/blocks/popup/ActionMenuHost.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
@@ -655,9 +321,6 @@
     },
     "@typescript-eslint/no-explicit-any": {
       "count": 3
-    },
-    "prettier/prettier": {
-      "count": 1
     }
   },
   "shared/blocks/transfer/TransferEntryRow.tsx": {
@@ -670,23 +333,8 @@
       "count": 3
     }
   },
-  "shared/hooks/useNostrProfile.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "shared/hooks/useReservedProofs.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "shared/hooks/useThemeColor.ts": {
     "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "shared/hooks/useVersionCheck.ts": {
-    "@typescript-eslint/no-floating-promises": {
       "count": 1
     }
   },
@@ -700,19 +348,9 @@
       "count": 3
     }
   },
-  "shared/lib/date.ts": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
   "shared/lib/downloadedThemeRegistry.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
-    }
-  },
-  "shared/lib/identity.ts": {
-    "prettier/prettier": {
-      "count": 1
     }
   },
   "shared/lib/map/btcMapClusterCache.ts": {
@@ -730,16 +368,6 @@
       "count": 3
     }
   },
-  "shared/lib/migrations/globalMigrations.ts": {
-    "prettier/prettier": {
-      "count": 3
-    }
-  },
-  "shared/lib/nostr/secureStorage.ts": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "shared/lib/persist/createMergeWithSchema.ts": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
@@ -751,16 +379,6 @@
     },
     "no-restricted-syntax": {
       "count": 2
-    }
-  },
-  "shared/lib/popup/animatedStatusShapes.ts": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/lib/popup/popups/emojiPicker.tsx": {
-    "prettier/prettier": {
-      "count": 4
     }
   },
   "shared/lib/routstr/api.ts": {
@@ -784,32 +402,9 @@
       "count": 4
     }
   },
-  "shared/providers/CocoProvider.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "shared/providers/NostrKeysProvider.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
-  "shared/providers/OfflineProvider.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 3
-    }
-  },
-  "shared/providers/WalletContextProvider.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    }
-  },
   "shared/providers/hero-transition/HeroTransitionProvider.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 3
-    },
-    "@typescript-eslint/no-misused-promises": {
-      "count": 2
     },
     "no-restricted-syntax": {
       "count": 1
@@ -825,33 +420,8 @@
       "count": 1
     }
   },
-  "shared/stores/global/wallpaperStore.ts": {
-    "unused-imports/no-unused-imports": {
-      "count": 1
-    }
-  },
   "shared/stores/profile/restoreActiveSessionView.ts": {
     "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
-  "shared/styles/tokens.ts": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/capability/defineVariants.tsx": {
-    "prettier/prettier": {
-      "count": 2
-    }
-  },
-  "shared/ui/capability/index.tsx": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/ActionMenuButton.tsx": {
-    "prettier/prettier": {
       "count": 1
     }
   },
@@ -860,47 +430,14 @@
       "count": 1
     }
   },
-  "shared/ui/composed/BalancePill/BalancePill.liquid.tsx": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/BootEntrance.tsx": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
   "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/CircleActionButton/CircleActionButton.blur.tsx": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/CircleActionButton/CircleActionButton.flat.tsx": {
-    "prettier/prettier": {
       "count": 1
     }
   },
   "shared/ui/composed/CircleActionButton/CircleActionButton.liquid.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    },
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/CircleActionButton/CircleActionButtonShell.tsx": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/CustomKeyboard.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 3
     }
   },
   "shared/ui/composed/QRButton/QRButton.android.tsx": {
@@ -911,24 +448,11 @@
   "shared/ui/composed/QRButton/QRButton.ios.tsx": {
     "no-restricted-syntax": {
       "count": 2
-    },
-    "prettier/prettier": {
-      "count": 1
     }
   },
   "shared/ui/composed/RowStatsAccent.tsx": {
     "no-restricted-syntax": {
       "count": 2
-    }
-  },
-  "shared/ui/composed/ScrollEdgeFade.tsx": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/SectionAnchorList.tsx": {
-    "prettier/prettier": {
-      "count": 1
     }
   },
   "shared/ui/composed/SpriteView.tsx": {
@@ -942,24 +466,8 @@
     }
   },
   "shared/ui/composed/chat/LiquidChatComposer.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
-    },
     "no-restricted-syntax": {
       "count": 4
-    },
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/composed/chat/useChatSurfacePerfLogger.ts": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
-  "shared/ui/primitives/Avatar.tsx": {
-    "@typescript-eslint/no-floating-promises": {
-      "count": 1
     }
   },
   "shared/ui/primitives/Button.tsx": {
@@ -972,17 +480,9 @@
       "count": 1
     }
   },
-  "shared/ui/primitives/SelectableCheck/index.tsx": {
-    "prettier/prettier": {
-      "count": 1
-    }
-  },
   "shared/ui/primitives/Text.tsx": {
     "no-restricted-syntax": {
       "count": 3
-    },
-    "prettier/prettier": {
-      "count": 2
     }
   },
   "shared/ui/primitives/View/HStack.tsx": {
@@ -993,19 +493,6 @@
   "shared/ui/primitives/View/VStack.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    }
-  },
-  "shim.js": {
-    "@typescript-eslint/ban-ts-comment": {
-      "count": 1
-    },
-    "no-var": {
-      "count": 1
-    }
-  },
-  "uniwind-types.d.ts": {
-    "prettier/prettier": {
-      "count": 4
     }
   }
 }

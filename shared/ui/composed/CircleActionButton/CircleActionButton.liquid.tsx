@@ -8,11 +8,7 @@ import {
 import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import {
-  CIRCLE_SIZE,
-  ICON_SIZE,
-  type CircleActionButtonProps,
-} from './CircleActionButton.types';
+import { CIRCLE_SIZE, ICON_SIZE, type CircleActionButtonProps } from './CircleActionButton.types';
 import { CircleActionButtonShell } from './CircleActionButtonShell';
 
 /**

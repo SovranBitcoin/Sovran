@@ -132,7 +132,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       }
     };
 
-    initializeCoco();
+    void initializeCoco();
 
     return () => {
       // Reset the start-guard so a deps change (e.g. profile switch flipping

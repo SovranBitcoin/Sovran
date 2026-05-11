@@ -35,7 +35,12 @@ export function ParticipantStatusIcon({ participant, foreground, danger, success
         name="ant-design:loading-outlined"
         size={22}
         color={opacity(foreground, 0.4)}
-        spin={{ duration: duration.spin, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
+        spin={{
+          duration: duration.spin,
+          outputRange: ['0deg', '360deg'],
+          delay: 0,
+          easing: 'linear',
+        }}
       />
     );
   }

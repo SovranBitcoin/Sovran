@@ -91,10 +91,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
     node?.measureInWindow?.((x, y, w, h) => {
       if (!w || !h) return;
       setQRButtonAnchor({ x, y, width: w, height: h, borderRadius });
-      initLog(
-        'QRButtonAnchor',
-        `measureInWindow(JS) — x=${x} y=${y} width=${w} height=${h}`
-      );
+      initLog('QRButtonAnchor', `measureInWindow(JS) — x=${x} y=${y} width=${w} height=${h}`);
     });
   }, [animatedRef, borderRadius]);
 

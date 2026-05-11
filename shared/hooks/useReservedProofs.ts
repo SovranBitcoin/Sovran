@@ -46,7 +46,7 @@ export function useReservedProofs(): ReservedProofsResult {
     }
 
     // Initial load (no debounce)
-    loadReserved();
+    void loadReserved();
 
     manager.on('proofs:reserved', scheduleLoad);
     manager.on('proofs:released', scheduleLoad);

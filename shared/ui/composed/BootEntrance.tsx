@@ -8,10 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import {
-  getBootSplashHandoff,
-  useBootSplashHandoff,
-} from '@/shared/lib/qrButtonAnchor';
+import { getBootSplashHandoff, useBootSplashHandoff } from '@/shared/lib/qrButtonAnchor';
 
 interface BootEntranceProps {
   children: React.ReactNode;

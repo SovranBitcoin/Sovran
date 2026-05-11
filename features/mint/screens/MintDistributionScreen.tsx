@@ -144,7 +144,7 @@ export function MintDistributionScreen() {
       });
       setMintInfoMap(infoMap);
     };
-    loadMintInfo();
+    void loadMintInfo();
   }, [trustedMints, getMintInfo]);
 
   const handleDistributionChange = useCallback(

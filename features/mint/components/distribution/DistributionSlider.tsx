@@ -83,7 +83,7 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
 
   const fireHaptic = useCallback(() => {
     if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, []);
 

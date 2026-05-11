@@ -955,7 +955,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       const errorData = stepData as StepDataMap['error'];
       const notificationHandler = notifications[errorData.code];
       if (notificationHandler) {
-        notificationHandler(errorData);
+        void notificationHandler(errorData);
       }
     }
 
@@ -1067,7 +1067,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           try {
             result = await sourceFn();
           } catch (err) {
-            notifications?.onScanError?.(
+            void notifications?.onScanError?.(
               source,
               err instanceof Error ? err : new Error(String(err))
             );
@@ -1078,11 +1078,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             return { urInProgress: false };
           }
           if ('empty' in result && result.empty) {
-            notifications?.onScanEmpty?.(source);
+            void notifications?.onScanEmpty?.(source);
             return { urInProgress: false };
           }
           if ('error' in result && result.error) {
-            notifications?.onScanError?.(source, result.error);
+            void notifications?.onScanError?.(source, result.error);
             return { urInProgress: false };
           }
           if ('data' in result && result.data) {

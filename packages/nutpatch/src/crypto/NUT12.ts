@@ -18,14 +18,14 @@ export const verifyDLEQProof = (
   dleq: DLEQ,
   B_: WeierstrassPoint<bigint>,
   C_: WeierstrassPoint<bigint>,
-  A: WeierstrassPoint<bigint>,
+  A: WeierstrassPoint<bigint>
 ): boolean => {
   return getInstance().verifyDleqProof(
     toBuffer(B_.toBytes(true)),
     toBuffer(C_.toBytes(true)),
     toBuffer(A.toBytes(true)),
     toBuffer(dleq.s),
-    toBuffer(dleq.e),
+    toBuffer(dleq.e)
   )
 }
 
@@ -33,7 +33,7 @@ export const verifyDLEQProof_reblind = (
   secret: Uint8Array,
   dleq: DLEQ,
   C: WeierstrassPoint<bigint>,
-  A: WeierstrassPoint<bigint>,
+  A: WeierstrassPoint<bigint>
 ): boolean => {
   if (dleq.r === undefined)
     throw new Error('verifyDLEQProof_reblind: Undefined blinding factor')
@@ -48,10 +48,10 @@ export const verifyDLEQProof_reblind = (
 
 export const createDLEQProof = (
   B_: WeierstrassPoint<bigint>,
-  a: Uint8Array,
+  a: Uint8Array
 ): DLEQ => {
   const result = new Uint8Array(
-    getInstance().createDleqProof(toBuffer(B_.toBytes(true)), toBuffer(a)),
+    getInstance().createDleqProof(toBuffer(B_.toBytes(true)), toBuffer(a))
   )
   return {
     s: result.slice(0, 32),

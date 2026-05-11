@@ -334,7 +334,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       return;
     }
     const controller = new AbortController();
-    fetchDiscoveredMintUrls(
+    void fetchDiscoveredMintUrls(
       mints.map((m) => m.mintUrl),
       controller.signal
     ).then((urls) => {

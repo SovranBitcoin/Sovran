@@ -255,8 +255,12 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const value = useMemo<Ctx>(
     () => ({
       registerRef,
-      startClaimUsername,
-      closeClaimUsername,
+      startClaimUsername: () => {
+        void startClaimUsername();
+      },
+      closeClaimUsername: () => {
+        void closeClaimUsername();
+      },
       isHidden,
       isAnimating,
       isTransitioning,

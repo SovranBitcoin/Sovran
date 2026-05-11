@@ -40,32 +40,37 @@ function getInstance(): Crypto {
   return _instance
 }
 
-
 export function hashToCurve(secret: Uint8Array): WeierstrassPoint<bigint> {
   return toPoint(getInstance().hashToCurve(toBuffer(secret)))
 }
 
-export function blindMessage(secret: Uint8Array, r?: bigint): RawBlindedMessage {
-  const scalar: bigint = r ?? secp256k1.Point.Fn.fromBytes(secp256k1.utils.randomSecretKey())
-  const B_ = toPoint(getInstance().blind(toBuffer(secret), bigintToBuffer(scalar)))
+export function blindMessage(
+  secret: Uint8Array,
+  r?: bigint
+): RawBlindedMessage {
+  const scalar: bigint =
+    r ?? secp256k1.Point.Fn.fromBytes(secp256k1.utils.randomSecretKey())
+  const B_ = toPoint(
+    getInstance().blind(toBuffer(secret), bigintToBuffer(scalar))
+  )
   return { B_, r: scalar, secret }
 }
 
 export function unblindSignature(
   C_: WeierstrassPoint<bigint>,
   r: bigint,
-  A: WeierstrassPoint<bigint>,
+  A: WeierstrassPoint<bigint>
 ): WeierstrassPoint<bigint> {
   return toPoint(
     getInstance().unblind(
       toBuffer(C_.toBytes(true)),
       bigintToBuffer(r),
-      toBuffer(A.toBytes(true)),
-    ),
+      toBuffer(A.toBytes(true))
+    )
   )
 }
 
-export function hash_e(pubkeys: Array<WeierstrassPoint<bigint>>): Uint8Array {
+export function hash_e(pubkeys: WeierstrassPoint<bigint>[]): Uint8Array {
   const e_ = pubkeys.map((p) => p.toHex(false)).join('')
   return sha256(new TextEncoder().encode(e_))
 }
@@ -85,7 +90,7 @@ export function createRandomSecretKey(): Uint8Array {
 export function createBlindSignature(
   B_: WeierstrassPoint<bigint>,
   privateKey: Uint8Array,
-  id: string,
+  id: string
 ): BlindSignature {
   const a = secp256k1.Point.Fn.fromBytes(privateKey)
   const C_: WeierstrassPoint<bigint> = B_.multiply(a)
@@ -102,7 +107,7 @@ export function constructUnblindedSignature(
   blindSig: BlindSignature,
   r: bigint,
   secret: Uint8Array,
-  key: WeierstrassPoint<bigint>,
+  key: WeierstrassPoint<bigint>
 ): UnblindedSignature {
   const C = unblindSignature(blindSig.C_, r, key)
   return { id: blindSig.id, secret, C }
@@ -123,18 +128,28 @@ export function getKeysetIdInt(keysetId: string): bigint {
 export function computeMessageDigest(message: string): Uint8Array
 export function computeMessageDigest(message: string, asHex: false): Uint8Array
 export function computeMessageDigest(message: string, asHex: true): string
-export function computeMessageDigest(message: string, asHex = false): string | Uint8Array {
+export function computeMessageDigest(
+  message: string,
+  asHex = false
+): string | Uint8Array {
   const hashBytes = sha256(new TextEncoder().encode(message))
   return asHex ? bytesToHex(hashBytes) : hashBytes
 }
 
-export const schnorrSignDigest = (digest: DigestInput, privateKey: PrivKey): string => {
+export const schnorrSignDigest = (
+  digest: DigestInput,
+  privateKey: PrivKey
+): string => {
   const digestBytes = typeof digest === 'string' ? hexToBytes(digest) : digest
-  const privKeyBytes = typeof privateKey === 'string' ? hexToBytes(privateKey) : privateKey
+  const privKeyBytes =
+    typeof privateKey === 'string' ? hexToBytes(privateKey) : privateKey
   return bytesToHex(schnorr.sign(digestBytes, privKeyBytes))
 }
 
-export const schnorrSignMessage = (message: string, privateKey: PrivKey): string => {
+export const schnorrSignMessage = (
+  message: string,
+  privateKey: PrivKey
+): string => {
   return schnorrSignDigest(computeMessageDigest(message), privateKey)
 }
 
@@ -142,7 +157,7 @@ export const schnorrVerifyMessage = (
   signature: string,
   message: string,
   pubkey: string,
-  throws: boolean = false,
+  throws: boolean = false
 ): boolean => {
   try {
     const msghash = computeMessageDigest(message)
@@ -157,11 +172,11 @@ export const schnorrVerifyMessage = (
 export function getValidSigners(
   signatures: string[],
   message: string,
-  pubkeys: string[],
+  pubkeys: string[]
 ): string[] {
   const uniquePubs = Array.from(new Set(pubkeys))
   return uniquePubs.filter((pubkey) =>
-    signatures.some((sig) => schnorrVerifyMessage(sig, message, pubkey)),
+    signatures.some((sig) => schnorrVerifyMessage(sig, message, pubkey))
   )
 }
 
@@ -169,7 +184,7 @@ export const meetsSignerThreshold = (
   signatures: string[],
   message: string,
   pubkeys: string[],
-  threshold: number = 1,
+  threshold: number = 1
 ): boolean => {
   return getValidSigners(signatures, message, pubkeys).length >= threshold
 }
@@ -187,10 +202,17 @@ export const meetsSignerThreshold = (
  * unwrapping. The ECDH is the dominant cost in those paths
  * (~5–15 ms per call in pure JS); native drops it to sub-millisecond.
  */
-export function nip44Ecdh(seckey: Uint8Array, xonlyPubkey: Uint8Array): Uint8Array {
-  if (seckey.length !== 32) throw new Error('nip44Ecdh: seckey must be 32 bytes')
-  if (xonlyPubkey.length !== 32) throw new Error('nip44Ecdh: xonlyPubkey must be 32 bytes')
-  return new Uint8Array(getInstance().ecdhNip44(toBuffer(seckey), toBuffer(xonlyPubkey)))
+export function nip44Ecdh(
+  seckey: Uint8Array,
+  xonlyPubkey: Uint8Array
+): Uint8Array {
+  if (seckey.length !== 32)
+    throw new Error('nip44Ecdh: seckey must be 32 bytes')
+  if (xonlyPubkey.length !== 32)
+    throw new Error('nip44Ecdh: xonlyPubkey must be 32 bytes')
+  return new Uint8Array(
+    getInstance().ecdhNip44(toBuffer(seckey), toBuffer(xonlyPubkey))
+  )
 }
 
 /**
@@ -201,12 +223,15 @@ export function nip44Ecdh(seckey: Uint8Array, xonlyPubkey: Uint8Array): Uint8Arr
  */
 export function nip44EcdhBatch(
   seckey: Uint8Array,
-  xonlyPubkeys: Uint8Array[],
+  xonlyPubkeys: Uint8Array[]
 ): Uint8Array[] {
-  if (seckey.length !== 32) throw new Error('nip44EcdhBatch: seckey must be 32 bytes')
+  if (seckey.length !== 32)
+    throw new Error('nip44EcdhBatch: seckey must be 32 bytes')
   if (xonlyPubkeys.length === 0) return []
   const buffers = xonlyPubkeys.map(toBuffer)
-  const flat = new Uint8Array(getInstance().batchEcdhNip44(toBuffer(seckey), buffers))
+  const flat = new Uint8Array(
+    getInstance().batchEcdhNip44(toBuffer(seckey), buffers)
+  )
   const out: Uint8Array[] = new Array(xonlyPubkeys.length)
   for (let i = 0; i < xonlyPubkeys.length; i++) {
     out[i] = flat.slice(i * 32, (i + 1) * 32)
@@ -223,12 +248,18 @@ export function chacha20Ietf(
   key: Uint8Array,
   nonce: Uint8Array,
   counter: number,
-  data: Uint8Array,
+  data: Uint8Array
 ): Uint8Array {
   if (key.length !== 32) throw new Error('chacha20Ietf: key must be 32 bytes')
-  if (nonce.length !== 12) throw new Error('chacha20Ietf: nonce must be 12 bytes')
+  if (nonce.length !== 12)
+    throw new Error('chacha20Ietf: nonce must be 12 bytes')
   return new Uint8Array(
-    getInstance().chacha20Ietf(toBuffer(key), toBuffer(nonce), counter, toBuffer(data)),
+    getInstance().chacha20Ietf(
+      toBuffer(key),
+      toBuffer(nonce),
+      counter,
+      toBuffer(data)
+    )
   )
 }
 
@@ -252,7 +283,7 @@ export function pbkdf2HmacSha512(
   password: Uint8Array,
   salt: Uint8Array,
   iterations: number = 2048,
-  dkLen: number = 64,
+  dkLen: number = 64
 ): Uint8Array {
   if (!Number.isFinite(iterations) || iterations < 1) {
     throw new Error('pbkdf2HmacSha512: iterations must be a positive integer')
@@ -261,6 +292,11 @@ export function pbkdf2HmacSha512(
     throw new Error('pbkdf2HmacSha512: dkLen must be a positive integer')
   }
   return new Uint8Array(
-    getInstance().pbkdf2HmacSha512(toBuffer(password), toBuffer(salt), iterations, dkLen),
+    getInstance().pbkdf2HmacSha512(
+      toBuffer(password),
+      toBuffer(salt),
+      iterations,
+      dkLen
+    )
   )
 }

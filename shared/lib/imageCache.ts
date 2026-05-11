@@ -65,7 +65,7 @@ export async function prefetchImage(url?: string | null): Promise<void> {
 }
 
 export async function prefetchImages(
-  urls: Array<string | null | undefined> | undefined
+  urls: (string | null | undefined)[] | undefined
 ): Promise<void> {
   if (!urls || urls.length === 0) return;
   const newUrls = urls.filter((u) => u && !prefetchedUrls.has(u.trim()));

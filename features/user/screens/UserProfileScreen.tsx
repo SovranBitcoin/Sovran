@@ -882,7 +882,9 @@ export function UserProfileScreen() {
         prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
         title: truncateMiddle(npub, 10),
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(npub, 'npub'),
+        onPress: () => {
+          void handleCopy(npub, 'npub');
+        },
       },
     ];
 
@@ -893,7 +895,9 @@ export function UserProfileScreen() {
         prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
         title: nip05,
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(nip05, 'nip05'),
+        onPress: () => {
+          void handleCopy(nip05, 'nip05');
+        },
       });
     }
 
@@ -904,7 +908,9 @@ export function UserProfileScreen() {
         prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
         title: lud16,
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(lud16, 'lud16'),
+        onPress: () => {
+          void handleCopy(lud16, 'lud16');
+        },
       });
     }
 
@@ -915,7 +921,9 @@ export function UserProfileScreen() {
         prefix: <Icon name="mdi:web" size={20} color={iconColor} />,
         title: website,
         suffixIcon: 'mdi:open-in-new',
-        onPress: () => handleOpenLink(website),
+        onPress: () => {
+          void handleOpenLink(website);
+        },
       });
     }
 

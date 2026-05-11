@@ -96,7 +96,7 @@ export function useMintContacts(
       }
     };
 
-    loadMintInfo();
+    void loadMintInfo();
     return () => {
       cancelled = true;
     };
@@ -107,7 +107,7 @@ export function useMintContacts(
 
   // Prefetch mint icons
   useEffect(() => {
-    prefetchImages(mintsWithInfo.map(({ mintInfo }) => mintInfo?.icon_url));
+    void prefetchImages(mintsWithInfo.map(({ mintInfo }) => mintInfo?.icon_url));
   }, [mintsWithInfo]);
 
   // NDK's useSubscribe returns a fresh `dmEvents` array reference on every
@@ -190,7 +190,7 @@ export function useMintContacts(
       }
     };
 
-    run();
+    void run();
     return () => {
       cancelled = true;
     };

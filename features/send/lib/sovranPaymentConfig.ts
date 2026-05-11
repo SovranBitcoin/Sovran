@@ -111,7 +111,7 @@ export function createSovranExecuteReceive(
     try {
       const beforeHistory = await manager.history.getPaginatedHistory(0, 100);
       beforeIds = new Set(
-        (beforeHistory as ReadonlyArray<Record<string, unknown>>)
+        (beforeHistory as readonly Record<string, unknown>[])
           .filter((h) => h.type === 'receive' && h.mintUrl === mintUrl)
           .map((h) => (typeof h.id === 'string' ? h.id : ''))
           .filter((id) => id.length > 0)
@@ -155,7 +155,7 @@ export function createSovranExecuteReceive(
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         const after = await manager.history.getPaginatedHistory(0, 100);
-        const newEntry = (after as ReadonlyArray<Record<string, unknown>>).find((h) => {
+        const newEntry = (after as readonly Record<string, unknown>[]).find((h) => {
           const id = typeof h.id === 'string' ? h.id : '';
           return (
             h.type === 'receive' && h.mintUrl === mintUrl && id.length > 0 && !beforeIds.has(id)

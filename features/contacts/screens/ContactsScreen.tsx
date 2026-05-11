@@ -204,7 +204,7 @@ export const ContactsScreen = () => {
   const { metadata: profilesMap } = useNostrProfileMetadataMany(allPubkeys);
 
   useEffect(() => {
-    prefetchImages(Array.from(profilesMap.values()).map((p) => p.picture));
+    void prefetchImages(Array.from(profilesMap.values()).map((p) => p.picture));
   }, [profilesMap]);
 
   const trimmedQuery = searchQuery.trim();

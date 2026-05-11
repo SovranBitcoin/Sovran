@@ -102,7 +102,7 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
       const { normalized, original } = urlsToFetch[queueIndex++]!;
 
       if (fetchingRef.current.has(normalized)) {
-        fetchNext();
+        void fetchNext();
         return;
       }
 
@@ -153,12 +153,12 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
       } finally {
         fetchingRef.current.delete(normalized);
         activeCount--;
-        fetchNext();
+        void fetchNext();
       }
     };
 
     for (let i = 0; i < Math.min(CONCURRENT_LIMIT, urlsToFetch.length); i++) {
-      fetchNext();
+      void fetchNext();
     }
 
     return () => controller.abort();

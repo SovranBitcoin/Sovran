@@ -58,7 +58,7 @@ export const useVersionCheck = () => {
       }
     };
 
-    checkForUpdates();
+    void checkForUpdates();
     return () => controller.abort();
   }, [bootDone]);
 };

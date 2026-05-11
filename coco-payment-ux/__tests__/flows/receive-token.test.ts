@@ -33,7 +33,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTestMachine, runScenario } from '../_harness';
-import { WALLETS, INPUTS, MINT1 } from '../_harness/fixtures';
+import { WALLETS, INPUTS } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
 
 // ---------------------------------------------------------------------------

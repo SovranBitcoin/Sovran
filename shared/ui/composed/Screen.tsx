@@ -14,8 +14,15 @@
  * — not an inline <Stack.Screen>.
  */
 
-import React, { ReactNode, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { useLayoutEffect } from 'react';
+import React, {
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  useLayoutEffect,
+} from 'react';
 import { View } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';

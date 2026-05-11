@@ -422,7 +422,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       }
     };
 
-    initializeKeys();
+    void initializeKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mnemonic, mnemonicLoading, stage.canStart, refreshMnemonic]);
 

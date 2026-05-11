@@ -1,5 +1,6 @@
 import React, { useRef, useCallback } from 'react';
-import { ScrollView, Linking, Alert } from 'react-native';
+import { ScrollView, Alert } from 'react-native';
+import { openExternalUrl } from '@/shared/lib/url';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
@@ -178,14 +179,14 @@ export const SettingsScreen = () => {
             <SettingsListActionItem
               title="View Source on GitHub"
               onPress={() => {
-                Linking.openURL('https://github.com/SovranBitcoin/Sovran');
+                void openExternalUrl('https://github.com/SovranBitcoin/Sovran');
               }}
             />
             <Separator className="mx-4" />
             <SettingsListActionItem
               title="Contact the Developer"
               onPress={() => {
-                Linking.openURL('https://x.com/KevinKelbie');
+                void openExternalUrl('https://x.com/KevinKelbie');
               }}
             />
           </ListGroup>

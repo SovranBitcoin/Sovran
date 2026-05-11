@@ -5,11 +5,7 @@ import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import {
-  CIRCLE_SIZE,
-  ICON_SIZE,
-  type CircleActionButtonProps,
-} from './CircleActionButton.types';
+import { CIRCLE_SIZE, ICON_SIZE, type CircleActionButtonProps } from './CircleActionButton.types';
 import { CircleActionButtonShell } from './CircleActionButtonShell';
 
 export function CircleActionButtonFlat(props: CircleActionButtonProps): React.ReactElement {

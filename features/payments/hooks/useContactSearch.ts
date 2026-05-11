@@ -126,7 +126,7 @@ export function useContactSearch(searchQuery: string) {
       }
     };
 
-    search();
+    void search();
     return () => controller.abort();
   }, [debouncedQuery, addSearchToHistory, seedFromSearchResults]);
 

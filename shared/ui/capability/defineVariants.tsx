@@ -55,14 +55,11 @@ function pickFromThreeWay<P>(variants: ThreeWay<P>, caps: Capabilities): React.C
   return variants.flat;
 }
 
-export function defineVariants<P extends object>(
-  name: string,
-  variants: ThreeWay<P>,
-): React.FC<P>;
+export function defineVariants<P extends object>(name: string, variants: ThreeWay<P>): React.FC<P>;
 export function defineVariants<P extends object>(name: string, pick: Selector<P>): React.FC<P>;
 export function defineVariants<P extends object>(
   name: string,
-  variantsOrPick: ThreeWay<P> | Selector<P>,
+  variantsOrPick: ThreeWay<P> | Selector<P>
 ): React.FC<P> {
   const Component: React.FC<P> = (props) => {
     const caps = useCapabilities();

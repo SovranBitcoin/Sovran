@@ -6,7 +6,7 @@ import { HeroUINativeProvider } from 'heroui-native/provider';
 import 'global.css';
 import 'intl';
 import 'intl/locale-data/jsonp/en';
-import 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
 import { useFonts } from '@/shared/hooks/useFonts';
 import { initLog, useInitMount } from '@/shared/lib/logger';
@@ -14,7 +14,6 @@ import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Dimensions, Image, LogBox, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import AppGate from '@/shared/blocks/AppGate';
@@ -78,7 +77,7 @@ export const unstable_settings = {
 };
 
 // Prevent splash screen from auto-hiding until fonts are loaded
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync();
 
 initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called');
 
@@ -473,7 +472,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     if (phase !== 'await_init') return;
     if (!hasRootLaidOut) return;
     initLog('SplashMorph', 'root laid out — hiding native splash');
-    SplashScreen.hideAsync();
+    void SplashScreen.hideAsync();
     setPhase('await_anchor');
   }, [phase, hasRootLaidOut]);
 

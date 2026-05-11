@@ -178,7 +178,7 @@ export function LiquidChatComposer({
   // `onTapGesture(focusTextField)` on the bubble below.
   const textFieldRef = useRef<TextFieldRef>(null);
   const focusTextField = useCallback(() => {
-    textFieldRef.current?.focus();
+    void textFieldRef.current?.focus();
   }, []);
 
   // Fallback-only state: the RN multiline `TextInput` reports its intrinsic
@@ -281,11 +281,7 @@ export function LiquidChatComposer({
                     modifiers={[
                       frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
                     ]}>
-                    <SwiftUIImage
-                      systemName={'plus' as never}
-                      size={ICON_SIZE}
-                      color="#FFFFFF"
-                    />
+                    <SwiftUIImage systemName={'plus' as never} size={ICON_SIZE} color="#FFFFFF" />
                   </SwiftUIHStack>
                 </SwiftUIButton>
 

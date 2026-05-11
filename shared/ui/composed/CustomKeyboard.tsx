@@ -39,13 +39,13 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
         let next: string;
 
         if (str === '<') {
-          EnhancedHaptics.actionHaptic();
+          void EnhancedHaptics.actionHaptic();
           next = prev.slice(0, -1);
         } else if (unit !== 'sat' && prev === '0' && str !== '.') {
-          EnhancedHaptics.buttonHaptic();
+          void EnhancedHaptics.buttonHaptic();
           next = str;
         } else {
-          EnhancedHaptics.buttonHaptic();
+          void EnhancedHaptics.buttonHaptic();
           next = prev + str;
         }
 

@@ -95,7 +95,7 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
       }
     };
 
-    loadMint();
+    void loadMint();
     return () => controller.abort();
   }, [mintUrl, getCached, setCached, isStale]);
 

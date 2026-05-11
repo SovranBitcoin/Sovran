@@ -537,9 +537,7 @@ export function SectionAnchorList<T>({
           zIndex={0}
         />
         <View pointerEvents="box-none" style={{ zIndex: zIndex.raised }}>
-          {aboveAnchors != null && (
-            <View onLayout={handleAboveAnchorsLayout}>{aboveAnchors}</View>
-          )}
+          {aboveAnchors != null && <View onLayout={handleAboveAnchorsLayout}>{aboveAnchors}</View>}
           {showAnchors && (
             <View onLayout={handleAnchorBarLayout} style={[styles.anchorBarOuter, anchorBarStyle]}>
               <ScrollView

@@ -49,7 +49,7 @@ export class WhitenoiseGroupHistory implements BaseGroupHistory {
 
   /** App-level extension: read everything we've stored, deserialized. */
   async loadMessages(): Promise<
-    Array<{ rumor: ReturnType<typeof deserializeApplicationRumor>; receivedAt: number }>
+    { rumor: ReturnType<typeof deserializeApplicationRumor>; receivedAt: number }[]
   > {
     const stored = (await this.backend.getItem(this.storageKey)) ?? [];
     return stored

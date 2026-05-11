@@ -5,7 +5,6 @@ import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
-
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface GradientTextProps extends TextProps {
@@ -220,9 +219,7 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
   if (loading) {
     return (
       <View pointerEvents="none" style={loadingWrapperStyle}>
-        <View
-          style={[loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }]}
-        />
+        <View style={[loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }]} />
         <UntranslatedText
           size={size}
           italic={italic}

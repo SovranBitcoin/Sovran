@@ -16,6 +16,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createDefaultOperations } from '../../src/operations/defaultOperations';
 
+import { defaultDetectors } from '../../src/detectors';
+
 const MINT1 = 'https://mint1.example.com';
 
 function createMockManager(overrides?: Record<string, any>) {
@@ -75,8 +77,6 @@ vi.mock('../../src/detectors', () => ({
     getPaymentRequestInfo: vi.fn(),
   },
 }));
-
-import { defaultDetectors } from '../../src/detectors';
 const mockGetPRInfo = defaultDetectors.getPaymentRequestInfo as ReturnType<typeof vi.fn>;
 
 // ---------------------------------------------------------------------------

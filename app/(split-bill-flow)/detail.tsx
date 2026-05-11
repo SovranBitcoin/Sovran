@@ -90,7 +90,7 @@ export default function SplitBillDetailScreen() {
         return;
       }
       deckRef.current?.scrollToIndex(index);
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      void listRef.current?.scrollToOffset({ offset: 0, animated: true });
       setFocusedIndex(index);
     },
     [groupId, retryDelivery]

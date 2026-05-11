@@ -127,7 +127,7 @@ export function createWhitenoiseNetwork(
             sub.on('close', () => {
               observer.complete?.();
             });
-            sub.start();
+            void sub.start();
           } catch (err) {
             observer.error?.(err);
           }

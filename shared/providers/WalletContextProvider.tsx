@@ -129,7 +129,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   }, [manager, stableMintUrls]);
 
   useEffect(() => {
-    fetchProofAmounts();
+    void fetchProofAmounts();
     // balanceSignature isn't used inside fetchProofAmounts but its change is the
     // signal that proofs have moved — depend on it explicitly.
   }, [fetchProofAmounts, balanceSignature]);

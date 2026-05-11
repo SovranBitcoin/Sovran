@@ -124,7 +124,12 @@ export function ParticipantCard({
         name="ant-design:loading-outlined"
         size={28}
         color="rgba(255,255,255,0.75)"
-        spin={{ duration: duration.spin, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
+        spin={{
+          duration: duration.spin,
+          outputRange: ['0deg', '360deg'],
+          delay: 0,
+          easing: 'linear',
+        }}
       />
       <Text size={12} style={{ color: 'rgba(255,255,255,0.75)', marginTop: 8 }}>
         Generating invoice…

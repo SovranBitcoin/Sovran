@@ -113,10 +113,7 @@ function getRelativeTimeFormat(locale: string): Intl.RelativeTimeFormat | null {
   }
 }
 
-const ABSOLUTE_OPTIONS: Record<
-  Exclude<AbsoluteDateStyle, 'iso'>,
-  Intl.DateTimeFormatOptions
-> = {
+const ABSOLUTE_OPTIONS: Record<Exclude<AbsoluteDateStyle, 'iso'>, Intl.DateTimeFormatOptions> = {
   time: { hour: '2-digit', minute: '2-digit' },
   'short-date': { year: 'numeric', month: 'short', day: 'numeric' },
   'long-date': { year: 'numeric', month: 'long', day: 'numeric' },

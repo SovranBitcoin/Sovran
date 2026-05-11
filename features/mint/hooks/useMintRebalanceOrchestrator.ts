@@ -1286,7 +1286,7 @@ export function useMintRebalanceOrchestrator({
 
     // Kick off the runner (do not await; keep UI responsive)
     // Use the snapshot steps (stable), not any live recomputed list.
-    runStepsSequentially(snapshot.steps, runId);
+    void runStepsSequentially(snapshot.steps, runId);
   }, [computedPlan, runStatus, runStepsSequentially, unit]);
 
   const handleRetry = useCallback(
