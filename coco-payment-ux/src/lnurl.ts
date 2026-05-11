@@ -283,5 +283,10 @@ export async function requestInvoiceFromLnurl(
 
 export function isLightningInvoiceBolt11(invoice: string): boolean {
   const lower = invoice.toLowerCase().trim();
-  return lower.startsWith('lnbc') || lower.startsWith('lntb') || lower.startsWith('lnbcrt');
+  return (
+    lower.startsWith('lnbc') ||
+    lower.startsWith('lntbs') ||
+    lower.startsWith('lntb') ||
+    lower.startsWith('lnbcrt')
+  );
 }

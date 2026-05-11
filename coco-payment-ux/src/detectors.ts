@@ -63,10 +63,41 @@ const isLightningAddress = (v: string) => !!v && LN_ADDRESS_REGEX.test(v);
 
 const isLnurlp = (v: string) => !!v && LNURLP_REGEX.test(v);
 
+const HEX_PUBKEY_REGEX = /^[0-9a-f]{64}$/;
+
 const parseNpub = (input: string): string | null => {
-  const v = input.replace(/^nostr:/i, '');
-  if (!v.startsWith('npub1')) return null;
-  return tryDecode(() => nip19.decode(v))?.type === 'npub' ? v : null;
+  const v = input.replace(/^nostr:/i, '').trim();
+  if (!v) return null;
+
+  // 64-char lowercase hex — a raw x-only pubkey. Wrap to npub so downstream
+  // code can treat all sources uniformly.
+  if (HEX_PUBKEY_REGEX.test(v)) {
+    return tryDecode(() => nip19.npubEncode(v));
+  }
+
+  if (v.startsWith('npub1')) {
+    return tryDecode(() => nip19.decode(v))?.type === 'npub' ? v : null;
+  }
+
+  // nprofile/nevent/naddr all carry a pubkey alongside other data (relay
+  // hints, event id, kind, etc.). We surface the author pubkey as an npub
+  // so the existing openProfile flow handles them uniformly. A richer
+  // detector that preserves event id / relays belongs in a follow-up.
+  if (v.startsWith('nprofile1') || v.startsWith('nevent1') || v.startsWith('naddr1')) {
+    const decoded = tryDecode(() => nip19.decode(v));
+    if (!decoded) return null;
+    const pubkey =
+      decoded.type === 'nprofile'
+        ? decoded.data.pubkey
+        : decoded.type === 'nevent'
+          ? decoded.data.author
+          : decoded.type === 'naddr'
+            ? decoded.data.pubkey
+            : null;
+    return pubkey ? tryDecode(() => nip19.npubEncode(pubkey)) : null;
+  }
+
+  return null;
 };
 
 export const defaultDetectors: Detectors = {

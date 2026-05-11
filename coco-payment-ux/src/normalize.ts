@@ -7,9 +7,30 @@
 
 const ZERO_WIDTH_RE = /[\u200B-\u200D\uFEFF]/g;
 
-const GENERIC_PREFIXES = ['cashu://', 'cashu:', 'lightning://', 'lightning:', 'lightning='];
+const GENERIC_PREFIXES = [
+  'web+cashu://',
+  'web+cashu:',
+  'cashu://',
+  'cashu:',
+  'lightning://',
+  'lightning:',
+  'lightning=',
+];
 
 const LIGHTNING_PREFIXES = ['lightning://', 'lightning:', 'lightning='];
+
+// Hosts that historically render `?token=` or `#token` fragments containing a
+// raw cashuA/cashuB token. Users frequently share these as web links.
+const WEB_WALLET_HOSTS: ReadonlyArray<{
+  host: string;
+  source: 'query' | 'fragment';
+  param?: string;
+}> = [
+  { host: 'wallet.cashu.me', source: 'query', param: 'token' },
+  { host: 'wallet.cashu.me', source: 'fragment' },
+  { host: 'wallet.nutstash.app', source: 'fragment' },
+  { host: 'wallet.nutstash.app', source: 'query', param: 'token' },
+];
 
 /**
  * Remove zero-width characters and BOM, then trim whitespace.
@@ -62,7 +83,38 @@ export function stripLightningPrefixes(value: string): string {
  * Strip Cashu-specific prefixes.
  */
 export function stripCashuPrefixes(value: string): string {
-  return stripPrefixes(value, ['cashu://', 'cashu:']);
+  return stripPrefixes(value, ['web+cashu://', 'web+cashu:', 'cashu://', 'cashu:']);
+}
+
+/**
+ * Pull the underlying token out of a known web-wallet share URL. Returns
+ * null if the input isn't a recognised wallet host. Pure string work —
+ * downstream detection decides whether the extracted value is a valid
+ * cashu token.
+ */
+export function extractWebWalletToken(value: string): string | null {
+  const trimmed = sanitizeInput(value);
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+
+  const host = url.hostname.toLowerCase();
+  for (const entry of WEB_WALLET_HOSTS) {
+    if (entry.host !== host) continue;
+    if (entry.source === 'query' && entry.param) {
+      const raw = url.searchParams.get(entry.param);
+      if (raw) return safeDecodeURIComponent(raw).trim();
+    } else if (entry.source === 'fragment') {
+      const frag = url.hash.replace(/^#/, '');
+      if (frag) return safeDecodeURIComponent(frag).trim();
+    }
+  }
+  return null;
 }
 
 /**
@@ -80,5 +132,12 @@ export function inputVariants(raw: string): Set<string> {
   variants.add(stripped);
   variants.add(decodedRaw);
   variants.add(decodedStripped);
+
+  const webWalletToken = extractWebWalletToken(sanitized);
+  if (webWalletToken) {
+    variants.add(webWalletToken);
+    variants.add(stripGenericPrefixes(webWalletToken));
+  }
+
   return variants;
 }
