@@ -66,13 +66,18 @@ function ReceiveMintSelectRoute() {
 
   if (!params) return null;
 
+  // NPC-scoped selection picks the receive mint for the npub.cash flow; the
+  // user is choosing among existing trusted mints (gated to NUT-17), not
+  // adding new ones or inspecting trust details, so collapse the chrome.
+  const isNpcScope = entry?.scope === 'npc';
+
   return (
     <>
       <Stack.Screen
         options={{
           title: 'Select Mint',
           headerRight: () =>
-            actions.addMint.available ? (
+            !isNpcScope && actions.addMint.available ? (
               <ScreenHeaderAction
                 icon="fluent:add-24-filled"
                 onPress={() => actions.addMint.execute()}
@@ -82,11 +87,11 @@ function ReceiveMintSelectRoute() {
       />
       <MintListScreen
         items={items}
-        showDetailsButton={actions.getInfo.available}
+        showDetailsButton={!isNpcScope && actions.getInfo.available}
         closeButtonLabel="Cancel"
         onMintSelect={(item) => actions.select.execute({ mintUrl: item.mintUrl })}
         onInspectMint={
-          actions.getInfo.available
+          !isNpcScope && actions.getInfo.available
             ? (url) =>
                 actions.getInfo.execute({
                   mintUrl: url,

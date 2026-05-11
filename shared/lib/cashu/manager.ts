@@ -11,6 +11,12 @@ import {
 } from '@/shared/lib/nostr/secureStorage';
 import { NPCPlugin, type Signer as NpcSigner } from 'coco-cashu-plugin-npc';
 import {
+  NPC_BASE_URL,
+  NPC_SYNC_INTERVAL_MS,
+  AsyncStorageSinceStore,
+  getNpcSinceStoreKey,
+} from './npc';
+import {
   deriveNostrKeys,
   deriveCashuWalletSeed,
   deriveCashuWalletSeedFromRoot,
@@ -214,12 +220,24 @@ export class CocoManager {
           // shape via nostr-tools, so we re-type the param at the boundary.
           const signerFunction: NpcSigner = (eventTemplate) =>
             nsecSigner.signEvent(eventTemplate as EventTemplate);
-          this.npcPlugin = new NPCPlugin('https://npub.cash', signerFunction, {
-            syncIntervalMs: 30000,
-            useWebsocket: true,
-          });
-          plugins.push(this.npcPlugin as unknown as Plugin);
-          initLog('CocoManager', 'NPC plugin created');
+
+          // Resolve the active profile's pubkey so the sync cursor is
+          // pubkey-keyed (not accountIndex-keyed); guards against index
+          // recycling when the highest-numbered profile is deleted.
+          const { useProfileStore } = await import('@/shared/stores/global/profileStore');
+          const activePubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
+
+          if (!activePubkey) {
+            cashuLog.warn('cashu.manager.npc_skip_no_pubkey');
+          } else {
+            this.npcPlugin = new NPCPlugin(NPC_BASE_URL, signerFunction, {
+              syncIntervalMs: NPC_SYNC_INTERVAL_MS,
+              useWebsocket: true,
+              sinceStore: new AsyncStorageSinceStore(getNpcSinceStoreKey(activePubkey)),
+            });
+            plugins.push(this.npcPlugin as unknown as Plugin);
+            initLog('CocoManager', 'NPC plugin created');
+          }
         }
 
         // 4. Create Manager

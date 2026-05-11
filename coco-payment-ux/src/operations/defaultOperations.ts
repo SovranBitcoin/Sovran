@@ -441,7 +441,17 @@ export function createDefaultOperations(
         const skipBalanceCheck =
           !needsBalanceCheck || data.scope === 'selected' || data.scope === 'npc';
 
-        if (supportedSet && !supportedSet.has(mintUrl)) {
+        // NPC receive only works against mints that speak NUT-17 websockets:
+        // the npub.cash plugin forwards paid quotes to the mint operation
+        // service, which subscribes via the mint's websocket to know when the
+        // quote settles. Mints without NUT-17 are shown for context but
+        // disabled so the user can't pick one that won't auto-receive.
+        const supportsWebsocket =
+          (info?.nuts?.['17']?.supported?.length ?? 0) > 0;
+        if (data.scope === 'npc' && !supportsWebsocket) {
+          status = 'disabled';
+          reason = { code: 'NO_WEBSOCKET', message: 'Does not support live updates (NUT-17)' };
+        } else if (supportedSet && !supportedSet.has(mintUrl)) {
           status = 'disabled';
           reason = { code: 'NOT_IN_PAYMENT_REQUEST', message: 'Not accepted by payment request' };
         } else if (!skipBalanceCheck && data.amount && balance < data.amount) {

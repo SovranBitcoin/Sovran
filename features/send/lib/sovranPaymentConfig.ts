@@ -61,6 +61,7 @@ import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
+import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
@@ -905,7 +906,7 @@ export function createSovranHandlers({
         id: 'receive-hub',
         createdAt: Date.now(),
         mintUrl: selectedMintUrl ?? '',
-        npcAddress: npub ? `${npub}@npub.cash` : undefined,
+        npcAddress: npub ? getNpcAddress(undefined, npub) : undefined,
         p2pkKey,
         selectedMintUrl,
         unit,

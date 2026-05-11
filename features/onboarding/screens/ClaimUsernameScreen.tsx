@@ -10,8 +10,14 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { TextInput, ActivityIndicator, Keyboard, StyleSheet, View as RNView } from 'react-native';
-import { openExternalUrl } from '@/shared/lib/url';
+import {
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  StyleSheet,
+  View as RNView,
+} from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -26,7 +32,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { log, redactError, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { finalizeEvent } from 'nostr-tools';
+import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
 import { alpha, duration, zIndex } from '@/shared/styles/tokens';
@@ -38,10 +44,12 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { z } from 'zod';
+import { NPC_BASE_URL, NPC_DOMAIN } from '@/shared/lib/cashu/npc';
+import { NPCClient, JWTAuthProvider, PaymentRequiredError } from 'npubcash-sdk';
 
 // Available domains for Lightning addresses
 const DOMAINS = [
-  { id: 'npub', label: 'npub.cash', value: 'npub.cash' },
+  { id: 'npub', label: NPC_DOMAIN, value: NPC_DOMAIN },
   { id: 'sovran', label: 'sovran.money', value: 'sovran.money' },
 ] as const;
 
@@ -74,37 +82,31 @@ function hashUsername(username: string): string {
   return h.toString(16).padStart(8, '0');
 }
 
-// Mock availability check - replace with actual API call
+// Public availability lookup against the NPC server. 200 with a body means the
+// username is taken; 404 means free. We treat any unrecognised shape as
+// "unknown" (returning available=true so the user can still try) — matches
+// eNuts, which has no pre-check at all and surfaces conflicts at submit time.
 async function checkUsernameAvailability(
   username: string,
-  _domain: string,
+  domain: string,
   signal?: AbortSignal
 ): Promise<{ available: boolean; error?: string }> {
-  // Simulate API delay; abort if the caller has moved on
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, 600 + Math.random() * 400);
-    if (signal) {
-      const onAbort = () => {
-        clearTimeout(timer);
-        reject(new DOMException('Aborted', 'AbortError'));
-      };
-      if (signal.aborted) onAbort();
-      else signal.addEventListener('abort', onAbort, { once: true });
-    }
-  });
-
   const parsed = usernameSchema.safeParse(username);
   if (!parsed.success) {
     return { available: false, error: parsed.error.issues[0]?.message ?? 'Invalid' };
   }
 
-  const takenUsernames = ['satoshi', 'admin', 'bitcoin', 'test', 'user'];
-  if (takenUsernames.includes(username.toLowerCase())) {
-    return { available: false };
+  // Only the NPC domain has a backend. Other domains (e.g. sovran.money)
+  // aren't wired yet — report available so the UI doesn't lie.
+  if (domain !== NPC_DOMAIN) {
+    return { available: true };
   }
 
-  // 90% chance of being available for demo purposes
-  return { available: Math.random() > 0.1 };
+  const url = `${NPC_BASE_URL}/api/v1/info/username/${encodeURIComponent(username)}`;
+  const res = await fetch(url, { method: 'GET', signal });
+  if (res.status === 404) return { available: true };
+  if (res.ok) return { available: false };
+  return { available: true };
 }
 
 // Username input with inline domain display
@@ -258,31 +260,12 @@ function DomainOption({
   );
 }
 
-/**
- * Generate NIP-98 HTTP Auth string for npub.cash API
- * @param url - The full URL being accessed
- * @param method - HTTP method (GET, POST, PUT, etc.)
- * @param privateKey - Nostr private key as Uint8Array
- * @returns Base64 encoded signed event with "Nostr " prefix
- */
-function generateNip98Auth(url: string, method: string, privateKey: Uint8Array): string {
-  // Create the NIP-98 event structure
-  const authEvent = {
-    content: '',
-    kind: 27235,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ['u', url],
-      ['method', method],
-    ],
-  };
-
-  // Sign the event with the private key
-  const signedEvent = finalizeEvent(authEvent, privateKey);
-
-  // Base64 encode the signed event and prefix with "Nostr "
-  // btoa is available in React Native/Expo environments
-  return `Nostr ${btoa(JSON.stringify(signedEvent))}`;
+// Build an NPCClient bound to the active Nostr identity. Mirrors the
+// JWTAuthProvider pattern eNuts uses in src/services/NpcService.ts.
+function createNpcClient(privateKey: Uint8Array): NPCClient {
+  const signer = async (template: EventTemplate): Promise<VerifiedEvent> =>
+    finalizeEvent(template, privateKey);
+  return new NPCClient(NPC_BASE_URL, new JWTAuthProvider(NPC_BASE_URL, signer));
 }
 
 export function ClaimUsernameScreen() {
@@ -303,6 +286,7 @@ export function ClaimUsernameScreen() {
   const [selectedDomain, setSelectedDomain] = useState<DomainId>('npub');
   const [availabilityResults, setAvailabilityResults] = useState<AvailabilityResult[]>([]);
   const [isChecking, setIsChecking] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
 
   // Close button for header
   const handleClose = useCallback(() => {
@@ -446,33 +430,53 @@ export function ClaimUsernameScreen() {
     return result?.available === true;
   }, [availabilityResults, selectedDomain]);
 
-  // Generate NIP-98 auth for npub.cash and navigate to local server with auth
-  const handleContinue = useCallback(() => {
+  // Claim the username via npubcash-sdk. Mirrors eNuts's NpcService.requestNpcUsername:
+  // attempt setUsername; on PaymentRequiredError, surface the paid-claim path
+  // (not yet wired in the Sovran UI). Other errors bubble as a generic alert.
+  const handleContinue = useCallback(async () => {
     Keyboard.dismiss();
     log.info('onboarding.claim.continue', {
       usernameHash: hashUsername(username),
       domain: selectedDomain,
     });
 
-    if (!nostrKeys?.privateKey) {
-      log.error('onboarding.claim.no_private_key');
+    const selectedDomainValue = DOMAINS.find((d) => d.id === selectedDomain)?.value;
+    if (selectedDomainValue !== NPC_DOMAIN) {
+      Alert.alert('Not yet supported', `Claiming on ${selectedDomainValue} isn't wired up yet.`);
       return;
     }
 
-    // The URL we're authenticating for (npub.cash API endpoint)
-    const npubCashApiUrl = 'https://npub.cash/api/v1/info/username';
+    if (!nostrKeys?.privateKey) {
+      log.error('onboarding.claim.no_private_key');
+      Alert.alert('Cannot claim', 'No Nostr identity available.');
+      return;
+    }
 
-    // Generate NIP-98 auth string for PUT request to npub.cash
-    const nostrAuth = generateNip98Auth(npubCashApiUrl, 'PUT', nostrKeys.privateKey);
-
-    // URL encode the auth string for use as query parameter
-    const encodedAuth = encodeURIComponent(nostrAuth);
-
-    // Navigate to local server with nostr auth as query parameter
-    const localUrl = `http://localhost:8080/api/npubcash-server/username?nostr:authorization=${encodedAuth}`;
-
-    void openExternalUrl(localUrl);
-  }, [nostrKeys?.privateKey, username, selectedDomain]);
+    setIsClaiming(true);
+    try {
+      const client = createNpcClient(nostrKeys.privateKey);
+      await client.setUsername(username);
+      log.info('onboarding.claim.success', { usernameHash: hashUsername(username) });
+      Alert.alert('Claimed', `${username}@${NPC_DOMAIN} is yours.`, [
+        { text: 'OK', onPress: () => hero.closeClaimUsername() },
+      ]);
+    } catch (error) {
+      if (error instanceof PaymentRequiredError) {
+        log.info('onboarding.claim.payment_required', {
+          usernameHash: hashUsername(username),
+        });
+        Alert.alert(
+          'Payment required',
+          'This username requires a Cashu payment. Paid claims aren’t supported in this screen yet — pick another username or try later.'
+        );
+        return;
+      }
+      log.error('onboarding.claim.failed', { error: redactError(error) });
+      Alert.alert('Could not claim', error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsClaiming(false);
+    }
+  }, [nostrKeys?.privateKey, username, selectedDomain, hero]);
 
   const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)!.value;
 
@@ -483,17 +487,18 @@ export function ClaimUsernameScreen() {
         <ButtonHandler
           buttons={[
             {
-              text: 'Continue',
+              text: isClaiming ? 'Claiming…' : 'Continue',
               variant: 'secondary' as const,
+              disabled: isClaiming || !selectedDomainAvailable,
               onPress: async () => {
-                handleContinue();
+                await handleContinue();
               },
             },
           ]}
         />
       </BottomButtons>
     ),
-    [handleContinue]
+    [handleContinue, isClaiming, selectedDomainAvailable]
   );
 
   return (
