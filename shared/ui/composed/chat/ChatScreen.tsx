@@ -397,19 +397,14 @@ export function ChatScreen({
             // wrong half. We layer our own padding via
             // `topInset` / `bottomInset`, so opting out is safe.
             contentInsetAdjustmentBehavior: 'never',
-            // Auto-adjust gives us the right *bottom* inset out of the
-            // box (lifts the indicator above the home indicator / tab
-            // bar so it aligns with the composer top). On the top side,
-            // UIKit adds a header inset even though our wrapper is
-            // already sized to `windowHeight - headerHeight` and the
-            // FlatList's true top edge is below the Stack header — so
-            // we pass a negative `top` to cancel out exactly that
-            // double-count. iOS adds `scrollIndicatorInsets` on top of
-            // the auto-adjusted ones, so a negative value here
-            // subtracts from the auto inset and lands the indicator's
-            // top right at the FlatList's actual edge.
-            automaticallyAdjustsScrollIndicatorInsets: true,
+            // iOS 26 added a NEW auto-management path that re-applies the
+            // vibrancy material via `automaticallyAdjustsScrollIndicatorInsets`
+            // even when `contentInsetAdjustmentBehavior: 'never'` is set.
+            // Force-disable both indicator auto-adjust + pin the static
+            // insets to zero so UIKit has no insets to drive material from.
+            automaticallyAdjustsScrollIndicatorInsets: false,
             scrollIndicatorInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+            contentInset: { top: 0, bottom: 0, left: 0, right: 0 },
             // Inverted list: `paddingTop` = visual BOTTOM clearance,
             // `paddingBottom` = visual TOP clearance. Padding the
             // contentContainer (rather than wrapping the list in a
