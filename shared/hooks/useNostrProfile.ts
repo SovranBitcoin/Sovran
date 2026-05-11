@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import { fetchNostrProfile, type NostrProfileResponse } from '@/shared/lib/apiClient';
+import { fetchNostrProfile, type NostrProfileFull } from '@/shared/lib/apiClient';
 import type { TopFollower } from '@sovranbitcoin/schemas';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
@@ -9,14 +9,14 @@ import { log } from '@/shared/lib/logger';
 export type { TopFollower };
 
 interface UseNostrProfileResult {
-  data: NostrProfileResponse | null;
+  data: NostrProfileFull | null;
   isLoading: boolean;
   error: Error | null;
   refetch: () => void;
 }
 
 export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
-  const [data, setData] = useState<NostrProfileResponse | null>(null);
+  const [data, setData] = useState<NostrProfileFull | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 

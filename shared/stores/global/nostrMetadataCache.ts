@@ -74,7 +74,7 @@ function evictIfOverCap(byPubkey: Record<string, NostrProfileMetadata>): void {
   });
 }
 
-/** Subset of `UserProfile` from `@sovranbitcoin/schemas` we read off
+/** Subset of `NostrSearchResult` from `@sovranbitcoin/schemas` we read off
  *  search results. Declared narrowly here to keep the store decoupled
  *  from the API client's full schema. */
 interface SearchResultLike {

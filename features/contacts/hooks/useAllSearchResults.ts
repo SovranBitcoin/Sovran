@@ -17,7 +17,7 @@ import { useMemo } from 'react';
 
 import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
-import type { UserProfile } from '@/shared/lib/apiClient';
+import type { NostrSearchResult } from '@/shared/lib/apiClient';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { parseGeohashQuery } from '../lib/parseGeohashQuery';
 import { matchTiers } from '../lib/matchTiers';
@@ -29,7 +29,7 @@ export type AllSearchResult =
       type: 'contact';
       id: string;
       pubkey: string;
-      profile?: UserProfile;
+      profile?: NostrSearchResult;
       isLoadingProfile: boolean;
       score: number;
     };
@@ -90,7 +90,7 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
       // + abbreviated pubkey title even though we already have the
       // profile cached from another surface.
       const cached = r.profile ? cachedMetadata.get(r.pubkey) : undefined;
-      const profile: UserProfile | undefined =
+      const profile: NostrSearchResult | undefined =
         r.profile && cached
           ? {
               ...r.profile,

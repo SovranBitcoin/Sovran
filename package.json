@@ -81,7 +81,7 @@
     "@scure/base": "^2.0.0",
     "@scure/bip32": "^1.3.3",
     "@scure/bip39": "^1.2.2",
-    "@sovranbitcoin/schemas": "latest",
+    "@sovranbitcoin/schemas": "^2.0.1",
     "bitchat-module": "file:./modules/bitchat-module",
     "buffer": "^6.0.3",
     "cashu-kym": "^0.4.1",

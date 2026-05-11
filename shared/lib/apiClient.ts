@@ -9,14 +9,13 @@ import {
   LatestVersionResponse,
   MintReviewsResponse,
   MintSearchResponse,
-  NostrProfileResponse,
+  NostrProfileFull,
   SearchUsersResponse,
   loggableIssues,
   parseWith,
   type MintRecommendation,
   type MintSearchResult,
-  type NostrProfileResponse as NostrProfileResponseType,
-  type UserProfile,
+  type NostrSearchResult,
   type ParseError,
 } from '@sovranbitcoin/schemas';
 
@@ -47,13 +46,8 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 
 // Re-export schema-derived types for callers that previously imported them
 // from this module.
-export type {
-  AuditMintResponseType as AuditMintResponse,
-  MintRecommendation,
-  MintSearchResult,
-  NostrProfileResponseType as NostrProfileResponse,
-  UserProfile,
-};
+export type { AuditMintResponseType as AuditMintResponse, MintRecommendation, MintSearchResult };
+export type { NostrProfileFull, NostrSearchResult } from '@sovranbitcoin/schemas';
 
 // Re-export coco-payment-ux's cancellable-fetch primitives so existing
 // `@/shared/lib/apiClient` consumers don't have to learn the new import
@@ -153,7 +147,7 @@ const parseSearchUsers = parseWith(SearchUsersResponse, 'nostr/search');
 const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
 const parseMintReviews = parseWith(MintReviewsResponse, 'cashu/mint/reviews');
 const parseMintSearch = parseWith(MintSearchResponse, 'cashu/mints/search');
-const parseNostrProfile = parseWith(NostrProfileResponse, 'nostr/profile');
+const parseNostrProfile = parseWith(NostrProfileFull, 'nostr/profile');
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
 const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
 

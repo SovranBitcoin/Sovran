@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { searchUsers as apiSearchUsers, type UserProfile } from '@/shared/lib/apiClient';
+import { searchUsers as apiSearchUsers, type NostrSearchResult } from '@/shared/lib/apiClient';
 import { paymentLog } from '@/shared/lib/logger';
 import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStore';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
-import { Hex64 } from '@sovranbitcoin/schemas';
 
 interface SearchResultData {
   pubkey: string;
-  profile: UserProfile;
+  profile: NostrSearchResult;
 }
 
 interface PlaceholderResult {
@@ -79,26 +78,10 @@ export function useContactSearch(searchQuery: string) {
         if (result.isOk()) {
           const data = result.value;
           if (data.results && Array.isArray(data.results)) {
-            const formatted: SearchResultData[] = data.results.map((res) => {
-              let profileEventPubkey = res.pubkey;
-              if (res.profileEvent) {
-                try {
-                  const parsed: unknown = JSON.parse(res.profileEvent);
-                  if (parsed !== null && typeof parsed === 'object' && 'pubkey' in parsed) {
-                    const validated = Hex64.safeParse(parsed.pubkey);
-                    if (validated.success) {
-                      profileEventPubkey = validated.data;
-                    }
-                  }
-                } catch {
-                  // Invalid profileEvent JSON
-                }
-              }
-              return {
-                pubkey: res.pubkey,
-                profile: { ...res, pubkey: profileEventPubkey },
-              };
-            });
+            const formatted: SearchResultData[] = data.results.map((res) => ({
+              pubkey: res.pubkey,
+              profile: res,
+            }));
             paymentLog.info('payment.contacts.search.results', {
               query: debouncedQuery,
               resultCount: formatted.length,
