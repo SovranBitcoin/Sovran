@@ -1,18 +1,11 @@
 import React from 'react';
 import { getPublicKey, nip19 } from 'nostr-tools';
-import {
-  defaultDetectors,
-  type AnnotatedOption,
-  type PaymentMachine,
-  type PaymentOptionKind,
-  type StepDataMap,
-} from 'coco-payment-ux';
+import { type PaymentMachine, type StepDataMap } from 'coco-payment-ux';
 
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon from 'assets/icons';
-import { getEcashTokenAmount } from '@/shared/lib/cashu/utils';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -195,110 +188,14 @@ function openProfileImportMenu(payload: ProfileSwitcherPopupPayload): void {
 }
 
 // ---------------------------------------------------------------------------
-// Pick-one-of-N menus — dispatched through actionMenuPopup so they share the
-// canonical `Menu presentation="bottom-sheet"` surface with "Select option",
-// Copy-as-Text/Emoji, and Next-as-Ecash/Lightning.
-//
-// Signatures match the old payload shapes so call sites in
-// features/send/lib/sovranPaymentConfig.ts don't change.
+// Proof selector — dispatched through actionMenuPopup so it shares the
+// canonical `Menu presentation="bottom-sheet"` surface with "Select option".
+// `paymentOptionsPopup` / `paymentFallbackPopup` used to live here too, but
+// moved to `paymentOptionsSheet.tsx` (PopupHost lane) because the camera
+// route — which is where they fire from — is itself a route modal, and the
+// menu lane can't stack above route modals (heroui Menu silently fails
+// inside FullWindowOverlay; see `actionSheetTypes.ts`).
 // ---------------------------------------------------------------------------
-
-const CASHU_KINDS: readonly PaymentOptionKind[] = ['paymentRequest', 'ecashToken'];
-const LIGHTNING_KINDS: readonly PaymentOptionKind[] = [
-  'lightningInvoice',
-  'lightningAddress',
-  'lnurlp',
-];
-
-function getMethodLabel(kind: PaymentOptionKind): string {
-  if (CASHU_KINDS.includes(kind)) return 'Cashu';
-  if (LIGHTNING_KINDS.includes(kind)) return 'Lightning';
-  return kind;
-}
-
-function getMethodIcon(kind: PaymentOptionKind): string {
-  if (CASHU_KINDS.includes(kind)) return 'majesticons:coins';
-  if (LIGHTNING_KINDS.includes(kind)) return 'mdi:lightning-bolt';
-  return 'ph:contactless-payment-fill';
-}
-
-function getOptionAmount(option: {
-  kind: PaymentOptionKind;
-  value: string;
-  amount?: number | null;
-}): number | undefined {
-  if (option.amount != null && option.amount > 0) return option.amount;
-  if (option.kind === 'paymentRequest') {
-    return defaultDetectors.getPaymentRequestInfo(option.value)?.amount ?? undefined;
-  }
-  if (option.kind === 'ecashToken') return getEcashTokenAmount(option.value);
-  return undefined;
-}
-
-function buildOptionButton(
-  annotated: AnnotatedOption,
-  unit: string,
-  machine: PaymentMachine,
-  extras?: { isFailed?: boolean; failedReason?: string }
-): ActionMenuItem {
-  const { option, status } = annotated;
-  const amount = getOptionAmount(option);
-  const hasAmount = amount != null && amount > 0;
-  const disabled = status === 'disabled';
-
-  return {
-    text: getMethodLabel(option.kind),
-    icon: getMethodIcon(option.kind),
-    disabled,
-    reason: extras?.isFailed
-      ? (extras.failedReason ?? 'Failed')
-      : (annotated.reason?.message ?? undefined),
-    description:
-      !disabled && !extras?.isFailed && status === 'recommended' ? 'Recommended' : undefined,
-    isFailed: extras?.isFailed,
-    suffix: hasAmount ? (
-      <AmountFormatter amount={amount} unit={unit} size={16} weight="medium" />
-    ) : undefined,
-    onPress: () => {
-      void machine.chooseOption(option);
-    },
-  };
-}
-
-type PaymentOptionsPopupPayload = StepDataMap['chooseOption'] & {
-  machine: PaymentMachine;
-  onDismiss?: () => void;
-};
-
-export function paymentOptionsPopup(payload: PaymentOptionsPopupPayload): void {
-  const { options, unit, machine, onDismiss } = payload;
-  actionMenuPopup({
-    title: 'Choose how to pay',
-    onDismiss,
-    buttons: options.map((annotated) => buildOptionButton(annotated, unit, machine)),
-  });
-}
-
-type PaymentFallbackPopupPayload = StepDataMap['chooseFallbackOption'] & {
-  machine: PaymentMachine;
-  onDismiss?: () => void;
-};
-
-export function paymentFallbackPopup(payload: PaymentFallbackPopupPayload): void {
-  const { options, unit, failedOptionValues, lastFailedMessage, machine, onDismiss } = payload;
-  const failedSet = new Set(failedOptionValues);
-
-  actionMenuPopup({
-    title: 'Payment failed — try another method',
-    onDismiss,
-    buttons: options.map((annotated) =>
-      buildOptionButton(annotated, unit, machine, {
-        isFailed: failedSet.has(annotated.option.value),
-        failedReason: lastFailedMessage,
-      })
-    ),
-  });
-}
 
 type ProofSelectorPopupPayload = StepDataMap['chooseProofs'] & {
   machine: PaymentMachine;

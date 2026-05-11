@@ -1,3 +1,5 @@
+import type { AnnotatedOption, PaymentMachine } from 'coco-payment-ux';
+
 export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }
   | { type: 'create' }
@@ -6,6 +8,18 @@ export type ProfileSwitcherAction =
 type EmojiPickerPayload = { token: string };
 
 type ModelPickerPayload = Record<string, never>;
+
+type PaymentOptionsPayload = {
+  options: readonly AnnotatedOption[];
+  unit: string;
+  machine: PaymentMachine;
+  onDismiss?: () => void;
+};
+
+type PaymentFallbackPayload = PaymentOptionsPayload & {
+  failedOptionValues: readonly string[];
+  lastFailedMessage?: string;
+};
 
 /**
  * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
@@ -38,6 +52,22 @@ type BaseActionSheetPayloads = {
    * row list on each tab switch — see `ModelPickerContent`.
    */
   'model-picker': ModelPickerPayload;
+  /**
+   * "Choose how to pay" — pick one of N detected payment methods (Lightning,
+   * Cashu, etc.) for a scanned destination. Lives in this lane because the
+   * QR-scan camera screen inside `(send-flow)` is itself an iOS route modal;
+   * the menu-lane (heroui `<Menu>` with `disableFullWindowOverlay`) renders
+   * in the root window and stacks *under* the camera, hiding the picker.
+   * The standalone `<BottomSheet>` path here uses FullWindowOverlay and
+   * mounts above route modals.
+   */
+  'payment-options': PaymentOptionsPayload;
+  /**
+   * Fallback variant — same surface as `payment-options`, but seeded with
+   * the failed attempt so the broken row renders red. Routed here for the
+   * same above-modal stacking reason.
+   */
+  'payment-fallback': PaymentFallbackPayload;
 };
 
 /** Payload types for custom action sheets. */

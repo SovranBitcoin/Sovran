@@ -38,6 +38,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { alpha } from '@/shared/styles/tokens';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
+import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
@@ -249,6 +250,51 @@ const CUSTOM_SHEET_CONTENT: Record<
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
   'model-picker': ModelPickerContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  // `payment-options` and `payment-fallback` share one renderer; the
+  // `isFallback` prop decides title + per-row red-wash. Wrapping keeps the
+  // registry's `Record<keyof ActionSheetPayloads, ...>` shape intact.
+  'payment-options': ((props: {
+    payload: ActionSheetPayloads['payment-options'];
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }) => <PaymentOptionsContent {...props} isFallback={false} />) as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'payment-fallback': ((props: {
+    payload: ActionSheetPayloads['payment-fallback'];
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }) => <PaymentOptionsContent {...props} isFallback={true} />) as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -610,33 +656,26 @@ function SheetPopup() {
           }
           handleComponent={
             isCustom
-              ? // Custom snapPoints sheets render the same chrome as
-                // `ActionMenuHost`'s `<Menu>` — heroui's default handle
-                // indicator. Suppressing it (`() => null`) leaves no top
-                // breathing room and the title sits flush against the
-                // sheet edge, which makes the picker look cramped vs
-                // Select Profile. Only the legacy `contentHeight` mode
-                // keeps the suppression (those sheets size to their own
-                // content and don't expect a handle).
-                layoutConfig?.mode === 'snapPoints'
-                ? undefined
-                : () => null
+              ? // Custom sheets render the same chrome as `ActionMenuHost`'s
+                // `<Menu>` — heroui's default handle indicator. Suppressing
+                // it leaves no top breathing room and the title sits flush
+                // against the sheet edge, which makes the picker look
+                // cramped vs Select Profile. Both snapPoints and
+                // contentHeight modes show the default handle.
+                undefined
               : hasLiveStatus
                 ? (props: any) => <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
                 : undefined
           }
           className={isCustom ? undefined : 'mx-4'}
-          // Custom snapPoints sheets render the same chrome as `ActionMenuHost`
+          // Custom sheets render the same chrome as `ActionMenuHost`
           // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
           // its content background. Match it here so surfaces routed through
-          // PopupHost (e.g. emoji picker — needs FullWindowOverlay above route
-          // modals) are visually indistinguishable from menu-lane surfaces.
+          // PopupHost (e.g. emoji picker, payment-options — both need
+          // FullWindowOverlay above route modals) are visually
+          // indistinguishable from menu-lane surfaces.
           backgroundClassName={
-            isCustom
-              ? layoutConfig?.mode === 'snapPoints'
-                ? 'bg-overlay'
-                : 'bg-surface'
-              : 'bg-surface rounded-[32px]'
+            isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'
           }
           backgroundComponent={
             hasLiveStatus

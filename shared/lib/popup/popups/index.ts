@@ -6,12 +6,8 @@ import type { PopupTextSegment } from '../format';
 
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
-export {
-  profileSwitcherPopup,
-  proofSelectorPopup,
-  paymentOptionsPopup,
-  paymentFallbackPopup,
-} from './actionSheets';
+export { profileSwitcherPopup, proofSelectorPopup } from './actionSheets';
+export { paymentOptionsPopup, paymentFallbackPopup } from './paymentOptionsSheet';
 export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';
