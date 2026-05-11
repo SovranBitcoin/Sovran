@@ -71,30 +71,12 @@ export default function TabLayout() {
               }),
             })}
             disableTransparentOnScrollEdge>
-            {TAB_DEFS.map((tab) => {
-              const isAi = tab.name === 'ai';
-              return (
-                <Expo55NativeTabs.Trigger
-                  key={tab.name}
-                  name={tab.name}
-                  disableAutomaticContentInsets={isAi}
-                  unstable_nativeProps={
-                    isAi
-                      ? {
-                          scrollEdgeEffects: {
-                            top: 'hidden',
-                            bottom: 'hidden',
-                            left: 'hidden',
-                            right: 'hidden',
-                          },
-                        }
-                      : undefined
-                  }>
-                  <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
-                  <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
-                </Expo55NativeTabs.Trigger>
-              );
-            })}
+            {TAB_DEFS.map((tab) => (
+              <Expo55NativeTabs.Trigger key={tab.name} name={tab.name}>
+                <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
+                <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
+              </Expo55NativeTabs.Trigger>
+            ))}
           </Expo55NativeTabs>
           <WhitenoiseSetupBanner />
         </View>

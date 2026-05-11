@@ -98,9 +98,6 @@ export function AiChatScreen() {
   //     against the bar instead of floating above it.
   const bottomInset = isExpo55NativeTabsSupported() ? insets.bottom : 0;
   const headerHeight = useHeaderHeight();
-  // The AI tab's stack header is non-transparent; pad the topmost bubble
-  // down by the header height so it doesn't slide under the BalancePill.
-  const topInset = headerHeight;
 
   const surfaceColor = useThemeColor('surface');
 
@@ -118,16 +115,16 @@ export function AiChatScreen() {
   // Mount visibility — narrow set, fires once. No imperative
   // scroll-chase plumbing: `alignItemsAtEnd` docks short content to the
   // bottom, `maintainScrollAtEnd` keeps the user pinned during streaming
-  // appends, and `waitForInitialLayout` + `initialScrollIndex` handles
-  // the first paint for histories larger than the viewport. Earlier
-  // attempts at setTimeout-based chasers landed mid-list when item
-  // measurements settled async — fragile for streaming content. Trust
-  // the library; reach for telemetry if behavior regresses.
+  // appends, and `initialScrollAtEnd` handles the first paint for
+  // histories larger than the viewport. Earlier attempts at
+  // setTimeout-based chasers landed mid-list when item measurements
+  // settled async — fragile for streaming content. Trust the library;
+  // reach for telemetry if behavior regresses.
   useEffect(() => {
     aiLog.info('ai.list.mount', {
       messageCount: activeMessages.length,
       bottomInset,
-      topInset,
+      headerHeight,
       estimatedItemSize: ESTIMATED_BUBBLE_HEIGHT,
     });
     return () => {
@@ -284,15 +281,13 @@ export function AiChatScreen() {
   // composer's top edge while the composer itself is absolutely positioned
   // over the chat — older bubbles slide *under* the composer's translucent
   // glass on scroll-up (the iMessage / Telegram bleed-under-input look).
-  //
-  // No `paddingTop` here, even though there's a nav header above. With
-  // `headerTransparent: false` the screen scene already starts BELOW the
-  // header, so content lays out in the available area without manual
-  // top padding. Adding `paddingTop` increases the effective content
-  // height and breaks `alignItemsAtEnd`'s "content < viewport → dock
-  // to bottom" math (LegendList thinks content already fills the
-  // viewport, skips the auto-bottom-padding, and content sits at the
-  // top instead of the bottom).
+  // No `paddingTop` here: adding one breaks `alignItemsAtEnd`'s
+  // "content < viewport → dock to bottom" math (the contentContainer's
+  // own paddingTop counts toward effective content height, so LegendList
+  // thinks the viewport is already filled and skips the auto-bottom
+  // padding it would otherwise insert). The AI Stack header is its own
+  // opaque/translucent surface above the screen scene; content sliding
+  // under it on scroll is the intended chat UX.
   const listContentContainerStyle = useMemo(
     () => ({
       paddingBottom: composerHeight + bottomInset + 16,
