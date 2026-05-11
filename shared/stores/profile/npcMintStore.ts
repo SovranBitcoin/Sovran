@@ -8,7 +8,7 @@ import { redactError, storeLog } from '@/shared/lib/logger';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
-const NPC_BASE_URL = 'https://npubx.cash';
+const NPC_BASE_URL = 'https://npub.cash';
 const NPC_DEFAULT_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
 
 interface NpcMintState {

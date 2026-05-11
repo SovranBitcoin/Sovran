@@ -905,7 +905,7 @@ export function createSovranHandlers({
         id: 'receive-hub',
         createdAt: Date.now(),
         mintUrl: selectedMintUrl ?? '',
-        npcAddress: npub ? `${npub}@npubx.cash` : undefined,
+        npcAddress: npub ? `${npub}@npub.cash` : undefined,
         p2pkKey,
         selectedMintUrl,
         unit,

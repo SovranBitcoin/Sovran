@@ -4,7 +4,7 @@
  * Clean modal for claiming a custom Lightning address username.
  * Features:
  * - Hero input field for entering username
- * - Domain selector dropdown (npubx.cash, sovran.money)
+ * - Domain selector dropdown (npub.cash, sovran.money)
  * - Real-time availability checking across all domains
  * - Bottom button to continue with claim process
  */
@@ -41,7 +41,7 @@ import { z } from 'zod';
 
 // Available domains for Lightning addresses
 const DOMAINS = [
-  { id: 'npubx', label: 'npubx.cash', value: 'npubx.cash' },
+  { id: 'npub', label: 'npub.cash', value: 'npub.cash' },
   { id: 'sovran', label: 'sovran.money', value: 'sovran.money' },
 ] as const;
 
@@ -300,7 +300,7 @@ export function ClaimUsernameScreen() {
   const scrollY = useSharedValue(0);
   const heroRef = useRef<RNView>(null);
   const [username, setUsername] = useState('');
-  const [selectedDomain, setSelectedDomain] = useState<DomainId>('npubx');
+  const [selectedDomain, setSelectedDomain] = useState<DomainId>('npub');
   const [availabilityResults, setAvailabilityResults] = useState<AvailabilityResult[]>([]);
   const [isChecking, setIsChecking] = useState(false);
 

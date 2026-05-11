@@ -214,7 +214,7 @@ export class CocoManager {
           // shape via nostr-tools, so we re-type the param at the boundary.
           const signerFunction: NpcSigner = (eventTemplate) =>
             nsecSigner.signEvent(eventTemplate as EventTemplate);
-          this.npcPlugin = new NPCPlugin('https://npubx.cash', signerFunction, {
+          this.npcPlugin = new NPCPlugin('https://npub.cash', signerFunction, {
             syncIntervalMs: 30000,
             useWebsocket: true,
           });
