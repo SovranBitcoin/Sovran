@@ -220,7 +220,7 @@ export function ButtonHandler({
         {visibleButtons.slice(0, 2).map((button, index) => (
           <View
             key={button.testID ?? (typeof button.text === 'string' ? button.text : `btn-${index}`)}
-            className="flex-1">
+            style={{ flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
             <Button
               testID={button.testID}
               onPress={() => handleButtonPress(button, index)}

@@ -35,8 +35,6 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
         cornerStyle,
         {
           minHeight: height,
-          maxWidth: 140,
-          alignSelf: 'center',
         },
       ]}>
       <BlurCardFrame accentColor={accentColor}>

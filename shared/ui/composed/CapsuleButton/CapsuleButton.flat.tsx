@@ -38,8 +38,6 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
         cornerStyle,
         {
           minHeight: height,
-          maxWidth: 140,
-          alignSelf: 'center',
           backgroundColor: surfaceSecondary,
           borderColor: opacity(muted, 0.3),
         },
