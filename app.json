@@ -39,8 +39,8 @@
       "versionCode": 2,
       "userInterfaceStyle": "dark",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/light-t.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/images/dark-t.png",
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": [
         "android.permission.CAMERA",
