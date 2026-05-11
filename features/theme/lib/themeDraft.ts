@@ -167,21 +167,15 @@ export const useThemeDraft = create<ThemeDraftStore>((set, get) => ({
 
   commit: async () => {
     const { activeAlbumSlug, unitWallpapers, mode } = get();
-    useThemeStore.setState({
-      activeAlbumSlug,
-      unitWallpapers,
-      mode,
-    });
-
     const wallpaperState = useWallpaperStore.getState();
     const primary = unitWallpapers[PROFILE_PRIMARY_UNIT_ID];
 
-    // Await the primary wallpaper download first so that by the time we
-    // call setTheme(primary), `backgroundImageThemes[primary]` is
-    // populated by `registerDownloadedTheme` and ThemeProvider's
-    // `applyCSSVars` can find the right palette. Otherwise the wallet
-    // screen falls back to a solid colour because the image source is
-    // still undefined at render time.
+    // Await the primary wallpaper download BEFORE writing to themeStore.
+    // ThemeProvider's `applyCSSVars` effect keys off `currentTheme` (the
+    // string), and bails if `THEMES[currentTheme]` isn't registered yet.
+    // If we flip themeStore first, the effect fires against an
+    // unregistered name, bails, and never re-runs once the download
+    // registers the theme — leaving the chrome on the previous palette.
     if (primary && !wallpaperState.downloaded[primary]) {
       const entry = wallpaperState.catalog.find((w) => w.themeName === primary);
       if (entry) {
@@ -190,6 +184,12 @@ export const useThemeDraft = create<ThemeDraftStore>((set, get) => ({
         log.info('theme.commit.primary_download_done', { theme: primary });
       }
     }
+
+    useThemeStore.setState({
+      activeAlbumSlug,
+      unitWallpapers,
+      mode,
+    });
 
     // Fire-and-forget downloads for the other unit wallpapers — they
     // show via the catalog thumb URL until their local files are ready.
