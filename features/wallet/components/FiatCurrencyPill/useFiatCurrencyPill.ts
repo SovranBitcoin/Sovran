@@ -18,8 +18,6 @@ export interface FiatCurrencyPillProps {
 }
 
 interface FiatCurrencyPillShared {
-  success: string;
-  green400: string;
   green500: string;
   handleSelectCurrency: (currency: DisplayCurrency) => void;
   text: string;
@@ -38,11 +36,7 @@ export function useFiatCurrencyPill({
   textSize = 14,
   enableCurrencyMenu = true,
 }: FiatCurrencyPillProps): FiatCurrencyPillShared {
-  const [success, green400, green500] = useThemeColor([
-    'success',
-    'green-400',
-    'green-500',
-  ] as const);
+  const [green500] = useThemeColor(['green-500'] as const);
   const setDisplayCurrency = useSettingsStore((state) => state.setDisplayCurrency);
 
   const handleSelectCurrency = useCallback(
@@ -61,8 +55,6 @@ export function useFiatCurrencyPill({
   const iosWidth = Math.max(72, Math.round(text.length * (textSize * 0.62) + 28));
 
   return {
-    success,
-    green400,
     green500,
     handleSelectCurrency,
     text,

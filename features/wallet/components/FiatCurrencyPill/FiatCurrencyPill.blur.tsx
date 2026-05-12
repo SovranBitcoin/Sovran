@@ -1,27 +1,27 @@
 /**
- * iOS non-liquid variant. Same tinted-flat chrome as the Android (`flat`)
- * variant, plus ActionSheetIOS-driven currency selection — preserves
- * today's behavior on older iOS without the SwiftUI Menu.
+ * iOS non-liquid variant: a real BlurView capsule with a green wash,
+ * mirroring CircleActionButton.blur's chrome (intensity 60, light tint)
+ * so the wallet's pill and toolbar buttons feel like the same family.
+ * Adds ActionSheetIOS-driven currency selection — preserves today's
+ * behavior on older iOS without the SwiftUI Menu.
  *
- * The dispatcher slots this in for `frostedSurface && !liquidGlass`. Named
- * `blur` to match the Capabilities axis even though no `BlurView` is
- * involved — the chrome is a tinted overlay.
+ * The dispatcher slots this in for `frostedSurface && !liquidGlass`.
  */
 
 import React, { useCallback } from 'react';
 import { ActionSheetIOS } from 'react-native';
 import opacity from 'hex-color-opacity';
 
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { View } from '@/shared/ui/primitives/View/View';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactElement {
   const {
     text,
-    success,
-    green400,
     green500,
     iosHeight,
     handleSelectCurrency,
@@ -29,13 +29,15 @@ export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactE
     enableCurrencyMenu,
     textSize,
   } = useFiatCurrencyPill(props);
+  const colorScheme = useColorScheme();
+  const [foreground] = useThemeColor(['foreground'] as const);
 
   const openCurrencySheet = useCallback(() => {
     ActionSheetIOS.showActionSheetWithOptions(
       {
         options: ['USD', 'EUR', 'GBP', 'Cancel'],
         cancelButtonIndex: 3,
-        userInterfaceStyle: 'dark',
+        userInterfaceStyle: colorScheme,
       },
       (buttonIndex) => {
         if (buttonIndex === 0) handleSelectCurrency('usd');
@@ -43,7 +45,7 @@ export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactE
         if (buttonIndex === 2) handleSelectCurrency('gbp');
       }
     );
-  }, [handleSelectCurrency]);
+  }, [handleSelectCurrency, colorScheme]);
 
   const primaryHandler = enableCurrencyMenu && !onPress ? openCurrencySheet : onPress;
   const longPressHandler = enableCurrencyMenu && onPress ? openCurrencySheet : undefined;
@@ -53,23 +55,25 @@ export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactE
       disabled={!primaryHandler && !longPressHandler}
       onPress={primaryHandler}
       onLongPress={longPressHandler}>
-      <HStack
-        align="center"
-        justify="center"
-        gap={6}
-        className="overflow-hidden rounded-full"
+      <View
+        blur
+        blurIntensity={60}
+        blurTint="light"
+        colorBlur={opacity(green500, 0.28)}
         style={{
-          backgroundColor: opacity(green500, 0.15),
-          borderWidth: 1,
-          borderColor: opacity(green400, 0.2),
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          borderRadius: 999,
           paddingHorizontal: 14,
           paddingVertical: 6,
           minHeight: iosHeight,
         }}>
-        <Text overpass size={textSize} bold color={success} style={{ letterSpacing: 0.3 }}>
+        <Text overpass size={textSize} bold color={foreground} style={{ letterSpacing: 0.3 }}>
           {text}
         </Text>
-      </HStack>
+      </View>
     </Pressable>
   );
 }

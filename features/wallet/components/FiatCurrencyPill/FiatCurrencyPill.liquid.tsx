@@ -1,14 +1,21 @@
 import React from 'react';
 import { Host, Menu, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/ui/swift-ui';
-import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
+import {
+  environment,
+  font,
+  foregroundStyle,
+  frame,
+  glassEffect,
+} from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 import { zIndex } from '@/shared/styles/tokens';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
   const {
-    success,
     green500,
     handleSelectCurrency,
     text,
@@ -19,17 +26,20 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
     textSize,
   } = useFiatCurrencyPill(props);
 
+  const colorScheme = useColorScheme();
+  const [foreground] = useThemeColor(['foreground'] as const);
   const glassModifiers = [
+    environment('colorScheme', colorScheme),
     frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
     glassEffect({
       shape: 'capsule' as const,
-      glass: { tint: opacity(green500, 0.15), variant: 'regular' as const, interactive: true },
+      glass: { tint: opacity(green500, 0.28), variant: 'regular' as const, interactive: true },
     }),
   ];
 
   const glassTextModifiers = [
     font({ size: textSize, design: 'monospaced' as const, weight: 'bold' as const }),
-    foregroundStyle(success),
+    foregroundStyle(foreground),
     frame({ height: 22, width: iosWidth, alignment: 'center' }),
   ];
 
