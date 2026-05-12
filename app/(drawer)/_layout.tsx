@@ -10,6 +10,7 @@ import { DrawerContentComponentProps } from '@react-navigation/drawer';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -184,8 +185,10 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 export default function DrawerLayout() {
   const { width } = useWindowDimensions();
   const drawerWidth = Math.min(width * 0.82, 320);
+  const [surface, border] = useThemeColor(['surface', 'separator-secondary'] as const);
+  const overlayRgb = useColorScheme() === 'light' ? '255,255,255' : '0,0,0';
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: surface }]}>
       <Drawer
         screenOptions={{
           headerShown: false,
@@ -193,16 +196,21 @@ export default function DrawerLayout() {
           drawerStyle: {
             width: drawerWidth,
             backgroundColor: 'transparent',
-            borderTopRightRadius: radius['2xl'],
-            borderBottomRightRadius: radius['2xl'],
             overflow: 'hidden',
           },
           sceneStyle: {
             borderTopLeftRadius: radius['2xl'],
             borderBottomLeftRadius: radius['2xl'],
+            borderCurve: 'continuous',
             overflow: 'hidden',
           },
-          overlayColor: `rgba(0,0,0,${alpha.strong})`,
+          overlayColor: `rgba(${overlayRgb},${alpha.strong})`,
+          overlayStyle: {
+            borderTopLeftRadius: radius['2xl'],
+            borderBottomLeftRadius: radius['2xl'],
+            borderCurve: 'continuous',
+            boxShadow: `inset ${StyleSheet.hairlineWidth}px 0 0 0 ${border}`,
+          },
           swipeEdgeWidth: 40,
           swipeMinDistance: 10,
         }}

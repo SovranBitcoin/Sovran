@@ -25,19 +25,22 @@ import { Menu, useMenu } from 'heroui-native';
 import { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { alpha, duration } from '@/shared/styles/tokens';
-
-const SCRIM_COLOR = `rgba(0,0,0,${alpha.strong})`;
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 
 export function MenuScrim() {
   const { isOpen } = useMenu();
   const opacity = useSharedValue(0);
+  const scrimColor =
+    useColorScheme() === 'light'
+      ? `rgba(255,255,255,${alpha.strong})`
+      : `rgba(0,0,0,${alpha.strong})`;
 
   useEffect(() => {
     opacity.value = withTiming(isOpen ? 1 : 0, { duration: duration.quick });
   }, [isOpen, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: SCRIM_COLOR,
+    backgroundColor: scrimColor,
     opacity: opacity.value,
   }));
 

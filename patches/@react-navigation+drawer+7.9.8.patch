@@ -1,0 +1,40 @@
+diff --git a/node_modules/@react-navigation/drawer/lib/module/views/DrawerView.js b/node_modules/@react-navigation/drawer/lib/module/views/DrawerView.js
+index 0000000..1111111 100644
+--- a/node_modules/@react-navigation/drawer/lib/module/views/DrawerView.js
++++ b/node_modules/@react-navigation/drawer/lib/module/views/DrawerView.js
+@@ -42,6 +42,7 @@
+     configureGestureHandler,
+     keyboardDismissMode,
+     overlayColor = 'rgba(0, 0, 0, 0.5)',
++    overlayStyle: overlayStyleOption,
+     swipeEdgeWidth,
+     swipeEnabled = Platform.OS !== 'web' && Platform.OS !== 'windows' && Platform.OS !== 'macos',
+     swipeMinDistance,
+@@ -254,9 +255,9 @@
+         borderTopLeftRadius: DRAWER_BORDER_RADIUS,
+         borderBottomLeftRadius: DRAWER_BORDER_RADIUS
+       }), drawerStyle],
+-      overlayStyle: {
++      overlayStyle: [{
+         backgroundColor: overlayColor
+-      },
++      }, overlayStyleOption],
+       renderDrawerContent: renderDrawerContent,
+       children: renderSceneContent()
+     })
+diff --git a/node_modules/@react-navigation/drawer/lib/typescript/src/types.d.ts b/node_modules/@react-navigation/drawer/lib/typescript/src/types.d.ts
+index 0000000..1111111 100644
+--- a/node_modules/@react-navigation/drawer/lib/typescript/src/types.d.ts
++++ b/node_modules/@react-navigation/drawer/lib/typescript/src/types.d.ts
+@@ -129,6 +129,11 @@
+      */
+     overlayColor?: string;
+     /**
++     * Style object for the overlay shown over the content view when the drawer is open.
++     * Merged with `overlayColor`-derived background.
++     */
++    overlayStyle?: StyleProp<ViewStyle>;
++    /**
+      * Accessibility label for the overlay. This is read by the screen reader when the user taps the overlay.
+      * Defaults to "Close drawer".
+      */
