@@ -157,13 +157,13 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
   return <OfflineContext.Provider value={contextValue}>{children}</OfflineContext.Provider>;
 }
 
-// Visual wrapper that renders the orange "YOU ARE OFFLINE" banner + screen
+// Visual wrapper that renders the blue "YOU ARE OFFLINE" banner + screen
 // border around its children. Consumes the context from <OfflineStatusProvider>
 // — which must be mounted above this component. Lives inside RootLayoutContent
 // so the banner overlays the navigation Stack without affecting providers above.
 export function OfflineShell({ children }: { children: React.ReactNode }) {
   const { isOffline } = useOfflineStatus();
-  const [foreground, info] = useThemeColor(['foreground', 'red-300'] as const);
+  const [foreground, info] = useThemeColor(['foreground', 'blue-300'] as const);
   const insets = useSafeAreaInsets();
   const frame = useSafeAreaFrame();
   const offlineAccentColor = info;
