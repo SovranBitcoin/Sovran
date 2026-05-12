@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
@@ -6,7 +6,8 @@ import {
 } from 'react-native-gesture-handler';
 import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { router, useSegments } from 'expo-router';
-import { DrawerContentComponentProps } from '@react-navigation/drawer';
+import { DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
+import { getCornerRadiusSync } from 'expo-screen-corner-radius';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -18,6 +19,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { DrawerProfileChrome } from '@/shared/blocks/DrawerProfileChrome';
 import { alpha, iconSize, radius, spacing } from '@/shared/styles/tokens';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 
 type MenuRoute =
   | '/(drawer)/(tabs)/feed'
@@ -129,6 +131,19 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   const segments = useSegments();
   const navInProgressRef = useRef(false);
 
+  // Fire a single Light-impact haptic the moment the drawer commits to a
+  // state change — covers gesture release that crosses the open/close
+  // threshold, the hamburger button, and overlay taps, since all three
+  // converge on the same navigation state.
+  const drawerStatus = useDrawerStatus();
+  const prevStatusRef = useRef(drawerStatus);
+  useEffect(() => {
+    if (prevStatusRef.current !== drawerStatus) {
+      void EnhancedHaptics.buttonHaptic();
+    }
+    prevStatusRef.current = drawerStatus;
+  }, [drawerStatus]);
+
   const isRouteActive = useCallback(
     (route: MenuRoute) => {
       const item = MENU_ITEMS.find((m) => m.route === route);
@@ -187,6 +202,10 @@ export default function DrawerLayout() {
   const drawerWidth = Math.min(width * 0.82, 320);
   const [surface, border] = useThemeColor(['surface', 'separator-secondary'] as const);
   const overlayRgb = useColorScheme() === 'light' ? '255,255,255' : '0,0,0';
+  // Match the device's hardware screen corner radius so the scene's rounded
+  // TL/BL hug the physical display curve. Falls back to a token-driven radius
+  // when null (Android <12, or devices without rounded displays).
+  const deviceRadius = getCornerRadiusSync() ?? radius['2xl'];
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: surface }]}>
       <Drawer
@@ -199,19 +218,19 @@ export default function DrawerLayout() {
             overflow: 'hidden',
           },
           sceneStyle: {
-            borderTopLeftRadius: radius['2xl'],
-            borderBottomLeftRadius: radius['2xl'],
+            borderTopLeftRadius: deviceRadius,
+            borderBottomLeftRadius: deviceRadius,
             borderCurve: 'continuous',
             overflow: 'hidden',
           },
           overlayColor: `rgba(${overlayRgb},${alpha.strong})`,
           overlayStyle: {
-            borderTopLeftRadius: radius['2xl'],
-            borderBottomLeftRadius: radius['2xl'],
+            borderTopLeftRadius: deviceRadius,
+            borderBottomLeftRadius: deviceRadius,
             borderCurve: 'continuous',
             boxShadow: `inset ${StyleSheet.hairlineWidth}px 0 0 0 ${border}`,
           },
-          swipeEdgeWidth: 40,
+          swipeEdgeWidth: 128,
           swipeMinDistance: 10,
         }}
         drawerContent={(props) => <CustomDrawerContent {...props} />}>

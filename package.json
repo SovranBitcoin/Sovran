@@ -111,6 +111,7 @@
     "expo-mesh-gradient": "~55.0.13",
     "expo-network": "~55.0.8",
     "expo-router": "~55.0.3",
+    "expo-screen-corner-radius": "^1.0.1",
     "expo-secure-store": "~55.0.8",
     "expo-sensors": "~55.0.8",
     "expo-sharing": "~55.0.11",
