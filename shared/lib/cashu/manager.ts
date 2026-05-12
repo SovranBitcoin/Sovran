@@ -1,5 +1,4 @@
 import { Manager, type Plugin } from '@cashu/coco-core';
-import { initNativeCrypto } from './nativeCrypto';
 import { CocoCoreLogger } from './cocoLogger';
 import { ExpoSqliteRepositories } from '@cashu/coco-expo-sqlite';
 import * as SQLite from 'expo-sqlite';
@@ -121,10 +120,6 @@ export class CocoManager {
    * NUT-13 restore so deterministic counters don't desync from the mint.
    */
   static async initialize(): Promise<Manager> {
-    // Activate native crypto (nutpatch) — must run after cashu-ts is imported
-    // so that __CASHU_NATIVE global exists from the patch. No-op if unavailable.
-    initNativeCrypto();
-
     // If a cleanup() call is still running (e.g. fire-and-forget from CocoProvider
     // unmount during hot reload), wait for it to finish before we decide whether
     // to return the existing instance or start a fresh one.

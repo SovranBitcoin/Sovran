@@ -8,51 +8,14 @@ import { log } from '../logger';
 
 // ── Memoized root seed ──────────────────────────────────────────
 // PBKDF2-SHA512 (BIP-39 mnemonicToSeed at c=2048, dkLen=64) is ~3s in
-// pure JS on Hermes. We do two things to keep boot snappy:
-//   1. Route through native PBKDF2 via `globalThis.__CASHU_NATIVE` when
-//      nutpatch is available — drops the cost from seconds to ms.
-//   2. Cache the result in-memory so deriveNostrKeys + deriveCashuMnemonic
-//      share a single PBKDF2 call per profile switch.
+// pure JS on Hermes. We cache the result in-memory so deriveNostrKeys
+// + deriveCashuMnemonic share a single PBKDF2 call per profile switch.
 let _cachedMnemonic: string | null = null;
 let _cachedRootSeed: Uint8Array | null = null;
 
-const _utf8 = new TextEncoder();
-
-function bufferOf(u8: Uint8Array): ArrayBuffer {
-  return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength) as ArrayBuffer;
-}
-
-/**
- * Native-first BIP-39 mnemonicToSeed. Tries the nutpatch
- * pbkdf2HmacSha512 hybrid method first; falls back to bip39's pure-JS
- * implementation if the native bridge isn't installed (Expo Go, web,
- * pre-CocoManager.initialize boot, or a build without nutpatch).
- *
- * Performs the same NFKD normalisation as @scure/bip39 so the output
- * is bit-identical to `bip39.mnemonicToSeedSync(mnemonic, passphrase)`.
- */
-function mnemonicToSeed(mnemonic: string, passphrase: string = ''): Uint8Array {
-  const native = globalThis.__CASHU_NATIVE;
-  if (native?.active && typeof native.crypto?.pbkdf2HmacSha512 === 'function') {
-    try {
-      const passwordBytes = _utf8.encode(mnemonic.normalize('NFKD'));
-      const saltBytes = _utf8.encode('mnemonic' + passphrase.normalize('NFKD'));
-      return new Uint8Array(
-        native.crypto.pbkdf2HmacSha512(bufferOf(passwordBytes), bufferOf(saltBytes), 2048, 64)
-      );
-    } catch (err) {
-      log.warn('nostr.key_derivation.native_pbkdf2_failed', {
-        reason: err instanceof Error ? err.message : String(err),
-      });
-      // fall through to JS
-    }
-  }
-  return bip39.mnemonicToSeedSync(mnemonic, passphrase);
-}
-
 function getRootSeed(mnemonic: string): Uint8Array {
   if (_cachedMnemonic === mnemonic && _cachedRootSeed) return _cachedRootSeed;
-  _cachedRootSeed = mnemonicToSeed(mnemonic);
+  _cachedRootSeed = bip39.mnemonicToSeedSync(mnemonic);
   _cachedMnemonic = mnemonic;
   return _cachedRootSeed;
 }
@@ -122,7 +85,7 @@ export function deriveCashuMnemonic(mnemonic: string, accountIndex: number = 0):
  */
 export function deriveCashuWalletSeed(cashuMnemonic: string): Uint8Array {
   log.debug('nostr.key_derivation.derive_cashu_wallet_seed.start');
-  const seed = mnemonicToSeed(cashuMnemonic, '');
+  const seed = bip39.mnemonicToSeedSync(cashuMnemonic, '');
   log.debug('nostr.key_derivation.derive_cashu_wallet_seed.complete', {
     seedBytes: seed.byteLength,
   });

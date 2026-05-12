@@ -338,11 +338,6 @@
       "count": 1
     }
   },
-  "shared/lib/cashu/nativeCrypto.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
   "shared/lib/colorExtraction.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 3

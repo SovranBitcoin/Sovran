@@ -15,8 +15,8 @@ module.exports = defineConfig([
       'vendor/**',
       // Compiled package output. `packages/*/src` stays in scope.
       'packages/*/lib/**',
-      // Per-package build-time scripts (e.g. nutpatch/scripts/check-patch-
-      // compat.ts) — same shape as top-level scripts/, Node-only tooling.
+      // Per-package build-time scripts — same shape as top-level scripts/,
+      // Node-only tooling.
       'packages/*/scripts/**',
       // coco-payment-ux is a file-dep with its own docs site (Vitepress) +
       // vendored reference apps. `src/` and `__tests__/` are still linted.
