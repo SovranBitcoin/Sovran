@@ -49,17 +49,20 @@ const COMPOSER_FOCUSED_BOTTOM_GAP = 0;
 const ESTIMATED_BUBBLE_HEIGHT = 80;
 
 /**
- * AI tab chat surface. Bypasses the shared `<ChatScreen />` (GiftedChat /
- * inverted `FlatList`) because iOS 26 applies a uniform dim to any RN
- * `FlatList`/`VirtualizedList` mounted inside this tab's wrapper tree —
- * affects both inverted AND non-inverted lists, independent of
- * `UIScrollEdgeEffect`. LegendList's separate virtualization sidesteps the
- * dim, so the AI surface is built directly on it: ascending data,
- * `alignItemsAtEnd` for the chat-style bottom dock, `maintainScrollAtEnd`
- * for stay-at-latest on streaming append. The other chat surfaces (BitChat,
- * WhiteNoise, Nostr DM, geohash) live in `(user-flow)` modal stacks where
- * the dim doesn't reproduce, so they keep using the shared GiftedChat-based
- * `<ChatScreen />`.
+ * AI tab chat surface. Built directly on LegendList rather than going
+ * through the shared `<ChatScreen />` because the AI surface needs a
+ * bubble-less assistant renderer + ModelChip row inline with the composer.
+ * The shared `<ChatScreen />` (BitChat, WhiteNoise, Nostr DM, geohash) is
+ * also LegendList-backed now, so the architecture is consistent: ascending
+ * data, `alignItemsAtEnd` for the chat-style bottom dock,
+ * `maintainScrollAtEnd` for stay-at-latest, and a Reanimated translate
+ * driving the keyboard lift for both list and composer in lock-step.
+ *
+ * LegendList replaced the previous GiftedChat / inverted FlatList stack
+ * across all chat surfaces; iOS 26 applies a soft `UIScrollEdgeEffect` to
+ * RN `FlatList` / `VirtualizedList` instances by default that surfaces as
+ * a visible band where the list meets the composer, and LegendList's
+ * separate virtualization sidesteps it cleanly.
  */
 export function AiChatScreen() {
   useLifecycleLogger('AiChatScreen');
