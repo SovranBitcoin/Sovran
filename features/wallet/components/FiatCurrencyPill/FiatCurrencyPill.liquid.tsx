@@ -16,7 +16,7 @@ import { zIndex } from '@/shared/styles/tokens';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
   const {
-    green500,
+    green400,
     handleSelectCurrency,
     text,
     iosHeight,
@@ -33,7 +33,7 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
     frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
     glassEffect({
       shape: 'capsule' as const,
-      glass: { tint: opacity(green500, 0.28), variant: 'regular' as const, interactive: true },
+      glass: { tint: opacity(green400, 0.4), variant: 'regular' as const, interactive: true },
     }),
   ];
 

@@ -8,7 +8,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactElement {
-  const { text, green500, iosHeight, onPress, textSize } = useFiatCurrencyPill(props);
+  const { text, green400, iosHeight, onPress, textSize } = useFiatCurrencyPill(props);
   const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
 
   return (
@@ -19,7 +19,7 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: opacity(green500, 0.28),
+          backgroundColor: opacity(green400, 0.4),
           borderWidth: 1,
           borderColor: opacity(muted, 0.3),
           paddingHorizontal: 14,

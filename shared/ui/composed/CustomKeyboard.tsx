@@ -5,6 +5,7 @@ import Icon from 'assets/icons';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Log } from '@/shared/lib/logger';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
@@ -25,6 +26,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   value,
 }) => {
   const [, setInputValue] = useState(value ?? '');
+  const foreground = useThemeColor('foreground');
 
   useEffect(() => {
     if (value !== undefined) {
@@ -73,24 +75,24 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
     (value: KeyboardValue) => (
       <Pressable
         key={String(value)}
-        className="bg-background mx-0.5 w-1/3 items-center justify-center overflow-hidden"
+        className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
         style={{ opacity: loading ? 0.5 : 1 }}
         disabled={loading}
         onPress={() => handlePress(value)}>
         {value === '<' ? (
-          <Icon name="lucide:delete" size={compact ? 22 : 24} color="white" />
+          <Icon name="lucide:delete" size={compact ? 22 : 24} color={foreground} />
         ) : (
           <Text
             size={compact ? 22 : 24}
             bold
-            color="white"
+            color={foreground}
             style={{ padding: compact ? 14 : 16, paddingHorizontal: compact ? 22 : 24 }}>
             {value}
           </Text>
         )}
       </Pressable>
     ),
-    [compact, handlePress, loading]
+    [compact, foreground, handlePress, loading]
   );
 
   const buttons: KeyboardValue[][] = [

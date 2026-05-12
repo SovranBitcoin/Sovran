@@ -17,7 +17,6 @@ export function CircleActionButtonFlat(props: CircleActionButtonProps): React.Re
   const { icon, onPress, disabled = false, color } = props;
   const iconColor = color ?? foreground;
   const interactive = !disabled && !!onPress;
-
   return (
     <CircleActionButtonShell {...props}>
       <Pressable

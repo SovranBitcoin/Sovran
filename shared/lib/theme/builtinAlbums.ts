@@ -21,6 +21,7 @@ interface BuiltinColorTheme {
 
 const BUILTIN_COLOR_THEMES: readonly BuiltinColorTheme[] = [
   { name: 'dark', displayName: 'Dark' },
+  { name: 'light', displayName: 'Light' },
   { name: 'navy', displayName: 'Navy' },
   { name: 'sunset', displayName: 'Sunset' },
   { name: 'beige', displayName: 'Beige' },

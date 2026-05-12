@@ -132,10 +132,10 @@ const MonthlyChart = React.memo(function MonthlyChart({
   unit = 'sat',
   mode,
 }: MonthlyChartProps) {
-  const [muted, foreground, shade100, successColor] = useThemeColor([
+  const [muted, foreground, dangerColor, successColor] = useThemeColor([
     'muted',
     'foreground',
-    'shade-100',
+    'danger',
     'success',
   ] as const);
   const { width: screenWidth } = useWindowDimensions();
@@ -146,7 +146,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
 
-  const actualLineColor = mode === 'spent' ? shade100 : successColor;
+  const actualLineColor = mode === 'spent' ? dangerColor : successColor;
   const projectedLineColor = useMemo(() => opacity(foreground, 0.3), [foreground]);
   const labelColor = useMemo(() => opacity(foreground, 0.66), [foreground]);
 

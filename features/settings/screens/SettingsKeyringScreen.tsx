@@ -41,7 +41,7 @@ const CurrentKeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const [foreground, surface, muted] = useThemeColor(['foreground', 'surface', 'muted'] as const);
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const [selectedTab, setSelectedTab] = useState('P2PK');
 
   const isDerived = keypair.derivationIndex !== undefined;
@@ -89,10 +89,12 @@ const CurrentKeyItem: React.FC<{
           style={{
             alignItems: 'center',
             padding: 12,
-            backgroundColor: foreground,
+            backgroundColor: '#FFFFFF',
             borderRadius: 12,
           }}>
-          <QRCode value={activeData} size={120} color={surface} backgroundColor={foreground} />
+          {/* QR pinned to dark-on-white regardless of theme — scanners are
+              strict and an inverted (light-on-dark) render is unreliable. */}
+          <QRCode value={activeData} size={120} color="#000000" backgroundColor="#FFFFFF" />
         </View>
       </PressableFeedback>
 

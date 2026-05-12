@@ -1,10 +1,8 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { LegendList } from '@legendapp/list';
 import Icon from 'assets/icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import opacity from 'hex-color-opacity';
 
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
@@ -25,6 +23,7 @@ import {
   nostrIdentity,
   type Identity,
 } from '@/shared/ui/composed/ContactRow';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { navigateToProfile } from '../lib/navigateToProfile';
 import {
@@ -125,11 +124,11 @@ export const ContactsScreen = () => {
   const [activeTab, setActiveTab] = useState<TopTab>('contacts');
   const [activeFilter, setActiveFilter] = useState<ContactsFilter>('All');
   const lastSearchFilterRef = useRef<ContactsFilter>('All');
-  const [foreground, surface, separator, accent] = useThemeColor([
+  const [foreground, surface, separator, muted] = useThemeColor([
     'foreground',
     'surface',
     'separator-secondary',
-    'accent',
+    'muted',
   ] as const);
   const { tiers: locationTiers } = useLocationTiers();
   const tabBarPadding = useTabBarBottomPadding();
@@ -419,16 +418,14 @@ export const ContactsScreen = () => {
     if (activeFilter === 'Mints' && mintInfoLoading) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
-            Loading mints...
-          </Text>
+          <Text style={[styles.emptyText, { color: muted }]}>Loading mints...</Text>
         </View>
       );
     }
     return (
       <View style={styles.emptyContainer}>
-        <Icon name="mdi:account-group" size={30} color={opacity(foreground, 0.3)} />
-        <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
+        <Icon name="mdi:account-group" size={30} color={muted} />
+        <Text style={[styles.emptyText, { color: muted }]}>
           {activeFilter === 'Mints'
             ? 'No mints with nostr contacts found'
             : activeFilter === 'Requests'
@@ -437,7 +434,7 @@ export const ContactsScreen = () => {
         </Text>
       </View>
     );
-  }, [foreground, activeFilter, mintInfoLoading]);
+  }, [muted, activeFilter, mintInfoLoading]);
 
   // Groups pill: filter tiers by label (e.g. "Province") or reverse-geocoded
   // displayName (e.g. "United Kingdom"). Shared with `useAllSearchResults`
@@ -484,29 +481,21 @@ export const ContactsScreen = () => {
   }, [visibleFilters, activeFilter]);
 
   // ===========================
-  // TOP TABS (hidden while searching)
+  // TOP TABS (hidden while searching). Labels are display-only; the index
+  // -> TopTab map below preserves the internal 'contacts'/'groups' state
+  // type so the rest of the screen (effectiveTab, useEffect resets, etc.)
+  // stays unchanged.
   // ===========================
 
-  const renderTab = useCallback(
-    (tab: TopTab, label: string) => {
-      const isActive = activeTab === tab;
-      return (
-        <Pressable
-          key={tab}
-          onPress={() => setActiveTab(tab)}
-          style={[styles.tab, isActive && { borderBottomColor: accent, borderBottomWidth: 2 }]}>
-          <Text
-            style={[
-              styles.tabLabel,
-              { color: isActive ? foreground : opacity(foreground, 0.4) },
-              isActive && styles.tabLabelActive,
-            ]}>
-            {label}
-          </Text>
-        </Pressable>
-      );
+  const TOP_TAB_KEYS: readonly TopTab[] = ['contacts', 'groups'];
+  const TOP_TAB_LABELS = ['Contacts', 'Groups'] as const;
+  const activeTabLabel = TOP_TAB_LABELS[TOP_TAB_KEYS.indexOf(activeTab)] ?? 'Contacts';
+  const handleTopTabPress = useCallback(
+    (_tab: string, index: number) => {
+      const nextKey = TOP_TAB_KEYS[index];
+      if (nextKey) setActiveTab(nextKey);
     },
-    [activeTab, foreground, accent]
+    []
   );
 
   // --- Render helpers ---
@@ -550,8 +539,8 @@ export const ContactsScreen = () => {
         ListEmptyComponent={
           !groupsGeohashQuery ? (
             <View style={styles.emptyContainer}>
-              <Icon name="mdi:map-marker-radius" size={30} color={opacity(foreground, 0.3)} />
-              <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
+              <Icon name="mdi:map-marker-radius" size={30} color={muted} />
+              <Text style={[styles.emptyText, { color: muted }]}>
                 {trimmedQuery ? 'No matching groups' : 'Getting your location...'}
               </Text>
             </View>
@@ -587,16 +576,16 @@ export const ContactsScreen = () => {
       {/* Outer tabs — hidden while searching; search scope is the pill bar below. */}
       {!isSearching && (
         <View
-          style={[
-            styles.tabBar,
-            {
-              backgroundColor: surface,
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              borderBottomColor: separator,
-            },
-          ]}>
-          {renderTab('contacts', 'Contacts')}
-          {renderTab('groups', 'Groups')}
+          style={{
+            backgroundColor: surface,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: separator,
+          }}>
+          <UnderlineTabs
+            tabs={TOP_TAB_LABELS}
+            selectedTab={activeTabLabel}
+            handleTabPress={handleTopTabPress}
+          />
         </View>
       )}
 
@@ -641,22 +630,6 @@ export const ContactsScreen = () => {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  tabBar: {
-    flexDirection: 'row',
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabLabel: {
-    fontSize: 16,
-  },
-  tabLabelActive: {
-    fontWeight: '600',
   },
   filtersRow: {
     height: SEARCH_FILTERS_HEIGHT,

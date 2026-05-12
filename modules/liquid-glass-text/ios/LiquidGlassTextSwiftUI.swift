@@ -11,6 +11,11 @@ final class LiquidGlassTextModel {
     var tint: UIColor? = nil
     var glassVariant: String = "regular"
     var interactive: Bool = false
+    /// "" inherits the window trait; "light" / "dark" forces the SwiftUI
+    /// `\.colorScheme` env value so the glass material renders in the matching
+    /// mode even though `userInterfaceStyle: 'dark'` is locked at the window
+    /// level in app.json.
+    var colorScheme: String = ""
     var debugShape: String = "none"
 
     func resolvedFont() -> UIFont {
@@ -72,6 +77,23 @@ struct StrokedTextShape: Shape {
     }
 }
 
+/// Forces the SwiftUI `colorScheme` env value when `scheme` is "light" or
+/// "dark". Any other value (incl. "") inherits the window trait — the app
+/// pins `userInterfaceStyle: 'dark'` so the inherited value is `.dark`,
+/// which is why the JS side passes an explicit scheme on light themes.
+@available(iOS 17.0, *)
+struct SchemeOverrideModifier: ViewModifier {
+    let scheme: String
+
+    func body(content: Content) -> some View {
+        switch scheme {
+        case "light": content.environment(\.colorScheme, .light)
+        case "dark":  content.environment(\.colorScheme, .dark)
+        default:      content
+        }
+    }
+}
+
 @available(iOS 17.0, *)
 struct LiquidGlassTextRoot: View {
     @Bindable var model: LiquidGlassTextModel
@@ -81,38 +103,36 @@ struct LiquidGlassTextRoot: View {
     private var debugFrame: CGSize { CGSize(width: 240, height: 80) }
 
     var body: some View {
+        AnyView(content.modifier(SchemeOverrideModifier(scheme: model.colorScheme)))
+    }
+
+    @ViewBuilder
+    private var content: some View {
         let mode = model.debugShape
 
         // For debug shapes we ignore the text-derived size and use a fixed
         // frame — this isolates "is glass rendering at all?" from "is the
         // glyph path the right size?".
         if mode != "none" && mode != "textFilled" && mode != "textStroked" {
-            return AnyView(
-                glassified(anyShape: resolveDebugShape(mode), frameSize: debugFrame, suppressTint: true)
-                    .frame(width: debugFrame.width, height: debugFrame.height)
-                    .accessibilityLabel("debug:\(mode)")
-            )
-        }
-
-        // Text-based paths (default + stroked variant).
-        let attr = model.buildAttributedString()
-        let textShape = TextShape(attr, alignment: .center)
-        let size = textShape.sizeThatFits(.unspecified)
-        let w = max(size.width, 1)
-        let h = max(size.height, 1)
-
-        let shape: AnyShape
-        if mode == "textStroked" {
-            shape = AnyShape(StrokedTextShape(attributedString: attr, lineWidth: max(model.fontSize * 0.08, 2)))
+            glassified(anyShape: resolveDebugShape(mode), frameSize: debugFrame, suppressTint: true)
+                .frame(width: debugFrame.width, height: debugFrame.height)
+                .accessibilityLabel("debug:\(mode)")
         } else {
-            shape = AnyShape(textShape)
-        }
+            // Text-based paths (default + stroked variant).
+            let attr = model.buildAttributedString()
+            let textShape = TextShape(attr, alignment: .center)
+            let size = textShape.sizeThatFits(.unspecified)
+            let w = max(size.width, 1)
+            let h = max(size.height, 1)
 
-        return AnyView(
+            let shape: AnyShape = (mode == "textStroked")
+                ? AnyShape(StrokedTextShape(attributedString: attr, lineWidth: max(model.fontSize * 0.08, 2)))
+                : AnyShape(textShape)
+
             glassified(anyShape: shape, frameSize: CGSize(width: w, height: h), suppressTint: false)
                 .frame(width: w, height: h)
                 .accessibilityLabel(model.text)
-        )
+        }
     }
 
     private func resolveDebugShape(_ mode: String) -> AnyShape {

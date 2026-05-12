@@ -146,9 +146,15 @@ function buildSemanticVars(palette: ThemePalette): SemanticVars {
     '--surface-shadow': bgIsDark
       ? '0 0 0 0 transparent inset'
       : '0 2px 4px 0 rgba(0,0,0,0.04), 0 1px 2px 0 rgba(0,0,0,0.06), 0 0 1px 0 rgba(0,0,0,0.06)',
+    // Dark theme uses a 1 px inset white highlight to lift the menu off the
+    // canvas. Light theme inverts the concept — instead of a dark drop-
+    // shadow (which read as a muddy halo on a near-white menu sitting on a
+    // near-white canvas), it stacks a bright inner edge with a wide white
+    // outer glow, plus a hairline 4 %-black ring for separation. Net effect:
+    // the menu feels lit from within rather than casting a shadow.
     '--overlay-shadow': bgIsDark
       ? '0 0 1px 0 rgba(255,255,255,0.2) inset'
-      : '0 2px 8px 0 rgba(0,0,0,0.02), 0 -6px 12px 0 rgba(0,0,0,0.01), 0 14px 28px 0 rgba(0,0,0,0.03)',
+      : '0 0 1px 0 rgba(255,255,255,1) inset, 0 0 24px 4px rgba(255,255,255,0.8), 0 0 0 1px rgba(0,0,0,0.04)',
     '--field-shadow': bgIsDark
       ? '0 0 0 0 transparent inset'
       : '0 2px 4px 0 rgba(0,0,0,0.04), 0 1px 2px 0 rgba(0,0,0,0.06), 0 0 1px 0 rgba(0,0,0,0.06)',

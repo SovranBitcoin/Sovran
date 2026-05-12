@@ -22,7 +22,7 @@ import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurren
 export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactElement {
   const {
     text,
-    green500,
+    green400,
     iosHeight,
     handleSelectCurrency,
     onPress,
@@ -59,7 +59,7 @@ export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactE
         blur
         blurIntensity={60}
         blurTint="light"
-        colorBlur={opacity(green500, 0.28)}
+        colorBlur={opacity(green400, 0.4)}
         style={{
           flexDirection: 'row',
           alignItems: 'center',

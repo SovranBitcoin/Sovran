@@ -58,7 +58,7 @@ export default function SplitBillAmountScreen() {
         onNext={handleNext}
         nextDisabled={effectiveSatAmount <= 0}
         nextTestID="split-bill-amount-next"
-        transactionType="neutral"
+        transactionType="receive"
         fiatSymbol={fiatSymbol}
         secondaryDisplay={secondaryDisplay}
         onToggleMode={onToggleMode}

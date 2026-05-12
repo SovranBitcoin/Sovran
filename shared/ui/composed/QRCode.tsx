@@ -84,7 +84,6 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   fragmentSize,
   size,
 }: AnimatedQRCodeProps) {
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const { width: screenWidth } = useWindowDimensions();
 
   const [index, setIndex] = useState(0);
@@ -182,7 +181,11 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 
   const width = size ?? Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
-  const gradientColors = [foreground, foreground] as const;
+  // QR codes are pinned to dark-on-white regardless of theme — scanners are
+  // strict, and an inverted (light-on-dark) QR is unreliable on most readers.
+  const QR_DARK = '#000000';
+  const QR_LIGHT = '#FFFFFF';
+  const gradientColors = [QR_LIGHT, QR_LIGHT] as const;
   const qrSize = width - 2 * padding;
   // When the caller sizes the block explicitly (e.g. a card deck), scale
   // the centered logo with it so the logo-to-QR ratio stays scan-safe
@@ -228,7 +231,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}>
-                <ActivityIndicator size="large" color={surfaceTertiary} />
+                <ActivityIndicator size="large" color={QR_DARK} />
               </View>
             ) : showError ? (
               <View
@@ -239,12 +242,12 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
                   alignItems: 'center',
                   padding: 20,
                 }}>
-                <Icon name="ri:error-warning-line" size={48} color={opacity(foreground, 0.5)} />
+                <Icon name="ri:error-warning-line" size={48} color={opacity(QR_DARK, 0.5)} />
               </View>
             ) : canRenderQR ? (
               <EQRCode
-                color={surfaceTertiary}
-                backgroundColor="transparent"
+                color={QR_DARK}
+                backgroundColor={QR_LIGHT}
                 value={qrData}
                 size={qrSize}
               />
@@ -257,12 +260,14 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
                   alignItems: 'center',
                   padding: 20,
                 }}>
-                <ActivityIndicator size="large" color={surfaceTertiary} />
+                <ActivityIndicator size="large" color={QR_DARK} />
               </View>
             )}
           </LinearGradient>
 
-          {/* Centered logo — absolutely positioned from the container's center */}
+          {/* Centered logo — absolutely positioned from the container's center.
+              The circle background matches the QR canvas (always white) so
+              the logo punches a clean hole through the pattern. */}
           <View
             pointerEvents="none"
             style={{
@@ -272,16 +277,20 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               width: circleSize,
               height: circleSize,
               borderRadius: circleSize / 2,
-              backgroundColor: foreground,
+              backgroundColor: QR_LIGHT,
             }}>
             {isLocationUnit ? (
               <Icon name={unit} size={logoSize} />
             ) : (
+              // CurrencyIcon's props are inverted from their names when
+              // `iconColor` is set: `iconColor` paints the OUTER disc,
+              // `colors[0]` paints the INNER symbol glyph. So:
+              //   dark disc + light symbol  →  iconColor=QR_DARK, colors=[QR_LIGHT]
               <CurrencyIcon
                 width={logoSize}
                 currency={unit}
-                colors={[foreground, foreground, foreground]}
-                iconColor={surfaceTertiary}
+                colors={[QR_LIGHT, QR_LIGHT, QR_LIGHT]}
+                iconColor={QR_DARK}
               />
             )}
           </View>

@@ -72,8 +72,7 @@ type SearchLayoutProps = {
 };
 
 export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
-  const iconColor = useThemeColor('foreground');
-  const surface = useThemeColor('surface');
+  const [iconColor, surface] = useThemeColor(['foreground', 'surface'] as const);
   const navigation = useNavigation();
   const search = useHeaderSearch();
 
@@ -101,6 +100,11 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
         options: {
           title,
           headerStyle: { backgroundColor: surface },
+          // Without this, the native bar inherits the locked dark
+          // `userInterfaceStyle` and renders the title white — invisible on
+          // the light theme's `surface` background.
+          headerTitleStyle: { color: iconColor },
+          headerTintColor: iconColor,
           ...(search.isSearching ? { headerTitle: searchBarTitle } : {}),
         },
       }),

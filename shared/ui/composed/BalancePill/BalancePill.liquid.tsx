@@ -1,9 +1,10 @@
 import React from 'react';
 import { View } from 'react-native';
 import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
-import { buttonStyle, frame } from '@expo/ui/swift-ui/modifiers';
+import { buttonStyle, environment, frame } from '@expo/ui/swift-ui/modifiers';
 
 import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import BalanceDisplay from './BalanceDisplay';
 import type { BalancePillProps } from './BalancePill.types';
 import { useBalancePillDimensions } from './useBalancePillDimensions';
@@ -27,9 +28,11 @@ export default function BalancePillLiquid({
     contentHeight: contentHeightOverride,
   });
   const h = HEADER_LAYOUT.BUTTON_HEIGHT;
+  const colorScheme = useColorScheme();
 
   const buttonModifiers = [
     buttonStyle('glass'),
+    environment('colorScheme', colorScheme),
     frame({
       height: h,
       width: dimensions.buttonWidth,

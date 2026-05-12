@@ -29,7 +29,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import { Tabs } from '@/shared/ui/composed/Tabs';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -143,29 +143,31 @@ const ReceiveP2pkTab = memo(function ReceiveP2pkTab({ data, actions, muted }: Re
       <PaymentInfo data={data.p2pkKey} copyTarget="p2pk" unit="p2pk" />
       <View className="mx-4">
         <Section title="P2PK PUBLIC KEY">
-          <ListGroup variant="secondary">
-            <PressableFeedback
-              animation={false}
-              onPress={async () => {
-                await EnhancedHaptics.copyHaptic();
-                await actions.copy.execute({ source: 'p2pk' });
-              }}>
-              <PressableFeedback.Scale>
-                <ListGroup.Item disabled>
-                  <ListGroup.ItemPrefix>
-                    <Icon name="solar:key-bold" size={20} color={muted} />
-                  </ListGroup.ItemPrefix>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>{truncateMiddle(data.p2pkKey, 10)}</ListGroup.ItemTitle>
-                  </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix>
-                    <Icon name="lets-icons:copy" size={20} color={muted} />
-                  </ListGroup.ItemSuffix>
-                </ListGroup.Item>
-              </PressableFeedback.Scale>
-              <PressableFeedback.Ripple />
-            </PressableFeedback>
-          </ListGroup>
+          <GradientCard>
+            <ListGroup variant="transparent">
+              <PressableFeedback
+                animation={false}
+                onPress={async () => {
+                  await EnhancedHaptics.copyHaptic();
+                  await actions.copy.execute({ source: 'p2pk' });
+                }}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon name="solar:key-bold" size={20} color={muted} />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{truncateMiddle(data.p2pkKey, 10)}</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Icon name="lets-icons:copy" size={20} color={muted} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
+          </GradientCard>
         </Section>
       </View>
     </>
@@ -259,8 +261,8 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         </BottomButtons>
       }>
       {quickAccessP2PK && (
-        <View className="mx-4 mb-4">
-          <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
+        <View className="mb-4">
+          <UnderlineTabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
         </View>
       )}
 

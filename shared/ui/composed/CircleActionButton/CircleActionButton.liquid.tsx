@@ -5,8 +5,9 @@ import {
   HStack as SwiftUIHStack,
   Image as SwiftUIImage,
 } from '@expo/ui/swift-ui';
-import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
+import { buttonStyle, environment, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { CIRCLE_SIZE, ICON_SIZE, type CircleActionButtonProps } from './CircleActionButton.types';
 import { CircleActionButtonShell } from './CircleActionButtonShell';
@@ -19,6 +20,7 @@ import { CircleActionButtonShell } from './CircleActionButtonShell';
  */
 export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.ReactElement {
   const [foreground] = useThemeColor(['foreground'] as const);
+  const colorScheme = useColorScheme();
   const { systemIcon, onPress, disabled = false, color } = props;
   const iconColor = color ?? foreground;
   const interactive = !disabled && !!onPress;
@@ -29,6 +31,7 @@ export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.
         <SwiftUIButton
           modifiers={[
             buttonStyle('glass'),
+            environment('colorScheme', colorScheme),
             frame({ height: CIRCLE_SIZE, width: CIRCLE_SIZE }),
             glassEffect({ shape: 'circle', glass: { variant: 'regular', interactive } }),
           ]}

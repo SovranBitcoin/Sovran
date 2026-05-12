@@ -20,8 +20,15 @@ import {
   Image as SwiftUIImage,
   Text as SwiftUIText,
 } from '@expo/ui/swift-ui';
-import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
+import {
+  environment,
+  font,
+  foregroundStyle,
+  frame,
+  glassEffect,
+} from '@expo/ui/swift-ui/modifiers';
 import { useCapabilities, useLiquidGlassModifiers } from '@/shared/ui/capability';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -103,6 +110,7 @@ function EcashStatusPill({
   onPress,
 }: EcashStatusPillProps): React.ReactElement | null {
   const [foreground] = useThemeColor(['foreground'] as const);
+  const colorScheme = useColorScheme();
   const tint = tintColor ?? foreground;
   const { liquidGlass } = useCapabilities();
   const glassPillModifiers = useLiquidGlassModifiers(
@@ -123,6 +131,7 @@ function EcashStatusPill({
         <SwiftUIButton
           onPress={onPress}
           modifiers={[
+            environment('colorScheme', colorScheme),
             frame({ height: PILL_IOS_HEIGHT, width: iosWidth, alignment: 'center' }),
             ...glassPillModifiers,
           ]}>

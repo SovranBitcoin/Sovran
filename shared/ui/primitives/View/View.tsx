@@ -43,6 +43,7 @@ import { BlurTint, BlurView } from 'expo-blur';
 import React from 'react';
 import { View as RNView, ViewProps as RNViewProps, StyleSheet } from 'react-native';
 import { supportsBlur } from '@/shared/lib/version';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 
 /**
  * Props for the View component
@@ -128,7 +129,7 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
   const {
     blur = false,
     blurIntensity = 70,
-    blurTint = 'dark',
+    blurTint: blurTintProp,
     colorBlur,
     style,
     children,
@@ -141,6 +142,16 @@ const View = React.forwardRef<RNView, ViewProps>((props, ref) => {
 
   // Only enable blur if the device supports it
   const effectiveBlur = blur && supportsBlur();
+  // Default the tint to the current theme's scheme so frosted surfaces stay
+  // legible on light themes. The app pins `userInterfaceStyle: 'dark'` at
+  // the window level, so a vanilla `tint: 'light'` UIBlurView still captures
+  // dark content underneath and reads as gray — `systemThickMaterialLight`
+  // is the brightest named material Apple ships (designed for nav-bar
+  // chrome) and looks near-white in this context. Callers can still pin a
+  // specific tint via prop.
+  const themeScheme = useColorScheme();
+  const blurTint: BlurTint =
+    blurTintProp ?? (themeScheme === 'light' ? 'systemThickMaterialLight' : 'dark');
 
   if (!effectiveBlur) {
     // 🔁 Normal unwrapped View – no blur requested or not supported

@@ -1,0 +1,35 @@
+diff --git a/node_modules/react-native-gifted-chat/src/MessagesContainer/types.ts b/node_modules/react-native-gifted-chat/src/MessagesContainer/types.ts
+--- a/node_modules/react-native-gifted-chat/src/MessagesContainer/types.ts
++++ b/node_modules/react-native-gifted-chat/src/MessagesContainer/types.ts
+@@ -1,10 +1,10 @@
+ import { RefObject } from 'react'
+ import {
++  FlatList,
+   FlatListProps,
+   StyleProp,
+   ViewStyle,
+ } from 'react-native'
+-import { FlatList } from 'react-native-gesture-handler'
+ import Animated, { ScrollEvent } from 'react-native-reanimated'
+ 
+ import { DayProps } from '../Day'
+@@ -14,14 +14,15 @@
+ import { ReplyProps } from '../Reply'
+ import { TypingIndicatorProps } from '../TypingIndicator/types'
+ 
+-/** Animated FlatList created from react-native-gesture-handler's FlatList */
+-const RNGHAnimatedFlatList = Animated.createAnimatedComponent(FlatList)
++/** Animated FlatList created from React Native's FlatList */
++const RNAnimatedFlatList = Animated.createAnimatedComponent(FlatList)
+ 
+ /**
+  * Typed AnimatedFlatList component that preserves generic type parameter.
+- * Uses react-native-gesture-handler's FlatList which respects keyboardShouldPersistTaps.
++ * Uses React Native's FlatList so inverted scroll transforms are applied
++ * directly to the native list instead of through RNGH's ScrollView wrapper.
+  */
+-export const AnimatedFlatList = RNGHAnimatedFlatList as <TMessage>(
++export const AnimatedFlatList = RNAnimatedFlatList as <TMessage>(
+   props: FlatListProps<TMessage> & {
+     ref?: RefObject<FlatList<TMessage>>
+   }

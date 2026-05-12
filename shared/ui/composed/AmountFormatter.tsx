@@ -16,6 +16,7 @@ import { formatAmount } from '@/shared/lib/currency';
 import { Log } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/utils';
 import { useCapabilities } from '@/shared/ui/capability';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -96,7 +97,11 @@ export function AmountFormatter({
   glassVariant = 'regular',
   sign,
 }: AmountFormatterProps) {
-  const [foreground, danger] = useThemeColor(['foreground', 'danger'] as const);
+  const [foreground, danger, receiveColor] = useThemeColor([
+    'foreground',
+    'danger',
+    'success',
+  ] as const);
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
 
   const decorated = decorate(
@@ -113,10 +118,12 @@ export function AmountFormatter({
     transactionType,
     foreground,
     danger,
+    receiveColor,
   });
 
   const { liquidGlass } = useCapabilities();
   const useGlass = liquid && liquidGlass;
+  const colorScheme = useColorScheme();
   const containerClass = centered ? 'items-center justify-center' : 'flex-row items-center';
 
   return (
@@ -146,6 +153,7 @@ export function AmountFormatter({
                 fontWeight={weight}
                 tint={resolvedColor}
                 glassVariant={glassVariant}
+                colorScheme={colorScheme}
                 style={[
                   StyleSheet.absoluteFill,
                   { alignItems: 'center', justifyContent: 'center' },
@@ -204,6 +212,7 @@ function resolveColor({
   transactionType,
   foreground,
   danger,
+  receiveColor,
 }: {
   color: string | null | undefined;
   useTypeColors: boolean;
@@ -211,6 +220,7 @@ function resolveColor({
   transactionType: TransactionType;
   foreground: string;
   danger: string;
+  receiveColor: string;
 }): string | null {
   // `color === null` is an explicit opt-out: "no tint at all" on the liquid
   // path. Must be checked before the `||` fallback, or null would coerce
@@ -219,7 +229,7 @@ function resolveColor({
   if (color) return color;
   if (useTypeColors) {
     if (!amount) return opacity(foreground, 0.4);
-    return transactionType === 'receive' ? foreground : danger;
+    return transactionType === 'receive' ? receiveColor : danger;
   }
   return foreground;
 }

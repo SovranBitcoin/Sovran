@@ -14,6 +14,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { useShallow } from 'zustand/react/shallow';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
 
@@ -66,6 +67,14 @@ function MapPreview({
   markers: NearbyMapMarker[];
 }) {
   const surfaceSecondary = useThemeColor('surface-secondary');
+  const scheme = useColorScheme();
+  // iOS gets the saturation / blend / gradient stack on both themes —
+  // most layers are already theme-aware (they tint with `surfaceSecondary`,
+  // and `overlay`/`color` blends lift dark Apple Maps pixels toward the
+  // light surface). Android stays plain (Google Maps doesn't honour the
+  // blend stack the same way and the result reads as a muddy smear).
+  const useChrome = Platform.OS === 'ios';
+  const isDark = scheme === 'dark';
 
   const cameraPosition = useMemo(
     () => ({ coordinates: { latitude, longitude }, zoom: MAP_ZOOM }),
@@ -86,7 +95,9 @@ function MapPreview({
         <GoogleMaps.View
           style={StyleSheet.absoluteFillObject}
           cameraPosition={cameraPosition}
-          colorScheme={GoogleMaps.MapColorScheme.DARK}
+          colorScheme={
+            scheme === 'dark' ? GoogleMaps.MapColorScheme.DARK : GoogleMaps.MapColorScheme.LIGHT
+          }
           properties={{
             isMyLocationEnabled: false,
             mapStyleOptions: { json: GOOGLE_MAPS_NO_LABELS_STYLE },
@@ -98,57 +109,72 @@ function MapPreview({
         <RNView style={StyleSheet.absoluteFillObject} />
       )}
 
-      <RNView style={overlayStyles.grayscaleOverlay} pointerEvents="none" />
-      <RNView style={overlayStyles.desaturationOverlay} pointerEvents="none" />
-      <RNView
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: opacity(surfaceSecondary, 0.35),
-            // @ts-ignore - mixBlendMode works on iOS
-            mixBlendMode: 'overlay',
-          },
-        ]}
-        pointerEvents="none"
-      />
-      <RNView
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: opacity(surfaceSecondary, 1),
-            // @ts-ignore - mixBlendMode works on iOS
-            mixBlendMode: 'color',
-          },
-        ]}
-        pointerEvents="none"
-      />
+      {useChrome && (
+        <>
+          <RNView style={overlayStyles.grayscaleOverlay} pointerEvents="none" />
+          {isDark ? (
+            // Dark veil: a hair of black to deepen the already-dark Apple
+            // Maps base before the surface tint kicks in.
+            <RNView style={overlayStyles.darkVeilOverlay} pointerEvents="none" />
+          ) : (
+            // Light lift: `screen` blend with white at 0.55 brightens the
+            // (still-dark) Apple Maps base so the `surfaceSecondary`
+            // `overlay`+`color` blends below land on a mid-tone map instead
+            // of a near-black one. Without this the chrome reads as a dark
+            // wash on a light card.
+            <RNView style={overlayStyles.lightLiftOverlay} pointerEvents="none" />
+          )}
+          <RNView
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                backgroundColor: opacity(surfaceSecondary, 0.35),
+                // @ts-ignore - mixBlendMode works on iOS
+                mixBlendMode: 'overlay',
+              },
+            ]}
+            pointerEvents="none"
+          />
+          <RNView
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                backgroundColor: opacity(surfaceSecondary, 1),
+                // @ts-ignore - mixBlendMode works on iOS
+                mixBlendMode: 'color',
+              },
+            ]}
+            pointerEvents="none"
+          />
 
-      <LinearGradient
-        colors={[
-          surfaceSecondary,
-          opacity(surfaceSecondary, 0.1),
-          opacity(surfaceSecondary, 0.1),
-          surfaceSecondary,
-        ]}
-        locations={[0, 0.3, 0.7, 1]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-      <LinearGradient
-        colors={[
-          surfaceSecondary,
-          opacity(surfaceSecondary, 0.1),
-          opacity(surfaceSecondary, 0.1),
-          surfaceSecondary,
-        ]}
-        locations={[0, 0.25, 0.75, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
+          <LinearGradient
+            colors={[
+              surfaceSecondary,
+              opacity(surfaceSecondary, 0.1),
+              opacity(surfaceSecondary, 0.1),
+              surfaceSecondary,
+            ]}
+            locations={[0, 0.3, 0.7, 1]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[
+              surfaceSecondary,
+              opacity(surfaceSecondary, 0.1),
+              opacity(surfaceSecondary, 0.1),
+              surfaceSecondary,
+            ]}
+            locations={[0, 0.25, 0.75, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+        </>
+      )}
     </RNView>
   );
 }
@@ -302,8 +328,15 @@ const overlayStyles = StyleSheet.create({
     // @ts-ignore - mixBlendMode supported on iOS
     mixBlendMode: 'saturation',
   },
-  desaturationOverlay: {
+  darkVeilOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  lightLiftOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'white',
+    opacity: 0.55,
+    // @ts-ignore - mixBlendMode supported on iOS
+    mixBlendMode: 'screen',
   },
 });

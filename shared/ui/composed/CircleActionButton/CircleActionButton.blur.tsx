@@ -13,7 +13,6 @@ export function CircleActionButtonBlur(props: CircleActionButtonProps): React.Re
   const { icon, onPress, disabled = false, color } = props;
   const iconColor = color ?? foreground;
   const interactive = !disabled && !!onPress;
-
   return (
     <CircleActionButtonShell {...props}>
       <Pressable
@@ -27,7 +26,8 @@ export function CircleActionButtonBlur(props: CircleActionButtonProps): React.Re
         <View
           blur
           blurIntensity={60}
-          blurTint="prominent"
+          blurTint="light"
+          colorBlur="rgba(0,0,0,0.08)"
           style={[
             styles.blurCircle,
             {

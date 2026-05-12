@@ -31,14 +31,15 @@ export interface QRButtonProps {
 
 const DEFAULT_SIZE = 64;
 
-const WHITE = '#FFFFFF';
-
 export function QRButton(props: QRButtonProps): React.ReactElement {
-  const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
+  // Inverts with the theme: on dark themes the base is the foreground (white)
+  // with a soft white gradient and a dark icon; on light themes the base is
+  // the foreground (black) with a soft black gradient and a light icon.
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { onPress, size = DEFAULT_SIZE } = props;
 
   const borderRadius = size * 0.18;
-  const glow = { color: WHITE, opacity: 0.6, radius: 10, offset: { width: 0, height: 0 } };
+  const glow = { color: foreground, opacity: 0.6, radius: 10, offset: { width: 0, height: 0 } };
 
   const containerStyle = {
     width: size,
@@ -119,12 +120,17 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           onPress={onPress}>
           <View style={[styles.container, containerStyle]} pointerEvents="none">
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: background }]} />
             <View
-              style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(WHITE, 0.35) }]}
+              style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(foreground, 0.65) }]}
             />
             <LinearGradient
-              colors={[WHITE, opacity(WHITE, 0.8), opacity(WHITE, 0.7), opacity(WHITE, 0.6)]}
+              colors={[
+                foreground,
+                opacity(foreground, 0.8),
+                opacity(foreground, 0.7),
+                opacity(foreground, 0.6),
+              ]}
               locations={[0, 0.35, 0.6, 1]}
               start={{ x: 0.5, y: 0 }}
               end={{ x: 0.5, y: 1 }}
@@ -133,7 +139,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
             <View
               style={[
                 StyleSheet.absoluteFillObject,
-                { borderWidth: 1, borderColor: opacity(WHITE, 0.4) },
+                { borderWidth: 1, borderColor: opacity(foreground, 0.4) },
               ]}
             />
           </View>
@@ -143,7 +149,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
               { justifyContent: 'center', alignItems: 'center' },
             ]}
             pointerEvents="none">
-            <Icon name="stash:qr-code" size={38} color={surfaceTertiary} />
+            <Icon name="stash:qr-code" size={38} color={background} />
           </View>
         </Pressable>
       </Animated.View>

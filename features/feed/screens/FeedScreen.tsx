@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { ScreenContainer } from '@/features/contacts/components/ScreenContainer';
 import FilterItem from '@/features/contacts/components/search/SearchFilterItem';
@@ -87,10 +86,11 @@ export function FeedScreen() {
 
   const { isSearching, searchQuery } = useSearchContext();
   const [activeFilter, setActiveFilter] = useState('Trending');
-  const [foreground, surface, separator] = useThemeColor([
+  const [foreground, surface, separator, muted] = useThemeColor([
     'foreground',
     'surface',
     'separator-secondary',
+    'muted',
   ] as const);
 
   const handleFilterChange = useCallback((filter: string) => {
@@ -126,13 +126,13 @@ export function FeedScreen() {
               justify="center"
               align="center"
               className="bg-surface-secondary h-20 w-20 rounded-full">
-              <Icon name="mingcute:search-3-line" size={40} color={opacity(foreground, 0.4)} />
+              <Icon name="mingcute:search-3-line" size={40} color={muted} />
             </VStack>
             <VStack spacing={12}>
-              <Text className="text-center" color={opacity(foreground, 0.5)} bold size={20}>
+              <Text className="text-center" color={foreground} bold size={20}>
                 Search for someone by name
               </Text>
-              <Text className="text-center" color={opacity(foreground, 0.4)} size={16}>
+              <Text className="text-center" color={muted} size={16}>
                 Enter a name, NIP-05, or npub to find people
               </Text>
             </VStack>

@@ -169,10 +169,11 @@ export function AmountEntryView({
   nextVariants,
   transactionType = 'neutral',
 }: AmountEntryViewProps) {
-  const [foreground, background, danger] = useThemeColor([
+  const [foreground, background, danger, success] = useThemeColor([
     'foreground',
     'background',
     'danger',
+    'success',
   ] as const);
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
@@ -184,8 +185,13 @@ export function AmountEntryView({
 
   const isFiat = inputMode === 'fiat';
   const isSend = transactionType === 'send';
-  const activeColor = rawInput ? (isSend ? danger : foreground) : opacity(foreground, 0.4);
-  const placeholderColor = opacity(isSend ? danger : foreground, 0.35);
+  const isReceive = transactionType === 'receive';
+  // Match `AmountFormatter.resolveColor`: send → danger, receive → success,
+  // anything else → foreground. Keeps the fiat raw-input path (which doesn't
+  // route through AmountFormatter) in sync with the BTC glyph path.
+  const typeTint = isSend ? danger : isReceive ? success : foreground;
+  const activeColor = rawInput ? typeTint : opacity(foreground, 0.4);
+  const placeholderColor = opacity(typeTint, 0.35);
 
   const suggestionsRow = useMemo(() => {
     if (transactionType !== 'send' || suggestions.length === 0) return null;

@@ -32,6 +32,12 @@ export type LiquidGlassTextProps = {
   tint?: string | null;
   glassVariant?: GlassVariant;
   interactive?: boolean;
+  /**
+   * Force the SwiftUI `colorScheme` env value on the hosting controller so the
+   * `glassEffect` material renders in the matching mode regardless of the
+   * app-window `userInterfaceStyle`. Omit to inherit the system trait.
+   */
+  colorScheme?: 'light' | 'dark';
   /** Debug override: replace the text glyph shape with a simple custom Path to isolate glass-effect rendering. */
   debugShape?: DebugShape;
   onLayout?: (e: { nativeEvent: { width: number; height: number } }) => void;
