@@ -12,6 +12,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useWindowDimensions, ActivityIndicator } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -187,6 +188,15 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   const QR_LIGHT = '#FFFFFF';
   const gradientColors = [QR_LIGHT, QR_LIGHT] as const;
   const qrSize = width - 2 * padding;
+  // On light themes a pure-white card disappears into the page surface, so
+  // swap the flat gradient for `GradientCard` — the same blur + corner-glow
+  // frame the Receive Address row uses on this screen, so the QR sits in
+  // matching chrome instead of floating on a flat white block. The inner
+  // `EQRCode` still paints an opaque white square at `qrSize` (the strict
+  // scanner quiet zone), so only the 16 px ring around the modules picks up
+  // the card material — that's the visible frame we wanted.
+  const scheme = useColorScheme();
+  const useBlurCard = scheme === 'light';
   // When the caller sizes the block explicitly (e.g. a card deck), scale
   // the centered logo with it so the logo-to-QR ratio stays scan-safe
   // (~18% of the QR area). Default (no `size`) preserves the original
@@ -217,57 +227,70 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     }
   });
 
+  const qrContent = showLoading ? (
+    <View
+      style={{
+        width: qrSize,
+        height: qrSize,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+      <ActivityIndicator size="large" color={QR_DARK} />
+    </View>
+  ) : showError ? (
+    <View
+      style={{
+        width: qrSize,
+        height: qrSize,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+      }}>
+      <Icon name="ri:error-warning-line" size={48} color={opacity(QR_DARK, 0.5)} />
+    </View>
+  ) : canRenderQR ? (
+    // `transparent` on light mode lets the `GradientCard`'s frosted
+    // material show through the QR's "white" cells, so the pattern reads
+    // as on-card instead of floating on a hard white block. Dark mode
+    // keeps a pure-white fill since the surrounding `LinearGradient` IS
+    // the white card.
+    <EQRCode
+      color={QR_DARK}
+      backgroundColor={useBlurCard ? 'transparent' : QR_LIGHT}
+      value={qrData}
+      size={qrSize}
+    />
+  ) : (
+    <View
+      style={{
+        width: qrSize,
+        height: qrSize,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+      }}>
+      <ActivityIndicator size="large" color={QR_DARK} />
+    </View>
+  );
+
   return (
     <Log name="AnimatedQRCode">
       <View style={{ alignItems: 'center' }}>
         {/* QR + centered logo overlay */}
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <LinearGradient colors={gradientColors} style={{ borderRadius: 16, padding: 16 }}>
-            {showLoading ? (
-              <View
-                style={{
-                  width: qrSize,
-                  height: qrSize,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <ActivityIndicator size="large" color={QR_DARK} />
-              </View>
-            ) : showError ? (
-              <View
-                style={{
-                  width: qrSize,
-                  height: qrSize,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: 20,
-                }}>
-                <Icon name="ri:error-warning-line" size={48} color={opacity(QR_DARK, 0.5)} />
-              </View>
-            ) : canRenderQR ? (
-              <EQRCode
-                color={QR_DARK}
-                backgroundColor={QR_LIGHT}
-                value={qrData}
-                size={qrSize}
-              />
-            ) : (
-              <View
-                style={{
-                  width: qrSize,
-                  height: qrSize,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: 20,
-                }}>
-                <ActivityIndicator size="large" color={QR_DARK} />
-              </View>
-            )}
-          </LinearGradient>
+          {useBlurCard ? (
+            <GradientCard contentStyle={{ padding: 16 }}>{qrContent}</GradientCard>
+          ) : (
+            <LinearGradient colors={gradientColors} style={{ borderRadius: 16, padding: 16 }}>
+              {qrContent}
+            </LinearGradient>
+          )}
 
           {/* Centered logo — absolutely positioned from the container's center.
-              The circle background matches the QR canvas (always white) so
-              the logo punches a clean hole through the pattern. */}
+              The circle background is always white so the logo punches a
+              clean hole through the QR pattern on both themes (even on
+              light mode where the surrounding cells are transparent, the
+              white disc keeps the logo legible against the frosted card). */}
           <View
             pointerEvents="none"
             style={{

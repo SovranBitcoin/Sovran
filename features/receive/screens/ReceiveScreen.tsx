@@ -261,7 +261,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         </BottomButtons>
       }>
       {quickAccessP2PK && (
-        <View className="mb-4">
+        <View className="mx-4 mb-4">
           <UnderlineTabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
         </View>
       )}

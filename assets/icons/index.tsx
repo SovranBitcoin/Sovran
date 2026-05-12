@@ -533,7 +533,11 @@ export function CurrencyIcon({
     gradientColors[1] ?? gradientColors[0],
     gradientColors[2] ?? gradientColors[1] ?? gradientColors[0],
   ];
-  const symbolColor = iconColor ?? foreground;
+  // The bitcoin disc is always orange (branded), so its inner "B" must
+  // always be white — otherwise the light-theme `foreground` (near-black)
+  // paints a black B on the orange disc, which is wrong. Other currencies
+  // still pick up the theme foreground so they invert with dark/light.
+  const symbolColor = iconColor ?? (currency === 'sat' ? '#FFFFFF' : foreground);
   /** When iconColor is passed (QR mode): background = text color, symbol = surface color */
   const symbolFill = iconColor != null ? g0 : symbolColor;
 
