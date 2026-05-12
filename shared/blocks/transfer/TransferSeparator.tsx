@@ -4,7 +4,7 @@
  * Shows a colored bar between send and receive rows with a status-aware icon:
  * - idle (default): arrow-down icon, primary color
  * - running: spinner, primary color
- * - done: checkmark, green
+ * - done: checkmark, blue
  * - failed: alert icon, red
  *
  * Used by both SwapTransactionScreen and RebalanceStepRow.
@@ -27,12 +27,12 @@ interface TransferSeparatorProps {
 }
 
 export const TransferSeparator = React.memo(({ failed, status }: TransferSeparatorProps) => {
-  const [accent, green500, red500] = useThemeColor(['accent', 'green-500', 'red-500'] as const);
+  const [accent, blue500, red500] = useThemeColor(['accent', 'blue-500', 'red-500'] as const);
 
   const effectiveStatus = status ?? (failed ? 'failed' : 'idle');
 
   const bgColor =
-    effectiveStatus === 'done' ? green500 : effectiveStatus === 'failed' ? red500 : accent;
+    effectiveStatus === 'done' ? blue500 : effectiveStatus === 'failed' ? red500 : accent;
 
   const renderIcon = () => {
     switch (effectiveStatus) {

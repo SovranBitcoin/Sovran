@@ -6,17 +6,17 @@ import {
   foregroundStyle,
   frame,
   glassEffect,
+  tint,
 } from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 import { zIndex } from '@/shared/styles/tokens';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
   const {
-    green400,
+    success,
     handleSelectCurrency,
     text,
     iosHeight,
@@ -27,19 +27,22 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
   } = useFiatCurrencyPill(props);
 
   const colorScheme = useColorScheme();
-  const [foreground] = useThemeColor(['foreground'] as const);
+  const textColor = colorScheme === 'light' ? '#000000' : '#FFFFFF';
   const glassModifiers = [
     environment('colorScheme', colorScheme),
     frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
     glassEffect({
       shape: 'capsule' as const,
-      glass: { tint: opacity(green400, 0.4), variant: 'regular' as const, interactive: true },
+      glass: { tint: opacity('#FFFFFF', 0.15), variant: 'regular' as const, interactive: true },
     }),
+    // Colors the highlighted Menu row + native check glyph on the selected
+    // currency. SwiftUI's Menu inherits its accent from the host's tint.
+    tint(success),
   ];
 
   const glassTextModifiers = [
     font({ size: textSize, design: 'monospaced' as const, weight: 'bold' as const }),
-    foregroundStyle(foreground),
+    foregroundStyle(textColor),
     frame({ height: 22, width: iosWidth, alignment: 'center' }),
   ];
 

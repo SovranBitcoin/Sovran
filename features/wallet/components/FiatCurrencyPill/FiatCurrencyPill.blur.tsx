@@ -1,5 +1,5 @@
 /**
- * iOS non-liquid variant: a real BlurView capsule with a green wash,
+ * iOS non-liquid variant: a real BlurView capsule with a white wash,
  * mirroring CircleActionButton.blur's chrome (intensity 60, light tint)
  * so the wallet's pill and toolbar buttons feel like the same family.
  * Adds ActionSheetIOS-driven currency selection — preserves today's
@@ -16,21 +16,13 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactElement {
-  const {
-    text,
-    green400,
-    iosHeight,
-    handleSelectCurrency,
-    onPress,
-    enableCurrencyMenu,
-    textSize,
-  } = useFiatCurrencyPill(props);
+  const { text, iosHeight, handleSelectCurrency, onPress, enableCurrencyMenu, textSize } =
+    useFiatCurrencyPill(props);
   const colorScheme = useColorScheme();
-  const [foreground] = useThemeColor(['foreground'] as const);
+  const textColor = colorScheme === 'light' ? '#000000' : '#FFFFFF';
 
   const openCurrencySheet = useCallback(() => {
     ActionSheetIOS.showActionSheetWithOptions(
@@ -59,7 +51,7 @@ export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactE
         blur
         blurIntensity={60}
         blurTint="light"
-        colorBlur={opacity(green400, 0.4)}
+        colorBlur={opacity('#FFFFFF', 0.15)}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -70,7 +62,7 @@ export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactE
           paddingVertical: 6,
           minHeight: iosHeight,
         }}>
-        <Text overpass size={textSize} bold color={foreground} style={{ letterSpacing: 0.3 }}>
+        <Text overpass size={textSize} bold color={textColor} style={{ letterSpacing: 0.3 }}>
           {text}
         </Text>
       </View>

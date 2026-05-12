@@ -310,9 +310,9 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   onComplete,
 }) => {
   useLifecycleLogger('SettingsRecoveryScreen');
-  const [foreground, green400, red400, surfaceSecondary] = useThemeColor([
+  const [foreground, blue400, red400, surfaceSecondary] = useThemeColor([
     'foreground',
-    'green-400',
+    'blue-400',
     'red-400',
     'surface-secondary',
   ] as const);
@@ -715,7 +715,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             <ShieldStatusIcon
               size={48}
               color={foreground}
-              successColor={green400}
+              successColor={blue400}
               errorColor={red400}
               status={isComplete ? 'success' : 'loading'}
             />
@@ -794,7 +794,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             <ShieldStatusIcon
               size={48}
               color={foreground}
-              successColor={green400}
+              successColor={blue400}
               errorColor={red400}
               status="error"
             />

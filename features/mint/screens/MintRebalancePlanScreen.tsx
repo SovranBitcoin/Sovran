@@ -52,7 +52,7 @@ export function MintRebalancePlanScreen() {
     'surface-secondary',
     'background',
   ] as const);
-  const [danger, green400] = useThemeColor(['danger', 'green-400'] as const);
+  const [danger, blue400] = useThemeColor(['danger', 'blue-400'] as const);
   const fgMuted = opacity(foreground, 0.5);
   const fgDim = opacity(foreground, 0.4);
 
@@ -274,7 +274,7 @@ export function MintRebalancePlanScreen() {
                 className="h-1.5 rounded-full"
                 style={{
                   width: `${stepCounts.progressPct * 100}%`,
-                  backgroundColor: stepCounts.failed > 0 ? danger : green400,
+                  backgroundColor: stepCounts.failed > 0 ? danger : blue400,
                 }}
               />
             </View>
@@ -328,7 +328,7 @@ export function MintRebalancePlanScreen() {
       {alreadyBalanced && (
         <View className="items-center p-10">
           <VStack gap={12} align="center">
-            <Icon name="mdi:check-circle" size={48} color={green400} />
+            <Icon name="mdi:check-circle" size={48} color={blue400} />
             <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
               Already balanced!
             </Text>
@@ -342,7 +342,7 @@ export function MintRebalancePlanScreen() {
       {!alreadyBalanced && plan.steps.length === 0 && (
         <View className="items-center p-10">
           <VStack gap={12} align="center">
-            <Icon name="mdi:check-circle" size={48} color={green400} />
+            <Icon name="mdi:check-circle" size={48} color={blue400} />
             <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
               No transfers needed
             </Text>

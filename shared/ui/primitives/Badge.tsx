@@ -142,7 +142,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
     success,
     warning,
     red500,
-    green500,
+    blue500,
   ] = useThemeColor([
     'foreground',
     'default-foreground',
@@ -152,7 +152,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
     'success',
     'yellow-300',
     'red-500',
-    'green-500',
+    'blue-500',
   ] as const);
 
   const getVariantStyles = (): ViewStyle => {
@@ -179,7 +179,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
         };
       case 'success':
         return {
-          backgroundColor: opacity(green500, 0.2),
+          backgroundColor: opacity(blue500, 0.2),
           borderColor: 'transparent',
         };
       case 'star':
@@ -211,7 +211,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
    * @example
    * getTextColor() // Returns theme color based on variant
    * // With color="red": Returns "red" (custom override)
-   * // With variant="success": Returns green theme color
+   * // With variant="success": Returns success theme color
    * // With variant="error": Returns red theme color
    */
   const getTextColor = () => {
