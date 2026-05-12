@@ -6,6 +6,7 @@ import { AiHeaderTitle, openAiSessionsMenu } from '@/features/ai';
 
 export default function AiLayout() {
   const iconColor = useThemeColor('foreground');
+  const surface = useThemeColor('surface');
   const navigation = useNavigation();
 
   const openDrawer = () => navigation.dispatch(DrawerActions.openDrawer());
@@ -13,7 +14,7 @@ export default function AiLayout() {
   return (
     <Stack
       screenOptions={{
-        contentStyle: { backgroundColor: 'transparent' },
+        contentStyle: { backgroundColor: surface },
       }}>
       <Stack.Screen
         name="index"

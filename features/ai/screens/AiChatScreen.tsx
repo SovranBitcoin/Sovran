@@ -12,6 +12,7 @@ import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { LegendList } from '@legendapp/list';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { PatternBackground } from '@/shared/ui/composed/PatternBackground';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useRoutstrStore, type RoutstrMessage } from '@/shared/stores/profile/routstrStore';
@@ -297,6 +298,7 @@ export function AiChatScreen() {
 
   return (
     <RNView style={{ flex: 1, backgroundColor: surfaceColor }}>
+      <PatternBackground />
       {/* List wrapper rides the keyboard via the same shared translate as
           the composer. When the keyboard opens, both shift up together so
           the latest message stays just above the composer instead of
