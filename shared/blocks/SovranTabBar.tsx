@@ -6,7 +6,9 @@ import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 
-const BAR_HEIGHT = 52;
+export const SOVRAN_TAB_BAR_ROW_HEIGHT = 52;
+/** Minimum bottom padding under the tab row when there's no home indicator. */
+export const SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING = 8;
 
 export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -22,7 +24,11 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const pressedColor = opacity(foreground, 0.08);
 
   return (
-    <View style={{ backgroundColor: surface, paddingBottom: Math.max(insets.bottom, 8) }}>
+    <View
+      style={{
+        backgroundColor: surface,
+        paddingBottom: Math.max(insets.bottom, SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING),
+      }}>
       <View style={[styles.divider, { backgroundColor: dividerColor }]} />
       <View style={styles.row}>
         {state.routes.map((route, index) => {
@@ -80,7 +86,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    height: BAR_HEIGHT,
+    height: SOVRAN_TAB_BAR_ROW_HEIGHT,
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 8,

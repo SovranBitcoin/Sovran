@@ -169,21 +169,33 @@ export function ChatScreen({
     setComposerHeight((prev) => (Math.abs(prev - next) > 0.5 ? next : prev));
   }, []);
 
-  // Composer rides the keyboard via two complementary mechanisms:
-  //   1. The KAV (below) animates `paddingBottom` from 0 → keyboardHeight
-  //      while opening, which lifts the composer's natural anchor at
-  //      `bottom: resolvedBottomInset` of the KAV's padding box. That
-  //      lands the composer exactly `resolvedBottomInset` above the
-  //      keyboard top — *too* much breathing room for a focused chat.
-  //   2. We layer a `translateY` (interpolated by keyboard progress)
-  //      that *closes* the gap from `resolvedBottomInset` down to
-  //      `COMPOSER_FOCUSED_BOTTOM_GAP` (8pt) by the time the keyboard
-  //      is fully open. Translate (not `bottom`) so the work stays on
-  //      the UI thread — no Yoga re-layout per frame.
-  const { progress: keyboardProgress } = useReanimatedKeyboardAnimation();
-  const composerTranslateStyle = useAnimatedStyle(() => ({
+  // Whole chat surface (list + composer) rides the keyboard via a single
+  // shared translate on a Reanimated wrapper around <GiftedChat>, mirroring
+  // AiChatScreen. GiftedChat's built-in KAV is disabled below — relying on
+  // `behavior: 'padding'` to lift the absolutely-positioned composer turned
+  // out to be unreliable across border-box positioning and modal contexts
+  // (some surfaces saw the composer pinned under the keyboard, others saw a
+  // double lift). Driving the lift ourselves removes the ambiguity. Math:
+  //
+  //   translateY = keyboardHeight.value
+  //              + keyboardProgress.value * (resolvedBottomInset - COMPOSER_FOCUSED_BOTTOM_GAP)
+  //
+  // `keyboardHeight.value` is negative when the keyboard is shown (RNKC
+  // convention: negative translateY = up). At rest both terms are 0 and the
+  // wrapper sits at its laid-out position. At fully open the wrapper moves up
+  // by `keyboardHeight - resolvedBottomInset`, which lands the composer's
+  // outer bottom edge flush with the keyboard top (since the composer sits
+  // at `bottom: resolvedBottomInset` of the wrapper). The list (an inverted
+  // FlatList inside the wrapper) rides along, so the newest bubble stays
+  // just above the composer instead of getting hidden behind the keyboard.
+  const { progress: keyboardProgress, height: keyboardHeight } = useReanimatedKeyboardAnimation();
+  const keyboardLiftStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: keyboardProgress.value * (resolvedBottomInset - COMPOSER_FOCUSED_BOTTOM_GAP) },
+      {
+        translateY:
+          keyboardHeight.value +
+          keyboardProgress.value * (resolvedBottomInset - COMPOSER_FOCUSED_BOTTOM_GAP),
+      },
     ],
   }));
 
@@ -261,12 +273,12 @@ export function ChatScreen({
   // it rides the keyboard animation in lock-step with the input bubble.
   const renderInputToolbar = useCallback(
     (_props: InputToolbarProps<GiftedMessage>) => (
-      <Reanimated.View
+      // No `transform` here — the outer Reanimated.View wrapping <GiftedChat>
+      // owns the keyboard lift. Composer just anchors statically at
+      // `bottom: resolvedBottomInset` of that wrapper and rides along.
+      <RNView
         onLayout={handleComposerLayout}
-        style={[
-          { position: 'absolute', left: 0, right: 0, bottom: resolvedBottomInset },
-          composerTranslateStyle,
-        ]}>
+        style={{ position: 'absolute', left: 0, right: 0, bottom: resolvedBottomInset }}>
         {composerActions ? (
           <ScrollView
             horizontal
@@ -289,10 +301,15 @@ export function ChatScreen({
           placeholder={composerPlaceholder}
           onPlusPress={composerOnPlusPress}
           onVoicePress={composerOnVoicePress}
+          // Modal-stack chat surfaces (DMs / geohash / Whitenoise) don't sit
+          // above a tab bar, so the bubble lands close to the keyboard top
+          // when focused. Bump bottomPadding above the default 12 to give
+          // the bubble breathing room over the keyboard and the home indicator.
+          bottomPadding={8}
           testID={composerTestID}
           surface={surface}
         />
-      </Reanimated.View>
+      </RNView>
     ),
     [
       draft,
@@ -306,7 +323,6 @@ export function ChatScreen({
       composerTestID,
       surface,
       resolvedBottomInset,
-      composerTranslateStyle,
     ]
   );
 
@@ -365,88 +381,84 @@ export function ChatScreen({
       {isLoading ? (
         (loadingContent ?? null)
       ) : (
-        <GiftedChat<GiftedMessage>
-          messages={giftedMessages}
-          messagesContainerStyle={{
-            height: 400,
-          }}
-          user={{ _id: OWN_USER_ID }}
-          renderInputToolbar={renderInputToolbar}
-          renderMessage={renderMessage}
-          renderChatEmpty={renderChatEmpty}
-          renderAvatar={null}
-          renderDay={() => null}
-          renderTime={() => null}
-          renderUsername={() => null}
-          isUsernameVisible={false}
-          isDayAnimationEnabled={false}
-          minInputToolbarHeight={0}
-          messageIdGenerator={() => `gc-${Date.now()}`}
-          listProps={{
-            // Transparent so our outer `surfaceColor` shows through —
-            // iOS FlatList defaults to `systemBackground` (≈ #1C1C1E
-            // in dark mode), which leaks a tinted rectangle behind
-            // bubble-less renderers like the AI assistant text.
-            style: { flex: 1, backgroundColor: 'transparent' },
-            // iOS 13+ defaults to `contentInsetAdjustmentBehavior:
-            // 'automatic'`, which makes UIScrollView push content out
-            // from under translucent navigation/tab bars AND apply a
-            // vibrancy material to the area "behind" them. Our list
-            // is `inverted`; UIKit doesn't know about the scaleY
-            // transform, so it applies the vibrancy zone to the
-            // wrong half. We layer our own padding via
-            // `topInset` / `bottomInset`, so opting out is safe.
-            contentInsetAdjustmentBehavior: 'never',
-            // Auto-adjust gives us the right *bottom* inset out of the
-            // box (lifts the indicator above the home indicator / tab
-            // bar so it aligns with the composer top). On the top side,
-            // UIKit adds a header inset even though our wrapper is
-            // already sized to `windowHeight - headerHeight` and the
-            // FlatList's true top edge is below the Stack header — so
-            // we pass a negative `top` to cancel out exactly that
-            // double-count. iOS adds `scrollIndicatorInsets` on top of
-            // the auto-adjusted ones, so a negative value here
-            // subtracts from the auto inset and lands the indicator's
-            // top right at the FlatList's actual edge.
-            automaticallyAdjustsScrollIndicatorInsets: true,
-            scrollIndicatorInsets: { top: 0, bottom: 0, left: 0, right: 0 },
-            // Inverted list: `paddingTop` = visual BOTTOM clearance,
-            // `paddingBottom` = visual TOP clearance. Padding the
-            // contentContainer (rather than wrapping the list in a
-            // padded View) keeps the FlatList full-screen, so
-            // bubbles bleed under the floating header / composer
-            // during scroll but settle at the right edges at rest.
-            //
-            // No magic-number breathing room on the top edge: when a
-            // header is present, `resolvedTopInset` is 0 and the
-            // header's own bottom edge gives the visual separation.
-            // When there's no header, `resolvedTopInset === insets.top`
-            // and the topmost bubble already clears the status bar.
-            // Adding extra px here just makes the rest position float
-            // lower than it should.
-            contentContainerStyle: {
-              paddingTop: composerHeight + resolvedBottomInset + 16,
-              paddingBottom: resolvedTopInset,
-            },
-          }}
-          // Plain `padding` grows `paddingBottom` to the keyboard
-          // height — no translate, no swap, no ghost band on
-          // focus/unfocus. `automaticOffset` lets the KAV measure
-          // its own screen position via `viewPositionInWindow` so
-          // the navigation header is accounted for. With `safeArea`
-          // owned inside ChatScreen (composer at
-          // `bottom: resolvedBottomInset`), the KAV measures a
-          // full-screen frame and `keyboardVerticalOffset: 0` lands
-          // the composer exactly `resolvedBottomInset` above the
-          // keyboard top — same gap as below the composer when the
-          // keyboard is closed.
-          keyboardAvoidingViewProps={{
-            behavior: 'padding',
-            // automaticOffset: true,
-            keyboardVerticalOffset: 0,
-          }}
-          onSend={() => {}}
-        />
+        <Reanimated.View style={[{ flex: 1 }, keyboardLiftStyle]}>
+          <GiftedChat<GiftedMessage>
+            messages={giftedMessages}
+            messagesContainerStyle={{
+              height: 400,
+            }}
+            user={{ _id: OWN_USER_ID }}
+            renderInputToolbar={renderInputToolbar}
+            renderMessage={renderMessage}
+            renderChatEmpty={renderChatEmpty}
+            renderAvatar={null}
+            renderDay={() => null}
+            renderTime={() => null}
+            renderUsername={() => null}
+            isUsernameVisible={false}
+            isDayAnimationEnabled={false}
+            minInputToolbarHeight={0}
+            messageIdGenerator={() => `gc-${Date.now()}`}
+            listProps={{
+              // Transparent so our outer `surfaceColor` shows through —
+              // iOS FlatList defaults to `systemBackground` (≈ #1C1C1E
+              // in dark mode), which leaks a tinted rectangle behind
+              // bubble-less renderers like the AI assistant text.
+              style: { flex: 1, backgroundColor: 'transparent' },
+              // iOS 13+ defaults to `contentInsetAdjustmentBehavior:
+              // 'automatic'`, which makes UIScrollView push content out
+              // from under translucent navigation/tab bars AND apply a
+              // vibrancy material to the area "behind" them. Our list
+              // is `inverted`; UIKit doesn't know about the scaleY
+              // transform, so it applies the vibrancy zone to the
+              // wrong half. We layer our own padding via
+              // `topInset` / `bottomInset`, so opting out is safe.
+              contentInsetAdjustmentBehavior: 'never',
+              // Auto-adjust gives us the right *bottom* inset out of the
+              // box (lifts the indicator above the home indicator / tab
+              // bar so it aligns with the composer top). On the top side,
+              // UIKit adds a header inset even though our wrapper is
+              // already sized to `windowHeight - headerHeight` and the
+              // FlatList's true top edge is below the Stack header — so
+              // we pass a negative `top` to cancel out exactly that
+              // double-count. iOS adds `scrollIndicatorInsets` on top of
+              // the auto-adjusted ones, so a negative value here
+              // subtracts from the auto inset and lands the indicator's
+              // top right at the FlatList's actual edge.
+              automaticallyAdjustsScrollIndicatorInsets: true,
+              scrollIndicatorInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+              // Inverted list: `paddingTop` = visual BOTTOM clearance,
+              // `paddingBottom` = visual TOP clearance. Padding the
+              // contentContainer (rather than wrapping the list in a
+              // padded View) keeps the FlatList full-screen, so
+              // bubbles bleed under the floating header / composer
+              // during scroll but settle at the right edges at rest.
+              //
+              // No magic-number breathing room on the top edge: when a
+              // header is present, `resolvedTopInset` is 0 and the
+              // header's own bottom edge gives the visual separation.
+              // When there's no header, `resolvedTopInset === insets.top`
+              // and the topmost bubble already clears the status bar.
+              // Adding extra px here just makes the rest position float
+              // lower than it should.
+              contentContainerStyle: {
+                paddingTop: composerHeight + resolvedBottomInset + 16,
+                paddingBottom: resolvedTopInset,
+              },
+            }}
+            // GiftedChat's internal KAV is disabled — the outer Reanimated.View
+            // around <GiftedChat> drives the keyboard lift for both the list and
+            // the composer in lock-step. Mixing the KAV's padding-based lift
+            // with our translate produced either no lift (composer pinned under
+            // the keyboard) or double-lift (composer floating well above it),
+            // depending on whether RN resolves `position:'absolute'; bottom:X`
+            // against the border or padding box in the current context. Owning
+            // the lift on our side removes that ambiguity and also makes the
+            // math identical across full-screen surfaces and modal-stack ones.
+            keyboardAvoidingViewProps={{ enabled: false }}
+            onSend={() => {}}
+          />
+        </Reanimated.View>
       )}
     </View>
   );

@@ -23,6 +23,10 @@ import {
 } from '@/shared/ui/composed/chat/useChatSurfacePerfLogger';
 import { aiLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
+import {
+  SOVRAN_TAB_BAR_ROW_HEIGHT,
+  SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING,
+} from '@/shared/blocks/SovranTabBar';
 import { ModelChip } from '../components/ModelChip';
 import { AiEmptyState } from '../components/AiEmptyState';
 import { AiMessageBubble, type BranchNav } from '../components/AiMessageBubble';
@@ -97,7 +101,19 @@ export function AiChatScreen() {
   //   • SovranTabBar (older iOS / Android): JS tab bar that already absorbs
   //     the home-indicator inset itself. Pass 0 so the composer sits flush
   //     against the bar instead of floating above it.
-  const bottomInset = isExpo55NativeTabsSupported() ? insets.bottom : 0;
+  const isNativeTabsPath = isExpo55NativeTabsSupported();
+  const bottomInset = isNativeTabsPath ? insets.bottom : 0;
+  // On the SovranTabBar path the screen-content area stops at the tab bar's
+  // top edge, which sits `sovranTabBarHeight` above the window bottom. The
+  // composer is anchored at `bottom: 0` of that content area — i.e., already
+  // `sovranTabBarHeight` above the window bottom at rest — so the keyboard
+  // lift below must subtract this gap or the composer overshoots the keyboard
+  // top by the tab bar's height when focused. On the NativeTabs path the
+  // screen extends to the window bottom under a translucent system bar, so
+  // this gap is 0 and `bottomInset` already captures the right offset.
+  const sovranTabBarHeight = isNativeTabsPath
+    ? 0
+    : SOVRAN_TAB_BAR_ROW_HEIGHT + Math.max(insets.bottom, SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING);
   const headerHeight = useHeaderHeight();
 
   const surfaceColor = useThemeColor('surface');
@@ -173,16 +189,22 @@ export function AiChatScreen() {
   // Composer + list both ride the keyboard via a single shared translate
   // (UI thread, no Yoga re-layout per frame). The math:
   //
-  //   translateY = keyboardHeight.value + keyboardProgress.value * (bottomInset - COMPOSER_FOCUSED_BOTTOM_GAP)
+  //   translateY = keyboardHeight.value
+  //              + keyboardProgress.value * (bottomInset + sovranTabBarHeight - COMPOSER_FOCUSED_BOTTOM_GAP)
   //
   // `keyboardHeight` is the keyboard's animated pixel height; RNKC's convention is
   // *negative* when the keyboard is shown (negative translateY = up). At rest
   // it's 0, so translateY is 0. At fully open, it's roughly `-keyboardH`, plus
-  // the `progress * bottomInset` term that brings the composer back DOWN by
-  // `bottomInset` to close the gap from "bottomInset above keyboard top" → "0pt
-  // above keyboard top" (flush). The same value is applied to a wrapper
-  // around the LegendList so the latest message rises with the composer
-  // instead of getting hidden behind the keyboard.
+  // a `progress`-driven term that brings the composer back DOWN by the distance
+  // between its rest anchor and the window bottom — `bottomInset` on the
+  // NativeTabs path (composer floats `insets.bottom` above the window bottom)
+  // or `sovranTabBarHeight` on the SovranTabBar path (composer sits at `bottom:
+  // 0` of a screen-content area whose floor is already `sovranTabBarHeight`
+  // above the window bottom). Without the `sovranTabBarHeight` term the
+  // SovranTabBar path overshoots the keyboard top by the bar's height when
+  // focused — exactly the "too much margin" symptom. The same translate is
+  // applied to a wrapper around the LegendList so the latest message rises
+  // with the composer instead of getting hidden behind the keyboard.
   //
   // Why this instead of `<KeyboardAvoidingView behavior="padding">`: in RN's
   // Yoga layout, `position: 'absolute', bottom: X` children are positioned
@@ -196,7 +218,8 @@ export function AiChatScreen() {
       {
         translateY:
           keyboardHeight.value +
-          keyboardProgress.value * (bottomInset - COMPOSER_FOCUSED_BOTTOM_GAP),
+          keyboardProgress.value *
+            (bottomInset + sovranTabBarHeight - COMPOSER_FOCUSED_BOTTOM_GAP),
       },
     ],
   }));
