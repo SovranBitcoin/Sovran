@@ -69,10 +69,21 @@ export default function NetworkSheet() {
 
   const { peers, connectedCount } = useBLEPeers();
 
-  // Sort: connected first, then by lastSeen desc. Matches upstream's
-  // MeshPeerList ordering where connected peers float to the top.
+  // Direct-link peers are the ones DMs can actually reach without bouncing
+  // through the mesh-flood spool (which expires after 15s). Surface this
+  // distinction in both the sort order and the header count so users don't
+  // think "5 connected" means "5 reachable for DM".
+  const directLinkCount = useMemo(
+    () => peers.filter((p) => p.hasDirectLink).length,
+    [peers]
+  );
+
+  // Sort: direct-link first, then mesh-reachable, then offline; ties broken
+  // by lastSeen desc. Matches upstream's MeshPeerList preference for "best
+  // reachability first".
   const sortedPeers = useMemo(() => {
     return [...peers].sort((a, b) => {
+      if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
       if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
       return b.lastSeen - a.lastSeen;
     });
@@ -85,8 +96,13 @@ export default function NetworkSheet() {
   const subtitleText = useMemo(() => {
     if (peers.length === 0) return 'Scanning for devices…';
     if (connectedCount === 0) return `${peers.length} nearby · 0 connected`;
-    return `${connectedCount} connected · ${peers.length} nearby`;
-  }, [peers.length, connectedCount]);
+    if (directLinkCount === connectedCount) {
+      return `${connectedCount} connected · ${peers.length} nearby`;
+    }
+    // Some peers are reachable only via mesh relay — call it out so users
+    // know not every "connected" peer is good for a DM.
+    return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${peers.length} nearby`;
+  }, [peers.length, connectedCount, directLinkCount]);
 
   return (
     <Log name="BitchatNetworkSheet" style={{ flex: 1 }}>

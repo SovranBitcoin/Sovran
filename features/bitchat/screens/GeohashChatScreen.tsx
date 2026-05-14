@@ -25,6 +25,7 @@ import { useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { useBitChat } from '../hooks/useBitChat';
 import { useBLEPeers } from '../hooks/useBLEPeers';
 import {
+  ChatMessageBubble,
   ChatScreen,
   DmChatHeader,
   extractCashuToken,
@@ -66,21 +67,32 @@ export function GeohashChatScreen({
 }: GeohashChatScreenProps) {
   useLifecycleLogger('GeohashChatScreen');
 
-  const [foreground, surfaceSecondary, shade400, shade500] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'shade-400',
-    'shade-500',
-  ] as const);
+  const [foreground, surfaceSecondary, shade400, shade500, accent, accentForeground] =
+    useThemeColor([
+      'foreground',
+      'surface-secondary',
+      'shade-400',
+      'shade-500',
+      'accent',
+      'accent-foreground',
+    ] as const);
 
   const { messages, isConnected, sendMessage } = useBitChat(
     geohash,
     transport,
     dmPeerID ? { dm: { peerID: dmPeerID, nickname: dmNickname } } : undefined
   );
-  // Always call; the hook is safe when BLE isn't running. We only render
-  // the peer count on the mesh tier below.
+  // Always call; the hook is safe when BLE isn't running. We use the peer
+  // list for two things: the peer-count badge on the mesh tier header, and
+  // the reachability banner above the BLE-DM composer.
   const { peers: blePeers, connectedCount: bleConnectedCount } = useBLEPeers();
+  const dmPeerSnapshot = useMemo(
+    () =>
+      transport === 'ble-dm' && dmPeerID
+        ? blePeers.find((p) => p.peerID === dmPeerID)
+        : undefined,
+    [blePeers, transport, dmPeerID]
+  );
 
   useEffect(() => {
     bitchatLog.debug('bitchat.screen.messages', {
@@ -96,9 +108,11 @@ export function GeohashChatScreen({
   const isDM = transport === 'ble-dm' || transport === 'nostr-dm';
   const title = isDM
     ? dmNickname || (dmPeerID ? dmPeerID.slice(0, 12) : 'Direct message')
-    : tierLabel
-      ? `${tierLabel} Chat`
-      : `#${geohash}`;
+    : transport === 'ble'
+      ? 'Bitchat'
+      : tierLabel
+        ? `${tierLabel} Chat`
+        : `#${geohash}`;
 
   // For nostr-dm the dmPeerID is a 64-hex Nostr pubkey (per-geohash ephemeral
   // identity). For ble-dm it's a 16-hex BitChat peer ID — no Nostr identity,
@@ -109,16 +123,27 @@ export function GeohashChatScreen({
 
   const bubbleMessages = useMemo<ChatBubbleMessage[]>(
     () =>
-      messages.map((m: ChatMessage) => ({
-        id: m.id,
-        content: m.content,
-        senderId: m.senderId,
-        sender: m.sender,
-        timestamp: m.timestamp,
-        isOwn: m.isOwn,
-        deliveryStatus: m.isOwn ? (m.isPending ? 'sending' : 'sent') : undefined,
-        cashuToken: extractCashuToken(m.content) ?? undefined,
-      })),
+      messages.map((m: ChatMessage) => {
+        // `ble-dm` messages carry a richer `deliveryStatus` from the global
+        // store; all other transports just have `isPending`. Cast to read
+        // the optional field without forcing every ChatMessage shape to
+        // declare it.
+        const richStatus = (m as { deliveryStatus?: ChatBubbleMessage['deliveryStatus'] })
+          .deliveryStatus;
+        const deliveryStatus: ChatBubbleMessage['deliveryStatus'] | undefined = m.isOwn
+          ? (richStatus ?? (m.isPending ? 'sending' : 'sent'))
+          : undefined;
+        return {
+          id: m.id,
+          content: m.content,
+          senderId: m.senderId,
+          sender: m.sender,
+          timestamp: m.timestamp,
+          isOwn: m.isOwn,
+          deliveryStatus,
+          cashuToken: extractCashuToken(m.content) ?? undefined,
+        };
+      }),
     [messages]
   );
 
@@ -127,6 +152,7 @@ export function GeohashChatScreen({
       pubkey={isNostrPubkey ? dmPeerID : undefined}
       nickname={dmNickname}
       displayName={dmNickname || (dmPeerID ? dmPeerID.slice(0, 12) : undefined)}
+      seed={dmPeerID}
       onBack={handleBack}
     />
   ) : (
@@ -138,6 +164,7 @@ export function GeohashChatScreen({
         headerShadowVisible: false,
         headerBackVisible: false,
         headerTintColor: foreground,
+        headerTitleAlign: 'center',
         title,
         headerLeft: () => (
           <Pressable onPress={handleBack} hitSlop={8}>
@@ -146,25 +173,42 @@ export function GeohashChatScreen({
         ),
         headerRight: () =>
           transport === 'ble' ? (
-            <Pressable onPress={() => router.push('/(user-flow)/bitchatNetwork')} hitSlop={8}>
-              <HStack spacing={6} align="center">
+            <Pressable
+              onPress={() => router.push('/(user-flow)/bitchatNetwork')}
+              hitSlop={8}
+              style={{ padding: 8 }}>
+              <View>
                 <Icon
-                  name="mdi:broadcast"
-                  size={16}
-                  color={bleConnectedCount > 0 ? CONNECTED_ACCENT : shade400}
+                  name="mdi:account-group"
+                  size={22}
+                  color={bleConnectedCount > 0 ? foreground : shade400}
                 />
-                <Text
-                  size={13}
-                  style={{
-                    color: bleConnectedCount > 0 ? foreground : shade400,
-                    fontWeight: '600',
-                  }}>
-                  {blePeers.length}
-                </Text>
-                <Text size={13} style={{ color: shade400 }}>
-                  #mesh
-                </Text>
-              </HStack>
+                {bleConnectedCount > 0 && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      right: -6,
+                      top: -4,
+                      minWidth: 16,
+                      height: 16,
+                      paddingHorizontal: 4,
+                      borderRadius: 8,
+                      backgroundColor: accent,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Text
+                      size={10}
+                      style={{
+                        color: accentForeground,
+                        fontWeight: '700',
+                        lineHeight: 12,
+                      }}>
+                      {bleConnectedCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </Pressable>
           ) : (
             <HStack spacing={8} align="center">
@@ -185,15 +229,99 @@ export function GeohashChatScreen({
     />
   );
 
+  // Surface peer reachability for BLE-DM so users aren't surprised when a
+  // "connected" peer's DM stalls. Three states map cleanly to upstream's
+  // transport behavior:
+  //   - direct link    → no banner (DMs go straight over BLE)
+  //   - mesh-only      → warning banner (DMs mesh-flood; 15s spool)
+  //   - unknown/offline → muted banner (peer not currently nearby)
+  let bleDmBanner: React.ReactNode = null;
+  if (transport === 'ble-dm') {
+    const isMeshOnly =
+      !!dmPeerSnapshot &&
+      dmPeerSnapshot.isConnected &&
+      dmPeerSnapshot.hasDirectLink === false;
+    const isUnknownOrOffline =
+      !dmPeerSnapshot || !dmPeerSnapshot.isConnected;
+    if (isMeshOnly) {
+      bleDmBanner = (
+        <HStack
+          spacing={8}
+          align="center"
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            backgroundColor: surfaceSecondary,
+          }}>
+          <Icon name="mdi:lan-disconnect" size={16} color={shade400} />
+          <Text
+            size={12}
+            style={{ color: shade400, flex: 1 }}
+            numberOfLines={2}>
+            Reachable only via mesh relay — messages may take several attempts.
+          </Text>
+        </HStack>
+      );
+    } else if (isUnknownOrOffline) {
+      bleDmBanner = (
+        <HStack
+          spacing={8}
+          align="center"
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            backgroundColor: surfaceSecondary,
+          }}>
+          <Icon name="mdi:bluetooth-off" size={16} color={shade400} />
+          <Text
+            size={12}
+            style={{ color: shade400, flex: 1 }}
+            numberOfLines={2}>
+            Peer is not currently nearby — your message will be queued briefly.
+          </Text>
+        </HStack>
+      );
+    }
+  }
+
   return (
     <Screen name="GeohashChatScreen" scroll="none">
       {header}
+      {bleDmBanner}
       <ChatScreen
         surface={surface}
         log={bitchatLog}
         messages={bubbleMessages}
         onSend={sendMessage}
         composerPlaceholder="Write here"
+        renderBubble={
+          transport === 'ble-dm'
+            ? ({ message: m, isFirstInGroup, isLastInGroup }) => {
+                // Look up the original content from `messages` so retry
+                // re-dispatches the exact text the user typed (the bubble's
+                // `content` may have been stripped of an embedded cashu
+                // token in `bubbleMessages`).
+                const original = messages.find((src) => src.id === m.id);
+                const handleRetry =
+                  m.deliveryStatus === 'failed' && original
+                    ? () => {
+                        bitchatLog.info('bitchat.screen.ble_dm_retry', {
+                          messageID: m.id,
+                        });
+                        void sendMessage(original.content);
+                      }
+                    : undefined;
+                return (
+                  <ChatMessageBubble
+                    message={m}
+                    isFirstInGroup={isFirstInGroup}
+                    isLastInGroup={isLastInGroup}
+                    onRetry={handleRetry}
+                  />
+                );
+              }
+            : undefined
+        }
         emptyContent={
           <VStack align="center" spacing={12}>
             <Icon

@@ -44,7 +44,21 @@ export interface LocationTier {
 export interface BLEPeer {
   peerID: string;
   nickname: string;
+  /**
+   * Cached announce-time reachability. True if the most recent announce was
+   * direct OR we had a peripheral/central connection at announce-time. Stays
+   * true after the BLE radio link silently dies — so do NOT use this alone
+   * to decide whether a DM can be delivered. Prefer `hasDirectLink`.
+   */
   isConnected: boolean;
+  /**
+   * Real-time check: do we currently have a direct peripheral or central
+   * link to this peer? When `false`, outbound encrypted DMs fall through to
+   * mesh-flood with a 15-second spool window — if the peer isn't reachable
+   * via some intermediary in that window, the message is silently dropped
+   * (upstream has no further retry).
+   */
+  hasDirectLink: boolean;
   lastSeen: number;
 }
 
@@ -74,6 +88,49 @@ export interface BLEPrivateMessageEvent {
 }
 
 /**
+ * Stable status strings emitted by `onBLEDeliveryStatus`. Map cleanly to
+ * the native `DeliveryStatus` enum (see DeliveryStatus.swift):
+ *   - `sending`            — queued; waiting for Noise handshake to complete
+ *   - `sent`               — encrypted + broadcast to BLE
+ *   - `delivered`          — recipient acked decryption (nickname populated)
+ *   - `read`               — recipient opened the chat (nickname populated)
+ *   - `failed`             — encryption / encode failure (`reason` populated)
+ *   - `partiallyDelivered` — group/room broadcast where some recipients missed
+ */
+export type BLEDeliveryStatus =
+  | 'sending'
+  | 'sent'
+  | 'delivered'
+  | 'read'
+  | 'failed'
+  | 'partiallyDelivered';
+
+/**
+ * Payload of the `onBLEDeliveryStatus` event. Use `messageID` to look up the
+ * optimistic message that was added to the local chat buffer at send time.
+ */
+export interface BLEDeliveryStatusEvent {
+  messageID: string;
+  status: BLEDeliveryStatus;
+  /** Counterparty nickname, only populated for `delivered` / `read`. */
+  nickname?: string;
+  /** Free-form reason or "<reached>/<total>" for partial deliveries. */
+  reason?: string;
+}
+
+/**
+ * Persisted summary of a BLE-mesh 1:1 chat counterparty. Returned by
+ * `getBLEDmHistory()` — used to surface peers we've previously DM'd in the
+ * Contacts screen's Recent / All tabs even after the app has been killed.
+ * `nickname` may be `''` if we never received an announce with one.
+ */
+export interface BLEDmContact {
+  peerID: string;
+  nickname: string;
+  lastTimestamp: number;
+}
+
+/**
  * Payload dispatched on the `onBLEPeerUpdate` event. The native bridge sends
  * a fresh peer snapshot whenever announce-state changes (new peer, peer
  * dropped, nickname change). Consumers may receive a single peer or a list —
@@ -84,78 +141,6 @@ export interface BLEPeerEvent {
   nickname?: string;
   isConnected?: boolean;
   lastSeen?: number;
-}
-
-export interface BLEDiagnostics {
-  isRunning: boolean;
-  centralState: string;
-  peripheralState: string;
-  isScanning: boolean;
-  isAdvertising: boolean;
-  /** Peers tracked via announce-packet exchange (post-Noise-handshake). */
-  peerCount: number;
-  connectedPeers: number;
-  /** CBPeripheral instances we're connected to as central (pre-announce). */
-  connectedPeripherals: number;
-  /**
-   * Subset of connectedPeripherals where we completed characteristic discovery
-   * and called setNotifyValue(true). The remote device's `updateValue`
-   * notifications only reach us for peripherals in this count.
-   */
-  peripheralsSubscribed: number;
-  /** CBCentral instances subscribed to our peripheral characteristic. */
-  subscribedCentrals: number;
-  /** Inbound writes being accumulated from centrals (long-write reassembly). */
-  pendingWriteBuffers: number;
-  /** Same as peerCount but raw — drift indicates tracking bugs. */
-  announcedPeers: number;
-  /**
-   * Count of `peripheral(_:didUpdateValueFor:error:)` delegate callbacks since
-   * start. 0 while peripheralsSubscribed ≥ 1 means the remote never notifies
-   * us — a discovery / setNotifyValue / characteristic-property problem.
-   */
-  inboundNotifyCount: number;
-  /** Subset of inboundNotifyCount where the delegate fired with a non-nil error. */
-  inboundNotifyErrorCount: number;
-  /** Subset of inboundNotifyCount where the characteristic value was nil or empty. */
-  inboundNotifyEmptyCount: number;
-  /**
-   * Gate counters inside `handleAnnounce`. `announceReceivedCount` ticks every
-   * time an announce packet enters the function. The other six track which
-   * early-return gate fired; sum should roughly equal received - accepted.
-   *
-   * If announceReceivedCount > 0 and announceAcceptedCount stays 0, one of the
-   * reject counters will reveal which gate is dropping. Most likely: sig fail
-   * (protocol divergence) or unverified (unsigned announces from a peer we
-   * don't have keys for).
-   */
-  announceReceivedCount: number;
-  announceDecodeFailCount: number;
-  announceSenderMismatchCount: number;
-  announceStaleCount: number;
-  announceSigFailCount: number;
-  announceUnverifiedCount: number;
-  announceAcceptedCount: number;
-  /**
-   * DM pipeline counters. Ticks when we hand a DM off to BLEService for
-   * encryption/broadcast. Non-zero on sender + zero on recipient ⇒ send
-   * reached the native layer but never reached the peer (handshake stuck,
-   * peer not directly connected, etc.).
-   */
-  sentPrivateMessageCount: number;
-  /**
-   * Ticks on every decrypted inbound Noise payload regardless of type. Zero
-   * here when the peer is sending you DMs means either no packet arrived
-   * or upstream's `handleNoiseEncrypted` couldn't decrypt it (session not
-   * established, nonce mismatch).
-   */
-  receivedNoisePayloadCount: number;
-  /**
-   * Ticks only for `.privateMessage` typed Noise payloads that decoded
-   * successfully. If this stays 0 while `receivedNoisePayloadCount` climbs,
-   * the payload shape diverged (wrong NoisePayloadType or TLV decode fail).
-   */
-  receivedPrivateMessageCount: number;
 }
 
 // --- Nostr bridge payloads ---

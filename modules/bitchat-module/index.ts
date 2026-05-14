@@ -3,11 +3,14 @@ export {
   startBLE,
   sendBLEMessage,
   startBLEPrivateChat,
+  resetBLEPrivateChat,
   sendBLEPrivateMessage,
   getBLEPeers,
+  getBLEDmHistory,
   getBLEState,
   addBLEMessageListener,
   addBLEPrivateMessageListener,
+  addBLEDeliveryStatusListener,
   addBLEPeerListener,
   addBLEStateListener,
   // Nostr (native)
@@ -23,7 +26,9 @@ export {
 export { encodeGeohash, isValidGeohash } from './src/geohash';
 
 export type {
-  BLEDiagnostics,
+  BLEDeliveryStatus,
+  BLEDeliveryStatusEvent,
+  BLEDmContact,
   BLEMessageEvent,
   BLEPeer,
   BLEPeerEvent,

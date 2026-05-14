@@ -304,16 +304,6 @@ final class BitChatNostrBridge {
         return Data(base64Encoded: str)
     }
 
-    // MARK: - Closest-relay query (for JS / diagnostics)
-
-    func closestRelays(toLat lat: Double, lon: Double, count: Int) -> [String] {
-        GeoRelayDirectory.shared.closestRelays(toLat: lat, lon: lon, count: count)
-    }
-
-    func closestRelays(toGeohash geohash: String, count: Int) -> [String] {
-        GeoRelayDirectory.shared.closestRelays(toGeohash: geohash, count: count)
-    }
-
     // MARK: - Event dispatch
 
     private func emit(event: NostrEvent, forGeohash geohash: String) {

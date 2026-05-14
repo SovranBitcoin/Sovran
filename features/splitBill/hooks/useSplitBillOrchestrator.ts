@@ -30,6 +30,7 @@ import { sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-mo
 
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { mintLocalId } from '@/shared/lib/id';
 import { buildRecipientGiftWrap, buildSenderSelfCopyWrap } from '@/shared/lib/nostr/nip17';
 import { useSplitBillTransactionsStore } from '@/shared/stores/profile/splitBillTransactionsStore';
 import type {
@@ -508,7 +509,7 @@ export function useSplitBillOrchestrator() {
             // silent drops as well as scrambled bubbles.
             const chunksStartAt = performance.now();
             for (const chunk of chunks) {
-              await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick);
+              await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick, mintLocalId('split-bill'));
             }
             flow.debug('split_bill.deliver.ble.chunks_sent', {
               participantId: p.id,
@@ -666,7 +667,7 @@ export function useSplitBillOrchestrator() {
           chunks: chunks.length,
         });
         for (const chunk of chunks) {
-          await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick);
+          await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick, mintLocalId('split-bill'));
         }
       } else {
         throw new Error('QR-only: no delivery channel');

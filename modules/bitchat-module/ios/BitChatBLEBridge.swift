@@ -23,6 +23,18 @@ enum BitChatBridgeError: Error, LocalizedError {
     }
 }
 
+/// Persisted summary of a 1:1 BLE chat counterparty. Keyed by 16-hex PeerID.
+/// Survives app restarts via UserDefaults so the Contacts "Recent" / "All"
+/// tabs can surface peers we DM'd in a previous session — upstream
+/// PrivateChatManager keeps full history only in-memory.
+private struct DmPeerSummary: Codable {
+    var peerID: String
+    var nickname: String?
+    var lastTimestamp: Double  // ms since epoch
+}
+
+private let DM_SUMMARIES_DEFAULTS_KEY = "bitchat.dmPeerSummaries"
+
 final class BitChatBLEBridge: NSObject {
     static let shared = BitChatBLEBridge()
 
@@ -31,18 +43,79 @@ final class BitChatBLEBridge: NSObject {
     private var isRunning = false
     private var lastCBState: CBManagerState = .unknown
 
-    // DM send/receive counters — surfaced via getBLEDiagnostics() so we can
-    // tell in JS whether a send reached the wire and whether a decrypted
-    // Noise payload reached our delegate. Silent drops are otherwise
-    // indistinguishable between "peer unreachable", "handshake stuck", and
-    // "payload decode failed". `&+=` wraps on overflow; Int is 64-bit so
-    // that's theoretical.
-    private var sentPrivateMessageCount: Int = 0
-    private var receivedNoisePayloadCount: Int = 0
-    private var receivedPrivateMessageCount: Int = 0
+    /// In-memory mirror of the persisted DM-peer summaries. Mutated only on the
+    /// main actor (didReceiveNoisePayload + sendPrivateMessage both hop there
+    /// before calling `recordDmPeer`).
+    private var dmSummaries: [String: DmPeerSummary] = [:]
+    private let dmSummariesQueue = DispatchQueue(label: "bitchat.dmSummaries", qos: .utility)
 
     private override init() {
         super.init()
+        loadDmSummaries()
+    }
+
+    // MARK: - DM peer summary persistence
+
+    private func loadDmSummaries() {
+        guard let data = UserDefaults.standard.data(forKey: DM_SUMMARIES_DEFAULTS_KEY),
+              let decoded = try? JSONDecoder().decode([String: DmPeerSummary].self, from: data) else {
+            return
+        }
+        dmSummaries = decoded
+    }
+
+    private func persistDmSummaries() {
+        let snapshot = dmSummaries
+        dmSummariesQueue.async {
+            guard let encoded = try? JSONEncoder().encode(snapshot) else { return }
+            UserDefaults.standard.set(encoded, forKey: DM_SUMMARIES_DEFAULTS_KEY)
+        }
+    }
+
+    /// Record a DM exchange with `peerIDStr`. Updates `lastTimestamp` and the
+    /// best-known `nickname`, then schedules a UserDefaults write off the main
+    /// queue. Called for both inbound (didReceiveNoisePayload) and outbound
+    /// (sendPrivateMessage) DMs so the contact appears in Recent/All as soon
+    /// as either direction flows.
+    @MainActor
+    func recordDmPeer(peerID peerIDStr: String, nickname: String?, timestampMs: Double) {
+        let existing = dmSummaries[peerIDStr]
+        // Keep the longest non-empty nickname we've seen — incoming events may
+        // carry a hex-prefix fallback while a later announce delivers the real
+        // nickname. We never want to overwrite a real nickname with a fallback.
+        let nextNickname: String?
+        if let n = nickname, !n.isEmpty {
+            if let prev = existing?.nickname, !prev.isEmpty, prev.count > n.count {
+                nextNickname = prev
+            } else {
+                nextNickname = n
+            }
+        } else {
+            nextNickname = existing?.nickname
+        }
+        let nextTimestamp = max(existing?.lastTimestamp ?? 0, timestampMs)
+        dmSummaries[peerIDStr] = DmPeerSummary(
+            peerID: peerIDStr,
+            nickname: nextNickname,
+            lastTimestamp: nextTimestamp
+        )
+        persistDmSummaries()
+    }
+
+    /// Returns a snapshot of all known DM-peer summaries, sorted by recency.
+    /// Merges any in-memory `PrivateChatManager` peers not yet persisted
+    /// (e.g. an inbound message that arrived before our delegate hop).
+    func getDmHistory() -> [[String: Any]] {
+        let summaries = dmSummaries
+        return summaries.values
+            .sorted { $0.lastTimestamp > $1.lastTimestamp }
+            .map { summary in
+                [
+                    "peerID": summary.peerID,
+                    "nickname": summary.nickname ?? "",
+                    "lastTimestamp": summary.lastTimestamp,
+                ] as [String: Any]
+            }
     }
 
     func attach(module: BitChatModule) {
@@ -124,7 +197,17 @@ final class BitChatBLEBridge: NSObject {
     /// 4-arg overload from an Expo AsyncFunction would execute Noise encrypt
     /// and pending-message bookkeeping on the wrong queue, silently dropping
     /// the send on a `collectionsQueue.sync(flags:.barrier)` race.
-    func sendPrivateMessage(_ content: String, to peerIDStr: String, nickname: String) throws {
+    /// Send a Noise-encrypted DM. `messageID` is supplied by the JS caller so
+    /// the optimistic chat bubble and the later `onBLEDeliveryStatus` events
+    /// (sent / delivered / failed) can be correlated on a single key. Returns
+    /// the messageID for symmetry with the JS contract.
+    @discardableResult
+    func sendPrivateMessage(
+        _ content: String,
+        to peerIDStr: String,
+        nickname: String,
+        messageID: String
+    ) throws -> String {
         guard let service = bleService else {
             throw BitChatBridgeError.notStarted
         }
@@ -133,140 +216,58 @@ final class BitChatBLEBridge: NSObject {
         }
         let peerID = PeerID(hexData: peerIDData)
         _ = nickname  // recipient-stamp nickname is unused by the BLE-direct path
-        service.sendMessage(content, mentions: [], to: peerID, messageID: UUID().uuidString, timestamp: nil)
-        // Serialize the counter bump on MainActor — matches the receive-side
-        // counters so reads from `getDiagnostics` aren't racing writes.
+        service.sendMessage(content, mentions: [], to: peerID, messageID: messageID, timestamp: nil)
+        // Stamp this peer into our persisted DM history so the Contacts tab's
+        // Recent/All lists surface them after a restart. Look up the best
+        // known nickname from current peer snapshots; falls back to nil.
+        let stampNickname = service.currentPeerSnapshots()
+            .first(where: { $0.peerID == peerID })?.nickname
+        let now = Date().timeIntervalSince1970 * 1000
         Task { @MainActor in
-            BitChatBLEBridge.shared.sentPrivateMessageCount &+= 1
+            BitChatBLEBridge.shared.recordDmPeer(
+                peerID: peerIDStr,
+                nickname: stampNickname,
+                timestampMs: now
+            )
         }
+        return messageID
+    }
+
+    /// Clear the Noise session for `peerIDStr` so the next outbound DM
+    /// triggers a fresh XX handshake. Used by the JS-side watchdog after an
+    /// outbound message has been `sending` for too long — likely a stuck
+    /// handshake or invalidated session keys. Does NOT drain upstream's
+    /// `pendingMessagesAfterHandshake[peerID]`; those messages remain queued
+    /// and will flush once the new handshake completes. The JS store marks
+    /// them `failed` so the user isn't blocked waiting on them.
+    func resetPrivateChat(_ peerIDStr: String) throws {
+        guard let service = bleService else {
+            throw BitChatBridgeError.notStarted
+        }
+        guard let peerIDData = Data(hexString: peerIDStr) else {
+            throw BitChatBridgeError.invalidPeerID
+        }
+        let peerID = PeerID(hexData: peerIDData)
+        service.getNoiseService().clearSession(for: peerID)
     }
 
     func getPeers() -> [[String: Any]] {
         guard let service = bleService else { return [] }
         return service.currentPeerSnapshots().map { peer in
-            [
+            // `isConnected` is the cached announce-time state — stays true if
+            // the BLE link silently dies. `hasDirectLink` is the real-time
+            // peripheral/central check — the only state that determines
+            // whether `sendEncrypted` can deliver a DM without bouncing
+            // through the mesh-flood + 15s spool fallback. Surface both so
+            // UI can warn users when "connected" doesn't mean reachable.
+            let link = service.linkState(for: peer.peerID)
+            return [
                 "peerID": peer.peerID.id,
                 "nickname": peer.nickname,
                 "isConnected": peer.isConnected,
+                "hasDirectLink": link.hasPeripheral || link.hasCentral,
                 "lastSeen": peer.lastSeen.timeIntervalSince1970 * 1000,
             ] as [String: Any]
-        }
-    }
-
-    /// Native CoreBluetooth state snapshot for debugging.
-    /// Tells us whether scanning/advertising is actually running — which is
-    /// notoriously hard to diagnose purely from JS-side `onBLEStateChanged`
-    /// events, because those only report the CBManager powered state, not
-    /// whether we actually called `scanForPeripherals` / `startAdvertising`.
-    ///
-    /// Also exposes the raw BLE link state (connected peripherals,
-    /// subscribed centrals, pending inbound write buffers) so we can tell
-    /// whether the asymmetry is "link exists but inbound announce never
-    /// arrives" vs "no link at all". Reads go through BLEService's own
-    /// dispatch queues to avoid racing against mutations.
-    func getDiagnostics() -> [String: Any] {
-        guard let service = bleService else {
-            return [
-                "isRunning": isRunning,
-                "centralState": "nil",
-                "peripheralState": "nil",
-                "isScanning": false,
-                "isAdvertising": false,
-                "peerCount": 0,
-                "connectedPeers": 0,
-                "connectedPeripherals": 0,
-                "subscribedCentrals": 0,
-                "pendingWriteBuffers": 0,
-                "announcedPeers": 0,
-                "sentPrivateMessageCount": sentPrivateMessageCount,
-                "receivedNoisePayloadCount": receivedNoisePayloadCount,
-                "receivedPrivateMessageCount": receivedPrivateMessageCount,
-            ]
-        }
-
-        let central = service.centralManager
-        let peripheral = service.peripheralManager
-
-        // BLE-layer link counts. Run on BLEService's own queues so we don't
-        // race with mutations from CoreBluetooth delegate callbacks.
-        //
-        // `peripheralsSubscribed` is the count of connected peripherals whose
-        // `characteristic` has been populated — i.e. we completed service +
-        // characteristic discovery AND called `setNotifyValue(true, …)`.
-        // This is the gate between "CBPeripheral.state == .connected" and
-        // "we can receive notifications from this device". If connected but
-        // not subscribed, the remote's `updateValue` notifications never
-        // reach us.
-        let (connectedPeripherals, peripheralsSubscribed, pendingWriteBuffers) = service.bleQueue.sync {
-            (
-                service.peripherals.values.filter { $0.isConnected }.count,
-                service.peripherals.values.filter { $0.isConnected && $0.characteristic != nil }.count,
-                service.pendingWriteBuffers.count
-            )
-        }
-        let (subscribedCentrals, announcedPeers) = service.collectionsQueue.sync {
-            (service.subscribedCentrals.count, service.peers.count)
-        }
-
-        // Inbound-notification counters injected into upstream BLEService by
-        // patch-bitchat-imports.js. `inboundNotifyCount` ticks on every
-        // `didUpdateValueFor` delegate callback from CoreBluetooth. If this
-        // stays at 0 while peripheralsSubscribed ≥ 1, the remote never sends
-        // notifications. If it climbs but announcedPeers stays 0, notifications
-        // are firing but decode/validate is silently rejecting them.
-        //
-        // handleAnnounce-gate counters fire only if notifications reach the
-        // announce-dispatch path. They tell us *which* gate is dropping.
-        let (notifyCount, notifyErrorCount, notifyEmptyCount,
-             announceReceived, announceDecodeFail, announceSenderMismatch,
-             announceStale, announceSigFail, announceUnverified, announceAccepted) =
-            service.bleQueue.sync {
-                (service.inboundNotifyCount, service.inboundNotifyErrorCount, service.inboundNotifyEmptyCount,
-                 service.announceReceivedCount, service.announceDecodeFailCount, service.announceSenderMismatchCount,
-                 service.announceStaleCount, service.announceSigFailCount, service.announceUnverifiedCount,
-                 service.announceAcceptedCount)
-            }
-
-        return [
-            "isRunning": isRunning,
-            "centralState": stateString(central?.state),
-            "peripheralState": stateString(peripheral?.state),
-            "isScanning": central?.isScanning ?? false,
-            "isAdvertising": peripheral?.isAdvertising ?? false,
-            "peerCount": service.currentPeerSnapshots().count,
-            "connectedPeers": service.currentPeerSnapshots().filter { $0.isConnected }.count,
-            "connectedPeripherals": connectedPeripherals,
-            "peripheralsSubscribed": peripheralsSubscribed,
-            "subscribedCentrals": subscribedCentrals,
-            "pendingWriteBuffers": pendingWriteBuffers,
-            "announcedPeers": announcedPeers,
-            "inboundNotifyCount": notifyCount,
-            "inboundNotifyErrorCount": notifyErrorCount,
-            "inboundNotifyEmptyCount": notifyEmptyCount,
-            "announceReceivedCount": announceReceived,
-            "announceDecodeFailCount": announceDecodeFail,
-            "announceSenderMismatchCount": announceSenderMismatch,
-            "announceStaleCount": announceStale,
-            "announceSigFailCount": announceSigFail,
-            "announceUnverifiedCount": announceUnverified,
-            "announceAcceptedCount": announceAccepted,
-            // DM pipeline visibility.
-            "sentPrivateMessageCount": sentPrivateMessageCount,
-            "receivedNoisePayloadCount": receivedNoisePayloadCount,
-            "receivedPrivateMessageCount": receivedPrivateMessageCount,
-        ]
-    }
-
-    private func stateString(_ state: CBManagerState?) -> String {
-        guard let state else { return "nil" }
-        switch state {
-        case .poweredOn: return "poweredOn"
-        case .poweredOff: return "poweredOff"
-        case .unauthorized: return "unauthorized"
-        case .unsupported: return "unsupported"
-        case .resetting: return "resetting"
-        case .unknown: return "unknown"
-        @unknown default: return "unknown_\(state.rawValue)"
         }
     }
 
@@ -334,7 +335,43 @@ extension BitChatBLEBridge: BitchatDelegate {
 
     nonisolated func isFavorite(fingerprint: String) -> Bool { false }
 
-    nonisolated func didUpdateMessageDeliveryStatus(_ messageID: String, status: DeliveryStatus) {}
+    nonisolated func didUpdateMessageDeliveryStatus(_ messageID: String, status: DeliveryStatus) {
+        // Map the vendored enum to a stable string so JS can render delivery
+        // states (sending → sent → delivered → failed). Without this hook the
+        // JS hook's optimistic message stayed "pending" forever — the user
+        // never saw send confirmation or failure, and pending-after-handshake
+        // queue drops were silent.
+        let statusStr: String
+        var reason: String? = nil
+        var nickname: String? = nil
+        switch status {
+        case .sending:
+            statusStr = "sending"
+        case .sent:
+            statusStr = "sent"
+        case .delivered(let to, _):
+            statusStr = "delivered"
+            nickname = to
+        case .read(let by, _):
+            statusStr = "read"
+            nickname = by
+        case .failed(let r):
+            statusStr = "failed"
+            reason = r
+        case .partiallyDelivered(let reached, let total):
+            statusStr = "partiallyDelivered"
+            reason = "\(reached)/\(total)"
+        }
+        Task { @MainActor in
+            var payload: [String: Any] = [
+                "messageID": messageID,
+                "status": statusStr,
+            ]
+            if let nickname { payload["nickname"] = nickname }
+            if let reason { payload["reason"] = reason }
+            module?.sendEvent("onBLEDeliveryStatus", payload)
+        }
+    }
 
     /// Decode + dispatch Noise-encrypted payloads targeted at us. The outer
     /// BLEService has already unwrapped the Noise tunnel; we only see the
@@ -343,25 +380,27 @@ extension BitChatBLEBridge: BitchatDelegate {
     /// nickname (looked up via BLEService peer snapshots), message id, body,
     /// and timestamp.
     nonisolated func didReceiveNoisePayload(from peerID: PeerID, type: NoisePayloadType, payload: Data, timestamp: Date) {
-        Task { @MainActor in
-            BitChatBLEBridge.shared.receivedNoisePayloadCount &+= 1
-        }
         guard type == .privateMessage,
               let pm = PrivateMessagePacket.decode(from: payload) else {
             return
         }
         Task { @MainActor in
-            BitChatBLEBridge.shared.receivedPrivateMessageCount &+= 1
             let senderNickname = BitChatBLEBridge.shared.bleService?
                 .currentPeerSnapshots()
                 .first(where: { $0.peerID == peerID })?
                 .nickname ?? String(peerID.id.prefix(12))
+            let timestampMs = timestamp.timeIntervalSince1970 * 1000
+            BitChatBLEBridge.shared.recordDmPeer(
+                peerID: peerID.id,
+                nickname: senderNickname,
+                timestampMs: timestampMs
+            )
             BitChatBLEBridge.shared.module?.sendEvent("onBLEPrivateMessage", [
                 "id": pm.messageID,
                 "peerID": peerID.id,
                 "sender": senderNickname,
                 "content": pm.content,
-                "timestamp": timestamp.timeIntervalSince1970 * 1000,
+                "timestamp": timestampMs,
                 "isOwn": false,
             ])
             // UX parity with upstream ChatViewModel:3079 — ack the message so
