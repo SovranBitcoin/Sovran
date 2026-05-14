@@ -11,12 +11,14 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
+import { Button } from '@/shared/ui/primitives/Button';
+import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { MintDistributionItem, DistributionBar } from '@/features/mint/components/distribution';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { Card } from '@/shared/ui/composed/Card';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import {
@@ -72,6 +74,8 @@ export function MintDistributionScreen() {
   const equalizeMints = useMintDistributionStore((state) => state.equalizeMints);
   const maxMint = useMintDistributionStore((state) => state.maxMint);
   const minMint = useMintDistributionStore((state) => state.minMint);
+  const mirrorBalances = useMintDistributionStore((state) => state.mirrorBalances);
+  const concentrateOnPrimary = useMintDistributionStore((state) => state.concentrateOnPrimary);
 
   const availableCurrencies = useMemo(() => {
     const units: string[] = [];
@@ -181,6 +185,30 @@ export function MintDistributionScreen() {
     equalizeMints(selectedCurrency, mintUrls);
   }, [selectedCurrency, mintUrls, equalizeMints]);
 
+  const balanceTotals = useMemo(() => {
+    const map: Record<string, number> = {};
+    mintUrls.forEach((url) => {
+      map[url] = liveBalances[url]?.total || 0;
+    });
+    return map;
+  }, [mintUrls, liveBalances]);
+
+  const handleMirror = useCallback(() => {
+    log.info('mint.distribution.mirror', {
+      currency: selectedCurrency,
+      mintCount: mintUrls.length,
+    });
+    mirrorBalances(selectedCurrency, balanceTotals, mintUrls);
+  }, [selectedCurrency, mintUrls, balanceTotals, mirrorBalances]);
+
+  const handleConcentrate = useCallback(() => {
+    log.info('mint.distribution.concentrate', {
+      currency: selectedCurrency,
+      mintCount: mintUrls.length,
+    });
+    concentrateOnPrimary(selectedCurrency, balanceTotals, mintUrls);
+  }, [selectedCurrency, mintUrls, balanceTotals, concentrateOnPrimary]);
+
   const hasActiveMints = useMemo(() => {
     return mintUrls.some((url) => (distribution[url] || 0) > 0);
   }, [mintUrls, distribution]);
@@ -216,26 +244,44 @@ export function MintDistributionScreen() {
     });
   }, [selectedCurrency]);
 
+  const canConcentrate = mintUrls.length > 1;
+
   const bottomButtons = useMemo(
     () => (
       <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Equalize',
-              variant: 'secondary' as const,
-              onPress: async () => handleEqualize(),
-            },
-            {
-              text: 'Rebalance',
-              variant: 'primary' as const,
-              onPress: async () => handleRebalance(),
-            },
-          ]}
-        />
+        <HStack justify="space-around" align="flex-start" className="mb-3 px-8">
+          <CircleActionButton
+            icon="mdi:equal"
+            systemIcon="equal.circle.fill"
+            label="Split"
+            onPress={handleEqualize}
+            accessibilityHint="Distribute evenly across active mints"
+            testID="mint-dist-equalize"
+          />
+          <CircleActionButton
+            icon="mdi:restore"
+            systemIcon="arrow.counterclockwise"
+            label="Reset"
+            onPress={handleMirror}
+            accessibilityHint="Reset shares to match current balances"
+            testID="mint-dist-mirror"
+          />
+          <CircleActionButton
+            icon="mdi:target"
+            systemIcon="target"
+            label="Focus"
+            onPress={handleConcentrate}
+            disabled={!canConcentrate}
+            accessibilityHint="Concentrate share on the top-balance mint"
+            testID="mint-dist-concentrate"
+          />
+        </HStack>
+        <View className="px-4">
+          <Button text="Next" variant="primary" onPress={handleRebalance} />
+        </View>
       </BottomButtons>
     ),
-    [handleEqualize, handleRebalance]
+    [handleEqualize, handleMirror, handleConcentrate, handleRebalance, canConcentrate]
   );
 
   return (
@@ -311,12 +357,15 @@ export function MintDistributionScreen() {
           </VStack>
         )}
 
-        <View className="mt-2 p-4">
-          <Text size={12} style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
-            {hasActiveMints
-              ? 'Adjusting one mint redistributes among active mints only'
-              : 'Tap Equalize to distribute evenly across all mints'}
-          </Text>
+        <View className="mx-4 mt-2">
+          <Card
+            variant="info"
+            message={
+              hasActiveMints
+                ? 'When you change one mint, only mints already above 0% rebalance to keep the total at 100%. Mints at 0% stay at 0%.'
+                : 'Tap Equalize to distribute evenly across all mints.'
+            }
+          />
         </View>
       </Screen>
     </GestureHandlerRootView>

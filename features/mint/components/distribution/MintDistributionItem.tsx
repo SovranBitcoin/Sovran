@@ -99,7 +99,6 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
     return {
       background: hexToRgba(accent.base, 0.12),
       border: hexToRgba(accent.border, 0.22) || hexToRgba(accent.base, 0.22),
-      icon: hexToRgba(accent.base, 0.9),
     };
   }, [accent]);
 
@@ -258,28 +257,6 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
 
         <HStack gap={8} className="justify-start">
           <Pressable
-            onPress={handleMax}
-            disabled={disabled || isAtMax}
-            haptics
-            className="flex-1 rounded-[14px] border px-3.5 py-3"
-            style={{
-              backgroundColor: buttonTint?.background || 'rgba(255,255,255,0.06)',
-              borderColor: buttonTint?.border || 'rgba(255,255,255,0.10)',
-              opacity: disabled || isAtMax ? 0.5 : 1,
-            }}>
-            <HStack align="center" gap={8}>
-              <Icon
-                name="mdi:arrow-collapse-up"
-                size={16}
-                color={buttonTint?.icon || primaryColor50}
-              />
-              <Text size={12} heavy style={{ color: primaryColor50 }}>
-                Max
-              </Text>
-            </HStack>
-          </Pressable>
-
-          <Pressable
             onPress={handleMin}
             disabled={disabled || isAtMin}
             haptics
@@ -290,13 +267,27 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
               opacity: disabled || isAtMin ? 0.5 : 1,
             }}>
             <HStack align="center" gap={8}>
-              <Icon
-                name="mdi:arrow-collapse-down"
-                size={16}
-                color={buttonTint?.icon || primaryColor50}
-              />
+              <Icon name="mdi:arrow-collapse-down" size={16} color={primaryColor50} />
               <Text size={12} heavy style={{ color: primaryColor50 }}>
                 Min
+              </Text>
+            </HStack>
+          </Pressable>
+
+          <Pressable
+            onPress={handleMax}
+            disabled={disabled || isAtMax}
+            haptics
+            className="flex-1 rounded-[14px] border px-3.5 py-3"
+            style={{
+              backgroundColor: buttonTint?.background || 'rgba(255,255,255,0.06)',
+              borderColor: buttonTint?.border || 'rgba(255,255,255,0.10)',
+              opacity: disabled || isAtMax ? 0.5 : 1,
+            }}>
+            <HStack align="center" gap={8}>
+              <Icon name="mdi:arrow-collapse-up" size={16} color={primaryColor50} />
+              <Text size={12} heavy style={{ color: primaryColor50 }}>
+                Max
               </Text>
             </HStack>
           </Pressable>

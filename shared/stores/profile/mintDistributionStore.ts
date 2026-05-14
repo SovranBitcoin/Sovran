@@ -45,6 +45,17 @@ interface MintDistributionActions {
   equalizeMints: (unit: string, mintUrls: string[]) => void;
   maxMint: (unit: string, mintUrl: string, allMintUrls: string[]) => void;
   minMint: (unit: string, mintUrl: string, allMintUrls: string[]) => void;
+  /** Match each mint's share to its current proportion of total holdings.
+   *  Falls back to equal split when total balance is zero. */
+  mirrorBalances: (unit: string, balances: Record<string, number>, mintUrls: string[]) => void;
+  /** Push the largest share to the highest-balance mint and split the rest
+   *  evenly among the others. Falls back to equal split when balances are
+   *  unknown or tied at zero. */
+  concentrateOnPrimary: (
+    unit: string,
+    balances: Record<string, number>,
+    mintUrls: string[]
+  ) => void;
 
   // Utility
   clearDistribution: (unit: string) => void;
@@ -493,6 +504,93 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
                 });
               }
             }
+
+            return {
+              distributions: {
+                ...state.distributions,
+                [normalizedUnit]: newDistribution,
+              },
+            };
+          });
+        },
+
+        // Match share to current balance proportions
+        mirrorBalances: (
+          unit: string,
+          balances: Record<string, number>,
+          mintUrls: string[]
+        ) => {
+          storeLog.info('store.mint_dist.mirror', { unit, mintCount: mintUrls.length });
+          const normalizedUnit = unit.toLowerCase();
+
+          set((state) => {
+            if (mintUrls.length === 0) return state;
+
+            const values = mintUrls.map((url) => Math.max(0, balances[url] ?? 0));
+            const total = values.reduce((s, v) => s + v, 0);
+
+            // No holdings → fall back to equal split, same as initializeDistribution.
+            const bps =
+              total === 0
+                ? distributeProportionally(
+                    mintUrls.map(() => 1),
+                    TOTAL_BASIS_POINTS
+                  )
+                : distributeProportionally(values, TOTAL_BASIS_POINTS);
+
+            const newDistribution: Record<string, number> = {};
+            mintUrls.forEach((url, i) => {
+              newDistribution[url] = bps[i];
+            });
+
+            return {
+              distributions: {
+                ...state.distributions,
+                [normalizedUnit]: newDistribution,
+              },
+            };
+          });
+        },
+
+        // Push the largest share to the top mint, split the rest evenly
+        concentrateOnPrimary: (
+          unit: string,
+          balances: Record<string, number>,
+          mintUrls: string[]
+        ) => {
+          storeLog.info('store.mint_dist.concentrate', { unit, mintCount: mintUrls.length });
+          const normalizedUnit = unit.toLowerCase();
+
+          set((state) => {
+            if (mintUrls.length === 0) return state;
+            if (mintUrls.length === 1) {
+              return {
+                distributions: {
+                  ...state.distributions,
+                  [normalizedUnit]: { [mintUrls[0]]: TOTAL_BASIS_POINTS },
+                },
+              };
+            }
+
+            // Pick the highest-balance mint as primary; fall back to the
+            // first url if every mint is at zero (we still want a deterministic
+            // pick rather than no-op).
+            const primary = mintUrls.reduce((best, url) =>
+              (balances[url] ?? 0) > (balances[best] ?? 0) ? url : best
+            );
+
+            const PRIMARY_SHARE_BP = 8_000; // 80%
+            const remainder = TOTAL_BASIS_POINTS - PRIMARY_SHARE_BP;
+            const others = mintUrls.filter((url) => url !== primary);
+            const perOther = Math.floor(remainder / others.length);
+            const leftover = remainder - perOther * others.length;
+
+            const newDistribution: Record<string, number> = {
+              [primary]: PRIMARY_SHARE_BP,
+            };
+            others.forEach((url, i) => {
+              newDistribution[url] = perOther + (i < leftover ? 1 : 0);
+            });
 
             return {
               distributions: {
