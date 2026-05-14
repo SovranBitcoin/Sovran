@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Platform, RefreshControl, StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import { PullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
 import {
   useHistoryWithMelts,
@@ -102,7 +103,7 @@ export function WalletScreen() {
     <BootEntrance>
       <LayoutDebugWrapper
         onContentSizeChange={onContentSizeChange}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
+        refreshControl={<PullToAiRefreshControl onRefresh={refresh} />}
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
           <ScrollableGradientOverlay contentHeight={contentHeight} />

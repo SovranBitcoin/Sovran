@@ -20,7 +20,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import CustomKeyboard from '@/shared/ui/composed/CustomKeyboard';
-import { FiatCurrencyPill } from '@/features/wallet';
+import { CurrencySwapperPill } from '@/features/wallet/components/CurrencySwapperPill';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -139,6 +139,17 @@ interface AmountEntryViewProps {
   nextVariants?: ActionMenuVariant[];
 
   /**
+   * Optional leading node rendered to the left of Next at 50% width.
+   * Caller-supplied node (e.g. `<MintSelector />`) so the bottom row can
+   * mirror the wallet header's pill chrome — including balance, mint icon,
+   * and liquid/blur/flat capability variants — without this primitive
+   * knowing about mint internals. Wrapped in a `flex:1` View. Suppresses
+   * `extraButtons` when set — Paste/Scan-QR are not meaningful once the
+   * recipient has been picked.
+   */
+  leadingBottomButton?: React.ReactNode;
+
+  /**
    * Color semantics:
    *   'send'    — danger tint on raw input; AmountFormatter uses useTypeColors.
    *   'receive' — foreground; AmountFormatter uses useTypeColors.
@@ -167,6 +178,7 @@ export function AmountEntryView({
   onSuggestionTap,
   extraButtons,
   nextVariants,
+  leadingBottomButton,
   transactionType = 'neutral',
 }: AmountEntryViewProps) {
   const [foreground, background, danger, success] = useThemeColor([
@@ -289,12 +301,7 @@ export function AmountEntryView({
               />
             )}
             {secondaryDisplay && (
-              <FiatCurrencyPill
-                displayText={secondaryDisplay}
-                onPress={onToggleMode}
-                showToggleGlyph
-                enableCurrencyMenu={false}
-              />
+              <CurrencySwapperPill inputMode={inputMode} onPress={onToggleMode} />
             )}
           </VStack>
         </View>
@@ -320,7 +327,14 @@ export function AmountEntryView({
             // This mirrors the plain-ButtonHandler path's "2 text + third
             // collapses to icon" rule we lost when Next got split into its
             // own component.
+            //
+            // When `leadingBottomButton` is set (recipient-header flow),
+            // extras are suppressed and the row becomes [leading 50%] +
+            // [ActionMenuButton 50%].
             <HStack align="center" gap={0} style={{ flex: 1 }}>
+              {leadingBottomButton ? (
+                <View style={{ flex: 1, alignItems: 'center' }}>{leadingBottomButton}</View>
+              ) : null}
               <ActionMenuButton
                 label={nextText}
                 testID={nextTestID}
@@ -340,7 +354,7 @@ export function AmountEntryView({
                 collapsedPressOpensMenu
                 menuTitle="Select option"
               />
-              {extraButtons && extraButtons.length > 0 ? (
+              {!leadingBottomButton && extraButtons && extraButtons.length > 0 ? (
                 <View style={{ flex: 1 }}>
                   <Button
                     testID={extraButtons[0].testID}
@@ -352,7 +366,7 @@ export function AmountEntryView({
                   />
                 </View>
               ) : null}
-              {extraButtons && extraButtons.length > 1 ? (
+              {!leadingBottomButton && extraButtons && extraButtons.length > 1 ? (
                 <View>
                   <Button
                     testID={extraButtons[1].testID}
@@ -370,6 +384,27 @@ export function AmountEntryView({
                   />
                 </View>
               ) : null}
+            </HStack>
+          ) : leadingBottomButton ? (
+            // Recipient-header flow: render the 50/50 row directly so the
+            // caller-supplied leading node (e.g. MintSelector pill) can
+            // render its own image-backed chrome without this primitive
+            // needing to model mint internals.
+            <HStack align="center" gap={0} style={{ flex: 1 }}>
+              <View style={{ flex: 1, alignItems: 'center' }}>{leadingBottomButton}</View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  testID={nextTestID}
+                  text={nextText}
+                  icon={nextIcon ? <Icon name={nextIcon} /> : undefined}
+                  variant="primary"
+                  loading={nextLoading}
+                  disabled={nextDisabled}
+                  onPress={async () => {
+                    await onNext();
+                  }}
+                />
+              </View>
             </HStack>
           ) : (
             <ButtonHandler

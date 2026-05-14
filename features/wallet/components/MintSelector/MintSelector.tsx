@@ -27,6 +27,8 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
         loadingTitlePlaceholder="Mint Name"
         onPress={shared.onRequestMintList}
         width={shared.dimensions.buttonWidth}
+        height={props.height}
+        contentHeight={props.contentHeight}
       />
     </Log>
   );

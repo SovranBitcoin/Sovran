@@ -7,7 +7,8 @@
  */
 
 import { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, ActivityIndicator } from 'react-native';
+import { PullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -683,7 +684,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
   const refreshControl = useMemo(
     () => (
-      <RefreshControl
+      <PullToAiRefreshControl
         refreshing={isRefreshing}
         onRefresh={handleRefresh}
         tintColor={refreshTintColor}

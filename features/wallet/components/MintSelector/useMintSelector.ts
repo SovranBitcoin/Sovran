@@ -25,6 +25,12 @@ export interface MintSelectorProps {
   unit?: string;
   /** Override button width (e.g. 280 for quote screens). Otherwise auto-calculated from window. */
   width?: number;
+  /** Override pill height. Defaults to the wallet-header pill height (54). */
+  height?: number;
+  /** Override inner content height. Pair with `height` when the pill is
+   *  rendered smaller than the header default so the avatar + label row
+   *  has visible padding inside the pill. */
+  contentHeight?: number;
 }
 
 interface MintSelectorShared {

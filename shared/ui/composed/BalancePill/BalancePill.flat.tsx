@@ -16,6 +16,7 @@ const HORIZONTAL_PADDING = 12;
 export default function BalancePillFlat({
   onPress,
   width,
+  height,
   contentWidth: contentWidthOverride,
   contentHeight: contentHeightOverride,
   ...display
@@ -27,7 +28,7 @@ export default function BalancePillFlat({
     contentHeight: contentHeightOverride,
   });
 
-  const cardHeight = HEADER_LAYOUT.BUTTON_HEIGHT;
+  const cardHeight = height ?? HEADER_LAYOUT.BUTTON_HEIGHT;
   const cardRadius = cardHeight / 2;
   const fallbackContentWidth =
     contentWidthOverride ?? Math.max(0, dimensions.buttonWidth - HORIZONTAL_PADDING * 2);

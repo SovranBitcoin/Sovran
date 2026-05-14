@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -10,18 +17,77 @@ export const SOVRAN_TAB_BAR_ROW_HEIGHT = 52;
 /** Minimum bottom padding under the tab row when there's no home indicator. */
 export const SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING = 8;
 
+type TabBarIcon = NonNullable<
+  BottomTabBarProps['descriptors'][string]['options']['tabBarIcon']
+>;
+
+type TabButtonProps = {
+  focused: boolean;
+  color: string;
+  accessibilityLabel: string;
+  testID: string | undefined;
+  onPress: () => void;
+  onLongPress: () => void;
+  icon: TabBarIcon | undefined;
+};
+
+function TabButton({
+  focused,
+  color,
+  accessibilityLabel,
+  testID,
+  onPress,
+  onLongPress,
+  icon,
+}: TabButtonProps) {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const onPressIn = useCallback(() => {
+    scale.value = withTiming(0.88, {
+      duration: 70,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [scale]);
+
+  const onPressOut = useCallback(() => {
+    scale.value = withSpring(1, {
+      damping: 12,
+      stiffness: 380,
+      mass: 0.6,
+    });
+  }, [scale]);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={focused ? { selected: true } : {}}
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onLongPress={onLongPress}
+      style={styles.tab}
+      activeOpacity={1}
+      hitSlop={8}>
+      <Animated.View style={[styles.tabInner, animatedStyle]}>
+        {icon ? icon({ focused, color, size: 26 }) : null}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const [foreground, surface, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'surface',
-    'surface-secondary',
-  ] as const);
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
 
   const activeColor = foreground;
   const inactiveColor = opacity(foreground, 0.5);
   const dividerColor = opacity(foreground, 0.12);
-  const pressedColor = opacity(foreground, 0.08);
 
   return (
     <View
@@ -53,26 +119,18 @@ export function SovranTabBar({ state, descriptors, navigation }: BottomTabBarPro
 
           const accessibilityLabel =
             options.tabBarAccessibilityLabel ?? options.title ?? route.name;
-          const tabBarIcon = options.tabBarIcon;
 
           return (
-            <Pressable
+            <TabButton
               key={route.key}
-              accessibilityRole="button"
-              accessibilityState={focused ? { selected: true } : {}}
+              focused={focused}
+              color={color}
               accessibilityLabel={accessibilityLabel}
               testID={options.tabBarButtonTestID}
               onPress={onPress}
               onLongPress={onLongPress}
-              style={({ pressed }) => [
-                styles.tab,
-                focused && { backgroundColor: surfaceSecondary },
-                pressed && { backgroundColor: pressedColor },
-              ]}
-              activeOpacity={1}
-              hitSlop={8}>
-              {tabBarIcon ? tabBarIcon({ focused, color, size: 26 }) : null}
-            </Pressable>
+              icon={options.tabBarIcon}
+            />
           );
         })}
       </View>
@@ -97,7 +155,9 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 14,
-    borderCurve: 'continuous',
+  },
+  tabInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

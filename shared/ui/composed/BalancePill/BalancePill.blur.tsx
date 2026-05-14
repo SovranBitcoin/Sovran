@@ -17,6 +17,7 @@ const HORIZONTAL_PADDING = 12;
 export default function BalancePillBlur({
   onPress,
   width,
+  height,
   contentWidth: contentWidthOverride,
   contentHeight: contentHeightOverride,
   ...display
@@ -31,7 +32,7 @@ export default function BalancePillBlur({
   const borderColor = opacity(muted, 0.3);
   // Match the glass variant's height so the header doesn't reflow when the
   // device toggles between liquid-glass and the fallback chrome.
-  const cardHeight = HEADER_LAYOUT.BUTTON_HEIGHT;
+  const cardHeight = height ?? HEADER_LAYOUT.BUTTON_HEIGHT;
   const verticalPadding = (cardHeight - dimensions.contentHeight) / 2;
   const cardRadius = cardHeight / 2;
   const fallbackContentWidth =
