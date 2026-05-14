@@ -5,6 +5,7 @@ import {
   Platform,
   RefreshControlProps,
   ScrollView,
+  ScrollViewProps,
   StyleProp,
   StyleSheet,
   View,
@@ -92,6 +93,8 @@ interface LayoutDebugWrapperProps {
    * Optional RefreshControl for pull-to-refresh (only used when scrollable=true)
    */
   refreshControl?: React.ReactElement<RefreshControlProps>;
+  onScrollBeginDrag?: ScrollViewProps['onScrollBeginDrag'];
+  onScrollEndDrag?: ScrollViewProps['onScrollEndDrag'];
 }
 
 export function LayoutDebugWrapper({
@@ -101,6 +104,8 @@ export function LayoutDebugWrapper({
   contentContainerStyle = { padding: 16 },
   onContentSizeChange,
   refreshControl,
+  onScrollBeginDrag,
+  onScrollEndDrag,
 }: LayoutDebugWrapperProps) {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
@@ -247,6 +252,8 @@ export function LayoutDebugWrapper({
           contentInsetAdjustmentBehavior="automatic"
           scrollEventThrottle={16}
           onScroll={debug ? handleScroll : undefined}
+          onScrollBeginDrag={onScrollBeginDrag}
+          onScrollEndDrag={onScrollEndDrag}
           onContentSizeChange={onContentSizeChange}
           contentContainerStyle={scrollContentStyle}
           refreshControl={refreshControl}>

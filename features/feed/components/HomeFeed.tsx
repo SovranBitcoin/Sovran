@@ -8,7 +8,7 @@
 
 import { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, ActivityIndicator } from 'react-native';
-import { PullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
+import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -682,16 +682,11 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
   const refreshTintColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
 
-  const refreshControl = useMemo(
-    () => (
-      <PullToAiRefreshControl
-        refreshing={isRefreshing}
-        onRefresh={handleRefresh}
-        tintColor={refreshTintColor}
-      />
-    ),
-    [isRefreshing, handleRefresh, refreshTintColor]
-  );
+  const pullToAi = usePullToAiRefreshControl({
+    refreshing: isRefreshing,
+    onRefresh: handleRefresh,
+    tintColor: refreshTintColor,
+  });
 
   const renderItem = renderFeedItem;
 
@@ -739,8 +734,10 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             contentContainerStyle={LIST_CONTENT_STYLE}
             showsVerticalScrollIndicator={false}
             onScroll={onScroll}
+            onScrollBeginDrag={pullToAi.onScrollBeginDrag}
+            onScrollEndDrag={pullToAi.onScrollEndDrag}
             scrollEventThrottle={16}
-            refreshControl={refreshControl}
+            refreshControl={pullToAi.refreshControl}
           />
         </View>
         <AnimatedImageOverlay />

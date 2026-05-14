@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { RefreshControl } from 'react-native';
 import type { RefreshControlProps } from 'react-native';
 import { router } from 'expo-router';
@@ -25,9 +25,41 @@ type Props = Omit<RefreshControlProps, 'onRefresh' | 'refreshing'> & {
  * off it.
  */
 export function PullToAiRefreshControl({ onRefresh, refreshing = false, ...rest }: Props) {
-  const handle = useCallback(() => {
+  const { refreshControl } = usePullToAiRefreshControl({ onRefresh, refreshing, ...rest });
+  return refreshControl;
+}
+
+export function usePullToAiRefreshControl({ onRefresh, refreshing = false, ...rest }: Props = {}) {
+  const isDraggingRef = useRef(false);
+  const pendingAiNavigationRef = useRef(false);
+
+  const commitPendingAiNavigation = useCallback(() => {
+    if (!pendingAiNavigationRef.current) return;
+    pendingAiNavigationRef.current = false;
+    router.navigate(AI_ROUTE);
+  }, []);
+
+  const handleRefresh = useCallback(() => {
     onRefresh?.();
+    if (isDraggingRef.current) {
+      pendingAiNavigationRef.current = true;
+      return;
+    }
     router.navigate(AI_ROUTE);
   }, [onRefresh]);
-  return <RefreshControl {...rest} refreshing={refreshing} onRefresh={handle} />;
+
+  const handleScrollBeginDrag = useCallback(() => {
+    isDraggingRef.current = true;
+  }, []);
+
+  const handleScrollEndDrag = useCallback(() => {
+    isDraggingRef.current = false;
+    commitPendingAiNavigation();
+  }, [commitPendingAiNavigation]);
+
+  return {
+    refreshControl: <RefreshControl {...rest} refreshing={refreshing} onRefresh={handleRefresh} />,
+    onScrollBeginDrag: handleScrollBeginDrag,
+    onScrollEndDrag: handleScrollEndDrag,
+  };
 }

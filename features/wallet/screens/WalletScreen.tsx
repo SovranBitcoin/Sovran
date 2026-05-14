@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
-import { PullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
+import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
 import {
   useHistoryWithMelts,
@@ -63,6 +63,10 @@ export function WalletScreen() {
   }, []);
 
   const { history, refresh } = useHistoryWithMelts();
+  const handlePullToAiRefresh = useCallback(() => {
+    void refresh();
+  }, [refresh]);
+  const pullToAi = usePullToAiRefreshControl({ onRefresh: handlePullToAiRefresh });
   useVersionCheck();
 
   const { handlePermission } = useHandleCameraPermission();
@@ -103,7 +107,9 @@ export function WalletScreen() {
     <BootEntrance>
       <LayoutDebugWrapper
         onContentSizeChange={onContentSizeChange}
-        refreshControl={<PullToAiRefreshControl onRefresh={refresh} />}
+        refreshControl={pullToAi.refreshControl}
+        onScrollBeginDrag={pullToAi.onScrollBeginDrag}
+        onScrollEndDrag={pullToAi.onScrollEndDrag}
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
           <ScrollableGradientOverlay contentHeight={contentHeight} />

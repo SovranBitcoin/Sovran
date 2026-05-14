@@ -26,7 +26,7 @@ import {
   type Identity,
 } from '@/shared/ui/composed/ContactRow';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
-import { PullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
+import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { navigateToProfile } from '../lib/navigateToProfile';
 import {
@@ -66,11 +66,7 @@ interface BitchatDmContactRow {
   timestamp: number;
 }
 
-type ContactsListItem =
-  | RecentContact
-  | MintContact
-  | WhitenoiseRequestRow
-  | BitchatDmContactRow;
+type ContactsListItem = RecentContact | MintContact | WhitenoiseRequestRow | BitchatDmContactRow;
 
 // Hostname extraction for mint URL search. Pure; hoisted so the reference is
 // stable across renders (each list filter pass would otherwise allocate a
@@ -152,6 +148,7 @@ export const ContactsScreen = () => {
   ] as const);
   const { tiers: locationTiers } = useLocationTiers();
   const tabBarPadding = useTabBarBottomPadding();
+  const pullToAi = usePullToAiRefreshControl();
 
   // When the search closes, restore the outer tab. If the user was on the
   // "Groups" pill, surface the groups list they were browsing.
@@ -567,13 +564,10 @@ export const ContactsScreen = () => {
   const TOP_TAB_KEYS: readonly TopTab[] = ['contacts', 'groups'];
   const TOP_TAB_LABELS = ['Contacts', 'Groups'] as const;
   const activeTabLabel = TOP_TAB_LABELS[TOP_TAB_KEYS.indexOf(activeTab)] ?? 'Contacts';
-  const handleTopTabPress = useCallback(
-    (_tab: string, index: number) => {
-      const nextKey = TOP_TAB_KEYS[index];
-      if (nextKey) setActiveTab(nextKey);
-    },
-    []
-  );
+  const handleTopTabPress = useCallback((_tab: string, index: number) => {
+    const nextKey = TOP_TAB_KEYS[index];
+    if (nextKey) setActiveTab(nextKey);
+  }, []);
 
   // --- Render helpers ---
 
@@ -582,7 +576,9 @@ export const ContactsScreen = () => {
       data={currentListData}
       extraData={profilesMap}
       estimatedItemSize={68}
-      refreshControl={<PullToAiRefreshControl />}
+      refreshControl={pullToAi.refreshControl}
+      onScrollBeginDrag={pullToAi.onScrollBeginDrag}
+      onScrollEndDrag={pullToAi.onScrollEndDrag}
       keyExtractor={(item, index) => {
         if (item.type === 'bitchat-dm') return `ble:${item.peerID}`;
         return (
@@ -613,7 +609,9 @@ export const ContactsScreen = () => {
         data={tierData}
         estimatedItemSize={68}
         keyExtractor={(item) => item.key}
-        refreshControl={<PullToAiRefreshControl />}
+        refreshControl={pullToAi.refreshControl}
+        onScrollBeginDrag={pullToAi.onScrollBeginDrag}
+        onScrollEndDrag={pullToAi.onScrollEndDrag}
         renderItem={({ item }) => <GroupsTierRow tier={item} />}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
