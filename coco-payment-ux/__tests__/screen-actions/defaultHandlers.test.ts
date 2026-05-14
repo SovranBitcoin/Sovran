@@ -227,7 +227,7 @@ describe('sendToken default handlers', () => {
 
       expect(notifications).toContainEqual({
         event: 'onSendCancelFailed',
-        args: [{ operationId: 'op-fail', message: 'Cannot rollback' }],
+        args: [{ operationId: 'op-fail', message: 'Cannot rollback', mintUnreachable: false }],
       });
     });
   });
@@ -711,6 +711,66 @@ describe('amountEntry default handlers', () => {
         destination: 'sendEcash',
         meltTarget: undefined,
         recipientPubkey,
+      });
+    });
+
+    it('prioritizes per-call recipient identity over entry identity', async () => {
+      const { handlers, machine } = createMockConfig();
+      const entryProfile = {
+        displayName: 'Entry Alice',
+        avatarUrl: null,
+        nip05: 'entry@example.com',
+      };
+      const ctxProfile = {
+        displayName: 'Fresh Alice',
+        avatarUrl: 'https://example.com/alice.png',
+        nip05: 'fresh@example.com',
+      };
+      const { mgr } = createManager('amountEntry', handlers, {
+        effectiveSatAmount: 100,
+        selectedMintUrl: MINT1,
+        destination: 'sendEcash',
+        recipientPubkey: 'a'.repeat(64),
+        recipientProfile: entryProfile,
+      });
+
+      await mgr.execute('next', {
+        recipientPubkey: 'b'.repeat(64),
+        recipientProfile: ctxProfile,
+      });
+
+      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+        destination: 'sendEcash',
+        meltTarget: undefined,
+        recipientPubkey: 'b'.repeat(64),
+        recipientProfile: ctxProfile,
+      });
+    });
+
+    it('switches send-money to lightning with recipient identity intact', async () => {
+      const { handlers, machine } = createMockConfig();
+      const recipientProfile = {
+        displayName: 'Alice',
+        avatarUrl: 'https://example.com/alice.png',
+        nip05: 'alice@example.com',
+      };
+      const recipientPubkey = 'a'.repeat(64);
+      const { mgr } = createManager('amountEntry', handlers, {
+        effectiveSatAmount: 100,
+        selectedMintUrl: MINT1,
+        destination: 'sendEcash',
+        meltTarget: 'alice@example.com',
+        recipientPubkey,
+        recipientProfile,
+      });
+
+      await mgr.execute('next', { variantId: 'lightning' });
+
+      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+        destination: 'meltQuote',
+        meltTarget: 'alice@example.com',
+        recipientPubkey,
+        recipientProfile,
       });
     });
 

@@ -217,5 +217,10 @@ export function createMockOperations(
 
     // rollbackMelt: cancels a melt operation (no-op in tests)
     rollbackMelt: wrap('rollbackMelt', async () => {}),
+
+    // resolveRecipientPubkey / resolveRecipientProfile: optional recipient
+    // identity enrichers. No defaults in tests; individual suites opt in.
+    resolveRecipientPubkey: wrap('resolveRecipientPubkey', undefined as any),
+    resolveRecipientProfile: wrap('resolveRecipientProfile', undefined as any),
   };
 }
