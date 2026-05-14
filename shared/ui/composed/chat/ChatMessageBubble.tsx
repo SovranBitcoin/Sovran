@@ -4,6 +4,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelative } from '@/shared/lib/date';
@@ -22,6 +23,14 @@ interface ChatMessageBubbleProps {
    */
   ownAvatar?: React.ReactNode;
   counterpartyAvatar?: React.ReactNode | null;
+  /**
+   * When `message.deliveryStatus === 'failed'`, the bubble renders a small
+   * tap target below it inviting the user to retry. Wire this from the
+   * screen to re-dispatch the message's content (typically generates a fresh
+   * messageID and triggers a new handshake). The original failed bubble
+   * remains as a record of the attempt.
+   */
+  onRetry?: () => void;
 }
 
 export function ChatMessageBubble({
@@ -30,13 +39,15 @@ export function ChatMessageBubble({
   isLastInGroup,
   ownAvatar,
   counterpartyAvatar,
+  onRetry,
 }: ChatMessageBubbleProps) {
-  const [foreground, defaultColor, surfaceTertiary, shade400, shade500] = useThemeColor([
+  const [foreground, defaultColor, surfaceTertiary, shade400, shade500, danger] = useThemeColor([
     'foreground',
     'default',
     'surface-tertiary',
     'shade-400',
     'shade-500',
+    'danger',
   ] as const);
 
   const showAvatar = !message.isOwn && isLastInGroup;
@@ -146,12 +157,30 @@ export function ChatMessageBubble({
               </Text>
               {message.isOwn && message.deliveryStatus ? (
                 <Icon
-                  name={isSending ? 'ant-design:loading-outlined' : 'simple-line-icons:check'}
+                  name={
+                    message.deliveryStatus === 'sending'
+                      ? 'ant-design:loading-outlined'
+                      : message.deliveryStatus === 'failed'
+                        ? 'mdi:alert-circle-outline'
+                        : message.deliveryStatus === 'delivered'
+                          ? 'mdi:check-all'
+                          : 'simple-line-icons:check'
+                  }
                   size={12}
-                  color={shade500}
+                  color={message.deliveryStatus === 'failed' ? danger : shade500}
                 />
               ) : null}
             </HStack>
+          ) : null}
+          {message.isOwn && message.deliveryStatus === 'failed' && onRetry ? (
+            <Pressable
+              onPress={onRetry}
+              hitSlop={8}
+              style={{ alignSelf: 'flex-end', marginTop: 2 }}>
+              <Text size={11} style={{ color: danger, fontWeight: '600' }}>
+                Tap to retry
+              </Text>
+            </Pressable>
           ) : null}
         </VStack>
 

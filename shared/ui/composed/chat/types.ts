@@ -34,16 +34,19 @@ export type ChatBubbleMessage = {
   isOwn: boolean;
   /**
    * Delivery state for own messages, modelled on the standard chat-app
-   * sending → sent vocabulary:
+   * sending → sent → delivered vocabulary:
    *  - `'sending'` — optimistic dispatch in flight (spinner glyph + bubble
    *    dimmed to 60%).
    *  - `'sent'` — transport ack received (single-check glyph).
-   * Non-own messages leave this field unset. None of the underlying
-   * protocols (NIP-04, NIP-17, MLS, BitChat) expose a read-receipt, so the
-   * vocabulary deliberately stops at 'sent' rather than introducing a
-   * misleading 'read' state.
+   *  - `'delivered'` — counterparty acked decryption (double-check glyph).
+   *  - `'failed'` — transport rejected the message (warning glyph). For
+   *    BitChat DMs this typically means a handshake never completed.
+   * Non-own messages leave this field unset. Nostr-based DMs (NIP-04,
+   * NIP-17, MLS) don't expose delivery acks, so they only ever surface
+   * 'sending' or 'sent'. BitChat BLE DMs flow through the full set via
+   * the native delivery-status event.
    */
-  deliveryStatus?: 'sending' | 'sent';
+  deliveryStatus?: 'sending' | 'sent' | 'delivered' | 'failed';
   /**
    * Pre-extracted cashu token (cashuA…/cashuB…) found inside `content`. When
    * present, the bubble strips it from the rendered text and shows a
