@@ -45,6 +45,7 @@ import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLo
 import { parseGeohashQuery } from '../lib/parseGeohashQuery';
 import { matchTiers } from '../lib/matchTiers';
 import type { NostrProfileMetadata } from '@/shared/stores/global/nostrMetadataCache';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 type TopTab = 'contacts' | 'groups';
 
@@ -149,6 +150,7 @@ export const ContactsScreen = () => {
   const { tiers: locationTiers } = useLocationTiers();
   const tabBarPadding = useTabBarBottomPadding();
   const pullToAi = usePullToAiRefreshControl();
+  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
 
   // When the search closes, restore the outer tab. If the user was on the
   // "Groups" pill, surface the groups list they were browsing.
@@ -186,8 +188,8 @@ export const ContactsScreen = () => {
     decline: declineWhitenoiseRequest,
   } = useWhitenoiseRequests();
   const requestPubkeys = useMemo(
-    () => whitenoiseRequests.map((r) => r.fromPubkey),
-    [whitenoiseRequests]
+    () => (whitenoiseEnabled ? whitenoiseRequests.map((r) => r.fromPubkey) : []),
+    [whitenoiseEnabled, whitenoiseRequests]
   );
 
   // Accepted Marmot DM counterparties — Marmot uses kind-445 group events,
@@ -196,8 +198,8 @@ export const ContactsScreen = () => {
   // sources below.
   const { entries: whitenoiseDmEntries } = useWhitenoiseDmContacts();
   const whitenoiseContactPubkeys = useMemo(
-    () => whitenoiseDmEntries.map((e) => e.pubkey),
-    [whitenoiseDmEntries]
+    () => (whitenoiseEnabled ? whitenoiseDmEntries.map((e) => e.pubkey) : []),
+    [whitenoiseEnabled, whitenoiseDmEntries]
   );
 
   // Persisted Bitchat (BLE) DM history — peers we've privately messaged in
@@ -275,12 +277,14 @@ export const ContactsScreen = () => {
 
   const requestRows = useMemo<WhitenoiseRequestRow[]>(
     () =>
-      whitenoiseRequests.map((r) => ({
-        type: 'request',
-        pubkey: r.fromPubkey,
-        request: r,
-      })),
-    [whitenoiseRequests]
+      whitenoiseEnabled
+        ? whitenoiseRequests.map((r) => ({
+            type: 'request',
+            pubkey: r.fromPubkey,
+            request: r,
+          }))
+        : [],
+    [whitenoiseEnabled, whitenoiseRequests]
   );
 
   // Map accepted Marmot DM counterparties into the same row shape used by
@@ -289,14 +293,16 @@ export const ContactsScreen = () => {
   // genuine recent activity until we wire group-history reads.
   const whitenoiseContactRows = useMemo<RecentContact[]>(
     () =>
-      whitenoiseDmEntries.map((e) => ({
-        type: 'contact',
-        pubkey: e.pubkey,
-        dmEvent: null,
-        nip17Content: undefined,
-        timestamp: 0,
-      })),
-    [whitenoiseDmEntries]
+      whitenoiseEnabled
+        ? whitenoiseDmEntries.map((e) => ({
+            type: 'contact',
+            pubkey: e.pubkey,
+            dmEvent: null,
+            nip17Content: undefined,
+            timestamp: 0,
+          }))
+        : [],
+    [whitenoiseEnabled, whitenoiseDmEntries]
   );
 
   const filteredWhitenoiseContacts = useMemo(() => {
@@ -523,13 +529,16 @@ export const ContactsScreen = () => {
   //   • Search open, empty query → all pills so the user can pick a scope.
   //   • Search open with a query → only pills that have at least one match.
   const visibleFilters = useMemo<readonly ContactsFilter[]>(() => {
-    if (!isSearching) return ['All', 'Recent', 'Requests', 'Mints'];
-    if (!lowerQuery) return ['All', 'Recent', 'Requests', 'Mints', 'Groups'];
+    const baseFilters: ContactsFilter[] = ['All', 'Recent'];
+    if (whitenoiseEnabled) baseFilters.push('Requests');
+    baseFilters.push('Mints');
+    if (!isSearching) return baseFilters;
+    if (!lowerQuery) return [...baseFilters, 'Groups'];
     const list: ContactsFilter[] = ['All'];
     if (filteredDisplayContacts.length > 0 || filteredBitchatDmRows.length > 0) {
       list.push('Recent');
     }
-    if (whitenoiseRequests.length > 0) list.push('Requests');
+    if (whitenoiseEnabled && whitenoiseRequests.length > 0) list.push('Requests');
     if (filteredDisplayMints.length > 0) list.push('Mints');
     if (matchingTiers.length > 0 || groupsGeohashQuery) list.push('Groups');
     return list;
@@ -539,6 +548,7 @@ export const ContactsScreen = () => {
     filteredDisplayContacts,
     filteredDisplayMints,
     filteredBitchatDmRows,
+    whitenoiseEnabled,
     whitenoiseRequests,
     matchingTiers,
     groupsGeohashQuery,

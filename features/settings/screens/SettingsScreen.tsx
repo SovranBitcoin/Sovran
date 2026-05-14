@@ -127,6 +127,8 @@ export const SettingsScreen = () => {
   const setMockFailMelt = useSettingsStore((state) => state.setMockFailMelt);
   const mockFailPaymentRequest = useSettingsStore((state) => state.mockFailPaymentRequest);
   const setMockFailPaymentRequest = useSettingsStore((state) => state.setMockFailPaymentRequest);
+  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
+  const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
 
@@ -310,6 +312,25 @@ export const SettingsScreen = () => {
                       <HeroSwitch
                         isSelected={mockFailPaymentRequest}
                         onSelectedChange={setMockFailPaymentRequest}
+                      />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback
+                animation={false}
+                onPress={() => setWhitenoiseEnabled(!whitenoiseEnabled)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>White Noise</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch
+                        isSelected={whitenoiseEnabled}
+                        onSelectedChange={setWhitenoiseEnabled}
                       />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>

@@ -43,6 +43,12 @@ interface SettingsState {
   mockFailMelt: boolean;
   mockFailPaymentRequest: boolean;
   /**
+   * Hidden developer toggle for surfacing White Noise / Marmot messaging UI.
+   * Defaults off so the experimental transport stays invisible unless enabled
+   * from Settings -> Developer.
+   */
+  whitenoiseEnabled: boolean;
+  /**
    * Dev toggle: when true, force `supportsLiquidGlass()` to return false
    * everywhere — the app behaves as if the device doesn't support iOS 26
    * liquid glass. Most surfaces re-render the next time they're visible;
@@ -95,6 +101,7 @@ const PersistedSettings = z.object({
   mockFailSend: z.boolean().default(false),
   mockFailMelt: z.boolean().default(false),
   mockFailPaymentRequest: z.boolean().default(false),
+  whitenoiseEnabled: z.boolean().default(false),
   mockNoGlass: z.boolean().default(false),
   termsAccepted: PersistedTermsAccepted.default(null),
   hasSeenOnboarding: z.boolean().default(false),
@@ -122,6 +129,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   mockFailSend: false,
   mockFailMelt: false,
   mockFailPaymentRequest: false,
+  whitenoiseEnabled: false,
   mockNoGlass: false,
   termsAccepted: null,
   hasSeenOnboarding: false,
@@ -158,6 +166,8 @@ interface SettingsActions {
   getMockFailMelt: () => boolean;
   setMockFailPaymentRequest: (enabled: boolean) => void;
   getMockFailPaymentRequest: () => boolean;
+  setWhitenoiseEnabled: (enabled: boolean) => void;
+  getWhitenoiseEnabled: () => boolean;
   setMockNoGlass: (enabled: boolean) => void;
   getMockNoGlass: () => boolean;
 
@@ -258,6 +268,11 @@ export const useSettingsStore = create<SettingsStore>()(
           set({ mockFailPaymentRequest: enabled });
         },
         getMockFailPaymentRequest: () => get().mockFailPaymentRequest,
+        setWhitenoiseEnabled: (enabled: boolean) => {
+          storeLog.info('store.settings.set_whitenoise_enabled', { enabled });
+          set({ whitenoiseEnabled: enabled });
+        },
+        getWhitenoiseEnabled: () => get().whitenoiseEnabled,
         setMockNoGlass: (enabled: boolean) => {
           storeLog.info('store.settings.set_mock_no_glass', { enabled });
           set({ mockNoGlass: enabled });
@@ -327,6 +342,7 @@ export const useSettingsStore = create<SettingsStore>()(
           mockFailSend: state.mockFailSend,
           mockFailMelt: state.mockFailMelt,
           mockFailPaymentRequest: state.mockFailPaymentRequest,
+          whitenoiseEnabled: state.whitenoiseEnabled,
           mockNoGlass: state.mockNoGlass,
           termsAccepted: state.termsAccepted,
           hasSeenOnboarding: state.hasSeenOnboarding,

@@ -10,6 +10,7 @@ import { zIndex } from '@/shared/styles/tokens';
 import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
 import { useWhitenoise } from '../WhitenoiseContext';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import Icon from 'assets/icons';
 
 /**
@@ -62,6 +63,7 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
   const insets = useSafeAreaInsets();
   const { isReady, isLoading, isBootstrapping, bootstrap } = useWhitenoiseSetup();
   const { client } = useWhitenoise();
+  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
 
   const [phase, setPhase] = useState<Phase>('idle');
 
@@ -91,6 +93,7 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
   // Once the user starts, we keep rendering through the full sequence
   // even if upstream `isReady` flips during the animation.
   const shouldRenderCard = (() => {
+    if (!whitenoiseEnabled) return false;
     if (phase === 'gone') return false;
     if (phase !== 'idle') return true;
     if (!pathname.includes('/contacts')) return false;
