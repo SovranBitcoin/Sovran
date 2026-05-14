@@ -24,6 +24,8 @@ import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { isMockContactPubkey, getMockDmThread } from '@/shared/stores/runtime/mockDataStore';
 
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -83,6 +85,13 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   const [messages, setMessages] = useState<DmMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Mock-mode short-circuit: if this DM is with one of the demo contacts,
+  // serve the seeded thread and disable relay subscriptions / publish.
+  // The actual `setMessages` happens further down so it runs AFTER the
+  // pubkey-reset effect — otherwise the reset would wipe the seed.
+  const mockMode = useSettingsStore((s) => s.mockMode);
+  const isMockThread = mockMode && isMockContactPubkey(pubkey);
+
   // Counterparty kind-0 metadata is served from the shared SWR cache.
   // First open of a conversation per session pays one round-trip; every
   // subsequent open is instant because the cache is shared across surfaces
@@ -92,6 +101,8 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
 
   const dmFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
+    // Mock thread is served entirely from local state — no relay traffic.
+    if (isMockThread) return null;
     return [
       {
         kinds: [EncryptedDirectMessage],
@@ -104,20 +115,21 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         authors: [pubkey],
       },
     ];
-  }, [pubkey, nostrKeys?.pubkey]);
+  }, [pubkey, nostrKeys?.pubkey, isMockThread]);
 
   const { events: dmEvents } = useSubscribe({ filters: dmFilters });
 
   // NIP-17: subscribe to gift-wrapped events (kind 1059) addressed to us.
   const giftWrapFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
+    if (isMockThread) return null;
     return [
       {
         kinds: [1059 as number],
         '#p': [nostrKeys.pubkey],
       },
     ];
-  }, [nostrKeys?.pubkey]);
+  }, [nostrKeys?.pubkey, isMockThread]);
 
   const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
 
@@ -198,6 +210,15 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     setMessages([]);
     setIsLoading(true);
   }, [pubkey]);
+
+  // Seed the mock thread after the pubkey-reset effect so it isn't wiped.
+  // Runs after both effects on the same `[pubkey]` change.
+  useEffect(() => {
+    if (!isMockThread) return;
+    const thread = getMockDmThread(pubkey) ?? [];
+    setMessages(thread.map((m) => ({ ...m })));
+    setIsLoading(false);
+  }, [isMockThread, pubkey]);
 
   // Process NIP-04 DM events - deferred to avoid blocking navigation.
   useEffect(() => {
@@ -336,6 +357,23 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
 
   const handleNostrDMSend = useCallback(
     async (text: string) => {
+      // Mock thread: append locally and stop. These pubkeys are real npubs the
+      // user pasted as demo seeds — publishing here would broadcast actual
+      // DMs to those Nostr users.
+      if (isMockThread) {
+        const timestamp = Math.floor(Date.now() / 1000);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `demo-dm-local-${timestamp}`,
+            content: text,
+            isOwn: true,
+            created_at: timestamp,
+            pubkey: '',
+          },
+        ]);
+        return;
+      }
       const dmStart = performance.now();
       log.info('dm.send.start', {
         messageLength: text.length,
@@ -426,7 +464,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         staticPopup('send-message-failed');
       }
     },
-    [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey]
+    [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey, isMockThread]
   );
 
   const handleSendMoney = useCallback(() => {

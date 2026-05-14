@@ -4,6 +4,7 @@ import { LegendList } from '@legendapp/list';
 import Icon from 'assets/icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { router } from 'expo-router';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -17,6 +18,7 @@ import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { Log, log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
 import {
+  bleIdentity,
   ContactRow,
   geohashIdentity,
   mintIdentity,
@@ -24,6 +26,7 @@ import {
   type Identity,
 } from '@/shared/ui/composed/ContactRow';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
+import { PullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { navigateToProfile } from '../lib/navigateToProfile';
 import {
@@ -36,6 +39,7 @@ import {
   type WhitenoiseRequest,
 } from '@/features/whitenoise/hooks/useWhitenoiseRequests';
 import { useWhitenoiseDmContacts } from '@/features/whitenoise/hooks/useWhitenoiseDmContacts';
+import { useBitchatDmContacts } from '@/features/bitchat/hooks/useBitchatDmContacts';
 import { RequestActions } from '@/features/whitenoise/components/RequestActions';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 import { parseGeohashQuery } from '../lib/parseGeohashQuery';
@@ -50,7 +54,23 @@ interface WhitenoiseRequestRow {
   request: WhitenoiseRequest;
 }
 
-type ContactsListItem = RecentContact | MintContact | WhitenoiseRequestRow;
+/**
+ * Persisted Bitchat (BLE) DM-peer row. Distinct from `RecentContact` because
+ * peerIDs aren't Nostr pubkeys — they're 16-hex BLE identifiers, addressed
+ * through a different navigation pathway (`/(user-flow)/bitchatDM`).
+ */
+interface BitchatDmContactRow {
+  type: 'bitchat-dm';
+  peerID: string;
+  nickname: string;
+  timestamp: number;
+}
+
+type ContactsListItem =
+  | RecentContact
+  | MintContact
+  | WhitenoiseRequestRow
+  | BitchatDmContactRow;
 
 // Hostname extraction for mint URL search. Pure; hoisted so the reference is
 // stable across renders (each list filter pass would otherwise allocate a
@@ -183,6 +203,11 @@ export const ContactsScreen = () => {
     [whitenoiseDmEntries]
   );
 
+  // Persisted Bitchat (BLE) DM history — peers we've privately messaged in
+  // any session. Native bridge keeps a UserDefaults-backed map of
+  // { peerID, nickname, lastTimestamp } so the list survives app kills.
+  const { contacts: bitchatDmContacts } = useBitchatDmContacts();
+
   // Profile metadata is served from the shared SWR cache. Cache hits
   // paint immediately; misses/stale entries trigger one batched kind-0
   // subscription with `authors: missingOrStale`. Other surfaces
@@ -285,16 +310,38 @@ export const ContactsScreen = () => {
     });
   }, [whitenoiseContactRows, profilesMap, lowerQuery, matchesProfileQuery]);
 
+  // Map BLE-DM peers into row shape. Search filters off the persisted
+  // nickname (peerIDs are opaque hex — never useful to match against).
+  const bitchatDmRows = useMemo<BitchatDmContactRow[]>(
+    () =>
+      bitchatDmContacts.map((c) => ({
+        type: 'bitchat-dm',
+        peerID: c.peerID,
+        nickname: c.nickname,
+        timestamp: c.lastTimestamp,
+      })),
+    [bitchatDmContacts]
+  );
+
+  const filteredBitchatDmRows = useMemo(() => {
+    if (!lowerQuery) return bitchatDmRows;
+    return bitchatDmRows.filter((c) => c.nickname.toLowerCase().includes(lowerQuery));
+  }, [bitchatDmRows, lowerQuery]);
+
   const currentListData = useMemo<ContactsListItem[]>(() => {
     switch (activeFilter) {
       case 'Recent': {
         // Merge NIP-17/NIP-04 recent contacts with accepted Marmot DM
-        // counterparties, deduped by pubkey (NIP-17 entries win — they
-        // carry actual lastMessage previews).
+        // counterparties + Bitchat BLE-DM peers, deduped by their
+        // namespaced key (peerIDs are 16-hex, nostr pubkeys 64-hex — no
+        // collision risk, but we prefix anyway to be defensive).
         const byKey = new Map<string, ContactsListItem>();
         for (const item of filteredWhitenoiseContacts) byKey.set(item.pubkey, item);
         for (const item of filteredDisplayContacts) {
           if (item.pubkey) byKey.set(item.pubkey, item);
+        }
+        for (const item of filteredBitchatDmRows) {
+          byKey.set(`ble:${item.peerID}`, item);
         }
         return Array.from(byKey.values());
       }
@@ -310,6 +357,9 @@ export const ContactsScreen = () => {
         for (const item of filteredDisplayContacts) {
           if (item.pubkey) byKey.set(item.pubkey, item);
         }
+        for (const item of filteredBitchatDmRows) {
+          byKey.set(`ble:${item.peerID}`, item);
+        }
         for (const item of filteredDisplayMints) {
           const key = item.pubkey || item.mint?.mintUrl;
           if (key) byKey.set(key, item);
@@ -322,6 +372,7 @@ export const ContactsScreen = () => {
     filteredDisplayContacts,
     filteredDisplayMints,
     filteredWhitenoiseContacts,
+    filteredBitchatDmRows,
     requestRows,
   ]);
 
@@ -333,6 +384,29 @@ export const ContactsScreen = () => {
 
   const renderContactItem = useCallback(
     ({ item }: { item: ContactsListItem }) => {
+      // Bitchat BLE-DM peer (from persisted DM history). Different namespace
+      // than nostr contacts: peerIDs aren't pubkeys, so no profile lookup —
+      // we render with the seeded ble identity and route to the BLE DM screen.
+      if (item.type === 'bitchat-dm') {
+        return (
+          <ContactRow
+            identity={bleIdentity({ peerID: item.peerID, nickname: item.nickname })}
+            onPress={() => {
+              paymentLog.info('contact.bitchat.press', { peerID: item.peerID });
+              router.push({
+                pathname: '/(user-flow)/bitchatDM',
+                params: {
+                  transport: 'ble-dm',
+                  peerID: item.peerID,
+                  nickname: item.nickname,
+                },
+              });
+            }}
+            testID={`contact-row:ble:${item.peerID}`}
+          />
+        );
+      }
+
       // White Noise pending invite — keep it in this list so the empty/
       // loading/scrolling behaviour is the same as the other pills, but
       // swap the trailing slot for accept/decline buttons.
@@ -455,7 +529,9 @@ export const ContactsScreen = () => {
     if (!isSearching) return ['All', 'Recent', 'Requests', 'Mints'];
     if (!lowerQuery) return ['All', 'Recent', 'Requests', 'Mints', 'Groups'];
     const list: ContactsFilter[] = ['All'];
-    if (filteredDisplayContacts.length > 0) list.push('Recent');
+    if (filteredDisplayContacts.length > 0 || filteredBitchatDmRows.length > 0) {
+      list.push('Recent');
+    }
     if (whitenoiseRequests.length > 0) list.push('Requests');
     if (filteredDisplayMints.length > 0) list.push('Mints');
     if (matchingTiers.length > 0 || groupsGeohashQuery) list.push('Groups');
@@ -465,6 +541,7 @@ export const ContactsScreen = () => {
     lowerQuery,
     filteredDisplayContacts,
     filteredDisplayMints,
+    filteredBitchatDmRows,
     whitenoiseRequests,
     matchingTiers,
     groupsGeohashQuery,
@@ -505,9 +582,15 @@ export const ContactsScreen = () => {
       data={currentListData}
       extraData={profilesMap}
       estimatedItemSize={68}
-      keyExtractor={(item, index) =>
-        item.pubkey || (item.type === 'mint' ? item.mint?.mintUrl : undefined) || `contact-${index}`
-      }
+      refreshControl={<PullToAiRefreshControl />}
+      keyExtractor={(item, index) => {
+        if (item.type === 'bitchat-dm') return `ble:${item.peerID}`;
+        return (
+          item.pubkey ||
+          (item.type === 'mint' ? item.mint?.mintUrl : undefined) ||
+          `contact-${index}`
+        );
+      }}
       renderItem={renderContactItem}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="always"
@@ -530,6 +613,7 @@ export const ContactsScreen = () => {
         data={tierData}
         estimatedItemSize={68}
         keyExtractor={(item) => item.key}
+        refreshControl={<PullToAiRefreshControl />}
         renderItem={({ item }) => <GroupsTierRow tier={item} />}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"

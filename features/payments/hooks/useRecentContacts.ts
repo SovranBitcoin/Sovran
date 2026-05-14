@@ -6,6 +6,8 @@ import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { decryptNip04Events } from '../lib/decryptNip04Events';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { getMockContacts } from '@/shared/stores/runtime/mockDataStore';
 
 const DEFAULT_CONTACTS = [{ pubkey: PUBLIC_KEYS.SUPPORT, label: 'Sovran' }] as const;
 
@@ -24,6 +26,7 @@ export interface RecentContact {
 }
 
 export function useRecentContacts(nostrKeys: NostrKeys | null) {
+  const mockMode = useSettingsStore((s) => s.mockMode);
   // NIP-04 DM subscription
   const dmFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
@@ -266,7 +269,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       if (c.pubkey) decryptedByPubkey.set(c.pubkey, c);
     });
 
-    return contactsWithDefaults.map((c) => {
+    const base = contactsWithDefaults.map((c) => {
       const decrypted = decryptedByPubkey.get(c.pubkey);
       if (decrypted) return decrypted;
       return {
@@ -274,12 +277,24 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
         dmEvent: c.nip17Content !== undefined ? { content: c.nip17Content } : undefined,
       };
     });
-  }, [decryptedContacts, contactsWithDefaults]);
 
-  const contactPubkeys = useMemo(
-    () => contactsWithDefaults.map((c) => c.pubkey).filter(Boolean),
-    [contactsWithDefaults]
-  );
+    if (!mockMode) return base;
+    // Mocks sort to the top via their fresh timestamps; defaults
+    // (timestamp 0) stay at the bottom. Real contacts are deduped against
+    // mocks by pubkey — a real DM from a mock pubkey wins so the demo
+    // doesn't mask actual history if any happens to exist.
+    const mocks = getMockContacts();
+    const realKeys = new Set(base.map((c) => c.pubkey));
+    return [...mocks.filter((m) => !realKeys.has(m.pubkey)), ...base];
+  }, [decryptedContacts, contactsWithDefaults, mockMode]);
+
+  const contactPubkeys = useMemo(() => {
+    const base = contactsWithDefaults.map((c) => c.pubkey).filter(Boolean);
+    if (!mockMode) return base;
+    const seen = new Set(base);
+    for (const m of getMockContacts()) if (!seen.has(m.pubkey)) base.push(m.pubkey);
+    return base;
+  }, [contactsWithDefaults, mockMode]);
 
   return { displayContacts, contactPubkeys, dmEvents };
 }

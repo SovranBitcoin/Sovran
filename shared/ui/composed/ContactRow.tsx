@@ -108,8 +108,16 @@ interface BleIdentity {
   kind: 'ble';
   peerID: string;
   nickname?: string;
-  /** Omit both fields when the caller supplies its own `subtitle` / `trailing`. */
+  /** Omit these fields when the caller supplies its own `subtitle` / `trailing`. */
+  /** Cached announce-time reachability (true if announce arrived directly or
+   *  we had a direct link at announce time). Use `hasDirectLink` for truthful
+   *  real-time reachability — `isConnected` can stay true after the BLE link
+   *  silently dies. */
   isConnected?: boolean;
+  /** Real-time peripheral/central link check. When false but `isConnected`
+   *  is true, the peer is mesh-reachable only — DMs will mesh-flood with a
+   *  15s spool fallback and may not arrive. */
+  hasDirectLink?: boolean;
   lastSeen?: number;
 }
 
@@ -222,6 +230,7 @@ export function bleIdentity(peer: {
   peerID: string;
   nickname?: string;
   isConnected?: boolean;
+  hasDirectLink?: boolean;
   lastSeen?: number;
 }): BleIdentity {
   return { kind: 'ble', ...peer };
@@ -441,9 +450,15 @@ function deriveSubtitle(ids: Identity[]): string | undefined {
   const ble = find(ids, 'ble');
   if (ble) {
     if (ble.isConnected === undefined) return undefined;
-    const suffix = ble.isConnected
-      ? 'connected'
-      : `seen ${typeof ble.lastSeen === 'number' ? formatRelative(ble.lastSeen, 'verbose') : 'recently'}`;
+    // Three states the user actually cares about for DM reachability:
+    //  - direct link → DM goes straight over BLE
+    //  - mesh-only  → reachable but DMs may stall / drop in spool window
+    //  - offline    → last-seen timestamp
+    const suffix = !ble.isConnected
+      ? `seen ${typeof ble.lastSeen === 'number' ? formatRelative(ble.lastSeen, 'verbose') : 'recently'}`
+      : ble.hasDirectLink
+        ? 'connected'
+        : 'mesh-only';
     return `#${ble.peerID.slice(0, 8)} · ${suffix}`;
   }
   const geohash = find(ids, 'geohash');
@@ -547,14 +562,28 @@ function buildStats(
         break;
       case 'connection':
         if (ble && ble.isConnected !== undefined) {
+          // Three-state badge: direct link (green), mesh-only (warning), offline.
+          // The mesh-only state is the one users find confusing — peer shows
+          // up but DMs are flaky. Calling it out by icon + word avoids that.
+          const meshOnly = ble.isConnected && ble.hasDirectLink === false;
           out.push({
-            icon: ble.isConnected ? 'mdi:broadcast' : 'mdi:clock-outline',
-            value: ble.isConnected
-              ? 'Connected'
-              : typeof ble.lastSeen === 'number'
+            icon: ble.isConnected
+              ? meshOnly
+                ? 'mdi:lan-disconnect'
+                : 'mdi:broadcast'
+              : 'mdi:clock-outline',
+            value: !ble.isConnected
+              ? typeof ble.lastSeen === 'number'
                 ? formatRelative(ble.lastSeen, 'verbose')
-                : 'Offline',
-            color: ble.isConnected ? CONNECTED_ACCENT : STAT_COLOR_SOCIAL,
+                : 'Offline'
+              : meshOnly
+                ? 'Mesh-only'
+                : 'Connected',
+            color: ble.isConnected
+              ? meshOnly
+                ? tints.warning
+                : CONNECTED_ACCENT
+              : STAT_COLOR_SOCIAL,
           });
         }
         break;
@@ -588,10 +617,14 @@ export function ContactRow({
   padding = 'default',
   testID,
 }: ContactRowProps) {
+  // Stat tints intentionally diverge from the theme `success` token: the
+  // app-wide retint moved `--success` to blue (see themeEngine.ts), but the
+  // audit-%/offline pills read more clearly as "good" in green. Other
+  // success surfaces (StatusToast, Badge, etc.) still consume the blue tint.
   const [foreground, accent, success, warning] = useThemeColor([
     'foreground',
     'accent',
-    'success',
+    'green-300',
     'yellow-300',
   ] as const);
 
@@ -726,12 +759,19 @@ export function ContactRow({
     </Pressable>
   ) : null;
 
+  // Trailing badge mirrors the same three-state model the subtitle uses so
+  // the row's right edge is honest about DM reachability:
+  //  - direct  → green broadcast icon ("ready to DM")
+  //  - mesh    → warning lan-disconnect icon ("DM may stall")
+  //  - offline → faded clock ("last seen…")
   const bleConnectionNode =
     ble && ble.isConnected !== undefined ? (
-      ble.isConnected ? (
-        <Icon name="mdi:broadcast" size={20} color={CONNECTED_ACCENT} />
-      ) : (
+      !ble.isConnected ? (
         <Icon name="mdi:clock-outline" size={20} color={opacity(foreground, 0.3)} />
+      ) : ble.hasDirectLink === false ? (
+        <Icon name="mdi:lan-disconnect" size={20} color={warning} />
+      ) : (
+        <Icon name="mdi:broadcast" size={20} color={CONNECTED_ACCENT} />
       )
     ) : null;
 

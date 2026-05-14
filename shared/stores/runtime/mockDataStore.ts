@@ -20,8 +20,15 @@ import {
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
+import {
+  useNostrMetadataCache,
+  type NostrProfileMetadata,
+} from '@/shared/stores/global/nostrMetadataCache';
 import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
 import type { HistoryEntry } from '@cashu/coco-core';
+// Type-only import — `useRecentContacts` does not import this file at runtime
+// (it reads mock state via getMockState() below), so there's no cycle.
+import type { RecentContact } from '@/features/payments/hooks/useRecentContacts';
 
 // ---------------------------------------------------------------------------
 // Demo row definition — single source of truth for all mock data.
@@ -176,6 +183,143 @@ function buildMockData() {
 }
 
 // ---------------------------------------------------------------------------
+// Mock contacts + DM threads
+//
+// Real npubs (decoded to hex once at module load) so deep-links and copy-pubkey
+// affordances stay coherent — the threads themselves are entirely fabricated
+// and never publish anywhere.
+// ---------------------------------------------------------------------------
+
+interface MockContact {
+  /** 64-hex Schnorr key. */
+  pubkey: string;
+  /** Bech32 form, retained for display affordances (copy as npub). */
+  npub: string;
+  metadata: Omit<NostrProfileMetadata, 'fetchedAt'>;
+  /** Deterministic thread, oldest first. ISO-ish offsets from `now` in minutes. */
+  thread: ReadonlyArray<{ content: string; isOwn: boolean; minutesAgo: number }>;
+}
+
+const MOCK_CONTACTS: ReadonlyArray<MockContact> = [
+  {
+    pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+    npub: 'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
+    metadata: {
+      name: 'satoshi',
+      displayName: 'Satoshi',
+      about: 'Just a guy who likes peer-to-peer cash.',
+      nip05: 'satoshi@sovran.money',
+      lud16: 'satoshi@sovran.money',
+    },
+    thread: [
+      { content: 'hey, you free for lunch?', isOwn: false, minutesAgo: 240 },
+      { content: 'yeah, 1pm at the usual spot?', isOwn: true, minutesAgo: 235 },
+      { content: 'perfect. bringing the new hardware to show you', isOwn: false, minutesAgo: 230 },
+      { content: 'oh nice, finally', isOwn: true, minutesAgo: 14 },
+    ],
+  },
+  {
+    pubkey: '50d94fc2d8580c682b071a542f8b1e31a200b0508bab95a33bef0855df281d63',
+    npub: 'npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg',
+    metadata: {
+      name: 'alice',
+      displayName: 'Alice',
+      about: 'mint operator. occasionally pays for coffee in sats.',
+      nip05: 'alice@sovran.money',
+      lud16: 'alice@sovran.money',
+    },
+    thread: [
+      { content: 'invoice please?', isOwn: false, minutesAgo: 90 },
+      { content: 'one sec', isOwn: true, minutesAgo: 89 },
+      { content: 'lnbc500u1pnxk4ppq0gfq2ue6m8k5tvz6gwldkdhjr07s', isOwn: true, minutesAgo: 88 },
+      { content: 'paid. thanks!', isOwn: false, minutesAgo: 47 },
+    ],
+  },
+  {
+    pubkey: '82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2',
+    npub: 'npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m',
+    metadata: {
+      name: 'bob',
+      displayName: 'Bob',
+      about: 'split bills with me, not with banks.',
+      nip05: 'bob@sovran.money',
+    },
+    thread: [
+      { content: 'split the dinner?', isOwn: true, minutesAgo: 60 * 26 },
+      { content: 'sure, send me a request', isOwn: false, minutesAgo: 60 * 25 },
+      { content: 'sent', isOwn: true, minutesAgo: 60 * 24 },
+    ],
+  },
+  {
+    pubkey: '3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d',
+    npub: 'npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6',
+    metadata: {
+      name: 'carol',
+      displayName: 'Carol',
+      about: 'nostr, NFC, and overpriced espresso.',
+      lud16: 'carol@sovran.money',
+    },
+    thread: [
+      { content: 'tap to pay worked first try 🎉', isOwn: false, minutesAgo: 60 * 72 },
+      { content: "told you it'd be smooth", isOwn: true, minutesAgo: 60 * 71 },
+    ],
+  },
+];
+
+interface MockDmMessage {
+  id: string;
+  content: string;
+  isOwn: boolean;
+  created_at: number;
+  pubkey: string;
+}
+
+function buildMockContactsAndThreads(now: number) {
+  const metadataByPubkey: Record<string, Omit<NostrProfileMetadata, 'fetchedAt'>> = {};
+  const threadsByPubkey: Record<string, MockDmMessage[]> = {};
+  const recentContacts: RecentContact[] = [];
+
+  for (const c of MOCK_CONTACTS) {
+    metadataByPubkey[c.pubkey] = c.metadata;
+
+    const messages: MockDmMessage[] = c.thread.map((m, idx) => {
+      const created_at = Math.floor((now - m.minutesAgo * 60_000) / 1000);
+      return {
+        id: `demo-dm-${c.pubkey.slice(0, 8)}-${idx}`,
+        content: m.content,
+        isOwn: m.isOwn,
+        created_at,
+        // Own messages have an empty senderId in the ChatBubble pipeline; the
+        // counterparty's pubkey is what the avatar/name look up. We never
+        // need the *user's* real pubkey here.
+        pubkey: m.isOwn ? '' : c.pubkey,
+      };
+    });
+    threadsByPubkey[c.pubkey] = messages;
+
+    const last = messages[messages.length - 1];
+    recentContacts.push({
+      type: 'contact',
+      pubkey: c.pubkey,
+      // ContactsScreen reads `dmEvent.content` as the row's last-message preview.
+      // Skipping the rest of the NDKEvent shape is fine: nothing else on the
+      // row touches it.
+      dmEvent: last ? { content: last.content } : null,
+      nip17Content: last?.content,
+      timestamp: last?.created_at ?? 0,
+    });
+  }
+
+  return { metadataByPubkey, threadsByPubkey, recentContacts };
+}
+
+const MOCK_PUBKEYS_SET: ReadonlySet<string> = new Set(MOCK_CONTACTS.map((c) => c.pubkey));
+
+export function isMockContactPubkey(pubkey: string | null | undefined): boolean {
+  return !!pubkey && MOCK_PUBKEYS_SET.has(pubkey);
+}
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -205,12 +349,24 @@ interface MockDataActions {
 type MockDataStore = MockDataState & MockDataActions;
 
 const MOCK = buildMockData();
+const MOCK_DM = buildMockContactsAndThreads(Date.now());
+
+/** Mock RecentContact rows. Consumed by `useRecentContacts` when mockMode is on. */
+export function getMockContacts(): RecentContact[] {
+  return MOCK_DM.recentContacts;
+}
+
+/** Mock DM thread for a counterparty pubkey, oldest-first. */
+export function getMockDmThread(pubkey: string): MockDmMessage[] | null {
+  return MOCK_DM.threadsByPubkey[pubkey] ?? null;
+}
 
 // Hydration unsubscribe handles — stored outside zustand state so they
 // are never serialised / compared.
 let unsubScans: (() => void) | null = null;
 let unsubSwaps: (() => void) | null = null;
 let unsubLocations: (() => void) | null = null;
+let unsubMetadata: (() => void) | null = null;
 
 // All inject/remove helpers gate the persist middleware off via
 // `withSkippedPersistWrites` so demo entries stay runtime-only and never
@@ -277,6 +433,35 @@ function removeLocations() {
   });
 }
 
+function injectNostrMetadata() {
+  // Seed kind-0 metadata so ContactRow / DmChatHeader / profile screens show
+  // the mock name + nip05 / about / lud16 instead of the deterministic
+  // "word-pair" fallback. fetchedAt: now keeps the SWR hook from triggering
+  // a relay refetch.
+  withSkippedPersistWrites(() => {
+    const now = Date.now();
+    useNostrMetadataCache.setState((state) => {
+      const next = { ...state.byPubkey };
+      for (const [pubkey, metadata] of Object.entries(MOCK_DM.metadataByPubkey)) {
+        next[pubkey] = { ...metadata, fetchedAt: now };
+      }
+      return { byPubkey: next };
+    });
+  });
+}
+
+function removeNostrMetadata() {
+  withSkippedPersistWrites(() => {
+    useNostrMetadataCache.setState((state) => {
+      const next = { ...state.byPubkey };
+      for (const pubkey of Object.keys(MOCK_DM.metadataByPubkey)) {
+        delete next[pubkey];
+      }
+      return { byPubkey: next };
+    });
+  });
+}
+
 export const useMockDataStore = create<MockDataStore>()((_set) => ({
   // Pre-built mock data — never changes at runtime.
   mockHistory: MOCK.history,
@@ -288,11 +473,13 @@ export const useMockDataStore = create<MockDataStore>()((_set) => ({
     injectScans();
     injectSwaps();
     injectLocations();
+    injectNostrMetadata();
 
     // Re-inject after rehydration from AsyncStorage
     unsubScans = useScanHistoryStore.persist.onFinishHydration(injectScans);
     unsubSwaps = useSwapTransactionsStore.persist.onFinishHydration(injectSwaps);
     unsubLocations = useTransactionLocationStore.persist.onFinishHydration(injectLocations);
+    unsubMetadata = useNostrMetadataCache.persist.onFinishHydration(injectNostrMetadata);
   },
 
   deactivate: () => {
@@ -300,13 +487,16 @@ export const useMockDataStore = create<MockDataStore>()((_set) => ({
     unsubScans?.();
     unsubSwaps?.();
     unsubLocations?.();
+    unsubMetadata?.();
     unsubScans = null;
     unsubSwaps = null;
     unsubLocations = null;
+    unsubMetadata = null;
 
     // Remove all demo entries from real stores
     removeScans();
     removeSwaps();
     removeLocations();
+    removeNostrMetadata();
   },
 }));
