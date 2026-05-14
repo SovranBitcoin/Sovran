@@ -129,7 +129,7 @@ export function MintQuoteScreen({
        */}
       <View testID={`mint-quote-id-${entry.id}`}>
         <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} />
+          <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
           {!isPaid && (
             <PaymentInfo
               data={[{ name: 'Lightning', value: entry.paymentRequest }]}

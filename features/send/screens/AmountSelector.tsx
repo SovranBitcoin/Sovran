@@ -5,10 +5,12 @@
  */
 
 import { useCallback, useMemo } from 'react';
+import { useWindowDimensions, View } from 'react-native';
 
-import type { ActionVariant, ScreenActionName } from 'coco-payment-ux';
+import type { ActionVariant, RecipientProfile, ScreenActionName } from 'coco-payment-ux';
 import type { BoundAction, QuickSendSuggestion } from 'coco-payment-ux/react';
 
+import { MintSelector } from '@/features/wallet';
 import type { ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import {
   AmountEntryView,
@@ -49,6 +51,28 @@ interface AmountSelectorProps {
   transactionType: 'send' | 'receive';
   /** True while the payment machine is busy (e.g. after Next). */
   machineBusy?: boolean;
+  /**
+   * When true, the mint selector has been moved out of the header (replaced
+   * by a recipient avatar + "Pay <name>") and should render as a 50/50
+   * bottom-bar pill alongside Next. The wallet flips this on once the
+   * payment machine has resolved a Nostr identity for the melt target
+   * (see `coco-payment-ux`'s `resolveRecipientPubkey` / `resolveRecipientProfile`
+   * operations).
+   */
+  showMintBottomButton?: boolean;
+  /** Mint URL — drives the MintSelector pill rendered in the bottom slot. */
+  mintUrl?: string;
+  /** Tap handler — opens the mint-list screen. */
+  onRequestMintList?: () => void;
+  /**
+   * Resolved Nostr recipient identity for the current melt target. When
+   * present, forwarded to `actions.next.execute(...)` as part of the params
+   * so coco-payment-ux's default `next` handler can pass it into the
+   * machine via `enterAmount`. Lets MeltQuoteScreen render the "Pay <name>"
+   * header on first paint instead of paying a second NIP-05 round-trip.
+   */
+  recipientPubkey?: string;
+  recipientProfile?: RecipientProfile;
 }
 
 export function AmountSelector({
@@ -57,6 +81,11 @@ export function AmountSelector({
   suggestions = [],
   transactionType,
   machineBusy = false,
+  showMintBottomButton = false,
+  mintUrl,
+  onRequestMintList,
+  recipientPubkey,
+  recipientProfile,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
 
@@ -91,10 +120,32 @@ export function AmountSelector({
     void actions.toggle.execute();
   }, [actions.toggle, inputMode]);
 
+  // Pack recipient identity into the execute params on every `next` call.
+  // Spread by the action manager into `ctx`, then read by coco-payment-ux's
+  // default `next` handler — undefined values are ignored downstream, so
+  // safe to always include.
+  const nextExecuteParams = useMemo(
+    () => ({
+      ...(recipientPubkey ? { recipientPubkey } : {}),
+      ...(recipientProfile ? { recipientProfile } : {}),
+    }),
+    [recipientPubkey, recipientProfile]
+  );
+
   const handleNext = useCallback(async () => {
-    walletLog.info('amount.next', { numericValue, inputMode, unit, transactionType });
-    await actions.next.execute();
-  }, [actions.next, numericValue, inputMode, unit, transactionType]);
+    walletLog.info('amount.next', {
+      numericValue,
+      inputMode,
+      unit,
+      transactionType,
+      recipientPubkeyPresent: !!('recipientPubkey' in nextExecuteParams),
+      recipientProfilePresent: !!('recipientProfile' in nextExecuteParams),
+      recipientDisplayName:
+        (nextExecuteParams as { recipientProfile?: { displayName?: string } }).recipientProfile
+          ?.displayName ?? null,
+    });
+    await actions.next.execute(nextExecuteParams);
+  }, [actions.next, numericValue, inputMode, unit, transactionType, nextExecuteParams]);
 
   // Map the coco-payment-ux availability variants (ecash/lightning/onchain on
   // send-money flows) into ActionMenuButton's variant shape. Each variant
@@ -112,11 +163,18 @@ export function AmountSelector({
       reason: v.reason,
       isDestructive: v.isDestructive,
       onPress: async () => {
-        walletLog.info('amount.next.variant', { variantId: v.id });
-        await actions.next.execute({ variantId: v.id });
+        walletLog.info('amount.next.variant', {
+          variantId: v.id,
+          recipientPubkeyPresent: !!('recipientPubkey' in nextExecuteParams),
+          recipientProfilePresent: !!('recipientProfile' in nextExecuteParams),
+          recipientDisplayName:
+            (nextExecuteParams as { recipientProfile?: { displayName?: string } }).recipientProfile
+              ?.displayName ?? null,
+        });
+        await actions.next.execute({ variantId: v.id, ...nextExecuteParams });
       },
     }));
-  }, [actions.next]);
+  }, [actions.next, nextExecuteParams]);
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled
   // navigation (`useRoutstrTopUpStore.start()` → `/(send-flow)/amount`),
@@ -163,6 +221,38 @@ export function AmountSelector({
   const nextDisabled = !actions.next.available;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
 
+  // When the recipient header is in play, surface the mint as a 50/50
+  // bottom-bar pill — same component the header uses, so balance, icon,
+  // and liquid/blur/flat chrome stay consistent across the swap.
+  //
+  // Sizing mirrors Button's `SIZES.default` so the pill and Next render
+  // with identical outer footprints:
+  //   • BottomButtons spans full window width (no horizontal padding),
+  //     so each 50% slot is `windowWidth / 2`.
+  //   • Button bakes `margin: 4` on all four sides + `marginBottom: 8`,
+  //     consuming 8 px of horizontal space inside its slot. The pill
+  //     gets the same margins on its wrapper, and `width = slot - 8`,
+  //     so visible button widths match to the pixel.
+  //   • Height 48 matches Button's `minHeight`; contentHeight 32 leaves
+  //     visible padding inside the SwiftUI liquid-glass button instead
+  //     of crowding the avatar + label + chevron row at 48 px.
+  const { width: windowWidth } = useWindowDimensions();
+  const mintBottomPillWidth = Math.max(0, windowWidth / 2 - 8);
+  const leadingBottomButton = useMemo(() => {
+    if (!showMintBottomButton || !onRequestMintList) return undefined;
+    return (
+      <View style={{ margin: 4, marginBottom: 8 }}>
+        <MintSelector
+          selectedMintUrl={mintUrl}
+          onRequestMintList={onRequestMintList}
+          width={mintBottomPillWidth}
+          height={48}
+          contentHeight={32}
+        />
+      </View>
+    );
+  }, [showMintBottomButton, onRequestMintList, mintUrl, mintBottomPillWidth]);
+
   return (
     <Log name="AmountSelector" style={{ flex: 1 }}>
       <AmountEntryView
@@ -183,6 +273,7 @@ export function AmountSelector({
         onSuggestionTap={handleSuggestionTap}
         extraButtons={extraButtons}
         nextVariants={nextVariants}
+        leadingBottomButton={leadingBottomButton}
         transactionType={transactionTypeForView}
       />
     </Log>

@@ -816,13 +816,27 @@ export function createSovranHandlers({
       });
     },
 
-    navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit, recipientPubkey }) => {
+    navigateToMeltPreview: ({
+      mintUrl,
+      meltTarget,
+      amount,
+      unit,
+      recipientPubkey,
+      recipientProfile,
+    }) => {
       paymentLog.info('payment.step.navigate_melt_preview', {
         mintUrl,
         amount,
         unit,
         recipientPubkeyPresent: !!recipientPubkey,
+        recipientProfilePresent: !!recipientProfile,
+        recipientProfileDisplayName: recipientProfile?.displayName ?? null,
+        recipientProfileAvatarUrlPresent: !!recipientProfile?.avatarUrl,
       });
+      // `MeltHistoryEntry.metadata` is typed `Record<string, string>` upstream
+      // in `@cashu/coco-core`, so the resolved profile is flattened into
+      // individual string keys instead of stored as a nested object.
+      // `MeltQuoteScreen` re-assembles them on read.
       const entry: MeltHistoryEntry = {
         id: mintLocalId('melt-preview'),
         type: 'melt',
@@ -836,6 +850,15 @@ export function createSovranHandlers({
           phase: 'preview',
           meltTarget,
           ...(recipientPubkey ? { recipientPubkey } : {}),
+          ...(recipientProfile?.displayName
+            ? { recipientDisplayName: recipientProfile.displayName }
+            : {}),
+          ...(recipientProfile?.avatarUrl
+            ? { recipientAvatarUrl: recipientProfile.avatarUrl }
+            : {}),
+          ...(recipientProfile?.nip05
+            ? { recipientNip05: recipientProfile.nip05 }
+            : {}),
         },
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
@@ -926,6 +949,13 @@ export function createSovranHandlers({
         selectedMintUrl: preselectedMintUrl ?? '',
         ...(constraints.paymentRequest ? { paymentRequest: constraints.paymentRequest } : {}),
         ...(constraints.meltTarget ? { meltTarget: constraints.meltTarget } : {}),
+        // Snapshot the machine-resolved recipient identity onto the entry so
+        // the amount screen renders "Pay <name>" + avatar on first paint
+        // when the resolver beat the navigation. AmountFlowScreen also
+        // subscribes to the live ctx for the case where the resolver lands
+        // after navigation.
+        ...(constraints.recipientPubkey ? { recipientPubkey: constraints.recipientPubkey } : {}),
+        ...(constraints.recipientProfile ? { recipientProfile: constraints.recipientProfile } : {}),
       };
       const params = { amountEntry: JSON.stringify(entry) };
       router.navigate(

@@ -36,6 +36,8 @@ interface HistoryEntryHeaderProps {
    * `entry.metadata.recipientPubkey` (see `coco-payment-ux` types).
    */
   recipientPubkey?: string;
+  /** Whether recipientPubkey should replace the transaction icon with an avatar. */
+  showRecipientAvatar?: boolean;
   /** Show loading state on the icon */
   isLoading?: boolean;
 }
@@ -44,9 +46,11 @@ export function HistoryEntryHeader({
   historyEntry,
   pendingData,
   recipientPubkey,
+  showRecipientAvatar = true,
   isLoading,
 }: HistoryEntryHeaderProps) {
-  const { metadata: recipientMetadata } = useNostrProfileMetadata(recipientPubkey);
+  const avatarRecipientPubkey = showRecipientAvatar ? recipientPubkey : undefined;
+  const { metadata: recipientMetadata } = useNostrProfileMetadata(avatarRecipientPubkey);
   const [foreground, surface, background, danger, success] = useThemeColor([
     'foreground',
     'surface',
@@ -68,14 +72,14 @@ export function HistoryEntryHeader({
   const iconOverlaySize = 24;
 
   const renderIcon = () => {
-    if (recipientPubkey) {
+    if (avatarRecipientPubkey) {
       const recipientName = recipientMetadata?.displayName ?? recipientMetadata?.name;
       return (
         <View className="relative">
           <Avatar
             state={recipientMetadata?.picture ? 'image' : 'fallback'}
             picture={recipientMetadata?.picture}
-            seed={recipientPubkey}
+            seed={avatarRecipientPubkey}
             size={avatarSize}
             name={recipientName}
           />

@@ -14,6 +14,7 @@ import type {
   FlowStep,
   PaymentMachine,
   ProcessResult,
+  RecipientProfile,
   ScanOptions,
   ScanSourceResult,
   StepDataMap,
@@ -218,6 +219,144 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     };
     listeners.forEach((fn) => fn());
   };
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Recipient identity resolvers (fire-and-forget)
+  //
+  // Stage 1: meltTarget → Nostr pubkey via `operations.resolveRecipientPubkey`
+  //          (default = NIP-05 HTTP fetch, see recipient.ts).
+  // Stage 2: pubkey → kind-0 profile via `operations.resolveRecipientProfile`
+  //          (wallet-supplied; NDK / cache integration lives in the app).
+  //
+  // Both stages run as background side effects from `send()` once the
+  // corresponding input lands on `flowCtx`. Stale guards re-check the
+  // current ctx values before applying, so a meltTarget swap mid-flight
+  // never leaks an out-of-date pubkey/profile.
+  //
+  // `flowCtx` and `stepData` are REPLACED (not mutated in place) when the
+  // resolver applies new fields. React consumers subscribe via
+  // `useSyncExternalStore(machine.subscribe, machine.getContext, …)`, and
+  // that hook diffs snapshots with `Object.is` — in-place mutation keeps
+  // the same reference and the subscriber skips the re-render, which is
+  // what made the scan-LA flow appear broken while chat-launched flows
+  // (where `recipientPubkey` is seeded into ctx at flow start) still
+  // worked.
+  // ───────────────────────────────────────────────────────────────────────
+
+  function mirrorRecipientOntoStepData(): void {
+    // Reflect the latest `flowCtx.recipientPubkey/Profile` onto whichever
+    // step is currently active by REPLACING the `stepData` reference (so
+    // any downstream consumer that diffs by identity sees a change). Each
+    // affected step shape already declares the optional fields (see
+    // `StepDataMap` in types.ts). Step shapes that don't carry recipient
+    // identity (idle, confirmSend, mintQuoteCreated, etc.) are no-ops.
+    const pk = flowCtx.recipientPubkey;
+    const profile = flowCtx.recipientProfile;
+    switch (step) {
+      case 'enterAmount': {
+        const d = stepData as StepDataMap['enterAmount'];
+        stepData = {
+          ...d,
+          constraints: {
+            ...d.constraints,
+            ...(pk ? { recipientPubkey: pk } : {}),
+            ...(profile ? { recipientProfile: profile } : {}),
+          },
+        } as StepDataMap[FlowStep];
+        return;
+      }
+      case 'selectMint':
+      case 'chooseProofs':
+      case 'sendComplete':
+      case 'navigateToMeltPreview':
+      case 'navigateToPaymentRequest': {
+        const d = stepData as Record<string, unknown>;
+        stepData = {
+          ...d,
+          ...(pk ? { recipientPubkey: pk } : {}),
+          ...(profile ? { recipientProfile: profile } : {}),
+        } as StepDataMap[FlowStep];
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  function maybeResolveRecipient(
+    prevMeltTarget: string | undefined,
+    prevPubkey: string | undefined
+  ): void {
+    // Stage 1: meltTarget appeared (or changed) and no pubkey yet.
+    const target = flowCtx.meltTarget;
+    logger.info('machine.recipient.maybeResolve', {
+      hasTarget: !!target,
+      targetChanged: target !== prevMeltTarget,
+      hasPubkey: !!flowCtx.recipientPubkey,
+      hasResolvePubkey: !!operations?.resolveRecipientPubkey,
+      hasResolveProfile: !!operations?.resolveRecipientProfile,
+    });
+    if (
+      target &&
+      target !== prevMeltTarget &&
+      !flowCtx.recipientPubkey &&
+      operations?.resolveRecipientPubkey
+    ) {
+      logger.info('machine.recipient.stage1.start', {
+        targetPreview: target.slice(0, 30),
+      });
+      void (async () => {
+        try {
+          const pk = await operations!.resolveRecipientPubkey!(target);
+          logger.info('machine.recipient.stage1.resolved', { hasPk: !!pk });
+          if (!pk) return;
+          if (flowCtx.meltTarget !== target) return; // stale guard
+          if (flowCtx.recipientPubkey) return; // already set
+          // Replace flowCtx so useSyncExternalStore subscribers see a fresh
+          // reference. Mutating in place keeps the same closure-bound ref
+          // and the snapshot diff is a no-op.
+          flowCtx = { ...flowCtx, recipientPubkey: pk };
+          mirrorRecipientOntoStepData();
+          notify();
+          // Chain into stage 2 immediately so the profile resolves without
+          // waiting for the next transition.
+          maybeResolveRecipient(target, undefined);
+        } catch (err) {
+          logger.warn('machine.recipient.resolvePubkey.threw', { error: errField(err) });
+        }
+      })();
+    }
+
+    // Stage 2: pubkey appeared (or changed) and no profile yet.
+    const pubkey = flowCtx.recipientPubkey;
+    if (
+      pubkey &&
+      pubkey !== prevPubkey &&
+      !flowCtx.recipientProfile &&
+      operations?.resolveRecipientProfile
+    ) {
+      logger.info('machine.recipient.stage2.start', {
+        pubkeyPreview: pubkey.slice(0, 8),
+      });
+      void (async () => {
+        try {
+          const profile = await operations!.resolveRecipientProfile!(pubkey);
+          logger.info('machine.recipient.stage2.resolved', {
+            hasProfile: !!profile,
+            displayName: profile?.displayName ?? null,
+          });
+          if (!profile) return;
+          if (flowCtx.recipientPubkey !== pubkey) return; // stale guard
+          if (flowCtx.recipientProfile) return;
+          flowCtx = { ...flowCtx, recipientProfile: profile };
+          mirrorRecipientOntoStepData();
+          notify();
+        } catch (err) {
+          logger.warn('machine.recipient.resolveProfile.threw', { error: errField(err) });
+        }
+      })();
+    }
+  }
 
   async function dispatchHandler(targetStep: FlowStep, data: StepDataMap[FlowStep]): Promise<void> {
     const handler = (handlers as Record<string, ((d: any) => void | Promise<void>) | undefined>)[
@@ -538,6 +677,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         : undefined;
 
     const prevStep = step;
+    // Capture recipient-identity ctx snapshot *before* the transition so the
+    // post-transition resolver only fires when something actually changed.
+    const prevMeltTarget = flowCtx.meltTarget;
+    const prevRecipientPubkey = flowCtx.recipientPubkey;
     const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit, offline);
 
     flowCtx = result.context;
@@ -545,6 +688,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     if (step !== prevStep) {
       logger.info('machine.transition', { from: prevStep, to: step, eventType: event.type });
     }
+
+    // Kick off NIP-05 + kind-0 resolution as a background side effect when
+    // meltTarget/recipientPubkey first appear on ctx. Best-effort: failure
+    // returns null silently, so the flow never blocks on identity lookup.
+    maybeResolveRecipient(prevMeltTarget, prevRecipientPubkey);
 
     // Save BIP321 original options for fallback (first selection only).
     if (preTransitionOptions && preTransitionOptions.length > 1) {
@@ -691,6 +839,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             setStep('sendComplete', {
               historyEntry: nfcSendResult.historyEntry,
               recipientPubkey: flowCtx.recipientPubkey,
+              recipientProfile: flowCtx.recipientProfile,
             });
           } catch (err) {
             // Write-back or send failed — rollback if token was created
@@ -738,6 +887,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           setStep('sendComplete', {
             historyEntry: result.historyEntry,
             recipientPubkey: flowCtx.recipientPubkey,
+            recipientProfile: flowCtx.recipientProfile,
           });
 
           const parsed = parseHistoryEntryOnce(result.historyEntry);
@@ -773,6 +923,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                   historyEntry: result.historyEntry,
                   mintWasOffline: true,
                   recipientPubkey: flowCtx.recipientPubkey,
+                  recipientProfile: flowCtx.recipientProfile,
                 });
 
                 const parsed = parseHistoryEntryOnce(result.historyEntry);
@@ -1101,6 +1252,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       offline?: boolean;
       meltTarget?: string;
       recipientPubkey?: string;
+      recipientProfile?: RecipientProfile;
     }
   ) =>
     send({
@@ -1111,6 +1263,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       offline: opts?.offline,
       meltTarget: opts?.meltTarget,
       recipientPubkey: opts?.recipientPubkey,
+      recipientProfile: opts?.recipientProfile,
     });
 
   const chooseOption = (option: PaymentOption) => send({ type: 'OPTION_CHOSEN', option });
@@ -1121,12 +1274,14 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     reset?: boolean;
     meltTarget?: string;
     recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
   }) => {
     if (opts?.reset) resetInternal();
     return send({
       type: 'START_SEND_ECASH',
       ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
       ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
+      ...(opts?.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
     });
   };
 

@@ -17,8 +17,10 @@ import { useHandleCameraPermission } from '@/features/camera/hooks/useHandleCame
 import { URDecoder } from '@gandlaf21/bc-ur';
 
 import { useManager } from '@cashu/coco-react';
+import { useNDK } from '@nostr-dev-kit/ndk-mobile';
+import { Metadata } from 'nostr-tools/kinds';
 
-import type { MachineOperations, NavigationCallbacks } from 'coco-payment-ux';
+import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'coco-payment-ux';
 import { createCocoPaymentUX, withTimeout } from 'coco-payment-ux';
 import {
   CocoPaymentUXProvider as PaymentUXProviderBase,
@@ -26,8 +28,11 @@ import {
 } from 'coco-payment-ux/react';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog } from '@/shared/lib/logger';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
+import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import {
   createSovranExecuteMintQuote,
   createSovranExecuteReceive,
@@ -61,6 +66,11 @@ const FIRST_OPEN_DEADLINE_MS = 3000;
 export function SovranPaymentUXProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
   const { keys } = useNostrKeysContext();
+  const { ndk } = useNDK();
+  // NDK can change identity across renders (login/logout); the operations
+  // closure below must always see the latest instance, so use a ref instead
+  // of capturing `ndk` directly.
+  const ndkRef = useLatestRef(ndk);
   const { isOffline: contextOffline } = useOfflineStatus();
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || contextOffline;
@@ -210,8 +220,45 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
         ...instance.operations,
         executeReceive: createSovranExecuteReceive(() => manager),
         executeMintQuote: createSovranExecuteMintQuote(() => manager),
+        // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
+        // Stage 1 (NIP-05 → pubkey) is shipped by coco-payment-ux's default
+        // operation set; this one has no default because NDK / cache wiring
+        // is app-specific. Returning null on any failure is the contract:
+        // the machine's resolver treats it as best-effort cosmetic data and
+        // does not block the flow.
+        resolveRecipientProfile: async (pubkey, signal): Promise<RecipientProfile | null> => {
+          const currentNdk = ndkRef.current;
+          if (!currentNdk) return null;
+          if (signal?.aborted) return null;
+          try {
+            const event = await currentNdk.fetchEvent({
+              kinds: [Metadata as number],
+              authors: [pubkey],
+              limit: 1,
+            });
+            if (!event) return null;
+            const parsed = parseRawMetadata(event.content);
+            if (!parsed) return null;
+            // Warm the shared SWR cache so other surfaces (ContactRow,
+            // DmChatHeader, profile screens, HistoryEntryHeader) hit warm
+            // cache for this pubkey on next render without re-fetching.
+            useNostrMetadataCache.getState().setProfile(pubkey, parsed);
+            const displayName = resolveIdentityName({ pubkey, nostrProfile: parsed });
+            if (!displayName) return null;
+            return {
+              displayName,
+              avatarUrl: parsed.picture ?? null,
+              nip05: parsed.nip05 ?? null,
+            };
+          } catch (err) {
+            paymentLog.warn('recipient.resolveProfile.threw', {
+              error: err instanceof Error ? err.message : String(err),
+            });
+            return null;
+          }
+        },
       }) as MachineOperations,
-    [instance, manager]
+    [instance, manager, ndkRef]
   );
 
   const actions = useMemo(() => createSovranScreenActionHandlers(), []);
@@ -220,10 +267,10 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
     () => ({
       scanQr: ({ unit, context }) => {
         void (async () => {
+          const granted = await requestCameraPermission();
+          paymentLog.info(`${context}.scan.permission`, { granted });
+          if (!granted) return;
           if (context === 'receive') {
-            const granted = await requestCameraPermission();
-            paymentLog.info('receive.scan.permission', { granted });
-            if (!granted) return;
             router.navigate({
               pathname: '/(receive-flow)/camera',
               params: { unit },

@@ -491,7 +491,35 @@ export function createDefaultScreenActionHandlers(
         // "Send Money" DM path where both ecash and lightning are available).
         const variantId = typeof ctx.variantId === 'string' ? ctx.variantId : undefined;
         const meltTargetFromEntry = typeof entry.meltTarget === 'string' ? entry.meltTarget : '';
-        const recipientPubkey = getString(entry, 'recipientPubkey');
+        // Identity fields are accepted from two sources, in priority order:
+        //   1. Per-call `execute(params)` — the amount screen passes whatever
+        //      it has locally resolved at the moment of submit (NIP-05 +
+        //      kind-0 from its screen-level fallback). One-shot, no entry
+        //      mutation, no reactive state churn.
+        //   2. The entry itself — chat-launched flows seed it at flow start.
+        const ctxRecipientPubkey =
+          typeof (ctx as Record<string, unknown>).recipientPubkey === 'string'
+            ? ((ctx as Record<string, unknown>).recipientPubkey as string)
+            : undefined;
+        const recipientPubkey = ctxRecipientPubkey ?? getString(entry, 'recipientPubkey');
+        const ctxRecipientProfile =
+          (ctx as Record<string, unknown>).recipientProfile &&
+          typeof (ctx as Record<string, unknown>).recipientProfile === 'object'
+            ? ((ctx as Record<string, unknown>).recipientProfile as {
+                displayName: string;
+                avatarUrl: string | null;
+                nip05: string | null;
+              })
+            : undefined;
+        const entryRecipientProfile =
+          entry.recipientProfile && typeof entry.recipientProfile === 'object'
+            ? (entry.recipientProfile as {
+                displayName: string;
+                avatarUrl: string | null;
+                nip05: string | null;
+              })
+            : undefined;
+        const recipientProfile = ctxRecipientProfile ?? entryRecipientProfile;
 
         let destination: Destination = entryDestination;
         let meltTarget: string | undefined;
@@ -527,12 +555,14 @@ export function createDefaultScreenActionHandlers(
           variantId: variantId ?? null,
           meltTargetPreview: meltTarget ? meltTarget.slice(0, 30) + '…' : null,
           recipientPubkeyPresent: !!recipientPubkey,
+          recipientProfilePresent: !!recipientProfile,
         });
         try {
           await machine.enterAmount(effectiveSat, mintUrl, {
             destination,
             meltTarget,
             recipientPubkey,
+            recipientProfile,
           });
           logger.info('screenAction.amountEntry.next.resolved');
         } catch (err) {

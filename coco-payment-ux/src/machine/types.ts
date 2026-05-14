@@ -38,6 +38,20 @@ export type FlowStep =
 export type Destination = AmountEntryConstraints['destination'];
 
 // ---------------------------------------------------------------------------
+// Recipient identity — populated by `operations.resolveRecipientPubkey`
+// (Lightning Address → Nostr hex pubkey via NIP-05) and
+// `operations.resolveRecipientProfile` (pubkey → Nostr kind-0 metadata).
+// Both run as fire-and-forget side effects from `send()` so they never
+// block the flow; consumer UIs read whichever fields have landed.
+// ---------------------------------------------------------------------------
+
+export interface RecipientProfile {
+  displayName: string;
+  avatarUrl: string | null;
+  nip05: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Step Data — typed payload delivered to each handler
 // ---------------------------------------------------------------------------
 
@@ -64,6 +78,7 @@ export interface StepDataMap {
       paymentRequest?: string;
       meltTarget?: string;
       recipientPubkey?: string;
+      recipientProfile?: RecipientProfile;
     };
   };
   selectMint: {
@@ -74,6 +89,7 @@ export interface StepDataMap {
     paymentRequest?: string;
     meltTarget?: string;
     recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
     destination?: Destination;
     /** Pre-computed mint list items (populated when machine operations are provided). */
     mintListItems?: MintListItem[];
@@ -86,6 +102,7 @@ export interface StepDataMap {
     paymentRequest?: string;
     meltTarget?: string;
     recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
     unit: string;
     proofAmounts: number[];
     suggestions?: {
@@ -99,6 +116,7 @@ export interface StepDataMap {
     historyEntry: string;
     mintWasOffline?: boolean;
     recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
   };
   navigateToMeltPreview: {
     mintUrl: string;
@@ -106,6 +124,7 @@ export interface StepDataMap {
     unit: string;
     amount: number;
     recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
     /** Populated after a successful melt so the screen can link to the new transaction. */
     historyEntry?: string;
   };
@@ -115,6 +134,7 @@ export interface StepDataMap {
     amount: number;
     unit: string;
     recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
     /** Populated after a successful payment request send. */
     historyEntry?: string;
   };
@@ -175,8 +195,18 @@ export interface FlowContext {
    * chat surface. Set on AMOUNT_ENTERED (or on the initial `enterAmount`
    * constraints) and propagated to terminal navigation step data so consumer
    * UIs can render recipient identity on payment-confirmation screens.
+   *
+   * Also populated automatically from `ctx.meltTarget` via
+   * `operations.resolveRecipientPubkey` (NIP-05) when present.
    */
   recipientPubkey?: string;
+  /**
+   * Nostr kind-0 profile metadata for `recipientPubkey`. Populated by
+   * `operations.resolveRecipientProfile` once a pubkey is known. Used by
+   * consumer UIs to render "Pay <name>" + avatar on the amount-entry and
+   * melt-preview headers without each screen re-running the fetch.
+   */
+  recipientProfile?: RecipientProfile;
   supportedMintUrls?: string[];
   /**
    * When true, force the proof selector for ecash sends instead of attempting
@@ -283,6 +313,8 @@ export type FlowEvent =
       meltTarget?: string;
       /** See `FlowContext.recipientPubkey` — chat-launched flows seed this. */
       recipientPubkey?: string;
+      /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
+      recipientProfile?: RecipientProfile;
     }
   | {
       type: 'MINT_SELECTED';
@@ -306,6 +338,8 @@ export type FlowEvent =
       meltTarget?: string;
       /** See `FlowContext.recipientPubkey` — chat-launched flows seed this. */
       recipientPubkey?: string;
+      /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
+      recipientProfile?: RecipientProfile;
     }
   | { type: 'START_RECEIVE_LIGHTNING' }
   | { type: 'START_RECEIVE' }
@@ -708,6 +742,32 @@ export interface MachineOperations {
    * NIP-17 / NIP-44 implementation a consumer concern.
    */
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+
+  /**
+   * Resolve a melt target (Lightning Address / lud16) to a Nostr hex pubkey
+   * via NIP-05. Best-effort: returns `null` on any failure. Fired
+   * automatically as a side effect when `ctx.meltTarget` is set and
+   * `ctx.recipientPubkey` is still empty. The default implementation is
+   * shipped by this package (`recipient.ts`); wallets only need to override
+   * to swap in a custom fetch (e.g. Tor routing).
+   */
+  resolveRecipientPubkey?: (
+    meltTarget: string,
+    signal?: AbortSignal
+  ) => Promise<string | null>;
+
+  /**
+   * Resolve a Nostr hex pubkey to a profile (kind-0 metadata). Best-effort:
+   * returns `null` on any failure. Fired automatically as a side effect
+   * when `ctx.recipientPubkey` is set and `ctx.recipientProfile` is still
+   * empty. No default — wallets supply their own NDK / cache integration
+   * (long-running Nostr subscriptions / cache writes don't belong in this
+   * package).
+   */
+  resolveRecipientProfile?: (
+    pubkey: string,
+    signal?: AbortSignal
+  ) => Promise<RecipientProfile | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -834,6 +894,7 @@ export interface PaymentMachine {
       offline?: boolean;
       meltTarget?: string;
       recipientPubkey?: string;
+      recipientProfile?: RecipientProfile;
     }
   ) => Promise<void>;
   /** User selected one of multiple payment options (e.g. from chooseOption step). */
@@ -856,6 +917,7 @@ export interface PaymentMachine {
     reset?: boolean;
     meltTarget?: string;
     recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
   }) => Promise<void>;
   /** Start a receive lightning flow. Opens amount screen for mint quote. */
   startReceiveLightning: () => Promise<void>;

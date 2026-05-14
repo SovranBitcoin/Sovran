@@ -6,7 +6,7 @@ import { selectMint, getValidMintCandidates } from '../mint-selection';
 import { isValidSatAmount } from '../guards';
 import type { Detectors, WalletContext } from '../types';
 import { resolveNext, type StepResult } from './resolveNext';
-import type { FlowContext, FlowEvent, FlowStep } from './types';
+import type { FlowContext, FlowEvent, FlowStep, RecipientProfile } from './types';
 
 // ---------------------------------------------------------------------------
 // Transition result — new step + merged context
@@ -164,6 +164,7 @@ function handleAmountEntered(
         offline: event.offline,
         meltTarget: event.meltTarget,
         recipientPubkey: event.recipientPubkey,
+        recipientProfile: event.recipientProfile,
       }
     : {
         ...currentCtx,
@@ -173,6 +174,7 @@ function handleAmountEntered(
         offline: event.offline ?? currentCtx.offline,
         meltTarget: event.meltTarget ?? currentCtx.meltTarget,
         recipientPubkey: event.recipientPubkey ?? currentCtx.recipientPubkey,
+        recipientProfile: event.recipientProfile ?? currentCtx.recipientProfile,
       };
 
   if (!ctx.intent) {
@@ -245,6 +247,7 @@ function handleProofsChosen(
         unit: ctx.unit,
         amount: event.amount,
         recipientPubkey: ctx.recipientPubkey,
+        recipientProfile: ctx.recipientProfile,
       },
     };
   }
@@ -259,6 +262,7 @@ function handleProofsChosen(
         unit: ctx.unit,
         amount: event.amount,
         recipientPubkey: ctx.recipientPubkey,
+        recipientProfile: ctx.recipientProfile,
       },
     };
   }
@@ -319,13 +323,14 @@ function handleStartSendEcash(
   walletCtx: WalletContext,
   unit: string,
   offline?: boolean,
-  opts?: { meltTarget?: string; recipientPubkey?: string }
+  opts?: { meltTarget?: string; recipientPubkey?: string; recipientProfile?: RecipientProfile }
 ): TransitionResult {
   logger.info('transitions.startSendEcash', {
     unit,
     offline: offline ?? false,
     hasMeltTarget: !!opts?.meltTarget,
     recipientPubkeyPresent: !!opts?.recipientPubkey,
+    recipientProfilePresent: !!opts?.recipientProfile,
   });
   const ctx: FlowContext = {
     unit,
@@ -333,6 +338,7 @@ function handleStartSendEcash(
     offline,
     ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
     ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
+    ...(opts?.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
   };
   const selection = selectMint(walletCtx);
   logger.info('transitions.mintSelection.result', {
@@ -353,6 +359,7 @@ function handleStartSendEcash(
             destination: 'sendEcash',
             ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
             ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
+            ...(opts?.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
           },
         },
       };
@@ -366,6 +373,7 @@ function handleStartSendEcash(
           destination: 'sendEcash',
           ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
           ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
+          ...(opts?.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
         },
       };
     case 'noValidMint':
@@ -464,6 +472,7 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
             destination,
             meltTarget: ctx.meltTarget,
             recipientPubkey: ctx.recipientPubkey,
+            recipientProfile: ctx.recipientProfile,
           },
         },
       };
@@ -480,6 +489,7 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
           unit,
           amount,
           recipientPubkey: ctx.recipientPubkey,
+          recipientProfile: ctx.recipientProfile,
         },
       };
     }
@@ -498,6 +508,7 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
           paymentRequest: ctx.paymentRequest,
           meltTarget: ctx.meltTarget,
           recipientPubkey: ctx.recipientPubkey,
+          recipientProfile: ctx.recipientProfile,
         },
       },
     };
@@ -550,6 +561,7 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
           unit,
           amount,
           recipientPubkey: ctx.recipientPubkey,
+          recipientProfile: ctx.recipientProfile,
         },
       };
     }
@@ -604,6 +616,7 @@ export function transition(
         handleStartSendEcash(walletCtx, unit, offline, {
           ...(event.meltTarget ? { meltTarget: event.meltTarget } : {}),
           ...(event.recipientPubkey ? { recipientPubkey: event.recipientPubkey } : {}),
+          ...(event.recipientProfile ? { recipientProfile: event.recipientProfile } : {}),
         })
       );
     case 'START_RECEIVE_LIGHTNING':

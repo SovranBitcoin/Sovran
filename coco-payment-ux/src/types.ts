@@ -126,6 +126,12 @@ export interface AmountEntryConstraints {
    * `navigateToPaymentRequest` / `sendComplete` step data.
    */
   recipientPubkey?: string;
+  /**
+   * Pre-resolved Nostr kind-0 profile for `recipientPubkey`. When the machine
+   * has fetched it via `operations.resolveRecipientProfile`, consumer UIs can
+   * render avatar + display name without re-fetching.
+   */
+  recipientProfile?: import('./machine/types').RecipientProfile;
   destination: 'paymentRequest' | 'meltQuote' | 'sendEcash' | 'mintQuote';
 }
 

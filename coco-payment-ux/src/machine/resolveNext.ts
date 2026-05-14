@@ -138,7 +138,7 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
     mintUrl: ctx.mintUrl,
     amount: ctx.amount,
   });
-  const { mintUrl, amount, unit, meltTarget, recipientPubkey } = ctx;
+  const { mintUrl, amount, unit, meltTarget, recipientPubkey, recipientProfile } = ctx;
 
   switch (destination) {
     case 'mintQuote':
@@ -155,6 +155,7 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
           unit,
           amount: amount!,
           recipientPubkey,
+          recipientProfile,
         },
       };
     case 'paymentRequest':
@@ -166,6 +167,7 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
           amount: amount!,
           unit,
           recipientPubkey,
+          recipientProfile,
         },
       };
     case 'sendEcash':
@@ -246,6 +248,14 @@ export function resolveNext(
           supportedMintUrls,
           paymentRequest: ctx.paymentRequest,
           meltTarget: ctx.meltTarget,
+          // Carry recipient identity onto the amount-entry constraints so the
+          // scan-LA flow (EXECUTE → resolveNext → enterAmount) reaches the
+          // amount screen with the same fields the chat-launched flow gets
+          // via handleStartSendEcash. Without this, the navigation handler's
+          // entry serialization loses pubkey/profile and AmountFlowScreen
+          // never shows the recipient header on first paint.
+          recipientPubkey: ctx.recipientPubkey,
+          recipientProfile: ctx.recipientProfile,
         },
       },
       contextPatch: { destination },

@@ -14,6 +14,8 @@
 import React from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
+import { Stack } from 'expo-router';
+
 import type { MeltHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
@@ -36,6 +38,9 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
+import { resolveIdentityName } from '@/shared/lib/identity';
+import { RecipientHeader } from '../components/RecipientHeader';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 
@@ -58,6 +63,45 @@ export function MeltQuoteScreen({
   );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
+
+  // Recipient identity for the navigation header. The machine threads both
+  // pubkey (NIP-05) and profile (kind-0) through `entry.metadata` via
+  // AmountFlowScreen → `actions.next.execute(...)` → `machine.enterAmount`
+  // → `sovranPaymentConfig.navigateToMeltPreview`. The profile is flattened
+  // into individual string keys at write time (`MeltHistoryEntry.metadata`
+  // is typed `Record<string, string>` upstream), so the read-side picks
+  // `recipientDisplayName` / `recipientAvatarUrl` directly.
+  //
+  // `useNostrProfileMetadata(pubkey)` is kept as a single warm-cache
+  // fallback for the race-loss case where the entry has `recipientPubkey`
+  // but `recipientDisplayName` wasn't populated yet at the moment of
+  // navigation. On a warm cache it returns synchronously on first render
+  // — no flicker; on a cold cache the layout default "Send Lightning"
+  // stays visible until kind-0 lands (documented trade-off).
+  const recipientPubkey =
+    typeof entry?.metadata?.recipientPubkey === 'string'
+      ? entry.metadata.recipientPubkey
+      : undefined;
+  const entryDisplayName =
+    typeof entry?.metadata?.recipientDisplayName === 'string'
+      ? entry.metadata.recipientDisplayName
+      : null;
+  const entryAvatarUrl =
+    typeof entry?.metadata?.recipientAvatarUrl === 'string'
+      ? entry.metadata.recipientAvatarUrl
+      : null;
+  log.debug('send.melt_quote.recipient_metadata', {
+    metadataKeys: entry?.metadata ? Object.keys(entry.metadata as Record<string, unknown>) : null,
+    recipientPubkeyPresent: !!recipientPubkey,
+    entryDisplayName,
+    entryAvatarUrlPresent: !!entryAvatarUrl,
+  });
+  const { metadata: liveNostrMetadata } = useNostrProfileMetadata(recipientPubkey);
+  const fallbackDisplayName = liveNostrMetadata
+    ? resolveIdentityName({ pubkey: recipientPubkey ?? '', nostrProfile: liveNostrMetadata })
+    : null;
+  const headerDisplayName = entryDisplayName ?? fallbackDisplayName ?? null;
+  const headerAvatarUrl = entryAvatarUrl ?? liveNostrMetadata?.picture ?? null;
 
   if (error) {
     log.warn('send.melt_quote.error', { error });
@@ -120,16 +164,27 @@ export function MeltQuoteScreen({
 
   return (
     <Screen name="MeltQuoteScreen" contentPadding={0} footer={bottomButtons}>
+      {recipientPubkey && headerDisplayName ? (
+        // Override the layout's static "Send Lightning" title with the
+        // resolved recipient identity. Expo Router lets a screen body
+        // render `<Stack.Screen options={...} />` to update its own
+        // active-route options without re-declaring at the layout level.
+        // See `AmountFlowScreen.tsx` for the same pattern.
+        <Stack.Screen
+          options={{
+            headerTitle: () => (
+              <RecipientHeader
+                pubkey={recipientPubkey}
+                displayName={headerDisplayName}
+                avatarUrl={headerAvatarUrl}
+              />
+            ),
+          }}
+        />
+      ) : null}
       <View testID={`melt-quote-id-${entry.id}`}>
         <VStack gap={12}>
-          <HistoryEntryHeader
-            historyEntry={entry}
-            recipientPubkey={
-              typeof entry.metadata?.recipientPubkey === 'string'
-                ? entry.metadata.recipientPubkey
-                : undefined
-            }
-          />
+          <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
 
           {entry.state === 'PAID' && <TransactionLocationSection transactionId={entry.id} />}
 

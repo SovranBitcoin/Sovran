@@ -26,6 +26,7 @@ import type { MintCatalogEntry, MintListItem, MintReviewInfo } from '../types';
 import { defaultDetectors } from '../detectors';
 import { errField, logger } from '../logger';
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
+import { resolveRecipientPubkey } from '../recipient';
 import { parseHistoryEntryOnce } from './historyEntry';
 
 // MintInfo is the cashu-ts GetInfoResponse — coco-core re-derives but does
@@ -870,6 +871,15 @@ export function createDefaultOperations(
         transport: nostrTransport ? 'nostr' : 'http',
       });
       return { historyEntry: JSON.stringify(enriched) };
+    },
+
+    // Lightning Address → Nostr hex pubkey via NIP-05. Best-effort. The
+    // machine fires this automatically once `ctx.meltTarget` is set; if the
+    // wallet supplies its own override (e.g. Tor-routed fetch) this default
+    // is replaced. See `recipient.ts` for the implementation and failure
+    // semantics — every error path returns `null`.
+    resolveRecipientPubkey: async (meltTarget, signal) => {
+      return resolveRecipientPubkey(meltTarget, { signal });
     },
   };
 }

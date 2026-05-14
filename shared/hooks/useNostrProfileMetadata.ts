@@ -59,7 +59,15 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
   return { metadata, isLoading };
 }
 
-function parseRawMetadata(content: string): Omit<NostrProfileMetadata, 'fetchedAt'> | null {
+/**
+ * Parse a raw kind-0 `content` JSON string into the cache's profile shape.
+ * Exported so other surfaces (e.g. coco-payment-ux's `resolveRecipientProfile`
+ * operation in `features/send/providers/CocoPaymentUX.tsx`) reuse the exact
+ * same Zod schema + field-mapping as the hook — keeps `display_name` /
+ * `displayName` aliasing and the rest of the metadata interpretation in one
+ * place.
+ */
+export function parseRawMetadata(content: string): Omit<NostrProfileMetadata, 'fetchedAt'> | null {
   let json: unknown;
   try {
     json = JSON.parse(content);

@@ -108,7 +108,7 @@ export function ReceiveTokenScreen({
     <Screen name="ReceiveTokenScreen" contentPadding={0} footer={bottomButtons}>
       <View testID={`receive-token-id-${entry.id}`}>
         <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} />
+          <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
 
           {isRedeemed && <TransactionLocationSection transactionId={entry.id} />}
 
