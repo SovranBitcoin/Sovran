@@ -41,6 +41,7 @@ final class BitChatBLEBridge: NSObject {
     private var bleService: BLEService?
     private var module: BitChatModule?
     private var isRunning = false
+    private var activeProfileScope: String?
     private var lastCBState: CBManagerState = .unknown
 
     /// In-memory mirror of the persisted DM-peer summaries. Mutated only on the
@@ -51,24 +52,37 @@ final class BitChatBLEBridge: NSObject {
 
     private override init() {
         super.init()
-        loadDmSummaries()
     }
 
     // MARK: - DM peer summary persistence
 
-    private func loadDmSummaries() {
-        guard let data = UserDefaults.standard.data(forKey: DM_SUMMARIES_DEFAULTS_KEY),
+    private func dmSummariesKey(for scope: String) -> String {
+        "\(DM_SUMMARIES_DEFAULTS_KEY).\(scope)"
+    }
+
+    private func loadDmSummaries(for scope: String) {
+        guard let data = UserDefaults.standard.data(forKey: dmSummariesKey(for: scope)),
               let decoded = try? JSONDecoder().decode([String: DmPeerSummary].self, from: data) else {
+            dmSummaries = [:]
             return
         }
         dmSummaries = decoded
     }
 
-    private func persistDmSummaries() {
+    private func loadDmSummariesSnapshot(for scope: String) -> [String: DmPeerSummary] {
+        guard let data = UserDefaults.standard.data(forKey: dmSummariesKey(for: scope)),
+              let decoded = try? JSONDecoder().decode([String: DmPeerSummary].self, from: data) else {
+            return [:]
+        }
+        return decoded
+    }
+
+    private func persistDmSummaries(for scope: String) {
         let snapshot = dmSummaries
+        let key = dmSummariesKey(for: scope)
         dmSummariesQueue.async {
             guard let encoded = try? JSONEncoder().encode(snapshot) else { return }
-            UserDefaults.standard.set(encoded, forKey: DM_SUMMARIES_DEFAULTS_KEY)
+            UserDefaults.standard.set(encoded, forKey: key)
         }
     }
 
@@ -79,6 +93,7 @@ final class BitChatBLEBridge: NSObject {
     /// as either direction flows.
     @MainActor
     func recordDmPeer(peerID peerIDStr: String, nickname: String?, timestampMs: Double) {
+        guard let activeProfileScope else { return }
         let existing = dmSummaries[peerIDStr]
         // Keep the longest non-empty nickname we've seen — incoming events may
         // carry a hex-prefix fallback while a later announce delivers the real
@@ -99,14 +114,15 @@ final class BitChatBLEBridge: NSObject {
             nickname: nextNickname,
             lastTimestamp: nextTimestamp
         )
-        persistDmSummaries()
+        persistDmSummaries(for: activeProfileScope)
     }
 
     /// Returns a snapshot of all known DM-peer summaries, sorted by recency.
     /// Merges any in-memory `PrivateChatManager` peers not yet persisted
     /// (e.g. an inbound message that arrived before our delegate hop).
-    func getDmHistory() -> [[String: Any]] {
-        let summaries = dmSummaries
+    func getDmHistory(profileScope: String) -> [[String: Any]] {
+        let scope = BitchatProfileScope.storageSuffix(for: profileScope)
+        let summaries = activeProfileScope == scope ? dmSummaries : loadDmSummariesSnapshot(for: scope)
         return summaries.values
             .sorted { $0.lastTimestamp > $1.lastTimestamp }
             .map { summary in
@@ -122,11 +138,20 @@ final class BitChatBLEBridge: NSObject {
         self.module = module
     }
 
-    func start(nickname: String) {
-        guard !isRunning else { return }
+    func start(nickname: String, profileScope: String) {
+        let scope = BitchatProfileScope.storageSuffix(for: profileScope)
+        if isRunning, activeProfileScope == scope {
+            bleService?.setNickname(nickname)
+            return
+        }
+        if isRunning {
+            stop()
+        }
         isRunning = true
+        activeProfileScope = scope
+        loadDmSummaries(for: scope)
 
-        let keychain = KeychainManager()
+        let keychain = ProfileScopedBitchatKeychain(profileScope: profileScope)
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
@@ -145,6 +170,8 @@ final class BitChatBLEBridge: NSObject {
         bleService?.stopServices()
         bleService = nil
         isRunning = false
+        activeProfileScope = nil
+        dmSummaries = [:]
     }
 
     func sendMessage(_ content: String) throws {

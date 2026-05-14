@@ -29,6 +29,7 @@ import {
   addBLEPrivateMessageListener,
   startBLE,
 } from 'bitchat-module';
+import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
 import { bitchatLog, initLog, useInitMount } from '@/shared/lib/logger';
@@ -43,6 +44,7 @@ initLog('Module', 'BitchatBLEProvider loaded');
 export function BitchatBLEProvider({ children }: { children: React.ReactNode }) {
   useInitMount('BitchatBLEProvider');
   const nickname = useBitchatNickname();
+  const profileScope = useBitchatProfileScope();
 
   useEffect(() => {
     let cancelled = false;
@@ -51,10 +53,10 @@ export function BitchatBLEProvider({ children }: { children: React.ReactNode }) 
     // we have something to advertise. A missing nickname still starts BLE
     // (upstream bitchat generates one), but we prefer to avoid the
     // re-announce that happens when nickname changes post-start.
-    if (!nickname) return;
+    if (!nickname || !profileScope) return;
 
     bitchatLog.info('bitchat.provider.ble_start', { hasNickname: !!nickname });
-    startBLE(nickname)
+    startBLE(nickname, profileScope)
       .then(() => {
         if (cancelled) return;
         bitchatLog.info('bitchat.provider.ble_started');
@@ -69,12 +71,12 @@ export function BitchatBLEProvider({ children }: { children: React.ReactNode }) 
       cancelled = true;
       // Deliberately DON'T stopBLE here either. The provider is mounted
       // inside AccountScopedProviders, so it only unmounts on profile
-      // switch — at which point the whole account scope restarts anyway.
-      // Calling stopBLE() during the switch window was causing race
-      // conditions where the new scope re-started BLE before the old
-      // one's stop had settled.
+      // switch. Native `startBLE(nickname, profileScope)` owns the actual
+      // scope transition: a different profileScope stops the old mesh and
+      // recreates it with profile-scoped identity keys/history. Calling an
+      // unconditional stop here would race that explicit handoff.
     };
-  }, [nickname]);
+  }, [nickname, profileScope]);
 
   // App-wide BLE-DM message + delivery-status listeners. Mounted here (not
   // on the DM screen) so:

@@ -35,16 +35,32 @@ The cache lives at the **single fetch wrapper** that everyone calls.
 
 Match the existing pattern. Every cache in this app does the same thing:
 
-| Concern | Pattern |
-|---|---|
-| Storage | Zustand `persist` + `persistConfig({...})` from `shared/lib/persist/persistConfig.ts` |
-| AsyncStorage adapter | bare `AsyncStorage` for **host-scoped** data (mint info, audit), `createProfileScopedStorage()` for **user-scoped** data (kind-0 metadata, NIP-04 plaintext) |
-| Schema | Zod `looseObject` over the persisted shape. Treat opaque blobs as `z.unknown()` and re-cast on read — don't try to validate vendor wire shapes |
-| Read API | sync `getCachedX(key)` → `T \| undefined`, hook `useCachedX(key)` for React |
-| Fetch API | async `getCachedX(fetcher, key)` returning `Promise<T>` with SWR semantics: cached fresh resolves immediately, cached stale resolves with the prior value + kicks off a background refetch, miss awaits |
-| Concurrency | module-level `Map<string, Promise<T>>` for in-flight dedupe |
-| Eviction | LRU at `MAX_ENTRIES * 0.9`, oldest by `fetchedAt` first |
-| TTL | 24h is the default for "stable wire data" (mint info, kind-0 metadata). Shorter only when the source itself rotates often |
+| Concern              | Pattern                                                                                                                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Storage              | Zustand `persist` + `persistConfig({...})` from `shared/lib/persist/persistConfig.ts`                                                                                                                   |
+| AsyncStorage adapter | bare `AsyncStorage` for **host-scoped** data (mint info, audit), `createProfileScopedStorage()` for **user-scoped** data (kind-0 metadata, NIP-04 plaintext)                                            |
+| Schema               | Zod `looseObject` over the persisted shape. Treat opaque blobs as `z.unknown()` and re-cast on read — don't try to validate vendor wire shapes                                                          |
+| Read API             | sync `getCachedX(key)` → `T \| undefined`, hook `useCachedX(key)` for React                                                                                                                             |
+| Fetch API            | async `getCachedX(fetcher, key)` returning `Promise<T>` with SWR semantics: cached fresh resolves immediately, cached stale resolves with the prior value + kicks off a background refetch, miss awaits |
+| Concurrency          | module-level `Map<string, Promise<T>>` for in-flight dedupe                                                                                                                                             |
+| Eviction             | LRU at `MAX_ENTRIES * 0.9`, oldest by `fetchedAt` first                                                                                                                                                 |
+| TTL                  | 24h is the default for "stable wire data" (mint info, kind-0 metadata). Shorter only when the source itself rotates often                                                                               |
+
+## Native module profile scope
+
+Native modules must not use a single `UserDefaults`, keychain, SQLite, or
+in-memory singleton namespace for user-scoped chat/payment data. Pass the
+active profile pubkey (or a stable hash of it) across the JS/native boundary
+and include it in every native storage key and identity seed.
+
+- **Profile-scoped:** DM threads, retry state, peer/contact history, private
+  message cursors, and transport identities that affect which messages are
+  accepted or advertised.
+- **Host-scoped:** public catalog data, static relay lists, cache metadata
+  that is independent of the logged-in profile.
+- If a native singleton stays alive across a React account-scope remount,
+  its `start(..., profileScope)` entrypoint must detect scope changes and
+  recreate the profile-owned native service before accepting new events.
 
 ## Examples in the codebase
 
@@ -60,12 +76,16 @@ Match the existing pattern. Every cache in this app does the same thing:
 - **NIP-17 gift-wrap unwraps** — `shared/lib/nostr/giftWrapCache.ts`.
   Hydrated at NDK init so `useRecentContacts` reads synchronously on
   first render.
+- **BitChat BLE DM state** — `features/bitchat/stores/bitchatDmMessages.ts`
+  uses `createProfileScopedStorage()`, while `BitChatBLEBridge` and
+  `BitChatNostrBridge` receive the active profile scope before reading native
+  DM history or deriving transport identity keys.
 
 ## What's already cached — don't re-cache
 
 - **NDK relay events**: `NDKCacheAdapterSqlite` is wired in
   `shared/providers/NostrNDKProvider.tsx`. Don't add a second event cache.
-  If profiles still feel slow, look at *when* the subscription is created
+  If profiles still feel slow, look at _when_ the subscription is created
   (after render = wait for at least one cache round-trip) or whether the
   consumer is blocking on a peer fetch (e.g. `getMintInfo`).
 - **Coco mint DB**: `manager.mint.getAllTrustedMints()` reads from coco's

@@ -29,8 +29,8 @@ public class BitChatModule: Module {
 
         // --- BLE Mesh ---
 
-        AsyncFunction("startBLE") { (nickname: String) in
-            await BitChatBLEBridge.shared.start(nickname: nickname)
+        AsyncFunction("startBLE") { (nickname: String, profileScope: String) in
+            await BitChatBLEBridge.shared.start(nickname: nickname, profileScope: profileScope)
         }
 
         AsyncFunction("sendBLEMessage") { (content: String) in
@@ -74,8 +74,8 @@ public class BitChatModule: Module {
         /// nickname + last activity timestamp) sorted by recency. Survives app
         /// restarts via UserDefaults — used by the Contacts screen's Recent /
         /// All tabs to surface peers we've DM'd in past sessions.
-        Function("getBLEDmHistory") { () -> [[String: Any]] in
-            return BitChatBLEBridge.shared.getDmHistory()
+        Function("getBLEDmHistory") { (profileScope: String) -> [[String: Any]] in
+            return BitChatBLEBridge.shared.getDmHistory(profileScope: profileScope)
         }
 
         Function("getBLEState") { () -> String in
@@ -84,9 +84,9 @@ public class BitChatModule: Module {
 
         // --- Nostr (upstream bitchat's NostrRelayManager + GeoRelayDirectory + per-geohash identity) ---
 
-        AsyncFunction("startNostr") {
+        AsyncFunction("startNostr") { (profileScope: String) in
             await MainActor.run {
-                BitChatNostrBridge.shared.start()
+                BitChatNostrBridge.shared.start(profileScope: profileScope)
             }
         }
 

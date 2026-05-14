@@ -131,6 +131,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'nostr-social-store',
   'nostr-metadata-cache',
   'theme-store',
+  'bitchat-dm-messages-store',
 ];
 
 /**
@@ -163,6 +164,7 @@ async function rehydrateProfileStores(): Promise<void> {
   const { useNostrSocialStore } = await import('@/shared/stores/profile/nostrSocialStore');
   const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
   const { useThemeStore } = await import('@/shared/stores/profile/themeStore');
+  const { useBitchatDmMessagesStore } = await import('@/features/bitchat/stores/bitchatDmMessages');
 
   // Reset each store to its initial state. Batched to reduce re-render cascade.
   // Skip persist writes so the empty reset state doesn't overwrite
@@ -210,6 +212,7 @@ async function rehydrateProfileStores(): Promise<void> {
         activeAlbumSlug: null,
         unitWallpapers: {},
       });
+      useBitchatDmMessagesStore.setState({ byPeer: {} });
     });
   } finally {
     _skipPersistWrite = false;
@@ -229,6 +232,7 @@ async function rehydrateProfileStores(): Promise<void> {
     useNpcMintStore.persist.rehydrate(),
     useNostrSocialStore.persist.rehydrate(),
     useThemeStore.persist.rehydrate(),
+    useBitchatDmMessagesStore.persist.rehydrate(),
   ]);
 
   log.info('cashu.storage.rehydrated');

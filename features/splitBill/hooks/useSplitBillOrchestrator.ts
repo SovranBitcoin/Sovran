@@ -28,6 +28,7 @@ import { useManager } from '@cashu/coco-react';
 import NDK, { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
 
+import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { mintLocalId } from '@/shared/lib/id';
@@ -253,6 +254,9 @@ export function useSplitBillOrchestrator() {
   const nickname = useBitchatNickname();
   const nicknameRef = useRef(nickname);
   nicknameRef.current = nickname;
+  const bitchatProfileScope = useBitchatProfileScope();
+  const bitchatProfileScopeRef = useRef(bitchatProfileScope);
+  bitchatProfileScopeRef.current = bitchatProfileScope;
 
   // NDK + main Nostr private key — same sources UserMessagesScreen uses
   // for its DM send. Held behind refs so `confirm` / `retryDelivery` can
@@ -509,7 +513,12 @@ export function useSplitBillOrchestrator() {
             // silent drops as well as scrambled bubbles.
             const chunksStartAt = performance.now();
             for (const chunk of chunks) {
-              await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick, mintLocalId('split-bill'));
+              await sendBLEPrivateMessage(
+                p.peerID,
+                chunk,
+                effectiveNick,
+                mintLocalId('split-bill')
+              );
             }
             flow.debug('split_bill.deliver.ble.chunks_sent', {
               participantId: p.id,
@@ -557,8 +566,18 @@ export function useSplitBillOrchestrator() {
       const bleWorker = (async (): Promise<DeliveryOutcome[]> => {
         if (bleParticipants.length > 0) {
           const effectiveNick = nicknameRef.current || 'sovran';
+          const profileScope = bitchatProfileScopeRef.current;
+          if (!profileScope) {
+            flow.warn('split_bill.deliver.ble.no_profile_scope');
+            for (const p of bleParticipants) {
+              useSplitBillTransactionsStore
+                .getState()
+                .markDelivered(groupId, p.id, false, 'BitChat profile scope unavailable');
+            }
+            return bleParticipants.map(() => 'failed' as const);
+          }
           const startupAt = performance.now();
-          await startBLE(effectiveNick).catch((err) => {
+          await startBLE(effectiveNick, profileScope).catch((err) => {
             flow.warn('split_bill.deliver.ble.start_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
@@ -650,7 +669,11 @@ export function useSplitBillOrchestrator() {
       } else if (p.channel === 'ble-dm' && p.peerID) {
         // Same bring-up sequence as the confirm path — see comments there.
         const effectiveNick = nicknameRef.current || 'sovran';
-        await startBLE(effectiveNick).catch(() => undefined);
+        const profileScope = bitchatProfileScopeRef.current;
+        if (!profileScope) {
+          throw new Error('BitChat profile scope unavailable');
+        }
+        await startBLE(effectiveNick, profileScope).catch(() => undefined);
         await startBLEPrivateChat(p.peerID).catch((err) => {
           flow.warn('split_bill.retry_delivery.ble.handshake_failed', {
             participantId,

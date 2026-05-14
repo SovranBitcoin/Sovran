@@ -21,10 +21,8 @@ import {
   type NostrPrivateMessageEvent,
 } from 'bitchat-module';
 import { useBitchatNickname } from './useBitchatNickname';
-import {
-  useBitchatDmMessagesStore,
-  type BleDmMessage,
-} from '../stores/bitchatDmMessages';
+import { useBitchatDmMessagesStore, type BleDmMessage } from '../stores/bitchatDmMessages';
+import { useBitchatProfileScope } from '../lib/profileScope';
 import { bitchatLog } from '@/shared/lib/logger';
 import { mintLocalId } from '@/shared/lib/id';
 
@@ -97,6 +95,7 @@ export function useBitChat(
   options: UseBitChatOptions = {}
 ): UseBitChatResult {
   const nickname = useBitchatNickname();
+  const profileScope = useBitchatProfileScope();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -127,7 +126,9 @@ export function useBitChat(
     // on the native side and covers the case where the provider hasn't
     // fired yet (e.g. mesh-chat screen opened before the nickname was
     // available).
-    startBLE(nickname)
+    if (!profileScope) return;
+
+    startBLE(nickname, profileScope)
       .then(() => {
         const state = getBLEState();
         bitchatLog.info('bitchat.hook.ble_started', { state });
@@ -178,7 +179,7 @@ export function useBitChat(
       // history.
       setIsConnected(false);
     };
-  }, [transport, nickname]);
+  }, [transport, nickname, profileScope]);
 
   // ===========================================================
   //  BLE DM — transport === 'ble-dm'
@@ -203,12 +204,12 @@ export function useBitChat(
   );
 
   useEffect(() => {
-    if (transport !== 'ble-dm' || !dmPeerID || !nickname) return;
+    if (transport !== 'ble-dm' || !dmPeerID || !nickname || !profileScope) return;
 
     bitchatLog.info('bitchat.hook.ble_dm_setup', { peerID: dmPeerID });
 
     // Reuse the mesh if it's already running (no-op); otherwise start it.
-    startBLE(nickname)
+    startBLE(nickname, profileScope)
       .then(() => setIsConnected(true))
       .catch((err) => {
         bitchatLog.error('bitchat.hook.ble_start_failed', {
@@ -230,7 +231,7 @@ export function useBitChat(
       // store, so nothing per-screen to tear down.
       setIsConnected(false);
     };
-  }, [transport, dmPeerID, nickname]);
+  }, [transport, dmPeerID, nickname, profileScope]);
 
   // ===========================================================
   //  Nostr public chat — transport === 'nostr'
@@ -265,7 +266,8 @@ export function useBitChat(
 
     void (async () => {
       try {
-        await startNostr();
+        if (!profileScope) return;
+        await startNostr(profileScope);
         if (cancelled) return;
         await joinGeohash(geohash);
         if (cancelled) return;
@@ -290,7 +292,7 @@ export function useBitChat(
       // leaveGeohash() during teardown.
       setIsConnected(false);
     };
-  }, [geohash, transport]);
+  }, [geohash, transport, profileScope]);
 
   // ===========================================================
   //  Nostr DM — transport === 'nostr-dm'
@@ -329,7 +331,8 @@ export function useBitChat(
 
     void (async () => {
       try {
-        await startNostr();
+        if (!profileScope) return;
+        await startNostr(profileScope);
         if (cancelled) return;
         await joinGeohash(geohash);
         if (cancelled) return;
@@ -348,7 +351,7 @@ export function useBitChat(
       setIsConnected(false);
     };
     // `nickname` is omitted for the same reason as the public-nostr effect.
-  }, [transport, dmPeerID, geohash]);
+  }, [transport, dmPeerID, geohash, profileScope]);
 
   // ===========================================================
   //  Send
@@ -425,9 +428,7 @@ export function useBitChat(
             knownToNative: !!peerSnapshot,
             isConnected: peerSnapshot?.isConnected ?? false,
             hasDirectLink: peerSnapshot?.hasDirectLink ?? false,
-            lastSeenAgeMs: peerSnapshot
-              ? Math.round(Date.now() - peerSnapshot.lastSeen)
-              : null,
+            lastSeenAgeMs: peerSnapshot ? Math.round(Date.now() - peerSnapshot.lastSeen) : null,
           });
 
           // Watchdog: if this message hasn't reached at least `sent` within
@@ -463,12 +464,7 @@ export function useBitChat(
 
           try {
             const startedAt = Date.now();
-            const returnedID = await sendBLEPrivateMessage(
-              dmPeerID,
-              content,
-              nickname,
-              messageID
-            );
+            const returnedID = await sendBLEPrivateMessage(dmPeerID, content, nickname, messageID);
             // Diagnostic: confirms the native AsyncFunction returned cleanly
             // (mesh started, peerID valid, dispatch enqueued). Useful for
             // distinguishing "native send rejected" from "native sent but no

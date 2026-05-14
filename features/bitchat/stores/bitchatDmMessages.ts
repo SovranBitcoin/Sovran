@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import type {
   BLEDeliveryStatus,
@@ -12,12 +12,7 @@ import type {
 
 const MESSAGE_BUFFER_CAP = 500;
 
-export type BleDmDeliveryStatus =
-  | 'sending'
-  | 'sent'
-  | 'delivered'
-  | 'read'
-  | 'failed';
+export type BleDmDeliveryStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export interface BleDmMessage extends ChatMessage {
   /** Status only set on own (outbound) messages. */
@@ -194,7 +189,7 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
     }),
     persistConfig<BitchatDmMessagesStore, PersistedSlice>({
       name: 'bitchat-dm-messages-store',
-      storage: AsyncStorage,
+      storage: createProfileScopedStorage(),
       schema: PersistedBitchatDmStore,
       partialize: (state) => ({ byPeer: state.byPeer }),
       afterHydrate: (state) => {
@@ -209,10 +204,7 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
         for (const [peer, thread] of Object.entries(state.byPeer)) {
           let changed = false;
           const updated = thread.map((m) => {
-            if (
-              m.isOwn &&
-              (m.deliveryStatus === 'sending' || m.deliveryStatus === 'sent')
-            ) {
+            if (m.isOwn && (m.deliveryStatus === 'sending' || m.deliveryStatus === 'sent')) {
               changed = true;
               return {
                 ...m,

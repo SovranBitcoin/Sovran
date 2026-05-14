@@ -120,8 +120,8 @@ export interface BLEDeliveryStatusEvent {
 
 /**
  * Persisted summary of a BLE-mesh 1:1 chat counterparty. Returned by
- * `getBLEDmHistory()` — used to surface peers we've previously DM'd in the
- * Contacts screen's Recent / All tabs even after the app has been killed.
+ * `getBLEDmHistory(profileScope)` — used to surface peers we've previously
+ * DM'd in the Contacts screen's Recent / All tabs even after the app has been killed.
  * `nickname` may be `''` if we never received an announce with one.
  */
 export interface BLEDmContact {

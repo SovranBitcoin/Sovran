@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  addBLEPrivateMessageListener,
-  getBLEDmHistory,
-  type BLEDmContact,
-} from 'bitchat-module';
+import { addBLEPrivateMessageListener, getBLEDmHistory, type BLEDmContact } from 'bitchat-module';
+import { useBitchatProfileScope } from '../lib/profileScope';
 
 /**
  * Tracks the persisted BLE-DM peer history.
@@ -20,11 +17,14 @@ import {
  * we rely on the next mount picking it up.
  */
 export function useBitchatDmContacts(): { contacts: BLEDmContact[] } {
-  const [contacts, setContacts] = useState<BLEDmContact[]>(() => getBLEDmHistory());
+  const profileScope = useBitchatProfileScope();
+  const [contacts, setContacts] = useState<BLEDmContact[]>(() =>
+    profileScope ? getBLEDmHistory(profileScope) : []
+  );
 
   const refresh = useCallback(() => {
-    setContacts(getBLEDmHistory());
-  }, []);
+    setContacts(profileScope ? getBLEDmHistory(profileScope) : []);
+  }, [profileScope]);
 
   useEffect(() => {
     refresh();

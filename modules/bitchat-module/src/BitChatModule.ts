@@ -13,7 +13,7 @@ import type {
 
 interface BitChatNativeModule {
   // BLE
-  startBLE(nickname: string): Promise<void>;
+  startBLE(nickname: string, profileScope: string): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
   startBLEPrivateChat(peerID: string): Promise<void>;
   resetBLEPrivateChat(peerID: string): Promise<void>;
@@ -24,10 +24,10 @@ interface BitChatNativeModule {
     messageID: string
   ): Promise<string>;
   getBLEPeers(): BLEPeer[];
-  getBLEDmHistory(): BLEDmContact[];
+  getBLEDmHistory(profileScope: string): BLEDmContact[];
   getBLEState(): string;
   // Nostr (native — wraps upstream bitchat's NostrRelayManager + GeoRelayDirectory)
-  startNostr(): Promise<void>;
+  startNostr(profileScope: string): Promise<void>;
   joinGeohash(hash: string): Promise<void>;
   leaveGeohash(): Promise<void>;
   sendGeohashMessage(content: string, nickname: string): Promise<void>;
@@ -60,8 +60,8 @@ function unavailable(): Promise<never> {
 
 // --- BLE Mesh ---
 
-export function startBLE(nickname: string): Promise<void> {
-  return NativeModule ? NativeModule.startBLE(nickname) : unavailable();
+export function startBLE(nickname: string, profileScope: string): Promise<void> {
+  return NativeModule ? NativeModule.startBLE(nickname, profileScope) : unavailable();
 }
 
 export function sendBLEMessage(content: string): Promise<void> {
@@ -137,8 +137,8 @@ export function getBLEPeers(): BLEPeer[] {
  * outbound BLE DMs in the native bridge. Empty array on Android (no native
  * bridge) and on first-launch iOS before any DM has flowed.
  */
-export function getBLEDmHistory(): BLEDmContact[] {
-  return NativeModule ? NativeModule.getBLEDmHistory() : [];
+export function getBLEDmHistory(profileScope: string): BLEDmContact[] {
+  return NativeModule && profileScope ? NativeModule.getBLEDmHistory(profileScope) : [];
 }
 
 export function getBLEState(): string {
@@ -166,8 +166,8 @@ export function addBLEStateListener(
 
 // --- Nostr ---
 
-export function startNostr(): Promise<void> {
-  return NativeModule ? NativeModule.startNostr() : unavailable();
+export function startNostr(profileScope: string): Promise<void> {
+  return NativeModule ? NativeModule.startNostr(profileScope) : unavailable();
 }
 
 export function joinGeohash(hash: string): Promise<void> {
