@@ -6,4 +6,5 @@ export { SettingsKeyringScreen } from './screens/SettingsKeyringScreen';
 export { SettingsRecoveryScreen } from './screens/SettingsRecoveryScreen';
 export { SettingsRoutingScreen } from './screens/SettingsRoutingScreen';
 export { SettingsStorageScreen } from './screens/SettingsStorageScreen';
+export { SettingsDesignSystemScreen } from './screens/SettingsDesignSystemScreen';
 export { DeleteScreen } from './screens/DeleteScreen';

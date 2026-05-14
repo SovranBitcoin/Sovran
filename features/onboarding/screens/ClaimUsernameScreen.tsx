@@ -10,14 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  TextInput,
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  StyleSheet,
-  View as RNView,
-} from 'react-native';
+import { TextInput, Alert, Keyboard, StyleSheet, View as RNView } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -35,6 +28,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import { alpha, duration, zIndex } from '@/shared/styles/tokens';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -158,7 +152,9 @@ function UsernameInput({
         @{selectedDomain}
       </Text>
       {isChecking && (
-        <ActivityIndicator size="small" color={accentColor} style={{ marginLeft: 12 }} />
+        <View style={{ marginLeft: 12 }}>
+          <LoadingIndicator size={20} phase="loading" color={accentColor} />
+        </View>
       )}
     </View>
   );
@@ -186,16 +182,37 @@ function DomainOption({
   ] as const);
   const [danger, success] = useThemeColor(['danger', 'success'] as const);
 
-  const getStatusInfo = () => {
+  type StatusInfo = {
+    color: string;
+    text: string;
+    indicator: { phase: 'loading' | 'done'; result?: 'success' | 'error' } | null;
+  };
+  const getStatusInfo = (): StatusInfo | null => {
     if (!availabilityResult) return null;
     if (availabilityResult.loading)
-      return { color: opacity(foreground, alpha.soft), text: 'Checking...' };
+      return {
+        color: opacity(foreground, alpha.soft),
+        text: 'Checking...',
+        indicator: { phase: 'loading' },
+      };
     if (availabilityResult.error)
-      return { color: danger, text: availabilityResult.error, icon: 'mdi:close-circle' };
+      return {
+        color: danger,
+        text: availabilityResult.error,
+        indicator: { phase: 'done', result: 'error' },
+      };
     if (availabilityResult.available === true)
-      return { color: success, text: 'Available', icon: 'mdi:check-circle' };
+      return {
+        color: success,
+        text: 'Available',
+        indicator: { phase: 'done', result: 'success' },
+      };
     if (availabilityResult.available === false)
-      return { color: danger, text: 'Taken', icon: 'mdi:close-circle' };
+      return {
+        color: danger,
+        text: 'Taken',
+        indicator: { phase: 'done', result: 'error' },
+      };
     return null;
   };
 
@@ -239,11 +256,16 @@ function DomainOption({
       {/* Status indicator */}
       {status && (
         <HStack align="center" style={{ gap: 6 }}>
-          {availabilityResult?.loading ? (
-            <ActivityIndicator size="small" color={status.color} />
-          ) : status.icon ? (
-            <Icon name={status.icon} size={16} color={status.color} />
-          ) : null}
+          {status.indicator && (
+            <LoadingIndicator
+              size={16}
+              phase={status.indicator.phase}
+              result={status.indicator.result ?? 'success'}
+              color={status.color}
+              successColor={success}
+              errorColor={danger}
+            />
+          )}
           <Text size={12} style={{ color: status.color }}>
             {status.text}
           </Text>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import * as Clipboard from 'expo-clipboard';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, router } from 'expo-router';
@@ -379,7 +379,7 @@ export const SettingsKeyringScreen: React.FC = () => {
               </Pressable>
               <Pressable onPress={handleGenerateKey} style={{ padding: 8 }} disabled={isGenerating}>
                 {isGenerating ? (
-                  <ActivityIndicator size="small" color={foreground} />
+                  <LoadingIndicator size={22} phase="loading" color={foreground} />
                 ) : (
                   <Icon name="mdi:key-plus" size={22} color={foreground} />
                 )}
@@ -429,7 +429,7 @@ export const SettingsKeyringScreen: React.FC = () => {
         <ListGroup variant="secondary">
           {isLoading ? (
             <VStack align="center" className="p-6">
-              <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
+              <LoadingIndicator size={20} phase="loading" color={opacity(foreground, 0.4)} />
               <Text size={14} className="mt-2" style={{ color: opacity(foreground, 0.4) }}>
                 Loading keys...
               </Text>

@@ -39,6 +39,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import Icon from 'assets/icons';
 import { useLifecycleLogger } from '@/shared/lib/logger';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
+import { LoadingIndicator } from '@/shared/blocks/status';
 
 const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),
@@ -328,7 +329,13 @@ export function MintRebalancePlanScreen() {
       {alreadyBalanced && (
         <View className="items-center p-10">
           <VStack gap={12} align="center">
-            <Icon name="mdi:check-circle" size={48} color={green400} />
+            <LoadingIndicator
+              size={48}
+              phase="done"
+              result="success"
+              successColor={green400}
+              playOnMount
+            />
             <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
               Already balanced!
             </Text>
@@ -342,7 +349,13 @@ export function MintRebalancePlanScreen() {
       {!alreadyBalanced && plan.steps.length === 0 && (
         <View className="items-center p-10">
           <VStack gap={12} align="center">
-            <Icon name="mdi:check-circle" size={48} color={green400} />
+            <LoadingIndicator
+              size={48}
+              phase="done"
+              result="success"
+              successColor={green400}
+              playOnMount
+            />
             <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
               No transfers needed
             </Text>

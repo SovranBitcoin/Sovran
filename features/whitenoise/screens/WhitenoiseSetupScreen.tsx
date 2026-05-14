@@ -6,6 +6,7 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
 
 export function WhitenoiseSetupScreen() {
@@ -55,21 +56,20 @@ export function WhitenoiseSetupScreen() {
       <View style={styles.bullets}>
         <Bullet
           color={foregroundSecondary}
-          icon="mdi:check-circle"
           accent={accent}
           text="Forward secrecy and post-compromise security"
         />
         <Bullet
           color={foregroundSecondary}
-          icon="mdi:check-circle"
           accent={accent}
           text="1:1 messages and group chats"
+          delayMs={120}
         />
         <Bullet
           color={foregroundSecondary}
-          icon="mdi:check-circle"
           accent={accent}
           text="Encrypted at rest on this device"
+          delayMs={240}
         />
       </View>
 
@@ -90,17 +90,24 @@ export function WhitenoiseSetupScreen() {
 function Bullet({
   color,
   accent,
-  icon,
   text,
+  delayMs = 0,
 }: {
   color: string;
   accent: string;
-  icon: string;
   text: string;
+  delayMs?: number;
 }) {
   return (
     <View style={styles.bullet}>
-      <Icon name={icon} size={18} color={accent} />
+      <LoadingIndicator
+        size={18}
+        phase="done"
+        result="success"
+        successColor={accent}
+        playOnMount
+        transitionDelayMs={delayMs}
+      />
       <Text style={[styles.bulletText, { color }]}>{text}</Text>
     </View>
   );

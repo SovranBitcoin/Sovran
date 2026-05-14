@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-import Animated, {
-  interpolateColor,
-  useAnimatedProps,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { SlideToConfirm } from '@/shared/ui/composed/SlideToConfirm';
@@ -28,10 +18,9 @@ import { useBalanceContext } from '@cashu/coco-react';
 import { deleteMintOperation } from '@/shared/lib/cashu/managerInternals';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { fetchJson } from '@/shared/lib/apiClient';
-import { STATUS_PATH, STATUS_LENGTH, STATUS_OFFSET } from '@/shared/lib/popup/animatedStatusShapes';
 import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
 
 // ─── Deep probe: discover mints from audit API ─────────────────────────────
@@ -124,142 +113,6 @@ interface RecoveryConfig {
   parallelKeysets: boolean;
   skipProbe: boolean;
 }
-
-// ─── Animated shield with spinner → checkmark/cross transition ───────────────
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-
-type ShieldStatus = 'loading' | 'success' | 'error';
-
-const ShieldStatusIcon: React.FC<{
-  size: number;
-  color: string;
-  successColor: string;
-  errorColor: string;
-  status: ShieldStatus;
-}> = ({ size, color, successColor, errorColor, status }) => {
-  const rotation = useSharedValue(0);
-  const circleOffset = useSharedValue(STATUS_OFFSET.pendingCircle);
-  const checkmarkOffset = useSharedValue(STATUS_LENGTH.checkmark);
-  const crossOffset = useSharedValue(STATUS_LENGTH.cross);
-  const colorProgress = useSharedValue(0);
-  const prevStatusRef = React.useRef<ShieldStatus>(status);
-
-  useEffect(() => {
-    const prevStatus = prevStatusRef.current;
-    prevStatusRef.current = status;
-
-    // Don't re-animate if already in a terminal state (success/error)
-    if (prevStatus === status && status !== 'loading') return;
-    if ((prevStatus === 'success' || prevStatus === 'error') && prevStatus === status) return;
-
-    if (status === 'loading') {
-      circleOffset.value = STATUS_OFFSET.pendingCircle;
-      checkmarkOffset.value = STATUS_LENGTH.checkmark;
-      crossOffset.value = STATUS_LENGTH.cross;
-      colorProgress.value = 0;
-      rotation.value = withRepeat(withTiming(360, { duration: 1500, easing: Easing.linear }), -1);
-    } else {
-      rotation.value = withTiming(0, { duration: 300 });
-      colorProgress.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
-      circleOffset.value = withTiming(0, { duration: 1000, easing: Easing.linear });
-      const symbolTiming = withTiming(0, { duration: 200, easing: Easing.out(Easing.ease) });
-      if (status === 'success') {
-        checkmarkOffset.value = symbolTiming;
-        crossOffset.value = STATUS_LENGTH.cross;
-      } else {
-        crossOffset.value = symbolTiming;
-        checkmarkOffset.value = STATUS_LENGTH.checkmark;
-      }
-    }
-  }, [status, rotation, circleOffset, checkmarkOffset, crossOffset, colorProgress]);
-
-  const targetColor = status === 'error' ? errorColor : successColor;
-
-  const spinnerStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
-
-  const circleProps = useAnimatedProps(() => ({
-    strokeDashoffset: circleOffset.value,
-    stroke:
-      status === 'loading'
-        ? color
-        : interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
-  }));
-
-  const checkmarkProps = useAnimatedProps(() => ({
-    strokeDashoffset: checkmarkOffset.value,
-    stroke: interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
-  }));
-
-  const crossProps = useAnimatedProps(() => ({
-    strokeDashoffset: crossOffset.value,
-    stroke: interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
-  }));
-
-  const shieldProps = useAnimatedProps(() => ({
-    fill: interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
-  }));
-
-  const spinnerSize = size * 0.5;
-  const spinnerLeft = size * 0.55;
-  const spinnerTop = size * 0.55;
-
-  return (
-    <View style={{ width: size, height: size }}>
-      {/* Shield body — transitions color with the spinner */}
-      <Svg width={size} height={size} viewBox="0 0 24 24" style={{ position: 'absolute' }}>
-        <AnimatedPath
-          d="M12 1L3 5v6c0 5.5 3.8 10.7 9 12c.4-.1.7-.2 1-.3c-1-1.2-1.5-2.7-1.5-4.2c0-3.6 2.9-6.5 6.5-6.5c1 0 2 .2 2.9.7c.1-.6.1-1.1.1-1.7V5z"
-          animatedProps={shieldProps}
-        />
-      </Svg>
-      {/* Spinner → checkmark/cross overlay */}
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            left: spinnerLeft,
-            top: spinnerTop,
-            width: spinnerSize,
-            height: spinnerSize,
-          },
-          spinnerStyle,
-        ]}>
-        <Svg width={spinnerSize} height={spinnerSize} viewBox="0 0 24 24">
-          <AnimatedPath
-            d={STATUS_PATH.circle}
-            fill="none"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={STATUS_LENGTH.circle}
-            animatedProps={circleProps}
-          />
-          <AnimatedPath
-            d={STATUS_PATH.checkmark}
-            fill="none"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={STATUS_LENGTH.checkmark}
-            animatedProps={checkmarkProps}
-          />
-          <AnimatedPath
-            d={STATUS_PATH.cross}
-            fill="none"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={STATUS_LENGTH.cross}
-            animatedProps={crossProps}
-          />
-        </Svg>
-      </Animated.View>
-    </View>
-  );
-};
 
 const DEFAULT_CONFIG: RecoveryConfig = {
   batchSize: 25,
@@ -679,7 +532,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           </Text>
         </VStack>
         <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
-          <PaymentStatusIcon size={24} status={done ? 'confirmed' : 'pending'} />
+          <LoadingIndicator size={24} phase={done ? 'done' : 'loading'} result="success" />
         </View>
       </HStack>
     );
@@ -692,16 +545,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // ─── Recovering + complete states (single tree) ──────────────────────────
   //
   // Rendered with one JSX structure so React reconciles instead of
-  // unmount/remount on the `recovering → complete` flip. That keeps:
-  //   - the in-flight per-row PaymentStatusIcon animations playing through
-  //     to their natural end instead of being killed mid-draw, and
-  //   - the top ShieldStatusIcon mounted across the transition so its
-  //     useEffect runs the proper `loading → success` animation (a fresh
-  //     mount with status='success' would early-return without animating
-  //     and leave the shield stuck in pending visuals).
-  //
-  // Differences between the two states are now expressed as prop/text
-  // toggles inside the same tree.
+  // unmount/remount on the `recovering → complete` flip. That keeps the
+  // hero LoadingIndicator and per-row indicators mounted across the
+  // transition so they animate from `loading → done/success` instead of
+  // mounting fresh in the terminal state and short-circuiting the
+  // animation (see LoadingIndicator's `startedDone` ref).
 
   const renderActiveOrCompleteState = () => {
     const isComplete = recoveryState === 'complete';
@@ -712,12 +560,13 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           <View
             className="h-24 w-24 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: surfaceSecondary }}>
-            <ShieldStatusIcon
+            <LoadingIndicator
               size={48}
+              phase={isComplete ? 'done' : 'loading'}
+              result="success"
               color={foreground}
               successColor={green400}
               errorColor={red400}
-              status={isComplete ? 'success' : 'loading'}
             />
           </View>
 
@@ -752,7 +601,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                     // While recovering, currentMintIndex is -1 (allActive
                     // mode in MintRecoveryRow). On `complete`, push it past
                     // the last index so every row reports as done — but the
-                    // per-row PaymentStatusIcon already drives off the
+                    // per-row LoadingIndicator already drives off the
                     // result.success state, so this is just for the row's
                     // text dimming.
                     currentIndex={isComplete ? results.length : currentMintIndex}
@@ -791,12 +640,13 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           <View
             className="h-24 w-24 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: surfaceSecondary }}>
-            <ShieldStatusIcon
+            <LoadingIndicator
               size={48}
+              phase="done"
+              result="error"
               color={foreground}
               successColor={green400}
               errorColor={red400}
-              status="error"
             />
           </View>
 
@@ -839,9 +689,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                           )}
                         </VStack>
                         <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
-                          <PaymentStatusIcon
+                          <LoadingIndicator
                             size={24}
-                            status={result.success ? 'confirmed' : 'failed'}
+                            phase="done"
+                            result={result.success ? 'success' : 'error'}
                           />
                         </View>
                       </HStack>
@@ -939,9 +790,10 @@ const MintRecoveryRow: React.FC<{
         </Text>
       </VStack>
       <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
-        <PaymentStatusIcon
+        <LoadingIndicator
           size={24}
-          status={isActive ? 'pending' : result?.success ? 'confirmed' : 'failed'}
+          phase={isActive ? 'loading' : 'done'}
+          result={result?.success ? 'success' : 'error'}
         />
       </View>
     </HStack>

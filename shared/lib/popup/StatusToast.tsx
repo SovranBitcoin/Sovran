@@ -12,7 +12,8 @@ import opacity from 'hex-color-opacity';
 
 import { supportsBlur } from '@/shared/lib/version';
 
-import { PaymentStatusIcon } from './PaymentStatusIcon';
+import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
+
 import { useToastSurface } from './useToastSurface';
 import { DANGER_DARK_BG, SUCCESS_DARK_BG, TINT_ALPHA, ToastSlab } from './ToastSlab';
 
@@ -46,7 +47,7 @@ type StatusToastProps = {
  * Animated terminal-state toast shell shared by `PaymentStatusToast` and
  * `SwapStatusToast`.
  *
- * Renders the frosted-glass slab with a `<PaymentStatusIcon>`, title + optional
+ * Renders the frosted-glass slab with a `<LoadingIndicator>`, title + optional
  * subtitle, and optional action pill. The tint background interpolates from
  * the theme surface to success or danger when `status` flips to a terminal
  * value (`'confirmed'` or `'failed'`); 3 seconds later the toast manager is
@@ -61,6 +62,9 @@ export function StatusToast({ status, title, subtitle, action, toastProps }: Sta
   const isTerminal = status === 'confirmed' || status === 'failed';
   const targetBg = status === 'failed' ? DANGER_DARK_BG : SUCCESS_DARK_BG;
   const targetBgTint = blurSupported ? opacity(targetBg, TINT_ALPHA) : targetBg;
+
+  const indicatorPhase: Phase = isTerminal ? 'done' : 'loading';
+  const indicatorResult: Result = status === 'failed' ? 'error' : 'success';
 
   const confirmedProgress = useSharedValue(isTerminal ? 1 : 0);
 
@@ -90,7 +94,12 @@ export function StatusToast({ status, title, subtitle, action, toastProps }: Sta
     <ToastSlab
       toastProps={toastProps}
       tint={<Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]} />}>
-      <PaymentStatusIcon size={ICON_SIZE} status={status} baseColor={surfaceFg} />
+      <LoadingIndicator
+        size={ICON_SIZE}
+        phase={indicatorPhase}
+        result={indicatorResult}
+        color={surfaceFg}
+      />
       <View style={{ flex: 1, gap: 2 }}>
         <RNText
           style={{ fontSize: TITLE_FONT_SIZE, fontWeight: '600', color: surfaceFg }}

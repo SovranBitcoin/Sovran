@@ -391,12 +391,12 @@ export const Button = ({
     accessibilityHint,
     accessibilityState: { disabled: disabled || loading, busy: loading },
   };
-  const [foreground, surfaceForeground, foregroundSecondary, surfaceTertiary, background, danger] =
+  const [foreground, surfaceForeground, foregroundSecondary, surfaceSecondary, background, danger] =
     useThemeColor([
       'foreground',
       'surface-foreground',
       'muted',
-      'surface-tertiary',
+      'surface-secondary',
       'background',
       'danger',
     ] as const);
@@ -479,13 +479,13 @@ export const Button = ({
         return {
           ...base,
           backgroundColor: foreground,
-          borderColor: isAndroid ? opacity(foregroundSecondary, 0.3) : surfaceForeground,
+          borderColor: opacity(foregroundSecondary, 0.25),
         };
       case 'secondary':
         return {
           ...base,
-          backgroundColor: surfaceTertiary,
-          borderColor: isAndroid ? opacity(foregroundSecondary, 0.3) : foregroundSecondary,
+          backgroundColor: surfaceSecondary,
+          borderColor: opacity(foregroundSecondary, 0.25),  
         };
       case 'dangerous':
         return {

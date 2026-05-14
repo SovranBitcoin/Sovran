@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
-import { ActivityIndicator, Platform, TextInput, useWindowDimensions } from 'react-native';
+import { Platform, TextInput, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
@@ -28,6 +28,7 @@ import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
@@ -166,18 +167,15 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         autoCorrect={false}
         autoCapitalize="none"
       />
-      {validationState.isLoading && (
-        <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
-      )}
-      {!validationState.isLoading && validationState.isValid === true && (
-        <Text size={16} style={{ color: green400 }}>
-          ✓
-        </Text>
-      )}
-      {!validationState.isLoading && validationState.isValid === false && (
-        <Text size={16} style={{ color: danger }}>
-          ✗
-        </Text>
+      {(validationState.isLoading || validationState.isValid != null) && (
+        <LoadingIndicator
+          size={20}
+          phase={validationState.isLoading ? 'loading' : 'done'}
+          result={validationState.isValid === false ? 'error' : 'success'}
+          color={opacity(foreground, 0.4)}
+          successColor={green400}
+          errorColor={danger}
+        />
       )}
     </View>
   );

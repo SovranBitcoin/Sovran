@@ -22,9 +22,12 @@ Every glyph in the app renders through `<Icon name="prefix:name" />` from `asset
 Some glyphs can't fit the registry's flat-string body format and stay as `react-native-svg` components:
 
 - **Multi-color or gradient icons** (e.g. the currency icons in `assets/icons/index.tsx` — `CurrencyIcon`, `BitcoinMaskIcon`, `LightningUnit`). Their `LinearGradient` and multi-`<Path>` composition can't be encoded as a single colorable shape.
-- **Animated status indicators** (`shared/lib/popup/PaymentStatusIcon.tsx`, `shared/blocks/transfer/AnimatedCheckpointDot.tsx`). These animate stroke-dasharray over time via Reanimated; the registry only carries static shape data. When you author a new spinner→check/cross indicator, import the path data and lengths from `shared/lib/popup/animatedStatusShapes.ts` rather than re-typing the geometry — the choreography lives in the consumer, the geometry is shared so every status mark in the app reads the same shape.
 
-If you're tempted to add a third entry to that list, ask whether the animation/gradient is actually load-bearing — most "special" glyphs are just a single shape that fits the registry fine.
+If you're tempted to add a second entry to that list, ask whether the gradient is actually load-bearing — most "special" glyphs are just a single shape that fits the registry fine.
+
+## Animated status indicators
+
+For any "loading → success / error / reverted" indicator (spinners that resolve into a checkmark, cross, or revert arrow), use `LoadingIndicator` from `shared/blocks/status` — see [`status-indicators.md`](./status-indicators.md). Do not author a new `react-native-svg` spinner with stroke-dasharray; there is exactly one canonical animated status surface.
 
 ## Selection checkmarks
 

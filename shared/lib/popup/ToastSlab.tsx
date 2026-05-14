@@ -19,7 +19,6 @@ const BLUR_INTENSITY = 60;
 // support (Android < 12, iOS < 13) the BlurView wrapper renders null and
 // callers fall back to the opaque tint so the toast doesn't look ghosted.
 export const TINT_ALPHA = 0.3;
-// Mirror the timeline checkpoint dot pattern (AnimatedCheckpointDot): the
 // "dark" variant is the surface, the bright theme `success`/`danger` token
 // is the foreground (icon/text). Hardcoded since the toast is theme-
 // invariant — these values match `--success-foreground` /

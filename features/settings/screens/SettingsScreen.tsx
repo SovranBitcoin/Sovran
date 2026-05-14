@@ -244,6 +244,12 @@ export const SettingsScreen = () => {
                 description="View persisted storage keys and coco database files"
               />
               <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/design-system"
+                title="Design System"
+                description="Preview shared UI components"
+              />
+              <Separator className="mx-4" />
               <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>

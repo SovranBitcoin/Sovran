@@ -20,7 +20,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import {
   TransferCard,
   TransferEntryRow,
@@ -215,7 +215,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
               {String(errorMessage).includes('no_route') &&
                 routeSuggestion?.status === 'searching' && (
                   <HStack align="center" gap={8} className="px-4">
-                    <Spinner size={14} />
+                    <LoadingIndicator size={14} phase="loading" color={primaryColor300} />
                     <Text size={12} style={{ color: primaryColor300 }}>
                       Finding a middleman…
                     </Text>

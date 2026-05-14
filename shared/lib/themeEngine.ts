@@ -18,44 +18,81 @@ const SHADE_300_HEX = '#3B82F6';
  * Uniwind's runtime does NOT follow var() chains, so both forms are needed.
  */
 const STATIC_COLOR_VALUES: Record<string, string> = {
+  // shade-* mirrors the blue ramp (the brand-neutral). shade-0 and -50
+  // are near-white surface tints; -100 through -500 match blue-100..500.
   'shade-0': '#F8FAFC',
-  'shade-50': '#EFF6FF',
-  'shade-100': '#DBEAFE',
-  'shade-200': '#93C5FD',
-  'shade-300': '#3B82F6',
-  'shade-400': '#2563EB',
-  'shade-500': '#1D4ED8',
+  'shade-50': '#F0F6FC',
+  'shade-100': '#E0EEFA',
+  'shade-200': '#95C5EA',
+  'shade-300': '#2A7AD0',
+  'shade-400': '#1F5BA0',
+  'shade-500': '#143E70',
 
-  'red-100': '#F8E0E6',
-  'red-200': '#E4A3B4',
-  'red-300': '#ED0C46',
-  'red-400': '#BF0A39',
-  'red-500': '#9A082E',
+  // Color ramps for a finance UI, anchored on Apple System Colors so the
+  // semantic registers (positive/negative/warning/info) read as the same
+  // visual language users see daily in Wallet, Stocks, and Messages.
+  // Each ramp follows a consistent shape: a near-white tint at 100, a
+  // pastel at 200, the canonical brand color at 300, a deeper variant at
+  // 400, and a deep AA-text-safe shade at 500. Saturation is held in a
+  // ~55–75% band — never neon, never washed out.
 
-  'green-100': '#E0F8E0',
-  'green-200': '#A3E4A3',
-  'green-300': '#0CED3E',
-  'green-400': '#0ABF35',
-  'green-500': '#089A2C',
+  // Reds use Tailwind's red ramp (hue 0° — pure red, neither orange nor
+  // pink). Apple System Red (#FF3B30) is hue 3° and reads as too orange
+  // alongside the Apple greens/blues anchored elsewhere; the original
+  // #ED0C46 was hue 343° and read as too pink. Tailwind red sits at
+  // neutral hue 0° and is the de-facto "danger" red across heroui /
+  // shadcn / radix component libraries the app composes with.
+  'red-100': '#FEE2E2',
+  'red-200': '#FECACA',
+  'red-300': '#EF4444',
+  'red-400': '#DC2626',
+  'red-500': '#991B1B',
 
-  'purple-100': '#E0E0F8',
-  'purple-200': '#A3A3E4',
-  'purple-300': '#8A2BE2',
-  'purple-400': '#6A0DAD',
-  'purple-500': '#4B0082',
+  // Greens anchored on Apple System Green (#34C759) — the universal
+  // "trustworthy positive / verified" register. Replaced #0CED3E (90%
+  // sat, highlighter) which failed WCAG AA on light backgrounds.
+  'green-100': '#E8F8EE',
+  'green-200': '#A8E0BD',
+  'green-300': '#34C759',
+  'green-400': '#2DA84B',
+  'green-500': '#1F7A38',
 
-  'blue-100': '#DBEAFE',
-  'blue-200': '#93C5FD',
-  'blue-300': '#3B82F6',
-  'blue-400': '#2563EB',
-  'blue-500': '#1D4ED8',
+  // Purples anchored on Apple System Purple (#AF52DE). Previous ramp
+  // had a hue jump (pastel blue-violet at 200 → red-violet at 300), so
+  // mid-tones drifted as you went up the scale; this ramp holds hue.
+  'purple-100': '#F4E8FB',
+  'purple-200': '#DDB8F0',
+  'purple-300': '#AF52DE',
+  'purple-400': '#8E3BB8',
+  'purple-500': '#5F1F88',
 
-  'yellow-100': '#F8F8E0',
-  'yellow-200': '#E4E4A3',
-  'yellow-300': '#EDED0C',
-  'yellow-400': '#BFBF01',
-  'yellow-500': '#9A9A00',
+  // Blues at the Apple-blue hue (~212°) but desaturated to match the
+  // green ramp's ~58% saturation profile. Apple System Blue (#007AFF)
+  // at full 100% saturation visibly out-shouted the green when the two
+  // sat next to each other — bringing blue to ~67% sat keeps the iOS
+  // "interactive / link / info" register without making it the loudest
+  // color on the screen. The `shade-*` ramp above mirrors these values.
+  'blue-100': '#E0EEFA',
+  'blue-200': '#95C5EA',
+  'blue-300': '#2A7AD0',
+  'blue-400': '#1F5BA0',
+  'blue-500': '#143E70',
 
+  // Yellows shifted to amber territory (~hue 45°) and desaturated from
+  // Apple System Yellow's 100% sat to ~75% so they don't out-shout the
+  // green ramp. Pure yellow at lower saturation reads as olive/mustard
+  // very quickly; the slight warm shift to amber gives the ramp room
+  // to breathe without losing the "caution" register. The previous
+  // #FFCC00 sat at LCH chroma ~90 vs green's ~63 — too loud next to it.
+  'yellow-100': '#FCF0CC',
+  'yellow-200': '#F1DA8F',
+  'yellow-300': '#E0B229',
+  'yellow-400': '#B0871E',
+  'yellow-500': '#6E5410',
+
+  // Oranges KEPT on Bitcoin Orange (#F7931A) at 300 — culturally
+  // load-bearing for a Bitcoin/Cashu wallet; the rest of the ramp is
+  // already hue-coherent with it. Do NOT swap to Apple System Orange.
   'orange-100': '#FEF0DC',
   'orange-200': '#FCC46A',
   'orange-300': '#F7931A',
@@ -136,12 +173,15 @@ function buildSemanticVars(palette: ThemePalette): SemanticVars {
     '--focus': palette[500],
     '--link': palette[400],
 
-    '--success': '#0CED3E',
-    '--success-foreground': bgIsDark ? '#E0F8E0' : '#089A2C',
-    '--warning': '#F0C800',
-    '--warning-foreground': bgIsDark ? '#FFF8DB' : '#7A6500',
-    '--danger': '#ED0C46',
-    '--danger-foreground': bgIsDark ? '#F8E0E6' : '#9A082E',
+    // Semantic tokens point at the canonical "300" of each ramp; the
+    // foreground variant pairs with the surface theme: 200-tier on dark
+    // for high-contrast pastel text, 500-tier on light for AA-safe ink.
+    '--success': '#34C759', // green-300, Apple System Green
+    '--success-foreground': bgIsDark ? '#A8E0BD' : '#1F7A38',
+    '--warning': '#E0B229', // yellow-300, amber (chroma-matched to green)
+    '--warning-foreground': bgIsDark ? '#F1DA8F' : '#6E5410',
+    '--danger': '#EF4444', // red-300, Tailwind red-500
+    '--danger-foreground': bgIsDark ? '#FECACA' : '#991B1B',
 
     '--surface-shadow': bgIsDark
       ? '0 0 0 0 transparent inset'

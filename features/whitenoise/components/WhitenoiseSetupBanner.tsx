@@ -7,7 +7,7 @@ import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
-import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -35,12 +35,12 @@ import Icon from 'assets/icons';
  */
 const TAB_BAR_HEIGHT_ESTIMATE = Platform.select({ ios: 49, android: 56, default: 56 });
 const FLOAT_GAP = 12;
-// PaymentStatusIcon's `confirmed` animation runs ~1200ms (circle draw
-// 1000ms → checkmark stroke 200ms). Start the dismiss right as the
-// stroke finishes — staring at a fully-drawn check for an extra 300ms
-// felt slow, and overlapping the tail-end of the stroke with the slide
-// reads as one continuous beat instead of two pauses.
-const SUCCESS_HOLD_MS = 1200;
+// LoadingIndicator's `done` choreography runs ~T_FILL+T_ICON+D_ICON_IN
+// (~1.4s end-to-end). Start the dismiss right as the glyph finishes —
+// staring at a fully-drawn check for an extra 300ms felt slow, and
+// overlapping the tail-end of the draw with the slide reads as one
+// continuous beat instead of two pauses.
+const SUCCESS_HOLD_MS = 1400;
 
 type Phase = 'idle' | 'running' | 'success' | 'gone';
 
@@ -146,11 +146,10 @@ function BannerCard({
   ] as const);
 
   const isInteractive = phase === 'idle';
-  // PaymentStatusIcon's `pending` is the spinning ring; `confirmed` runs
-  // the draw-circle + checkmark stroke. Same animation the restore screen
-  // and the payment toast pop use, so the affordance reads identically.
-  const statusIconState =
-    phase === 'running' || isBootstrapping ? 'pending' : phase === 'success' ? 'confirmed' : null;
+  // Same LoadingIndicator the restore screen and the payment toast use,
+  // so the affordance reads identically across the app.
+  const indicatorPhase: 'loading' | 'done' | null =
+    phase === 'running' || isBootstrapping ? 'loading' : phase === 'success' ? 'done' : null;
 
   return (
     <Pressable
@@ -183,8 +182,8 @@ function BannerCard({
       </View>
       <View style={[styles.divider, { backgroundColor: separator }]} />
       <View style={styles.actionRow}>
-        {statusIconState ? (
-          <PaymentStatusIcon size={26} status={statusIconState} />
+        {indicatorPhase ? (
+          <LoadingIndicator size={26} phase={indicatorPhase} result="success" />
         ) : (
           <Text size={15} bold style={{ color: accent }}>
             Set up

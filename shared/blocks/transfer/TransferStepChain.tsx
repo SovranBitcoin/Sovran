@@ -31,8 +31,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import type { CheckpointDotType } from './AnimatedCheckpointDot';
-import { AnimatedCheckpointDot } from './AnimatedCheckpointDot';
+import { LoadingIndicator, mapCheckpointStatusToIndicator } from '@/shared/blocks/status';
 
 type StepStatus =
   | 'pending'
@@ -158,10 +157,6 @@ function timed(
   config: { duration: number; easing: EasingFunction }
 ) {
   return delayMs > 0 ? withDelay(delayMs, withTiming(target, config)) : withTiming(target, config);
-}
-
-function nodeTypeToCheckpointDotType(type: NodeType): CheckpointDotType {
-  return type;
 }
 
 // ---------- Animated line ----------
@@ -311,13 +306,13 @@ export const TransferStepChain = React.memo(
               return (
                 <React.Fragment key={node.label}>
                   <View style={styles.nodeColumn}>
-                    <AnimatedCheckpointDot
-                      type={nodeTypeToCheckpointDotType(node.type)}
-                      delayMs={nodeDelays[idx]}
+                    <LoadingIndicator
+                      size={DOT_CONTAINER}
+                      transitionDelayMs={nodeDelays[idx]}
                       successColor={successColor}
-                      dangerColor={dangerColor}
-                      warningColor={warningColor}
-                      mutedColor={mutedColor}
+                      errorColor={dangerColor}
+                      revertedColor={warningColor}
+                      {...mapCheckpointStatusToIndicator(node.type)}
                     />
                     <AnimatedLabel
                       label={node.label}

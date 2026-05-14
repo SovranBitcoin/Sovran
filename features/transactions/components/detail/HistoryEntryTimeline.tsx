@@ -15,7 +15,11 @@ import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 
-import { AnimatedCheckpointDot, type CheckpointDotType } from '@/shared/blocks/transfer';
+import {
+  LoadingIndicator,
+  mapCheckpointStatusToIndicator,
+  type CheckpointStatus,
+} from '@/shared/blocks/status';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -135,7 +139,7 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
   );
 });
 
-function timelineStepTypeToCheckpointDotType(stepType: TimelineStepType): CheckpointDotType {
+function timelineStepTypeToCheckpointStatus(stepType: TimelineStepType): CheckpointStatus {
   return stepType === 'expired' ? 'failed' : stepType;
 }
 
@@ -290,13 +294,15 @@ export function HistoryEntryTimeline({
               <Animated.View key={item.state} entering={FadeInDown.delay(index * 60).duration(250)}>
                 <HStack align="flex-start">
                   <VStack align="center" style={{ marginRight: 14 }}>
-                    <AnimatedCheckpointDot
-                      type={timelineStepTypeToCheckpointDotType(item.stepType)}
-                      delayMs={dotDelay}
+                    <LoadingIndicator
+                      size={20}
+                      transitionDelayMs={dotDelay}
                       successColor={successColor}
-                      dangerColor={dangerColor}
-                      warningColor={warningColor}
-                      mutedColor={mutedColor}
+                      errorColor={dangerColor}
+                      revertedColor={warningColor}
+                      {...mapCheckpointStatusToIndicator(
+                        timelineStepTypeToCheckpointStatus(item.stepType)
+                      )}
                     />
                     {lineType && (
                       <AnimatedTimelineLine
