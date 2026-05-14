@@ -136,8 +136,8 @@ function buildSemanticVars(palette: ThemePalette): SemanticVars {
     '--focus': palette[500],
     '--link': palette[400],
 
-    '--success': '#3B82F6',
-    '--success-foreground': bgIsDark ? '#DBEAFE' : '#1D4ED8',
+    '--success': '#0CED3E',
+    '--success-foreground': bgIsDark ? '#E0F8E0' : '#089A2C',
     '--warning': '#F0C800',
     '--warning-foreground': bgIsDark ? '#FFF8DB' : '#7A6500',
     '--danger': '#ED0C46',

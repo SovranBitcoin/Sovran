@@ -126,11 +126,11 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
     'default',
     'surface-secondary',
   ] as const);
-  const [blue400, danger] = useThemeColor(['blue-400', 'danger'] as const);
+  const [green400, danger] = useThemeColor(['green-400', 'danger'] as const);
 
   const getStatusColor = () => {
     if (validationState.isLoading) return opacity(foreground, 0.4);
-    if (validationState.isValid === true) return blue400;
+    if (validationState.isValid === true) return green400;
     if (validationState.isValid === false) return danger;
     return defaultColor;
   };
@@ -170,7 +170,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
       )}
       {!validationState.isLoading && validationState.isValid === true && (
-        <Text size={16} style={{ color: blue400 }}>
+        <Text size={16} style={{ color: green400 }}>
           ✓
         </Text>
       )}

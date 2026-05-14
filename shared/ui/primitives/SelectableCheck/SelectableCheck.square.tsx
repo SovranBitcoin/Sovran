@@ -22,20 +22,20 @@ export function SelectableCheckSquare({
   accessibilityLabel,
   accessibilityHint,
 }: SelectableCheckProps) {
-  const [foreground, muted, surface, danger, blue300, blue400, warning] = useThemeColor([
+  const [foreground, muted, surface, danger, blue300, green400, warning] = useThemeColor([
     'foreground',
     'muted',
     'surface',
     'danger',
     'blue-300',
-    'blue-400',
+    'green-400',
     'warning',
   ] as const);
 
   const palette = {
     default: { border: muted, fill: foreground, mark: surface },
     primary: { border: blue300, fill: blue300, mark: 'white' },
-    success: { border: blue400, fill: blue400, mark: 'white' },
+    success: { border: green400, fill: green400, mark: 'white' },
     warning: { border: warning, fill: warning, mark: 'white' },
     error: { border: danger, fill: danger, mark: 'white' },
   }[variant];
