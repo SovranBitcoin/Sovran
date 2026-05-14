@@ -65,7 +65,7 @@ function ProgressRingComponent({
   const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
 
   useEffect(() => {
-    fadeAnim.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.cubic) });
+    fadeAnim.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
   }, [fadeAnim]);
 
   return (
@@ -106,6 +106,9 @@ function AnimatedAvatarComponent({
   status,
   size = 70,
   isLoading = false,
+  okBg,
+  okIcon,
+  okOutline,
 }: {
   picture?: string;
   name?: string;
@@ -113,6 +116,14 @@ function AnimatedAvatarComponent({
   status?: string;
   size?: number;
   isLoading?: boolean;
+  /** Solid-disc tint for the OK badge — overrides Badge variant="success"
+   *  (now blue) so the verified mint reads as green. */
+  okBg?: string;
+  /** Checkmark glyph color — paired with `okBg` for the OK badge. */
+  okIcon?: string;
+  /** Optional outline color for the checkmark — usually the screen background
+   *  so the glyph carries the same visual gap as the disc-to-avatar seam. */
+  okOutline?: string;
 }) {
   const badgeAnim = useSharedValue(0);
   const badgeStyle = useAnimatedStyle(() => ({
@@ -135,9 +146,35 @@ function AnimatedAvatarComponent({
 
   useEffect(() => {
     if (status && !isLoading) {
-      badgeAnim.value = withDelay(300, withSpring(1, { damping: 8, stiffness: 100 }));
+      badgeAnim.value = withDelay(80, withSpring(1, { damping: 14, stiffness: 260 }));
     }
   }, [status, isLoading, badgeAnim]);
+
+  const badgeSize = size * 0.33;
+  // OK gets a custom solid green disc — Badge variant="success" is hardcoded
+  // to a translucent blue wash + blue icon (deliberate app-wide retint), but
+  // the verified mint badge reads as "good" in green here.
+  // Ring around the disc in the screen background color — same visual weight
+  // as the seam between the avatar and the badge, just continued all the way
+  // around. `borderWidth` paints inside the box, so we add 2*ring to the
+  // total width to keep the green disc itself the same size as before.
+  const ring = okOutline ? 2 : 0;
+  const okOuter = badgeSize + 4 + ring * 2;
+  const okBadge = statusBadge?.variant === 'success' && okBg && okIcon ? (
+    <View
+      style={{
+        width: okOuter,
+        height: okOuter,
+        borderRadius: okOuter / 2,
+        backgroundColor: okBg,
+        borderWidth: ring,
+        borderColor: okOutline,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <Icon name={statusBadge.icon} size={badgeSize} color={okIcon} />
+    </View>
+  ) : null;
 
   return (
     <View className="relative">
@@ -150,7 +187,7 @@ function AnimatedAvatarComponent({
       />
       {statusBadge && (
         <Animated.View style={badgeStyle}>
-          <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={size * 0.33} />
+          {okBadge ?? <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={badgeSize} />}
         </Animated.View>
       )}
     </View>
@@ -408,7 +445,19 @@ const RatingBarChart = React.memo(RatingBarChartComponent);
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const [danger, success, starColor] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
+  // The mint-status ring + OK badge intentionally diverge from the theme
+  // `success` token (which is blue app-wide after the retint commit). A
+  // verified mint reads as "good" in green here, so pull the static green
+  // scale instead. Ring uses the vivid `green-300` (a thin stroke needs the
+  // brighter shade to register); the solid OK disc uses saturated `green-400`
+  // with a pale `green-100` checkmark for tonal contrast.
+  const [danger, success, starColor, okBadgeBg, okBadgeIcon] = useThemeColor([
+    'danger',
+    'green-300',
+    'yellow-300',
+    'green-400',
+    'green-100',
+  ] as const);
   const insets = useSafeAreaInsets();
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
   const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
@@ -489,6 +538,9 @@ export function MintInfoScreen() {
               status={entry?.auditState as string | undefined}
               size={70}
               isLoading={!entry}
+              okBg={okBadgeBg}
+              okIcon={okBadgeIcon}
+              okOutline={background}
             />
           </ProgressRing>
 
