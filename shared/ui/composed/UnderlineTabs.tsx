@@ -19,9 +19,6 @@ interface UnderlineTabsProps {
  * 2 px bottom border in `accent` and a heavier weight; inactive labels use
  * the theme `muted` token. Mirrors the top-tab pattern on `ContactsScreen`
  * so screens that opt for the underline style render byte-identical chrome.
- *
- * For the pill / blur-card variant (Receive's prior look, kept for the
- * keyring P2PK/NPUB toggle and ShareScreen), use `./Tabs.tsx` instead.
  */
 export function UnderlineTabs({
   tabs,

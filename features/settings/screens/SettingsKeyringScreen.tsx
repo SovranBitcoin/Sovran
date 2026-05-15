@@ -23,7 +23,7 @@ import { nip19 } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 import QRCode from 'react-native-qrcode-svg';
-import { Tabs } from '@/shared/ui/composed/Tabs';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import opacity from 'hex-color-opacity';
 import {
   Button,
@@ -77,7 +77,11 @@ const CurrentKeyItem: React.FC<{
     <View className="p-4">
       {!isDerived && (
         <View className="mb-4">
-          <Tabs tabs={['P2PK', 'NPUB']} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+          <UnderlineTabs
+            tabs={['P2PK', 'NPUB']}
+            selectedTab={selectedTab}
+            handleTabPress={handleTabPress}
+          />
         </View>
       )}
 
