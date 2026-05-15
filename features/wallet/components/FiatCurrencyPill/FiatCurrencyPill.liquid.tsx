@@ -6,7 +6,6 @@ import {
   foregroundStyle,
   frame,
   glassEffect,
-  tint,
 } from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 
@@ -18,7 +17,6 @@ import { zIndex } from '@/shared/styles/tokens';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
   const {
-    success,
     handleSelectCurrency,
     text,
     iosHeight,
@@ -41,15 +39,18 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
         interactive: true,
       },
     }),
-    // Colors the highlighted Menu row + native check glyph on the selected
-    // currency. SwiftUI's Menu inherits its accent from the host's tint.
-    tint(success),
   ];
 
   const glassTextModifiers = [
     font({ size: textSize, design: 'monospaced' as const, weight: 'bold' as const }),
     foregroundStyle(textColor),
     frame({ height: 22, width: iosWidth, alignment: 'center' }),
+  ];
+
+  // Renders each menu row's systemImage in the default label color
+  // instead of the inherited system accent (which would tint $/€/£).
+  const menuItemModifiers = [
+    foregroundStyle({ type: 'hierarchical' as const, style: 'primary' as const }),
   ];
 
   if (enableCurrencyMenu) {
@@ -62,16 +63,19 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
           <SwiftUIButton
             systemImage="dollarsign"
             label="USD"
+            modifiers={menuItemModifiers}
             onPress={() => handleSelectCurrency('usd')}
           />
           <SwiftUIButton
             systemImage="eurosign"
             label="EUR"
+            modifiers={menuItemModifiers}
             onPress={() => handleSelectCurrency('eur')}
           />
           <SwiftUIButton
             systemImage="sterlingsign"
             label="GBP"
+            modifiers={menuItemModifiers}
             onPress={() => handleSelectCurrency('gbp')}
           />
         </Menu>
