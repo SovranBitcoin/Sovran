@@ -15,7 +15,8 @@ import { copyPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import opacity from 'hex-color-opacity';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { Tabs } from '@/shared/ui/composed/Tabs';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
+import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -146,40 +147,42 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
     <Screen name="ShareScreen">
       {/* Tab bar - only show if npub is available for p2pk type */}
       {showTabs && (
-        <View style={{ marginBottom: 16 }}>
-          <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+        <View className="mb-4">
+          <UnderlineTabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
         </View>
       )}
 
       <PaymentInfo copyTarget={config.copyTarget} data={activeData} unit={config.unit} />
 
       <Section title={config.sectionTitle}>
-        <ListGroup variant="secondary">
-          <PressableFeedback animation={false} onPress={handleCopy}>
-            <PressableFeedback.Scale>
-              <ListGroup.Item disabled>
-                <ListGroup.ItemPrefix>
-                  {config.iconCurrency ? (
-                    <CurrencyIcon
-                      colors={[opacity(foreground, 0.4)]}
-                      width={20}
-                      currency={config.iconCurrency}
-                    />
-                  ) : config.iconName ? (
-                    <Icon name={config.iconName} size={20} color={opacity(foreground, 0.4)} />
-                  ) : undefined}
-                </ListGroup.ItemPrefix>
-                <ListGroup.ItemContent>
-                  <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
-                </ListGroup.ItemContent>
-                <ListGroup.ItemSuffix>
-                  <Icon name="lets-icons:copy" size={20} color={opacity(foreground, 0.4)} />
-                </ListGroup.ItemSuffix>
-              </ListGroup.Item>
-            </PressableFeedback.Scale>
-            <PressableFeedback.Ripple />
-          </PressableFeedback>
-        </ListGroup>
+        <GradientCard>
+          <ListGroup variant="transparent">
+            <PressableFeedback animation={false} onPress={handleCopy}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemPrefix>
+                    {config.iconCurrency ? (
+                      <CurrencyIcon
+                        colors={[opacity(foreground, 0.4)]}
+                        width={20}
+                        currency={config.iconCurrency}
+                      />
+                    ) : config.iconName ? (
+                      <Icon name={config.iconName} size={20} color={opacity(foreground, 0.4)} />
+                    ) : undefined}
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <Icon name="lets-icons:copy" size={20} color={opacity(foreground, 0.4)} />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          </ListGroup>
+        </GradientCard>
       </Section>
     </Screen>
   );
