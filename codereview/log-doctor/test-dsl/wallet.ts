@@ -237,4 +237,3 @@ function parseBalance(stdout: string): string | undefined {
     return m ? m[1] : undefined;
   }
 }
-

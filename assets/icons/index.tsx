@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import Svg, { Circle, Defs, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Monicon } from '@monicon/native';
 
 import { Animated, StyleProp, ViewStyle } from 'react-native';
@@ -537,7 +538,7 @@ export function CurrencyIcon({
   // always be white — otherwise the light-theme `foreground` (near-black)
   // paints a black B on the orange disc, which is wrong. Other currencies
   // still pick up the theme foreground so they invert with dark/light.
-  const symbolColor = iconColor ?? (currency === 'sat' ? '#FFFFFF' : foreground);
+  const symbolColor = iconColor ?? (currency === 'sat' ? INVARIANT_WHITE : foreground);
   /** When iconColor is passed (QR mode): background = text color, symbol = surface color */
   const symbolFill = iconColor != null ? g0 : symbolColor;
 

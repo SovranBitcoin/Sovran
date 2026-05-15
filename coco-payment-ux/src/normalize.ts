@@ -21,11 +21,11 @@ const LIGHTNING_PREFIXES = ['lightning://', 'lightning:', 'lightning='];
 
 // Hosts that historically render `?token=` or `#token` fragments containing a
 // raw cashuA/cashuB token. Users frequently share these as web links.
-const WEB_WALLET_HOSTS: ReadonlyArray<{
+const WEB_WALLET_HOSTS: readonly {
   host: string;
   source: 'query' | 'fragment';
   param?: string;
-}> = [
+}[] = [
   { host: 'wallet.cashu.me', source: 'query', param: 'token' },
   { host: 'wallet.cashu.me', source: 'fragment' },
   { host: 'wallet.nutstash.app', source: 'fragment' },

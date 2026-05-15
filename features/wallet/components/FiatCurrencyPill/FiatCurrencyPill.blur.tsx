@@ -15,14 +15,16 @@ import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactElement {
   const { text, iosHeight, handleSelectCurrency, onPress, enableCurrencyMenu, textSize } =
     useFiatCurrencyPill(props);
   const colorScheme = useColorScheme();
-  const textColor = colorScheme === 'light' ? '#000000' : '#FFFFFF';
+  const textColor = useThemeColor('foreground');
 
   const openCurrencySheet = useCallback(() => {
     ActionSheetIOS.showActionSheetWithOptions(
@@ -51,7 +53,7 @@ export function FiatCurrencyPillBlur(props: FiatCurrencyPillProps): React.ReactE
         blur
         blurIntensity={60}
         blurTint="light"
-        colorBlur={opacity('#FFFFFF', 0.15)}
+        colorBlur={opacity(INVARIANT_WHITE, 0.15)}
         style={{
           flexDirection: 'row',
           alignItems: 'center',

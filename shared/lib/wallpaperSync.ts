@@ -52,10 +52,7 @@ export async function refreshCatalog(signal?: AbortSignal): Promise<boolean> {
       new Map(
         albums
           .filter((a) => !isSovran(a.author?.pubkey))
-          .map((a) => [
-            a.author?.pubkey ?? '<no-pubkey>',
-            a.author?.displayName ?? '<no-name>',
-          ])
+          .map((a) => [a.author?.pubkey ?? '<no-pubkey>', a.author?.displayName ?? '<no-name>'])
       ).entries()
     ).map(([pubkey, name]) => `${name}:${pubkey.slice(0, 12)}…`);
 

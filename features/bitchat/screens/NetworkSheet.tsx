@@ -73,10 +73,7 @@ export default function NetworkSheet() {
   // through the mesh-flood spool (which expires after 15s). Surface this
   // distinction in both the sort order and the header count so users don't
   // think "5 connected" means "5 reachable for DM".
-  const directLinkCount = useMemo(
-    () => peers.filter((p) => p.hasDirectLink).length,
-    [peers]
-  );
+  const directLinkCount = useMemo(() => peers.filter((p) => p.hasDirectLink).length, [peers]);
 
   // Sort: direct-link first, then mesh-reachable, then offline; ties broken
   // by lastSeen desc. Matches upstream's MeshPeerList preference for "best

@@ -43,7 +43,7 @@ import opacity from 'hex-color-opacity';
  *     half-faded with the gap shown as the row description.
  */
 export function ModelChip() {
-  const [background, accent] = useThemeColor(['background', 'accent'] as const);
+  const background = useThemeColor('background');
 
   const selectedTier = useRoutstrStore((s) => s.selectedTier);
   const selectedProvider = useRoutstrStore((s) => s.selectedProvider);
@@ -99,7 +99,6 @@ export function ModelChip() {
         cellSnapshots.push({
           tierId: tier.id,
           providerId: provider.id,
-          modelId,
           ...details,
           catalog_max_cost_sats: model?.sats_pricing?.max_cost ?? null,
           catalog_max_cost_usd: model?.pricing?.max_cost ?? null,

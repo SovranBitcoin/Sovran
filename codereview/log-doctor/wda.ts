@@ -1308,6 +1308,7 @@ export async function tapByText(text: string): Promise<{ node: FlatNode; nudge: 
             centerX: cx,
             centerY: cy,
             hasIdent: false,
+            hasText: true,
           },
           nudge: true,
         };

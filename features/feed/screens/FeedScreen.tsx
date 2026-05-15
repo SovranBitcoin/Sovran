@@ -4,8 +4,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { ScreenContainer } from '@/features/contacts/components/ScreenContainer';
 import FilterItem from '@/features/contacts/components/search/SearchFilterItem';
-import { HomeFeed, PRIMAL_FEED_SPECS, categoryToLabel } from '@/features/feed/components/HomeFeed';
-import { CATEGORY_PUBKEYS } from '@/features/feed/components/nostr/categoryNpubs';
+import { HomeFeed, PRIMAL_FEED_SPECS } from '@/features/feed/components/HomeFeed';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import Icon from '@/assets/icons';
@@ -23,7 +22,6 @@ type FeedFiltersProps = {
 function FeedFilters({ isSearching, onFilterChange }: FeedFiltersProps) {
   const feedFilters = useMemo(() => {
     const primalNames = PRIMAL_FEED_SPECS.map((s) => s.name);
-    const categoryNames = Object.keys(CATEGORY_PUBKEYS).map(categoryToLabel);
     return [...primalNames];
   }, []);
 

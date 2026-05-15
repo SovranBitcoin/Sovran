@@ -36,7 +36,6 @@ import {
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import Icon from 'assets/icons';
 import { useLifecycleLogger } from '@/shared/lib/logger';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
 import { LoadingIndicator } from '@/shared/blocks/status';

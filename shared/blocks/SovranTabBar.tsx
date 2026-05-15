@@ -17,9 +17,7 @@ export const SOVRAN_TAB_BAR_ROW_HEIGHT = 52;
 /** Minimum bottom padding under the tab row when there's no home indicator. */
 export const SOVRAN_TAB_BAR_MIN_BOTTOM_PADDING = 8;
 
-type TabBarIcon = NonNullable<
-  BottomTabBarProps['descriptors'][string]['options']['tabBarIcon']
->;
+type TabBarIcon = NonNullable<BottomTabBarProps['descriptors'][string]['options']['tabBarIcon']>;
 
 type TabButtonProps = {
   focused: boolean;

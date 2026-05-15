@@ -38,8 +38,7 @@ export function walkFiles(dir, opts = {}, out = []) {
     if (st.isDirectory()) {
       if (IGNORE_PATH_PATTERNS.some((re) => re.test(full))) continue;
       walkFiles(full, opts, out);
-    }
-    else if (TS_EXTS.has(extname(entry))) {
+    } else if (TS_EXTS.has(extname(entry))) {
       if (!includeTests && isTestPath(full)) continue;
       out.push(full);
     }

@@ -102,13 +102,6 @@ export interface PickerCandidate {
   nip05Valid?: boolean;
 }
 
-// Source → delivery channel. Fixed; no runtime choice.
-function channelFor(source: SplitBillParticipantSource): SplitBillDeliveryChannel {
-  if (source === 'ble') return 'ble-dm';
-  if (source === 'nostr') return 'nostr-dm';
-  return 'qr-only';
-}
-
 /**
  * Shallow equality across every field of two PickerCandidates. Used by the
  * selection-refresh effect to skip work when a fresh candidate matches the
@@ -457,7 +450,6 @@ export function useSplitBillParticipantPicker(
       if (map.has(r.pubkey)) continue;
       map.set(r.pubkey, {
         name: r.profile?.name,
-        display_name: r.profile?.display_name,
         displayName: r.profile?.displayName,
         picture: r.profile?.picture,
         nip05: r.profile?.nip05,

@@ -16,6 +16,7 @@ import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
+import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 
 export { SPEED_PRESETS, DENSITY_PRESETS, DEFAULT_SPEED_INDEX, DEFAULT_DENSITY_INDEX };
 
@@ -46,7 +47,6 @@ const DENSITY_PRESETS = [
 const DEFAULT_DENSITY_INDEX = 2; // L (150 bytes, ecosystem default)
 
 const LOGO_SIZE = 54;
-const CIRCLE_SIZE = LOGO_SIZE + 8;
 
 interface AnimatedQRCodeProps {
   padding?: number;
@@ -178,14 +178,13 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   const showLoading = needsAnimation && (isEncoding || (parts.length === 0 && !encodingError));
   const showError = needsAnimation && encodingError && parts.length === 0;
   const canRenderQR = !showLoading && !showError && qrData && qrData.length <= MAX_QR_DATA_LENGTH;
-  const isAnimating = needsAnimation && parts.length > 1;
 
   const width = size ?? Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
   // QR codes are pinned to dark-on-white regardless of theme — scanners are
   // strict, and an inverted (light-on-dark) QR is unreliable on most readers.
-  const QR_DARK = '#000000';
-  const QR_LIGHT = '#FFFFFF';
+  const QR_DARK = INVARIANT_BLACK;
+  const QR_LIGHT = INVARIANT_WHITE;
   const gradientColors = [QR_LIGHT, QR_LIGHT] as const;
   const qrSize = width - 2 * padding;
   // On light themes a pure-white card disappears into the page surface, so

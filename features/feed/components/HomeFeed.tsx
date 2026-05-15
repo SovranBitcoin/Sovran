@@ -139,7 +139,7 @@ function EmptyFeed() {
 
 export function HomeFeed({ activeFilter }: HomeFeedProps) {
   useBackgroundConfig(BG_CONFIG);
-  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
+  const foreground = useThemeColor('foreground');
   const imageOverlay = useImageOverlay();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;

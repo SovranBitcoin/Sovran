@@ -14,33 +14,43 @@
  * The first screen shows a close button, subsequent screens show a back button.
  */
 
+import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
+const MINT_SELECT_OPTIONS = { title: 'Select Mint' };
+const AMOUNT_OPTIONS = { title: 'Select Amount' };
+const SEND_TOKEN_OPTIONS = { title: 'Send Ecash' };
+const MELT_QUOTE_OPTIONS = {
+  title: 'Send Lightning',
+  headerBackButtonMenuEnabled: false,
+};
+const PAYMENT_REQUEST_OPTIONS = {
+  title: 'Payment Request',
+  headerBackButtonMenuEnabled: false,
+};
+const CAMERA_HEADER_STYLE = { backgroundColor: 'transparent' };
+const CAMERA_OPTIONS = {
+  title: 'Scan QR',
+  headerStyle: CAMERA_HEADER_STYLE,
+};
+
 export default function SendFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const screenOptions = useMemo(
+    () => createFlowLayoutScreenOptions({ foreground, background }),
+    [foreground, background]
+  );
 
   return (
-    <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
-      <Stack.Screen name="mintSelect" options={{ title: 'Select Mint' }} />
-      <Stack.Screen name="amount" options={{ title: 'Select Amount' }} />
-      <Stack.Screen name="sendToken" options={{ title: 'Send Ecash' }} />
-      <Stack.Screen
-        name="meltQuote"
-        options={{ title: 'Send Lightning', headerBackButtonMenuEnabled: false }}
-      />
-      <Stack.Screen
-        name="paymentRequest"
-        options={{ title: 'Payment Request', headerBackButtonMenuEnabled: false }}
-      />
-      <Stack.Screen
-        name="camera"
-        options={{
-          title: 'Scan QR',
-          headerStyle: { backgroundColor: 'transparent' },
-        }}
-      />
+    <Stack screenOptions={screenOptions}>
+      <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
+      <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
+      <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
+      <Stack.Screen name="meltQuote" options={MELT_QUOTE_OPTIONS} />
+      <Stack.Screen name="paymentRequest" options={PAYMENT_REQUEST_OPTIONS} />
+      <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
     </Stack>
   );
 }

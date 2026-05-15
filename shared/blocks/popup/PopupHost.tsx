@@ -686,9 +686,7 @@ function SheetPopup() {
           // PopupHost (e.g. emoji picker, payment-options — both need
           // FullWindowOverlay above route modals) are visually
           // indistinguishable from menu-lane surfaces.
-          backgroundClassName={
-            isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'
-          }
+          backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}
           backgroundComponent={
             hasLiveStatus
               ? (props: any) => (

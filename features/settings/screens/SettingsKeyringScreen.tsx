@@ -22,6 +22,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { nip19 } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import QRCode from 'react-native-qrcode-svg';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import opacity from 'hex-color-opacity';
@@ -41,7 +42,7 @@ const CurrentKeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const muted = useThemeColor('muted');
   const [selectedTab, setSelectedTab] = useState('P2PK');
 
   const isDerived = keypair.derivationIndex !== undefined;
@@ -93,12 +94,17 @@ const CurrentKeyItem: React.FC<{
           style={{
             alignItems: 'center',
             padding: 12,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: INVARIANT_WHITE,
             borderRadius: 12,
           }}>
           {/* QR pinned to dark-on-white regardless of theme — scanners are
               strict and an inverted (light-on-dark) render is unreliable. */}
-          <QRCode value={activeData} size={120} color="#000000" backgroundColor="#FFFFFF" />
+          <QRCode
+            value={activeData}
+            size={120}
+            color={INVARIANT_BLACK}
+            backgroundColor={INVARIANT_WHITE}
+          />
         </View>
       </PressableFeedback>
 

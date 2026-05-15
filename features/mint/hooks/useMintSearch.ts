@@ -9,6 +9,15 @@ interface UseMintSearchReturn {
   error: string | null;
 }
 
+function hasMintIconUrl(result: MintSearchResult): boolean {
+  const { info } = result;
+  if (typeof info !== 'object' || info === null) return false;
+  if (!('icon_url' in info)) return false;
+
+  const iconUrl = (info as { icon_url?: unknown }).icon_url;
+  return typeof iconUrl === 'string' && iconUrl.trim().length > 0;
+}
+
 /**
  * Server-backed mint search hook.
  *
@@ -66,7 +75,7 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
           }
           const duration = Math.round(performance.now() - t0);
           if (res.isOk()) {
-            const withIcons = res.value.results.filter((r) => r.info?.icon_url).length;
+            const withIcons = res.value.results.filter(hasMintIconUrl).length;
             const withReviews = res.value.results.filter((r) => r.review_score !== null).length;
             cashuLog.info('mint.search.results', {
               fetchId,

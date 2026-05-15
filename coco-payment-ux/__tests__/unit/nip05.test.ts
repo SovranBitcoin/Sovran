@@ -7,11 +7,12 @@ const PUBKEY = 'a'.repeat(64);
 const ODELL_PUBKEY = '04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9';
 
 function mockJsonResponse(body: unknown, init?: { ok?: boolean; status?: number }): Response {
-  return {
+  const response: Pick<Response, 'ok' | 'status' | 'json'> = {
     ok: init?.ok ?? true,
     status: init?.status ?? 200,
     json: async () => body,
-  } as Response;
+  };
+  return response as Response;
 }
 
 describe('NIP-05 recipient resolution', () => {
@@ -20,7 +21,7 @@ describe('NIP-05 recipient resolution', () => {
   });
 
   it('fetches the lightning-address well-known URL and returns lowercase pubkey', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
       mockJsonResponse({
         names: {
           alice: PUBKEY.toUpperCase(),
@@ -53,7 +54,7 @@ describe('NIP-05 recipient resolution', () => {
   });
 
   it('accepts the real Primal response shape for odell@primal.net', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
       mockJsonResponse({
         names: {
           odell: ODELL_PUBKEY,

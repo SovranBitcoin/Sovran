@@ -27,11 +27,6 @@
       "count": 1
     }
   },
-  "coco-payment-ux/__tests__/_harness/mockOperations.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "coco-payment-ux/__tests__/integration/operations.test.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 2
@@ -433,16 +428,6 @@
   "shared/ui/composed/CircleActionButton/CircleActionButton.liquid.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    }
-  },
-  "shared/ui/composed/QRButton/QRButton.android.tsx": {
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
-  "shared/ui/composed/QRButton/QRButton.ios.tsx": {
-    "no-restricted-syntax": {
-      "count": 2
     }
   },
   "shared/ui/composed/RowStatsAccent.tsx": {

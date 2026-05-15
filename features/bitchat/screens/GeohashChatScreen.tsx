@@ -88,9 +88,7 @@ export function GeohashChatScreen({
   const { peers: blePeers, connectedCount: bleConnectedCount } = useBLEPeers();
   const dmPeerSnapshot = useMemo(
     () =>
-      transport === 'ble-dm' && dmPeerID
-        ? blePeers.find((p) => p.peerID === dmPeerID)
-        : undefined,
+      transport === 'ble-dm' && dmPeerID ? blePeers.find((p) => p.peerID === dmPeerID) : undefined,
     [blePeers, transport, dmPeerID]
   );
 
@@ -238,11 +236,8 @@ export function GeohashChatScreen({
   let bleDmBanner: React.ReactNode = null;
   if (transport === 'ble-dm') {
     const isMeshOnly =
-      !!dmPeerSnapshot &&
-      dmPeerSnapshot.isConnected &&
-      dmPeerSnapshot.hasDirectLink === false;
-    const isUnknownOrOffline =
-      !dmPeerSnapshot || !dmPeerSnapshot.isConnected;
+      !!dmPeerSnapshot && dmPeerSnapshot.isConnected && dmPeerSnapshot.hasDirectLink === false;
+    const isUnknownOrOffline = !dmPeerSnapshot || !dmPeerSnapshot.isConnected;
     if (isMeshOnly) {
       bleDmBanner = (
         <HStack
@@ -254,10 +249,7 @@ export function GeohashChatScreen({
             backgroundColor: surfaceSecondary,
           }}>
           <Icon name="mdi:lan-disconnect" size={16} color={shade400} />
-          <Text
-            size={12}
-            style={{ color: shade400, flex: 1 }}
-            numberOfLines={2}>
+          <Text size={12} style={{ color: shade400, flex: 1 }} numberOfLines={2}>
             Reachable only via mesh relay — messages may take several attempts.
           </Text>
         </HStack>
@@ -273,10 +265,7 @@ export function GeohashChatScreen({
             backgroundColor: surfaceSecondary,
           }}>
           <Icon name="mdi:bluetooth-off" size={16} color={shade400} />
-          <Text
-            size={12}
-            style={{ color: shade400, flex: 1 }}
-            numberOfLines={2}>
+          <Text size={12} style={{ color: shade400, flex: 1 }} numberOfLines={2}>
             Peer is not currently nearby — your message will be queued briefly.
           </Text>
         </HStack>

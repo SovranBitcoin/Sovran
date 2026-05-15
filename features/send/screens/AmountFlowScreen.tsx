@@ -98,15 +98,15 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
     };
   }, [entryRecipientPubkey, liveCtx.recipientPubkey, entryMeltTarget]);
 
-  const recipientPubkey = entryRecipientPubkey ?? liveCtx.recipientPubkey ?? localPubkey ?? undefined;
+  const recipientPubkey =
+    entryRecipientPubkey ?? liveCtx.recipientPubkey ?? localPubkey ?? undefined;
   const recipientProfile = entryRecipientProfile ?? liveCtx.recipientProfile;
   const { metadata: liveNostrMetadata } = useNostrProfileMetadata(recipientPubkey);
   const fallbackDisplayName = liveNostrMetadata
     ? resolveIdentityName({ pubkey: recipientPubkey ?? '', nostrProfile: liveNostrMetadata })
     : null;
   const headerDisplayName = recipientProfile?.displayName ?? fallbackDisplayName ?? null;
-  const headerAvatarUrl =
-    recipientProfile?.avatarUrl ?? liveNostrMetadata?.picture ?? null;
+  const headerAvatarUrl = recipientProfile?.avatarUrl ?? liveNostrMetadata?.picture ?? null;
   const recipientReady = !!(recipientPubkey && headerDisplayName);
 
   // Profile bundle forwarded to AmountSelector → `actions.next.execute(...)` →
@@ -143,7 +143,8 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   useEffect(() => {
     paymentLog.debug('amount_flow.entry_dump', {
       entryKeys: entry ? Object.keys(entry) : null,
-      entryRecipientPubkey: typeof entry?.recipientPubkey === 'string' ? entry.recipientPubkey.slice(0, 8) : null,
+      entryRecipientPubkey:
+        typeof entry?.recipientPubkey === 'string' ? entry.recipientPubkey.slice(0, 8) : null,
       entryRecipientProfilePresent: !!entry?.recipientProfile,
       entryMeltTarget: typeof entry?.meltTarget === 'string' ? entry.meltTarget.slice(0, 40) : null,
       entryDestination: entry?.destination ?? null,

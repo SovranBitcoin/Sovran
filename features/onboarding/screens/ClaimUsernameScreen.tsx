@@ -39,6 +39,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { z } from 'zod';
 import { NPC_BASE_URL, NPC_DOMAIN } from '@/shared/lib/cashu/npc';
+import { fetchStatus } from '@/shared/lib/apiClient';
 import { NPCClient, JWTAuthProvider, PaymentRequiredError } from 'npubcash-sdk';
 
 // Available domains for Lightning addresses
@@ -97,9 +98,11 @@ async function checkUsernameAvailability(
   }
 
   const url = `${NPC_BASE_URL}/api/v1/info/username/${encodeURIComponent(username)}`;
-  const res = await fetch(url, { method: 'GET', signal });
-  if (res.status === 404) return { available: true };
-  if (res.ok) return { available: false };
+  const res = await fetchStatus(url, { method: 'GET' }, { signal });
+  if (res.isErr()) return { available: true };
+  const { ok, status } = res.value;
+  if (status === 404) return { available: true };
+  if (ok) return { available: false };
   return { available: true };
 }
 

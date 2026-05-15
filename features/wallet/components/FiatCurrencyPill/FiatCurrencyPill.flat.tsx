@@ -4,13 +4,13 @@ import opacity from 'hex-color-opacity';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactElement {
   const { text, iosHeight, onPress, textSize } = useFiatCurrencyPill(props);
-  const colorScheme = useColorScheme();
-  const textColor = colorScheme === 'light' ? '#000000' : '#FFFFFF';
+  const textColor = useThemeColor('foreground');
 
   return (
     <Pressable disabled={!onPress} onPress={onPress}>
@@ -20,9 +20,9 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: opacity('#FFFFFF', 0.15),
+          backgroundColor: opacity(INVARIANT_WHITE, 0.15),
           borderWidth: 1,
-          borderColor: opacity('#FFFFFF', 0.2),
+          borderColor: opacity(INVARIANT_WHITE, 0.2),
           paddingHorizontal: 14,
           paddingVertical: 6,
           minHeight: iosHeight,

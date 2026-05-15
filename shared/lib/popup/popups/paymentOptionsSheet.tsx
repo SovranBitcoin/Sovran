@@ -13,7 +13,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
-import { defaultDetectors, type AnnotatedOption, type PaymentMachine } from 'coco-payment-ux';
+import { defaultDetectors, type AnnotatedOption } from 'coco-payment-ux';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -27,11 +27,7 @@ import type { CustomSheetSharedProps } from '../sheets/types';
 type OptionKind = AnnotatedOption['option']['kind'];
 
 const CASHU_KINDS: readonly OptionKind[] = ['paymentRequest', 'ecashToken'];
-const LIGHTNING_KINDS: readonly OptionKind[] = [
-  'lightningInvoice',
-  'lightningAddress',
-  'lnurlp',
-];
+const LIGHTNING_KINDS: readonly OptionKind[] = ['lightningInvoice', 'lightningAddress', 'lnurlp'];
 
 function getMethodLabel(kind: OptionKind): string {
   if (CASHU_KINDS.includes(kind)) return 'Cashu';
@@ -76,10 +72,7 @@ function OptionRow({ annotated, unit, isFailed, failedReason, onPress }: OptionR
         : undefined;
 
   const item = (
-    <Menu.Item
-      isDisabled={disabled}
-      variant={isFailed ? 'danger' : 'default'}
-      onPress={onPress}>
+    <Menu.Item isDisabled={disabled} variant={isFailed ? 'danger' : 'default'} onPress={onPress}>
       <HStack align="center" gap={10} style={{ flex: 1 }}>
         <Icon name={getMethodIcon(option.kind)} size={20} />
         <View style={{ flex: 1 }}>
@@ -89,9 +82,7 @@ function OptionRow({ annotated, unit, isFailed, failedReason, onPress }: OptionR
           <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
             {getMethodLabel(option.kind)}
           </Menu.ItemTitle>
-          {descriptionText ? (
-            <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
-          ) : null}
+          {descriptionText ? <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription> : null}
         </View>
         {hasAmount ? (
           <View>
@@ -116,9 +107,8 @@ export function PaymentOptionsContent({ payload, close, isFallback }: PaymentOpt
     isFallback && 'failedOptionValues' in payload
       ? new Set(payload.failedOptionValues)
       : new Set<string>();
-  const lastFailedMessage = isFallback && 'lastFailedMessage' in payload
-    ? payload.lastFailedMessage
-    : undefined;
+  const lastFailedMessage =
+    isFallback && 'lastFailedMessage' in payload ? payload.lastFailedMessage : undefined;
 
   // Distinguish user-pick close (machine.chooseOption already fired) from
   // overlay-tap / swipe-down close (machine still needs `onDismiss`).

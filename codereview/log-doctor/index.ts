@@ -62,20 +62,11 @@ import * as url from 'url';
 
 // Test DSL — parser, executor, discovery, verification metadata writer.
 // These power the `phone test ...` subcommand.
-import {
-  discoverTests,
-  findMatrix,
-  findTest,
-  formatTestList,
-} from './test-dsl/discovery';
+import { discoverTests, findMatrix, findTest, formatTestList } from './test-dsl/discovery';
 import type { RunnerEvent } from './test-dsl/events';
 import { executeMatrix, executeTest } from './test-dsl/executor';
 import { parseSuite } from './test-dsl/parser';
-import {
-  createTtyReporter,
-  isInteractiveTty,
-  type TtyReporter,
-} from './test-dsl/tty-reporter';
+import { createTtyReporter, isInteractiveTty, type TtyReporter } from './test-dsl/tty-reporter';
 import { writeMatrixResultTable, writeVerifiedComment } from './test-dsl/verification';
 // WebDriverAgent primitives — see ./wda.ts for the rationale this lives in
 // its own module (executor.ts also depends on these primitives, so keeping
@@ -1723,17 +1714,28 @@ function modeGC(entries: LogEntry[], _opts: Options): string {
 function modeCrypto(entries: LogEntry[], opts: Options): string {
   // Crypto ops come from __CASHU_PERF or native_crypto events
   const cryptoOps = [
-    'hashToCurve', 'hash_e', 'blindMessage', 'unblind', 'constructProof',
-    'schnorr.sign', 'schnorr.verify', 'dleq.verify', 'dleq.verifyReblind',
-    'derive_deprecated', 'deriveBoth', 'createDeterministicData_batch',
-    'createRandomData', 'createSingleRandomData', 'outputData.toProof',
-    'encodeToken', 'decodeToken', 'wallet.checkProofsStates',
+    'hashToCurve',
+    'hash_e',
+    'blindMessage',
+    'unblind',
+    'constructProof',
+    'schnorr.sign',
+    'schnorr.verify',
+    'dleq.verify',
+    'dleq.verifyReblind',
+    'derive_deprecated',
+    'deriveBoth',
+    'createDeterministicData_batch',
+    'createRandomData',
+    'createSingleRandomData',
+    'outputData.toProof',
+    'encodeToken',
+    'decodeToken',
+    'wallet.checkProofsStates',
   ];
 
   // Find cashu.native_crypto events
-  const nativeCryptoEntries = entries.filter(
-    (e) => e.event === 'cashu.native_crypto.enabled'
-  );
+  const nativeCryptoEntries = entries.filter((e) => e.event === 'cashu.native_crypto.enabled');
 
   // Find coco perf entries with crypto timing
   const perfEntries = entries.filter((e) => {
@@ -1768,7 +1770,17 @@ function modeCrypto(entries: LogEntry[], opts: Options): string {
   lines.push('');
 
   // Aggregate perf entries by operation type
-  const byOp = new Map<string, { count: number; totalMs: number; minMs: number; maxMs: number; native: number; jsCount: number }>();
+  const byOp = new Map<
+    string,
+    {
+      count: number;
+      totalMs: number;
+      minMs: number;
+      maxMs: number;
+      native: number;
+      jsCount: number;
+    }
+  >();
   for (const e of perfEntries) {
     const params = e.params as Record<string, unknown>;
     // Try to extract op from event name
@@ -1777,7 +1789,14 @@ function modeCrypto(entries: LogEntry[], opts: Options): string {
 
     const ms = params.ms as number;
     const isNative = params.native === true;
-    const existing = byOp.get(op) ?? { count: 0, totalMs: 0, minMs: Infinity, maxMs: 0, native: 0, jsCount: 0 };
+    const existing = byOp.get(op) ?? {
+      count: 0,
+      totalMs: 0,
+      minMs: Infinity,
+      maxMs: 0,
+      native: 0,
+      jsCount: 0,
+    };
     existing.count++;
     existing.totalMs += ms;
     existing.minMs = Math.min(existing.minMs, ms);
@@ -1863,9 +1882,12 @@ function modeOps(entries: LogEntry[], opts: Options): string {
       byPhase.set(phase, existing);
     }
 
-    for (const [phase, stats] of [...byPhase.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs)) {
+    for (const [phase, stats] of [...byPhase.entries()].sort(
+      (a, b) => b[1].totalMs - a[1].totalMs
+    )) {
       const avg = stats.count > 0 ? stats.totalMs / stats.count : 0;
-      const msStr = stats.totalMs > 0 ? ` (${stats.totalMs.toFixed(1)}ms total, ${avg.toFixed(1)}ms avg)` : '';
+      const msStr =
+        stats.totalMs > 0 ? ` (${stats.totalMs.toFixed(1)}ms total, ${avg.toFixed(1)}ms avg)` : '';
       lines.push(`  ${phase.padEnd(25)} ${String(stats.count).padStart(3)}x${msStr}`);
     }
     lines.push('');
@@ -1873,7 +1895,11 @@ function modeOps(entries: LogEntry[], opts: Options): string {
 
   // Show wallet-level operations (wallet.send, wallet.receive, etc. from cashu-ts __CASHU_PERF)
   const walletOps = entries.filter((e) => {
-    return e.event.startsWith('wallet.action.') || e.event.startsWith('payment.step.') || e.event.startsWith('payment.processing');
+    return (
+      e.event.startsWith('wallet.action.') ||
+      e.event.startsWith('payment.step.') ||
+      e.event.startsWith('payment.processing')
+    );
   });
   if (walletOps.length > 0) {
     lines.push('WALLET ACTIONS:');
@@ -1885,8 +1911,15 @@ function modeOps(entries: LogEntry[], opts: Options): string {
       const delta = prevT !== null ? t - prevT : 0;
       prevT = t;
       const params = e.params as Record<string, unknown> | undefined;
-      const paramsStr = params ? Object.entries(params).filter(([k]) => k !== '_t' && k !== '_dedup').map(([k, v]) => `${k}=${v}`).join(' ') : '';
-      lines.push(`${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(35).slice(0, 35)} ${paramsStr}`);
+      const paramsStr = params
+        ? Object.entries(params)
+            .filter(([k]) => k !== '_t' && k !== '_dedup')
+            .map(([k, v]) => `${k}=${v}`)
+            .join(' ')
+        : '';
+      lines.push(
+        `${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(35).slice(0, 35)} ${paramsStr}`
+      );
     }
     lines.push(footer);
   }
@@ -1917,7 +1950,13 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
   >();
   for (const e of perfEntries) {
     const ms = (e.params as Record<string, unknown>).ms as number;
-    const existing = byEvent.get(e.event) ?? { count: 0, totalMs: 0, minMs: Infinity, maxMs: 0, samples: [] };
+    const existing = byEvent.get(e.event) ?? {
+      count: 0,
+      totalMs: 0,
+      minMs: Infinity,
+      maxMs: 0,
+      samples: [],
+    };
     existing.count++;
     existing.totalMs += ms;
     existing.minMs = Math.min(existing.minMs, ms);
@@ -1931,7 +1970,9 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
 
   lines.push('BOTTLENECK RANKING (by total time):');
   lines.push('');
-  lines.push('  Event                                  Count   Total ms   Avg ms   Min ms   Max ms   P95 ms');
+  lines.push(
+    '  Event                                  Count   Total ms   Avg ms   Min ms   Max ms   P95 ms'
+  );
   lines.push('  ' + '-'.repeat(100));
 
   for (const [event, stats] of sorted) {
@@ -1945,11 +1986,15 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
   lines.push('');
 
   // Show entries with ms > 500 (slow operations)
-  const slowOps = perfEntries.filter((e) => ((e.params as Record<string, unknown>).ms as number) > 500);
+  const slowOps = perfEntries.filter(
+    (e) => ((e.params as Record<string, unknown>).ms as number) > 500
+  );
   if (slowOps.length > 0) {
     lines.push(`SLOW OPERATIONS (>500ms): ${slowOps.length}`);
     lines.push('');
-    for (const e of slowOps.sort((a, b) => ((b.params as any).ms as number) - ((a.params as any).ms as number)).slice(0, 20)) {
+    for (const e of slowOps
+      .sort((a, b) => ((b.params as any).ms as number) - ((a.params as any).ms as number))
+      .slice(0, 20)) {
       const params = e.params as Record<string, unknown>;
       const ms = params.ms as number;
       const extra = Object.entries(params)
@@ -1962,7 +2007,9 @@ function modePerf(entries: LogEntry[], _opts: Options): string {
   }
 
   // Network vs compute breakdown
-  const withNetwork = perfEntries.filter((e) => (e.params as Record<string, unknown>).networkMs !== undefined);
+  const withNetwork = perfEntries.filter(
+    (e) => (e.params as Record<string, unknown>).networkMs !== undefined
+  );
   if (withNetwork.length > 0) {
     lines.push('NETWORK vs COMPUTE BREAKDOWN:');
     lines.push('');
@@ -2251,12 +2298,9 @@ async function modePhoneTest(args: string[]): Promise<string> {
       if (matrixResult.ok) pass++;
       else fail++;
       try {
-        writeMatrixResultTable(
-          foundMatrix.file,
-          foundMatrix.matrix,
-          matrixResult,
-          { label: await detectDeviceLabel() }
-        );
+        writeMatrixResultTable(foundMatrix.file, foundMatrix.matrix, matrixResult, {
+          label: await detectDeviceLabel(),
+        });
       } catch {
         /* best effort */
       }
@@ -2319,9 +2363,7 @@ async function modePhoneTest(args: string[]): Promise<string> {
   // a given key resolves to exactly one runnable.
   const foundMatrix = findMatrix(result, name);
   if (!foundMatrix) {
-    throw new Error(
-      `no test or matrix named '${name}'.\n\nAvailable:\n${formatTestList(result)}`
-    );
+    throw new Error(`no test or matrix named '${name}'.\n\nAvailable:\n${formatTestList(result)}`);
   }
   await ensureWDAReady();
   const cellCount = foundMatrix.matrix.stages.reduce(
@@ -2343,12 +2385,9 @@ async function modePhoneTest(args: string[]): Promise<string> {
   if (streamEvent) matrixOpts.onEvent = streamEvent;
   const matrixResult = await executeMatrix(foundMatrix.matrix, matrixOpts);
   try {
-    writeMatrixResultTable(
-      foundMatrix.file,
-      foundMatrix.matrix,
-      matrixResult,
-      { label: await detectDeviceLabel() }
-    );
+    writeMatrixResultTable(foundMatrix.file, foundMatrix.matrix, matrixResult, {
+      label: await detectDeviceLabel(),
+    });
   } catch {
     /* best effort */
   }
@@ -2706,7 +2745,9 @@ const __entryFile = process.argv[1] ? nodePath.resolve(process.argv[1]) : '';
 const __isShimEntry = __entryFile.endsWith(`${nodePath.sep}scripts${nodePath.sep}log-doctor.ts`);
 if (__entryFile === __thisFile || __isShimEntry) {
   // Best-effort cleanup of the cached WDA session on exit.
-  process.on('exit', () => { invalidateCachedSession(); });
+  process.on('exit', () => {
+    invalidateCachedSession();
+  });
   main().catch((err) => {
     console.error(err instanceof Error ? err.stack || err.message : String(err));
     process.exit(1);

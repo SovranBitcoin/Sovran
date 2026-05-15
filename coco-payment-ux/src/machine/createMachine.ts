@@ -252,17 +252,24 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     // identity (idle, confirmSend, mintQuoteCreated, etc.) are no-ops.
     const pk = flowCtx.recipientPubkey;
     const profile = flowCtx.recipientProfile;
+    const withRecipientIdentity = <T extends Record<string, unknown>>(data: T) => ({
+      ...data,
+      ...(pk ? { recipientPubkey: pk } : {}),
+      ...(profile ? { recipientProfile: profile } : {}),
+    });
+
     switch (step) {
       case 'enterAmount': {
         const d = stepData as StepDataMap['enterAmount'];
-        stepData = {
+        const nextData: StepDataMap['enterAmount'] = {
           ...d,
           constraints: {
             ...d.constraints,
             ...(pk ? { recipientPubkey: pk } : {}),
             ...(profile ? { recipientProfile: profile } : {}),
           },
-        } as StepDataMap[FlowStep];
+        };
+        stepData = nextData;
         return;
       }
       case 'selectMint':
@@ -271,11 +278,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       case 'navigateToMeltPreview':
       case 'navigateToPaymentRequest': {
         const d = stepData as Record<string, unknown>;
-        stepData = {
-          ...d,
-          ...(pk ? { recipientPubkey: pk } : {}),
-          ...(profile ? { recipientProfile: profile } : {}),
-        } as StepDataMap[FlowStep];
+        const nextData = withRecipientIdentity(d);
+        stepData = nextData as StepDataMap[FlowStep];
         return;
       }
       default:

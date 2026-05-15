@@ -174,7 +174,7 @@ export function createMockOperations(
     trustMint: wrap('trustMint', async () => {}),
 
     // buildMintReviewInfo: fetches KYM/audit data (not available in tests)
-    buildMintReviewInfo: wrap('buildMintReviewInfo', undefined as any),
+    buildMintReviewInfo: wrap('buildMintReviewInfo', undefined),
 
     // executeMelt: converts ecash to Lightning payment
     executeMelt: wrap('executeMelt', async (_mintUrl, _meltTarget, _amount, _unit) => ({
@@ -220,7 +220,7 @@ export function createMockOperations(
 
     // resolveRecipientPubkey / resolveRecipientProfile: optional recipient
     // identity enrichers. No defaults in tests; individual suites opt in.
-    resolveRecipientPubkey: wrap('resolveRecipientPubkey', undefined as any),
-    resolveRecipientProfile: wrap('resolveRecipientProfile', undefined as any),
+    resolveRecipientPubkey: wrap('resolveRecipientPubkey', undefined),
+    resolveRecipientProfile: wrap('resolveRecipientProfile', undefined),
   };
 }

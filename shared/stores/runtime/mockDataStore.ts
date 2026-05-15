@@ -197,10 +197,10 @@ interface MockContact {
   npub: string;
   metadata: Omit<NostrProfileMetadata, 'fetchedAt'>;
   /** Deterministic thread, oldest first. ISO-ish offsets from `now` in minutes. */
-  thread: ReadonlyArray<{ content: string; isOwn: boolean; minutesAgo: number }>;
+  thread: readonly { content: string; isOwn: boolean; minutesAgo: number }[];
 }
 
-const MOCK_CONTACTS: ReadonlyArray<MockContact> = [
+const MOCK_CONTACTS: readonly MockContact[] = [
   {
     pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
     npub: 'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',

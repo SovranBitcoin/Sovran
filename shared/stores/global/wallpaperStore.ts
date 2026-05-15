@@ -259,7 +259,7 @@ export const useWallpaperStore = create<WallpaperState>()(
         const { downloaded } = get();
         const orphans: string[] = [];
 
-        for (const [themeName, wallpaper] of Object.entries(downloaded)) {
+        for (const themeName of Object.keys(downloaded)) {
           const exists = await isWallpaperDownloaded(themeName);
           if (!exists) {
             storeLog.warn('wallpaper.integrity.missing', { themeName });

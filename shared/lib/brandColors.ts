@@ -20,3 +20,11 @@ export const CONNECTED_ACCENT = '#34C759';
  *  `themeEngine.ts`; declared here too so callers don't reach into the theme
  *  layer for a value that's identical across every theme. */
 export const BITCOIN_ACCENT = '#F7931A';
+
+/** Fixed white for theme-invariant surfaces such as QR backgrounds, bitcoin
+ *  symbol cutouts, and iOS glass wash layers that must not invert by theme. */
+export const INVARIANT_WHITE = '#FFFFFF';
+
+/** Fixed black for theme-invariant QR foregrounds. Scanners expect dark modules
+ *  on a light background, so this intentionally does not follow app theme. */
+export const INVARIANT_BLACK = '#000000';

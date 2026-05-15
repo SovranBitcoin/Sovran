@@ -1,10 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Keyboard,
-  ScrollView,
-  View as RNView,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { Keyboard, ScrollView, View as RNView, type LayoutChangeEvent } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
@@ -92,7 +87,6 @@ export function AiChatScreen() {
       archivedCount: store.conversationHistory.length,
     });
     store.createSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const insets = useSafeAreaInsets();
@@ -221,8 +215,7 @@ export function AiChatScreen() {
       {
         translateY:
           keyboardHeight.value +
-          keyboardProgress.value *
-            (bottomInset + sovranTabBarHeight - COMPOSER_FOCUSED_BOTTOM_GAP),
+          keyboardProgress.value * (bottomInset + sovranTabBarHeight - COMPOSER_FOCUSED_BOTTOM_GAP),
       },
     ],
   }));
@@ -330,46 +323,46 @@ export function AiChatScreen() {
           the latest message stays just above the composer instead of
           getting hidden behind the keyboard. */}
       <Reanimated.View style={[{ flex: 1 }, keyboardLiftStyle]}>
-      {activeMessages.length === 0 ? (
-        emptyContent
-      ) : (
-        <LegendList
-          data={activeMessages}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          estimatedItemSize={ESTIMATED_BUBBLE_HEIGHT}
-          // Canonical LegendList v3 chat pattern. Each prop addresses a
-          // different dynamic-content concern:
-          //
-          // `initialScrollAtEnd` — v3-only convenience; initializes the
-          //   list scrolled to the last item. Replaces the v2 dance of
-          //   `initialScrollIndex={length-1}` + `waitForInitialLayout` +
-          //   manual `scrollToEnd` chasers (LegendApp/legend-list#174).
-          //
-          // `alignItemsAtEnd` — docks short histories (content < viewport)
-          //   to the bottom by adding top padding internally. Only works if
-          //   we DON'T set our own `paddingTop` on `contentContainerStyle`.
-          //
-          // `maintainScrollAtEnd` — keeps the viewport pinned to the
-          //   bottom when new content appends, as long as the user is
-          //   within `maintainScrollAtEndThreshold * viewportHeight` of
-          //   the end. Carries us through streaming token append for free
-          //   (assistant content grows over seconds; no setTimeout chasers).
-          //
-          // `maintainVisibleContentPosition` — keeps the visible item
-          //   anchored when items above the viewport resize or load (our
-          //   async bubble-height measurements). Without it, late
-          //   measurements above the viewport shift content downward and
-          //   land the user mid-list instead of pinned to the latest.
-          initialScrollAtEnd
-          alignItemsAtEnd
-          maintainScrollAtEnd
-          maintainScrollAtEndThreshold={0.1}
-          maintainVisibleContentPosition
-          recycleItems
-          contentContainerStyle={listContentContainerStyle}
-        />
-      )}
+        {activeMessages.length === 0 ? (
+          emptyContent
+        ) : (
+          <LegendList
+            data={activeMessages}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            estimatedItemSize={ESTIMATED_BUBBLE_HEIGHT}
+            // Canonical LegendList v3 chat pattern. Each prop addresses a
+            // different dynamic-content concern:
+            //
+            // `initialScrollAtEnd` — v3-only convenience; initializes the
+            //   list scrolled to the last item. Replaces the v2 dance of
+            //   `initialScrollIndex={length-1}` + `waitForInitialLayout` +
+            //   manual `scrollToEnd` chasers (LegendApp/legend-list#174).
+            //
+            // `alignItemsAtEnd` — docks short histories (content < viewport)
+            //   to the bottom by adding top padding internally. Only works if
+            //   we DON'T set our own `paddingTop` on `contentContainerStyle`.
+            //
+            // `maintainScrollAtEnd` — keeps the viewport pinned to the
+            //   bottom when new content appends, as long as the user is
+            //   within `maintainScrollAtEndThreshold * viewportHeight` of
+            //   the end. Carries us through streaming token append for free
+            //   (assistant content grows over seconds; no setTimeout chasers).
+            //
+            // `maintainVisibleContentPosition` — keeps the visible item
+            //   anchored when items above the viewport resize or load (our
+            //   async bubble-height measurements). Without it, late
+            //   measurements above the viewport shift content downward and
+            //   land the user mid-list instead of pinned to the latest.
+            initialScrollAtEnd
+            alignItemsAtEnd
+            maintainScrollAtEnd
+            maintainScrollAtEndThreshold={0.1}
+            maintainVisibleContentPosition
+            recycleItems
+            contentContainerStyle={listContentContainerStyle}
+          />
+        )}
       </Reanimated.View>
 
       <Reanimated.View

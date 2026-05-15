@@ -92,10 +92,7 @@ export function parseSelector(
       throw new ParseError(pos, 'empty testID after `#`');
     }
     if (!TESTID_BODY_RE.test(body)) {
-      throw new ParseError(
-        pos,
-        `invalid testID "${body}" — must be kebab-case [a-z0-9-]`
-      );
+      throw new ParseError(pos, `invalid testID "${body}" — must be kebab-case [a-z0-9-]`);
     }
 
     // Optional `first` modifier — only legal on the wildcard form

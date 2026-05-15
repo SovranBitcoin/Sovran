@@ -391,15 +391,13 @@ export const Button = ({
     accessibilityHint,
     accessibilityState: { disabled: disabled || loading, busy: loading },
   };
-  const [foreground, surfaceForeground, foregroundSecondary, surfaceSecondary, background, danger] =
-    useThemeColor([
-      'foreground',
-      'surface-foreground',
-      'muted',
-      'surface-secondary',
-      'background',
-      'danger',
-    ] as const);
+  const [foreground, foregroundSecondary, surfaceSecondary, background, danger] = useThemeColor([
+    'foreground',
+    'muted',
+    'surface-secondary',
+    'background',
+    'danger',
+  ] as const);
 
   // Ripple hook
   const rippleConfig = typeof ripple === 'object' ? ripple : {};
@@ -485,7 +483,7 @@ export const Button = ({
         return {
           ...base,
           backgroundColor: surfaceSecondary,
-          borderColor: opacity(foregroundSecondary, 0.25),  
+          borderColor: opacity(foregroundSecondary, 0.25),
         };
       case 'dangerous':
         return {

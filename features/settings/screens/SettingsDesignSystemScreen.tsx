@@ -11,9 +11,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
 
-type CycleStep =
-  | { type: 'phase'; value: Phase }
-  | { type: 'result'; value: Result };
+type CycleStep = { type: 'phase'; value: Phase } | { type: 'result'; value: Result };
 
 const CYCLE: CycleStep[] = [
   { type: 'phase', value: 'idle' },
@@ -100,7 +98,7 @@ export function SettingsDesignSystemScreen() {
         <Card variant="secondary" className="mb-4">
           <Card.Body className="gap-4 py-6">
             <View
-              className="self-center items-center justify-center rounded-full"
+              className="items-center justify-center self-center rounded-full"
               style={{
                 width: 200,
                 height: 200,
@@ -143,7 +141,7 @@ export function SettingsDesignSystemScreen() {
               </View>
             </HStack>
 
-            <Text size={11} bold className="text-foreground/50 tracking-widest mt-2">
+            <Text size={11} bold className="text-foreground/50 mt-2 tracking-widest">
               RESOLVE TO
             </Text>
             <VStack spacing={8}>
@@ -156,9 +154,7 @@ export function SettingsDesignSystemScreen() {
                 <Button.Label>Success</Button.Label>
               </Button>
               <Button
-                variant={
-                  !auto && phase === 'done' && result === 'error' ? 'primary' : 'secondary'
-                }
+                variant={!auto && phase === 'done' && result === 'error' ? 'primary' : 'secondary'}
                 size="sm"
                 onPress={() => onLockResult('error')}>
                 <Button.Label>Error</Button.Label>

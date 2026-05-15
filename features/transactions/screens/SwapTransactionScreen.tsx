@@ -323,7 +323,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
   }, [group]);
 
   // ── Compute totals for the header and footer ──
-  const { totalReceived, totalSent, totalFees, stepCount, historyReady } = useMemo(() => {
+  const { totalReceived, totalSent, totalFees, stepCount } = useMemo(() => {
     if (!group)
       return { totalReceived: 0, totalSent: 0, totalFees: 0, stepCount: 0, historyReady: false };
 

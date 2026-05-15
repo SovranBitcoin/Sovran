@@ -8,17 +8,25 @@
  * - detail: Merchant details (horizontal push)
  */
 
+import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
+const INDEX_OPTIONS = { title: 'Bitcoin Map' };
+const DETAIL_OPTIONS = { title: 'Merchant Details' };
+
 export default function MapFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const screenOptions = useMemo(
+    () => createFlowLayoutScreenOptions({ foreground, background }),
+    [foreground, background]
+  );
 
   return (
-    <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
-      <Stack.Screen name="index" options={{ title: 'Bitcoin Map' }} />
-      <Stack.Screen name="detail" options={{ title: 'Merchant Details' }} />
+    <Stack screenOptions={screenOptions}>
+      <Stack.Screen name="index" options={INDEX_OPTIONS} />
+      <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
     </Stack>
   );
 }

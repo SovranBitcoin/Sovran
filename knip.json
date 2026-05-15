@@ -1,20 +1,39 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["shim.js", "polyfills.js", "app/**/*.{ts,tsx}", "scripts/*.{js,ts}"],
+  "entry": [
+    "shim.js",
+    "polyfills.js",
+    "metro.config.js",
+    "app/**/*.{ts,tsx}",
+    "plugins/withLowerPodDeploymentTarget.js",
+    "scripts/*.{js,ts}"
+  ],
   "project": ["**/*.{ts,tsx,js,jsx}"],
-  "ignore": [".agents/**", ".monicon/**", "targets/**", "coco-payment-ux/docs/references/**"],
+  "ignore": [
+    ".agents/**",
+    ".monicon/**",
+    "modules/**",
+    "targets/**",
+    "coco-payment-ux/docs/references/**"
+  ],
   "ignoreDependencies": [
+    "^@iconify-json/",
     "buffer",
     "process",
+    "@expo/metro-config",
     "cashu-kym",
     "@monicon/metro",
-    "number-flow-react-native"
+    "metro-minify-terser",
+    "number-flow-react-native",
+    "nutpatch"
   ],
-  "ignoreBinaries": ["eas", "maestro"],
+  "ignoreBinaries": ["claude", "eas", "maestro", "tsx"],
   "ignoreIssues": {
     "**/*.android.{ts,tsx}": ["files"],
     "**/*.liquid.{ts,tsx}": ["files"],
+    "codereview/**": ["exports", "types"],
     "features/feed/**": ["exports", "types"],
+    "features/transactions/components/MonthSelector.tsx": ["types"],
     "features/camera/**": ["files", "types"],
     "features/mint/**": ["exports", "types"],
     "features/settings/**": ["exports"],
@@ -22,8 +41,17 @@
     "features/user/**": ["exports"],
     "features/wallet/**": ["exports", "types"],
     "assets/icons/**": ["exports"],
+    "shared/blocks/PullToAiRefreshControl.tsx": ["exports"],
+    "shared/blocks/status/**": ["exports", "types", "duplicates"],
+    "shared/lib/date.ts": ["types"],
+    "shared/lib/nav/profileRoutes.ts": ["types"],
+    "shared/lib/popup/popups/index.ts": ["types"],
+    "shared/lib/wallpaperStorage.ts": ["exports"],
+    "shared/styles/tokens.ts": ["exports", "types"],
+    "shared/ui/capability/index.tsx": ["exports", "types"],
     "shared/ui/composed/GlassSearchBar/**": ["files", "types"],
     "shared/ui/composed/QRButton/**": ["files", "types"],
+    "shared/ui/primitives/SelectableCheck/index.tsx": ["types"],
     "shared/lib/popup/**": ["exports"],
     "coco-payment-ux/**": ["files", "exports", "types", "dependencies", "unlisted"]
   }

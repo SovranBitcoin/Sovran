@@ -515,11 +515,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
         },
 
         // Match share to current balance proportions
-        mirrorBalances: (
-          unit: string,
-          balances: Record<string, number>,
-          mintUrls: string[]
-        ) => {
+        mirrorBalances: (unit: string, balances: Record<string, number>, mintUrls: string[]) => {
           storeLog.info('store.mint_dist.mirror', { unit, mintCount: mintUrls.length });
           const normalizedUnit = unit.toLowerCase();
 

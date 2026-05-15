@@ -141,8 +141,7 @@ export const ContactsScreen = () => {
   const [activeTab, setActiveTab] = useState<TopTab>('contacts');
   const [activeFilter, setActiveFilter] = useState<ContactsFilter>('All');
   const lastSearchFilterRef = useRef<ContactsFilter>('All');
-  const [foreground, surface, separator, muted] = useThemeColor([
-    'foreground',
+  const [surface, separator, muted] = useThemeColor([
     'surface',
     'separator-secondary',
     'muted',

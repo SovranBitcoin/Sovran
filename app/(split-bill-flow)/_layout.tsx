@@ -41,6 +41,15 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const PickerContext = createContext<UseSplitBillParticipantPickerResult | null>(null);
+const AMOUNT_OPTIONS = { title: 'Split Bill' };
+const PARTICIPANTS_OPTIONS = { title: 'Who Pays' };
+const SEARCH_OPTIONS = {
+  title: 'Search Nostr',
+  presentation: 'modal',
+  headerTransparent: false,
+} as const;
+const SUMMARY_OPTIONS = { title: 'Review' };
+const DETAIL_OPTIONS = { title: 'Split Bill' };
 
 export function useSplitBillPickerContext(): UseSplitBillParticipantPickerResult {
   const ctx = useContext(PickerContext);
@@ -56,6 +65,10 @@ const PICKER_ROUTES = new Set(['participants', 'search']);
 
 export default function SplitBillLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const screenOptions = useMemo(
+    () => createFlowLayoutScreenOptions({ foreground, background }),
+    [foreground, background]
+  );
   const segments = useSegments();
   const needsPickerNow = useMemo(() => segments.some((s) => PICKER_ROUTES.has(s)), [segments]);
   // Sticky activation. Once the user first visits a picker-consuming
@@ -74,19 +87,12 @@ export default function SplitBillLayout() {
 
   return (
     <PickerContext.Provider value={picker}>
-      <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
-        <Stack.Screen name="amount" options={{ title: 'Split Bill' }} />
-        <Stack.Screen name="participants" options={{ title: 'Who Pays' }} />
-        <Stack.Screen
-          name="search"
-          options={{
-            title: 'Search Nostr',
-            presentation: 'modal',
-            headerTransparent: false,
-          }}
-        />
-        <Stack.Screen name="summary" options={{ title: 'Review' }} />
-        <Stack.Screen name="detail" options={{ title: 'Split Bill' }} />
+      <Stack screenOptions={screenOptions}>
+        <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
+        <Stack.Screen name="participants" options={PARTICIPANTS_OPTIONS} />
+        <Stack.Screen name="search" options={SEARCH_OPTIONS} />
+        <Stack.Screen name="summary" options={SUMMARY_OPTIONS} />
+        <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
       </Stack>
     </PickerContext.Provider>
   );

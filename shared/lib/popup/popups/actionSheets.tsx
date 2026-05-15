@@ -185,4 +185,3 @@ function openProfileImportMenu(payload: ProfileSwitcherPopupPayload): void {
     },
   });
 }
-

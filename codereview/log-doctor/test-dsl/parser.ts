@@ -75,8 +75,22 @@ export function parseSuite(source: string, file: string): Suite {
 // ─── Block stack frames ────────────────────────────────────────────────────
 
 type BlockFrame =
-  | { kind: 'test'; name: string; pos: SourcePos; body: Step[]; verified?: VerifiedComment; description?: string }
-  | { kind: 'define'; name: string; params?: string[]; pos: SourcePos; body: Step[]; description?: string }
+  | {
+      kind: 'test';
+      name: string;
+      pos: SourcePos;
+      body: Step[];
+      verified?: VerifiedComment;
+      description?: string;
+    }
+  | {
+      kind: 'define';
+      name: string;
+      params?: string[];
+      pos: SourcePos;
+      body: Step[];
+      description?: string;
+    }
   | { kind: 'if'; negated: boolean; selector: Selector; pos: SourcePos; body: Step[] }
   | {
       kind: 'ifVar';
@@ -292,15 +306,18 @@ class Parser {
     }
     const withIdx = rest.search(/\s+with(?:\s|$)/);
     const namePart = withIdx === -1 ? rest : rest.slice(0, withIdx).trim();
-    const paramsPart = withIdx === -1 ? '' : rest.slice(withIdx).replace(/^\s+with\s*/, '').trim();
+    const paramsPart =
+      withIdx === -1
+        ? ''
+        : rest
+            .slice(withIdx)
+            .replace(/^\s+with\s*/, '')
+            .trim();
     if (namePart.length === 0) {
       throw new ParseError(pos, `'define' requires a name`);
     }
     if (!/^[a-z][a-z0-9-]*$/.test(namePart)) {
-      throw new ParseError(
-        pos,
-        `define name '${namePart}' must be kebab-case [a-z][a-z0-9-]*`
-      );
+      throw new ParseError(pos, `define name '${namePart}' must be kebab-case [a-z][a-z0-9-]*`);
     }
     if (this.defines.has(namePart)) {
       throw new ParseError(pos, `duplicate define '${namePart}'`);
@@ -942,9 +959,10 @@ class Parser {
 
     // ── assert $var <op> <rhs> ──
     if (rest.startsWith('$')) {
-      const m = /^\$([a-zA-Z_][a-zA-Z0-9_]*)\s+(starts-with|contains|matches|eq|gt|cashu-amount|bolt11-amount)\s+(.+)$/.exec(
-        rest
-      );
+      const m =
+        /^\$([a-zA-Z_][a-zA-Z0-9_]*)\s+(starts-with|contains|matches|eq|gt|cashu-amount|bolt11-amount)\s+(.+)$/.exec(
+          rest
+        );
       if (!m) {
         throw new ParseError(
           pos,
@@ -1099,15 +1117,15 @@ class Parser {
     const withIdx = rest.search(/\s+with(?:\s|$)/);
     const defineName = withIdx === -1 ? rest : rest.slice(0, withIdx).trim();
     if (!/^[a-z][a-z0-9-]*$/.test(defineName)) {
-      throw new ParseError(
-        pos,
-        `run target '${defineName}' must be a kebab-case define name`
-      );
+      throw new ParseError(pos, `run target '${defineName}' must be a kebab-case define name`);
     }
     const step: RunStep = { kind: 'run', defineName, pos };
     if (withIdx === -1) return step;
 
-    const argsPart = rest.slice(withIdx).replace(/^\s+with\s*/, '').trim();
+    const argsPart = rest
+      .slice(withIdx)
+      .replace(/^\s+with\s*/, '')
+      .trim();
     if (argsPart.length === 0) {
       throw new ParseError(pos, `'run ${defineName} with' requires at least one argument`);
     }
@@ -1140,9 +1158,10 @@ class Parser {
   private parseIfVar(text: string, pos: SourcePos): null {
     const negated = text.startsWith('if not ');
     const rest = negated ? text.slice('if not '.length) : text.slice('if '.length);
-    const m = /^\$([a-zA-Z_][a-zA-Z0-9_]*)\s+(starts-with|contains|matches|eq|gt|cashu-amount|bolt11-amount)\s+(.+)$/.exec(
-      rest.trim()
-    );
+    const m =
+      /^\$([a-zA-Z_][a-zA-Z0-9_]*)\s+(starts-with|contains|matches|eq|gt|cashu-amount|bolt11-amount)\s+(.+)$/.exec(
+        rest.trim()
+      );
     if (!m) {
       throw new ParseError(
         pos,

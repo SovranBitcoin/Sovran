@@ -106,10 +106,10 @@ export function decodeBolt11Amount(invoice: string): number {
 
   // The last character may be a multiplier: m (milli), u (micro), n (nano), p (pico)
   const multipliers: Record<string, number> = {
-    m: 100_000,     // milli-BTC = 100,000 sats
-    u: 100,         // micro-BTC = 100 sats
-    n: 0.1,         // nano-BTC  = 0.1 sats
-    p: 0.0001,      // pico-BTC  = 0.0001 sats
+    m: 100_000, // milli-BTC = 100,000 sats
+    u: 100, // micro-BTC = 100 sats
+    n: 0.1, // nano-BTC  = 0.1 sats
+    p: 0.0001, // pico-BTC  = 0.0001 sats
   };
   const lastChar = amountStr[amountStr.length - 1];
   if (multipliers[lastChar] !== undefined) {
@@ -148,7 +148,8 @@ function decodeCBOR(data: Uint8Array): any {
     if (additionalInfo < 24) return additionalInfo;
     if (additionalInfo === 24) return readByte();
     if (additionalInfo === 25) {
-      const hi = readByte(), lo = readByte();
+      const hi = readByte(),
+        lo = readByte();
       return (hi << 8) | lo;
     }
     if (additionalInfo === 26) {
@@ -169,25 +170,29 @@ function decodeCBOR(data: Uint8Array): any {
         return readUint(additionalInfo);
       case 1: // negative integer
         return -1 - readUint(additionalInfo);
-      case 2: { // byte string
+      case 2: {
+        // byte string
         const len = readUint(additionalInfo);
         const bytes = data.slice(offset, offset + len);
         offset += len;
         return bytes;
       }
-      case 3: { // text string
+      case 3: {
+        // text string
         const len = readUint(additionalInfo);
         const bytes = data.slice(offset, offset + len);
         offset += len;
         return new TextDecoder().decode(bytes);
       }
-      case 4: { // array
+      case 4: {
+        // array
         const len = readUint(additionalInfo);
         const arr: any[] = [];
         for (let i = 0; i < len; i++) arr.push(decode());
         return arr;
       }
-      case 5: { // map
+      case 5: {
+        // map
         const len = readUint(additionalInfo);
         const obj: Record<string, any> = {};
         for (let i = 0; i < len; i++) {

@@ -15,7 +15,6 @@ import {
   parseWith,
   type MintRecommendation,
   type MintSearchResult,
-  type NostrSearchResult,
   type ParseError,
 } from '@sovranbitcoin/schemas';
 
@@ -119,6 +118,35 @@ export async function fetchJson<T>(
       return err(e instanceof Error ? e : new Error('Aborted'));
     }
     apiLog.error('api.fetch_failed', { ...route, error: e });
+    return err(e instanceof Error ? e : new Error('Unknown error'));
+  }
+}
+
+export async function fetchStatus(
+  url: string,
+  init?: RequestInit,
+  controls: RequestControls = {}
+): Promise<Result<{ ok: boolean; status: number }, Error>> {
+  const { signal: callerSignal, timeoutMs = DEFAULT_TIMEOUT_MS } = controls;
+  const signal = combineSignals(callerSignal, timeoutSignal(timeoutMs));
+  const route = describeRoute(url);
+
+  try {
+    apiLog.debug('api.fetch_status', route);
+    const res = await fetch(url, { ...init, signal });
+    if (!res.ok) {
+      apiLog.warn('api.fetch_status_not_ok', { ...route, status: res.status });
+    }
+    return ok({ ok: res.ok, status: res.status });
+  } catch (e) {
+    if (isAbortError(e)) {
+      apiLog.debug('api.fetch_status_aborted', {
+        ...route,
+        reason: callerSignal?.aborted ? 'caller' : 'timeout',
+      });
+      return err(e instanceof Error ? e : new Error('Aborted'));
+    }
+    apiLog.error('api.fetch_status_failed', { ...route, error: e });
     return err(e instanceof Error ? e : new Error('Unknown error'));
   }
 }

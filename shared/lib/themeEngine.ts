@@ -7,8 +7,6 @@ import {
 
 type SemanticVars = Record<string, string>;
 
-const SHADE_300_HEX = '#3B82F6';
-
 /**
  * Static color scales — constant across all themes.
  * Hex values declared once here, then expanded into both:
@@ -128,7 +126,6 @@ function hexLuminance(hex: string): number {
  */
 function buildSemanticVars(palette: ThemePalette): SemanticVars {
   const bgIsDark = hexLuminance(palette[950]) < 0.5;
-  const accentIsDark = hexLuminance(SHADE_300_HEX) < 0.5;
 
   return {
     '--background': palette[950],
