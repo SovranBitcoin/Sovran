@@ -586,8 +586,6 @@ export const ContactsScreen = () => {
       extraData={profilesMap}
       estimatedItemSize={68}
       refreshControl={pullToAi.refreshControl}
-      onScrollBeginDrag={pullToAi.onScrollBeginDrag}
-      onScrollEndDrag={pullToAi.onScrollEndDrag}
       keyExtractor={(item, index) => {
         if (item.type === 'bitchat-dm') return `ble:${item.peerID}`;
         return (
@@ -619,8 +617,6 @@ export const ContactsScreen = () => {
         estimatedItemSize={68}
         keyExtractor={(item) => item.key}
         refreshControl={pullToAi.refreshControl}
-        onScrollBeginDrag={pullToAi.onScrollBeginDrag}
-        onScrollEndDrag={pullToAi.onScrollEndDrag}
         renderItem={({ item }) => <GroupsTierRow tier={item} />}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"

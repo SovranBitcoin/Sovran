@@ -754,8 +754,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             contentContainerStyle={LIST_CONTENT_STYLE}
             showsVerticalScrollIndicator={false}
             onScroll={onScroll}
-            onScrollBeginDrag={pullToAi.onScrollBeginDrag}
-            onScrollEndDrag={pullToAi.onScrollEndDrag}
             scrollEventThrottle={16}
             refreshControl={pullToAi.refreshControl}
           />

@@ -108,8 +108,6 @@ export function WalletScreen() {
       <LayoutDebugWrapper
         onContentSizeChange={onContentSizeChange}
         refreshControl={pullToAi.refreshControl}
-        onScrollBeginDrag={pullToAi.onScrollBeginDrag}
-        onScrollEndDrag={pullToAi.onScrollEndDrag}
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
           <ScrollableGradientOverlay contentHeight={contentHeight} />
