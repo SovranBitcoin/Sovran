@@ -6,6 +6,6 @@
  * - NfcError: typed errors with .code for UI handling
  */
 
-export { NfcError } from './errors';
+export { NfcError, isUserCancelError } from './errors';
 export { createNfcAdapter } from './adapter';
 export { writeTokenToNFC } from './write-token';

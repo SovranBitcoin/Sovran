@@ -41,7 +41,7 @@ import {
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
-import { writeTokenToNFC, NfcError } from '@/shared/lib/nfc';
+import { writeTokenToNFC, NfcError, isUserCancelError } from '@/shared/lib/nfc';
 import {
   copyPopup,
   emojiPickerPopup,
@@ -699,6 +699,9 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
             const data = await nfcAdapter.readPaymentRequest();
             return { data };
           } catch (err) {
+            // User dismissed the system NFC sheet — treat as a no-op,
+            // not an error (suppresses the `general-error` popup).
+            if (isUserCancelError(err)) return { empty: true };
             return { error: err instanceof Error ? err : new Error(String(err)) };
           }
         }
@@ -1070,6 +1073,12 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           nfcEcashSharedPopup();
           return;
         } catch (rawError) {
+          // User dismissed the system NFC sheet — no popup, no rollback;
+          // the send op was never committed to the wire.
+          if (isUserCancelError(rawError)) {
+            paymentLog.info('payment.screen_action.nfc.user_cancel');
+            return;
+          }
           const code = rawError instanceof NfcError ? rawError.code : 'WRITE_FAILED';
           const message =
             rawError instanceof Error ? rawError.message : 'Unable to write token via NFC.';

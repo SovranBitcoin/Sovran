@@ -11,7 +11,7 @@
  * (e.g. `'TAG_LOST'`, `'TRANSCEIVE_FAILED'`).
  */
 
-import { NfcError } from './errors';
+import { NfcError, isUserCancelError } from './errors';
 import { SELECT_AID, SELECT_NDEF } from './constants';
 import { sendApdu, getStatusMessage } from './apdu';
 import { isNfcSupported, isNfcEnabled } from './status';
@@ -53,6 +53,10 @@ export async function writeTokenToNFC(token: string): Promise<void> {
       nfcLog.info('nfc.write.success');
     });
   } catch (error) {
+    // Preserve UserCancel so the caller can distinguish a user-initiated
+    // close from a real failure — wrapping it as 'WRITE_FAILED' would
+    // trigger an error popup for a normal cancel.
+    if (isUserCancelError(error)) throw error;
     const message = error instanceof Error ? error.message : String(error);
     nfcLog.error('nfc.write.failed', { error: message });
     if (error instanceof NfcError) throw error;
