@@ -1,6 +1,5 @@
 import React from 'react';
 import { getPublicKey, nip19 } from 'nostr-tools';
-import { type PaymentMachine, type StepDataMap } from 'coco-payment-ux';
 
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -187,71 +186,3 @@ function openProfileImportMenu(payload: ProfileSwitcherPopupPayload): void {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Proof selector — dispatched through actionMenuPopup so it shares the
-// canonical `Menu presentation="bottom-sheet"` surface with "Select option".
-// `paymentOptionsPopup` / `paymentFallbackPopup` used to live here too, but
-// moved to `paymentOptionsSheet.tsx` (PopupHost lane) because the camera
-// route — which is where they fire from — is itself a route modal, and the
-// menu lane can't stack above route modals (heroui Menu silently fails
-// inside FullWindowOverlay; see `actionSheetTypes.ts`).
-// ---------------------------------------------------------------------------
-
-type ProofSelectorPopupPayload = StepDataMap['chooseProofs'] & {
-  machine: PaymentMachine;
-};
-
-export function proofSelectorPopup(payload: ProofSelectorPopupPayload): void {
-  const { suggestions, unit, machine } = payload;
-  const buttons: ActionMenuItem[] = [];
-
-  if (suggestions?.roundUp != null) {
-    buttons.push({
-      text: 'Round up',
-      icon: 'fluent:arrow-upload-16-filled',
-      suffix: (
-        <AmountFormatter
-          amount={suggestions.roundUp.amount}
-          unit={unit}
-          size={16}
-          weight="medium"
-        />
-      ),
-      onPress: () => {
-        void machine.chooseProofs(suggestions.roundUp!.amount);
-      },
-    });
-  }
-
-  if (suggestions?.roundDown != null) {
-    buttons.push({
-      text: 'Round down',
-      icon: 'fluent:arrow-download-16-filled',
-      suffix: (
-        <AmountFormatter
-          amount={suggestions.roundDown.amount}
-          unit={unit}
-          size={16}
-          weight="medium"
-        />
-      ),
-      onPress: () => {
-        void machine.chooseProofs(suggestions.roundDown!.amount);
-      },
-    });
-  }
-
-  buttons.push({
-    text: 'Change mint',
-    icon: 'mdi:swap-horizontal',
-    separator: true,
-    onPress: () => {
-      void machine.requestMintSelector();
-    },
-  });
-
-  actionMenuPopup({
-    title: 'Choose amount',
-    buttons,
-  });
-}

@@ -609,6 +609,23 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
   // ── Render ──
 
+  const getThreadContext = useCallback(() => {
+    const allEvents = new Map<string, FeedEvent>();
+    for (const it of feedItems) {
+      if (it.type === 'note') {
+        allEvents.set(it.event.id, it.event);
+      } else if (it.originalEvent) {
+        allEvents.set(it.originalEvent.id, it.originalEvent);
+      }
+    }
+    return {
+      allEvents,
+      profiles: profilesRef.current,
+      metrics: metricsRef.current,
+      quotedEvents: quotedRef.current,
+    };
+  }, [feedItems, profilesRef, metricsRef, quotedRef]);
+
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
       const feedIndex = index;
@@ -635,6 +652,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             onLikePress={() => toggleLike(item.event)}
             onRepostPress={() => toggleRepost(item.event)}
             skipAnimation={!isFirstRender.current}
+            getThreadContext={getThreadContext}
           />
         );
       }
@@ -667,6 +685,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
+          getThreadContext={getThreadContext}
         />
       );
     },
@@ -677,6 +696,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       onOverlayOpenedFromIndex,
       toggleLike,
       toggleRepost,
+      getThreadContext,
     ]
   );
 

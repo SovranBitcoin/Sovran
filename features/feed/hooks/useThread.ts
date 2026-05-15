@@ -22,6 +22,7 @@ import type {
   RawPrimalEvent,
 } from '@/features/feed/components/nostr/feedTypes';
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
+import { consumeThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { feedLog } from '@/shared/lib/logger';
 
 export type ThreadItem =
@@ -119,10 +120,31 @@ export function useThread(eventId: string): UseThreadResult {
     if (!eventId) return;
 
     let cancelled = false;
-    setIsLoading(true);
     setError(null);
 
-    feedLog.info('thread.load.start', { eventId });
+    const seed = consumeThreadSeed(eventId);
+    if (seed) {
+      const seeded = buildThreadStructure(eventId, seed.allEvents);
+      if (seeded.target) {
+        const seededItems: ThreadItem[] = [
+          ...seeded.parents.map<ThreadItem>((event) => ({ type: 'parent', event })),
+          { type: 'target', event: seeded.target },
+        ];
+        profilesRef.current = seed.profiles;
+        metricsRef.current = seed.metrics;
+        quotedEventsRef.current = seed.quotedEvents;
+        setItems(seededItems);
+        setHiddenReplyCount(0);
+        setDataVersion((v) => v + 1);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true);
+      }
+    } else {
+      setIsLoading(true);
+    }
+
+    feedLog.info('thread.load.start', { eventId, seeded: !!seed });
 
     const fetchThread = async () => {
       const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
@@ -131,10 +153,10 @@ export function useThread(eventId: string): UseThreadResult {
         const prefix = nextRequestPrefix();
 
         const buckets: MergeBuckets = {
-          allEvents: new Map<string, FeedEvent>(),
-          profiles: new Map<string, ProfileInfo>(),
-          metrics: new Map<string, NoteMetrics>(),
-          embeddedMentions: new Map<string, FeedEvent>(),
+          allEvents: seed ? new Map(seed.allEvents) : new Map<string, FeedEvent>(),
+          profiles: seed ? new Map(seed.profiles) : new Map<string, ProfileInfo>(),
+          metrics: seed ? new Map(seed.metrics) : new Map<string, NoteMetrics>(),
+          embeddedMentions: seed ? new Map(seed.quotedEvents) : new Map<string, FeedEvent>(),
         };
 
         const phase1Raw = await client.request(`${prefix}_thread`, {
@@ -145,8 +167,10 @@ export function useThread(eventId: string): UseThreadResult {
 
         const initial = buildThreadStructure(eventId, buckets.allEvents);
         if (!initial.target) {
-          setError('Post not found');
-          setIsLoading(false);
+          if (!seed) {
+            setError('Post not found');
+            setIsLoading(false);
+          }
           return;
         }
 
@@ -242,8 +266,10 @@ export function useThread(eventId: string): UseThreadResult {
             eventId,
             error: err instanceof Error ? err : new Error(String(err)),
           });
-          setError('Failed to load thread');
-          setIsLoading(false);
+          if (!seed) {
+            setError('Failed to load thread');
+            setIsLoading(false);
+          }
         }
       } finally {
         client.close();

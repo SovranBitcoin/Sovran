@@ -27,6 +27,7 @@ import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition
 import { StyleSheet, InteractionManager, ActivityIndicator } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -145,6 +146,7 @@ export const RepostCard = React.memo(function RepostCard({
   onLikePress,
   onRepostPress,
   skipAnimation,
+  getThreadContext,
 }: {
   repostEvent: FeedEvent;
   originalEvent: FeedEvent | undefined;
@@ -167,6 +169,7 @@ export const RepostCard = React.memo(function RepostCard({
   onLikePress?: () => void;
   onRepostPress?: () => void;
   skipAnimation?: boolean;
+  getThreadContext?: () => ThreadSeed | null;
 }) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -193,11 +196,21 @@ export const RepostCard = React.memo(function RepostCard({
   const threadEventId = originalEvent?.id || _repostEvent.id;
 
   const navigateToThread = useCallback(() => {
-    router.navigate({
+    const ctx = getThreadContext?.() ?? null;
+    const allEvents = new Map(ctx?.allEvents ?? []);
+    if (originalEvent) allEvents.set(originalEvent.id, originalEvent);
+    allEvents.set(_repostEvent.id, _repostEvent);
+    seedThread(threadEventId, {
+      allEvents,
+      profiles: ctx?.profiles ?? new Map(),
+      metrics: ctx?.metrics ?? new Map(),
+      quotedEvents: ctx?.quotedEvents ?? new Map(),
+    });
+    router.push({
       pathname: '/(user-flow)/thread',
       params: { eventId: threadEventId },
     });
-  }, [threadEventId]);
+  }, [threadEventId, getThreadContext, originalEvent, _repostEvent]);
 
   const suppressThreadTapRef = useRef(false);
 
@@ -271,6 +284,7 @@ export const RepostCard = React.memo(function RepostCard({
             onRepostPress={onRepostPress}
             onNestedProfilePressIn={suppressThreadTapStart}
             onNestedProfilePressOut={suppressThreadTapEnd}
+            getThreadContext={getThreadContext}
           />
         ) : (
           <View
@@ -709,6 +723,24 @@ export function UserFeed({
     pubkey,
     overrideName: authorName,
   });
+
+  const getThreadContext = useCallback(() => {
+    const allEvents = new Map<string, FeedEvent>();
+    for (const it of feedItems) {
+      if (it.type === 'note') {
+        allEvents.set(it.event.id, it.event);
+      } else if (it.originalEvent) {
+        allEvents.set(it.originalEvent.id, it.originalEvent);
+      }
+    }
+    return {
+      allEvents,
+      profiles: profilesRef.current,
+      metrics: metricsRef.current,
+      quotedEvents: quotedRef.current,
+    };
+  }, [feedItems, profilesRef, metricsRef, quotedRef]);
+
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
       if (item.type === 'note') {
@@ -734,6 +766,7 @@ export function UserFeed({
             onLikePress={() => toggleLike(item.event)}
             onRepostPress={() => toggleRepost(item.event)}
             skipAnimation={!isFirstRender.current}
+            getThreadContext={getThreadContext}
           />
         );
       }
@@ -761,6 +794,7 @@ export function UserFeed({
           onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
+          getThreadContext={getThreadContext}
         />
       );
     },
@@ -773,6 +807,7 @@ export function UserFeed({
       toggleLike,
       toggleRepost,
       onOverlayOpenedFromIndex,
+      getThreadContext,
     ]
   );
 

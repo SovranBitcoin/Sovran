@@ -52,7 +52,7 @@ function MediaPageAnimated({
 
   const player = useVideoPlayer(mediaType === 'video' ? url : '', (p) => {
     p.loop = true;
-    p.muted = true;
+    p.muted = false;
   });
 
   useEffect(() => {

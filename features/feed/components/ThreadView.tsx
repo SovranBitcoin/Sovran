@@ -16,7 +16,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 
-import { type NoteMetrics, DEFAULT_METRICS } from './nostr/feedTypes';
+import { type FeedEvent, type NoteMetrics, DEFAULT_METRICS } from './nostr/feedTypes';
 import { PostCard } from './nostr/PostCard';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 
@@ -77,6 +77,17 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 
+  const getThreadContext = useCallback(() => {
+    const allEvents = new Map<string, FeedEvent>();
+    for (const it of items) allEvents.set(it.event.id, it.event);
+    return {
+      allEvents,
+      profiles: profilesRef.current,
+      metrics: metricsRef.current,
+      quotedEvents: quotedEventsRef.current,
+    };
+  }, [items, profilesRef, metricsRef, quotedEventsRef]);
+
   const renderItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<ThreadItem, string | undefined>) => {
       const isParent = item.type === 'parent';
@@ -103,6 +114,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           repostPendingDirection={engagement.repostPendingDirection}
           onLikePress={() => toggleLike(item.event)}
           onRepostPress={() => toggleRepost(item.event)}
+          getThreadContext={getThreadContext}
         />
       );
     },
@@ -115,6 +127,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       quotedEventsRef,
       toggleLike,
       toggleRepost,
+      getThreadContext,
     ]
   );
 

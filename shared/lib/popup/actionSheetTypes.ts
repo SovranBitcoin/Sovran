@@ -1,4 +1,4 @@
-import type { AnnotatedOption, PaymentMachine } from 'coco-payment-ux';
+import type { AnnotatedOption, PaymentMachine, StepDataMap } from 'coco-payment-ux';
 
 export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }
@@ -19,6 +19,10 @@ type PaymentOptionsPayload = {
 type PaymentFallbackPayload = PaymentOptionsPayload & {
   failedOptionValues: readonly string[];
   lastFailedMessage?: string;
+};
+
+type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
+  machine: PaymentMachine;
 };
 
 /**
@@ -68,6 +72,14 @@ type BaseActionSheetPayloads = {
    * same above-modal stacking reason.
    */
   'payment-fallback': PaymentFallbackPayload;
+  /**
+   * "Choose amount" — round-up / round-down / change-mint suggestions when
+   * the entered amount doesn't compose exactly from available proofs. Fires
+   * from the send-flow amount screen, which is itself an iOS route modal;
+   * the menu lane would render below it. Same above-modal stacking reason
+   * as `payment-options`.
+   */
+  'proof-selector': ProofSelectorPayload;
 };
 
 /** Payload types for custom action sheets. */

@@ -39,6 +39,7 @@ import { alpha } from '@/shared/styles/tokens';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
+import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
@@ -295,6 +296,17 @@ const CUSTOM_SHEET_CONTENT: Record<
     canPop: boolean;
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }) => <PaymentOptionsContent {...props} isFallback={true} />) as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'proof-selector': ProofSelectorContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -692,7 +704,21 @@ function SheetPopup() {
             // its own bottom inset via `contentBottomInset` so the last
             // row clears the iOS home indicator without the wrapper
             // forcing a visible padding band beneath the BlurView.
-            isCustom && layoutConfig?.mode === 'snapPoints' ? 'h-full px-0 pt-0 pb-0' : undefined
+            //
+            // contentHeight custom sheets: tighten horizontal padding from
+            // heroui's default `p-5` (20px) to `px-3` (12px) to match the
+            // menu-lane chrome. heroui's `<Menu presentation="bottom-sheet">`
+            // applies a `px-3` override on top of the same `p-5` base (see
+            // `node_modules/heroui-native/src/components/menu/menu.styles.ts`'s
+            // `contentBottomSheet`), so without this override the FWO-lane
+            // custom sheets render with 8px more horizontal padding per
+            // side than visually-identical menu-lane sheets like "Select
+            // option".
+            isCustom
+              ? layoutConfig?.mode === 'snapPoints'
+                ? 'h-full px-0 pt-0 pb-0'
+                : 'px-3'
+              : undefined
           }
           // Patched flag (see patches/heroui-native+1.0.2.patch): swap
           // heroui's `BottomSheetView` wrapper for a plain RN `View` so

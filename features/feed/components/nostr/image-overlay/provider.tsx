@@ -382,10 +382,25 @@ export function ImageOverlayProvider({
     (layout: ImageOverlayLayout) => {
       safeTopSv.value = safeTop;
       safeBottomSv.value = safeBottom;
-      const aspectRatio = layout.aspectRatio ?? layout.width / layout.height;
       const hasPanel = !!layout.post;
       // When hasPanel we start with sheet closed: image centered in viewport (below notch to bottom); absolute overlay sits on top.
       const availableHeight = imageViewportHeight;
+
+      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
+      const types =
+        layout.mediaTypes && layout.mediaTypes.length === urls.length
+          ? layout.mediaTypes
+          : urls.map((u) => inferMediaType(u));
+      // Videos render at natural aspect via contentFit=contain inside the
+      // pager container, so the container itself must fill the full viewport
+      // — otherwise a portrait video letterboxed inside a 16:9 rect ends up
+      // narrow. Override the thumbnail aspect ratio whenever the pager
+      // contains any video; pure-image overlays keep their thumbnail aspect
+      // so the shared-element transition lands precisely.
+      const hasVideo = types.some((t) => t === 'video');
+      const aspectRatio = hasVideo
+        ? screenWidth / availableHeight
+        : (layout.aspectRatio ?? layout.width / layout.height);
       // Use actual thumbnail aspect ratio so overlay image rect matches the feed image; shared-element close animates correctly.
       const { width: expW, height: expH } = computeExpandedSize(
         screenWidth,
@@ -393,12 +408,6 @@ export function ImageOverlayProvider({
         aspectRatio
       );
       const imageAreaCenterY = safeTop + availableHeight / 2;
-
-      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
-      const types =
-        layout.mediaTypes && layout.mediaTypes.length === urls.length
-          ? layout.mediaTypes
-          : urls.map((u) => inferMediaType(u));
       const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
       setActiveUrls(urls);
       setActiveMediaTypes(types);
@@ -554,10 +563,19 @@ export function ImageOverlayProvider({
       const preserveCloseTarget = options?.preserveCloseTarget === true;
       safeTopSv.value = safeTop;
       safeBottomSv.value = safeBottom;
-      // Replace layout has no pageX/pageY/width/height; use aspectRatio only.
-      const aspectRatio = layout.aspectRatio ?? 16 / 9;
       const hasPanel = !!layout.post;
       const availableHeight = imageViewportHeight;
+
+      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
+      const types =
+        layout.mediaTypes && layout.mediaTypes.length === urls.length
+          ? layout.mediaTypes
+          : urls.map((u) => inferMediaType(u));
+      // See open() above — videos need a full-viewport container so
+      // contentFit=contain shows them at natural aspect at max size.
+      const hasVideo = types.some((t) => t === 'video');
+      // Replace layout has no pageX/pageY/width/height; use aspectRatio only.
+      const aspectRatio = hasVideo ? screenWidth / availableHeight : (layout.aspectRatio ?? 16 / 9);
       const { width: expW, height: expH } = computeExpandedSize(
         screenWidth,
         availableHeight,
@@ -566,12 +584,6 @@ export function ImageOverlayProvider({
       const imageAreaCenterY = safeTop + availableHeight / 2;
       const centerX = screenWidth / 2;
       const toCenterY = hasPanel ? imageAreaCenterY : screenCenterY;
-
-      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
-      const types =
-        layout.mediaTypes && layout.mediaTypes.length === urls.length
-          ? layout.mediaTypes
-          : urls.map((u) => inferMediaType(u));
       const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
       setActiveUrls(urls);
       setActiveMediaTypes(types);

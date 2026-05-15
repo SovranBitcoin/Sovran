@@ -28,6 +28,7 @@ import { MetricsFooter } from './MetricsFooter';
 import { sharedStyles } from './feedStyles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
+import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
 
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
 
@@ -63,6 +64,13 @@ interface PostCardProps {
   likePendingDirection?: 'activating' | 'deactivating';
   onNestedProfilePressIn?: () => void;
   onNestedProfilePressOut?: () => void;
+  /**
+   * Called immediately before navigating to this post's thread. Returns the
+   * data the caller already has (visible parent chain via `allEvents`, plus
+   * profile/metric/quoted-event maps) so the destination thread can render the
+   * post optimistically. The tapped event itself is merged in automatically.
+   */
+  getThreadContext?: () => ThreadSeed | null;
 }
 
 export const PostCard = React.memo(function PostCard({
@@ -90,6 +98,7 @@ export const PostCard = React.memo(function PostCard({
   likePendingDirection,
   onNestedProfilePressIn,
   onNestedProfilePressOut,
+  getThreadContext,
 }: PostCardProps) {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
@@ -129,11 +138,20 @@ export const PostCard = React.memo(function PostCard({
   }));
 
   const navigateToThread = useCallback(() => {
-    router.navigate({
+    const ctx = getThreadContext?.() ?? null;
+    const allEvents = new Map(ctx?.allEvents ?? []);
+    allEvents.set(event.id, event);
+    seedThread(event.id, {
+      allEvents,
+      profiles: ctx?.profiles ?? new Map(),
+      metrics: ctx?.metrics ?? new Map(),
+      quotedEvents: ctx?.quotedEvents ?? new Map(),
+    });
+    router.push({
       pathname: '/(user-flow)/thread',
       params: { eventId: event.id },
     });
-  }, [event.id]);
+  }, [event, getThreadContext]);
 
   const navigateToProfile = useCallback(() => {
     // push so each profile pushes a new stack entry — see navigateToProfile.
