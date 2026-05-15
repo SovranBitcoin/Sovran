@@ -22,6 +22,7 @@ import { useHandleCameraPermission } from '../../hooks/useHandleCameraPermission
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useCapabilities } from '@/shared/ui/capability';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -65,6 +66,7 @@ export function CameraScreen() {
   const selectedMint = useMintStore((state) => state.selectedMint);
   const walletContext = useWalletContextWithOverride(selectedMint);
   const foreground = useThemeColor('foreground');
+  const { liquidGlass } = useCapabilities();
   const insets = useSafeAreaInsets();
   const [progress, setProgress] = useState(0);
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
@@ -308,7 +310,9 @@ export function CameraScreen() {
 
   return (
     <Log name="CameraScreen">
-      <CameraLayout {...shared}>{Platform.OS === 'ios' ? iosButtons : androidButtons}</CameraLayout>
+      <CameraLayout {...shared}>
+        {Platform.OS === 'ios' && liquidGlass ? iosButtons : androidButtons}
+      </CameraLayout>
     </Log>
   );
 }

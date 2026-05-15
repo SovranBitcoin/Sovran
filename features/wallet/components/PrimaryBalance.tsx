@@ -27,7 +27,7 @@ import {
   frame,
   glassEffect,
 } from '@expo/ui/swift-ui/modifiers';
-import { useCapabilities, useLiquidGlassModifiers } from '@/shared/ui/capability';
+import { useCapabilities } from '@/shared/ui/capability';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
@@ -113,12 +113,14 @@ function EcashStatusPill({
   const colorScheme = useColorScheme();
   const tint = tintColor ?? foreground;
   const { liquidGlass } = useCapabilities();
-  const glassPillModifiers = useLiquidGlassModifiers(
-    glassEffect({
-      shape: 'capsule',
-      glass: { tint: opacity(tint, 0.15), variant: 'regular', interactive: false },
-    })
-  );
+  const glassPillModifiers = liquidGlass
+    ? [
+        glassEffect({
+          shape: 'capsule' as const,
+          glass: { tint: opacity(tint, 0.15), variant: 'regular' as const, interactive: false },
+        }),
+      ]
+    : [];
 
   if (totalAmount <= 0) return null;
 

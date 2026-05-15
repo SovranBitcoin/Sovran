@@ -11,7 +11,11 @@ Pod::Spec.new do |s|
   s.author         = 'Sovran'
   s.homepage       = 'https://github.com/sovran/sovran-app'
   # Matches sovran-app's iOS deployment target (app.json / expo-build-properties).
-  s.platforms      = { :ios => '18.0' }
+  # The SwiftUI types under LiquidGlassTextSwiftUI.swift are @available(iOS 17, *)
+  # and the .glassEffect(_:in:) path is @available(iOS 26, *); JS-side `isSupported`
+  # in src/LiquidGlassText.tsx falls back to plain <Text> on iOS <26, so this
+  # module is safe to ship at an iOS 16.4 floor.
+  s.platforms      = { :ios => '16.4' }
   s.swift_version  = '5.9'
   s.source         = { git: '' }
   s.static_framework = true
