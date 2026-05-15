@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from 'react';
-import { ScrollView, useWindowDimensions } from 'react-native';
+import { ScrollView, Text as RNText, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
@@ -16,7 +16,7 @@ import opacity from 'hex-color-opacity';
 import type { QuickSendSuggestion } from 'coco-payment-ux/react';
 
 import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
-import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { AMOUNT_FONT_FAMILY, AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import CustomKeyboard from '@/shared/ui/composed/CustomKeyboard';
@@ -33,62 +33,65 @@ import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
 export type AmountEntryTransactionType = 'send' | 'receive' | 'neutral';
 
+const FIAT_DECIMAL_PLACES = 2;
+
 interface FiatAmountDisplayProps {
   rawInput: string;
   symbol: string;
   activeColor: string;
   placeholderColor: string;
   size: number;
+  lineHeight: number;
 }
 
+/**
+ * Renders the in-progress fiat raw input (e.g. "$1,234.5") as a single text
+ * node so its line-box height matches AmountFormatter's sat path exactly —
+ * same MonaSans face, same explicit lineHeight. Toggling between fiat and
+ * sat modes therefore can't shift the display vertically. Greyed-out trailing
+ * zeros are nested <RNText> children, which inherit the parent's metrics
+ * instead of opening a new flex line.
+ */
 function FiatAmountDisplay({
   rawInput,
   symbol,
   activeColor,
   placeholderColor,
   size,
+  lineHeight,
 }: FiatAmountDisplayProps) {
   const hasDecimal = rawInput.includes('.');
-  const parts = rawInput.split('.');
-  const wholePart = parts[0] || '';
-  const decimalPart = parts[1] || '';
+  const [wholeRaw = '', decimalPart = ''] = rawInput.split('.');
+  const parsedWhole = parseInt(wholeRaw, 10);
+  const formattedWhole = Number.isNaN(parsedWhole) ? '0' : parsedWhole.toLocaleString('en-US');
 
-  const parsedWhole = parseInt(wholePart, 10);
-  const formattedWhole = !isNaN(parsedWhole) ? parsedWhole.toLocaleString('en-US') : '0';
-
-  const showDecimalSection = hasDecimal || wholePart === '0';
+  const showDecimalSection = hasDecimal || wholeRaw === '0';
   const placeholderDecimals = showDecimalSection
-    ? '0'.repeat(Math.max(0, 2 - decimalPart.length))
+    ? '0'.repeat(Math.max(0, FIAT_DECIMAL_PLACES - decimalPart.length))
     : '';
 
   return (
-    <HStack align="baseline" justify="center">
-      <Text overpass size={size} weight="heavy" style={{ color: activeColor }}>
-        {symbol}
-        {formattedWhole}
-      </Text>
+    <RNText
+      allowFontScaling={false}
+      style={{
+        fontFamily: AMOUNT_FONT_FAMILY.heavy,
+        fontSize: size,
+        lineHeight,
+        textAlign: 'center',
+        color: activeColor,
+        margin: 0,
+      }}>
+      {`${symbol} ${formattedWhole}`}
       {showDecimalSection && (
         <>
-          <Text
-            overpass
-            size={size}
-            weight="heavy"
-            style={{ color: hasDecimal ? activeColor : placeholderColor }}>
-            .
-          </Text>
-          {decimalPart && (
-            <Text overpass size={size} weight="heavy" style={{ color: activeColor }}>
-              {decimalPart}
-            </Text>
-          )}
-          {placeholderDecimals && (
-            <Text overpass size={size} weight="heavy" style={{ color: placeholderColor }}>
-              {placeholderDecimals}
-            </Text>
+          <RNText style={{ color: hasDecimal ? activeColor : placeholderColor }}>.</RNText>
+          {decimalPart}
+          {placeholderDecimals !== '' && (
+            <RNText style={{ color: placeholderColor }}>{placeholderDecimals}</RNText>
           )}
         </>
       )}
-    </HStack>
+    </RNText>
   );
 }
 
@@ -192,6 +195,10 @@ export function AmountEntryView({
   const isCompactPhone = screenHeight <= 760;
   const isVeryCompactPhone = screenHeight <= 680;
   const amountTextSize = isVeryCompactPhone ? 36 : isCompactPhone ? 42 : 48;
+  // Lock the line-box for both display paths so toggling fiat ↔ sat can't
+  // jitter the rendered height. RN otherwise uses the font's intrinsic
+  // metric, which differs by face and weight.
+  const amountLineHeight = Math.round(amountTextSize * 1.2);
   const centerSpacing = isCompactPhone ? 3 : 4;
   const topPadding = insets.top + (isCompactPhone ? 12 : 24);
 
@@ -283,6 +290,7 @@ export function AmountEntryView({
                 rawInput={rawInput}
                 symbol={fiatSymbol}
                 size={amountTextSize}
+                lineHeight={amountLineHeight}
                 activeColor={activeColor}
                 placeholderColor={placeholderColor}
               />
@@ -291,6 +299,7 @@ export function AmountEntryView({
                 amount={numericValue}
                 unit={unit}
                 size={amountTextSize}
+                lineHeight={amountLineHeight}
                 weight="heavy"
                 animated
                 useTypeColors={useTypeColors}

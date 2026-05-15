@@ -30,7 +30,12 @@ type TransactionType = 'send' | 'receive';
 // Keys are PostScript names — they must match entries registered in
 // useFonts.ts, so UIFont(name:) on iOS and the RN font resolver on Android
 // both find the face without an alias map.
-const FONT_FAMILY: Record<FontWeight, string> = {
+//
+// Exported so other amount displays (e.g. the fiat raw-input view) can lock
+// onto the same font metrics. Without this, toggling between display paths
+// shifts the rendered height because each font has its own intrinsic
+// line-box.
+export const AMOUNT_FONT_FAMILY: Record<FontWeight, string> = {
   light: 'MonaSans-Light',
   regular: 'MonaSans-Regular',
   medium: 'MonaSans-Medium',
@@ -148,7 +153,7 @@ export function AmountFormatter({
               </RNText>
               <LiquidGlassText
                 text={text}
-                fontName={FONT_FAMILY[weight]}
+                fontName={AMOUNT_FONT_FAMILY[weight]}
                 fontSize={size}
                 fontWeight={weight}
                 tint={resolvedColor}
@@ -179,10 +184,13 @@ export function AmountFormatter({
 // The ⚡︎ uses U+FE0E (VS15) to request the text-presentation glyph — without
 // it, some OSes render the emoji-color variant which doesn't extract to a
 // vector path inside the glass surface.
+// U+2009 thin space sits ~\u00BD the width of a regular space and reads as the
+// natural gap between a currency glyph and the digits it labels. Mirrored in
+// FiatAmountDisplay so toggling fiat \u2194 sat keeps the symbol cadence identical.
 function decorate(formatted: string, unit: CurrencyUnit, displayBtc: number): string {
   if (unit !== 'sat') return formatted;
-  if (displayBtc === 0 || displayBtc === 3) return `\u20BF ${formatted}`;
-  if (displayBtc === 1) return `${formatted} \u26A1\uFE0E`;
+  if (displayBtc === 0 || displayBtc === 3) return `\u20BF\u2009${formatted}`;
+  if (displayBtc === 1) return `${formatted}\u2009\u26A1\uFE0E`;
   return formatted;
 }
 
@@ -194,7 +202,7 @@ function plainTextStyle(
   centered: boolean
 ): TextStyle {
   return {
-    fontFamily: FONT_FAMILY[weight],
+    fontFamily: AMOUNT_FONT_FAMILY[weight],
     fontSize: size,
     lineHeight,
     // The plain path has no glass surface, so a null tint collapses to the

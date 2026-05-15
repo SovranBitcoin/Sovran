@@ -40,6 +40,23 @@ const FIAT_FLAG_NAMES: Record<DisplayCurrency, string> = {
   gbp: 'circle-flags:gb',
 };
 
+// Pill width is sized to fit just the *active* label so "Euro" doesn't carry
+// the same footprint as "British Pound". The pill reflows when the user
+// toggles sat ↔ fiat or picks a different `displayCurrency`.
+//
+//   chrome  = icon-box (ICON_SIZE) + iconRightSpacing (6)
+//             + chevron (12) + chevron mr-2 (8)
+//             + BalancePill HORIZONTAL_PADDING * 2 (24)
+//   label   = label glyphs × bold size-14 Oxygen avg (~8 px)
+//   safety  = +8 px to absorb font-metric variance across iOS/Android.
+const PILL_CHROME_WIDTH = ICON_SIZE + 6 + 12 + 8 + 24;
+const LABEL_GLYPH_WIDTH = 8;
+const LABEL_SAFETY_PADDING = 8;
+
+function widthForLabel(label: string): number {
+  return PILL_CHROME_WIDTH + label.length * LABEL_GLYPH_WIDTH + LABEL_SAFETY_PADDING;
+}
+
 function CurrencyGlyph({ currency }: { currency: SwapperCurrency }) {
   if (currency === 'sat') {
     return <CurrencyIcon currency="sat" width={ICON_SIZE} />;
@@ -54,7 +71,8 @@ interface CurrencySwapperPillProps {
   /** Tap handler — caller flips the input mode (or whatever the swap does
    *  in their flow). */
   onPress?: () => void;
-  /** Override pill width. Defaults to a compact 130. */
+  /** Override pill width. Defaults to a value sized to the active label,
+   *  so the pill grows or shrinks as the user toggles currencies. */
   width?: number;
   /** Override pill height. Defaults to 36 (smaller than the header pill
    *  so the amount-entry layout stays balanced). */
@@ -64,11 +82,13 @@ interface CurrencySwapperPillProps {
 export function CurrencySwapperPill({
   inputMode,
   onPress,
-  width = 130,
+  width,
   height = 36,
 }: CurrencySwapperPillProps) {
   const displayCurrency = useSettingsStore((s) => s.displayCurrency);
   const activeCurrency: SwapperCurrency = inputMode === 'sat' ? 'sat' : displayCurrency;
+  const label = CURRENCY_LABELS[activeCurrency];
+  const resolvedWidth = width ?? widthForLabel(label);
 
   return (
     <BalancePill
@@ -79,10 +99,10 @@ export function CurrencySwapperPill({
       iconNode={<CurrencyGlyph currency={activeCurrency} />}
       iconBoxSize={ICON_SIZE}
       iconRightSpacing={6}
-      ctaLabel={CURRENCY_LABELS[activeCurrency]}
+      ctaLabel={label}
       balance={0}
       onPress={onPress}
-      width={width}
+      width={resolvedWidth}
       height={height}
       // Let BalanceDisplay span the full pill height so its inner
       // HStack's `align="center"` handles vertical centering at the
