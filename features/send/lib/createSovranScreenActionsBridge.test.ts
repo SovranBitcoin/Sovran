@@ -26,7 +26,12 @@ jest.mock('@/shared/lib/logger', () => {
     trace: noop,
     child: () => stub,
   };
-  return { paymentLog: stub };
+  return {
+    paymentLog: stub,
+    storeLog: stub,
+    log: stub,
+    redactError: (err: unknown) => err,
+  };
 });
 
 jest.mock('@/shared/stores/global/auditMintStore', () => ({
