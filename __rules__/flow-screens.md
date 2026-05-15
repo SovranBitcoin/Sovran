@@ -1,6 +1,12 @@
 # Flow screens — the rules
 
-The app organizes screens into Expo Router groups that present as **modal stacks** from the parent layout. Each top-level group (`(settings-flow)`, `(receive-flow)`, `(send-flow)`, `(mint-flow)`, `(split-bill-flow)`, `(filter-flow)`, `(map-flow)`, `(stories-flow)`) is its own modal that slides up from the bottom; nested screens within the group push horizontally with the standard close/back header.
+The app organizes screens into Expo Router groups that present as **modal stacks** from the parent layout. Each top-level group (`(settings-flow)`, `(receive-flow)`, `(send-flow)`, `(mint-flow)`, `(profile-flow)`, `(split-bill-flow)`, `(filter-flow)`, `(map-flow)`, `(stories-flow)`) is its own modal that slides up from the bottom; nested screens within the group push horizontally with the standard close/back header.
+
+## Nostr profile flow choice
+
+Use `(user-flow)` for normal flat profile navigation from Contacts, Feed, search, and other tab-level surfaces. It is registered as a side-slide stack so profile browsing feels like a lateral detail view.
+
+Use `(profile-flow)` when opening a Nostr profile from camera scanning or from inside another modal flow. This keeps the profile above the active modal stack instead of opening as a sibling behind it. Profile-internal actions such as Share and Nostr DM must route through `shared/lib/nav/profileRoutes.ts` so they stay inside whichever profile flow is currently active.
 
 ## The four-file pattern for adding a screen to a flow
 
@@ -32,11 +38,7 @@ If you're not sure which shape fits, find the closest existing screen in the sam
 Settings entries use the inline `SettingsListLinkItem` defined at the top of `SettingsScreen.tsx`. Pattern:
 
 ```tsx
-<SettingsListLinkItem
-  href="/(settings-flow)/foo"
-  title="Foo"
-  description="Optional second line"
-/>
+<SettingsListLinkItem href="/(settings-flow)/foo" title="Foo" description="Optional second line" />
 ```
 
 The `href` must include the group name in parens — `(settings-flow)/foo`, not `/foo`. Other flows have their own list-item primitives or are entered from app actions (`router.push('/(receive-flow)')`); check the flow's existing screens for the entry pattern.

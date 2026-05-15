@@ -42,6 +42,7 @@ import {
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
 import { writeTokenToNFC, NfcError, isUserCancelError } from '@/shared/lib/nfc';
+import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import {
   copyPopup,
   emojiPickerPopup,
@@ -859,9 +860,7 @@ export function createSovranHandlers({
           ...(recipientProfile?.avatarUrl
             ? { recipientAvatarUrl: recipientProfile.avatarUrl }
             : {}),
-          ...(recipientProfile?.nip05
-            ? { recipientNip05: recipientProfile.nip05 }
-            : {}),
+          ...(recipientProfile?.nip05 ? { recipientNip05: recipientProfile.nip05 } : {}),
         },
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
@@ -905,10 +904,7 @@ export function createSovranHandlers({
     },
 
     openProfile: ({ npub }) => {
-      router.navigate({
-        pathname: '/(user-flow)/profile',
-        params: { npub },
-      });
+      router.navigate(buildModalProfileHref({ npub }));
     },
 
     navigateToReceive: async ({ unit }) => {

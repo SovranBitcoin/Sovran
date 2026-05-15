@@ -34,6 +34,7 @@ import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
 
@@ -160,21 +161,22 @@ function AnimatedAvatarComponent({
   // total width to keep the green disc itself the same size as before.
   const ring = okOutline ? 2 : 0;
   const okOuter = badgeSize + 4 + ring * 2;
-  const okBadge = statusBadge?.variant === 'success' && okBg && okIcon ? (
-    <View
-      style={{
-        width: okOuter,
-        height: okOuter,
-        borderRadius: okOuter / 2,
-        backgroundColor: okBg,
-        borderWidth: ring,
-        borderColor: okOutline,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-      <Icon name={statusBadge.icon} size={badgeSize} color={okIcon} />
-    </View>
-  ) : null;
+  const okBadge =
+    statusBadge?.variant === 'success' && okBg && okIcon ? (
+      <View
+        style={{
+          width: okOuter,
+          height: okOuter,
+          borderRadius: okOuter / 2,
+          backgroundColor: okBg,
+          borderWidth: ring,
+          borderColor: okOutline,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Icon name={statusBadge.icon} size={badgeSize} color={okIcon} />
+      </View>
+    ) : null;
 
   return (
     <View className="relative">
@@ -187,7 +189,9 @@ function AnimatedAvatarComponent({
       />
       {statusBadge && (
         <Animated.View style={badgeStyle}>
-          {okBadge ?? <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={badgeSize} />}
+          {okBadge ?? (
+            <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={badgeSize} />
+          )}
         </Animated.View>
       )}
     </View>
@@ -483,7 +487,7 @@ export function MintInfoScreen() {
         await open(`https://x.com/${encodeURIComponent(info.replace('@', ''))}`);
         break;
       case 'nostr':
-        router.push({ pathname: '/(user-flow)/profile', params: { npub: info } });
+        router.push(buildModalProfileHref({ npub: info }));
         break;
       default:
         await Clipboard.setStringAsync(info);

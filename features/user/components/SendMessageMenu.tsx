@@ -4,6 +4,7 @@ import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/A
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
 import { useWhitenoiseSetup } from '@/features/whitenoise/hooks/useWhitenoiseSetup';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
 import Icon from 'assets/icons';
 import { nostrLog } from '@/shared/lib/logger';
 
@@ -27,6 +28,7 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
   const { peers } = useBLEPeers();
   const { isReady: whitenoiseReady } = useWhitenoiseSetup();
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
+  const profileFlowGroup = useActiveProfileFlowGroup();
 
   const bitchatPeer = useMemo(() => {
     if (!displayName) return undefined;
@@ -45,10 +47,7 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
         testID: 'send-message-menu-nostr',
         onPress: () => {
           nostrLog.info('user.profile.send_message', { pubkey, transport: 'nostr' });
-          router.navigate({
-            pathname: '/(user-flow)/userMessages' as never,
-            params: { pubkey },
-          });
+          router.navigate(buildProfileHref('userMessages', { pubkey }, profileFlowGroup) as never);
         },
       },
     ];
@@ -68,13 +67,10 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
             ready: whitenoiseReady,
           });
           if (!whitenoiseReady) {
-            router.push('/(user-flow)/whitenoiseSetup' as never);
+            router.push(buildProfileHref('whitenoiseSetup', undefined, profileFlowGroup) as never);
             return;
           }
-          router.navigate({
-            pathname: '/(user-flow)/whitenoiseDM' as never,
-            params: { pubkey },
-          });
+          router.navigate(buildProfileHref('whitenoiseDM', { pubkey }, profileFlowGroup) as never);
         },
       });
     }
@@ -93,18 +89,21 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
           transport: 'bitchat',
           peerID: bitchatPeer.peerID.slice(0, 8),
         });
-        router.push({
-          pathname: '/(user-flow)/bitchatDM' as never,
-          params: {
-            transport: 'ble-dm',
-            peerID: bitchatPeer.peerID,
-            nickname: bitchatPeer.nickname,
-          },
-        });
+        router.push(
+          buildProfileHref(
+            'bitchatDM',
+            {
+              transport: 'ble-dm',
+              peerID: bitchatPeer.peerID,
+              nickname: bitchatPeer.nickname,
+            },
+            profileFlowGroup
+          ) as never
+        );
       },
     });
     return list;
-  }, [pubkey, whitenoiseEnabled, whitenoiseReady, bitchatPeer]);
+  }, [pubkey, whitenoiseEnabled, whitenoiseReady, bitchatPeer, profileFlowGroup]);
 
   return (
     <ActionMenuButton

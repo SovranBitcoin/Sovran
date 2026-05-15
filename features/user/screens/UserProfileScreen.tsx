@@ -57,6 +57,7 @@ import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
 import {
   selectIsFollowingPubkey,
   useNostrSocialStore,
@@ -228,6 +229,7 @@ function TopFollowersComponent({
   isLoading: boolean;
 }) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const profileFlowGroup = useActiveProfileFlowGroup();
   const { width: screenWidth } = useWindowDimensions();
   const fadeAnim = useSharedValue(0);
   const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
@@ -254,10 +256,7 @@ function TopFollowersComponent({
   const handleFollowerPress = (follower: TopFollower) => {
     // push (not navigate) so each profile pushes a new stack entry; tapping
     // through follower → follower-of-follower then back returns step by step.
-    router.push({
-      pathname: '/(user-flow)/profile',
-      params: { npub: follower.npub },
-    });
+    router.push(buildProfileHref('profile', { npub: follower.npub }, profileFlowGroup) as never);
   };
 
   const renderItem = (follower: TopFollower) => (
@@ -626,6 +625,7 @@ export function UserProfileScreen() {
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const profileFlowGroup = useActiveProfileFlowGroup();
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
   const params = useRouteParams(UserProfileParamsSchema, {
@@ -954,14 +954,17 @@ export function UserProfileScreen() {
                 </Link>
               )}
               <Link
-                href={{
-                  pathname: '/(user-flow)/share',
-                  params: {
-                    type: 'npub',
-                    data: npub,
-                    ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
-                  },
-                }}
+                href={
+                  buildProfileHref(
+                    'share',
+                    {
+                      type: 'npub',
+                      data: npub,
+                      ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
+                    },
+                    profileFlowGroup
+                  ) as never
+                }
                 asChild>
                 <Pressable style={{ padding: 8 }}>
                   <Icon name="mdi:qrcode" size={24} color={foreground} />
