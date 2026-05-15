@@ -8,6 +8,7 @@ import { MintSelector } from '@/features/wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
+import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 export default function HomeLayout() {
   const iconColor = useThemeColor('foreground');
@@ -38,8 +39,7 @@ export default function HomeLayout() {
           name="index"
           options={buildExpoRouterHeaderOptions({
             iconColor,
-            headerLeftIcon: 'line.3.horizontal',
-            onHeaderLeftPress: openDrawer,
+            headerLeft: () => <HeaderProfileButton onPress={openDrawer} />,
             headerRightIcon: 'wave.3.right',
             onHeaderRightPress: handleNfcPayment,
             options: {

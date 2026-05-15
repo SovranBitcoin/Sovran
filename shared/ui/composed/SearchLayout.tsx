@@ -9,6 +9,7 @@ import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
+import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 // --- Context ---
 
@@ -89,13 +90,16 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
     [placeholder]
   );
   const headerRight = useCallback(() => <SearchHeaderRight />, []);
+  const headerLeft = useCallback(
+    () => <HeaderProfileButton onPress={openDrawer} />,
+    [openDrawer]
+  );
 
   const screenOptions = useMemo(
     () =>
       buildExpoRouterHeaderOptions({
         iconColor,
-        headerLeftIcon: 'line.3.horizontal',
-        onHeaderLeftPress: openDrawer,
+        headerLeft,
         headerRight,
         options: {
           title,
@@ -108,7 +112,7 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
           ...(search.isSearching ? { headerTitle: searchBarTitle } : {}),
         },
       }),
-    [iconColor, openDrawer, headerRight, surface, title, search.isSearching, searchBarTitle]
+    [iconColor, headerLeft, headerRight, surface, title, search.isSearching, searchBarTitle]
   );
 
   const contextValue: SearchContextValue = useMemo(

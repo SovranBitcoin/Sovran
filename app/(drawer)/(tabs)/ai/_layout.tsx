@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { AiHeaderTitle, openAiSessionsMenu } from '@/features/ai';
+import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 export default function AiLayout() {
   const iconColor = useThemeColor('foreground');
@@ -20,8 +21,7 @@ export default function AiLayout() {
         name="index"
         options={buildExpoRouterHeaderOptions({
           iconColor,
-          headerLeftIcon: 'line.3.horizontal',
-          onHeaderLeftPress: openDrawer,
+          headerLeft: () => <HeaderProfileButton onPress={openDrawer} />,
           headerRightIcon: 'clock.arrow.circlepath',
           onHeaderRightPress: openAiSessionsMenu,
           options: {
