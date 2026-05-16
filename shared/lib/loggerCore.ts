@@ -166,9 +166,9 @@ const LEVEL_CONSOLE_METHOD: Record<LogLevel, 'debug' | 'info' | 'warn' | 'error'
 
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 
-// Master switch: dev-only by default. Production builds skip the JS-thread
-// heartbeat side-effect entirely and skip the per-emit stack walk for warn.
-export const SHOW_LOGS = true;
+// Master switch: dev-only. Production builds short-circuit at the top of
+// `emit` and skip the JS-thread heartbeat side-effect entirely.
+export const SHOW_LOGS = IS_DEV;
 
 // ─── Monotonic Clock ────────────────────────────────────────────────────────
 //
