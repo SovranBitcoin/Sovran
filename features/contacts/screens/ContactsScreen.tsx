@@ -46,6 +46,7 @@ import { parseGeohashQuery } from '../lib/parseGeohashQuery';
 import { matchTiers } from '../lib/matchTiers';
 import type { NostrProfileMetadata } from '@/shared/stores/global/nostrMetadataCache';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { MOCK_ALLOWED_PUBKEYS_HEX } from '@/shared/stores/runtime/mockDataStore';
 
 type TopTab = 'contacts' | 'groups';
 
@@ -150,6 +151,7 @@ export const ContactsScreen = () => {
   const tabBarPadding = useTabBarBottomPadding();
   const pullToAi = usePullToAiRefreshControl();
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
+  const mockMode = useSettingsStore((state) => state.mockMode);
 
   // When the search closes, restore the outer tab. If the user was on the
   // "Groups" pill, surface the groups list they were browsing.
@@ -330,7 +332,7 @@ export const ContactsScreen = () => {
     return bitchatDmRows.filter((c) => c.nickname.toLowerCase().includes(lowerQuery));
   }, [bitchatDmRows, lowerQuery]);
 
-  const currentListData = useMemo<ContactsListItem[]>(() => {
+  const rawListData = useMemo<ContactsListItem[]>(() => {
     switch (activeFilter) {
       case 'Recent': {
         // Merge NIP-17/NIP-04 recent contacts with accepted Marmot DM
@@ -377,6 +379,18 @@ export const ContactsScreen = () => {
     filteredBitchatDmRows,
     requestRows,
   ]);
+
+  // Mock-mode allowlist filter: only show rows whose nostr pubkey is in
+  // MOCK_ALLOWED_PUBKEYS_HEX (defined in mockDataStore). Mints / requests
+  // / BLE peers are dropped entirely so the screen reads as a clean,
+  // hardcoded demo list. The allowlisted pubkeys are seeded as default
+  // rows in useRecentContacts so they appear here even with no DMs.
+  const currentListData = useMemo<ContactsListItem[]>(() => {
+    if (!mockMode) return rawListData;
+    return rawListData.filter(
+      (item) => item.type === 'contact' && MOCK_ALLOWED_PUBKEYS_HEX.has(item.pubkey)
+    );
+  }, [rawListData, mockMode]);
 
   const handleFilterChange = useCallback((filter: ContactsFilter) => {
     log.debug('contacts.filter_changed', { filter });

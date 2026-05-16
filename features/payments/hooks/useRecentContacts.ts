@@ -7,7 +7,7 @@ import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { decryptNip04Events } from '../lib/decryptNip04Events';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { getMockContacts } from '@/shared/stores/runtime/mockDataStore';
+import { getMockContacts, MOCK_ALLOWED_PUBKEYS_HEX } from '@/shared/stores/runtime/mockDataStore';
 
 const DEFAULT_CONTACTS = [{ pubkey: PUBLIC_KEYS.SUPPORT, label: 'Sovran' }] as const;
 
@@ -283,9 +283,25 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
     // (timestamp 0) stay at the bottom. Real contacts are deduped against
     // mocks by pubkey — a real DM from a mock pubkey wins so the demo
     // doesn't mask actual history if any happens to exist.
+    //
+    // Allowlisted pubkeys are seeded as default-style rows so they always
+    // surface in the Contacts list even with no DM history. They are NOT
+    // injected with mock metadata or mock threads (`mockDataStore` excludes
+    // them from `EFFECTIVE_MOCK_CONTACTS`) so the row renders with real
+    // kind-0 metadata fetched from relays.
     const mocks = getMockContacts();
     const realKeys = new Set(base.map((c) => c.pubkey));
-    return [...mocks.filter((m) => !realKeys.has(m.pubkey)), ...base];
+    const allowlistRows: RecentContact[] = [...MOCK_ALLOWED_PUBKEYS_HEX]
+      .filter((pk) => !realKeys.has(pk))
+      .map((pk) => ({
+        type: 'contact',
+        pubkey: pk,
+        dmEvent: null,
+        nip17Content: undefined,
+        timestamp: 0,
+        isDefault: true,
+      }));
+    return [...mocks.filter((m) => !realKeys.has(m.pubkey)), ...allowlistRows, ...base];
   }, [decryptedContacts, contactsWithDefaults, mockMode]);
 
   const contactPubkeys = useMemo(() => {
@@ -293,6 +309,9 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
     if (!mockMode) return base;
     const seen = new Set(base);
     for (const m of getMockContacts()) if (!seen.has(m.pubkey)) base.push(m.pubkey);
+    // Allowlisted pubkeys also need to be in the kind-0 batched fetch so
+    // the row gets real metadata.
+    for (const pk of MOCK_ALLOWED_PUBKEYS_HEX) if (!seen.has(pk)) base.push(pk);
     return base;
   }, [contactsWithDefaults, mockMode]);
 

@@ -14,6 +14,7 @@
  */
 
 import { create } from 'zustand';
+import { nip19 } from 'nostr-tools';
 import { useScanHistoryStore, type ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useSwapTransactionsStore,
@@ -266,6 +267,39 @@ const MOCK_CONTACTS: readonly MockContact[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Mock-mode contacts allowlist
+//
+// In mock mode the Contacts screen is restricted to ONLY the npubs in this
+// list (every other contact, mint, request, BLE peer is hidden). Crucially,
+// pubkeys on this list use REAL Nostr data — they are excluded from every
+// mock injection below (metadata, threads, recent-contacts rows, the
+// `isMockContactPubkey` check). That way a collision between an allowlisted
+// npub and an entry in `MOCK_CONTACTS` (e.g. "alice") does not shadow real
+// kind-0 metadata or real DM history.
+//
+// To add a real contact to the demo, append its npub here.
+// ---------------------------------------------------------------------------
+
+export const MOCK_ALLOWED_NPUBS: readonly string[] = [
+  'npub1ceel7z6ly287kz4mzqqcsgtc6nzc30zw2ru9w9e4gj64gw69f7qscyf0p8',
+  'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
+] as const;
+
+export const MOCK_ALLOWED_PUBKEYS_HEX: ReadonlySet<string> = new Set(
+  MOCK_ALLOWED_NPUBS.map((npub) => {
+    const decoded = nip19.decode(npub);
+    return decoded.type === 'npub' ? (decoded.data as string) : '';
+  }).filter(Boolean)
+);
+
+// Mocks that are NOT shadowed by the allowlist. Single source of truth for
+// every runtime injection below — keep `MOCK_CONTACTS` itself intact so the
+// raw demo data is auditable and easy to repopulate later.
+const EFFECTIVE_MOCK_CONTACTS = MOCK_CONTACTS.filter(
+  (c) => !MOCK_ALLOWED_PUBKEYS_HEX.has(c.pubkey)
+);
+
 interface MockDmMessage {
   id: string;
   content: string;
@@ -279,7 +313,7 @@ function buildMockContactsAndThreads(now: number) {
   const threadsByPubkey: Record<string, MockDmMessage[]> = {};
   const recentContacts: RecentContact[] = [];
 
-  for (const c of MOCK_CONTACTS) {
+  for (const c of EFFECTIVE_MOCK_CONTACTS) {
     metadataByPubkey[c.pubkey] = c.metadata;
 
     const messages: MockDmMessage[] = c.thread.map((m, idx) => {
@@ -313,7 +347,9 @@ function buildMockContactsAndThreads(now: number) {
   return { metadataByPubkey, threadsByPubkey, recentContacts };
 }
 
-const MOCK_PUBKEYS_SET: ReadonlySet<string> = new Set(MOCK_CONTACTS.map((c) => c.pubkey));
+const MOCK_PUBKEYS_SET: ReadonlySet<string> = new Set(
+  EFFECTIVE_MOCK_CONTACTS.map((c) => c.pubkey)
+);
 
 export function isMockContactPubkey(pubkey: string | null | undefined): boolean {
   return !!pubkey && MOCK_PUBKEYS_SET.has(pubkey);
