@@ -71,6 +71,7 @@ describe('Operations — real Manager', () => {
       unit: 'sat',
       candidates: [],
       supportedMintUrls: undefined,
+      destination: 'sendEcash',
     });
 
     const testItem = items.find((i) => i.mintUrl === TEST_MINT);

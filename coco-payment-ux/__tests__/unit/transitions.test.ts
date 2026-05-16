@@ -48,7 +48,7 @@
 import { describe, it, expect } from 'vitest';
 import { transition, type TransitionResult } from '../../src/machine/transitions';
 import { defaultDetectors } from '../../src/detectors';
-import { WALLETS, MINT1, MINT2, INPUTS } from '../_harness/fixtures';
+import { WALLETS, MINT1, MINT2, MINT3, INPUTS } from '../_harness/fixtures';
 import type { FlowContext, FlowEvent, FlowStep } from '../../src/machine/types';
 import type { WalletContext } from '../../src/types';
 
@@ -458,6 +458,243 @@ describe('transition — AMOUNT_ENTERED', () => {
     });
     // meltTarget should still be there for the melt preview
     expect(result.context.meltTarget).toBe('user@example.com');
+  });
+
+  it('keeps the current mint when it can cover an ecash send amount', () => {
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'sendEcash',
+      mintUrl: MINT1,
+    };
+    const result = tx('enterAmount', ctx, {
+      type: 'AMOUNT_ENTERED',
+      amount: 200,
+      mintUrl: MINT1,
+    });
+
+    expect(result.step).toBe('confirmSend');
+    expect(result.context.mintUrl).toBe(MINT1);
+    expect(result.data).toMatchObject({ mintUrl: MINT1, amount: 200 });
+  });
+
+  it('replaces an underfunded ecash send mint with the only sufficient mint', () => {
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'sendEcash',
+      mintUrl: MINT2,
+    };
+    const result = tx(
+      'enterAmount',
+      ctx,
+      {
+        type: 'AMOUNT_ENTERED',
+        amount: 200,
+        mintUrl: MINT2,
+      },
+      WALLETS.multiMintUnbalanced
+    );
+
+    expect(result.step).toBe('confirmSend');
+    expect(result.context.mintUrl).toBe(MINT1);
+    expect(result.data).toMatchObject({ mintUrl: MINT1, amount: 200 });
+  });
+
+  it('opens the mint selector for ecash sends when multiple mints can cover the amount', () => {
+    const wallet: WalletContext = {
+      trustedMintUrls: [MINT1, MINT2, MINT3],
+      mintBalances: { [MINT1]: 5000, [MINT2]: 4000, [MINT3]: 100 },
+      preferredMintUrl: MINT3,
+      proofAmounts: {
+        [MINT1]: [2048, 1024, 512],
+        [MINT2]: [2048, 1024, 512],
+        [MINT3]: [64, 32, 4],
+      },
+    };
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'sendEcash',
+      mintUrl: MINT3,
+    };
+    const result = tx(
+      'enterAmount',
+      ctx,
+      {
+        type: 'AMOUNT_ENTERED',
+        amount: 1000,
+        mintUrl: MINT3,
+      },
+      wallet
+    );
+
+    expect(result.step).toBe('selectMint');
+    expect(result.context).toMatchObject({
+      amount: 1000,
+      destination: 'sendEcash',
+      mintUrl: MINT3,
+    });
+    expect(result.data).toMatchObject({
+      amount: 1000,
+      destination: 'sendEcash',
+      candidates: [
+        { mintUrl: MINT1, balance: 5000 },
+        { mintUrl: MINT2, balance: 4000 },
+      ],
+    });
+  });
+
+  it('routes meltQuote amount entry to an error when no mint can cover the amount', () => {
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'meltQuote',
+      mintUrl: MINT1,
+      meltTarget: 'user@example.com',
+    };
+    const result = tx(
+      'enterAmount',
+      ctx,
+      {
+        type: 'AMOUNT_ENTERED',
+        amount: 9999,
+        mintUrl: MINT1,
+      },
+      WALLETS.insufficientBalance
+    );
+
+    expect(result.step).toBe('error');
+    expect(result.context).toMatchObject({
+      amount: 9999,
+      destination: 'meltQuote',
+      meltTarget: 'user@example.com',
+    });
+    expect(result.data).toMatchObject({ code: 'NO_BALANCE' });
+  });
+
+  it('selects a sufficient meltQuote mint when amount entry provides no mintUrl', () => {
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'meltQuote',
+      meltTarget: 'user@example.com',
+      recipientPubkey: 'recipient-pubkey',
+      recipientProfile: {
+        displayName: 'Recipient',
+        avatarUrl: 'https://example.com/avatar.png',
+        nip05: 'user@example.com',
+      },
+    };
+    const result = tx(
+      'enterAmount',
+      ctx,
+      {
+        type: 'AMOUNT_ENTERED',
+        amount: 200,
+        mintUrl: '',
+      },
+      WALLETS.multiMintUnbalanced
+    );
+
+    expect(result.step).toBe('navigateToMeltPreview');
+    expect(result.context.mintUrl).toBe(MINT1);
+    expect(result.data).toMatchObject({
+      mintUrl: MINT1,
+      amount: 200,
+      meltTarget: 'user@example.com',
+      recipientPubkey: 'recipient-pubkey',
+      recipientProfile: {
+        displayName: 'Recipient',
+        avatarUrl: 'https://example.com/avatar.png',
+        nip05: 'user@example.com',
+      },
+    });
+  });
+
+  it('revalidates payment requests against supported mints when amount is entered', () => {
+    const wallet: WalletContext = {
+      trustedMintUrls: [MINT1, MINT2],
+      mintBalances: { [MINT1]: 5000, [MINT2]: 3000 },
+      preferredMintUrl: MINT1,
+      proofAmounts: {
+        [MINT1]: [2048, 1024, 512],
+        [MINT2]: [2048, 1024, 512],
+      },
+    };
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'paymentRequest',
+      mintUrl: MINT1,
+      paymentRequest: 'creq_test',
+      supportedMintUrls: [MINT2],
+    };
+    const result = tx(
+      'enterAmount',
+      ctx,
+      {
+        type: 'AMOUNT_ENTERED',
+        amount: 1000,
+        mintUrl: MINT1,
+      },
+      wallet
+    );
+
+    expect(result.step).toBe('navigateToPaymentRequest');
+    expect(result.context).toMatchObject({
+      mintUrl: MINT2,
+      paymentRequest: 'creq_test',
+      supportedMintUrls: [MINT2],
+    });
+    expect(result.data).toMatchObject({
+      mintUrl: MINT2,
+      paymentRequest: 'creq_test',
+      amount: 1000,
+    });
+  });
+
+  it('opens the mint selector for payment requests when multiple supported mints can cover the amount', () => {
+    const wallet: WalletContext = {
+      trustedMintUrls: [MINT1, MINT2, MINT3],
+      mintBalances: { [MINT1]: 100, [MINT2]: 3000, [MINT3]: 4000 },
+      preferredMintUrl: MINT1,
+      proofAmounts: {
+        [MINT1]: [64, 32, 4],
+        [MINT2]: [2048, 1024, 512],
+        [MINT3]: [2048, 1024, 512],
+      },
+    };
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'paymentRequest',
+      mintUrl: MINT1,
+      paymentRequest: 'creq_test',
+      supportedMintUrls: [MINT2, MINT3],
+    };
+    const result = tx(
+      'enterAmount',
+      ctx,
+      {
+        type: 'AMOUNT_ENTERED',
+        amount: 1000,
+        mintUrl: MINT1,
+      },
+      wallet
+    );
+
+    expect(result.step).toBe('selectMint');
+    expect(result.context).toMatchObject({
+      amount: 1000,
+      destination: 'paymentRequest',
+      mintUrl: MINT1,
+      paymentRequest: 'creq_test',
+      supportedMintUrls: [MINT2, MINT3],
+    });
+    expect(result.data).toMatchObject({
+      amount: 1000,
+      destination: 'paymentRequest',
+      paymentRequest: 'creq_test',
+      supportedMintUrls: [MINT2, MINT3],
+      candidates: [
+        { mintUrl: MINT3, balance: 4000 },
+        { mintUrl: MINT2, balance: 3000 },
+      ],
+    });
   });
 });
 

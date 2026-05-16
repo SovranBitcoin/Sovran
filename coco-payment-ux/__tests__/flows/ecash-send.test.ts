@@ -35,7 +35,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTestMachine, runScenario } from '../_harness';
-import { WALLETS, MINT1, MINT2 } from '../_harness/fixtures';
+import { WALLETS, MINT1, MINT2, MINT3 } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
 
 // ---------------------------------------------------------------------------
@@ -238,13 +238,59 @@ describe('ecash send — insufficient balance', () => {
     expect(opCall?.args).toEqual([MINT1, 200]);
   });
 
+  it('opens the mint selector when multiple mints can cover the entered amount', async () => {
+    const tm = createTestMachine({
+      wallet: {
+        trustedMintUrls: [MINT1, MINT2, MINT3],
+        mintBalances: { [MINT1]: 5000, [MINT2]: 4000, [MINT3]: 100 },
+        preferredMintUrl: MINT3,
+        proofAmounts: {
+          [MINT1]: [2048, 1024, 512],
+          [MINT2]: [2048, 1024, 512],
+          [MINT3]: [64, 32, 4],
+        },
+      },
+    });
+
+    await tm.machine.startSendEcash();
+    tm.assertStep('enterAmount');
+    tm.assertContext({ mintUrl: MINT3 });
+
+    await tm.machine.enterAmount(1000, MINT3);
+
+    tm.assertStep('selectMint');
+    tm.assertContext({ amount: 1000, mintUrl: MINT3, destination: 'sendEcash' });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'selectMint',
+      data: {
+        amount: 1000,
+        destination: 'sendEcash',
+      },
+    });
+    expect((lastHandler.data as { candidates: unknown[] }).candidates).toEqual([
+      { mintUrl: MINT1, balance: 5000 },
+      { mintUrl: MINT2, balance: 4000 },
+    ]);
+  });
+
+  it('selects a sufficient mint when amount entry provides no mintUrl', async () => {
+    const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
+
+    await tm.machine.enterAmount(200, '', { destination: 'sendEcash' });
+
+    tm.assertStep('sendComplete');
+    tm.assertContext({ amount: 200, mintUrl: MINT1, destination: 'sendEcash' });
+    const opCall = tm.operationCalls.find((c) => c.name === 'executeSend');
+    expect(opCall?.args).toEqual([MINT1, 200]);
+  });
+
   it('routes to error when amount exceeds all mints', async () => {
     const tm = createTestMachine({ wallet: WALLETS.insufficientBalance });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount(9999, MINT1);
-    // The machine may handle this at different points in the pipeline
-    const step = tm.machine.getStep();
-    expect(['error', 'enterAmount', 'selectMint', 'chooseProofs', 'sendComplete']).toContain(step);
+    tm.assertStep('error');
+    tm.assertContext({ amount: 9999, mintUrl: MINT1, destination: 'sendEcash' });
   });
 });
 
