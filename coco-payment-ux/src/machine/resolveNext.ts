@@ -24,7 +24,7 @@ function errorResult(code: ErrorCode, message: string): StepResult<'error'> {
   return { step: 'error', data: { code, message } };
 }
 
-function toMintError(reason: LocalizedReason): StepResult<'error'> {
+export function toMintError(reason: LocalizedReason): StepResult<'error'> {
   switch (reason.code) {
     case 'INSUFFICIENT_BALANCE':
     case 'INSUFFICIENT_BALANCE_ALLOWED':

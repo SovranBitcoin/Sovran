@@ -5,8 +5,8 @@ import { parsePaymentInput } from '../parse';
 import { selectMint, getValidMintCandidates } from '../mint-selection';
 import { isValidSatAmount } from '../guards';
 import type { Detectors, WalletContext } from '../types';
-import { resolveNext, type StepResult } from './resolveNext';
-import type { FlowContext, FlowEvent, FlowStep, RecipientProfile } from './types';
+import { resolveNext, toMintError, type StepResult } from './resolveNext';
+import type { Destination, FlowContext, FlowEvent, FlowStep, RecipientProfile } from './types';
 
 // ---------------------------------------------------------------------------
 // Transition result — new step + merged context
@@ -410,6 +410,76 @@ function handleStartReceive(unit: string): TransitionResult {
 }
 
 /**
+ * Re-validate the current mint against an entered amount for send/melt-style
+ * flows. Mirrors the selection logic in resolveNext for the QR-driven path so
+ * the Send Money → enter-amount path doesn't silently advance with an
+ * insufficient-balance mint.
+ *
+ * Returns either the mint to use (the preferred one when it still fits, or a
+ * substitute auto-picked by `selectMint`) or a redirect TransitionResult that
+ * should be returned immediately (mint selector / error).
+ */
+type RevalidateResult =
+  | { kind: 'ok'; mintUrl: string }
+  | { kind: 'redirect'; result: TransitionResult };
+
+function revalidateMintForAmount(
+  ctx: FlowContext,
+  walletCtx: WalletContext,
+  destination: Destination,
+  amount: number
+): RevalidateResult {
+  // If the user already picked a mint (or had it preselected) and it still
+  // holds enough balance under the current constraints, keep it — don't
+  // re-prompt. Only fall through to mint selection when the chosen mint is
+  // no longer viable for the entered amount.
+  const currentMint = ctx.mintUrl;
+  if (currentMint && walletCtx.trustedMintUrls.includes(currentMint)) {
+    const allowed = ctx.supportedMintUrls;
+    const allowedOk = !allowed?.length || allowed.includes(currentMint);
+    const balance = walletCtx.mintBalances[currentMint] ?? 0;
+    if (allowedOk && balance >= amount) {
+      return { kind: 'ok', mintUrl: currentMint };
+    }
+  }
+
+  const selection = selectMint(walletCtx, {
+    allowedMints: ctx.supportedMintUrls,
+    minAmount: amount,
+  });
+  switch (selection.type) {
+    case 'selected':
+      return { kind: 'ok', mintUrl: selection.mintUrl };
+    case 'selectionNeeded':
+      return {
+        kind: 'redirect',
+        result: {
+          step: 'selectMint',
+          context: { ...ctx, destination },
+          data: {
+            candidates: selection.validMints,
+            supportedMintUrls: ctx.supportedMintUrls,
+            amount,
+            unit: ctx.unit,
+            paymentRequest: ctx.paymentRequest,
+            meltTarget: ctx.meltTarget,
+            recipientPubkey: ctx.recipientPubkey,
+            recipientProfile: ctx.recipientProfile,
+            destination,
+          },
+        },
+      };
+    case 'noValidMint': {
+      const err = toMintError(selection.reason);
+      return {
+        kind: 'redirect',
+        result: { step: 'error', context: { ...ctx, destination }, data: err.data },
+      };
+    }
+  }
+}
+
+/**
  * Resolve from context alone (no intent). Used when events arrive
  * without a prior EXECUTE (e.g. Send/Receive button flows).
  */
@@ -479,20 +549,20 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
     }
     // Melts always attempt the exact amount — the mint handles the swap
     // server-side. Never show the proof selector for lightning sends.
-    if (mintUrl) {
-      return {
-        step: 'navigateToMeltPreview',
-        context: { ...ctx, destination },
-        data: {
-          mintUrl,
-          meltTarget: ctx.meltTarget,
-          unit,
-          amount,
-          recipientPubkey: ctx.recipientPubkey,
-          recipientProfile: ctx.recipientProfile,
-        },
-      };
-    }
+    const revalidated = revalidateMintForAmount(ctx, walletCtx, destination, amount);
+    if (revalidated.kind === 'redirect') return revalidated.result;
+    return {
+      step: 'navigateToMeltPreview',
+      context: { ...ctx, mintUrl: revalidated.mintUrl, destination },
+      data: {
+        mintUrl: revalidated.mintUrl,
+        meltTarget: ctx.meltTarget,
+        unit,
+        amount,
+        recipientPubkey: ctx.recipientPubkey,
+        recipientProfile: ctx.recipientProfile,
+      },
+    };
   }
 
   // sendEcash or paymentRequest without intent
@@ -514,71 +584,64 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
     };
   }
 
-  if (mintUrl) {
-    // Only show proof selector for ecash sends — payment requests must
-    // always attempt the exact amount.
-    if (destination === 'sendEcash') {
-      const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
-      if (proofAmounts.length > 0 && ctx.offline) {
-        // Online: skip proof selector — the mint handles swaps server-side
-        // via executeSend. If executeSend fails, the catch block in
-        // createMachine falls back to chooseProofs.
-        // Offline: always show proof selector since the mint is unreachable.
-        const composition = composeSatoshis(proofAmounts, amount);
-        return {
-          step: 'chooseProofs',
-          context: { ...ctx, destination },
-          data: {
-            mintUrl,
-            amount,
-            unit,
-            proofAmounts,
-            suggestions: {
-              roundDown: composition.exactMatch
-                ? { amount }
-                : composition.nearestLower != null
-                  ? { amount: composition.nearestLower }
-                  : null,
-              roundUp: composition.exactMatch
-                ? null
-                : composition.nearestUpper != null
-                  ? { amount: composition.nearestUpper }
-                  : null,
-            },
-          },
-        };
-      }
-    }
+  const revalidated = revalidateMintForAmount(ctx, walletCtx, destination, amount);
+  if (revalidated.kind === 'redirect') return revalidated.result;
+  const effectiveMintUrl = revalidated.mintUrl;
 
-    // Terminal step for whichever destination we're heading to.
-    if (destination === 'paymentRequest' && ctx.paymentRequest) {
+  // Only show proof selector for ecash sends — payment requests must
+  // always attempt the exact amount.
+  if (destination === 'sendEcash') {
+    const proofAmounts = walletCtx.proofAmounts[effectiveMintUrl] ?? [];
+    if (proofAmounts.length > 0 && ctx.offline) {
+      // Online: skip proof selector — the mint handles swaps server-side
+      // via executeSend. If executeSend fails, the catch block in
+      // createMachine falls back to chooseProofs.
+      // Offline: always show proof selector since the mint is unreachable.
+      const composition = composeSatoshis(proofAmounts, amount);
       return {
-        step: 'navigateToPaymentRequest',
-        context: { ...ctx, destination },
+        step: 'chooseProofs',
+        context: { ...ctx, mintUrl: effectiveMintUrl, destination },
         data: {
-          mintUrl,
-          paymentRequest: ctx.paymentRequest,
-          unit,
+          mintUrl: effectiveMintUrl,
           amount,
-          recipientPubkey: ctx.recipientPubkey,
-          recipientProfile: ctx.recipientProfile,
+          unit,
+          proofAmounts,
+          suggestions: {
+            roundDown: composition.exactMatch
+              ? { amount }
+              : composition.nearestLower != null
+                ? { amount: composition.nearestLower }
+                : null,
+            roundUp: composition.exactMatch
+              ? null
+              : composition.nearestUpper != null
+                ? { amount: composition.nearestUpper }
+                : null,
+          },
         },
       };
     }
-    return {
-      step: 'confirmSend',
-      context: { ...ctx, destination },
-      data: { mintUrl, amount },
-    };
   }
 
+  // Terminal step for whichever destination we're heading to.
+  if (destination === 'paymentRequest' && ctx.paymentRequest) {
+    return {
+      step: 'navigateToPaymentRequest',
+      context: { ...ctx, mintUrl: effectiveMintUrl, destination },
+      data: {
+        mintUrl: effectiveMintUrl,
+        paymentRequest: ctx.paymentRequest,
+        unit,
+        amount,
+        recipientPubkey: ctx.recipientPubkey,
+        recipientProfile: ctx.recipientProfile,
+      },
+    };
+  }
   return {
-    step: 'enterAmount',
-    context: { ...ctx, destination },
-    data: {
-      unit,
-      constraints: { destination, paymentRequest: ctx.paymentRequest },
-    },
+    step: 'confirmSend',
+    context: { ...ctx, mintUrl: effectiveMintUrl, destination },
+    data: { mintUrl: effectiveMintUrl, amount },
   };
 }
 

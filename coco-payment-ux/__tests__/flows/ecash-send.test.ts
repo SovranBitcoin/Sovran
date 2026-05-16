@@ -223,6 +223,21 @@ describe('ecash send — proof selection', () => {
  * for correction, or show the proof picker.
  */
 describe('ecash send — insufficient balance', () => {
+  it('uses another mint when the preselected mint cannot cover the entered amount', async () => {
+    const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
+
+    await tm.machine.startSendEcash();
+    tm.assertStep('enterAmount');
+    tm.assertContext({ mintUrl: MINT2 });
+
+    await tm.machine.enterAmount(200, MINT2);
+
+    tm.assertStep('sendComplete');
+    tm.assertContext({ amount: 200, mintUrl: MINT1, destination: 'sendEcash' });
+    const opCall = tm.operationCalls.find((c) => c.name === 'executeSend');
+    expect(opCall?.args).toEqual([MINT1, 200]);
+  });
+
   it('routes to error when amount exceeds all mints', async () => {
     const tm = createTestMachine({ wallet: WALLETS.insufficientBalance });
     await tm.machine.startSendEcash();
@@ -328,7 +343,10 @@ describe('ecash send — executeSend operation', () => {
 
   it('routes to error with SEND_FAILED when no fallback proofs', async () => {
     const tm = createTestMachine({
-      wallet: WALLETS.noBalance,
+      // Balance covers the amount so the machine's pre-flight mint check
+      // passes; empty proofAmounts ensures no chooseProofs fallback so we
+      // exercise the executeSend-throws → error mapping.
+      wallet: { ...WALLETS.noBalance, mintBalances: { [MINT1]: 1000 } },
       operations: {
         executeSend: async () => {
           throw new Error('Insufficient balance');
@@ -337,7 +355,6 @@ describe('ecash send — executeSend operation', () => {
     });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount(100, MINT1);
-    // No proofs available → no chooseProofs fallback → error
     tm.assertStep('error');
     tm.assertExecution({ code: 'SEND_FAILED' });
   });
@@ -432,7 +449,10 @@ describe('ecash send — notification timeline', () => {
 
   it('fires SEND_FAILED error notification when send fails with no fallback', async () => {
     const tm = createTestMachine({
-      wallet: WALLETS.noBalance,
+      // See the matching test above — give MINT1 balance so the pre-flight
+      // mint check passes, while keeping proofAmounts empty so executeSend
+      // is the failure source under test.
+      wallet: { ...WALLETS.noBalance, mintBalances: { [MINT1]: 1000 } },
       operations: {
         executeSend: async () => { throw new Error('No proofs'); },
       },
