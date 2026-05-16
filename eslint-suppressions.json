@@ -49,7 +49,7 @@
   },
   "coco-payment-ux/__tests__/unit/default-operations.test.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 6
+      "count": 5
     }
   },
   "coco-payment-ux/__tests__/unit/guards.test.ts": {

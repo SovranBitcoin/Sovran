@@ -16,15 +16,8 @@ import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurren
 import { zIndex } from '@/shared/styles/tokens';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
-  const {
-    handleSelectCurrency,
-    text,
-    iosHeight,
-    iosWidth,
-    onPress,
-    enableCurrencyMenu,
-    textSize,
-  } = useFiatCurrencyPill(props);
+  const { handleSelectCurrency, text, iosHeight, iosWidth, onPress, enableCurrencyMenu, textSize } =
+    useFiatCurrencyPill(props);
 
   const colorScheme = useColorScheme();
   const textColor = useThemeColor('foreground');

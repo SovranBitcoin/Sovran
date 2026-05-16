@@ -90,10 +90,7 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
     [placeholder]
   );
   const headerRight = useCallback(() => <SearchHeaderRight />, []);
-  const headerLeft = useCallback(
-    () => <HeaderProfileButton onPress={openDrawer} />,
-    [openDrawer]
-  );
+  const headerLeft = useCallback(() => <HeaderProfileButton onPress={openDrawer} />, [openDrawer]);
 
   const screenOptions = useMemo(
     () =>
