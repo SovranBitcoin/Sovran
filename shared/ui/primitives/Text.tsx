@@ -214,7 +214,7 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
   // ambient "stuff is loading" rather than a row of bold rectangles. The
   // foreground color (theme-aware) ensures it remains visible on any
   // background tint.
-  const loadingColor = opacity(foreground, 0.15);
+  const loadingColor = opacity(foreground, 0.07);
 
   if (loading) {
     return (

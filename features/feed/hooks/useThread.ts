@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { InteractionManager } from 'react-native';
+import { InteractionManager, useWindowDimensions } from 'react-native';
 import { Metadata, ShortTextNote } from 'nostr-tools/kinds';
 
 import {
@@ -23,12 +23,19 @@ import type {
 } from '@/features/feed/components/nostr/feedTypes';
 import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import { consumeThreadSeed } from '@/features/feed/lib/threadSeedCache';
+import {
+  charsPerLineForWidth,
+  DEFAULT_REPLY_SKELETON_COUNT,
+  MAX_REPLY_SKELETON_COUNT,
+  type ReplySkeletonMatch,
+  sortRepliesForSkeletons,
+} from '@/features/feed/lib/threadReplySkeletons';
 import { feedLog } from '@/shared/lib/logger';
 
 export type ThreadItem =
   | { type: 'parent'; event: FeedEvent }
   | { type: 'target'; event: FeedEvent }
-  | { type: 'reply'; event: FeedEvent };
+  | { type: 'reply'; event: FeedEvent; skeletonMatch?: ReplySkeletonMatch };
 
 let threadRequestCounter = 0;
 
@@ -94,6 +101,7 @@ type UseThreadResult = {
   items: ThreadItem[];
   hiddenReplyCount: number;
   isLoading: boolean;
+  isFetching: boolean;
   error: string | null;
   dataVersion: number;
   profilesRef: React.MutableRefObject<Map<string, ProfileInfo>>;
@@ -109,6 +117,7 @@ export function useThread(eventId: string): UseThreadResult {
   const [items, setItems] = useState<ThreadItem[]>([]);
   const [hiddenReplyCount, setHiddenReplyCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
 
@@ -116,11 +125,16 @@ export function useThread(eventId: string): UseThreadResult {
   const metricsRef = useRef<Map<string, NoteMetrics>>(EMPTY_METRICS);
   const quotedEventsRef = useRef<Map<string, FeedEvent>>(EMPTY_QUOTED);
 
+  const { width: viewportWidth } = useWindowDimensions();
+  const charsPerLineRef = useRef(charsPerLineForWidth(viewportWidth));
+  charsPerLineRef.current = charsPerLineForWidth(viewportWidth);
+
   useEffect(() => {
     if (!eventId) return;
 
     let cancelled = false;
     setError(null);
+    setIsFetching(true);
 
     const seed = consumeThreadSeed(eventId);
     if (seed) {
@@ -141,6 +155,8 @@ export function useThread(eventId: string): UseThreadResult {
         setIsLoading(true);
       }
     } else {
+      setItems([]);
+      setHiddenReplyCount(0);
       setIsLoading(true);
     }
 
@@ -167,10 +183,9 @@ export function useThread(eventId: string): UseThreadResult {
 
         const initial = buildThreadStructure(eventId, buckets.allEvents);
         if (!initial.target) {
-          if (!seed) {
-            setError('Post not found');
-            setIsLoading(false);
-          }
+          setError('Post not found');
+          setIsLoading(false);
+          setIsFetching(false);
           return;
         }
 
@@ -234,15 +249,29 @@ export function useThread(eventId: string): UseThreadResult {
         if (cancelled) return;
 
         const target = thread.target!;
+        const targetMetrics = buckets.metrics.get(eventId);
+        const expectedReplies = targetMetrics?.replyCount ?? 0;
+        const skeletonMatchCount = Math.min(
+          MAX_REPLY_SKELETON_COUNT,
+          targetMetrics?.replyCount ?? DEFAULT_REPLY_SKELETON_COUNT
+        );
+        const sortedReplies = sortRepliesForSkeletons(
+          thread.replies,
+          skeletonMatchCount,
+          charsPerLineRef.current
+        );
+        const replies = sortedReplies.replies;
         const nextItems: ThreadItem[] = [
           ...thread.parents.map<ThreadItem>((event) => ({ type: 'parent', event })),
           { type: 'target', event: target },
-          ...thread.replies.map<ThreadItem>((event) => ({ type: 'reply', event })),
+          ...replies.map<ThreadItem>((event, index) => ({
+            type: 'reply',
+            event,
+            skeletonMatch: sortedReplies.matches[index],
+          })),
         ];
 
-        const targetMetrics = buckets.metrics.get(eventId);
-        const expectedReplies = targetMetrics?.replyCount ?? 0;
-        const hidden = Math.max(0, expectedReplies - thread.replies.length);
+        const hidden = Math.max(0, expectedReplies - replies.length);
 
         feedLog.info('thread.load.done', {
           eventId,
@@ -250,6 +279,20 @@ export function useThread(eventId: string): UseThreadResult {
           replies: thread.replies.length,
           profiles: buckets.profiles.size,
           hiddenReplies: hidden,
+        });
+
+        feedLog.info('thread.reply_skeleton.sort', {
+          eventId,
+          expectedReplies,
+          receivedReplies: thread.replies.length,
+          skeletonMatchCount,
+          originalOrder: thread.replies.slice(0, 10).map((event, originalIndex) => ({
+            originalIndex,
+            eventId: event.id,
+            contentLength: event.content.length,
+          })),
+          sortedOrder: sortedReplies.matches.slice(0, 10),
+          visibleMatches: sortedReplies.matches.filter((match) => match.skeletonIndex !== null),
         });
 
         profilesRef.current = buckets.profiles;
@@ -260,6 +303,7 @@ export function useThread(eventId: string): UseThreadResult {
         setHiddenReplyCount(hidden);
         setDataVersion((v) => v + 1);
         setIsLoading(false);
+        setIsFetching(false);
       } catch (err) {
         if (!cancelled) {
           feedLog.error('thread.load.error', {
@@ -270,6 +314,7 @@ export function useThread(eventId: string): UseThreadResult {
             setError('Failed to load thread');
             setIsLoading(false);
           }
+          setIsFetching(false);
         }
       } finally {
         client.close();
@@ -290,6 +335,7 @@ export function useThread(eventId: string): UseThreadResult {
     items,
     hiddenReplyCount,
     isLoading,
+    isFetching,
     error,
     dataVersion,
     profilesRef,
