@@ -147,9 +147,9 @@ export function buildReceiveHistoryEntry(
 
 /**
  * Send-operation states that can be rolled back. `prepared` operations need
- * `cancel`; `pending`/`executing` need `reclaim` (see `attemptRollback`).
+ * `cancel`; `pending`/`rolling_back` need `reclaim` (see `attemptRollback`).
  */
-const CANCELLABLE_SEND_STATES = new Set(['pending', 'prepared']);
+const CANCELLABLE_SEND_STATES = new Set(['pending', 'prepared', 'rolling_back']);
 
 /**
  * Type guard: a history entry that can be cancelled by the user via swipe
@@ -164,14 +164,14 @@ export function isCancellablePendingEcash(entry: HistoryEntry): entry is SendHis
  * `coco-payment-ux/src/operations/defaultOperations.ts` so the in-app sweep
  * surface (Transactions) and the offline-payment-rollback path agree on
  * which RPC to call: `cancel` for `prepared`, `reclaim` for `pending`/
- * `executing`. Returns `true` on success, `false` otherwise (errors logged).
+ * `rolling_back`. Returns `true` on success, `false` otherwise (errors logged).
  */
 export async function attemptRollback(mgr: Manager, operationId: string): Promise<boolean> {
   try {
     const operation = await mgr.ops.send.get(operationId);
     if (operation && operation.state === 'prepared') {
       await mgr.ops.send.cancel(operationId);
-    } else if (operation && (operation.state === 'pending' || operation.state === 'executing')) {
+    } else if (operation && (operation.state === 'pending' || operation.state === 'rolling_back')) {
       await mgr.ops.send.reclaim(operationId);
     } else {
       log.warn('cashu.utils.rollback.unexpected_state', {

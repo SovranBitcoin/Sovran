@@ -117,7 +117,7 @@ async function attemptRollback(mgr: Manager, operationId: string): Promise<boole
     if (operation && operation.state === 'prepared') {
       logger.info('operations.attemptRollback.cancelPrepared', { operationId });
       await mgr.ops.send.cancel(operationId);
-    } else if (operation && ['executing', 'pending'].includes(operation.state)) {
+    } else if (operation && ['executing', 'pending', 'rolling_back'].includes(operation.state)) {
       logger.info('operations.attemptRollback.reclaim', {
         state: operation.state,
         operationId,
@@ -542,7 +542,7 @@ export function createDefaultOperations(
       if (operation.state === 'prepared') {
         logger.info('operations.rollbackSend.cancelPrepared', { operationId });
         await mgr.ops.send.cancel(operationId);
-      } else if (['executing', 'pending'].includes(operation.state)) {
+      } else if (['executing', 'pending', 'rolling_back'].includes(operation.state)) {
         logger.info('operations.rollbackSend.reclaim', {
           state: operation.state,
           operationId,

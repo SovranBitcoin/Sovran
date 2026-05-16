@@ -1,8 +1,8 @@
 diff --git a/node_modules/@cashu/coco-core/dist/index.cjs b/node_modules/@cashu/coco-core/dist/index.cjs
-index 0000000..0000000 100644
+index ac97941f..bcbdb926 100644
 --- a/node_modules/@cashu/coco-core/dist/index.cjs
 +++ b/node_modules/@cashu/coco-core/dist/index.cjs
-@@ -1337,6 +1337,7 @@
+@@ -1337,6 +1337,7 @@ var MintService = class {
  	* @param options.trusted - Whether to add the mint as trusted (default: false)
  	*/
  	async addMintByUrl(mintUrl, options) {
@@ -10,7 +10,7 @@ index 0000000..0000000 100644
  		mintUrl = normalizeMintUrl(mintUrl);
  		const trusted = options?.trusted ?? false;
  		this.logger?.info("Adding mint by URL", {
-@@ -1374,6 +1375,7 @@
+@@ -1374,6 +1375,7 @@ var MintService = class {
  			mintUrl,
  			trusted
  		});
@@ -18,7 +18,7 @@ index 0000000..0000000 100644
  		return added;
  	}
  	async updateMintData(mintUrl) {
-@@ -1397,6 +1399,7 @@
+@@ -1397,6 +1399,7 @@ var MintService = class {
  		return await this.mintRepo.isTrustedMint(normalizeMintUrl(mintUrl));
  	}
  	async ensureUpdatedMint(mintUrl) {
@@ -26,7 +26,7 @@ index 0000000..0000000 100644
  		mintUrl = normalizeMintUrl(mintUrl);
  		let mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
  		if (!mint) {
-@@ -1413,11 +1416,21 @@
+@@ -1413,11 +1416,21 @@ var MintService = class {
  		const now = Math.floor(Date.now() / 1e3);
  		if (mint.updatedAt < now - MINT_REFRESH_TTL_S) {
  			this.logger?.debug("Refreshing stale mint", { mintUrl });
@@ -51,7 +51,7 @@ index 0000000..0000000 100644
  		return {
  			mint,
  			keysets
-@@ -1455,27 +1468,36 @@
+@@ -1455,27 +1468,36 @@ var MintService = class {
  		await this.eventBus?.emit("mint:updated", await this.ensureUpdatedMint(mintUrl));
  	}
  	async updateMint(mint) {
@@ -106,7 +106,7 @@ index 0000000..0000000 100644
  		}
  		await Promise.all(keysets.map(async (ks) => {
  			if (await this.keysetRepo.getKeysetById(mint.mintUrl, ks.id)) {
-@@ -1510,7 +1532,9 @@
+@@ -1510,7 +1532,9 @@ var MintService = class {
  		mint.updatedAt = Math.floor(Date.now() / 1e3);
  		await this.mintRepo.addOrUpdateMint(mint);
  		const repoKeysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
@@ -117,7 +117,7 @@ index 0000000..0000000 100644
  			mintUrl: mint.mintUrl,
  			keysets: repoKeysets.length
  		});
-@@ -1697,10 +1721,12 @@
+@@ -1697,10 +1721,12 @@ var WalletService = class {
  		return promise;
  	}
  	async getWalletWithActiveKeysetId(mintUrl) {
@@ -130,7 +130,7 @@ index 0000000..0000000 100644
  		return {
  			wallet,
  			keysetId: keyset.id,
-@@ -1808,8 +1834,9 @@
+@@ -1808,8 +1834,9 @@ var ProofService = class {
  		return sendAmount + receiveFee;
  	}
  	async checkInflightProofs() {
@@ -141,7 +141,7 @@ index 0000000..0000000 100644
  		if (inflightProofs.length === 0) return;
  		const batchedByMint = {};
  		for (const proof of inflightProofs) {
-@@ -1856,6 +1883,7 @@
+@@ -1856,6 +1883,7 @@ var ProofService = class {
  		}
  	}
  	async createOutputsAndIncrementCounters(mintUrl, amount, options) {
@@ -149,7 +149,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!Number.isFinite(amount.keep) || !Number.isFinite(amount.send) || amount.keep < 0 || amount.send < 0) return {
  			keep: [],
-@@ -1893,11 +1921,14 @@
+@@ -1893,11 +1921,14 @@ var ProofService = class {
  			data.send = _cashu_cashu_ts.OutputData.createDeterministicData(sendAmount, seed, currentCounter.counter + data.keep.length, keys);
  			if (data.send.length > 0) await this.counterService.incrementCounter(mintUrl, keys.id, data.send.length);
  		}
@@ -167,7 +167,7 @@ index 0000000..0000000 100644
  		});
  		return {
  			keep: data.keep,
-@@ -1907,6 +1938,7 @@
+@@ -1907,6 +1938,7 @@ var ProofService = class {
  		};
  	}
  	async saveProofs(mintUrl, proofs) {
@@ -175,7 +175,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!Array.isArray(proofs) || proofs.length === 0) return;
  		const groupedByKeyset = this.groupProofsByKeysetId(proofs);
-@@ -1943,6 +1975,7 @@
+@@ -1943,6 +1975,7 @@ var ProofService = class {
  			const aggregate = new AggregateError(details.map((d) => d?.error instanceof Error ? d.error : new Error(String(d?.error))), `Failed to persist proofs for ${failed.length} keyset group(s)`);
  			throw new ProofOperationError(mintUrl, failedKeysets.length > 0 ? `Failed to persist proofs for ${failed.length} keyset group(s) [${failedKeysets.join(", ")}]` : `Failed to persist proofs for ${failed.length} keyset group(s)`, void 0, aggregate);
  		}
@@ -183,7 +183,7 @@ index 0000000..0000000 100644
  	}
  	async getReadyProofs(mintUrl) {
  		return this.proofRepository.getReadyProofs(mintUrl);
-@@ -2097,6 +2130,7 @@
+@@ -2097,6 +2130,7 @@ var ProofService = class {
  	* @throws ProofOperationError if any proof is not available for reservation
  	*/
  	async reserveProofs(mintUrl, secrets, operationId) {
@@ -191,7 +191,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!operationId || operationId.trim().length === 0) throw new ProofValidationError("operationId is required");
  		if (!secrets || secrets.length === 0) return { amount: 0 };
-@@ -2108,7 +2142,9 @@
+@@ -2108,7 +2142,9 @@ var ProofService = class {
  			secrets,
  			amount
  		});
@@ -202,7 +202,7 @@ index 0000000..0000000 100644
  			mintUrl,
  			operationId,
  			count: secrets.length,
-@@ -2196,14 +2232,18 @@
+@@ -2196,14 +2232,18 @@ var ProofService = class {
  	* @throws ProofValidationError if insufficient balance to cover the amount
  	*/
  	async selectProofsToSend(mintUrl, amount, includeFees = true) {
@@ -224,7 +224,7 @@ index 0000000..0000000 100644
  		});
  		return selectedProofs.send;
  	}
-@@ -2485,7 +2525,7 @@
+@@ -2485,7 +2525,7 @@ var WalletRestoreService = class {
  	walletService;
  	requestProvider;
  	logger;
@@ -233,7 +233,7 @@ index 0000000..0000000 100644
  	restoreGapLimit = 100;
  	restoreStartCounter = 0;
  	constructor(proofService, counterService, walletService, requestProvider, logger) {
-@@ -2607,6 +2647,7 @@
+@@ -2607,6 +2647,7 @@ var WalletRestoreService = class {
  	* Throws on any validation or persistence error. No transactions are used here.
  	*/
  	async restoreKeyset(mintUrl, wallet, keysetId) {
@@ -241,7 +241,7 @@ index 0000000..0000000 100644
  		this.logger?.debug("Restoring keyset", {
  			mintUrl,
  			keysetId
-@@ -2617,7 +2658,25 @@
+@@ -2617,7 +2658,25 @@ var WalletRestoreService = class {
  			keysetId,
  			count: oldProofs.length
  		});
@@ -268,7 +268,7 @@ index 0000000..0000000 100644
  		if (proofs.length === 0) {
  			this.logger?.warn("No proofs to restore", {
  				mintUrl,
-@@ -2680,9 +2739,13 @@
+@@ -2680,9 +2739,13 @@ var WalletRestoreService = class {
  			counter: newCounter
  		});
  		await this.proofService.saveProofs(mintUrl, mapProofToCoreProof(mintUrl, "ready", checkedProofs.ready));
@@ -283,7 +283,7 @@ index 0000000..0000000 100644
  			total: checkedProofs.ready.length + checkedProofs.spent.length
  		});
  	}
-@@ -3189,6 +3252,32 @@
+@@ -3189,6 +3252,32 @@ var MintOperationProcessor = class {
  				});
  				return;
  			}
@@ -316,7 +316,43 @@ index 0000000..0000000 100644
  			this.logger?.error("Mint operation error, not retrying", {
  				mintUrl,
  				operationId,
-@@ -5650,9 +5739,13 @@
+@@ -4040,11 +4129,11 @@ var SendOperationService = class {
+ 		try {
+ 			const operation = await this.sendOperationRepository.getById(operationId);
+ 			if (!operation) throw new Error(`Operation ${operationId} not found`);
+-			if (operation.state === "finalized" || operation.state === "rolled_back" || operation.state === "rolling_back" || operation.state === "init" || operation.state === "executing") throw new Error(`Cannot rollback operation in state ${operation.state}`);
++			if (operation.state === "finalized" || operation.state === "rolled_back" || operation.state === "init" || operation.state === "executing") throw new Error(`Cannot rollback operation in state ${operation.state}`);
+ 			if (!hasPreparedData(operation)) throw new Error(`Operation ${operationId} is not in a rollbackable state`);
+ 			const handler = this.handlerProvider.get(operation.method);
+ 			if (!handler.rollback) throw new Error(`Send operations of method ${operation.method} can not be rolled back`);
+-			if (operation.state === "pending" && operation.method === "p2pk") throw new Error("Cannot rollback pending P2PK send operation");
++			if ((operation.state === "pending" || operation.state === "rolling_back") && operation.method === "p2pk") throw new Error("Cannot rollback pending P2PK send operation");
+ 			const { wallet } = await this.walletService.getWalletWithActiveKeysetId(operation.mintUrl);
+ 			let opForRollback = operation;
+ 			if (operation.state === "pending") {
+@@ -4056,11 +4145,16 @@ var SendOperationService = class {
+ 				await this.sendOperationRepository.update(rollingBack);
+ 				opForRollback = rollingBack;
+ 			}
+-			await handler.rollback({
+-				...this.buildDeps(),
+-				operation: opForRollback,
+-				wallet
+-			});
++			try {
++				await handler.rollback({
++					...this.buildDeps(),
++					operation: opForRollback,
++					wallet
++				});
++			} catch (error) {
++				if (operation.state === "pending") await this.sendOperationRepository.update(operation);
++				throw error;
++			}
+ 			await this.markAsRolledBack(opForRollback, reason);
+ 		} finally {
+ 			releaseLock();
+@@ -5669,9 +5763,13 @@ var ReceiveOperationService = class {
  	* This is the primary entry point used by WalletApi.
  	*/
  	async receive(token) {
@@ -330,7 +366,7 @@ index 0000000..0000000 100644
  	}
  	/**
  	* Finalize an executing operation (idempotent).
-@@ -7544,6 +7637,7 @@
+@@ -7563,6 +7661,7 @@ var MeltBolt11Handler = class {
  	* @returns Prepared operation ready for execution
  	*/
  	async prepare(ctx) {
@@ -338,7 +374,7 @@ index 0000000..0000000 100644
  		const { mintUrl, id: operationId } = ctx.operation;
  		ctx.logger?.debug("Preparing bolt11 melt operation", {
  			operationId,
-@@ -7568,6 +7662,7 @@
+@@ -7587,6 +7686,7 @@ var MeltBolt11Handler = class {
  			proofCount: selectedProofs.length,
  			needsSwap
  		});
@@ -346,7 +382,7 @@ index 0000000..0000000 100644
  		if (!needsSwap) return this.prepareDirectMelt(ctx, quote, selectedProofs);
  		return this.prepareSwapThenMelt(ctx, quote, totalAmount);
  	}
-@@ -7686,6 +7781,7 @@
+@@ -7705,6 +7805,7 @@ var MeltBolt11Handler = class {
  	* 4. Handles the response (PAID → finalize, PENDING → wait, UNPAID → restore proofs)
  	*/
  	async execute(ctx) {
@@ -354,7 +390,7 @@ index 0000000..0000000 100644
  		const { quoteId, mintUrl, changeOutputData: serializedChangeOutputData, id: operationId } = ctx.operation;
  		ctx.logger?.debug("Executing bolt11 melt", {
  			operationId,
-@@ -7700,12 +7796,18 @@
+@@ -7719,12 +7820,18 @@ var MeltBolt11Handler = class {
  			quoteId,
  			proofCount: proofsToMelt.length
  		});
@@ -375,7 +411,7 @@ index 0000000..0000000 100644
  		});
  		return this.handleMeltResponse(ctx, res, proofsToMelt);
  	}
-@@ -8055,6 +8157,7 @@
+@@ -8074,6 +8181,7 @@ var DefaultSendHandler = class {
  	* Prepare the send operation by selecting proofs and creating outputs.
  	*/
  	async prepare(ctx) {
@@ -383,7 +419,7 @@ index 0000000..0000000 100644
  		const { operation, wallet, proofService, logger } = ctx;
  		const { mintUrl, amount } = operation;
  		const exactProofs = await proofService.selectProofsToSend(mintUrl, amount, false);
-@@ -8115,7 +8218,9 @@
+@@ -8134,7 +8242,9 @@ var DefaultSendHandler = class {
  			operationId: operation.id,
  			needsSwap,
  			fee,
@@ -394,7 +430,7 @@ index 0000000..0000000 100644
  		});
  		return prepared;
  	}
-@@ -8123,6 +8228,7 @@
+@@ -8142,6 +8252,7 @@ var DefaultSendHandler = class {
  	* Execute the send operation by performing the swap and creating the token.
  	*/
  	async execute(ctx) {
@@ -402,7 +438,7 @@ index 0000000..0000000 100644
  		const { operation, wallet, reservedProofs, proofService, logger } = ctx;
  		const { mintUrl, amount, needsSwap, inputProofSecrets } = operation;
  		const inputProofs = reservedProofs.filter((p) => inputProofSecrets.includes(p.secret));
-@@ -8177,7 +8283,10 @@
+@@ -8196,7 +8307,10 @@ var DefaultSendHandler = class {
  		logger?.info("Send operation executed", {
  			operationId: operation.id,
  			sendProofCount: sendProofs.length,
@@ -414,7 +450,19 @@ index 0000000..0000000 100644
  		});
  		return {
  			status: "PENDING",
-@@ -8549,6 +8658,7 @@
+@@ -8225,6 +8339,11 @@ var DefaultSendHandler = class {
+ 			await proofService.releaseProofs(mintUrl, inputProofSecrets);
+ 			logger?.info("Rolling back prepared operation - released reserved proofs", { operationId: operation.id });
+ 		} else if (operation.state === "pending" || operation.state === "rolling_back") {
++			if (!operation.needsSwap) {
++				await proofService.restoreProofsToReady(mintUrl, inputProofSecrets);
++				logger?.info("Rolling back exact-match pending operation - restored original proofs", { operationId: operation.id });
++				return;
++			}
+ 			const sendSecrets = getSendProofSecrets(operation);
+ 			if (sendSecrets.length > 0) {
+ 				const sendProofs = (await proofRepository.getProofsByOperationId(mintUrl, operation.id)).filter((p) => sendSecrets.includes(p.secret) && p.state === "inflight");
+@@ -8568,6 +8687,7 @@ var MintHandlerProvider = class {
  //#region infra/handlers/mint/MintBolt11Handler.ts
  var MintBolt11Handler = class {
  	async prepare(ctx) {
@@ -422,7 +470,7 @@ index 0000000..0000000 100644
  		const quote = ctx.importedQuote ?? await ctx.wallet.createMintQuoteBolt11(ctx.operation.amount);
  		if (!quote.amount || quote.amount <= 0) throw new Error(`Mint quote ${quote.quote} has invalid amount`);
  		if (quote.amount !== ctx.operation.amount) throw new Error(`Mint quote ${quote.quote} amount ${quote.amount} does not match requested amount ${ctx.operation.amount}`);
-@@ -8558,6 +8668,7 @@
+@@ -8577,6 +8697,7 @@ var MintBolt11Handler = class {
  			send: 0
  		});
  		if (outputData.keep.length === 0) throw new Error("Failed to create deterministic outputs for mint operation");
@@ -430,7 +478,7 @@ index 0000000..0000000 100644
  		return {
  			...ctx.operation,
  			quoteId: quote.quote,
-@@ -8569,6 +8680,7 @@
+@@ -8587,6 +8708,7 @@ var MintBolt11Handler = class {
  			pubkey: quote.pubkey,
  			lastObservedRemoteState: quote.state,
  			lastObservedRemoteStateAt: Date.now(),
@@ -438,7 +486,7 @@ index 0000000..0000000 100644
  			outputData: serializeOutputData({
  				keep: outputData.keep,
  				send: []
-@@ -8576,17 +8688,20 @@
+@@ -8595,17 +8717,20 @@ var MintBolt11Handler = class {
  		};
  	}
  	async execute(ctx) {
@@ -464,7 +512,7 @@ index 0000000..0000000 100644
  			throw err;
  		}
  	}
-@@ -8651,13 +8765,16 @@
+@@ -8670,13 +8795,16 @@ var MintBolt11Handler = class {
  		}
  	}
  	async checkPending(ctx) {
@@ -482,7 +530,7 @@ index 0000000..0000000 100644
  			mintUrl,
  			quoteId,
  			state: quote.state
-@@ -8695,6 +8812,7 @@
+@@ -8714,6 +8842,7 @@ var ConsoleLogger = class ConsoleLogger {
  		info: 2,
  		debug: 3
  	};
@@ -490,7 +538,7 @@ index 0000000..0000000 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8702,21 +8820,36 @@
+@@ -8721,21 +8850,36 @@ var ConsoleLogger = class ConsoleLogger {
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}
@@ -531,7 +579,7 @@ index 0000000..0000000 100644
  	}
  	log(level, message, ...meta) {
  		switch (level) {
-@@ -8799,23 +8932,39 @@
+@@ -8818,23 +8962,39 @@ var WalletApi = class {
  		return this.receiveOperationService.receive(token);
  	}
  	async restore(mintUrl) {
@@ -581,7 +629,7 @@ index 0000000..0000000 100644
  		}
  		if (Object.keys(failedKeysetIds).length > 0) {
  			this.logger?.error("Restore completed with failures", {
-@@ -8824,7 +8973,7 @@
+@@ -8843,7 +9003,7 @@ var WalletApi = class {
  			});
  			throw new Error("Failed to restore some keysets");
  		}
@@ -590,11 +638,33 @@ index 0000000..0000000 100644
  	}
  	/**
  	* Sweeps a mint by sweeping each keyset and adds the swept proofs to the wallet
+@@ -9169,11 +9329,12 @@ var SendOpsApi = class {
+ 	* Attempts to reclaim a pending send operation.
+ 	*
+ 	* This is intended for sends that are already in flight but still support
+-	* rollback according to the underlying send method.
++	* rollback according to the underlying send method. A previous interrupted
++	* reclaim may leave the operation in `rolling_back`; treat that as retryable.
+ 	*/
+ 	async reclaim(operationId) {
+ 		const operation = await this.requireOperation(operationId);
+-		if (operation.state !== "pending") throw new Error(`Cannot reclaim operation in state '${operation.state}'. Expected 'pending'.`);
++		if (operation.state !== "pending" && operation.state !== "rolling_back") throw new Error(`Cannot reclaim operation in state '${operation.state}'. Expected 'pending' or 'rolling_back'.`);
+ 		await this.sendOperationService.rollback(operation.id);
+ 	}
+ 	/**
+@@ -10869,4 +11030,4 @@ exports.isPreparedOperation = isPreparedOperation;
+ exports.isRolledBackOperation = isRolledBackOperation;
+ exports.isRollingBackOperation = isRollingBackOperation;
+ exports.isTerminalOperation = isTerminalOperation;
+-exports.normalizeMintUrl = normalizeMintUrl;
+\ No newline at end of file
++exports.normalizeMintUrl = normalizeMintUrl;
 diff --git a/node_modules/@cashu/coco-core/dist/index.js b/node_modules/@cashu/coco-core/dist/index.js
-index 0000000..0000000 100644
+index 071a2a2c..ca845304 100644
 --- a/node_modules/@cashu/coco-core/dist/index.js
 +++ b/node_modules/@cashu/coco-core/dist/index.js
-@@ -1337,6 +1337,7 @@
+@@ -1337,6 +1337,7 @@ var MintService = class {
  	* @param options.trusted - Whether to add the mint as trusted (default: false)
  	*/
  	async addMintByUrl(mintUrl, options) {
@@ -602,7 +672,7 @@ index 0000000..0000000 100644
  		mintUrl = normalizeMintUrl(mintUrl);
  		const trusted = options?.trusted ?? false;
  		this.logger?.info("Adding mint by URL", {
-@@ -1374,6 +1375,7 @@
+@@ -1374,6 +1375,7 @@ var MintService = class {
  			mintUrl,
  			trusted
  		});
@@ -610,7 +680,7 @@ index 0000000..0000000 100644
  		return added;
  	}
  	async updateMintData(mintUrl) {
-@@ -1397,6 +1399,7 @@
+@@ -1397,6 +1399,7 @@ var MintService = class {
  		return await this.mintRepo.isTrustedMint(normalizeMintUrl(mintUrl));
  	}
  	async ensureUpdatedMint(mintUrl) {
@@ -618,7 +688,7 @@ index 0000000..0000000 100644
  		mintUrl = normalizeMintUrl(mintUrl);
  		let mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
  		if (!mint) {
-@@ -1413,11 +1416,21 @@
+@@ -1413,11 +1416,21 @@ var MintService = class {
  		const now = Math.floor(Date.now() / 1e3);
  		if (mint.updatedAt < now - MINT_REFRESH_TTL_S) {
  			this.logger?.debug("Refreshing stale mint", { mintUrl });
@@ -643,7 +713,7 @@ index 0000000..0000000 100644
  		return {
  			mint,
  			keysets
-@@ -1455,27 +1468,36 @@
+@@ -1455,27 +1468,36 @@ var MintService = class {
  		await this.eventBus?.emit("mint:updated", await this.ensureUpdatedMint(mintUrl));
  	}
  	async updateMint(mint) {
@@ -698,7 +768,7 @@ index 0000000..0000000 100644
  		}
  		await Promise.all(keysets.map(async (ks) => {
  			if (await this.keysetRepo.getKeysetById(mint.mintUrl, ks.id)) {
-@@ -1510,7 +1532,9 @@
+@@ -1510,7 +1532,9 @@ var MintService = class {
  		mint.updatedAt = Math.floor(Date.now() / 1e3);
  		await this.mintRepo.addOrUpdateMint(mint);
  		const repoKeysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
@@ -709,7 +779,7 @@ index 0000000..0000000 100644
  			mintUrl: mint.mintUrl,
  			keysets: repoKeysets.length
  		});
-@@ -1697,10 +1721,12 @@
+@@ -1697,10 +1721,12 @@ var WalletService = class {
  		return promise;
  	}
  	async getWalletWithActiveKeysetId(mintUrl) {
@@ -722,7 +792,7 @@ index 0000000..0000000 100644
  		return {
  			wallet,
  			keysetId: keyset.id,
-@@ -1808,8 +1834,9 @@
+@@ -1808,8 +1834,9 @@ var ProofService = class {
  		return sendAmount + receiveFee;
  	}
  	async checkInflightProofs() {
@@ -733,7 +803,7 @@ index 0000000..0000000 100644
  		if (inflightProofs.length === 0) return;
  		const batchedByMint = {};
  		for (const proof of inflightProofs) {
-@@ -1856,6 +1883,7 @@
+@@ -1856,6 +1883,7 @@ var ProofService = class {
  		}
  	}
  	async createOutputsAndIncrementCounters(mintUrl, amount, options) {
@@ -741,7 +811,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!Number.isFinite(amount.keep) || !Number.isFinite(amount.send) || amount.keep < 0 || amount.send < 0) return {
  			keep: [],
-@@ -1893,11 +1921,14 @@
+@@ -1893,11 +1921,14 @@ var ProofService = class {
  			data.send = OutputData.createDeterministicData(sendAmount, seed, currentCounter.counter + data.keep.length, keys);
  			if (data.send.length > 0) await this.counterService.incrementCounter(mintUrl, keys.id, data.send.length);
  		}
@@ -759,7 +829,7 @@ index 0000000..0000000 100644
  		});
  		return {
  			keep: data.keep,
-@@ -1907,6 +1938,7 @@
+@@ -1907,6 +1938,7 @@ var ProofService = class {
  		};
  	}
  	async saveProofs(mintUrl, proofs) {
@@ -767,7 +837,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!Array.isArray(proofs) || proofs.length === 0) return;
  		const groupedByKeyset = this.groupProofsByKeysetId(proofs);
-@@ -1943,6 +1975,7 @@
+@@ -1943,6 +1975,7 @@ var ProofService = class {
  			const aggregate = new AggregateError(details.map((d) => d?.error instanceof Error ? d.error : new Error(String(d?.error))), `Failed to persist proofs for ${failed.length} keyset group(s)`);
  			throw new ProofOperationError(mintUrl, failedKeysets.length > 0 ? `Failed to persist proofs for ${failed.length} keyset group(s) [${failedKeysets.join(", ")}]` : `Failed to persist proofs for ${failed.length} keyset group(s)`, void 0, aggregate);
  		}
@@ -775,7 +845,7 @@ index 0000000..0000000 100644
  	}
  	async getReadyProofs(mintUrl) {
  		return this.proofRepository.getReadyProofs(mintUrl);
-@@ -2097,6 +2130,7 @@
+@@ -2097,6 +2130,7 @@ var ProofService = class {
  	* @throws ProofOperationError if any proof is not available for reservation
  	*/
  	async reserveProofs(mintUrl, secrets, operationId) {
@@ -783,7 +853,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!operationId || operationId.trim().length === 0) throw new ProofValidationError("operationId is required");
  		if (!secrets || secrets.length === 0) return { amount: 0 };
-@@ -2108,7 +2142,9 @@
+@@ -2108,7 +2142,9 @@ var ProofService = class {
  			secrets,
  			amount
  		});
@@ -794,7 +864,7 @@ index 0000000..0000000 100644
  			mintUrl,
  			operationId,
  			count: secrets.length,
-@@ -2196,14 +2232,18 @@
+@@ -2196,14 +2232,18 @@ var ProofService = class {
  	* @throws ProofValidationError if insufficient balance to cover the amount
  	*/
  	async selectProofsToSend(mintUrl, amount, includeFees = true) {
@@ -816,7 +886,7 @@ index 0000000..0000000 100644
  		});
  		return selectedProofs.send;
  	}
-@@ -2485,7 +2525,7 @@
+@@ -2485,7 +2525,7 @@ var WalletRestoreService = class {
  	walletService;
  	requestProvider;
  	logger;
@@ -825,7 +895,7 @@ index 0000000..0000000 100644
  	restoreGapLimit = 100;
  	restoreStartCounter = 0;
  	constructor(proofService, counterService, walletService, requestProvider, logger) {
-@@ -2607,6 +2647,7 @@
+@@ -2607,6 +2647,7 @@ var WalletRestoreService = class {
  	* Throws on any validation or persistence error. No transactions are used here.
  	*/
  	async restoreKeyset(mintUrl, wallet, keysetId) {
@@ -833,7 +903,7 @@ index 0000000..0000000 100644
  		this.logger?.debug("Restoring keyset", {
  			mintUrl,
  			keysetId
-@@ -2617,7 +2658,25 @@
+@@ -2617,7 +2658,25 @@ var WalletRestoreService = class {
  			keysetId,
  			count: oldProofs.length
  		});
@@ -860,7 +930,7 @@ index 0000000..0000000 100644
  		if (proofs.length === 0) {
  			this.logger?.warn("No proofs to restore", {
  				mintUrl,
-@@ -2680,9 +2739,13 @@
+@@ -2680,9 +2739,13 @@ var WalletRestoreService = class {
  			counter: newCounter
  		});
  		await this.proofService.saveProofs(mintUrl, mapProofToCoreProof(mintUrl, "ready", checkedProofs.ready));
@@ -875,7 +945,7 @@ index 0000000..0000000 100644
  			total: checkedProofs.ready.length + checkedProofs.spent.length
  		});
  	}
-@@ -3189,6 +3252,32 @@
+@@ -3189,6 +3252,32 @@ var MintOperationProcessor = class {
  				});
  				return;
  			}
@@ -908,7 +978,43 @@ index 0000000..0000000 100644
  			this.logger?.error("Mint operation error, not retrying", {
  				mintUrl,
  				operationId,
-@@ -5650,9 +5739,13 @@
+@@ -4040,11 +4129,11 @@ var SendOperationService = class {
+ 		try {
+ 			const operation = await this.sendOperationRepository.getById(operationId);
+ 			if (!operation) throw new Error(`Operation ${operationId} not found`);
+-			if (operation.state === "finalized" || operation.state === "rolled_back" || operation.state === "rolling_back" || operation.state === "init" || operation.state === "executing") throw new Error(`Cannot rollback operation in state ${operation.state}`);
++			if (operation.state === "finalized" || operation.state === "rolled_back" || operation.state === "init" || operation.state === "executing") throw new Error(`Cannot rollback operation in state ${operation.state}`);
+ 			if (!hasPreparedData(operation)) throw new Error(`Operation ${operationId} is not in a rollbackable state`);
+ 			const handler = this.handlerProvider.get(operation.method);
+ 			if (!handler.rollback) throw new Error(`Send operations of method ${operation.method} can not be rolled back`);
+-			if (operation.state === "pending" && operation.method === "p2pk") throw new Error("Cannot rollback pending P2PK send operation");
++			if ((operation.state === "pending" || operation.state === "rolling_back") && operation.method === "p2pk") throw new Error("Cannot rollback pending P2PK send operation");
+ 			const { wallet } = await this.walletService.getWalletWithActiveKeysetId(operation.mintUrl);
+ 			let opForRollback = operation;
+ 			if (operation.state === "pending") {
+@@ -4056,11 +4145,16 @@ var SendOperationService = class {
+ 				await this.sendOperationRepository.update(rollingBack);
+ 				opForRollback = rollingBack;
+ 			}
+-			await handler.rollback({
+-				...this.buildDeps(),
+-				operation: opForRollback,
+-				wallet
+-			});
++			try {
++				await handler.rollback({
++					...this.buildDeps(),
++					operation: opForRollback,
++					wallet
++				});
++			} catch (error) {
++				if (operation.state === "pending") await this.sendOperationRepository.update(operation);
++				throw error;
++			}
+ 			await this.markAsRolledBack(opForRollback, reason);
+ 		} finally {
+ 			releaseLock();
+@@ -5669,9 +5763,13 @@ var ReceiveOperationService = class {
  	* This is the primary entry point used by WalletApi.
  	*/
  	async receive(token) {
@@ -922,7 +1028,7 @@ index 0000000..0000000 100644
  	}
  	/**
  	* Finalize an executing operation (idempotent).
-@@ -7544,6 +7637,7 @@
+@@ -7563,6 +7661,7 @@ var MeltBolt11Handler = class {
  	* @returns Prepared operation ready for execution
  	*/
  	async prepare(ctx) {
@@ -930,7 +1036,7 @@ index 0000000..0000000 100644
  		const { mintUrl, id: operationId } = ctx.operation;
  		ctx.logger?.debug("Preparing bolt11 melt operation", {
  			operationId,
-@@ -7568,6 +7662,7 @@
+@@ -7587,6 +7686,7 @@ var MeltBolt11Handler = class {
  			proofCount: selectedProofs.length,
  			needsSwap
  		});
@@ -938,7 +1044,7 @@ index 0000000..0000000 100644
  		if (!needsSwap) return this.prepareDirectMelt(ctx, quote, selectedProofs);
  		return this.prepareSwapThenMelt(ctx, quote, totalAmount);
  	}
-@@ -7686,6 +7781,7 @@
+@@ -7705,6 +7805,7 @@ var MeltBolt11Handler = class {
  	* 4. Handles the response (PAID → finalize, PENDING → wait, UNPAID → restore proofs)
  	*/
  	async execute(ctx) {
@@ -946,7 +1052,7 @@ index 0000000..0000000 100644
  		const { quoteId, mintUrl, changeOutputData: serializedChangeOutputData, id: operationId } = ctx.operation;
  		ctx.logger?.debug("Executing bolt11 melt", {
  			operationId,
-@@ -7700,12 +7796,18 @@
+@@ -7719,12 +7820,18 @@ var MeltBolt11Handler = class {
  			quoteId,
  			proofCount: proofsToMelt.length
  		});
@@ -967,7 +1073,7 @@ index 0000000..0000000 100644
  		});
  		return this.handleMeltResponse(ctx, res, proofsToMelt);
  	}
-@@ -8055,6 +8157,7 @@
+@@ -8074,6 +8181,7 @@ var DefaultSendHandler = class {
  	* Prepare the send operation by selecting proofs and creating outputs.
  	*/
  	async prepare(ctx) {
@@ -975,7 +1081,7 @@ index 0000000..0000000 100644
  		const { operation, wallet, proofService, logger } = ctx;
  		const { mintUrl, amount } = operation;
  		const exactProofs = await proofService.selectProofsToSend(mintUrl, amount, false);
-@@ -8115,7 +8218,9 @@
+@@ -8134,7 +8242,9 @@ var DefaultSendHandler = class {
  			operationId: operation.id,
  			needsSwap,
  			fee,
@@ -986,7 +1092,7 @@ index 0000000..0000000 100644
  		});
  		return prepared;
  	}
-@@ -8123,6 +8228,7 @@
+@@ -8142,6 +8252,7 @@ var DefaultSendHandler = class {
  	* Execute the send operation by performing the swap and creating the token.
  	*/
  	async execute(ctx) {
@@ -994,7 +1100,7 @@ index 0000000..0000000 100644
  		const { operation, wallet, reservedProofs, proofService, logger } = ctx;
  		const { mintUrl, amount, needsSwap, inputProofSecrets } = operation;
  		const inputProofs = reservedProofs.filter((p) => inputProofSecrets.includes(p.secret));
-@@ -8177,7 +8283,10 @@
+@@ -8196,7 +8307,10 @@ var DefaultSendHandler = class {
  		logger?.info("Send operation executed", {
  			operationId: operation.id,
  			sendProofCount: sendProofs.length,
@@ -1006,7 +1112,19 @@ index 0000000..0000000 100644
  		});
  		return {
  			status: "PENDING",
-@@ -8549,6 +8658,7 @@
+@@ -8225,6 +8339,11 @@ var DefaultSendHandler = class {
+ 			await proofService.releaseProofs(mintUrl, inputProofSecrets);
+ 			logger?.info("Rolling back prepared operation - released reserved proofs", { operationId: operation.id });
+ 		} else if (operation.state === "pending" || operation.state === "rolling_back") {
++			if (!operation.needsSwap) {
++				await proofService.restoreProofsToReady(mintUrl, inputProofSecrets);
++				logger?.info("Rolling back exact-match pending operation - restored original proofs", { operationId: operation.id });
++				return;
++			}
+ 			const sendSecrets = getSendProofSecrets(operation);
+ 			if (sendSecrets.length > 0) {
+ 				const sendProofs = (await proofRepository.getProofsByOperationId(mintUrl, operation.id)).filter((p) => sendSecrets.includes(p.secret) && p.state === "inflight");
+@@ -8568,6 +8687,7 @@ var MintHandlerProvider = class {
  //#region infra/handlers/mint/MintBolt11Handler.ts
  var MintBolt11Handler = class {
  	async prepare(ctx) {
@@ -1014,7 +1132,7 @@ index 0000000..0000000 100644
  		const quote = ctx.importedQuote ?? await ctx.wallet.createMintQuoteBolt11(ctx.operation.amount);
  		if (!quote.amount || quote.amount <= 0) throw new Error(`Mint quote ${quote.quote} has invalid amount`);
  		if (quote.amount !== ctx.operation.amount) throw new Error(`Mint quote ${quote.quote} amount ${quote.amount} does not match requested amount ${ctx.operation.amount}`);
-@@ -8558,6 +8668,7 @@
+@@ -8577,6 +8697,7 @@ var MintBolt11Handler = class {
  			send: 0
  		});
  		if (outputData.keep.length === 0) throw new Error("Failed to create deterministic outputs for mint operation");
@@ -1022,7 +1140,7 @@ index 0000000..0000000 100644
  		return {
  			...ctx.operation,
  			quoteId: quote.quote,
-@@ -8569,6 +8680,7 @@
+@@ -8587,6 +8708,7 @@ var MintBolt11Handler = class {
  			pubkey: quote.pubkey,
  			lastObservedRemoteState: quote.state,
  			lastObservedRemoteStateAt: Date.now(),
@@ -1030,7 +1148,7 @@ index 0000000..0000000 100644
  			outputData: serializeOutputData({
  				keep: outputData.keep,
  				send: []
-@@ -8576,17 +8688,20 @@
+@@ -8595,17 +8717,20 @@ var MintBolt11Handler = class {
  		};
  	}
  	async execute(ctx) {
@@ -1056,7 +1174,7 @@ index 0000000..0000000 100644
  			throw err;
  		}
  	}
-@@ -8651,13 +8765,16 @@
+@@ -8670,13 +8795,16 @@ var MintBolt11Handler = class {
  		}
  	}
  	async checkPending(ctx) {
@@ -1074,7 +1192,7 @@ index 0000000..0000000 100644
  			mintUrl,
  			quoteId,
  			state: quote.state
-@@ -8695,6 +8812,7 @@
+@@ -8714,6 +8842,7 @@ var ConsoleLogger = class ConsoleLogger {
  		info: 2,
  		debug: 3
  	};
@@ -1082,7 +1200,7 @@ index 0000000..0000000 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8702,21 +8820,36 @@
+@@ -8721,21 +8850,36 @@ var ConsoleLogger = class ConsoleLogger {
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}
@@ -1123,7 +1241,7 @@ index 0000000..0000000 100644
  	}
  	log(level, message, ...meta) {
  		switch (level) {
-@@ -8799,23 +8932,39 @@
+@@ -8818,23 +8962,39 @@ var WalletApi = class {
  		return this.receiveOperationService.receive(token);
  	}
  	async restore(mintUrl) {
@@ -1173,7 +1291,7 @@ index 0000000..0000000 100644
  		}
  		if (Object.keys(failedKeysetIds).length > 0) {
  			this.logger?.error("Restore completed with failures", {
-@@ -8824,7 +8973,7 @@
+@@ -8843,7 +9003,7 @@ var WalletApi = class {
  			});
  			throw new Error("Failed to restore some keysets");
  		}
@@ -1182,3 +1300,25 @@ index 0000000..0000000 100644
  	}
  	/**
  	* Sweeps a mint by sweeping each keyset and adds the swept proofs to the wallet
+@@ -9169,11 +9329,12 @@ var SendOpsApi = class {
+ 	* Attempts to reclaim a pending send operation.
+ 	*
+ 	* This is intended for sends that are already in flight but still support
+-	* rollback according to the underlying send method.
++	* rollback according to the underlying send method. A previous interrupted
++	* reclaim may leave the operation in `rolling_back`; treat that as retryable.
+ 	*/
+ 	async reclaim(operationId) {
+ 		const operation = await this.requireOperation(operationId);
+-		if (operation.state !== "pending") throw new Error(`Cannot reclaim operation in state '${operation.state}'. Expected 'pending'.`);
++		if (operation.state !== "pending" && operation.state !== "rolling_back") throw new Error(`Cannot reclaim operation in state '${operation.state}'. Expected 'pending' or 'rolling_back'.`);
+ 		await this.sendOperationService.rollback(operation.id);
+ 	}
+ 	/**
+@@ -10777,4 +10938,4 @@ var MemoryRepositories = class {
+ };
+ 
+ //#endregion
+-export { AuthApi, AuthService, AuthSessionError, AuthSessionExpiredError, AuthSessionService, ConsoleLogger, CounterService, DuplicatePluginRegistrationError, ExtensionRegistrationError, HistoryApi, HistoryService, HttpResponseError, KeyRingApi, KeyRingService, KeysetSyncError, Manager, MeltOperationService, MeltOpsApi, MeltQuoteService, MemoryAuthSessionRepository, MemoryCounterRepository, MemoryHistoryRepository, MemoryKeyRingRepository, MemoryKeysetRepository, MemoryMeltOperationRepository, MemoryMeltQuoteRepository, MemoryMintOperationRepository, MemoryMintQuoteRepository, MemoryMintRepository, MemoryProofRepository, MemoryReceiveOperationRepository, MemoryRepositories, MemorySendOperationRepository, MintApi, MintFetchError, MintOperationError, MintOperationProcessor, MintOperationService, MintOperationWatcherService, MintOpsApi, MintService, NetworkError, OperationInProgressError, OpsApi, PaymentRequestError, PaymentRequestService, PaymentRequestsApi, PluginHost, ProofOperationError, ProofService, ProofStateWatcherService, ProofValidationError, ReceiveOperationService, ReceiveOpsApi, SeedService, SendOperationService, SendOpsApi, SubscriptionApi, SubscriptionManager, TokenService, TokenValidationError, UnknownMintError, WalletApi, WalletBalancesApi, WalletRestoreService, WalletService, WsConnectionManager, createSendOperation, getDecodedToken, getEncodedToken, getKeepProofSecrets, getSendProofSecrets, hasPreparedData, initializeCoco, isExecutingOperation, isFinalizedOperation, isInitOperation, isPendingOperation, isPreparedOperation, isRolledBackOperation, isRollingBackOperation, isTerminalOperation, normalizeMintUrl };
+\ No newline at end of file
++export { AuthApi, AuthService, AuthSessionError, AuthSessionExpiredError, AuthSessionService, ConsoleLogger, CounterService, DuplicatePluginRegistrationError, ExtensionRegistrationError, HistoryApi, HistoryService, HttpResponseError, KeyRingApi, KeyRingService, KeysetSyncError, Manager, MeltOperationService, MeltOpsApi, MeltQuoteService, MemoryAuthSessionRepository, MemoryCounterRepository, MemoryHistoryRepository, MemoryKeyRingRepository, MemoryKeysetRepository, MemoryMeltOperationRepository, MemoryMeltQuoteRepository, MemoryMintOperationRepository, MemoryMintQuoteRepository, MemoryMintRepository, MemoryProofRepository, MemoryReceiveOperationRepository, MemoryRepositories, MemorySendOperationRepository, MintApi, MintFetchError, MintOperationError, MintOperationProcessor, MintOperationService, MintOperationWatcherService, MintOpsApi, MintService, NetworkError, OperationInProgressError, OpsApi, PaymentRequestError, PaymentRequestService, PaymentRequestsApi, PluginHost, ProofOperationError, ProofService, ProofStateWatcherService, ProofValidationError, ReceiveOperationService, ReceiveOpsApi, SeedService, SendOperationService, SendOpsApi, SubscriptionApi, SubscriptionManager, TokenService, TokenValidationError, UnknownMintError, WalletApi, WalletBalancesApi, WalletRestoreService, WalletService, WsConnectionManager, createSendOperation, getDecodedToken, getEncodedToken, getKeepProofSecrets, getSendProofSecrets, hasPreparedData, initializeCoco, isExecutingOperation, isFinalizedOperation, isInitOperation, isPendingOperation, isPreparedOperation, isRolledBackOperation, isRollingBackOperation, isTerminalOperation, normalizeMintUrl };
