@@ -281,7 +281,7 @@ const MOCK_CONTACTS: readonly MockContact[] = [
 // To add a real contact to the demo, append its npub here.
 // ---------------------------------------------------------------------------
 
-export const MOCK_ALLOWED_NPUBS: readonly string[] = [
+const MOCK_ALLOWED_NPUBS: readonly string[] = [
   'npub1ceel7z6ly287kz4mzqqcsgtc6nzc30zw2ru9w9e4gj64gw69f7qscyf0p8',
   'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
 ] as const;
@@ -347,9 +347,7 @@ function buildMockContactsAndThreads(now: number) {
   return { metadataByPubkey, threadsByPubkey, recentContacts };
 }
 
-const MOCK_PUBKEYS_SET: ReadonlySet<string> = new Set(
-  EFFECTIVE_MOCK_CONTACTS.map((c) => c.pubkey)
-);
+const MOCK_PUBKEYS_SET: ReadonlySet<string> = new Set(EFFECTIVE_MOCK_CONTACTS.map((c) => c.pubkey));
 
 export function isMockContactPubkey(pubkey: string | null | undefined): boolean {
   return !!pubkey && MOCK_PUBKEYS_SET.has(pubkey);
