@@ -309,15 +309,17 @@ export class CocoManager {
   }
 
   /**
-   * Start NPC sync, the mint-operation watcher (with `watchExistingPendingOnStart`),
-   * and the mint-operation processor. **Must NOT be called until the wallet
+   * Start the mint-operation watcher (with `watchExistingPendingOnStart`),
+   * the mint-operation processor, and NPC sync. **Must NOT be called until the wallet
    * has restored its NUT-13 deterministic counter from the mint** — otherwise
    * any minting from a paid quote will use a counter the mint already signed,
    * triggering an `outputs already signed` rejection that retries forever
    * (see walletLifecycleStore + AppGate's RestoreGate).
    */
   static async enableNpcSyncAndProcessor(): Promise<void> {
-    if (!this.instance) {
+    const manager = this.instance;
+    const npcPlugin = this.npcPlugin;
+    if (!manager) {
       throw new Error('Manager not initialized. Call initialize() first.');
     }
     this.isBackgroundRunning = true;
@@ -325,19 +327,28 @@ export class CocoManager {
     cashuLog.info('cashu.manager.npc_sync_and_processor.start');
 
     try {
-      const npcPromise = this.npcPlugin
-        ? this.npcPlugin.sync().then(
-            () => initLog('CocoManager', 'NPC sync done'),
-            (error) => cashuLog.warn('cashu.manager.npc_sync_failed', { error })
-          )
-        : Promise.resolve();
-      initLog('CocoManager', 'NPC sync starting...');
+      try {
+        initLog('CocoManager', 'initializing plugins...');
+        await manager.initPlugins();
+        initLog('CocoManager', 'plugins initialized');
+      } catch (error) {
+        cashuLog.warn('cashu.manager.plugins_init_failed', { error });
+      }
 
-      await npcPromise;
+      try {
+        initLog('CocoManager', 'reconciling legacy mint quotes...');
+        const result = await manager.reconcileLegacyMintQuotes();
+        cashuLog.info('cashu.manager.legacy_mint_quotes_reconciled', {
+          reconciled: result.reconciled.length,
+          skipped: result.skipped.length,
+        });
+      } catch (error) {
+        cashuLog.warn('cashu.manager.legacy_mint_quote_reconcile_failed', { error });
+      }
 
       try {
         initLog('CocoManager', 'enabling mint quote watcher...');
-        await this.instance.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
+        await manager.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
         initLog('CocoManager', 'mint quote watcher enabled');
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
@@ -345,7 +356,7 @@ export class CocoManager {
 
       try {
         initLog('CocoManager', 'enabling mint quote processor...');
-        await this.instance.enableMintOperationProcessor({
+        await manager.enableMintOperationProcessor({
           processIntervalMs: 5000,
           maxRetries: 3,
           baseRetryDelayMs: 1000,
@@ -354,6 +365,50 @@ export class CocoManager {
         initLog('CocoManager', 'mint quote processor enabled');
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_processor_failed', { error });
+      }
+
+      try {
+        initLog('CocoManager', 'recovering pending mint operations...');
+        await manager.recoverPendingMintOperations();
+        initLog('CocoManager', 'pending mint operation recovery done');
+      } catch (error) {
+        cashuLog.warn('cashu.manager.pending_mint_recovery_failed', { error });
+      }
+
+      try {
+        const result = await manager.requeuePaidMintQuotes();
+        if (result.requeued.length > 0) {
+          cashuLog.info('cashu.manager.paid_mint_quotes_requeued', {
+            requeued: result.requeued.length,
+          });
+        }
+      } catch (error) {
+        cashuLog.warn('cashu.manager.paid_mint_quote_requeue_failed', { error });
+      }
+
+      if (npcPlugin) {
+        const timeoutMs = 15_000;
+        initLog('CocoManager', 'NPC sync starting...');
+        let syncTimeout: ReturnType<typeof setTimeout> | null = null;
+        const syncPromise = npcPlugin.sync().then(
+          () => initLog('CocoManager', 'NPC sync done'),
+          (error) => cashuLog.warn('cashu.manager.npc_sync_failed', { error })
+        );
+        try {
+          await Promise.race([
+            syncPromise,
+            new Promise<void>((resolve) => {
+              syncTimeout = setTimeout(() => {
+                cashuLog.warn('cashu.manager.npc_sync_timeout', { timeoutMs });
+                resolve();
+              }, timeoutMs);
+            }),
+          ]);
+        } finally {
+          if (syncTimeout) {
+            clearTimeout(syncTimeout);
+          }
+        }
       }
 
       cashuLog.info('cashu.manager.npc_sync_and_processor.done', {
@@ -440,6 +495,13 @@ export class CocoManager {
           cashuLog.debug('cashu.manager.quote_watcher_disabled');
         } catch (error) {
           cashuLog.warn('cashu.manager.quote_watcher_disable_failed', { error });
+        }
+
+        try {
+          await this.instance.dispose();
+          cashuLog.debug('cashu.manager.disposed');
+        } catch (error) {
+          cashuLog.warn('cashu.manager.dispose_failed', { error });
         }
 
         // Close the SQLite connection to prevent "database is locked" on revisit
@@ -583,6 +645,14 @@ export class CocoManager {
   static async completeReset(accountIndexes: number[]): Promise<void> {
     try {
       await this.disableWatchers();
+      if (this.instance) {
+        try {
+          await this.instance.dispose();
+          cashuLog.debug('cashu.manager.disposed');
+        } catch (error) {
+          cashuLog.warn('cashu.manager.dispose_failed', { error });
+        }
+      }
       this.instance = null;
       this.pendingInit = null;
 

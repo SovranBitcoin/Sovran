@@ -179,6 +179,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
           bgStage.log('Recovering pending operations...');
           await initPhase('Coco-bg.sendRecovery', () => manager.ops.send.recovery.run());
           await initPhase('Coco-bg.meltRecovery', () => manager.ops.melt.recovery.run());
+          await initPhase('Coco-bg.receiveRecovery', () => manager.ops.receive.recovery.run());
         } catch (recoveryErr) {
           initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
         }
