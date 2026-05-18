@@ -11,6 +11,9 @@ type NetworkStateForReachability = Pick<
 export type ReachabilityProbe = {
   url: string;
   name: string;
+  method?: string;
+  headers?: HeadersInit;
+  body?: RequestInit['body'];
   timeoutMs?: number;
   test?: (response: Response) => boolean;
 };
@@ -42,6 +45,11 @@ const DEFAULT_REACHABILITY_PROBES: readonly ReachabilityProbe[] = [
   {
     name: 'sovran-api',
     url: REACHABILITY_PRIMARY_URL,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ storage: { version: '0.0.0' } }),
     test: (response) => response.ok,
   },
 ];
@@ -88,9 +96,9 @@ async function runProbe(
   try {
     const response = await fetcher(probe.url, {
       cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-      },
+      method: probe.method,
+      headers: withNoCacheHeader(probe.headers),
+      body: probe.body,
       signal: controller.signal,
     });
     return {
@@ -111,6 +119,14 @@ async function runProbe(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function withNoCacheHeader(headers: HeadersInit | undefined): Headers {
+  const merged = new Headers(headers);
+  if (!merged.has('Cache-Control')) {
+    merged.set('Cache-Control', 'no-cache');
+  }
+  return merged;
 }
 
 function getHost(url: string): string {

@@ -20,6 +20,9 @@ const disconnected: NetworkState = {
 const primaryProbe: ReachabilityProbe = {
   name: 'primary',
   url: 'https://api.sovran.money/api/app/latest-version',
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ storage: { version: '0.0.0' } }),
   test: (response) => response.ok,
 };
 
@@ -62,6 +65,13 @@ describe('offline reachability', () => {
     expect(result).toMatchObject({ isOffline: false, reason: 'probe-reachable' });
     expect(result.probes).toHaveLength(1);
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledWith(
+      primaryProbe.url,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ storage: { version: '0.0.0' } }),
+      })
+    );
   });
 
   it('treats a failing app-owned probe as offline', async () => {
