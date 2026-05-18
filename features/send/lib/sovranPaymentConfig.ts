@@ -533,8 +533,10 @@ export function createSovranNotifications(
       staticPopup('transaction-cancelled');
     },
 
-    onSendCancelFailed: ({ message, mintUnreachable }) => {
-      if (mintUnreachable) {
+    onSendCancelFailed: ({ message, mintUnreachable, offline }) => {
+      if (offline) {
+        staticPopup('cancel-transaction-offline');
+      } else if (mintUnreachable) {
         staticPopup('mint-unreachable');
       } else {
         staticPopup('cancel-transaction-failed', { text: message });

@@ -44,6 +44,7 @@ function createMockConfig(overrides?: {
   operations?: Partial<MachineOperations>;
   machine?: Partial<PaymentMachine>;
   navigation?: Partial<NavigationCallbacks>;
+  getOffline?: () => boolean;
 }) {
   const notifications: { event: string; args: unknown[] }[] = [];
   const ops: Partial<MachineOperations> = {
@@ -91,6 +92,7 @@ function createMockConfig(overrides?: {
   const config: DefaultScreenActionHandlersConfig = {
     getMachine: () => machine as PaymentMachine,
     getOperations: () => ops,
+    getOffline: overrides?.getOffline,
     notify: (event: string, ...args: unknown[]) => {
       notifications.push({ event, args });
     },
@@ -205,6 +207,31 @@ describe('sendToken default handlers', () => {
       expect(notifications).toContainEqual({
         event: 'onSendCancelled',
         args: [{ operationId: 'op-789' }],
+      });
+    });
+
+    it('blocks cancellation while offline', async () => {
+      const { handlers, ops, notifications } = createMockConfig({
+        getOffline: () => true,
+      });
+      const { mgr } = createManager('sendToken', handlers, {
+        type: 'send',
+        operationId: 'op-offline',
+        token: null,
+      });
+
+      await mgr.execute('cancel');
+
+      expect(ops.rollbackSend).not.toHaveBeenCalled();
+      expect(notifications).toContainEqual({
+        event: 'onSendCancelFailed',
+        args: [
+          {
+            operationId: 'op-offline',
+            message: 'Cancel transaction is not possible while offline.',
+            offline: true,
+          },
+        ],
       });
     });
 

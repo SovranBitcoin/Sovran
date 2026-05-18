@@ -27,11 +27,12 @@ import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWit
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { paramPopup } from '@/shared/lib/popup';
+import { paramPopup, staticPopup } from '@/shared/lib/popup';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useManager } from '@cashu/coco-react';
 import { attemptRollback } from '@/shared/lib/cashu/utils';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type PaymentType = 'all' | 'lightning' | 'ecash';
@@ -69,6 +70,7 @@ export function TransactionsScreen({
 }: TransactionsScreenProps) {
   useLifecycleLogger('TransactionsScreen');
   const manager = useManager();
+  const { isOffline } = useOfflineStatus();
 
   const selectedCurrency = filterCurrency || 'sat';
   const paymentType = filterPaymentType;
@@ -100,17 +102,25 @@ export function TransactionsScreen({
   const handleCancelOne = useCallback(
     async (entry: SendHistoryEntry) => {
       if (useRollbackStore.getState().inFlight.has(entry.operationId)) return;
+      if (isOffline) {
+        staticPopup('cancel-transaction-offline');
+        return;
+      }
       log.info('transactions.pending.cancel.one', {
         operationId: entry.operationId,
         mintUrl: entry.mintUrl,
       });
       await reclaimOne(entry.operationId);
     },
-    [reclaimOne]
+    [isOffline, reclaimOne]
   );
 
   const handleSweepVisible = useCallback(async () => {
     if (isSweeping || visiblePendingEcash.length === 0) return;
+    if (isOffline) {
+      staticPopup('cancel-transaction-offline');
+      return;
+    }
     log.info('transactions.pending.sweep.visible.start', {
       count: visiblePendingEcash.length,
     });
@@ -133,7 +143,7 @@ export function TransactionsScreen({
     } else {
       paramPopup('rollback-partial', { success, failed, total: targets.length });
     }
-  }, [isSweeping, visiblePendingEcash, reclaimOne]);
+  }, [isOffline, isSweeping, visiblePendingEcash, reclaimOne]);
 
   const totalVisiblePendingAmount = useMemo(
     () => visiblePendingEcash.reduce((sum, tx) => sum + tx.amount, 0),

@@ -519,6 +519,7 @@ export type NotificationHandlerMap = {
     operationId: string;
     message: string;
     mintUnreachable?: boolean;
+    offline?: boolean;
   }) => MaybeAsync;
 
   /**

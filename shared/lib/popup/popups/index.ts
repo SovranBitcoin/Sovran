@@ -105,6 +105,12 @@ const STATIC_POPUPS = {
     icon: 'icon:mdi:close-circle',
     type: 'error',
   },
+  'cancel-transaction-offline': {
+    message: 'Cannot cancel while offline',
+    text: 'This action is not possible while offline. Connect to the internet and try again.',
+    icon: 'icon:feather:wifi-off',
+    type: 'warning',
+  },
   'operation-not-found': {
     message: 'Operation not found',
     icon: 'icon:majesticons:search-line',

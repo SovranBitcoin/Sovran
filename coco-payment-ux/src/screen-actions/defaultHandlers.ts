@@ -38,6 +38,7 @@ export interface NavigationCallbacks {
 export interface DefaultScreenActionHandlersConfig {
   getMachine: () => PaymentMachine | null;
   getOperations: () => Partial<MachineOperations> | undefined;
+  getOffline?: () => boolean;
   notify: (event: string, ...args: unknown[]) => void;
   navigation: NavigationCallbacks;
 }
@@ -105,7 +106,7 @@ function encodeToken(entry: EntryLike): string | null {
 export function createDefaultScreenActionHandlers(
   config: DefaultScreenActionHandlersConfig
 ): ScreenActionHandlerMap {
-  const { getMachine, getOperations, notify, navigation } = config;
+  const { getMachine, getOperations, getOffline, notify, navigation } = config;
 
   return {
     // ── sendToken ────────────────────────────────────────────────────
@@ -138,6 +139,16 @@ export function createDefaultScreenActionHandlers(
 
         const ops = getOperations();
         if (!ops?.rollbackSend) return;
+
+        if (getOffline?.() === true) {
+          logger.info('screenAction.sendToken.cancel.blockedOffline', { operationId });
+          notify('onSendCancelFailed', {
+            operationId,
+            message: 'Cancel transaction is not possible while offline.',
+            offline: true,
+          });
+          return;
+        }
 
         logger.info('screenAction.sendToken.cancel.start', { operationId });
         try {

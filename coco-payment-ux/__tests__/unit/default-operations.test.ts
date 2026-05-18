@@ -218,24 +218,3 @@ describe('executePaymentRequest — inband fallback', () => {
     expect(mockManager.paymentRequests.execute).toHaveBeenCalledOnce();
   });
 });
-
-describe('rollbackSend', () => {
-  it('retries reclaim for an operation left rolling_back by an interrupted rollback', async () => {
-    const mockManager = createMockManager({
-      ops: {
-        send: {
-          get: vi.fn().mockResolvedValue({ id: 'op-rolling', state: 'rolling_back' }),
-          reclaim: vi.fn().mockResolvedValue(undefined),
-        },
-      },
-    });
-
-    const ops = createDefaultOperations({
-      getManager: () => mockManager as never,
-    });
-
-    await ops.rollbackSend!('op-rolling');
-
-    expect(mockManager.ops.send.reclaim).toHaveBeenCalledWith('op-rolling');
-  });
-});

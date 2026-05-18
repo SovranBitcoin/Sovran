@@ -241,6 +241,7 @@ export function useScreenActions(
     screenActionHandlers,
     screenActionsBridge,
     getLocaleRef,
+    getOfflineRef,
     getBtcPriceRef,
     getDisplayCurrencyRef,
     notificationsRef,
@@ -294,6 +295,7 @@ export function useScreenActions(
       createDefaultScreenActionHandlers({
         getMachine: () => machineRef.current,
         getOperations: () => operationsRef.current,
+        getOffline: () => getOfflineRef.current?.() ?? false,
         notify: (event: string, ...args: unknown[]) => {
           const notifications = notificationsRef.current;
           if (!notifications) return;

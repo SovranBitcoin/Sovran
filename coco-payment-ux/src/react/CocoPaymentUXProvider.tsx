@@ -208,6 +208,7 @@ interface CocoPaymentUXContextValue {
   screenActionHandlers: ScreenActionHandlerMap;
   screenActionsBridge: ScreenActionsBridge | undefined;
   getLocaleRef: React.MutableRefObject<(() => string) | undefined>;
+  getOfflineRef: React.MutableRefObject<(() => boolean) | undefined>;
   getBtcPriceRef: React.MutableRefObject<(() => number) | undefined>;
   getDisplayCurrencyRef: React.MutableRefObject<
     (() => { code: string; symbol: string } | null) | undefined
@@ -390,6 +391,7 @@ export function CocoPaymentUXProvider({
       screenActionHandlers,
       screenActionsBridge,
       getLocaleRef,
+      getOfflineRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
       notificationsRef,
