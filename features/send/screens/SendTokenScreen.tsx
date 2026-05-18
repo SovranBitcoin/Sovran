@@ -7,6 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { StyleSheet } from 'react-native';
 
 import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
@@ -41,6 +42,7 @@ import {
   useSendReachability,
   useSendReachabilityStore,
 } from '@/shared/stores/profile/sendReachabilityStore';
+import { spacing } from '@/shared/styles/tokens';
 import { getSendTokenReachabilityWarning } from '../lib/sendTokenWarning';
 
 interface SendTokenScreenProps {
@@ -294,12 +296,14 @@ export function SendTokenScreen({
           <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
 
           {reachabilityWarning && (
-            <Alert status="warning" className="bg-surface-secondary">
-              <Alert.Content>
-                <Alert.Title>{reachabilityWarning.title}</Alert.Title>
-                <Alert.Description>{reachabilityWarning.description}</Alert.Description>
-              </Alert.Content>
-            </Alert>
+            <View style={styles.reachabilityWarning}>
+              <Alert status="warning" className="bg-surface-secondary">
+                <Alert.Content>
+                  <Alert.Title>{reachabilityWarning.title}</Alert.Title>
+                  <Alert.Description>{reachabilityWarning.description}</Alert.Description>
+                </Alert.Content>
+              </Alert>
+            </View>
           )}
 
           {entry.state !== 'finalized' && entry.state !== 'rolledBack' && entry.tokenString && (
@@ -347,3 +351,9 @@ export function SendTokenScreen({
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  reachabilityWarning: {
+    marginHorizontal: spacing.lg,
+  },
+});
