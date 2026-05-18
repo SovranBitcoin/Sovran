@@ -916,8 +916,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         });
         handlerExecuting = true;
         notify();
+        const skipOnlineSend =
+          ((getOffline?.() ?? false) || flowCtx.offline === true || flowCtx.localProofSend === true) &&
+          !!operations.executeOfflineSend;
         try {
-          if ((getOffline?.() ?? false) && operations.executeOfflineSend) {
+          if (skipOnlineSend) {
             const error = new Error(t('MINT_UNREACHABLE', getLocale?.() ?? 'en'));
             error.name = 'MintFetchError';
             throw error;
@@ -948,6 +951,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           const walletCtx = getContext();
           const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
           let handled = false;
+          const mintUnreachableConfirmed =
+            isMintOfflineError(err) && !skipOnlineSend;
+          if (mintUnreachableConfirmed && !flowCtx.mintUnreachableConfirmed) {
+            flowCtx = { ...flowCtx, mintUnreachableConfirmed: true };
+          }
 
           // Phase 1: If mint is offline and exact proofs exist, auto offline send
           if (
@@ -964,7 +972,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                 logger.info('machine.send.offlineFallback.success');
                 setStep('sendComplete', {
                   historyEntry: result.historyEntry,
-                  mintWasOffline: true,
+                  mintWasOffline:
+                    mintUnreachableConfirmed || flowCtx.mintUnreachableConfirmed
+                      ? true
+                      : undefined,
                   recipientPubkey: flowCtx.recipientPubkey,
                   recipientProfile: flowCtx.recipientProfile,
                 });

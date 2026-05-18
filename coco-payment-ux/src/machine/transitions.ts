@@ -235,10 +235,17 @@ function handleMintSelected(
 function handleProofsChosen(
   event: FlowEvent & { type: 'PROOFS_CHOSEN' },
   currentCtx: FlowContext,
-  _walletCtx: WalletContext
+  walletCtx: WalletContext
 ): TransitionResult {
-  const ctx: FlowContext = { ...currentCtx, amount: event.amount };
-  const destination = ctx.destination ?? 'sendEcash';
+  const destination = currentCtx.destination ?? 'sendEcash';
+  const proofAmounts = currentCtx.mintUrl ? (walletCtx.proofAmounts[currentCtx.mintUrl] ?? []) : [];
+  const canSendLocally =
+    destination === 'sendEcash' && buildProofSuggestions(proofAmounts, event.amount).exactMatch;
+  const ctx: FlowContext = {
+    ...currentCtx,
+    amount: event.amount,
+    localProofSend: canSendLocally ? true : currentCtx.localProofSend,
+  };
 
   // After proof selection, go straight to terminal — proofs are already
   // validated and we must not re-enter resolveFromContext (which would

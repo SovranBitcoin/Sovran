@@ -340,6 +340,12 @@ describe('ecash send — insufficient balance', () => {
  * exist and can compose options) or error (when they can't).
  */
 describe('ecash send — online executeSend fallback', () => {
+  function mintFetchError(): Error {
+    const err = new Error('Mint unreachable');
+    err.name = 'MintFetchError';
+    return err;
+  }
+
   it('online + non-exact proofs + send succeeds → sendComplete', async () => {
     const tm = createTestMachine({ wallet: WALLETS.noExactProofs });
     await tm.machine.startSendEcash();
@@ -371,6 +377,32 @@ describe('ecash send — online executeSend fallback', () => {
     });
   });
 
+  it('local proof choice after mint failure does not retry executeSend', async () => {
+    const tm = createTestMachine({
+      wallet: WALLETS.noExactProofs,
+      operations: {
+        executeSend: async () => {
+          throw mintFetchError();
+        },
+      },
+    });
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+    tm.assertStep('chooseProofs');
+
+    await tm.machine.chooseProofs(96);
+
+    tm.assertStep('sendComplete');
+    const executeSendCalls = tm.operationCalls.filter((call) => call.name === 'executeSend');
+    expect(executeSendCalls).toHaveLength(1);
+    const offlineSendCall = tm.operationCalls.find((call) => call.name === 'executeOfflineSend');
+    expect(offlineSendCall?.args).toEqual([MINT1, 96]);
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
+      step: 'sendComplete',
+      data: { mintWasOffline: true },
+    });
+  });
+
   it('online + exact proofs + send fails → error without same-amount fallback', async () => {
     const tm = createTestMachine({
       operations: {
@@ -382,12 +414,34 @@ describe('ecash send — online executeSend fallback', () => {
     tm.assertStep('error');
   });
 
+  it('online + exact proofs + mint fetch fails → offline send with mint warning', async () => {
+    const tm = createTestMachine({
+      operations: {
+        executeSend: async () => {
+          throw mintFetchError();
+        },
+      },
+    });
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+
+    tm.assertStep('sendComplete');
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
+      step: 'sendComplete',
+      data: { mintWasOffline: true },
+    });
+  });
+
   it('offline + exact proofs → sendComplete through executeOfflineSend', async () => {
     const tm = createTestMachine({ offline: true });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount(100, MINT1);
     tm.assertStep('sendComplete');
     expect(tm.operationCalls.map((call) => call.name)).toContain('executeOfflineSend');
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
+      step: 'sendComplete',
+      data: expect.not.objectContaining({ mintWasOffline: true }),
+    });
   });
 
   it('offline flag propagates through startSendEcash flow context', async () => {

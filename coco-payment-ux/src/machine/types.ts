@@ -220,6 +220,17 @@ export interface FlowContext {
    */
   recipientProfile?: RecipientProfile;
   amountEntryDisplay?: AmountEntryDisplayMetadata;
+  /**
+   * True after the user accepts a locally composable proof suggestion. The
+   * selected amount is already exact locally, so confirmSend should not retry
+   * an online send before creating the offline token.
+   */
+  localProofSend?: boolean;
+  /**
+   * True when an online app path reached the mint and got a mint-unreachable
+   * failure. This is distinct from the whole wallet being offline.
+   */
+  mintUnreachableConfirmed?: boolean;
   supportedMintUrls?: string[];
   /**
    * When true, use local proof routing for ecash sends instead of relying on

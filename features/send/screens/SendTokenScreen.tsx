@@ -35,6 +35,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { shouldShowMintOfflineWarning } from '../lib/sendTokenWarning';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -108,6 +109,7 @@ export function SendTokenScreen({
     unit: entry.unit,
     mintWasOffline,
   });
+  const showMintOfflineWarning = shouldShowMintOfflineWarning(entry, mintWasOffline);
 
   const bottomButtons = (
     <BottomButtons>
@@ -228,7 +230,7 @@ export function SendTokenScreen({
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
 
-          {mintWasOffline && (
+          {showMintOfflineWarning && (
             <Alert status="warning" className="bg-surface-secondary">
               <Alert.Content>
                 <Alert.Title>Mint was offline</Alert.Title>
