@@ -335,9 +335,9 @@ describe('ecash send — insufficient balance', () => {
 // ---------------------------------------------------------------------------
 
 /**
- * When online, the machine always attempts executeSend first. If it fails,
- * the catch block in createMachine falls back to chooseProofs (when proofs
- * exist and can compose options) or error (when they can't).
+ * When exact local proofs exist, the machine creates the token locally first.
+ * Non-exact online sends still attempt executeSend and can fall back to
+ * chooseProofs when the mint is unreachable.
  */
 describe('ecash send — online executeSend fallback', () => {
   function mintFetchError(): Error {
@@ -352,6 +352,25 @@ describe('ecash send — online executeSend fallback', () => {
     await tm.machine.enterAmount(100, MINT1);
     // Online: executeSend succeeds, proof selector is skipped
     tm.assertStep('sendComplete');
+  });
+
+  it('online + exact proofs → local-first offline send without executeSend', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+
+    tm.assertStep('sendComplete');
+    expect(tm.operationCalls.map((call) => call.name)).toContain('executeOfflineSend');
+    expect(tm.operationCalls.map((call) => call.name)).not.toContain('executeSend');
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
+      step: 'sendComplete',
+      data: {
+        createdOffline: true,
+      },
+    });
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1].data).not.toMatchObject({
+      mintWasOffline: true,
+    });
   });
 
   it('online + non-exact proofs + send fails → chooseProofs fallback', async () => {
@@ -406,30 +425,15 @@ describe('ecash send — online executeSend fallback', () => {
   it('online + exact proofs + send fails → error without same-amount fallback', async () => {
     const tm = createTestMachine({
       operations: {
+        executeOfflineSend: async () => {
+          throw new Error('Local proof composition failed');
+        },
         executeSend: async () => { throw new Error('Mint unreachable'); },
       },
     });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount(100, MINT1);
     tm.assertStep('error');
-  });
-
-  it('online + exact proofs + mint fetch fails → offline send with mint warning', async () => {
-    const tm = createTestMachine({
-      operations: {
-        executeSend: async () => {
-          throw mintFetchError();
-        },
-      },
-    });
-    await tm.machine.startSendEcash();
-    await tm.machine.enterAmount(100, MINT1);
-
-    tm.assertStep('sendComplete');
-    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
-      step: 'sendComplete',
-      data: { mintWasOffline: true },
-    });
   });
 
   it('offline + exact proofs → sendComplete through executeOfflineSend', async () => {
@@ -440,7 +444,10 @@ describe('ecash send — online executeSend fallback', () => {
     expect(tm.operationCalls.map((call) => call.name)).toContain('executeOfflineSend');
     expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
       step: 'sendComplete',
-      data: expect.not.objectContaining({ mintWasOffline: true }),
+      data: expect.objectContaining({ createdOffline: true }),
+    });
+    expect(tm.handlerCalls[tm.handlerCalls.length - 1].data).not.toMatchObject({
+      mintWasOffline: true,
     });
   });
 
@@ -474,7 +481,7 @@ describe('ecash send — online executeSend fallback', () => {
  */
 describe('ecash send — executeSend operation', () => {
   it('calls executeSend and reaches sendComplete on success', async () => {
-    const tm = createTestMachine();
+    const tm = createTestMachine({ wallet: WALLETS.noExactProofs });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount(100, MINT1);
     tm.assertStep('sendComplete');
@@ -520,8 +527,8 @@ describe('ecash send — historyEntry data', () => {
     await tm.machine.enterAmount(100, MINT1);
     tm.assertStep('sendComplete');
 
-    const opCall = tm.operationCalls.find((c) => c.name === 'executeSend');
-    const historyEntry = (opCall!.result as Record<string, unknown>).historyEntry as string;
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    const historyEntry = (lastHandler.data as { historyEntry: string }).historyEntry;
     const parsed = JSON.parse(historyEntry);
     expect(parsed.type).toBe('send');
     expect(typeof parsed.id).toBe('string');

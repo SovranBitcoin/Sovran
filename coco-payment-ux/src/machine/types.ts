@@ -102,6 +102,7 @@ export interface StepDataMap {
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
     destination?: Destination;
+    mintListItemsStatus?: 'loading' | 'ready' | 'failed';
     /** Pre-computed mint list items (populated when machine operations are provided). */
     mintListItems?: MintListItem[];
     /** When 'npc', selection updates NPC mint only (not selectedMint). */
@@ -126,6 +127,8 @@ export interface StepDataMap {
   confirmSend: { mintUrl: string; amount: number };
   sendComplete: {
     historyEntry: string;
+    /** True when the token was created from local proofs without contacting the mint first. */
+    createdOffline?: boolean;
     mintWasOffline?: boolean;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;

@@ -79,6 +79,14 @@ jest.mock('@/shared/stores/global/settingsStore', () => ({
 jest.mock('@/shared/stores/profile/scanHistoryStore', () => ({
   useScanHistoryStore: { getState: jest.fn(() => ({})) },
 }));
+jest.mock('@/shared/stores/profile/sendReachabilityStore', () => ({
+  useSendReachabilityStore: {
+    getState: jest.fn(() => ({
+      markChecking: jest.fn(),
+      pruneOld: jest.fn(),
+    })),
+  },
+}));
 jest.mock('@/shared/stores/profile/transactionDistributionStore', () => ({
   useTransactionDistributionStore: { getState: jest.fn(() => ({})) },
 }));

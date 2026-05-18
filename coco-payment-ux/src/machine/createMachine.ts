@@ -20,6 +20,7 @@ import type {
   ScanSourceResult,
   StepDataMap,
 } from './types';
+import type { MintListItem } from '../types';
 
 // ---------------------------------------------------------------------------
 // Derive ExecutionState from step
@@ -445,6 +446,51 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
     // Single-option: stay on the current step so the user can retry.
     // Step is NOT changed — the Pay/Confirm button becomes active again.
+  }
+
+  function buildFallbackMintListItems(data: StepDataMap['selectMint']): MintListItem[] {
+    return data.candidates.map((candidate) => ({
+      mintUrl: candidate.mintUrl,
+      displayName: candidate.mintUrl,
+      balance: candidate.balance,
+      unit: data.unit,
+      status: 'available' as const,
+      reason: null,
+      isPreferred: false,
+    }));
+  }
+
+  function startMintListEnrichment(
+    data: StepDataMap['selectMint'],
+    generation: number
+  ): void {
+    if (!operations?.buildMintListItems) return;
+
+    void (async () => {
+      try {
+        const items = await operations.buildMintListItems(data);
+        if (isStaleGeneration(generation, 'buildMintListItems')) return;
+        if (step !== 'selectMint') return;
+        const current = stepData as StepDataMap['selectMint'];
+        setStep('selectMint', {
+          ...current,
+          mintListItems: items,
+          mintListItemsStatus: 'ready',
+        });
+        notify();
+      } catch (err) {
+        if (isStaleGeneration(generation, 'buildMintListItems.catch')) return;
+        if (step !== 'selectMint') return;
+        logger.warn('machine.selectMint.enrichment.failed', { error: errField(err) });
+        const current = stepData as StepDataMap['selectMint'];
+        setStep('selectMint', {
+          ...current,
+          mintListItems: current.mintListItems ?? buildFallbackMintListItems(current),
+          mintListItemsStatus: 'failed',
+        });
+        notify();
+      }
+    })();
   }
 
   const send = async (event: import('./types').FlowEvent): Promise<void> => {
@@ -910,49 +956,78 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     if (operations) {
       if (step === 'confirmSend') {
         const data = stepData as StepDataMap['confirmSend'];
+        const walletCtx = getContext();
+        const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
+        const localProofs = buildProofSuggestions(proofAmounts, data.amount);
+        const hasExactLocalProofs = proofAmounts.length > 0 && localProofs.exactMatch;
+        const shouldCreateLocalTokenFirst = hasExactLocalProofs && !!operations.executeOfflineSend;
+        const appOffline = (getOffline?.() ?? false) || flowCtx.offline === true;
+        const forceLocalSend = appOffline || flowCtx.localProofSend === true;
         logger.info('machine.confirmSend.start', {
           mintUrl: data.mintUrl,
           amount: data.amount,
+          hasExactLocalProofs,
+          localFirst: shouldCreateLocalTokenFirst,
         });
         handlerExecuting = true;
         notify();
-        const skipOnlineSend =
-          ((getOffline?.() ?? false) || flowCtx.offline === true || flowCtx.localProofSend === true) &&
-          !!operations.executeOfflineSend;
         try {
-          if (skipOnlineSend) {
+          if (shouldCreateLocalTokenFirst) {
+            const result = await operations.executeOfflineSend!(data.mintUrl, data.amount);
+            if (isStaleGeneration(sendGeneration, 'executeOfflineSend.localFirst')) return;
+            logger.info('machine.send.localFirst.success');
+            setStep('sendComplete', {
+              historyEntry: result.historyEntry,
+              createdOffline: true,
+              mintWasOffline: flowCtx.mintUnreachableConfirmed ? true : undefined,
+              recipientPubkey: flowCtx.recipientPubkey,
+              recipientProfile: flowCtx.recipientProfile,
+            });
+
+            const parsed = parseHistoryEntryOnce(result.historyEntry);
+            if (parsed?.id) {
+              void notifications?.onTransactionCreated?.({
+                transactionId: parsed.id,
+                type: 'send',
+                mintUrl: data.mintUrl,
+                amount: data.amount,
+                unit: flowCtx.unit,
+                rawInput: flowCtx.rawInput,
+                source: flowCtx.source,
+              });
+            }
+          } else if (forceLocalSend && operations.executeOfflineSend) {
             const error = new Error(t('MINT_UNREACHABLE', getLocale?.() ?? 'en'));
             error.name = 'MintFetchError';
             throw error;
-          }
-          const result = await operations.executeSend(data.mintUrl, data.amount);
-          if (isStaleGeneration(sendGeneration, 'executeSend')) return;
-          logger.info('machine.send.success');
-          setStep('sendComplete', {
-            historyEntry: result.historyEntry,
-            recipientPubkey: flowCtx.recipientPubkey,
-            recipientProfile: flowCtx.recipientProfile,
-          });
-
-          const parsed = parseHistoryEntryOnce(result.historyEntry);
-          if (parsed?.id) {
-            void notifications?.onTransactionCreated?.({
-              transactionId: parsed.id,
-              type: 'send',
-              mintUrl: data.mintUrl,
-              amount: data.amount,
-              unit: flowCtx.unit,
-              rawInput: flowCtx.rawInput,
-              source: flowCtx.source,
+          } else {
+            const result = await operations.executeSend(data.mintUrl, data.amount);
+            if (isStaleGeneration(sendGeneration, 'executeSend')) return;
+            logger.info('machine.send.success');
+            setStep('sendComplete', {
+              historyEntry: result.historyEntry,
+              recipientPubkey: flowCtx.recipientPubkey,
+              recipientProfile: flowCtx.recipientProfile,
             });
+
+            const parsed = parseHistoryEntryOnce(result.historyEntry);
+            if (parsed?.id) {
+              void notifications?.onTransactionCreated?.({
+                transactionId: parsed.id,
+                type: 'send',
+                mintUrl: data.mintUrl,
+                amount: data.amount,
+                unit: flowCtx.unit,
+                rawInput: flowCtx.rawInput,
+                source: flowCtx.source,
+              });
+            }
           }
         } catch (err) {
           if (isStaleGeneration(sendGeneration, 'executeSend.catch')) return;
-          const walletCtx = getContext();
-          const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
           let handled = false;
           const mintUnreachableConfirmed =
-            isMintOfflineError(err) && !skipOnlineSend;
+            isMintOfflineError(err) && !forceLocalSend && !shouldCreateLocalTokenFirst;
           if (mintUnreachableConfirmed && !flowCtx.mintUnreachableConfirmed) {
             flowCtx = { ...flowCtx, mintUnreachableConfirmed: true };
           }
@@ -972,6 +1047,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                 logger.info('machine.send.offlineFallback.success');
                 setStep('sendComplete', {
                   historyEntry: result.historyEntry,
+                  createdOffline: true,
                   mintWasOffline:
                     mintUnreachableConfirmed || flowCtx.mintUnreachableConfirmed
                       ? true
@@ -1079,24 +1155,15 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         notify();
       } else if (step === 'selectMint') {
         const data = stepData as StepDataMap['selectMint'];
-        handlerExecuting = true;
-        notify();
-        try {
-          const items = await operations.buildMintListItems(data);
-          if (isStaleGeneration(sendGeneration, 'buildMintListItems')) return;
-          // Fresh ref so useSyncExternalStore consumers (and any details-keyed
-          // useMemo) see the enrichment instead of reusing the stale snapshot.
-          setStep('selectMint', { ...data, mintListItems: items });
-        } catch (err) {
-          if (isStaleGeneration(sendGeneration, 'buildMintListItems.catch')) return;
-          setStep('error', {
-            code: 'UNSUPPORTED_INPUT',
-            message:
-              err instanceof Error ? err.message : t('LOAD_MINTS_FAILED', getLocale?.() ?? 'en'),
+        if (!data.mintListItems) {
+          setStep('selectMint', {
+            ...data,
+            mintListItems: buildFallbackMintListItems(data),
+            mintListItemsStatus: 'loading',
           });
+          startMintListEnrichment(data, sendGeneration);
+          notify();
         }
-        handlerExecuting = false;
-        notify();
       }
     }
 

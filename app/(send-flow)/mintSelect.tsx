@@ -17,8 +17,8 @@ import React, { useEffect, useMemo } from 'react';
 import { Stack, router } from 'expo-router';
 import { z } from 'zod';
 
-import { useScreenActions, usePaymentFlowMachine } from 'coco-payment-ux/react';
-import type { MintListItem } from 'coco-payment-ux';
+import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'coco-payment-ux/react';
+import type { MintListItem, StepDataMap } from 'coco-payment-ux';
 
 import { MintListScreen } from '@/features/mint';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
@@ -35,13 +35,21 @@ function MintSelectRoute() {
   const params = useRouteParams(ParamsSchema, { where: 'send-flow.mintSelect' });
 
   const walletContext = useWalletContext();
-  usePaymentFlowMachine({ walletContext });
+  const machine = usePaymentFlowMachine({ walletContext });
+  const execution = useExecutionState(machine);
 
   const { entry, actions } = useScreenActions('mintSelector', params?.mintSelectorEntry);
+  const liveSelectMint =
+    execution.step === 'selectMint' ? (execution.details as StepDataMap['selectMint']) : null;
 
   const items = useMemo<MintListItem[]>(
-    () => (Array.isArray(entry?.items) ? (entry.items as MintListItem[]) : []),
-    [entry?.items]
+    () =>
+      Array.isArray(liveSelectMint?.mintListItems)
+        ? liveSelectMint.mintListItems
+        : Array.isArray(entry?.items)
+          ? (entry.items as MintListItem[])
+          : [],
+    [entry?.items, liveSelectMint?.mintListItems]
   );
 
   useEffect(() => {

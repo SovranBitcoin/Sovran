@@ -24,6 +24,7 @@ import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
   sendHistoryEntry: z.string().min(1).max(64_000).optional(),
+  createdOffline: z.string().max(16).optional(),
   mintWasOffline: z.string().max(16).optional(),
 });
 
@@ -39,6 +40,7 @@ export function SendTokenRoute({ where }: SendTokenRouteProps) {
   return (
     <SendTokenScreen
       sendHistoryEntry={params.sendHistoryEntry}
+      createdOffline={params.createdOffline === 'true'}
       mintWasOffline={params.mintWasOffline === 'true'}
       onNavigateBack={() => router.back()}
     />

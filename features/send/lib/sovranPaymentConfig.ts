@@ -67,6 +67,7 @@ import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { useSendReachabilityStore } from '@/shared/stores/profile/sendReachabilityStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 
 // =============================================================================
@@ -747,8 +748,9 @@ export function createSovranHandlers({
       });
     },
 
-    sendComplete: async ({ historyEntry, mintWasOffline, recipientPubkey }) => {
+    sendComplete: async ({ historyEntry, createdOffline, mintWasOffline, recipientPubkey }) => {
       paymentLog.info('payment.step.send_complete', {
+        createdOffline: !!createdOffline,
         mintWasOffline: !!mintWasOffline,
         recipientPubkeyPresent: !!recipientPubkey,
       });
@@ -790,11 +792,25 @@ export function createSovranHandlers({
       const enrichedHistoryEntry = recipientPubkey
         ? injectRecipientPubkey(historyEntry, recipientPubkey)
         : historyEntry;
+      if (createdOffline) {
+        try {
+          const entry = JSON.parse(enrichedHistoryEntry) as { id?: unknown; mintUrl?: unknown };
+          if (typeof entry.id === 'string' && typeof entry.mintUrl === 'string') {
+            useSendReachabilityStore.getState().markChecking(entry.id, entry.mintUrl);
+            useSendReachabilityStore.getState().pruneOld();
+          }
+        } catch (e) {
+          paymentLog.warn('payment.send_complete.reachability_seed_failed', {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',
         params: {
           sendHistoryEntry: enrichedHistoryEntry,
+          ...(createdOffline ? { createdOffline: 'true' } : {}),
           ...(mintWasOffline ? { mintWasOffline: 'true' } : {}),
         },
       });

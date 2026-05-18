@@ -6,7 +6,7 @@
  * only renders UI and wires buttons.
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
@@ -33,18 +33,26 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { fetchMintInfo } from '@/shared/lib/apiClient';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
-import { shouldShowMintOfflineWarning } from '../lib/sendTokenWarning';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import {
+  useSendReachability,
+  useSendReachabilityStore,
+} from '@/shared/stores/profile/sendReachabilityStore';
+import { getSendTokenReachabilityWarning } from '../lib/sendTokenWarning';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
+  createdOffline?: boolean;
   mintWasOffline?: boolean;
   onNavigateBack: () => void;
 }
 
 export function SendTokenScreen({
   sendHistoryEntry,
+  createdOffline,
   mintWasOffline,
   onNavigateBack,
 }: SendTokenScreenProps) {
@@ -55,6 +63,56 @@ export function SendTokenScreen({
   );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
+  const { isOffline } = useOfflineStatus();
+  const transactionId = typeof entry?.id === 'string' ? entry.id : undefined;
+  const reachability = useSendReachability(transactionId);
+
+  useEffect(() => {
+    const shouldTrackReachability = createdOffline === true || !!reachability;
+    if (!shouldTrackReachability || !transactionId || !mintUrl) return;
+
+    const store = useSendReachabilityStore.getState();
+    const current = store.byTransactionId[transactionId];
+    let currentStatus = current?.status;
+    if (!current) {
+      store.markChecking(transactionId, mintUrl);
+      currentStatus = 'checking';
+    }
+
+    if (isOffline) {
+      if (currentStatus !== 'device-offline') {
+        store.markDeviceOffline(transactionId, mintUrl);
+      }
+      return;
+    }
+
+    if (currentStatus === 'mint-reachable' || currentStatus === 'mint-unreachable') {
+      return;
+    }
+
+    let cancelled = false;
+    if (currentStatus !== 'checking') {
+      store.markChecking(transactionId, mintUrl);
+    }
+    void fetchMintInfo(mintUrl, { timeoutMs: 1500 })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.isOk()) {
+          store.markMintReachable(transactionId, mintUrl);
+        } else {
+          store.markMintUnreachable(transactionId, mintUrl);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          store.markMintUnreachable(transactionId, mintUrl);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [createdOffline, isOffline, mintUrl, reachability, transactionId]);
 
   // NOTE: All hook calls must run on every render. Early returns for
   // error / loading states live below these hooks to respect the Rules of
@@ -107,9 +165,14 @@ export function SendTokenScreen({
     state: entry.state,
     amount: entry.amount,
     unit: entry.unit,
+    createdOffline,
     mintWasOffline,
+    reachabilityStatus: reachability?.status,
   });
-  const showMintOfflineWarning = shouldShowMintOfflineWarning(entry, mintWasOffline);
+  const reachabilityWarning = getSendTokenReachabilityWarning(entry, {
+    mintWasOffline,
+    reachabilityStatus: reachability?.status,
+  });
 
   const bottomButtons = (
     <BottomButtons>
@@ -230,14 +293,11 @@ export function SendTokenScreen({
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
 
-          {showMintOfflineWarning && (
+          {reachabilityWarning && (
             <Alert status="warning" className="bg-surface-secondary">
               <Alert.Content>
-                <Alert.Title>Mint was offline</Alert.Title>
-                <Alert.Description>
-                  This token was created offline. The recipient may have trouble redeeming it until
-                  the mint is back online.
-                </Alert.Description>
+                <Alert.Title>{reachabilityWarning.title}</Alert.Title>
+                <Alert.Description>{reachabilityWarning.description}</Alert.Description>
               </Alert.Content>
             </Alert>
           )}
