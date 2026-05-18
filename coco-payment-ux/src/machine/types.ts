@@ -920,7 +920,7 @@ export interface PaymentMachine {
     recipientProfile?: RecipientProfile;
   }) => Promise<void>;
   /** Start a receive lightning flow. Opens amount screen for mint quote. */
-  startReceiveLightning: () => Promise<void>;
+  startReceiveLightning: (opts?: { reset?: boolean }) => Promise<void>;
   /** Open the receive hub screen (Lightning address, P2PK). */
   startReceive: (opts?: { reset?: boolean }) => Promise<void>;
   /**

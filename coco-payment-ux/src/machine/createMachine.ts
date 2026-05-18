@@ -186,6 +186,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   let stepData: StepDataMap[FlowStep] = idleData;
   let handlerExecuting = false;
   let sendLocked = false;
+  let flowGeneration = 0;
   // Per-call result holders for `confirmPaymentRequest`. Each invocation
   // pushes its own holder before awaiting `send`; the CONFIRM_PAYMENT_REQUEST
   // handler snapshots and drains holders right after acquiring `sendLocked`,
@@ -202,13 +203,27 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   let cachedSnapshot: ExecutionState = deriveExecutionState('idle', idleData);
 
   function resetInternal() {
+    flowGeneration += 1;
     flowCtx = { unit: getUnit?.() ?? configUnit };
     setStep('idle', {});
     handlerExecuting = false;
+    sendLocked = false;
     processedRef = false;
+    pendingPaymentRequestConfirms = [];
     if (createURDecoder) {
       urDecoder = createURDecoder();
     }
+  }
+
+  function isStaleGeneration(generation: number, op: string): boolean {
+    if (generation === flowGeneration) return false;
+    logger.info('machine.stale_result.ignored', {
+      op,
+      generation,
+      currentGeneration: flowGeneration,
+      currentStep: step,
+    });
+    return true;
   }
 
   const notify = () => {
@@ -437,6 +452,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       return;
     }
     sendLocked = true;
+    const sendGeneration = flowGeneration;
     logger.info('machine.event.received', { type: event.type, currentStep: step });
 
     // Handle CONFIRM_MELT/CONFIRM_PAYMENT_REQUEST directly — these bypass transition().
@@ -492,6 +508,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
       try {
         const result = await operations.executeMelt(data.mintUrl, data.meltTarget, data.amount, data.unit);
+        if (isStaleGeneration(sendGeneration, 'executeMelt')) return;
         logger.info('machine.melt.success', { mintUrl: data.mintUrl });
 
         const parsed = parseHistoryEntryOnce(result.historyEntry);
@@ -528,10 +545,12 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
         setStep('navigateToMeltPreview', { ...data, historyEntry: result.historyEntry });
       } catch (err) {
+        if (isStaleGeneration(sendGeneration, 'executeMelt.catch')) return;
         logger.warn('machine.melt.failed', { error: errField(err) });
         routeOperationFailure(err, 'melt', data.meltTarget, data);
       }
 
+      if (isStaleGeneration(sendGeneration, 'executeMelt.finalize')) return;
       handlerExecuting = false;
       notify();
 
@@ -545,7 +564,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           notify();
         }
       } finally {
-        sendLocked = false;
+        if (!isStaleGeneration(sendGeneration, 'confirmMelt.unlock')) {
+          sendLocked = false;
+        }
       }
       return;
     }
@@ -579,6 +600,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
       try {
         const result = await operations.executePaymentRequest(data.mintUrl, data.paymentRequest, data.amount, data.unit);
+        if (isStaleGeneration(sendGeneration, 'executePaymentRequest')) return;
 
         if (result.rolledBack) {
           // Delivery failed but ecash was reclaimed — route through standard
@@ -628,11 +650,13 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           setStep('navigateToPaymentRequest', { ...data, historyEntry: result.historyEntry });
         }
       } catch (err) {
+        if (isStaleGeneration(sendGeneration, 'executePaymentRequest.catch')) return;
         logger.warn('machine.paymentRequest.failed', { error: errField(err) });
         settle(false);
         routeOperationFailure(err, 'paymentRequest', data.paymentRequest, data);
       }
 
+      if (isStaleGeneration(sendGeneration, 'executePaymentRequest.finalize')) return;
       handlerExecuting = false;
       notify();
 
@@ -645,7 +669,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           notify();
         }
       } finally {
-        sendLocked = false;
+        if (!isStaleGeneration(sendGeneration, 'confirmPaymentRequest.unlock')) {
+          sendLocked = false;
+        }
       }
       return;
     }
@@ -809,10 +835,13 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           let nfcSendResult: { token: string; historyEntry: string; operationId: string } | null = null;
           try {
             nfcSendResult = await operations.executeNfcSend(data.mintUrl, data.amount);
+            if (isStaleGeneration(sendGeneration, 'executeNfcSend')) return;
 
             void notifications?.onNfcPaymentProgress?.({ phase: 'writing' });
             await nfcAdapter.writeToken(nfcSendResult.token);
+            if (isStaleGeneration(sendGeneration, 'nfc.writeToken')) return;
             await nfcAdapter.releaseSession();
+            if (isStaleGeneration(sendGeneration, 'nfc.releaseSession')) return;
 
             const parsed = parseHistoryEntryOnce(nfcSendResult.historyEntry);
             // Link transaction for scan history provenance
@@ -846,6 +875,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               recipientProfile: flowCtx.recipientProfile,
             });
           } catch (err) {
+            if (isStaleGeneration(sendGeneration, 'executeNfcSend.catch')) return;
             // Write-back or send failed — rollback if token was created
             let rolledBack = false;
             if (nfcSendResult && operations.rollbackSend) {
@@ -887,6 +917,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         notify();
         try {
           const result = await operations.executeSend(data.mintUrl, data.amount);
+          if (isStaleGeneration(sendGeneration, 'executeSend')) return;
           logger.info('machine.send.success');
           setStep('sendComplete', {
             historyEntry: result.historyEntry,
@@ -907,6 +938,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             });
           }
         } catch (err) {
+          if (isStaleGeneration(sendGeneration, 'executeSend.catch')) return;
           const walletCtx = getContext();
           const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
           let handled = false;
@@ -922,6 +954,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             if (composition.exactMatch) {
               try {
                 const result = await operations.executeOfflineSend(data.mintUrl, data.amount);
+                if (isStaleGeneration(sendGeneration, 'executeOfflineSend')) return;
                 logger.info('machine.send.offlineFallback.success');
                 setStep('sendComplete', {
                   historyEntry: result.historyEntry,
@@ -945,6 +978,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
                 handled = true;
               } catch (e) {
+                if (isStaleGeneration(sendGeneration, 'executeOfflineSend.catch')) return;
                 logger.warn('machine.send.offlineFallback.failed', { error: errField(e) });
               }
             }
@@ -1003,7 +1037,13 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         handlerExecuting = true;
         notify();
         try {
+          if (getOffline?.() ?? false) {
+            const error = new Error(t('MINT_UNREACHABLE', getLocale?.() ?? 'en'));
+            error.name = 'MintFetchError';
+            throw error;
+          }
           const result = await operations.executeMintQuote(data.mintUrl, data.amount, data.unit);
+          if (isStaleGeneration(sendGeneration, 'executeMintQuote')) return;
           logger.info('machine.createMintQuote.success');
           setStep('mintQuoteCreated', { historyEntry: result.historyEntry, unit: data.unit });
 
@@ -1020,6 +1060,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             });
           }
         } catch (err) {
+          if (isStaleGeneration(sendGeneration, 'executeMintQuote.catch')) return;
           logger.warn('machine.createMintQuote.failed', { error: errField(err) });
           const mintUnreachable = isMintOfflineError(err);
           setStep('error', {
@@ -1038,10 +1079,12 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         notify();
         try {
           const items = await operations.buildMintListItems(data);
+          if (isStaleGeneration(sendGeneration, 'buildMintListItems')) return;
           // Fresh ref so useSyncExternalStore consumers (and any details-keyed
           // useMemo) see the enrichment instead of reusing the stale snapshot.
           setStep('selectMint', { ...data, mintListItems: items });
         } catch (err) {
+          if (isStaleGeneration(sendGeneration, 'buildMintListItems.catch')) return;
           setStep('error', {
             code: 'UNSUPPORTED_INPUT',
             message:
@@ -1071,12 +1114,14 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       notify();
       try {
         const info = await operations.buildMintReviewInfo(mintUrl);
+        if (isStaleGeneration(sendGeneration, 'buildMintReviewInfo')) return;
         if (reviewStep === 'reviewMint') {
           setStep('reviewMint', { ...(reviewData as StepDataMap['reviewMint']), mintInfo: info });
         } else {
           setStep('openMint', { ...(reviewData as StepDataMap['openMint']), mintInfo: info });
         }
       } catch (err) {
+        if (isStaleGeneration(sendGeneration, 'buildMintReviewInfo.catch')) return;
         setStep('error', {
           code: 'UNSUPPORTED_INPUT',
           message:
@@ -1094,7 +1139,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       notify();
       try {
         await operations.trustMint(reviewMintData.mintUrl);
+        if (isStaleGeneration(sendGeneration, 'trustMint')) return;
       } catch (err) {
+        if (isStaleGeneration(sendGeneration, 'trustMint.catch')) return;
         setStep('error', {
           code: 'UNSUPPORTED_INPUT',
           message:
@@ -1122,7 +1169,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
     try {
       await dispatchHandler(step, stepData);
+      if (isStaleGeneration(sendGeneration, 'dispatchHandler')) return;
     } finally {
+      if (isStaleGeneration(sendGeneration, 'dispatchHandler.finally')) return;
       if (trackExecuting) {
         handlerExecuting = false;
       }
@@ -1133,6 +1182,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     } catch (err) {
       // Safety net: release sendLocked so the machine doesn't permanently lock
       // if transition() or an operation throws before the inner finally runs.
+      if (isStaleGeneration(sendGeneration, 'machine.transition.safetyNet')) return;
       logger.warn('machine.transition.safetyNet', { error: errField(err) });
       sendLocked = false;
       handlerExecuting = false;
@@ -1289,7 +1339,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     });
   };
 
-  const startReceiveLightning = () => send({ type: 'START_RECEIVE_LIGHTNING' });
+  const startReceiveLightning = (opts?: { reset?: boolean }) => {
+    if (opts?.reset) resetInternal();
+    return send({ type: 'START_RECEIVE_LIGHTNING' });
+  };
   const startReceive = (opts?: { reset?: boolean }) => {
     if (opts?.reset) resetInternal();
     return send({ type: 'START_RECEIVE' });

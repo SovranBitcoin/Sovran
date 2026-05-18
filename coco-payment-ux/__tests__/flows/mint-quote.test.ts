@@ -35,6 +35,31 @@ import { createTestMachine, runScenario } from '../_harness';
 import { WALLETS, MINT1, MINT2 } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+function mintQuoteResult(id: string) {
+  return {
+    historyEntry: JSON.stringify({
+      id,
+      type: 'mint',
+      createdAt: 1,
+      mintUrl: MINT1,
+      unit: 'sat',
+      quoteId: id,
+      state: 'UNPAID',
+      amount: 1000,
+      paymentRequest: `lnbc-${id}`,
+      metadata: { operationId: id },
+    }),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // startReceiveLightning — direct entry
 // ---------------------------------------------------------------------------
@@ -146,6 +171,84 @@ describe('mint quote — executeMintQuote operation', () => {
     expect(opCall).toBeDefined();
     expect(opCall!.args[0]).toBe(MINT1); // mintUrl
     expect(opCall!.args[1]).toBe(1000); // amount
+  });
+
+  it('does not call executeMintQuote while the device is offline', async () => {
+    const tm = createTestMachine({ offline: true });
+
+    await tm.machine.startReceiveLightning();
+    await tm.machine.enterAmount(1000, MINT1);
+
+    tm.assertStep('error');
+    tm.assertExecution({ code: 'MINT_QUOTE_FAILED' });
+    expect(tm.operationCalls.find((c) => c.name === 'executeMintQuote')).toBeUndefined();
+  });
+});
+
+describe('mint quote — hung operation recovery', () => {
+  it('startReceive({ reset: true }) recovers while executeMintQuote is still pending', async () => {
+    const pendingQuote = deferred<ReturnType<typeof mintQuoteResult>>();
+    const tm = createTestMachine({
+      operations: {
+        executeMintQuote: async () => pendingQuote.promise,
+      },
+    });
+
+    await tm.machine.startReceiveLightning();
+    const blockedNext = tm.machine.enterAmount(1000, MINT1);
+    expect(tm.operationCalls.find((c) => c.name === 'executeMintQuote')).toBeDefined();
+
+    await tm.machine.startReceive({ reset: true });
+    tm.assertStep('navigateToReceive');
+
+    pendingQuote.resolve(mintQuoteResult('late-receive'));
+    await blockedNext;
+
+    tm.assertStep('navigateToReceive');
+  });
+
+  it('startSendEcash({ reset: true }) recovers while executeMintQuote is still pending', async () => {
+    const pendingQuote = deferred<ReturnType<typeof mintQuoteResult>>();
+    const tm = createTestMachine({
+      operations: {
+        executeMintQuote: async () => pendingQuote.promise,
+      },
+    });
+
+    await tm.machine.startReceiveLightning();
+    const blockedNext = tm.machine.enterAmount(1000, MINT1);
+
+    await tm.machine.startSendEcash({ reset: true });
+    tm.assertStep('enterAmount');
+    tm.assertContext({ destination: 'sendEcash' });
+
+    pendingQuote.resolve(mintQuoteResult('late-send'));
+    await blockedNext;
+
+    tm.assertStep('enterAmount');
+    tm.assertContext({ destination: 'sendEcash' });
+  });
+
+  it('startReceiveLightning({ reset: true }) recovers while executeMintQuote is still pending', async () => {
+    const pendingQuote = deferred<ReturnType<typeof mintQuoteResult>>();
+    const tm = createTestMachine({
+      operations: {
+        executeMintQuote: async () => pendingQuote.promise,
+      },
+    });
+
+    await tm.machine.startReceiveLightning();
+    const blockedNext = tm.machine.enterAmount(1000, MINT1);
+
+    await tm.machine.startReceiveLightning({ reset: true });
+    tm.assertStep('enterAmount');
+    tm.assertContext({ destination: 'mintQuote' });
+
+    pendingQuote.resolve(mintQuoteResult('late-fixed-amount'));
+    await blockedNext;
+
+    tm.assertStep('enterAmount');
+    tm.assertContext({ destination: 'mintQuote' });
   });
 });
 

@@ -7,6 +7,10 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
+import {
+  resolveOfflineReachability,
+  type OfflineReachabilityResult,
+} from '@/shared/lib/offlineReachability';
 
 initLog('Module', 'OfflineProvider loaded');
 
@@ -50,8 +54,19 @@ function getIosCornerRadius(frameWidth: number, frameHeight: number): number {
   return longEdge >= 850 ? 55 : 47.33;
 }
 
-function isOfflineFromState(state: Network.NetworkState): boolean {
-  return state.isConnected === false || state.isInternetReachable === false;
+function summarizeReachability(result: OfflineReachabilityResult) {
+  const successfulProbe = result.probes.find((probe) => probe.ok);
+  const lastProbe = result.probes.at(-1);
+  return {
+    reachabilityReason: result.reason,
+    probeStatus: result.probes.length === 0 ? 'skipped' : result.isOffline ? 'failed' : 'success',
+    probeHost: successfulProbe?.host ?? lastProbe?.host,
+    probeName: successfulProbe?.name ?? lastProbe?.name,
+    probeStatusCode: successfulProbe?.status ?? lastProbe?.status,
+    probeError: lastProbe?.ok ? undefined : lastProbe?.error,
+    probeCount: result.probes.length,
+    probeDurationMs: result.probes.reduce((total, probe) => total + probe.durationMs, 0),
+  };
 }
 
 // Context-only provider. Mount above any consumer that needs to react to live
@@ -70,29 +85,41 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
     let interval: ReturnType<typeof setInterval> | null = null;
     let networkSubscription: { remove: () => void } | null = null;
     let lastOffline: boolean | null = null;
+    let lastCheckId = 0;
 
-    const applyState = (state: Network.NetworkState) => {
-      if (!mounted) return;
-      const nowOffline = isOfflineFromState(state);
-      // Only log when state actually changes to reduce noise
-      if (lastOffline !== nowOffline) {
-        log.debug('provider.offline.network_state', {
-          isConnected: state.isConnected,
-          isInternetReachable: state.isInternetReachable,
-          type: state.type,
-          resolvedOffline: nowOffline,
-        });
-        lastOffline = nowOffline;
-      }
-      setNetworkOffline((prev) => {
-        if (prev !== nowOffline) {
-          log.info('provider.offline.transition', {
-            from: prev ? 'offline' : 'online',
-            to: nowOffline ? 'offline' : 'online',
+    const applyState = async (state: Network.NetworkState) => {
+      const checkId = ++lastCheckId;
+      try {
+        const reachability = await resolveOfflineReachability(state);
+        if (!mounted || checkId !== lastCheckId) return;
+        const nowOffline = reachability.isOffline;
+        const reachabilityLog = summarizeReachability(reachability);
+        // Only log when state actually changes to reduce noise.
+        if (lastOffline !== nowOffline) {
+          log.debug('provider.offline.network_state', {
+            isConnected: state.isConnected,
+            isInternetReachable: state.isInternetReachable,
+            type: state.type,
+            resolvedOffline: nowOffline,
+            ...reachabilityLog,
           });
+          lastOffline = nowOffline;
         }
-        return nowOffline;
-      });
+        setNetworkOffline((prev) => {
+          if (prev !== nowOffline) {
+            log.info('provider.offline.transition', {
+              from: prev ? 'offline' : 'online',
+              to: nowOffline ? 'offline' : 'online',
+              ...reachabilityLog,
+            });
+          }
+          return nowOffline;
+        });
+      } catch (err) {
+        log.warn('provider.offline.check_failed', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+      }
     };
 
     const runConnectivityCheck = async () => {
@@ -100,7 +127,7 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
       isCheckingRef.current = true;
       try {
         const state = await Network.getNetworkStateAsync();
-        applyState(state);
+        await applyState(state);
       } catch (err) {
         log.warn('provider.offline.check_failed', {
           error: err instanceof Error ? err : new Error(String(err)),
@@ -112,7 +139,9 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
 
     log.debug('provider.offline.init', { pollIntervalMs: CONNECTIVITY_POLL_MS });
     void runConnectivityCheck();
-    networkSubscription = Network.addNetworkStateListener(applyState);
+    networkSubscription = Network.addNetworkStateListener((state) => {
+      void applyState(state);
+    });
     interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
 
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
@@ -124,7 +153,6 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
 
     const onWebOnline = () => {
       log.info('provider.offline.web_event', { event: 'online' });
-      setNetworkOffline(false);
       void runConnectivityCheck();
     };
 

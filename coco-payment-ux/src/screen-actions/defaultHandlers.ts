@@ -392,7 +392,7 @@ export function createDefaultScreenActionHandlers(
 
       fixedAmount: async () => {
         const machine = getMachine();
-        await machine?.startReceiveLightning();
+        await machine?.startReceiveLightning({ reset: true });
       },
 
       scanQr: async (ctx: ScreenActionContext) => {

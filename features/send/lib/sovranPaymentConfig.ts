@@ -29,6 +29,7 @@ import type {
   ReceiveHistoryEntry,
 } from '@cashu/coco-core';
 import {
+  withTimeout,
   type MachineOperations,
   type NotificationHandlerMap,
   type PaymentMachine,
@@ -220,6 +221,8 @@ export function createSovranExecuteReceive(
 // createSovranExecuteMintQuote
 // =============================================================================
 
+const MINT_QUOTE_PREPARE_TIMEOUT_MS = 10_000;
+
 /**
  * Sovran-side override for coco-payment-ux's default `executeMintQuote`.
  *
@@ -267,7 +270,11 @@ export function createSovranExecuteMintQuote(
     }
 
     paymentLog.info('payment.execute_mint_quote.start', { mintUrl, amount });
-    const mintOp = await manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
+    const mintOp = await withTimeout(
+      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+      MINT_QUOTE_PREPARE_TIMEOUT_MS,
+      'executeMintQuote.prepare'
+    );
     paymentLog.info('payment.execute_mint_quote.prepared', {
       operationId: mintOp.id,
       quoteId: mintOp.quoteId,
