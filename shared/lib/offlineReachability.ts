@@ -1,7 +1,7 @@
 import type { NetworkState } from 'expo-network';
 
-export const REACHABILITY_PRIMARY_URL = 'https://api.sovran.money/api/app/latest-version';
-export const REACHABILITY_TIMEOUT_MS = 1500;
+const REACHABILITY_PRIMARY_URL = 'https://api.sovran.money/api/app/latest-version';
+const REACHABILITY_TIMEOUT_MS = 1500;
 
 type NetworkStateForReachability = Pick<
   NetworkState,
@@ -38,7 +38,7 @@ type ResolveOfflineOptions = {
   now?: () => number;
 };
 
-export const DEFAULT_REACHABILITY_PROBES: readonly ReachabilityProbe[] = [
+const DEFAULT_REACHABILITY_PROBES: readonly ReachabilityProbe[] = [
   {
     name: 'sovran-api',
     url: REACHABILITY_PRIMARY_URL,
