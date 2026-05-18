@@ -409,6 +409,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - **Minimum OS:** 16.4
 - **Bundle id:** `com.sovranbitcoin` in production, `com.sovranbitcoin.dev` for development/preview profiles
 - **Widgets:** Bitcoin Pay and Sovran Pay under `targets/widget/`
+- **App size:** 415 MB raw archive at upload, 94 MB bundled on TestFlight
 
 ### Android
 
