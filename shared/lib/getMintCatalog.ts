@@ -1,5 +1,12 @@
 /**
- * Per-mint catalog fetcher with a deterministic source preference.
+ * Per-mint catalog fetcher with a cache-first source preference.
+ *
+ * Existing source caches (audit / KYM / operator profile) are read before
+ * touching the network, so offline mint lists can render the rich data the
+ * wallet has already seen. Online callers use the same API surface: cached
+ * rows return immediately and refreshes write back through the source stores.
+ *
+ * Network refresh preference:
  *
  *   1. **Audit endpoint** (`/cashu/mint/audit`) — preferred because one
  *      response carries both audit aggregates (n_mints / n_melts / n_errors)
@@ -33,6 +40,13 @@ import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
 
+type MintCatalogNetworkMode = 'cache-only' | 'cache-first' | 'network-first';
+
+interface GetMintCatalogOptions {
+  networkMode?: MintCatalogNetworkMode;
+  signal?: AbortSignal;
+}
+
 function isMintInfoObject(value: unknown): value is Record<string, unknown> {
   return (
     typeof value === 'object' &&
@@ -40,6 +54,39 @@ function isMintInfoObject(value: unknown): value is Record<string, unknown> {
     !Array.isArray(value) &&
     Object.keys(value as Record<string, unknown>).length > 0
   );
+}
+
+function hasCatalogFields(entry: MintCatalogEntry): boolean {
+  return Object.values(entry).some((value) => value !== undefined);
+}
+
+function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unknown } {
+  const audit = useAuditMintStore.getState().getCached(mintUrl);
+  const kym = useKYMMintStore.getState().getCached(mintUrl);
+  const profile = useMintProfileStore.getState().getCached(mintUrl);
+
+  const entry: MintCatalogEntry = {};
+  let info: unknown = null;
+
+  if (audit) {
+    const { score } = transformAuditData(audit.auditData);
+    entry.auditScore = score;
+    entry.auditState = audit.auditData.state;
+    entry.auditTotalOps = audit.auditData.n_mints + audit.auditData.n_melts;
+    info = audit.mintInfo;
+  }
+
+  if (kym) {
+    entry.kymScore = kym.score;
+    entry.reviewCount = kym.recommendations.length;
+  }
+
+  if (profile) {
+    entry.contactFollowers = profile.followers;
+    entry.contactReputation = Math.round(profile.reputation);
+  }
+
+  return { entry, info };
 }
 
 async function resolveNostrProfile(
@@ -71,6 +118,7 @@ type MintInfoLookup = (mintUrl: string) => Promise<GetInfoResponse | null>;
 async function fetchEntry(
   mintUrl: string,
   getMintInfo: MintInfoLookup,
+  cached: { entry: MintCatalogEntry; info: unknown },
   signal?: AbortSignal
 ): Promise<MintCatalogEntry> {
   const [auditRes, reviewRes] = await Promise.all([
@@ -78,8 +126,8 @@ async function fetchEntry(
     reviewMint({ mintUrl, signal }).catch(() => null),
   ]);
 
-  const entry: MintCatalogEntry = {};
-  let info: unknown = null;
+  const entry: MintCatalogEntry = { ...cached.entry };
+  let info: unknown = isMintInfoObject(cached.info) ? cached.info : null;
 
   // Audit data + info from the audit endpoint when available …
   if (auditRes && auditRes.isOk()) {
@@ -129,6 +177,39 @@ async function fetchEntry(
   return entry;
 }
 
+function normalizeOptions(options?: AbortSignal | GetMintCatalogOptions): GetMintCatalogOptions {
+  if (!options) return {};
+  if (typeof AbortSignal !== 'undefined' && options instanceof AbortSignal) {
+    return { signal: options };
+  }
+  return options as GetMintCatalogOptions;
+}
+
+async function fetchCatalogEntries(
+  mintUrls: string[],
+  getMintInfo: MintInfoLookup,
+  cachedByUrl: Record<string, { entry: MintCatalogEntry; info: unknown }>,
+  signal?: AbortSignal
+): Promise<Record<string, MintCatalogEntry>> {
+  const entries = await Promise.all(
+    mintUrls.map(async (url) => {
+      const cached = cachedByUrl[url] ?? readCachedEntry(url);
+      const entry = await fetchEntry(url, getMintInfo, cached, signal).catch(() => cached.entry);
+      return [url, entry] as const;
+    })
+  );
+  return Object.fromEntries(entries.filter(([, entry]) => hasCatalogFields(entry)));
+}
+
+function refreshCatalogInBackground(
+  mintUrls: string[],
+  getMintInfo: MintInfoLookup,
+  cachedByUrl: Record<string, { entry: MintCatalogEntry; info: unknown }>,
+  signal?: AbortSignal
+): void {
+  void fetchCatalogEntries(mintUrls, getMintInfo, cachedByUrl, signal).catch(() => {});
+}
+
 /**
  * Pull the catalog for `mintUrls` in parallel. Each mint independently
  * resolves audit / review / Nostr-profile data; failures on any single
@@ -138,11 +219,25 @@ async function fetchEntry(
 export async function getMintCatalog(
   mintUrls: string[],
   getMintInfo: MintInfoLookup,
-  signal?: AbortSignal
+  options?: AbortSignal | GetMintCatalogOptions
 ): Promise<Record<string, MintCatalogEntry>> {
   if (mintUrls.length === 0) return {};
-  const entries = await Promise.all(
-    mintUrls.map(async (url) => [url, await fetchEntry(url, getMintInfo, signal)] as const)
+
+  const { networkMode = 'cache-first', signal } = normalizeOptions(options);
+  const cachedByUrl = Object.fromEntries(mintUrls.map((url) => [url, readCachedEntry(url)]));
+  const cachedCatalog = Object.fromEntries(
+    Object.entries(cachedByUrl)
+      .filter(([, cached]) => hasCatalogFields(cached.entry))
+      .map(([url, cached]) => [url, cached.entry])
   );
-  return Object.fromEntries(entries);
+
+  if (networkMode === 'cache-only') return cachedCatalog;
+
+  if (networkMode === 'cache-first' && Object.keys(cachedCatalog).length > 0) {
+    refreshCatalogInBackground(mintUrls, getMintInfo, cachedByUrl, signal);
+    return cachedCatalog;
+  }
+
+  const freshCatalog = await fetchCatalogEntries(mintUrls, getMintInfo, cachedByUrl, signal);
+  return Object.keys(freshCatalog).length > 0 ? freshCatalog : cachedCatalog;
 }

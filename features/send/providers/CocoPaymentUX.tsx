@@ -131,14 +131,15 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
         getBtcPrice,
         getDisplayCurrency,
         getPreferredMintUrl: () => useMintStore.getState().selectedMint,
-        // Per-mint audit + KYM + operator Nostr profile, with a fallback to
-        // coco's NUT-06 `getMintInfo` for mints that the auditor doesn't
-        // track (e.g. mint.sovran.money is excluded from api.sovran.money).
-        // Awaited inside coco-payment-ux's buildMintListItems so rows reach
-        // the screen with score / audit / followers already set.
+        // Per-mint audit + KYM + operator Nostr profile. Reads existing
+        // source caches first so offline Select Mint rows keep the rich data
+        // the app has already seen; online opens refresh those caches behind
+        // the same API surface.
         fetchMintCatalog: (mintUrls) =>
-          getMintCatalog(mintUrls, (url) =>
-            getCachedMintInfo((u) => manager.mint.getMintInfo(u), url)
+          getMintCatalog(
+            mintUrls,
+            (url) => getCachedMintInfo((u) => manager.mint.getMintInfo(u), url),
+            { networkMode: getOffline() ? 'cache-only' : 'cache-first' }
           ),
         // Per-mint NUT-06 fetcher for the Select Mint list. Routes through the
         // 24h SWR cache so a dead mint can't gate the screen — cached entries

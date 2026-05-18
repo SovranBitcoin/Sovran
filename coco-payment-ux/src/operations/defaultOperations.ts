@@ -34,6 +34,14 @@ import { parseHistoryEntryOnce } from './historyEntry';
 // stay aligned with whatever shape mgr.mint.getMintInfo actually returns.
 type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
 
+function hasMintInfo(value: MintInfo | undefined): value is MintInfo {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Object.keys(value as Record<string, unknown>).length > 0
+  );
+}
+
 // ---------------------------------------------------------------------------
 // History lookup helpers
 // ---------------------------------------------------------------------------
@@ -367,14 +375,19 @@ export function createDefaultOperations(
         Object.entries(balancesByMint).map(([url, snap]) => [url, snap.total])
       );
 
-      // Fetch NUT-06 mint info for each mint in parallel.
-      // getAllTrustedMints() returns stored records without display metadata;
-      // getMintInfo() returns the NUT-06 info with name/icon_url.
+      // Seed from coco's local trusted-mint records first, then refresh via
+      // getMintInfo. Offline or timed-out refreshes must not erase the
+      // locally persisted name/icon/NUT metadata.
       // When the wallet injects `config.fetchMintInfo`, it can route through
       // its own SWR cache + per-mint deadline so a dead mint doesn't gate the
       // whole list.
       const fetchInfo = config.fetchMintInfo ?? ((url: string) => mgr.mint.getMintInfo(url));
       const mintInfoMap = new Map<string, MintInfo>();
+      for (const mint of allTrustedMints) {
+        if (hasMintInfo(mint.mintInfo)) {
+          mintInfoMap.set(mint.mintUrl, mint.mintInfo);
+        }
+      }
       await Promise.all(
         allTrustedMints.map(async (mint) => {
           try {
