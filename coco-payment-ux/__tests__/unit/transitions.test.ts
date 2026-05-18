@@ -477,7 +477,7 @@ describe('transition — AMOUNT_ENTERED', () => {
     expect(result.data).toMatchObject({ mintUrl: MINT1, amount: 200 });
   });
 
-  it('replaces an underfunded ecash send mint with the only sufficient mint', () => {
+  it('opens mint selector when an underfunded ecash send has one sufficient alternate mint', () => {
     const ctx: FlowContext = {
       ...idle,
       destination: 'sendEcash',
@@ -494,9 +494,13 @@ describe('transition — AMOUNT_ENTERED', () => {
       WALLETS.multiMintUnbalanced
     );
 
-    expect(result.step).toBe('confirmSend');
-    expect(result.context.mintUrl).toBe(MINT1);
-    expect(result.data).toMatchObject({ mintUrl: MINT1, amount: 200 });
+    expect(result.step).toBe('selectMint');
+    expect(result.context.mintUrl).toBe(MINT2);
+    expect(result.data).toMatchObject({
+      candidates: [{ mintUrl: MINT1, balance: 5000 }],
+      amount: 200,
+      destination: 'sendEcash',
+    });
   });
 
   it('opens the mint selector for ecash sends when multiple mints can cover the amount', () => {
@@ -542,7 +546,7 @@ describe('transition — AMOUNT_ENTERED', () => {
     });
   });
 
-  it('routes meltQuote amount entry to an error when no mint can cover the amount', () => {
+  it('routes meltQuote amount entry to balance round-down when no online mint can cover the amount', () => {
     const ctx: FlowContext = {
       ...idle,
       destination: 'meltQuote',
@@ -560,13 +564,18 @@ describe('transition — AMOUNT_ENTERED', () => {
       WALLETS.insufficientBalance
     );
 
-    expect(result.step).toBe('error');
+    expect(result.step).toBe('chooseProofs');
     expect(result.context).toMatchObject({
       amount: 9999,
       destination: 'meltQuote',
       meltTarget: 'user@example.com',
     });
-    expect(result.data).toMatchObject({ code: 'NO_BALANCE' });
+    expect(result.data).toMatchObject({
+      suggestions: {
+        roundDown: { amount: 50 },
+        roundUp: null,
+      },
+    });
   });
 
   it('selects a sufficient meltQuote mint when amount entry provides no mintUrl', () => {
@@ -607,7 +616,7 @@ describe('transition — AMOUNT_ENTERED', () => {
     });
   });
 
-  it('revalidates payment requests against supported mints when amount is entered', () => {
+  it('opens the mint selector when a payment request has one sufficient alternate mint', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 5000, [MINT2]: 3000 },
@@ -635,16 +644,17 @@ describe('transition — AMOUNT_ENTERED', () => {
       wallet
     );
 
-    expect(result.step).toBe('navigateToPaymentRequest');
+    expect(result.step).toBe('selectMint');
     expect(result.context).toMatchObject({
-      mintUrl: MINT2,
+      mintUrl: MINT1,
       paymentRequest: 'creq_test',
       supportedMintUrls: [MINT2],
     });
     expect(result.data).toMatchObject({
-      mintUrl: MINT2,
+      candidates: [{ mintUrl: MINT2, balance: 3000 }],
       paymentRequest: 'creq_test',
       amount: 1000,
+      destination: 'paymentRequest',
     });
   });
 

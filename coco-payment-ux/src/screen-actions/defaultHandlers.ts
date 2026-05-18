@@ -15,7 +15,12 @@ import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 
 import { isMintOfflineError } from '../errors';
 import { errField, logger } from '../logger';
-import type { Destination, MachineOperations, PaymentMachine } from '../machine/types';
+import type {
+  AmountEntryDisplayMetadata,
+  Destination,
+  MachineOperations,
+  PaymentMachine,
+} from '../machine/types';
 import { parseHistoryEntryOnce } from '../operations/historyEntry';
 import type { ScreenActionContext, ScreenActionHandlerMap } from './types';
 
@@ -51,6 +56,30 @@ function getString(entry: EntryLike | null | undefined, key: string): string | u
 function getNumber(entry: EntryLike | null | undefined, key: string): number | undefined {
   const v = entry?.[key];
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+}
+
+function getNullableNumber(entry: EntryLike | null | undefined, key: string): number | null {
+  const v = entry?.[key];
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function getNullableString(entry: EntryLike | null | undefined, key: string): string | null {
+  const v = entry?.[key];
+  return typeof v === 'string' ? v : null;
+}
+
+function readAmountEntryDisplay(entry: EntryLike): AmountEntryDisplayMetadata {
+  const inputMode = entry.inputMode === 'fiat' ? 'fiat' : 'sat';
+  return {
+    inputMode,
+    rawInput: getString(entry, 'rawInput') ?? '',
+    fiatCurrency: getNullableString(entry, 'fiatCurrency'),
+    fiatSymbol: getNullableString(entry, 'fiatSymbol'),
+    btcPrice: getNumber(entry, 'btcPrice') ?? 0,
+    displayFiat: getNullableNumber(entry, 'displayFiat'),
+    displaySats: getNumber(entry, 'displaySats') ?? getNumber(entry, 'effectiveSatAmount') ?? 0,
+    autoOptimized: entry.autoOptimized === true,
+  };
 }
 
 function getMetadata(entry: EntryLike | null | undefined): EntryLike | undefined {
@@ -563,6 +592,7 @@ export function createDefaultScreenActionHandlers(
             meltTarget,
             recipientPubkey,
             recipientProfile,
+            amountEntryDisplay: readAmountEntryDisplay(entry),
           });
           logger.info('screenAction.amountEntry.next.resolved');
         } catch (err) {

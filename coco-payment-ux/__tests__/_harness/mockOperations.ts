@@ -140,6 +140,11 @@ export function createMockOperations(
       historyEntry: stubHistoryEntry({ type: 'send' }),
     })),
 
+    // executeOfflineSend: creates an ecash token from exact local proofs.
+    executeOfflineSend: wrap('executeOfflineSend', async (_mintUrl, _amount) => ({
+      historyEntry: stubHistoryEntry({ type: 'send', offline: true }),
+    })),
+
     // executeMintQuote: creates a Lightning invoice via the mint
     executeMintQuote: wrap('executeMintQuote', async (_mintUrl, _amount, _unit) => ({
       historyEntry: stubHistoryEntry({ type: 'mint' }),

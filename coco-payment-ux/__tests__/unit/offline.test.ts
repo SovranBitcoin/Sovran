@@ -54,6 +54,7 @@ import {
   getRoundedFiatMinorUnitForSats,
   getSatRangeForDisplayedFiatMinorUnit,
 } from '../../src/offline';
+import { resolveAmount } from '../../src/amount-actions/resolve';
 
 // ---------------------------------------------------------------------------
 // composeSatoshis — edge cases
@@ -291,6 +292,24 @@ describe('composeFiat', () => {
         result.nearestLowerFiat !== null || result.nearestUpperFiat !== null
       ).toBe(true);
     }
+  });
+});
+
+describe('fiat amount offline optimization', () => {
+  it('submits composable sats inside the fiat rounding window instead of center sats', () => {
+    const result = resolveAmount('fiat', '0.01', 0.01, [20], 100_000_000 / 2100, true);
+
+    expect(result.displayFiat).toBe(0.01);
+    expect(result.displaySats).toBe(20);
+    expect(result.effectiveSatAmount).toBe(20);
+    expect(result.autoOptimized).toBe(true);
+  });
+
+  it('keeps a one-cent amount sendable with only the optimized sats available', () => {
+    const result = resolveAmount('fiat', '0.01', 0.01, [20], 100_000_000 / 2100, true);
+
+    expect(result.effectiveSatAmount).toBe(20);
+    expect(result.canSendOffline).toBe(true);
   });
 });
 

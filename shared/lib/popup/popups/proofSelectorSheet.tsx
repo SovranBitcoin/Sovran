@@ -23,12 +23,41 @@ import type { CustomSheetSharedProps } from '../sheets/types';
 interface SuggestionRowProps {
   text: string;
   icon: string;
-  amount: number;
-  unit: string;
+  display: ProofSuggestionDisplay;
   onPress: () => void;
 }
 
-function SuggestionRow({ text, icon, amount, unit, onPress }: SuggestionRowProps) {
+type ProofSuggestionDisplay =
+  | { kind: 'sat'; amount: number; unit: string }
+  | { kind: 'fiat'; label: string };
+
+export function getProofSuggestionDisplay(
+  amount: number,
+  unit: string,
+  payload: Pick<ActionSheetPayloads['proof-selector'], 'displayMetadata'>
+): ProofSuggestionDisplay {
+  const metadata = payload.displayMetadata;
+  if (metadata?.inputMode !== 'fiat') return { kind: 'sat', amount, unit };
+
+  const fiat =
+    metadata.displaySats === amount && metadata.displayFiat != null
+      ? metadata.displayFiat
+      : metadata.btcPrice > 0
+        ? Math.round((amount / 100_000_000) * metadata.btcPrice * 100) / 100
+        : null;
+
+  if (fiat == null) return { kind: 'sat', amount, unit };
+  return { kind: 'fiat', label: `${metadata.fiatSymbol ?? ''}${fiat.toFixed(2)}` };
+}
+
+export function submitProofSuggestion(
+  machine: ActionSheetPayloads['proof-selector']['machine'],
+  amount: number
+): void {
+  void machine.chooseProofs(amount);
+}
+
+function SuggestionRow({ text, icon, display, onPress }: SuggestionRowProps) {
   return (
     <Menu.Item onPress={onPress}>
       <HStack align="center" gap={10} style={{ flex: 1 }}>
@@ -42,7 +71,18 @@ function SuggestionRow({ text, icon, amount, unit, onPress }: SuggestionRowProps
           </Menu.ItemTitle>
         </View>
         <View>
-          <AmountFormatter amount={amount} unit={unit} size={16} weight="medium" />
+          {display.kind === 'fiat' ? (
+            <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
+              {display.label}
+            </Menu.ItemTitle>
+          ) : (
+            <AmountFormatter
+              amount={display.amount}
+              unit={display.unit}
+              size={16}
+              weight="medium"
+            />
+          )}
         </View>
       </HStack>
     </Menu.Item>
@@ -66,10 +106,9 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
           <SuggestionRow
             text="Round up"
             icon="fluent:arrow-upload-16-filled"
-            amount={suggestions.roundUp.amount}
-            unit={unit}
+            display={getProofSuggestionDisplay(suggestions.roundUp.amount, unit, payload)}
             onPress={() => {
-              void machine.chooseProofs(suggestions.roundUp!.amount);
+              submitProofSuggestion(machine, suggestions.roundUp!.amount);
               close();
             }}
           />
@@ -78,10 +117,9 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
           <SuggestionRow
             text="Round down"
             icon="fluent:arrow-download-16-filled"
-            amount={suggestions.roundDown.amount}
-            unit={unit}
+            display={getProofSuggestionDisplay(suggestions.roundDown.amount, unit, payload)}
             onPress={() => {
-              void machine.chooseProofs(suggestions.roundDown!.amount);
+              submitProofSuggestion(machine, suggestions.roundDown!.amount);
               close();
             }}
           />

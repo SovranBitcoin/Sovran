@@ -51,6 +51,17 @@ export interface RecipientProfile {
   nip05: string | null;
 }
 
+export interface AmountEntryDisplayMetadata {
+  inputMode: 'sat' | 'fiat';
+  rawInput: string;
+  fiatCurrency: string | null;
+  fiatSymbol: string | null;
+  btcPrice: number;
+  displayFiat: number | null;
+  displaySats: number;
+  autoOptimized: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Step Data — typed payload delivered to each handler
 // ---------------------------------------------------------------------------
@@ -105,6 +116,7 @@ export interface StepDataMap {
     recipientProfile?: RecipientProfile;
     unit: string;
     proofAmounts: number[];
+    displayMetadata?: AmountEntryDisplayMetadata;
     suggestions?: {
       roundDown: { amount: number } | null;
       roundUp: { amount: number } | null;
@@ -207,11 +219,12 @@ export interface FlowContext {
    * melt-preview headers without each screen re-running the fetch.
    */
   recipientProfile?: RecipientProfile;
+  amountEntryDisplay?: AmountEntryDisplayMetadata;
   supportedMintUrls?: string[];
   /**
-   * When true, force the proof selector for ecash sends instead of attempting
-   * an online confirmSend. Set from the device offline provider via `getOffline()`
-   * or explicitly via `enterAmount({ offline: true })`.
+   * When true, use local proof routing for ecash sends instead of relying on
+   * an online swap. Exact local composition can still go straight to token
+   * creation; non-exact composition asks the user to choose a nearby amount.
    *
    * Only affects `sendEcash` — melt (lightning) and payment request flows always
    * attempt the operation regardless of offline status because the mint handles
@@ -315,6 +328,7 @@ export type FlowEvent =
       recipientPubkey?: string;
       /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
       recipientProfile?: RecipientProfile;
+      amountEntryDisplay?: AmountEntryDisplayMetadata;
     }
   | {
       type: 'MINT_SELECTED';
@@ -885,7 +899,7 @@ export interface PaymentMachine {
   send: (event: FlowEvent) => Promise<void>;
   /** Process scan/paste/lightning input. Parses and routes to the appropriate flow. */
   execute: (input: string, opts?: { reset?: boolean }) => Promise<void>;
-  /** Submit amount and mint for the current flow. Pass `offline: true` to force proof selection. */
+  /** Submit amount and mint for the current flow. Pass `offline: true` for local proof routing. */
   enterAmount: (
     amount: number,
     mintUrl: string,
@@ -895,6 +909,7 @@ export interface PaymentMachine {
       meltTarget?: string;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
+      amountEntryDisplay?: AmountEntryDisplayMetadata;
     }
   ) => Promise<void>;
   /** User selected one of multiple payment options (e.g. from chooseOption step). */

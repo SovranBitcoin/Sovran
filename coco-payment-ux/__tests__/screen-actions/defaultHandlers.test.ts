@@ -693,6 +693,50 @@ describe('amountEntry default handlers', () => {
         destination: 'sendEcash',
         meltTarget: undefined,
         recipientPubkey: undefined,
+        amountEntryDisplay: {
+          inputMode: 'sat',
+          rawInput: '',
+          fiatCurrency: null,
+          fiatSymbol: null,
+          btcPrice: 0,
+          displayFiat: null,
+          displaySats: 100,
+          autoOptimized: false,
+        },
+      });
+    });
+
+    it('carries amount-entry display metadata to machine.enterAmount', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        effectiveSatAmount: 20,
+        selectedMintUrl: MINT1,
+        destination: 'sendEcash',
+        inputMode: 'fiat',
+        rawInput: '0.01',
+        fiatCurrency: 'usd',
+        fiatSymbol: '$',
+        btcPrice: 47_619,
+        displayFiat: 0.01,
+        displaySats: 20,
+        autoOptimized: true,
+      });
+
+      await mgr.execute('next');
+      expect(machine.enterAmount).toHaveBeenCalledWith(20, MINT1, {
+        destination: 'sendEcash',
+        meltTarget: undefined,
+        recipientPubkey: undefined,
+        amountEntryDisplay: {
+          inputMode: 'fiat',
+          rawInput: '0.01',
+          fiatCurrency: 'usd',
+          fiatSymbol: '$',
+          btcPrice: 47_619,
+          displayFiat: 0.01,
+          displaySats: 20,
+          autoOptimized: true,
+        },
       });
     });
 
@@ -711,6 +755,7 @@ describe('amountEntry default handlers', () => {
         destination: 'sendEcash',
         meltTarget: undefined,
         recipientPubkey,
+        amountEntryDisplay: expect.any(Object),
       });
     });
 
@@ -744,6 +789,7 @@ describe('amountEntry default handlers', () => {
         meltTarget: undefined,
         recipientPubkey: 'b'.repeat(64),
         recipientProfile: ctxProfile,
+        amountEntryDisplay: expect.any(Object),
       });
     });
 
@@ -771,6 +817,7 @@ describe('amountEntry default handlers', () => {
         meltTarget: 'alice@example.com',
         recipientPubkey,
         recipientProfile,
+        amountEntryDisplay: expect.any(Object),
       });
     });
 

@@ -29,8 +29,9 @@
  *   - Change mint mid-flow: requestMintSelector → changeMint → continue
  *   - Non-exact proofs (online): → sendComplete (mint swaps server-side)
  *   - Non-exact proofs (online, send fails): → chooseProofs fallback
- *   - Offline mode: → always chooseProofs (can't swap with mint)
- *   - Insufficient balance: → error or chooseProofs
+ *   - Offline exact proofs: → sendComplete through executeOfflineSend
+ *   - Offline non-exact proofs: → chooseProofs
+ *   - Insufficient balance: → mint selector first, then chooseProofs fallback
  */
 
 import { describe, it, expect } from 'vitest';
@@ -159,17 +160,16 @@ const ECASH_SEND_NO_EXACT_PROOFS: FlowScenario = {
 };
 
 const ECASH_SEND_OFFLINE: FlowScenario = {
-  name: 'ecash send: offline mode always shows proof selector',
-  // When offline, the mint can't swap proofs for us — we MUST compose
-  // from what we have locally. Even with "exact" proof amounts, we show
-  // the proof picker so the user sees what they're sending.
+  name: 'ecash send: offline exact proofs create token without proof selector',
+  // When offline and local proofs can compose the requested amount exactly,
+  // the machine creates the token directly through executeOfflineSend.
   offline: true,
   steps: [
     { type: 'startSendEcash' },
     { type: 'enterAmount', amount: 100, mintUrl: MINT1 },
   ],
   expect: {
-    step: 'chooseProofs',
+    step: 'sendComplete',
   },
 };
 
@@ -198,6 +198,25 @@ describe('ecash send — table-driven scenarios', () => {
  * original entered amount.
  */
 describe('ecash send — proof selection', () => {
+  it('offline + non-exact proofs → chooseProofs', async () => {
+    const tm = createTestMachine({ wallet: WALLETS.noExactProofs, offline: true });
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+
+    tm.assertStep('chooseProofs');
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'chooseProofs',
+      data: {
+        amount: 100,
+        suggestions: {
+          roundDown: { amount: 96 },
+          roundUp: { amount: 104 },
+        },
+      },
+    });
+  });
+
   it('chooseProofs with round-down amount → sendComplete', async () => {
     const tm = createTestMachine({ wallet: WALLETS.noExactProofs, offline: true });
     await tm.machine.startSendEcash();
@@ -223,7 +242,7 @@ describe('ecash send — proof selection', () => {
  * for correction, or show the proof picker.
  */
 describe('ecash send — insufficient balance', () => {
-  it('uses another mint when the preselected mint cannot cover the entered amount', async () => {
+  it('opens mint selector when another mint can cover the entered amount', async () => {
     const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
 
     await tm.machine.startSendEcash();
@@ -232,10 +251,17 @@ describe('ecash send — insufficient balance', () => {
 
     await tm.machine.enterAmount(200, MINT2);
 
-    tm.assertStep('sendComplete');
-    tm.assertContext({ amount: 200, mintUrl: MINT1, destination: 'sendEcash' });
-    const opCall = tm.operationCalls.find((c) => c.name === 'executeSend');
-    expect(opCall?.args).toEqual([MINT1, 200]);
+    tm.assertStep('selectMint');
+    tm.assertContext({ amount: 200, mintUrl: MINT2, destination: 'sendEcash' });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'selectMint',
+      data: {
+        candidates: [{ mintUrl: MINT1, balance: 5000 }],
+        amount: 200,
+        destination: 'sendEcash',
+      },
+    });
   });
 
   it('opens the mint selector when multiple mints can cover the entered amount', async () => {
@@ -285,12 +311,22 @@ describe('ecash send — insufficient balance', () => {
     expect(opCall?.args).toEqual([MINT1, 200]);
   });
 
-  it('routes to error when amount exceeds all mints', async () => {
+  it('shows chooseProofs with a real round-down when amount exceeds all mints', async () => {
     const tm = createTestMachine({ wallet: WALLETS.insufficientBalance });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount(9999, MINT1);
-    tm.assertStep('error');
+    tm.assertStep('chooseProofs');
     tm.assertContext({ amount: 9999, mintUrl: MINT1, destination: 'sendEcash' });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'chooseProofs',
+      data: {
+        suggestions: {
+          roundDown: { amount: 50 },
+          roundUp: null,
+        },
+      },
+    });
   });
 });
 
@@ -323,9 +359,19 @@ describe('ecash send — online executeSend fallback', () => {
     await tm.machine.enterAmount(100, MINT1);
     // executeSend failed, proofs exist with composition options → chooseProofs
     tm.assertStep('chooseProofs');
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'chooseProofs',
+      data: {
+        suggestions: {
+          roundDown: { amount: 96 },
+          roundUp: { amount: 104 },
+        },
+      },
+    });
   });
 
-  it('online + exact proofs + send fails → chooseProofs fallback', async () => {
+  it('online + exact proofs + send fails → error without same-amount fallback', async () => {
     const tm = createTestMachine({
       operations: {
         executeSend: async () => { throw new Error('Mint unreachable'); },
@@ -333,28 +379,27 @@ describe('ecash send — online executeSend fallback', () => {
     });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount(100, MINT1);
-    // executeSend failed, default wallet has exact proofs → chooseProofs with exact match
-    tm.assertStep('chooseProofs');
+    tm.assertStep('error');
   });
 
-  it('offline + exact proofs → chooseProofs (forced offline)', async () => {
+  it('offline + exact proofs → sendComplete through executeOfflineSend', async () => {
     const tm = createTestMachine({ offline: true });
     await tm.machine.startSendEcash();
     await tm.machine.enterAmount(100, MINT1);
-    // Offline: proof selector shown regardless of exact composition
-    tm.assertStep('chooseProofs');
+    tm.assertStep('sendComplete');
+    expect(tm.operationCalls.map((call) => call.name)).toContain('executeOfflineSend');
   });
 
   it('offline flag propagates through startSendEcash flow context', async () => {
     // Simulates mock offline mode: getOffline() returns true from the start.
     // The offline flag should persist through startSendEcash → enterAmount
-    // and trigger the proof selector even with exact proofs.
+    // and still allow an exact local offline token without proof selection.
     const tm = createTestMachine({ offline: true });
     await tm.machine.startSendEcash();
     // Offline flag should already be on the flow context
     tm.assertContext({ offline: true });
     await tm.machine.enterAmount(100, MINT1);
-    tm.assertStep('chooseProofs');
+    tm.assertStep('sendComplete');
     tm.assertContext({ offline: true });
   });
 });

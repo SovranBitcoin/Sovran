@@ -2,12 +2,13 @@ import { defaultDetectors } from '../detectors';
 import { isMintOfflineError } from '../errors';
 import { t } from '../formatting/locales';
 import { errField, logger } from '../logger';
-import { composeSatoshis } from '../offline';
 import { parseHistoryEntryOnce } from '../operations/historyEntry';
+import { buildChooseProofsData, buildProofSuggestions } from './amountFallback';
 import { transition } from './transitions';
 import type { PaymentOption } from '../types';
 import type {
   CreateMachineConfig,
+  AmountEntryDisplayMetadata,
   Destination,
   ExecutionState,
   FlowContext,
@@ -916,6 +917,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         handlerExecuting = true;
         notify();
         try {
+          if ((getOffline?.() ?? false) && operations.executeOfflineSend) {
+            const error = new Error(t('MINT_UNREACHABLE', getLocale?.() ?? 'en'));
+            error.name = 'MintFetchError';
+            throw error;
+          }
           const result = await operations.executeSend(data.mintUrl, data.amount);
           if (isStaleGeneration(sendGeneration, 'executeSend')) return;
           logger.info('machine.send.success');
@@ -950,8 +956,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             proofAmounts.length > 0
           ) {
             logger.info('machine.send.offlineFallback.attempt', { mintUrl: data.mintUrl });
-            const composition = composeSatoshis(proofAmounts, data.amount);
-            if (composition.exactMatch) {
+            const built = buildProofSuggestions(proofAmounts, data.amount);
+            if (built.exactMatch) {
               try {
                 const result = await operations.executeOfflineSend(data.mintUrl, data.amount);
                 if (isStaleGeneration(sendGeneration, 'executeOfflineSend')) return;
@@ -986,30 +992,17 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
           // Phase 2: Proof selector fallback (existing behavior)
           if (!handled && proofAmounts.length > 0) {
-            const composition = composeSatoshis(proofAmounts, data.amount);
-            const hasOptions =
-              composition.exactMatch ||
-              composition.nearestLower != null ||
-              composition.nearestUpper != null;
-            if (hasOptions) {
-              setStep('chooseProofs', {
+            const built = buildProofSuggestions(proofAmounts, data.amount);
+            if (!built.exactMatch && built.hasSuggestion) {
+              const chooseProofsData = buildChooseProofsData({
                 mintUrl: data.mintUrl,
                 amount: data.amount,
                 unit: flowCtx.unit,
                 proofAmounts,
-                suggestions: {
-                  roundDown: composition.exactMatch
-                    ? { amount: data.amount }
-                    : composition.nearestLower != null
-                      ? { amount: composition.nearestLower }
-                      : null,
-                  roundUp: composition.exactMatch
-                    ? null
-                    : composition.nearestUpper != null
-                      ? { amount: composition.nearestUpper }
-                      : null,
-                },
+                suggestions: built.suggestions,
+                ctx: flowCtx,
               });
+              setStep('chooseProofs', chooseProofsData);
               handled = true;
             }
           }
@@ -1307,6 +1300,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       meltTarget?: string;
       recipientPubkey?: string;
       recipientProfile?: RecipientProfile;
+      amountEntryDisplay?: AmountEntryDisplayMetadata;
     }
   ) =>
     send({
@@ -1318,6 +1312,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       meltTarget: opts?.meltTarget,
       recipientPubkey: opts?.recipientPubkey,
       recipientProfile: opts?.recipientProfile,
+      amountEntryDisplay: opts?.amountEntryDisplay,
     });
 
   const chooseOption = (option: PaymentOption) => send({ type: 'OPTION_CHOSEN', option });

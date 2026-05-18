@@ -1,11 +1,16 @@
 import { resolveIntent } from '../intent';
 import { logger } from '../logger';
-import { composeSatoshis } from '../offline';
 import { parsePaymentInput } from '../parse';
 import { selectMint, getValidMintCandidates } from '../mint-selection';
 import { isValidSatAmount } from '../guards';
 import type { Detectors, WalletContext } from '../types';
 import { resolveNext, toMintError, type StepResult } from './resolveNext';
+import {
+  buildChooseAmountFallback,
+  buildChooseProofsData,
+  buildProofSuggestions,
+  findFullAmountCandidates,
+} from './amountFallback';
 import type { Destination, FlowContext, FlowEvent, FlowStep, RecipientProfile } from './types';
 
 // ---------------------------------------------------------------------------
@@ -165,6 +170,7 @@ function handleAmountEntered(
         meltTarget: event.meltTarget,
         recipientPubkey: event.recipientPubkey,
         recipientProfile: event.recipientProfile,
+        amountEntryDisplay: event.amountEntryDisplay,
       }
     : {
         ...currentCtx,
@@ -175,6 +181,7 @@ function handleAmountEntered(
         meltTarget: event.meltTarget ?? currentCtx.meltTarget,
         recipientPubkey: event.recipientPubkey ?? currentCtx.recipientPubkey,
         recipientProfile: event.recipientProfile ?? currentCtx.recipientProfile,
+        amountEntryDisplay: event.amountEntryDisplay ?? currentCtx.amountEntryDisplay,
       };
 
   if (!ctx.intent) {
@@ -203,6 +210,7 @@ function handleMintSelected(
         mintUrl: event.mintUrl,
         amount: event.amount,
         destination: event.destination,
+        amountEntryDisplay: currentCtx.amountEntryDisplay,
       }
     : {
         ...currentCtx,
@@ -447,8 +455,32 @@ function revalidateMintForAmount(
     allowedMints: ctx.supportedMintUrls,
     minAmount: amount,
   });
+  const fullAmountCandidates = findFullAmountCandidates(walletCtx, amount, ctx.supportedMintUrls);
   switch (selection.type) {
     case 'selected':
+      if (currentMint && selection.mintUrl !== currentMint) {
+        return {
+          kind: 'redirect',
+          result: {
+            step: 'selectMint',
+            context: { ...ctx, destination },
+            data: {
+              candidates:
+                fullAmountCandidates.length > 0
+                  ? fullAmountCandidates
+                  : [{ mintUrl: selection.mintUrl, balance: selection.balance }],
+              supportedMintUrls: ctx.supportedMintUrls,
+              amount,
+              unit: ctx.unit,
+              paymentRequest: ctx.paymentRequest,
+              meltTarget: ctx.meltTarget,
+              recipientPubkey: ctx.recipientPubkey,
+              recipientProfile: ctx.recipientProfile,
+              destination,
+            },
+          },
+        };
+      }
       return { kind: 'ok', mintUrl: selection.mintUrl };
     case 'selectionNeeded':
       return {
@@ -470,6 +502,30 @@ function revalidateMintForAmount(
         },
       };
     case 'noValidMint': {
+      const fallback = buildChooseAmountFallback({
+        walletCtx,
+        ctx: { ...ctx, destination },
+        destination,
+        amount,
+        preferredMintUrl: walletCtx.preferredMintUrl,
+      });
+      if (fallback) {
+        return {
+          kind: 'redirect',
+          result: {
+            step: 'chooseProofs',
+            context: { ...ctx, mintUrl: fallback.mintUrl, destination },
+            data: buildChooseProofsData({
+              mintUrl: fallback.mintUrl,
+              amount,
+              unit: ctx.unit,
+              proofAmounts: fallback.proofAmounts,
+              suggestions: fallback.suggestions,
+              ctx: { ...ctx, mintUrl: fallback.mintUrl, destination },
+            }),
+          },
+        };
+      }
       const err = toMintError(selection.reason);
       return {
         kind: 'redirect',
@@ -547,8 +603,8 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
         },
       };
     }
-    // Melts always attempt the exact amount — the mint handles the swap
-    // server-side. Never show the proof selector for lightning sends.
+    // Melts attempt the exact amount first. If no mint can cover it while
+    // online, revalidation may offer a balance-based round-down amount.
     const revalidated = revalidateMintForAmount(ctx, walletCtx, destination, amount);
     if (revalidated.kind === 'redirect') return revalidated.result;
     return {
@@ -596,30 +652,23 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
       // Online: skip proof selector — the mint handles swaps server-side
       // via executeSend. If executeSend fails, the catch block in
       // createMachine falls back to chooseProofs.
-      // Offline: always show proof selector since the mint is unreachable.
-      const composition = composeSatoshis(proofAmounts, amount);
-      return {
-        step: 'chooseProofs',
-        context: { ...ctx, mintUrl: effectiveMintUrl, destination },
-        data: {
-          mintUrl: effectiveMintUrl,
-          amount,
-          unit,
-          proofAmounts,
-          suggestions: {
-            roundDown: composition.exactMatch
-              ? { amount }
-              : composition.nearestLower != null
-                ? { amount: composition.nearestLower }
-                : null,
-            roundUp: composition.exactMatch
-              ? null
-              : composition.nearestUpper != null
-                ? { amount: composition.nearestUpper }
-                : null,
-          },
-        },
-      };
+      // Offline: exact proofs continue directly; non-exact proofs ask the
+      // user to choose a nearby locally composable amount.
+      const built = buildProofSuggestions(proofAmounts, amount);
+      if (!built.exactMatch && built.hasSuggestion) {
+        return {
+          step: 'chooseProofs',
+          context: { ...ctx, mintUrl: effectiveMintUrl, destination },
+          data: buildChooseProofsData({
+            mintUrl: effectiveMintUrl,
+            amount,
+            unit,
+            proofAmounts,
+            suggestions: built.suggestions,
+            ctx: { ...ctx, mintUrl: effectiveMintUrl, destination },
+          }),
+        };
+      }
     }
   }
 

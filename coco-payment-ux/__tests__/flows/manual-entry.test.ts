@@ -137,7 +137,7 @@ describe('manual entry — startSendEcash', () => {
     });
   });
 
-  it('chat send-money lightning: auto-selects the only mint that can cover the entered amount', async () => {
+  it('chat send-money lightning: opens mint selector when another mint can cover the entered amount', async () => {
     const recipientPubkey = 'c'.repeat(64);
     const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
 
@@ -154,6 +154,30 @@ describe('manual entry — startSendEcash', () => {
       recipientPubkey,
     });
 
+    tm.assertStep('selectMint');
+    tm.assertContext({
+      amount: 200,
+      destination: 'meltQuote',
+      mintUrl: MINT2,
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+    let lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'selectMint',
+      data: {
+        amount: 200,
+        destination: 'meltQuote',
+        meltTarget: 'alice@example.com',
+        recipientPubkey,
+      },
+    });
+    expect((lastHandler.data as { candidates: unknown[] }).candidates).toEqual([
+      { mintUrl: MINT1, balance: 5000 },
+    ]);
+
+    await tm.machine.changeMint(MINT1);
+
     tm.assertStep('navigateToMeltPreview');
     tm.assertContext({
       amount: 200,
@@ -162,7 +186,8 @@ describe('manual entry — startSendEcash', () => {
       meltTarget: 'alice@example.com',
       recipientPubkey,
     });
-    expect(tm.handlerCalls[tm.handlerCalls.length - 1]).toMatchObject({
+    lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
       step: 'navigateToMeltPreview',
       data: {
         mintUrl: MINT1,
