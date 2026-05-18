@@ -7,6 +7,10 @@ import { createSovranHandlers } from '@/features/send/lib/sovranPaymentConfig';
 
 const mockNavigate = jest.fn();
 
+jest.mock('coco-payment-ux', () => ({
+  withTimeout: jest.fn((promise: Promise<unknown>) => promise),
+}));
+
 jest.mock('expo-router', () => ({
   router: {
     navigate: (...args: unknown[]) => mockNavigate(...args),
