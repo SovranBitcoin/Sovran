@@ -7,15 +7,18 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { formatTimestamp, formatCount, formatSats, parseContent } from '../shared';
-import type { ContentSegment } from '../shared';
+import { formatRelative } from '@/shared/lib/date';
+import { formatCount, formatSats } from '../feedFormat';
+import { parseContent } from '../feedParse';
+import type { ContentSegment } from '../feedTypes';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -202,7 +205,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   }, [initialContentExpanded, onConsumedExpand]);
   const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
-  const shortTime = formatTimestamp(event.created_at);
+  const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
 
   const { blocks, showInlineImages } = useMemo(() => {
@@ -241,8 +244,8 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         {/* Author row */}
         <Pressable
           onPress={() => {
-            router.navigate({
-              pathname: '/(user-flow)/profile' as any,
+            router.push({
+              pathname: '/(user-flow)/profile',
               params: { pubkey: event.pubkey },
             });
           }}
@@ -366,7 +369,7 @@ export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBott
 });
 
 /** Options when opening the sheet from the absolute bar. */
-export type ImageOverlayOpenSheetOptions = { expandContent?: boolean };
+type ImageOverlayOpenSheetOptions = { expandContent?: boolean };
 
 /** Absolute overlay bar when sheet is closed: pfp, truncated content, show more, metric buttons. Tapping comment or show more opens the sheet. */
 export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteBar({
@@ -380,7 +383,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   const repostedColor = useThemeColor('success');
   const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
-  const shortTime = formatTimestamp(event.created_at);
+  const shortTime = formatRelative(event.created_at * 1000, 'compact');
   const fullContent = event.content.trim();
   const contentPreview = fullContent.slice(0, 120);
   const contentTruncated = fullContent.length > 120;
@@ -398,8 +401,8 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
       <View style={[styles.wrap, absoluteBarStyles.bar]}>
         <Pressable
           onPress={() => {
-            router.navigate({
-              pathname: '/(user-flow)/profile' as any,
+            router.push({
+              pathname: '/(user-flow)/profile',
               params: { pubkey: event.pubkey },
             });
           }}
@@ -503,7 +506,7 @@ const absoluteBarStyles = StyleSheet.create({
   },
 });
 
-export const styles = StyleSheet.create({
+const styles = StyleSheet.create({
   wrap: {
     paddingHorizontal: BOTTOM_PANEL_PADDING_HORIZONTAL,
     paddingTop: BOTTOM_PANEL_PADDING_TOP,

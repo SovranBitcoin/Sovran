@@ -9,12 +9,12 @@ import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   GestureResponderEvent,
-  Pressable,
   Platform,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Animated, {
   SharedValue,
   useSharedValue,
@@ -35,7 +35,7 @@ import Icon from 'assets/icons';
 import { StoriesContainer } from './StoriesContainer';
 import { StoryProgressBar } from './StoryProgressBar';
 import { easeGradient } from './easeGradient';
-import type { ProfileInfo, VideoPostRecord } from './shared';
+import type { ProfileInfo, VideoPostRecord } from './feedTypes';
 import { Log } from '@/shared/lib/logger';
 
 // ============================================================================

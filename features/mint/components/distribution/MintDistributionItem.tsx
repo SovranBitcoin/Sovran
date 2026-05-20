@@ -6,12 +6,12 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import Icon from 'assets/icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DistributionSlider } from './DistributionSlider';
-import { hexToRgb, useExtractedColors } from './colorUtils';
+import { hexToRgb, useExtractedColors } from '@/shared/lib/colorExtraction';
 import { bpToPercent, TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { extractDomain } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -99,7 +99,6 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
     return {
       background: hexToRgba(accent.base, 0.12),
       border: hexToRgba(accent.border, 0.22) || hexToRgba(accent.base, 0.22),
-      icon: hexToRgba(accent.base, 0.9),
     };
   }, [accent]);
 
@@ -257,29 +256,7 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
         </View>
 
         <HStack gap={8} className="justify-start">
-          <TouchableOpacity
-            onPress={handleMax}
-            disabled={disabled || isAtMax}
-            haptics
-            className="flex-1 rounded-[14px] border px-3.5 py-3"
-            style={{
-              backgroundColor: buttonTint?.background || 'rgba(255,255,255,0.06)',
-              borderColor: buttonTint?.border || 'rgba(255,255,255,0.10)',
-              opacity: disabled || isAtMax ? 0.5 : 1,
-            }}>
-            <HStack align="center" gap={8}>
-              <Icon
-                name="mdi:arrow-collapse-up"
-                size={16}
-                color={buttonTint?.icon || primaryColor50}
-              />
-              <Text size={12} heavy style={{ color: primaryColor50 }}>
-                Max
-              </Text>
-            </HStack>
-          </TouchableOpacity>
-
-          <TouchableOpacity
+          <Pressable
             onPress={handleMin}
             disabled={disabled || isAtMin}
             haptics
@@ -290,16 +267,30 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
               opacity: disabled || isAtMin ? 0.5 : 1,
             }}>
             <HStack align="center" gap={8}>
-              <Icon
-                name="mdi:arrow-collapse-down"
-                size={16}
-                color={buttonTint?.icon || primaryColor50}
-              />
+              <Icon name="mdi:arrow-collapse-down" size={16} color={primaryColor50} />
               <Text size={12} heavy style={{ color: primaryColor50 }}>
                 Min
               </Text>
             </HStack>
-          </TouchableOpacity>
+          </Pressable>
+
+          <Pressable
+            onPress={handleMax}
+            disabled={disabled || isAtMax}
+            haptics
+            className="flex-1 rounded-[14px] border px-3.5 py-3"
+            style={{
+              backgroundColor: buttonTint?.background || 'rgba(255,255,255,0.06)',
+              borderColor: buttonTint?.border || 'rgba(255,255,255,0.10)',
+              opacity: disabled || isAtMax ? 0.5 : 1,
+            }}>
+            <HStack align="center" gap={8}>
+              <Icon name="mdi:arrow-collapse-up" size={16} color={primaryColor50} />
+              <Text size={12} heavy style={{ color: primaryColor50 }}>
+                Max
+              </Text>
+            </HStack>
+          </Pressable>
         </HStack>
       </View>
     </Log>

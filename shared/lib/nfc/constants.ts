@@ -52,3 +52,6 @@ export const STATUS_CODES: Record<string, string> = {
 
 export const MAX_CHUNK_SIZE = 240;
 export const SHORT_RECORD_FLAG = 0x10;
+
+/** Default IANA language tag for NDEF Text records when no override is given. */
+export const NDEF_TEXT_LANG = 'en';

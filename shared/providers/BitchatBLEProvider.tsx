@@ -24,13 +24,17 @@
  */
 
 import React, { useEffect } from 'react';
-import { startBLE } from 'bitchat-module';
+import {
+  addBLEDeliveryStatusListener,
+  addBLEPrivateMessageListener,
+  startBLE,
+} from 'bitchat-module';
+import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
-import { log, initLog, useInitMount } from '@/shared/lib/logger';
+import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
+import { bitchatLog, initLog, useInitMount } from '@/shared/lib/logger';
 
 initLog('Module', 'BitchatBLEProvider loaded');
-
-const bleLog = log.child({ module: 'bitchat' });
 
 /**
  * Invisible component. Mount inside `AccountScopedProviders` (not outer
@@ -40,6 +44,7 @@ const bleLog = log.child({ module: 'bitchat' });
 export function BitchatBLEProvider({ children }: { children: React.ReactNode }) {
   useInitMount('BitchatBLEProvider');
   const nickname = useBitchatNickname();
+  const profileScope = useBitchatProfileScope();
 
   useEffect(() => {
     let cancelled = false;
@@ -48,16 +53,16 @@ export function BitchatBLEProvider({ children }: { children: React.ReactNode }) 
     // we have something to advertise. A missing nickname still starts BLE
     // (upstream bitchat generates one), but we prefer to avoid the
     // re-announce that happens when nickname changes post-start.
-    if (!nickname) return;
+    if (!nickname || !profileScope) return;
 
-    bleLog.info('bitchat.provider.ble_start', { hasNickname: !!nickname });
-    startBLE(nickname)
+    bitchatLog.info('bitchat.provider.ble_start', { hasNickname: !!nickname });
+    startBLE(nickname, profileScope)
       .then(() => {
         if (cancelled) return;
-        bleLog.info('bitchat.provider.ble_started');
+        bitchatLog.info('bitchat.provider.ble_started');
       })
       .catch((err) => {
-        bleLog.error('bitchat.provider.ble_start_failed', {
+        bitchatLog.error('bitchat.provider.ble_start_failed', {
           error: err instanceof Error ? err.message : String(err),
         });
       });
@@ -66,12 +71,50 @@ export function BitchatBLEProvider({ children }: { children: React.ReactNode }) 
       cancelled = true;
       // Deliberately DON'T stopBLE here either. The provider is mounted
       // inside AccountScopedProviders, so it only unmounts on profile
-      // switch — at which point the whole account scope restarts anyway.
-      // Calling stopBLE() during the switch window was causing race
-      // conditions where the new scope re-started BLE before the old
-      // one's stop had settled.
+      // switch. Native `startBLE(nickname, profileScope)` owns the actual
+      // scope transition: a different profileScope stops the old mesh and
+      // recreates it with profile-scoped identity keys/history. Calling an
+      // unconditional stop here would race that explicit handoff.
     };
-  }, [nickname]);
+  }, [nickname, profileScope]);
+
+  // App-wide BLE-DM message + delivery-status listeners. Mounted here (not
+  // on the DM screen) so:
+  //   1. Inbound DMs aren't dropped while the DM screen is closed — they're
+  //      buffered in the store and rendered the next time the user opens it.
+  //   2. Delivery status transitions for in-flight outbound messages keep
+  //      flowing even if the user navigates away mid-send, so the bubble
+  //      reflects the true final state on return.
+  // Independent of `nickname` — once the mesh has started, these listeners
+  // should live for the whole account scope.
+  useEffect(() => {
+    const appendIncoming = useBitchatDmMessagesStore.getState().appendIncoming;
+    const applyDeliveryStatus = useBitchatDmMessagesStore.getState().applyDeliveryStatus;
+
+    bitchatLog.info('bitchat.provider.dm_listeners_mounted');
+
+    const msgSub = addBLEPrivateMessageListener((event) => {
+      bitchatLog.info('bitchat.provider.dm_inbound', {
+        peerID: event.peerID,
+        contentLen: event.content.length,
+        isOwn: event.isOwn,
+      });
+      appendIncoming(event);
+    });
+    const statusSub = addBLEDeliveryStatusListener((event) => {
+      bitchatLog.info('bitchat.provider.dm_status', {
+        messageID: event.messageID,
+        status: event.status,
+        reason: event.reason,
+      });
+      applyDeliveryStatus(event);
+    });
+
+    return () => {
+      msgSub.remove();
+      statusSub.remove();
+    };
+  }, []);
 
   return <>{children}</>;
 }

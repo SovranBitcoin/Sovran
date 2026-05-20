@@ -1,11 +1,11 @@
-import React, { ReactNode, useEffect, useRef, useState } from 'react';
+import React, { ReactNode } from 'react';
 
 import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorage';
 import { runGlobalMigrations } from '@/shared/lib/migrations/globalMigrations';
-import { initLog, log, Log, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
+import { initLog } from '@/shared/lib/logger';
+import { InitializationGate } from '@/shared/blocks/InitializationGate';
 
 initLog('Module', 'GlobalMigrationGate loaded');
-import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 
 interface GlobalMigrationGateProps {
   children: ReactNode;
@@ -13,52 +13,25 @@ interface GlobalMigrationGateProps {
 
 /**
  * Runs all global migrations (profile-scoped key rename, etc.) once at
- * app start, before any AccountScopedProviders mount.
- * Blocks rendering of children until the runner completes.
+ * app start, before any AccountScopedProviders mount. Blocks rendering of
+ * children until the runner completes.
+ *
+ * `signalMigrationsComplete()` opens the profile-scoped storage gate that
+ * Zustand persist waits on. It MUST fire only on success — opening the gate
+ * after a partial migration causes stores to load empty defaults and then
+ * overwrite the migrated data on first write (audit-46 F-001).
  */
 export default function GlobalMigrationGate({ children }: GlobalMigrationGateProps) {
-  useInitMount('GlobalMigrationGate');
-  useLifecycleLogger('GlobalMigrationGate');
-  const stage = useInitializationStage('global-migrations', {
-    message: 'Running global migrations...',
-    blocking: true,
-    dependsOn: ['legacy-redux-bootstrap'],
-  });
-  const [isComplete, setIsComplete] = useState(false);
-  const hasStarted = useRef(false);
-
-  useEffect(() => {
-    if (hasStarted.current) return;
-    hasStarted.current = true;
-
-    const run = async () => {
-      try {
-        stage.log('Running global migrations...');
-        initLog('GlobalMigrationGate', 'starting global migrations');
-        log.info('gate.global_migration.start');
-        await runGlobalMigrations();
-        signalMigrationsComplete();
-        stage.complete();
-        setIsComplete(true);
-        log.info('gate.global_migration.complete');
-        initLog('GlobalMigrationGate', 'global migrations complete');
-      } catch (error) {
-        signalMigrationsComplete();
-        const msg = error instanceof Error ? error.message : 'Global migrations failed';
-        log.error('gate.global_migration.failed', {
-          error: error instanceof Error ? error : new Error(String(error)),
-        });
-        stage.error(msg);
-        setIsComplete(true);
-        initLog('GlobalMigrationGate', `ERROR: ${error}`);
-      }
-    };
-
-    void run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (!isComplete) return null;
-
-  return <Log name="GlobalMigrationGate">{children}</Log>;
+  return (
+    <InitializationGate
+      tag="GlobalMigrationGate"
+      stageId="global-migrations"
+      message="Running global migrations..."
+      dependsOn={['legacy-redux-bootstrap']}
+      logEvent="gate.global_migration"
+      run={runGlobalMigrations}
+      onSuccess={signalMigrationsComplete}>
+      {children}
+    </InitializationGate>
+  );
 }

@@ -1,42 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NDKEvent, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { paymentLog } from '@/shared/lib/logger';
+import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
-import {
-  getCachedUnwrap,
-  hydrateGiftWrapCache,
-  putUnwrap,
-} from '@/shared/lib/nostr/giftWrapCache';
+import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { decryptNip04Events } from '../lib/decryptNip04Events';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { getMockContacts, MOCK_ALLOWED_PUBKEYS_HEX } from '@/shared/stores/runtime/mockDataStore';
 
-/** Pre-computed hex pubkeys — avoids runtime nip19.decode() on every mount */
-const DEFAULT_CONTACTS = [
-  {
-    pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
-    label: 'Sovran',
-  },
-  {
-    pubkey: 'c673ff0b5f228feb0abb1001882178d4c588bc4e50f857173544b5543b454f81',
-    label: 'kelbie',
-  },
-];
+const DEFAULT_CONTACTS = [{ pubkey: PUBLIC_KEYS.SUPPORT, label: 'Sovran' }] as const;
 
 interface NostrKeys {
   pubkey?: string;
   privateKey?: Uint8Array;
 }
 
-export function useRecentContacts(nostrKeys: NostrKeys | null) {
-  const defaultContactPubkeys = useMemo(
-    () =>
-      DEFAULT_CONTACTS.map((contact) => ({
-        pubkey: contact.pubkey,
-        label: contact.label,
-      })),
-    []
-  );
+export interface RecentContact {
+  type: 'contact';
+  pubkey: string;
+  dmEvent: NDKEvent | { content: string } | null | undefined;
+  nip17Content: string | undefined;
+  timestamp: number;
+  isDefault?: boolean;
+}
 
+export function useRecentContacts(nostrKeys: NostrKeys | null) {
+  const mockMode = useSettingsStore((s) => s.mockMode);
   // NIP-04 DM subscription
   const dmFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
@@ -60,13 +50,26 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
   // active. The cache hydrates from AsyncStorage in the background — by
   // the time `unwrappedDMs` runs (after the first relay tick), most or
   // all entries are in memory, so the loop below short-circuits to
-  // `getCachedUnwrap` for previously-seen wraps and only pays the
+  // `giftWrapCache.cache.get` for previously-seen wraps and only pays the
   // secp256k1 ECDH cost on genuinely new wraps.
   useEffect(() => {
     if (nostrKeys?.pubkey) {
-      void hydrateGiftWrapCache(nostrKeys.pubkey);
+      void giftWrapCache.cache.hydrate(nostrKeys.pubkey);
     }
   }, [nostrKeys?.pubkey]);
+
+  // NDK's useSubscribe returns a fresh `giftWrapEvents` array reference on
+  // every relay flush even when no new wraps arrived. Key the unwrap memo on
+  // the sorted id-set so the loop below does not re-run (and re-emit the
+  // unwrap_pass log) on unchanged relay output.
+  const giftWrapEventsKey = useMemo(
+    () =>
+      giftWrapEvents
+        ?.map((e) => e.id)
+        .sort()
+        .join(',') ?? '',
+    [giftWrapEvents]
+  );
 
   const unwrappedDMs = useMemo(() => {
     const privateKey = nostrKeys?.privateKey;
@@ -80,15 +83,12 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
     const out = giftWrapEvents
       .map((event) => {
         // L1 hit: skip the two NIP-44 decrypts entirely.
-        const cached = getCachedUnwrap(recipientPubkey, event.id);
+        const cached = giftWrapCache.cache.get(recipientPubkey, event.id);
         if (cached) {
           cacheHits++;
           return { ...cached, wrapId: event.id };
         }
-        const fresh = unwrapGiftWrap(
-          { content: event.content, pubkey: event.pubkey },
-          privateKey
-        );
+        const fresh = unwrapGiftWrap({ content: event.content, pubkey: event.pubkey }, privateKey);
         if (!fresh) {
           failed++;
           return null;
@@ -96,7 +96,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
         // Persist for the next session — the same wraps will keep
         // arriving from relays on every `useSubscribe`, and we don't
         // want to pay the unwrap cost again next launch.
-        putUnwrap(recipientPubkey, event.id, fresh);
+        giftWrapCache.cache.put(recipientPubkey, event.id, fresh);
         unwrapped++;
         return { ...fresh, wrapId: event.id };
       })
@@ -123,9 +123,22 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       duration_ms: Math.round((performance.now() - t0) * 100) / 100,
     });
     return out;
-  }, [giftWrapEvents, nostrKeys?.privateKey, nostrKeys?.pubkey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giftWrapEventsKey, nostrKeys?.privateKey, nostrKeys?.pubkey]);
 
-  const [decryptedContacts, setDecryptedContacts] = useState<any[]>([]);
+  const [decryptedContacts, setDecryptedContacts] = useState<RecentContact[]>([]);
+
+  // NIP-04 NDK subscription churns its array reference on every relay flush
+  // too. Same id-set key trick as giftWrapEventsKey — keeps the contact-map
+  // build (and the downstream decrypt) from re-running per flush.
+  const dmEventsKey = useMemo(
+    () =>
+      dmEvents
+        ?.map((e) => e.id)
+        .sort()
+        .join(',') ?? '',
+    [dmEvents]
+  );
 
   // Build recent activity contacts from NIP-04 and NIP-17 events
   const recentActivityContacts = useMemo(() => {
@@ -161,11 +174,11 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       }
     });
 
-    const contacts = Array.from(contactMap.entries())
+    const contacts: RecentContact[] = Array.from(contactMap.entries())
       .map(([pubkey, entry]) => ({
-        type: 'contact',
+        type: 'contact' as const,
         pubkey,
-        dmEvent: entry.type === 'nip04' ? entry.event : null,
+        dmEvent: entry.type === 'nip04' ? (entry.event ?? null) : null,
         nip17Content: entry.type === 'nip17' ? entry.dm?.content : undefined,
         timestamp: entry.timestamp,
       }))
@@ -177,25 +190,26 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       nip17Events: unwrappedDMs.length,
     });
     return contacts;
-  }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dmEventsKey, unwrappedDMs, nostrKeys?.pubkey]);
 
   // Merge default contacts with recent activity contacts
-  const contactsWithDefaults = useMemo(() => {
+  const contactsWithDefaults = useMemo<RecentContact[]>(() => {
     const existingPubkeys = new Set(recentActivityContacts.map((c) => c.pubkey));
 
-    const defaultsToAdd = defaultContactPubkeys
-      .filter((dc) => !existingPubkeys.has(dc.pubkey))
-      .map((dc) => ({
-        type: 'contact' as const,
-        pubkey: dc.pubkey,
-        dmEvent: null,
-        nip17Content: undefined as string | undefined,
-        timestamp: 0,
-        isDefault: true,
-      }));
+    const defaultsToAdd: RecentContact[] = DEFAULT_CONTACTS.filter(
+      (dc) => !existingPubkeys.has(dc.pubkey)
+    ).map((dc) => ({
+      type: 'contact',
+      pubkey: dc.pubkey,
+      dmEvent: null,
+      nip17Content: undefined,
+      timestamp: 0,
+      isDefault: true,
+    }));
 
     return [...recentActivityContacts, ...defaultsToAdd];
-  }, [recentActivityContacts, defaultContactPubkeys]);
+  }, [recentActivityContacts]);
 
   // Decrypt contact DM events
   useEffect(() => {
@@ -242,20 +256,20 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       }
     };
 
-    run();
+    void run();
     return () => {
       cancelled = true;
     };
   }, [contactsWithDefaults, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
   // Overlay decrypted message content per-pubkey when available
-  const displayContacts = useMemo(() => {
-    const decryptedByPubkey = new Map<string, any>();
+  const displayContacts = useMemo<RecentContact[]>(() => {
+    const decryptedByPubkey = new Map<string, RecentContact>();
     decryptedContacts.forEach((c) => {
       if (c.pubkey) decryptedByPubkey.set(c.pubkey, c);
     });
 
-    return contactsWithDefaults.map((c) => {
+    const base = contactsWithDefaults.map((c) => {
       const decrypted = decryptedByPubkey.get(c.pubkey);
       if (decrypted) return decrypted;
       return {
@@ -263,12 +277,43 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
         dmEvent: c.nip17Content !== undefined ? { content: c.nip17Content } : undefined,
       };
     });
-  }, [decryptedContacts, contactsWithDefaults]);
 
-  const contactPubkeys = useMemo(
-    () => contactsWithDefaults.map((c) => c.pubkey).filter(Boolean),
-    [contactsWithDefaults]
-  );
+    if (!mockMode) return base;
+    // Mocks sort to the top via their fresh timestamps; defaults
+    // (timestamp 0) stay at the bottom. Real contacts are deduped against
+    // mocks by pubkey — a real DM from a mock pubkey wins so the demo
+    // doesn't mask actual history if any happens to exist.
+    //
+    // Allowlisted pubkeys are seeded as default-style rows so they always
+    // surface in the Contacts list even with no DM history. They are NOT
+    // injected with mock metadata or mock threads (`mockDataStore` excludes
+    // them from `EFFECTIVE_MOCK_CONTACTS`) so the row renders with real
+    // kind-0 metadata fetched from relays.
+    const mocks = getMockContacts();
+    const realKeys = new Set(base.map((c) => c.pubkey));
+    const allowlistRows: RecentContact[] = [...MOCK_ALLOWED_PUBKEYS_HEX]
+      .filter((pk) => !realKeys.has(pk))
+      .map((pk) => ({
+        type: 'contact',
+        pubkey: pk,
+        dmEvent: null,
+        nip17Content: undefined,
+        timestamp: 0,
+        isDefault: true,
+      }));
+    return [...mocks.filter((m) => !realKeys.has(m.pubkey)), ...allowlistRows, ...base];
+  }, [decryptedContacts, contactsWithDefaults, mockMode]);
+
+  const contactPubkeys = useMemo(() => {
+    const base = contactsWithDefaults.map((c) => c.pubkey).filter(Boolean);
+    if (!mockMode) return base;
+    const seen = new Set(base);
+    for (const m of getMockContacts()) if (!seen.has(m.pubkey)) base.push(m.pubkey);
+    // Allowlisted pubkeys also need to be in the kind-0 batched fetch so
+    // the row gets real metadata.
+    for (const pk of MOCK_ALLOWED_PUBKEYS_HEX) if (!seen.has(pk)) base.push(pk);
+    return base;
+  }, [contactsWithDefaults, mockMode]);
 
   return { displayContacts, contactPubkeys, dmEvents };
 }

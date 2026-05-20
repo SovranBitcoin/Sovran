@@ -5,13 +5,13 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
-import * as Linking from 'expo-linking';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
+import { z } from 'zod';
 
 import Icon from 'assets/icons';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -21,33 +21,18 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBTCMapStore, BTCMapPlaceDetails } from '@/shared/stores/global/btcMapStore';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { getMarkerColor } from '@/shared/lib/map/categories';
+import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
+import { isAbortError } from '@/shared/lib/apiClient';
+import { openExternalUrl } from '@/shared/lib/url';
+import { staticPopup } from '@/shared/lib/popup';
+import { formatDate } from '@/shared/lib/date';
 
-const CATEGORIES: Record<string, { icons: string[] }> = {
-  food: { icons: ['local_cafe', 'lunch_dining', 'restaurant', 'bakery_dining'] },
-  retail: { icons: ['storefront', 'local_grocery_store', 'computer', 'diamond'] },
-  atm: { icons: ['local_atm', 'currency_exchange'] },
-  accommodation: { icons: ['hotel', 'spa'] },
-  services: {
-    icons: [
-      'medical_services',
-      'local_pharmacy',
-      'content_cut',
-      'car_repair',
-      'fitness_center',
-      'business',
-    ],
-  },
-};
-
-function getMarkerColor(icon: string): string {
-  if (CATEGORIES.food.icons.includes(icon)) return '#FF6B6B';
-  if (CATEGORIES.retail.icons.includes(icon)) return '#4ECDC4';
-  if (CATEGORIES.atm.icons.includes(icon)) return '#F7931A';
-  if (CATEGORIES.accommodation.icons.includes(icon)) return '#9B59B6';
-  if (CATEGORIES.services.icons.includes(icon)) return '#3498DB';
-  return '#6366f1';
-}
+const ParamsSchema = z.object({
+  placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
+});
 
 export function MerchantDetailScreen() {
   useLifecycleLogger('MerchantDetailScreen');
@@ -59,7 +44,8 @@ export function MerchantDetailScreen() {
     'background',
   ] as const);
   const insets = useSafeAreaInsets();
-  const { placeId } = useLocalSearchParams<{ placeId: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'map-flow.detail' });
+  const placeId = params?.placeId;
   const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore(
     useShallow((s) => ({
       fetchPlaceDetails: s.fetchPlaceDetails,
@@ -71,6 +57,8 @@ export function MerchantDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const loadDetails = async () => {
       if (!placeId) {
         setIsLoading(false);
@@ -91,16 +79,19 @@ export function MerchantDetailScreen() {
       }
 
       try {
-        const details = await fetchPlaceDetails(id);
+        const details = await fetchPlaceDetails(id, false, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         setPlace(details);
       } catch (err) {
+        if (isAbortError(err)) return;
         log.error('map.merchant.fetch_failed', { error: err });
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
-    loadDetails();
+    void loadDetails();
+    return () => controller.abort();
   }, [placeId, fetchPlaceDetails, getCachedPlaceDetails]);
 
   useEffect(() => {
@@ -109,17 +100,28 @@ export function MerchantDetailScreen() {
     }
   }, [place?.name, navigation]);
 
-  const handleOpenURL = useCallback((url: string) => {
-    Linking.openURL(url);
+  const handleOpenURL = useCallback(async (url: string) => {
+    const result = await openExternalUrl(url);
+    if (result.isErr()) {
+      log.warn('map.merchant.open_link.failed', { url, reason: result.error.type });
+      staticPopup('open-link-failed');
+    }
   }, []);
 
-  const handleCall = useCallback((phone: string) => {
-    Linking.openURL(`tel:${phone}`);
-  }, []);
+  const handleCall = useCallback(
+    async (phone: string) => {
+      // Strip everything but digits and a leading + so user-supplied formatting
+      // (spaces, dashes, parens) doesn't fail URL parsing.
+      const sanitized = phone.replace(/[^\d+]/g, '');
+      await handleOpenURL(`tel:${sanitized}`);
+    },
+    [handleOpenURL]
+  );
 
-  const handleEmail = useCallback((email: string) => {
-    Linking.openURL(`mailto:${email}`);
-  }, []);
+  const handleEmail = useCallback(
+    async (email: string) => handleOpenURL(`mailto:${email.trim()}`),
+    [handleOpenURL]
+  );
 
   const supportsOnchain = place?.['osm:payment:onchain'] === 'yes';
   const supportsLightning = place?.['osm:payment:lightning'] === 'yes';
@@ -131,13 +133,7 @@ export function MerchantDetailScreen() {
   const instagram = place?.['osm:contact:instagram'] || place?.instagram;
   const twitter = place?.['osm:contact:twitter'] || place?.twitter;
 
-  const verifiedDate = place?.verified_at
-    ? new Date(place.verified_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
-    : null;
+  const verifiedDate = place?.verified_at ? formatDate(place.verified_at, 'short-date') : null;
 
   const contactItems = useMemo(() => {
     const items: { method: string; info: string; icon: string; fullInfo?: string }[] = [];
@@ -158,20 +154,20 @@ export function MerchantDetailScreen() {
     (method: string, info: string, fullInfo?: string) => {
       switch (method) {
         case 'phone':
-          handleCall(info);
+          void handleCall(info);
           break;
         case 'website':
           const url = fullInfo || info;
-          handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
+          void handleOpenURL(url.startsWith('http') ? url : `https://${url}`);
           break;
         case 'email':
-          handleEmail(info);
+          void handleEmail(info);
           break;
         case 'instagram':
-          handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
+          void handleOpenURL(`https://instagram.com/${info.replace('@', '')}`);
           break;
         case 'twitter':
-          handleOpenURL(`https://x.com/${info.replace('@', '')}`);
+          void handleOpenURL(`https://x.com/${info.replace('@', '')}`);
           break;
       }
     },
@@ -180,32 +176,32 @@ export function MerchantDetailScreen() {
 
   if (isLoading) {
     return (
-      <Screen name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F7931A" />
+          <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   if (!place) {
     return (
-      <Screen name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.loadingContainer}>
           <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
           <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
             No merchant data available
           </Text>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   return (
-    <Screen name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={{
@@ -243,7 +239,7 @@ export function MerchantDetailScreen() {
               {supportsOnchain && (
                 <ListGroup.Item>
                   <ListGroup.ItemPrefix>
-                    <Icon name="mdi:bitcoin" size={20} color="#F7931A" />
+                    <Icon name="mdi:bitcoin" size={20} color={BITCOIN_ACCENT} />
                   </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
                     <ListGroup.ItemTitle>On-chain</ListGroup.ItemTitle>
@@ -256,7 +252,7 @@ export function MerchantDetailScreen() {
               {supportsLightning && (
                 <ListGroup.Item>
                   <ListGroup.ItemPrefix>
-                    <Icon name="mingcute:lightning-fill" size={20} color="#F7931A" />
+                    <Icon name="mingcute:lightning-fill" size={20} color={BITCOIN_ACCENT} />
                   </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
                     <ListGroup.ItemTitle>Lightning</ListGroup.ItemTitle>
@@ -269,7 +265,7 @@ export function MerchantDetailScreen() {
               {supportsContactless && (
                 <ListGroup.Item>
                   <ListGroup.ItemPrefix>
-                    <Icon name="ph:contactless-payment-fill" size={20} color="#F7931A" />
+                    <Icon name="ph:contactless-payment-fill" size={20} color={BITCOIN_ACCENT} />
                   </ListGroup.ItemPrefix>
                   <ListGroup.ItemContent>
                     <ListGroup.ItemTitle>Contactless</ListGroup.ItemTitle>
@@ -343,11 +339,11 @@ export function MerchantDetailScreen() {
 
         <View style={styles.sourceInfo}>
           <Text size={11} style={{ color: defaultColor, textAlign: 'center' }}>
-            Data from BTCMap.org • Last updated {new Date(place.updated_at).toLocaleDateString()}
+            Data from BTCMap.org • Last updated {formatDate(place.updated_at, 'short-date')}
           </Text>
         </View>
       </ScrollView>
-    </Screen>
+    </Log>
   );
 }
 

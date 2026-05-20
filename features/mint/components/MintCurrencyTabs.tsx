@@ -13,7 +13,7 @@ import Animated, {
   Extrapolation,
   SharedValue,
 } from 'react-native-reanimated';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { cashuLog, Log } from '@/shared/lib/logger';
@@ -184,7 +184,7 @@ function AnimatedCurrencyTab({
   };
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+    <Pressable onPress={onPress} activeOpacity={0.7}>
       <Animated.View
         className="rounded-2xl"
         style={[
@@ -201,7 +201,7 @@ function AnimatedCurrencyTab({
           </Animated.Text>
         </Animated.View>
       </Animated.View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

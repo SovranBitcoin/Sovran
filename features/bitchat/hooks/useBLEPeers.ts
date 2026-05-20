@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { getBLEPeers, addBLEPeerListener, type BLEPeer } from 'bitchat-module';
 
-export interface UseBLEPeersResult {
+interface UseBLEPeersResult {
   peers: BLEPeer[];
   connectedCount: number;
   refresh: () => void;
@@ -42,7 +42,7 @@ export function useBLEPeers(): UseBLEPeersResult {
     };
   }, [refresh]);
 
-  const connectedCount = peers.filter((p) => p.isConnected).length;
+  const connectedCount = useMemo(() => peers.filter((p) => p.isConnected).length, [peers]);
 
   return { peers, connectedCount, refresh };
 }

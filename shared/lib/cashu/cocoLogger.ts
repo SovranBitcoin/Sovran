@@ -49,7 +49,7 @@ function eventKey(message: string): string {
     .slice(0, 50);
 }
 
-export class CocoLogger implements Logger {
+export class CocoCoreLogger implements Logger {
   /** Dot-joined module chain, e.g. "manager.MintService.RequestRateLimiter" */
   private modulePath: string;
   /** Sticky bindings from child() — mintUrl, operationId, etc. */
@@ -97,6 +97,6 @@ export class CocoLogger implements Logger {
     const { module: _, ...rest } = newBindings;
     const mergedBindings = { ...this.bindings, ...rest };
 
-    return new CocoLogger(nextPath, mergedBindings);
+    return new CocoCoreLogger(nextPath, mergedBindings);
   }
 }

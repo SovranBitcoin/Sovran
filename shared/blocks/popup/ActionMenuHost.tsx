@@ -6,7 +6,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable } from 'react-native';
+import { LayoutChangeEvent } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu } from 'heroui-native';
 import {
@@ -21,24 +22,23 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-
-const hostLog = log.child({ module: 'actionMenuHost' });
-import {
-  SectionAnchorList,
-  type AnchorSection,
-} from '@/shared/ui/composed/SectionAnchorList';
+import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import {
   dismissActionMenuPopup,
   useActionMenuPayload,
-  type ActionMenuButton,
+  type ActionMenuItem,
   type ActionMenuInput,
   type ActionMenuPrimaryAction,
   type ActionMenuSection,
 } from '@/shared/lib/popup/popups/actionMenu';
 import Icon from 'assets/icons';
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+
+const hostLog = log.child({ module: 'actionMenuHost' });
 
 function buildInitialValues(inputs: ActionMenuInput[] | undefined): Record<string, string> {
   if (!inputs) return {};
@@ -290,7 +290,7 @@ export function ActionMenuHost() {
     if (!picked && onDismiss) onDismiss();
   }, []);
 
-  const handleItemPress = useCallback((button: ActionMenuButton): void => {
+  const handleItemPress = useCallback((button: ActionMenuItem): void => {
     if (button.disabled || button.isFailed) return;
     selectedRef.current = true;
     if (button.keepOpen) {
@@ -301,7 +301,7 @@ export function ActionMenuHost() {
     void button.onPress?.(() => dismissActionMenuPopup());
   }, []);
 
-  const handlePrimaryPress = useCallback(
+  const handlePrimaryPressInner = useCallback(
     async (action: ActionMenuPrimaryAction): Promise<void> => {
       if (isSubmitting) return;
       setError(null);
@@ -320,6 +320,13 @@ export function ActionMenuHost() {
     },
     [inputValues, isSubmitting]
   );
+
+  // `isSubmitting` is React state — a rapid double-tap on the primary
+  // action button (Import-Nsec, Claim Username, etc.) lands twice into
+  // `action.onPress` and dispatches duplicate side-effects (two profile
+  // imports, two `storeImportedNsec` writes). The synchronous ref guard
+  // closes the window before the second call enters.
+  const handlePrimaryPress = useSingleFlight(handlePrimaryPressInner);
 
   // Defaults-merged input values — when a chained payload introduces
   // new input keys (e.g. profile-switcher → "Import Nostr" with `nsec`),
@@ -369,7 +376,7 @@ export function ActionMenuHost() {
     payload?.snapPoint ??
     (useSections ? '60%' : payload?.footerButtons?.length ? '60%' : hasFooter ? '40%' : undefined);
 
-  const renderActionButton = (button: ActionMenuButton, key: React.Key): React.ReactNode => {
+  const renderActionButton = (button: ActionMenuItem, key: React.Key): React.ReactNode => {
     const isDisabled = button.disabled === true || button.isFailed === true;
     const isDanger = button.variant === 'dangerous' || button.isFailed === true;
     const descriptionText = button.isFailed
@@ -377,25 +384,33 @@ export function ActionMenuHost() {
       : isDisabled
         ? button.reason
         : button.description;
+    const item = (
+      <Menu.Item
+        testID={button.testID}
+        isDisabled={isDisabled}
+        variant={isDanger ? 'danger' : 'default'}
+        onPress={() => handleItemPress(button)}>
+        <HStack align="center" gap={10} style={{ flex: 1 }}>
+          {button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
+          <View style={{ flex: 1 }}>
+            <Menu.ItemTitle>{button.text}</Menu.ItemTitle>
+            {descriptionText ? (
+              <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
+            ) : null}
+          </View>
+          {button.suffix ? <View>{button.suffix}</View> : null}
+        </HStack>
+      </Menu.Item>
+    );
     return (
       <React.Fragment key={key}>
         {button.separator ? <View className="bg-foreground/10 mx-3 my-1 h-px" /> : null}
-        <Menu.Item
-          testID={button.testID}
-          isDisabled={isDisabled}
-          variant={isDanger ? 'danger' : 'default'}
-          onPress={() => handleItemPress(button)}>
-          <HStack align="center" gap={10} style={{ flex: 1 }}>
-            {button.iconNode ?? (button.icon ? <Icon name={button.icon} size={20} /> : null)}
-            <View style={{ flex: 1 }}>
-              <Menu.ItemTitle>{button.text}</Menu.ItemTitle>
-              {descriptionText ? (
-                <Menu.ItemDescription>{descriptionText}</Menu.ItemDescription>
-              ) : null}
-            </View>
-            {button.suffix ? <View>{button.suffix}</View> : null}
-          </HStack>
-        </Menu.Item>
+        {/* heroui's `variant="danger"` only tints the title/description text; a
+            failed payment row needs the whole row red so it reads "tried,
+            broke" at a glance instead of competing visually with neighbouring
+            "Recommended" items. The description prefix ("Failed: ...") stays
+            for screen readers — colour alone is not an accessibility signal. */}
+        {button.isFailed ? <View className="bg-danger/10 mx-1 rounded-2xl">{item}</View> : item}
       </React.Fragment>
     );
   };
@@ -457,7 +472,7 @@ export function ActionMenuHost() {
     </>
   ) : null;
 
-  // Map ActionMenuSection[] → AnchorSection<ActionMenuButton>[] for
+  // Map ActionMenuSection[] → AnchorSection<ActionMenuItem>[] for
   // SectionAnchorList. Two shapes:
   //   - Sections with `buttons` use the standard data + renderItem
   //     path so each profile row virtualizes individually (LegendList
@@ -466,7 +481,7 @@ export function ActionMenuHost() {
   //   - Sections with `renderBody` (custom non-button content, e.g.
   //     emoji grids when this lane is used for them) render through
   //     `renderHeader` with empty `data` — same as before.
-  const sectionsForList = useMemo<AnchorSection<ActionMenuButton>[]>(() => {
+  const sectionsForList = useMemo<AnchorSection<ActionMenuItem>[]>(() => {
     const list = payload?.sections;
     if (!list?.length) return [];
     return list.map((section: ActionMenuSection) => {
@@ -474,7 +489,7 @@ export function ActionMenuHost() {
         return {
           id: section.id,
           anchor: section.anchor,
-          data: [] as ActionMenuButton[],
+          data: [] as ActionMenuItem[],
           renderHeader: () => section.renderBody!(),
         };
       }
@@ -555,7 +570,7 @@ export function ActionMenuHost() {
        * which uses FWO and works fine — see `actionSheetTypes.ts`.
        */}
       <Menu.Portal disableFullWindowOverlay>
-        <Menu.Overlay />
+        <MenuScrim />
         <Menu.Content
           presentation="bottom-sheet"
           // `interactive` lifts the sheet by the keyboard height — works with
@@ -624,9 +639,9 @@ export function ActionMenuHost() {
             // background. `contentBottomInset` clears the gorhom
             // `BottomSheetFooter` slot so the last row isn't hidden
             // beneath sticky footer buttons.
-            <SectionAnchorList<ActionMenuButton>
+            <SectionAnchorList<ActionMenuItem>
               sections={sectionsForList}
-              // Each section's `data` is its `ActionMenuButton[]` (see
+              // Each section's `data` is its `ActionMenuItem[]` (see
               // `sectionsForList`); we render one Menu.Item per button.
               // LegendList virtualizes the row stream so even a long
               // profile list (or future >100-item picker) only mounts
@@ -634,9 +649,7 @@ export function ActionMenuHost() {
               renderItem={(button, sectionId) =>
                 renderActionButton(button, `${sectionId}-${button.testID ?? button.text}`)
               }
-              keyExtractor={(button, sectionId) =>
-                `${sectionId}-${button.testID ?? button.text}`
-              }
+              keyExtractor={(button, sectionId) => `${sectionId}-${button.testID ?? button.text}`}
               // Profile rows are ~58px (avatar 36 + paddingVertical from
               // Menu.Item). 60 is a safe estimate that overshoots
               // slightly so LegendList doesn't under-allocate the

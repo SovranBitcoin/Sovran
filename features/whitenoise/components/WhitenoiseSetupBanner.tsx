@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
+import { zIndex } from '@/shared/styles/tokens';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
-import { useWhitenoise } from '../WhitenoiseProvider';
-import { MarmotIcon } from './MarmotIcon';
+import { useWhitenoise } from '../WhitenoiseContext';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import Icon from 'assets/icons';
 
 /**
  * Floating call-to-action card that nudges the user to publish key
@@ -32,12 +35,12 @@ import { MarmotIcon } from './MarmotIcon';
  */
 const TAB_BAR_HEIGHT_ESTIMATE = Platform.select({ ios: 49, android: 56, default: 56 });
 const FLOAT_GAP = 12;
-// PaymentStatusIcon's `confirmed` animation runs ~1200ms (circle draw
-// 1000ms → checkmark stroke 200ms). Start the dismiss right as the
-// stroke finishes — staring at a fully-drawn check for an extra 300ms
-// felt slow, and overlapping the tail-end of the stroke with the slide
-// reads as one continuous beat instead of two pauses.
-const SUCCESS_HOLD_MS = 1200;
+// LoadingIndicator's `done` choreography runs ~T_FILL+T_ICON+D_ICON_IN
+// (~1.4s end-to-end). Start the dismiss right as the glyph finishes —
+// staring at a fully-drawn check for an extra 300ms felt slow, and
+// overlapping the tail-end of the draw with the slide reads as one
+// continuous beat instead of two pauses.
+const SUCCESS_HOLD_MS = 1400;
 
 type Phase = 'idle' | 'running' | 'success' | 'gone';
 
@@ -60,6 +63,7 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
   const insets = useSafeAreaInsets();
   const { isReady, isLoading, isBootstrapping, bootstrap } = useWhitenoiseSetup();
   const { client } = useWhitenoise();
+  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
 
   const [phase, setPhase] = useState<Phase>('idle');
 
@@ -69,19 +73,27 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
     if (phase === 'gone' && !isReady) setPhase('idle');
   }, [isReady, phase]);
 
+  // Hold the green check for a beat, then dismiss. Owned by an effect so
+  // unmount (profile switch, tab change) clears the timer instead of
+  // firing setPhase on a dead component.
+  useEffect(() => {
+    if (phase !== 'success') return;
+    const id = setTimeout(() => setPhase('gone'), SUCCESS_HOLD_MS);
+    return () => clearTimeout(id);
+  }, [phase]);
+
   const onPress = useCallback(async () => {
     if (phase !== 'idle') return;
     setPhase('running');
     await bootstrap();
     setPhase('success');
-    // Hold the green check for a beat, then dismiss.
-    setTimeout(() => setPhase('gone'), SUCCESS_HOLD_MS);
   }, [phase, bootstrap]);
 
   // Render gates — idle state hides when there's nothing to set up.
   // Once the user starts, we keep rendering through the full sequence
   // even if upstream `isReady` flips during the animation.
   const shouldRenderCard = (() => {
+    if (!whitenoiseEnabled) return false;
     if (phase === 'gone') return false;
     if (phase !== 'idle') return true;
     if (!pathname.includes('/contacts')) return false;
@@ -120,36 +132,24 @@ function BannerCard({
   isBootstrapping: boolean;
   testID?: string;
 }) {
-  const [
-    surface,
-    foreground,
-    foregroundSecondary,
-    accent,
-    iconBg,
-    separator,
-  ] = useThemeColor([
+  const [surface, foreground, foregroundSecondary, accent, iconBg, separator] = useThemeColor([
     'surface-secondary',
     'foreground',
     'surface-secondary-foreground',
     'accent',
     // One shade darker than the card (`surface-secondary`) but not as
     // deep as `background`. In heroui's token scale this is the base
-    // surface — gives the chipmunk a subtle inset without going pitch-
-    // black on dark mode.
+    // surface — gives the marmot glyph a subtle inset without going
+    // pitch-black on dark mode.
     'surface',
     'separator-secondary',
   ] as const);
 
   const isInteractive = phase === 'idle';
-  // PaymentStatusIcon's `pending` is the spinning ring; `confirmed` runs
-  // the draw-circle + checkmark stroke. Same animation the restore screen
-  // and the payment toast pop use, so the affordance reads identically.
-  const statusIconState =
-    phase === 'running' || isBootstrapping
-      ? 'pending'
-      : phase === 'success'
-        ? 'confirmed'
-        : null;
+  // Same LoadingIndicator the restore screen and the payment toast use,
+  // so the affordance reads identically across the app.
+  const indicatorPhase: 'loading' | 'done' | null =
+    phase === 'running' || isBootstrapping ? 'loading' : phase === 'success' ? 'done' : null;
 
   return (
     <Pressable
@@ -165,7 +165,7 @@ function BannerCard({
       ]}>
       <View style={styles.body}>
         <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-          <MarmotIcon size={32} />
+          <Icon name="internal:whitenoise" size={32} />
         </View>
         <View style={styles.copy}>
           <Text size={16} bold style={{ color: foreground }} numberOfLines={1}>
@@ -175,15 +175,15 @@ function BannerCard({
             size={13}
             style={{ color: foregroundSecondary, lineHeight: 18, marginTop: 2 }}
             numberOfLines={3}>
-            Publish your encryption keys so contacts can start
-            MLS-encrypted DMs and group chats with you.
+            Publish your encryption keys so contacts can start MLS-encrypted DMs and group chats
+            with you.
           </Text>
         </View>
       </View>
       <View style={[styles.divider, { backgroundColor: separator }]} />
       <View style={styles.actionRow}>
-        {statusIconState ? (
-          <PaymentStatusIcon size={26} status={statusIconState} />
+        {indicatorPhase ? (
+          <LoadingIndicator size={26} phase={indicatorPhase} result="success" />
         ) : (
           <Text size={15} bold style={{ color: accent }}>
             Set up
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    zIndex: 10,
+    zIndex: zIndex.sticky,
     elevation: 10,
   },
   cardWrap: {

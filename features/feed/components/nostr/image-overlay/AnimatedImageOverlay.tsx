@@ -4,7 +4,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   type GestureType,
   Gesture,
@@ -16,7 +17,6 @@ import Animated, {
   cancelAnimation,
   Easing,
   interpolate,
-  runOnJS,
   useAnimatedProps,
   useAnimatedReaction,
   useAnimatedStyle,
@@ -24,10 +24,11 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { scheduleOnUI } from 'react-native-worklets';
+import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -35,6 +36,7 @@ import type { ImageOverlayContextValue } from './types';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './provider';
 import { MemoizedMediaPagerPage } from './MediaPagerPage';
 import { OverlayDot } from './PagerDots';
+import { duration, zIndex } from '@/shared/styles/tokens';
 import {
   ImageOverlayBottomPanelContent,
   ImageOverlayBottomPanelReply,
@@ -126,8 +128,6 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     closeTargetHeight,
     blurIntensity,
     closeBtnOpacity,
-    expandedWidth,
-    expandedHeight,
     expandedWidthSv,
     expandedHeightSv,
     panelHeightSv,
@@ -136,6 +136,9 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     openReplace,
     openToCenter,
   } = ctx;
+  /** Image viewport: full width, screen height minus top inset (matches provider's imageViewportHeight). */
+  const expandedWidth = screenWidth;
+  const expandedHeight = screenHeight - insets.top;
 
   const hasMultipleMedia = activeUrls.length > 1;
   const maxPagerIndex = Math.max(0, activeUrls.length - 1);
@@ -187,7 +190,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     if (!activeOverlayPost) setSheetOpen(false);
   }, [activeOverlayPost]);
 
-  /** Sync sheetOpen with panel height; only runOnJS when threshold crosses to avoid 60fps setState during animation. */
+  /** Sync sheetOpen with panel height; only schedule to JS when threshold crosses to avoid 60fps setState during animation. */
   const setSheetOpenFromReaction = useCallback((open: boolean) => {
     setSheetOpen(open);
   }, []);
@@ -195,7 +198,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     () => panelHeightSv.value > 10,
     (isOpen, wasOpen) => {
       if (wasOpen !== undefined && isOpen !== wasOpen) {
-        runOnJS(setSheetOpenFromReaction)(isOpen);
+        scheduleOnRN(setSheetOpenFromReaction, isOpen);
       }
     },
     [setSheetOpenFromReaction, panelHeightSv]
@@ -204,13 +207,13 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   /** Fade absolute overlay bar in when sheet is closed, out when sheet opens or overlay closes. */
   useEffect(() => {
     if (!activeOverlayPost) {
-      absoluteOverlayOpacitySv.value = withTiming(0, { duration: 150 });
+      absoluteOverlayOpacitySv.value = withTiming(0, { duration: duration.instant });
       return;
     }
     if (sheetOpen) {
-      absoluteOverlayOpacitySv.value = withTiming(0, { duration: 180 });
+      absoluteOverlayOpacitySv.value = withTiming(0, { duration: duration.quick });
     } else {
-      absoluteOverlayOpacitySv.value = withTiming(1, { duration: 220 });
+      absoluteOverlayOpacitySv.value = withTiming(1, { duration: duration.quick });
     }
   }, [activeOverlayPost, sheetOpen, absoluteOverlayOpacitySv]);
 
@@ -244,7 +247,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const onReplyPress = useCallback(() => {
     if (!activeOverlayPost) return;
     router.navigate({
-      pathname: '/(user-flow)/thread' as any,
+      pathname: '/(user-flow)/thread',
       params: { eventId: activeOverlayPost.event.id },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on event.id only so memoized panel gets stable callback
@@ -393,8 +396,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     }
   }, []);
 
-  const closeRef = useRef(close);
-  closeRef.current = close;
+  const closeRef = useLatestRef(close);
   /** Pass current pager index when multiple images so dismiss animates to the visible thumbnail. */
   const triggerClose = useCallback(
     (dismissedPageIndex?: number) => {
@@ -438,7 +440,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
       return gesture
         .onStart(() => {
           dismissPanActive.value = 1;
-          runOnJS(setDismissPanActive)(true);
+          scheduleOnRN(setDismissPanActive, true);
           panStartX.value = imageXCoord.value;
           panStartY.value = imageYCoord.value;
           closeBtnOpacity.value = withTiming(0, {
@@ -472,14 +474,14 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           const eh = expandedHeightSv.value || expandedHeight;
           const threshold = Math.max(ew, eh) * DISMISS_THRESHOLD_FRACTION;
           const dismissed = distance > threshold;
-          runOnJS(setDismissPanActive)(false);
+          scheduleOnRN(setDismissPanActive, false);
           if (!wasActive) return;
           if (dismissed) {
             // Avoid transform-origin drift while closing; return animation should be driven by x/y/size only.
             imageScale.value = 1;
             cancelAnimation(pagerOffsetSv);
             pagerOffsetSv.value = Math.round(pagerOffsetSv.value);
-            runOnJS(triggerClose)(Math.round(pagerOffsetSv.value));
+            scheduleOnRN(triggerClose, Math.round(pagerOffsetSv.value));
           } else {
             imageScale.value = withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG);
             openToCenter();
@@ -536,6 +538,16 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     }
   }, []);
 
+  // Unmount cleanup for the two cooldown timers above. Their callbacks only
+  // touch refs so they're harmless after unmount, but cancelling on teardown
+  // keeps the component from holding closures past its lifetime.
+  useEffect(() => {
+    return () => {
+      if (clearDismissPanTimeoutRef.current) clearTimeout(clearDismissPanTimeoutRef.current);
+      if (clearPagerDragTimeoutRef.current) clearTimeout(clearPagerDragTimeoutRef.current);
+    };
+  }, []);
+
   /** Max finger movement (px) for tap to count; prevents swipe-to-page from triggering toggle. */
   const TAP_MAX_DISTANCE = 12;
 
@@ -554,7 +566,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           const ih = imageHeight.value;
           const insideImage = x >= ix && x <= ix + iw && y >= iy && y <= iy + ih;
           if (insideImage) {
-            runOnJS(handleImagePress)();
+            scheduleOnRN(handleImagePress);
             return;
           }
           const effectiveBottom = activeOverlayPost
@@ -567,7 +579,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           if (insideBottomPanel) return;
           cancelAnimation(pagerOffsetSv);
           pagerOffsetSv.value = Math.round(pagerOffsetSv.value);
-          runOnJS(triggerClose)(Math.round(pagerOffsetSv.value));
+          scheduleOnRN(triggerClose, Math.round(pagerOffsetSv.value));
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet reads shared values
     [triggerClose, handleImagePress, screenHeight, activeOverlayPost, panelHeightSv, pagerOffsetSv]
@@ -632,7 +644,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             },
             (finished) => {
               'worklet';
-              if (finished && closeSheet) runOnJS(setSheetOpenFromReaction)(false);
+              if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
             }
           );
         }),
@@ -737,7 +749,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             },
             (finished) => {
               'worklet';
-              if (finished && closeSheet) runOnJS(setSheetOpenFromReaction)(false);
+              if (finished && closeSheet) scheduleOnRN(setSheetOpenFromReaction, false);
             }
           );
         })
@@ -770,7 +782,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
       -screenHeight,
       { duration, easing: Easing.out(Easing.cubic) },
       (finished) => {
-        if (finished) runOnJS(triggerSwipeUpToNext)();
+        if (finished) scheduleOnRN(triggerSwipeUpToNext);
       }
     );
   }, [onSwipeUpToNextPost, openReplace, screenHeight, swipeUpTranslateY, triggerSwipeUpToNext]);
@@ -785,7 +797,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
         .minDistance(PAGER_MIN_DISTANCE)
         .onStart(() => {
           if (imageState.value !== 'open') return;
-          runOnJS(setPagerDragActive)(true);
+          scheduleOnRN(setPagerDragActive, true);
           startVerticalPagerOffsetSv.value = verticalPagerOffsetSv.value;
         })
         .onChange((e) => {
@@ -823,11 +835,11 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             },
             (finished) => {
               if (finished && didChangePage) {
-                runOnJS(onVerticalPagerSnap)(snapTo);
+                scheduleOnRN(onVerticalPagerSnap, snapTo);
               }
             }
           );
-          runOnJS(setPagerDragActive)(false);
+          scheduleOnRN(setPagerDragActive, false);
         }),
     [
       isVerticalFeed,
@@ -914,7 +926,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             swipeUpTranslateY.value = withSpring(0, SNAP_SPRING_SAME_PAGE);
             return;
           }
-          runOnJS(commitToNextPost)();
+          scheduleOnRN(commitToNextPost);
         }),
     [
       onSwipeUpToNextPost,
@@ -935,7 +947,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
         .minDistance(PAGER_MIN_DISTANCE)
         .onStart(() => {
           if (imageState.value !== 'open') return;
-          runOnJS(setPagerDragActive)(true);
+          scheduleOnRN(setPagerDragActive, true);
           startPagerOffsetSv.value = pagerOffsetSv.value;
         })
         .onChange((e) => {
@@ -972,11 +984,11 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             },
             (finished) => {
               if (finished && didChangePage) {
-                runOnJS(setActiveIndex)(snapTo);
+                scheduleOnRN(setActiveIndex, snapTo);
               }
             }
           );
-          runOnJS(setPagerDragActive)(false);
+          scheduleOnRN(setPagerDragActive, false);
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values stable refs
     [
@@ -1008,7 +1020,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
         .minDistance(DISMISS_MIN_DISTANCE)
         .onStart(() => {
           dismissPanActive.value = 1;
-          runOnJS(setDismissPanActive)(true);
+          scheduleOnRN(setDismissPanActive, true);
           panStartX.value = imageXCoord.value;
           panStartY.value = imageYCoord.value;
           closeBtnOpacity.value = withTiming(0, {
@@ -1042,14 +1054,14 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           const eh = expandedHeightSv.value || expandedHeight;
           const threshold = Math.max(ew, eh) * DISMISS_THRESHOLD_FRACTION;
           const dismissed = distance > threshold;
-          runOnJS(setDismissPanActive)(false);
+          scheduleOnRN(setDismissPanActive, false);
           if (!wasActive) return;
           if (dismissed) {
             // Avoid transform-origin drift while closing; return animation should be driven by x/y/size only.
             imageScale.value = 1;
             cancelAnimation(pagerOffsetSv);
             pagerOffsetSv.value = Math.round(pagerOffsetSv.value);
-            runOnJS(triggerClose)(Math.round(pagerOffsetSv.value));
+            scheduleOnRN(triggerClose, Math.round(pagerOffsetSv.value));
           } else {
             imageScale.value = withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG);
             openToCenter();
@@ -1081,7 +1093,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
 
   return (
     <View
-      style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
+      style={[StyleSheet.absoluteFill, { zIndex: zIndex.overlay }]}
       pointerEvents={activeUrl ? 'auto' : 'none'}>
       <Animated.View style={[StyleSheet.absoluteFill, rSwipeUpWrapperStyle]}>
         <GestureDetector gesture={composed}>
@@ -1350,7 +1362,7 @@ const overlayStyles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    zIndex: 1,
+    zIndex: zIndex.raised,
     justifyContent: 'flex-end',
     backgroundColor: 'transparent',
   },
@@ -1359,13 +1371,13 @@ const overlayStyles = StyleSheet.create({
     left: 0,
     right: 0,
     top: 0,
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
   bottomPanel: {
     position: 'absolute',
     left: 0,
     right: 0,
-    zIndex: 2,
+    zIndex: zIndex.raised,
     backgroundColor: PANEL_BG,
     borderTopLeftRadius: BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,
     borderTopRightRadius: BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS,

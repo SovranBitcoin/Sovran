@@ -9,7 +9,7 @@ type NostrProfile = {
   image: string;
 };
 
-export type Message = {
+type Message = {
   sender: string;
   receiver: string;
   pubkey: string;

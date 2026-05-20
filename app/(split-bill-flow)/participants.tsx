@@ -18,9 +18,10 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable, StyleSheet } from 'react-native';
-import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { LayoutChangeEvent, StyleSheet } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { z } from 'zod';
 import opacity from 'hex-color-opacity';
 
 import { useSplitBillPickerContext } from './_layout';
@@ -28,7 +29,6 @@ import { type PickerCandidate } from '@/features/splitBill/hooks/useSplitBillPar
 import { ParticipantRow } from '@/features/splitBill/components/ParticipantRow';
 import { useSplitBillTransactionsStore } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -37,19 +37,28 @@ import { LiquidGlassText } from 'liquid-glass-text';
 
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { ScrollEdgeFade } from '@/shared/ui/composed/ScrollEdgeFade';
-import { supportsLiquidGlass } from '@/shared/lib/version';
+import { useCapabilities } from '@/shared/ui/capability';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import { HistoryEntryHeader } from '@/features/transactions';
 import Icon from 'assets/icons';
-import { Screen, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { Log, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 
-const BLUETOOTH_ACCENT = '#0A84FF';
+const ParamsSchema = z.object({
+  totalAmount: z
+    .string()
+    .regex(/^\d{1,15}$/)
+    .optional(),
+  unit: z.string().max(16).optional(),
+});
 
 /** Small soft-entry region above the measured bar top. Rows entering this
  *  band begin fading before they ever reach the pills, so the top of the
@@ -74,12 +83,9 @@ export default function SplitBillParticipantsScreen() {
   useLifecycleLogger('SplitBillParticipantsScreen', walletLog);
   useRenderLogger('SplitBillParticipantsScreen', 120, walletLog);
   const router = useRouter();
-  const { totalAmount: totalAmountStr, unit: unitParam } = useLocalSearchParams<{
-    totalAmount?: string;
-    unit?: string;
-  }>();
-  const totalAmount = parseInt(totalAmountStr ?? '0', 10) || 0;
-  const unit = (unitParam as string) || 'sat';
+  const params = useRouteParams(ParamsSchema, { where: 'split-bill-flow.participants' });
+  const totalAmount = params?.totalAmount ? parseInt(params.totalAmount, 10) : 0;
+  const unit = params?.unit ?? 'sat';
 
   const [foreground, background, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -101,10 +107,7 @@ export default function SplitBillParticipantsScreen() {
   const picker = useSplitBillPickerContext();
   const { sections, selected, selectedIds, toggle } = picker;
 
-  const { keys: nostrKeys } = useNostrKeysContext();
-  const activeMintUrl = useMintStore((s) =>
-    nostrKeys?.pubkey ? s.selectedMints[nostrKeys.pubkey] : undefined
-  );
+  const activeMintUrl = useMintStore((s) => s.selectedMint);
   const startGroup = useSplitBillTransactionsStore((s) => s.startGroup);
 
   // Toggle wrapper — instruments latency so logs show the gap between
@@ -114,8 +117,7 @@ export default function SplitBillParticipantsScreen() {
   // every row to reconcile on every tap. `selectedIds` is read through
   // a ref so the log stays accurate without tripping the dep list.
   const togglePressAt = useRef<number | null>(null);
-  const selectedIdsRef = useRef(selectedIds);
-  selectedIdsRef.current = selectedIds;
+  const selectedIdsRef = useLatestRef(selectedIds);
   const instrumentedToggle = useCallback(
     (candidate: PickerCandidate) => {
       togglePressAt.current = performance.now();
@@ -215,7 +217,7 @@ export default function SplitBillParticipantsScreen() {
       perPerson,
     });
     router.push({
-      pathname: '/(split-bill-flow)/summary' as any,
+      pathname: '/(split-bill-flow)/summary',
       params: { groupId: group.id },
     });
   }, [
@@ -290,7 +292,7 @@ export default function SplitBillParticipantsScreen() {
   }, [anchorSections.length, foreground]);
 
   return (
-    <Screen name="SplitBillParticipantsScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="SplitBillParticipantsScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: 'Who Pays',
@@ -299,7 +301,7 @@ export default function SplitBillParticipantsScreen() {
               testID="split-bill-participants-search"
               icon="mdi:magnify"
               size={22}
-              onPress={() => router.push('/(split-bill-flow)/search' as any)}
+              onPress={() => router.push('/(split-bill-flow)/search')}
             />
           ),
         }}
@@ -309,6 +311,7 @@ export default function SplitBillParticipantsScreen() {
           sections={anchorSections}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          extraData={selectedIds}
           aboveAnchors={
             <HistoryEntryHeader pendingData={{ amount: totalAmount, unit, type: 'receive' }} />
           }
@@ -363,7 +366,7 @@ export default function SplitBillParticipantsScreen() {
           />
         </HStack>
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }
 
@@ -386,7 +389,8 @@ interface GlassTextProps {
  * is promoted to visible and the overlay is skipped.
  */
 function GlassText({ text, fontFamily, fontSize, color }: GlassTextProps) {
-  if (!supportsLiquidGlass()) {
+  const { liquidGlass } = useCapabilities();
+  if (!liquidGlass) {
     return (
       <Text size={fontSize} allowFontScaling={false} style={{ fontFamily, color }}>
         {text}

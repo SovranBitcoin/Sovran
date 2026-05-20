@@ -17,9 +17,10 @@ import { useMemo } from 'react';
 
 import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
-import { isValidGeohash } from 'bitchat-module';
-import type { UserProfile } from '@/shared/lib/apiClient';
+import type { NostrSearchResult } from '@/shared/lib/apiClient';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
+import { parseGeohashQuery } from '../lib/parseGeohashQuery';
+import { matchTiers } from '../lib/matchTiers';
 
 export type AllSearchResult =
   | { type: 'geohash'; id: string; geohash: string; score: number }
@@ -28,48 +29,14 @@ export type AllSearchResult =
       type: 'contact';
       id: string;
       pubkey: string;
-      profile?: UserProfile;
+      profile?: NostrSearchResult;
       isLoadingProfile: boolean;
       score: number;
     };
 
-export interface UseAllSearchResultsResult {
+interface UseAllSearchResultsResult {
   results: AllSearchResult[];
   loading: boolean;
-}
-
-/**
- * Extract a geohash from the raw query: accept both "#abc" and bare "abc"
- * as long as it's at least 2 chars and passes `isValidGeohash`. We decline
- * to match if the query contains whitespace — that's almost certainly a
- * word search, not a geohash, even if every letter happens to be base32.
- */
-function parseGeohashQuery(trimmed: string): string | null {
-  if (!trimmed) return null;
-  const hash = trimmed.startsWith('#')
-    ? trimmed.slice(1).toLowerCase()
-    : trimmed.toLowerCase();
-  if (hash.length < 2) return null;
-  if (!isValidGeohash(hash)) return null;
-  if (!trimmed.startsWith('#') && /\s/.test(trimmed)) return null;
-  return hash;
-}
-
-/**
- * Match tiers by `label` prefix OR reverse-geocoded `displayName` substring.
- * BLE ("Bluetooth") only matches ≥3-char queries so stray "bl" doesn't
- * surface it.
- */
-function matchTiers(tiers: TierEntry[], lowerQuery: string): TierEntry[] {
-  if (!lowerQuery) return [];
-  return tiers.filter((tier) => {
-    if (tier.transport === 'ble') {
-      return tier.label.toLowerCase().startsWith(lowerQuery) && lowerQuery.length >= 3;
-    }
-    if (tier.label.toLowerCase().startsWith(lowerQuery)) return true;
-    if (tier.displayName?.toLowerCase().includes(lowerQuery)) return true;
-    return false;
-  });
 }
 
 // Score constants — arrange the All feed with geohash jump on top, then
@@ -95,7 +62,7 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
       displayResults
         .filter((r) => !!r.profile && !r.pubkey.startsWith('placeholder-'))
         .map((r) => r.pubkey),
-    [displayResults],
+    [displayResults]
   );
   const { metadata: cachedMetadata } = useNostrProfileMetadataMany(realPubkeys);
 
@@ -123,7 +90,7 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
       // + abbreviated pubkey title even though we already have the
       // profile cached from another surface.
       const cached = r.profile ? cachedMetadata.get(r.pubkey) : undefined;
-      const profile: UserProfile | undefined =
+      const profile: NostrSearchResult | undefined =
         r.profile && cached
           ? {
               ...r.profile,

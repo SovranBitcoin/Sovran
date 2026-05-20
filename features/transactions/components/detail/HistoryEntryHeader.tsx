@@ -14,16 +14,10 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { formatAmount } from '@/shared/lib/currency';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { Log } from '@/shared/lib/logger';
 
 import TransactionIcon from '../TransactionIcon';
-
-/** Recipient profile data for payment request mode */
-interface RecipientProfile {
-  pubkey: string;
-  picture?: string;
-  displayName?: string;
-}
 
 interface HistoryEntryHeaderProps {
   /** History entry (optional if using pendingData) */
@@ -34,8 +28,16 @@ interface HistoryEntryHeaderProps {
     unit: string;
     type: 'send' | 'receive';
   };
-  /** Recipient profile for payment request mode */
-  recipientProfile?: RecipientProfile;
+  /**
+   * Nostr pubkey (hex) of the recipient — surfaces a Nostr-themed avatar
+   * with an outgoing-arrow overlay in place of the default transaction
+   * icon. Profile picture / display name are resolved from the metadata
+   * cache. Set by the chat→send-money flow via
+   * `entry.metadata.recipientPubkey` (see `coco-payment-ux` types).
+   */
+  recipientPubkey?: string;
+  /** Whether recipientPubkey should replace the transaction icon with an avatar. */
+  showRecipientAvatar?: boolean;
   /** Show loading state on the icon */
   isLoading?: boolean;
 }
@@ -43,9 +45,12 @@ interface HistoryEntryHeaderProps {
 export function HistoryEntryHeader({
   historyEntry,
   pendingData,
-  recipientProfile,
+  recipientPubkey,
+  showRecipientAvatar = true,
   isLoading,
 }: HistoryEntryHeaderProps) {
+  const avatarRecipientPubkey = showRecipientAvatar ? recipientPubkey : undefined;
+  const { metadata: recipientMetadata } = useNostrProfileMetadata(avatarRecipientPubkey);
   const [foreground, surface, background, danger, success] = useThemeColor([
     'foreground',
     'surface',
@@ -67,15 +72,16 @@ export function HistoryEntryHeader({
   const iconOverlaySize = 24;
 
   const renderIcon = () => {
-    if (recipientProfile) {
+    if (avatarRecipientPubkey) {
+      const recipientName = recipientMetadata?.displayName ?? recipientMetadata?.name;
       return (
         <View className="relative">
           <Avatar
-            state={recipientProfile.picture ? 'image' : 'fallback'}
-            picture={recipientProfile.picture}
-            seed={recipientProfile.pubkey}
+            state={recipientMetadata?.picture ? 'image' : 'fallback'}
+            picture={recipientMetadata?.picture}
+            seed={avatarRecipientPubkey}
             size={avatarSize}
-            name={recipientProfile.displayName}
+            name={recipientName}
           />
           <View
             style={{

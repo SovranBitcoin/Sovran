@@ -24,7 +24,7 @@ import type { RoutstrMessage } from '@/shared/stores/profile/routstrStore';
  *     so the active path swings to the new branch immediately.
  */
 
-export interface BranchInfo {
+interface BranchInfo {
   /** All siblings (including this message), ordered by timestamp. */
   siblings: RoutstrMessage[];
   /** 1-based index of `messageId` within `siblings` — for "2 / 3" UI. */
@@ -123,8 +123,7 @@ export function deriveActivePath(
     const kids = childrenByParent.get(cursor.id);
     if (!kids || kids.length === 0) break;
     const pickedId: string | undefined = activeChildren[cursor.id];
-    const picked: RoutstrMessage | undefined =
-      pickedId != null ? byId.get(pickedId) : undefined;
+    const picked: RoutstrMessage | undefined = pickedId != null ? byId.get(pickedId) : undefined;
     const next: RoutstrMessage = picked ?? kids[kids.length - 1];
     cursor = next;
   }

@@ -12,9 +12,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export interface NostrProfileMetadata {
   displayName?: string;
@@ -72,10 +74,10 @@ function evictIfOverCap(byPubkey: Record<string, NostrProfileMetadata>): void {
   });
 }
 
-/** Subset of `UserProfile` from `@sovranbitcoin/schemas` we read off
+/** Subset of `NostrSearchResult` from `@sovranbitcoin/schemas` we read off
  *  search results. Declared narrowly here to keep the store decoupled
  *  from the API client's full schema. */
-export interface SearchResultLike {
+interface SearchResultLike {
   pubkey: string;
   profile: MetadataPartial;
 }
@@ -102,6 +104,45 @@ interface NostrMetadataCacheState {
 
   clear: () => void;
 }
+
+/**
+ * Wire shape of a Nostr kind-0 metadata event's `content` after
+ * `JSON.parse`. Same fields as `NostrProfileMetadata` plus the snake_case
+ * `display_name` alias the spec permits. `looseObject` ignores unknown
+ * keys (relays serve all sorts of vendor extensions on kind-0). Field
+ * caps come from the persisted-cache schema below — keep the two in sync.
+ *
+ * Exported so the runtime parse path in `useNostrProfileMetadata` shares
+ * one definition with the persisted-cache validator instead of casting
+ * `JSON.parse` output as a TS type.
+ */
+export const Kind0MetadataSchema = z.looseObject({
+  display_name: z.string().max(512).optional(),
+  displayName: z.string().max(512).optional(),
+  name: z.string().max(512).optional(),
+  picture: z.string().max(2048).optional(),
+  banner: z.string().max(2048).optional(),
+  nip05: z.string().max(512).optional(),
+  lud16: z.string().max(512).optional(),
+  website: z.string().max(2048).optional(),
+  about: z.string().max(4096).optional(),
+});
+
+const PersistedNostrMetadataEntry = z.looseObject({
+  displayName: z.string().max(512).optional(),
+  name: z.string().max(512).optional(),
+  picture: z.string().max(2048).optional(),
+  banner: z.string().max(2048).optional(),
+  nip05: z.string().max(512).optional(),
+  lud16: z.string().max(512).optional(),
+  website: z.string().max(2048).optional(),
+  about: z.string().max(4096).optional(),
+  fetchedAt: z.number().int().nonnegative(),
+});
+
+const PersistedNostrMetadataCache = z.object({
+  byPubkey: z.record(z.string().max(128), PersistedNostrMetadataEntry).default({}),
+});
 
 export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
   persist(
@@ -179,12 +220,14 @@ export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
 
       clear: () => set({ byPubkey: {} }),
     }),
-    {
+    persistConfig({
       name: 'nostr-metadata-cache',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
+      storage: createProfileScopedStorage(),
+      schema: PersistedNostrMetadataCache,
+      logKey: 'nostr_metadata',
       partialize: (state) => ({ byPubkey: state.byPubkey }),
-    },
-  ),
+    })
+  )
 );
 
 export function useCachedNostrProfile(pubkey: string): {

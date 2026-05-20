@@ -24,17 +24,13 @@ import type { MintListItem } from 'coco-payment-ux';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Checkbox } from '@/shared/ui/primitives/Checkbox';
+import { SelectableCheck } from '@/shared/ui/primitives/SelectableCheck';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import {
-  ListRow,
-  type ListRowAvatar,
-  type ListRowIconCircle,
-} from '@/shared/ui/composed/ListRow';
+import { ListRow, type ListRowAvatar, type ListRowIconCircle } from '@/shared/ui/composed/ListRow';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import {
   RowStatsAccent,
@@ -46,13 +42,14 @@ import {
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatCompact } from '@/shared/lib/number';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { relativeTime } from '@/shared/lib/time';
+import { formatRelative } from '@/shared/lib/date';
+import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 
 // ---------------------------------------------------------------------------
 // Identity types
 // ---------------------------------------------------------------------------
 
-export interface NostrProfileLike {
+interface NostrProfileLike {
   name?: string;
   display_name?: string;
   displayName?: string;
@@ -67,7 +64,7 @@ export interface NostrProfileLike {
   follows?: number;
 }
 
-export interface NostrIdentity {
+interface NostrIdentity {
   kind: 'nostr';
   pubkey: string;
   profile?: NostrProfileLike;
@@ -82,7 +79,7 @@ export interface NostrIdentity {
 /** Stats that a mint may carry — present on `MintListItem` and on lighter
  *  mint shapes (NUT-06 info, search results). Gated per-field so a mint
  *  known only by URL + name still works. */
-export interface MintStatFields {
+interface MintStatFields {
   balance?: number;
   unit?: string;
   status?: 'available' | 'disabled';
@@ -91,12 +88,15 @@ export interface MintStatFields {
   reviewCount?: number;
   auditScore?: number;
   auditState?: string;
+  /** Total auditor-observed mint+melt operations. Rendered as `(123)` next
+   *  to the audit %. */
+  auditTotalOps?: number;
   worksOffline?: boolean;
   contactFollowers?: number;
   contactReputation?: number;
 }
 
-export interface MintIdentity {
+interface MintIdentity {
   kind: 'mint';
   mintUrl: string;
   displayName: string;
@@ -104,16 +104,24 @@ export interface MintIdentity {
   stats?: MintStatFields;
 }
 
-export interface BleIdentity {
+interface BleIdentity {
   kind: 'ble';
   peerID: string;
   nickname?: string;
-  /** Omit both fields when the caller supplies its own `subtitle` / `trailing`. */
+  /** Omit these fields when the caller supplies its own `subtitle` / `trailing`. */
+  /** Cached announce-time reachability (true if announce arrived directly or
+   *  we had a direct link at announce time). Use `hasDirectLink` for truthful
+   *  real-time reachability — `isConnected` can stay true after the BLE link
+   *  silently dies. */
   isConnected?: boolean;
+  /** Real-time peripheral/central link check. When false but `isConnected`
+   *  is true, the peer is mesh-reachable only — DMs will mesh-flood with a
+   *  15s spool fallback and may not arrive. */
+  hasDirectLink?: boolean;
   lastSeen?: number;
 }
 
-export interface GeohashIdentity {
+interface GeohashIdentity {
   kind: 'geohash';
   geohash: string;
   label?: string;
@@ -124,7 +132,7 @@ export interface GeohashIdentity {
   icon?: string;
 }
 
-export interface SelfIdentity {
+interface SelfIdentity {
   kind: 'self';
   pubkey: string;
   nickname: string;
@@ -133,14 +141,9 @@ export interface SelfIdentity {
   subtitle?: string;
 }
 
-export type Identity =
-  | NostrIdentity
-  | MintIdentity
-  | BleIdentity
-  | GeohashIdentity
-  | SelfIdentity;
+export type Identity = NostrIdentity | MintIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
-export type StatKey =
+type StatKey =
   | 'balance'
   | 'score'
   | 'audit'
@@ -156,7 +159,7 @@ export type StatKey =
 export function nostrIdentity(
   pubkey: string,
   profile?: NostrProfileLike,
-  opts?: { isLoadingProfile?: boolean; verified?: boolean },
+  opts?: { isLoadingProfile?: boolean; verified?: boolean }
 ): NostrIdentity {
   return {
     kind: 'nostr',
@@ -172,22 +175,52 @@ export function nostrIdentity(
 
 /** Overload: accept either a full `MintListItem` or a minimal shape. */
 export function mintIdentity(item: MintListItem): MintIdentity;
-export function mintIdentity(
-  input: { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields },
-): MintIdentity;
+export function mintIdentity(input: {
+  mintUrl: string;
+  displayName: string;
+  iconUrl?: string;
+  stats?: MintStatFields;
+}): MintIdentity;
 export function mintIdentity(
   input:
     | MintListItem
-    | { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields },
+    | { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields }
 ): MintIdentity {
   if ('balance' in input) {
-    const { mintUrl, displayName, iconUrl, balance, unit, status, kymScore, reviewCount, auditScore, auditState, worksOffline, contactFollowers, contactReputation } = input;
+    const {
+      mintUrl,
+      displayName,
+      iconUrl,
+      balance,
+      unit,
+      status,
+      kymScore,
+      reviewCount,
+      auditScore,
+      auditState,
+      auditTotalOps,
+      worksOffline,
+      contactFollowers,
+      contactReputation,
+    } = input;
     return {
       kind: 'mint',
       mintUrl,
       displayName,
       iconUrl,
-      stats: { balance, unit, status, kymScore, reviewCount, auditScore, auditState, worksOffline, contactFollowers, contactReputation },
+      stats: {
+        balance,
+        unit,
+        status,
+        kymScore,
+        reviewCount,
+        auditScore,
+        auditState,
+        auditTotalOps,
+        worksOffline,
+        contactFollowers,
+        contactReputation,
+      },
     };
   }
   return { kind: 'mint', ...input };
@@ -197,6 +230,7 @@ export function bleIdentity(peer: {
   peerID: string;
   nickname?: string;
   isConnected?: boolean;
+  hasDirectLink?: boolean;
   lastSeen?: number;
 }): BleIdentity {
   return { kind: 'ble', ...peer };
@@ -209,7 +243,7 @@ export function geohashIdentity(
     displayName?: string;
     transport?: 'ble' | 'nostr' | 'geohash';
     icon?: string;
-  },
+  }
 ): GeohashIdentity {
   return {
     kind: 'geohash',
@@ -224,7 +258,7 @@ export function geohashIdentity(
 export function selfIdentity(
   pubkey: string,
   nickname: string,
-  opts?: { avatarUrl?: string; isActive?: boolean; subtitle?: string },
+  opts?: { avatarUrl?: string; isActive?: boolean; subtitle?: string }
 ): SelfIdentity {
   return {
     kind: 'self',
@@ -240,7 +274,7 @@ export function selfIdentity(
 // Props
 // ---------------------------------------------------------------------------
 
-export interface ContactRowProps {
+interface ContactRowProps {
   /** One identity, or an array for composites (e.g. mint + nostr). */
   identity: Identity | Identity[];
 
@@ -254,12 +288,16 @@ export interface ContactRowProps {
 
   /** Declarative stat picker. Omit to use the kind's default. Order preserved,
    *  stats with no data drop out silently. */
-  stats?: ReadonlyArray<StatKey>;
+  stats?: readonly StatKey[];
 
   selectable?: boolean;
   selected?: boolean;
   onToggle?: () => void;
   selectionVariant?: 'circle-check' | 'checkbox';
+
+  /** Forwarded to ListRow. `'below'` moves the stats row beneath the
+   *  main HStack, indented past the avatar — used by the Select Mint row. */
+  accentPosition?: 'inline' | 'below';
 
   /** Full trailing override; beats every variant / kind default. */
   trailing?: ReactNode;
@@ -281,8 +319,6 @@ export interface ContactRowProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-const BLUETOOTH_ACCENT = '#0A84FF';
-const CONNECTED_ACCENT = '#34C759';
 const AVATAR_SIZE = 44;
 
 /**
@@ -324,12 +360,12 @@ function hashSeed(seed: string): number {
   return Math.abs(h);
 }
 
-function pickPlaceholder(seed: string | undefined, options: ReadonlyArray<string>): string {
+function pickPlaceholder(seed: string | undefined, options: readonly string[]): string {
   if (!seed || options.length === 0) return options[0] ?? '';
   return options[hashSeed(seed) % options.length];
 }
 
-const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], ReadonlyArray<StatKey>> = {
+const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // `following` is intentionally absent: the count lands in a narrow accent
   // row where a second "people" number alongside followers doesn't earn its
   // space. UserProfileScreen still shows it on the full profile header.
@@ -346,7 +382,7 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], ReadonlyArray<StatKey>> = 
 
 function find<K extends Identity['kind']>(
   ids: Identity[],
-  kind: K,
+  kind: K
 ): Extract<Identity, { kind: K }> | undefined {
   return ids.find((i): i is Extract<Identity, { kind: K }> => i.kind === kind);
 }
@@ -414,9 +450,15 @@ function deriveSubtitle(ids: Identity[]): string | undefined {
   const ble = find(ids, 'ble');
   if (ble) {
     if (ble.isConnected === undefined) return undefined;
-    const suffix = ble.isConnected
-      ? 'connected'
-      : `seen ${typeof ble.lastSeen === 'number' ? relativeTime(ble.lastSeen) : 'recently'}`;
+    // Three states the user actually cares about for DM reachability:
+    //  - direct link → DM goes straight over BLE
+    //  - mesh-only  → reachable but DMs may stall / drop in spool window
+    //  - offline    → last-seen timestamp
+    const suffix = !ble.isConnected
+      ? `seen ${typeof ble.lastSeen === 'number' ? formatRelative(ble.lastSeen, 'verbose') : 'recently'}`
+      : ble.hasDirectLink
+        ? 'connected'
+        : 'mesh-only';
     return `#${ble.peerID.slice(0, 8)} · ${suffix}`;
   }
   const geohash = find(ids, 'geohash');
@@ -435,8 +477,8 @@ function deriveSubtitle(ids: Identity[]): string | undefined {
  *  contactFollowers) for reputation / followers. */
 function buildStats(
   ids: Identity[],
-  keys: ReadonlyArray<StatKey>,
-  tints: { warning: string; success: string },
+  keys: readonly StatKey[],
+  tints: { warning: string; success: string }
 ): RowStat[] {
   const mintStats = find(ids, 'mint')?.stats;
   const nostr = find(ids, 'nostr');
@@ -474,10 +516,18 @@ function buildStats(
       case 'audit':
         if (typeof mintStats?.auditScore === 'number') {
           const pct = Math.round((mintStats.auditScore / 5) * 100);
+          const total = mintStats.auditTotalOps;
           out.push({
             icon: STAT_ICONS.audit,
             value: `${pct}%`,
+            // Mirrors the score case: show the operation count in brackets so
+            // the user knows whether the % comes from 12 ops or 12,000.
+            meta: typeof total === 'number' && total > 0 ? formatCompact(total) : undefined,
             color: mintStats.auditState === 'ERROR' ? STAT_COLOR_ERROR : tints.success,
+            accessibilityLabel:
+              typeof total === 'number'
+                ? `Audit success ${pct}% across ${total} operations`
+                : `Audit success ${pct}%`,
           });
         }
         break;
@@ -512,14 +562,28 @@ function buildStats(
         break;
       case 'connection':
         if (ble && ble.isConnected !== undefined) {
+          // Three-state badge: direct link (green), mesh-only (warning), offline.
+          // The mesh-only state is the one users find confusing — peer shows
+          // up but DMs are flaky. Calling it out by icon + word avoids that.
+          const meshOnly = ble.isConnected && ble.hasDirectLink === false;
           out.push({
-            icon: ble.isConnected ? 'mdi:broadcast' : 'mdi:clock-outline',
-            value: ble.isConnected
-              ? 'Connected'
-              : typeof ble.lastSeen === 'number'
-                ? relativeTime(ble.lastSeen)
-                : 'Offline',
-            color: ble.isConnected ? CONNECTED_ACCENT : STAT_COLOR_SOCIAL,
+            icon: ble.isConnected
+              ? meshOnly
+                ? 'mdi:lan-disconnect'
+                : 'mdi:broadcast'
+              : 'mdi:clock-outline',
+            value: !ble.isConnected
+              ? typeof ble.lastSeen === 'number'
+                ? formatRelative(ble.lastSeen, 'verbose')
+                : 'Offline'
+              : meshOnly
+                ? 'Mesh-only'
+                : 'Connected',
+            color: ble.isConnected
+              ? meshOnly
+                ? tints.warning
+                : CONNECTED_ACCENT
+              : STAT_COLOR_SOCIAL,
           });
         }
         break;
@@ -542,6 +606,7 @@ export function ContactRow({
   selected = false,
   onToggle,
   selectionVariant = 'circle-check',
+  accentPosition,
   trailing: trailingOverride,
   trailingVariant,
   onInspectPress,
@@ -552,10 +617,14 @@ export function ContactRow({
   padding = 'default',
   testID,
 }: ContactRowProps) {
+  // Stat tints intentionally diverge from the theme `success` token: the
+  // app-wide retint moved `--success` to blue (see themeEngine.ts), but the
+  // audit-%/offline pills read more clearly as "good" in green. Other
+  // success surfaces (StatusToast, Badge, etc.) still consume the blue tint.
   const [foreground, accent, success, warning] = useThemeColor([
     'foreground',
     'accent',
-    'success',
+    'green-300',
     'yellow-300',
   ] as const);
 
@@ -669,52 +738,42 @@ export function ContactRow({
 
   // ---- Trailing ---------------------------------------------------------
 
-  const chevronNode = (
-    <Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />
-  );
+  const chevronNode = <Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />;
 
-  const selectionNode = selectable
-    ? selectionVariant === 'checkbox'
-      ? (
-          <Checkbox
-            checked={selected}
-            onCheckedChange={() => onToggle?.()}
-            size={24}
-            variant="success"
-          />
-        )
-      : (
-          <View
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 12,
-              borderWidth: 1.5,
-              borderColor: selected ? accent : opacity(foreground, 0.25),
-              backgroundColor: selected ? accent : 'transparent',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            {selected ? <Icon name="mdi:check" size={16} color="#FFFFFF" /> : null}
-          </View>
-        )
-    : null;
+  const selectionNode = selectable ? (
+    <SelectableCheck
+      style={selectionVariant === 'checkbox' ? 'square' : 'circle'}
+      selected={selected ?? false}
+      onChange={selectionVariant === 'checkbox' ? () => onToggle?.() : undefined}
+      size={24}
+      variant="success"
+    />
+  ) : null;
 
   const inspectNode = onInspectPress ? (
-    <TouchableOpacity
+    <Pressable
       onPress={onInspectPress}
       hitSlop={8}
       style={{ padding: 8, borderRadius: 999, backgroundColor: opacity(foreground, 0.06) }}>
       <Icon name="bx:dots-vertical-rounded" size={18} color={foreground} />
-    </TouchableOpacity>
+    </Pressable>
   ) : null;
 
+  // Trailing badge mirrors the same three-state model the subtitle uses so
+  // the row's right edge is honest about DM reachability:
+  //  - direct  → green broadcast icon ("ready to DM")
+  //  - mesh    → warning lan-disconnect icon ("DM may stall")
+  //  - offline → faded clock ("last seen…")
   const bleConnectionNode =
-    ble && ble.isConnected !== undefined
-      ? ble.isConnected
-        ? <Icon name="mdi:broadcast" size={20} color={CONNECTED_ACCENT} />
-        : <Icon name="mdi:clock-outline" size={20} color={opacity(foreground, 0.3)} />
-      : null;
+    ble && ble.isConnected !== undefined ? (
+      !ble.isConnected ? (
+        <Icon name="mdi:clock-outline" size={20} color={opacity(foreground, 0.3)} />
+      ) : ble.hasDirectLink === false ? (
+        <Icon name="mdi:lan-disconnect" size={20} color={warning} />
+      ) : (
+        <Icon name="mdi:broadcast" size={20} color={CONNECTED_ACCENT} />
+      )
+    ) : null;
 
   let trailingNode: ReactNode;
   if (trailingOverride !== undefined) {
@@ -764,6 +823,7 @@ export function ContactRow({
       subtitle={subtitleNode}
       subtitlePlaceholder={subtitlePlaceholder}
       accent={accentNode}
+      accentPosition={accentPosition}
       trailing={trailingNode}
       onPress={effectivePress}
       loading={resolvedLoading}

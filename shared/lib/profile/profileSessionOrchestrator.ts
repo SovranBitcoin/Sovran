@@ -17,12 +17,13 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { log } from '../logger';
+import { log, redactError } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 
 // ── AsyncStorage-based transition guard ──────────────────────────
 const TRANSITION_KEY = 'profile-transition-in-progress';
@@ -156,7 +157,7 @@ export async function switchToExistingProfile(opts: {
     // If restarted, leave transitionInFlight=true — the module is about to reload.
     return true;
   } catch (error) {
-    log.error('profile.orchestrator.switch_failed', { error });
+    log.error('profile.orchestrator.switch_failed', { error: redactError(error) });
     cancelResetStages?.();
     transitionInFlight = false;
     await endTransition();
@@ -216,7 +217,7 @@ export async function createAndSwitchProfile(opts?: {
     }
     return true;
   } catch (error) {
-    log.error('profile.orchestrator.create_failed', { error });
+    log.error('profile.orchestrator.create_failed', { error: redactError(error) });
     cancelResetStages?.();
     transitionInFlight = false;
     await endTransition();
@@ -263,7 +264,7 @@ export async function deleteAllProfiles(opts?: {
     try {
       await CocoManager.completeReset(accountIndexes);
     } catch (e) {
-      log.warn('profile.orchestrator.coco_reset_failed', { error: e });
+      log.warn('profile.orchestrator.coco_reset_failed', { error: redactError(e) });
     }
 
     // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
@@ -271,7 +272,7 @@ export async function deleteAllProfiles(opts?: {
       const { clearAllSecureData } = await import('@/shared/lib/nostr/secureStorage');
       await clearAllSecureData(accountIndexes, importedPubkeys);
     } catch (e) {
-      log.warn('profile.orchestrator.clear_secure_data_failed', { error: e });
+      log.warn('profile.orchestrator.clear_secure_data_failed', { error: redactError(e) });
     }
 
     // 3a. Per-feature wipes BEFORE the nuclear AsyncStorage.clear() so any
@@ -279,19 +280,17 @@ export async function deleteAllProfiles(opts?: {
     // still gets cleaned up. AsyncStorage.clear() then catches anything we
     // missed.
     try {
-      const { wipeWhitenoiseStorageForAccounts } = await import(
-        '@/features/whitenoise/storage'
-      );
+      const { wipeWhitenoiseStorageForAccounts } = await import('@/features/whitenoise/storage');
       await wipeWhitenoiseStorageForAccounts(accountIndexes);
     } catch (e) {
-      log.warn('profile.orchestrator.wipe_whitenoise_failed', { error: e });
+      log.warn('profile.orchestrator.wipe_whitenoise_failed', { error: redactError(e) });
     }
 
     // 3b. Nuclear AsyncStorage wipe — every key, every store, everything
     try {
       await AsyncStorage.clear();
     } catch (e) {
-      log.warn('profile.orchestrator.async_storage_clear_failed', { error: e });
+      log.warn('profile.orchestrator.async_storage_clear_failed', { error: redactError(e) });
     }
 
     // 4. Purge Redux persisted state
@@ -299,7 +298,7 @@ export async function deleteAllProfiles(opts?: {
       const { persistor } = await import('@/redux/store/store.deprecated');
       await persistor.purge();
     } catch (e) {
-      log.warn('profile.orchestrator.redux_purge_failed', { error: e });
+      log.warn('profile.orchestrator.redux_purge_failed', { error: redactError(e) });
     }
 
     // 5. Clear all Zustand in-memory state so nothing bleeds before restart
@@ -308,6 +307,11 @@ export async function deleteAllProfiles(opts?: {
       profiles: [],
       cocoMigrationComplete: {},
     });
+    // btcMapStore holds an in-flight 2–3s places fetch that would otherwise
+    // resolve between AsyncStorage.clear() above and restartApp() below,
+    // re-populating cleared storage with stale data. reset() bumps an epoch
+    // the in-flight closure rechecks before commit.
+    useBTCMapStore.getState().reset();
 
     const restarted = await teardownAndRestart();
     if (!restarted) {
@@ -321,7 +325,7 @@ export async function deleteAllProfiles(opts?: {
     }
     return true;
   } catch (error) {
-    log.error('profile.orchestrator.delete_all_failed', { error });
+    log.error('profile.orchestrator.delete_all_failed', { error: redactError(error) });
     cancelResetStages?.();
     transitionInFlight = false;
     await endTransition();

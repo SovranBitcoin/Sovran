@@ -23,19 +23,8 @@
  * below can jump the deck when a row is tapped.
  */
 
-import React, {
-  forwardRef,
-  useCallback,
-  useImperativeHandle,
-  useMemo,
-  useRef,
-} from 'react';
-import {
-  Dimensions,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  StyleSheet,
-} from 'react-native';
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react';
+import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, StyleSheet } from 'react-native';
 import Animated, {
   Extrapolation,
   SharedValue,
@@ -66,7 +55,7 @@ export interface ParticipantCardDeckRef {
   scrollToIndex: (index: number, animated?: boolean) => void;
 }
 
-export interface ParticipantCardDeckProps {
+interface ParticipantCardDeckProps {
   group: SplitBillGroup;
   /** Called whenever the focused card changes (at momentum end). */
   onFocusChange?: (index: number) => void;
@@ -98,18 +87,8 @@ function DeckItem({ group, participant, index, scrollX, onRetry, onView }: DeckI
 
     // Apple-invites values verbatim — a concave fan where neighbour cards
     // lean OUTWARD (away from centre) with their bottom edge pinned.
-    const rotate = interpolate(
-      offset,
-      [-STEP, 0, STEP],
-      [-0.6, 0, 0.6],
-      Extrapolation.CLAMP
-    );
-    const translateY = interpolate(
-      offset,
-      [-STEP, 0, STEP],
-      [1, -0.5, 1],
-      Extrapolation.CLAMP
-    );
+    const rotate = interpolate(offset, [-STEP, 0, STEP], [-0.6, 0, 0.6], Extrapolation.CLAMP);
+    const translateY = interpolate(offset, [-STEP, 0, STEP], [1, -0.5, 1], Extrapolation.CLAMP);
 
     return {
       transform: [{ translateY }, { rotateZ: `${rotate}deg` }],
@@ -118,12 +97,7 @@ function DeckItem({ group, participant, index, scrollX, onRetry, onView }: DeckI
 
   return (
     <Animated.View style={[styles.item, animatedStyle]}>
-      <ParticipantCard
-        group={group}
-        participant={participant}
-        onRetry={onRetry}
-        onView={onView}
-      />
+      <ParticipantCard group={group} participant={participant} onRetry={onRetry} onView={onView} />
     </Animated.View>
   );
 }
@@ -158,10 +132,7 @@ export const ParticipantCardDeck = forwardRef<ParticipantCardDeckRef, Participan
       []
     );
 
-    const contentStyle = useMemo(
-      () => ({ paddingHorizontal: SIDE_PAD, paddingVertical: 8 }),
-      []
-    );
+    const contentStyle = useMemo(() => ({ paddingHorizontal: SIDE_PAD, paddingVertical: 8 }), []);
 
     return (
       <View>
@@ -207,5 +178,3 @@ const styles = StyleSheet.create({
     paddingVertical: ITEM_MARGIN,
   },
 });
-
-export const DECK_CARD_WIDTH = CARD_W - ITEM_MARGIN * 2;

@@ -1,21 +1,29 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { z } from 'zod';
 
 import { StoriesCarousel, type StoryUser } from '@/features/feed/components/nostr/StoriesCarousel';
-import { Screen, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const CLOSE_DELAY_MS = 350;
+
+const ParamsSchema = z.object({
+  startIndex: z
+    .string()
+    .regex(/^\d{1,5}$/)
+    .optional(),
+  storyUsersJson: z.string().min(1).max(64_000).optional(),
+});
 
 export function StoriesScreen() {
   useLifecycleLogger('StoriesScreen', feedLog);
 
   const insets = useSafeAreaInsets();
-  const { startIndex, storyUsersJson } = useLocalSearchParams<{
-    startIndex?: string;
-    storyUsersJson?: string;
-  }>();
+  const params = useRouteParams(ParamsSchema, { where: 'stories-flow.stories' });
+  const startIndex = params?.startIndex;
+  const storyUsersJson = params?.storyUsersJson;
 
   const [isClosing, setIsClosing] = useState(false);
   const closeRequestedRef = useRef(false);
@@ -62,7 +70,7 @@ export function StoriesScreen() {
   }
 
   return (
-    <Screen
+    <Log
       name="StoriesScreen"
       style={{
         flex: 1,
@@ -76,6 +84,6 @@ export function StoriesScreen() {
         onClose={handleClose}
         isClosing={isClosing}
       />
-    </Screen>
+    </Log>
   );
 }

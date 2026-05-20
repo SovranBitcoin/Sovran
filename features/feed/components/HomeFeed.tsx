@@ -6,46 +6,36 @@
  * multi-author feed using the same event format as UserFeed.
  */
 
-import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
+import { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
+import { StyleSheet, ActivityIndicator } from 'react-native';
+import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log } from '@/shared/lib/logger';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
+import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
+import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feedTypes';
+import { DEFAULT_METRICS } from './nostr/feedTypes';
 import {
-  type FeedEvent,
-  type FeedItem,
-  type FeedParseResult,
-  type NoteMetrics,
-  type ProfileInfo,
-  type RawPrimalEvent,
-  DEFAULT_METRICS,
-  PRIMAL_CACHE_RELAY_URL,
-  PRIMAL_KIND_NOTE_STATS,
-  PRIMAL_KIND_MENTIONS,
-  PRIMAL_KIND_FEED_RANGE,
-  MAX_VIDEO_FEED_PAGES,
   createPrimalRelayClient,
-  collectReferencedIds,
-  normalizeFeedEvent,
-  parseJson,
-  getFirstTagValue,
-  parseProfileFromRaw,
-  parseNoteMetrics,
-  tryNpubEncode,
-  getEmbeddedRepostEvent,
+  PRIMAL_CACHE_RELAY_URL,
+  PRIMAL_KIND_FEED_RANGE,
+} from './nostr/primalRelay';
+import { parseJson, tryNpubEncode } from './nostr/feedParse';
+import {
   buildVideoOverlayLayout,
   computeFeedIndicesWithVideo,
-  enrichFeedPage,
-} from './nostr/shared';
+  MAX_VIDEO_FEED_PAGES,
+} from './nostr/videoLayout';
+import { enrichFeedPage, parseFeedPage } from './nostr/parseFeedPage';
 import { CATEGORY_PUBKEYS } from './nostr/categoryNpubs';
 
 import { PostCard } from './nostr/PostCard';
@@ -57,14 +47,11 @@ import {
   type ImageOverlayReplaceLayout,
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
-import { StoriesRow } from './nostr/StoriesRow';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 // ============================================================================
 // Types
 // ============================================================================
-
-type HomeFeedListItem = { type: 'stories' } | FeedItem;
 
 interface HomeFeedProps {
   activeFilter?: string;
@@ -116,195 +103,12 @@ function getCategoryPubkeysFromSpec(spec: string): string[] {
   const seen = new Set<string>();
   const pubkeys: string[] = [];
   for (const value of parsed.pubkeys) {
-    if (typeof value !== 'string' || value.length !== 64) continue;
+    if (!isNostrPubkeyHex(value)) continue;
     if (seen.has(value)) continue;
     seen.add(value);
     pubkeys.push(value);
   }
   return pubkeys;
-}
-
-function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): FeedParseResult {
-  const t0 = performance.now();
-  const eventMap = new Map<string, FeedEvent>();
-  const notes: FeedEvent[] = [];
-  const reposts: FeedEvent[] = [];
-  const embeddedMentionEvents = new Map<string, FeedEvent>();
-  const metricsMap = new Map<string, NoteMetrics>();
-  const profilesMap = new Map<string, ProfileInfo>();
-  let feedOrder: string[] = [];
-  let paginationUntil = 0;
-
-  for (const raw of feedRawEvents) {
-    if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-      const parsed = parseJson<Record<string, unknown>>(raw.content);
-      const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-      if (!eventId || !parsed) continue;
-      metricsMap.set(eventId, parseNoteMetrics(parsed));
-      continue;
-    }
-
-    if (raw.kind === PRIMAL_KIND_FEED_RANGE) {
-      const parsed = parseJson<Record<string, unknown>>(raw.content);
-      if (Array.isArray(parsed?.elements)) {
-        feedOrder = parsed.elements
-          .map((el: unknown) => {
-            if (typeof el === 'string') return el;
-            if (
-              el &&
-              typeof el === 'object' &&
-              'id' in el &&
-              typeof (el as Record<string, unknown>).id === 'string'
-            )
-              return (el as Record<string, unknown>).id as string;
-            return null;
-          })
-          .filter((id): id is string => id !== null);
-      }
-      const rawUntil = parsed?.until;
-      if (typeof rawUntil === 'number' && rawUntil > 0) {
-        paginationUntil = rawUntil;
-      } else if (typeof rawUntil === 'string') {
-        const num = Number(rawUntil);
-        if (num > 0) paginationUntil = num;
-      }
-      continue;
-    }
-
-    if (raw.kind === PRIMAL_KIND_MENTIONS) {
-      const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
-      if (!mentionEvent) continue;
-      embeddedMentionEvents.set(mentionEvent.id, mentionEvent);
-      eventMap.set(mentionEvent.id, mentionEvent);
-      continue;
-    }
-
-    const ev = normalizeFeedEvent(raw);
-    if (!ev) continue;
-
-    if (ev.kind === ShortTextNote) {
-      eventMap.set(ev.id, ev);
-      notes.push(ev);
-      continue;
-    }
-
-    if (ev.kind === Repost || ev.kind === GenericRepost) {
-      eventMap.set(ev.id, ev);
-      reposts.push(ev);
-      continue;
-    }
-
-    if (ev.kind === Metadata) {
-      const result = parseProfileFromRaw(raw);
-      if (result) profilesMap.set(result[0], result[1]);
-      continue;
-    }
-  }
-
-  const nextFeedItems: FeedItem[] = [];
-  const feedItemsByEventId = new Map<string, FeedItem>();
-
-  for (const note of notes) {
-    const item: FeedItem = { type: 'note', event: note, timestamp: note.created_at || 0 };
-    nextFeedItems.push(item);
-    feedItemsByEventId.set(note.id, item);
-  }
-
-  for (const repostEvent of reposts) {
-    const originalEventId = getFirstTagValue(repostEvent, 'e');
-    if (!originalEventId) continue;
-    let originalEvent = eventMap.get(originalEventId);
-    if (!originalEvent) {
-      originalEvent = getEmbeddedRepostEvent(repostEvent, originalEventId);
-      if (originalEvent) eventMap.set(originalEvent.id, originalEvent);
-    }
-
-    const item: FeedItem = {
-      type: 'repost',
-      repostEvent,
-      originalEvent,
-      originalEventId,
-      timestamp: repostEvent.created_at || 0,
-    };
-    nextFeedItems.push(item);
-    feedItemsByEventId.set(repostEvent.id, item);
-  }
-
-  const orderedFeedItems =
-    feedOrder.length > 0
-      ? [
-          ...feedOrder
-            .map((id) => feedItemsByEventId.get(id))
-            .filter((item): item is FeedItem => item !== undefined),
-          ...nextFeedItems.filter(
-            (item) =>
-              !feedOrder.includes(item.type === 'note' ? item.event.id : item.repostEvent.id)
-          ),
-        ]
-      : nextFeedItems;
-
-  if (feedOrder.length === 0) {
-    orderedFeedItems.sort((a, b) => b.timestamp - a.timestamp);
-  }
-
-  const repostedOriginalEvents = orderedFeedItems
-    .filter((item): item is Extract<FeedItem, { type: 'repost' }> => item.type === 'repost')
-    .map((item) => item.originalEvent)
-    .filter((ev): ev is FeedEvent => ev !== undefined);
-
-  const contentSources = [...notes, ...repostedOriginalEvents];
-  const { eventIds: referencedEventIds, pubkeys: inlineMentionPubkeys } =
-    collectReferencedIds(contentSources);
-
-  const quotedEventsMap = new Map<string, FeedEvent>(embeddedMentionEvents);
-  const missingQuotedIds = referencedEventIds.filter((id) => !quotedEventsMap.has(id));
-
-  const neededPubkeys = new Set(inlineMentionPubkeys);
-  for (const ev of embeddedMentionEvents.values()) neededPubkeys.add(ev.pubkey);
-  for (const ev of repostedOriginalEvents) neededPubkeys.add(ev.pubkey);
-  for (const note of notes) neededPubkeys.add(note.pubkey);
-  const missingProfilePubkeys = Array.from(neededPubkeys).filter((pk) => !profilesMap.has(pk));
-
-  for (const item of orderedFeedItems) {
-    const metricId = item.type === 'note' ? item.event.id : item.originalEventId;
-    if (!metricsMap.has(metricId)) metricsMap.set(metricId, { ...DEFAULT_METRICS });
-  }
-
-  // Fallback cursor: use oldest item timestamp when FeedRange didn't provide `until`
-  if (paginationUntil === 0 && orderedFeedItems.length > 0) {
-    for (const item of orderedFeedItems) {
-      if (paginationUntil === 0 || item.timestamp < paginationUntil) {
-        paginationUntil = item.timestamp;
-      }
-    }
-  }
-
-  const duration = Math.round((performance.now() - t0) * 100) / 100;
-  if (duration > 50) {
-    log.warn('feed.parse.slow', {
-      duration_ms: duration,
-      rawEvents: feedRawEvents.length,
-      feedItems: orderedFeedItems.length,
-      profiles: profilesMap.size,
-    });
-  } else {
-    log.debug('feed.parse.done', {
-      duration_ms: duration,
-      rawEvents: feedRawEvents.length,
-      feedItems: orderedFeedItems.length,
-    });
-  }
-
-  return {
-    orderedFeedItems,
-    metricsMap,
-    profilesMap,
-    quotedEventsMap,
-    missingQuotedIds,
-    missingProfilePubkeys,
-    paginationUntil,
-    paginationOffset: feedOrder.length || orderedFeedItems.length,
-  };
 }
 
 // ============================================================================
@@ -333,9 +137,9 @@ function EmptyFeed() {
 // Main HomeFeed Component
 // ============================================================================
 
-function HomeFeedInner({ activeFilter }: HomeFeedProps) {
+export function HomeFeed({ activeFilter }: HomeFeedProps) {
   useBackgroundConfig(BG_CONFIG);
-  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
+  const foreground = useThemeColor('foreground');
   const imageOverlay = useImageOverlay();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;
@@ -358,20 +162,19 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   const paginationOffsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(new Set<string>());
+  // Tracks the request prefix of the most recently started loadFeed/loadMoreItems
+  // — onUpdate callbacks captured by an older request bail out when this drifts.
+  const activeLoadIdRef = useRef<string | null>(null);
 
-  const metricsRef = useRef(metricsMap);
-  metricsRef.current = metricsMap;
-  const quotedRef = useRef(quotedEventsMap);
-  quotedRef.current = quotedEventsMap;
-  const profilesRef = useRef(profilesMap);
-  profilesRef.current = profilesMap;
+  const metricsRef = useLatestRef(metricsMap);
+  const quotedRef = useLatestRef(quotedEventsMap);
+  const profilesRef = useLatestRef(profilesMap);
   const [dataVersion, setDataVersion] = useState(0);
 
   const isFirstRender = useRef(true);
 
   const listRef = useRef<LegendListRef>(null);
 
-  const storiesHeightRef = useRef(0);
   const scrollOffsetRef = useRef(0);
 
   const categoryFeedSpecs = useMemo<FeedSpec[]>(() => {
@@ -408,6 +211,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
 
       const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
       const requestPrefix = Date.now().toString(36);
+      activeLoadIdRef.current = requestPrefix;
 
       try {
         // Hydrate spec with user pubkey for personalized feeds
@@ -454,7 +258,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
                 });
               })();
 
-        const phase1 = parseMegaFeedResponse(feedRawEvents);
+        const phase1 = parseFeedPage(feedRawEvents, { perfLogTag: 'feed.parse' });
 
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
@@ -484,6 +288,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
           phase1.quotedEventsMap,
           phase1.profilesMap,
           (updates) => {
+            if (activeLoadIdRef.current !== requestPrefix) return;
             startTransition(() => {
               if (updates.quotedEvents) {
                 setQuotedEventsMap((prev) => {
@@ -511,7 +316,9 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
           }
         );
       } catch (error) {
-        log.error('feed.home.load_failed', { error });
+        log.error('feed.home.load_failed', {
+          message: error instanceof Error ? error.message : String(error),
+        });
         setFeedItems([]);
         setMetricsMap(new Map());
         setQuotedEventsMap(new Map());
@@ -534,13 +341,13 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
     if (currentSpec === prevSpecRef.current && userPubkey === prevPubkeyRef.current) return;
     prevSpecRef.current = currentSpec;
     prevPubkeyRef.current = userPubkey;
-    loadFeed(activeSpecIndex);
+    void loadFeed(activeSpecIndex);
   }, [activeSpecIndex, currentSpec, userPubkey, loadFeed]);
 
   const handleRefresh = useCallback(() => {
     if (!currentSpec) return;
     setIsRefreshing(true);
-    loadFeed(activeSpecIndex, true);
+    void loadFeed(activeSpecIndex, true);
   }, [activeSpecIndex, currentSpec, loadFeed]);
 
   // Reset feed items when the active filter changes
@@ -568,6 +375,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
     setIsLoadingMore(true);
     const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
     const rp = Date.now().toString(36);
+    activeLoadIdRef.current = rp;
 
     try {
       const hydratedSpec = userPubkey
@@ -607,7 +415,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
                 cache: ['mega_feed_directive', payload],
               });
             })();
-      const page = parseMegaFeedResponse(rawEvents);
+      const page = parseFeedPage(rawEvents, { perfLogTag: 'feed.parse' });
 
       if (page.orderedFeedItems.length === 0) {
         hasMoreRef.current = false;
@@ -687,6 +495,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
         quotedRef.current,
         profilesRef.current,
         (updates) => {
+          if (activeLoadIdRef.current !== rp) return;
           startTransition(() => {
             if (updates.quotedEvents) {
               setQuotedEventsMap((prev) => {
@@ -715,7 +524,9 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
       );
       return newItems;
     } catch (error) {
-      log.error('feed.home.load_more_failed', { error });
+      log.error('feed.home.load_more_failed', {
+        message: error instanceof Error ? error.message : String(error),
+      });
       return [];
     } finally {
       client.close();
@@ -725,7 +536,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   }, [currentSpec, userPubkey, startTransition]);
 
   const handleEndReached = useCallback(() => {
-    loadMoreItems();
+    void loadMoreItems();
   }, [loadMoreItems]);
 
   // ── Derived data ──
@@ -750,8 +561,6 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 
-  // listData = [tabs, ...feedItems] when stories are hidden, otherwise [stories, tabs, ...feedItems].
-  const FEED_ITEM_OFFSET = SHOW_STORIES_ROW ? 2 : 1;
   const overlaySourceIndexRef = useRef(-1);
   const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
 
@@ -800,9 +609,26 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
 
   // ── Render ──
 
+  const getThreadContext = useCallback(() => {
+    const allEvents = new Map<string, FeedEvent>();
+    for (const it of feedItems) {
+      if (it.type === 'note') {
+        allEvents.set(it.event.id, it.event);
+      } else if (it.originalEvent) {
+        allEvents.set(it.originalEvent.id, it.originalEvent);
+      }
+    }
+    return {
+      allEvents,
+      profiles: profilesRef.current,
+      metrics: metricsRef.current,
+      quotedEvents: quotedRef.current,
+    };
+  }, [feedItems, profilesRef, metricsRef, quotedRef]);
+
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
-      const feedIndex = index - FEED_ITEM_OFFSET;
+      const feedIndex = index;
       if (item.type === 'note') {
         const metrics = getDisplayMetrics(item.event.id);
         const engagement = getEngagementState(item.event.id);
@@ -826,6 +652,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
             onLikePress={() => toggleLike(item.event)}
             onRepostPress={() => toggleRepost(item.event)}
             skipAnimation={!isFirstRender.current}
+            getThreadContext={getThreadContext}
           />
         );
       }
@@ -858,57 +685,30 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
           onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
+          getThreadContext={getThreadContext}
         />
       );
     },
     [
-      FEED_ITEM_OFFSET,
       getDisplayMetrics,
       getEngagementState,
       getMetrics,
       onOverlayOpenedFromIndex,
       toggleLike,
       toggleRepost,
+      getThreadContext,
     ]
   );
 
   const refreshTintColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
 
-  const refreshControl = useMemo(
-    () => (
-      <RefreshControl
-        refreshing={isRefreshing}
-        onRefresh={handleRefresh}
-        tintColor={refreshTintColor}
-      />
-    ),
-    [isRefreshing, handleRefresh, refreshTintColor]
-  );
+  const pullToAi = usePullToAiRefreshControl({
+    refreshing: isRefreshing,
+    onRefresh: handleRefresh,
+    tintColor: refreshTintColor,
+  });
 
-  const listData = useMemo<HomeFeedListItem[]>(
-    () => (SHOW_STORIES_ROW ? [STORIES_ITEM, ...feedItems] : feedItems),
-    [feedItems]
-  );
-
-  const renderItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<HomeFeedListItem, string | undefined>) => {
-      if (item.type === 'stories') {
-        return (
-          <View
-            onLayout={(e) => {
-              storiesHeightRef.current = e.nativeEvent.layout.height;
-            }}>
-            <StoriesRow userPubkey={userPubkey} />
-          </View>
-        );
-      }
-      return renderFeedItem({
-        item,
-        index,
-      } as LegendListRenderItemProps<FeedItem, string | undefined>);
-    },
-    [userPubkey, renderFeedItem]
-  );
+  const renderItem = renderFeedItem;
 
   const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
     scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
@@ -934,7 +734,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
         <View style={styles.flex1}>
           <LegendList
             ref={listRef}
-            data={listData}
+            data={feedItems}
             keyExtractor={listKeyExtractor}
             getItemType={listGetItemType}
             estimatedItemSize={300}
@@ -955,7 +755,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
             showsVerticalScrollIndicator={false}
             onScroll={onScroll}
             scrollEventThrottle={16}
-            refreshControl={refreshControl}
+            refreshControl={pullToAi.refreshControl}
           />
         </View>
         <AnimatedImageOverlay />
@@ -964,25 +764,15 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   );
 }
 
-function HomeFeedComponent({ activeFilter }: HomeFeedProps) {
-  return <HomeFeedInner activeFilter={activeFilter} />;
-}
-
-export const HomeFeed = React.memo(HomeFeedComponent);
-
 // ============================================================================
 // Stable references — defined outside the component to avoid re-creation
 // ============================================================================
 
-const STORIES_ITEM: HomeFeedListItem = { type: 'stories' };
-const SHOW_STORIES_ROW = false;
 const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 
-const listKeyExtractor = (item: HomeFeedListItem) => {
-  if (item.type === 'stories') return '__stories__';
-  return item.type === 'note' ? item.event.id : item.repostEvent.id;
-};
-const listGetItemType = (item: HomeFeedListItem) => item.type;
+const listKeyExtractor = (item: FeedItem) =>
+  item.type === 'note' ? item.event.id : item.repostEvent.id;
+const listGetItemType = (item: FeedItem) => item.type;
 
 export const PRIMAL_FEED_SPECS: FeedSpec[] = [
   {

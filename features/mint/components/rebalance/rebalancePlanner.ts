@@ -29,7 +29,7 @@ const ESTIMATED_FEE_PERCENTAGE = 0.02; // 2%
  */
 export const MIN_FEE_RESERVE = 5;
 
-export interface MintBalance {
+interface MintBalance {
   mintUrl: string;
   balance: number; // Current balance in sats (or smallest unit)
 }

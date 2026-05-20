@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useMemo } from 'react';
-import { Pressable, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
@@ -8,6 +9,7 @@ import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
+import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 // --- Context ---
 
@@ -53,12 +55,12 @@ function SearchHeaderRight() {
   const iconColor = useThemeColor('foreground');
 
   return (
-    <Pressable onPress={isSearching ? onCloseSearch : onOpenSearch} style={{ padding: 8 }}>
-      <IconSymbol
-        name={isSearching ? 'xmark' : 'magnifyingglass'}
-        size={20}
-        color={iconColor}
-      />
+    <Pressable
+      onPress={isSearching ? onCloseSearch : onOpenSearch}
+      style={{ padding: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={isSearching ? 'Close search' : 'Open search'}>
+      <IconSymbol name={isSearching ? 'xmark' : 'magnifyingglass'} size={20} color={iconColor} />
     </Pressable>
   );
 }
@@ -71,7 +73,7 @@ type SearchLayoutProps = {
 };
 
 export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
-  const iconColor = useThemeColor('foreground');
+  const [iconColor, surface] = useThemeColor(['foreground', 'surface'] as const);
   const navigation = useNavigation();
   const search = useHeaderSearch();
 
@@ -88,20 +90,26 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
     [placeholder]
   );
   const headerRight = useCallback(() => <SearchHeaderRight />, []);
+  const headerLeft = useCallback(() => <HeaderProfileButton onPress={openDrawer} />, [openDrawer]);
 
   const screenOptions = useMemo(
     () =>
       buildExpoRouterHeaderOptions({
         iconColor,
-        headerLeftIcon: 'line.3.horizontal',
-        onHeaderLeftPress: openDrawer,
+        headerLeft,
         headerRight,
         options: {
           title,
+          headerStyle: { backgroundColor: surface },
+          // Without this, the native bar inherits the locked dark
+          // `userInterfaceStyle` and renders the title white — invisible on
+          // the light theme's `surface` background.
+          headerTitleStyle: { color: iconColor },
+          headerTintColor: iconColor,
           ...(search.isSearching ? { headerTitle: searchBarTitle } : {}),
         },
       }),
-    [iconColor, openDrawer, headerRight, title, search.isSearching, searchBarTitle]
+    [iconColor, headerLeft, headerRight, surface, title, search.isSearching, searchBarTitle]
   );
 
   const contextValue: SearchContextValue = useMemo(
@@ -125,7 +133,7 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
 
   return (
     <SearchContext.Provider value={contextValue}>
-      <Stack screenOptions={{ contentStyle: { backgroundColor: 'transparent' } }}>
+      <Stack screenOptions={{ contentStyle: { backgroundColor: surface } }}>
         <Stack.Screen name="index" options={screenOptions} />
       </Stack>
     </SearchContext.Provider>

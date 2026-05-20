@@ -5,10 +5,10 @@ import React, {
   useState,
   ReactNode,
   useCallback,
+  useMemo,
   useRef,
 } from 'react';
 import { InteractionManager } from 'react-native';
-import { useMnemonic } from '@/shared/hooks/useSecureStore';
 import {
   ensureMnemonicExists,
   retrieveMnemonic,
@@ -18,6 +18,7 @@ import {
   storeCashuMnemonic,
   retrieveImportedNsec,
   hashMnemonic,
+  useMnemonic,
   type CachedDerivedKeys,
 } from '@/shared/lib/nostr/secureStorage';
 import {
@@ -31,7 +32,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { log, initLog, initPhase, useInitMount } from '@/shared/lib/logger';
+import { log, initLog, initPhase, redactError, useInitMount } from '@/shared/lib/logger';
 
 initLog('Module', 'NostrKeysProvider loaded');
 
@@ -53,18 +54,9 @@ interface NostrKeysContextValue {
   getCashuMnemonicForAccount: (accountIndex: number) => Promise<string | null>;
 }
 
-const NostrKeysContext = createContext<NostrKeysContextValue>({
-  keys: null,
-  cashuMnemonic: null,
-  isReady: false,
-  isLoading: false,
-  error: null,
-  refresh: async () => {},
-  getKeysForAccount: async () => null,
-  getCashuMnemonicForAccount: async () => null,
-});
+const NostrKeysContext = createContext<NostrKeysContextValue | null>(null);
 
-export const useNostrKeysContext = () => {
+export const useNostrKeysContext = (): NostrKeysContextValue => {
   const context = useContext(NostrKeysContext);
   if (!context) {
     throw new Error('useNostrKeysContext must be used within a NostrKeysProvider');
@@ -98,8 +90,15 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cachedKeys, setCachedKeys] = useState<Map<number, NostrKeys>>(new Map());
-  const [cachedCashuMnemonics, setCachedCashuMnemonics] = useState<Map<number, string>>(new Map());
+  // Caches are refs, not state: derivation is memoised between calls but is
+  // never read in render output. Using state would shake context identity for
+  // all 23 consumers on every cache write.
+  const cachedKeys = useRef<Map<number, NostrKeys>>(new Map());
+  const cachedCashuMnemonics = useRef<Map<number, string>>(new Map());
+  // Single-flight dedupe: two concurrent callers for the same accountIndex
+  // share one BIP-32 derivation instead of racing.
+  const inFlightKeys = useRef<Map<number, Promise<NostrKeys>>>(new Map());
+  const inFlightCashu = useRef<Map<number, Promise<string>>>(new Map());
   const hasStarted = useRef(false);
 
   const getMnemonicForDerivation = useCallback(async (): Promise<string | null> => {
@@ -125,25 +124,35 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         return null;
       }
 
-      try {
-        // Check cache first
-        if (cachedKeys.has(accountIndex)) {
-          return cachedKeys.get(accountIndex)!;
-        }
-
-        const derivedKeys: NostrKeys = deriveNostrKeys(rootMnemonic, accountIndex);
-
-        // Cache the keys
-        setCachedKeys((prev) => new Map(prev).set(accountIndex, derivedKeys));
-
-        return derivedKeys;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to derive Nostr keys';
-        log.error('nostr.keys.derive_failed', { error: err });
-        throw new Error(errorMessage);
+      const cached = cachedKeys.current.get(accountIndex);
+      if (cached) {
+        return cached;
       }
+      const inflight = inFlightKeys.current.get(accountIndex);
+      if (inflight) {
+        return inflight;
+      }
+
+      const work = (async () => {
+        try {
+          // initPhase parity with the init path so log-doctor can see on-demand spikes.
+          const derivedKeys = await initPhase('NostrKeys.deriveOnDemand', async () =>
+            deriveNostrKeys(rootMnemonic, accountIndex)
+          );
+          cachedKeys.current.set(accountIndex, derivedKeys);
+          return derivedKeys;
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to derive Nostr keys';
+          log.error('nostr.keys.derive_failed', { error: redactError(err) });
+          throw new Error(errorMessage);
+        } finally {
+          inFlightKeys.current.delete(accountIndex);
+        }
+      })();
+      inFlightKeys.current.set(accountIndex, work);
+      return work;
     },
-    [getMnemonicForDerivation, cachedKeys]
+    [getMnemonicForDerivation]
   );
 
   const deriveCashuMnemonic = useCallback(
@@ -153,25 +162,35 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         return null;
       }
 
-      try {
-        // Check cache first
-        if (cachedCashuMnemonics.has(accountIndex)) {
-          return cachedCashuMnemonics.get(accountIndex)!;
-        }
-
-        const derivedCashuMnemonic = deriveCashuMnemonicPure(rootMnemonic, accountIndex);
-
-        // Cache the mnemonic
-        setCachedCashuMnemonics((prev) => new Map(prev).set(accountIndex, derivedCashuMnemonic));
-
-        return derivedCashuMnemonic;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to derive cashu mnemonic';
-        log.error('nostr.keys.cashu_mnemonic_failed', { error: err });
-        throw new Error(errorMessage);
+      const cached = cachedCashuMnemonics.current.get(accountIndex);
+      if (cached) {
+        return cached;
       }
+      const inflight = inFlightCashu.current.get(accountIndex);
+      if (inflight) {
+        return inflight;
+      }
+
+      const work = (async () => {
+        try {
+          const derivedCashuMnemonic = await initPhase('NostrKeys.deriveCashuOnDemand', async () =>
+            deriveCashuMnemonicPure(rootMnemonic, accountIndex)
+          );
+          cachedCashuMnemonics.current.set(accountIndex, derivedCashuMnemonic);
+          return derivedCashuMnemonic;
+        } catch (err) {
+          const errorMessage =
+            err instanceof Error ? err.message : 'Failed to derive cashu mnemonic';
+          log.error('nostr.keys.cashu_mnemonic_failed', { error: redactError(err) });
+          throw new Error(errorMessage);
+        } finally {
+          inFlightCashu.current.delete(accountIndex);
+        }
+      })();
+      inFlightCashu.current.set(accountIndex, work);
+      return work;
     },
-    [getMnemonicForDerivation, cachedCashuMnemonics]
+    [getMnemonicForDerivation]
   );
 
   const getKeysForAccount = useCallback(
@@ -209,8 +228,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       setError(null);
 
       // Clear cache and rederive default keys
-      setCachedKeys(new Map());
-      setCachedCashuMnemonics(new Map());
+      cachedKeys.current.clear();
+      cachedCashuMnemonics.current.clear();
       const defaultKeys = await deriveKeys(defaultAccountIndex);
       const defaultCashuMnemonic = await deriveCashuMnemonic(defaultAccountIndex);
       setKeys(defaultKeys);
@@ -226,7 +245,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to refresh keys';
       setError(errorMessage);
-      log.error('nostr.keys.refresh_failed', { error: err });
+      log.error('nostr.keys.refresh_failed', { error: redactError(err) });
     } finally {
       setIsLoading(false);
     }
@@ -325,13 +344,11 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         } else {
           // ── Derived profile: existing NIP-06 derivation path ──
           // Try loading cached keys from SecureStore (fast path)
-          const [cachedDerived, cachedCashu] = await initPhase(
-            'NostrKeys.cacheRead',
-            () =>
-              Promise.all([
-                retrieveDerivedKeys(defaultAccountIndex),
-                retrieveCashuMnemonic(defaultAccountIndex),
-              ])
+          const [cachedDerived, cachedCashu] = await initPhase('NostrKeys.cacheRead', () =>
+            Promise.all([
+              retrieveDerivedKeys(defaultAccountIndex),
+              retrieveCashuMnemonic(defaultAccountIndex),
+            ])
           );
           initLog(
             'NostrKeys',
@@ -358,9 +375,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
               deriveNostrKeys(mnemonicToUse!, defaultAccountIndex)
             );
 
-            defaultCashuMnemonic = await initPhase(
-              'NostrKeys.deriveCashuMnemonic',
-              async () => deriveCashuMnemonicPure(mnemonicToUse!, defaultAccountIndex)
+            defaultCashuMnemonic = await initPhase('NostrKeys.deriveCashuMnemonic', async () =>
+              deriveCashuMnemonicPure(mnemonicToUse!, defaultAccountIndex)
             );
 
             const cachePayload: CachedDerivedKeys = {
@@ -406,7 +422,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       }
     };
 
-    initializeKeys();
+    void initializeKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mnemonic, mnemonicLoading, stage.canStart, refreshMnemonic]);
 
@@ -417,16 +433,29 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     }
   }, [mnemonicError]);
 
-  const contextValue: NostrKeysContextValue = {
-    keys,
-    cashuMnemonic,
-    isReady,
-    isLoading: isLoading || mnemonicLoading,
-    error,
-    refresh,
-    getKeysForAccount,
-    getCashuMnemonicForAccount,
-  };
+  const contextValue = useMemo<NostrKeysContextValue>(
+    () => ({
+      keys,
+      cashuMnemonic,
+      isReady,
+      isLoading: isLoading || mnemonicLoading,
+      error,
+      refresh,
+      getKeysForAccount,
+      getCashuMnemonicForAccount,
+    }),
+    [
+      keys,
+      cashuMnemonic,
+      isReady,
+      isLoading,
+      mnemonicLoading,
+      error,
+      refresh,
+      getKeysForAccount,
+      getCashuMnemonicForAccount,
+    ]
+  );
 
   // Loading UI is now handled by InitializationScreen
   // Only render children when ready

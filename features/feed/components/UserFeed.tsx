@@ -24,8 +24,11 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, InteractionManager, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { StyleSheet, InteractionManager, ActivityIndicator } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -35,7 +38,6 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
 import { LegendList, LegendListRef, type LegendListRenderItemProps } from '@legendapp/list';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
@@ -51,33 +53,23 @@ import Reanimated, {
 // Shared module — types, constants, utils, rendering components
 // ============================================================================
 
+import type {
+  FeedEvent,
+  FeedItem,
+  NoteMetrics,
+  ProfileInfo,
+  RawPrimalEvent,
+  VideoPostRecord,
+} from './nostr/feedTypes';
+import { DEFAULT_METRICS } from './nostr/feedTypes';
+import { createPrimalRelayClient, PRIMAL_CACHE_RELAY_URL } from './nostr/primalRelay';
 import {
-  type FeedEvent,
-  type FeedItem,
-  type FeedParseResult,
-  type NoteMetrics,
-  type ProfileInfo,
-  type RawPrimalEvent,
-  DEFAULT_METRICS,
-  PRIMAL_CACHE_RELAY_URL,
-  PRIMAL_KIND_NOTE_STATS,
-  PRIMAL_KIND_MENTIONS,
-  PRIMAL_KIND_FEED_RANGE,
-  MAX_VIDEO_FEED_PAGES,
-  createPrimalRelayClient,
-  collectReferencedIds,
-  normalizeFeedEvent,
-  parseJson,
-  getFirstTagValue,
-  parseProfileFromRaw,
-  parseNoteMetrics,
-  getEmbeddedRepostEvent,
   buildVideoOverlayLayout,
   computeFeedIndicesWithVideo,
-  enrichFeedPage,
   buildDedupedVideoPosts,
-  type VideoPostRecord,
-} from './nostr/shared';
+  MAX_VIDEO_FEED_PAGES,
+} from './nostr/videoLayout';
+import { enrichFeedPage, parseFeedPage } from './nostr/parseFeedPage';
 
 import { PostCard } from './nostr/PostCard';
 import {
@@ -113,164 +105,19 @@ function isRootNote(event: FeedEvent): boolean {
   return eTags.every((t) => t[3] === 'mention');
 }
 
-function parsePhase1(
+function parseUserFeedPage(
   feedRawEvents: RawPrimalEvent[],
   pubkey: string,
   authorName?: string,
   authorPicture?: string
-): FeedParseResult {
-  const eventMap = new Map<string, FeedEvent>();
-  const userAuthoredPosts: FeedEvent[] = [];
-  const embeddedMentionEvents = new Map<string, FeedEvent>();
-  const metricsMap = new Map<string, NoteMetrics>();
-  const profilesMap = new Map<string, ProfileInfo>();
-  let feedOrder: string[] = [];
-  let paginationUntil = 0;
-
-  for (const raw of feedRawEvents) {
-    if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-      const parsed = parseJson<Record<string, unknown>>(raw.content);
-      const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-      if (!eventId || !parsed) continue;
-      metricsMap.set(eventId, parseNoteMetrics(parsed));
-      continue;
-    }
-
-    if (raw.kind === PRIMAL_KIND_FEED_RANGE) {
-      const parsed = parseJson<Record<string, unknown>>(raw.content);
-      if (Array.isArray(parsed?.elements)) {
-        feedOrder = parsed.elements.filter((id): id is string => typeof id === 'string');
-      }
-      const rawUntil = parsed?.until;
-      if (typeof rawUntil === 'number' && rawUntil > 0) {
-        paginationUntil = rawUntil;
-      } else if (typeof rawUntil === 'string') {
-        const num = Number(rawUntil);
-        if (num > 0) paginationUntil = num;
-      }
-      continue;
-    }
-
-    if (raw.kind === PRIMAL_KIND_MENTIONS) {
-      const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
-      if (!mentionEvent) continue;
-      embeddedMentionEvents.set(mentionEvent.id, mentionEvent);
-      eventMap.set(mentionEvent.id, mentionEvent);
-      continue;
-    }
-
-    const ev = normalizeFeedEvent(raw);
-    if (!ev) continue;
-
-    if (ev.kind === ShortTextNote || ev.kind === Repost || ev.kind === GenericRepost) {
-      eventMap.set(ev.id, ev);
-      if (ev.pubkey === pubkey) userAuthoredPosts.push(ev);
-      continue;
-    }
-
-    if (ev.kind === Metadata) {
-      const result = parseProfileFromRaw(raw);
-      if (result) profilesMap.set(result[0], result[1]);
-      continue;
-    }
-  }
-
-  if (authorName) {
-    profilesMap.set(pubkey, { name: authorName, picture: authorPicture });
-  }
-
-  const rootNotes = userAuthoredPosts.filter((ev) => ev.kind === ShortTextNote && isRootNote(ev));
-  const userRepostEvents = userAuthoredPosts.filter(
-    (ev) => ev.kind === Repost || ev.kind === GenericRepost
-  );
-
-  const nextFeedItems: FeedItem[] = [];
-  const feedItemsByEventId = new Map<string, FeedItem>();
-
-  for (const note of rootNotes) {
-    const item: FeedItem = { type: 'note', event: note, timestamp: note.created_at || 0 };
-    nextFeedItems.push(item);
-    feedItemsByEventId.set(note.id, item);
-  }
-
-  for (const repostEvent of userRepostEvents) {
-    const originalEventId = getFirstTagValue(repostEvent, 'e');
-    if (!originalEventId) continue;
-    let originalEvent = eventMap.get(originalEventId);
-    if (!originalEvent) {
-      originalEvent = getEmbeddedRepostEvent(repostEvent, originalEventId);
-      if (originalEvent) eventMap.set(originalEvent.id, originalEvent);
-    }
-
-    const item: FeedItem = {
-      type: 'repost',
-      repostEvent,
-      originalEvent,
-      originalEventId,
-      timestamp: repostEvent.created_at || 0,
-    };
-    nextFeedItems.push(item);
-    feedItemsByEventId.set(repostEvent.id, item);
-  }
-
-  const orderedFeedItems =
-    feedOrder.length > 0
-      ? [
-          ...feedOrder
-            .map((id) => feedItemsByEventId.get(id))
-            .filter((item): item is FeedItem => item !== undefined),
-          ...nextFeedItems.filter(
-            (item) =>
-              !feedOrder.includes(item.type === 'note' ? item.event.id : item.repostEvent.id)
-          ),
-        ]
-      : nextFeedItems;
-
-  if (feedOrder.length === 0) {
-    orderedFeedItems.sort((a, b) => b.timestamp - a.timestamp);
-  }
-
-  const repostedOriginalEvents = orderedFeedItems
-    .filter((item): item is Extract<FeedItem, { type: 'repost' }> => item.type === 'repost')
-    .map((item) => item.originalEvent)
-    .filter((ev): ev is FeedEvent => ev !== undefined);
-
-  const contentSources = [...rootNotes, ...repostedOriginalEvents];
-  const { eventIds: referencedEventIds, pubkeys: inlineMentionPubkeys } =
-    collectReferencedIds(contentSources);
-
-  const quotedEventsMap = new Map<string, FeedEvent>(embeddedMentionEvents);
-  const missingQuotedIds = referencedEventIds.filter((id) => !quotedEventsMap.has(id));
-
-  const neededPubkeys = new Set(inlineMentionPubkeys);
-  for (const ev of embeddedMentionEvents.values()) neededPubkeys.add(ev.pubkey);
-  for (const ev of repostedOriginalEvents) neededPubkeys.add(ev.pubkey);
-  const missingProfilePubkeys = Array.from(neededPubkeys).filter((pk) => !profilesMap.has(pk));
-
-  for (const item of orderedFeedItems) {
-    const metricId = item.type === 'note' ? item.event.id : item.originalEventId;
-    if (!metricsMap.has(metricId)) metricsMap.set(metricId, { ...DEFAULT_METRICS });
-  }
-
-  // Fallback cursor: use oldest item timestamp when FeedRange didn't provide `until`
-  if (paginationUntil === 0 && orderedFeedItems.length > 0) {
-    for (const item of orderedFeedItems) {
-      if (paginationUntil === 0 || item.timestamp < paginationUntil) {
-        paginationUntil = item.timestamp;
-      }
-    }
-  }
-
-  return {
-    orderedFeedItems,
-    metricsMap,
-    profilesMap,
-    quotedEventsMap,
-    missingQuotedIds,
-    missingProfilePubkeys,
-    paginationUntil,
-    paginationOffset: feedOrder.length || orderedFeedItems.length,
-  };
+) {
+  return parseFeedPage(feedRawEvents, {
+    includeNote: (ev) => ev.pubkey === pubkey && isRootNote(ev),
+    includeRepost: (ev) => ev.pubkey === pubkey,
+    extraProfile: authorName
+      ? { pubkey, profile: { name: authorName, picture: authorPicture } }
+      : undefined,
+  });
 }
 
 // ============================================================================
@@ -299,6 +146,7 @@ export const RepostCard = React.memo(function RepostCard({
   onLikePress,
   onRepostPress,
   skipAnimation,
+  getThreadContext,
 }: {
   repostEvent: FeedEvent;
   originalEvent: FeedEvent | undefined;
@@ -321,6 +169,7 @@ export const RepostCard = React.memo(function RepostCard({
   onLikePress?: () => void;
   onRepostPress?: () => void;
   skipAnimation?: boolean;
+  getThreadContext?: () => ThreadSeed | null;
 }) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -347,11 +196,21 @@ export const RepostCard = React.memo(function RepostCard({
   const threadEventId = originalEvent?.id || _repostEvent.id;
 
   const navigateToThread = useCallback(() => {
-    router.navigate({
-      pathname: '/(user-flow)/thread' as any,
+    const ctx = getThreadContext?.() ?? null;
+    const allEvents = new Map(ctx?.allEvents ?? []);
+    if (originalEvent) allEvents.set(originalEvent.id, originalEvent);
+    allEvents.set(_repostEvent.id, _repostEvent);
+    seedThread(threadEventId, {
+      allEvents,
+      profiles: ctx?.profiles ?? new Map(),
+      metrics: ctx?.metrics ?? new Map(),
+      quotedEvents: ctx?.quotedEvents ?? new Map(),
+    });
+    router.push({
+      pathname: '/(user-flow)/thread',
       params: { eventId: threadEventId },
     });
-  }, [threadEventId]);
+  }, [threadEventId, getThreadContext, originalEvent, _repostEvent]);
 
   const suppressThreadTapRef = useRef(false);
 
@@ -383,13 +242,13 @@ export const RepostCard = React.memo(function RepostCard({
     <GestureDetector gesture={tapGesture}>
       <Reanimated.View style={animStyle}>
         {/* Repost header */}
-        <TouchableOpacity
+        <Pressable
           activeOpacity={0.7}
           onPressIn={suppressThreadTapStart}
           onPressOut={suppressThreadTapEnd}
           onPress={() =>
-            router.navigate({
-              pathname: '/(user-flow)/profile' as any,
+            router.push({
+              pathname: '/(user-flow)/profile',
               params: { pubkey: reposterPubkey },
             })
           }>
@@ -402,7 +261,7 @@ export const RepostCard = React.memo(function RepostCard({
               {reposterName} reposted
             </Text>
           </HStack>
-        </TouchableOpacity>
+        </Pressable>
 
         {originalEvent ? (
           <PostCard
@@ -425,6 +284,7 @@ export const RepostCard = React.memo(function RepostCard({
             onRepostPress={onRepostPress}
             onNestedProfilePressIn={suppressThreadTapStart}
             onNestedProfilePressOut={suppressThreadTapEnd}
+            getThreadContext={getThreadContext}
           />
         ) : (
           <View
@@ -474,7 +334,7 @@ function EmptyFeed() {
 // Main UserFeed Component
 // ============================================================================
 
-function UserFeedInner({
+export function UserFeed({
   pubkey,
   authorName,
   authorPicture,
@@ -496,14 +356,14 @@ function UserFeedInner({
   const paginationOffsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(new Set<string>());
+  // Tracks the prefix of the most recent loadMoreItems request so its
+  // enrichFeedPage onUpdate cannot write into a feed reset by a later author switch.
+  const activeLoadMoreIdRef = useRef<string | null>(null);
 
   // Stable refs for renderItem — avoids re-creating renderItem on every Map update
-  const metricsRef = useRef(metricsMap);
-  metricsRef.current = metricsMap;
-  const quotedRef = useRef(quotedEventsMap);
-  quotedRef.current = quotedEventsMap;
-  const profilesRef = useRef(profilesMap);
-  profilesRef.current = profilesMap;
+  const metricsRef = useLatestRef(metricsMap);
+  const quotedRef = useLatestRef(quotedEventsMap);
+  const profilesRef = useLatestRef(profilesMap);
   const [dataVersion, setDataVersion] = useState(0);
 
   // Track whether initial load has completed — skip fade-in for items after first render
@@ -535,6 +395,7 @@ function UserFeedInner({
     paginationOffsetRef.current = 0;
     feedItemIdsRef.current.clear();
     loadingMoreRef.current = false;
+    activeLoadMoreIdRef.current = null;
     deletedRepostIdsRef.current = null;
 
     const loadFeedFromPrimal = async () => {
@@ -547,7 +408,7 @@ function UserFeedInner({
         });
         if (cancelled) return;
 
-        const phase1 = parsePhase1(feedRawEvents, pubkey, authorName, authorPicture);
+        const phase1 = parseUserFeedPage(feedRawEvents, pubkey, authorName, authorPicture);
 
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
@@ -633,7 +494,7 @@ function UserFeedInner({
     };
 
     const task = InteractionManager.runAfterInteractions(() => {
-      loadFeedFromPrimal();
+      void loadFeedFromPrimal();
     });
 
     return () => {
@@ -657,6 +518,7 @@ function UserFeedInner({
     setIsLoadingMore(true);
     const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
     const rp = Date.now().toString(36);
+    activeLoadMoreIdRef.current = rp;
 
     try {
       const payload: Record<string, unknown> = {
@@ -668,7 +530,7 @@ function UserFeedInner({
       if (paginationOffsetRef.current > 0) payload.offset = paginationOffsetRef.current;
 
       const rawEvents = await client.request(`${rp}_more`, { cache: ['feed', payload] });
-      const page = parsePhase1(rawEvents, pubkey, authorName, authorPicture);
+      const page = parseUserFeedPage(rawEvents, pubkey, authorName, authorPicture);
 
       if (page.orderedFeedItems.length === 0) {
         hasMoreRef.current = false;
@@ -747,6 +609,7 @@ function UserFeedInner({
         quotedRef.current,
         profilesRef.current,
         (updates) => {
+          if (activeLoadMoreIdRef.current !== rp) return;
           startTransition(() => {
             if (updates.quotedEvents) {
               setQuotedEventsMap((prev) => {
@@ -785,7 +648,7 @@ function UserFeedInner({
   }, [pubkey, authorName, authorPicture, isOwnProfile, startTransition]);
 
   const handleEndReached = useCallback(() => {
-    loadMoreItems();
+    void loadMoreItems();
   }, [loadMoreItems]);
 
   const getMetrics = useCallback(
@@ -860,6 +723,24 @@ function UserFeedInner({
     pubkey,
     overrideName: authorName,
   });
+
+  const getThreadContext = useCallback(() => {
+    const allEvents = new Map<string, FeedEvent>();
+    for (const it of feedItems) {
+      if (it.type === 'note') {
+        allEvents.set(it.event.id, it.event);
+      } else if (it.originalEvent) {
+        allEvents.set(it.originalEvent.id, it.originalEvent);
+      }
+    }
+    return {
+      allEvents,
+      profiles: profilesRef.current,
+      metrics: metricsRef.current,
+      quotedEvents: quotedRef.current,
+    };
+  }, [feedItems, profilesRef, metricsRef, quotedRef]);
+
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
       if (item.type === 'note') {
@@ -885,6 +766,7 @@ function UserFeedInner({
             onLikePress={() => toggleLike(item.event)}
             onRepostPress={() => toggleRepost(item.event)}
             skipAnimation={!isFirstRender.current}
+            getThreadContext={getThreadContext}
           />
         );
       }
@@ -912,6 +794,7 @@ function UserFeedInner({
           onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
+          getThreadContext={getThreadContext}
         />
       );
     },
@@ -924,6 +807,7 @@ function UserFeedInner({
       toggleLike,
       toggleRepost,
       onOverlayOpenedFromIndex,
+      getThreadContext,
     ]
   );
 
@@ -1021,12 +905,6 @@ function UserFeedInner({
     </Log>
   );
 }
-
-function UserFeedComponent(props: UserFeedProps) {
-  return <UserFeedInner {...props} />;
-}
-
-export const UserFeed = React.memo(UserFeedComponent);
 
 // ============================================================================
 // Stable list references

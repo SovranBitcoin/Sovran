@@ -3,10 +3,12 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { router } from 'expo-router';
 import { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import { useMints } from '@cashu/coco-react';
+import { z } from 'zod';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -21,12 +23,21 @@ import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWit
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 const SUPPORTED_CURRENCIES = ['ALL', 'SAT', 'USD', 'EUR', 'GBP'];
+
+const ParamsSchema = z.object({
+  currency: z.string().max(16).optional(),
+  paymentType: z.enum(['all', 'lightning', 'ecash']).optional(),
+  direction: z.enum(['all', 'incoming', 'outgoing']).optional(),
+  status: z.enum(['All', 'Confirmed', 'Pending', 'Expired']).optional(),
+  mintUrl: z.string().max(2048).optional(),
+});
 
 interface ChipProps {
   label: string;
@@ -134,21 +145,13 @@ export function FiltersScreen() {
   const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
   const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
-  const params = useLocalSearchParams<{
-    currency?: string;
-    paymentType?: string;
-    direction?: string;
-    status?: string;
-    mintUrl?: string;
-  }>();
+  const params = useRouteParams(ParamsSchema, { where: 'filter-flow.filters' });
 
-  const [currency, setCurrency] = useState<string>(params.currency || 'sat');
-  const [paymentType, setPaymentType] = useState<PaymentType>(
-    (params.paymentType as PaymentType) || 'all'
-  );
-  const [direction, setDirection] = useState<Direction>((params.direction as Direction) || 'all');
-  const [status, setStatus] = useState<Status>((params.status as Status) || 'All');
-  const [mintUrl, setMintUrl] = useState<string>(params.mintUrl || 'all');
+  const [currency, setCurrency] = useState<string>(params?.currency || 'sat');
+  const [paymentType, setPaymentType] = useState<PaymentType>(params?.paymentType || 'all');
+  const [direction, setDirection] = useState<Direction>(params?.direction || 'all');
+  const [status, setStatus] = useState<Status>(params?.status || 'All');
+  const [mintUrl, setMintUrl] = useState<string>(params?.mintUrl || 'all');
 
   const mintOptions = useMemo(
     () => [
@@ -289,103 +292,103 @@ export function FiltersScreen() {
         </BottomButtons>
       }>
       <View style={styles.filterContent}>
-          <Section title="Mint">
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.mintChipsRow}>
-              {mintOptions.map((mint) => (
-                <MintSelectorChip
-                  key={mint.mintUrl}
-                  showIcon={mint.mintUrl !== 'all'}
-                  name={mint.name}
-                  iconUrl={mint.icon_url}
-                  isSelected={mintUrl === mint.mintUrl}
-                  onPress={() => setMintUrl(mint.mintUrl)}
-                />
-              ))}
-            </ScrollView>
-          </Section>
-
-          <Section title="Currency">
-            {SUPPORTED_CURRENCIES.map((curr) => (
-              <Chip
-                key={curr}
-                label={curr}
-                isSelected={currency.toUpperCase() === curr}
-                onPress={() => setCurrency(curr.toLowerCase())}
+        <Section title="Mint">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.mintChipsRow}>
+            {mintOptions.map((mint) => (
+              <MintSelectorChip
+                key={mint.mintUrl}
+                showIcon={mint.mintUrl !== 'all'}
+                name={mint.name}
+                iconUrl={mint.icon_url}
+                isSelected={mintUrl === mint.mintUrl}
+                onPress={() => setMintUrl(mint.mintUrl)}
               />
             ))}
-          </Section>
+          </ScrollView>
+        </Section>
 
-          <Section title="Type">
+        <Section title="Currency">
+          {SUPPORTED_CURRENCIES.map((curr) => (
             <Chip
-              label="All"
-              icon="fluent:apps-16-filled"
-              isSelected={paymentType === 'all'}
-              onPress={() => setPaymentType('all')}
+              key={curr}
+              label={curr}
+              isSelected={currency.toUpperCase() === curr}
+              onPress={() => setCurrency(curr.toLowerCase())}
             />
-            <Chip
-              label="Lightning"
-              icon="mingcute:lightning-fill"
-              isSelected={paymentType === 'lightning'}
-              onPress={() => setPaymentType('lightning')}
-            />
-            <Chip
-              label="Ecash"
-              icon="majesticons:coins"
-              isSelected={paymentType === 'ecash'}
-              onPress={() => setPaymentType('ecash')}
-            />
-          </Section>
+          ))}
+        </Section>
 
-          <Section title="Direction">
-            <Chip
-              label="All"
-              icon="fluent:arrow-swap-16-filled"
-              isSelected={direction === 'all'}
-              onPress={() => setDirection('all')}
-            />
-            <Chip
-              label="In"
-              icon="fluent:arrow-download-16-filled"
-              isSelected={direction === 'incoming'}
-              onPress={() => setDirection('incoming')}
-            />
-            <Chip
-              label="Out"
-              icon="fluent:arrow-upload-16-filled"
-              isSelected={direction === 'outgoing'}
-              onPress={() => setDirection('outgoing')}
-            />
-          </Section>
+        <Section title="Type">
+          <Chip
+            label="All"
+            icon="fluent:apps-16-filled"
+            isSelected={paymentType === 'all'}
+            onPress={() => setPaymentType('all')}
+          />
+          <Chip
+            label="Lightning"
+            icon="mingcute:lightning-fill"
+            isSelected={paymentType === 'lightning'}
+            onPress={() => setPaymentType('lightning')}
+          />
+          <Chip
+            label="Ecash"
+            icon="majesticons:coins"
+            isSelected={paymentType === 'ecash'}
+            onPress={() => setPaymentType('ecash')}
+          />
+        </Section>
 
-          <Section title="Status">
-            <Chip
-              label="All"
-              icon="fluent:list-16-filled"
-              isSelected={status === 'All'}
-              onPress={() => setStatus('All')}
-            />
-            <Chip
-              label="Confirmed"
-              icon="fluent:checkmark-circle-16-filled"
-              isSelected={status === 'Confirmed'}
-              onPress={() => setStatus('Confirmed')}
-            />
-            <Chip
-              label="Pending"
-              icon="fluent:clock-16-filled"
-              isSelected={status === 'Pending'}
-              onPress={() => setStatus('Pending')}
-            />
-            <Chip
-              label="Expired"
-              icon="fluent:dismiss-circle-16-filled"
-              isSelected={status === 'Expired'}
-              onPress={() => setStatus('Expired')}
-            />
-          </Section>
+        <Section title="Direction">
+          <Chip
+            label="All"
+            icon="fluent:arrow-swap-16-filled"
+            isSelected={direction === 'all'}
+            onPress={() => setDirection('all')}
+          />
+          <Chip
+            label="In"
+            icon="fluent:arrow-download-16-filled"
+            isSelected={direction === 'incoming'}
+            onPress={() => setDirection('incoming')}
+          />
+          <Chip
+            label="Out"
+            icon="fluent:arrow-upload-16-filled"
+            isSelected={direction === 'outgoing'}
+            onPress={() => setDirection('outgoing')}
+          />
+        </Section>
+
+        <Section title="Status">
+          <Chip
+            label="All"
+            icon="fluent:list-16-filled"
+            isSelected={status === 'All'}
+            onPress={() => setStatus('All')}
+          />
+          <Chip
+            label="Confirmed"
+            icon="fluent:checkmark-circle-16-filled"
+            isSelected={status === 'Confirmed'}
+            onPress={() => setStatus('Confirmed')}
+          />
+          <Chip
+            label="Pending"
+            icon="fluent:clock-16-filled"
+            isSelected={status === 'Pending'}
+            onPress={() => setStatus('Pending')}
+          />
+          <Chip
+            label="Expired"
+            icon="fluent:dismiss-circle-16-filled"
+            isSelected={status === 'Expired'}
+            onPress={() => setStatus('Expired')}
+          />
+        </Section>
       </View>
     </ScreenWrapper>
   );

@@ -16,7 +16,8 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useSyncExternalStore } from 'react';
 
-import type { CreateAmountActionManagerConfig } from '../amount-actions/types';
+import { useLatestRef } from './useLatestRef';
+import type { CreateAmountActionManagerConfig , QuickSendSuggestion } from '../amount-actions/types';
 import {
   createScreenActionManager,
   shouldApplyEntryUpdate as defaultShouldApply,
@@ -24,7 +25,6 @@ import {
   decorateEntry as defaultDecorate,
 } from '../screen-actions/createManager';
 import { createDefaultScreenActionHandlers } from '../screen-actions/defaultHandlers';
-import type { QuickSendSuggestion } from '../amount-actions/types';
 import type {
   ActionState,
   DecoratedEntryFields,
@@ -135,14 +135,10 @@ export function useScreenActionsWithConfig<S extends ScreenType>(
     amountConfig,
   } = config;
 
-  const getExtraContextRef = useRef(getExtraContext);
-  getExtraContextRef.current = getExtraContext;
-  const shouldApplyEntryUpdateRef = useRef(shouldApplyEntryUpdate);
-  shouldApplyEntryUpdateRef.current = shouldApplyEntryUpdate;
-  const mergeEntryUpdateRef = useRef(mergeEntryUpdate);
-  mergeEntryUpdateRef.current = mergeEntryUpdate;
-  const amountConfigRef = useRef(amountConfig);
-  amountConfigRef.current = amountConfig;
+  const getExtraContextRef = useLatestRef(getExtraContext);
+  const shouldApplyEntryUpdateRef = useLatestRef(shouldApplyEntryUpdate);
+  const mergeEntryUpdateRef = useLatestRef(mergeEntryUpdate);
+  const amountConfigRef = useLatestRef(amountConfig);
 
   const { parsed, error } = useMemo(
     () =>
@@ -245,6 +241,7 @@ export function useScreenActions(
     screenActionHandlers,
     screenActionsBridge,
     getLocaleRef,
+    getOfflineRef,
     getBtcPriceRef,
     getDisplayCurrencyRef,
     notificationsRef,
@@ -256,10 +253,8 @@ export function useScreenActions(
   const isAmountEntry = screenType === 'amountEntry';
   const skipDecoration = isAmountEntry || screenType === 'mintSelector';
 
-  const machineRef = useRef(machine);
-  machineRef.current = machine;
-  const bridgeRef = useRef(screenActionsBridge);
-  bridgeRef.current = screenActionsBridge;
+  const machineRef = useLatestRef(machine);
+  const bridgeRef = useLatestRef(screenActionsBridge);
 
   const getExtraContext = useCallback(
     () => ({
@@ -300,12 +295,13 @@ export function useScreenActions(
       createDefaultScreenActionHandlers({
         getMachine: () => machineRef.current,
         getOperations: () => operationsRef.current,
+        getOffline: () => getOfflineRef.current?.() ?? false,
         notify: (event: string, ...args: unknown[]) => {
           const notifications = notificationsRef.current;
           if (!notifications) return;
-          const handler = (notifications as Record<string, ((...a: unknown[]) => void) | undefined>)[
-            event
-          ];
+          const handler = (
+            notifications as Record<string, ((...a: unknown[]) => void) | undefined>
+          )[event];
           if (typeof handler === 'function') handler(...args);
         },
         navigation: {
@@ -318,7 +314,9 @@ export function useScreenActions(
     [] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const defaultHandlersForScreen = (
-    isAmountEntry ? allDefaults.amountEntry : allDefaults[screenType as Exclude<ScreenType, 'amountEntry'>]
+    isAmountEntry
+      ? allDefaults.amountEntry
+      : allDefaults[screenType as Exclude<ScreenType, 'amountEntry'>]
   ) as ScreenActionHandlerMap[typeof screenType];
 
   const shouldApply = screenActionsBridge?.shouldApplyEntryUpdate ?? defaultShouldApply;
@@ -332,13 +330,13 @@ export function useScreenActions(
   }, [subscribeGlobal]);
 
   // Auto-derive amountConfig from provider context when not explicitly provided.
-  // Uses getter closures so values stay fresh on each inspect().
+  // Every reactive field is a getter so the manager — created once and held
+  // in managerRef across the screen's lifetime — re-reads destination, unit,
+  // and display currency on every inspect(). Without this, opening amountEntry
+  // a second time from a different destination (sendEcash → meltQuote) or
+  // after a settings currency change keeps the first-render snapshot.
   const derivedAmountConfig = useMemo((): CreateAmountActionManagerConfig | undefined => {
     if (!isAmountEntry || options?.amountConfig) return undefined;
-    const flowCtx = machine.getContext();
-    const isSend = flowCtx.destination !== 'mintQuote';
-    const isEcashSend = flowCtx.destination === 'sendEcash';
-    const dc = getDisplayCurrencyRef.current?.();
     return {
       getMintUrl: () => machineRef.current.getContext().mintUrl,
       getProofAmounts: () => {
@@ -346,12 +344,15 @@ export function useScreenActions(
         return mint ? (walletContextRef.current?.proofAmounts[mint] ?? []) : [];
       },
       getBtcPrice: () => getBtcPriceRef.current?.() ?? 0,
-      offlineOptimization: isEcashSend,
-      unit: flowCtx.unit,
-      fiatCurrency: dc?.code,
-      fiatSymbol: dc?.symbol,
+      offlineOptimization: () => machineRef.current.getContext().destination === 'sendEcash',
+      unit: () => machineRef.current.getContext().unit,
+      fiatCurrency: () => getDisplayCurrencyRef.current?.()?.code,
+      fiatSymbol: () => getDisplayCurrencyRef.current?.()?.symbol,
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Refs are stable across renders; getter closures read .current on each
+    // inspect() so the manager always sees the latest values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAmountEntry, options?.amountConfig]);
 
   const effectiveAmountConfig = isAmountEntry
     ? (options?.amountConfig ?? derivedAmountConfig)

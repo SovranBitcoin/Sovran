@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useCameraPermissions } from 'expo-camera';
 import { Linking } from 'react-native';
 
-import { actionMenuPopup, cameraPermissionPopup } from '@/shared/lib/popup';
+import { actionMenuPopup, paramPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 
 export function useHandleCameraPermission() {
@@ -29,7 +29,7 @@ export function useHandleCameraPermission() {
       const res = await requestPermission();
       if (res.granted) {
         log.info('camera.permission.granted');
-        cameraPermissionPopup('granted');
+        paramPopup('camera-permission', 'granted');
         return true;
       }
     }
@@ -44,6 +44,10 @@ export function useHandleCameraPermission() {
           icon: 'material-symbols:settings-rounded',
           variant: 'primary',
           onPress: async () => {
+            // `app-settings:` is the iOS deep link to the app's own Settings
+            // page — not in the http/https/mailto/tel allowlist enforced by
+            // openExternalUrl, but safe here because the scheme is a constant.
+            // eslint-disable-next-line no-restricted-syntax
             await Linking.openURL('app-settings:');
           },
         },

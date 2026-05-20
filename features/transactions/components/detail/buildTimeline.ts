@@ -1,0 +1,571 @@
+import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
+import type { HistoryEntry } from '@cashu/coco-core';
+
+import {
+  MINT_COPY,
+  MELT_COPY,
+  SEND_COPY,
+  PAYMENT_REQUEST_COPY,
+  RECEIVE_COPY,
+} from '@/shared/lib/paymentCopy';
+import { meltQuoteExpired, mintHistoryEntryExpired } from '@/shared/lib/utils';
+
+const EXPIRED_STATE = 'expired';
+
+export type TimelineStepType =
+  | 'complete'
+  | 'current'
+  | 'next-pending'
+  | 'future-small'
+  | 'expired'
+  | 'rolled-back'
+  | 'already-spent'
+  | 'success';
+
+export interface TimelineItem {
+  state: string;
+  displayLabel: string;
+  stepType: TimelineStepType;
+  timestamp?: number;
+  info?: string;
+}
+
+interface BuildTimelineInput {
+  historyEntry: HistoryEntry;
+  meltQuote?: MeltQuoteBolt11Response;
+  currentTime: number;
+  tokenCreated?: boolean;
+  nostrSent?: boolean;
+}
+
+export function buildTimeline({
+  historyEntry,
+  meltQuote,
+  currentTime,
+  tokenCreated,
+  nostrSent,
+}: BuildTimelineInput): TimelineItem[] {
+  switch (historyEntry.type) {
+    case 'mint': {
+      const isExpired =
+        historyEntry.state === MintQuoteState.UNPAID && mintHistoryEntryExpired(historyEntry);
+
+      if (isExpired) {
+        return [
+          {
+            state: MintQuoteState.UNPAID,
+            displayLabel: MINT_COPY.UNPAID.label,
+            stepType: 'complete',
+            timestamp: historyEntry.createdAt,
+          },
+          {
+            state: EXPIRED_STATE,
+            displayLabel: MINT_COPY.expired.label,
+            stepType: 'expired',
+            info: MINT_COPY.expired.info,
+          },
+        ];
+      }
+
+      switch (historyEntry.state) {
+        case MintQuoteState.UNPAID:
+          return [
+            {
+              state: MintQuoteState.UNPAID,
+              displayLabel: MINT_COPY.UNPAID.label,
+              stepType: 'next-pending',
+              info: MINT_COPY.UNPAID.info,
+            },
+            {
+              state: MintQuoteState.PAID,
+              displayLabel: MINT_COPY.PAID.label,
+              stepType: 'future-small',
+            },
+            {
+              state: MintQuoteState.ISSUED,
+              displayLabel: MINT_COPY.ISSUED.label,
+              stepType: 'future-small',
+            },
+          ];
+        case MintQuoteState.PAID:
+          return [
+            {
+              state: MintQuoteState.UNPAID,
+              displayLabel: MINT_COPY.UNPAID.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: MintQuoteState.PAID,
+              displayLabel: MINT_COPY.PAID.label,
+              stepType: 'next-pending',
+              info: MINT_COPY.PAID.info,
+            },
+            {
+              state: MintQuoteState.ISSUED,
+              displayLabel: MINT_COPY.ISSUED.label,
+              stepType: 'future-small',
+            },
+          ];
+        case MintQuoteState.ISSUED:
+          return [
+            {
+              state: MintQuoteState.UNPAID,
+              displayLabel: MINT_COPY.UNPAID.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: MintQuoteState.PAID,
+              displayLabel: MINT_COPY.PAID.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: MintQuoteState.ISSUED,
+              displayLabel: MINT_COPY.ISSUED.label,
+              stepType: 'success',
+              info: MINT_COPY.ISSUED.info(historyEntry.amount),
+            },
+          ];
+        default:
+          return [];
+      }
+    }
+
+    case 'melt': {
+      const isExpired =
+        meltQuote &&
+        historyEntry.state === MeltQuoteState.UNPAID &&
+        meltQuoteExpired(meltQuote, currentTime);
+
+      if (isExpired) {
+        return [
+          {
+            state: MeltQuoteState.UNPAID,
+            displayLabel: MELT_COPY.UNPAID.label,
+            stepType: 'complete',
+            timestamp: historyEntry.createdAt,
+          },
+          {
+            state: EXPIRED_STATE,
+            displayLabel: MELT_COPY.expired.label,
+            stepType: 'expired',
+            info: MELT_COPY.expired.info,
+          },
+        ];
+      }
+
+      switch (historyEntry.state) {
+        case MeltQuoteState.UNPAID:
+          return [
+            {
+              state: MeltQuoteState.UNPAID,
+              displayLabel: MELT_COPY.UNPAID.label,
+              stepType: 'next-pending',
+              info: MELT_COPY.UNPAID.info,
+            },
+            {
+              state: MeltQuoteState.PENDING,
+              displayLabel: MELT_COPY.PENDING.label,
+              stepType: 'future-small',
+            },
+            {
+              state: MeltQuoteState.PAID,
+              displayLabel: MELT_COPY.PAID.label,
+              stepType: 'future-small',
+            },
+          ];
+        case MeltQuoteState.PENDING:
+          return [
+            {
+              state: MeltQuoteState.UNPAID,
+              displayLabel: MELT_COPY.UNPAID.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: MeltQuoteState.PENDING,
+              displayLabel: MELT_COPY.PENDING.label,
+              stepType: 'current',
+              info: MELT_COPY.PENDING.info,
+            },
+            {
+              state: MeltQuoteState.PAID,
+              displayLabel: MELT_COPY.PAID.label,
+              stepType: 'future-small',
+            },
+          ];
+        case MeltQuoteState.PAID:
+          return [
+            {
+              state: MeltQuoteState.UNPAID,
+              displayLabel: MELT_COPY.UNPAID.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: MeltQuoteState.PENDING,
+              displayLabel: MELT_COPY.PENDING.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: MeltQuoteState.PAID,
+              displayLabel: MELT_COPY.PAID.label,
+              stepType: 'success',
+              info: MELT_COPY.PAID.info,
+            },
+          ];
+        default:
+          return [];
+      }
+    }
+
+    case 'send': {
+      const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
+
+      if (historyEntry.state === 'rolledBack') {
+        const copy = isPaymentRequestMode ? PAYMENT_REQUEST_COPY : SEND_COPY;
+        const rolledBackTimeline: TimelineItem[] = [
+          {
+            state: 'prepared',
+            displayLabel: copy.prepared.label,
+            stepType: 'complete',
+            timestamp: historyEntry.createdAt,
+          },
+        ];
+        if (nostrSent) {
+          rolledBackTimeline.push({
+            state: 'nostrSent',
+            displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+            stepType: 'complete',
+            timestamp: historyEntry.createdAt,
+          });
+        }
+        rolledBackTimeline.push({
+          state: 'rolledBack',
+          displayLabel: copy.rolledBack.label,
+          stepType: 'rolled-back',
+          info: copy.rolledBack.info,
+        });
+        return rolledBackTimeline;
+      }
+
+      if (isPaymentRequestMode) {
+        switch (historyEntry.state) {
+          case 'prepared':
+            return [
+              {
+                state: 'prepared',
+                displayLabel: PAYMENT_REQUEST_COPY.prepared.label,
+                stepType: tokenCreated ? 'complete' : 'next-pending',
+                info: PAYMENT_REQUEST_COPY.prepared.info,
+                ...(tokenCreated ? { timestamp: historyEntry.createdAt } : {}),
+              },
+              {
+                state: 'nostrSent',
+                displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+                stepType: 'future-small',
+              },
+              {
+                state: 'finalized',
+                displayLabel: PAYMENT_REQUEST_COPY.finalized.label,
+                stepType: 'future-small',
+              },
+            ];
+          case 'pending':
+            if (nostrSent) {
+              return [
+                {
+                  state: 'prepared',
+                  displayLabel: PAYMENT_REQUEST_COPY.prepared.label,
+                  stepType: 'complete',
+                  timestamp: historyEntry.createdAt,
+                },
+                {
+                  state: 'nostrSent',
+                  displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+                  stepType: 'complete',
+                  timestamp: historyEntry.createdAt,
+                  info: PAYMENT_REQUEST_COPY.nostrSent.infoSent,
+                },
+                {
+                  state: 'finalized',
+                  displayLabel: PAYMENT_REQUEST_COPY.finalized.label,
+                  stepType: 'next-pending',
+                  info: SEND_COPY.pending.info,
+                },
+              ];
+            }
+            return [
+              {
+                state: 'prepared',
+                displayLabel: PAYMENT_REQUEST_COPY.prepared.label,
+                stepType: 'complete',
+                timestamp: historyEntry.createdAt,
+              },
+              {
+                state: 'nostrSent',
+                displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+                stepType: 'next-pending',
+                info: PAYMENT_REQUEST_COPY.nostrSent.infoSending,
+              },
+              {
+                state: 'finalized',
+                displayLabel: PAYMENT_REQUEST_COPY.finalized.label,
+                stepType: 'future-small',
+              },
+            ];
+          case 'finalized':
+            return [
+              {
+                state: 'prepared',
+                displayLabel: PAYMENT_REQUEST_COPY.prepared.label,
+                stepType: 'complete',
+                timestamp: historyEntry.createdAt,
+              },
+              {
+                state: 'nostrSent',
+                displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+                stepType: 'complete',
+                timestamp: historyEntry.createdAt,
+                info: PAYMENT_REQUEST_COPY.nostrSent.infoSent,
+              },
+              {
+                state: 'finalized',
+                displayLabel: PAYMENT_REQUEST_COPY.finalized.label,
+                stepType: 'success',
+                info: PAYMENT_REQUEST_COPY.finalized.info,
+              },
+            ];
+          default:
+            return [];
+        }
+      }
+
+      switch (historyEntry.state) {
+        case 'prepared':
+          return [
+            {
+              state: 'prepared',
+              displayLabel: SEND_COPY.prepared.label,
+              stepType: 'current',
+              info: SEND_COPY.prepared.info,
+            },
+            {
+              state: 'pending',
+              displayLabel: SEND_COPY.pending.label,
+              stepType: 'next-pending',
+            },
+            {
+              state: 'finalized',
+              displayLabel: SEND_COPY.finalized.label,
+              stepType: 'future-small',
+            },
+          ];
+        case 'pending':
+          return [
+            {
+              state: 'prepared',
+              displayLabel: SEND_COPY.prepared.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: 'pending',
+              displayLabel: SEND_COPY.pending.label,
+              stepType: 'next-pending',
+              info: SEND_COPY.pending.info,
+            },
+            {
+              state: 'finalized',
+              displayLabel: SEND_COPY.finalized.label,
+              stepType: 'future-small',
+            },
+          ];
+        case 'finalized':
+          return [
+            {
+              state: 'prepared',
+              displayLabel: SEND_COPY.prepared.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: 'pending',
+              displayLabel: SEND_COPY.pending.label,
+              stepType: 'complete',
+              timestamp: historyEntry.createdAt,
+            },
+            {
+              state: 'finalized',
+              displayLabel: SEND_COPY.finalized.label,
+              stepType: 'success',
+              info: SEND_COPY.finalized.info,
+            },
+          ];
+        default:
+          return [];
+      }
+    }
+
+    case 'receive': {
+      if (historyEntry.state === 'rolledBack') {
+        return [
+          {
+            state: 'pending',
+            displayLabel: RECEIVE_COPY.pending.label,
+            stepType: 'complete',
+            timestamp: historyEntry.createdAt,
+          },
+          {
+            state: 'alreadySpent',
+            displayLabel: RECEIVE_COPY.alreadySpent.label,
+            stepType: 'already-spent',
+            info: RECEIVE_COPY.alreadySpent.info,
+          },
+        ];
+      }
+
+      if (historyEntry.state === 'prepared') {
+        return [
+          {
+            state: 'pending',
+            displayLabel: RECEIVE_COPY.pending.label,
+            stepType: 'next-pending',
+            info: RECEIVE_COPY.pending.info,
+          },
+          {
+            state: 'redeemed',
+            displayLabel: RECEIVE_COPY.redeemed.label,
+            stepType: 'future-small',
+          },
+        ];
+      }
+
+      return [
+        {
+          state: 'pending',
+          displayLabel: RECEIVE_COPY.pending.label,
+          stepType: 'complete',
+          timestamp: historyEntry.createdAt,
+        },
+        {
+          state: 'redeemed',
+          displayLabel: RECEIVE_COPY.redeemed.label,
+          stepType: 'success',
+          info: RECEIVE_COPY.redeemed.info(historyEntry.amount),
+        },
+      ];
+    }
+
+    default:
+      return [];
+  }
+}
+
+export function getCardLabel(
+  historyEntry: HistoryEntry,
+  timeline: TimelineItem[],
+  tokenCreated?: boolean,
+  nostrSent?: boolean
+): string {
+  const isFailed = timeline.some(
+    (item) =>
+      item.stepType === 'expired' ||
+      item.stepType === 'rolled-back' ||
+      item.stepType === 'already-spent'
+  );
+
+  let status = '';
+
+  switch (historyEntry.type) {
+    case 'mint': {
+      if (isFailed) {
+        status = 'Failed';
+      } else if (historyEntry.state === MintQuoteState.ISSUED) {
+        status = 'Complete';
+      } else if (historyEntry.state === MintQuoteState.PAID) {
+        status = 'In Progress';
+      } else {
+        status = 'Awaiting Payment';
+      }
+      // Intentional collapse with the 'receive' branch: a Lightning mint quote and a
+      // token-redemption receive both surface to the user as 'incoming payment'.
+      return `Receive • ${status}`;
+    }
+    case 'melt': {
+      if (isFailed) {
+        status = 'Failed';
+      } else if (historyEntry.state === MeltQuoteState.PAID) {
+        status = 'Complete';
+      } else if (historyEntry.state === MeltQuoteState.PENDING) {
+        status = 'In Progress';
+      } else {
+        status = 'Ready';
+      }
+      return `Send • ${status}`;
+    }
+    case 'send': {
+      const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
+      const label = isPaymentRequestMode ? 'Payment' : 'Send';
+      if (historyEntry.state === 'rolledBack') {
+        status = 'Cancelled';
+      } else if (historyEntry.state === 'finalized') {
+        status = 'Complete';
+      } else if (historyEntry.state === 'pending') {
+        status = 'In Progress';
+      } else {
+        status = 'Ready';
+      }
+      return `${label} • ${status}`;
+    }
+    case 'receive': {
+      if (historyEntry.state === 'finalized') {
+        status = 'Complete';
+      } else if (historyEntry.state === 'rolledBack') {
+        status = 'Already Spent';
+      } else {
+        status = 'Pending';
+      }
+      return `Receive • ${status}`;
+    }
+    default:
+      return 'Transaction';
+  }
+}
+
+export function getStatusHeader(timeline: TimelineItem[]): string {
+  const current = timeline.find(
+    (item) =>
+      item.stepType === 'current' ||
+      item.stepType === 'success' ||
+      item.stepType === 'expired' ||
+      item.stepType === 'rolled-back' ||
+      item.stepType === 'already-spent'
+  );
+  if (current) {
+    return current.displayLabel.toUpperCase();
+  }
+  const nextUp = timeline.find((item) => item.stepType === 'next-pending');
+  if (nextUp) {
+    return nextUp.displayLabel.toUpperCase();
+  }
+  return timeline[timeline.length - 1]?.displayLabel.toUpperCase() || '';
+}
+
+type StatusColorType = 'default' | 'success' | 'error' | 'warning';
+
+export function getStatusColorType(timeline: TimelineItem[]): StatusColorType {
+  const hasExpired = timeline.some((item) => item.stepType === 'expired');
+  const hasRolledBack = timeline.some((item) => item.stepType === 'rolled-back');
+  const hasAlreadySpent = timeline.some((item) => item.stepType === 'already-spent');
+  const hasSuccess = timeline.some((item) => item.stepType === 'success');
+
+  if (hasExpired) return 'error';
+  if (hasAlreadySpent) return 'warning';
+  if (hasRolledBack) return 'warning';
+  if (hasSuccess) return 'success';
+  return 'default';
+}

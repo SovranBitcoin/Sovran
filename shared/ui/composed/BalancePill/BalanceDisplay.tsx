@@ -43,6 +43,14 @@ export interface BalanceDisplayProps {
   loadingTitlePlaceholder?: string;
   contentWidth?: number;
   contentHeight?: number;
+  /** Override the square wrapper around `iconNode` / Avatar. Defaults to
+   *  32 — matches the wallet-header pill. Pass a smaller value for
+   *  compact pills where the glyph should sit snug against the row
+   *  instead of floating in a big centered box. */
+  iconBoxSize?: number;
+  /** Override the gap between the icon and the title/CTA text. Defaults
+   *  to 4 (matches the header pill's `mr-1`). */
+  iconRightSpacing?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -65,6 +73,8 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
   loadingTitlePlaceholder = 'Title',
   contentWidth,
   contentHeight,
+  iconBoxSize = 32,
+  iconRightSpacing = 4,
   style,
 }) => {
   const foreground = useThemeColor('foreground');
@@ -84,14 +94,17 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
         justify="space-between"
         style={[{ height: innerHeight, width: innerWidth }, style]}>
         <HStack align="center">
-          <View className="mr-1">
+          <View style={{ marginRight: iconRightSpacing }}>
             {iconNode ? (
-              // 32x32 box keeps spacing identical to the avatar-driven
-              // variant so swapping doesn't shift the rest of the row.
+              // Square box around the glyph — defaults to 32 to keep
+              // spacing identical to the avatar-driven variant. Compact
+              // pills override via `iconBoxSize` so the glyph sits snug
+              // against the row instead of floating in a big centered
+              // box.
               <View
                 style={{
-                  width: 32,
-                  height: 32,
+                  width: iconBoxSize,
+                  height: iconBoxSize,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
@@ -101,7 +114,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
               <Avatar
                 state={isLoading ? 'loading' : iconUrl ? 'image' : 'fallback'}
                 picture={iconUrl}
-                size={32}
+                size={iconBoxSize}
                 name={iconFallbackName ?? title}
                 alt={`${title || 'Balance'} icon`}
               />
@@ -112,10 +125,7 @@ const BalanceDisplay: React.FC<BalanceDisplayProps> = ({
             // centered inside the same pill so the header doesn't reflow
             // when the user tops up and the layout swaps back to the
             // standard two-line balance row.
-            <Text
-              size={14}
-              bold
-              style={{ color: foreground }}>
+            <Text size={14} bold style={{ color: foreground }}>
               {ctaLabel}
             </Text>
           ) : (

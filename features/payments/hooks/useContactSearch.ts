@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { searchUsers as apiSearchUsers, type UserProfile } from '@/shared/lib/apiClient';
+import { searchUsers as apiSearchUsers, type NostrSearchResult } from '@/shared/lib/apiClient';
 import { paymentLog } from '@/shared/lib/logger';
 import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStore';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 
-export interface SearchResultData {
+interface SearchResultData {
   pubkey: string;
-  profile: UserProfile;
+  profile: NostrSearchResult;
 }
 
 interface PlaceholderResult {
@@ -25,6 +25,10 @@ const PLACEHOLDER_RESULTS: PlaceholderResult[] = Array.from({ length: 6 }, (_, i
 // to coalesce a burst, short enough that a deliberate pause feels responsive.
 const SEARCH_DEBOUNCE_MS = 250;
 
+// Mirror the server-side `SearchQuery.min(3)` in `sovran-schemas/src/nostr-api.ts`.
+// Anything shorter is rejected upstream, so suppress the request entirely.
+export const CONTACT_SEARCH_MIN_LENGTH = 3;
+
 export function useContactSearch(searchQuery: string) {
   const addSearchToHistory = useSearchHistoryStore((state) => state.addSearch);
   const seedFromSearchResults = useNostrMetadataCache((s) => s.seedFromSearchResults);
@@ -38,7 +42,7 @@ export function useContactSearch(searchQuery: string) {
   // wait because they'll be rejected by the length guard anyway.
   useEffect(() => {
     const trimmed = searchQuery.trim();
-    if (!trimmed || trimmed.length < 2) {
+    if (!trimmed || trimmed.length < CONTACT_SEARCH_MIN_LENGTH) {
       setDebouncedQuery(searchQuery);
       return;
     }
@@ -48,40 +52,36 @@ export function useContactSearch(searchQuery: string) {
 
   useEffect(() => {
     const trimmed = debouncedQuery.trim();
-    if (!trimmed || trimmed.length < 2) {
+    if (!trimmed || trimmed.length < CONTACT_SEARCH_MIN_LENGTH) {
       setHasSearched(false);
       setSearchResults([]);
       setSearchLoading(false);
       return;
     }
 
-    let cancelled = false;
+    // Abort any in-flight request when the query changes or the component
+    // unmounts. Without this the radio stays warm for every keystroke in a
+    // typing burst even though only the last result is consumed.
+    const controller = new AbortController();
     setSearchLoading(true);
     setHasSearched(true);
 
     const search = async () => {
       try {
         paymentLog.debug('payment.contacts.search', { query: debouncedQuery, limit: 10 });
-        const result = await apiSearchUsers({ query: debouncedQuery, limit: 10 });
-        if (cancelled) return;
+        const result = await apiSearchUsers({
+          query: debouncedQuery,
+          limit: 10,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
         if (result.isOk()) {
           const data = result.value;
           if (data.results && Array.isArray(data.results)) {
-            const formatted: SearchResultData[] = data.results.map((res) => {
-              let profileEventPubkey = res.pubkey;
-              if (res.profileEvent) {
-                try {
-                  const parsed = JSON.parse(res.profileEvent);
-                  if (parsed?.pubkey) profileEventPubkey = parsed.pubkey;
-                } catch {
-                  // Invalid profileEvent JSON
-                }
-              }
-              return {
-                pubkey: res.pubkey,
-                profile: { ...res, pubkey: profileEventPubkey },
-              };
-            });
+            const formatted: SearchResultData[] = data.results.map((res) => ({
+              pubkey: res.pubkey,
+              profile: res,
+            }));
             paymentLog.info('payment.contacts.search.results', {
               query: debouncedQuery,
               resultCount: formatted.length,
@@ -98,19 +98,19 @@ export function useContactSearch(searchQuery: string) {
           setSearchResults([]);
         }
       } catch (err) {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         paymentLog.error('payment.contacts.search.error', {
           query: debouncedQuery,
           error: err instanceof Error ? err : new Error(String(err)),
         });
         setSearchResults([]);
       } finally {
-        if (!cancelled) setSearchLoading(false);
+        if (!controller.signal.aborted) setSearchLoading(false);
       }
     };
 
-    search();
-    return () => { cancelled = true; };
+    void search();
+    return () => controller.abort();
   }, [debouncedQuery, addSearchToHistory, seedFromSearchResults]);
 
   // Stale-while-revalidate: once the first response has landed we keep

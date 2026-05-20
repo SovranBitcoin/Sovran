@@ -35,12 +35,13 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 export const STAT_ICONS = {
   /** Reputation / KYM score. Tint: theme `warning`. */
   score: 'ic:round-star',
-  /** Follower count (people following this pubkey). Tint: `#3B82F6`
-   *  (Tailwind blue-500) across the app. */
+  /** Follower count (people following this pubkey). Tint:
+   *  `STAT_COLOR_SOCIAL` (theme blue-300) across the app. */
   followers: 'mdi:account-group',
-  /** Contact-reputation badge (distinct from score). Tint: `#3B82F6`. */
+  /** Contact-reputation badge (distinct from score). Tint:
+   *  `STAT_COLOR_SOCIAL`. */
   reputation: 'mdi:shield-check',
-  /** Audit / activity signal. Tint: theme `success` or `#EF4444` on error. */
+  /** Audit / activity signal. Tint: theme `success` or `STAT_COLOR_ERROR` on error. */
   audit: 'lucide:activity',
   /** Works-offline indicator. Tint: theme `success`. */
   offline: 'mdi:airplane',
@@ -53,10 +54,12 @@ export const STAT_ICONS = {
   nip05: 'mdi:check-decagram',
 } as const;
 
-/** Tailwind blue-500 — the shared tint for social / identity stats. */
-export const STAT_COLOR_SOCIAL = '#3B82F6';
+/** Theme blue-300 — shared tint for social / identity stats. Mirrors the
+ *  design-system blue ramp (Apple-blue hue at green-matched saturation). */
+export const STAT_COLOR_SOCIAL = '#2A7AD0';
 
-/** Tailwind red-500 — the shared tint for audit/error states. */
+/** Theme red-300 (Tailwind red-500) — shared tint for audit/error states.
+ *  Mirrors the design-system red ramp. */
 export const STAT_COLOR_ERROR = '#EF4444';
 
 export interface RowStat {
@@ -74,7 +77,7 @@ export interface RowStat {
   accessibilityLabel?: string;
 }
 
-export interface RowStatsAccentProps {
+interface RowStatsAccentProps {
   stats: RowStat[];
   /** Trailing note appended below the stats (e.g. a disabled reason). */
   note?: string;

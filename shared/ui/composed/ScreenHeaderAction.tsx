@@ -1,9 +1,11 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+import opacity from 'hex-color-opacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
-export interface ScreenHeaderActionProps {
+interface ScreenHeaderActionProps {
   icon: string;
   onPress: () => void;
   testID?: string;
@@ -20,14 +22,40 @@ export function ScreenHeaderAction({
   size = 24,
   disabled,
 }: ScreenHeaderActionProps) {
-  const foreground = useThemeColor('foreground');
+  const [foreground, surfaceSecondary, muted] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'muted',
+  ] as const);
+
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={onPress}
-      style={{ padding: 8, opacity: disabled ? 0.4 : 1 }}
+      style={[
+        styles.base,
+        Platform.OS === 'android' ? styles.androidFlat : null,
+        Platform.OS === 'android'
+          ? { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) }
+          : null,
+        { opacity: disabled ? 0.4 : 1 },
+      ]}
       disabled={disabled}
       testID={testID}>
       <Icon name={icon} size={size} color={color ?? foreground} />
-    </TouchableOpacity>
+    </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  base: {
+    padding: 8,
+  },
+  androidFlat: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

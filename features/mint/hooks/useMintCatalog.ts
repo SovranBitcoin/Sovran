@@ -14,9 +14,12 @@ import { useManager } from '@cashu/coco-react';
 import type { MintCatalogEntry } from 'coco-payment-ux';
 
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 
 export function useMintCatalog(mintUrls: string[]): Record<string, MintCatalogEntry> {
   const manager = useManager();
+  const { isOffline } = useOfflineStatus();
   const [catalog, setCatalog] = useState<Record<string, MintCatalogEntry>>({});
 
   // Stable key collapses array-identity churn so callers can pass a fresh
@@ -30,7 +33,9 @@ export function useMintCatalog(mintUrls: string[]): Record<string, MintCatalogEn
     }
 
     let cancelled = false;
-    getMintCatalog(mintUrls, (url) => manager.mint.getMintInfo(url))
+    getMintCatalog(mintUrls, (url) => getCachedMintInfo((u) => manager.mint.getMintInfo(u), url), {
+      networkMode: isOffline ? 'cache-only' : 'cache-first',
+    })
       .then((result) => {
         if (!cancelled) setCatalog(result);
       })
@@ -42,7 +47,7 @@ export function useMintCatalog(mintUrls: string[]): Record<string, MintCatalogEn
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, manager]);
+  }, [key, manager, isOffline]);
 
   return catalog;
 }

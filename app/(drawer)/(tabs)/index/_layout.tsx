@@ -3,13 +3,12 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
-
-export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/features/wallet/lib/walletHeader';
+import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 export default function HomeLayout() {
   const iconColor = useThemeColor('foreground');
@@ -26,13 +25,6 @@ export default function HomeLayout() {
     navigation.dispatch(DrawerActions.openDrawer());
   }, [navigation]);
 
-  const handleMintSelected = useCallback(
-    (mintUrl: string) => {
-      void machine.changeMint(mintUrl);
-    },
-    [machine]
-  );
-
   const handleRequestMintList = useCallback(() => {
     void machine.requestMintSelector({ reset: true });
   }, [machine]);
@@ -47,19 +39,13 @@ export default function HomeLayout() {
           name="index"
           options={buildExpoRouterHeaderOptions({
             iconColor,
-            headerLeftIcon: 'line.3.horizontal',
-            onHeaderLeftPress: openDrawer,
+            headerLeft: () => <HeaderProfileButton onPress={openDrawer} />,
             headerRightIcon: 'wave.3.right',
             onHeaderRightPress: handleNfcPayment,
             options: {
               headerTransparent: true,
               headerTitleAlign: 'center',
-              headerTitle: () => (
-                <MintSelector
-                  onMintSelected={handleMintSelected}
-                  onRequestMintList={handleRequestMintList}
-                />
-              ),
+              headerTitle: () => <MintSelector onRequestMintList={handleRequestMintList} />,
             },
           })}
         />

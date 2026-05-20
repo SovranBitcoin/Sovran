@@ -35,7 +35,7 @@ export interface AlbumListEntry {
   newestAt: number;
 }
 
-export interface AlbumGroup {
+interface AlbumGroup {
   /** Stable key: `${topic}::${authorPubkey ?? 'system'}`. */
   key: string;
   topic: string;
@@ -101,7 +101,7 @@ export function useAlbumList(): {
     ];
 
     const all = [...syntheticEntries, ...serverEntries].filter(
-      (a) => a.synthetic || (themesByAlbum[a.slug]?.length ?? 0) > 0,
+      (a) => a.synthetic || (themesByAlbum[a.slug]?.length ?? 0) > 0
     );
 
     // Group by (topic, authorPubkey). Two authors publishing to the same

@@ -7,11 +7,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
-
-const profileStorage = createProfileScopedStorage();
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export interface TransactionLocation {
   latitude: number;
@@ -35,15 +35,22 @@ interface TransactionLocationActions {
   ) => void;
   /** Get the location for a transaction */
   getTransactionLocation: (entryId: string) => TransactionLocation | null;
-  /** Remove location for a specific transaction */
-  removeTransactionLocation: (entryId: string) => void;
-  /** Clear all stored locations */
-  clearAllLocations: () => void;
-  /** Clear all data from both state and storage */
-  clearAllData: () => Promise<void>;
 }
 
 type TransactionLocationStore = TransactionLocationState & TransactionLocationActions;
+
+const PersistedTransactionLocationStore = z.object({
+  locations: z
+    .record(
+      z.string().max(256),
+      z.looseObject({
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        createdAt: z.number().int().nonnegative(),
+      })
+    )
+    .default({}),
+});
 
 export const useTransactionLocationStore = create<TransactionLocationStore>()(
   persist(
@@ -72,42 +79,16 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
         const state = get();
         return state.locations[entryId] ?? null;
       },
-
-      removeTransactionLocation: (entryId: string) => {
-        storeLog.debug('store.tx_location.remove', { entryId });
-        set((state) => {
-          const { [entryId]: _, ...rest } = state.locations;
-          return { locations: rest };
-        });
-      },
-
-      clearAllLocations: () => {
-        storeLog.info('store.tx_location.clear_all');
-        set({ locations: {} });
-      },
-
-      clearAllData: async () => {
-        try {
-          await profileStorage.removeItem('transaction-location-store');
-          set({ locations: {} });
-        } catch (error) {
-          log.error('store.tx_location.clear_failed', { error });
-          throw error;
-        }
-      },
     }),
-    {
+    persistConfig({
       name: 'transaction-location-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
+      storage: createProfileScopedStorage(),
+      schema: PersistedTransactionLocationStore,
+      logKey: 'tx_location',
       partialize: (state) => ({
         locations: state.locations,
       }),
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          log.warn('store.tx_location.rehydrate_failed', { error });
-        }
-      },
-    }
+    })
   )
 );
 

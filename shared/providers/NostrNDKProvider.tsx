@@ -1,8 +1,8 @@
 import React, { createContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from '@/shared/ndk';
-import { hydrateGiftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
-import { hydrateNip04Cache } from '@/shared/lib/nostr/nip04Cache';
+import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
+import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { useInitializationStage } from './InitializationProvider';
 import { useNostrKeysContext } from './NostrKeysProvider';
 import { initLog, initPhaseSync, nostrLog, useInitMount } from '@/shared/lib/logger';
@@ -51,8 +51,8 @@ export function NostrNDKProvider({
   // first mount and force every wrap to re-decrypt.
   useEffect(() => {
     if (!nostrKeys?.pubkey) return;
-    void hydrateGiftWrapCache(nostrKeys.pubkey);
-    void hydrateNip04Cache(nostrKeys.pubkey);
+    void giftWrapCache.cache.hydrate(nostrKeys.pubkey);
+    void nip04Cache.hydrate(nostrKeys.pubkey);
   }, [nostrKeys?.pubkey]);
 
   useEffect(() => {

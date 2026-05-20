@@ -9,20 +9,20 @@
  */
 
 import { create } from 'zustand';
-import type { UnitId, ThemeName, ThemeMode } from '@/shared/stores/profile/themeStore';
+import type { UnitId, ThemeMode } from '@/shared/stores/profile/themeStore';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
+import { PROFILE_PRIMARY_UNIT_ID } from '@/shared/lib/theme/builtinAlbums';
 import {
-  BUILTIN_COLORS_ALBUM_SLUG,
-  BUILTIN_COLOR_THEME_NAMES,
-  PROFILE_PRIMARY_UNIT_ID,
-} from '@/shared/lib/theme/builtinAlbums';
+  getCatalogThemesForAlbum,
+  resolveUnitWallpaper,
+} from '@/shared/lib/theme/resolveUnitWallpaper';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { log } from '@/shared/lib/logger';
 
 interface ThemeDraftState {
   active: boolean;
   activeAlbumSlug: string | null;
-  unitWallpapers: Record<UnitId, ThemeName>;
+  unitWallpapers: Record<UnitId, string>;
   mode: ThemeMode;
 }
 
@@ -32,14 +32,14 @@ interface ThemeDraftActions {
   /** Replace the album and re-randomise unit wallpapers from its pool. */
   setAlbum: (albumSlug: string, unitIds: UnitId[]) => void;
   /** Override a single unit in the draft. */
-  setUnitWallpaper: (unitId: UnitId, theme: ThemeName) => void;
+  setUnitWallpaper: (unitId: UnitId, theme: string) => void;
   /** Flip light/dark mode in the draft. */
   setMode: (mode: ThemeMode) => void;
   /**
    * Resolve the theme to render for `unitId`: draft override first, then
    * the main themeStore resolver (which walks album → fallback).
    */
-  resolveUnitTheme: (unitId: UnitId) => ThemeName;
+  resolveUnitTheme: (unitId: UnitId) => string;
   /** Revert draft to committed themeStore state. */
   resetDraft: () => void;
   /** Drop the draft entirely. */
@@ -65,18 +65,9 @@ function snapshotFromStore(): Pick<ThemeDraftState, 'activeAlbumSlug' | 'unitWal
   };
 }
 
-function distributeFromAlbum(
-  albumSlug: string,
-  unitIds: UnitId[],
-): Record<UnitId, ThemeName> {
+function distributeFromAlbum(albumSlug: string, unitIds: UnitId[]): Record<UnitId, string> {
   const catalog = useWallpaperStore.getState().catalog;
-  const pool =
-    albumSlug === BUILTIN_COLORS_ALBUM_SLUG
-      ? [...BUILTIN_COLOR_THEME_NAMES]
-      : catalog
-          .filter((w) => w.albumSlug === albumSlug)
-          .sort((a, b) => b.createdAt - a.createdAt)
-          .map((w) => w.themeName);
+  const pool = getCatalogThemesForAlbum(catalog, albumSlug);
 
   if (pool.length === 0 || unitIds.length === 0) {
     log.warn('theme.draft.album_empty', { albumSlug, poolSize: pool.length });
@@ -86,7 +77,7 @@ function distributeFromAlbum(
   // Take the first N wallpapers (newest-first) and hand one to each unit
   // in order. If the pool is smaller than the unit count, cycle. This is
   // deterministic — same album always produces the same assignment.
-  const assigned: Record<UnitId, ThemeName> = {};
+  const assigned: Record<UnitId, string> = {};
   for (let i = 0; i < unitIds.length; i++) {
     assigned[unitIds[i]] = pool[i % pool.length];
   }
@@ -148,7 +139,9 @@ export const useThemeDraft = create<ThemeDraftStore>((set, get) => ({
   resolveUnitTheme: (unitId) => {
     const { unitWallpapers } = get();
     if (unitWallpapers[unitId]) return unitWallpapers[unitId];
-    return useThemeStore.getState().getUnitWallpaper(unitId);
+    const themeState = useThemeStore.getState();
+    const catalog = useWallpaperStore.getState().catalog;
+    return resolveUnitWallpaper(unitId, themeState, catalog);
   },
 
   resetDraft: () => {
@@ -174,21 +167,15 @@ export const useThemeDraft = create<ThemeDraftStore>((set, get) => ({
 
   commit: async () => {
     const { activeAlbumSlug, unitWallpapers, mode } = get();
-    useThemeStore.setState({
-      activeAlbumSlug,
-      unitWallpapers,
-      mode,
-    });
-
     const wallpaperState = useWallpaperStore.getState();
     const primary = unitWallpapers[PROFILE_PRIMARY_UNIT_ID];
 
-    // Await the primary wallpaper download first so that by the time we
-    // call setTheme(primary), `backgroundImageThemes[primary]` is
-    // populated by `registerDownloadedTheme` and ThemeProvider's
-    // `applyCSSVars` can find the right palette. Otherwise the wallet
-    // screen falls back to a solid colour because the image source is
-    // still undefined at render time.
+    // Await the primary wallpaper download BEFORE writing to themeStore.
+    // ThemeProvider's `applyCSSVars` effect keys off `currentTheme` (the
+    // string), and bails if `THEMES[currentTheme]` isn't registered yet.
+    // If we flip themeStore first, the effect fires against an
+    // unregistered name, bails, and never re-runs once the download
+    // registers the theme — leaving the chrome on the previous palette.
     if (primary && !wallpaperState.downloaded[primary]) {
       const entry = wallpaperState.catalog.find((w) => w.themeName === primary);
       if (entry) {
@@ -197,6 +184,12 @@ export const useThemeDraft = create<ThemeDraftStore>((set, get) => ({
         log.info('theme.commit.primary_download_done', { theme: primary });
       }
     }
+
+    useThemeStore.setState({
+      activeAlbumSlug,
+      unitWallpapers,
+      mode,
+    });
 
     // Fire-and-forget downloads for the other unit wallpapers — they
     // show via the catalog thumb URL until their local files are ready.

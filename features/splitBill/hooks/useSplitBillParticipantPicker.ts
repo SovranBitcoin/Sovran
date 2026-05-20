@@ -14,8 +14,8 @@
  *   - nostr  → nostr-dm
  *   - search → qr-only (no established DM channel)
  *
- * Search hits only appear while the searchbar has ≥2 chars (matches the
- * behaviour of `useContactSearch` itself).
+ * Search hits only appear while the searchbar has ≥3 chars (matches the
+ * server-side `SearchQuery.min(3)` enforced by `useContactSearch` itself).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -102,13 +102,6 @@ export interface PickerCandidate {
   nip05Valid?: boolean;
 }
 
-// Source → delivery channel. Fixed; no runtime choice.
-function channelFor(source: SplitBillParticipantSource): SplitBillDeliveryChannel {
-  if (source === 'ble') return 'ble-dm';
-  if (source === 'nostr') return 'nostr-dm';
-  return 'qr-only';
-}
-
 /**
  * Shallow equality across every field of two PickerCandidates. Used by the
  * selection-refresh effect to skip work when a fresh candidate matches the
@@ -170,7 +163,7 @@ function bleCandidate(peer: BLEPeer): PickerCandidate {
 function nostrCandidate(
   pubkey: string,
   profile: ProfileMetadata | undefined,
-  stats: SearchHitStats | undefined,
+  stats: SearchHitStats | undefined
 ): PickerCandidate {
   const nickname = resolveIdentityName({ pubkey, nostrProfile: profile });
   return {
@@ -287,7 +280,7 @@ export interface UseSplitBillParticipantPickerResult {
   searchLoading: boolean;
 }
 
-export interface UseSplitBillParticipantPickerOptions {
+interface UseSplitBillParticipantPickerOptions {
   /**
    * When `false`, all expensive subscriptions short-circuit: NDK relay
    * subscriptions never go out, NIP-17 unwrapping is skipped, kind-0
@@ -302,7 +295,7 @@ export interface UseSplitBillParticipantPickerOptions {
 }
 
 export function useSplitBillParticipantPicker(
-  options: UseSplitBillParticipantPickerOptions = {},
+  options: UseSplitBillParticipantPickerOptions = {}
 ): UseSplitBillParticipantPickerResult {
   const enabled = options.enabled ?? true;
   // Suppress nostrKeys downstream when disabled. Both `useRecentContacts`
@@ -457,7 +450,6 @@ export function useSplitBillParticipantPicker(
       if (map.has(r.pubkey)) continue;
       map.set(r.pubkey, {
         name: r.profile?.name,
-        display_name: r.profile?.display_name,
         displayName: r.profile?.displayName,
         picture: r.profile?.picture,
         nip05: r.profile?.nip05,
@@ -473,7 +465,7 @@ export function useSplitBillParticipantPicker(
   const resolveProfile = useCallback(
     (pubkey: string): ProfileMetadata | undefined =>
       profilesByPubkey.get(pubkey) ?? searchProfilesByPubkey.get(pubkey),
-    [profilesByPubkey, searchProfilesByPubkey],
+    [profilesByPubkey, searchProfilesByPubkey]
   );
 
   // Session-scoped reputation cache. `/nostr/search` responses inline
@@ -487,9 +479,7 @@ export function useSplitBillParticipantPicker(
   // Shape stays as `state` rather than a ref so a fresh stat arriving for
   // a pubkey triggers the candidate memo to re-run via a stable identity
   // change.
-  const [statsByPubkey, setStatsByPubkey] = useState<Map<string, SearchHitStats>>(
-    () => new Map(),
-  );
+  const [statsByPubkey, setStatsByPubkey] = useState<Map<string, SearchHitStats>>(() => new Map());
   useEffect(() => {
     setStatsByPubkey((prev) => {
       let next: Map<string, SearchHitStats> | undefined;
@@ -500,14 +490,20 @@ export function useSplitBillParticipantPicker(
           followers: r.profile?.followers,
           follows: r.profile?.follows,
         };
-        if (fresh.score === undefined && fresh.followers === undefined && fresh.follows === undefined) continue;
+        if (
+          fresh.score === undefined &&
+          fresh.followers === undefined &&
+          fresh.follows === undefined
+        )
+          continue;
         const existing = prev.get(r.pubkey);
         if (
           existing &&
           existing.score === fresh.score &&
           existing.followers === fresh.followers &&
           existing.follows === fresh.follows
-        ) continue;
+        )
+          continue;
         if (!next) next = new Map(prev);
         next.set(r.pubkey, fresh);
       }
@@ -517,7 +513,7 @@ export function useSplitBillParticipantPicker(
 
   const resolveStats = useCallback(
     (pubkey: string): SearchHitStats | undefined => statsByPubkey.get(pubkey),
-    [statsByPubkey],
+    [statsByPubkey]
   );
 
   // Warm the expo-image cache with every profile picture we know about.
@@ -525,7 +521,7 @@ export function useSplitBillParticipantPicker(
   // triggers the image fetch inline and the PFP appears to "pop in" a beat
   // after the row mounts.
   useEffect(() => {
-    prefetchImages(Array.from(profilesByPubkey.values()).map((p) => p?.picture));
+    void prefetchImages(Array.from(profilesByPubkey.values()).map((p) => p?.picture));
   }, [profilesByPubkey]);
 
   // --- Build candidates per source. Dedup across sources by pubkey / peerID. ---
@@ -561,7 +557,7 @@ export function useSplitBillParticipantPicker(
         stats: SearchHitStats | undefined;
         candidate: PickerCandidate;
       }
-    >(),
+    >()
   );
 
   const nostrCandidates = useMemo(() => {
@@ -612,6 +608,26 @@ export function useSplitBillParticipantPicker(
     [displayContacts]
   );
 
+  // Same pattern as `nostrCandidateCache` above — keep search-candidate refs
+  // stable across keystrokes when a row's source tuple is unchanged, so
+  // memoised `ParticipantRow`s in the search modal don't reconcile every
+  // character. The merged profile object is freshly spread per render, so
+  // we compare by the two source refs (REST + relay) rather than the merged
+  // result.
+  const searchCandidateCache = useRef(
+    new Map<
+      string,
+      {
+        restProfile: unknown;
+        relayProfile: ProfileMetadata | undefined;
+        score: number | undefined;
+        followers: number | undefined;
+        follows: number | undefined;
+        candidate: PickerCandidate;
+      }
+    >()
+  );
+
   const searchCandidates = useMemo(() => {
     if (!hasSearched) return [];
     // Note: we intentionally no longer gate on `searchLoading` — `useContactSearch`
@@ -619,6 +635,9 @@ export function useSplitBillParticipantPicker(
     // flight (stale-while-revalidate), so dropping to [] here would cause the
     // list to flash empty on every keystroke.
     const t0 = performance.now();
+    const cache = searchCandidateCache.current;
+    const seen = new Set<string>();
+    let reused = 0;
     const out = displayResults
       .filter((r) => r.profile && r.pubkey && !r.pubkey.startsWith('placeholder-'))
       // Dedupe against actual DM history + own profiles. Promoted pubkeys
@@ -628,32 +647,51 @@ export function useSplitBillParticipantPicker(
       .map((r) => {
         // Prefer fresh relay metadata over REST snapshot when both exist.
         const relayProfile = profilesByPubkey.get(r.pubkey);
-        const merged = { ...(r.profile as ProfileMetadata | undefined), ...relayProfile };
         // Reputation stats come from the REST hit. `/nostr/search` inlines
         // `followers` / `follows` / `score` / `created_at` from the server's
         // cached `/profile` records (cache-only — the server never fetches
         // per search hit), so each field flows through as an optional.
-        const stats: SearchHitStats = {
-          score: r.profile?.score,
-          followers: r.profile?.followers,
-          follows: r.profile?.follows,
-        };
-        return searchCandidate(r.pubkey, merged, stats);
+        const score = r.profile?.score;
+        const followers = r.profile?.followers;
+        const follows = r.profile?.follows;
+        seen.add(r.pubkey);
+        const cached = cache.get(r.pubkey);
+        if (
+          cached &&
+          Object.is(cached.restProfile, r.profile) &&
+          Object.is(cached.relayProfile, relayProfile) &&
+          cached.score === score &&
+          cached.followers === followers &&
+          cached.follows === follows
+        ) {
+          reused++;
+          return cached.candidate;
+        }
+        const merged = { ...(r.profile as ProfileMetadata | undefined), ...relayProfile };
+        const stats: SearchHitStats = { score, followers, follows };
+        const fresh = searchCandidate(r.pubkey, merged, stats);
+        cache.set(r.pubkey, {
+          restProfile: r.profile,
+          relayProfile,
+          score,
+          followers,
+          follows,
+          candidate: fresh,
+        });
+        return fresh;
       });
+    // GC entries that dropped out of the current result set so the cache
+    // doesn't grow unbounded across a long session of distinct queries.
+    for (const pk of cache.keys()) if (!seen.has(pk)) cache.delete(pk);
     walletLog.debug('split_bill.picker.search_candidates_built', {
       displayResults: displayResults.length,
       keptAfterFilter: out.length,
       dedupedByRecent: displayResults.length - out.length,
+      reused,
       duration_ms: Math.round((performance.now() - t0) * 100) / 100,
     });
     return out;
-  }, [
-    displayResults,
-    hasSearched,
-    originalRecentPubkeys,
-    selfPubkeys,
-    profilesByPubkey,
-  ]);
+  }, [displayResults, hasSearched, originalRecentPubkeys, selfPubkeys, profilesByPubkey]);
 
   // Main-screen sections: Your Accounts / Bluetooth / Recent. Search
   // results live in the dedicated search modal and are exposed separately

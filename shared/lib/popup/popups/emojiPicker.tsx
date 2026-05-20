@@ -20,7 +20,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { BottomSheet } from 'heroui-native';
 import { LegendList } from '@legendapp/list';
@@ -37,14 +38,9 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 
-import { showActionSheet } from '../bridge';
+import { showActionSheet } from './bridge';
 import { copyPopup } from './copy';
-import {
-  CATEGORIES,
-  searchEmojis,
-  type EmojiCategory,
-  type EmojiEntry,
-} from './emojiData';
+import { CATEGORIES, searchEmojis, type EmojiCategory, type EmojiEntry } from './emojiData';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';
 
@@ -134,8 +130,7 @@ function chunkEmojis(emojis: EmojiEntry[]): EmojiEntry[][] {
 // uses the chunked `renderRow` path.
 const emojiKeyExtractor = (item: EmojiEntry): string => item.emoji;
 const noopRenderItem = (): null => null;
-const searchRowKeyExtractor = (_row: EmojiEntry[], index: number): string =>
-  `search-row-${index}`;
+const searchRowKeyExtractor = (_row: EmojiEntry[], index: number): string => `search-row-${index}`;
 
 /**
  * Search field — copy of `ActionMenuHost`'s `MenuSearchField` so the
@@ -209,7 +204,13 @@ interface EmojiPickerContentProps extends CustomSheetSharedProps {
  * uses `SectionAnchorList` for the tabbed scroll — same primitive that
  * powers Select Profile's tabs in `ActionMenuHost`.
  */
-export function EmojiPickerContent({ payload, close, setFooterConfig, canPop, popCustomPage }: EmojiPickerContentProps) {
+export function EmojiPickerContent({
+  payload,
+  close,
+  setFooterConfig,
+  canPop,
+  popCustomPage,
+}: EmojiPickerContentProps) {
   // 30 is the warn threshold — the picker shouldn't re-render that
   // many times during normal use (search debounce + tab interactions
   // are the only state churn). Going over hints at parent-driven
@@ -261,9 +262,7 @@ export function EmojiPickerContent({ payload, close, setFooterConfig, canPop, po
 
   useEffect(() => {
     setFooterConfig(
-      canPop
-        ? { buttons: [{ label: 'Back', variant: 'tertiary', onPress: popCustomPage }] }
-        : null
+      canPop ? { buttons: [{ label: 'Back', variant: 'tertiary', onPress: popCustomPage }] } : null
     );
     return () => setFooterConfig(null);
   }, [setFooterConfig, canPop, popCustomPage]);

@@ -34,8 +34,7 @@ async function runMigration(store: StorageMap): Promise<void> {
     const profiles: { accountIndex: number; pubkey: string }[] =
       profileParsed?.state?.profiles ?? [];
     const activeIndex: number | undefined = profileParsed?.state?.activeAccountIndex;
-    const activeProfile =
-      profiles.find((p) => p.accountIndex === activeIndex) ?? profiles[0];
+    const activeProfile = profiles.find((p) => p.accountIndex === activeIndex) ?? profiles[0];
 
     if (activeProfile?.pubkey && !isBuiltinColorTheme(legacyTheme)) {
       const themeStoreKey = `theme-store:profile:${activeProfile.pubkey}`;
@@ -43,8 +42,7 @@ async function runMigration(store: StorageMap): Promise<void> {
       const existing = existingRaw ? JSON.parse(existingRaw) : null;
       const hasUserData =
         !!existing?.state?.activeAlbumSlug ||
-        (existing?.state?.unitWallpapers &&
-          Object.keys(existing.state.unitWallpapers).length > 0);
+        (existing?.state?.unitWallpapers && Object.keys(existing.state.unitWallpapers).length > 0);
 
       if (!hasUserData) {
         const nextBlob = {

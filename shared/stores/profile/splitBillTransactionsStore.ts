@@ -21,11 +21,12 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
-
-const profileStorage = createProfileScopedStorage();
+import { mintLocalId } from '@/shared/lib/id';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,13 +39,13 @@ export type SplitBillParticipantSource = 'nostr' | 'ble' | 'search' | 'self';
 export type SplitBillDeliveryChannel = 'nostr-dm' | 'ble-dm' | 'qr-only' | 'self';
 
 /** Delivery status per participant. */
-export type SplitBillDeliveryState = 'pending' | 'sent' | 'failed';
+type SplitBillDeliveryState = 'pending' | 'sent' | 'failed';
 
 /** Payment status per participant (independent of delivery). */
-export type SplitBillPaymentState = 'pending' | 'paid' | 'expired';
+type SplitBillPaymentState = 'pending' | 'paid' | 'expired';
 
 /** Top-level group lifecycle. */
-export type SplitBillGroupState =
+type SplitBillGroupState =
   | 'draft'
   | 'awaiting'
   | 'partially-paid'
@@ -71,8 +72,6 @@ export interface SplitBillParticipant {
   mintQuoteId?: string;
   /** The raw BOLT11 invoice string for manual share / QR render. */
   bolt11?: string;
-  /** Mint quote expiry (ms since epoch) if available. */
-  expiresAt?: number;
 
   deliveryState: SplitBillDeliveryState;
   deliveryError?: string;
@@ -94,7 +93,7 @@ export interface SplitBillGroup {
 /** Reverse index: mint quote id → (groupId, participantId). Lets the
  *  Transactions list hide individual mint entries that belong to a group
  *  by filtering on quoteId, same pattern as `swapTransactionsStore`. */
-export type QuoteIdToSplitBillIndex = Record<string, { groupId: string; participantId: string }>;
+type QuoteIdToSplitBillIndex = Record<string, { groupId: string; participantId: string }>;
 
 // ---------------------------------------------------------------------------
 // Store
@@ -112,13 +111,7 @@ interface StartGroupInput {
   title?: string;
   participants: (Omit<
     SplitBillParticipant,
-    | 'id'
-    | 'mintQuoteId'
-    | 'bolt11'
-    | 'expiresAt'
-    | 'deliveryState'
-    | 'deliveryError'
-    | 'paymentState'
+    'id' | 'mintQuoteId' | 'bolt11' | 'deliveryState' | 'deliveryError' | 'paymentState'
   > & {
     id?: string;
   })[];
@@ -131,7 +124,7 @@ interface SplitBillStoreActions {
   tagMintQuote: (
     groupId: string,
     participantId: string,
-    params: { mintQuoteId: string; bolt11?: string; expiresAt?: number }
+    params: { mintQuoteId: string; bolt11?: string }
   ) => void;
 
   markDelivered: (groupId: string, participantId: string, ok: boolean, error?: string) => void;
@@ -152,14 +145,9 @@ interface SplitBillStoreActions {
 
   getGroup: (groupId: string) => SplitBillGroup | null;
   getGroupsForUnit: (unit: string) => SplitBillGroup[];
-
-  clearAllData: () => Promise<void>;
 }
 
-export type SplitBillStore = SplitBillStoreState & SplitBillStoreActions;
-
-const generateGroupId = () => `sb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-const generateParticipantId = () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+type SplitBillStore = SplitBillStoreState & SplitBillStoreActions;
 
 // ---------------------------------------------------------------------------
 
@@ -184,6 +172,63 @@ function deriveGroupState(group: SplitBillGroup): SplitBillGroupState {
 }
 
 // ---------------------------------------------------------------------------
+// Persisted-shape schema (defensive rehydrate validation)
+// ---------------------------------------------------------------------------
+
+const ParticipantSourceSchema = z.enum(['nostr', 'ble', 'search', 'self']);
+const DeliveryChannelSchema = z.enum(['nostr-dm', 'ble-dm', 'qr-only', 'self']);
+const DeliveryStateSchema = z.enum(['pending', 'sent', 'failed']);
+const PaymentStateSchema = z.enum(['pending', 'paid', 'expired']);
+const GroupStateSchema = z.enum([
+  'draft',
+  'awaiting',
+  'partially-paid',
+  'paid',
+  'expired',
+  'cancelled',
+]);
+
+const PersistedParticipant = z.looseObject({
+  id: z.string().max(128),
+  source: ParticipantSourceSchema,
+  channel: DeliveryChannelSchema,
+  pubkey: z.string().max(128).optional(),
+  peerID: z.string().max(64).optional(),
+  nickname: z.string().max(256).optional(),
+  avatarUrl: z.string().max(2048).optional(),
+  amount: z.number().int().nonnegative(),
+  mintQuoteId: z.string().max(256).optional(),
+  bolt11: z.string().max(8192).optional(),
+  deliveryState: DeliveryStateSchema,
+  deliveryError: z.string().max(2048).optional(),
+  paymentState: PaymentStateSchema,
+});
+
+const PersistedGroup = z.looseObject({
+  id: z.string().max(128),
+  unit: z.string().max(16),
+  mintUrl: z.string().max(2048),
+  totalAmount: z.number().int().nonnegative(),
+  title: z.string().max(512),
+  createdAt: z.number().int().nonnegative(),
+  state: GroupStateSchema,
+  participants: z.array(PersistedParticipant).max(256),
+});
+
+const PersistedSplitBillStore = z.object({
+  groups: z.record(z.string().max(128), PersistedGroup).default({}),
+  quoteIdToSplitBill: z
+    .record(
+      z.string().max(256),
+      z.looseObject({
+        groupId: z.string().max(128),
+        participantId: z.string().max(128),
+      })
+    )
+    .default({}),
+});
+
+// ---------------------------------------------------------------------------
 
 export const useSplitBillTransactionsStore = create<SplitBillStore>()(
   persist(
@@ -192,7 +237,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
       quoteIdToSplitBill: {},
 
       startGroup: ({ unit, mintUrl, totalAmount, title, participants }) => {
-        const id = generateGroupId();
+        const id = mintLocalId('sb');
         const group: SplitBillGroup = {
           id,
           unit,
@@ -204,7 +249,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
           createdAt: Date.now(),
           state: 'draft',
           participants: participants.map((p) => ({
-            id: p.id ?? generateParticipantId(),
+            id: p.id ?? mintLocalId('p'),
             source: p.source,
             channel: p.channel,
             pubkey: p.pubkey,
@@ -247,7 +292,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
         });
       },
 
-      tagMintQuote: (groupId, participantId, { mintQuoteId, bolt11, expiresAt }) => {
+      tagMintQuote: (groupId, participantId, { mintQuoteId, bolt11 }) => {
         if (!mintQuoteId) return;
         storeLog.debug('store.split_bill.tag_mint_quote', {
           groupId,
@@ -260,7 +305,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
           if (!group) return state;
 
           const participants = group.participants.map((p) =>
-            p.id === participantId ? { ...p, mintQuoteId, bolt11, expiresAt } : p
+            p.id === participantId ? { ...p, mintQuoteId, bolt11 } : p
           );
 
           return {
@@ -414,29 +459,16 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
         const groups = Object.values(get().groups).filter((g) => g.unit === unit);
         return groups.sort((a, b) => b.createdAt - a.createdAt);
       },
-
-      clearAllData: async () => {
-        try {
-          await profileStorage.removeItem('split-bill-transactions-store');
-          set({ groups: {}, quoteIdToSplitBill: {} });
-        } catch (error) {
-          log.error('store.split_bill.clear_failed', { error });
-          throw error;
-        }
-      },
     }),
-    {
+    persistConfig({
       name: 'split-bill-transactions-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
+      storage: createProfileScopedStorage(),
+      schema: PersistedSplitBillStore,
+      logKey: 'split_bill',
       partialize: (state) => ({
         groups: state.groups,
         quoteIdToSplitBill: state.quoteIdToSplitBill,
       }),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          log.warn('store.split_bill.rehydrate_failed', { error });
-        }
-      },
-    }
+    })
   )
 );

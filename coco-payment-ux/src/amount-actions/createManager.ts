@@ -9,9 +9,10 @@
 // The manager computes EVERYTHING the UI needs — the component is stateless.
 // ---------------------------------------------------------------------------
 
+import { logger } from '../logger';
 import { resolveAmount, resolutionEqual } from './resolve';
-import { computeQuickSendSuggestions, type QuickSendSuggestion } from './suggestions';
-import type {
+import { computeQuickSendSuggestions } from './suggestions';
+import type { QuickSendSuggestion ,
   AmountActionManager,
   AmountInputMode,
   AmountResolution,
@@ -56,6 +57,15 @@ function formatSecondaryDisplay(
   return `≈ ${fiatSymbol}0.00`;
 }
 
+/**
+ * Resolve a value-or-getter config field to a getter. A constant becomes a
+ * getter that returns it; an existing getter passes through. Lets the manager
+ * read a single canonical shape regardless of which form the caller used.
+ */
+function asGetter<T>(value: T | (() => T)): () => T {
+  return typeof value === 'function' ? (value as () => T) : () => value;
+}
+
 export function createAmountActionManager(
   config: CreateAmountActionManagerConfig
 ): AmountActionManager {
@@ -70,7 +80,11 @@ export function createAmountActionManager(
     quickSendConfig,
   } = config;
 
-  const hasFiatToggle = !!fiatCurrency && !!fiatSymbol;
+  const getOfflineOptimization = asGetter(offlineOptimization);
+  const getUnit = asGetter(unit);
+  const getFiatCurrency = asGetter<string | undefined>(fiatCurrency);
+  const getFiatSymbol = asGetter<string | undefined>(fiatSymbol);
+  const hasFiatToggleNow = (): boolean => !!getFiatCurrency() && !!getFiatSymbol();
   const suggestionsDisabled = quickSendConfig === null;
 
   let inputMode: AmountInputMode = 'sat';
@@ -84,7 +98,7 @@ export function createAmountActionManager(
     null;
 
   function getSuggestions(): QuickSendSuggestion[] {
-    if (!offlineOptimization || suggestionsDisabled) return EMPTY_SUGGESTIONS;
+    if (!getOfflineOptimization() || suggestionsDisabled) return EMPTY_SUGGESTIONS;
     const proofs = getProofAmounts();
     const price = getBtcPrice();
     if (proofs.length === 0 || price <= 0) return EMPTY_SUGGESTIONS;
@@ -96,16 +110,28 @@ export function createAmountActionManager(
     }
 
     const result = computeQuickSendSuggestions(proofs, price, {
-      fiatCurrency,
-      fiatSymbol,
+      fiatCurrency: getFiatCurrency(),
+      fiatSymbol: getFiatSymbol(),
       config: quickSendConfig ?? undefined,
+    });
+    // Logged so we can verify the "Send all" suggestion's satoshis matches the
+    // actual sum of available proofs. Mismatches indicate the wallet's
+    // proofAmounts cache is stale relative to coco's proof state.
+    const sendAll = result.find((s) => s.sendAll);
+    logger.info('amountActions.suggestion.derive', {
+      proofCount: len,
+      spendableTotal: sum,
+      displayedSendAll: sendAll?.satoshis ?? null,
     });
     sugCache = { len, sum, price, result };
     return result;
   }
 
   function notify(): void {
-    prevResolution = null;
+    // Don't invalidate `prevResolution` — `inspect()`'s structural-equal check
+    // already promotes a new ref only when the resolution actually changed,
+    // so notifying here without clearing the cache lets useSyncExternalStore
+    // skip re-renders for setInput calls that produce structurally equal output.
     for (const fn of listeners) fn();
   }
 
@@ -120,35 +146,38 @@ export function createAmountActionManager(
     const mintUrl = getMintUrl();
     const proofAmounts = mintUrl ? getProofAmounts() : [];
     const btcPrice = getBtcPrice();
+    const offlineOpt = getOfflineOptimization();
+    const unitNow = getUnit();
+    const fiatCurrencyNow = getFiatCurrency();
+    const fiatSymbolNow = getFiatSymbol();
+    const fiatToggleAvailable = !!fiatCurrencyNow && !!fiatSymbolNow;
+    const fiatToggleActive = fiatToggleAvailable && btcPrice > 0;
+
     const core = resolveAmount(
       inputMode,
       rawInput,
       numericValue,
       proofAmounts,
       btcPrice,
-      offlineOptimization
+      offlineOpt
     );
 
     // Keyboard unit: fiat currency code in fiat mode, base unit otherwise
-    const keyboardUnit = inputMode === 'fiat' && fiatCurrency ? fiatCurrency : unit;
+    const keyboardUnit = inputMode === 'fiat' && fiatCurrencyNow ? fiatCurrencyNow : unitNow;
 
     // Secondary display: only when fiat toggle is available and btcPrice is valid
-    let secondaryDisplay: string | null = null;
-    if (hasFiatToggle && btcPrice > 0) {
-      secondaryDisplay = formatSecondaryDisplay(
-        inputMode,
-        core.displaySats,
-        core.displayFiat,
-        fiatSymbol!
-      );
-    }
+    const secondaryDisplay = fiatToggleActive
+      ? formatSecondaryDisplay(inputMode, core.displaySats, core.displayFiat, fiatSymbolNow!)
+      : null;
 
     return {
       ...core,
-      unit,
+      unit: unitNow,
       keyboardUnit,
       secondaryDisplay,
-      fiatSymbol: hasFiatToggle && btcPrice > 0 ? fiatSymbol! : null,
+      fiatCurrency: fiatToggleActive ? fiatCurrencyNow! : null,
+      fiatSymbol: fiatToggleActive ? fiatSymbolNow! : null,
+      btcPrice,
       suggestions: getSuggestions(),
     };
   }
@@ -172,13 +201,13 @@ export function createAmountActionManager(
   };
 
   const setMode = (mode: AmountInputMode): void => {
-    if (!hasFiatToggle || mode === inputMode) return;
+    if (!hasFiatToggleNow() || mode === inputMode) return;
     inputMode = mode;
     // Don't notify — caller will follow with setInput.
   };
 
   const toggle = (): void => {
-    if (!hasFiatToggle) return;
+    if (!hasFiatToggleNow()) return;
 
     const btcPrice = getBtcPrice();
     if (btcPrice <= 0) return;

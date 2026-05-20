@@ -2,9 +2,9 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.0.63",
+    "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": ["sovran", "cashu"],
+    "scheme": ["sovran", "cashu", "lightning", "lnurl", "lnurlw", "lnurlp", "bitcoin", "nostr"],
     "userInterfaceStyle": "dark",
     "icon": "./assets/images/light.png",
     "assetBundlePatterns": ["**/*"],
@@ -39,8 +39,8 @@
       "versionCode": 2,
       "userInterfaceStyle": "dark",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/light-t.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/images/dark-t.png",
+        "backgroundColor": "#FFFFFF"
       },
       "permissions": [
         "android.permission.CAMERA",
@@ -82,7 +82,8 @@
           }
         }
       ],
-      ["expo-build-properties", { "ios": { "deploymentTarget": "18.0" } }],
+      ["expo-build-properties", { "ios": { "deploymentTarget": "16.4" } }],
+      "./plugins/withLowerPodDeploymentTarget",
       [
         "expo-font",
         {

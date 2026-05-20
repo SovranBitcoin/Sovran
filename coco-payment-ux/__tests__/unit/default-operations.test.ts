@@ -16,11 +16,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createDefaultOperations } from '../../src/operations/defaultOperations';
 
+import { defaultDetectors } from '../../src/detectors';
+
 const MINT1 = 'https://mint1.example.com';
 
 function createMockManager(overrides?: Record<string, any>) {
   const mockToken = { proofs: [{ id: 'proof-1', amount: 100, C: 'abc', secret: 'def' }] };
-  let inbandCallback: ((token: any) => Promise<void>) | null = null;
 
   return {
     history: {
@@ -36,20 +37,33 @@ function createMockManager(overrides?: Record<string, any>) {
       ]),
     },
     wallet: {
-      processPaymentRequest: vi.fn().mockResolvedValue({ matchingMints: [MINT1] }),
-      preparePaymentRequestTransaction: vi.fn().mockResolvedValue({
-        sendOperation: { id: 'op-1', createdAt: Date.now() },
-      }),
-      handleHttpPaymentRequest: vi.fn().mockResolvedValue(undefined),
-      handleInbandPaymentRequest: vi.fn().mockImplementation(async (_tx, cb) => {
-        inbandCallback = cb;
-        if (cb) await cb(mockToken);
-      }),
       ...overrides?.wallet,
     },
     mint: {
       addMint: vi.fn(),
       isTrustedMint: vi.fn().mockResolvedValue(true),
+    },
+    ops: {
+      send: {
+        prepare: vi.fn().mockResolvedValue({ id: 'prepared-send-1' }),
+        execute: vi.fn().mockResolvedValue({
+          operation: { id: 'op-1', createdAt: Date.now() },
+          token: mockToken,
+        }),
+        get: vi.fn(),
+        cancel: vi.fn(),
+        reclaim: vi.fn(),
+        ...overrides?.ops?.send,
+      },
+      ...overrides?.ops,
+    },
+    paymentRequests: {
+      parse: vi.fn().mockResolvedValue({ id: 'parsed-creq' }),
+      prepare: vi.fn().mockResolvedValue({
+        sendOperation: { id: 'op-1', createdAt: Date.now() },
+      }),
+      execute: vi.fn().mockResolvedValue(undefined),
+      ...overrides?.paymentRequests,
     },
     send: {
       prepareSend: vi.fn(),
@@ -57,11 +71,11 @@ function createMockManager(overrides?: Record<string, any>) {
       getOperation: vi.fn(),
       checkPendingOperation: vi.fn(),
       rollback: vi.fn(),
+      ...overrides?.send,
     },
     quotes: {
       createMintQuote: vi.fn(),
     },
-    _getInbandCallback: () => inbandCallback,
     _mockToken: mockToken,
   };
 }
@@ -75,8 +89,6 @@ vi.mock('../../src/detectors', () => ({
     getPaymentRequestInfo: vi.fn(),
   },
 }));
-
-import { defaultDetectors } from '../../src/detectors';
 const mockGetPRInfo = defaultDetectors.getPaymentRequestInfo as ReturnType<typeof vi.fn>;
 
 // ---------------------------------------------------------------------------
@@ -102,6 +114,8 @@ describe('executePaymentRequest — Nostr transport', () => {
 
     const result = await ops.executePaymentRequest!(MINT1, 'creqABC', 100, 'sat');
 
+    expect(mockManager.ops.send.prepare).toHaveBeenCalledWith({ mintUrl: MINT1, amount: 100 });
+    expect(mockManager.ops.send.execute).toHaveBeenCalledWith('prepared-send-1');
     expect(sendNostrDM).toHaveBeenCalledOnce();
     const [target, payloadStr] = sendNostrDM.mock.calls[0];
     expect(target).toBe('nprofile1abc');
@@ -144,7 +158,7 @@ describe('executePaymentRequest — Nostr transport', () => {
 // ---------------------------------------------------------------------------
 
 describe('executePaymentRequest — HTTP transport', () => {
-  it('calls handleHttpPaymentRequest and does NOT call sendNostrDM', async () => {
+  it('executes through paymentRequests API and does NOT call sendNostrDM', async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager();
 
@@ -163,17 +177,21 @@ describe('executePaymentRequest — HTTP transport', () => {
     await ops.executePaymentRequest!(MINT1, 'creqHTTP', 100, 'sat');
 
     expect(sendNostrDM).not.toHaveBeenCalled();
-    expect(mockManager.wallet.handleHttpPaymentRequest).toHaveBeenCalledOnce();
-    expect(mockManager.wallet.handleInbandPaymentRequest).not.toHaveBeenCalled();
+    expect(mockManager.paymentRequests.parse).toHaveBeenCalledWith('creqHTTP');
+    expect(mockManager.paymentRequests.prepare).toHaveBeenCalledWith(
+      { id: 'parsed-creq' },
+      { mintUrl: MINT1, amount: 100 }
+    );
+    expect(mockManager.paymentRequests.execute).toHaveBeenCalledOnce();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Inband transport (no Nostr, no HTTP) — uses empty callback
+// Inband transport (no Nostr, no HTTP) — uses paymentRequests API fallback
 // ---------------------------------------------------------------------------
 
 describe('executePaymentRequest — inband fallback', () => {
-  it('calls handleInbandPaymentRequest with empty callback when no transport matches', async () => {
+  it('executes through paymentRequests API when no explicit transport matches', async () => {
     const sendNostrDM = vi.fn().mockResolvedValue(undefined);
     const mockManager = createMockManager();
 
@@ -192,7 +210,11 @@ describe('executePaymentRequest — inband fallback', () => {
     await ops.executePaymentRequest!(MINT1, 'creqInband', 100, 'sat');
 
     expect(sendNostrDM).not.toHaveBeenCalled();
-    expect(mockManager.wallet.handleHttpPaymentRequest).not.toHaveBeenCalled();
-    expect(mockManager.wallet.handleInbandPaymentRequest).toHaveBeenCalledOnce();
+    expect(mockManager.paymentRequests.parse).toHaveBeenCalledWith('creqInband');
+    expect(mockManager.paymentRequests.prepare).toHaveBeenCalledWith(
+      { id: 'parsed-creq' },
+      { mintUrl: MINT1, amount: 100 }
+    );
+    expect(mockManager.paymentRequests.execute).toHaveBeenCalledOnce();
   });
 });

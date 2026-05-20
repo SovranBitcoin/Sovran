@@ -1,35 +1,13 @@
 /**
- * @fileoverview Transactions flow meltQuote route wrapper
- *
- * Part of the (transactions-flow) modal group - displays with back button.
- * Primarily used for viewing existing transactions.
+ * @fileoverview Transactions-flow meltQuote route — re-entry from the
+ * transactions list. The route body and zod schema live on
+ * `MeltQuoteRoute`. Mint-pill callbacks stay undefined here: this route
+ * renders the entry read-only. `Stack.Screen` title comes from
+ * `(transactions-flow)/_layout.tsx`.
  */
 
-import React from 'react';
-import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { MeltQuoteScreen } from '@/features/send';
+import { MeltQuoteRoute } from '@/features/send';
 
-function ModalScreen() {
-  const { meltHistoryEntry } = useLocalSearchParams<{
-    meltHistoryEntry?: string;
-  }>();
-
-  return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Send Lightning',
-          headerBackButtonMenuEnabled: false,
-        }}
-      />
-      <MeltQuoteScreen
-        meltHistoryEntry={meltHistoryEntry}
-        onCancel={() => {
-          router.dismissTo('/');
-        }}
-      />
-    </>
-  );
+export default function ModalScreen() {
+  return <MeltQuoteRoute where="transactions-flow.meltQuote" />;
 }
-
-export default ModalScreen;

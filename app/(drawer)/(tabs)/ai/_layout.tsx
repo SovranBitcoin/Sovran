@@ -3,9 +3,11 @@ import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { AiHeaderTitle, openAiSessionsMenu } from '@/features/ai';
+import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 export default function AiLayout() {
   const iconColor = useThemeColor('foreground');
+  const surface = useThemeColor('surface');
   const navigation = useNavigation();
 
   const openDrawer = () => navigation.dispatch(DrawerActions.openDrawer());
@@ -13,14 +15,13 @@ export default function AiLayout() {
   return (
     <Stack
       screenOptions={{
-        contentStyle: { backgroundColor: 'transparent' },
+        contentStyle: { backgroundColor: surface },
       }}>
       <Stack.Screen
         name="index"
         options={buildExpoRouterHeaderOptions({
           iconColor,
-          headerLeftIcon: 'line.3.horizontal',
-          onHeaderLeftPress: openDrawer,
+          headerLeft: () => <HeaderProfileButton onPress={openDrawer} />,
           headerRightIcon: 'clock.arrow.circlepath',
           onHeaderRightPress: openAiSessionsMenu,
           options: {

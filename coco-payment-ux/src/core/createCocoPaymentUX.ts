@@ -11,6 +11,7 @@
 
 import type { Manager } from '@cashu/coco-core';
 import { createPaymentMachine } from '../machine/createMachine';
+import { setLogger, type CocoLogger } from '../logger';
 import type {
   MachineOperations,
   NfcIOAdapter,
@@ -23,6 +24,11 @@ import type {
 import type { MintCatalogEntry, MintReviewInfo, WalletContext } from '../types';
 import { createDefaultOperations } from '../operations/defaultOperations';
 import { createWalletContextTracker, type WalletContextTracker } from './walletContextTracker';
+
+// NUT-06 mint info as returned by coco's `Manager`. Re-derived here (rather than
+// imported from cashu-ts) so the type tracks whatever shape `mgr.mint.getMintInfo`
+// actually resolves to.
+type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
 
 // ---------------------------------------------------------------------------
 // Config
@@ -55,11 +61,36 @@ export interface CocoPaymentUXConfig {
    * build, regardless of mint count.
    */
   fetchMintCatalog?: (mintUrls: string[]) => Promise<Record<string, MintCatalogEntry>>;
+  /**
+   * Per-mint NUT-06 fetcher used by `buildMintListItems`. Lets the wallet route
+   * through its own SWR cache + per-mint deadline so one slow/dead mint can't
+   * gate the Select Mint screen. Defaults to coco's `manager.mint.getMintInfo`.
+   */
+  fetchMintInfo?: (mintUrl: string) => Promise<MintInfo | null>;
   /** Per-mint enrichment for the trust-review screen. Read from local caches. */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
 
   /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
+  /** Dev: when true, executeMelt fails after prepare so the cancel-rescue path runs. */
+  shouldMockFailMelt?: () => boolean;
+  /** Dev: when true, executeSend fails before prepare. */
+  shouldMockFailSend?: () => boolean;
+
+  /**
+   * Per-request timeout for external lightning calls (LNURL pay-params,
+   * LNURL invoice callback). Defaults to 15 seconds. Tighter values give
+   * the melt flow a faster fail-stop on hostile or stalled providers.
+   */
+  lightningTimeoutMs?: number;
+
+  /**
+   * Structured logger used by every internal module. Defaults to a no-op
+   * so the package stays runtime-agnostic; sovran-app passes its scoped
+   * `paymentLog` so coco-payment-ux events flow through the same
+   * structured pipeline as the rest of the app.
+   */
+  logger?: CocoLogger;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +121,8 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     enrichMintReviewInfo,
   } = config;
 
+  if (config.logger) setLogger(config.logger);
+
   const tracker = createWalletContextTracker(manager, {
     getPreferredMintUrl: config.getPreferredMintUrl,
   });
@@ -101,7 +134,11 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     sendNostrDM,
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
+    fetchMintInfo: config.fetchMintInfo,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
+    shouldMockFailMelt: config.shouldMockFailMelt,
+    shouldMockFailSend: config.shouldMockFailSend,
+    lightningTimeoutMs: config.lightningTimeoutMs,
   });
 
   return {

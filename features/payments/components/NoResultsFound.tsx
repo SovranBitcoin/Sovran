@@ -1,7 +1,7 @@
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import opacity from 'hex-color-opacity';
-import Icon from '@/assets/icons';
+import Icon from 'assets/icons';
 import { SearchTip } from './SearchTip';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';

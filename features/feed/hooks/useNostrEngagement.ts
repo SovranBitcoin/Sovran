@@ -4,9 +4,10 @@ import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
 import { useShallow } from 'zustand/shallow';
 
-import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/shared';
+import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/feedTypes';
 import { log } from '@/shared/lib/logger';
-import { engagementUpdateFailedPopup } from '@/shared/lib/popup';
+import { paramPopup } from '@/shared/lib/popup';
+import { useKeyedSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
@@ -219,7 +220,7 @@ async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
     } else {
       clearOptimistic(eventId);
     }
-    engagementUpdateFailedPopup(label as 'follow' | 'like' | 'repost');
+    paramPopup('engagement-update-failed', label as 'follow' | 'like' | 'repost');
   }
 }
 
@@ -244,12 +245,6 @@ export function useNostrEngagement(
         optimisticRepostsByEventId: s.optimisticRepostsByEventId,
       }))
     );
-
-  // Actions are stable references — read once from the store, no selector needed
-  const actions = useRef(useNostrSocialStore.getState());
-  useEffect(() => {
-    actions.current = useNostrSocialStore.getState();
-  });
 
   const lastStaleWarningRef = useRef(0);
 
@@ -313,7 +308,7 @@ export function useNostrEngagement(
 
   useEffect(() => {
     if (eventIds.length === 0) return;
-    const { syncLikesFromRelay, syncRepostsFromRelay } = actions.current;
+    const { syncLikesFromRelay, syncRepostsFromRelay } = useNostrSocialStore.getState();
 
     const likesPayload = relayLikes.map((l) => ({
       targetEventId: l.targetEventId,
@@ -333,7 +328,7 @@ export function useNostrEngagement(
   // ---- settle optimistic entries when relay catches up ----
 
   useEffect(() => {
-    const { clearLikeOptimistic, clearRepostOptimistic } = actions.current;
+    const { clearLikeOptimistic, clearRepostOptimistic } = useNostrSocialStore.getState();
 
     for (const eventId of eventIds) {
       settleOptimistic(
@@ -379,19 +374,11 @@ export function useNostrEngagement(
 
   // ---- engagement revision (for consumer cache-busting) ----
 
+  const engagementRevisionRef = useRef(0);
   const engagementRevision = useMemo(() => {
-    let revision = 0;
-    for (const eventId of eventIds) {
-      for (const entry of [
-        likesByEventId[eventId],
-        repostsByEventId[eventId],
-        optimisticLikesByEventId[eventId],
-        optimisticRepostsByEventId[eventId],
-      ]) {
-        if (entry) revision += (entry as { updatedAt?: number }).updatedAt || 1;
-      }
-    }
-    return revision;
+    engagementRevisionRef.current += 1;
+    return engagementRevisionRef.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     eventIds,
     likesByEventId,
@@ -445,13 +432,14 @@ export function useNostrEngagement(
 
   // ---- toggle actions (unified via toggleEngagement) ----
 
-  const toggleLike = useCallback(
+  const toggleLikeInner = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
-        engagementUpdateFailedPopup('like');
+        paramPopup('engagement-update-failed', 'like');
         return;
       }
       const state = getEngagementState(target.id);
+      const { setLikeOptimistic, clearLikeOptimistic } = useNostrSocialStore.getState();
       await toggleEngagement({
         target,
         ndk,
@@ -462,8 +450,8 @@ export function useNostrEngagement(
         relatedEventIdFromStore: likesByEventId[target.id]?.reactionEventId,
         displayedCount: getDisplayMetrics(target.id).likeCount,
         baseCount: getBaseMetrics(target.id).likeCount,
-        setOptimistic: actions.current.setLikeOptimistic,
-        clearOptimistic: actions.current.clearLikeOptimistic,
+        setOptimistic: setLikeOptimistic,
+        clearOptimistic: clearLikeOptimistic,
         buildContent: () => '+',
         label: 'like',
       });
@@ -479,13 +467,15 @@ export function useNostrEngagement(
     ]
   );
 
-  const toggleRepost = useCallback(
+  const toggleRepostInner = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
-        engagementUpdateFailedPopup('repost');
+        paramPopup('engagement-update-failed', 'repost');
         return;
       }
       const state = getEngagementState(target.id);
+      const { setRepostOptimistic, clearRepostOptimistic, unmarkRepostDeleted, markRepostDeleted } =
+        useNostrSocialStore.getState();
       await toggleEngagement({
         target,
         ndk,
@@ -496,11 +486,11 @@ export function useNostrEngagement(
         relatedEventIdFromStore: repostsByEventId[target.id]?.repostEventId,
         displayedCount: getDisplayMetrics(target.id).repostCount,
         baseCount: getBaseMetrics(target.id).repostCount,
-        setOptimistic: actions.current.setRepostOptimistic,
-        clearOptimistic: actions.current.clearRepostOptimistic,
+        setOptimistic: setRepostOptimistic,
+        clearOptimistic: clearRepostOptimistic,
         buildContent: (t) => JSON.stringify(t),
-        onActivated: () => actions.current.unmarkRepostDeleted(target.id),
-        onDeactivated: () => actions.current.markRepostDeleted(target.id),
+        onActivated: () => unmarkRepostDeleted(target.id),
+        onDeactivated: () => markRepostDeleted(target.id),
         label: 'repost',
       });
     },
@@ -514,6 +504,15 @@ export function useNostrEngagement(
       repostsByEventId,
     ]
   );
+
+  // Per-target single-flight: tapping like on post A while post B is still
+  // publishing must not block — use the target id as the key so concurrent
+  // calls on different posts run in parallel, but a rapid double-tap on the
+  // same post drops the duplicate before the second `ndkEvent.publish()`
+  // can stomp the first call's optimistic state.
+  const targetKey = useCallback((target: FeedEvent) => target.id, []);
+  const toggleLike = useKeyedSingleFlight(toggleLikeInner, targetKey);
+  const toggleRepost = useKeyedSingleFlight(toggleRepostInner, targetKey);
 
   return {
     getDisplayMetrics,

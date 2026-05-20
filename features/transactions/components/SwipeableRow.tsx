@@ -24,10 +24,10 @@ const SPRING = { damping: 22, stiffness: 220, mass: 0.6 };
 
 // Hoisted: closure-free, allocated once per module — not per row.
 const tickHaptic = () => {
-  EnhancedHaptics.buttonHaptic();
+  void EnhancedHaptics.buttonHaptic();
 };
 const commitHaptic = () => {
-  EnhancedHaptics.warningHaptic();
+  void EnhancedHaptics.warningHaptic();
 };
 
 interface SwipeableRowProps {

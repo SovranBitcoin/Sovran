@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Clipboard,
-  Alert,
-  ActivityIndicator,
-  TouchableOpacity as RNTouchableOpacity,
-} from 'react-native';
+import { LoadingIndicator } from '@/shared/blocks/status';
+import * as Clipboard from 'expo-clipboard';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, router } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -14,24 +11,20 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import Icon from 'assets/icons';
 import { useManager } from '@cashu/coco-react';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
-import {
-  keysLoadFailedPopup,
-  keyGenerateFailedPopup,
-  invalidKeyFormatPopup,
-  keyGeneratedPopup,
-  keyImportedPopup,
-  keyImportFailedPopup,
-  copyPopup,
-} from '@/shared/lib/popup';
+import { actionMenuPopup, copyPopup, staticPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import type { Keypair } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { nip19 } from 'nostr-tools';
+import { hexToBytes } from '@noble/hashes/utils.js';
+import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import QRCode from 'react-native-qrcode-svg';
-import { Tabs } from '@/shared/ui/composed/Tabs';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import opacity from 'hex-color-opacity';
 import {
   Button,
@@ -49,7 +42,7 @@ const CurrentKeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const [foreground, surface, muted] = useThemeColor(['foreground', 'surface', 'muted'] as const);
+  const muted = useThemeColor('muted');
   const [selectedTab, setSelectedTab] = useState('P2PK');
 
   const isDerived = keypair.derivationIndex !== undefined;
@@ -85,7 +78,11 @@ const CurrentKeyItem: React.FC<{
     <View className="p-4">
       {!isDerived && (
         <View className="mb-4">
-          <Tabs tabs={['P2PK', 'NPUB']} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+          <UnderlineTabs
+            tabs={['P2PK', 'NPUB']}
+            selectedTab={selectedTab}
+            handleTabPress={handleTabPress}
+          />
         </View>
       )}
 
@@ -97,10 +94,17 @@ const CurrentKeyItem: React.FC<{
           style={{
             alignItems: 'center',
             padding: 12,
-            backgroundColor: foreground,
+            backgroundColor: INVARIANT_WHITE,
             borderRadius: 12,
           }}>
-          <QRCode value={activeData} size={120} color={surface} backgroundColor={foreground} />
+          {/* QR pinned to dark-on-white regardless of theme — scanners are
+              strict and an inverted (light-on-dark) render is unreliable. */}
+          <QRCode
+            value={activeData}
+            size={120}
+            color={INVARIANT_BLACK}
+            backgroundColor={INVARIANT_WHITE}
+          />
         </View>
       </PressableFeedback>
 
@@ -232,48 +236,36 @@ export const SettingsKeyringScreen: React.FC = () => {
       setKeypairs(allKeys);
     } catch (error) {
       log.error('settings.keyring.load_failed', { error });
-      keysLoadFailedPopup();
+      staticPopup('keys-load-failed');
     } finally {
       setIsLoading(false);
     }
   }, [manager]);
 
   useEffect(() => {
-    loadKeypairs();
+    void loadKeypairs();
   }, [loadKeypairs]);
 
   /**
-   * Generates a new keypair
+   * Generates a new keypair. `isGenerating` is React state and lands too
+   * late to block a rapid double-tap on Generate, which would otherwise
+   * write two new keypairs into the secure-store keyring.
    */
-  const handleGenerateKey = async () => {
+  const handleGenerateKey = useSingleFlight(async () => {
     if (!manager) return;
 
     try {
       setIsGenerating(true);
       await manager.keyring.generateKeyPair();
-      keyGeneratedPopup();
+      staticPopup('key-generated');
       await loadKeypairs();
     } catch (error) {
       log.error('settings.keyring.generate_failed', { error });
-      keyGenerateFailedPopup();
+      staticPopup('key-generate-failed');
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  /**
-   * Helper to convert hex string to bytes
-   */
-  const hexToBytes = (hex: string): Uint8Array | null => {
-    if (hex.length !== 64 || !/^[0-9a-fA-F]+$/.test(hex)) {
-      return null;
-    }
-    const bytes = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) {
-      bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-    }
-    return bytes;
-  };
+  });
 
   /**
    * Try to import a key with multiple strategies without manipulating the input
@@ -289,61 +281,95 @@ export const SettingsKeyringScreen: React.FC = () => {
           await manager.keyring.addKeyPair(decoded.data as Uint8Array);
           return true;
         }
-      } catch {}
+      } catch (error) {
+        log.warn('settings.keyring.import.nsec_decode_failed', {
+          error: (error as Error)?.message,
+        });
+      }
     }
 
-    // Strategy 2: Try as raw 64-char hex
-    const rawBytes = hexToBytes(input);
-    if (rawBytes) {
+    // Strategy 2: Try as raw 64-char hex (32-byte private key)
+    if (isNostrPubkeyHex(input)) {
       try {
-        await manager.keyring.addKeyPair(rawBytes);
+        await manager.keyring.addKeyPair(hexToBytes(input));
         return true;
-      } catch {}
+      } catch (error) {
+        log.warn('settings.keyring.import.hex_decode_failed', {
+          error: (error as Error)?.message,
+        });
+      }
     }
 
     return false;
   };
 
   /**
-   * Imports an existing private key (nsec or hex format)
+   * Imports an existing private key (nsec or hex format). The single-flight
+   * guard wraps the whole prompt → submit → addKeyPair lifecycle so a
+   * double-tap on the Import row before the menu renders cannot stack two
+   * `addKeyPair` writes against the same nsec. Uses the canonical
+   * `actionMenuPopup` surface (mirrors profile-switcher's nsec import) so
+   * the flow renders cross-platform — `Alert.prompt` is iOS-only.
    */
-  const handleImportNsec = () => {
-    Alert.prompt(
-      'Import Private Key',
-      'Enter your nsec or hex private key',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Import',
-          onPress: async (value: string | undefined) => {
-            if (!value || !manager) return;
-
-            try {
-              const trimmedValue = value.trim();
-              const success = await tryImportKey(trimmedValue);
-
-              if (success) {
-                keyImportedPopup();
-                await loadKeypairs();
-              } else {
-                invalidKeyFormatPopup();
+  const handleImportNsec = useSingleFlight(
+    () =>
+      new Promise<void>((resolve) => {
+        let didFinalize = false;
+        const finalize = () => {
+          if (didFinalize) return;
+          didFinalize = true;
+          resolve();
+        };
+        actionMenuPopup({
+          title: 'Import Private Key',
+          inputs: [
+            {
+              id: 'key',
+              placeholder: 'nsec1... or 64-char hex',
+              secureTextEntry: true,
+              autoCapitalize: 'none',
+              autoCorrect: false,
+              description: 'Paste an existing P2PK key — nsec or 64-character hex.',
+            },
+          ],
+          primaryAction: {
+            text: 'Import',
+            loadingText: 'Importing...',
+            icon: 'mdi:key-arrow-right',
+            testID: 'keyring-import-submit',
+            isDisabled: (v) => !v.key.trim(),
+            onPress: async (values, { setError, close }) => {
+              if (!manager) {
+                setError('Wallet not ready.');
+                return;
               }
-            } catch (error) {
-              log.error('settings.keyring.import_failed', { error });
-              keyImportFailedPopup();
-            }
+              const trimmedValue = values.key.trim();
+              try {
+                const success = await tryImportKey(trimmedValue);
+                if (!success) {
+                  setError('Enter nsec or 64-character hex key.');
+                  return;
+                }
+                staticPopup('key-imported');
+                await loadKeypairs();
+              } catch (error) {
+                log.error('settings.keyring.import_failed', { error });
+                staticPopup('key-import-failed');
+              } finally {
+                // Host suppresses `onDismiss` once an action commits, so
+                // release the single-flight guard explicitly here.
+                finalize();
+                close();
+              }
+            },
           },
-        },
-      ],
-      'secure-text'
-    );
-  };
+          onDismiss: finalize,
+        });
+      })
+  );
 
-  /**
-   * Copies a public key to clipboard
-   */
-  const handleCopyKey = (publicKey: string) => {
-    Clipboard.setString(publicKey);
+  const handleCopyKey = async (publicKey: string) => {
+    await Clipboard.setStringAsync(publicKey);
     copyPopup('publicKey');
   };
 
@@ -354,22 +380,20 @@ export const SettingsKeyringScreen: React.FC = () => {
           title: 'P2PK Keys',
           headerRight: () => (
             <HStack spacing={4}>
-              <RNTouchableOpacity
+              <Pressable
                 onPress={handleImportNsec}
                 style={{ padding: 8 }}
-                disabled={isGenerating}>
+                disabled={isGenerating}
+                testID="keyring-import-trigger">
                 <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
-              </RNTouchableOpacity>
-              <RNTouchableOpacity
-                onPress={handleGenerateKey}
-                style={{ padding: 8 }}
-                disabled={isGenerating}>
+              </Pressable>
+              <Pressable onPress={handleGenerateKey} style={{ padding: 8 }} disabled={isGenerating}>
                 {isGenerating ? (
-                  <ActivityIndicator size="small" color={foreground} />
+                  <LoadingIndicator size={22} phase="loading" color={foreground} />
                 ) : (
                   <Icon name="mdi:key-plus" size={22} color={foreground} />
                 )}
-              </RNTouchableOpacity>
+              </Pressable>
             </HStack>
           ),
         }}
@@ -396,8 +420,8 @@ export const SettingsKeyringScreen: React.FC = () => {
             <ListGroup.ItemContent>
               <ListGroup.ItemTitle>Regenerate Key on Receive</ListGroup.ItemTitle>
               <ListGroup.ItemDescription>
-                Automatically generate a new P2PK key after redeeming a locked token for
-                improved privacy
+                Automatically generate a new P2PK key after redeeming a locked token for improved
+                privacy
               </ListGroup.ItemDescription>
             </ListGroup.ItemContent>
             <ListGroup.ItemSuffix>
@@ -415,7 +439,7 @@ export const SettingsKeyringScreen: React.FC = () => {
         <ListGroup variant="secondary">
           {isLoading ? (
             <VStack align="center" className="p-6">
-              <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
+              <LoadingIndicator size={20} phase="loading" color={opacity(foreground, 0.4)} />
               <Text size={14} className="mt-2" style={{ color: opacity(foreground, 0.4) }}>
                 Loading keys...
               </Text>

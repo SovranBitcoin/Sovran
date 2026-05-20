@@ -8,7 +8,7 @@
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { ParamListBase, NavigationProp } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 
 interface FlowColors {
@@ -27,7 +27,7 @@ const FlowHeaderButton = ({
   isFirstScreen: boolean;
   foreground: string;
 }) => (
-  <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+  <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
     <Icon
       name={
         isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
@@ -35,7 +35,7 @@ const FlowHeaderButton = ({
       size={24}
       color={foreground}
     />
-  </TouchableOpacity>
+  </Pressable>
 );
 
 /**
@@ -45,6 +45,7 @@ const FlowHeaderButton = ({
 const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOptions => ({
   headerShown: true,
   headerTransparent: true,
+  headerTitleAlign: 'center',
   headerStyle: {
     backgroundColor: 'transparent',
   },
@@ -92,6 +93,7 @@ export const getBaseModalHeaderOptions = (
   foreground: string,
   backgroundColor: string
 ): NativeStackNavigationOptions => ({
+  headerTitleAlign: 'center',
   headerTitleStyle: {
     color: foreground,
   },

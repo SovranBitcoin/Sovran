@@ -14,32 +14,48 @@
  * Uses native header for liquid glass button animations.
  */
 
+import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 import { TransactionsFilterProvider } from '@/features/transactions';
 
+const TRANSPARENT_HEADER_STYLE = { backgroundColor: 'transparent' };
+const MINT_QUOTE_OPTIONS = { title: 'Receive Lightning' };
+const MELT_QUOTE_OPTIONS = {
+  title: 'Send Lightning',
+  headerBackButtonMenuEnabled: false,
+};
+const SEND_TOKEN_OPTIONS = { title: 'Send Ecash' };
+const RECEIVE_TOKEN_OPTIONS = { title: 'Receive Ecash' };
+const SWAP_OPTIONS = { title: 'Swap' };
+
 function TransactionsFlowContent() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const screenOptions = useMemo(
+    () => createFlowLayoutScreenOptions({ foreground, background }),
+    [foreground, background]
+  );
+  const transactionsOptions = useMemo(
+    () => ({
+      title: 'Transactions',
+      headerTransparent: true,
+      headerStyle: TRANSPARENT_HEADER_STYLE,
+      contentStyle: {
+        backgroundColor: background,
+      },
+    }),
+    [background]
+  );
 
   return (
-    <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
-      <Stack.Screen
-        name="transactions"
-        options={{
-          title: 'Transactions',
-          headerTransparent: true,
-          headerStyle: { backgroundColor: 'transparent' },
-          contentStyle: {
-            backgroundColor: background,
-          },
-        }}
-      />
-      <Stack.Screen name="mintQuote" options={{ title: 'Receive Lightning' }} />
-      <Stack.Screen name="meltQuote" options={{ title: 'Send Lightning' }} />
-      <Stack.Screen name="sendToken" options={{ title: 'Send Ecash' }} />
-      <Stack.Screen name="receiveToken" options={{ title: 'Receive Ecash' }} />
-      <Stack.Screen name="swap" options={{ title: 'Swap' }} />
+    <Stack screenOptions={screenOptions}>
+      <Stack.Screen name="transactions" options={transactionsOptions} />
+      <Stack.Screen name="mintQuote" options={MINT_QUOTE_OPTIONS} />
+      <Stack.Screen name="meltQuote" options={MELT_QUOTE_OPTIONS} />
+      <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
+      <Stack.Screen name="receiveToken" options={RECEIVE_TOKEN_OPTIONS} />
+      <Stack.Screen name="swap" options={SWAP_OPTIONS} />
     </Stack>
   );
 }

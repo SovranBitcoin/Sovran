@@ -262,23 +262,25 @@ The redeem handler validates the token, checks mint trust, and receives:
       router.navigate({ pathname: '/receive-token', params: { token } });
     },
   })}
-  actions={{
-    receiveToken: {
-      redeem: async (ctx) => {
-        const tokenString = ctx.manager.wallet.encodeToken(ctx.entry.token);
+  callbacks={{
+    actions: {
+      receiveToken: {
+        redeem: async (ctx) => {
+          const tokenString = ctx.manager.wallet.encodeToken(ctx.entry.token);
 
-        if (decodedUnit !== 'sat') {
-          unsupportedTokenUnitPopup({ unit: decodedUnit });
-          return;
-        }
+          if (decodedUnit !== 'sat') {
+            unsupportedTokenUnitPopup({ unit: decodedUnit });
+            return;
+          }
 
-        const isTrusted = await ctx.manager.mint.isTrustedMint(ctx.entry.mintUrl);
-        if (!isTrusted) {
-          await ctx.paymentMachine.reviewMint(ctx.entry.mintUrl, tokenString);
-          return;
-        }
+          const isTrusted = await ctx.manager.mint.isTrustedMint(ctx.entry.mintUrl);
+          if (!isTrusted) {
+            await ctx.paymentMachine.reviewMint(ctx.entry.mintUrl, tokenString);
+            return;
+          }
 
-        await ctx.manager.wallet.receive(tokenString);
+          await ctx.manager.wallet.receive(tokenString);
+        },
       },
     },
   }}
@@ -417,7 +419,7 @@ function MintReviewScreen({ mintInfoEntry }) {
 | `copy` *  | Has mint URL   | Copy the mint URL to clipboard                   |
 | `share` * | Has mint URL   | Platform share sheet with the mint URL           |
 
-\* Built-in — works automatically when `writeClipboard` / `shareContent` are provided on the provider. No handler needed.
+\* Built-in — works automatically when `platform.writeClipboard` / `platform.shareContent` are provided on the provider. No handler needed.
 
 ### Action handlers
 
@@ -425,51 +427,57 @@ The `trustMint` and `buildMintReviewInfo` operations are provided via `MachineOp
 
 ```tsx
 <CocoPaymentUXProvider
-  operations={{
-    executeSend: ...,
-    executeMintQuote: ...,
-    buildMintListItems: ...,
-    trustMint: async (mintUrl) => {
-      await walletManager.mint.addMint(mintUrl, { trusted: true });
-    },
-    buildMintReviewInfo: async (mintUrl) => {
-      const [mintInfo, auditData, balances, isTrusted] = await Promise.all([
-        fetchMintInfo(mintUrl),
-        auditMint(mintUrl),
-        walletManager.wallet.getBalances(),
-        walletManager.mint.isTrustedMint(mintUrl),
-      ]);
-      return {
-        mintUrl,
-        displayName: mintInfo?.name ?? mintUrl,
-        description: mintInfo?.description,
-        contact: mintInfo?.contact,
-        balance: balances[mintUrl] ?? 0,
-        unit: 'sat',
-        isPreferred: false,
-        isTrusted,
-        auditScore: auditData?.score,
-        auditState: auditData?.state,
-        successRate: auditData?.successRate,
-        avgTimeMs: auditData?.avgTimeMs,
-        totalMints: auditData?.totalMints,
-        totalMelts: auditData?.totalMelts,
-      };
+  engine={{
+    operations: {
+      executeSend: ...,
+      executeMintQuote: ...,
+      buildMintListItems: ...,
+      trustMint: async (mintUrl) => {
+        await walletManager.mint.addMint(mintUrl, { trusted: true });
+      },
+      buildMintReviewInfo: async (mintUrl) => {
+        const [mintInfo, auditData, balances, isTrusted] = await Promise.all([
+          fetchMintInfo(mintUrl),
+          auditMint(mintUrl),
+          walletManager.wallet.getBalances(),
+          walletManager.mint.isTrustedMint(mintUrl),
+        ]);
+        return {
+          mintUrl,
+          displayName: mintInfo?.name ?? mintUrl,
+          description: mintInfo?.description,
+          contact: mintInfo?.contact,
+          balance: balances[mintUrl] ?? 0,
+          unit: 'sat',
+          isPreferred: false,
+          isTrusted,
+          auditScore: auditData?.score,
+          auditState: auditData?.state,
+          successRate: auditData?.successRate,
+          avgTimeMs: auditData?.avgTimeMs,
+          totalMints: auditData?.totalMints,
+          totalMelts: auditData?.totalMelts,
+        };
+      },
     },
   }}
-  writeClipboard={(text) => Clipboard.setStringAsync(text)}
-  shareContent={(content) => Share.share({ message: content.message, url: content.url })}
-  actions={{
-    mintInfo: {
-      trust: async (ctx) => {
-        await ctx.manager.mint.addMint(ctx.entry.mintUrl, { trusted: true });
-        if (ctx.entry.fromAccepter) {
-          router.dismiss();
-        } else {
-          router.back();
-        }
+  platform={{
+    writeClipboard: (text) => Clipboard.setStringAsync(text),
+    shareContent: (content) => Share.share({ message: content.message, url: content.url }),
+  }}
+  callbacks={{
+    actions: {
+      mintInfo: {
+        trust: async (ctx) => {
+          await ctx.manager.mint.addMint(ctx.entry.mintUrl, { trusted: true });
+          if (ctx.entry.fromAccepter) {
+            router.dismiss();
+          } else {
+            router.back();
+          }
+        },
+        // copy and share are built-in — no handler needed
       },
-      // copy and share are built-in — no handler needed
     },
   }}
 />

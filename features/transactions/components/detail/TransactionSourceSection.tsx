@@ -4,21 +4,13 @@ import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
-import { useScanHistoryStore, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
+import { useScanEntryForTransactionId, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 
 const SOURCE_LABELS: Record<ScanSource, string> = {
   qr: 'QR Code',
   nfc: 'NFC',
   paste: 'Clipboard',
   deeplink: 'Deep Link',
-};
-
-const OPTION_KIND_LABELS: Record<string, string> = {
-  lightningInvoice: 'Lightning',
-  lightningAddress: 'Lightning Address',
-  lnurlp: 'LNURL-pay',
-  paymentRequest: 'Cashu Payment Request',
-  ecashToken: 'Cashu Token',
 };
 
 function isLightningKind(k: string) {
@@ -34,32 +26,20 @@ function isEcashKind(k: string) {
  * Intended for use as a row in DetailsSection.
  */
 export function useTransactionSource(transactionId: string | undefined): string | null {
-  return useScanHistoryStore((state) => {
-    if (!transactionId) return null;
-    const entry = state.entries.find((e) => e.transactionId === transactionId);
-    return entry?.source ? SOURCE_LABELS[entry.source] : null;
-  });
+  const entry = useScanEntryForTransactionId(transactionId);
+  return entry?.source ? SOURCE_LABELS[entry.source] : null;
 }
 
 /**
  * Returns BIP321 metadata for a transaction's DetailsSection.
- * Uses primitive selectors to avoid infinite re-render loops.
  */
 export function useBip321Info(transactionId: string | undefined): {
   isBip321: boolean;
   optionKinds: string[] | null;
 } {
-  const isBip321 = useScanHistoryStore((state) => {
-    if (!transactionId) return false;
-    const entry = state.entries.find((e) => e.transactionId === transactionId);
-    return entry?.container === 'bip321';
-  });
-  const optionKinds = useScanHistoryStore((state) => {
-    if (!transactionId) return null;
-    const entry = state.entries.find((e) => e.transactionId === transactionId);
-    if (entry?.container !== 'bip321' || !entry.optionKinds?.length) return null;
-    return entry.optionKinds;
-  });
+  const entry = useScanEntryForTransactionId(transactionId);
+  const isBip321 = entry?.container === 'bip321';
+  const optionKinds = isBip321 && entry.optionKinds?.length ? entry.optionKinds : null;
   return { isBip321, optionKinds };
 }
 

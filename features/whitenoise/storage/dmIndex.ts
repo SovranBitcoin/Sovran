@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AsyncStorageKVBackend } from './asyncStorageBackend';
+import { WhitenoiseNamespace, whitenoisePrefix } from './namespaces';
 
 export type WhitenoiseDmIndexEntry = {
   /** Counterparty hex pubkey. */
@@ -11,28 +12,27 @@ export type WhitenoiseDmIndexEntry = {
  * Maps counterparty pubkey (hex) → group id hex for 1:1 White Noise DMs.
  * Per-account namespaced. Stored separately from MLS group state because it
  * is just a lookup hint; the canonical state lives in the GroupStateStore.
+ *
+ * Routed through `AsyncStorageKVBackend` so values share the same
+ * `WHITENOISE_STORAGE_VERSION` envelope as every other Whitenoise namespace
+ * — a future schema bump can migrate every namespace through one
+ * discriminator instead of special-casing this one.
  */
 export class WhitenoiseDmIndex {
-  private readonly prefix: string;
+  private readonly backend: AsyncStorageKVBackend<string>;
 
   constructor(accountIndex: number) {
-    this.prefix = `whitenoise:${accountIndex}:dm-index`;
-  }
-
-  private key(counterpartyPubkey: string): string {
-    return `${this.prefix}:${counterpartyPubkey}`;
+    this.backend = new AsyncStorageKVBackend<string>(
+      whitenoisePrefix(accountIndex, WhitenoiseNamespace.DmIndex)
+    );
   }
 
   async get(counterpartyPubkey: string): Promise<string | null> {
-    return AsyncStorage.getItem(this.key(counterpartyPubkey));
+    return this.backend.getItem(counterpartyPubkey);
   }
 
   async set(counterpartyPubkey: string, groupIdHex: string): Promise<void> {
-    await AsyncStorage.setItem(this.key(counterpartyPubkey), groupIdHex);
-  }
-
-  async remove(counterpartyPubkey: string): Promise<void> {
-    await AsyncStorage.removeItem(this.key(counterpartyPubkey));
+    await this.backend.setItem(counterpartyPubkey, groupIdHex);
   }
 
   /**
@@ -42,19 +42,7 @@ export class WhitenoiseDmIndex {
    * Marmot uses kind-445 group events, not kind-4/kind-14 DMs).
    */
   async list(): Promise<WhitenoiseDmIndexEntry[]> {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const prefixWithSep = `${this.prefix}:`;
-    const matching = allKeys.filter((k) => k.startsWith(prefixWithSep));
-    if (matching.length === 0) return [];
-    const pairs = await AsyncStorage.multiGet(matching);
-    const entries: WhitenoiseDmIndexEntry[] = [];
-    for (const [storageKey, value] of pairs) {
-      if (!value) continue;
-      entries.push({
-        pubkey: storageKey.slice(prefixWithSep.length),
-        groupIdHex: value,
-      });
-    }
-    return entries;
+    const pairs = await this.backend.entries();
+    return pairs.map(([pubkey, groupIdHex]) => ({ pubkey, groupIdHex }));
   }
 }

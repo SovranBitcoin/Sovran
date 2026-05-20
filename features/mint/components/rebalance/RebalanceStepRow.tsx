@@ -19,14 +19,15 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
-import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import {
   TransferCard,
   TransferEntryRow,
   TransferStepChain,
   TransferErrorBanner,
 } from '@/shared/blocks/transfer';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 import Icon from 'assets/icons';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -43,11 +44,6 @@ export type StepStatus =
   | 'failed'
   | 'skipped';
 
-interface MintInfo {
-  name?: string;
-  icon_url?: string;
-}
-
 interface ChainInfo {
   chainId: string;
   /** Full ordered path of mint URLs: [source, via1, …, destination]. */
@@ -55,7 +51,7 @@ interface ChainInfo {
   /** 0-based index of the current hop within the chain. */
   chainHopIndex: number;
   /** Mint info for each URL in chainPath (parallel array). */
-  pathMintInfos: (MintInfo | null)[];
+  pathMintInfos: (GetInfoResponse | null)[];
 }
 
 interface RebalanceStepRowProps {
@@ -64,11 +60,11 @@ interface RebalanceStepRowProps {
   /** Source mint URL */
   fromMintUrl: string;
   /** Source mint info */
-  fromMintInfo?: MintInfo | null;
+  fromMintInfo?: GetInfoResponse | null;
   /** Destination mint URL */
   toMintUrl: string;
   /** Destination mint info */
-  toMintInfo?: MintInfo | null;
+  toMintInfo?: GetInfoResponse | null;
   /** Amount to transfer */
   amount: number;
   /** Unit for display */
@@ -219,7 +215,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
               {String(errorMessage).includes('no_route') &&
                 routeSuggestion?.status === 'searching' && (
                   <HStack align="center" gap={8} className="px-4">
-                    <Spinner size={14} />
+                    <LoadingIndicator size={14} phase="loading" color={primaryColor300} />
                     <Text size={12} style={{ color: primaryColor300 }}>
                       Finding a middleman…
                     </Text>
@@ -232,7 +228,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
               )}
               <HStack gap={8} className="px-4">
                 {routeSuggestion?.status === 'found' && routeSuggestion?.path && onRouteThrough ? (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={onRouteThrough}
                     haptics
                     style={{
@@ -254,9 +250,9 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         </Text>
                       )}
                     </VStack>
-                  </TouchableOpacity>
+                  </Pressable>
                 ) : onRetry ? (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={onRetry}
                     haptics
                     style={{
@@ -271,10 +267,10 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         Retry
                       </Text>
                     </HStack>
-                  </TouchableOpacity>
+                  </Pressable>
                 ) : null}
                 {onSkip && (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={onSkip}
                     haptics
                     style={{
@@ -289,7 +285,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         Skip
                       </Text>
                     </HStack>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
               </HStack>
             </VStack>

@@ -8,6 +8,7 @@ public class BitChatModule: Module {
         Events(
             "onBLEMessage",
             "onBLEPrivateMessage",
+            "onBLEDeliveryStatus",
             "onBLEPeerUpdate",
             "onBLEStateChanged",
             "onNostrMessage",
@@ -26,43 +27,10 @@ public class BitChatModule: Module {
             }
         }
 
-        // --- Geohash encode/decode (sync, no state) ---
-
-        Function("encodeGeohash") { (latitude: Double, longitude: Double, precision: Int) -> String in
-            return BitChatGeohash.encode(latitude: latitude, longitude: longitude, precision: precision)
-        }
-
-        Function("decodeGeohash") { (hash: String) -> [String: Double] in
-            let center = BitChatGeohash.decodeCenter(hash)
-            return ["lat": center.lat, "lon": center.lon]
-        }
-
-        Function("neighbors") { (hash: String) -> [String] in
-            return BitChatGeohash.neighbors(of: hash)
-        }
-
-        // --- Geo relay directory (upstream bitchat's 304-entry CSV, Haversine) ---
-
-        AsyncFunction("closestRelays") { (latitude: Double, longitude: Double, count: Int) -> [String] in
-            await MainActor.run {
-                BitChatNostrBridge.shared.closestRelays(toLat: latitude, lon: longitude, count: count)
-            }
-        }
-
-        AsyncFunction("closestRelaysForGeohash") { (hash: String, count: Int) -> [String] in
-            await MainActor.run {
-                BitChatNostrBridge.shared.closestRelays(toGeohash: hash, count: count)
-            }
-        }
-
         // --- BLE Mesh ---
 
-        AsyncFunction("startBLE") { (nickname: String) in
-            await BitChatBLEBridge.shared.start(nickname: nickname)
-        }
-
-        AsyncFunction("stopBLE") {
-            await BitChatBLEBridge.shared.stop()
+        AsyncFunction("startBLE") { (nickname: String, profileScope: String) in
+            await BitChatBLEBridge.shared.start(nickname: nickname, profileScope: profileScope)
         }
 
         AsyncFunction("sendBLEMessage") { (content: String) in
@@ -75,37 +43,50 @@ public class BitChatModule: Module {
             try BitChatBLEBridge.shared.startPrivateChat(peerID)
         }
 
-        /// Send a Noise-encrypted DM. `nickname` is our own nickname, passed
-        /// through so upstream can stamp the recipientNickname field on the
-        /// persisted message (used for UI rendering + delivery receipts).
+        /// Clear the Noise session for `peerID` so the next outbound DM
+        /// triggers a fresh handshake. The JS-side watchdog calls this when
+        /// a `sending`-state message hasn't progressed to `sent` within a
+        /// timeout — likely a stuck handshake or invalidated session.
+        AsyncFunction("resetBLEPrivateChat") { (peerID: String) in
+            try BitChatBLEBridge.shared.resetPrivateChat(peerID)
+        }
+
+        /// Send a Noise-encrypted DM. `messageID` is provided by the JS caller
+        /// so the optimistic bubble and later `onBLEDeliveryStatus` events
+        /// (sent / delivered / failed) correlate on a single key. `nickname`
+        /// is our own nickname — upstream stamps it on the persisted message
+        /// for the recipient's display.
         AsyncFunction("sendBLEPrivateMessage") {
-            (peerID: String, content: String, nickname: String) in
-            try BitChatBLEBridge.shared.sendPrivateMessage(content, to: peerID, nickname: nickname)
+            (peerID: String, content: String, nickname: String, messageID: String) -> String in
+            return try BitChatBLEBridge.shared.sendPrivateMessage(
+                content,
+                to: peerID,
+                nickname: nickname,
+                messageID: messageID
+            )
         }
 
         Function("getBLEPeers") { () -> [[String: Any]] in
             return BitChatBLEBridge.shared.getPeers()
         }
 
+        /// Returns the persisted 1:1 DM-peer history (peerID + best-known
+        /// nickname + last activity timestamp) sorted by recency. Survives app
+        /// restarts via UserDefaults — used by the Contacts screen's Recent /
+        /// All tabs to surface peers we've DM'd in past sessions.
+        Function("getBLEDmHistory") { (profileScope: String) -> [[String: Any]] in
+            return BitChatBLEBridge.shared.getDmHistory(profileScope: profileScope)
+        }
+
         Function("getBLEState") { () -> String in
             return BitChatBLEBridge.shared.bluetoothState
         }
 
-        Function("getBLEDiagnostics") { () -> [String: Any] in
-            return BitChatBLEBridge.shared.getDiagnostics()
-        }
-
         // --- Nostr (upstream bitchat's NostrRelayManager + GeoRelayDirectory + per-geohash identity) ---
 
-        AsyncFunction("startNostr") {
+        AsyncFunction("startNostr") { (profileScope: String) in
             await MainActor.run {
-                BitChatNostrBridge.shared.start()
-            }
-        }
-
-        AsyncFunction("stopNostr") {
-            await MainActor.run {
-                BitChatNostrBridge.shared.stop()
+                BitChatNostrBridge.shared.start(profileScope: profileScope)
             }
         }
 

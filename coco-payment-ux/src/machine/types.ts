@@ -38,6 +38,31 @@ export type FlowStep =
 export type Destination = AmountEntryConstraints['destination'];
 
 // ---------------------------------------------------------------------------
+// Recipient identity — populated by `operations.resolveRecipientPubkey`
+// (Lightning Address → Nostr hex pubkey via NIP-05) and
+// `operations.resolveRecipientProfile` (pubkey → Nostr kind-0 metadata).
+// Both run as fire-and-forget side effects from `send()` so they never
+// block the flow; consumer UIs read whichever fields have landed.
+// ---------------------------------------------------------------------------
+
+export interface RecipientProfile {
+  displayName: string;
+  avatarUrl: string | null;
+  nip05: string | null;
+}
+
+export interface AmountEntryDisplayMetadata {
+  inputMode: 'sat' | 'fiat';
+  rawInput: string;
+  fiatCurrency: string | null;
+  fiatSymbol: string | null;
+  btcPrice: number;
+  displayFiat: number | null;
+  displaySats: number;
+  autoOptimized: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Step Data — typed payload delivered to each handler
 // ---------------------------------------------------------------------------
 
@@ -63,6 +88,8 @@ export interface StepDataMap {
       supportedMintUrls?: string[];
       paymentRequest?: string;
       meltTarget?: string;
+      recipientPubkey?: string;
+      recipientProfile?: RecipientProfile;
     };
   };
   selectMint: {
@@ -72,7 +99,10 @@ export interface StepDataMap {
     unit: string;
     paymentRequest?: string;
     meltTarget?: string;
+    recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
     destination?: Destination;
+    mintListItemsStatus?: 'loading' | 'ready' | 'failed';
     /** Pre-computed mint list items (populated when machine operations are provided). */
     mintListItems?: MintListItem[];
     /** When 'npc', selection updates NPC mint only (not selectedMint). */
@@ -83,8 +113,11 @@ export interface StepDataMap {
     amount: number;
     paymentRequest?: string;
     meltTarget?: string;
+    recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
     unit: string;
     proofAmounts: number[];
+    displayMetadata?: AmountEntryDisplayMetadata;
     suggestions?: {
       roundDown: { amount: number } | null;
       roundUp: { amount: number } | null;
@@ -92,13 +125,33 @@ export interface StepDataMap {
   };
   receiveToken: { token: string };
   confirmSend: { mintUrl: string; amount: number };
-  sendComplete: { historyEntry: string; mintWasOffline?: boolean };
-  navigateToMeltPreview: { mintUrl: string; meltTarget: string; unit: string; amount: number };
+  sendComplete: {
+    historyEntry: string;
+    /** True when the token was created from local proofs without contacting the mint first. */
+    createdOffline?: boolean;
+    mintWasOffline?: boolean;
+    recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
+  };
+  navigateToMeltPreview: {
+    mintUrl: string;
+    meltTarget: string;
+    unit: string;
+    amount: number;
+    recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
+    /** Populated after a successful melt so the screen can link to the new transaction. */
+    historyEntry?: string;
+  };
   navigateToPaymentRequest: {
     mintUrl: string;
     paymentRequest: string;
     amount: number;
     unit: string;
+    recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
+    /** Populated after a successful payment request send. */
+    historyEntry?: string;
   };
   createMintQuote: { mintUrl: string; amount: number; unit: string };
   mintQuoteCreated: { historyEntry: string; unit: string };
@@ -152,11 +205,40 @@ export interface FlowContext {
   unit: string;
   paymentRequest?: string;
   meltTarget?: string;
+  /**
+   * Nostr pubkey (hex) of the recipient when this flow was launched from a
+   * chat surface. Set on AMOUNT_ENTERED (or on the initial `enterAmount`
+   * constraints) and propagated to terminal navigation step data so consumer
+   * UIs can render recipient identity on payment-confirmation screens.
+   *
+   * Also populated automatically from `ctx.meltTarget` via
+   * `operations.resolveRecipientPubkey` (NIP-05) when present.
+   */
+  recipientPubkey?: string;
+  /**
+   * Nostr kind-0 profile metadata for `recipientPubkey`. Populated by
+   * `operations.resolveRecipientProfile` once a pubkey is known. Used by
+   * consumer UIs to render "Pay <name>" + avatar on the amount-entry and
+   * melt-preview headers without each screen re-running the fetch.
+   */
+  recipientProfile?: RecipientProfile;
+  amountEntryDisplay?: AmountEntryDisplayMetadata;
+  /**
+   * True after the user accepts a locally composable proof suggestion. The
+   * selected amount is already exact locally, so confirmSend should not retry
+   * an online send before creating the offline token.
+   */
+  localProofSend?: boolean;
+  /**
+   * True when an online app path reached the mint and got a mint-unreachable
+   * failure. This is distinct from the whole wallet being offline.
+   */
+  mintUnreachableConfirmed?: boolean;
   supportedMintUrls?: string[];
   /**
-   * When true, force the proof selector for ecash sends instead of attempting
-   * an online confirmSend. Set from the device offline provider via `getOffline()`
-   * or explicitly via `enterAmount({ offline: true })`.
+   * When true, use local proof routing for ecash sends instead of relying on
+   * an online swap. Exact local composition can still go straight to token
+   * creation; non-exact composition asks the user to choose a nearby amount.
    *
    * Only affects `sendEcash` — melt (lightning) and payment request flows always
    * attempt the operation regardless of offline status because the mint handles
@@ -256,6 +338,11 @@ export type FlowEvent =
        * + meltTarget so the machine can route to navigateToMeltPreview.
        */
       meltTarget?: string;
+      /** See `FlowContext.recipientPubkey` — chat-launched flows seed this. */
+      recipientPubkey?: string;
+      /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
+      recipientProfile?: RecipientProfile;
+      amountEntryDisplay?: AmountEntryDisplayMetadata;
     }
   | {
       type: 'MINT_SELECTED';
@@ -269,7 +356,19 @@ export type FlowEvent =
     }
   | { type: 'PROOFS_CHOSEN'; amount: number }
   | { type: 'REQUEST_MINT_SELECTOR'; scope?: 'npc' | 'selected' }
-  | { type: 'START_SEND_ECASH' }
+  | {
+      type: 'START_SEND_ECASH';
+      /**
+       * Optional Lightning target to carry into amount entry. Chat surfaces
+       * can start with the same ecash-send mint guard while still enabling
+       * the Lightning variant from the amount screen.
+       */
+      meltTarget?: string;
+      /** See `FlowContext.recipientPubkey` — chat-launched flows seed this. */
+      recipientPubkey?: string;
+      /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
+      recipientProfile?: RecipientProfile;
+    }
   | { type: 'START_RECEIVE_LIGHTNING' }
   | { type: 'START_RECEIVE' }
   | { type: 'REVIEW_MINT'; mintUrl: string; token: string }
@@ -419,7 +518,12 @@ export type NotificationHandlerMap = {
   onSendCancelled?: (data: { operationId: string }) => MaybeAsync;
 
   /** Called when a send token cancellation fails. */
-  onSendCancelFailed?: (data: { operationId: string; message: string; mintUnreachable?: boolean }) => MaybeAsync;
+  onSendCancelFailed?: (data: {
+    operationId: string;
+    message: string;
+    mintUnreachable?: boolean;
+    offline?: boolean;
+  }) => MaybeAsync;
 
   /**
    * Called when an ecash receive starts processing.
@@ -461,7 +565,11 @@ export type NotificationHandlerMap = {
   onMeltCancelled?: (data: { operationId: string }) => MaybeAsync;
 
   /** Called when a melt cancellation fails. */
-  onMeltCancelFailed?: (data: { operationId: string; message: string; mintUnreachable?: boolean }) => MaybeAsync;
+  onMeltCancelFailed?: (data: {
+    operationId: string;
+    message: string;
+    mintUnreachable?: boolean;
+  }) => MaybeAsync;
 
   /** Called when a received token has an unsupported unit (not 'sat'). */
   onUnsupportedTokenUnit?: (data: { unit: string }) => MaybeAsync;
@@ -658,10 +766,37 @@ export interface MachineOperations {
   /**
    * Send a NIP-17 gift-wrapped direct message to an nprofile.
    * Used internally by `executePaymentRequest` for Nostr transport.
-   * The wallet provides this by wrapping `sendDirectMessageToRelays`
-   * with the user's private key.
+   * The wallet supplies its own publisher (decode nprofile, build kind-1059
+   * gift wrap, publish) — the package no longer ships its own to keep
+   * NIP-17 / NIP-44 implementation a consumer concern.
    */
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+
+  /**
+   * Resolve a melt target (Lightning Address / lud16) to a Nostr hex pubkey
+   * via NIP-05. Best-effort: returns `null` on any failure. Fired
+   * automatically as a side effect when `ctx.meltTarget` is set and
+   * `ctx.recipientPubkey` is still empty. The default implementation is
+   * shipped by this package (`recipient.ts`); wallets only need to override
+   * to swap in a custom fetch (e.g. Tor routing).
+   */
+  resolveRecipientPubkey?: (
+    meltTarget: string,
+    signal?: AbortSignal
+  ) => Promise<string | null>;
+
+  /**
+   * Resolve a Nostr hex pubkey to a profile (kind-0 metadata). Best-effort:
+   * returns `null` on any failure. Fired automatically as a side effect
+   * when `ctx.recipientPubkey` is set and `ctx.recipientProfile` is still
+   * empty. No default — wallets supply their own NDK / cache integration
+   * (long-running Nostr subscriptions / cache writes don't belong in this
+   * package).
+   */
+  resolveRecipientProfile?: (
+    pubkey: string,
+    signal?: AbortSignal
+  ) => Promise<RecipientProfile | null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -779,11 +914,18 @@ export interface PaymentMachine {
   send: (event: FlowEvent) => Promise<void>;
   /** Process scan/paste/lightning input. Parses and routes to the appropriate flow. */
   execute: (input: string, opts?: { reset?: boolean }) => Promise<void>;
-  /** Submit amount and mint for the current flow. Pass `offline: true` to force proof selection. */
+  /** Submit amount and mint for the current flow. Pass `offline: true` for local proof routing. */
   enterAmount: (
     amount: number,
     mintUrl: string,
-    opts?: { destination?: Destination; offline?: boolean; meltTarget?: string }
+    opts?: {
+      destination?: Destination;
+      offline?: boolean;
+      meltTarget?: string;
+      recipientPubkey?: string;
+      recipientProfile?: RecipientProfile;
+      amountEntryDisplay?: AmountEntryDisplayMetadata;
+    }
   ) => Promise<void>;
   /** User selected one of multiple payment options (e.g. from chooseOption step). */
   chooseOption: (option: PaymentOption) => Promise<void>;
@@ -801,9 +943,14 @@ export interface PaymentMachine {
    */
   requestMintSelector: (opts?: { reset?: boolean; scope?: 'npc' | 'selected' }) => Promise<void>;
   /** Start a send ecash flow. Auto-selects mint, opens amount screen. */
-  startSendEcash: (opts?: { reset?: boolean }) => Promise<void>;
+  startSendEcash: (opts?: {
+    reset?: boolean;
+    meltTarget?: string;
+    recipientPubkey?: string;
+    recipientProfile?: RecipientProfile;
+  }) => Promise<void>;
   /** Start a receive lightning flow. Opens amount screen for mint quote. */
-  startReceiveLightning: () => Promise<void>;
+  startReceiveLightning: (opts?: { reset?: boolean }) => Promise<void>;
   /** Open the receive hub screen (Lightning address, P2PK). */
   startReceive: (opts?: { reset?: boolean }) => Promise<void>;
   /**

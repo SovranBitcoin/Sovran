@@ -15,8 +15,9 @@
  *   Phase 1 (transition): stepData.candidates = [{ mintUrl, balance }]
  *   Phase 2 (enrichment): stepData.mintListItems = [{ mintUrl, displayName, iconUrl, ... }]
  *
- * Phase 2 runs BEFORE the handler is dispatched, so the handler and the
- * UI (via inspect().details) always receive enriched data.
+ * Phase 2 runs in the background after the handler is dispatched, so the UI
+ * can open immediately with fallback rows and then observe enriched rows via
+ * inspect().details.
  *
  * These tests guard against:
  *   - buildMintListItems not being called
@@ -37,6 +38,18 @@ import { WALLETS, MINT1, MINT2, MINT_METADATA } from '../_harness/fixtures';
 import type { StepDataMap } from '../../src/machine/types';
 import type { MintListItem } from '../../src/types';
 
+async function waitForMintListStatus(
+  tm: ReturnType<typeof createTestMachine>,
+  status: StepDataMap['selectMint']['mintListItemsStatus'] = 'ready'
+): Promise<StepDataMap['selectMint']> {
+  for (let i = 0; i < 20; i++) {
+    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    if (details.mintListItemsStatus === status) return details;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  return tm.machine.inspect().details as StepDataMap['selectMint'];
+}
+
 // ---------------------------------------------------------------------------
 // startSendEcash → selectMint
 // ---------------------------------------------------------------------------
@@ -49,7 +62,8 @@ describe('mint list enrichment — startSendEcash → selectMint', () => {
     await tm.machine.startSendEcash();
     tm.assertStep('selectMint');
 
-    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    const details = await waitForMintListStatus(tm);
+    expect(details.mintListItemsStatus).toBe('ready');
     expect(details.mintListItems).toBeDefined();
     expect(details.mintListItems!.length).toBeGreaterThan(0);
 
@@ -85,7 +99,7 @@ describe('mint list enrichment — startSendEcash → selectMint', () => {
     expect(arg.unit).toBe('sat');
   });
 
-  it('handler receives enriched mintListItems in step data', async () => {
+  it('handler receives fallback mintListItems immediately', async () => {
     const tm = createTestMachine({
       wallet: { preferredMintUrl: undefined },
     });
@@ -97,7 +111,28 @@ describe('mint list enrichment — startSendEcash → selectMint', () => {
     const data = handlerCall!.data as StepDataMap['selectMint'];
     expect(data.mintListItems).toBeDefined();
     expect(data.mintListItems!.length).toBeGreaterThan(0);
-    expect(data.mintListItems![0].displayName).toBeDefined();
+    expect(data.mintListItemsStatus).toBe('loading');
+    expect(data.mintListItems![0].displayName).toBe(data.mintListItems![0].mintUrl);
+  });
+
+  it('opens selectMint immediately even when enrichment never resolves', async () => {
+    const tm = createTestMachine({
+      wallet: { preferredMintUrl: undefined },
+      operations: {
+        buildMintListItems: async () => new Promise<MintListItem[]>(() => {}),
+      },
+    });
+    await tm.machine.startSendEcash();
+    tm.assertStep('selectMint');
+
+    const details = await waitForMintListStatus(tm);
+    expect(details.mintListItemsStatus).toBe('loading');
+    expect(details.mintListItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ mintUrl: MINT1, displayName: MINT1 }),
+        expect.objectContaining({ mintUrl: MINT2, displayName: MINT2 }),
+      ])
+    );
   });
 });
 
@@ -114,7 +149,7 @@ describe('mint list enrichment — requestMintSelector', () => {
     await tm.machine.requestMintSelector({ scope: 'selected' });
     tm.assertStep('selectMint');
 
-    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    const details = await waitForMintListStatus(tm);
     expect(details.mintListItems).toBeDefined();
     expect(details.mintListItems!.length).toBeGreaterThan(0);
 
@@ -129,7 +164,7 @@ describe('mint list enrichment — requestMintSelector', () => {
     await tm.machine.requestMintSelector({ reset: true });
     tm.assertStep('selectMint');
 
-    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    const details = await waitForMintListStatus(tm);
     expect(details.mintListItems).toBeDefined();
     expect(details.mintListItems!.length).toBeGreaterThan(0);
   });
@@ -140,7 +175,7 @@ describe('mint list enrichment — requestMintSelector', () => {
 // ---------------------------------------------------------------------------
 
 describe('mint list enrichment — failure handling', () => {
-  it('routes to error when buildMintListItems throws', async () => {
+  it('keeps fallback rows when buildMintListItems throws', async () => {
     const tm = createTestMachine({
       wallet: { preferredMintUrl: undefined },
       operations: {
@@ -150,8 +185,16 @@ describe('mint list enrichment — failure handling', () => {
       },
     });
     await tm.machine.startSendEcash();
-    tm.assertStep('error');
-    tm.assertExecution({ code: 'UNSUPPORTED_INPUT' });
+    tm.assertStep('selectMint');
+
+    const details = await waitForMintListStatus(tm, 'failed');
+    expect(details.mintListItemsStatus).toBe('failed');
+    expect(details.mintListItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ mintUrl: MINT1, displayName: MINT1 }),
+        expect.objectContaining({ mintUrl: MINT2, displayName: MINT2 }),
+      ])
+    );
   });
 });
 
@@ -170,7 +213,7 @@ describe('mint list enrichment — sorting', () => {
     await tm.machine.startSendEcash();
     tm.assertStep('selectMint');
 
-    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    const details = await waitForMintListStatus(tm);
     const items = details.mintListItems!;
 
     const firstDisabledIdx = items.findIndex((i) => i.status === 'disabled');
@@ -205,7 +248,7 @@ describe('mint list enrichment — data shape', () => {
     await tm.machine.startSendEcash();
     tm.assertStep('selectMint');
 
-    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    const details = await waitForMintListStatus(tm);
     for (const item of details.mintListItems!) {
       expect(item).toEqual(
         expect.objectContaining({
@@ -228,7 +271,7 @@ describe('mint list enrichment — data shape', () => {
     await tm.machine.startSendEcash();
     tm.assertStep('selectMint');
 
-    const details = tm.machine.inspect().details as StepDataMap['selectMint'];
+    const details = await waitForMintListStatus(tm);
     for (const item of details.mintListItems!) {
       expect(item.displayName).not.toBe(item.mintUrl);
     }

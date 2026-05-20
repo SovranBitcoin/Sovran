@@ -103,6 +103,7 @@ const flowGroups = [
   '(map-flow)',
   '(split-bill-flow)',
   '(theme-flow)',
+  '(profile-flow)',
 ].map(modalFlow);
 
 const standaloneScreens: ModalConfig[] = [
@@ -110,7 +111,6 @@ const standaloneScreens: ModalConfig[] = [
   slideFromRight('(settings-flow)'),
   slideFromRight('(user-flow)'),
   fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
-  cardFade('healthModal'),
   modalWithBlur('currency', 'formSheet', 'Select Amount'),
   modalTransparent('camera', 'Scan QR'),
   modalWithBlur('share', 'formSheet'),

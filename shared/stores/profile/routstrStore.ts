@@ -1,24 +1,21 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { mintLocalId } from '@/shared/lib/id';
+import { storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
-
-const profileStorage = createProfileScopedStorage();
-
-// Last-resort model id used by the legacy `UserMessagesScreen` flow when no
-// `selectedModel` has been set. The AI tab does NOT consume this — it
-// resolves models via tier candidates in `features/ai/lib/format.ts`.
-const FALLBACK_MODEL = 'gpt-4o-mini';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { restoreActiveSessionView } from '@/shared/stores/profile/restoreActiveSessionView';
 
 // AI tab tier + provider ids — duplicated as literal types to avoid a
 // feature → store → feature import cycle. Kept in lockstep with the
 // matching declarations in `features/ai/lib/format.ts`.
-export type RoutstrTierId = 'auto' | 'pro' | 'max';
+type RoutstrTierId = 'auto' | 'pro' | 'max';
 const TIER_IDS: readonly RoutstrTierId[] = ['auto', 'pro', 'max'] as const;
 const DEFAULT_TIER: RoutstrTierId = 'auto';
 
-export type RoutstrProviderId = 'openai' | 'claude' | 'grok';
+type RoutstrProviderId = 'openai' | 'claude' | 'grok';
 const PROVIDER_IDS: readonly RoutstrProviderId[] = ['openai', 'claude', 'grok'] as const;
 const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
 
@@ -48,9 +45,18 @@ export interface RoutstrMessage {
    * messages from before the cost-tracking change shipped.
    */
   costSats?: number;
+  /**
+   * Optimistic dispatch flag for user messages — `true` between submit and
+   * the moment the streaming round-trip resolves (success or error).
+   * `UserBubble` renders a spinner/check accordingly so the AI surface
+   * matches the chat-app sending → sent vocabulary used by the DM screens.
+   * Transient: cleared on rehydrate so a crashed mid-send doesn't leave a
+   * stuck spinner on next launch (see `routstrStore.afterHydrate`).
+   */
+  pending?: boolean;
 }
 
-export interface RoutstrSession {
+interface RoutstrSession {
   id: string;
   title: string;
   createdAt: number;
@@ -79,16 +85,17 @@ interface RoutstrState {
   /** Balance in msats */
   balance: number | null;
   /**
-   * Working copy of the active session's messages.
-   * Synced bidirectionally with sessions[currentSessionId].messages.
-   * In anonymous mode, this is the only copy (no session).
+   * Working copy of the active session's messages. The canonical home is
+   * `sessions[currentSessionId].messages`; this field is rehydrated from
+   * the active session in `afterHydrate` and is *not* persisted on its
+   * own. In anonymous mode this is the only copy (no session row exists)
+   * and resets to empty across cold starts.
    */
   conversationHistory: RoutstrMessage[];
   /**
-   * Working copy of the active session's `activeChildren` map. Mirrors
-   * `sessions[currentSessionId].activeChildren` the same way
-   * `conversationHistory` mirrors `messages`. In anonymous mode this is
-   * the only copy (no session row to write through to).
+   * Working copy of the active session's `activeChildren` map. Same
+   * persistence story as `conversationHistory` — rehydrated from the
+   * active session, never persisted standalone.
    */
   activeChildren: Record<string, string>;
   /**
@@ -118,17 +125,18 @@ interface RoutstrState {
 
 interface RoutstrActions {
   setApiKey: (apiKey: string) => void;
-  getApiKey: () => string | null;
   clearApiKey: () => void;
 
   setBalance: (balance: number) => void;
-  getBalance: () => number | null;
   clearBalance: () => void;
 
   addMessage: (message: RoutstrMessage) => void;
-  getConversationHistory: () => RoutstrMessage[];
   clearConversation: () => void;
   updateMessage: (id: string, content: string) => void;
+  /** Toggle a message's transient `pending` flag. Used by `useAiSend` to
+   *  flip the user-bubble spinner → check once the streaming round-trip
+   *  resolves. Transient — never persisted as `true` (see `afterHydrate`). */
+  setMessagePending: (id: string, pending: boolean) => void;
   /** Persist the final assistant payload (content + reasoning + thinking
    *  duration + cost) in one atomic write, replacing the placeholder body
    *  added at stream open. Preserves `id`, `parentId`, `role`, and
@@ -147,41 +155,59 @@ interface RoutstrActions {
    *  the current session's `activeChildren` so the choice survives across
    *  app restarts. */
   setActiveBranch: (parentId: string, childId: string) => void;
-  getActiveChildren: () => Record<string, string>;
 
   setSelectedModel: (modelId: string) => void;
-  getSelectedModel: () => string;
   clearSelectedModel: () => void;
 
   setSelectedTier: (tier: RoutstrTierId) => void;
-  getSelectedTier: () => RoutstrTierId;
 
   setSelectedProvider: (provider: RoutstrProviderId) => void;
-  getSelectedProvider: () => RoutstrProviderId;
   /** Atomic write of the (provider, tier) pair — used by the tabbed
    *  picker so flipping a row doesn't briefly leave the store in a
    *  half-updated state between two `set()` calls. */
   setSelectedSlot: (slot: { provider: RoutstrProviderId; tier: RoutstrTierId }) => void;
 
-  getCachedModels: () => RoutstrModel[] | null;
   setCachedModels: (models: RoutstrModel[]) => void;
   isCacheStale: () => boolean;
   clearModelsCache: () => void;
 
   createSession: () => string;
   switchSession: (sessionId: string) => void;
-  getAllSessions: () => RoutstrSession[];
-  getCurrentSessionId: () => string | null;
   updateCurrentSessionTitle: () => void;
   deleteSession: (sessionId: string) => void;
 
   setAnonymousMode: (isAnonymous: boolean) => void;
-  getAnonymousMode: () => boolean;
-
-  clearAllData: () => Promise<void>;
 }
 
 type RoutstrStore = RoutstrState & RoutstrActions;
+
+const PersistedRoutstrMessage = z.looseObject({
+  id: z.string().max(128),
+  role: z.enum(['user', 'assistant']),
+  content: z.string().max(65_536),
+  timestamp: z.number().int().nonnegative(),
+  parentId: z.string().max(128).nullable().optional(),
+  thinkingDurationSec: z.number().nonnegative().optional(),
+  reasoningContent: z.string().max(65_536).optional(),
+  costSats: z.number().int().nonnegative().optional(),
+  pending: z.boolean().optional(),
+});
+
+const PersistedRoutstrSession = z.looseObject({
+  id: z.string().max(128),
+  title: z.string().max(512),
+  createdAt: z.number().int().nonnegative(),
+  messages: z.array(PersistedRoutstrMessage).max(10_000),
+  activeChildren: z.record(z.string().max(128), z.string().max(128)).optional(),
+});
+
+const PersistedRoutstrStore = z.object({
+  apiKey: z.string().max(8192).nullable().default(null),
+  balance: z.number().nullable().default(null),
+  selectedModel: z.string().max(256).nullable().default(null),
+  sessions: z.array(PersistedRoutstrSession).max(1024).default([]),
+  currentSessionId: z.string().max(128).nullable().default(null),
+});
 
 export const useRoutstrStore = create<RoutstrStore>()(
   persist(
@@ -203,8 +229,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({ apiKey });
       },
 
-      getApiKey: () => get().apiKey,
-
       clearApiKey: () => {
         storeLog.info('store.routstr.clear_api_key');
         set({ apiKey: null });
@@ -214,8 +238,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         storeLog.debug('store.routstr.set_balance', { balance });
         set({ balance });
       },
-
-      getBalance: () => get().balance,
 
       clearBalance: () => {
         storeLog.info('store.routstr.clear_balance');
@@ -244,8 +266,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
-      getConversationHistory: () => get().conversationHistory,
-
       clearConversation: () => {
         storeLog.info('store.routstr.clear_conversation');
         set({ conversationHistory: [], activeChildren: {} });
@@ -263,6 +283,26 @@ export const useRoutstrStore = create<RoutstrStore>()(
             return { conversationHistory: filtered, sessions: updatedSessions };
           }
           return { conversationHistory: filtered };
+        });
+      },
+
+      setMessagePending: (id: string, pending: boolean) => {
+        set((state) => {
+          const apply = (msg: RoutstrMessage): RoutstrMessage =>
+            msg.id === id ? { ...msg, pending } : msg;
+          const updatedHistory = state.conversationHistory.map(apply);
+          if (state.isAnonymousMode) {
+            return { conversationHistory: updatedHistory };
+          }
+          if (state.currentSessionId) {
+            const updatedSessions = state.sessions.map((session) =>
+              session.id === state.currentSessionId
+                ? { ...session, messages: session.messages.map(apply) }
+                : session
+            );
+            return { conversationHistory: updatedHistory, sessions: updatedSessions };
+          }
+          return { conversationHistory: updatedHistory };
         });
       },
 
@@ -336,9 +376,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
           if (state.isAnonymousMode) return { activeChildren: next };
           if (state.currentSessionId) {
             const updatedSessions = state.sessions.map((session) =>
-              session.id === state.currentSessionId
-                ? { ...session, activeChildren: next }
-                : session
+              session.id === state.currentSessionId ? { ...session, activeChildren: next } : session
             );
             return { activeChildren: next, sessions: updatedSessions };
           }
@@ -346,14 +384,10 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
-      getActiveChildren: () => get().activeChildren,
-
       setSelectedModel: (modelId: string) => {
         storeLog.info('store.routstr.set_model', { modelId });
         set({ selectedModel: modelId });
       },
-
-      getSelectedModel: () => get().selectedModel || FALLBACK_MODEL,
 
       clearSelectedModel: () => {
         storeLog.info('store.routstr.clear_model');
@@ -366,20 +400,10 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({ selectedTier: safe });
       },
 
-      getSelectedTier: () => {
-        const t = get().selectedTier;
-        return TIER_IDS.includes(t) ? t : DEFAULT_TIER;
-      },
-
       setSelectedProvider: (provider: RoutstrProviderId) => {
         const safe = PROVIDER_IDS.includes(provider) ? provider : DEFAULT_PROVIDER;
         storeLog.info('store.routstr.set_provider', { provider: safe });
         set({ selectedProvider: safe });
-      },
-
-      getSelectedProvider: () => {
-        const p = get().selectedProvider;
-        return PROVIDER_IDS.includes(p) ? p : DEFAULT_PROVIDER;
       },
 
       setSelectedSlot: (slot) => {
@@ -392,13 +416,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
           tier: safeTier,
         });
         set({ selectedProvider: safeProvider, selectedTier: safeTier });
-      },
-
-      getCachedModels: () => {
-        const cache = get().modelsCache;
-        if (!cache) return null;
-        if (Date.now() - cache.timestamp > MODELS_CACHE_TTL) return null;
-        return cache.data;
       },
 
       setCachedModels: (models: RoutstrModel[]) => {
@@ -418,7 +435,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       createSession: () => {
-        const sessionId = `session-${Date.now()}`;
+        const sessionId = mintLocalId('session');
         storeLog.info('store.routstr.create_session', { sessionId });
         const newSession: RoutstrSession = {
           id: sessionId,
@@ -447,18 +464,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
             activeChildren: session.activeChildren ?? {},
           });
         } else {
-          log.warn('store.routstr.session_not_found', { sessionId });
+          storeLog.warn('store.routstr.session_not_found', { sessionId });
         }
-      },
-
-      getAllSessions: () => {
-        const sessions = get().sessions;
-        // Sort by createdAt, newest first
-        return [...sessions].sort((a, b) => b.createdAt - a.createdAt);
-      },
-
-      getCurrentSessionId: () => {
-        return get().currentSessionId;
       },
 
       updateCurrentSessionTitle: () => {
@@ -524,48 +531,31 @@ export const useRoutstrStore = create<RoutstrStore>()(
           set({ conversationHistory: [], activeChildren: {} });
         }
       },
-
-      getAnonymousMode: () => get().isAnonymousMode,
-
-      clearAllData: async () => {
-        try {
-          await profileStorage.removeItem('routstr-store');
-          set({
-            apiKey: null,
-            balance: null,
-            conversationHistory: [],
-            activeChildren: {},
-            selectedModel: null,
-            selectedTier: DEFAULT_TIER,
-            selectedProvider: DEFAULT_PROVIDER,
-            modelsCache: null,
-            sessions: [],
-            currentSessionId: null,
-            isAnonymousMode: false,
-          });
-        } catch (error) {
-          log.error('store.routstr.clear_failed', { error });
-          throw error;
-        }
-      },
     }),
-    {
+    persistConfig({
       name: 'routstr-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
+      storage: createProfileScopedStorage(),
+      schema: PersistedRoutstrStore,
       partialize: (state) => ({
         apiKey: state.apiKey,
         balance: state.balance,
-        conversationHistory: state.conversationHistory,
-        activeChildren: state.activeChildren,
         selectedModel: state.selectedModel,
         sessions: state.sessions,
         currentSessionId: state.currentSessionId,
       }),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          log.warn('store.routstr.rehydrate_failed', { error });
+      afterHydrate: (state) => {
+        if (!state) return;
+        // Drop transient `pending: true` flags — any user message marked
+        // pending at persist time (e.g. app killed mid-send) resolves to
+        // "not in flight" on the next launch so the user sees a static
+        // check rather than a stuck spinner.
+        for (const session of state.sessions ?? []) {
+          for (const m of session.messages) {
+            if (m.pending) m.pending = false;
+          }
         }
+        restoreActiveSessionView(state);
       },
-    }
+    })
   )
 );

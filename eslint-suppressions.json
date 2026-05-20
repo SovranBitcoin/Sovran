@@ -1,0 +1,478 @@
+{
+  "app/(drawer)/(tabs)/_layout.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "app/(mint-flow)/list.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "app/(stories-flow)/_layout.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "assets/icons/index.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "coco-payment-ux/__tests__/_harness/createTestMachine.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "coco-payment-ux/__tests__/integration/operations.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "coco-payment-ux/__tests__/screen-actions/defaultHandlers.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 13
+    }
+  },
+  "coco-payment-ux/__tests__/screen-actions/entry-matching.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    }
+  },
+  "coco-payment-ux/__tests__/unit/core-factory.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "coco-payment-ux/__tests__/unit/default-operations.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "coco-payment-ux/__tests__/unit/guards.test.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "coco-payment-ux/__tests__/unit/transitions.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "coco-payment-ux/src/core/walletContextTracker.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "coco-payment-ux/src/machine/createMachine.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "coco-payment-ux/src/machine/transitions.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "coco-payment-ux/src/react/useScreenActions.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "coco-payment-ux/src/screen-actions/createManager.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 2
+    }
+  },
+  "coco-payment-ux/src/screen-actions/defaultHandlers.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "config/modalScreens.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/ai/hooks/useAiSend.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    }
+  },
+  "features/feed/components/nostr/MetricsFooter.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/feed/components/nostr/StoriesCarousel.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "features/feed/components/nostr/StoryProgressBar.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/feed/components/nostr/easeGradient.ts": {
+    "no-restricted-imports": {
+      "count": 2
+    }
+  },
+  "features/feed/components/nostr/image-overlay/AnimatedImageOverlay.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/feed/components/nostr/image-overlay/BottomPanel.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/feed/hooks/useNostrEngagement.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "features/map/screens/MapScreen.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/map/screens/MerchantDetailScreen.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/mint/components/distribution/DistributionBar.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "features/mint/components/rebalance/rebalancePlanner.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "features/mint/components/rebalance/releaseTrustWindow.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "features/mint/screens/MintDistributionScreen.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "features/mint/screens/MintRebalancePlanScreen.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "features/onboarding/components/types.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "features/payments/lib/decryptNip04Events.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "features/send/providers/CocoPaymentUX.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "features/send/screens/PaymentRequestScreen.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "features/settings/screens/SettingsRecoveryScreen.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "features/settings/screens/SettingsRoutingScreen.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "features/splitBill/components/ParticipantCard.tsx": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "features/theme/components/UnitPreviewCard.tsx": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "features/theme/components/WallpaperThumbnail.tsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "features/theme/screens/GalleryScreen.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/transactions/components/MonthlyChart.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "features/transactions/components/TransactionLocationSection.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/transactions/screens/FiltersScreen.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "features/transactions/screens/SwapTransactionScreen.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/wallet/components/BitcoinNearYou.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "features/whitenoise/client/network.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "features/whitenoise/components/WhitenoiseSetupBanner.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "navigation/nativeTabs.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "redux/cashu/types.deprecated.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "redux/nostr/reducer.deprecated.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    }
+  },
+  "redux/store/reducer.deprecated.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "redux/store/store.deprecated.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 29
+    }
+  },
+  "shared/blocks/popup/ActionMenuHost.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "shared/blocks/popup/PopupHost.tsx": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "shared/blocks/transfer/TransferEntryRow.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "shared/blocks/transfer/TransferSeparator.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "shared/hooks/useThemeColor.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "shared/lib/colorExtraction.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "shared/lib/downloadedThemeRegistry.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "shared/lib/map/btcMapClusterCache.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "shared/lib/map/categories.ts": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "shared/lib/map/mapClustering.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "shared/lib/persist/createMergeWithSchema.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "shared/lib/popup/ToastSlab.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "shared/lib/routstr/api.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 3
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    },
+    "no-restricted-globals": {
+      "count": 4
+    }
+  },
+  "shared/lib/typedUpdate.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 7
+    }
+  },
+  "shared/lib/utils.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "shared/providers/hero-transition/HeroTransitionProvider.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "shared/providers/hero-transition/measure.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "shared/stores/global/migrateSettings.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "shared/stores/profile/restoreActiveSessionView.ts": {
+    "@typescript-eslint/consistent-type-assertions": {
+      "count": 1
+    }
+  },
+  "shared/ui/composed/AmountFormatter.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "shared/ui/composed/CapsuleButton/CapsuleButton.liquid.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "shared/ui/composed/CircleActionButton/CircleActionButton.liquid.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "shared/ui/composed/RowStatsAccent.tsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "shared/ui/composed/SpriteView.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "shared/ui/composed/chat/ChatMessageBubble.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "shared/ui/composed/chat/LiquidChatComposer.tsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "shared/ui/primitives/Button.tsx": {
+    "no-restricted-imports": {
+      "count": 1
+    }
+  },
+  "shared/ui/primitives/SelectableCheck/SelectableCheck.circle.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "shared/ui/primitives/Text.tsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "shared/ui/primitives/View/HStack.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "shared/ui/primitives/View/VStack.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  }
+}

@@ -27,8 +27,27 @@ import { log } from '../logger';
  * while we reset store state during a profile switch. Without this, the
  * empty reset state is written to AsyncStorage before rehydrate() can read
  * the real data — permanently destroying the stored profile data.
+ *
+ * Also used by `withSkippedPersistWrites` to keep runtime-only mutations
+ * (e.g. mock-mode demo data injection) out of the persisted blob.
  */
 let _skipPersistWrite = false;
+
+/**
+ * Run `fn` with the persist-write gate raised. Synchronous: mutations queued
+ * inside `fn` (`useStore.setState(...)`) bypass AsyncStorage; afterwards the
+ * gate drops and normal persistence resumes. Use for runtime-only injections
+ * into persisted profile-scoped stores.
+ */
+export function withSkippedPersistWrites<T>(fn: () => T): T {
+  const prev = _skipPersistWrite;
+  _skipPersistWrite = true;
+  try {
+    return fn();
+  } finally {
+    _skipPersistWrite = prev;
+  }
+}
 
 /**
  * Promise gate that blocks all profile-scoped storage operations until
@@ -112,6 +131,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'nostr-social-store',
   'nostr-metadata-cache',
   'theme-store',
+  'bitchat-dm-messages-store',
 ];
 
 /**
@@ -135,6 +155,8 @@ async function rehydrateProfileStores(): Promise<void> {
   const { useSearchHistoryStore } = await import('@/shared/stores/profile/searchHistoryStore');
   const { useSwapTransactionsStore } =
     await import('@/shared/stores/profile/swapTransactionsStore');
+  const { useSplitBillTransactionsStore } =
+    await import('@/shared/stores/profile/splitBillTransactionsStore');
   const { useTransactionLocationStore } =
     await import('@/shared/stores/profile/transactionLocationStore');
   const { useTransactionDistributionStore } =
@@ -142,6 +164,7 @@ async function rehydrateProfileStores(): Promise<void> {
   const { useNostrSocialStore } = await import('@/shared/stores/profile/nostrSocialStore');
   const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
   const { useThemeStore } = await import('@/shared/stores/profile/themeStore');
+  const { useBitchatDmMessagesStore } = await import('@/features/bitchat/stores/bitchatDmMessages');
 
   // Reset each store to its initial state. Batched to reduce re-render cascade.
   // Skip persist writes so the empty reset state doesn't overwrite
@@ -149,7 +172,7 @@ async function rehydrateProfileStores(): Promise<void> {
   _skipPersistWrite = true;
   try {
     unstable_batchedUpdates(() => {
-      useMintStore.setState({ selectedMints: {} });
+      useMintStore.setState({ selectedMint: undefined });
       useMintDistributionStore.setState({ distributions: {} });
       useRoutstrStore.setState({
         apiKey: null,
@@ -164,11 +187,11 @@ async function rehydrateProfileStores(): Promise<void> {
       useScanHistoryStore.setState({ entries: [] });
       useSearchHistoryStore.setState({ recentSearches: {} });
       useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });
+      useSplitBillTransactionsStore.setState({ groups: {}, quoteIdToSplitBill: {} });
       useTransactionLocationStore.setState({ locations: {} });
       useTransactionDistributionStore.setState({ distributions: {} });
       useNpcMintStore.setState({
-        mintUrls: {},
-        lastSyncedAt: {},
+        mintUrl: undefined,
         isSyncing: false,
         isUpdating: false,
       });
@@ -189,6 +212,7 @@ async function rehydrateProfileStores(): Promise<void> {
         activeAlbumSlug: null,
         unitWallpapers: {},
       });
+      useBitchatDmMessagesStore.setState({ byPeer: {} });
     });
   } finally {
     _skipPersistWrite = false;
@@ -202,11 +226,13 @@ async function rehydrateProfileStores(): Promise<void> {
     useScanHistoryStore.persist.rehydrate(),
     useSearchHistoryStore.persist.rehydrate(),
     useSwapTransactionsStore.persist.rehydrate(),
+    useSplitBillTransactionsStore.persist.rehydrate(),
     useTransactionLocationStore.persist.rehydrate(),
     useTransactionDistributionStore.persist.rehydrate(),
     useNpcMintStore.persist.rehydrate(),
     useNostrSocialStore.persist.rehydrate(),
     useThemeStore.persist.rehydrate(),
+    useBitchatDmMessagesStore.persist.rehydrate(),
   ]);
 
   log.info('cashu.storage.rehydrated');

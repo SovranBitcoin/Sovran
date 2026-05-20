@@ -20,7 +20,8 @@
  */
 
 import React, { ReactNode } from 'react';
-import { Pressable, View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
+import { View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import opacity from 'hex-color-opacity';
 
 import { Avatar, AvatarState } from '@/shared/ui/primitives/Avatar';
@@ -49,7 +50,7 @@ export interface ListRowIconCircle {
   backgroundColor?: string;
 }
 
-export interface ListRowProps {
+interface ListRowProps {
   /** Leading slot — pick exactly one. `leading` takes priority as the escape hatch. */
   avatar?: ListRowAvatar;
   iconCircle?: ListRowIconCircle;
@@ -65,6 +66,18 @@ export interface ListRowProps {
 
   /** Optional third line — stats rows, inline amounts, etc. */
   accent?: ReactNode;
+
+  /**
+   * Where the `accent` slot renders relative to the main row.
+   *   - `'inline'` (default) — third line inside the text column, sharing
+   *     vertical center with leading + trailing.
+   *   - `'below'` — accent moves out of the text column into a sibling row
+   *     beneath the main HStack, indented past the leading width so the
+   *     leading + trailing slots can align with just the title + subtitle
+   *     band. Used by the Select Mint row where stats sit visually
+   *     decoupled from the avatar / inspect button.
+   */
+  accentPosition?: 'inline' | 'below';
 
   /** Trailing slot — chevron, icon, checkbox, spinner, button. */
   trailing?: ReactNode;
@@ -88,6 +101,12 @@ export interface ListRowProps {
   padding?: 'default' | 'compact';
 
   style?: StyleProp<ViewStyle>;
+
+  /** VoiceOver/TalkBack label for the row. Defaults to `title` when `title`
+   *  is a string. Required for rows whose title is a ReactNode. */
+  accessibilityLabel?: string;
+  /** Optional VoiceOver hint describing the row's tap outcome. */
+  accessibilityHint?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +126,7 @@ export function ListRow({
   title,
   subtitle,
   accent,
+  accentPosition = 'inline',
   trailing,
   onPress,
   disabled = false,
@@ -118,6 +138,8 @@ export function ListRow({
   testID,
   padding = 'default',
   style,
+  accessibilityLabel,
+  accessibilityHint,
 }: ListRowProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -182,34 +204,65 @@ export function ListRow({
 
   const subtitleIsNode = typeof subtitle !== 'string' && subtitle != null;
   const subtitleEl =
-    subtitle == null && subtitleFallback == null && !loading
-      ? null
-      : subtitleIsNode
-        ? subtitle
-        : (
-          <Text
-            size={14}
-            numberOfLines={1}
-            color={opacity(foreground, 0.5)}
-            loading={loading}
-            placeholder={subtitlePlaceholder}
-            fallback={subtitleFallback}>
-            {subtitle as string | undefined}
-          </Text>
-        );
+    subtitle == null && subtitleFallback == null && !loading ? null : subtitleIsNode ? (
+      subtitle
+    ) : (
+      <Text
+        size={14}
+        numberOfLines={1}
+        color={opacity(foreground, 0.5)}
+        loading={loading}
+        placeholder={subtitlePlaceholder}
+        fallback={subtitleFallback}>
+        {subtitle as string | undefined}
+      </Text>
+    );
 
   // ----- Row content -----
 
-  const body = (
-    <HStack align="center" style={{ paddingHorizontal: 20, paddingVertical, gap: ROW_GAP }}>
+  // When `accentPosition='below'`, pull the accent out of the text column so the
+  // leading + trailing slots align with just the title/subtitle band. The accent
+  // renders as a sibling row beneath, indented past the leading width so it
+  // hangs under the title rather than restarting at the row edge.
+  const accentBelow = accentPosition === 'below' && accent != null;
+  const leadingWidth =
+    avatar?.size ?? iconCircle?.size ?? (leading != null ? DEFAULT_AVATAR_SIZE : 0);
+  const accentInsetLeft = leadingEl ? 20 + leadingWidth + ROW_GAP : 20;
+
+  const mainRow = (
+    <HStack
+      align="center"
+      style={{
+        paddingHorizontal: 20,
+        paddingTop: paddingVertical,
+        paddingBottom: accentBelow ? 0 : paddingVertical,
+        gap: ROW_GAP,
+      }}>
       {leadingEl}
       <VStack style={styles.textCol} spacing={2}>
         {titleEl}
         {subtitleEl}
-        {accent}
+        {accentBelow ? null : accent}
       </VStack>
       {trailing}
     </HStack>
+  );
+
+  const body = accentBelow ? (
+    <VStack>
+      {mainRow}
+      <View
+        style={{
+          paddingLeft: accentInsetLeft,
+          paddingRight: 20,
+          paddingTop: 4,
+          paddingBottom: paddingVertical,
+        }}>
+        {accent}
+      </View>
+    </VStack>
+  ) : (
+    mainRow
   );
 
   // ----- Pressable wrapper (only if onPress), disabled dim, press-feedback -----
@@ -222,11 +275,17 @@ export function ListRow({
     );
   }
 
+  const a11yLabel = accessibilityLabel ?? (typeof title === 'string' ? title : undefined);
+
   return (
     <Pressable
       testID={testID}
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         pressed && { backgroundColor: surfaceSecondary },
         disabled && styles.disabled,

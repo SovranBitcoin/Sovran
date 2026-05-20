@@ -8,8 +8,10 @@ import Icon from 'assets/icons';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { prefetchImage } from '@/shared/lib/imageCache';
+import { log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Badge } from './Badge';
+import { zIndex } from '@/shared/styles/tokens';
 
 export type AvatarState = 'loading' | 'fallback' | 'image';
 
@@ -63,10 +65,10 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
   const foreground = useThemeColor('foreground');
   // Match the skeleton fill used by `Text` — low-opacity foreground reads
   // as ambient "loading" rather than a solid silhouette.
-  const loadingColor = useMemo(() => opacity(foreground, 0.15), [foreground]);
+  const loadingColor = useMemo(() => opacity(foreground, 0.07), [foreground]);
 
   useEffect(() => {
-    prefetchImage(picture);
+    void prefetchImage(picture);
   }, [picture]);
 
   const [imageStatus, setImageStatus] = useState<ImageStatus>('loading');
@@ -107,7 +109,7 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
         position: 'absolute',
         bottom: -2,
         right: -2,
-        zIndex: 50,
+        zIndex: zIndex.dropdown,
       }}>
       {statusBadge.badge ? (
         <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={statusIconSize} />
@@ -140,10 +142,7 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
   if (state === 'fallback') {
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <View
-          style={containerStyle}
-          accessibilityRole="image"
-          accessibilityLabel={imageAlt}>
+        <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
           <FallbackContent gradientTheme={gradientTheme} borderRadius={borderRadius} />
         </View>
         {StatusBadgeWrapper}
@@ -154,7 +153,7 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
   // 3. Image state — dev misuse without picture, fall back safely.
   if (!picture) {
     if (__DEV__) {
-      console.warn('[Avatar] state="image" but picture is missing — falling back to gradient');
+      log.warn('avatar.image_missing_picture');
     }
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>

@@ -1,15 +1,11 @@
 import * as React from 'react';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
-export type RestoreStatus =
-  | 'unknown'
-  | 'not-needed'
-  | 'pending'
-  | 'in-progress'
-  | 'complete'
-  | 'failed';
+type RestoreStatus = 'unknown' | 'not-needed' | 'pending' | 'in-progress' | 'complete' | 'failed';
 
 interface WalletLifecycleState {
   /**
@@ -31,6 +27,15 @@ interface WalletLifecycleState {
   markRestoreComplete: () => void;
 }
 
+const PersistedWalletLifecycleStore = z.object({
+  seedCreatedAt: z.number().int().nonnegative().nullable().default(null),
+  restoreStatus: z
+    .enum(['unknown', 'not-needed', 'pending', 'in-progress', 'complete', 'failed'])
+    .default('unknown'),
+  lastRestoreAt: z.number().int().nonnegative().nullable().default(null),
+  lastRestoreError: z.string().max(500).nullable().default(null),
+});
+
 export const useWalletLifecycleStore = create<WalletLifecycleState>()(
   persist(
     (set) => ({
@@ -48,32 +53,20 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>()(
       markRestoreComplete: () =>
         set({ restoreStatus: 'complete', lastRestoreAt: Date.now(), lastRestoreError: null }),
     }),
-    {
+    persistConfig({
       name: 'wallet-lifecycle',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: AsyncStorage,
+      schema: PersistedWalletLifecycleStore,
+      logKey: 'wallet_lifecycle',
       partialize: (s) => ({
         seedCreatedAt: s.seedCreatedAt,
         restoreStatus: s.restoreStatus,
         lastRestoreAt: s.lastRestoreAt,
+        lastRestoreError: s.lastRestoreError,
       }),
-    }
+    })
   )
 );
-
-/**
- * Resolves whether a NUT-13 wallet restore must run before minting can safely
- * use the deterministic counter on this device.
- *
- * @param mnemonicExists Whether retrieveMnemonic() found a seed in SecureStore
- * @param seedCreatedAt The persisted seedCreatedAt from this store
- * @returns true if restore is needed (seed pre-existed but this app didn't create it)
- */
-export function needsRestore(
-  mnemonicExists: boolean,
-  seedCreatedAt: number | null
-): boolean {
-  return mnemonicExists && seedCreatedAt == null;
-}
 
 /**
  * React hook returning true once the persisted lifecycle store has finished

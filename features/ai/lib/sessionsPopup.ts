@@ -1,6 +1,6 @@
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { actionMenuPopup } from '@/shared/lib/popup';
-import { formatRelative } from './format';
+import { formatRelative } from '@/shared/lib/date';
 
 /**
  * Open the heroui-Menu (bottom-sheet) listing prior AI conversations. Tap a
@@ -29,8 +29,11 @@ export function openAiSessionsMenu() {
         : sessions.map((session) => {
             const subtitle =
               session.messages.length > 0
-                ? formatRelative(session.messages[session.messages.length - 1].timestamp)
-                : formatRelative(session.createdAt);
+                ? formatRelative(
+                    session.messages[session.messages.length - 1].timestamp,
+                    'conversation-list'
+                  )
+                : formatRelative(session.createdAt, 'conversation-list');
             const isCurrent = session.id === currentSessionId;
             return {
               text: session.title || 'New conversation',

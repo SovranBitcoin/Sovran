@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Pressable, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Feather } from '@expo/vector-icons';
 import type { RefObject } from 'react';
 import type { FlatList } from 'react-native';
@@ -8,21 +9,21 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { Log } from '@/shared/lib/logger';
 
-type FilterItemProps = {
-  item: string;
+type FilterItemProps<F extends string> = {
+  item: F;
   index: number;
-  activeFilterItem: string;
-  flatListRef: RefObject<FlatList<string> | null>;
-  setActiveFilterItem: (item: string) => void;
+  activeFilterItem: F;
+  flatListRef: RefObject<FlatList<F> | null>;
+  setActiveFilterItem: (item: F) => void;
 };
 
-const FilterItem = ({
+function FilterItem<F extends string>({
   item,
   index,
   activeFilterItem,
   flatListRef,
   setActiveFilterItem,
-}: FilterItemProps) => {
+}: FilterItemProps<F>) {
   const isActive = activeFilterItem === item;
   const isPressed = useSharedValue(false);
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
@@ -58,7 +59,7 @@ const FilterItem = ({
       </Pressable>
     </Log>
   );
-};
+}
 
 export default FilterItem;
 

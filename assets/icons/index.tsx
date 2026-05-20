@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import Svg, { Circle, Defs, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Monicon } from '@monicon/native';
 
 import { Animated, StyleProp, ViewStyle } from 'react-native';
@@ -150,6 +151,7 @@ export const icons: string[] = [
   'material-symbols:currency-bitcoin',
   'material-symbols-light:currency-bitcoin',
   'fluent:wallet-20-filled',
+  'fluent:wallet-20-regular',
   'majesticons:coins',
   'solar:card-bold',
   'material-symbols:arrow-back-rounded',
@@ -197,6 +199,7 @@ export const icons: string[] = [
   'mdi:anonymous',
   'ph:coins',
   'mingcute:home-4-fill',
+  'mingcute:home-4-line',
 
   // Explore page icons
   'mdi:chevron-left',
@@ -342,6 +345,10 @@ export const icons: string[] = [
   'mdi:delete-outline',
   'mdi:sync',
   'mdi:brush',
+
+  // Drawer and bottom tab bar route icons — selected/unselected pairs
+  'mdi:account-group-outline',
+  'mdi:robot-outline',
 ];
 
 export function BitcoinMaskIcon() {
@@ -527,7 +534,11 @@ export function CurrencyIcon({
     gradientColors[1] ?? gradientColors[0],
     gradientColors[2] ?? gradientColors[1] ?? gradientColors[0],
   ];
-  const symbolColor = iconColor ?? foreground;
+  // The bitcoin disc is always orange (branded), so its inner "B" must
+  // always be white — otherwise the light-theme `foreground` (near-black)
+  // paints a black B on the orange disc, which is wrong. Other currencies
+  // still pick up the theme foreground so they invert with dark/light.
+  const symbolColor = iconColor ?? (currency === 'sat' ? INVARIANT_WHITE : foreground);
   /** When iconColor is passed (QR mode): background = text color, symbol = surface color */
   const symbolFill = iconColor != null ? g0 : symbolColor;
 

@@ -45,7 +45,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { getValidMintCandidates, selectMint, selectMintForMelt } from '../../src/mint-selection';
-import { WALLETS, MINT1, MINT2, MINT3, UNTRUSTED_MINT } from '../_harness/fixtures';
+import { WALLETS, MINT1, MINT2, UNTRUSTED_MINT } from '../_harness/fixtures';
 
 // ---------------------------------------------------------------------------
 // getValidMintCandidates

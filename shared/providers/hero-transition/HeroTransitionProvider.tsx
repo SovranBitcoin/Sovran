@@ -12,10 +12,10 @@ import Animated, {
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { router } from 'expo-router';
-import { WalletHealthCardFrame } from '@/features/health/components/WalletHealthCardFrame';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
 import { measureInWindowAsync, rafAsync } from './measure';
 import type { HeroId, Rect, HeroRole } from './types';
+import { zIndex } from '@/shared/styles/tokens';
 
 type HeroTransitionPhase =
   | { state: 'idle' }
@@ -26,8 +26,6 @@ type HeroTransitionPhase =
 
 type Ctx = {
   registerRef: (id: HeroId, role: HeroRole, ref: any) => void;
-  startWalletHealth: (unit: string) => void;
-  closeWalletHealth: (unit: string) => void;
   startClaimUsername: () => void;
   closeClaimUsername: () => void;
   isHidden: (id: HeroId, role: HeroRole) => boolean;
@@ -40,23 +38,21 @@ const HeroTransitionContext = createContext<Ctx | null>(null);
 const DURATION_MS = 520;
 
 export function HeroTransitionProvider({ children }: { children: React.ReactNode }) {
-  const [background, surfaceForeground, red] = useThemeColor([
+  const [background, surfaceForeground] = useThemeColor([
     'background',
     'surface-foreground',
-    'danger',
   ] as const);
   const primary950 = background;
   const primary50 = surfaceForeground;
   const gold = '#f59e0b';
+  const overlayBorderColor = opacity(gold, 0.3);
 
   const refs = useRef<Record<HeroId, Partial<Record<HeroRole, any>>>>({
-    walletHealth: {},
     claimUsername: {},
   });
 
   const [phase, setPhase] = useState<HeroTransitionPhase>({ state: 'idle' });
   const [overlayVisible, setOverlayVisible] = useState(false);
-  const [overlayBorderColor, setOverlayBorderColor] = useState<string>(opacity(red, 0.25));
 
   const progress = useSharedValue(0);
   const fromX = useSharedValue(0);
@@ -166,112 +162,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
     [overlayVisible, phase]
   );
 
-  const startWalletHealth = useCallback(
-    async (unit: string) => {
-      if (phase.state !== 'idle') return;
-
-      const sourceRef = refs.current.walletHealth?.source;
-      const fromRect = await measureInWindowAsync(sourceRef);
-      if (!fromRect) {
-        router.navigate({ pathname: '/healthModal' as any, params: { unit } });
-        return;
-      }
-
-      setOverlayBorderColor(opacity(red, 0.25));
-      setPhase({ state: 'forward_navigating', id: 'walletHealth', params: { unit } });
-      setOverlayVisible(true);
-      // Prime overlay geometry immediately (pins overlay to source until destination is known).
-      cancelAnimation(progress);
-      fromX.set(fromRect.x);
-      fromY.set(fromRect.y);
-      fromW.set(fromRect.width);
-      fromH.set(fromRect.height);
-      toX.set(0);
-      toY.set(0);
-      toW.set(0);
-      toH.set(0);
-      progress.set(0);
-
-      router.navigate({ pathname: '/healthModal' as any, params: { unit } });
-
-      // Wait until destination registers and layout stabilizes.
-      // (This can take a bit on slower devices and with transparent headers.)
-      for (let i = 0; i < 30; i++) {
-        await rafAsync();
-        const destRef = refs.current.walletHealth?.destination;
-        const toRect = await measureInWindowAsync(destRef);
-        if (toRect) {
-          // One extra settle frame to reduce layout jitter (header/safe-area settling).
-          await rafAsync();
-          const toRectSettled = (await measureInWindowAsync(destRef)) ?? toRect;
-          setPhase({ state: 'forward_animating', id: 'walletHealth', params: { unit } });
-          animateOverlay(fromRect, toRectSettled, () => {
-            setOverlayVisible(false);
-            setPhase({ state: 'idle' });
-          });
-          return;
-        }
-      }
-
-      // Fallback: if we can't measure destination, just drop the overlay.
-      setOverlayVisible(false);
-      setPhase({ state: 'idle' });
-    },
-    [animateOverlay, fromH, fromW, fromX, fromY, phase.state, progress, red, toH, toW, toX, toY]
-  );
-
-  const closeWalletHealth = useCallback(
-    async (unit: string) => {
-      if (phase.state !== 'idle') return;
-
-      const destRef = refs.current.walletHealth?.destination;
-      const fromRect = await measureInWindowAsync(destRef);
-      if (!fromRect) {
-        router.back();
-        return;
-      }
-
-      setOverlayBorderColor(opacity(red, 0.25));
-      setPhase({ state: 'back_navigating', id: 'walletHealth', params: { unit } });
-      setOverlayVisible(true);
-
-      // Prime overlay at the destination rect so it's visible immediately.
-      cancelAnimation(progress);
-      fromX.set(fromRect.x);
-      fromY.set(fromRect.y);
-      fromW.set(fromRect.width);
-      fromH.set(fromRect.height);
-      toX.set(0);
-      toY.set(0);
-      toW.set(0);
-      toH.set(0);
-      progress.set(0);
-
-      // IMPORTANT: pop immediately so the Explore screen is visible right away.
-      router.back();
-
-      // Now wait for the source card to be laid out on Explore, then animate overlay to it.
-      for (let i = 0; i < 30; i++) {
-        await rafAsync();
-        const sourceRef = refs.current.walletHealth?.source;
-        const toRect = await measureInWindowAsync(sourceRef);
-        if (!toRect) continue;
-
-        setPhase({ state: 'back_animating', id: 'walletHealth', params: { unit } });
-        animateOverlay(fromRect, toRect, () => {
-          setOverlayVisible(false);
-          setPhase({ state: 'idle' });
-        });
-        return;
-      }
-
-      // Fallback: if we can't measure the source, drop overlay.
-      setOverlayVisible(false);
-      setPhase({ state: 'idle' });
-    },
-    [animateOverlay, fromH, fromW, fromX, fromY, phase.state, progress, red, toH, toW, toX, toY]
-  );
-
   const startClaimUsername = useCallback(async () => {
     if (phase.state !== 'idle') return;
 
@@ -282,7 +172,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
       return;
     }
 
-    setOverlayBorderColor(opacity(gold, 0.3));
     setPhase({ state: 'forward_navigating', id: 'claimUsername' });
     setOverlayVisible(true);
 
@@ -329,7 +218,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
       return;
     }
 
-    setOverlayBorderColor(opacity(gold, 0.3));
     setPhase({ state: 'back_navigating', id: 'claimUsername' });
     setOverlayVisible(true);
 
@@ -367,24 +255,17 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const value = useMemo<Ctx>(
     () => ({
       registerRef,
-      startWalletHealth,
-      closeWalletHealth,
-      startClaimUsername,
-      closeClaimUsername,
+      startClaimUsername: () => {
+        void startClaimUsername();
+      },
+      closeClaimUsername: () => {
+        void closeClaimUsername();
+      },
       isHidden,
       isAnimating,
       isTransitioning,
     }),
-    [
-      registerRef,
-      startWalletHealth,
-      closeWalletHealth,
-      startClaimUsername,
-      closeClaimUsername,
-      isHidden,
-      isAnimating,
-      isTransitioning,
-    ]
+    [registerRef, startClaimUsername, closeClaimUsername, isHidden, isAnimating, isTransitioning]
   );
 
   return (
@@ -397,24 +278,16 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
             style={[
               overlayStyle,
               {
-                zIndex: 9999,
+                zIndex: zIndex.overlay,
                 borderWidth: 1,
                 borderColor: overlayBorderColor,
               },
             ]}>
-            {'id' in phase && phase.id === 'claimUsername' ? (
-              <ClaimUsernameCardFrame
-                accentColor={gold}
-                backgroundColor={primary950}
-                highlightColor={primary50}
-              />
-            ) : (
-              <WalletHealthCardFrame
-                accentColor={red}
-                backgroundColor={primary950}
-                highlightColor={primary50}
-              />
-            )}
+            <ClaimUsernameCardFrame
+              accentColor={gold}
+              backgroundColor={primary950}
+              highlightColor={primary50}
+            />
           </Animated.View>
         ) : (
           // Native-stack uses separate native views for screens; FullWindowOverlay ensures our hero overlay
@@ -428,24 +301,16 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
               style={[
                 overlayStyle,
                 {
-                  zIndex: 9999,
+                  zIndex: zIndex.overlay,
                   borderWidth: 1,
                   borderColor: overlayBorderColor,
                 },
               ]}>
-              {'id' in phase && phase.id === 'claimUsername' ? (
-                <ClaimUsernameCardFrame
-                  accentColor={gold}
-                  backgroundColor={primary950}
-                  highlightColor={primary50}
-                />
-              ) : (
-                <WalletHealthCardFrame
-                  accentColor={red}
-                  backgroundColor={primary950}
-                  highlightColor={primary50}
-                />
-              )}
+              <ClaimUsernameCardFrame
+                accentColor={gold}
+                backgroundColor={primary950}
+                highlightColor={primary50}
+              />
             </Animated.View>
           </FullWindowOverlay>
         ))}

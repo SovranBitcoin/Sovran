@@ -1,20 +1,13 @@
 /**
- * @fileoverview Standalone sendToken route wrapper
- *
- * This is the standalone version used for direct navigation and deep linking.
- * Param parsing and error handling is done by SendTokenScreen.
+ * @fileoverview Standalone sendToken route — used for direct
+ * navigation, deep links, and PaymentStatusToast re-entry. The route
+ * body and zod schema live on `SendTokenRoute` so this file shares one
+ * canonical implementation with `(send-flow)/sendToken` and
+ * `(transactions-flow)/sendToken`.
  */
 
-import React from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
-import { SendTokenScreen } from '@/features/send';
+import { SendTokenRoute } from '@/features/send';
 
-function ModalScreen() {
-  const { sendHistoryEntry } = useLocalSearchParams<{ sendHistoryEntry: string }>();
-
-  return (
-    <SendTokenScreen sendHistoryEntry={sendHistoryEntry} onNavigateBack={() => router.back()} />
-  );
+export default function ModalScreen() {
+  return <SendTokenRoute where="app.sendToken" />;
 }
-
-export default ModalScreen;

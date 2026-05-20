@@ -47,7 +47,6 @@ import type {
   PaymentMachine,
   StepHandlerMap,
   NotificationHandlerMap,
-  NfcIOAdapter,
 } from '../../src/machine/types';
 import type { Detectors, WalletContext } from '../../src/types';
 

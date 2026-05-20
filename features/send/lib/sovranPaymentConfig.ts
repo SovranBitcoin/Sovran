@@ -17,9 +17,11 @@ import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { paymentLog } from '@/shared/lib/logger';
+import { mintLocalId } from '@/shared/lib/id';
 
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type {
+  HistoryEntry,
   Manager,
   SendHistoryEntry,
   MeltHistoryEntry,
@@ -27,6 +29,7 @@ import type {
   ReceiveHistoryEntry,
 } from '@cashu/coco-core';
 import {
+  withTimeout,
   type MachineOperations,
   type NotificationHandlerMap,
   type PaymentMachine,
@@ -39,58 +42,32 @@ import {
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
-import { writeTokenToNFC } from '@/shared/lib/nfc';
+import { writeTokenToNFC, NfcError, isUserCancelError } from '@/shared/lib/nfc';
+import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import {
-  allOptionsDisabledPopup,
-  balanceTooLowPopup,
-  cancelTransactionFailedPopup,
   copyPopup,
-  couldNotCancelPopup,
   emojiPickerPopup,
-  generalErrorPopup,
-  mintUnreachablePopup,
-  missingMeltTargetPopup,
   nfcConnectionLostPopup,
   nfcEcashSharedPopup,
-  nfcErrorPopup,
   nfcSendFailedPopup,
-  noAmountPopup,
-  noMintSelectedPopup,
-  noClipboardAddressPopup,
-  noQrCodeFoundPopup,
-  noValidMintPopup,
-  operationInvalidStatePopup,
-  operationNotFoundPopup,
   paymentCancelledPopup,
   paymentFallbackPopup,
   paymentOptionsPopup,
   paymentStatusPopup,
   proofSelectorPopup,
-  qrScanFailedPopup,
-  receiveFailedPopup,
-  receiveMintUpdatedPopup,
-  receiveMintUpdateFailedPopup,
-  sendPaymentFailedPopup,
-  tokenPendingNotRedeemedPopup,
-  tokenRedeemedByRecipientPopup,
-  transactionAlreadyCancelledPopup,
-  transactionCancelledPopup,
-  unsupportedInputPopup,
-  unsupportedTokenUnitPopup,
+  staticPopup,
+  paramPopup,
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
-import {
-  routstrTopUpSuccessPopup,
-  routstrWalletCreatedPopup,
-  routstrTransactionFailedPopup,
-} from '@/shared/lib/popup/popups/routstr';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
+import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { useSendReachabilityStore } from '@/shared/stores/profile/sendReachabilityStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 
 // =============================================================================
@@ -138,7 +115,7 @@ export function createSovranExecuteReceive(
     try {
       const beforeHistory = await manager.history.getPaginatedHistory(0, 100);
       beforeIds = new Set(
-        (beforeHistory as ReadonlyArray<Record<string, unknown>>)
+        (beforeHistory as readonly Record<string, unknown>[])
           .filter((h) => h.type === 'receive' && h.mintUrl === mintUrl)
           .map((h) => (typeof h.id === 'string' ? h.id : ''))
           .filter((id) => id.length > 0)
@@ -182,13 +159,10 @@ export function createSovranExecuteReceive(
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         const after = await manager.history.getPaginatedHistory(0, 100);
-        const newEntry = (after as ReadonlyArray<Record<string, unknown>>).find((h) => {
+        const newEntry = (after as readonly Record<string, unknown>[]).find((h) => {
           const id = typeof h.id === 'string' ? h.id : '';
           return (
-            h.type === 'receive' &&
-            h.mintUrl === mintUrl &&
-            id.length > 0 &&
-            !beforeIds.has(id)
+            h.type === 'receive' && h.mintUrl === mintUrl && id.length > 0 && !beforeIds.has(id)
           );
         });
         if (newEntry?.id) {
@@ -229,7 +203,7 @@ export function createSovranExecuteReceive(
       /* ignore */
     }
     const fallbackEntry = {
-      id: `redeemed-${Date.now()}`,
+      id: mintLocalId('redeemed'),
       type: 'receive' as const,
       createdAt: Date.now(),
       mintUrl,
@@ -247,6 +221,8 @@ export function createSovranExecuteReceive(
 // =============================================================================
 // createSovranExecuteMintQuote
 // =============================================================================
+
+const MINT_QUOTE_PREPARE_TIMEOUT_MS = 10_000;
 
 /**
  * Sovran-side override for coco-payment-ux's default `executeMintQuote`.
@@ -283,12 +259,9 @@ export function createSovranExecuteMintQuote(
     // newly-persisted row by set difference if quoteId matching fails.
     let beforeIds: Set<string>;
     try {
-      const beforeHistory = await manager.history.getPaginatedHistory(0, 100);
+      const beforeHistory: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
       beforeIds = new Set(
-        (beforeHistory as ReadonlyArray<Record<string, unknown>>)
-          .filter((h) => h.type === 'mint' && h.mintUrl === mintUrl)
-          .map((h) => (typeof h.id === 'string' ? h.id : ''))
-          .filter((id) => id.length > 0)
+        beforeHistory.filter((h) => h.type === 'mint' && h.mintUrl === mintUrl).map((h) => h.id)
       );
     } catch (e) {
       paymentLog.warn('payment.execute_mint_quote.snapshot_failed', {
@@ -298,25 +271,28 @@ export function createSovranExecuteMintQuote(
     }
 
     paymentLog.info('payment.execute_mint_quote.start', { mintUrl, amount });
-    const mintOp = await manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
+    const mintOp = await withTimeout(
+      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+      MINT_QUOTE_PREPARE_TIMEOUT_MS,
+      'executeMintQuote.prepare'
+    );
     paymentLog.info('payment.execute_mint_quote.prepared', {
       operationId: mintOp.id,
       quoteId: mintOp.quoteId,
     });
 
     // Constructed entry — used as a fallback (same shape as coco's default
-    // executeMintQuote) and as the source of `paymentRequest` if coco's
-    // persisted row doesn't carry it.
-    const constructedEntry = {
+    // executeMintQuote) when polling can't find coco's persisted row in time.
+    const constructedEntry: MintHistoryEntry = {
       id: mintOp.id,
-      type: 'mint' as const,
-      createdAt: (mintOp as Record<string, unknown>).createdAt ?? Date.now(),
-      mintUrl: ((mintOp as Record<string, unknown>).mintUrl as string) ?? mintUrl,
-      unit: ((mintOp as Record<string, unknown>).unit as string) ?? 'sat',
+      type: 'mint',
+      createdAt: mintOp.createdAt,
+      mintUrl: mintOp.mintUrl,
+      unit: mintOp.unit,
       quoteId: mintOp.quoteId,
-      state: 'UNPAID' as const,
-      amount: ((mintOp as Record<string, unknown>).amount as number) ?? amount,
-      paymentRequest: (mintOp as Record<string, unknown>).request as string | undefined,
+      state: 'UNPAID',
+      amount: mintOp.amount,
+      paymentRequest: mintOp.request,
       metadata: { operationId: mintOp.id },
     };
 
@@ -326,20 +302,13 @@ export function createSovranExecuteMintQuote(
     const DELAY_MS = 200;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        const after = await manager.history.getPaginatedHistory(0, 100);
-        const persisted = (after as ReadonlyArray<Record<string, unknown>>).find((h) => {
+        const after: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
+        const persisted = after.find((h): h is MintHistoryEntry => {
           if (h.type !== 'mint' || h.mintUrl !== mintUrl) return false;
           // Preferred: deterministic quoteId match
-          if (
-            mintOp.quoteId &&
-            typeof h.quoteId === 'string' &&
-            h.quoteId === mintOp.quoteId
-          ) {
-            return true;
-          }
+          if (mintOp.quoteId && h.quoteId === mintOp.quoteId) return true;
           // Fallback: set difference on ids
-          const id = typeof h.id === 'string' ? h.id : '';
-          return id.length > 0 && !beforeIds.has(id);
+          return !beforeIds.has(h.id);
         });
         if (persisted) {
           paymentLog.info('payment.execute_mint_quote.found', {
@@ -349,16 +318,9 @@ export function createSovranExecuteMintQuote(
             matchedById: persisted.id === mintOp.id,
             attempts: attempt + 1,
           });
-          // Use coco's persisted row as authoritative (so its real id flows
-          // downstream), but preserve `paymentRequest` from the operation
-          // result if coco's row doesn't carry it.
-          const merged = {
-            ...persisted,
-            paymentRequest:
-              (persisted as Record<string, unknown>).paymentRequest ??
-              constructedEntry.paymentRequest,
-          };
-          return { historyEntry: JSON.stringify(merged) };
+          // Coco's persisted row is authoritative — its `id` is what flows
+          // downstream to onTransactionCreated and the scan-history link.
+          return { historyEntry: JSON.stringify(persisted) };
         }
       } catch (e) {
         paymentLog.warn('payment.execute_mint_quote.poll_failed', {
@@ -398,60 +360,60 @@ export function createSovranNotifications(
   return {
     NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
       paymentLog.warn('payment.notification.no_amount');
-      noAmountPopup();
+      staticPopup('no-amount');
     },
     NO_VALID_MINT: ({ code: _code, message, data: _data }) => {
-      noValidMintPopup({ text: message });
+      staticPopup('no-valid-mint', { text: message });
     },
     INSUFFICIENT_BALANCE: ({ code: _code, message, data: _data }) => {
-      balanceTooLowPopup({ text: message });
+      staticPopup('balance-too-low', { text: message });
     },
     NO_BALANCE: ({ code: _code, message, data: _data }) => {
-      balanceTooLowPopup({ text: message });
+      staticPopup('balance-too-low', { text: message });
     },
     UNSUPPORTED_INPUT: ({ code: _code, message, data: _data }) => {
-      unsupportedInputPopup({ text: message });
+      staticPopup('unsupported-input', { text: message });
     },
     ALL_OPTIONS_DISABLED: ({ code: _code, message: _message, data: _data }) => {
-      allOptionsDisabledPopup();
+      staticPopup('all-options-disabled');
     },
     MISSING_MELT_TARGET: ({ code: _code, message: _message, data: _data }) => {
-      missingMeltTargetPopup();
+      staticPopup('missing-melt-target');
     },
     SEND_FAILED: ({ code: _code, message, data }) => {
       paymentLog.error('payment.notification.send_failed', { message });
       if (data?.mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        generalErrorPopup({ text: message });
+        staticPopup('general-error', { text: message });
       }
     },
     MINT_QUOTE_FAILED: ({ code: _code, message, data }) => {
       if (data?.mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        generalErrorPopup({ text: message });
+        staticPopup('general-error', { text: message });
       }
     },
     MELT_FAILED: ({ code: _code, message, data }) => {
       paymentLog.error('payment.notification.melt_failed', { message });
       if (data?.mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        generalErrorPopup({ text: message });
+        staticPopup('general-error', { text: message });
       }
     },
     PAYMENT_REQUEST_FAILED: ({ code: _code, message, data: _data }) => {
-      sendPaymentFailedPopup({ text: message });
+      staticPopup('send-payment-failed', { text: message });
     },
     NFC_WRITE_FAILED: ({ code: _code, message, data: _data }) => {
-      nfcErrorPopup({ title: 'NFC Write Failed', message });
+      paramPopup('nfc-error', { title: 'NFC Write Failed', message });
     },
     NFC_SESSION_LOST: ({ code: _code, message, data: _data }) => {
-      nfcErrorPopup({ title: 'NFC Connection Lost', message });
+      paramPopup('nfc-error', { title: 'NFC Connection Lost', message });
     },
     NFC_READ_FAILED: ({ code: _code, message, data: _data }) => {
-      nfcErrorPopup({ title: 'NFC Read Failed', message });
+      paramPopup('nfc-error', { title: 'NFC Read Failed', message });
     },
     onPaymentProcessing: (data) => {
       paymentLog.info('payment.processing', {
@@ -508,15 +470,15 @@ export function createSovranNotifications(
       }
     },
     onScanEmpty: (source) => {
-      if (source === 'clipboard') noClipboardAddressPopup();
-      else if (source === 'gallery') noQrCodeFoundPopup();
+      if (source === 'clipboard') staticPopup('no-clipboard-address');
+      else if (source === 'gallery') staticPopup('no-qr-code-found');
     },
     onScanError: (source, err) => {
-      if (source === 'gallery') qrScanFailedPopup();
-      else generalErrorPopup({ text: err.message });
+      if (source === 'gallery') staticPopup('qr-scan-failed');
+      else staticPopup('general-error', { text: err.message });
     },
     onMissingMintForAmount: () => {
-      noMintSelectedPopup();
+      staticPopup('no-mint-selected');
     },
     onCopied: (target) => {
       copyPopup(target as Parameters<typeof copyPopup>[0]);
@@ -545,38 +507,40 @@ export function createSovranNotifications(
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
       useScanHistoryStore
         .getState()
-        .addScan(rawInput, rawInput, scanType, scanSource, parsedType, container, optionKinds);
+        .addScan(rawInput, scanType, scanSource, parsedType, container, optionKinds);
     },
     onNfcWriteFailed: ({ message, rolledBack }) => {
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
-      nfcErrorPopup({ title: 'NFC Write Failed', message: errorMsg });
+      paramPopup('nfc-error', { title: 'NFC Write Failed', message: errorMsg });
     },
 
     // ── Screen action notifications ─────────────────────────────────
 
     onSendStatusChecked: ({ operationId: _operationId, state, redeemed }) => {
       if (redeemed || state === 'finalized') {
-        tokenRedeemedByRecipientPopup();
+        staticPopup('token-redeemed-by-recipient');
       } else if (state === 'rolled_back') {
-        transactionAlreadyCancelledPopup();
+        staticPopup('transaction-already-cancelled');
       } else if (state === 'not_found') {
-        operationNotFoundPopup();
+        staticPopup('operation-not-found');
       } else if (state !== 'pending') {
-        operationInvalidStatePopup({ state });
+        paramPopup('operation-invalid-state', { state });
       } else {
-        tokenPendingNotRedeemedPopup();
+        staticPopup('token-pending-not-redeemed');
       }
     },
 
     onSendCancelled: (_data) => {
-      transactionCancelledPopup();
+      staticPopup('transaction-cancelled');
     },
 
-    onSendCancelFailed: ({ message, mintUnreachable }) => {
-      if (mintUnreachable) {
-        mintUnreachablePopup();
+    onSendCancelFailed: ({ message, mintUnreachable, offline }) => {
+      if (offline) {
+        staticPopup('cancel-transaction-offline');
+      } else if (mintUnreachable) {
+        staticPopup('mint-unreachable');
       } else {
-        cancelTransactionFailedPopup({ text: message });
+        staticPopup('cancel-transaction-failed', { text: message });
       }
     },
 
@@ -625,7 +589,7 @@ export function createSovranNotifications(
       if (store.active?.id === id && store.active?.state === 'processing') {
         store.setFailed(id, new Error(message));
       } else {
-        receiveFailedPopup({ text: message });
+        staticPopup('receive-failed', { text: message });
       }
     },
 
@@ -635,14 +599,14 @@ export function createSovranNotifications(
 
     onMeltCancelFailed: ({ message, mintUnreachable }) => {
       if (mintUnreachable) {
-        mintUnreachablePopup();
+        staticPopup('mint-unreachable');
       } else {
-        couldNotCancelPopup({ text: message });
+        staticPopup('could-not-cancel', { text: message });
       }
     },
 
     onUnsupportedTokenUnit: ({ unit }) => {
-      unsupportedTokenUnitPopup({ unit });
+      paramPopup('unsupported-token-unit', { unit });
     },
 
     onMintTrustedFromScreen: ({ fromAccepter }) => {
@@ -656,18 +620,15 @@ export function createSovranNotifications(
     // ── State change notifications ──────────────────────────────────
 
     onPreferredMintChanged: ({ mintUrl }) => {
-      const pubkey = config?.getPubkey?.();
-      if (pubkey) {
-        useMintStore.getState().setSelectedMint(pubkey, mintUrl);
-      }
+      useMintStore.getState().setSelectedMint(mintUrl);
     },
 
     onNpcMintChanged: async ({ mintUrl }) => {
       const pk = config?.getPrivateKey?.();
       if (pk) {
         const ok = await useNpcMintStore.getState().updateServerMint(mintUrl, pk);
-        if (ok) receiveMintUpdatedPopup();
-        else receiveMintUpdateFailedPopup();
+        if (ok) staticPopup('receive-mint-updated');
+        else staticPopup('receive-mint-update-failed');
       }
     },
 
@@ -749,6 +710,9 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
             const data = await nfcAdapter.readPaymentRequest();
             return { data };
           } catch (err) {
+            // User dismissed the system NFC sheet — treat as a no-op,
+            // not an error (suppresses the `general-error` popup).
+            if (isUserCancelError(err)) return { empty: true };
             return { error: err instanceof Error ? err : new Error(String(err)) };
           }
         }
@@ -784,8 +748,12 @@ export function createSovranHandlers({
       });
     },
 
-    sendComplete: async ({ historyEntry, mintWasOffline }) => {
-      paymentLog.info('payment.step.send_complete', { mintWasOffline: !!mintWasOffline });
+    sendComplete: async ({ historyEntry, createdOffline, mintWasOffline, recipientPubkey }) => {
+      paymentLog.info('payment.step.send_complete', {
+        createdOffline: !!createdOffline,
+        mintWasOffline: !!mintWasOffline,
+        recipientPubkeyPresent: !!recipientPubkey,
+      });
 
       // Routstr top-up: intercept the token and send it to the Routstr API
       const topUpState = useRoutstrTopUpStore.getState();
@@ -798,59 +766,108 @@ export function createSovranHandlers({
           if (result.success) {
             const balanceStr = formatRoutstrBalance(result.balance);
             if (result.isNewWallet) {
-              routstrWalletCreatedPopup({ balance: balanceStr });
+              paramPopup('routstr-wallet-created', { balance: balanceStr });
             } else {
-              routstrTopUpSuccessPopup({ balance: balanceStr });
+              paramPopup('routstr-top-up-success', { balance: balanceStr });
             }
             useRoutstrTopUpStore.getState().complete('success');
           } else {
-            routstrTransactionFailedPopup({ text: result.error });
+            staticPopup('routstr-transaction-failed', { text: result.error });
             useRoutstrTopUpStore.getState().complete('failed');
           }
         } catch (e) {
           paymentLog.error('payment.routstr_topup.error', {
             error: e instanceof Error ? e.message : String(e),
           });
-          routstrTransactionFailedPopup({ text: 'Failed to process top-up' });
+          staticPopup('routstr-transaction-failed', { text: 'Failed to process top-up' });
           useRoutstrTopUpStore.getState().complete('failed');
         }
         router.dismiss();
         return;
       }
 
+      // Inject recipientPubkey into the executed history entry's metadata
+      // so SendTokenScreen can render the recipient identity. Operations
+      // build the entry; we attach identity at the screen-handler seam.
+      const enrichedHistoryEntry = recipientPubkey
+        ? injectRecipientPubkey(historyEntry, recipientPubkey)
+        : historyEntry;
+      if (createdOffline) {
+        try {
+          const entry = JSON.parse(enrichedHistoryEntry) as { id?: unknown; mintUrl?: unknown };
+          if (typeof entry.id === 'string' && typeof entry.mintUrl === 'string') {
+            useSendReachabilityStore.getState().markChecking(entry.id, entry.mintUrl);
+            useSendReachabilityStore.getState().pruneOld();
+          }
+        } catch (e) {
+          paymentLog.warn('payment.send_complete.reachability_seed_failed', {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+
       router.navigate({
         pathname: '/(send-flow)/sendToken',
         params: {
-          sendHistoryEntry: historyEntry,
+          sendHistoryEntry: enrichedHistoryEntry,
+          ...(createdOffline ? { createdOffline: 'true' } : {}),
           ...(mintWasOffline ? { mintWasOffline: 'true' } : {}),
         },
       });
     },
 
-    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit }) => {
-      paymentLog.info('payment.step.navigate_payment_request', { mintUrl, amount, unit });
+    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit, recipientPubkey }) => {
+      paymentLog.info('payment.step.navigate_payment_request', {
+        mintUrl,
+        amount,
+        unit,
+        recipientPubkeyPresent: !!recipientPubkey,
+      });
       const entry = {
-        id: `pr-preview-${Date.now()}`,
+        id: mintLocalId('pr-preview'),
         type: 'send',
         createdAt: Date.now(),
         mintUrl,
         amount,
         unit,
         state: 'prepared',
-        metadata: { paymentRequest, phase: 'preview' },
+        metadata: {
+          paymentRequest,
+          phase: 'preview',
+          ...(recipientPubkey ? { recipientPubkey } : {}),
+        },
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
       nav({
-        pathname: '/(send-flow)/paymentRequest' as any,
+        pathname: '/(send-flow)/paymentRequest',
         params: { paymentRequestEntry: JSON.stringify(entry) },
       });
     },
 
-    navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit }) => {
-      paymentLog.info('payment.step.navigate_melt_preview', { mintUrl, amount, unit });
+    navigateToMeltPreview: ({
+      mintUrl,
+      meltTarget,
+      amount,
+      unit,
+      recipientPubkey,
+      recipientProfile,
+    }) => {
+      paymentLog.info('payment.step.navigate_melt_preview', {
+        mintUrl,
+        amount,
+        unit,
+        recipientPubkeyPresent: !!recipientPubkey,
+        recipientProfilePresent: !!recipientProfile,
+        recipientProfileDisplayName: recipientProfile?.displayName ?? null,
+        recipientProfileAvatarUrlPresent: !!recipientProfile?.avatarUrl,
+      });
+      // `MeltHistoryEntry.metadata` is typed `Record<string, string>` upstream
+      // in `@cashu/coco-core`, so the resolved profile is flattened into
+      // individual string keys instead of stored as a nested object.
+      // `MeltQuoteScreen` re-assembles them on read.
       const entry: MeltHistoryEntry = {
-        id: `melt-preview-${Date.now()}`,
+        id: mintLocalId('melt-preview'),
         type: 'melt',
         createdAt: Date.now(),
         mintUrl,
@@ -858,7 +875,18 @@ export function createSovranHandlers({
         quoteId: '',
         state: 'UNPAID',
         amount,
-        metadata: { phase: 'preview', meltTarget },
+        metadata: {
+          phase: 'preview',
+          meltTarget,
+          ...(recipientPubkey ? { recipientPubkey } : {}),
+          ...(recipientProfile?.displayName
+            ? { recipientDisplayName: recipientProfile.displayName }
+            : {}),
+          ...(recipientProfile?.avatarUrl
+            ? { recipientAvatarUrl: recipientProfile.avatarUrl }
+            : {}),
+          ...(recipientProfile?.nip05 ? { recipientNip05: recipientProfile.nip05 } : {}),
+        },
       };
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
@@ -901,10 +929,7 @@ export function createSovranHandlers({
     },
 
     openProfile: ({ npub }) => {
-      router.navigate({
-        pathname: '/(user-flow)/profile',
-        params: { npub },
-      });
+      router.navigate(buildModalProfileHref({ npub }));
     },
 
     navigateToReceive: async ({ unit }) => {
@@ -928,7 +953,7 @@ export function createSovranHandlers({
         id: 'receive-hub',
         createdAt: Date.now(),
         mintUrl: selectedMintUrl ?? '',
-        npcAddress: npub ? `${npub}@npubx.cash` : undefined,
+        npcAddress: npub ? getNpcAddress(undefined, npub) : undefined,
         p2pkKey,
         selectedMintUrl,
         unit,
@@ -948,13 +973,20 @@ export function createSovranHandlers({
         selectedMintUrl: preselectedMintUrl ?? '',
         ...(constraints.paymentRequest ? { paymentRequest: constraints.paymentRequest } : {}),
         ...(constraints.meltTarget ? { meltTarget: constraints.meltTarget } : {}),
+        // Snapshot the machine-resolved recipient identity onto the entry so
+        // the amount screen renders "Pay <name>" + avatar on first paint
+        // when the resolver beat the navigation. AmountFlowScreen also
+        // subscribes to the live ctx for the case where the resolver lands
+        // after navigation.
+        ...(constraints.recipientPubkey ? { recipientPubkey: constraints.recipientPubkey } : {}),
+        ...(constraints.recipientProfile ? { recipientProfile: constraints.recipientProfile } : {}),
       };
-      const pathname =
-        constraints.destination === 'mintQuote' ? '/(receive-flow)/amount' : '/(send-flow)/amount';
-      router.navigate({
-        pathname: pathname as any,
-        params: { amountEntry: JSON.stringify(entry) },
-      });
+      const params = { amountEntry: JSON.stringify(entry) };
+      router.navigate(
+        constraints.destination === 'mintQuote'
+          ? { pathname: '/(receive-flow)/amount', params }
+          : { pathname: '/(send-flow)/amount', params }
+      );
       paymentLog.info('navigate.enterAmount.done', { duration_ms: performance.now() - t0 });
     },
 
@@ -976,14 +1008,12 @@ export function createSovranHandlers({
         unit,
       };
 
-      const pathname =
+      const params = { mintSelectorEntry: JSON.stringify(entry) };
+      router.navigate(
         destination === 'mintQuote' || scope === 'npc'
-          ? '/(receive-flow)/mintSelect'
-          : '/(send-flow)/mintSelect';
-      router.navigate({
-        pathname: pathname as any,
-        params: { mintSelectorEntry: JSON.stringify(entry) },
-      });
+          ? { pathname: '/(receive-flow)/mintSelect', params }
+          : { pathname: '/(send-flow)/mintSelect', params }
+      );
     },
 
     chooseOption: (stepData) => {
@@ -1009,6 +1039,22 @@ export function createSovranHandlers({
 // =============================================================================
 
 type Ctx<E> = ScreenActionContext<E> & { manager: Manager };
+
+/**
+ * Re-serialize a JSON-encoded coco history entry with `recipientPubkey`
+ * added to its metadata. Returns the input unchanged if it can't be parsed
+ * — operations build the entry, this only attaches identity at the seam.
+ */
+function injectRecipientPubkey(historyEntry: string, recipientPubkey: string): string {
+  try {
+    const parsed = JSON.parse(historyEntry) as { metadata?: Record<string, unknown> };
+    parsed.metadata = { ...(parsed.metadata ?? {}), recipientPubkey };
+    return JSON.stringify(parsed);
+  } catch {
+    paymentLog.warn('payment.recipient_pubkey.inject_failed');
+    return historyEntry;
+  }
+}
 
 function sendCtx(ctx: ScreenActionContext): Ctx<SendHistoryEntry> {
   return ctx as Ctx<SendHistoryEntry>;
@@ -1042,37 +1088,47 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           return;
         }
 
-        const writeResult = await writeTokenToNFC(getEncodedTokenV4(entry.token));
-        if (writeResult.success) {
+        try {
+          await writeTokenToNFC(getEncodedTokenV4(entry.token));
           paymentLog.info('payment.screen_action.nfc.success');
           nfcEcashSharedPopup();
           return;
-        }
-
-        const lostConnection =
-          writeResult.errorCode === 'TAG_LOST' || writeResult.errorCode === 'TRANSCEIVE_FAILED';
-
-        if (lostConnection && entry.operationId) {
-          paymentLog.warn('payment.screen_action.nfc.connection_lost', {
-            operationId: entry.operationId,
-          });
-          try {
-            await manager.ops.send.reclaim(entry.operationId);
-            nfcConnectionLostPopup();
-            return;
-          } catch (rollbackError) {
-            paymentLog.error('payment.screen_action.nfc.rollback_failed', { error: rollbackError });
-            nfcSendFailedPopup({
-              rollbackFailed: true,
-              text: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-            });
+        } catch (rawError) {
+          // User dismissed the system NFC sheet — no popup, no rollback;
+          // the send op was never committed to the wire.
+          if (isUserCancelError(rawError)) {
+            paymentLog.info('payment.screen_action.nfc.user_cancel');
             return;
           }
-        }
+          const code = rawError instanceof NfcError ? rawError.code : 'WRITE_FAILED';
+          const message =
+            rawError instanceof Error ? rawError.message : 'Unable to write token via NFC.';
+          const lostConnection = code === 'TAG_LOST' || code === 'TRANSCEIVE_FAILED';
 
-        nfcSendFailedPopup({
-          text: writeResult.errorMessage || 'Unable to write token via NFC.',
-        });
+          if (lostConnection && entry.operationId) {
+            paymentLog.warn('payment.screen_action.nfc.connection_lost', {
+              operationId: entry.operationId,
+            });
+            try {
+              await manager.ops.send.reclaim(entry.operationId);
+              nfcConnectionLostPopup();
+              return;
+            } catch (rollbackError) {
+              paymentLog.error('payment.screen_action.nfc.rollback_failed', {
+                error:
+                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+              });
+              nfcSendFailedPopup({
+                rollbackFailed: true,
+                text:
+                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+              });
+              return;
+            }
+          }
+
+          nfcSendFailedPopup({ text: message });
+        }
       },
 
       /**
@@ -1084,10 +1140,10 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       copy: async (rawCtx) => {
         const { entry } = sendCtx(rawCtx);
         if (!entry.token) return;
-        const variantId =
-          typeof (rawCtx as unknown as { variantId?: unknown }).variantId === 'string'
-            ? (rawCtx as unknown as { variantId: string }).variantId
-            : 'text';
+        // `ScreenActionContext` carries action params via the `[key: string]: unknown`
+        // index signature, so `rawCtx.variantId` is already typed as `unknown` —
+        // narrow it directly without a cast.
+        const variantId = typeof rawCtx.variantId === 'string' ? rawCtx.variantId : 'text';
         if (variantId === 'emoji') {
           emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
           return;

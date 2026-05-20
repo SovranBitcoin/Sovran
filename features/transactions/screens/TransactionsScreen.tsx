@@ -14,20 +14,25 @@
  *   reclaims every visible row, plus per-row swipe-to-cancel.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import PagerView from 'react-native-pager-view';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Transactions } from '@/features/transactions/components/Transactions';
-import { MonthSelector } from '@/features/transactions/components/MonthSelector';
+import {
+  MonthSelector,
+  extractMonthsFromHistory,
+} from '@/features/transactions/components/MonthSelector';
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { rollbackPartialPopup, rollbackSuccessPopup } from '@/shared/lib/popup';
+import { paramPopup, staticPopup } from '@/shared/lib/popup';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useManager } from '@cashu/coco-react';
 import { attemptRollback } from '@/shared/lib/cashu/utils';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type PaymentType = 'all' | 'lightning' | 'ecash';
@@ -36,7 +41,6 @@ type Direction = 'all' | 'incoming' | 'outgoing';
 const MONTH_SELECTOR_HEIGHT = 48;
 
 interface TransactionsScreenProps {
-  initialAccount?: { unit: string };
   initialTab?: StatusTab;
   /** Called when a transaction is tapped - used for flow-aware navigation */
   onTransactionPress?: (historyEntry: HistoryEntry) => void;
@@ -55,7 +59,6 @@ interface TransactionsScreenProps {
 }
 
 export function TransactionsScreen({
-  initialAccount,
   initialTab = 'All',
   onTransactionPress,
   filterCurrency,
@@ -67,8 +70,9 @@ export function TransactionsScreen({
 }: TransactionsScreenProps) {
   useLifecycleLogger('TransactionsScreen');
   const manager = useManager();
+  const { isOffline } = useOfflineStatus();
 
-  const selectedCurrency = filterCurrency || initialAccount?.unit || 'sat';
+  const selectedCurrency = filterCurrency || 'sat';
   const paymentType = filterPaymentType;
   const direction = filterDirection;
   const tab = initialTab;
@@ -78,6 +82,7 @@ export function TransactionsScreen({
   const handleMonthChange = onMonthChange || setInternalMonth;
 
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
+  const pagerRef = useRef<PagerView>(null);
 
   const [visiblePendingEcash, setVisiblePendingEcash] = useState<SendHistoryEntry[]>([]);
   const [isSweeping, setIsSweeping] = useState(false);
@@ -97,17 +102,25 @@ export function TransactionsScreen({
   const handleCancelOne = useCallback(
     async (entry: SendHistoryEntry) => {
       if (useRollbackStore.getState().inFlight.has(entry.operationId)) return;
+      if (isOffline) {
+        staticPopup('cancel-transaction-offline');
+        return;
+      }
       log.info('transactions.pending.cancel.one', {
         operationId: entry.operationId,
         mintUrl: entry.mintUrl,
       });
       await reclaimOne(entry.operationId);
     },
-    [reclaimOne]
+    [isOffline, reclaimOne]
   );
 
   const handleSweepVisible = useCallback(async () => {
     if (isSweeping || visiblePendingEcash.length === 0) return;
+    if (isOffline) {
+      staticPopup('cancel-transaction-offline');
+      return;
+    }
     log.info('transactions.pending.sweep.visible.start', {
       count: visiblePendingEcash.length,
     });
@@ -126,11 +139,11 @@ export function TransactionsScreen({
     log.info('transactions.pending.sweep.visible.complete', { success, failed });
 
     if (failed === 0) {
-      rollbackSuccessPopup({ count: success });
+      paramPopup('rollback-success', { count: success });
     } else {
-      rollbackPartialPopup({ success, failed, total: targets.length });
+      paramPopup('rollback-partial', { success, failed, total: targets.length });
     }
-  }, [isSweeping, visiblePendingEcash, reclaimOne]);
+  }, [isOffline, isSweeping, visiblePendingEcash, reclaimOne]);
 
   const totalVisiblePendingAmount = useMemo(
     () => visiblePendingEcash.reduce((sum, tx) => sum + tx.amount, 0),
@@ -165,15 +178,6 @@ export function TransactionsScreen({
 
   const { history, isFetching } = useHistoryWithMelts();
 
-  log.debug('tx.list.render', {
-    totalHistory: history.length,
-    isFetching,
-    currency: selectedCurrency,
-    paymentType,
-    direction,
-    tab,
-  });
-
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}-${selectedMonth}`;
 
   const filteredByTypeHistory = useMemo(() => {
@@ -188,15 +192,67 @@ export function TransactionsScreen({
 
   const parsedAccount = { unit: selectedCurrency };
 
+  // Pager pages and the month-pill row need to share the same months array so
+  // the active index always lines up with the active page.
+  const months = useMemo(
+    () => extractMonthsFromHistory(filteredByTypeHistory),
+    [filteredByTypeHistory]
+  );
+
+  // Default to the newest month once the months list is known. Owning this
+  // here (instead of inside MonthSelector) lets the pager's `initialPage`
+  // line up with the selected pill on first paint, no flicker.
+  useEffect(() => {
+    if (selectedMonth === null && months.length > 0) {
+      handleMonthChange(months[0].key);
+    }
+  }, [months, selectedMonth, handleMonthChange]);
+
+  const activeIndex = useMemo(() => {
+    if (!selectedMonth || months.length === 0) return 0;
+    const idx = months.findIndex((m) => m.key === selectedMonth);
+    return idx >= 0 ? idx : 0;
+  }, [months, selectedMonth]);
+
+  // If a filter change drops the current month out of `months`, snap the
+  // pager and pill row back to the first available month. Mirrors the
+  // BackgroundScreen pattern.
+  useEffect(() => {
+    if (months.length === 0) return;
+    if (selectedMonth && !months.some((m) => m.key === selectedMonth)) {
+      handleMonthChange(months[0].key);
+      pagerRef.current?.setPageWithoutAnimation(0);
+    }
+  }, [months, selectedMonth, handleMonthChange]);
+
+  const handlePillSelect = useCallback(
+    (key: string | null) => {
+      handleMonthChange(key);
+      if (!key) return;
+      const idx = months.findIndex((m) => m.key === key);
+      if (idx >= 0) pagerRef.current?.setPage(idx);
+    },
+    [handleMonthChange, months]
+  );
+
+  const handlePageSelected = useCallback(
+    (event: { nativeEvent: { position: number } }) => {
+      const idx = event.nativeEvent.position;
+      const next = months[idx];
+      if (next) handleMonthChange(next.key);
+    },
+    [months, handleMonthChange]
+  );
+
   const monthSelectorContent = useMemo(
     () => (
       <MonthSelector
-        history={filteredByTypeHistory}
+        months={months}
         selectedMonth={selectedMonth}
-        onMonthChange={handleMonthChange}
+        onMonthChange={handlePillSelect}
       />
     ),
-    [filteredByTypeHistory, selectedMonth, handleMonthChange]
+    [months, selectedMonth, handlePillSelect]
   );
 
   const listHeader = useMemo(
@@ -247,24 +303,61 @@ export function TransactionsScreen({
       scroll="custom"
       footer={sweepFooter}
       onHeaderHeightChange={setTotalHeaderHeight}>
-      <Transactions
-        listKey={listKey}
-        account={{ ...parsedAccount, unit: selectedCurrency }}
-        showMore={false}
-        history={history}
-        isFetching={isFetching}
-        filter={direction}
-        type={paymentType}
-        mintUrlFilter={filterMintUrl}
-        at="all"
-        tab={tab}
-        selectedMonth={selectedMonth}
-        onTransactionPress={onTransactionPress}
-        onCancelPendingEcash={handleCancelOne}
-        onVisiblePendingEcashChange={setVisiblePendingEcash}
-        header={listHeader}
-        disableContentInsetAdjustment
-      />
+      {months.length > 0 ? (
+        <PagerView
+          ref={pagerRef}
+          style={{ flex: 1 }}
+          initialPage={activeIndex}
+          onPageSelected={handlePageSelected}
+          overdrag>
+          {months.map((month, idx) => (
+            <View key={month.key} className="flex-1">
+              <Transactions
+                listKey={`${listKey}-${month.key}`}
+                account={{ ...parsedAccount, unit: selectedCurrency }}
+                showMore={false}
+                history={filteredByTypeHistory}
+                isFetching={isFetching}
+                filter={direction}
+                type={paymentType}
+                mintUrlFilter={filterMintUrl}
+                at="all"
+                tab={tab}
+                selectedMonth={month.key}
+                onTransactionPress={onTransactionPress}
+                onCancelPendingEcash={handleCancelOne}
+                // Only the active page reports its visible pending ecash so
+                // the sweep footer reflects what the user is currently
+                // looking at, not what other off-screen pages contain.
+                onVisiblePendingEcashChange={
+                  idx === activeIndex ? setVisiblePendingEcash : undefined
+                }
+                header={listHeader}
+                disableContentInsetAdjustment
+              />
+            </View>
+          ))}
+        </PagerView>
+      ) : (
+        <Transactions
+          listKey={listKey}
+          account={{ ...parsedAccount, unit: selectedCurrency }}
+          showMore={false}
+          history={filteredByTypeHistory}
+          isFetching={isFetching}
+          filter={direction}
+          type={paymentType}
+          mintUrlFilter={filterMintUrl}
+          at="all"
+          tab={tab}
+          selectedMonth={selectedMonth}
+          onTransactionPress={onTransactionPress}
+          onCancelPendingEcash={handleCancelOne}
+          onVisiblePendingEcashChange={setVisiblePendingEcash}
+          header={listHeader}
+          disableContentInsetAdjustment
+        />
+      )}
     </Screen>
   );
 }

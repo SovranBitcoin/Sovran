@@ -3,7 +3,8 @@
  *
  * Provides a pre-built WalletContext (trustedMintUrls, mintBalances, proofAmounts,
  * preferredMintUrl) so call sites don't need to construct it or fetch proofs.
- * Proof amounts are fetched from manager.proofService when balance changes.
+ * Proof amounts are fetched via the shared/lib/cashu/managerInternals seam when
+ * balance changes.
  *
  * Must be a descendant of CocoProvider (CocoCashuProvider).
  */
@@ -19,10 +20,10 @@ import React, {
 } from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
-import type { WalletContext } from 'coco-payment-ux';
+import { type WalletContext } from 'coco-payment-ux';
+import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog, initLog, useInitMount } from '@/shared/lib/logger';
 
@@ -64,11 +65,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     [rawBalanceCtx]
   );
   const manager = useManager();
-  const { keys } = useNostrKeysContext();
-  const pubkey = keys?.pubkey;
-  const preferredMintUrl = useMintStore(
-    useCallback((state) => (pubkey ? state.selectedMints[pubkey] : undefined), [pubkey])
-  );
+  const preferredMintUrl = useMintStore((state) => state.selectedMint);
 
   const [proofAmounts, setProofAmounts] = useState<Record<string, number[]>>({});
 
@@ -87,16 +84,35 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     return trustedMintUrls;
   }, [trustedMintUrls]);
 
+  // RC4+ removed the legacy `total` injection into the per-mint map; mintBalances
+  // already contains only mint-keyed entries.
+  const mintBalancesOnly = mintBalances;
+
+  // Stable balance signature so `fetchProofAmounts` re-runs whenever any mint
+  // balance changes (i.e. after a send / receive). Without this the cached
+  // `proofAmounts` would only refresh on mint-add, leaving "Send all" showing
+  // the pre-spend total — the user-reported bug where the quick suggestions
+  // sometimes exceed the actual spendable balance.
+  const balanceSignature = useMemo(
+    () =>
+      Object.entries(mintBalancesOnly)
+        .map(([url, total]) => `${url}:${total}`)
+        .sort()
+        .join('|'),
+    [mintBalancesOnly]
+  );
+
   const fetchProofAmounts = useCallback(async () => {
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {
       mintCount: stableMintUrls.length,
     });
-    const proofService = manager.proofService;
     const next: Record<string, number[]> = {};
+    let totalReady = 0;
     for (const url of stableMintUrls) {
       try {
-        const proofs = await proofService.getReadyProofs(url);
+        const proofs = await getReadyProofs(manager, url);
         next[url] = proofs.map((p) => p.amount).sort((a, b) => a - b);
+        totalReady += next[url].reduce((sum, n) => sum + n, 0);
       } catch (err) {
         walletLog.warn('provider.wallet_context.proof_fetch_failed', {
           mintUrl: url,
@@ -107,17 +123,16 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     }
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_done', {
       mintCount: stableMintUrls.length,
+      totalReady,
     });
     setProofAmounts(next);
   }, [manager, stableMintUrls]);
 
   useEffect(() => {
-    fetchProofAmounts();
-  }, [fetchProofAmounts]);
-
-  // RC4+ removed the legacy `total` injection into the per-mint map; mintBalances
-  // already contains only mint-keyed entries.
-  const mintBalancesOnly = mintBalances;
+    void fetchProofAmounts();
+    // balanceSignature isn't used inside fetchProofAmounts but its change is the
+    // signal that proofs have moved — depend on it explicitly.
+  }, [fetchProofAmounts, balanceSignature]);
 
   const value = useMemo<WalletContext>(() => {
     walletLog.info('provider.wallet_context.value_updated', {

@@ -1,13 +1,14 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
+import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
-
-initLog('Module', 'ThemeProvider loaded');
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
 import { Uniwind } from 'uniwind';
+
+initLog('Module', 'ThemeProvider loaded');
 
 interface ThemeContextValue {
   currentTheme: string;
@@ -36,18 +37,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // lower in the tree. Gating ThemeProvider on themeStore._hasHydrated
   // here would deadlock the splash screen.
   const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
-  const unitWallpapers = useThemeStore((s) => s.unitWallpapers);
-  const activeAlbumSlug = useThemeStore((s) => s.activeAlbumSlug);
+  // Resolve the chrome theme via the shared resolver hook, which subscribes
+  // to themeStore (unitWallpapers + activeAlbumSlug) and wallpaperStore
+  // (catalog) and walks the fallback chain. Re-renders when any of those
+  // references change.
+  const currentTheme = useUnitWallpaper();
   const mode = useThemeStore((s) => s.mode);
-  const getUnitWallpaper = useThemeStore((s) => s.getUnitWallpaper);
-
-  // Chrome theme = resolver with no unit id (walks fallback chain).
-  // Re-runs whenever per-unit map or active album changes.
-  const currentTheme = useMemo(
-    () => getUnitWallpaper(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getUnitWallpaper, unitWallpapers, activeAlbumSlug],
-  );
 
   const lastApplied = useRef<string | null>(null);
 
@@ -77,7 +72,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   if (!wallpaperHydrated) return null;
 
   return (
-    <ThemeContext.Provider value={{ currentTheme, mode, availableThemes: Object.keys(THEMES) as ThemeName[] }}>
+    <ThemeContext.Provider
+      value={{ currentTheme, mode, availableThemes: Object.keys(THEMES) as ThemeName[] }}>
       <View className="flex-1">{children}</View>
     </ThemeContext.Provider>
   );
@@ -90,5 +86,3 @@ export const useTheme = () => {
   }
   return context;
 };
-
-export { THEMES };

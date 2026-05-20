@@ -1,22 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Dimensions, ScrollView, StyleSheet } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Svg, { Path } from 'react-native-svg';
-import Animated, {
-  interpolate,
-  Extrapolation,
-  runOnJS,
-  interpolateColor,
-  useAnimatedProps,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withRepeat,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import { ScrollView } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { SlideToConfirm } from '@/shared/ui/composed/SlideToConfirm';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -29,32 +15,82 @@ import { useMintManagement } from '@/features/mint';
 import { useNavigation, router } from 'expo-router';
 import { Mint } from '@cashu/coco-core';
 import { useBalanceContext } from '@cashu/coco-react';
+import { deleteMintOperation } from '@/shared/lib/cashu/managerInternals';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
-import {
-  recoverySuccessPopup,
-  recoveryPartialPopup,
-  recoveryFailedPopup,
-} from '@/shared/lib/popup';
+import { LoadingIndicator } from '@/shared/blocks/status';
+import { staticPopup, paramPopup } from '@/shared/lib/popup';
+import { fetchJson } from '@/shared/lib/apiClient';
+import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
 
 // ─── Deep probe: discover mints from audit API ─────────────────────────────
 
 const SOVRAN_MINTS_API = 'https://api.sovran.money/api/cashu/mints';
+const MAX_DISCOVERED_MINTS = 100;
 
-async function fetchDiscoveredMintUrls(knownUrls: string[]): Promise<string[]> {
-  const known = new Set(knownUrls.map((u) => u.replace(/\/$/, '')));
-  try {
-    const res = await fetch(SOVRAN_MINTS_API);
-    if (!res.ok) return [];
-    const urls: string[] = await res.json();
-    return urls
-      .filter((u) => u.startsWith('https://'))
-      .map((u) => u.replace(/\/$/, ''))
-      .filter((u) => !known.has(u));
-  } catch {
-    return [];
+const parseMintList = parseWith(MintListResponse, 'cashu/mints');
+
+function normalizeMintUrl(url: string): string {
+  return url.replace(/\/$/, '').toLowerCase();
+}
+
+// Hostname allowlist for backend-supplied mint URLs. Every admitted host
+// will be probed by `wallet.restore`, which sends the user's IP and derived
+// blinded messages — a compromised api.sovran.money response (or CDN MITM)
+// must not aim the wallet at LAN, loopback, link-local, or `.onion` hosts.
+function isAllowedMintHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === 'localhost') return false;
+  if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.onion')) return false;
+  // Block bare IPs entirely — public mints are reached by hostname.
+  // `URL.hostname` strips brackets from IPv6 literals, leaving colons.
+  if (h.includes(':')) return false;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false;
+  return true;
+}
+
+async function fetchDiscoveredMintUrls(
+  knownUrls: string[],
+  signal?: AbortSignal
+): Promise<string[]> {
+  const known = new Set(knownUrls.map(normalizeMintUrl));
+  const result = await fetchJson(SOVRAN_MINTS_API, parseMintList, 'cashu/mints', undefined, {
+    signal,
+  });
+  if (result.isErr()) return [];
+  const admitted: string[] = [];
+  let rejectedHost = 0;
+  let rejectedScheme = 0;
+  let rejectedMalformed = 0;
+  for (const raw of result.value) {
+    if (admitted.length >= MAX_DISCOVERED_MINTS) break;
+    if (!raw.startsWith('https://')) {
+      rejectedScheme++;
+      continue;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      rejectedMalformed++;
+      continue;
+    }
+    if (!isAllowedMintHost(parsed.hostname)) {
+      rejectedHost++;
+      continue;
+    }
+    const normalized = raw.replace(/\/$/, '');
+    if (known.has(normalized.toLowerCase())) continue;
+    admitted.push(normalized);
   }
+  cashuLog.info('recovery.discover.admitted', {
+    admittedCount: admitted.length,
+    rejectedHost,
+    rejectedScheme,
+    rejectedMalformed,
+    totalReturned: result.value.length,
+  });
+  return admitted;
 }
 
 type RecoveryState = 'idle' | 'recovering' | 'complete' | 'error';
@@ -77,142 +113,6 @@ interface RecoveryConfig {
   parallelKeysets: boolean;
   skipProbe: boolean;
 }
-
-// ─── Animated shield with spinner → checkmark/cross transition ───────────────
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-const CIRCLE_PATH = 'M3 12c0-4.97 4.03-9 9-9c4.97 0 9 4.03 9 9c0 4.97-4.03 9-9 9c-4.97 0-9-4.03-9-9Z';
-const CHECKMARK_PATH = 'M8 12l3 3l5-5';
-const CROSS_PATH = 'M12 12l4 4M12 12l-4-4M12 12l-4 4M12 12l4-4';
-const CIRCLE_LENGTH = 60;
-const CHECKMARK_LENGTH = 14;
-const CROSS_LENGTH = 23;
-const PENDING_OFFSET = 45;
-
-type ShieldStatus = 'loading' | 'success' | 'error';
-
-const ShieldStatusIcon: React.FC<{
-  size: number;
-  color: string;
-  successColor: string;
-  errorColor: string;
-  status: ShieldStatus;
-}> = ({ size, color, successColor, errorColor, status }) => {
-  const rotation = useSharedValue(0);
-  const circleOffset = useSharedValue(PENDING_OFFSET);
-  const checkmarkOffset = useSharedValue(CHECKMARK_LENGTH);
-  const crossOffset = useSharedValue(CROSS_LENGTH);
-  const colorProgress = useSharedValue(0);
-  const prevStatusRef = React.useRef<ShieldStatus>(status);
-
-  useEffect(() => {
-    const prevStatus = prevStatusRef.current;
-    prevStatusRef.current = status;
-
-    // Don't re-animate if already in a terminal state (success/error)
-    if (prevStatus === status && status !== 'loading') return;
-    if ((prevStatus === 'success' || prevStatus === 'error') && prevStatus === status) return;
-
-    if (status === 'loading') {
-      circleOffset.value = PENDING_OFFSET;
-      checkmarkOffset.value = CHECKMARK_LENGTH;
-      crossOffset.value = CROSS_LENGTH;
-      colorProgress.value = 0;
-      rotation.value = withRepeat(withTiming(360, { duration: 1500, easing: Easing.linear }), -1);
-    } else {
-      rotation.value = withTiming(0, { duration: 300 });
-      colorProgress.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) });
-      circleOffset.value = withTiming(0, { duration: 1000, easing: Easing.linear });
-      const symbolTiming = withTiming(0, { duration: 200, easing: Easing.out(Easing.ease) });
-      if (status === 'success') {
-        checkmarkOffset.value = symbolTiming;
-        crossOffset.value = CROSS_LENGTH;
-      } else {
-        crossOffset.value = symbolTiming;
-        checkmarkOffset.value = CHECKMARK_LENGTH;
-      }
-    }
-  }, [status, rotation, circleOffset, checkmarkOffset, crossOffset, colorProgress]);
-
-  const targetColor = status === 'error' ? errorColor : successColor;
-
-  const spinnerStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
-
-  const circleProps = useAnimatedProps(() => ({
-    strokeDashoffset: circleOffset.value,
-    stroke: status === 'loading'
-      ? color
-      : interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
-  }));
-
-  const checkmarkProps = useAnimatedProps(() => ({
-    strokeDashoffset: checkmarkOffset.value,
-    stroke: interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
-  }));
-
-  const crossProps = useAnimatedProps(() => ({
-    strokeDashoffset: crossOffset.value,
-    stroke: interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
-  }));
-
-  const shieldProps = useAnimatedProps(() => ({
-    fill: interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
-  }));
-
-  const spinnerSize = size * 0.5;
-  const spinnerLeft = size * 0.55;
-  const spinnerTop = size * 0.55;
-
-  return (
-    <View style={{ width: size, height: size }}>
-      {/* Shield body — transitions color with the spinner */}
-      <Svg width={size} height={size} viewBox="0 0 24 24" style={{ position: 'absolute' }}>
-        <AnimatedPath
-          d="M12 1L3 5v6c0 5.5 3.8 10.7 9 12c.4-.1.7-.2 1-.3c-1-1.2-1.5-2.7-1.5-4.2c0-3.6 2.9-6.5 6.5-6.5c1 0 2 .2 2.9.7c.1-.6.1-1.1.1-1.7V5z"
-          animatedProps={shieldProps}
-        />
-      </Svg>
-      {/* Spinner → checkmark/cross overlay */}
-      <Animated.View
-        style={[
-          { position: 'absolute', left: spinnerLeft, top: spinnerTop, width: spinnerSize, height: spinnerSize },
-          spinnerStyle,
-        ]}>
-        <Svg width={spinnerSize} height={spinnerSize} viewBox="0 0 24 24">
-          <AnimatedPath
-            d={CIRCLE_PATH}
-            fill="none"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={CIRCLE_LENGTH}
-            animatedProps={circleProps}
-          />
-          <AnimatedPath
-            d={CHECKMARK_PATH}
-            fill="none"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={CHECKMARK_LENGTH}
-            animatedProps={checkmarkProps}
-          />
-          <AnimatedPath
-            d={CROSS_PATH}
-            fill="none"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={CROSS_LENGTH}
-            animatedProps={crossProps}
-          />
-        </Svg>
-      </Animated.View>
-    </View>
-  );
-};
 
 const DEFAULT_CONFIG: RecoveryConfig = {
   batchSize: 25,
@@ -240,97 +140,9 @@ declare global {
   var __CASHU_RECOVERY_CONFIG: RecoveryConfig | undefined;
 }
 
-// ─── Slide to recover ──────────────────────────────────────────────────────
-
-const SLIDER_WIDTH = Dimensions.get('window').width - 48;
-const THUMB_SIZE = 40;
-const TRACK_PADDING = 4;
-const MAX_TRANSLATE = SLIDER_WIDTH - THUMB_SIZE - TRACK_PADDING * 2;
-
-const SlideToRecover: React.FC<{
-  onComplete: () => void;
-  trackColor: string;
-  thumbColor: string;
-  textColor: string;
-  iconColor: string;
-  label?: string;
-}> = ({ onComplete, trackColor, thumbColor, textColor, iconColor, label }) => {
-  const translateX = useSharedValue(0);
-  const isComplete = useSharedValue(false);
-
-  const handleComplete = useCallback(() => {
-    onComplete();
-  }, [onComplete]);
-
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      if (isComplete.value) return;
-      translateX.value = Math.max(0, Math.min(event.translationX, MAX_TRANSLATE));
-    })
-    .onEnd(() => {
-      if (isComplete.value) return;
-      if (translateX.value > MAX_TRANSLATE * 0.9) {
-        translateX.value = withSpring(MAX_TRANSLATE, { damping: 20, stiffness: 200 });
-        isComplete.value = true;
-        runOnJS(handleComplete)();
-      } else {
-        translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
-      }
-    });
-
-  const thumbAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
-  const textAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, MAX_TRANSLATE * 0.5], [1, 0], Extrapolation.CLAMP),
-  }));
-
-  return (
-    <GestureHandlerRootView>
-      <View style={[styles.track, { backgroundColor: trackColor, width: SLIDER_WIDTH }]}>
-        <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
-          <Text size={16} medium style={{ color: textColor }}>
-            {label || 'Swipe to recover'}
-          </Text>
-        </Animated.View>
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            style={[styles.thumb, thumbAnimatedStyle, { backgroundColor: thumbColor }]}>
-            <Icon name="mdi:shield-refresh" size={24} color={iconColor} />
-          </Animated.View>
-        </GestureDetector>
-      </View>
-    </GestureHandlerRootView>
-  );
-};
-
-const styles = StyleSheet.create({
-  track: {
-    height: THUMB_SIZE + TRACK_PADDING * 2,
-    borderRadius: (THUMB_SIZE + TRACK_PADDING * 2) / 2,
-    justifyContent: 'center',
-    padding: TRACK_PADDING,
-  },
-  textContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumb: {
-    width: THUMB_SIZE,
-    height: THUMB_SIZE,
-    borderRadius: THUMB_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
-
 // ─── Main screen ────────────────────────────────────────────────────────────
 
-export interface SettingsRecoveryScreenProps {
+interface SettingsRecoveryScreenProps {
   /**
    * When true, renders without the Cancel button and without manipulating
    * navigation options — the screen is a forced gate (rendered inline by
@@ -358,7 +170,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     'surface-secondary',
   ] as const);
   const navigation = useNavigation();
-  const { mints, restoreMint, loadMints } = useMintManagement();
+  const { mints, loadMints } = useMintManagement();
 
   const [recoveryState, setRecoveryState] = useState<RecoveryState>('idle');
   const [currentMintIndex, setCurrentMintIndex] = useState(0);
@@ -368,24 +180,21 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   // Deep probe: also check mints from the audit API
   const [deepProbe, setDeepProbe] = useState(false);
   const [discoveredMintUrls, setDiscoveredMintUrls] = useState<string[]>([]);
-  const [discoveryLoading, setDiscoveryLoading] = useState(false);
 
   useEffect(() => {
     if (!deepProbe) {
       setDiscoveredMintUrls([]);
       return;
     }
-    let cancelled = false;
-    setDiscoveryLoading(true);
-    fetchDiscoveredMintUrls(mints.map((m) => m.mintUrl)).then((urls) => {
-      if (!cancelled) {
-        setDiscoveredMintUrls(urls);
-        setDiscoveryLoading(false);
-      }
+    const controller = new AbortController();
+    void fetchDiscoveredMintUrls(
+      mints.map((m) => m.mintUrl),
+      controller.signal
+    ).then((urls) => {
+      if (controller.signal.aborted) return;
+      setDiscoveredMintUrls(urls);
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [deepProbe, mints]);
 
   // Lock navigation when recovery is in progress.
@@ -421,7 +230,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     const allMintUrls = [...knownMintUrls, ...probeMintUrls];
 
     if (allMintUrls.length === 0) {
-      recoveryFailedPopup({ text: 'No mints found to recover from. Add a mint first.' });
+      staticPopup('recovery-failed', { text: 'No mints found to recover from. Add a mint first.' });
       return;
     }
 
@@ -492,6 +301,28 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       setCurrentMintIndex(-1);
       await Promise.allSettled(allMintUrls.map((url, i) => restoreOneUrl(url, i)));
 
+      // Untrust discovered mints that returned no funds. `wallet.restore`
+      // calls `mintService.addMintByUrl(url, { trusted: true })` for every
+      // probed URL (see ../coco/packages/core/api/WalletApi.ts), which would
+      // otherwise leave attacker-supplied URLs from the audit API permanently
+      // in the trusted-mints set used by the routing surface.
+      const discoveredEmpty = recoveryResults.filter((r) => r.isDiscovered && !r.fundsFound);
+      if (discoveredEmpty.length > 0) {
+        await Promise.allSettled(
+          discoveredEmpty.map(async (r) => {
+            try {
+              await manager.mint.untrustMint(r.mint);
+              cashuLog.info('recovery.cleanup.discovered_mint_untrusted', { mintUrl: r.mint });
+            } catch (e) {
+              cashuLog.warn('recovery.cleanup.untrust_failed', {
+                mintUrl: r.mint,
+                error: (e as Error)?.message,
+              });
+            }
+          })
+        );
+      }
+
       // Clean up stuck pending mint operations from before the restore.
       // These were queued (typically by NPC sync) when the wallet's
       // deterministic counter was out of sync with the mint, so their
@@ -504,30 +335,20 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         const pendingOps = await manager.ops.mint.listPending();
         if (pendingOps.length > 0) {
           // Coco doesn't expose a public abandon API for pending operations,
-          // so reach into the private repository — same pattern this manager
-          // already uses for proofRepository / proofService elsewhere.
-          const repo = (manager as unknown as {
-            mintOperationRepository?: { delete(id: string): Promise<void> };
-          }).mintOperationRepository;
-          if (repo?.delete) {
-            for (const op of pendingOps) {
-              await repo.delete(op.id).catch((e) =>
-                cashuLog.warn('recovery.cleanup.delete_failed', {
-                  operationId: op.id,
-                  mintUrl: op.mintUrl,
-                  error: (e as Error)?.message,
-                })
-              );
-            }
-            cashuLog.info('recovery.cleanup.dropped_stuck_pending_ops', {
-              count: pendingOps.length,
-              operationIds: pendingOps.map((o) => o.id),
-            });
-          } else {
-            cashuLog.warn('recovery.cleanup.no_repo_access', {
-              pendingOpCount: pendingOps.length,
-            });
+          // so go through the typed seam in shared/lib/cashu/managerInternals.
+          for (const op of pendingOps) {
+            await deleteMintOperation(manager, op.id).catch((e) =>
+              cashuLog.warn('recovery.cleanup.delete_failed', {
+                operationId: op.id,
+                mintUrl: op.mintUrl,
+                error: (e as Error)?.message,
+              })
+            );
           }
+          cashuLog.info('recovery.cleanup.dropped_stuck_pending_ops', {
+            count: pendingOps.length,
+            operationIds: pendingOps.map((o) => o.id),
+          });
         }
       } catch (cleanupErr) {
         cashuLog.warn('recovery.cleanup.failed', {
@@ -558,13 +379,24 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       globalThis.__CASHU_RECOVERY_CONFIG = undefined;
 
       if (knownFailureCount === 0) {
-        recoverySuccessPopup({ mintCount: successCount, durationSec: (totalMs / 1000).toFixed(1) });
+        // Gate-mode owns its own UI through to AppGate's transition (SOV-00 §8).
+        // The runtime popupStore survives a gate→app remount, so a toast pushed
+        // here would render over the freshly-mounted wallet. The inline
+        // `renderCompleteState` already provides feedback in gate mode.
+        if (!gateMode) {
+          paramPopup('recovery-success', {
+            mintCount: successCount,
+            durationSec: (totalMs / 1000).toFixed(1),
+          });
+        }
         setRecoveryState('complete');
       } else {
-        if (successCount > 0) {
-          recoveryPartialPopup({ successCount, failureCount: knownFailureCount });
-        } else {
-          recoveryFailedPopup();
+        if (!gateMode) {
+          if (successCount > 0) {
+            paramPopup('recovery-partial', { successCount, failureCount: knownFailureCount });
+          } else {
+            staticPopup('recovery-failed');
+          }
         }
         setRecoveryState('error');
       }
@@ -573,10 +405,12 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       globalThis.__CASHU_RECOVERY_CONFIG = undefined;
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       setErrorMessage(errorMsg);
-      recoveryFailedPopup({ text: errorMsg });
+      if (!gateMode) {
+        staticPopup('recovery-failed', { text: errorMsg });
+      }
       setRecoveryState('error');
     }
-  }, [mints, deepProbe, discoveredMintUrls, loadMints]);
+  }, [mints, deepProbe, discoveredMintUrls, loadMints, gateMode]);
 
   const handleClose = useCallback(() => router.back(), []);
 
@@ -587,7 +421,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       <Card.Body>
         <VStack spacing={12}>
           {mints.map((mint) => {
-            const displayName = mint.mintInfo?.name || tryHostname(mint.mintUrl);
+            const displayName = getMintDisplayName(mint, mint.mintUrl);
             return (
               <HStack key={mint.mintUrl} spacing={12} className="items-center">
                 <Avatar
@@ -608,8 +442,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   );
 
   // ─── Idle state ─────────────────────────────────────────────────────────
-
-  const totalMintCount = mints.length + (deepProbe ? discoveredMintUrls.length : 0);
 
   const renderIdleState = () => (
     <VStack spacing={24} className="flex-1 px-6 pt-12">
@@ -648,8 +480,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           </VStack>
           <Switch isSelected={deepProbe} onSelectedChange={setDeepProbe} />
         </HStack>
-        <SlideToRecover
-          onComplete={handleStartRecovery}
+        <SlideToConfirm
+          onConfirm={handleStartRecovery}
+          iconName="mdi:shield-refresh"
+          label="Swipe to recover"
           trackColor={surfaceSecondary}
           thumbColor={foreground}
           textColor={foreground}
@@ -698,7 +532,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           </Text>
         </VStack>
         <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
-          <PaymentStatusIcon size={24} status={done ? 'confirmed' : 'pending'} />
+          <LoadingIndicator size={24} phase={done ? 'done' : 'loading'} result="success" />
         </View>
       </HStack>
     );
@@ -706,22 +540,16 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
   // Build lookup and filter: only show known mints + discovered mints that recovered funds
   const mintsByUrl = Object.fromEntries(mints.map((m) => [m.mintUrl, m]));
-  const knownMintUrlSet = new Set(mints.map((m) => m.mintUrl));
   const visibleResults = results.filter((r) => !r.isDiscovered || r.fundsFound);
 
   // ─── Recovering + complete states (single tree) ──────────────────────────
   //
   // Rendered with one JSX structure so React reconciles instead of
-  // unmount/remount on the `recovering → complete` flip. That keeps:
-  //   - the in-flight per-row PaymentStatusIcon animations playing through
-  //     to their natural end instead of being killed mid-draw, and
-  //   - the top ShieldStatusIcon mounted across the transition so its
-  //     useEffect runs the proper `loading → success` animation (a fresh
-  //     mount with status='success' would early-return without animating
-  //     and leave the shield stuck in pending visuals).
-  //
-  // Differences between the two states are now expressed as prop/text
-  // toggles inside the same tree.
+  // unmount/remount on the `recovering → complete` flip. That keeps the
+  // hero LoadingIndicator and per-row indicators mounted across the
+  // transition so they animate from `loading → done/success` instead of
+  // mounting fresh in the terminal state and short-circuiting the
+  // animation (see LoadingIndicator's `startedDone` ref).
 
   const renderActiveOrCompleteState = () => {
     const isComplete = recoveryState === 'complete';
@@ -732,12 +560,13 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           <View
             className="h-24 w-24 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: surfaceSecondary }}>
-            <ShieldStatusIcon
+            <LoadingIndicator
               size={48}
+              phase={isComplete ? 'done' : 'loading'}
+              result="success"
               color={foreground}
               successColor={green400}
               errorColor={red400}
-              status={isComplete ? 'success' : 'loading'}
             />
           </View>
 
@@ -772,7 +601,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                     // While recovering, currentMintIndex is -1 (allActive
                     // mode in MintRecoveryRow). On `complete`, push it past
                     // the last index so every row reports as done — but the
-                    // per-row PaymentStatusIcon already drives off the
+                    // per-row LoadingIndicator already drives off the
                     // result.success state, so this is just for the row's
                     // text dimming.
                     currentIndex={isComplete ? results.length : currentMintIndex}
@@ -811,7 +640,14 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           <View
             className="h-24 w-24 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: surfaceSecondary }}>
-            <ShieldStatusIcon size={48} color={foreground} successColor={green400} errorColor={red400} status="error" />
+            <LoadingIndicator
+              size={48}
+              phase="done"
+              result="error"
+              color={foreground}
+              successColor={green400}
+              errorColor={red400}
+            />
           </View>
 
           <VStack spacing={8} className="items-center">
@@ -833,7 +669,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                 <VStack spacing={12}>
                   {visibleResults.map((result, index) => {
                     const mint = mintsByUrl[result.mint];
-                    const displayName = mint?.mintInfo?.name || tryHostname(result.mint);
+                    const displayName = getMintDisplayName(mint, result.mint);
                     return (
                       <HStack key={index} spacing={12} className="items-center">
                         <Avatar
@@ -853,9 +689,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                           )}
                         </VStack>
                         <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
-                          <PaymentStatusIcon
+                          <LoadingIndicator
                             size={24}
-                            status={result.success ? 'confirmed' : 'failed'}
+                            phase="done"
+                            result={result.success ? 'success' : 'error'}
                           />
                         </View>
                       </HStack>
@@ -868,9 +705,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         </VStack>
 
         <VStack spacing={12} className="w-full items-center pb-6">
-          <SlideToRecover
+          <SlideToConfirm
+            onConfirm={handleStartRecovery}
+            iconName="mdi:shield-refresh"
             label="Reswipe to try again"
-            onComplete={handleStartRecovery}
             trackColor={surfaceSecondary}
             thumbColor={foreground}
             textColor={foreground}
@@ -888,15 +726,15 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
   return (
     <ScreenWrapper name="SettingsRecoveryScreen" scroll="custom" safeArea>
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ flexGrow: 1 }}
-          scrollEnabled={recoveryState !== 'recovering'}>
-          {recoveryState === 'idle' && renderIdleState()}
-          {(recoveryState === 'recovering' || recoveryState === 'complete') &&
-            renderActiveOrCompleteState()}
-          {recoveryState === 'error' && renderErrorState()}
-        </ScrollView>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ flexGrow: 1 }}
+        scrollEnabled={recoveryState !== 'recovering'}>
+        {recoveryState === 'idle' && renderIdleState()}
+        {(recoveryState === 'recovering' || recoveryState === 'complete') &&
+          renderActiveOrCompleteState()}
+        {recoveryState === 'error' && renderErrorState()}
+      </ScrollView>
     </ScreenWrapper>
   );
 };
@@ -909,6 +747,10 @@ function tryHostname(url: string): string {
   }
 }
 
+function getMintDisplayName(mint: Mint | undefined, fallbackUrl: string): string {
+  return mint?.mintInfo?.name || tryHostname(fallbackUrl);
+}
+
 const MintRecoveryRow: React.FC<{
   mintUrl: string;
   mint?: Mint;
@@ -916,21 +758,16 @@ const MintRecoveryRow: React.FC<{
   currentIndex: number;
   result?: RecoveryResult;
 }> = ({ mintUrl, mint, index, currentIndex, result }) => {
-  const [foreground, green400, red400] = useThemeColor([
-    'foreground',
-    'green-400',
-    'red-400',
-  ] as const);
+  const foreground = useThemeColor('foreground');
   const { balances: liveBalances } = useBalanceContext();
   const mintBalance = liveBalances.byMint[mintUrl]?.total || 0;
 
   const allActive = currentIndex === -1;
   const hasResult = result?.durationMs != null;
   const isActive = allActive ? !hasResult : index === currentIndex;
-  const isComplete = allActive ? hasResult : index < currentIndex;
   const isPending = allActive ? false : index > currentIndex;
 
-  const displayName = mint?.mintInfo?.name || tryHostname(mintUrl);
+  const displayName = getMintDisplayName(mint, mintUrl);
 
   return (
     <HStack spacing={12} className="items-center">
@@ -953,9 +790,10 @@ const MintRecoveryRow: React.FC<{
         </Text>
       </VStack>
       <View style={{ width: 24, flexShrink: 0, alignItems: 'center' }}>
-        <PaymentStatusIcon
+        <LoadingIndicator
           size={24}
-          status={isActive ? 'pending' : result?.success ? 'confirmed' : 'failed'}
+          phase={isActive ? 'loading' : 'done'}
+          result={result?.success ? 'success' : 'error'}
         />
       </View>
     </HStack>

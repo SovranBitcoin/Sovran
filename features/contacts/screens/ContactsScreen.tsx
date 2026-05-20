@@ -1,60 +1,89 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import Icon from 'assets/icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
-import opacity from 'hex-color-opacity';
 
+import { router } from 'expo-router';
+import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
+import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
-import { useRecentContacts } from '@/features/payments/hooks/useRecentContacts';
-import { useMintContacts } from '@/features/payments/hooks/useMintContacts';
+import { useRecentContacts, type RecentContact } from '@/features/payments/hooks/useRecentContacts';
+import { useMintContacts, type MintContact } from '@/features/payments/hooks/useMintContacts';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
 import {
+  bleIdentity,
   ContactRow,
   geohashIdentity,
   mintIdentity,
   nostrIdentity,
   type Identity,
 } from '@/shared/ui/composed/ContactRow';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
+import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { ScreenContainer } from '../components/ScreenContainer';
-import { navigateToContact } from '../lib/navigateToProfile';
-import { SearchFilters } from '../components/search/SearchFilters';
+import { navigateToProfile } from '../lib/navigateToProfile';
+import {
+  SearchFilters,
+  SEARCH_FILTERS_HEIGHT,
+  type ContactsFilter,
+} from '../components/search/SearchFilters';
 import {
   useWhitenoiseRequests,
   type WhitenoiseRequest,
 } from '@/features/whitenoise/hooks/useWhitenoiseRequests';
 import { useWhitenoiseDmContacts } from '@/features/whitenoise/hooks/useWhitenoiseDmContacts';
+import { useBitchatDmContacts } from '@/features/bitchat/hooks/useBitchatDmContacts';
 import { RequestActions } from '@/features/whitenoise/components/RequestActions';
-import { SEARCH_FILTERS_HEIGHT } from '../lib/constants/styles';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
-import { isValidGeohash } from 'bitchat-module';
+import { parseGeohashQuery } from '../lib/parseGeohashQuery';
+import { matchTiers } from '../lib/matchTiers';
+import type { NostrProfileMetadata } from '@/shared/stores/global/nostrMetadataCache';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { MOCK_ALLOWED_PUBKEYS_HEX } from '@/shared/stores/runtime/mockDataStore';
 
 type TopTab = 'contacts' | 'groups';
 
+interface WhitenoiseRequestRow {
+  type: 'request';
+  pubkey: string;
+  request: WhitenoiseRequest;
+}
+
 /**
- * Bare geohash detection for the Groups pill header.
- * (All pill's geohash handling lives in `useAllSearchResults` + `SearchResultsList`.)
+ * Persisted Bitchat (BLE) DM-peer row. Distinct from `RecentContact` because
+ * peerIDs aren't Nostr pubkeys — they're 16-hex BLE identifiers, addressed
+ * through a different navigation pathway (`/(user-flow)/bitchatDM`).
  */
-function parseGeohashQuery(trimmed: string): string | null {
-  if (!trimmed) return null;
-  const hash = trimmed.startsWith('#')
-    ? trimmed.slice(1).toLowerCase()
-    : trimmed.toLowerCase();
-  if (hash.length < 2) return null;
-  if (!isValidGeohash(hash)) return null;
-  if (!trimmed.startsWith('#') && /\s/.test(trimmed)) return null;
-  return hash;
+interface BitchatDmContactRow {
+  type: 'bitchat-dm';
+  peerID: string;
+  nickname: string;
+  timestamp: number;
+}
+
+type ContactsListItem = RecentContact | MintContact | WhitenoiseRequestRow | BitchatDmContactRow;
+
+// Hostname extraction for mint URL search. Pure; hoisted so the reference is
+// stable across renders (each list filter pass would otherwise allocate a
+// fresh closure).
+function mintHost(url: string | undefined): string {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return url.toLowerCase();
+  }
 }
 
 function GeohashJumpRow({ geohash }: { geohash: string }) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   return (
     <ContactRow
       identity={geohashIdentity(geohash, {
@@ -65,10 +94,11 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
       subtitle="Open geohash chat channel"
       trailingVariant="chevron"
       onPress={() => {
+        paymentLog.info('contact.geohash.press', { geohash, source: 'contacts' });
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: { geohash },
-        } as any);
+        });
       }}
       testID={`contact-row:geohash:${geohash}`}
     />
@@ -76,7 +106,7 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
 }
 
 function GroupsTierRow({ tier }: { tier: TierEntry }) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   return (
     <ContactRow
       identity={geohashIdentity(tier.geohash, {
@@ -87,6 +117,11 @@ function GroupsTierRow({ tier }: { tier: TierEntry }) {
       })}
       trailingVariant="chevron"
       onPress={() => {
+        paymentLog.info('contact.tier.press', {
+          tier: tier.key,
+          transport: tier.transport,
+          source: 'contacts',
+        });
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: {
@@ -94,7 +129,7 @@ function GroupsTierRow({ tier }: { tier: TierEntry }) {
             tierLabel: tier.label,
             transport: tier.transport,
           },
-        } as any);
+        });
       }}
       testID={`contact-row:geohash:${tier.geohash}`}
     />
@@ -105,15 +140,18 @@ export const ContactsScreen = () => {
   useLifecycleLogger('ContactsScreen');
   const { isSearching, searchQuery } = useSearchContext();
   const [activeTab, setActiveTab] = useState<TopTab>('contacts');
-  const [activeFilter, setActiveFilter] = useState('All');
-  const lastSearchFilterRef = useRef<string>('All');
-  const [foreground, surface, separator, accent] = useThemeColor([
-    'foreground',
+  const [activeFilter, setActiveFilter] = useState<ContactsFilter>('All');
+  const lastSearchFilterRef = useRef<ContactsFilter>('All');
+  const [surface, separator, muted] = useThemeColor([
     'surface',
     'separator-secondary',
-    'accent',
+    'muted',
   ] as const);
   const { tiers: locationTiers } = useLocationTiers();
+  const tabBarPadding = useTabBarBottomPadding();
+  const pullToAi = usePullToAiRefreshControl();
+  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
+  const mockMode = useSettingsStore((state) => state.mockMode);
 
   // When the search closes, restore the outer tab. If the user was on the
   // "Groups" pill, surface the groups list they were browsing.
@@ -151,8 +189,8 @@ export const ContactsScreen = () => {
     decline: declineWhitenoiseRequest,
   } = useWhitenoiseRequests();
   const requestPubkeys = useMemo(
-    () => whitenoiseRequests.map((r) => r.fromPubkey),
-    [whitenoiseRequests]
+    () => (whitenoiseEnabled ? whitenoiseRequests.map((r) => r.fromPubkey) : []),
+    [whitenoiseEnabled, whitenoiseRequests]
   );
 
   // Accepted Marmot DM counterparties — Marmot uses kind-445 group events,
@@ -161,9 +199,14 @@ export const ContactsScreen = () => {
   // sources below.
   const { entries: whitenoiseDmEntries } = useWhitenoiseDmContacts();
   const whitenoiseContactPubkeys = useMemo(
-    () => whitenoiseDmEntries.map((e) => e.pubkey),
-    [whitenoiseDmEntries]
+    () => (whitenoiseEnabled ? whitenoiseDmEntries.map((e) => e.pubkey) : []),
+    [whitenoiseEnabled, whitenoiseDmEntries]
   );
+
+  // Persisted Bitchat (BLE) DM history — peers we've privately messaged in
+  // any session. Native bridge keeps a UserDefaults-backed map of
+  // { peerID, nickname, lastTimestamp } so the list survives app kills.
+  const { contacts: bitchatDmContacts } = useBitchatDmContacts();
 
   // Profile metadata is served from the shared SWR cache. Cache hits
   // paint immediately; misses/stale entries trigger one batched kind-0
@@ -180,12 +223,12 @@ export const ContactsScreen = () => {
         ...whitenoiseContactPubkeys,
       ]),
     ],
-    [contactPubkeys, mintPubkeys, requestPubkeys, whitenoiseContactPubkeys],
+    [contactPubkeys, mintPubkeys, requestPubkeys, whitenoiseContactPubkeys]
   );
   const { metadata: profilesMap } = useNostrProfileMetadataMany(allPubkeys);
 
   useEffect(() => {
-    prefetchImages(Array.from(profilesMap.values()).map((p) => p.picture));
+    void prefetchImages(Array.from(profilesMap.values()).map((p) => p.picture));
   }, [profilesMap]);
 
   const trimmedQuery = searchQuery.trim();
@@ -195,35 +238,22 @@ export const ContactsScreen = () => {
   // excludes the raw hex pubkey — those are 64-char hex and would false-match
   // any short alphanumeric query ("abc", "face", "123", …).
   const matchesProfileQuery = useCallback(
-    (profile: any): boolean => {
+    (profile: NostrProfileMetadata | undefined): boolean => {
       if (!lowerQuery) return true;
       if (!profile) return false;
       const candidates = [profile.name, profile.displayName, profile.nip05];
-      return candidates.some(
-        (v) => typeof v === 'string' && v.toLowerCase().includes(lowerQuery)
-      );
+      return candidates.some((v) => typeof v === 'string' && v.toLowerCase().includes(lowerQuery));
     },
     [lowerQuery]
   );
 
   const filteredDisplayContacts = useMemo(() => {
     if (!lowerQuery) return displayContacts;
-    return displayContacts.filter((c: any) => {
+    return displayContacts.filter((c) => {
       const profile = c.pubkey ? profilesMap.get(c.pubkey) : undefined;
       return matchesProfileQuery(profile);
     });
   }, [displayContacts, profilesMap, lowerQuery, matchesProfileQuery]);
-
-  // Extract a mint URL's hostname for matching. Falls back to the raw string
-  // on parse failure so a mint isn't accidentally unsearchable.
-  const mintHost = (url: string | undefined): string => {
-    if (!url) return '';
-    try {
-      return new URL(url).hostname.toLowerCase();
-    } catch {
-      return url.toLowerCase();
-    }
-  };
 
   // Only surface mints whose nostr-contact kind-0 profile has actually landed.
   // A mint with a valid npub but no profile metadata yet renders as a bare
@@ -231,13 +261,13 @@ export const ContactsScreen = () => {
   // the user. The row reappears automatically when the kind-0 event arrives
   // (this memo depends on `profilesMap`).
   const mintsWithProfile = useMemo(
-    () => displayMints.filter((m: any) => m.pubkey && profilesMap.has(m.pubkey)),
-    [displayMints, profilesMap],
+    () => displayMints.filter((m) => !!m.pubkey && profilesMap.has(m.pubkey)),
+    [displayMints, profilesMap]
   );
 
   const filteredDisplayMints = useMemo(() => {
     if (!lowerQuery) return mintsWithProfile;
-    return mintsWithProfile.filter((m: any) => {
+    return mintsWithProfile.filter((m) => {
       const name = m.mintInfo?.name;
       if (typeof name === 'string' && name.toLowerCase().includes(lowerQuery)) return true;
       if (mintHost(m.mint?.mintUrl).includes(lowerQuery)) return true;
@@ -246,30 +276,34 @@ export const ContactsScreen = () => {
     });
   }, [mintsWithProfile, profilesMap, lowerQuery, matchesProfileQuery]);
 
-  const requestRows = useMemo(
+  const requestRows = useMemo<WhitenoiseRequestRow[]>(
     () =>
-      whitenoiseRequests.map((r) => ({
-        type: 'request' as const,
-        pubkey: r.fromPubkey,
-        request: r,
-      })),
-    [whitenoiseRequests]
+      whitenoiseEnabled
+        ? whitenoiseRequests.map((r) => ({
+            type: 'request',
+            pubkey: r.fromPubkey,
+            request: r,
+          }))
+        : [],
+    [whitenoiseEnabled, whitenoiseRequests]
   );
 
   // Map accepted Marmot DM counterparties into the same row shape used by
   // useRecentContacts entries so renderContactItem (and search filtering)
   // treats them identically. timestamp 0 keeps them below entries with
   // genuine recent activity until we wire group-history reads.
-  const whitenoiseContactRows = useMemo(
+  const whitenoiseContactRows = useMemo<RecentContact[]>(
     () =>
-      whitenoiseDmEntries.map((e) => ({
-        type: 'contact' as const,
-        pubkey: e.pubkey,
-        dmEvent: null,
-        nip17Content: undefined as string | undefined,
-        timestamp: 0,
-      })),
-    [whitenoiseDmEntries]
+      whitenoiseEnabled
+        ? whitenoiseDmEntries.map((e) => ({
+            type: 'contact',
+            pubkey: e.pubkey,
+            dmEvent: null,
+            nip17Content: undefined,
+            timestamp: 0,
+          }))
+        : [],
+    [whitenoiseEnabled, whitenoiseDmEntries]
   );
 
   const filteredWhitenoiseContacts = useMemo(() => {
@@ -280,16 +314,38 @@ export const ContactsScreen = () => {
     });
   }, [whitenoiseContactRows, profilesMap, lowerQuery, matchesProfileQuery]);
 
-  const currentListData = useMemo(() => {
+  // Map BLE-DM peers into row shape. Search filters off the persisted
+  // nickname (peerIDs are opaque hex — never useful to match against).
+  const bitchatDmRows = useMemo<BitchatDmContactRow[]>(
+    () =>
+      bitchatDmContacts.map((c) => ({
+        type: 'bitchat-dm',
+        peerID: c.peerID,
+        nickname: c.nickname,
+        timestamp: c.lastTimestamp,
+      })),
+    [bitchatDmContacts]
+  );
+
+  const filteredBitchatDmRows = useMemo(() => {
+    if (!lowerQuery) return bitchatDmRows;
+    return bitchatDmRows.filter((c) => c.nickname.toLowerCase().includes(lowerQuery));
+  }, [bitchatDmRows, lowerQuery]);
+
+  const rawListData = useMemo<ContactsListItem[]>(() => {
     switch (activeFilter) {
       case 'Recent': {
         // Merge NIP-17/NIP-04 recent contacts with accepted Marmot DM
-        // counterparties, deduped by pubkey (NIP-17 entries win — they
-        // carry actual lastMessage previews).
-        const byKey = new Map<string, any>();
+        // counterparties + Bitchat BLE-DM peers, deduped by their
+        // namespaced key (peerIDs are 16-hex, nostr pubkeys 64-hex — no
+        // collision risk, but we prefix anyway to be defensive).
+        const byKey = new Map<string, ContactsListItem>();
         for (const item of filteredWhitenoiseContacts) byKey.set(item.pubkey, item);
         for (const item of filteredDisplayContacts) {
           if (item.pubkey) byKey.set(item.pubkey, item);
+        }
+        for (const item of filteredBitchatDmRows) {
+          byKey.set(`ble:${item.peerID}`, item);
         }
         return Array.from(byKey.values());
       }
@@ -298,13 +354,15 @@ export const ContactsScreen = () => {
       case 'Requests':
         return requestRows;
       default: {
-        const byKey = new Map<string, any>();
+        const byKey = new Map<string, ContactsListItem>();
         for (const item of filteredWhitenoiseContacts) {
           byKey.set(item.pubkey, item);
         }
         for (const item of filteredDisplayContacts) {
-          const key = item.pubkey || item.mint?.mintUrl;
-          if (key) byKey.set(key, item);
+          if (item.pubkey) byKey.set(item.pubkey, item);
+        }
+        for (const item of filteredBitchatDmRows) {
+          byKey.set(`ble:${item.peerID}`, item);
         }
         for (const item of filteredDisplayMints) {
           const key = item.pubkey || item.mint?.mintUrl;
@@ -318,22 +376,58 @@ export const ContactsScreen = () => {
     filteredDisplayContacts,
     filteredDisplayMints,
     filteredWhitenoiseContacts,
+    filteredBitchatDmRows,
     requestRows,
   ]);
 
-  const handleFilterChange = useCallback((filter: string) => {
+  // Mock-mode allowlist filter: only show rows whose nostr pubkey is in
+  // MOCK_ALLOWED_PUBKEYS_HEX (defined in mockDataStore). Mints / requests
+  // / BLE peers are dropped entirely so the screen reads as a clean,
+  // hardcoded demo list. The allowlisted pubkeys are seeded as default
+  // rows in useRecentContacts so they appear here even with no DMs.
+  const currentListData = useMemo<ContactsListItem[]>(() => {
+    if (!mockMode) return rawListData;
+    return rawListData.filter(
+      (item) => item.type === 'contact' && MOCK_ALLOWED_PUBKEYS_HEX.has(item.pubkey)
+    );
+  }, [rawListData, mockMode]);
+
+  const handleFilterChange = useCallback((filter: ContactsFilter) => {
     log.debug('contacts.filter_changed', { filter });
     setActiveFilter(filter);
     lastSearchFilterRef.current = filter;
   }, []);
 
   const renderContactItem = useCallback(
-    ({ item }: { item: any }) => {
+    ({ item }: { item: ContactsListItem }) => {
+      // Bitchat BLE-DM peer (from persisted DM history). Different namespace
+      // than nostr contacts: peerIDs aren't pubkeys, so no profile lookup —
+      // we render with the seeded ble identity and route to the BLE DM screen.
+      if (item.type === 'bitchat-dm') {
+        return (
+          <ContactRow
+            identity={bleIdentity({ peerID: item.peerID, nickname: item.nickname })}
+            onPress={() => {
+              paymentLog.info('contact.bitchat.press', { peerID: item.peerID });
+              router.push({
+                pathname: '/(user-flow)/bitchatDM',
+                params: {
+                  transport: 'ble-dm',
+                  peerID: item.peerID,
+                  nickname: item.nickname,
+                },
+              });
+            }}
+            testID={`contact-row:ble:${item.peerID}`}
+          />
+        );
+      }
+
       // White Noise pending invite — keep it in this list so the empty/
       // loading/scrolling behaviour is the same as the other pills, but
       // swap the trailing slot for accept/decline buttons.
       if (item.type === 'request') {
-        const req: WhitenoiseRequest = item.request;
+        const req = item.request;
         const profile = profilesMap.get(req.fromPubkey);
         // Strangers' kind-0 metadata may simply not be on the user's
         // default relay set — that's the whole point of a "request". So
@@ -343,16 +437,20 @@ export const ContactsScreen = () => {
         // displayName replaces the truncated-pubkey fallback.
         return (
           <ContactRow
-            identity={[
-              nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false }),
-            ]}
+            identity={[nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false })]}
             subtitle="Wants to start a White Noise chat"
             hideMetadata
             trailing={
               <RequestActions
                 isBusy={whitenoiseBusyId === req.id}
-                onAccept={() => void acceptWhitenoiseRequest(req)}
-                onDecline={() => void declineWhitenoiseRequest(req)}
+                onAccept={() => {
+                  paymentLog.info('contact.whitenoise.accept', { pubkey: req.fromPubkey });
+                  void acceptWhitenoiseRequest(req);
+                }}
+                onDecline={() => {
+                  paymentLog.info('contact.whitenoise.decline', { pubkey: req.fromPubkey });
+                  void declineWhitenoiseRequest(req);
+                }}
               />
             }
             testID={`request-row:${req.fromPubkey}`}
@@ -361,7 +459,8 @@ export const ContactsScreen = () => {
       }
 
       const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
-      const lastMessage = item.dmEvent?.content as string | undefined;
+      const lastMessage =
+        typeof item.dmEvent?.content === 'string' ? item.dmEvent.content : undefined;
       // Don't drive the avatar's loading skeleton off "profile is missing":
       // for strangers (Marmot DM accept, Requests pill) kind-0 may simply
       // not be on our relay set, so missing IS the steady state. With
@@ -369,7 +468,7 @@ export const ContactsScreen = () => {
       // avatar plus deterministic word-pair name renders immediately —
       // no skeleton-forever rows.
       const isLoadingProfile = false;
-      const mintUrl: string | undefined = item.mint?.mintUrl;
+      const mintUrl = item.type === 'mint' ? item.mint?.mintUrl : undefined;
 
       // Layered identity: mint-type items also have a nostr contact key
       // (NIP-87 / NUT-06), so render the mint avatar/name with the nostr
@@ -381,7 +480,7 @@ export const ContactsScreen = () => {
             mintUrl,
             displayName: item.mintInfo?.name ?? mintUrl,
             iconUrl: item.mintInfo?.icon_url,
-          }),
+          })
         );
       }
       if (item.pubkey) {
@@ -397,33 +496,26 @@ export const ContactsScreen = () => {
           identity={identity}
           subtitle={lastMessage}
           hideMetadata={!!lastMessage}
-          onPress={() => navigateToContact(item.pubkey, mintUrl)}
+          onPress={() => navigateToProfile(item.pubkey, mintUrl)}
           testID={`contact-row:nostr:${item.pubkey}`}
         />
       );
     },
-    [
-      profilesMap,
-      whitenoiseBusyId,
-      acceptWhitenoiseRequest,
-      declineWhitenoiseRequest,
-    ]
+    [profilesMap, whitenoiseBusyId, acceptWhitenoiseRequest, declineWhitenoiseRequest]
   );
 
   const renderEmpty = useCallback(() => {
     if (activeFilter === 'Mints' && mintInfoLoading) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
-            Loading mints...
-          </Text>
+          <Text style={[styles.emptyText, { color: muted }]}>Loading mints...</Text>
         </View>
       );
     }
     return (
       <View style={styles.emptyContainer}>
-        <Icon name="mdi:account-group" size={30} color={opacity(foreground, 0.3)} />
-        <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
+        <Icon name="mdi:account-group" size={30} color={muted} />
+        <Text style={[styles.emptyText, { color: muted }]}>
           {activeFilter === 'Mints'
             ? 'No mints with nostr contacts found'
             : activeFilter === 'Requests'
@@ -432,40 +524,34 @@ export const ContactsScreen = () => {
         </Text>
       </View>
     );
-  }, [foreground, activeFilter, mintInfoLoading]);
+  }, [muted, activeFilter, mintInfoLoading]);
 
   // Groups pill: filter tiers by label (e.g. "Province") or reverse-geocoded
-  // displayName (e.g. "United Kingdom"). Case-insensitive prefix/substring.
-  // (Mirrors the matching in `useAllSearchResults` so Groups pill and All pill
-  // stay consistent for tier hits.)
-  const matchingTiers = useMemo(() => {
-    if (!lowerQuery) return [];
-    return locationTiers.filter((tier: TierEntry) => {
-      if (tier.transport === 'ble') {
-        return tier.label.toLowerCase().startsWith(lowerQuery) && lowerQuery.length >= 3;
-      }
-      if (tier.label.toLowerCase().startsWith(lowerQuery)) return true;
-      if (tier.displayName?.toLowerCase().includes(lowerQuery)) return true;
-      return false;
-    });
-  }, [lowerQuery, locationTiers]);
+  // displayName (e.g. "United Kingdom"). Shared with `useAllSearchResults`
+  // so Groups pill and All pill stay consistent for tier hits.
+  const matchingTiers = useMemo(
+    () => matchTiers(locationTiers, lowerQuery),
+    [lowerQuery, locationTiers]
+  );
 
   // Groups pill still surfaces the geohash jump row as a list header.
-  const groupsGeohashQuery = useMemo(
-    () => parseGeohashQuery(trimmedQuery),
-    [trimmedQuery]
-  );
+  const groupsGeohashQuery = useMemo(() => parseGeohashQuery(trimmedQuery), [trimmedQuery]);
 
   // Pill visibility:
   //   • No active search → base pills (Groups lives in the outer tab bar).
   //   • Search open, empty query → all pills so the user can pick a scope.
   //   • Search open with a query → only pills that have at least one match.
-  const visibleFilters = useMemo<readonly string[]>(() => {
-    if (!isSearching) return ['All', 'Recent', 'Requests', 'Mints'];
-    if (!lowerQuery) return ['All', 'Recent', 'Requests', 'Mints', 'Groups'];
-    const list: string[] = ['All'];
-    if (filteredDisplayContacts.length > 0) list.push('Recent');
-    if (whitenoiseRequests.length > 0) list.push('Requests');
+  const visibleFilters = useMemo<readonly ContactsFilter[]>(() => {
+    const baseFilters: ContactsFilter[] = ['All', 'Recent'];
+    if (whitenoiseEnabled) baseFilters.push('Requests');
+    baseFilters.push('Mints');
+    if (!isSearching) return baseFilters;
+    if (!lowerQuery) return [...baseFilters, 'Groups'];
+    const list: ContactsFilter[] = ['All'];
+    if (filteredDisplayContacts.length > 0 || filteredBitchatDmRows.length > 0) {
+      list.push('Recent');
+    }
+    if (whitenoiseEnabled && whitenoiseRequests.length > 0) list.push('Requests');
     if (filteredDisplayMints.length > 0) list.push('Mints');
     if (matchingTiers.length > 0 || groupsGeohashQuery) list.push('Groups');
     return list;
@@ -474,6 +560,8 @@ export const ContactsScreen = () => {
     lowerQuery,
     filteredDisplayContacts,
     filteredDisplayMints,
+    filteredBitchatDmRows,
+    whitenoiseEnabled,
     whitenoiseRequests,
     matchingTiers,
     groupsGeohashQuery,
@@ -490,47 +578,45 @@ export const ContactsScreen = () => {
   }, [visibleFilters, activeFilter]);
 
   // ===========================
-  // TOP TABS (hidden while searching)
+  // TOP TABS (hidden while searching). Labels are display-only; the index
+  // -> TopTab map below preserves the internal 'contacts'/'groups' state
+  // type so the rest of the screen (effectiveTab, useEffect resets, etc.)
+  // stays unchanged.
   // ===========================
 
-  const renderTab = useCallback(
-    (tab: TopTab, label: string) => {
-      const isActive = activeTab === tab;
-      return (
-        <Pressable
-          key={tab}
-          onPress={() => setActiveTab(tab)}
-          style={[
-            styles.tab,
-            isActive && { borderBottomColor: accent, borderBottomWidth: 2 },
-          ]}>
-          <Text
-            style={[
-              styles.tabLabel,
-              { color: isActive ? foreground : opacity(foreground, 0.4) },
-              isActive && styles.tabLabelActive,
-            ]}>
-            {label}
-          </Text>
-        </Pressable>
-      );
-    },
-    [activeTab, foreground, accent]
-  );
+  const TOP_TAB_KEYS: readonly TopTab[] = ['contacts', 'groups'];
+  const TOP_TAB_LABELS = ['Contacts', 'Groups'] as const;
+  const activeTabLabel = TOP_TAB_LABELS[TOP_TAB_KEYS.indexOf(activeTab)] ?? 'Contacts';
+  const handleTopTabPress = useCallback((_tab: string, index: number) => {
+    const nextKey = TOP_TAB_KEYS[index];
+    if (nextKey) setActiveTab(nextKey);
+  }, []);
 
   // --- Render helpers ---
 
   const renderContactsList = () => (
     <LegendList
       data={currentListData}
-      extraData={profilesMap.size}
+      extraData={profilesMap}
       estimatedItemSize={68}
-      keyExtractor={(item, index) => item.pubkey || item.mint?.mintUrl || `contact-${index}`}
+      refreshControl={pullToAi.refreshControl}
+      keyExtractor={(item, index) => {
+        if (item.type === 'bitchat-dm') return `ble:${item.peerID}`;
+        return (
+          item.pubkey ||
+          (item.type === 'mint' ? item.mint?.mintUrl : undefined) ||
+          `contact-${index}`
+        );
+      }}
       renderItem={renderContactItem}
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="always"
       ListEmptyComponent={renderEmpty}
-      contentContainerStyle={currentListData.length === 0 ? styles.emptyList : undefined}
+      contentContainerStyle={
+        currentListData.length === 0
+          ? [styles.emptyList, { paddingBottom: tabBarPadding }]
+          : { paddingBottom: tabBarPadding }
+      }
     />
   );
 
@@ -544,6 +630,7 @@ export const ContactsScreen = () => {
         data={tierData}
         estimatedItemSize={68}
         keyExtractor={(item) => item.key}
+        refreshControl={pullToAi.refreshControl}
         renderItem={({ item }) => <GroupsTierRow tier={item} />}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
@@ -553,55 +640,62 @@ export const ContactsScreen = () => {
         ListEmptyComponent={
           !groupsGeohashQuery ? (
             <View style={styles.emptyContainer}>
-              <Icon name="mdi:map-marker-radius" size={30} color={opacity(foreground, 0.3)} />
-              <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
+              <Icon name="mdi:map-marker-radius" size={30} color={muted} />
+              <Text style={[styles.emptyText, { color: muted }]}>
                 {trimmedQuery ? 'No matching groups' : 'Getting your location...'}
               </Text>
             </View>
           ) : null
         }
         contentContainerStyle={
-          tierData.length === 0 && !groupsGeohashQuery ? styles.emptyList : undefined
+          tierData.length === 0 && !groupsGeohashQuery
+            ? [styles.emptyList, { paddingBottom: tabBarPadding }]
+            : { paddingBottom: tabBarPadding }
         }
       />
     );
   };
 
-  // Decide which body to render. Groups view wins if either the outer tab
-  // is Groups OR the Contacts-tab filter pill is 'Groups' (which is only
-  // selectable during search). Otherwise on Contacts tab: All-search when
-  // there's a query, otherwise the filtered local list.
+  // While searching, the outer Groups tab is folded into the Contacts
+  // search flow — same pill bar, same unified SearchResultsList. The user
+  // never sees a separate "Groups search". `activeTab` itself is left
+  // alone so closing the search restores the original outer tab.
+  const effectiveTab: TopTab = isSearching ? 'contacts' : activeTab;
+
+  // Decide which body to render. Groups view wins if either the (effective)
+  // outer tab is Groups OR the Contacts-tab filter pill is 'Groups' (which
+  // is only selectable during search). Otherwise on Contacts tab: All-search
+  // when there's a query, otherwise the filtered local list.
   const showGroupsBody =
-    activeTab === 'groups' || (activeTab === 'contacts' && activeFilter === 'Groups');
+    effectiveTab === 'groups' || (effectiveTab === 'contacts' && activeFilter === 'Groups');
 
   const showAllSearch =
-    activeTab === 'contacts' &&
-    activeFilter === 'All' &&
-    isSearching &&
-    trimmedQuery.length > 0;
+    effectiveTab === 'contacts' && activeFilter === 'All' && isSearching && trimmedQuery.length > 0;
 
   return (
-    <Screen name="ContactsScreen" style={styles.root}>
+    <Log name="ContactsScreen" style={[styles.root, { backgroundColor: surface }]}>
       {/* Outer tabs — hidden while searching; search scope is the pill bar below. */}
       {!isSearching && (
         <View
-          style={[
-            styles.tabBar,
-            {
-              backgroundColor: surface,
-              borderBottomWidth: 0.5,
-              borderBottomColor: separator,
-            },
-          ]}>
-          {renderTab('contacts', 'Contacts')}
-          {renderTab('groups', 'Groups')}
+          style={{
+            backgroundColor: surface,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: separator,
+          }}>
+          <UnderlineTabs
+            tabs={TOP_TAB_LABELS}
+            selectedTab={activeTabLabel}
+            handleTabPress={handleTopTabPress}
+          />
         </View>
       )}
 
-      {/* Pill bar — only on Contacts tab. Groups tab owns its own filtering
-          (matching tiers + geohash header) without needing pills.
-          The `Groups` pill is added to the SearchFilters only while searching. */}
-      {activeTab === 'contacts' && (
+      {/* Pill bar — shown on the Contacts tab and during search (when the
+          outer Groups tab is folded into the Contacts search flow). Groups
+          tab in its idle state owns its own filtering (matching tiers +
+          geohash header) without needing pills. The `Groups` pill is added
+          to the SearchFilters only while searching. */}
+      {effectiveTab === 'contacts' && (
         <Animated.View
           entering={FadeIn.duration(200)}
           style={[
@@ -609,7 +703,7 @@ export const ContactsScreen = () => {
             {
               backgroundColor: surface,
               paddingHorizontal: 20,
-              borderBottomWidth: 0.5,
+              borderBottomWidth: StyleSheet.hairlineWidth,
               borderBottomColor: separator,
             },
           ]}>
@@ -622,35 +716,21 @@ export const ContactsScreen = () => {
       )}
 
       <ScreenContainer>
-        {showGroupsBody
-          ? renderGroupsList()
-          : showAllSearch
-            ? <SearchResultsList searchQuery={searchQuery} />
-            : renderContactsList()}
+        {showGroupsBody ? (
+          renderGroupsList()
+        ) : showAllSearch ? (
+          <SearchResultsList searchQuery={searchQuery} />
+        ) : (
+          renderContactsList()
+        )}
       </ScreenContainer>
-    </Screen>
+    </Log>
   );
 };
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  tabBar: {
-    flexDirection: 'row',
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabLabel: {
-    fontSize: 16,
-  },
-  tabLabelActive: {
-    fontWeight: '600',
   },
   filtersRow: {
     height: SEARCH_FILTERS_HEIGHT,

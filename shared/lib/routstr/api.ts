@@ -1,7 +1,87 @@
-import OpenAI from 'openai';
+import { z } from 'zod';
 import { apiLog } from '../logger';
+import { buildAbortSignal, isAbortError } from '../apiClient';
+import { type RequestControls } from 'coco-payment-ux';
 
 const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
+
+/**
+ * Per-request budget for routstr endpoints. The chat APIs can take longer
+ * than the wallet's `DEFAULT_TIMEOUT_MS` (10s) — match the streaming-side
+ * 60s budget for the bare-fetch endpoints so a slow upstream doesn't
+ * surface as a fake timeout.
+ */
+const ROUTSTR_TIMEOUT_MS = 30_000;
+
+/**
+ * Minimal shape of an OpenAI-compatible chat completion stream chunk —
+ * captures the fields useAiSend.ts actually reads (`choices[0].delta.*`).
+ * Defining locally avoids shipping the full `openai` SDK in production.
+ *
+ * Validated at the SSE-chunk boundary by `ChatCompletionChunkSpine` below
+ * so a malformed line warns-and-skips rather than crashing the stream.
+ */
+const ChatCompletionDeltaSpine = z
+  .object({
+    content: z.string().nullish(),
+    reasoning_content: z.string().nullish(),
+    reasoning: z.string().nullish(),
+    message: z.object({ content: z.string().nullish() }).passthrough().nullish(),
+    text: z.string().nullish(),
+  })
+  .passthrough();
+
+const ChatCompletionChunkSpine = z
+  .object({
+    choices: z
+      .array(
+        z
+          .object({
+            delta: ChatCompletionDeltaSpine.optional(),
+            finish_reason: z.string().nullish(),
+          })
+          .passthrough()
+      )
+      .optional(),
+  })
+  .passthrough();
+
+type ChatCompletionChunk = z.infer<typeof ChatCompletionChunkSpine>;
+
+/**
+ * Spine validators for the JSON envelopes routstr returns. Like
+ * `apiClient.MintInfoSpine`, these intentionally validate only the fields
+ * we read — Postel's Law leaves room for the upstream to add fields without
+ * forcing a Sovran release. Hostile or misconfigured upstreams that mangle
+ * `balance` or `data` into non-numbers/non-arrays are rejected before they
+ * reach the wallet UI.
+ */
+const ModelsResponseSpine = z
+  .object({
+    data: z.array(
+      z
+        .object({
+          enabled: z.boolean().optional(),
+        })
+        .passthrough()
+    ),
+  })
+  .passthrough();
+
+const BalanceSpine = z
+  .object({
+    balance: z.number().optional(),
+    total_spent: z.number().optional(),
+    api_key: z.string().optional(),
+    reserved: z.number().optional(),
+  })
+  .passthrough();
+
+const TopUpSpine = z
+  .object({
+    msats: z.number().optional(),
+  })
+  .passthrough();
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -153,6 +233,12 @@ async function throwResponseError(response: Response): Promise<never> {
 /** Wrap a caught unknown into a RoutstrError (re-throws if already one). */
 function toRoutstrError(error: unknown): never {
   if (error && typeof error === 'object' && 'status' in error) throw error;
+  if (isAbortError(error)) {
+    throw {
+      status: 0,
+      error: { message: 'Request cancelled', type: 'aborted' },
+    } as RoutstrError;
+  }
   const message =
     error instanceof Error ? error.message : typeof error === 'string' ? error : 'Network error';
   throw { status: 0, error: { message, type: 'network_error' } } as RoutstrError;
@@ -209,30 +295,28 @@ interface ModelsResponse {
   data: RoutstrModel[];
 }
 
-// ── Client ───────────────────────────────────────────────────────────────
-
-function createRoutstrClient(apiKey: string): OpenAI {
-  return new OpenAI({
-    apiKey,
-    baseURL: ROUTSTR_BASE_URL,
-    timeout: 60_000,
-    maxRetries: 2,
-  });
-}
-
 // ── Public API ───────────────────────────────────────────────────────────
 
-export async function getModels(): Promise<RoutstrModel[]> {
+export async function getModels(controls: RequestControls = {}): Promise<RoutstrModel[]> {
   apiLog.info('api.routstr.models.start');
   const start = performance.now();
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/models`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
+      signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
     if (!response.ok) await throwResponseError(response);
 
-    const data: ModelsResponse = await response.json();
+    const raw = await response.json();
+    const validated = ModelsResponseSpine.safeParse(raw);
+    if (!validated.success) {
+      apiLog.warn('api.routstr.models.invalid_shape', {
+        issues: validated.error.issues.length,
+      });
+      throw new Error('Routstr /models returned a malformed envelope');
+    }
+    const data = validated.data as unknown as ModelsResponse;
     const enabled = data.data.filter((model) => model.enabled);
     apiLog.info('api.routstr.models.success', {
       count: enabled.length,
@@ -248,7 +332,10 @@ export async function getModels(): Promise<RoutstrModel[]> {
   }
 }
 
-export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
+export async function checkBalance(
+  apiKey: string,
+  controls: RequestControls = {}
+): Promise<BalanceResponse> {
   apiLog.debug('api.routstr.balance.start', { hasApiKey: !!apiKey, keyLength: apiKey?.length });
   const start = performance.now();
   try {
@@ -257,6 +344,7 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
+      signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
     apiLog.debug('api.routstr.balance.response', {
       status: response.status,
@@ -264,12 +352,20 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
     });
     if (!response.ok) await throwResponseError(response);
 
-    const data = await response.json();
+    const raw = await response.json();
+    const validated = BalanceSpine.safeParse(raw);
+    if (!validated.success) {
+      apiLog.warn('api.routstr.balance.invalid_shape', {
+        issues: validated.error.issues.length,
+      });
+      throw new Error('Routstr /wallet/info returned a malformed envelope');
+    }
+    const data = validated.data;
     const result = {
-      balance: data.balance || 0,
-      total_spent: data.total_spent || 0,
+      balance: data.balance ?? 0,
+      total_spent: data.total_spent ?? 0,
       api_key: data.api_key,
-      reserved: data.reserved || 0,
+      reserved: data.reserved ?? 0,
     };
     apiLog.info('api.routstr.balance.success', {
       balance: result.balance,
@@ -288,7 +384,11 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
   }
 }
 
-export async function topUpBalance(apiKey: string, cashuToken: string): Promise<TopUpResponse> {
+export async function topUpBalance(
+  apiKey: string,
+  cashuToken: string,
+  controls: RequestControls = {}
+): Promise<TopUpResponse> {
   apiLog.info('api.routstr.wallet.topup.start', { tokenLength: cashuToken?.length });
   const start = performance.now();
   try {
@@ -299,6 +399,7 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ cashu_token: cashuToken }),
+      signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
     apiLog.debug('api.routstr.wallet.topup.response', {
       status: response.status,
@@ -306,8 +407,15 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
     });
     if (!response.ok) await throwResponseError(response);
 
-    const data = await response.json();
-    const result = { added_amount: data.msats || 0 };
+    const raw = await response.json();
+    const validated = TopUpSpine.safeParse(raw);
+    if (!validated.success) {
+      apiLog.warn('api.routstr.wallet.topup.invalid_shape', {
+        issues: validated.error.issues.length,
+      });
+      throw new Error('Routstr /wallet/topup returned a malformed envelope');
+    }
+    const result = { added_amount: validated.data.msats ?? 0 };
     apiLog.info('api.routstr.wallet.topup.success', {
       addedAmount: result.added_amount,
       duration_ms: Math.round(performance.now() - start),
@@ -326,9 +434,7 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
  * Parse SSE stream manually for React Native compatibility.
  * Uses ReadableStream when available, falls back to full-text parsing.
  */
-async function* parseSSEStream(
-  response: Response
-): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+async function* parseSSEStream(response: Response): AsyncGenerator<ChatCompletionChunk> {
   const hasReadableStream = response.body && typeof response.body.getReader === 'function';
   apiLog.debug('routstr.sse.start', {
     hasReadableStream,
@@ -343,25 +449,33 @@ async function* parseSSEStream(
   yield* parseSSEFromText(await response.text());
 }
 
-function tryParseSSELine(
-  line: string
-): OpenAI.Chat.Completions.ChatCompletionChunk | 'done' | null {
+function tryParseSSELine(line: string): ChatCompletionChunk | 'done' | null {
   const trimmed = line.trim();
   if (!trimmed || !trimmed.startsWith('data: ')) return null;
   const data = trimmed.slice(6).trim();
   if (data === '[DONE]') return 'done';
   if (!data) return null;
+  let raw: unknown;
   try {
-    return JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
+    raw = JSON.parse(data);
   } catch {
     apiLog.warn('routstr.sse.parse_failed', { preview: data.substring(0, 100) });
     return null;
   }
+  const validated = ChatCompletionChunkSpine.safeParse(raw);
+  if (!validated.success) {
+    apiLog.warn('routstr.sse.invalid_shape', {
+      issues: validated.error.issues.length,
+      preview: data.substring(0, 100),
+    });
+    return null;
+  }
+  return validated.data;
 }
 
 async function* parseSSEFromReadableStream(
   body: ReadableStream<Uint8Array>
-): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+): AsyncGenerator<ChatCompletionChunk> {
   const reader = body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
@@ -421,7 +535,7 @@ async function* parseSSEFromReadableStream(
   }
 }
 
-function* parseSSEFromText(text: string): Generator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+function* parseSSEFromText(text: string): Generator<ChatCompletionChunk> {
   for (const line of text.split('\n')) {
     const result = tryParseSSELine(line);
     if (result === 'done') return;
@@ -436,17 +550,13 @@ export async function sendMessage(
     model?: string;
     temperature?: number;
     max_tokens?: number;
-    stream?: boolean;
+    signal?: AbortSignal;
   } = {}
-): Promise<{
-  response?: OpenAI.Chat.Completions.ChatCompletion;
-  stream?: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
-}> {
-  const { model = 'gpt-3.5-turbo', temperature = 0.7, max_tokens, stream = false } = options;
+): Promise<{ stream: AsyncIterable<ChatCompletionChunk> }> {
+  const { model = 'gpt-3.5-turbo', temperature = 0.7, max_tokens, signal } = options;
   const totalTokens = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
   apiLog.info('api.routstr.chat.start', {
     model,
-    stream,
     messageCount: messages.length,
     totalInputChars: totalTokens,
     temperature,
@@ -455,50 +565,35 @@ export async function sendMessage(
   const start = performance.now();
 
   try {
-    if (stream) {
-      const response = await fetch(`${ROUTSTR_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature,
-          ...(max_tokens != null && { max_tokens }),
-          stream: true,
-        }),
-      });
-      const requestId = response.headers.get('x-routstr-request-id') || undefined;
-      apiLog.debug('api.routstr.chat.response_received', {
-        status: response.status,
-        requestId,
-        duration_ms: Math.round(performance.now() - start),
-      });
-      if (!response.ok) await throwResponseError(response);
-
-      apiLog.info('api.routstr.chat.stream_started', {
+    const response = await fetch(`${ROUTSTR_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         model,
-        requestId,
-        ttfb_ms: Math.round(performance.now() - start),
-      });
-      return { stream: parseSSEStream(response) };
-    }
-
-    const client = createRoutstrClient(apiKey);
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      temperature,
-      ...(max_tokens != null && { max_tokens }),
-      stream: false,
+        messages,
+        temperature,
+        ...(max_tokens != null && { max_tokens }),
+        stream: true,
+      }),
+      signal,
     });
-    apiLog.info('api.routstr.chat.success', {
-      model,
+    const requestId = response.headers.get('x-routstr-request-id') || undefined;
+    apiLog.debug('api.routstr.chat.response_received', {
+      status: response.status,
+      requestId,
       duration_ms: Math.round(performance.now() - start),
     });
-    return { response };
+    if (!response.ok) await throwResponseError(response);
+
+    apiLog.info('api.routstr.chat.stream_started', {
+      model,
+      requestId,
+      ttfb_ms: Math.round(performance.now() - start),
+    });
+    return { stream: parseSSEStream(response) };
   } catch (error: unknown) {
     apiLog.error('api.routstr.chat.failed', {
       model,

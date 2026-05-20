@@ -26,22 +26,15 @@
  */
 
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import {
-  getContrastColors,
-  useDominantColor,
-} from '@/shared/lib/colorExtraction';
-// `#F7931A` — bitcoin orange, already used in `shared/lib/themeEngine.ts`
-// as `orange-300` and in `shared/lib/map/mapClustering.ts` for the same
-// semantic cue ("bitcoin-accepting spot"). Using the raw hex keeps the
-// pill legible on any seeded gradient regardless of theme.
-const BTC_ORANGE = '#F7931A';
+import { getContrastColors, useDominantColor } from '@/shared/lib/colorExtraction';
 import { AnimatedQRCode } from '@/shared/ui/composed/QRCode';
 import { Log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -49,12 +42,14 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
+import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
+import { duration } from '@/shared/styles/tokens';
 import type {
   SplitBillGroup,
   SplitBillParticipant,
 } from '@/shared/stores/profile/splitBillTransactionsStore';
 
-export interface ParticipantCardProps {
+interface ParticipantCardProps {
   group: SplitBillGroup;
   participant: SplitBillParticipant;
   /** Called when the user taps the retry CTA on a failed card. */
@@ -97,11 +92,16 @@ export function ParticipantCard({
   const isPaid = participant.paymentState === 'paid';
   const isExpired = participant.paymentState === 'expired';
   const isFailed = participant.deliveryState === 'failed';
+  const isSelf = participant.source === 'self' || participant.channel === 'self';
   const qrDimmed = isPaid || isExpired;
   const canView = !!participant.mintQuoteId && !!onView;
 
   const title = participant.nickname ?? seed.slice(0, 12);
 
+  // Internal (`self`) participants are paid via an internal coco transfer —
+  // there's no Lightning invoice to share. Show a different placeholder
+  // (avatar glyph + "Sending to @name…") instead of the spinner-and-
+  // "Generating invoice…" copy that confused the user during testing.
   const qrBody = participant.bolt11 ? (
     <View style={{ opacity: qrDimmed ? 0.4 : 1 }}>
       <AnimatedQRCode
@@ -111,13 +111,25 @@ export function ParticipantCard({
         padding={10}
       />
     </View>
+  ) : isSelf ? (
+    <View style={styles.qrPlaceholder}>
+      <Icon name="mdi:account-arrow-right" size={32} color="rgba(255,255,255,0.85)" />
+      <Text size={12} style={{ color: 'rgba(255,255,255,0.85)', marginTop: 8 }}>
+        {`Sending to ${title}…`}
+      </Text>
+    </View>
   ) : (
     <View style={styles.qrPlaceholder}>
       <Icon
         name="ant-design:loading-outlined"
         size={28}
         color="rgba(255,255,255,0.75)"
-        spin={{ duration: 1000, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
+        spin={{
+          duration: duration.spin,
+          outputRange: ['0deg', '360deg'],
+          delay: 0,
+          easing: 'linear',
+        }}
       />
       <Text size={12} style={{ color: 'rgba(255,255,255,0.75)', marginTop: 8 }}>
         Generating invoice…
@@ -128,6 +140,8 @@ export function ParticipantCard({
   const retryCTA = (
     <Pressable
       onPress={onRetry ? () => onRetry(participant.id) : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={`Retry delivery to ${title}`}
       style={({ pressed }) => [
         styles.retryCTA,
         { backgroundColor: opacity('#FFFFFF', pressed ? 0.35 : 0.2) },
@@ -227,13 +241,13 @@ export function ParticipantCard({
           <Pressable
             onPress={canView ? () => onView(participant.id) : undefined}
             disabled={!canView}
+            accessibilityRole="button"
+            accessibilityLabel={`${viewLabel} for ${title}`}
+            accessibilityState={{ disabled: !canView }}
             style={({ pressed }) => [
               styles.viewButton,
               {
-                backgroundColor: opacity(
-                  '#FFFFFF',
-                  !canView ? 0.1 : pressed ? 0.38 : 0.22
-                ),
+                backgroundColor: opacity('#FFFFFF', !canView ? 0.1 : pressed ? 0.38 : 0.22),
               },
             ]}
             testID={`split-bill-card-view-${participant.id}`}>
@@ -305,7 +319,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: BTC_ORANGE,
+    backgroundColor: BITCOIN_ACCENT,
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',

@@ -9,28 +9,17 @@
 
 import { useEffect, useRef } from 'react';
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
+import {
+  extractMintNostrPubkey,
+  type MintInfoForNostr,
+} from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { cashuLog } from '@/shared/lib/logger';
 
-/**
- * Extract a Nostr pubkey from NUT-06 mint info contact array.
- * Returns the hex pubkey or npub if found, undefined otherwise.
- */
-function extractNostrPubkey(mintInfo: any): string | undefined {
-  const contacts = mintInfo?.contact;
-  if (!Array.isArray(contacts)) return undefined;
-  for (const c of contacts) {
-    if (c.method === 'nostr' && typeof c.info === 'string' && c.info.length > 0) {
-      return c.info;
-    }
-  }
-  return undefined;
-}
-
 interface MintWithInfo {
   url: string;
-  mintInfo?: any;
+  mintInfo?: MintInfoForNostr;
 }
 
 /**
@@ -42,18 +31,20 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
   const inflightRef = useRef(new Set<string>());
 
   useEffect(() => {
-    const { getCached, setCached, isStale } = useMintProfileStore.getState();
+    const { isStale } = useMintProfileStore.getState();
+    const controller = new AbortController();
     for (const mint of mints) {
-      const pubkey = extractNostrPubkey(mint.mintInfo);
+      const pubkey = extractMintNostrPubkey(mint.mintInfo);
       if (!pubkey) continue;
 
       const key = normalizeMintUrlKey(mint.url);
       if (!isStale(key) || inflightRef.current.has(key)) continue;
 
       inflightRef.current.add(key);
-      fetchNostrProfile(pubkey).then(
+      fetchNostrProfile(pubkey, { signal: controller.signal }).then(
         (result) => {
           inflightRef.current.delete(key);
+          if (controller.signal.aborted) return;
           if (result.isOk()) {
             const { followers, score } = result.value;
             cashuLog.debug('mint.profile.resolved', {
@@ -70,5 +61,6 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
         }
       );
     }
+    return () => controller.abort();
   }, [mints]);
 }

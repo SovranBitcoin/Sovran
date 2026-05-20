@@ -22,7 +22,7 @@ import { log } from '@/shared/lib/logger';
 // Capture bundled theme names at module load (before any dynamic registration)
 const BUNDLED_THEME_NAMES = new Set(Object.keys(THEMES));
 
-export interface DownloadedThemeData {
+interface DownloadedThemeData {
   themeName: string;
   displayName: string;
   localUri: string;
@@ -90,11 +90,4 @@ export function unregisterDownloadedTheme(themeName: string): void {
   delete (backgroundThemeGradientColors as Record<string, GradientColor[]>)[themeName];
 
   log.info('theme.unregister.downloaded', { themeName });
-}
-
-/**
- * Check if a theme name would collide with a bundled theme.
- */
-export function isBundledTheme(themeName: string): boolean {
-  return BUNDLED_THEME_NAMES.has(themeName);
 }

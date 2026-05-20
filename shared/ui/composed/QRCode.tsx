@@ -1,7 +1,6 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
-import Svg, { G, Path } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import 'react-native-get-random-values';
 import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { PressableFeedback } from 'heroui-native';
@@ -13,9 +12,11 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useWindowDimensions, ActivityIndicator } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
+import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 
 export { SPEED_PRESETS, DENSITY_PRESETS, DEFAULT_SPEED_INDEX, DEFAULT_DENSITY_INDEX };
 
@@ -46,7 +47,6 @@ const DENSITY_PRESETS = [
 const DEFAULT_DENSITY_INDEX = 2; // L (150 bytes, ecosystem default)
 
 const LOGO_SIZE = 54;
-const CIRCLE_SIZE = LOGO_SIZE + 8;
 
 interface AnimatedQRCodeProps {
   padding?: number;
@@ -85,7 +85,6 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   fragmentSize,
   size,
 }: AnimatedQRCodeProps) {
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const { width: screenWidth } = useWindowDimensions();
 
   const [index, setIndex] = useState(0);
@@ -121,7 +120,6 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     log.info('ui.qrcode.address_set', {
       length: address.length,
       needsAnimation,
-      preview: address.slice(0, 30),
       isUR: address.toLowerCase().startsWith('ur:'),
     });
 
@@ -180,12 +178,24 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   const showLoading = needsAnimation && (isEncoding || (parts.length === 0 && !encodingError));
   const showError = needsAnimation && encodingError && parts.length === 0;
   const canRenderQR = !showLoading && !showError && qrData && qrData.length <= MAX_QR_DATA_LENGTH;
-  const isAnimating = needsAnimation && parts.length > 1;
 
   const width = size ?? Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
-  const gradientColors = [foreground, foreground] as const;
+  // QR codes are pinned to dark-on-white regardless of theme — scanners are
+  // strict, and an inverted (light-on-dark) QR is unreliable on most readers.
+  const QR_DARK = INVARIANT_BLACK;
+  const QR_LIGHT = INVARIANT_WHITE;
+  const gradientColors = [QR_LIGHT, QR_LIGHT] as const;
   const qrSize = width - 2 * padding;
+  // On light themes a pure-white card disappears into the page surface, so
+  // swap the flat gradient for `GradientCard` — the same blur + corner-glow
+  // frame the Receive Address row uses on this screen, so the QR sits in
+  // matching chrome instead of floating on a flat white block. The inner
+  // `EQRCode` still paints an opaque white square at `qrSize` (the strict
+  // scanner quiet zone), so only the 16 px ring around the modules picks up
+  // the card material — that's the visible frame we wanted.
+  const scheme = useColorScheme();
+  const useBlurCard = scheme === 'light';
   // When the caller sizes the block explicitly (e.g. a card deck), scale
   // the centered logo with it so the logo-to-QR ratio stays scan-safe
   // (~18% of the QR area). Default (no `size`) preserves the original
@@ -216,55 +226,70 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     }
   });
 
+  const qrContent = showLoading ? (
+    <View
+      style={{
+        width: qrSize,
+        height: qrSize,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+      <ActivityIndicator size="large" color={QR_DARK} />
+    </View>
+  ) : showError ? (
+    <View
+      style={{
+        width: qrSize,
+        height: qrSize,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+      }}>
+      <Icon name="ri:error-warning-line" size={48} color={opacity(QR_DARK, 0.5)} />
+    </View>
+  ) : canRenderQR ? (
+    // `transparent` on light mode lets the `GradientCard`'s frosted
+    // material show through the QR's "white" cells, so the pattern reads
+    // as on-card instead of floating on a hard white block. Dark mode
+    // keeps a pure-white fill since the surrounding `LinearGradient` IS
+    // the white card.
+    <EQRCode
+      color={QR_DARK}
+      backgroundColor={useBlurCard ? 'transparent' : QR_LIGHT}
+      value={qrData}
+      size={qrSize}
+    />
+  ) : (
+    <View
+      style={{
+        width: qrSize,
+        height: qrSize,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+      }}>
+      <ActivityIndicator size="large" color={QR_DARK} />
+    </View>
+  );
+
   return (
     <Log name="AnimatedQRCode">
       <View style={{ alignItems: 'center' }}>
         {/* QR + centered logo overlay */}
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <LinearGradient colors={gradientColors} style={{ borderRadius: 16, padding: 16 }}>
-            {showLoading ? (
-              <View
-                style={{
-                  width: qrSize,
-                  height: qrSize,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <ActivityIndicator size="large" color={surfaceTertiary} />
-              </View>
-            ) : showError ? (
-              <View
-                style={{
-                  width: qrSize,
-                  height: qrSize,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: 20,
-                }}>
-                <Icon name="ri:error-warning-line" size={48} color={opacity(foreground, 0.5)} />
-              </View>
-            ) : canRenderQR ? (
-              <EQRCode
-                color={surfaceTertiary}
-                backgroundColor="transparent"
-                value={qrData}
-                size={qrSize}
-              />
-            ) : (
-              <View
-                style={{
-                  width: qrSize,
-                  height: qrSize,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: 20,
-                }}>
-                <ActivityIndicator size="large" color={surfaceTertiary} />
-              </View>
-            )}
-          </LinearGradient>
+          {useBlurCard ? (
+            <GradientCard contentStyle={{ padding: 16 }}>{qrContent}</GradientCard>
+          ) : (
+            <LinearGradient colors={gradientColors} style={{ borderRadius: 16, padding: 16 }}>
+              {qrContent}
+            </LinearGradient>
+          )}
 
-          {/* Centered logo — absolutely positioned from the container's center */}
+          {/* Centered logo — absolutely positioned from the container's center.
+              The circle background is always white so the logo punches a
+              clean hole through the QR pattern on both themes (even on
+              light mode where the surrounding cells are transparent, the
+              white disc keeps the logo legible against the frosted card). */}
           <View
             pointerEvents="none"
             style={{
@@ -274,16 +299,20 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               width: circleSize,
               height: circleSize,
               borderRadius: circleSize / 2,
-              backgroundColor: foreground,
+              backgroundColor: QR_LIGHT,
             }}>
             {isLocationUnit ? (
               <Icon name={unit} size={logoSize} />
             ) : (
+              // CurrencyIcon's props are inverted from their names when
+              // `iconColor` is set: `iconColor` paints the OUTER disc,
+              // `colors[0]` paints the INNER symbol glyph. So:
+              //   dark disc + light symbol  →  iconColor=QR_DARK, colors=[QR_LIGHT]
               <CurrencyIcon
                 width={logoSize}
                 currency={unit}
-                colors={[foreground, foreground, foreground]}
-                iconColor={surfaceTertiary}
+                colors={[QR_LIGHT, QR_LIGHT, QR_LIGHT]}
+                iconColor={QR_DARK}
               />
             )}
           </View>

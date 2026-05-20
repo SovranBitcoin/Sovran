@@ -27,7 +27,8 @@ import {
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { useScrollViewOffset } from '@/features/feed/hooks/useScrollViewOffset';
 import type { EngagementViewState } from '@/features/feed/hooks/useNostrEngagement';
-import type { NoteMetrics } from '../shared';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import type { NoteMetrics } from '../feedTypes';
 import {
   BOTTOM_PANEL_STIFF_DURATION_MS,
   CLEAR_URL_DELAY_MS,
@@ -49,14 +50,6 @@ const TIMING_CONFIG = {
   duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
   easing: Easing.out(Easing.cubic),
 };
-
-// Types re-exported from ./types for backward compatibility
-export type {
-  ImageOverlayPost,
-  ImageOverlayLayout,
-  ThumbnailLayout,
-  ImageOverlayContextValue,
-} from './types';
 
 /** State that changes on open/close; separate context to keep actions context stable. */
 type ImageOverlayStateValue = Pick<
@@ -82,14 +75,8 @@ type ImageOverlayActionsValue = Omit<
   | 'activeMediaTypes'
   | 'videoFeedLayouts'
   | 'videoFeedLayoutIndex'
-  | 'expandedWidth'
-  | 'expandedHeight'
 > & {
   onSwipeUpToNextPost: ((openNext: (layout: ImageOverlayReplaceLayout) => void) => void) | null;
-  screenWidth: number;
-  screenHeight: number;
-  /** Image viewport height (screenHeight - top inset); used by hook for expandedHeight. */
-  expandedHeightFromContext: number;
 };
 
 const ImageOverlayStateContext = createContext<ImageOverlayStateValue | null>(null);
@@ -101,6 +88,15 @@ export function computeExpandedSize(
   screenHeight: number,
   aspectRatio: number
 ): { width: number; height: number } {
+  // aspectRatio originates in relay-supplied event content; a hostile or
+  // malformed `imeta`/`dim` tag can deliver 0, negative, NaN, or Infinity.
+  // Without this guard the result poisons every downstream shared value
+  // (centerX/Y, expandedWidth/Height) with NaN/Infinity and the overlay
+  // silently renders nothing. Fall back to a square in the screen rect.
+  if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+    const side = Math.min(screenWidth, screenHeight);
+    return { width: side, height: side };
+  }
   const fitByWidth = screenWidth / aspectRatio <= screenHeight;
   if (fitByWidth) {
     return { width: screenWidth, height: screenWidth / aspectRatio };
@@ -110,7 +106,7 @@ export function computeExpandedSize(
 
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?\S*)?$/i;
 
-function inferMediaType(url: string): 'image' | 'video' {
+export function inferMediaType(url: string): 'image' | 'video' {
   return VIDEO_EXT.test(url) ? 'video' : 'image';
 }
 
@@ -155,14 +151,23 @@ export function ImageOverlayProvider({
   );
   const [videoFeedLayoutIndex, setVideoFeedLayoutIndexState] = useState(0);
 
-  const onSwipeUpToNextPostRef = useRef<
+  const onSwipeUpToNextPostRef = useLatestRef<
     ((openNext: (layout: ImageOverlayReplaceLayout) => void) => void) | undefined
   >(onSwipeUpToNextPost);
-  onSwipeUpToNextPostRef.current = onSwipeUpToNextPost;
 
   const setActiveIndex = useCallback((index: number) => {
     setActiveIndexState((prev) => (index === prev ? prev : index));
   }, []);
+
+  const thumbnailLayoutsRef = useRef<Record<string, ThumbnailLayout>>({});
+  /** Layout of the image we opened from (tap-time). Used for dismiss so we don't get overwritten by registerThumbnailLayout from other cards. */
+  const openSessionInitialLayoutRef = useRef<ThumbnailLayout | null>(null);
+  const openSessionInitialIndexRef = useRef(0);
+  /** Snapshot of thumbnail layouts for every pager index at open() time. Prevents wrong height when dismissing from page 2/3 (ref would otherwise be overwritten by other cards). */
+  const openSessionLayoutsByIndexRef = useRef<(ThumbnailLayout | null)[]>([]);
+  /** Pending close-clear and open-panel-animation timers; cleared on unmount so we never fire setState after teardown. */
+  const clearUrlTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openPanelAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const registerThumbnailLayout = useCallback(
     (url: string, layout: ThumbnailLayout, options?: { eventId?: string; imageIndex?: number }) => {
@@ -229,12 +234,12 @@ export function ImageOverlayProvider({
     safeBottomSv.value = safeBottom;
   }, [safeTop, safeBottom, safeTopSv, safeBottomSv]);
 
-  const thumbnailLayoutsRef = useRef<Record<string, ThumbnailLayout>>({});
-  /** Layout of the image we opened from (tap-time). Used for dismiss so we don't get overwritten by registerThumbnailLayout from other cards. */
-  const openSessionInitialLayoutRef = useRef<ThumbnailLayout | null>(null);
-  const openSessionInitialIndexRef = useRef(0);
-  /** Snapshot of thumbnail layouts for every pager index at open() time. Prevents wrong height when dismissing from page 2/3 (ref would otherwise be overwritten by other cards). */
-  const openSessionLayoutsByIndexRef = useRef<(ThumbnailLayout | null)[]>([]);
+  useEffect(() => {
+    return () => {
+      if (clearUrlTimeoutRef.current) clearTimeout(clearUrlTimeoutRef.current);
+      if (openPanelAnimationTimeoutRef.current) clearTimeout(openPanelAnimationTimeoutRef.current);
+    };
+  }, []);
 
   /** 0 when overlay is aligned with thumbnail, max when displaced (open/drag). Drives thumbnail blur. */
   const thumbnailBlurIntensity = useDerivedValue(() => {
@@ -265,7 +270,14 @@ export function ImageOverlayProvider({
     panelContentMinHeightSv.value = 0;
     openSessionInitialLayoutRef.current = null;
     openSessionLayoutsByIndexRef.current = [];
-    setTimeout(() => setActiveUrls([]), CLEAR_URL_DELAY_MS);
+    // No overlay is open at clear-time, so cached thumbnail positions are
+    // unreachable. Resetting bounds the ref's lifetime (audit 58 F-004).
+    thumbnailLayoutsRef.current = {};
+    if (clearUrlTimeoutRef.current) clearTimeout(clearUrlTimeoutRef.current);
+    clearUrlTimeoutRef.current = setTimeout(() => {
+      clearUrlTimeoutRef.current = null;
+      setActiveUrls([]);
+    }, CLEAR_URL_DELAY_MS);
   }, [hasPanelSv, openAnimationInProgressSv, panelHeightSv, panelContentMinHeightSv]);
 
   const finishClose = useCallback(() => {
@@ -370,10 +382,25 @@ export function ImageOverlayProvider({
     (layout: ImageOverlayLayout) => {
       safeTopSv.value = safeTop;
       safeBottomSv.value = safeBottom;
-      const aspectRatio = layout.aspectRatio ?? layout.width / layout.height;
       const hasPanel = !!layout.post;
       // When hasPanel we start with sheet closed: image centered in viewport (below notch to bottom); absolute overlay sits on top.
       const availableHeight = imageViewportHeight;
+
+      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
+      const types =
+        layout.mediaTypes && layout.mediaTypes.length === urls.length
+          ? layout.mediaTypes
+          : urls.map((u) => inferMediaType(u));
+      // Videos render at natural aspect via contentFit=contain inside the
+      // pager container, so the container itself must fill the full viewport
+      // — otherwise a portrait video letterboxed inside a 16:9 rect ends up
+      // narrow. Override the thumbnail aspect ratio whenever the pager
+      // contains any video; pure-image overlays keep their thumbnail aspect
+      // so the shared-element transition lands precisely.
+      const hasVideo = types.some((t) => t === 'video');
+      const aspectRatio = hasVideo
+        ? screenWidth / availableHeight
+        : (layout.aspectRatio ?? layout.width / layout.height);
       // Use actual thumbnail aspect ratio so overlay image rect matches the feed image; shared-element close animates correctly.
       const { width: expW, height: expH } = computeExpandedSize(
         screenWidth,
@@ -381,12 +408,6 @@ export function ImageOverlayProvider({
         aspectRatio
       );
       const imageAreaCenterY = safeTop + availableHeight / 2;
-
-      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
-      const types =
-        layout.mediaTypes && layout.mediaTypes.length === urls.length
-          ? layout.mediaTypes
-          : urls.map((u) => inferMediaType(u));
       const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
       setActiveUrls(urls);
       setActiveMediaTypes(types);
@@ -542,10 +563,19 @@ export function ImageOverlayProvider({
       const preserveCloseTarget = options?.preserveCloseTarget === true;
       safeTopSv.value = safeTop;
       safeBottomSv.value = safeBottom;
-      // Replace layout has no pageX/pageY/width/height; use aspectRatio only.
-      const aspectRatio = layout.aspectRatio ?? 16 / 9;
       const hasPanel = !!layout.post;
       const availableHeight = imageViewportHeight;
+
+      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
+      const types =
+        layout.mediaTypes && layout.mediaTypes.length === urls.length
+          ? layout.mediaTypes
+          : urls.map((u) => inferMediaType(u));
+      // See open() above — videos need a full-viewport container so
+      // contentFit=contain shows them at natural aspect at max size.
+      const hasVideo = types.some((t) => t === 'video');
+      // Replace layout has no pageX/pageY/width/height; use aspectRatio only.
+      const aspectRatio = hasVideo ? screenWidth / availableHeight : (layout.aspectRatio ?? 16 / 9);
       const { width: expW, height: expH } = computeExpandedSize(
         screenWidth,
         availableHeight,
@@ -554,12 +584,6 @@ export function ImageOverlayProvider({
       const imageAreaCenterY = safeTop + availableHeight / 2;
       const centerX = screenWidth / 2;
       const toCenterY = hasPanel ? imageAreaCenterY : screenCenterY;
-
-      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
-      const types =
-        layout.mediaTypes && layout.mediaTypes.length === urls.length
-          ? layout.mediaTypes
-          : urls.map((u) => inferMediaType(u));
       const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
       setActiveUrls(urls);
       setActiveMediaTypes(types);
@@ -570,13 +594,12 @@ export function ImageOverlayProvider({
       screenWidthSv.value = screenWidth;
       screenHeightSv.value = screenHeight;
       aspectRatioSv.value = aspectRatio;
+      panelHeightSv.value = 0;
       if (hasPanel) {
         hasPanelSv.value = 1;
-        panelHeightSv.value = 0;
         openAnimationInProgressSv.value = 1;
       } else {
         hasPanelSv.value = 0;
-        panelHeightSv.value = 0;
       }
 
       const targetX = centerX - expW / 2;
@@ -630,7 +653,12 @@ export function ImageOverlayProvider({
       });
 
       if (hasPanel) {
-        setTimeout(() => startOpenPanelImageAnimation(0, aspectRatio), OPEN_START_DELAY_MS);
+        if (openPanelAnimationTimeoutRef.current)
+          clearTimeout(openPanelAnimationTimeoutRef.current);
+        openPanelAnimationTimeoutRef.current = setTimeout(() => {
+          openPanelAnimationTimeoutRef.current = null;
+          startOpenPanelImageAnimation(0, aspectRatio);
+        }, OPEN_START_DELAY_MS);
       }
     },
     [
@@ -928,9 +956,6 @@ export function ImageOverlayProvider({
       expandedHeightSv,
       panelHeightSv,
       panelContentMinHeightSv,
-      screenWidth,
-      screenHeight,
-      expandedHeightFromContext: imageViewportHeight,
     };
   }, [
     scrollHandler,
@@ -967,9 +992,6 @@ export function ImageOverlayProvider({
     expandedHeightSv,
     panelHeightSv,
     panelContentMinHeightSv,
-    screenWidth,
-    screenHeight,
-    imageViewportHeight,
   ]);
 
   useAnimatedReaction(
@@ -1017,15 +1039,7 @@ export function useImageOverlay(): ImageOverlayContextValue | null {
   const actions = useContext(ImageOverlayActionsContext);
   return useMemo((): ImageOverlayContextValue | null => {
     if (!actions || !state) return null;
-    // When sheet is closed image is centered in safe area; when sheet open the reaction drives layout.
-    const expandedWidth = actions.screenWidth;
-    const expandedHeight = actions.expandedHeightFromContext;
-    return {
-      ...actions,
-      ...state,
-      expandedWidth,
-      expandedHeight,
-    };
+    return { ...actions, ...state };
   }, [state, actions]);
 }
 

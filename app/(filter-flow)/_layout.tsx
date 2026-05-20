@@ -6,16 +6,23 @@
  * Used for transaction filtering options.
  */
 
+import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
+const FILTERS_OPTIONS = { title: 'Filters' };
+
 export default function FilterFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const screenOptions = useMemo(
+    () => createFlowLayoutScreenOptions({ foreground, background }),
+    [foreground, background]
+  );
 
   return (
-    <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
-      <Stack.Screen name="filters" options={{ title: 'Filters' }} />
+    <Stack screenOptions={screenOptions}>
+      <Stack.Screen name="filters" options={FILTERS_OPTIONS} />
     </Stack>
   );
 }

@@ -2,6 +2,71 @@
 // FormattedTimestamp — extends Number with locale-aware date formatting
 // ---------------------------------------------------------------------------
 
+// Module-scope locale-keyed caches. Intl formatter construction is the
+// expensive step (locale data lookup, ICU table allocation); reuse is safe
+// because formatters are immutable once built.
+const shortCache = new Map<string, Intl.DateTimeFormat>();
+const fullCache = new Map<string, Intl.DateTimeFormat>();
+const datetimeCache = new Map<string, Intl.DateTimeFormat>();
+const relativeCache = new Map<string, Intl.RelativeTimeFormat>();
+
+function getShort(locale: string): Intl.DateTimeFormat {
+  let f = shortCache.get(locale);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    shortCache.set(locale, f);
+  }
+  return f;
+}
+
+function getFull(locale: string): Intl.DateTimeFormat {
+  let f = fullCache.get(locale);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    fullCache.set(locale, f);
+  }
+  return f;
+}
+
+function getDatetime(locale: string): Intl.DateTimeFormat {
+  let f = datetimeCache.get(locale);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+    datetimeCache.set(locale, f);
+  }
+  return f;
+}
+
+function getRelative(locale: string): Intl.RelativeTimeFormat | null {
+  if (relativeCache.has(locale)) return relativeCache.get(locale) ?? null;
+  try {
+    const f = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    relativeCache.set(locale, f);
+    return f;
+  } catch {
+    // Hermes / older runtimes without RelativeTimeFormat — fall back.
+    return null;
+  }
+}
+
 /**
  * A number that also provides locale-aware date formatting.
  *
@@ -36,50 +101,29 @@ export class FormattedTimestamp extends Number {
 
     if (seconds < 60) return 'just now';
 
-    // Use Intl.RelativeTimeFormat when available
-    try {
-      const rtf = new Intl.RelativeTimeFormat(this._locale, { numeric: 'auto' });
+    const rtf = getRelative(this._locale);
+    if (rtf) {
       if (days > 0) return rtf.format(isPast ? -days : days, 'day');
       if (hours > 0) return rtf.format(isPast ? -hours : hours, 'hour');
       return rtf.format(isPast ? -minutes : minutes, 'minute');
-    } catch {
-      // Fallback for environments without RelativeTimeFormat
-      if (days > 0) return `${days}d ago`;
-      if (hours > 0) return `${hours}h ago`;
-      return `${minutes}m ago`;
     }
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    return `${minutes}m ago`;
   }
 
   /** Short date: "Mar 16, 2026". */
   get short(): string {
-    return new Intl.DateTimeFormat(this._locale, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    }).format(this.valueOf());
+    return getShort(this._locale).format(this.valueOf());
   }
 
   /** Full date with time: "March 16, 2026, 3:45 PM". */
   get full(): string {
-    return new Intl.DateTimeFormat(this._locale, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(this.valueOf());
+    return getFull(this._locale).format(this.valueOf());
   }
 
   /** Datetime string: "03/16/2026 15:45:00". */
   get datetime(): string {
-    return new Intl.DateTimeFormat(this._locale, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(this.valueOf());
+    return getDatetime(this._locale).format(this.valueOf());
   }
 }

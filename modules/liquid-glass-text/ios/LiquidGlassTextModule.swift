@@ -48,6 +48,10 @@ public class LiquidGlassTextModule: Module {
                 guard #available(iOS 17.0, *) else { return }
                 view.model.interactive = value
             }
+            Prop("colorScheme") { (view: LiquidGlassTextView, value: String?) in
+                guard #available(iOS 17.0, *) else { return }
+                view.model.colorScheme = value ?? ""
+            }
             Prop("debugShape") { (view: LiquidGlassTextView, value: String) in
                 guard #available(iOS 17.0, *) else { return }
                 view.model.debugShape = value

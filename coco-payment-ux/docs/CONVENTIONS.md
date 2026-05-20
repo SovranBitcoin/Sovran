@@ -39,15 +39,19 @@ Operations and actions follow the same provider pattern:
 
 ```tsx
 <CocoPaymentUXProvider
-  operations={{
-    // ...
-    executeSend: async (mintUrl, amount) => { ... },
-    // ...
-  }}
-  actions={{
-    sendToken: {
-      copy: async (ctx) => { ... },
+  engine={{
+    operations: {
       // ...
+      executeSend: async (mintUrl, amount) => { ... },
+      // ...
+    },
+  }}
+  callbacks={{
+    actions: {
+      sendToken: {
+        copy: async (ctx) => { ... },
+        // ...
+      },
     },
   }}
 />
@@ -92,7 +96,7 @@ Post-flow screens (send token, receive, etc.):
 | 3     | Component: proof-of-concept using `useScreenActions`              | Always       |
 | 4     | UI tips: `::: info` box                                           | Always       |
 | 5     | Actions table: \| Action \| Available when \| What it does \|     | Always       |
-| 6     | Action handlers: inside `<CocoPaymentUXProvider actions={...} />` | Always       |
+| 6     | Action handlers: inside `<CocoPaymentUXProvider callbacks={{ actions: ... }} />` | Always       |
 
 ## Diagrams
 

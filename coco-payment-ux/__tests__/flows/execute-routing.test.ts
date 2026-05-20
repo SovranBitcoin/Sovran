@@ -37,12 +37,11 @@
  * auto-resolves to mintQuoteCreated.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 import { createTestMachine } from '../_harness';
 import {
   WALLETS,
   INPUTS,
-  MINT1,
 } from '../_harness/fixtures';
 import type { FlowStep } from '../../src/machine/types';
 import type { WalletContext } from '../../src/types';

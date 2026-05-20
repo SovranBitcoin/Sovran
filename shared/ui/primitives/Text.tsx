@@ -5,7 +5,6 @@ import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
-
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface GradientTextProps extends TextProps {
@@ -96,7 +95,7 @@ export const StyledText = ({
 
 type TextProps = DefaultText['props'] & { id?: string };
 
-export interface CustomTextProps extends TextProps {
+interface CustomTextProps extends TextProps {
   thin?: boolean;
   extralight?: boolean;
   light?: boolean;
@@ -215,14 +214,12 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
   // ambient "stuff is loading" rather than a row of bold rectangles. The
   // foreground color (theme-aware) ensures it remains visible on any
   // background tint.
-  const loadingColor = opacity(foreground, 0.15);
+  const loadingColor = opacity(foreground, 0.07);
 
   if (loading) {
     return (
       <View pointerEvents="none" style={loadingWrapperStyle}>
-        <View
-          style={[loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }]}
-        />
+        <View style={[loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }]} />
         <UntranslatedText
           size={size}
           italic={italic}

@@ -185,11 +185,7 @@ function updateAltstoreSource(adpId, manifestData) {
     }
     const bracketPos = content.indexOf(match[0]) + 1 + match[1].length;
     content =
-      content.slice(0, bracketPos) +
-      ',\n    ' +
-      appJson +
-      '\n  ]' +
-      content.slice(bracketPos + 1);
+      content.slice(0, bracketPos) + ',\n    ' + appJson + '\n  ]' + content.slice(bracketPos + 1);
 
     fs.writeFileSync(ALTSTORE_SOURCE_PATH, content);
     console.log(`   ✓ Added Sovran with version to altstore-source.json`);
@@ -282,8 +278,7 @@ function getAscToken() {
     );
   }
 
-  const b64url = (obj) =>
-    Buffer.from(JSON.stringify(obj)).toString('base64url');
+  const b64url = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
 
   const header = b64url({ alg: 'ES256', kid: keyId, typ: 'JWT' });
   const payload = b64url({
@@ -426,7 +421,9 @@ async function syncScreenshots(versionString) {
     : versions[0];
 
   if (!targetVersion) {
-    console.log(`   ⚠️  Version ${versionString} not found in App Store Connect, skipping screenshots.`);
+    console.log(
+      `   ⚠️  Version ${versionString} not found in App Store Connect, skipping screenshots.`
+    );
     return;
   }
 
@@ -474,9 +471,7 @@ async function syncScreenshots(versionString) {
     const deviceType = screenshotSet.attributes.screenshotDisplayType;
     const deviceName = deviceNames[deviceType] || deviceType;
 
-    const shotsData = await ascRequest(
-      `/appScreenshotSets/${screenshotSet.id}/appScreenshots`
-    );
+    const shotsData = await ascRequest(`/appScreenshotSets/${screenshotSet.id}/appScreenshots`);
     const screenshots = sortScreenshotsForListing(shotsData.data);
 
     if (screenshots.length === 0) continue;
@@ -522,9 +517,7 @@ async function syncScreenshots(versionString) {
       }
 
       orderedFiles.push(filename);
-      deviceScreenshots[deviceType].push(
-        `https://sovran.money/ios/${deviceType}/${filename}`
-      );
+      deviceScreenshots[deviceType].push(`https://sovran.money/ios/${deviceType}/${filename}`);
       totalScreenshots++;
     }
 
@@ -547,7 +540,9 @@ async function syncScreenshots(versionString) {
 
   // Update screenshots.ts
   generateScreenshotsTs(deviceScreenshots, primaryDevice);
-  console.log(`   ✓ screenshots.ts updated (${Object.keys(deviceScreenshots).length} device types)`);
+  console.log(
+    `   ✓ screenshots.ts updated (${Object.keys(deviceScreenshots).length} device types)`
+  );
 
   console.log(`   ✓ ${totalScreenshots} screenshots synced total`);
 }

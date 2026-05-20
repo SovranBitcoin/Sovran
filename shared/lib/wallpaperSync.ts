@@ -1,81 +1,23 @@
-// ---------------------------------------------------------------------------
-// Wallpaper Sync — catalog refresh and album sync operations
-//
-// Fetches the wallpaper catalog from the API (falls back to direct relay query)
-// and provides sync/download/delete operations for albums.
-// ---------------------------------------------------------------------------
-
 import { log } from '@/shared/lib/logger';
-import { useWallpaperStore, type WallpaperCatalogEntry, type DownloadedWallpaper } from '@/shared/stores/global/wallpaperStore';
+import {
+  useWallpaperStore,
+  type WallpaperCatalogEntry,
+} from '@/shared/stores/global/wallpaperStore';
 import { fetchWallpaperCatalog } from '@/shared/lib/apiClient';
-
-// ---------------------------------------------------------------------------
-// Sync plan
-// ---------------------------------------------------------------------------
-
-export interface SyncPlan {
-  toAdd: WallpaperCatalogEntry[];
-  toUpdate: WallpaperCatalogEntry[];
-  toDelete: string[]; // themeNames
-  unchanged: string[];
-}
+import { PUBLIC_KEYS } from '@/shared/lib/constants';
 
 /**
- * Compute a sync plan by comparing server catalog with local downloads.
- * Optionally filter by albumSlug.
+ * Refresh the wallpaper catalog from the API. `signal` aborts the fetch
+ * if the caller goes away before the catalog lands.
+ *
+ * The API may carry albums published by third-party pubkeys (NIP-32 wallpaper
+ * events from anyone using the `money.sovran.wallpaper` namespace). We drop
+ * anything whose `author.pubkey` is set and doesn't match Sovran's own
+ * pubkey so the gallery only surfaces officially-published themes. Albums
+ * with no `author` are treated as system-curated and kept.
  */
-export function computeSyncPlan(
-  serverCatalog: WallpaperCatalogEntry[],
-  localDownloaded: Record<string, DownloadedWallpaper>,
-  albumSlug?: string,
-): SyncPlan {
-  const serverWallpapers = albumSlug
-    ? serverCatalog.filter((w) => w.albumSlug === albumSlug)
-    : serverCatalog;
-
-  const localWallpapers = albumSlug
-    ? Object.values(localDownloaded).filter((w) => w.albumSlug === albumSlug)
-    : Object.values(localDownloaded);
-
-  const serverMap = new Map(serverWallpapers.map((w) => [w.themeName, w]));
-  const localMap = new Map(localWallpapers.map((w) => [w.themeName, w]));
-
-  const toAdd: WallpaperCatalogEntry[] = [];
-  const toUpdate: WallpaperCatalogEntry[] = [];
-  const unchanged: string[] = [];
-  const toDelete: string[] = [];
-
-  // Check server wallpapers against local
-  for (const [themeName, serverEntry] of serverMap) {
-    const localEntry = localMap.get(themeName);
-    if (!localEntry) {
-      toAdd.push(serverEntry);
-    } else if (localEntry.eventId !== serverEntry.eventId) {
-      toUpdate.push(serverEntry);
-    } else {
-      unchanged.push(themeName);
-    }
-  }
-
-  // Check local wallpapers not on server (deleted upstream)
-  for (const [themeName] of localMap) {
-    if (!serverMap.has(themeName)) {
-      toDelete.push(themeName);
-    }
-  }
-
-  return { toAdd, toUpdate, toDelete, unchanged };
-}
-
-// ---------------------------------------------------------------------------
-// Catalog refresh
-// ---------------------------------------------------------------------------
-
-/**
- * Refresh the wallpaper catalog from the API.
- */
-export async function refreshCatalog(): Promise<boolean> {
-  const result = await fetchWallpaperCatalog();
+export async function refreshCatalog(signal?: AbortSignal): Promise<boolean> {
+  const result = await fetchWallpaperCatalog({ signal });
 
   if (result.isErr()) {
     log.warn('wallpaper.sync.catalog_failed', { error: result.error.message });
@@ -83,114 +25,51 @@ export async function refreshCatalog(): Promise<boolean> {
   }
 
   const { wallpapers, albums } = result.value;
+
+  // Hex pubkeys are case-insensitive on the wire — some relays / publishers
+  // round-trip them upper- or mixed-case. Normalise both sides before
+  // comparing so a casing mismatch doesn't drop legitimate Sovran albums.
+  const SOVRAN_PUBKEY = PUBLIC_KEYS.SUPPORT.toLowerCase();
+  const isSovran = (pubkey: string | undefined | null) =>
+    !pubkey || pubkey.toLowerCase() === SOVRAN_PUBKEY;
+
+  const filteredAlbums = albums.filter((a) => isSovran(a.author?.pubkey));
+  // Wallpapers are dropped ONLY when their `albumSlug` matches an album we
+  // explicitly removed for a non-Sovran pubkey. Orphan slugs that don't
+  // appear in any album in the response (e.g. `uncategorized`) are kept —
+  // those are server-side bookkeeping artefacts, not third-party content.
+  const removedSlugs = new Set(
+    albums.filter((a) => !isSovran(a.author?.pubkey)).map((a) => a.slug)
+  );
+  const filteredWallpapers = wallpapers.filter((w) => !removedSlugs.has(w.albumSlug));
+
+  const droppedAlbums = albums.length - filteredAlbums.length;
+  const droppedWallpapers = wallpapers.length - filteredWallpapers.length;
+  if (droppedAlbums > 0 || droppedWallpapers > 0) {
+    // Surface which authors got dropped so a mismatch is debuggable from the
+    // log stream — listing distinct pubkeys (truncated) + display names.
+    const droppedAuthors = Array.from(
+      new Map(
+        albums
+          .filter((a) => !isSovran(a.author?.pubkey))
+          .map((a) => [a.author?.pubkey ?? '<no-pubkey>', a.author?.displayName ?? '<no-name>'])
+      ).entries()
+    ).map(([pubkey, name]) => `${name}:${pubkey.slice(0, 12)}…`);
+
+    log.info('wallpaper.sync.filtered_non_sovran', {
+      droppedAlbums,
+      droppedWallpapers,
+      keptAlbums: filteredAlbums.length,
+      keptWallpapers: filteredWallpapers.length,
+      droppedAuthors,
+      expectedSovranPubkey: SOVRAN_PUBKEY.slice(0, 12) + '…',
+    });
+  }
+
   // Schema palette is typed as Record<string, string>; the app's WallpaperCatalogEntry
   // narrows it to the specific shade-keyed ThemePalette. JSON shape matches.
   useWallpaperStore
     .getState()
-    .setCatalog(wallpapers as WallpaperCatalogEntry[], albums);
+    .setCatalog(filteredWallpapers as WallpaperCatalogEntry[], filteredAlbums);
   return true;
-}
-
-// ---------------------------------------------------------------------------
-// Album operations
-// ---------------------------------------------------------------------------
-
-/**
- * Sync an album: download new/updated wallpapers, delete removed ones.
- * Returns the sync plan that was executed.
- */
-export async function syncAlbum(
-  albumSlug: string,
-  onProgress?: (completed: number, total: number) => void,
-): Promise<SyncPlan> {
-  // Refresh catalog first
-  await refreshCatalog();
-
-  const store = useWallpaperStore.getState();
-  const plan = computeSyncPlan(store.catalog, store.downloaded, albumSlug);
-
-  const totalOps = plan.toAdd.length + plan.toUpdate.length + plan.toDelete.length;
-  let completed = 0;
-
-  // Process deletions first
-  for (const themeName of plan.toDelete) {
-    await store.removeDownloaded(themeName);
-    completed++;
-    onProgress?.(completed, totalOps);
-  }
-
-  // Download new wallpapers (max 3 concurrent)
-  const toDownload = [...plan.toAdd, ...plan.toUpdate];
-  const concurrency = 3;
-
-  for (let i = 0; i < toDownload.length; i += concurrency) {
-    const batch = toDownload.slice(i, i + concurrency);
-    await Promise.all(
-      batch.map(async (entry) => {
-        await store.downloadWallpaper(entry);
-        completed++;
-        onProgress?.(completed, totalOps);
-      }),
-    );
-  }
-
-  log.info('wallpaper.sync.complete', {
-    album: albumSlug,
-    added: plan.toAdd.length,
-    updated: plan.toUpdate.length,
-    deleted: plan.toDelete.length,
-    unchanged: plan.unchanged.length,
-  });
-
-  return plan;
-}
-
-/**
- * Download all wallpapers in an album that aren't already downloaded.
- * Purely additive — does NOT delete anything.
- */
-export async function downloadAlbum(
-  albumSlug: string,
-  onProgress?: (completed: number, total: number) => void,
-): Promise<number> {
-  // Refresh catalog first
-  await refreshCatalog();
-
-  const store = useWallpaperStore.getState();
-  const albumWallpapers = store.catalog.filter((w) => w.albumSlug === albumSlug);
-  const toDownload = albumWallpapers.filter(
-    (w) => !store.downloaded[w.themeName],
-  );
-
-  let completed = 0;
-  const concurrency = 3;
-
-  for (let i = 0; i < toDownload.length; i += concurrency) {
-    const batch = toDownload.slice(i, i + concurrency);
-    await Promise.all(
-      batch.map(async (entry) => {
-        await store.downloadWallpaper(entry);
-        completed++;
-        onProgress?.(completed, toDownload.length);
-      }),
-    );
-  }
-
-  return completed;
-}
-
-/**
- * Delete all downloaded wallpapers in an album.
- */
-export async function deleteAlbum(albumSlug: string): Promise<number> {
-  const store = useWallpaperStore.getState();
-  const toDelete = Object.values(store.downloaded).filter(
-    (w) => w.albumSlug === albumSlug,
-  );
-
-  for (const w of toDelete) {
-    await store.removeDownloaded(w.themeName);
-  }
-
-  return toDelete.length;
 }

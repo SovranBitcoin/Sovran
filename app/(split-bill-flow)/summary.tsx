@@ -12,72 +12,32 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { z } from 'zod';
+
+import { useGuardedRouter as useRouter } from '@/shared/hooks/useGuardedRouter';
 import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
-import {
-  useSplitBillOrchestrator,
-  useSplitBillPaymentWatcher,
-} from '@/features/splitBill/hooks/useSplitBillOrchestrator';
-import {
-  useSplitBillTransactionsStore,
-  type SplitBillParticipant,
-} from '@/shared/stores/profile/splitBillTransactionsStore';
+import { useSplitBillOrchestrator } from '@/features/splitBill/hooks/useSplitBillOrchestrator';
+import { useSplitBillTransactionsStore } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler, type ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { HistoryEntryHeader } from '@/features/transactions';
 import { ListRow } from '@/shared/ui/composed/ListRow';
-import Icon from 'assets/icons';
-import { Screen, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
+import { ParticipantStatusIcon } from '@/features/splitBill/components/ParticipantStatusIcon';
+import { participantSubtitle } from '@/features/splitBill/lib/participantSubtitle';
 
-function ParticipantStatusIcon({
-  participant,
-  foreground,
-  danger,
-  success,
-}: {
-  participant: SplitBillParticipant;
-  foreground: string;
-  danger: string;
-  success: string;
-}) {
-  if (participant.paymentState === 'paid') {
-    return <Icon name="mdi:check-circle" size={22} color={success} />;
-  }
-  if (participant.paymentState === 'expired') {
-    return <Icon name="mdi:alert-circle" size={22} color={danger} />;
-  }
-  if (participant.deliveryState === 'failed') {
-    return <Icon name="mdi:alert-circle" size={22} color={danger} />;
-  }
-  if (participant.deliveryState === 'pending') {
-    return (
-      <Icon
-        name="ant-design:loading-outlined"
-        size={22}
-        color={opacity(foreground, 0.4)}
-        spin={{ duration: 1000, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
-      />
-    );
-  }
-  // sent, awaiting payment
-  return <Icon name="mdi:clock-outline" size={22} color={opacity(foreground, 0.5)} />;
-}
-
-function participantSubtitle(p: SplitBillParticipant): string {
-  if (p.paymentState === 'paid') return 'Paid ✓';
-  if (p.paymentState === 'expired') return 'Expired';
-  if (p.deliveryState === 'failed') return 'Delivery failed';
-  if (p.channel === 'qr-only') return 'Awaiting payment · tap for QR';
-  if (p.deliveryState === 'pending') return 'Sending invoice…';
-  return 'Invoice delivered · awaiting payment';
-}
+const ParamsSchema = z.object({
+  groupId: z.string().min(1).max(256).optional(),
+});
 
 export default function SplitBillSummaryScreen() {
   useLifecycleLogger('SplitBillSummaryScreen', walletLog);
@@ -85,7 +45,8 @@ export default function SplitBillSummaryScreen() {
   // one render per delivery + one per payment flip. Warn past 60.
   useRenderLogger('SplitBillSummaryScreen', 60, walletLog);
   const router = useRouter();
-  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'split-bill-flow.summary' });
+  const groupId = params?.groupId;
   const [foreground, background, danger, success] = useThemeColor([
     'foreground',
     'background',
@@ -96,7 +57,6 @@ export default function SplitBillSummaryScreen() {
 
   const group = useSplitBillTransactionsStore((s) => (groupId ? s.groups[groupId] : undefined));
   const { confirm } = useSplitBillOrchestrator();
-  useSplitBillPaymentWatcher(groupId);
 
   const [confirming, setConfirming] = useState(false);
   const hasStarted = group ? group.state !== 'draft' : false;
@@ -148,10 +108,17 @@ export default function SplitBillSummaryScreen() {
     setConfirming(true);
     try {
       await confirm(groupId);
+      // After confirm transitions the group to `awaiting`, hand the user off
+      // to the Split Bill detail (per-participant deck + payment watcher).
+      // Replace so back doesn't drop us on a now-stale summary screen.
+      router.replace({
+        pathname: '/(split-bill-flow)/detail',
+        params: { groupId },
+      });
     } finally {
       setConfirming(false);
     }
-  }, [groupId, confirming, confirm]);
+  }, [groupId, confirming, confirm, router]);
 
   const handleDone = useCallback(async () => {
     router.dismissAll();
@@ -162,18 +129,18 @@ export default function SplitBillSummaryScreen() {
 
   if (!group) {
     return (
-      <Screen name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.emptyCenter}>
           <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
             Split bill not found.
           </Text>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   return (
-    <Screen name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
       <View style={{ flex: 1, paddingTop: headerHeight }}>
         {/* Shared amount header — same component used by Mint/Melt/Send/ReceiveToken. */}
         <HistoryEntryHeader
@@ -209,13 +176,13 @@ export default function SplitBillSummaryScreen() {
                 p.source === 'ble'
                   ? {
                       icon: 'mdi:bluetooth',
-                      color: '#0A84FF',
-                      backgroundColor: opacity('#0A84FF', 0.12),
+                      color: BLUETOOTH_ACCENT,
+                      backgroundColor: opacity(BLUETOOTH_ACCENT, 0.12),
                     }
                   : undefined
               }
               title={p.nickname ?? p.pubkey?.slice(0, 12) ?? p.peerID ?? 'Participant'}
-              subtitle={participantSubtitle(p)}
+              subtitle={participantSubtitle(p, 'summary')}
               accent={
                 <AmountFormatter amount={p.amount} unit={group.unit} size={13} weight="heavy" />
               }
@@ -263,7 +230,7 @@ export default function SplitBillSummaryScreen() {
           />
         </HStack>
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }
 

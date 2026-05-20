@@ -1,49 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
 import type { CoreProof } from '@cashu/coco-core';
+import { getReservedProofs } from '@/shared/lib/cashu/managerInternals';
 
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { walletLog } from '@/shared/lib/logger';
 
-type UnsafeManager = {
-  proofRepository?: {
-    getReservedProofs?: () => Promise<CoreProof[]>;
-  };
-};
-
-export interface ReservedProofsResult {
+interface ReservedProofsResult {
   reservedTotal: number;
-  reservedProofs: (CoreProof & { usedByOperationId?: string })[];
+  reservedProofs: CoreProof[];
 }
 
 export function useReservedProofs(): ReservedProofsResult {
   const manager = useManager();
   const [reservedTotal, setReservedTotal] = useState(0);
-  const [reservedProofs, setReservedProofs] = useState<
-    (CoreProof & { usedByOperationId?: string })[]
-  >([]);
+  const [reservedProofs, setReservedProofs] = useState<CoreProof[]>([]);
 
-  const managerRef = useRef(manager);
-  managerRef.current = manager;
+  const managerRef = useLatestRef(manager);
 
   useEffect(() => {
     let cancelled = false;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function loadReserved() {
-      const repo = (managerRef.current as unknown as UnsafeManager).proofRepository;
-      if (!repo?.getReservedProofs) {
-        setReservedTotal(0);
-        setReservedProofs([]);
-        return;
-      }
-
       try {
-        const proofs = await repo.getReservedProofs();
+        const proofs = await getReservedProofs(managerRef.current);
         if (cancelled) return;
         const total = proofs.reduce((sum, proof) => sum + proof.amount, 0);
         walletLog.info('reservedProofs.loaded', { count: proofs.length, total });
         setReservedTotal(total);
-        setReservedProofs(proofs as (CoreProof & { usedByOperationId?: string })[]);
+        setReservedProofs(proofs);
       } catch (err) {
         if (cancelled) return;
         walletLog.error('reservedProofs.error', { error: err });
@@ -60,7 +46,7 @@ export function useReservedProofs(): ReservedProofsResult {
     }
 
     // Initial load (no debounce)
-    loadReserved();
+    void loadReserved();
 
     manager.on('proofs:reserved', scheduleLoad);
     manager.on('proofs:released', scheduleLoad);

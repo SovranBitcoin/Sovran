@@ -11,22 +11,35 @@
  * The first screen shows a close button, subsequent screens show a back button.
  */
 
+import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
+const PROFILE_OPTIONS = { title: 'Profile' };
+const USER_MESSAGES_OPTIONS = { headerShown: false };
+const SHARE_OPTIONS = { title: 'Share Profile' };
+const THREAD_OPTIONS = { title: 'Thread' };
+const GEOHASH_CHAT_OPTIONS = { headerShown: false };
+const BITCHAT_NETWORK_OPTIONS = { headerShown: false };
+const BITCHAT_DM_OPTIONS = { headerShown: false };
+
 export default function UserFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const screenOptions = useMemo(
+    () => createFlowLayoutScreenOptions({ foreground, background }),
+    [foreground, background]
+  );
 
   return (
-    <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
-      <Stack.Screen name="profile" options={{ title: 'Profile' }} />
-      <Stack.Screen name="userMessages" options={{ headerShown: false }} />
-      <Stack.Screen name="share" options={{ title: 'Share Profile' }} />
-      <Stack.Screen name="thread" options={{ title: 'Thread' }} />
-      <Stack.Screen name="geohashChat" options={{ headerShown: false }} />
-      <Stack.Screen name="bitchatNetwork" options={{ headerShown: false }} />
-      <Stack.Screen name="bitchatDM" options={{ headerShown: false }} />
+    <Stack screenOptions={screenOptions}>
+      <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
+      <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
+      <Stack.Screen name="share" options={SHARE_OPTIONS} />
+      <Stack.Screen name="thread" options={THREAD_OPTIONS} />
+      <Stack.Screen name="geohashChat" options={GEOHASH_CHAT_OPTIONS} />
+      <Stack.Screen name="bitchatNetwork" options={BITCHAT_NETWORK_OPTIONS} />
+      <Stack.Screen name="bitchatDM" options={BITCHAT_DM_OPTIONS} />
     </Stack>
   );
 }

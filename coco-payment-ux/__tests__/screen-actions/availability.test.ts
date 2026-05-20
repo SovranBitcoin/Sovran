@@ -14,7 +14,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getAvailableActions, isPaymentRequestPreview } from '../../src/screen-actions/availability';
+import {
+  getAvailableActions,
+  isPaymentRequestPreview,
+} from '../../src/screen-actions/availability';
 
 // ---------------------------------------------------------------------------
 // paymentRequest — Confirm availability
@@ -178,5 +181,38 @@ describe('isPaymentRequestPreview', () => {
       metadata: { phase: 'delivered' },
     };
     expect(isPaymentRequestPreview(entry)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// amountEntry — Next gate
+//
+// `next.available` and the per-variant ecash/lightning availability must
+// gate on the effective sat amount, not on raw numeric input. Otherwise a
+// fiat-mode user typing "$0.00001" sees an enabled Next that the handler
+// silently no-ops because the handler reads effectiveSatAmount.
+// ---------------------------------------------------------------------------
+
+describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () => {
+  it('disables next when effectiveSatAmount is 0 even if numericValue > 0', () => {
+    const entry = {
+      destination: 'sendEcash',
+      numericValue: 1e-5, // dollars in fiat mode
+      effectiveSatAmount: 0,
+    };
+    const actions = getAvailableActions('amountEntry', entry);
+    expect(actions.next.available).toBe(false);
+    const ecash = actions.next.variants?.find((v) => v.id === 'ecash');
+    expect(ecash?.available).toBe(false);
+  });
+
+  it('enables next when effectiveSatAmount is at least 1 sat', () => {
+    const entry = {
+      destination: 'sendEcash',
+      numericValue: 1, // sat mode
+      effectiveSatAmount: 1,
+    };
+    const actions = getAvailableActions('amountEntry', entry);
+    expect(actions.next.available).toBe(true);
   });
 });

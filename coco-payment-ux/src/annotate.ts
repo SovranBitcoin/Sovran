@@ -51,6 +51,27 @@ function totalBalance(ctx: WalletContext): number {
   return Object.values(ctx.mintBalances).reduce((a, b) => a + b, 0);
 }
 
+function hasLightningOption(options: PaymentOption[]): boolean {
+  return options.some(
+    (option) =>
+      option.kind === 'lightningInvoice' ||
+      option.kind === 'lightningAddress' ||
+      option.kind === 'lnurlp'
+  );
+}
+
+function hasMintHint(info?: PaymentRequestInfo | null): boolean {
+  return (info?.mints ?? []).length > 0;
+}
+
+function paymentRequestShouldPreferLightning(
+  option: PaymentOption,
+  options: PaymentOption[],
+  info?: PaymentRequestInfo | null
+): boolean {
+  return option.source === 'bip321' && !hasMintHint(info) && hasLightningOption(options);
+}
+
 // ---------------------------------------------------------------------------
 // Rules tables
 // ---------------------------------------------------------------------------
@@ -103,12 +124,21 @@ const STATUS_SORT: Record<OptionStatus, number> = {
   disabled: 2,
 };
 
+const PROMOTION_SORT: Partial<Record<PaymentOption['kind'], number>> = {
+  lightningInvoice: 0,
+  lightningAddress: 0,
+  lnurlp: 0,
+  ecashToken: 1,
+  paymentRequest: 2,
+};
+
 // ---------------------------------------------------------------------------
 // Annotate a single option
 // ---------------------------------------------------------------------------
 
 function annotateOption(
   option: PaymentOption,
+  options: PaymentOption[],
   ctx: WalletContext,
   detectors: Detectors,
   locale: string = 'en'
@@ -120,6 +150,13 @@ function annotateOption(
 
   const info =
     option.kind === 'paymentRequest' ? detectors.getPaymentRequestInfo(option.value) : null;
+
+  if (
+    option.kind === 'paymentRequest' &&
+    paymentRequestShouldPreferLightning(option, options, info)
+  ) {
+    return { option, status: 'available', reason: null };
+  }
 
   for (const rule of rules) {
     if (rule.applies(option, ctx, info)) {
@@ -145,13 +182,19 @@ export function annotateOptions(
   locale: string = 'en'
 ): AnnotatedOption[] {
   const annotated = options
-    .map((o) => annotateOption(o, ctx, detectors, locale))
+    .map((o) => annotateOption(o, options, ctx, detectors, locale))
     .sort((a, b) => STATUS_SORT[a.status] - STATUS_SORT[b.status]);
 
   const hasRecommended = annotated.some((a) => a.status === 'recommended');
   let result: AnnotatedOption[];
   if (!hasRecommended) {
-    const firstAvailable = annotated.find((a) => a.status === 'available');
+    const available = annotated
+      .filter((a) => a.status === 'available')
+      .sort(
+        (a, b) =>
+          (PROMOTION_SORT[a.option.kind] ?? 10) - (PROMOTION_SORT[b.option.kind] ?? 10)
+      );
+    const firstAvailable = available[0];
     if (firstAvailable) {
       result = annotated.map((a) =>
         a === firstAvailable ? { ...a, status: 'recommended' as OptionStatus } : a

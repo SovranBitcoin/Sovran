@@ -30,23 +30,27 @@
  *
  * After applying rules, annotateOptions:
  *   1. Sorts: recommended > available > disabled
- *   2. Promotes: if no option is naturally 'recommended', the first
+ *   2. Promotes: if no option is naturally 'recommended', the best
  *      'available' option gets promoted to 'recommended'
  */
 
 import { describe, it, expect } from 'vitest';
 import { annotateOptions } from '../../src/annotate';
 import { defaultDetectors } from '../../src/detectors';
-import { WALLETS, MINT1, MINT2, UNTRUSTED_MINT } from '../_harness/fixtures';
-import type { PaymentOption, WalletContext } from '../../src/types';
+import { WALLETS, MINT1, UNTRUSTED_MINT } from '../_harness/fixtures';
+import type { PaymentOption } from '../../src/types';
 
 /**
  * Helper to create a minimal PaymentOption for testing. The `source`
  * field indicates where the option came from — 'standalone' means it
  * was the only thing in the input (not from a BIP-321 container).
  */
-function makeOption(kind: PaymentOption['kind'], value: string): PaymentOption {
-  return { kind, value, source: 'standalone' };
+function makeOption(
+  kind: PaymentOption['kind'],
+  value: string,
+  source: PaymentOption['source'] = 'standalone'
+): PaymentOption {
+  return { kind, value, source };
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +136,7 @@ describe('annotateOptions — lightning', () => {
  * This ensures the UI always shows the best option first.
  *
  * PROMOTION RULE: If no option is naturally 'recommended' (i.e. no rule
- * explicitly sets recommended), the first 'available' option gets promoted
+ * explicitly sets recommended), the best 'available' option gets promoted
  * to 'recommended'. This ensures the UI always has a highlighted default.
  *
  * The promotion rule does NOT fire when a 'recommended' option already
@@ -156,9 +160,9 @@ describe('annotateOptions — sorting and promotion', () => {
     }
   });
 
-  it('promotes first available to recommended when none naturally recommended', () => {
+  it('promotes an available option to recommended when none naturally recommended', () => {
     // Both lightning and ecash with balance — neither has a natural
-    // 'recommended' rule, so the first available option gets promoted
+    // 'recommended' rule, so one available option gets promoted
     const options = [
       makeOption('lightningInvoice', 'lnbc1...'),
       makeOption('ecashToken', 'cashuAtoken...'),
@@ -193,6 +197,29 @@ describe('annotateOptions — sorting and promotion', () => {
     // Exactly one recommended — the payment request
     expect(recommended.length).toBe(1);
     expect(recommended[0].option.kind).toBe('paymentRequest');
+  });
+
+  it('promotes Lightning over a BIP-321 payment request without a mint hint', () => {
+    const prOption = makeOption('paymentRequest', 'fake_creq_for_test', 'bip321');
+    const lnOption = makeOption('lightningInvoice', 'lnbc1...', 'bip321');
+
+    const detectors = {
+      ...defaultDetectors,
+      getPaymentRequestInfo: () => ({
+        mints: [],
+        amount: 100,
+        unit: 'sat',
+      }),
+    };
+
+    const result = annotateOptions([prOption, lnOption], WALLETS.default, detectors);
+
+    expect(result.filter((a) => a.status === 'recommended')).toEqual([
+      expect.objectContaining({
+        option: expect.objectContaining({ kind: 'lightningInvoice' }),
+      }),
+    ]);
+    expect(result.find((a) => a.option.kind === 'paymentRequest')?.status).toBe('available');
   });
 });
 
@@ -265,7 +292,7 @@ describe('annotateOptions — paymentRequest rules', () => {
     expect(result[0].status).toBe('disabled');
   });
 
-  it('recommends when no mints specified (any trusted mint works)', () => {
+  it('recommends a standalone request when no mints are specified', () => {
     // PR has empty mints list — this means "any mint is fine."
     // The wallet trusts MINT1 and MINT2, and has balance → recommended.
     const detectors = {

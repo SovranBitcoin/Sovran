@@ -29,7 +29,7 @@ import { ContactRow } from '@/shared/ui/composed/ContactRow';
 import { candidateToIdentity } from '@/features/splitBill/lib/candidateToIdentity';
 import type { PickerCandidate } from '@/features/splitBill/hooks/useSplitBillParticipantPicker';
 
-export interface ParticipantRowProps {
+interface ParticipantRowProps {
   candidate: PickerCandidate;
   selected: boolean;
   /** Stable toggle handler. Row wraps the call with its own candidate to

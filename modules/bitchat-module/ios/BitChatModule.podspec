@@ -14,8 +14,11 @@ Pod::Spec.new do |s|
   s.license        = 'MIT'
   s.author         = 'Sovran'
   s.homepage       = 'https://github.com/permissionlesstech/bitchat'
-  # iOS 18 required by swift-secp256k1 CocoaPods distribution.
-  s.platforms      = { :ios => '18.0' }
+  # swift-secp256k1 v0.21.1's published CocoaPods metadata declares iOS 18.0
+  # and ships an iOS-18-built P256K.xcframework. The app config plugin pins
+  # local source-build podspecs under ios/podspecs/ so iOS 16.4+ devices do
+  # not crash while loading a binary built for a newer OS.
+  s.platforms      = { :ios => '16.4' }
   s.swift_version  = '5.9'
   s.source         = { git: '' }
   s.static_framework = true

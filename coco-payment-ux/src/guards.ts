@@ -15,6 +15,21 @@ import type {
   CapabilityCheckResult,
 } from './types';
 
+// 21M BTC × 1e8 sats/BTC. Anything beyond is not a representable Bitcoin
+// amount; cashu mints reject it and our sat-mode math assumes safe-int.
+export const MAX_SAT_AMOUNT = 2_100_000_000_000_000;
+
+/**
+ * True iff `n` is a positive, finite, safe-integer sat amount within the
+ * total Bitcoin supply. Use at every boundary that accepts an amount from
+ * an untrusted source — payment requests, BIP-321 query params, intent
+ * options — before assigning to a flow context. Floating-point fiat values
+ * must be converted to sats first; this helper deliberately rejects them.
+ */
+export function isValidSatAmount(n: unknown): n is number {
+  return typeof n === 'number' && Number.isSafeInteger(n) && n > 0 && n <= MAX_SAT_AMOUNT;
+}
+
 // ---------------------------------------------------------------------------
 // Intent validation
 // ---------------------------------------------------------------------------

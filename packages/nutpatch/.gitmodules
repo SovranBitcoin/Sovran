@@ -1,3 +1,0 @@
-[submodule "cpp/vendor/secp256k1"]
-	path = cpp/vendor/secp256k1
-	url = https://github.com/bitcoin-core/secp256k1

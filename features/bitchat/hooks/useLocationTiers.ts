@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
-import { encodeGeohash, type LocationTier } from 'bitchat-module';
+import { encodeGeohash } from 'bitchat-module/geohash';
+import type { LocationTier } from 'bitchat-module';
 import { LOCATION_TIERS, BLUETOOTH_TIER } from '../lib/constants';
+import { bitchatLog } from '@/shared/lib/logger';
 
 export interface TierEntry extends LocationTier {
   transport: 'ble' | 'nostr';
@@ -95,8 +97,11 @@ export function useLocationTiers() {
               return name ? { ...tier, displayName: name } : tier;
             })
           );
-        } catch {
+        } catch (e) {
           // Reverse geocoding is best-effort; tiers still work without it.
+          bitchatLog.warn('bitchat.location_tiers.reverse_geocode_failed', {
+            error: e instanceof Error ? e.message : String(e),
+          });
         }
       } catch (e) {
         if (!cancelled) {
@@ -107,7 +112,7 @@ export function useLocationTiers() {
       }
     }
 
-    compute();
+    void compute();
     return () => {
       cancelled = true;
     };

@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MarmotClient } from '@internet-privacy/marmot-ts';
-import { useWhitenoise } from '../WhitenoiseProvider';
-import { log } from '@/shared/lib/logger';
-
-const wnLog = log.child({ module: 'whitenoise' });
+import { useWhitenoise } from '../WhitenoiseContext';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { wnLog } from '@/shared/lib/logger';
 
 const TARGET_KEY_PACKAGE_COUNT = 2;
 
-export type WhitenoiseSetupState = {
+type WhitenoiseSetupState = {
   isReady: boolean;
   keyPackageCount: number;
   isLoading: boolean;
@@ -47,8 +46,12 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
   useEffect(() => {
     void refresh();
     if (!client) return;
-    const onAdded = () => void refresh();
-    const onRemoved = () => void refresh();
+    // Listener path updates the count directly. A full `refresh()` here
+    // would (a) flash isLoading on every event and disable the action
+    // button mid-bootstrap, and (b) fire one count() RPC per
+    // create() inside the bootstrap loop instead of one at the end.
+    const onAdded = () => setKeyPackageCount((c) => c + 1);
+    const onRemoved = () => setKeyPackageCount((c) => Math.max(0, c - 1));
     client.keyPackages.on('keyPackageAdded', onAdded);
     client.keyPackages.on('keyPackageRemoved', onRemoved);
     return () => {
@@ -57,7 +60,7 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
     };
   }, [client, refresh]);
 
-  const bootstrap = useCallback(async () => {
+  const bootstrapInner = useCallback(async () => {
     if (!client) {
       setError('White Noise client not ready');
       return;
@@ -91,6 +94,11 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
       setIsBootstrapping(false);
     }
   }, [client, relays]);
+
+  // Key-package creation is finite-resource work — a duplicate concurrent
+  // bootstrap would publish two key packages per slot and burn relay
+  // round-trips. `isBootstrapping` is React state and lands too late.
+  const bootstrap = useSingleFlight(bootstrapInner);
 
   return {
     isReady: keyPackageCount >= TARGET_KEY_PACKAGE_COUNT,

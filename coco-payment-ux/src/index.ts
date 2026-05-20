@@ -16,10 +16,13 @@ export {
 // Re-export Manager type so consumers don't need to import coco-cashu-core
 export type { Manager } from '@cashu/coco-core';
 
+// Logger seam — consumers inject a structured logger via the `logger` option
+// on `createCocoPaymentUX`; tests and standalone consumers get a no-op default.
+export { setLogger, type CocoLogger } from './logger';
+
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';
-export { selectMintContext, buildMintAvailability } from './machine/selectMintContext';
 
 // Pipeline utilities (usable standalone)
 export { parsePaymentInput, isBip321 } from './parse';
@@ -27,7 +30,13 @@ export { resolveIntent } from './intent';
 export { defaultDetectors } from './detectors';
 export { annotateOptions } from './annotate';
 export { selectMint, selectMintForMelt, type MintSelectionConfig } from './mint-selection';
-export { validateIntent, checkWalletCapabilities, checkAllCapabilities } from './guards';
+export {
+  validateIntent,
+  checkWalletCapabilities,
+  checkAllCapabilities,
+  isValidSatAmount,
+  MAX_SAT_AMOUNT,
+} from './guards';
 export { getNfcFallback, getAllFallbacks } from './nfc-fallback';
 
 // Normalization
@@ -68,14 +77,10 @@ export type {
   ScanSourceResult,
   ScanSources,
   NfcIOAdapter,
+  RecipientProfile,
 } from './machine/types';
 
-export type {
-  MintAvailability,
-  MintAvailabilityStatus,
-  MintAvailabilityReason,
-  MintResolutionContext,
-} from './machine/selectMintContext';
+export type { MintAvailability } from './machine/selectMintContext';
 
 // Amount actions (amount screen action system)
 export {
@@ -134,16 +139,27 @@ export {
   parseLnurlp,
   decodeUrlOrAddress,
   isLightningInvoiceBolt11,
+  LnurlError,
+  type LnurlErrorCode,
 } from './lnurl';
 
-// Nostr (NIP-17 gift wrap + relay publishing)
+// Recipient identity resolution (Lightning Address → Nostr hex pubkey)
+export { fetchNip05Pubkey } from './nip05';
+export { resolveRecipientPubkey } from './recipient';
+
+// Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
+// `DOMException`, so callers must duck-type aborts via `isAbortError`
+// rather than `instanceof DOMException`. The same primitives back the
+// app's `apiClient` so there's one canonical implementation.
 export {
-  sendDirectMessageToRelays,
-  buildGiftWrappedDM,
-  buildGiftWrappedDMPair,
-  unwrapGiftWrap,
-  type UnwrappedDM,
-} from './nostr';
+  combineSignals,
+  isAbortError,
+  safeFetch,
+  timeoutSignal,
+  withTimeout,
+  DEFAULT_TIMEOUT_MS,
+  type RequestControls,
+} from './safeFetch';
 
 // Domain types
 export type {

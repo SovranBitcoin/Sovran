@@ -2,20 +2,25 @@
  * @fileoverview Scan History Store
  *
  * Keeps track of all QR codes/strings that have been scanned via QR or NFC.
- * Stores both raw and processed versions for different use cases.
  *
- * This can be used for:
+ * Used for:
  * - Recently scanned items
  * - Scan analytics
  * - Quick re-access to previously scanned data
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { mintLocalId } from '@/shared/lib/id';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const profileStorage = createProfileScopedStorage();
+
+/** Cap matches `searchHistoryStore`'s MAX_RECENT_SEARCHES convention; tail-evicts oldest. */
+const MAX_SCAN_HISTORY = 500;
 
 /** What type of data was scanned */
 type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'unknown';
@@ -28,8 +33,6 @@ interface ScanHistoryEntry {
   id: string;
   /** The raw string as scanned */
   raw: string;
-  /** The processed/normalized string (e.g., npub without nostr: prefix) */
-  processed: string;
   /** Type of the scanned data (what was scanned) */
   type: ScanType;
   /** Source of the scan (how it was scanned) */
@@ -48,205 +51,174 @@ interface ScanHistoryEntry {
 
 interface ScanHistoryState {
   entries: ScanHistoryEntry[];
+  /**
+   * Indexed view of `entries` keyed by `transactionId` so row + detail
+   * selectors can resolve a scan in O(1) instead of scanning `entries`
+   * once per mounted row. Maintained by `addScan`/`linkTransaction` and
+   * rebuilt from `entries` after rehydration; not persisted. Direct
+   * `setState({ entries })` (test-only) won't refresh it — call an action
+   * or seed `entriesByTransactionId` alongside.
+   */
+  entriesByTransactionId: Record<string, ScanHistoryEntry>;
+}
+
+function buildEntriesByTransactionId(
+  entries: ScanHistoryEntry[]
+): Record<string, ScanHistoryEntry> {
+  const byTx: Record<string, ScanHistoryEntry> = {};
+  for (const entry of entries) {
+    if (entry.transactionId) byTx[entry.transactionId] = entry;
+  }
+  return byTx;
 }
 
 interface ScanHistoryActions {
-  /** Add a scan to history */
+  /** Add a scan to history. Dedupes on the normalised raw (see `normaliseForDedupe`). */
   addScan: (
     raw: string,
-    processed: string,
     type: ScanType,
     source: ScanSource,
     inputType?: string,
     container?: string,
     optionKinds?: string[]
   ) => void;
-  /** Get all scan history entries */
-  getEntries: () => ScanHistoryEntry[];
-  /** Get entries filtered by type */
-  getEntriesByType: (type: ScanType) => ScanHistoryEntry[];
-  /** Get most recent scans (default: 20) */
-  getRecentScans: (limit?: number) => ScanHistoryEntry[];
-  /** Get most recent scans of a specific type */
-  getRecentScansByType: (type: ScanType, limit?: number) => ScanHistoryEntry[];
-  /** Check if a raw string has been scanned before */
-  hasScanned: (raw: string) => boolean;
-  /** Find an entry by raw string */
-  findByRaw: (raw: string) => ScanHistoryEntry | undefined;
-  /** Find an entry by processed string */
-  findByProcessed: (processed: string) => ScanHistoryEntry | undefined;
-  /** Find an entry by transaction ID */
-  findByTransactionId: (transactionId: string) => ScanHistoryEntry | undefined;
-  /** Link a scan entry to a transaction by matching the processed string */
-  linkTransaction: (processed: string, transactionId: string) => void;
-  /** Remove a specific entry by id */
-  removeEntry: (id: string) => void;
-  /** Clear all history */
-  clearHistory: () => void;
-  /** Clear history for a specific type */
-  clearHistoryByType: (type: ScanType) => void;
-  /** Clear all stored data (state + AsyncStorage) */
-  clearAllData: () => Promise<void>;
+  /** Link a scan entry to a transaction by matching the raw string. */
+  linkTransaction: (raw: string, transactionId: string) => void;
 }
 
 type ScanHistoryStore = ScanHistoryState & ScanHistoryActions;
 
-const generateId = () => `scan-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+/**
+ * Lookup key for dedupe — never persisted. Strips a leading payment-URI scheme
+ * (`nostr:`, `cashu:`, `bitcoin:`, `lightning:`), trims, and lower-cases so
+ * trivially-different surface forms collapse onto the same prior entry.
+ */
+export function normaliseForDedupe(raw: string): string {
+  const trimmed = raw.trim().toLowerCase();
+  return trimmed.replace(/^(nostr|cashu|bitcoin|lightning):/, '');
+}
+
+// `processed` was an in-memory mirror of `raw` (the sole call site passed raw
+// twice). Removed from the schema; older persisted blobs that still carry
+// `processed` validate via `looseObject` and the value ages out via the cap.
+const PersistedScanEntry = z.looseObject({
+  id: z.string().max(128),
+  raw: z.string().max(16_384),
+  type: z.enum(['npub', 'ecash', 'lightning', 'mint', 'paymentRequest', 'unknown']),
+  source: z.enum(['qr', 'nfc', 'paste', 'deeplink']),
+  inputType: z.string().max(64).optional(),
+  container: z.string().max(64).optional(),
+  optionKinds: z.array(z.string().max(128)).max(64).optional(),
+  scannedAt: z.number().int().nonnegative(),
+  transactionId: z.string().max(256).optional(),
+});
+
+const PersistedScanHistoryStore = z.object({
+  entries: z.array(PersistedScanEntry).max(MAX_SCAN_HISTORY).default([]),
+});
 
 export const useScanHistoryStore = create<ScanHistoryStore>()(
-  persist(
-    (set, get) => ({
-      // Initial state
-      entries: [],
+  subscribeWithSelector(
+    persist(
+      (set) => ({
+        entries: [],
+        entriesByTransactionId: {},
 
-      // Add a scan to history
-      addScan: (
-        raw: string,
-        processed: string,
-        type: ScanType,
-        source: ScanSource,
-        inputType?: string,
-        container?: string,
-        optionKinds?: string[]
-      ) => {
-        storeLog.info('store.scan_history.add', { type, source, inputType, container });
-        const { entries } = get();
-        const now = Date.now();
+        addScan: (
+          raw: string,
+          type: ScanType,
+          source: ScanSource,
+          inputType?: string,
+          container?: string,
+          optionKinds?: string[]
+        ) => {
+          storeLog.info('store.scan_history.add', { type, source, inputType, container });
+          const now = Date.now();
+          const key = normaliseForDedupe(raw);
 
-        // Check if this raw string was already scanned
-        const existingIndex = entries.findIndex((entry) => entry.raw === raw);
+          set((state) => {
+            const existingIndex = state.entries.findIndex(
+              (entry) => normaliseForDedupe(entry.raw) === key
+            );
+            let nextEntries: ScanHistoryEntry[];
+            if (existingIndex !== -1) {
+              nextEntries = [...state.entries];
+              nextEntries[existingIndex] = {
+                ...nextEntries[existingIndex],
+                source,
+                scannedAt: now,
+                ...(inputType != null && { inputType }),
+                ...(container != null && { container }),
+                ...(optionKinds != null && { optionKinds }),
+              };
+            } else {
+              const newEntry: ScanHistoryEntry = {
+                id: mintLocalId('scan'),
+                raw,
+                type,
+                source,
+                ...(inputType != null && { inputType }),
+                ...(container != null && { container }),
+                ...(optionKinds != null && { optionKinds }),
+                scannedAt: now,
+              };
+              const appended = [...state.entries, newEntry];
+              // Tail-evict oldest by scannedAt once the cap is breached. Stable when under cap.
+              nextEntries =
+                appended.length > MAX_SCAN_HISTORY
+                  ? [...appended]
+                      .sort((a, b) => b.scannedAt - a.scannedAt)
+                      .slice(0, MAX_SCAN_HISTORY)
+                  : appended;
+            }
+            return {
+              entries: nextEntries,
+              entriesByTransactionId: buildEntriesByTransactionId(nextEntries),
+            };
+          });
+        },
 
-        if (existingIndex !== -1) {
-          // Update timestamp and source for existing entry
-          const updated = [...entries];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            source,
-            scannedAt: now,
-            ...(inputType != null && { inputType }),
-            ...(container != null && { container }),
-            ...(optionKinds != null && { optionKinds }),
-          };
-          set({ entries: updated });
-        } else {
-          // Add new entry
-          const newEntry: ScanHistoryEntry = {
-            id: generateId(),
-            raw,
-            processed,
-            type,
-            source,
-            ...(inputType != null && { inputType }),
-            ...(container != null && { container }),
-            ...(optionKinds != null && { optionKinds }),
-            scannedAt: now,
-          };
-          set({ entries: [...entries, newEntry] });
-        }
-      },
+        linkTransaction: (raw: string, transactionId: string) => {
+          if (!raw || !transactionId) return;
+          storeLog.debug('store.scan_history.link_transaction', { transactionId });
 
-      // Get all entries
-      getEntries: () => {
-        return get().entries;
-      },
-
-      // Get entries filtered by type
-      getEntriesByType: (type: ScanType) => {
-        return get().entries.filter((entry) => entry.type === type);
-      },
-
-      // Get most recent scans
-      getRecentScans: (limit = 20) => {
-        const { entries } = get();
-        return [...entries].sort((a, b) => b.scannedAt - a.scannedAt).slice(0, limit);
-      },
-
-      // Get most recent scans of a specific type
-      getRecentScansByType: (type: ScanType, limit = 20) => {
-        const { entries } = get();
-        return [...entries]
-          .filter((entry) => entry.type === type)
-          .sort((a, b) => b.scannedAt - a.scannedAt)
-          .slice(0, limit);
-      },
-
-      // Check if a raw string has been scanned
-      hasScanned: (raw: string) => {
-        return get().entries.some((entry) => entry.raw === raw);
-      },
-
-      // Find by raw string
-      findByRaw: (raw: string) => {
-        return get().entries.find((entry) => entry.raw === raw);
-      },
-
-      // Find by processed string
-      findByProcessed: (processed: string) => {
-        return get().entries.find((entry) => entry.processed === processed);
-      },
-
-      // Find by transaction ID
-      findByTransactionId: (transactionId: string) => {
-        return get().entries.find((entry) => entry.transactionId === transactionId);
-      },
-
-      // Link a scan entry to a transaction by matching the processed string
-      linkTransaction: (processed: string, transactionId: string) => {
-        if (!processed || !transactionId) return;
-        storeLog.debug('store.scan_history.link_transaction', { transactionId });
-
-        const { entries } = get();
-        const index = entries.findIndex((entry) => entry.processed === processed);
-
-        if (index !== -1) {
-          const updated = [...entries];
-          updated[index] = {
-            ...updated[index],
-            transactionId,
-          };
-          set({ entries: updated });
-        }
-      },
-
-      // Remove entry by id
-      removeEntry: (id: string) => {
-        storeLog.debug('store.scan_history.remove', { id });
-        const { entries } = get();
-        set({ entries: entries.filter((entry) => entry.id !== id) });
-      },
-
-      // Clear all history
-      clearHistory: () => {
-        storeLog.info('store.scan_history.clear');
-        set({ entries: [] });
-      },
-
-      // Clear history for a specific type
-      clearHistoryByType: (type: ScanType) => {
-        storeLog.info('store.scan_history.clear_by_type', { type });
-        const { entries } = get();
-        set({ entries: entries.filter((entry) => entry.type !== type) });
-      },
-
-      // Clear all stored data (state + AsyncStorage)
-      clearAllData: async () => {
-        try {
-          await profileStorage.removeItem('scan-history-store');
-          set({ entries: [] });
-        } catch (error) {
-          log.error('store.scan_history.clear_failed', { error });
-          throw error;
-        }
-      },
-    }),
-    {
-      name: 'scan-history-store',
-      storage: createJSONStorage(() => profileStorage),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          log.warn('store.scan_history.rehydrate_failed', { error });
-        }
-      },
-    }
+          set((state) => {
+            const index = state.entries.findIndex((entry) => entry.raw === raw);
+            if (index === -1) return state;
+            const nextEntries = [...state.entries];
+            nextEntries[index] = { ...nextEntries[index], transactionId };
+            return {
+              entries: nextEntries,
+              entriesByTransactionId: buildEntriesByTransactionId(nextEntries),
+            };
+          });
+        },
+      }),
+      persistConfig({
+        name: 'scan-history-store',
+        storage: profileStorage,
+        schema: PersistedScanHistoryStore,
+        partialize: (state) => ({ entries: state.entries }),
+        afterHydrate: (state) => {
+          if (state) {
+            state.entriesByTransactionId = buildEntriesByTransactionId(state.entries);
+          }
+        },
+      })
+    )
   )
 );
+
+/**
+ * O(1) selector for the scan-history entry linked to a given transaction id.
+ * Row + detail surfaces both consume this so they share one subscription
+ * shape and skip the per-render `entries.find` scan that compounds with
+ * scroll length × scan-history depth.
+ */
+export function useScanEntryForTransactionId(
+  transactionId: string | undefined
+): ScanHistoryEntry | null {
+  return useScanHistoryStore((state) =>
+    transactionId ? (state.entriesByTransactionId[transactionId] ?? null) : null
+  );
+}

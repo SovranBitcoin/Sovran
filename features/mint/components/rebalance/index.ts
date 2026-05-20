@@ -14,3 +14,9 @@ export {
   addLocalHistoryEdges,
   getLocalCandidatesForDestination,
 } from './routing';
+export {
+  releaseTrustWindow,
+  formatStrandedRoutingDetail,
+  type StrandedMint,
+  type ReleaseTrustWindowResult,
+} from './releaseTrustWindow';

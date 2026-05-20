@@ -2,11 +2,10 @@
  * Wallet header layout constants and dimension helpers.
  * Used by the wallet tab layout and screens that need consistent header sizing.
  *
- * In components, prefer useWindowDimensions() + getHeaderTitleWidthFromWidth(width)
- * over getHeaderTitleWidth() so layout reacts to orientation/resize.
+ * Components should pull width from `useWindowDimensions()` and pass it into
+ * `getHeaderTitleWidthFromWidth(windowWidth)` so layout reacts to orientation
+ * and split-view changes.
  */
-
-import { Dimensions } from 'react-native';
 
 /** Shared header layout constants for calculating title dimensions. */
 export const HEADER_LAYOUT = {
@@ -30,24 +29,6 @@ export function getHeaderTitleWidthFromWidth(windowWidth: number): number {
   return windowWidth - SIDE * 2;
 }
 
-/** Use when hook context not available (e.g. outside component). */
-export function getHeaderTitleWidth(): number {
-  return getHeaderTitleWidthFromWidth(Dimensions.get('window').width);
-}
-
-export function getHeaderTitleHeight(): number {
-  return HEADER_LAYOUT.BUTTON_HEIGHT;
-}
-
-export function getHeaderContentWidth(): number {
-  return getHeaderTitleWidth() - HEADER_LAYOUT.CONTENT_PADDING_HORIZONTAL;
-}
-
-/** Content dimensions from a known window width (for use with useWindowDimensions). */
-export function getHeaderContentWidthFromWidth(windowWidth: number): number {
-  return getHeaderTitleWidthFromWidth(windowWidth) - HEADER_LAYOUT.CONTENT_PADDING_HORIZONTAL;
-}
-
 /** Content width derived from button width (e.g. for BalanceDisplay inside header). */
 export function getContentWidthFromButtonWidth(
   buttonWidth: number | undefined
@@ -55,18 +36,3 @@ export function getContentWidthFromButtonWidth(
   if (buttonWidth === undefined) return undefined;
   return Math.max(0, buttonWidth - HEADER_LAYOUT.CONTENT_PADDING_HORIZONTAL);
 }
-
-export function getHeaderContentHeight(): number {
-  return getHeaderTitleHeight() - HEADER_LAYOUT.CONTENT_PADDING_VERTICAL;
-}
-
-/** NFC payment limit tiers for the header action menu. */
-export const PAYMENT_TIERS = [
-  { label: 'Up to $10', usdLimit: 10, icon: 'cup.and.saucer.fill' },
-  { label: 'Up to $50', usdLimit: 50, icon: 'fork.knife' },
-  { label: 'Up to $100', usdLimit: 100, icon: 'cart.fill' },
-  { label: 'No limit', usdLimit: undefined, icon: 'exclamationmark.triangle.fill' },
-] as const;
-
-/** Mock amount (sats) shown in NFC success overlay when triggered from dev "Preview" button. */
-export const MOCK_NFC_SUCCESS_SATS = 21;

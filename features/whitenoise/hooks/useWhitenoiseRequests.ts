@@ -2,11 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { UnreadInvite } from '@internet-privacy/marmot-ts';
-import { useWhitenoise } from '../WhitenoiseProvider';
+import { useWhitenoise } from '../WhitenoiseContext';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
-import { log } from '@/shared/lib/logger';
-
-const wnLog = log.child({ module: 'whitenoise' });
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { wnLog } from '@/shared/lib/logger';
 
 export type WhitenoiseRequest = {
   /** Rumor ID — stable across the lifetime of the unread entry. */
@@ -19,7 +18,7 @@ export type WhitenoiseRequest = {
   rumor: UnreadInvite;
 };
 
-export type UseWhitenoiseRequestsState = {
+type UseWhitenoiseRequestsState = {
   requests: WhitenoiseRequest[];
   isReady: boolean;
   busyId: string | null;
@@ -71,7 +70,7 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     };
   }, [inviteReader]);
 
-  const accept = useCallback(
+  const acceptInner = useCallback(
     async (request: WhitenoiseRequest) => {
       if (!client || !inviteReader) {
         setError('White Noise client not ready');
@@ -110,7 +109,7 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     [accountIndex, client, inviteReader]
   );
 
-  const decline = useCallback(
+  const declineInner = useCallback(
     async (request: WhitenoiseRequest) => {
       if (!inviteReader) return;
       setBusyId(request.id);
@@ -131,6 +130,13 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     },
     [inviteReader]
   );
+
+  // `busyId` is React state and lands too late to block a rapid second tap.
+  // The single-flight guard drops the duplicate before it reaches
+  // `joinGroupFromWelcome` (which would consume a second key package and
+  // leave the inviteReader in an inconsistent state).
+  const accept = useSingleFlight(acceptInner);
+  const decline = useSingleFlight(declineInner);
 
   return {
     requests,

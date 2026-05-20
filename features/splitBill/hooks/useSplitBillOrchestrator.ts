@@ -7,7 +7,7 @@
  *      `requestLightningInvoice(group.mintUrl, p.amount)` for each. Every
  *      invoice mints into the USER's wallet — each participant pays their
  *      share of the bill, total sats arrive at our mint.
- *   3. Tags the quote id + bolt11 + expiresAt on each participant.
+ *   3. Tags the quote id + bolt11 on each participant.
  *   4. Delivers the invoice via the participant's channel:
  *        - `nostr-dm` → NIP-17 gift-wrap (BitChatNostrBridge)
  *        - `ble-dm`   → Noise private message (BitChatBLEBridge)
@@ -16,10 +16,11 @@
  *      don't abort the overall flow; the user can retry per-participant
  *      from the detail screen.
  *
- * Also exposes `useSplitBillPaymentWatcher(groupId)` — subscribes to coco
- * `HistoryEntry` changes and flips participants' `paymentState` to `paid`
- * when their mint quote hits ISSUED/PAID. Summary + detail screens mount
- * this so payment updates propagate live.
+ * Also exposes `useSplitBillPaymentReconciler()` — subscribes to coco's
+ * `history:updated` event bus and flips participants' `paymentState` to
+ * `paid`/`expired` when their mint quote hits ISSUED/PAID/EXPIRED. Mount
+ * once at app root so reconciliation runs regardless of which screen the
+ * user has open.
  */
 
 import { useCallback, useEffect, useRef } from 'react';
@@ -27,9 +28,10 @@ import { useManager } from '@cashu/coco-react';
 import NDK, { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
 
-import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
+import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { mintLocalId } from '@/shared/lib/id';
 import { buildRecipientGiftWrap, buildSenderSelfCopyWrap } from '@/shared/lib/nostr/nip17';
 import { useSplitBillTransactionsStore } from '@/shared/stores/profile/splitBillTransactionsStore';
 import type {
@@ -37,6 +39,7 @@ import type {
   SplitBillParticipant,
 } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { paymentLog } from '@/shared/lib/logger';
+import { reconcileSplitBillHistoryUpdate } from '@/features/splitBill/lib/reconcileSplitBillHistoryUpdate';
 
 // ---------------------------------------------------------------------------
 
@@ -145,6 +148,11 @@ function chunkUtf8(text: string, maxBytes = 255): string[] {
  * failed self-copy publish doesn't affect the recipient's DM delivery, just
  * whether the sender sees the sent invoice in their own Contacts thread.
  *
+ * `pendingTimers` is the orchestrator hook's per-instance Set of deferred
+ * timer ids. The hook clears every entry on unmount so the closure (which
+ * captures `senderPrivateKey: Uint8Array`) becomes unreachable for GC the
+ * moment the user dismisses the flow — addresses 43.json#F-015.
+ *
  * Each step is instrumented so `log-doctor timeline --event
  * "nostr\.(build|publish)"` breaks the crypto vs relay costs apart.
  */
@@ -152,7 +160,8 @@ async function sendNostrDM(
   ndk: NDK,
   senderPrivateKey: Uint8Array,
   recipientPublicKey: string,
-  body: string
+  body: string,
+  pendingTimers: Set<ReturnType<typeof setTimeout>>
 ): Promise<void> {
   const hydrate = (w: {
     kind: number;
@@ -199,7 +208,8 @@ async function sendNostrDM(
   // drains and the UI gets a paint cycle. setTimeout(…, 0) is chosen over
   // queueMicrotask so the event loop can process UI touches / timers /
   // pending inbound DM decrypts before we kick off ~1s of crypto.
-  setTimeout(() => {
+  const timerId: ReturnType<typeof setTimeout> = setTimeout(() => {
+    pendingTimers.delete(timerId);
     const selfBuildStart = performance.now();
     let senderWrap;
     try {
@@ -227,6 +237,7 @@ async function sendNostrDM(
         });
       });
   }, 0);
+  pendingTimers.add(timerId);
 }
 
 // ---------------------------------------------------------------------------
@@ -234,10 +245,18 @@ async function sendNostrDM(
 // ---------------------------------------------------------------------------
 
 export function useSplitBillOrchestrator() {
-  const { requestLightningInvoice } = useLightningOperations();
+  const manager = useManager();
+  const requestLightningInvoice = useCallback(
+    (mintUrl: string, amount: number) =>
+      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+    [manager]
+  );
   const nickname = useBitchatNickname();
   const nicknameRef = useRef(nickname);
   nicknameRef.current = nickname;
+  const bitchatProfileScope = useBitchatProfileScope();
+  const bitchatProfileScopeRef = useRef(bitchatProfileScope);
+  bitchatProfileScopeRef.current = bitchatProfileScope;
 
   // NDK + main Nostr private key — same sources UserMessagesScreen uses
   // for its DM send. Held behind refs so `confirm` / `retryDelivery` can
@@ -253,6 +272,17 @@ export function useSplitBillOrchestrator() {
   useEffect(() => {
     keysRef.current = keys;
   }, [keys]);
+
+  // Pending self-copy timer ids — see sendNostrDM. Cleared on unmount so a
+  // dismissed flow doesn't keep `senderPrivateKey` reachable for ~1s.
+  const pendingTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  useEffect(() => {
+    const timers = pendingTimersRef.current;
+    return () => {
+      for (const id of timers) clearTimeout(id);
+      timers.clear();
+    };
+  }, []);
 
   const confirm = useCallback(
     async (groupId: string) => {
@@ -317,15 +347,12 @@ export function useSplitBillOrchestrator() {
               warnThresholdMs: 3000,
             }
           );
-          const mintQuoteId =
-            (mintOp as any)?.quoteId ?? (mintOp as any)?.quote ?? (mintOp as any)?.id;
-          const bolt11 = (mintOp as any)?.request ?? (mintOp as any)?.invoice ?? undefined;
-          const expiresAt = (mintOp as any)?.expiresAt ?? undefined;
+          const { quoteId: mintQuoteId, request: bolt11 } = mintOp;
 
           if (mintQuoteId) {
             useSplitBillTransactionsStore
               .getState()
-              .tagMintQuote(groupId, p.id, { mintQuoteId: String(mintQuoteId), bolt11, expiresAt });
+              .tagMintQuote(groupId, p.id, { mintQuoteId, bolt11 });
             quoteSuccessCount++;
           }
         } catch (err) {
@@ -427,7 +454,13 @@ export function useSplitBillOrchestrator() {
               pubkeyPrefix: p.pubkey.slice(0, 8),
               bodyLen: body.length,
             });
-            await sendNostrDM(currentNdk, currentKeys.privateKey, p.pubkey, body);
+            await sendNostrDM(
+              currentNdk,
+              currentKeys.privateKey,
+              p.pubkey,
+              body,
+              pendingTimersRef.current
+            );
           } else if (p.channel === 'ble-dm' && p.peerID) {
             // Per-peer bring-up: trigger the lazy Noise XX handshake and
             // wait a short beat for the init packet to hit the air before
@@ -480,7 +513,12 @@ export function useSplitBillOrchestrator() {
             // silent drops as well as scrambled bubbles.
             const chunksStartAt = performance.now();
             for (const chunk of chunks) {
-              await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick);
+              await sendBLEPrivateMessage(
+                p.peerID,
+                chunk,
+                effectiveNick,
+                mintLocalId('split-bill')
+              );
             }
             flow.debug('split_bill.deliver.ble.chunks_sent', {
               participantId: p.id,
@@ -528,8 +566,18 @@ export function useSplitBillOrchestrator() {
       const bleWorker = (async (): Promise<DeliveryOutcome[]> => {
         if (bleParticipants.length > 0) {
           const effectiveNick = nicknameRef.current || 'sovran';
+          const profileScope = bitchatProfileScopeRef.current;
+          if (!profileScope) {
+            flow.warn('split_bill.deliver.ble.no_profile_scope');
+            for (const p of bleParticipants) {
+              useSplitBillTransactionsStore
+                .getState()
+                .markDelivered(groupId, p.id, false, 'BitChat profile scope unavailable');
+            }
+            return bleParticipants.map(() => 'failed' as const);
+          }
           const startupAt = performance.now();
-          await startBLE(effectiveNick).catch((err) => {
+          await startBLE(effectiveNick, profileScope).catch((err) => {
             flow.warn('split_bill.deliver.ble.start_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
@@ -611,11 +659,21 @@ export function useSplitBillOrchestrator() {
           pubkeyPrefix: p.pubkey.slice(0, 8),
           bodyLen: body.length,
         });
-        await sendNostrDM(currentNdk, currentKeys.privateKey, p.pubkey, body);
+        await sendNostrDM(
+          currentNdk,
+          currentKeys.privateKey,
+          p.pubkey,
+          body,
+          pendingTimersRef.current
+        );
       } else if (p.channel === 'ble-dm' && p.peerID) {
         // Same bring-up sequence as the confirm path — see comments there.
         const effectiveNick = nicknameRef.current || 'sovran';
-        await startBLE(effectiveNick).catch(() => undefined);
+        const profileScope = bitchatProfileScopeRef.current;
+        if (!profileScope) {
+          throw new Error('BitChat profile scope unavailable');
+        }
+        await startBLE(effectiveNick, profileScope).catch(() => undefined);
         await startBLEPrivateChat(p.peerID).catch((err) => {
           flow.warn('split_bill.retry_delivery.ble.handshake_failed', {
             participantId,
@@ -632,7 +690,7 @@ export function useSplitBillOrchestrator() {
           chunks: chunks.length,
         });
         for (const chunk of chunks) {
-          await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick);
+          await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick, mintLocalId('split-bill'));
         }
       } else {
         throw new Error('QR-only: no delivery channel');
@@ -659,90 +717,46 @@ export function useSplitBillOrchestrator() {
 }
 
 // ---------------------------------------------------------------------------
-// Payment watcher
+// Payment reconciler — event-driven, app-root scope.
 // ---------------------------------------------------------------------------
 
 /**
- * Poll coco's history for paid mint-quotes belonging to this group and
- * flip participants to `paid`. Polled instead of event-subscribed because
- * coco-core's event surface varies across versions; polling the history
- * array is stable and cheap at ~every 8s. Unmounts when the screen does.
+ * Subscribe to coco's `history:updated` event bus and flip split-bill
+ * participants to `paid`/`expired` when their tracked mint quote reaches
+ * a terminal state. Mount once at app root (`<SplitBillPaymentReconciler />`
+ * in `app/_layout.tsx`) — runs regardless of which screen is foregrounded.
+ *
+ * The reverse-index `quoteIdToSplitBill` makes the per-event lookup O(1)
+ * and side-steps the previous polling watcher's three failure modes:
+ *   - state never reconciled when no split-bill screen was mounted (43.json#F-002)
+ *   - a participant's quote outside the most-recent-200-row page never
+ *     matched (43.json#F-007)
+ *   - 8s polling kept ticking when the app was backgrounded (43.json#F-013)
+ *
+ * Pattern matches the other 3 in-tree consumers of this event:
+ * `useHistoryWithMelts`, `useHistoryEntry`, `usePaymentStatusListener`.
  */
-export function useSplitBillPaymentWatcher(groupId?: string) {
+export function useSplitBillPaymentReconciler() {
   const manager = useManager();
 
   useEffect(() => {
-    if (!groupId || !manager) return;
+    if (!manager) return;
+    paymentLog.info('split_bill.reconciler.start');
 
-    let cancelled = false;
-    let tickCount = 0;
-    const watchStartAt = performance.now();
-    const flow = paymentLog.child({ flowId: groupId });
-    flow.info('split_bill.watcher.start', { groupId });
-
-    const tick = async () => {
-      if (cancelled) return;
-      tickCount++;
-      const tickStart = performance.now();
-      try {
-        const history: Record<string, unknown>[] =
-          (await (manager as any).history?.getPaginatedHistory?.(0, 200)) ?? [];
-        const historyMs = performance.now() - tickStart;
-        const store = useSplitBillTransactionsStore.getState();
-        const group = store.getGroup(groupId);
-        if (!group) return;
-
-        let matched = 0;
-        let paidFlipped = 0;
-        let expiredFlipped = 0;
-        let stillPending = 0;
-        for (const p of group.participants) {
-          if (!p.mintQuoteId) continue;
-          if (p.paymentState === 'paid') continue;
-          const row = history.find(
-            (h) => h.type === 'mint' && typeof h.quoteId === 'string' && h.quoteId === p.mintQuoteId
-          );
-          if (row) matched++;
-          const state = row?.state as string | undefined;
-          if (state === 'PAID' || state === 'ISSUED') {
-            store.markPaymentPaidByQuoteId(p.mintQuoteId);
-            paidFlipped++;
-          } else if (state === 'EXPIRED') {
-            store.markPaymentExpiredByQuoteId(p.mintQuoteId);
-            expiredFlipped++;
-          } else {
-            stillPending++;
-          }
-        }
-        flow.debug('split_bill.watcher.tick', {
-          groupId,
-          tick: tickCount,
-          historyRows: history.length,
-          historyMs: Math.round(historyMs * 100) / 100,
-          tick_ms: Math.round((performance.now() - tickStart) * 100) / 100,
-          matched,
-          paidFlipped,
-          expiredFlipped,
-          stillPending,
-        });
-      } catch (err) {
-        flow.debug('split_bill.watcher.tick_failed', {
-          error: err instanceof Error ? err.message : String(err),
+    const off = manager.on('history:updated', ({ entry }) => {
+      const store = useSplitBillTransactionsStore.getState();
+      const outcome = reconcileSplitBillHistoryUpdate(entry, store);
+      if (outcome !== 'ignored') {
+        paymentLog.info('split_bill.reconciler.flip', {
+          quoteId: (entry as { quoteId?: string }).quoteId,
+          outcome,
         });
       }
-    };
+    });
 
-    // Eager initial tick, then poll every 8s.
-    tick();
-    const id = setInterval(tick, 8_000);
     return () => {
-      cancelled = true;
-      clearInterval(id);
-      flow.info('split_bill.watcher.stop', {
-        groupId,
-        ticks: tickCount,
-        alive_ms: Math.round((performance.now() - watchStartAt) * 100) / 100,
-      });
+      off();
+      paymentLog.info('split_bill.reconciler.stop');
     };
-  }, [manager, groupId]);
+  }, [manager]);
 }

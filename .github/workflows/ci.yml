@@ -9,30 +9,95 @@ on:
 jobs:
   code-quality:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: '22'
-          cache: 'npm'
+          bun-version-file: package.json
 
       - name: Install dependencies
-        run: npm ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bun install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: bun run lint
 
       - name: Type Check
-        run: npm run type-check
+        run: bun run type-check
 
       - name: Prettier Check
-        run: npm run pretty:check
+        run: bun run pretty:check
 
       - name: Knip
-        run: npm run knip
+        run: bun run knip
 
       - name: Test
-        run: npm test
+        run: bun run test
+
+  # Non-blocking signal job: runs `codereview/analyze-structure` and posts
+  # the LLM-friendly summary as a sticky PR comment. The signal mirrors
+  # what `npm run analyze-structure` (or the `audit/fix` scripts) consume
+  # locally — top complexity hotspots, shallow modules, pass-through
+  # suspects, hub-spoke patterns, churn-weighted hotspots, type-safety
+  # debt, etc. Continues on failure so the structural report never blocks
+  # a merge — it's review-time signal, not a gate.
+  structural-health:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history needed for `--history` (churn × complexity,
+          # temporal coupling, stale-file signals).
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bun install --frozen-lockfile
+
+      - name: Run analyze-structure
+        continue-on-error: true
+        run: |
+          bun run codereview/analyze-structure/index.mjs --llm --history \
+            > analyze-output.txt 2>&1 || true
+
+      - name: Post structural-health comment on PR
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- structural-health -->';
+            const output = fs.readFileSync('analyze-output.txt', 'utf8');
+            // GitHub comment max body: 65,536 chars. Truncate if needed.
+            const MAX = 60_000;
+            const truncated = output.length > MAX
+              ? output.slice(0, MAX) + '\n\n…[truncated]'
+              : output;
+            const body = `${marker}\n## Structural health\n\n\`\`\`\n${truncated}\n\`\`\``;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
 

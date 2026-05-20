@@ -140,6 +140,11 @@ export function createMockOperations(
       historyEntry: stubHistoryEntry({ type: 'send' }),
     })),
 
+    // executeOfflineSend: creates an ecash token from exact local proofs.
+    executeOfflineSend: wrap('executeOfflineSend', async (_mintUrl, _amount) => ({
+      historyEntry: stubHistoryEntry({ type: 'send', offline: true }),
+    })),
+
     // executeMintQuote: creates a Lightning invoice via the mint
     executeMintQuote: wrap('executeMintQuote', async (_mintUrl, _amount, _unit) => ({
       historyEntry: stubHistoryEntry({ type: 'mint' }),
@@ -174,7 +179,7 @@ export function createMockOperations(
     trustMint: wrap('trustMint', async () => {}),
 
     // buildMintReviewInfo: fetches KYM/audit data (not available in tests)
-    buildMintReviewInfo: wrap('buildMintReviewInfo', undefined as any),
+    buildMintReviewInfo: wrap('buildMintReviewInfo', undefined),
 
     // executeMelt: converts ecash to Lightning payment
     executeMelt: wrap('executeMelt', async (_mintUrl, _meltTarget, _amount, _unit) => ({
@@ -217,5 +222,10 @@ export function createMockOperations(
 
     // rollbackMelt: cancels a melt operation (no-op in tests)
     rollbackMelt: wrap('rollbackMelt', async () => {}),
+
+    // resolveRecipientPubkey / resolveRecipientProfile: optional recipient
+    // identity enrichers. No defaults in tests; individual suites opt in.
+    resolveRecipientPubkey: wrap('resolveRecipientPubkey', undefined),
+    resolveRecipientProfile: wrap('resolveRecipientProfile', undefined),
   };
 }

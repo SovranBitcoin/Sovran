@@ -51,9 +51,9 @@ import {
   ScrollViewProps,
   StyleProp,
   StyleSheet,
-  TouchableOpacity,
   ViewStyle,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { LegendList, type LegendListRef, type ViewToken } from '@legendapp/list';
 import opacity from 'hex-color-opacity';
 
@@ -62,6 +62,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useRenderLogger } from '@/shared/lib/logger';
+import { zIndex } from '@/shared/styles/tokens';
 
 const sectionListLog = log.child({ module: 'sectionAnchorList' });
 
@@ -79,7 +80,7 @@ export interface AnchorSection<T> {
   renderHeader?: () => ReactNode;
 }
 
-export interface SectionAnchorListProps<T> {
+interface SectionAnchorListProps<T> {
   sections: AnchorSection<T>[];
   /** Per-item renderer. Used when `rowChunkSize` is 1 (the default). */
   renderItem: (item: T, sectionId: string) => ReactNode;
@@ -138,6 +139,14 @@ export interface SectionAnchorListProps<T> {
    * own inset. Merged with this component's own paddingTop/paddingBottom.
    */
   listContentContainerStyle?: StyleProp<ViewStyle>;
+  /**
+   * External state that affects how rows render but isn't part of `sections`.
+   * LegendList recycles rows; with `recycleItems` on, it skips re-invoking
+   * `renderItem` for already-mounted rows when the `data` ref is unchanged.
+   * Pass anything that should force a re-render here (selection sets,
+   * filter flags, etc.) — same convention as FlatList / FlashList.
+   */
+  extraData?: unknown;
 }
 
 const PROGRAMMATIC_SCROLL_SUPPRESS_MS = 400;
@@ -166,6 +175,7 @@ export function SectionAnchorList<T>({
   estimatedItemSize = 60,
   estimatedHeaderSize = 0,
   listContentContainerStyle,
+  extraData,
 }: SectionAnchorListProps<T>) {
   // Track render count + per-render timing so a stress run shows up as
   // either lots of renders (state churn) or as a slow single render
@@ -491,6 +501,7 @@ export function SectionAnchorList<T>({
           getItemType={getItemType}
           getEstimatedItemSize={getEstimatedItemSize}
           recycleItems
+          extraData={extraData}
           // Tuned down from 250 → 150 after a stress test showed that
           // continuous fast scroll across many sections caused 6s+ JS
           // thread blocks: the bigger the over-render buffer, the more
@@ -525,10 +536,8 @@ export function SectionAnchorList<T>({
           color={topFadeColor}
           zIndex={0}
         />
-        <View pointerEvents="box-none" style={{ zIndex: 1 }}>
-          {aboveAnchors != null && (
-            <View onLayout={handleAboveAnchorsLayout}>{aboveAnchors}</View>
-          )}
+        <View pointerEvents="box-none" style={{ zIndex: zIndex.raised }}>
+          {aboveAnchors != null && <View onLayout={handleAboveAnchorsLayout}>{aboveAnchors}</View>}
           {showAnchors && (
             <View onLayout={handleAnchorBarLayout} style={[styles.anchorBarOuter, anchorBarStyle]}>
               <ScrollView
@@ -540,7 +549,7 @@ export function SectionAnchorList<T>({
                 {sections.map((s) => {
                   const isSelected = activeAnchor === s.id;
                   return (
-                    <TouchableOpacity
+                    <Pressable
                       key={s.id}
                       testID={s.anchor.testID}
                       onPress={() => handleAnchorPress(s.id)}
@@ -562,7 +571,7 @@ export function SectionAnchorList<T>({
                         style={{ color: isSelected ? foreground : opacity(foreground, 0.7) }}>
                         {s.anchor.label}
                       </Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   );
                 })}
               </ScrollView>
@@ -580,7 +589,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 20,
+    zIndex: zIndex.sticky,
   },
   anchorBarOuter: {
     paddingTop: 12,

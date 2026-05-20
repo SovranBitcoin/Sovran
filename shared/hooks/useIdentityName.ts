@@ -1,12 +1,6 @@
 import { useMemo } from 'react';
-import {
-  useNostrProfileMetadata,
-  useNostrProfileMetadataMany,
-} from './useNostrProfileMetadata';
-import {
-  resolveIdentityName,
-  type IdentityNameInputs,
-} from '@/shared/lib/identity';
+import { useNostrProfileMetadata } from './useNostrProfileMetadata';
+import { resolveIdentityName, type IdentityNameInputs } from '@/shared/lib/identity';
 
 /**
  * Resolves a single pubkey to a human-readable name using the canonical
@@ -47,27 +41,4 @@ export function useIdentityName(
   );
 
   return { displayName, isLoading };
-}
-
-/**
- * Batched variant for list rendering. Subscribes to one kind-0 query for
- * every pubkey at once (via `useNostrProfileMetadataMany`) and returns a
- * `Map<pubkey, displayName>`. Each entry is always a non-empty string —
- * unresolved pubkeys fall through to the deterministic word pair.
- */
-export function useIdentityNames(
-  pubkeys: readonly string[]
-): ReadonlyMap<string, string> {
-  const { metadata } = useNostrProfileMetadataMany(pubkeys);
-
-  return useMemo(() => {
-    const out = new Map<string, string>();
-    for (const pk of pubkeys) {
-      out.set(
-        pk,
-        resolveIdentityName({ pubkey: pk, nostrProfile: metadata.get(pk) })
-      );
-    }
-    return out;
-  }, [pubkeys, metadata]);
 }

@@ -40,19 +40,27 @@ function PaymentProvider({ children }) {
 
   return (
     <CocoPaymentUXProvider
-      instance={instance}
       handlers={(machine, refs) => createHandlers({ machine })}
-      notifications={createNotifications()}
-      scanSources={scanSources}
-      createURDecoder={() => new URDecoder()}
-      nfcAdapter={nfcAdapter}
-      getOffline={() => offlineRef.current}
-      getBtcPrice={() => priceStore.getBtcPrice(currency)}
-      getDisplayCurrency={() => ({ code: 'usd', symbol: '$' })}
-      actions={screenActionHandlers}
-      screenActionsBridge={bridge}
-      deepLinks={{ url: linkingUrl, customSchemes: ['myapp'] }}
-      navigation={{ scanQr, mintInfo, addMint, goBack }}
+      engine={{
+        instance,
+      }}
+      callbacks={{
+        notifications: createNotifications(),
+        actions: screenActionHandlers,
+        screenActionsBridge: bridge,
+      }}
+      runtime={{
+        getOffline: () => offlineRef.current,
+        getBtcPrice: () => priceStore.getBtcPrice(currency),
+        getDisplayCurrency: () => ({ code: 'usd', symbol: '$' }),
+      }}
+      platform={{
+        scanSources,
+        createURDecoder: () => new URDecoder(),
+        nfcAdapter,
+        deepLinks: { url: linkingUrl, customSchemes: ['myapp'] },
+        navigation: { scanQr, mintInfo, addMint, goBack },
+      }}
     >
       {children}
     </CocoPaymentUXProvider>

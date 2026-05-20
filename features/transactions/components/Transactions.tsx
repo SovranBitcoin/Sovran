@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Dimensions, StyleSheet } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import { Easing, LinearTransition } from 'react-native-reanimated';
 
 import { AnimatedLegendList } from '@legendapp/list/reanimated';
@@ -20,15 +20,16 @@ import { SplitBillTransactionRow } from '@/features/transactions/components/Spli
 import { Transaction } from '@/features/transactions/components/Transaction';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { formatDate } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { duration, spacing, zIndex } from '@/shared/styles/tokens';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import {
   useSwapTransactionsStore,
@@ -58,16 +59,15 @@ function getTimelineKey(item: TimelineItem): string {
   if (item.kind === 'split-bill') return `split-bill-${item.data.id}`;
   const entry = item.data;
   if (entry.id) return entry.id;
-  if ('token' in entry && entry.token)
-    return typeof entry.token === 'string' ? entry.token : JSON.stringify(entry.token);
-  return Math.random().toString();
+  // Bearer tokens MUST NOT become React keys; Math.random() destroys list
+  // diffing. Derive a deterministic composite from invariant fields.
+  return `${entry.type}-${entry.createdAt}-${entry.amount}`;
 }
 
 // ---------------------------------------------------------------------------
 
 interface Account {
   unit: string;
-  type?: string;
 }
 
 interface Section {
@@ -138,6 +138,7 @@ export const Transactions = React.memo(
     onVisiblePendingEcashChange,
   }: Props) => {
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
+    const { height: screenHeight } = useWindowDimensions();
 
     // Operation ids that are still showing the post-success collapse
     // animation. Keeping them pinned in the Pending bucket gives the
@@ -319,7 +320,9 @@ export const Transactions = React.memo(
       const t0 = performance.now();
       const createSections = (items: TimelineItem[], prefix: string) => {
         // Group by date string for display, but keep track of the original date for sorting
-        const groupedByDate = _.groupBy(items, (item) => formatDate(getTimelineCreatedAt(item)));
+        const groupedByDate = _.groupBy(items, (item) =>
+          formatDate(getTimelineCreatedAt(item), 'long-date')
+        );
 
         // Create an array of {dateString, originalDate} pairs for proper sorting
         const dateEntries = Object.keys(groupedByDate).map((dateString) => {
@@ -427,6 +430,32 @@ export const Transactions = React.memo(
       [onTransactionPress, onCancelPendingEcash]
     );
 
+    const getEstimatedItemSize = useCallback(
+      (section: Section) => HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16,
+      []
+    );
+
+    const renderSection = useCallback(
+      ({ item: section }: { item: Section }) => (
+        <VStack spacing={4} className="mb-4">
+          <Text size={14} heavy color={opacity(foreground, 0.33)} style={{ height: HEADER_HEIGHT }}>
+            {section.title}
+          </Text>
+          <View style={[styles.card, { borderColor }]}>
+            <BlurCardFrame accentColor={muted}>
+              <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
+            </BlurCardFrame>
+          </View>
+        </VStack>
+      ),
+      [foreground, muted, borderColor, renderTimelineItem]
+    );
+
+    const resolvedHeader = useMemo(
+      () => <View>{typeof header === 'function' ? header() : header}</View>,
+      [header]
+    );
+
     const emptyComponent = useMemo(
       () => (
         <View className="pt-8">
@@ -465,7 +494,7 @@ export const Transactions = React.memo(
           <View
             className="flex items-center"
             style={{
-              minHeight: Dimensions.get('screen').height / 2,
+              minHeight: screenHeight / 2,
             }}>
             <Spacer size={24} />
             <Icon
@@ -473,7 +502,7 @@ export const Transactions = React.memo(
               size={32}
               color={opacity(foreground, 0.33)}
               spin={{
-                duration: 1000,
+                duration: duration.spin,
                 outputRange: ['0deg', '360deg'],
                 delay: 0,
                 easing: 'linear',
@@ -549,12 +578,12 @@ export const Transactions = React.memo(
                         href={{
                           pathname: '/transactions',
                           params: {
-                            account: JSON.stringify(account),
-                            tab: 'Confirmed',
+                            filterCurrency: account.unit,
+                            filterStatus: 'Confirmed',
                           },
                         }}
                         asChild>
-                        <TouchableOpacity>
+                        <Pressable>
                           <View style={[styles.viewAllButton, { borderColor }]}>
                             <BlurCardFrame accentColor={muted}>
                               <View style={styles.viewAllContent}>
@@ -564,7 +593,7 @@ export const Transactions = React.memo(
                               </View>
                             </BlurCardFrame>
                           </View>
-                        </TouchableOpacity>
+                        </Pressable>
                       </Link>
                     )}
                   </VStack>
@@ -575,18 +604,20 @@ export const Transactions = React.memo(
         );
       };
 
+      const hasPending = sections.pending.length > 0;
+      const hasExpired = sections.expired.length > 0;
+      const hasConfirmed = sections.confirmed.length > 0;
+
       return (
         <View className="w-full">
           {renderStatus('Pending', sections.pending)}
+          {hasPending && (hasExpired || hasConfirmed) && <Spacer size={spacing['sm']} />}
           {renderStatus('Expired', sections.expired)}
+          {hasExpired && hasConfirmed && <Spacer size={spacing['sm']} />}
           {renderStatus('Confirmed', sections.confirmed)}
         </View>
       );
     }
-
-    // Estimate section height: header + (items * item height)
-    const estimateSectionHeight = (section: Section) =>
-      HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16; // 16 for spacing
 
     return (
       <Log name="Transactions">
@@ -595,7 +626,7 @@ export const Transactions = React.memo(
           style={{ flex: 1 }}
           data={sectionsToDisplay}
           keyExtractor={(section) => section.index!}
-          estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
+          getEstimatedItemSize={getEstimatedItemSize}
           maintainVisibleContentPosition
           // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
           // triggers a fresh LinearTransition on every measured-position
@@ -607,26 +638,11 @@ export const Transactions = React.memo(
           // moves in lock-step with the row's `layout` shrink.
           itemLayoutAnimation={LinearTransition.duration(16).easing(Easing.linear)}
           contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
-          ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
+          ListHeaderComponent={resolvedHeader}
           ListEmptyComponent={emptyComponent}
           onScroll={onScroll}
           scrollEventThrottle={16}
-          renderItem={({ item: section }) => (
-            <VStack spacing={4} className="mb-4">
-              <Text
-                size={14}
-                heavy
-                color={opacity(foreground, 0.33)}
-                style={{ height: HEADER_HEIGHT }}>
-                {section.title}
-              </Text>
-              <View style={[styles.card, { borderColor }]}>
-                <BlurCardFrame accentColor={muted}>
-                  <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
-                </BlurCardFrame>
-              </View>
-            </VStack>
-          )}
+          renderItem={renderSection}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
         />
       </Log>
@@ -644,7 +660,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   content: {
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
   sectionHeader: {
     paddingHorizontal: 16,
@@ -660,13 +676,13 @@ const styles = StyleSheet.create({
   viewAllContent: {
     padding: 12,
     alignItems: 'center',
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
   emptyState: {
     paddingVertical: 48,
     paddingHorizontal: 24,
     alignItems: 'center',
     gap: 8,
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
 });

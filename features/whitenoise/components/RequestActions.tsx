@@ -1,10 +1,11 @@
 import React from 'react';
-import { Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
-export interface RequestActionsProps {
+interface RequestActionsProps {
   onAccept: () => void;
   onDecline: () => void;
   isBusy?: boolean;
@@ -38,6 +39,8 @@ export function RequestActions({ onAccept, onDecline, isBusy }: RequestActionsPr
       <Pressable
         onPress={onDecline}
         hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel="Decline request"
         style={[styles.button, { backgroundColor: danger }]}
         testID="whitenoise-request-decline">
         <Text size={13} bold style={{ color: dangerForeground }}>
@@ -47,6 +50,8 @@ export function RequestActions({ onAccept, onDecline, isBusy }: RequestActionsPr
       <Pressable
         onPress={onAccept}
         hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel="Accept request"
         style={[styles.button, { backgroundColor: accent }]}
         testID="whitenoise-request-accept">
         <Text size={13} bold style={{ color: accentForeground }}>

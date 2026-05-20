@@ -6,7 +6,7 @@ import Icon from 'assets/icons';
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 
-export type DecorationIcon = {
+type DecorationIcon = {
   name: string;
   size: number;
   style: ViewStyle;

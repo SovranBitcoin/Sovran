@@ -1,76 +1,12 @@
 import React from 'react';
-import { router } from 'expo-router';
-import { log } from '../../logger';
-import { CocoManager } from '@/shared/lib/cashu/manager';
-import { TOAST_COPY } from '@/shared/lib/paymentCopy';
-import { popup } from '../engine';
-import { showCustomToast } from '../bridge';
-import { fmt } from '../format';
-import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
-import type { PopupTextSegment } from '../format';
-import { PaymentStatusIcon } from '../PaymentStatusIcon';
+import { showCustomToast } from './bridge';
 import { PaymentStatusToast } from '../PaymentStatusToast';
-import type { BaseOverrides, PopupOverrides, TextOverrides } from './types';
+import { SwapStatusToast } from '../SwapStatusToast';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
+import { makeStaticPopup, makeParamPopup } from './factory';
 
 type PaymentStatusVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
-
-type PaymentStatusCase = {
-  message: string;
-  submessagePending?: string;
-  submessageConfirmed: string | ((amount: number, unit: string) => string | PopupTextSegment[]);
-  submessageFailed: string;
-  history: {
-    type: 'mint' | 'send' | 'melt' | 'receive';
-    idField: 'quoteId' | 'operationId' | 'id';
-  };
-  route: { pathname: string; paramKey: string };
-};
-
-const PAYMENT_STATUS_CASES: Record<PaymentStatusVariant, PaymentStatusCase> = {
-  receive: {
-    message: TOAST_COPY.receive.message,
-    submessagePending: TOAST_COPY.receive.processing,
-    submessageConfirmed: (amount, unit) => fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
-    submessageFailed: TOAST_COPY.receive.failed,
-    history: { type: 'mint', idField: 'quoteId' },
-    route: { pathname: '/mintQuote', paramKey: 'mintHistoryEntry' },
-  },
-  send: {
-    message: TOAST_COPY.send.message,
-    submessagePending: TOAST_COPY.send.processing,
-    submessageConfirmed: (amount, unit) => fmt`${TOAST_COPY.send.confirmed} ${{ amount, unit }}`,
-    submessageFailed: TOAST_COPY.send.failed,
-    history: { type: 'send', idField: 'operationId' },
-    route: { pathname: '/sendToken', paramKey: 'sendHistoryEntry' },
-  },
-  'payment-request': {
-    message: TOAST_COPY['payment-request'].message,
-    submessagePending: TOAST_COPY['payment-request'].processing,
-    submessageConfirmed: TOAST_COPY['payment-request'].confirmed,
-    submessageFailed: TOAST_COPY['payment-request'].failed,
-    history: { type: 'send', idField: 'operationId' },
-    route: { pathname: '/sendToken', paramKey: 'sendHistoryEntry' },
-  },
-  melt: {
-    message: TOAST_COPY.melt.message,
-    submessagePending: TOAST_COPY.melt.processing,
-    submessageConfirmed: (amount, unit) => fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
-    submessageFailed: TOAST_COPY.melt.failed,
-    history: { type: 'melt', idField: 'quoteId' },
-    route: { pathname: '/meltQuote', paramKey: 'meltHistoryEntry' },
-  },
-  'receive-ecash': {
-    message: TOAST_COPY['receive-ecash'].message,
-    submessagePending: TOAST_COPY['receive-ecash'].processing,
-    submessageConfirmed: (amount, unit) =>
-      fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
-    submessageFailed: TOAST_COPY['receive-ecash'].failed,
-    history: { type: 'receive', idField: 'id' },
-    route: { pathname: '/receiveToken', paramKey: 'receiveHistoryEntry' },
-  },
-};
-
-const PAYMENT_STATUS_DISPLAY: 'toast' | 'sheet' = 'toast';
 
 export function paymentStatusPopup(payload: {
   variant: PaymentStatusVariant;
@@ -82,166 +18,88 @@ export function paymentStatusPopup(payload: {
   receiveEntryId?: string;
 }): void {
   const { variant, id, amount, unit, mintUrl, operationId, receiveEntryId } = payload;
-  const config = PAYMENT_STATUS_CASES[variant];
+  showCustomToast({
+    component: (toastProps) =>
+      React.createElement(PaymentStatusToast, {
+        ...toastProps,
+        variant,
+        paymentId: id,
+        mintUrl,
+        amount,
+        unit,
+        ...(operationId !== undefined && { operationId }),
+        ...(receiveEntryId !== undefined && { receiveEntryId }),
+      }),
+    duration: 'persistent',
+    onHide: () => usePaymentStatusStore.getState().setActive(null),
+  });
+}
 
-  if (PAYMENT_STATUS_DISPLAY === 'toast') {
-    showCustomToast({
-      component: (toastProps) =>
-        React.createElement(PaymentStatusToast, {
-          ...toastProps,
-          variant,
-          paymentId: id,
-          mintUrl,
-          amount,
-          unit,
-          ...(operationId !== undefined && { operationId }),
-          ...(receiveEntryId !== undefined && { receiveEntryId }),
-        }),
-      duration: 'persistent',
-      onHide: () => usePaymentStatusStore.getState().setActive(null),
-    });
-    return;
-  }
+/**
+ * Show the unified swap-progress toast. The orchestrator calls
+ * `useSwapStatusStore.start({ legs })` before this; the toast subscribes to
+ * the store and re-renders as legs flip pending → active → done. On
+ * `complete()` / `fail()` it animates to the green/red terminal state and
+ * auto-dismisses 3s later.
+ *
+ * The store is only cleared on a terminal-state dismissal. A swipe while
+ * `state === 'running'` leaves `active` in place so AccountPagerViewLayout's
+ * payment-button gate stays load-bearing — clearing mid-flight would let the
+ * user kick off a Send/Receive into coco's serialised mint/melt mutex.
+ *
+ * Idempotent: if a swap toast is already mounted, this is a no-op so
+ * `useSwapStatusListener` can call it on running→terminal transitions
+ * without racing the runner's own initial pop in MintRebalancePlanScreen.
+ */
+let swapToastMounted = false;
 
-  const onPressViewTransaction = async () => {
-    try {
-      if (!CocoManager.isInitialized()) return;
-      const manager = CocoManager.getInstance();
-      const history = await manager.history.getPaginatedHistory(0, 100);
-      const { type, idField } = config.history;
-      const entry = history.find(
-        (h) =>
-          h.type === type &&
-          idField in h &&
-          (h as Record<string, unknown>)[idField] === id &&
-          h.mintUrl === mintUrl
-      );
-      if (entry) {
-        router.navigate({
-          pathname: config.route.pathname as
-            | '/mintQuote'
-            | '/sendToken'
-            | '/meltQuote'
-            | '/receiveToken',
-          params: { [config.route.paramKey]: JSON.stringify(entry) },
-        });
+export function isSwapStatusToastMounted(): boolean {
+  return swapToastMounted;
+}
+
+export function swapStatusPopup(): void {
+  if (swapToastMounted) return;
+  swapToastMounted = true;
+  showCustomToast({
+    component: (toastProps) => React.createElement(SwapStatusToast, toastProps),
+    duration: 'persistent',
+    onHide: () => {
+      swapToastMounted = false;
+      const cur = useSwapStatusStore.getState().active;
+      // Mid-flight swipe leaves the gate engaged; clear only after the
+      // toast unmounts in a terminal state (or the store is already empty).
+      if (!cur || cur.state !== 'running') {
+        useSwapStatusStore.getState().clear();
       }
-    } catch (e) {
-      log.warn('popup.open_transaction_failed', { error: e });
-    }
-  };
-
-  const confirmedButtons = [{ text: 'View Transaction', onPress: onPressViewTransaction }];
-  const confirmedSubmessage =
-    typeof config.submessageConfirmed === 'function'
-      ? config.submessageConfirmed(amount, unit)
-      : config.submessageConfirmed;
-
-  popup({
-    message: config.message,
-    variant: 'sheet',
-    live: {
-      get: () => {
-        const active = usePaymentStatusStore.getState().active;
-        const isConfirmed = active?.id === id && active?.state === 'confirmed';
-        const isFailed = active?.id === id && active?.state === 'failed';
-        const status: 'pending' | 'confirmed' | 'failed' = isConfirmed
-          ? 'confirmed'
-          : isFailed
-            ? 'failed'
-            : 'pending';
-
-        const submessage = isConfirmed
-          ? confirmedSubmessage
-          : isFailed
-            ? (active?.errorMessage ?? config.submessageFailed)
-            : (config.submessagePending ?? confirmedSubmessage);
-
-        return {
-          message: config.message,
-          status,
-          submessage,
-          icon: React.createElement(PaymentStatusIcon, {
-            size: 88,
-            status,
-          }),
-          ...((isConfirmed || isFailed) && {
-            duration: 3000,
-            ...(isConfirmed && { buttons: confirmedButtons }),
-          }),
-        };
-      },
-      subscribe: (onUpdate) => usePaymentStatusStore.subscribe(onUpdate),
     },
   });
 }
 
-export function sendSuccessPopup(overrides?: PopupOverrides): void {
-  popup({
-    message: 'Funds Sent',
-    text: 'Funds have been sent successfully.',
-    icon: 'icon:mdi:send',
-    type: 'success',
-    ...overrides,
-  });
-}
+export const paymentCancelledPopup = makeStaticPopup({
+  message: 'Payment cancelled',
+  text: 'Reserved proofs have been freed.',
+  icon: 'icon:mdi:close-circle',
+  type: 'success',
+});
 
-export function receiveSuccessPopup(
-  params: { amount: number; unit: string },
-  overrides?: PopupOverrides
-): void {
-  popup({
-    message: 'Funds Received',
-    text: `${params.amount} ${params.unit} has been added to your wallet.`,
-    icon: 'icon:mdi:check-circle',
-    type: 'success',
-    ...overrides,
-  });
-}
+export const nfcEcashSharedPopup = makeStaticPopup({
+  message: 'Ecash Token Shared via NFC',
+  text: 'Ecash token has been shared via NFC.',
+  icon: 'icon:lucide:nfc',
+  type: 'success',
+});
 
-export function nostrPaymentSentPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Payment sent successfully via Nostr',
-    icon: 'icon:mdi:send',
-    type: 'success',
-    ...overrides,
-  });
-}
+export const nfcConnectionLostPopup = makeStaticPopup({
+  message: 'NFC connection lost. Send was rolled back.',
+  icon: 'icon:feather:wifi',
+  type: 'warning',
+});
 
-export function paymentCancelledPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Payment cancelled',
-    icon: 'icon:mdi:close-circle',
-    type: 'success',
-    text: 'Reserved proofs have been freed.',
-    ...overrides,
-  });
-}
-
-export function nfcEcashSharedPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Ecash Token Shared via NFC',
-    text: 'Ecash token has been shared via NFC.',
-    icon: 'icon:lucide:nfc',
-    type: 'success',
-    ...overrides,
-  });
-}
-
-export function nfcConnectionLostPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'NFC connection lost. Send was rolled back.',
-    icon: 'icon:feather:wifi',
-    type: 'warning',
-    ...overrides,
-  });
-}
-
-export function nfcSendFailedPopup(options?: { text?: string; rollbackFailed?: boolean }): void {
-  popup({
-    message: options?.rollbackFailed ? 'NFC send failed and rollback failed' : 'NFC send failed',
-    text: options?.text,
-    icon: 'icon:lucide:nfc',
-    type: 'error',
-  });
-}
+export const nfcSendFailedPopup = makeParamPopup<
+  { text?: string; rollbackFailed?: boolean } | undefined
+>((options) => ({
+  message: options?.rollbackFailed ? 'NFC send failed and rollback failed' : 'NFC send failed',
+  text: options?.text,
+  icon: 'icon:lucide:nfc',
+  type: 'error',
+}));

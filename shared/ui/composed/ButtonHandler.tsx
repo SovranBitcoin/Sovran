@@ -55,7 +55,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
+import { StyleProp, ViewStyle } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 import { Log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -63,6 +63,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from '@/assets/icons';
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 
 /**
  * Configuration for individual buttons in ButtonHandler
@@ -91,13 +92,16 @@ export interface ButtonHandlerButton {
   /** Optional secondary caption shown under the button text in the overflow
    *  Menu (has no effect on inline buttons). */
   description?: string;
-  /** Press event handler with close function parameter */
-  onPress?: (close: (event: GestureResponderEvent) => void) => Promise<void>;
+  /** Press event handler. ButtonHandler renders inline buttons (and an
+   *  overflow Menu); neither host owns a dismissal seam to forward, so the
+   *  handler takes no arguments. Callers that need to dismiss a parent
+   *  surface should do it explicitly inside the body. */
+  onPress?: () => void | Promise<void>;
   /** Whether the button should be visible (default: true) */
   condition?: boolean;
 }
 
-export type ButtonHandlerActionButton = ButtonHandlerButton;
+type ButtonHandlerActionButton = ButtonHandlerButton;
 
 /**
  * Props for the ButtonHandler component
@@ -154,7 +158,7 @@ export function ButtonHandler({
   style,
   className,
 }: ButtonHandlerProps) {
-  const [loading, setLoading] = useState(false);
+  const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
   const danger = useThemeColor('danger');
 
   // Filter buttons based on condition
@@ -182,21 +186,27 @@ export function ButtonHandler({
     setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
   }, []);
 
-  // Fires the button's onPress with a no-op close since the Menu closes
-  // itself on select (shouldCloseOnSelect default). Any async work runs in
-  // the background — callers still get their own per-button `loading` state.
+  // The Menu closes itself on select (shouldCloseOnSelect default); async
+  // work runs in the background — callers still get their own per-button
+  // `loading` state.
   const handleMenuItemPress = (button: ButtonHandlerActionButton): void => {
     if (button.disabled) return;
-    void button.onPress?.(() => {});
+    void button.onPress?.();
   };
 
-  const handleButtonPress = async (button: ButtonHandlerActionButton) => {
+  // The inner shared `Button` already routes its onPress through
+  // `useSingleFlight`, so a rapid second tap is dropped before reaching
+  // this wrapper. We track the in-flight button by its visible-array index
+  // so siblings keep their own visual state while one action runs.
+  const handleButtonPress = async (button: ButtonHandlerActionButton, idx: number) => {
     if (button.disabled) return;
-    setLoading(true);
+    const result = button.onPress?.();
+    if (!(result instanceof Promise)) return;
+    setLoadingIdx(idx);
     try {
-      await button.onPress?.(() => {});
+      await result;
     } finally {
-      setLoading(false);
+      setLoadingIdx((current) => (current === idx ? null : current));
     }
   };
 
@@ -205,17 +215,18 @@ export function ButtonHandler({
       <HStack
         align="center"
         justify="space-between"
-        spacing={0}
         className={`flex-row ${className || ''}`}
         style={[style]}>
         {visibleButtons.slice(0, 2).map((button, index) => (
-          <View key={index} className="flex-1">
+          <View
+            key={button.testID ?? (typeof button.text === 'string' ? button.text : `btn-${index}`)}
+            style={{ flexGrow: 1, flexShrink: 1, flexBasis: 'auto', minWidth: 0 }}>
             <Button
               testID={button.testID}
-              onPress={() => handleButtonPress(button)}
+              onPress={() => handleButtonPress(button, index)}
               text={button.text}
               variant={button.variant}
-              loading={loading || button.loading}
+              loading={loadingIdx === index || button.loading}
               disabled={button.disabled}
             />
           </View>
@@ -233,9 +244,9 @@ export function ButtonHandler({
                   <Icon name="tabler:dots" />
                 )
               }
-              onPress={() => handleButtonPress(visibleButtons[2])}
+              onPress={() => handleButtonPress(visibleButtons[2], 2)}
               variant="secondary"
-              loading={loading}
+              loading={loadingIdx === 2 || visibleButtons[2].loading}
               disabled={visibleButtons[2].disabled}
             />
           </View>
@@ -251,9 +262,9 @@ export function ButtonHandler({
                 <View style={{ width: 1, height: 1 }} />
               </Menu.Trigger>
               <Menu.Portal>
-                <Menu.Overlay />
+                <MenuScrim />
                 <Menu.Content presentation="bottom-sheet">
-                  <Menu.Label className="text-lg font-bold text-foreground ml-3 -mt-2 mb-2">
+                  <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
                     Select option
                   </Menu.Label>
                   {overflowMenuButtons.map((button, i) => {
@@ -261,7 +272,10 @@ export function ButtonHandler({
                     const isDanger = button.variant === 'dangerous';
                     return (
                       <Menu.Item
-                        key={i}
+                        key={
+                          button.testID ??
+                          (typeof button.text === 'string' ? button.text : `overflow-${i}`)
+                        }
                         testID={button.testID ? `overflow-${button.testID}` : undefined}
                         isDisabled={button.disabled}
                         variant={isDanger ? 'danger' : 'default'}
@@ -293,7 +307,6 @@ export function ButtonHandler({
                 icon={<Icon name="tabler:dots" />}
                 onPress={openMoreMenu}
                 variant="secondary"
-                loading={loading}
               />
             </View>
           </>

@@ -1,7 +1,7 @@
 import { MintKeys, MintKeyset, Proof } from '@cashu/cashu-ts';
 type MintInfo = any;
 
-export interface TransactionData {
+interface TransactionData {
   id?: string;
   txid?: string;
   request?: string;

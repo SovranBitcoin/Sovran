@@ -4,9 +4,9 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCameraPermissions } from 'expo-camera';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { z } from 'zod';
 
 import {
   Host,
@@ -17,18 +17,31 @@ import {
 import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import Icon from 'assets/icons';
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from 'coco-payment-ux/react';
+import { useHandleCameraPermission } from '../../hooks/useHandleCameraPermission';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useCapabilities } from '@/shared/ui/capability';
 import { Button } from '@/shared/ui/primitives/Button';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 import { CameraLayout } from './CameraLayout';
-import type { CameraScreenProps, ScanningData } from './types';
+import type { ScanningData } from './types';
 
-export type { CameraScreenProps, ScanningData } from './types';
+/**
+ * Canonical schema for /camera deep-link params. StandaloneCameraScreen
+ * extends with `action`. Tightening `unit` to a short lowercase token shape
+ * rejects malformed deep links at the route boundary instead of silently
+ * propagating into machine state.
+ */
+export const cameraRouteParamsSchema = z.object({
+  unit: z
+    .string()
+    .regex(/^[a-z]{2,8}$/, 'unit must be a short lowercase token')
+    .optional(),
+});
 
 function applyScanResult(
   result: { urInProgress?: boolean; progress?: number; lockedPending?: boolean } | undefined,
@@ -46,31 +59,29 @@ function applyScanResult(
   }
 }
 
-export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
+export function CameraScreen() {
   useLifecycleLogger('CameraScreen');
-  const { unit } = useLocalSearchParams<{ unit?: string }>();
-  const { keys } = useNostrKeysContext();
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
+  const params = useRouteParams(cameraRouteParamsSchema, { where: 'camera' });
+  const unit = params?.unit;
+  const selectedMint = useMintStore((state) => state.selectedMint);
   const walletContext = useWalletContextWithOverride(selectedMint);
   const foreground = useThemeColor('foreground');
+  const { liquidGlass } = useCapabilities();
   const insets = useSafeAreaInsets();
   const [progress, setProgress] = useState(0);
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
-  const [hasPermission] = useCameraPermissions();
+  const [cameraReady, setCameraReady] = useState(false);
+  const { permission, handlePermission } = useHandleCameraPermission();
+  const hasPermission = !!permission?.granted;
   const [isFocused, setIsFocused] = useState(true);
   const appStateRef = useRef(AppState.currentState);
   const isProcessingRef = useRef(false);
-  const unlockRef = useRef<() => void>(() => {});
 
-  const unlock = useCallback(() => {
+  const onOptionDismiss = useCallback(() => {
     isProcessingRef.current = false;
     setLoading(false);
   }, []);
-  unlockRef.current = unlock;
-
-  const onOptionDismiss = useCallback(() => unlockRef.current?.(), []);
 
   const machine = usePaymentFlowMachine({
     walletContext,
@@ -96,13 +107,28 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
     }, [machine])
   );
 
+  // Auto-disengage the flashlight one second after the camera reports ready.
+  // Effect-scoped so unmounting before the timer fires cancels the late
+  // setState (and pinned closure that prevents GC of the prior screen).
+  useEffect(() => {
+    if (!cameraReady) return;
+    const id = setTimeout(() => setFlashlightOn(false), 1000);
+    return () => clearTimeout(id);
+  }, [cameraReady]);
+
   const lastScanRef = useRef<{ data: string; t: number }>({ data: '', t: 0 });
+
+  /** Common gate for every scan source. iOS can deliver taps during the
+   * inactive→background transition; AppState/isFocused must be live. */
+  const shouldAcceptScan = useCallback(
+    () => appStateRef.current === 'active' && isFocused,
+    [isFocused]
+  );
 
   const handleScan = useCallback(
     async (data: ScanningData) => {
-      if (scanLocked) return;
       const isUr = data.data.toLowerCase().startsWith('ur:');
-      if (appStateRef.current !== 'active' || !isFocused) return;
+      if (!shouldAcceptScan()) return;
       if (!isUr && isProcessingRef.current) return;
 
       // Debounce: skip identical scans within 500ms
@@ -129,18 +155,18 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
         isProcessingRef.current = false;
       }
     },
-    [machine, isFocused, scanLocked]
+    [machine, shouldAcceptScan]
   );
 
   const handleBarcodeScanned = useCallback(
     (result: { data?: string }) => {
-      if (result?.data) handleScan({ data: result.data, type: 'qr' });
+      if (result?.data) void handleScan({ data: result.data, type: 'qr' });
     },
     [handleScan]
   );
 
   const handleClipboardPress = useCallback(async () => {
-    if (scanLocked) return;
+    if (!shouldAcceptScan()) return;
     log.info('camera.scan.clipboard');
     isProcessingRef.current = true;
     setLoading(true);
@@ -155,10 +181,10 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
       setProgress(0);
       isProcessingRef.current = false;
     }
-  }, [machine, scanLocked]);
+  }, [machine, shouldAcceptScan]);
 
   const handleGalleryPress = useCallback(async () => {
-    if (scanLocked) return;
+    if (!shouldAcceptScan()) return;
     log.info('camera.scan.gallery');
     isProcessingRef.current = true;
     setLoading(true);
@@ -173,15 +199,19 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
       setProgress(0);
       isProcessingRef.current = false;
     }
-  }, [machine, scanLocked]);
+  }, [machine, shouldAcceptScan]);
 
   const handleCameraReady = useCallback(() => {
-    setTimeout(() => setFlashlightOn(false), 1000);
+    setCameraReady(true);
   }, []);
 
   const toggleFlashlight = useCallback(() => {
     setFlashlightOn((p) => !p);
   }, []);
+
+  const requestPermission = useCallback(() => {
+    void handlePermission();
+  }, [handlePermission]);
 
   const shared = {
     foreground,
@@ -189,8 +219,8 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
     progress,
     flashlightOn,
     loading,
-    hasPermission: !!hasPermission?.granted,
-    scanLocked,
+    hasPermission,
+    requestPermission,
     handleScan: handleBarcodeScanned,
     handleCameraReady,
     handleClipboardPress,
@@ -279,8 +309,10 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
   );
 
   return (
-    <Screen name="CameraScreen">
-      <CameraLayout {...shared}>{Platform.OS === 'ios' ? iosButtons : androidButtons}</CameraLayout>
-    </Screen>
+    <Log name="CameraScreen">
+      <CameraLayout {...shared}>
+        {Platform.OS === 'ios' && liquidGlass ? iosButtons : androidButtons}
+      </CameraLayout>
+    </Log>
   );
 }

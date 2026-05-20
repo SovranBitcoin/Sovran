@@ -8,32 +8,52 @@
  *                   per-geohash derived hex pubkey. `geohash` must be passed
  *                   so native knows which geohash subscription to ride.
  *
- * This is a thin wrapper around `GeohashChatScreen`'s DM mode — the screen
- * component does all the real work, matching the public-chat UI so DMs and
- * public chats feel identical.
+ * Deep-link params are validated with Zod at the route boundary per
+ * AUDIT.md dim-5 — `peerID` must match the transport's expected shape so
+ * an attacker-crafted link cannot funnel arbitrary pubkeys into the DM
+ * cipher path.
  */
 
 import React from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
+import { router } from 'expo-router';
+import { z } from 'zod';
+
 import { GeohashChatScreen } from '@/features/bitchat/screens/GeohashChatScreen';
+import { Geohash, Hex16, Hex64 } from '@/shared/lib/nav/routeSchemas';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z
+  .object({
+    transport: z.enum(['ble-dm', 'nostr-dm']),
+    peerID: z.string().min(1),
+    nickname: z.string().max(64).optional(),
+    geohash: Geohash.optional(),
+  })
+  .refine(
+    (v) =>
+      v.transport === 'ble-dm'
+        ? Hex16.safeParse(v.peerID).success
+        : Hex64.safeParse(v.peerID).success,
+    {
+      message: 'peerID shape does not match transport',
+      path: ['peerID'],
+    }
+  )
+  .refine((v) => v.transport === 'ble-dm' || typeof v.geohash === 'string', {
+    message: 'nostr-dm requires geohash',
+    path: ['geohash'],
+  });
 
 function BitchatDMRoute() {
-  const { transport, peerID, nickname, geohash } = useLocalSearchParams<{
-    transport: 'ble-dm' | 'nostr-dm';
-    peerID: string;
-    nickname?: string;
-    /** Only required for nostr-dm; ble-dm ignores it. */
-    geohash?: string;
-  }>();
-
-  if (!transport || !peerID) return null;
+  const params = useRouteParams(ParamsSchema, { where: 'user-flow.bitchatDM' });
+  if (!params) return null;
 
   return (
     <GeohashChatScreen
-      geohash={geohash ?? 'mesh'}
-      transport={transport}
-      dmPeerID={peerID}
-      dmNickname={nickname}
+      geohash={params.geohash}
+      transport={params.transport}
+      dmPeerID={params.peerID}
+      dmNickname={params.nickname}
       onBack={() => router.back()}
     />
   );

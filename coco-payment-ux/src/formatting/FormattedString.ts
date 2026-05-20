@@ -11,6 +11,23 @@ function isRTLLocale(locale?: string): boolean {
   return RTL_LANGS.has(locale.split('-')[0].toLowerCase());
 }
 
+// Code-point segmentation. `Array.from`/spread iterate via the string iterator,
+// which yields full Unicode scalar values — keeping surrogate pairs (emoji,
+// non-BMP CJK, etc.) intact through slicing. Falls short of grapheme clusters
+// (a flag emoji is 2 code points) but Hermes does not ship Intl.Segmenter, so
+// code-point iteration is the portable choice.
+function codePoints(str: string): string[] {
+  return Array.from(str);
+}
+
+function takeStart(cp: string[], n: number): string {
+  return cp.slice(0, n).join('');
+}
+
+function takeEnd(cp: string[], n: number): string {
+  return cp.slice(cp.length - n).join('');
+}
+
 /**
  * A string that also provides smart truncation.
  *
@@ -39,11 +56,11 @@ export class FormattedString extends String {
   }
 
   /**
-   * Truncate the string keeping `n` characters visible.
+   * Truncate the string keeping `n` code points visible.
    *
-   * - `'middle'`: keeps `n` chars from start and end, joins with "..."
-   * - `'end'`: keeps first `n` chars, appends "..."
-   * - `'start'`: keeps last `n` chars, prepends "..."
+   * - `'middle'`: keeps `n` code points from start and end, joins with "..."
+   * - `'end'`: keeps first `n` code points, appends "..."
+   * - `'start'`: keeps last `n` code points, prepends "..."
    * - `'beforeAt'`: truncates only the part before `@`, keeps domain intact (for NPC/lightning addresses)
    *
    * Returns the original string if already short enough.
@@ -56,29 +73,33 @@ export class FormattedString extends String {
 
     switch (m) {
       case 'middle': {
-        if (n * 2 >= str.length) return str;
-        return `${str.substring(0, n)}...${str.substring(str.length - n)}`;
+        const cp = codePoints(str);
+        if (n * 2 >= cp.length) return str;
+        return `${takeStart(cp, n)}...${takeEnd(cp, n)}`;
       }
       case 'end': {
-        if (n >= str.length) return str;
-        return `${str.substring(0, n)}...`;
+        const cp = codePoints(str);
+        if (n >= cp.length) return str;
+        return `${takeStart(cp, n)}...`;
       }
       case 'start': {
-        if (n >= str.length) return str;
-        return `...${str.substring(str.length - n)}`;
+        const cp = codePoints(str);
+        if (n >= cp.length) return str;
+        return `...${takeEnd(cp, n)}`;
       }
       case 'beforeAt': {
         const atIdx = str.indexOf('@');
         if (atIdx < 0) return this.truncate(n, 'middle');
         const local = str.substring(0, atIdx);
         const domain = str.substring(atIdx);
+        const localCp = codePoints(local);
         if (isRTLLocale(this._locale)) {
-          if (n >= local.length) return str;
-          const truncated = `...${local.substring(local.length - n)}`;
+          if (n >= localCp.length) return str;
+          const truncated = `...${takeEnd(localCp, n)}`;
           return `${truncated}${domain}`;
         }
-        if (n * 2 >= local.length) return str;
-        const truncated = `${local.substring(0, n)}...${local.substring(local.length - n)}`;
+        if (n * 2 >= localCp.length) return str;
+        const truncated = `${takeStart(localCp, n)}...${takeEnd(localCp, n)}`;
         return `${truncated}${domain}`;
       }
     }

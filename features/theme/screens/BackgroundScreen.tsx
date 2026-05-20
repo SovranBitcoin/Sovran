@@ -7,15 +7,17 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, useWindowDimensions } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { FlatList, useWindowDimensions } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
+import { z } from 'zod';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useLifecycleLogger, log } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeDraft } from '@/features/theme/lib/themeDraft';
 import { useAlbumList } from '@/features/theme/lib/useAlbumList';
@@ -28,11 +30,15 @@ const GRID_GAP = 10;
 const GRID_HORIZONTAL_PADDING = 20;
 const TABS_AREA_HEIGHT = 56;
 
+const ParamsSchema = z.object({
+  unitId: z.string().max(16).optional(),
+});
+
 export function BackgroundScreen() {
   useLifecycleLogger('BackgroundScreen');
 
-  const { unitId: unitIdParam } = useLocalSearchParams<{ unitId?: string }>();
-  const unitId = unitIdParam ?? 'sat';
+  const params = useRouteParams(ParamsSchema, { where: 'theme-flow.background' });
+  const unitId = params?.unitId ?? 'sat';
 
   const { width: screenWidth, height: windowHeight } = useWindowDimensions();
   const headerHeight = useHeaderHeight();
@@ -80,19 +86,16 @@ export function BackgroundScreen() {
       setActiveIndex(idx);
       pagerRef.current?.setPage(idx);
     },
-    [tabLabels],
+    [tabLabels]
   );
 
-  const onPageSelected = useCallback(
-    (event: { nativeEvent: { position: number } }) => {
-      const idx = event.nativeEvent.position;
-      setActiveIndex(idx);
-    },
-    [],
-  );
+  const onPageSelected = useCallback((event: { nativeEvent: { position: number } }) => {
+    const idx = event.nativeEvent.position;
+    setActiveIndex(idx);
+  }, []);
 
   const cardWidth = Math.floor(
-    (screenWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS,
+    (screenWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS
   );
   const cardHeight = Math.round(cardWidth * 1.55);
 
@@ -102,21 +105,20 @@ export function BackgroundScreen() {
       setUnitWallpaper(unitId, themeName);
       router.back();
     },
-    [setUnitWallpaper, unitId],
+    [setUnitWallpaper, unitId]
   );
 
   // Pager needs explicit height; carve out the space between tabs and the
   // bottom safe area so each page's grid can scroll vertically inside its
   // own bounds.
-  const pagerHeight =
-    windowHeight - headerHeight - TABS_AREA_HEIGHT - insets.bottom - 8;
+  const pagerHeight = windowHeight - headerHeight - TABS_AREA_HEIGHT - insets.bottom - 8;
 
   return (
     <>
       <Stack.Screen options={{ title: 'Background' }} />
       <Screen name="BackgroundScreen" scroll="custom">
-        <View style={{ flex: 1, paddingTop: headerHeight }}>
-          <View style={styles.tabsWrap}>
+        <View className="flex-1" style={{ paddingTop: headerHeight }}>
+          <View className="justify-center" style={{ height: TABS_AREA_HEIGHT }}>
             <AlbumPillTabs
               tabs={tabLabels}
               selectedTab={selectedTabLabel}
@@ -145,7 +147,7 @@ export function BackgroundScreen() {
               ))}
             </PagerView>
           ) : (
-            <Text size={13} style={styles.empty}>
+            <Text size={13} className="mt-8 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
               Loading albums…
             </Text>
           )}
@@ -194,11 +196,11 @@ const AlbumPage = React.memo(function AlbumPage({
         </View>
       );
     },
-    [catalog, draftUnitTheme, cardWidth, cardHeight, onPick],
+    [catalog, draftUnitTheme, cardWidth, cardHeight, onPick]
   );
 
   return (
-    <View key={slug} style={{ flex: 1 }}>
+    <View key={slug} className="flex-1">
       <FlatList
         data={themeNames}
         keyExtractor={(n) => n}
@@ -210,7 +212,7 @@ const AlbumPage = React.memo(function AlbumPage({
           paddingBottom: 48,
         }}
         ListEmptyComponent={
-          <Text size={13} style={styles.empty}>
+          <Text size={13} className="mt-8 text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
             No wallpapers in this album yet.
           </Text>
         }
@@ -218,16 +220,4 @@ const AlbumPage = React.memo(function AlbumPage({
       />
     </View>
   );
-});
-
-const styles = StyleSheet.create({
-  tabsWrap: {
-    height: TABS_AREA_HEIGHT,
-    justifyContent: 'center',
-  },
-  empty: {
-    color: 'rgba(255,255,255,0.4)',
-    textAlign: 'center',
-    marginTop: 32,
-  },
 });

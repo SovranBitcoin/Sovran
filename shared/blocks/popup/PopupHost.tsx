@@ -33,9 +33,13 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { alpha } from '@/shared/styles/tokens';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
+import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
+import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
@@ -126,7 +130,7 @@ function LiveSheetBackground({
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel="Bottom Sheet"
-      style={[sanitized as ViewStyle, animatedStyle]}
+      style={[sanitized, animatedStyle]}
     />
   );
 }
@@ -144,7 +148,7 @@ function LiveSheetHandle({
     <View style={[style, { padding: 10 }]}>
       <Animated.View
         style={[
-          { alignSelf: 'center', width: 36, height: 4, borderRadius: 4 } as ViewStyle,
+          { alignSelf: 'center', width: 36, height: 4, borderRadius: 4 },
           indicatorStyle,
           animatedStyle,
         ]}
@@ -257,6 +261,62 @@ const CUSTOM_SHEET_CONTENT: Record<
     canPop: boolean;
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
+  // `payment-options` and `payment-fallback` share one renderer; the
+  // `isFallback` prop decides title + per-row red-wash. Wrapping keeps the
+  // registry's `Record<keyof ActionSheetPayloads, ...>` shape intact.
+  'payment-options': ((props: {
+    payload: ActionSheetPayloads['payment-options'];
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }) => <PaymentOptionsContent {...props} isFallback={false} />) as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'payment-fallback': ((props: {
+    payload: ActionSheetPayloads['payment-fallback'];
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }) => <PaymentOptionsContent {...props} isFallback={true} />) as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'proof-selector': ProofSelectorContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
 };
 
 function SheetContent({
@@ -350,34 +410,55 @@ function SheetContent({
 
       {(standardPayload?.buttons?.length ?? 0) > 0 ? (
         <View className="mt-4 gap-2">
-          {standardPayload?.buttons?.map((button, index) => {
-            const variant = index === 0 ? 'primary' : 'tertiary';
-            const className = getSheetButtonClassName(variant);
-            const labelClassName = getSheetButtonLabelClassName(variant);
-
-            return (
-              <Button
-                key={`${button.text}-${index}`}
-                variant={variant}
-                className={className}
-                feedbackVariant={hasLiveStatus ? 'scale' : undefined}
-                onPress={async () => {
-                  if (button.onPress) {
-                    await button.onPress();
-                  } else if (button.page) {
-                    router.navigate(`/${button.page}` as any);
-                  }
-                  close();
-                }}>
-                <Button.Label className={labelClassName}>{button.text}</Button.Label>
-              </Button>
-            );
-          })}
+          {standardPayload?.buttons?.map((button, index) => (
+            <SheetActionButton
+              key={`${button.text}-${index}`}
+              button={button}
+              variant={index === 0 ? 'primary' : 'tertiary'}
+              feedbackVariant={hasLiveStatus ? 'scale' : undefined}
+              close={close}
+            />
+          ))}
         </View>
       ) : null}
 
       {showDuration ? <DurationBar duration={standardPayload!.duration!} /> : null}
     </View>
+  );
+}
+
+// Each sheet button owns its own single-flight slot — declared as a separate
+// component because hooks can't be called inside the parent's `.map` callback.
+// A rapid double-tap on "View Transaction" / "Continue" / etc. would otherwise
+// run `button.onPress` twice and `close()` twice (or run the navigation twice
+// before close lands), which double-stacks the destination on the back stack.
+type SheetActionButtonProps = {
+  button: { text: string; page?: string; onPress?: () => void | Promise<void> };
+  variant: 'primary' | 'tertiary';
+  feedbackVariant: 'scale' | undefined;
+  close: () => void;
+};
+
+function SheetActionButton({ button, variant, feedbackVariant, close }: SheetActionButtonProps) {
+  const className = getSheetButtonClassName(variant);
+  const labelClassName = getSheetButtonLabelClassName(variant);
+  const handlePress = useSingleFlight(async () => {
+    if (button.onPress) {
+      await button.onPress();
+    } else if (button.page) {
+      router.navigate(`/${button.page}` as never);
+    }
+    close();
+  });
+
+  return (
+    <Button
+      variant={variant}
+      className={className}
+      feedbackVariant={feedbackVariant}
+      onPress={handlePress}>
+      <Button.Label className={labelClassName}>{button.text}</Button.Label>
+    </Button>
   );
 }
 
@@ -401,6 +482,16 @@ function SheetPopup() {
       setOpenCycle((value) => value + 1);
     }
     wasOpenRef.current = isOpen;
+    // While `isOpen` is false, the render still falls back to
+    // `lastPayloadRef` so the exit animation has content to draw.
+    // After heroui's exit animation lands (~300ms), drop the cached
+    // payload so a later re-open never flashes the previous popup.
+    if (!isOpen) {
+      const timer = setTimeout(() => {
+        lastPayloadRef.current = null;
+      }, 400);
+      return () => clearTimeout(timer);
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -561,7 +652,10 @@ function SheetPopup() {
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
       <BottomSheet.Portal>
-        <BottomSheet.Overlay isCloseOnPress={standardPayload?.dismissable ?? true} />
+        <BottomSheet.Overlay
+          isCloseOnPress={standardPayload?.dismissable ?? true}
+          style={{ backgroundColor: `rgba(0,0,0,${alpha.strong})` }}
+        />
         <BottomSheet.Content
           accessible={false}
           detached={!isCustom}
@@ -574,34 +668,25 @@ function SheetPopup() {
           }
           handleComponent={
             isCustom
-              ? // Custom snapPoints sheets render the same chrome as
-                // `ActionMenuHost`'s `<Menu>` — heroui's default handle
-                // indicator. Suppressing it (`() => null`) leaves no top
-                // breathing room and the title sits flush against the
-                // sheet edge, which makes the picker look cramped vs
-                // Select Profile. Only the legacy `contentHeight` mode
-                // keeps the suppression (those sheets size to their own
-                // content and don't expect a handle).
-                layoutConfig?.mode === 'snapPoints'
-                ? undefined
-                : () => null
+              ? // Custom sheets render the same chrome as `ActionMenuHost`'s
+                // `<Menu>` — heroui's default handle indicator. Suppressing
+                // it leaves no top breathing room and the title sits flush
+                // against the sheet edge, which makes the picker look
+                // cramped vs Select Profile. Both snapPoints and
+                // contentHeight modes show the default handle.
+                undefined
               : hasLiveStatus
                 ? (props: any) => <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
                 : undefined
           }
           className={isCustom ? undefined : 'mx-4'}
-          // Custom snapPoints sheets render the same chrome as `ActionMenuHost`
+          // Custom sheets render the same chrome as `ActionMenuHost`
           // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
           // its content background. Match it here so surfaces routed through
-          // PopupHost (e.g. emoji picker — needs FullWindowOverlay above route
-          // modals) are visually indistinguishable from menu-lane surfaces.
-          backgroundClassName={
-            isCustom
-              ? layoutConfig?.mode === 'snapPoints'
-                ? 'bg-overlay'
-                : 'bg-surface'
-              : 'bg-surface rounded-[32px]'
-          }
+          // PopupHost (e.g. emoji picker, payment-options — both need
+          // FullWindowOverlay above route modals) are visually
+          // indistinguishable from menu-lane surfaces.
+          backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}
           backgroundComponent={
             hasLiveStatus
               ? (props: any) => (
@@ -617,8 +702,20 @@ function SheetPopup() {
             // its own bottom inset via `contentBottomInset` so the last
             // row clears the iOS home indicator without the wrapper
             // forcing a visible padding band beneath the BlurView.
-            isCustom && layoutConfig?.mode === 'snapPoints'
-              ? 'h-full px-0 pt-0 pb-0'
+            //
+            // contentHeight custom sheets: tighten horizontal padding from
+            // heroui's default `p-5` (20px) to `px-3` (12px) to match the
+            // menu-lane chrome. heroui's `<Menu presentation="bottom-sheet">`
+            // applies a `px-3` override on top of the same `p-5` base (see
+            // `node_modules/heroui-native/src/components/menu/menu.styles.ts`'s
+            // `contentBottomSheet`), so without this override the FWO-lane
+            // custom sheets render with 8px more horizontal padding per
+            // side than visually-identical menu-lane sheets like "Select
+            // option".
+            isCustom
+              ? layoutConfig?.mode === 'snapPoints'
+                ? 'h-full px-0 pt-0 pb-0'
+                : 'px-3'
               : undefined
           }
           // Patched flag (see patches/heroui-native+1.0.2.patch): swap

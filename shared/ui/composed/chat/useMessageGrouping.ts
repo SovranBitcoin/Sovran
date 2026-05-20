@@ -8,7 +8,7 @@ type GroupedKey = { isFirst: boolean; isLast: boolean };
  * GeohashChatScreen so multiple chat surfaces (BitChat, White Noise) share
  * one implementation.
  */
-export function useMessageGrouping<T extends { id: string; senderPubkey: string }>(
+export function useMessageGrouping<T extends { id: string; senderId: string }>(
   messages: readonly T[]
 ): Map<string, GroupedKey> {
   return useMemo(() => {
@@ -17,8 +17,8 @@ export function useMessageGrouping<T extends { id: string; senderPubkey: string 
       const msg = messages[i];
       const prev = i > 0 ? messages[i - 1] : null;
       const next = i < messages.length - 1 ? messages[i + 1] : null;
-      const isFirst = !prev || prev.senderPubkey !== msg.senderPubkey;
-      const isLast = !next || next.senderPubkey !== msg.senderPubkey;
+      const isFirst = !prev || prev.senderId !== msg.senderId;
+      const isLast = !next || next.senderId !== msg.senderId;
       map.set(msg.id, { isFirst, isLast });
     }
     return map;

@@ -10,15 +10,16 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Image from '@/shared/ui/primitives/Image';
+import { Image } from '@/shared/ui/primitives/Image';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
-import { THEMES } from '@/shared/providers/ThemeProvider';
+import { THEMES } from '@/themes';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import type { WallpaperCatalogEntry } from '@/shared/stores/global/wallpaperStore';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
-export interface WallpaperThumbnailProps {
+interface WallpaperThumbnailProps {
   themeName: string;
   entry?: WallpaperCatalogEntry;
   selected?: boolean;
@@ -42,35 +43,30 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   const paletteColors = THEMES[themeName as keyof typeof THEMES] as
     | Record<string, string>
     | undefined;
+  // Selection border tracks the wallet's active theme so the picker
+  // reflects the user's choice instead of a hardcoded blue.
+  const foreground = useThemeColor('foreground');
 
   const imageSource = downloaded
     ? { uri: downloaded.localUri }
     : entry?.thumbUrl
-    ? { uri: entry.thumbUrl }
-    : null;
+      ? { uri: entry.thumbUrl }
+      : null;
 
-  const inProgress =
-    activeDownloadProgress !== undefined && activeDownloadProgress < 1;
+  const inProgress = activeDownloadProgress !== undefined && activeDownloadProgress < 1;
 
   return (
     <PressableFeedback
       onPress={onPress}
-      disabled={!onPress || inProgress}
+      isDisabled={!onPress || inProgress}
       animation={false}
       style={{ width, height }}>
       <PressableFeedback.Scale>
         <View
-          style={[
-            styles.card,
-            { width, height },
-            selected && styles.cardSelected,
-          ]}>
+          className="overflow-hidden rounded-2xl bg-[#1a1a1a]"
+          style={[{ width, height }, selected && { borderWidth: 2, borderColor: foreground }]}>
           {imageSource ? (
-            <Image
-              source={imageSource}
-              style={StyleSheet.absoluteFillObject}
-              contentFit="cover"
-            />
+            <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
           ) : paletteColors ? (
             <LinearGradient
               colors={[
@@ -83,13 +79,11 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
               end={{ x: 1, y: 1 }}
             />
           ) : (
-            <View
-              style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]}
-            />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]} />
           )}
 
           {inProgress && (
-            <View style={styles.progressOverlay}>
+            <View className="absolute inset-0 items-center justify-center bg-black/60">
               <Text size={14} bold style={{ color: '#fff' }}>
                 {Math.round((activeDownloadProgress ?? 0) * 100)}%
               </Text>
@@ -97,13 +91,13 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
           )}
 
           {showPlayBadge && !inProgress && (
-            <View style={styles.playBadge}>
+            <View className="absolute bottom-2 right-2 h-7 w-7 items-center justify-center rounded-[14px] bg-black/55">
               <Icon name="mdi:play" size={16} color="#fff" />
             </View>
           )}
 
           {!downloaded && entry && !inProgress && (
-            <View style={styles.downloadBadge}>
+            <View className="absolute right-2 top-2 h-6 w-6 items-center justify-center rounded-xl bg-black/50">
               <Icon name="mdi:cloud-download-outline" size={12} color="#fff" />
             </View>
           )}
@@ -111,44 +105,4 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
       </PressableFeedback.Scale>
     </PressableFeedback>
   );
-});
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-  },
-  cardSelected: {
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-  },
-  progressOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  downloadBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

@@ -1,5 +1,4 @@
 import React, { useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -8,7 +7,7 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
@@ -21,11 +20,19 @@ import {
   Image as SwiftUIImage,
   Text as SwiftUIText,
 } from '@expo/ui/swift-ui';
-import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
-import { liquidGlassModifiers, supportsLiquidGlass } from '@/shared/lib/version';
-import { useRouter } from 'expo-router';
+import {
+  environment,
+  font,
+  foregroundStyle,
+  frame,
+  glassEffect,
+} from '@expo/ui/swift-ui/modifiers';
+import { useCapabilities } from '@/shared/ui/capability';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/shared/lib/popup';
+import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
 import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -73,7 +80,10 @@ const LIQUID_GLASS_BALANCE_TINT_ALPHA = 0.75;
 // Stretching the touchable to fill the row and giving it a comfortable min
 // height makes the whole balance area tap-to-cycle-unit again, matching
 // the old behaviour before we switched to liquid glass.
-const BALANCE_TAP_HEIGHT = 48;
+const BALANCE_TEXT_SIZE = 42;
+const BALANCE_TEXT_LINE_HEIGHT = 54;
+const BALANCE_TAP_HEIGHT = 60;
+const BALANCE_SECTION_GAP = 18;
 
 // ---------------------------------------------------------------------------
 // Shared ecash status pill (pending / reserved / etc.)
@@ -100,26 +110,32 @@ function EcashStatusPill({
   onPress,
 }: EcashStatusPillProps): React.ReactElement | null {
   const [foreground] = useThemeColor(['foreground'] as const);
+  const colorScheme = useColorScheme();
   const tint = tintColor ?? foreground;
+  const { liquidGlass } = useCapabilities();
+  const glassPillModifiers = liquidGlass
+    ? [
+        glassEffect({
+          shape: 'capsule' as const,
+          glass: { tint: opacity(tint, 0.15), variant: 'regular' as const, interactive: false },
+        }),
+      ]
+    : [];
 
   if (totalAmount <= 0) return null;
 
   const text = `${label}: ${totalAmount.toLocaleString()} ${unit.toUpperCase()}`;
   const iosWidth = Math.max(72, Math.round(text.length * (PILL_TEXT_SIZE * 0.62) + 28 + 17));
 
-  if (Platform.OS === 'ios' && supportsLiquidGlass()) {
+  if (liquidGlass) {
     return (
       <Host matchContents>
         <SwiftUIButton
           onPress={onPress}
           modifiers={[
+            environment('colorScheme', colorScheme),
             frame({ height: PILL_IOS_HEIGHT, width: iosWidth, alignment: 'center' }),
-            ...liquidGlassModifiers(
-              glassEffect({
-                shape: 'capsule',
-                glass: { tint: opacity(tint, 0.15), variant: 'regular', interactive: false },
-              })
-            ),
+            ...glassPillModifiers,
           ]}>
           <SwiftUIHStack
             alignment="center"
@@ -140,7 +156,7 @@ function EcashStatusPill({
   }
 
   return (
-    <TouchableOpacity onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
+    <Pressable onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
       <HStack
         align="center"
         justify="center"
@@ -163,7 +179,7 @@ function EcashStatusPill({
           {text}
         </UntranslatedText>
       </HStack>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -171,7 +187,7 @@ function EcashStatusPill({
  * Component that displays the primary balance with unit toggling capability
  */
 export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactElement {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { history } = usePaginatedHistory();
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
@@ -205,7 +221,6 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     router.navigate({
       pathname: '/transactions',
       params: {
-        account: JSON.stringify(account),
         filterCurrency: account.unit,
         filterPaymentType: 'ecash',
         filterDirection: 'outgoing',
@@ -213,9 +228,11 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         filterMintUrl: 'all',
       },
     });
-  }, [router, account]);
+  }, [router, account.unit]);
 
-  const handleReservedPress = useCallback(() => {
+  // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
+  // dropped by `useSingleFlight` until the first interaction settles.
+  const handleReservedPressInner = useCallback(async () => {
     const recoverPending = async () => {
       walletLog.info('wallet.reserved.recovery_start', { reservedTotal });
       try {
@@ -224,7 +241,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         await manager.ops.send.recovery.run();
         await manager.ops.melt.recovery.run();
         walletLog.info('wallet.reserved.recovery_complete');
-        reservedProofsFreedPopup({
+        staticPopup('reserved-proofs-freed', {
           text:
             'Recovery completed.\n' +
             'Checked pending send and melt operations.\n' +
@@ -234,23 +251,44 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         walletLog.error('wallet.reserved.recovery_failed', {
           error: error instanceof Error ? error : new Error(String(error)),
         });
-        reservedProofsFailedPopup({
+        staticPopup('reserved-proofs-failed', {
           text: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     };
 
-    Alert.alert('Reserved Proofs', 'Choose a recovery action.', [
-      { text: 'Close', style: 'cancel' },
-      { text: 'Recover Pending Operations', onPress: recoverPending },
-    ]);
-  }, []);
+    await new Promise<void>((resolve) => {
+      actionMenuPopup({
+        title: 'Reserved Proofs',
+        // Fires on overlay-tap / swipe-down (no item picked); the picked
+        // path resolves from the button's onPress finally-block instead.
+        onDismiss: () => resolve(),
+        buttons: [
+          {
+            testID: 'reserved-proofs-recover',
+            text: 'Recover Pending Operations',
+            description: 'Checks pending send and melt operations',
+            icon: 'mdi:wrench',
+            onPress: async () => {
+              try {
+                await recoverPending();
+              } finally {
+                resolve();
+              }
+            },
+          },
+        ],
+      });
+    });
+  }, [reservedTotal]);
+
+  const handleReservedPress = useSingleFlight(handleReservedPressInner);
 
   return (
     <Log name="PrimaryBalance">
-      <VStack align="center" gap={8} className="z-9">
+      <VStack align="center" gap={BALANCE_SECTION_GAP} className="z-9">
         <FiatCurrencyPill displayText={displayText} textSize={12} />
-        <TouchableOpacity
+        <Pressable
           onPress={toggleUnit}
           style={{
             alignSelf: 'stretch',
@@ -261,12 +299,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           <AmountFormatter
             amount={balance}
             unit={account.unit}
+            size={BALANCE_TEXT_SIZE}
+            lineHeight={BALANCE_TEXT_LINE_HEIGHT}
             weight="heavy"
             liquid
             glassVariant={LIQUID_GLASS_BALANCE_VARIANT}
             color={balanceTint}
           />
-        </TouchableOpacity>
+        </Pressable>
         <EcashStatusPill
           label="PENDING"
           totalAmount={pendingTotal}

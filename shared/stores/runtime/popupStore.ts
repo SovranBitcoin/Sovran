@@ -1,15 +1,24 @@
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import type { PopupIcon, PopupTextSegment } from '@/shared/lib/popup';
 import type { LiveSheetConfig, LiveSheetStatus } from '@/shared/lib/popup/liveSheetTypes';
 import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
 
-export type SheetButton = {
+type SheetButton = {
   text: string;
   page?: string;
   onPress?: () => void;
 };
+
+/**
+ * Why each onClose fires. `dismiss` = user-driven close. `replaced` = another
+ * sheet opened on top before this one was closed. `destroyed` = forced teardown
+ * (e.g. profile transition; PopupHost unmounts the native overlay).
+ */
+type SheetCloseReason = 'dismiss' | 'replaced' | 'destroyed';
+
+export type SheetCloseEvent = { reason: SheetCloseReason };
 
 /** Standard popup sheet: icon, title, submessage, buttons */
 export type StandardSheetPayload = {
@@ -19,19 +28,19 @@ export type StandardSheetPayload = {
   dismissable?: boolean;
   duration?: number;
   buttons?: SheetButton[];
-  onClose?: (data: unknown) => void;
+  onClose?: (event: SheetCloseEvent) => void;
   live?: LiveSheetConfig;
   /** Set by live.get() for styling (e.g. animate to green when confirmed). */
   status?: LiveSheetStatus;
 };
 
 /** Custom action sheet: sheetId + typed payload */
-export type CustomSheetPayload<K extends keyof ActionSheetPayloads = keyof ActionSheetPayloads> = {
+type CustomSheetPayload<K extends keyof ActionSheetPayloads = keyof ActionSheetPayloads> = {
   sheetId: K;
   payload: ActionSheetPayloads[K];
 };
 
-export type SheetPayload = StandardSheetPayload | CustomSheetPayload;
+type SheetPayload = StandardSheetPayload | CustomSheetPayload;
 
 export function isCustomSheetPayload(p: SheetPayload | null): p is CustomSheetPayload {
   return p != null && 'sheetId' in p && 'payload' in p;
@@ -49,47 +58,50 @@ type PopupStore = {
   update: (partial: Partial<StandardSheetPayload>) => void;
 };
 
-export const usePopupStore = create<PopupStore>((set, get) => ({
-  current: null,
-  isOpen: false,
-  destroyed: false,
-  open: (payload) => {
-    storeLog.info(
-      'store.popup.open',
-      isCustomSheetPayload(payload)
-        ? { sheetId: payload.sheetId }
-        : { message: (payload as StandardSheetPayload).message }
-    );
-    set({ current: payload, isOpen: true, destroyed: false });
-  },
-  update: (partial) => {
+export const usePopupStore = create<PopupStore>((set, get) => {
+  const fireOnClose = (reason: SheetCloseReason) => {
     const { current } = get();
-    if (!current || isCustomSheetPayload(current)) return;
-    storeLog.debug('store.popup.update');
-    set({ current: { ...current, ...partial } });
-  },
-  close: () => {
-    storeLog.debug('store.popup.close');
-    const { current } = get();
-    if (current && !isCustomSheetPayload(current) && current.onClose) {
-      try {
-        current.onClose({ reason: 'dismiss' });
-      } catch (error) {
-        log.error('store.popup.on_close_failed', { error });
-      }
+    if (!current || isCustomSheetPayload(current) || !current.onClose) return;
+    try {
+      current.onClose({ reason });
+    } catch (error) {
+      storeLog.error('store.popup.on_close_failed', {
+        reason,
+        error: redactError(error),
+      });
     }
-    set({ current: null, isOpen: false });
-  },
-  destroySheet: () => {
-    storeLog.debug('store.popup.destroy');
-    const { current } = get();
-    if (current && !isCustomSheetPayload(current) && current.onClose) {
-      try {
-        current.onClose({ reason: 'dismiss' });
-      } catch (error) {
-        log.error('store.popup.on_close_failed', { error });
-      }
-    }
-    set({ current: null, isOpen: false, destroyed: true });
-  },
-}));
+  };
+
+  return {
+    current: null,
+    isOpen: false,
+    destroyed: false,
+    open: (payload) => {
+      storeLog.info(
+        'store.popup.open',
+        isCustomSheetPayload(payload) ? { sheetId: payload.sheetId } : { message: payload.message }
+      );
+      // Honour the "every onClose fires exactly once" contract: if a standard
+      // sheet is already open, fire its onClose with `replaced` before the
+      // new payload overwrites `current`.
+      fireOnClose('replaced');
+      set({ current: payload, isOpen: true, destroyed: false });
+    },
+    update: (partial) => {
+      const { current } = get();
+      if (!current || isCustomSheetPayload(current)) return;
+      storeLog.debug('store.popup.update');
+      set({ current: { ...current, ...partial } });
+    },
+    close: () => {
+      storeLog.debug('store.popup.close');
+      fireOnClose('dismiss');
+      set({ current: null, isOpen: false });
+    },
+    destroySheet: () => {
+      storeLog.debug('store.popup.destroy');
+      fireOnClose('destroyed');
+      set({ current: null, isOpen: false, destroyed: true });
+    },
+  };
+});

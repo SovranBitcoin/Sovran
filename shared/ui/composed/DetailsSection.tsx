@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Log } from '@/shared/lib/logger';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Section } from '@/shared/ui/composed/Section';
+import { DetailsList } from '@/shared/ui/composed/DetailsList';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
@@ -48,7 +49,10 @@ export function DetailsSection({
         <Pressable
           onPress={() => setExpanded((v) => !v)}
           style={styles.toggle}
-          hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          accessibilityState={{ expanded }}>
           <HStack align="center" gap={6}>
             <Icon
               name={expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
@@ -61,7 +65,7 @@ export function DetailsSection({
           </HStack>
         </Pressable>
         {expanded ? (
-          <Section items={items} camera={camera} gradient style={{ marginHorizontal: 0 }} />
+          <DetailsList items={items} camera={camera} gradient style={{ marginHorizontal: 0 }} />
         ) : null}
       </View>
     </Log>

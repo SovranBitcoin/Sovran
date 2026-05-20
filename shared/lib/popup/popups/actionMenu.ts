@@ -94,7 +94,7 @@ import { log } from '@/shared/lib/logger';
 
 const actionMenuLog = log.child({ module: 'actionMenu' });
 
-export interface ActionMenuButton {
+export interface ActionMenuItem {
   text: string;
   icon?: string;
   /** Custom leading glyph node (takes precedence over `icon`). Use when the
@@ -120,7 +120,17 @@ export interface ActionMenuButton {
    * menu via `actionMenuPopup` so the surface swaps content instead of closing.
    */
   keepOpen?: boolean;
-  /** Receives a close callback; if omitted the menu closes immediately. */
+  /**
+   * Receives a close callback; if omitted the menu closes immediately.
+   *
+   * Race note: tapping a button commits the host's "user picked" flag
+   * synchronously, before this `onPress` resolves. If the user then taps
+   * the overlay (or swipes the sheet down) while `onPress` is still
+   * pending, `ActionMenuPayload.onDismiss` does NOT fire — the host
+   * treats the in-flight selection as the terminal user action. Wire any
+   * "user explicitly dismissed mid-action" handling into the body of
+   * `onPress` itself rather than relying on `onDismiss`.
+   */
   onPress?: (close: (event?: GestureResponderEvent) => void) => void | Promise<void>;
 }
 
@@ -136,7 +146,7 @@ export interface ActionMenuInput {
   description?: string;
 }
 
-export interface ActionMenuPrimaryActionContext {
+interface ActionMenuPrimaryActionContext {
   setError: (message: string | null) => void;
   close: () => void;
 }
@@ -145,7 +155,7 @@ export interface ActionMenuPrimaryAction {
   text: string;
   /** Label shown while the async onPress is pending. Defaults to `text`. */
   loadingText?: string;
-  /** Optional leading icon (matches the icon convention on `ActionMenuButton`). */
+  /** Optional leading icon (matches the icon convention on `ActionMenuItem`). */
   icon?: string;
   testID?: string;
   isDisabled?: (values: Record<string, string>) => boolean;
@@ -168,7 +178,7 @@ export interface ActionMenuPrimaryAction {
 export interface ActionMenuSection {
   id: string;
   anchor: { icon?: React.ReactNode; label: string; testID?: string };
-  buttons?: ActionMenuButton[];
+  buttons?: ActionMenuItem[];
   renderBody?: () => React.ReactNode;
 }
 
@@ -179,17 +189,17 @@ export interface ActionMenuSection {
  * Return `null` (or omit `renderResults`) to keep showing the section list
  * regardless of input — useful when the caller wants the input as filter only.
  */
-export interface ActionMenuSearchable {
+interface ActionMenuSearchable {
   placeholder?: string;
   renderResults?: (query: string) => React.ReactNode | null;
 }
 
-export interface ActionMenuPayload {
+interface ActionMenuPayload {
   /** Rendered as `Menu.Label` at the top of the sheet. */
   title?: string;
   /** Custom content rendered between the title and any items / inputs. */
   header?: React.ReactNode;
-  buttons?: ActionMenuButton[];
+  buttons?: ActionMenuItem[];
   /**
    * Buttons pinned at the bottom of the sheet (with a gradient/blur fade
    * above them so the scrollable content visibly disappears beneath).
@@ -201,7 +211,7 @@ export interface ActionMenuPayload {
    * When set, the menu's body becomes a scroll container capped at ~85%
    * of the viewport. When unset, the menu auto-fits content as before.
    */
-  footerButtons?: ActionMenuButton[];
+  footerButtons?: ActionMenuItem[];
   /** Form inputs rendered above the primary action. */
   inputs?: ActionMenuInput[];
   /** Submit button for `inputs`. Required when `inputs` is set. */

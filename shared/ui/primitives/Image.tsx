@@ -1,59 +1,13 @@
-import React, { useCallback, useRef } from 'react';
-import { Image, ImageSource, ImageStyle } from 'expo-image';
-import { StyleProp } from 'react-native';
-import { log } from '@/shared/lib/logger';
+import React from 'react';
+import { Image as ExpoImage, type ImageProps as ExpoImageProps } from 'expo-image';
 
-const BLUR_HASH = '000000';
-
-interface AppProps {
-  style?: StyleProp<ImageStyle>;
-  source: ImageSource;
-  transitionDuration?: number;
-  className?: string;
-}
+type ImageProps = ExpoImageProps;
 
 /**
- * Image component that displays an image with a blur hash placeholder
- * while the image is loading.
+ * Wallpaper-friendly defaults over `expo-image`: aggressive memory+disk caching,
+ * a 1s cross-fade, and `cover` content fit. All expo-image props forward
+ * untouched, so any default is overridable.
  */
-export default function App({
-  style,
-  source,
-  transitionDuration = 1000,
-  className,
-}: AppProps): React.ReactElement {
-  const t0 = useRef(performance.now());
-
-  const onLoad = useCallback(
-    (e: { source: { width: number; height: number; url: string }; cacheType?: string }) => {
-      const duration_ms = Math.round((performance.now() - t0.current) * 100) / 100;
-      const src =
-        typeof source === 'number'
-          ? 'asset'
-          : typeof source === 'string'
-            ? (source as string).slice(0, 40)
-            : ((source as any)?.uri?.slice(0, 40) ?? 'unknown');
-      log.debug('image.loaded', {
-        src,
-        width: e.source.width,
-        height: e.source.height,
-        duration_ms,
-        cacheType: e.cacheType,
-      });
-    },
-    [source]
-  );
-
-  return (
-    <Image
-      className={className}
-      style={style}
-      source={source}
-      placeholder={{ blurhash: BLUR_HASH }}
-      contentFit="cover"
-      cachePolicy="memory-disk"
-      transition={transitionDuration}
-      onLoad={onLoad}
-    />
-  );
+export function Image(props: ImageProps): React.ReactElement {
+  return <ExpoImage contentFit="cover" cachePolicy="memory-disk" transition={1000} {...props} />;
 }

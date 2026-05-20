@@ -8,18 +8,19 @@
  */
 
 import { useMemo } from 'react';
-import { Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { ScrollView, Text as RNText, useWindowDimensions } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 
 import type { QuickSendSuggestion } from 'coco-payment-ux/react';
 
 import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
-import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { AMOUNT_FONT_FAMILY, AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import CustomKeyboard from '@/shared/ui/composed/CustomKeyboard';
-import { FiatCurrencyPill } from '@/features/wallet';
+import { CurrencySwapperPill } from '@/features/wallet/components/CurrencySwapperPill';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -32,66 +33,69 @@ import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
 export type AmountEntryTransactionType = 'send' | 'receive' | 'neutral';
 
+const FIAT_DECIMAL_PLACES = 2;
+
 interface FiatAmountDisplayProps {
   rawInput: string;
   symbol: string;
   activeColor: string;
   placeholderColor: string;
   size: number;
+  lineHeight: number;
 }
 
+/**
+ * Renders the in-progress fiat raw input (e.g. "$1,234.5") as a single text
+ * node so its line-box height matches AmountFormatter's sat path exactly —
+ * same MonaSans face, same explicit lineHeight. Toggling between fiat and
+ * sat modes therefore can't shift the display vertically. Greyed-out trailing
+ * zeros are nested <RNText> children, which inherit the parent's metrics
+ * instead of opening a new flex line.
+ */
 function FiatAmountDisplay({
   rawInput,
   symbol,
   activeColor,
   placeholderColor,
   size,
+  lineHeight,
 }: FiatAmountDisplayProps) {
   const hasDecimal = rawInput.includes('.');
-  const parts = rawInput.split('.');
-  const wholePart = parts[0] || '';
-  const decimalPart = parts[1] || '';
+  const [wholeRaw = '', decimalPart = ''] = rawInput.split('.');
+  const parsedWhole = parseInt(wholeRaw, 10);
+  const formattedWhole = Number.isNaN(parsedWhole) ? '0' : parsedWhole.toLocaleString('en-US');
 
-  const parsedWhole = parseInt(wholePart, 10);
-  const formattedWhole = !isNaN(parsedWhole) ? parsedWhole.toLocaleString('en-US') : '0';
-
-  const showDecimalSection = hasDecimal || wholePart === '0';
+  const showDecimalSection = hasDecimal || wholeRaw === '0';
   const placeholderDecimals = showDecimalSection
-    ? '0'.repeat(Math.max(0, 2 - decimalPart.length))
+    ? '0'.repeat(Math.max(0, FIAT_DECIMAL_PLACES - decimalPart.length))
     : '';
 
   return (
-    <HStack align="baseline" justify="center">
-      <Text overpass size={size} weight="heavy" style={{ color: activeColor }}>
-        {symbol}
-        {formattedWhole}
-      </Text>
+    <RNText
+      allowFontScaling={false}
+      style={{
+        fontFamily: AMOUNT_FONT_FAMILY.heavy,
+        fontSize: size,
+        lineHeight,
+        textAlign: 'center',
+        color: activeColor,
+        margin: 0,
+      }}>
+      {`${symbol} ${formattedWhole}`}
       {showDecimalSection && (
         <>
-          <Text
-            overpass
-            size={size}
-            weight="heavy"
-            style={{ color: hasDecimal ? activeColor : placeholderColor }}>
-            .
-          </Text>
-          {decimalPart && (
-            <Text overpass size={size} weight="heavy" style={{ color: activeColor }}>
-              {decimalPart}
-            </Text>
-          )}
-          {placeholderDecimals && (
-            <Text overpass size={size} weight="heavy" style={{ color: placeholderColor }}>
-              {placeholderDecimals}
-            </Text>
+          <RNText style={{ color: hasDecimal ? activeColor : placeholderColor }}>.</RNText>
+          {decimalPart}
+          {placeholderDecimals !== '' && (
+            <RNText style={{ color: placeholderColor }}>{placeholderDecimals}</RNText>
           )}
         </>
       )}
-    </HStack>
+    </RNText>
   );
 }
 
-export interface AmountEntryViewProps {
+interface AmountEntryViewProps {
   /** Raw keyboard input string; source of truth for CustomKeyboard's internal state. */
   rawInput: string;
   /** Parsed amount as a number (sats when inputMode === 'sat'). */
@@ -138,6 +142,17 @@ export interface AmountEntryViewProps {
   nextVariants?: ActionMenuVariant[];
 
   /**
+   * Optional leading node rendered to the left of Next at 50% width.
+   * Caller-supplied node (e.g. `<MintSelector />`) so the bottom row can
+   * mirror the wallet header's pill chrome — including balance, mint icon,
+   * and liquid/blur/flat capability variants — without this primitive
+   * knowing about mint internals. Wrapped in a `flex:1` View. Suppresses
+   * `extraButtons` when set — Paste/Scan-QR are not meaningful once the
+   * recipient has been picked.
+   */
+  leadingBottomButton?: React.ReactNode;
+
+  /**
    * Color semantics:
    *   'send'    — danger tint on raw input; AmountFormatter uses useTypeColors.
    *   'receive' — foreground; AmountFormatter uses useTypeColors.
@@ -166,25 +181,36 @@ export function AmountEntryView({
   onSuggestionTap,
   extraButtons,
   nextVariants,
+  leadingBottomButton,
   transactionType = 'neutral',
 }: AmountEntryViewProps) {
-  const [foreground, background, danger] = useThemeColor([
+  const [foreground, background, danger, success] = useThemeColor([
     'foreground',
     'background',
     'danger',
+    'success',
   ] as const);
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const isCompactPhone = screenHeight <= 760;
   const isVeryCompactPhone = screenHeight <= 680;
   const amountTextSize = isVeryCompactPhone ? 36 : isCompactPhone ? 42 : 48;
+  // Lock the line-box for both display paths so toggling fiat ↔ sat can't
+  // jitter the rendered height. RN otherwise uses the font's intrinsic
+  // metric, which differs by face and weight.
+  const amountLineHeight = Math.round(amountTextSize * 1.2);
   const centerSpacing = isCompactPhone ? 3 : 4;
   const topPadding = insets.top + (isCompactPhone ? 12 : 24);
 
   const isFiat = inputMode === 'fiat';
   const isSend = transactionType === 'send';
-  const activeColor = rawInput ? (isSend ? danger : foreground) : opacity(foreground, 0.4);
-  const placeholderColor = opacity(isSend ? danger : foreground, 0.35);
+  const isReceive = transactionType === 'receive';
+  // Match `AmountFormatter.resolveColor`: send → danger, receive → success,
+  // anything else → foreground. Keeps the fiat raw-input path (which doesn't
+  // route through AmountFormatter) in sync with the BTC glyph path.
+  const typeTint = isSend ? danger : isReceive ? success : foreground;
+  const activeColor = rawInput ? typeTint : opacity(foreground, 0.4);
+  const placeholderColor = opacity(typeTint, 0.35);
 
   const suggestionsRow = useMemo(() => {
     if (transactionType !== 'send' || suggestions.length === 0) return null;
@@ -264,6 +290,7 @@ export function AmountEntryView({
                 rawInput={rawInput}
                 symbol={fiatSymbol}
                 size={amountTextSize}
+                lineHeight={amountLineHeight}
                 activeColor={activeColor}
                 placeholderColor={placeholderColor}
               />
@@ -272,6 +299,7 @@ export function AmountEntryView({
                 amount={numericValue}
                 unit={unit}
                 size={amountTextSize}
+                lineHeight={amountLineHeight}
                 weight="heavy"
                 animated
                 useTypeColors={useTypeColors}
@@ -282,12 +310,7 @@ export function AmountEntryView({
               />
             )}
             {secondaryDisplay && (
-              <FiatCurrencyPill
-                displayText={secondaryDisplay}
-                onPress={onToggleMode}
-                showToggleGlyph
-                enableCurrencyMenu={false}
-              />
+              <CurrencySwapperPill inputMode={inputMode} onPress={onToggleMode} />
             )}
           </VStack>
         </View>
@@ -313,7 +336,14 @@ export function AmountEntryView({
             // This mirrors the plain-ButtonHandler path's "2 text + third
             // collapses to icon" rule we lost when Next got split into its
             // own component.
+            //
+            // When `leadingBottomButton` is set (recipient-header flow),
+            // extras are suppressed and the row becomes [leading 50%] +
+            // [ActionMenuButton 50%].
             <HStack align="center" gap={0} style={{ flex: 1 }}>
+              {leadingBottomButton ? (
+                <View style={{ flex: 1, alignItems: 'center' }}>{leadingBottomButton}</View>
+              ) : null}
               <ActionMenuButton
                 label={nextText}
                 testID={nextTestID}
@@ -333,7 +363,7 @@ export function AmountEntryView({
                 collapsedPressOpensMenu
                 menuTitle="Select option"
               />
-              {extraButtons && extraButtons.length > 0 ? (
+              {!leadingBottomButton && extraButtons && extraButtons.length > 0 ? (
                 <View style={{ flex: 1 }}>
                   <Button
                     testID={extraButtons[0].testID}
@@ -341,11 +371,11 @@ export function AmountEntryView({
                     variant={extraButtons[0].variant}
                     loading={extraButtons[0].loading}
                     disabled={extraButtons[0].disabled}
-                    onPress={() => extraButtons[0].onPress?.(() => {})}
+                    onPress={() => extraButtons[0].onPress?.()}
                   />
                 </View>
               ) : null}
-              {extraButtons && extraButtons.length > 1 ? (
+              {!leadingBottomButton && extraButtons && extraButtons.length > 1 ? (
                 <View>
                   <Button
                     testID={extraButtons[1].testID}
@@ -359,10 +389,31 @@ export function AmountEntryView({
                     variant={extraButtons[1].variant ?? 'secondary'}
                     loading={extraButtons[1].loading}
                     disabled={extraButtons[1].disabled}
-                    onPress={() => extraButtons[1].onPress?.(() => {})}
+                    onPress={() => extraButtons[1].onPress?.()}
                   />
                 </View>
               ) : null}
+            </HStack>
+          ) : leadingBottomButton ? (
+            // Recipient-header flow: render the 50/50 row directly so the
+            // caller-supplied leading node (e.g. MintSelector pill) can
+            // render its own image-backed chrome without this primitive
+            // needing to model mint internals.
+            <HStack align="center" gap={0} style={{ flex: 1 }}>
+              <View style={{ flex: 1, alignItems: 'center' }}>{leadingBottomButton}</View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  testID={nextTestID}
+                  text={nextText}
+                  icon={nextIcon ? <Icon name={nextIcon} /> : undefined}
+                  variant="primary"
+                  loading={nextLoading}
+                  disabled={nextDisabled}
+                  onPress={async () => {
+                    await onNext();
+                  }}
+                />
+              </View>
             </HStack>
           ) : (
             <ButtonHandler

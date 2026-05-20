@@ -17,6 +17,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Log } from '@/shared/lib/logger';
+import { zIndex } from '@/shared/styles/tokens';
 
 interface TransferCardProps {
   /** Accent color for the BlurCardFrame gradients. Falls back to primary-300. */
@@ -55,6 +56,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   content: {
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
 });

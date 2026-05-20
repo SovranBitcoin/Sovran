@@ -29,7 +29,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import Icon from 'assets/icons';
-import { Screen, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -75,11 +75,7 @@ export default function SplitBillSearchScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: PickerCandidate }) => (
-      <ParticipantRow
-        candidate={item}
-        selected={selectedIds.has(item.id)}
-        onToggle={toggle}
-      />
+      <ParticipantRow candidate={item} selected={selectedIds.has(item.id)} onToggle={toggle} />
     ),
     [selectedIds, toggle]
   );
@@ -99,7 +95,7 @@ export default function SplitBillSearchScreen() {
     // overshoots the keyboard top by `insets.bottom`. Adding it back on
     // the `opened` side cancels that overshoot so the button lands flush
     // on the keyboard.
-    <Screen name="SplitBillSearchScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="SplitBillSearchScreen" style={{ flex: 1, backgroundColor: background }}>
       <View style={[styles.inputWrapper, { backgroundColor: surfaceSecondary }]}>
         <Icon name="mdi:magnify" size={18} color={opacity(foreground, 0.5)} />
         <TextInput
@@ -153,7 +149,7 @@ export default function SplitBillSearchScreen() {
           </HStack>
         </BottomButtons>
       </KeyboardStickyView>
-    </Screen>
+    </Log>
   );
 }
 

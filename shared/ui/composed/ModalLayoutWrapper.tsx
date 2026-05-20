@@ -5,7 +5,7 @@
  */
 
 import React, { ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { NativeScrollEvent, ScrollView, StyleSheet, View } from 'react-native';
+import { NativeScrollEvent, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
@@ -18,6 +18,7 @@ import { ScrollEdgeFade } from './ScrollEdgeFade';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { zIndex } from '@/shared/styles/tokens';
 
 const DebugRow = ({
   label,
@@ -38,7 +39,7 @@ const DebugRow = ({
   </View>
 );
 
-export interface ModalLayoutWrapperProps {
+interface ModalLayoutWrapperProps {
   children: ReactNode;
   /** Enable debug overlays to visualize safe areas and header height */
   debug?: boolean;
@@ -140,6 +141,9 @@ export function ModalLayoutWrapper({
     onHeaderHeightChange?.(totalHeaderHeight);
   }, [totalHeaderHeight, onHeaderHeightChange]);
 
+  const shouldRenderAndroidHeaderSpacer =
+    Platform.OS === 'android' && !disableHeaderSpacer && totalHeaderHeight > 0;
+
   const scrollContentStyle = {
     paddingHorizontal: contentPadding,
     paddingBottom: bottomPadding,
@@ -148,14 +152,19 @@ export function ModalLayoutWrapper({
   return (
     <Log name="ModalLayoutWrapper">
       <View className="flex-1" style={{ backgroundColor: background }}>
-        <View
-          className="absolute inset-0"
-          pointerEvents="none"
-          style={{
-            borderWidth: debug ? 2 : 0,
-            borderColor: debug ? 'blue' : 'transparent',
-          }}
-        />
+        {/* Debug-only outlines/zones. Kept off the tree entirely when not
+            debugging so `react-native-screens`' `findScrollViewInFirstDescendant`
+            chain finder can walk through `subviews[0]` and reach the actual
+            scroll view — iOS 26's `scrollEdgeEffects` screen option only
+            applies if the finder can reach the scroll view, and a leaf View
+            at index 0 breaks that traversal. */}
+        {debug && (
+          <View
+            className="absolute inset-0"
+            pointerEvents="none"
+            style={{ borderWidth: 2, borderColor: 'blue' }}
+          />
+        )}
 
         {headerGradient && (
           <ScrollEdgeFade edge="top" height={gradientHeight * 2} color={background} />
@@ -165,33 +174,27 @@ export function ModalLayoutWrapper({
           <View style={[styles.stickyContainer, { top: headerHeight }]}>{stickyContent}</View>
         )}
 
-        <View
-          className="absolute left-0 right-0 top-0 z-[100] items-center justify-end pb-1"
-          style={{
-            height: headerHeight,
-            backgroundColor: debug ? 'rgba(255,0,0,0.2)' : 'transparent',
-          }}
-          pointerEvents="none">
-          {debug && (
+        {debug && (
+          <View
+            className="absolute left-0 right-0 top-0 z-[100] items-center justify-end pb-1"
+            style={{ height: headerHeight, backgroundColor: 'rgba(255,0,0,0.2)' }}
+            pointerEvents="none">
             <Text className="text-[10px] font-bold" style={{ color: 'red' }}>
               header: {headerHeight}px
             </Text>
-          )}
-        </View>
+          </View>
+        )}
 
-        <View
-          className="absolute bottom-0 left-0 right-0 z-[100] items-center justify-center"
-          style={{
-            height: insets.bottom,
-            backgroundColor: debug ? 'rgba(0,255,255,0.3)' : 'transparent',
-          }}
-          pointerEvents="none">
-          {debug && (
+        {debug && (
+          <View
+            className="absolute bottom-0 left-0 right-0 z-[100] items-center justify-center"
+            style={{ height: insets.bottom, backgroundColor: 'rgba(0,255,255,0.3)' }}
+            pointerEvents="none">
             <Text className="text-[9px] font-bold" style={{ color: 'cyan' }}>
               safe: {insets.bottom}px
             </Text>
-          )}
-        </View>
+          </View>
+        )}
 
         {useCustomScrollView ? (
           <View style={{ flex: 1 }}>{children}</View>
@@ -212,6 +215,7 @@ export function ModalLayoutWrapper({
             scrollEventThrottle={16}
             onScroll={handleScroll}
             contentContainerStyle={scrollContentStyle}>
+            {shouldRenderAndroidHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
             {children}
           </ScrollView>
         )}
@@ -272,6 +276,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    zIndex: 99,
+    zIndex: zIndex.dropdown,
   },
 });

@@ -14,16 +14,17 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import Icon from 'assets/icons';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { convertTime } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import type { SplitBillGroup } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
@@ -81,14 +82,14 @@ export const SplitBillTransactionRow = React.memo(({ group }: Props) => {
       participants: group.participants.length,
     });
     router.navigate({
-      pathname: '/(split-bill-flow)/detail' as any,
+      pathname: '/(split-bill-flow)/detail',
       params: { groupId: group.id },
     });
   }, [group.id, group.state, group.participants.length]);
 
   return (
     <Log name="SplitBillTransactionRow">
-      <TouchableOpacity
+      <Pressable
         className="flex-row items-center justify-between bg-transparent px-4 py-5"
         onPress={handlePress}>
         <HStack spacing={12} flex={1}>
@@ -108,7 +109,7 @@ export const SplitBillTransactionRow = React.memo(({ group }: Props) => {
 
             <HStack justify="space-between" align="center">
               <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
-                {convertTime(new Date(group.createdAt))}
+                {formatDate(group.createdAt, 'short-date-time')}
               </UntranslatedText>
               <UntranslatedText bold size={10} color={opacity(foreground, 0.8)}>
                 {aggregate.counter}
@@ -116,7 +117,7 @@ export const SplitBillTransactionRow = React.memo(({ group }: Props) => {
             </HStack>
           </VStack>
         </HStack>
-      </TouchableOpacity>
+      </Pressable>
     </Log>
   );
 });

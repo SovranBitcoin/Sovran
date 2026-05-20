@@ -1,15 +1,6 @@
-import { Dimensions } from 'react-native';
-
-const { width: screenWidth } = Dimensions.get('window');
-export const scanBoxSize = screenWidth * 0.8;
-
 export interface ScanningData {
   data: string;
   type?: string;
-}
-
-export interface CameraScreenProps {
-  scanLocked?: boolean;
 }
 
 export interface CameraScreenShared {
@@ -19,7 +10,7 @@ export interface CameraScreenShared {
   flashlightOn: boolean | null;
   loading: boolean;
   hasPermission: boolean;
-  scanLocked: boolean;
+  requestPermission: () => void;
   handleScan: (data: { data?: string }) => void;
   handleCameraReady: () => void;
   handleClipboardPress: () => void;

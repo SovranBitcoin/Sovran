@@ -18,8 +18,9 @@ final class BitChatNostrBridge {
     static let shared = BitChatNostrBridge()
 
     private weak var module: BitChatModule?
-    private let identityBridge = NostrIdentityBridge()
+    private var identityBridge: NostrIdentityBridge?
     private var relayManager: NostrRelayManager?
+    private var activeProfileScope: String?
     private var currentGeohash: String?
     private var currentGeohashPubkey: String?
     /// Cached so we can decrypt inbound gift wraps without re-deriving on
@@ -44,9 +45,17 @@ final class BitChatNostrBridge {
 
     // MARK: - Lifecycle
 
-    func start() {
-        guard !isStarted else { return }
+    func start(profileScope: String) {
+        let scope = BitchatProfileScope.storageSuffix(for: profileScope)
+        if isStarted, activeProfileScope == scope { return }
+        if isStarted {
+            stop()
+        }
         isStarted = true
+        activeProfileScope = scope
+        identityBridge = NostrIdentityBridge(
+            keychain: ProfileScopedBitchatKeychain(profileScope: profileScope)
+        )
 
         // NostrRelayManager.live() would pull in NetworkActivationService /
         // FavoritesPersistenceService / LocationChannelManager / TorManager —
@@ -87,6 +96,8 @@ final class BitChatNostrBridge {
         leaveGeohash()
         relayManager?.disconnect()
         relayManager = nil
+        identityBridge = nil
+        activeProfileScope = nil
         isStarted = false
     }
 
@@ -103,6 +114,9 @@ final class BitChatNostrBridge {
             relayManager.unsubscribe(id: "geo-dm-\(previous)")
         }
 
+        guard let identityBridge else {
+            throw BitChatNostrBridgeError.notStarted
+        }
         let identity = try identityBridge.deriveIdentity(forGeohash: geohash)
         currentGeohash = geohash
         currentGeohashIdentity = identity
@@ -159,7 +173,7 @@ final class BitChatNostrBridge {
     // MARK: - Send
 
     func sendMessage(_ content: String, nickname: String?) throws {
-        guard let relayManager else {
+        guard let relayManager, let identityBridge else {
             throw BitChatNostrBridgeError.notStarted
         }
         guard let geohash = currentGeohash else {
@@ -302,16 +316,6 @@ final class BitChatNostrBridge {
         str = str.replacingOccurrences(of: "-", with: "+")
                  .replacingOccurrences(of: "_", with: "/")
         return Data(base64Encoded: str)
-    }
-
-    // MARK: - Closest-relay query (for JS / diagnostics)
-
-    func closestRelays(toLat lat: Double, lon: Double, count: Int) -> [String] {
-        GeoRelayDirectory.shared.closestRelays(toLat: lat, lon: lon, count: count)
-    }
-
-    func closestRelays(toGeohash geohash: String, count: Int) -> [String] {
-        GeoRelayDirectory.shared.closestRelays(toGeohash: geohash, count: count)
     }
 
     // MARK: - Event dispatch

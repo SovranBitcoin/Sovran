@@ -118,6 +118,20 @@ export type ResolvedIntent =
 export interface AmountEntryConstraints {
   paymentRequest?: string;
   meltTarget?: string;
+  /**
+   * Nostr pubkey (32-byte hex) of the recipient when this amount-entry was
+   * launched from a chat surface. UI-agnostic identity — consumers resolve to
+   * a profile (picture, displayName) via their own metadata cache. Threaded
+   * through `FlowContext` and surfaced on `navigateToMeltPreview` /
+   * `navigateToPaymentRequest` / `sendComplete` step data.
+   */
+  recipientPubkey?: string;
+  /**
+   * Pre-resolved Nostr kind-0 profile for `recipientPubkey`. When the machine
+   * has fetched it via `operations.resolveRecipientProfile`, consumer UIs can
+   * render avatar + display name without re-fetching.
+   */
+  recipientProfile?: import('./machine/types').RecipientProfile;
   destination: 'paymentRequest' | 'meltQuote' | 'sendEcash' | 'mintQuote';
 }
 
@@ -140,6 +154,9 @@ export interface MintCatalogEntry {
   auditScore?: number;
   /** Auditor state string, e.g. 'OK' or 'ERROR'. */
   auditState?: string;
+  /** Total mint+melt operations the auditor has observed for this mint.
+   *  Rendered as `(123)` next to the audit %. */
+  auditTotalOps?: number;
   /** Follower count of the mint operator's Nostr identity. */
   contactFollowers?: number;
   /** Reputation score (0-100) of the mint operator's Nostr identity. */
@@ -176,6 +193,8 @@ export interface MintListItem {
   auditScore?: number;
   /** Auditor state string, e.g. 'OK' or 'ERROR'. */
   auditState?: string;
+  /** Total mint+melt operations the auditor has observed for this mint. */
+  auditTotalOps?: number;
   /** Whether this mint can send the requested amount offline (exact proof composition). */
   worksOffline?: boolean;
   /** Whether the mint was unreachable during enrichment. */
@@ -200,13 +219,15 @@ export interface MintReviewInfo {
   description?: string;
   longDescription?: string;
   motd?: string;
-  contact?: Array<{ method: string; info: string }>;
+  contact?: { method: string; info: string }[];
   nuts?: number[];
   balance: number;
   unit: string;
   isPreferred: boolean;
   isTrusted: boolean;
   kymScore?: number;
+  /** Number of community reviews behind `kymScore`. */
+  reviewCount?: number;
   auditScore?: number;
   auditState?: string;
   successRate?: number;
@@ -215,6 +236,10 @@ export interface MintReviewInfo {
   swapTotal?: number;
   totalMints?: number;
   totalMelts?: number;
+  /** Follower count of the mint operator's Nostr identity (NUT-06 contact). */
+  contactFollowers?: number;
+  /** Reputation score (0-100) of the mint operator's Nostr identity. */
+  contactReputation?: number;
 }
 
 export type MintSelectionResult =

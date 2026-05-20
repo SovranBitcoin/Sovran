@@ -5,12 +5,13 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Reanimated, { useAnimatedProps, useSharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { View } from '@/shared/ui/primitives/View/View';
-import type { FeedEvent, NoteMetrics, ProfileInfo } from '../shared';
+import type { FeedEvent, NoteMetrics, ProfileInfo } from '../feedTypes';
 import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType } from './types';
 import { Log } from '@/shared/lib/logger';
@@ -98,7 +99,7 @@ export const ImageBlock = React.memo(function ImageBlock({
     const node = measureSourceRef();
     if (!node) return;
     node.measureInWindow((pageX: number, pageY: number, width: number, height: number) => {
-      imageOverlay?.registerThumbnailLayout?.(
+      imageOverlay?.registerThumbnailLayout(
         url,
         { pageX, pageY, width, height },
         overlayEvent?.id != null && layoutIndex != null

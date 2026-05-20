@@ -1,11 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  Platform,
-  TextInput,
-  useWindowDimensions,
-} from 'react-native';
+import { Platform, TextInput, useWindowDimensions } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -26,18 +21,14 @@ import {
   normalizeUrlForApi,
 } from '@/shared/lib/url';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import {
-  noMintsSelectedPopup,
-  managerNotInitializedPopup,
-  mintsAddFailedPopup,
-  mintsAddedPopup,
-} from '@/shared/lib/popup';
+import { staticPopup, paramPopup } from '@/shared/lib/popup';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { LoadingIndicator } from '@/shared/blocks/status';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
@@ -45,6 +36,7 @@ import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
 import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;
@@ -54,7 +46,7 @@ const CURRENCY_TABS_HEIGHT = 48;
 interface PseudoMint {
   url: string;
   isPseudoMint: true;
-  mintInfo?: any;
+  mintInfo?: GetInfoResponse | null;
   name?: string;
 }
 
@@ -66,7 +58,7 @@ interface DisplayMint {
     name?: string;
     description?: string | null;
     /** NUT-06 contact entries — needed by `useMintProfiles` to find the operator's Nostr pubkey. */
-    contact?: Array<{ method: string; info: string }>;
+    contact?: { method: string; info: string }[];
   } | null;
   contactFollowers?: number;
   contactReputation?: number;
@@ -88,7 +80,7 @@ function adaptSearchResult(result: MintSearchResult): DisplayMint {
     icon_url?: string | null;
     name?: string;
     description?: string | null;
-    contact?: Array<{ method: string; info: string }>;
+    contact?: { method: string; info: string }[];
   };
   return {
     url: result.url,
@@ -175,18 +167,15 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         autoCorrect={false}
         autoCapitalize="none"
       />
-      {validationState.isLoading && (
-        <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
-      )}
-      {!validationState.isLoading && validationState.isValid === true && (
-        <Text size={16} style={{ color: green400 }}>
-          ✓
-        </Text>
-      )}
-      {!validationState.isLoading && validationState.isValid === false && (
-        <Text size={16} style={{ color: danger }}>
-          ✗
-        </Text>
+      {(validationState.isLoading || validationState.isValid != null) && (
+        <LoadingIndicator
+          size={20}
+          phase={validationState.isLoading ? 'loading' : 'done'}
+          result={validationState.isValid === false ? 'error' : 'success'}
+          color={opacity(foreground, 0.4)}
+          successColor={green400}
+          errorColor={danger}
+        />
       )}
     </View>
   );
@@ -247,17 +236,24 @@ const MintItem = memo(function MintItem({
     [mint.url, mint.mintInfo]
   );
 
-  // Translate server-side `serverStats` (mint/melt ops + error count) into
-  // the 0–5 audit-score scale `ContactRow` expects, so the audit pill
-  // renders identically whether the signal came from a `MintListItem` or
-  // from the Mint Add search enrichment.
-  const auditScore = useMemo<number | undefined>(() => {
-    if (!('serverStats' in mint) || !mint.serverStats) return undefined;
+  // Search-result preview only: the search endpoint returns `serverStats`
+  // (`n_mints`/`n_melts`/`n_errors`) without the per-swap array, so we can't
+  // route through `transformAuditData` like the catalog/info paths do. The
+  // resulting score is an ops-aggregate approximation; it can disagree with
+  // the swap-based score the user sees once the mint is opened. That's
+  // accepted — this pill is best-effort during search; authoritative scores
+  // come from `getMintCatalog` and `MintInfoScreen`.
+  const { auditScore, auditTotalOps } = useMemo<{
+    auditScore: number | undefined;
+    auditTotalOps: number | undefined;
+  }>(() => {
+    if (!('serverStats' in mint) || !mint.serverStats)
+      return { auditScore: undefined, auditTotalOps: undefined };
     const { n_mints, n_melts, n_errors } = mint.serverStats;
     const totalOps = n_mints + n_melts;
-    if (totalOps <= 0) return undefined;
+    if (totalOps <= 0) return { auditScore: undefined, auditTotalOps: undefined };
     const successRate = 1 - n_errors / totalOps; // 0..1
-    return successRate * 5; // 0..5
+    return { auditScore: successRate * 5, auditTotalOps: totalOps };
   }, [mint]);
 
   return (
@@ -277,10 +273,9 @@ const MintItem = memo(function MintItem({
               : undefined,
           auditScore,
           auditState: 'auditState' in mint ? mint.auditState : undefined,
-          contactReputation:
-            'contactReputation' in mint ? mint.contactReputation : undefined,
-          contactFollowers:
-            'contactFollowers' in mint ? mint.contactFollowers : undefined,
+          auditTotalOps,
+          contactReputation: 'contactReputation' in mint ? mint.contactReputation : undefined,
+          contactFollowers: 'contactFollowers' in mint ? mint.contactFollowers : undefined,
         },
       })}
       subtitle={extractDomain(mint.url)}
@@ -311,14 +306,8 @@ export function MintAddScreen() {
   const [selectedCurrency, setSelectedCurrency] = useState('ALL');
 
   // Search toggle (matches contacts page pattern)
-  const {
-    isSearching,
-    searchQuery,
-    clearKey,
-    onOpenSearch,
-    onCloseSearch,
-    onSearchChange,
-  } = useHeaderSearch();
+  const { isSearching, searchQuery, clearKey, onOpenSearch, onCloseSearch, onSearchChange } =
+    useHeaderSearch();
 
   // URL validation fallback — only triggers when input looks like a URL
   const {
@@ -355,7 +344,10 @@ export function MintAddScreen() {
   }, [validationState, validatedUrl, customMintInfo]);
 
   // Server-side mint search
-  const { results: searchResults, loading: searchLoading } = useMintSearch(searchQuery, selectedCurrency);
+  const { results: searchResults, loading: searchLoading } = useMintSearch(
+    searchQuery,
+    selectedCurrency
+  );
 
   // Hold a skeleton until the discovered list stops changing for 500ms.
   // Individual fetchMintInfo calls resolve at different times, causing the list
@@ -386,16 +378,10 @@ export function MintAddScreen() {
     let hasPseudo = false;
 
     // If searching with a URL-like query that validated as a mint, prepend it
-    if (
-      searchQuery.trim() &&
-      validationState.isValid === true &&
-      customMintInfo !== null
-    ) {
+    if (searchQuery.trim() && validationState.isValid === true && customMintInfo !== null) {
       const apiUrl = normalizeUrlForApi(searchQuery);
       const normalizedInput = normalizeMintUrlKey(apiUrl);
-      const alreadyInResults = adapted.some(
-        (m) => normalizeMintUrlKey(m.url) === normalizedInput
-      );
+      const alreadyInResults = adapted.some((m) => normalizeMintUrlKey(m.url) === normalizedInput);
       if (!alreadyInResults && !knownMintUrls.has(normalizedInput)) {
         const pseudoMint: PseudoMint = {
           url: apiUrl,
@@ -449,7 +435,10 @@ export function MintAddScreen() {
     }
     const allowed = ['SAT', 'USD', 'EUR', 'GBP'];
     const currencies = ['ALL', ...[...units].filter((c) => allowed.includes(c))];
-    cashuLog.debug('mint.add.currencies.extracted', { currencies, resultCount: searchResults.length });
+    cashuLog.debug('mint.add.currencies.extracted', {
+      currencies,
+      resultCount: searchResults.length,
+    });
     return currencies;
   }, [searchResults]);
 
@@ -473,7 +462,7 @@ export function MintAddScreen() {
 
   const handleSave = useCallback(async () => {
     if (selectedMints.size === 0) {
-      noMintsSelectedPopup();
+      staticPopup('no-mints-selected');
       return;
     }
     if (isAdding) return;
@@ -483,7 +472,7 @@ export function MintAddScreen() {
     try {
       if (!CocoManager.isInitialized()) {
         log.error('mint.add.batch.manager_not_initialized');
-        managerNotInitializedPopup();
+        staticPopup('manager-not-initialized');
         setIsAdding(false);
         return;
       }
@@ -492,10 +481,10 @@ export function MintAddScreen() {
       const results: string[] = [];
       const errors: { mintUrl: string; error: string }[] = [];
 
-      // Normalize all URLs to ensure https:// prefix before adding
-      const mintUrlsToAdd = Array.from(selectedMints).map((u) =>
-        u.startsWith('https://') || u.startsWith('http://') ? u : normalizeUrlForApi(u)
-      );
+      // Normalize all URLs to ensure https:// prefix before adding.
+      // normalizeUrlForApi strips any http(s)?:// prefix and re-prepends https://,
+      // so plaintext-http URLs from the search backend can't bypass the upgrade.
+      const mintUrlsToAdd = Array.from(selectedMints).map(normalizeUrlForApi);
 
       for (let i = 0; i < mintUrlsToAdd.length; i++) {
         const mintUrl = mintUrlsToAdd[i];
@@ -511,33 +500,49 @@ export function MintAddScreen() {
           try {
             const restoreT0 = performance.now();
             await manager.wallet.restore(mintUrl);
-            log.info('mint.add.restore.success', { mintUrl, duration_ms: Math.round(performance.now() - restoreT0) });
+            log.info('mint.add.restore.success', {
+              mintUrl,
+              duration_ms: Math.round(performance.now() - restoreT0),
+            });
           } catch (restoreErr) {
-            log.warn('mint.add.restore.failed', { mintUrl, error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr) });
+            log.warn('mint.add.restore.failed', {
+              mintUrl,
+              error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
+            });
           }
 
           if (i < mintUrlsToAdd.length - 1) {
             await new Promise((r) => setTimeout(r, 100));
           }
         } catch (err) {
-          log.error('mint.add.item.failed', { mintUrl, duration_ms: Math.round(performance.now() - itemT0), error: err instanceof Error ? err.message : String(err) });
+          log.error('mint.add.item.failed', {
+            mintUrl,
+            duration_ms: Math.round(performance.now() - itemT0),
+            error: err instanceof Error ? err.message : String(err),
+          });
           errors.push({ mintUrl, error: err instanceof Error ? err.message : String(err) });
         }
       }
 
       log.info('mint.add.batch.complete', { added: results.length, failed: errors.length });
+      // Give the MintProvider's `mint:added` listener a tick to refetch
+      // `trustedMints` before we pop back. Without this delay the parent
+      // Mint List screen sometimes refocuses before the new mint is in
+      // its `useMints()` snapshot, leaving the row missing until the next
+      // background tick.
+      await new Promise((resolve) => setTimeout(resolve, 50));
       if (errors.length === 0) {
-        mintsAddedPopup({ added: results.length });
+        paramPopup('mints-added', { added: results.length });
         router.back();
       } else if (results.length > 0) {
-        mintsAddedPopup({ added: results.length, failed: errors.length });
+        paramPopup('mints-added', { added: results.length, failed: errors.length });
         router.back();
       } else {
-        mintsAddFailedPopup();
+        staticPopup('mints-add-failed');
       }
     } catch {
       log.error('mint.add.batch.unexpected_error');
-      mintsAddFailedPopup();
+      staticPopup('mints-add-failed');
     } finally {
       setIsAdding(false);
     }
@@ -577,7 +582,15 @@ export function MintAddScreen() {
       selectedCurrency,
       selectedCount: selectedMints.size,
     });
-  }, [showContent, searchLoading, displayMints.length, isSearching, searchQuery, selectedCurrency, selectedMints.size]);
+  }, [
+    showContent,
+    searchLoading,
+    displayMints.length,
+    isSearching,
+    searchQuery,
+    selectedCurrency,
+    selectedMints.size,
+  ]);
 
   // ── Header: search icon toggle (matches contacts pattern) ──────────────
 

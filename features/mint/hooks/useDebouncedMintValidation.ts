@@ -25,6 +25,10 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
   const [url, setUrl] = useState('');
   const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the in-flight validation. Each new keystroke aborts the previous
+  // request so a slow mint that responds after the user has typed past it
+  // can't overwrite the result for the current URL.
+  const inFlightRef = useRef<AbortController | null>(null);
 
   const validateUrl = useCallback(async (mintUrl: string) => {
     if (!mintUrl.trim()) {
@@ -44,10 +48,15 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       return;
     }
 
+    inFlightRef.current?.abort();
+    const controller = new AbortController();
+    inFlightRef.current = controller;
+
     log.debug('mint.validate.start', { mintUrl: normalizedUrl });
     setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    const mintInfoResult = await fetchMintInfo(normalizedUrl);
+    const mintInfoResult = await fetchMintInfo(normalizedUrl, { signal: controller.signal });
+    if (controller.signal.aborted) return;
 
     if (mintInfoResult.isErr()) {
       log.warn('mint.validate.unreachable', { mintUrl: normalizedUrl });
@@ -78,6 +87,8 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       }
 
       if (!mintUrl.trim()) {
+        inFlightRef.current?.abort();
+        inFlightRef.current = null;
         setValidationState({ isValid: null, isLoading: false, error: null });
         setMintInfo(null);
         return;
@@ -86,7 +97,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
       debounceTimeoutRef.current = setTimeout(() => {
-        validateUrl(mintUrl);
+        void validateUrl(mintUrl);
       }, debounceMs);
     },
     [validateUrl, debounceMs]
@@ -97,6 +108,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
+      inFlightRef.current?.abort();
     };
   }, []);
 
@@ -107,6 +119,8 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
+    inFlightRef.current?.abort();
+    inFlightRef.current = null;
   }, []);
 
   return {

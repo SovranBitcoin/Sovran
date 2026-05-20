@@ -9,6 +9,7 @@
 // meet-in-the-middle (≤40 proofs, larger sums).
 // ---------------------------------------------------------------------------
 
+import { errField, logger } from './logger';
 import type {
   ExactOfflineAmountIndex,
   FiatMinorUnitSatRange,
@@ -280,11 +281,7 @@ export function composeSatoshis(coins: number[], target: number): CompositionRes
     // Defense in depth: if the chosen strategy throws (e.g. bitset-DP hitting
     // Hermes' BigInt ceiling on an unusually large denomination), degrade to
     // an unknown-composition result rather than crashing the amount screen.
-    // eslint-disable-next-line no-console
-    console.warn(
-      '[composeSatoshis] strategy failed, returning unknown result',
-      err instanceof Error ? err.message : err
-    );
+    logger.warn('offline.composeSatoshis.strategyFailed', { error: errField(err) });
     result = compositionResult(false, target, null, null, 'exhaustive', t0);
   }
   return result;

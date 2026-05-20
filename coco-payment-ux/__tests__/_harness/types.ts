@@ -22,7 +22,6 @@ import type {
   PaymentMachine,
   MachineOperations,
   NfcIOAdapter,
-  StepDataMap,
 } from '../../src/machine/types';
 import type { Detectors, PaymentOptionKind, WalletContext } from '../../src/types';
 

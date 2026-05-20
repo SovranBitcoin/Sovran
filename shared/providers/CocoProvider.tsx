@@ -4,37 +4,14 @@ import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { attachMintInfoCacheToManager } from '@/shared/stores/global/mintInfoCache';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
-import {
-  getBootMorphCompleted,
-  subscribeBootMorphCompleted,
-} from '@/shared/lib/qrButtonAnchor';
-import {
-  useWalletLifecycleStore,
-  type RestoreStatus,
-} from '@/shared/stores/global/walletLifecycleStore';
+import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
+import { awaitRestoreReady } from '@/shared/providers/awaitRestoreReady';
+import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 
 initLog('Module', 'CocoProvider loaded');
-
-/**
- * Resolves once the wallet-lifecycle restoreStatus is 'complete' or 'not-needed'
- * — the safe-to-mint signal. Used to gate NPC sync + the mint-operation
- * processor so they don't fire on a counter the mint already signed.
- */
-function awaitRestoreReady(): Promise<void> {
-  const isReady = (s: RestoreStatus) => s === 'complete' || s === 'not-needed';
-  const initial = useWalletLifecycleStore.getState().restoreStatus;
-  if (isReady(initial)) return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    const unsubscribe = useWalletLifecycleStore.subscribe((state, prev) => {
-      if (state.restoreStatus !== prev.restoreStatus && isReady(state.restoreStatus)) {
-        unsubscribe();
-        resolve();
-      }
-    });
-  });
-}
 
 interface CocoContextValue {
   manager: Manager | null;
@@ -54,16 +31,12 @@ interface CocoProviderProps {
   children: ReactNode;
 }
 
-async function initializeDefaultMints(
-  manager: Manager,
-  pubkey?: string,
-  setSelectedMint?: (pubkey: string, mintUrl: string) => void
-): Promise<void> {
+async function initializeDefaultMints(manager: Manager): Promise<void> {
   try {
     log.info('coco.init_default_mints');
 
     const defaultMints = ['https://mint.sovran.money', 'https://mint.minibits.cash/Bitcoin'];
-    const selectedMint = 'https://mint.minibits.cash/Bitcoin';
+    const defaultSelectedMint = 'https://mint.minibits.cash/Bitcoin';
 
     for (const mintUrl of defaultMints) {
       try {
@@ -80,21 +53,17 @@ async function initializeDefaultMints(
       }
     }
 
-    if (pubkey && setSelectedMint) {
-      try {
-        const getSelectedMint = useMintStore.getState().getSelectedMint;
-        const currentSelectedMint = getSelectedMint(pubkey);
-
-        if (!currentSelectedMint) {
-          const isSovranTrusted = await manager.mint.isTrustedMint(selectedMint);
-          if (isSovranTrusted) {
-            setSelectedMint(pubkey, selectedMint);
-            log.info('coco.mint_selected', { pubkey });
-          }
+    try {
+      const { selectedMint, setSelectedMint } = useMintStore.getState();
+      if (!selectedMint) {
+        const isDefaultTrusted = await manager.mint.isTrustedMint(defaultSelectedMint);
+        if (isDefaultTrusted) {
+          setSelectedMint(defaultSelectedMint);
+          log.info('coco.mint_selected');
         }
-      } catch (error) {
-        log.warn('coco.mint_select_failed', { error });
       }
+    } catch (error) {
+      log.warn('coco.mint_select_failed', { error });
     }
 
     log.info('coco.init_default_mints_done');
@@ -163,9 +132,16 @@ export function CocoProvider({ children }: CocoProviderProps) {
       }
     };
 
-    initializeCoco();
+    void initializeCoco();
 
     return () => {
+      // Reset the start-guard so a deps change (e.g. profile switch flipping
+      // keys.pubkey) re-runs init for the new identity. Without this, the
+      // cleanup tears down the singleton but the re-run sees hasStarted=true
+      // and bails out, leaving the new profile without a manager.
+      hasStarted.current = false;
+      setManager(null);
+      setIsReady(false);
       CocoManager.cleanup().catch((error) => {
         log.error('coco.cleanup_failed', { error });
       });
@@ -188,18 +164,14 @@ export function CocoProvider({ children }: CocoProviderProps) {
         // immediately — neither uses the deterministic counter.
         await initPhase('Coco-bg.safeWatchers', () => CocoManager.enableSafeWatchers());
 
-        const currentPubkey = keys?.pubkey;
         bgStage.log('Initializing default mints...');
-        const currentSetSelectedMint = useMintStore.getState().setSelectedMint;
-        await initPhase('Coco-bg.defaultMints', () =>
-          initializeDefaultMints(manager, currentPubkey, currentSetSelectedMint)
-        );
+        await initPhase('Coco-bg.defaultMints', () => initializeDefaultMints(manager));
 
         // Block NPC sync + the mint-operation processor until the wallet
         // has restored its NUT-13 counter (or proven restore isn't needed).
         // RestoreGate routes the user to /restore when this is pending.
         bgStage.log('Waiting for wallet restore...');
-        await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady());
+        await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady(useWalletLifecycleStore));
         bgStage.log('Starting NPC sync...');
         await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());
 
@@ -207,6 +179,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
           bgStage.log('Recovering pending operations...');
           await initPhase('Coco-bg.sendRecovery', () => manager.ops.send.recovery.run());
           await initPhase('Coco-bg.meltRecovery', () => manager.ops.melt.recovery.run());
+          await initPhase('Coco-bg.receiveRecovery', () => manager.ops.receive.recovery.run());
         } catch (recoveryErr) {
           initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
         }
@@ -261,9 +234,25 @@ export function CocoProvider({ children }: CocoProviderProps) {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       unsubscribe?.();
       deferHandle?.cancel();
+      // Symmetric to Phase 1: a deps change (profile switch via keys.pubkey,
+      // or a re-init that produced a fresh manager) must allow the bg work
+      // to re-run for the new identity. Without this, the new manager never
+      // gets NPC sync + recovery.
+      bgStarted.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bgStage.canStart, manager, keys?.pubkey]);
+
+  // Keep the mint-info SWR cache in sync with coco's DB. mint:updated /
+  // mint:added fire from recovery, addMintByUrl, and the per-mint refresh
+  // inside ensureUpdatedMint — paths that don't necessarily route through
+  // `getCachedMintInfo`. Without this subscription, those refreshes would
+  // sit in coco's DB while our cache served stale data until its 24h SWR
+  // window elapsed.
+  useEffect(() => {
+    if (!manager) return;
+    return attachMintInfoCacheToManager(manager);
+  }, [manager]);
 
   const contextValue: CocoContextValue = {
     manager,

@@ -1,39 +1,74 @@
+/**
+ * Transport-agnostic chat-message shape used by `useBitChat`. The same shape
+ * carries BLE-mesh and Nostr-geohash messages, which means `senderId` is NOT
+ * a single semantic kind — it's whichever stable per-sender identifier the
+ * source transport gives us:
+ *
+ *   - BLE public chat:  `senderPeerID` (16-hex BLE peer ID)
+ *   - BLE DM:           `peerID` (16-hex BLE peer ID)
+ *   - Nostr public:     per-geohash Nostr hex pubkey
+ *   - Nostr DM:         per-geohash Nostr hex pubkey
+ *   - Own (echoed):     `''` — empty string keeps `useMessageGrouping` from
+ *                       conflating own + peer runs at side switches
+ *
+ * Used downstream as an Avatar seed and as the sender-grouping key — never as
+ * a Nostr pubkey at the protocol layer. Protocol-truth pubkeys live on
+ * `NostrMessageEvent.senderPubkey` / `NostrPrivateMessageEvent.senderPubkey`.
+ */
 export interface ChatMessage {
   id: string;
   content: string;
   sender: string;
-  senderPubkey: string;
+  senderId: string;
   timestamp: number;
   isPrivate: boolean;
   isOwn: boolean;
+  /**
+   * Sender-side optimistic flag: `true` between dispatch and transport ack
+   * (BLE acked from native, or `sendGeohashMessage`/`sendGeohashPrivateMessage`
+   * resolves on the JS side). Cleared once the send succeeds; the optimistic
+   * row is removed on failure. Non-own messages leave it unset.
+   */
+  isPending?: boolean;
 }
 
-export interface Participant {
+export interface LocationTier {
+  key: string;
+  label: string;
+  precision: number;
+  geohash: string;
+}
+
+// --- BLE bridge payloads ---
+
+export interface BLEPeer {
   peerID: string;
   nickname: string;
-  pubkey: string;
+  /**
+   * Cached announce-time reachability. True if the most recent announce was
+   * direct OR we had a peripheral/central connection at announce-time. Stays
+   * true after the BLE radio link silently dies — so do NOT use this alone
+   * to decide whether a DM can be delivered. Prefer `hasDirectLink`.
+   */
+  isConnected: boolean;
+  /**
+   * Real-time check: do we currently have a direct peripheral or central
+   * link to this peer? When `false`, outbound encrypted DMs fall through to
+   * mesh-flood with a 15-second spool window — if the peer isn't reachable
+   * via some intermediary in that window, the message is silently dropped
+   * (upstream has no further retry).
+   */
+  hasDirectLink: boolean;
   lastSeen: number;
 }
 
-export interface RelayStatus {
-  url: string;
-  isConnected: boolean;
-  messagesSent: number;
-  messagesReceived: number;
-}
-
-/**
- * Payload dispatched on the `onNostrMessage` event from BitChatNostrBridge.
- * `senderPubkey` is the per-geohash-derived pubkey, NOT the user's main npub.
- */
-export interface NostrMessageEvent {
+export interface BLEMessageEvent {
   id: string;
   content: string;
   sender: string;
-  senderPubkey: string;
+  senderPeerID: string;
   timestamp: number;
-  geohash: string;
-  isOwn: boolean;
+  isPrivate: boolean;
 }
 
 /**
@@ -53,6 +88,78 @@ export interface BLEPrivateMessageEvent {
 }
 
 /**
+ * Stable status strings emitted by `onBLEDeliveryStatus`. Map cleanly to
+ * the native `DeliveryStatus` enum (see DeliveryStatus.swift):
+ *   - `sending`            — queued; waiting for Noise handshake to complete
+ *   - `sent`               — encrypted + broadcast to BLE
+ *   - `delivered`          — recipient acked decryption (nickname populated)
+ *   - `read`               — recipient opened the chat (nickname populated)
+ *   - `failed`             — encryption / encode failure (`reason` populated)
+ *   - `partiallyDelivered` — group/room broadcast where some recipients missed
+ */
+export type BLEDeliveryStatus =
+  | 'sending'
+  | 'sent'
+  | 'delivered'
+  | 'read'
+  | 'failed'
+  | 'partiallyDelivered';
+
+/**
+ * Payload of the `onBLEDeliveryStatus` event. Use `messageID` to look up the
+ * optimistic message that was added to the local chat buffer at send time.
+ */
+export interface BLEDeliveryStatusEvent {
+  messageID: string;
+  status: BLEDeliveryStatus;
+  /** Counterparty nickname, only populated for `delivered` / `read`. */
+  nickname?: string;
+  /** Free-form reason or "<reached>/<total>" for partial deliveries. */
+  reason?: string;
+}
+
+/**
+ * Persisted summary of a BLE-mesh 1:1 chat counterparty. Returned by
+ * `getBLEDmHistory(profileScope)` — used to surface peers we've previously
+ * DM'd in the Contacts screen's Recent / All tabs even after the app has been killed.
+ * `nickname` may be `''` if we never received an announce with one.
+ */
+export interface BLEDmContact {
+  peerID: string;
+  nickname: string;
+  lastTimestamp: number;
+}
+
+/**
+ * Payload dispatched on the `onBLEPeerUpdate` event. The native bridge sends
+ * a fresh peer snapshot whenever announce-state changes (new peer, peer
+ * dropped, nickname change). Consumers may receive a single peer or a list —
+ * the bridge normalises to one event per change.
+ */
+export interface BLEPeerEvent {
+  peerID: string;
+  nickname?: string;
+  isConnected?: boolean;
+  lastSeen?: number;
+}
+
+// --- Nostr bridge payloads ---
+
+/**
+ * Payload dispatched on the `onNostrMessage` event from BitChatNostrBridge.
+ * `senderPubkey` is the per-geohash-derived pubkey, NOT the user's main npub.
+ */
+export interface NostrMessageEvent {
+  id: string;
+  content: string;
+  sender: string;
+  senderPubkey: string;
+  timestamp: number;
+  geohash: string;
+  isOwn: boolean;
+}
+
+/**
  * Payload dispatched on the `onNostrPrivateMessage` event. A NIP-17 gift
  * wrap addressed to our per-geohash derived Nostr pubkey, unwrapped +
  * BitChat-inner decoded by BitChatNostrBridge. `senderPubkey` is the
@@ -67,17 +174,3 @@ export interface NostrPrivateMessageEvent {
   geohash: string;
   isOwn: boolean;
 }
-
-export interface LocationTier {
-  key: string;
-  label: string;
-  precision: number;
-  geohash: string;
-}
-
-export type BitChatEventMap = {
-  onMessage: ChatMessage;
-  onParticipantsChanged: { count: number; participants: Participant[] };
-  onConnectionStateChanged: { isConnected: boolean; relayCount: number };
-  onChannelChanged: { geohash: string; precision: number };
-};

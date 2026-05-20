@@ -1,20 +1,19 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { NPCClient, JWTAuthProvider } from 'npubcash-sdk';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
-import { log, storeLog } from '@/shared/lib/logger';
+import { z } from 'zod';
+import { redactError, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { NPC_BASE_URL } from '@/shared/lib/cashu/npc';
 
-const NPC_BASE_URL = 'https://npubx.cash';
 const NPC_DEFAULT_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
 
 interface NpcMintState {
-  /** Persisted map of pubkey → NPC receive mint URL */
-  mintUrls: Record<string, string | undefined>;
-  /** Timestamp of last successful server sync per pubkey */
-  lastSyncedAt: Record<string, number | undefined>;
+  /** Persisted NPC receive mint URL for the active profile. */
+  mintUrl: string | undefined;
   isSyncing: boolean;
   isUpdating: boolean;
 }
@@ -25,7 +24,7 @@ interface NpcInfo {
 }
 
 interface NpcMintActions {
-  getActiveMintUrl: () => string | undefined;
+  getActiveMintUrl: () => string;
 
   /**
    * Fetch the current mint URL from the NPC server and cache locally.
@@ -44,6 +43,9 @@ interface NpcMintActions {
 
 type NpcMintStore = NpcMintState & NpcMintActions;
 
+type V1Persisted = { mintUrls?: Record<string, string | undefined> };
+type V2Persisted = { mintUrl?: string };
+
 function createNpcClient(privateKey: Uint8Array): NPCClient {
   const signer = async (eventTemplate: EventTemplate): Promise<VerifiedEvent> =>
     finalizeEvent(eventTemplate, privateKey);
@@ -51,101 +53,105 @@ function createNpcClient(privateKey: Uint8Array): NPCClient {
   return new NPCClient(NPC_BASE_URL, authProvider);
 }
 
-function getOrDefault(mintUrls: Record<string, string | undefined>, pubkey: string): string {
-  return mintUrls[pubkey] ?? NPC_DEFAULT_MINT_URL;
+const PersistedNpcMintStore = z.object({
+  mintUrl: z.string().max(2048).optional(),
+});
+
+// v1 -> v2: legacy `mintUrls: Record<pubkey, url>` was double-scoped inside
+// a store already partitioned by createProfileScopedStorage. Collapse to a
+// scalar.
+function v1ToV2(state: unknown): V2Persisted {
+  if (!state || typeof state !== 'object' || !('mintUrls' in state)) {
+    return { mintUrl: undefined };
+  }
+  const map = (state as V1Persisted).mintUrls;
+  const first = map
+    ? Object.values(map).find((v): v is string => typeof v === 'string' && v.length > 0)
+    : undefined;
+  return { mintUrl: first };
 }
 
-function getActiveProfilePubkey(): string | undefined {
-  const { activeAccountIndex, profiles } = useProfileStore.getState();
-  return profiles.find((profile) => profile.accountIndex === activeAccountIndex)?.pubkey;
+// Append-only migration chain. Zustand only calls migrate on version mismatch.
+function migrateNpcMintStore(state: unknown, version: number): V2Persisted {
+  let s: unknown = state;
+  if (version < 2) s = v1ToV2(s);
+  return s as V2Persisted;
 }
 
 export const useNpcMintStore = create<NpcMintStore>()(
-  persist(
-    (set, get) => ({
-      mintUrls: {},
-      lastSyncedAt: {},
-      isSyncing: false,
-      isUpdating: false,
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
+        mintUrl: undefined,
+        isSyncing: false,
+        isUpdating: false,
 
-      getActiveMintUrl: () => {
-        const pubkey = getActiveProfilePubkey();
-        if (!pubkey) return undefined;
-        return getOrDefault(get().mintUrls, pubkey);
-      },
+        getActiveMintUrl: () => get().mintUrl ?? NPC_DEFAULT_MINT_URL,
 
-      syncFromServer: async (manager) => {
-        const pubkey = getActiveProfilePubkey();
-        if (!pubkey) return undefined;
-        if (get().isSyncing) return getOrDefault(get().mintUrls, pubkey);
+        syncFromServer: async (manager) => {
+          if (get().isSyncing) return get().mintUrl ?? NPC_DEFAULT_MINT_URL;
 
-        storeLog.info('store.npc_mint.sync.start');
-        const startTime = performance.now();
-        set({ isSyncing: true });
-        try {
-          const npcApi = manager?.ext?.npc;
-          if (!npcApi) return getOrDefault(get().mintUrls, pubkey);
+          storeLog.info('store.npc_mint.sync.start');
+          const startTime = performance.now();
+          set({ isSyncing: true });
+          try {
+            const npcApi = manager?.ext?.npc;
+            if (!npcApi) return get().mintUrl ?? NPC_DEFAULT_MINT_URL;
 
-          const npcInfo = await npcApi.getInfo();
-          const mintUrl = npcInfo?.mintUrl ?? npcInfo?.mint_url;
+            const npcInfo = await npcApi.getInfo();
+            const mintUrl = npcInfo?.mintUrl ?? npcInfo?.mint_url;
 
-          if (mintUrl) {
-            storeLog.info('store.npc_mint.sync.success', {
-              mintUrl,
+            if (mintUrl) {
+              storeLog.info('store.npc_mint.sync.success', {
+                mintUrl,
+                duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+              });
+              set({ mintUrl });
+              return mintUrl;
+            }
+
+            return get().mintUrl ?? NPC_DEFAULT_MINT_URL;
+          } catch (error) {
+            storeLog.warn('store.npc_mint.sync_failed', { error: redactError(error) });
+            return get().mintUrl ?? NPC_DEFAULT_MINT_URL;
+          } finally {
+            set({ isSyncing: false });
+          }
+        },
+
+        updateServerMint: async (newMintUrl, privateKey) => {
+          if (get().isUpdating) return false;
+
+          storeLog.info('store.npc_mint.update.start', { newMintUrl });
+          const startTime = performance.now();
+          set({ isUpdating: true });
+          try {
+            const client = createNpcClient(privateKey);
+            await client.settings.setMintUrl(newMintUrl);
+
+            storeLog.info('store.npc_mint.update.success', {
+              newMintUrl,
               duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
             });
-            set((state) => ({
-              mintUrls: { ...state.mintUrls, [pubkey]: mintUrl },
-              lastSyncedAt: { ...state.lastSyncedAt, [pubkey]: Date.now() },
-            }));
-            return mintUrl;
+            set({ mintUrl: newMintUrl });
+            return true;
+          } catch (error) {
+            storeLog.error('store.npc_mint.update_failed', { error: redactError(error) });
+            return false;
+          } finally {
+            set({ isUpdating: false });
           }
-
-          return getOrDefault(get().mintUrls, pubkey);
-        } catch (error) {
-          log.warn('store.npc_mint.sync_failed', { error });
-          return getOrDefault(get().mintUrls, pubkey);
-        } finally {
-          set({ isSyncing: false });
-        }
-      },
-
-      updateServerMint: async (newMintUrl, privateKey) => {
-        const pubkey = getActiveProfilePubkey();
-        if (!pubkey) return false;
-        if (get().isUpdating) return false;
-
-        storeLog.info('store.npc_mint.update.start', { newMintUrl });
-        const startTime = performance.now();
-        set({ isUpdating: true });
-        try {
-          const client = createNpcClient(privateKey);
-          await client.settings.setMintUrl(newMintUrl);
-
-          storeLog.info('store.npc_mint.update.success', {
-            newMintUrl,
-            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
-          });
-          set((state) => ({
-            mintUrls: { ...state.mintUrls, [pubkey]: newMintUrl },
-            lastSyncedAt: { ...state.lastSyncedAt, [pubkey]: Date.now() },
-          }));
-          return true;
-        } catch (error) {
-          log.error('store.npc_mint.update_failed', { error });
-          return false;
-        } finally {
-          set({ isUpdating: false });
-        }
-      },
-    }),
-    {
-      name: 'npc-mint-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      partialize: (state) => ({
-        mintUrls: state.mintUrls,
-        lastSyncedAt: state.lastSyncedAt,
+        },
       }),
-    }
+      persistConfig({
+        name: 'npc-mint-store',
+        storage: createProfileScopedStorage(),
+        schema: PersistedNpcMintStore,
+        logKey: 'npc_mint',
+        version: 2,
+        migrate: migrateNpcMintStore,
+        partialize: (state) => ({ mintUrl: state.mintUrl }),
+      })
+    )
   )
 );

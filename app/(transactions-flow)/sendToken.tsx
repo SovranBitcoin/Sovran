@@ -1,23 +1,12 @@
 /**
- * @fileoverview Transactions flow sendToken route wrapper
- *
- * Part of the (transactions-flow) modal group - displays with back button.
- * Param parsing and error handling is done by SendTokenScreen.
+ * @fileoverview Transactions-flow sendToken route — re-entry from the
+ * transactions list. The route body and zod schema live on
+ * `SendTokenRoute`. `Stack.Screen` title comes from
+ * `(transactions-flow)/_layout.tsx`.
  */
 
-import React from 'react';
-import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { SendTokenScreen } from '@/features/send';
+import { SendTokenRoute } from '@/features/send';
 
-function ModalScreen() {
-  const { sendHistoryEntry } = useLocalSearchParams<{ sendHistoryEntry: string }>();
-
-  return (
-    <>
-      <Stack.Screen options={{ title: 'Send Ecash' }} />
-      <SendTokenScreen sendHistoryEntry={sendHistoryEntry} onNavigateBack={() => router.back()} />
-    </>
-  );
+export default function ModalScreen() {
+  return <SendTokenRoute where="transactions-flow.sendToken" />;
 }
-
-export default ModalScreen;

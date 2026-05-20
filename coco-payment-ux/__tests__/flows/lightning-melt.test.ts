@@ -24,13 +24,12 @@
  *   - No balance: still routes to enterAmount (error surfaces later)
  *   - Mint selection: preferred mint is auto-selected, user can change
  *   - LNURL-pay: same flow as lightning address
- *   - NO proof selector: melts NEVER show chooseProofs — the mint handles
- *     proof swapping server-side during the melt operation
+ *   - No proof-composition selector: melts skip offline proof alternatives
+ *   - Insufficient online amount can offer a balance-based round-down
  *
- * That last point is critical: unlike ecash sends where the user must
- * compose exact proofs offline, melts always go through the mint which
- * can swap proofs to the exact amount. So even with "non-exact" proof
- * sets, melts skip the proof picker entirely.
+ * That distinction is critical: non-exact proof denominations alone should
+ * not open chooseProofs for melts, but an online insufficient-balance amount
+ * can offer a lower amount before melt quote creation.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -149,7 +148,7 @@ describe('lightning melt — lnurlp', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Melt never shows proof selector (mint handles swap server-side)
+// Melt never shows proof-composition selector (mint handles swap server-side)
 // ---------------------------------------------------------------------------
 
 /**
@@ -163,8 +162,9 @@ describe('lightning melt — lnurlp', () => {
  *   sends whatever proofs they have, and the mint swaps them to the exact
  *   amount before making the Lightning payment.
  *
- * Therefore, melts should NEVER route to chooseProofs, even when the
- * wallet's proof denominations don't exactly match the entered amount.
+ * Therefore, proof denomination mismatch alone must not route melts to
+ * chooseProofs. Only an online insufficient-balance fallback can use the
+ * same choose amount surface.
  */
 describe('lightning melt — no proof selector', () => {
   it('skips chooseProofs even with non-exact proof amounts', async () => {
@@ -175,6 +175,37 @@ describe('lightning melt — no proof selector', () => {
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
     await tm.machine.enterAmount(100, MINT1);
     tm.assertStep('navigateToMeltPreview');
+  });
+
+  it('shows chooseProofs with balance round-down when no mint covers the full online amount', async () => {
+    const tm = createTestMachine({ wallet: WALLETS.insufficientBalance });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount(100, MINT1);
+
+    tm.assertStep('chooseProofs');
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'chooseProofs',
+      data: {
+        meltTarget: INPUTS.lightningAddress,
+        suggestions: {
+          roundDown: { amount: 50 },
+          roundUp: null,
+        },
+      },
+    });
+
+    await tm.machine.chooseProofs(50);
+    tm.assertStep('navigateToMeltPreview');
+    tm.assertContext({ amount: 50, mintUrl: MINT1, destination: 'meltQuote' });
+  });
+
+  it('does not show chooseProofs for lightning while offline', async () => {
+    const tm = createTestMachine({ wallet: WALLETS.insufficientBalance, offline: true });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount(100, MINT1);
+
+    tm.assertStep('error');
   });
 });
 

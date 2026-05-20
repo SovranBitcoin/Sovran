@@ -14,6 +14,9 @@
 
 import Supercluster from 'supercluster';
 
+import { mapLog } from '@/shared/lib/logger';
+import { CLUSTER_MARKER_COLOR, getMarkerColor } from './categories';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -36,34 +39,6 @@ export interface MapMarker {
   clusterId?: number;
   placeId?: number;
 }
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const COLORS: Record<string, string> = {
-  local_cafe: '#FF6B6B',
-  lunch_dining: '#FF6B6B',
-  restaurant: '#FF6B6B',
-  bakery_dining: '#FF6B6B',
-  storefront: '#4ECDC4',
-  local_grocery_store: '#4ECDC4',
-  computer: '#4ECDC4',
-  diamond: '#4ECDC4',
-  local_atm: '#F7931A',
-  currency_exchange: '#F7931A',
-  hotel: '#9B59B6',
-  spa: '#9B59B6',
-  medical_services: '#3498DB',
-  local_pharmacy: '#3498DB',
-  content_cut: '#3498DB',
-  car_repair: '#3498DB',
-  fitness_center: '#3498DB',
-  business: '#3498DB',
-};
-
-const DEFAULT_COLOR = '#6366f1';
-const CLUSTER_COLOR = '#F7931A';
 
 // ============================================================================
 // Supercluster Manager
@@ -119,9 +94,10 @@ export class ClusterManager {
     this.loaded = true;
     const duration = Math.round((performance.now() - t0) * 100) / 100;
     if (duration > 100) {
-      console.warn(
-        `[perf] Supercluster.load(${points.length} points) took ${duration}ms — JS thread was blocked`
-      );
+      mapLog.warn('map.cluster.load_slow', {
+        points: points.length,
+        duration_ms: duration,
+      });
     }
   }
 
@@ -147,7 +123,7 @@ export class ClusterManager {
           type: 'cluster',
           latitude: lat,
           longitude: lon,
-          tintColor: CLUSTER_COLOR,
+          tintColor: CLUSTER_MARKER_COLOR,
           title: `${props.point_count} merchants`,
           count: props.point_count || 0,
           clusterId: props.cluster_id,
@@ -159,7 +135,7 @@ export class ClusterManager {
           type: 'single',
           latitude: lat,
           longitude: lon,
-          tintColor: COLORS[props.icon as string] || DEFAULT_COLOR,
+          tintColor: getMarkerColor(props.icon as string),
           title: 'Merchant',
           count: 1,
           placeId: props.pointId,
@@ -177,27 +153,6 @@ export class ClusterManager {
       return this.cluster.getClusterExpansionZoom(clusterId);
     } catch {
       return 10;
-    }
-  }
-
-  /**
-   * Get all points in a cluster (for showing list, etc.)
-   */
-  getClusterLeaves(clusterId: number, limit: number = 100): GeoPoint[] {
-    if (!this.loaded) return [];
-    try {
-      const leaves = this.cluster.getLeaves(clusterId, limit);
-      return leaves.map((f) => {
-        const props = f.properties as any;
-        return {
-          id: props.pointId || 0,
-          lat: f.geometry.coordinates[1],
-          lon: f.geometry.coordinates[0],
-          icon: props.icon || '',
-        };
-      });
-    } catch {
-      return [];
     }
   }
 

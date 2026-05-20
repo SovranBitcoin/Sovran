@@ -112,18 +112,6 @@ export function BottomButtons({
         : null,
     [resolvedGradientColor]
   );
-  // Second, simpler transparent → opaque gradient layered on top. The eased
-  // 3-stop gradient above shapes the *fade*, but its lower half can still
-  // read slightly translucent against complex scroll content. This 2-stop
-  // pass guarantees the bottom edge is fully solid screen-color so buttons
-  // always sit against a flat surface, not a half-faded gradient.
-  const solidFloorColors = useMemo(
-    () =>
-      resolvedGradientColor
-        ? ([opacity(resolvedGradientColor, 0), resolvedGradientColor] as const)
-        : null,
-    [resolvedGradientColor]
-  );
   return (
     <Log name="BottomButtons">
       <View

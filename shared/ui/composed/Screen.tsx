@@ -14,8 +14,15 @@
  * — not an inline <Stack.Screen>.
  */
 
-import React, { ReactNode, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { useLayoutEffect } from 'react';
+import React, {
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  useLayoutEffect,
+} from 'react';
 import { View } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
@@ -23,14 +30,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderHeightContext } from '@react-navigation/elements';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
-import { Screen as LogScreen } from '@/shared/lib/logger';
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ModalLayoutWrapper } from './ModalLayoutWrapper';
 import { ScreenBackgroundContext, ScreenFooterContext } from './ScreenFooterContext';
 
-export type ScreenScrollMode = 'auto' | 'animated' | 'none' | 'custom';
+type ScreenScrollMode = 'auto' | 'animated' | 'none' | 'custom';
 
-export interface ScreenProps {
+interface ScreenProps {
   /** Required. Names the screen boundary for log-doctor + phone-tree testID paths. */
   name: string;
   children: ReactNode;
@@ -151,7 +158,7 @@ export function Screen({
     );
 
   return (
-    <LogScreen name={name} style={{ flex: 1 }}>
+    <Log name={name} style={{ flex: 1 }}>
       <ScreenBackgroundContext.Provider value={resolvedBgColor}>
         <ScreenFooterContext.Provider value={footerContextValue}>
           <ModalLayoutWrapper
@@ -174,7 +181,7 @@ export function Screen({
           </ModalLayoutWrapper>
         </ScreenFooterContext.Provider>
       </ScreenBackgroundContext.Provider>
-    </LogScreen>
+    </Log>
   );
 }
 

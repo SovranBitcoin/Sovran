@@ -7,7 +7,7 @@
  * usePaymentFlowMachine after entry is available).
  */
 
-import React, { memo, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { router } from 'expo-router';
@@ -15,10 +15,10 @@ import { router } from 'expo-router';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import { useScreenActions, type UseScreenActionsResult } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import type { FormattedString } from 'coco-payment-ux';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { HistoryEntryRefresh } from '@/features/transactions';
@@ -29,7 +29,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import { Tabs } from '@/shared/ui/composed/Tabs';
+import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -63,64 +63,57 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
   actions,
   muted,
 }: ReceiveLightningTabProps) {
-  const showLightningAddress = Boolean(data.npcAddress && unit === 'sat');
+  const npcAddress = unit === 'sat' ? data.npcAddress : undefined;
+  if (!npcAddress) return null;
 
   return (
     <>
-      {showLightningAddress && (
-        <PaymentInfo data={data.npcAddress!.toString()} copyTarget="address" unit="sat" />
-      )}
-      {showLightningAddress && (
-        <View className="mx-4">
-          <Section title="RECEIVE ADDRESS">
-            <GradientCard>
-              <ListGroup variant="transparent">
-                <PressableFeedback
-                  animation={false}
-                  onPress={async () => {
-                    await EnhancedHaptics.copyHaptic();
-                    await actions.copy.execute({ source: 'npc' });
-                  }}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemPrefix>
-                        <Icon name="mingcute:lightning-fill" size={20} color={muted} />
-                      </ListGroup.ItemPrefix>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>
-                          {data.npcAddress?.truncate(6) ?? ''}
-                        </ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <Icon name="lets-icons:copy" size={20} color={muted} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-              </ListGroup>
-            </GradientCard>
-          </Section>
-        </View>
-      )}
-
-      {showLightningAddress && (
-        <HistoryEntryRefresh
-          mintInfo={mintInfo}
-          historyEntry={{
-            type: 'receive',
-            mintUrl: selectedMintUrl || undefined,
-          }}
-          onPress={
-            isNpcMintUpdating || !actions.changeNpcMint.available
-              ? undefined
-              : async () => {
+      <PaymentInfo data={npcAddress.toString()} copyTarget="address" unit="sat" />
+      <View className="mx-4">
+        <Section title="RECEIVE ADDRESS">
+          <GradientCard>
+            <ListGroup variant="transparent">
+              <PressableFeedback
+                animation={false}
+                onPress={async () => {
                   await EnhancedHaptics.copyHaptic();
-                  await actions.changeNpcMint.execute();
-                }
-          }
-        />
-      )}
+                  await actions.copy.execute({ source: 'npc' });
+                }}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon name="mingcute:lightning-fill" size={20} color={muted} />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{npcAddress.truncate(6)}</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Icon name="lets-icons:copy" size={20} color={muted} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
+          </GradientCard>
+        </Section>
+      </View>
+
+      <HistoryEntryRefresh
+        mintInfo={mintInfo}
+        historyEntry={{
+          type: 'receive',
+          mintUrl: selectedMintUrl || undefined,
+        }}
+        onPress={
+          isNpcMintUpdating || !actions.changeNpcMint.available
+            ? undefined
+            : async () => {
+                await EnhancedHaptics.copyHaptic();
+                await actions.changeNpcMint.execute();
+              }
+        }
+      />
     </>
   );
 });
@@ -150,29 +143,31 @@ const ReceiveP2pkTab = memo(function ReceiveP2pkTab({ data, actions, muted }: Re
       <PaymentInfo data={data.p2pkKey} copyTarget="p2pk" unit="p2pk" />
       <View className="mx-4">
         <Section title="P2PK PUBLIC KEY">
-          <ListGroup variant="secondary">
-            <PressableFeedback
-              animation={false}
-              onPress={async () => {
-                await EnhancedHaptics.copyHaptic();
-                await actions.copy.execute({ source: 'p2pk' });
-              }}>
-              <PressableFeedback.Scale>
-                <ListGroup.Item disabled>
-                  <ListGroup.ItemPrefix>
-                    <Icon name="solar:key-bold" size={20} color={muted} />
-                  </ListGroup.ItemPrefix>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>{truncateMiddle(data.p2pkKey, 10)}</ListGroup.ItemTitle>
-                  </ListGroup.ItemContent>
-                  <ListGroup.ItemSuffix>
-                    <Icon name="lets-icons:copy" size={20} color={muted} />
-                  </ListGroup.ItemSuffix>
-                </ListGroup.Item>
-              </PressableFeedback.Scale>
-              <PressableFeedback.Ripple />
-            </PressableFeedback>
-          </ListGroup>
+          <GradientCard>
+            <ListGroup variant="transparent">
+              <PressableFeedback
+                animation={false}
+                onPress={async () => {
+                  await EnhancedHaptics.copyHaptic();
+                  await actions.copy.execute({ source: 'p2pk' });
+                }}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon name="solar:key-bold" size={20} color={muted} />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{truncateMiddle(data.p2pkKey, 10)}</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Icon name="lets-icons:copy" size={20} color={muted} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
+          </GradientCard>
         </Section>
       </View>
     </>
@@ -201,8 +196,18 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
   const mintInfo = useMintInfo(mintUrl);
 
+  // The P2PK tab is gated behind the quickAccessP2PK setting. If the user
+  // had it open and then toggled the setting off elsewhere, snap back to
+  // Lightning so the now-hidden P2PK content stops rendering.
+  useEffect(() => {
+    if (!quickAccessP2PK && selectedTab !== 'Lightning') setSelectedTab('Lightning');
+  }, [quickAccessP2PK, selectedTab]);
+
+  useEffect(() => {
+    if (error) paymentLog.warn('receive.screen.error', { error });
+  }, [error]);
+
   if (error) {
-    log.warn('receive.screen.error', { error });
     return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
   }
 
@@ -257,11 +262,13 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
       }>
       {quickAccessP2PK && (
         <View className="mx-4 mb-4">
-          <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
+          <UnderlineTabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
         </View>
       )}
 
-      {selectedTab === 'Lightning' ? (
+      {quickAccessP2PK && selectedTab === 'P2PK' ? (
+        <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
+      ) : (
         <ReceiveLightningTab
           data={receiveEntryData}
           unit={unit}
@@ -271,8 +278,6 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           actions={actions}
           muted={muted}
         />
-      ) : (
-        <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
       )}
     </ScreenWrapper>
   );

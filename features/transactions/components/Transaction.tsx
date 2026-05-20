@@ -7,8 +7,9 @@ import {
   ReceiveHistoryEntry,
   SendHistoryEntry,
 } from '@cashu/coco-core';
-import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import Icon from 'assets/icons';
 import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
@@ -21,15 +22,15 @@ import {
   useIsReclaiming,
 } from '@/shared/stores/runtime/rollbackStore';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
-import { convertTime } from '@/shared/lib/time';
+import { formatDate } from '@/shared/lib/date';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
-import { useScanHistoryStore, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
+import { useScanEntryForTransactionId, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useTransactionDistributionStore,
   DistributionSource,
@@ -84,28 +85,30 @@ const SOURCE_ICONS: Record<TransactionSource, string> = {
  * is the more specific signal.
  */
 const useTransactionSource = (historyEntry: HistoryEntry): TransactionSource | null => {
-  const fromScan = useScanHistoryStore((state) => {
-    const entry = state.entries.find((e) => e.transactionId === historyEntry.id);
-    return entry?.source ?? null;
-  });
+  const scanEntry = useScanEntryForTransactionId(historyEntry.id);
   const distKey =
     historyEntry.type === 'mint' ? (historyEntry as MintHistoryEntry).quoteId : historyEntry.id;
   const fromDistribution = useTransactionDistributionStore(
     (state) => state.distributions[distKey]?.source ?? null
   );
-  return fromScan ?? fromDistribution;
+  return scanEntry?.source ?? fromDistribution;
 };
 
 /** Returns BIP321 option kinds for a transaction, or null if not BIP321. */
 const useBip321Options = (transactionId: string): string[] | null => {
-  return useScanHistoryStore((state) => {
-    const entry = state.entries.find((e) => e.transactionId === transactionId);
-    if (entry?.container !== 'bip321' || !entry.optionKinds?.length) return null;
-    return entry.optionKinds;
-  });
+  const scanEntry = useScanEntryForTransactionId(transactionId);
+  if (scanEntry?.container !== 'bip321' || !scanEntry.optionKinds?.length) return null;
+  return scanEntry.optionKinds;
 };
 
-const useHistoryEntry = (historyEntry: HistoryEntry) => {
+/**
+ * Row-UI state for the Transaction component. Renamed from `useHistoryEntry`
+ * to avoid colliding with the canonical `useHistoryEntry` exported from
+ * `features/transactions/hooks/useHistoryEntry.ts` (different semantics:
+ * that one parses route params and subscribes to `history:updated`; this
+ * one bundles row-display state + the navigate handler).
+ */
+const useTransactionRow = (historyEntry: HistoryEntry) => {
   const isSend = isOutgoingTransaction(historyEntry);
   const isReceive = !isSend;
 
@@ -121,7 +124,6 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
   const handlePress = useCallback((): void => {
     log.debug('transaction.press', { type: historyEntry.type, id: historyEntry.id });
 
-    // Using router.navigate instead of router.push to prevent duplicate navigation
     switch (historyEntry.type) {
       case 'mint': {
         // Coco uses 'mint' for Lightning-to-ecash (Lightning receive)
@@ -199,7 +201,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
     fiatAmount,
     handlePress: defaultHandlePress,
     displayLabel,
-  } = useHistoryEntry(historyEntry);
+  } = useTransactionRow(historyEntry);
 
   const handlePress = onPress ? () => onPress(historyEntry) : defaultHandlePress;
 
@@ -234,7 +236,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
   const collapsedStyle = isCollapsing ? { height: 0, opacity: 0 } : null;
 
   const row = (
-    <TouchableOpacity
+    <Pressable
       key={historyEntry?.id}
       testID={testID}
       className="flex-row items-center justify-between bg-transparent px-4 py-5"
@@ -262,7 +264,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
             <HStack align="center" spacing={4}>
               <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
                 {historyEntry?.createdAt
-                  ? convertTime(new Date(historyEntry.createdAt))
+                  ? formatDate(historyEntry.createdAt, 'short-date-time')
                   : 'Unconfirmed'}
               </UntranslatedText>
               {transactionSource && (
@@ -308,7 +310,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
           </HStack>
         </VStack>
       </HStack>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   return (

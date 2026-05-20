@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import {
+  Kind0MetadataSchema,
   useCachedNostrProfile,
   useNostrMetadataCache,
   type NostrProfileMetadata,
@@ -17,26 +18,12 @@ const STALE_TTL_MS = 24 * 60 * 60 * 1000;
 // ("Maximum update depth exceeded"). Module-level constant fixes it.
 const SUBSCRIBE_OPTS = { closeOnEose: true } as const;
 
-interface RawProfileMetadata {
-  display_name?: string;
-  displayName?: string;
-  name?: string;
-  picture?: string;
-  banner?: string;
-  nip05?: string;
-  lud16?: string;
-  website?: string;
-  about?: string;
-}
-
-export interface UseNostrProfileMetadataResult {
+interface UseNostrProfileMetadataResult {
   metadata: NostrProfileMetadata | undefined;
   isLoading: boolean;
 }
 
-export function useNostrProfileMetadata(
-  pubkey: string | undefined,
-): UseNostrProfileMetadataResult {
+export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrProfileMetadataResult {
   const setProfile = useNostrMetadataCache((s) => s.setProfile);
   const { metadata, isStale, isMissing } = useCachedNostrProfile(pubkey ?? '');
 
@@ -56,50 +43,53 @@ export function useNostrProfileMetadata(
     if (!pubkey || !events?.length) return;
     const newest = events.reduce(
       (best, e) => ((e.created_at ?? 0) > (best.created_at ?? 0) ? e : best),
-      events[0],
+      events[0]
     );
     if (newest.id === lastProcessedId.current) return;
     lastProcessedId.current = newest.id ?? null;
-    try {
-      const raw = JSON.parse(newest.content) as RawProfileMetadata;
-      setProfile(pubkey, {
-        displayName: raw.display_name ?? raw.displayName,
-        name: raw.name,
-        picture: raw.picture,
-        banner: raw.banner,
-        nip05: raw.nip05,
-        lud16: raw.lud16,
-        website: raw.website,
-        about: raw.about,
-      });
-    } catch (err) {
-      nostrLog.warn('nostr.metadata.parse_failed', { pubkey: pubkey.slice(0, 8), err });
+    const parsed = parseRawMetadata(newest.content);
+    if (!parsed) {
+      nostrLog.warn('nostr.metadata.parse_failed', { pubkey: pubkey.slice(0, 8) });
+      return;
     }
+    setProfile(pubkey, parsed);
   }, [events, pubkey, setProfile]);
 
   const isLoading = isMissing && !eose;
   return { metadata, isLoading };
 }
 
-function parseRawMetadata(content: string): Omit<NostrProfileMetadata, 'fetchedAt'> | null {
+/**
+ * Parse a raw kind-0 `content` JSON string into the cache's profile shape.
+ * Exported so other surfaces (e.g. coco-payment-ux's `resolveRecipientProfile`
+ * operation in `features/send/providers/CocoPaymentUX.tsx`) reuse the exact
+ * same Zod schema + field-mapping as the hook — keeps `display_name` /
+ * `displayName` aliasing and the rest of the metadata interpretation in one
+ * place.
+ */
+export function parseRawMetadata(content: string): Omit<NostrProfileMetadata, 'fetchedAt'> | null {
+  let json: unknown;
   try {
-    const raw = JSON.parse(content) as RawProfileMetadata;
-    return {
-      displayName: raw.display_name ?? raw.displayName,
-      name: raw.name,
-      picture: raw.picture,
-      banner: raw.banner,
-      nip05: raw.nip05,
-      lud16: raw.lud16,
-      website: raw.website,
-      about: raw.about,
-    };
+    json = JSON.parse(content);
   } catch {
     return null;
   }
+  const result = Kind0MetadataSchema.safeParse(json);
+  if (!result.success) return null;
+  const raw = result.data;
+  return {
+    displayName: raw.display_name ?? raw.displayName,
+    name: raw.name,
+    picture: raw.picture,
+    banner: raw.banner,
+    nip05: raw.nip05,
+    lud16: raw.lud16,
+    website: raw.website,
+    about: raw.about,
+  };
 }
 
-export interface UseNostrProfileMetadataManyResult {
+interface UseNostrProfileMetadataManyResult {
   /** Cached metadata for every pubkey we know about. Pubkeys still
    *  loading on first paint are absent from the map — callers can use
    *  `metadata.has(pubkey)` to drive loading skeletons. */
@@ -117,7 +107,7 @@ export interface UseNostrProfileMetadataManyResult {
  * relays for entries we already have.
  */
 export function useNostrProfileMetadataMany(
-  pubkeys: readonly string[],
+  pubkeys: readonly string[]
 ): UseNostrProfileMetadataManyResult {
   const setManyProfiles = useNostrMetadataCache((s) => s.setManyProfiles);
   const byPubkey = useNostrMetadataCache((s) => s.byPubkey);

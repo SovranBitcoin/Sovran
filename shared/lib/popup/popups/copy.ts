@@ -1,4 +1,4 @@
-import { popup } from '../engine';
+import { popup } from './engine';
 import type { PopupOverrides } from './types';
 
 const COPY_CONFIGS = {

@@ -1,18 +1,15 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { router } from 'expo-router';
 import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
-import {
-  actionMenuPopup,
-  modelSwitchedPopup,
-  noApiKeyPopup,
-  noWalletAvailablePopup,
-  sendMessageFailedPopup,
-} from '@/shared/lib/popup';
-import { aiLog, log } from '@/shared/lib/logger';
+import { isAbortError } from '@/shared/lib/apiClient';
+import { pickFinalizeMessage } from '../lib/finalize';
+import { actionMenuPopup, staticPopup, paramPopup } from '@/shared/lib/popup';
+import { aiLog } from '@/shared/lib/logger';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import {
   AFFORD_BUFFER,
@@ -109,6 +106,7 @@ export function useAiSend() {
   const currentSessionId = useRoutstrStore((s) => s.currentSessionId);
   const createSession = useRoutstrStore((s) => s.createSession);
   const addMessage = useRoutstrStore((s) => s.addMessage);
+  const setMessagePending = useRoutstrStore((s) => s.setMessagePending);
   const removeMessages = useRoutstrStore((s) => s.removeMessages);
   const finalizeAssistantMessage = useRoutstrStore((s) => s.finalizeAssistantMessage);
   const setActiveBranch = useRoutstrStore((s) => s.setActiveBranch);
@@ -118,14 +116,30 @@ export function useAiSend() {
 
   const { keys: nostrKeys } = useNostrKeysContext();
 
+  // Stream + balance lifecycle. Each `streamIntoPlaceholder` aborts the
+  // prior stream (so backgrounding mid-stream stops billing) and awaits
+  // the prior balance promise so the new flow's `balanceBeforeMsats`
+  // snapshot is fresh — without that wait, a retry-during-balance-refresh
+  // captures the same pre-send balance as the first call and double-counts
+  // the cost diff.
+  const streamControllerRef = useRef<AbortController | null>(null);
+  const balancePromiseRef = useRef<Promise<unknown> | null>(null);
+
+  useEffect(
+    () => () => {
+      streamControllerRef.current?.abort();
+    },
+    []
+  );
+
   const navigateToTopUp = useCallback(
     (pendingMessage: string) => {
       if (!nostrKeys?.pubkey) {
-        noWalletAvailablePopup();
+        staticPopup('no-wallet-available');
         return;
       }
       useRoutstrTopUpStore.getState().start(pendingMessage);
-      const preferredMint = useMintStore.getState().getSelectedMint(nostrKeys.pubkey) ?? '';
+      const preferredMint = useMintStore.getState().selectedMint ?? '';
       router.navigate({
         pathname: '/(send-flow)/amount',
         params: {
@@ -156,9 +170,18 @@ export function useAiSend() {
     }) => {
       const { assistantMessageId, apiMessages, flowId, pendingUserMessageForTopUp } = params;
       if (!apiKey) {
-        noApiKeyPopup();
+        staticPopup('no-api-key');
         return;
       }
+
+      // Abort any prior in-flight stream and wait for its balance refresh
+      // to settle so this flow's snapshot reflects the prior call's debit.
+      streamControllerRef.current?.abort();
+      if (balancePromiseRef.current) {
+        await balancePromiseRef.current.catch(() => {});
+      }
+      const controller = new AbortController();
+      streamControllerRef.current = controller;
 
       const storeState = useRoutstrStore.getState();
       const balanceBeforeMsats = storeState.balance ?? 0;
@@ -169,17 +192,8 @@ export function useAiSend() {
       // Resolve the (provider, tier) pair against the live catalog, then
       // take the affordable head of the same-tier chain across the other
       // providers as runtime fallback for connect-time failures.
-      const primaryModel = resolveSelectedModel(
-        provider.id,
-        tier.id,
-        balanceSats,
-        cachedModels
-      );
-      const allCandidates = resolveCandidateChainForSlot(
-        provider.id,
-        tier.id,
-        cachedModels
-      );
+      const primaryModel = resolveSelectedModel(provider.id, tier.id, balanceSats, cachedModels);
+      const allCandidates = resolveCandidateChainForSlot(provider.id, tier.id, cachedModels);
       const primaryIdx = allCandidates.indexOf(primaryModel);
       const candidateChain =
         primaryIdx >= 0 ? allCandidates.slice(primaryIdx) : [primaryModel, ...allCandidates];
@@ -194,15 +208,22 @@ export function useAiSend() {
       // candidate we were last attempting when the request failed.
       let modelToUse = primaryModel;
 
-      const span = aiLog.startSpan('ai.send', {
-        flowId,
-        tier: tier.id,
-        provider: provider.id,
-        model: primaryModel,
-        candidateCount: candidateChain.length,
-        balanceSats,
-        retried: params.retriedFromMessageId ?? null,
-      });
+      // AI completions routinely run multiple seconds; keep the span's
+      // slow-escalation thresholds well above the default 1s/5s so a normal
+      // success doesn't log as ERROR (audit 34 F-005).
+      const span = aiLog.startSpan(
+        'ai.send',
+        {
+          flowId,
+          tier: tier.id,
+          provider: provider.id,
+          model: primaryModel,
+          candidateCount: candidateChain.length,
+          balanceSats,
+          retried: params.retriedFromMessageId ?? null,
+        },
+        { warnAtMs: 15_000, errorAtMs: 60_000 }
+      );
 
       try {
         const apiInputChars = apiMessages.reduce((n, m) => n + m.content.length, 0);
@@ -252,7 +273,7 @@ export function useAiSend() {
             const result = await sendMessage(apiKey, apiMessages, {
               model: candidate,
               temperature: 0.7,
-              stream: true,
+              signal: controller.signal,
             });
             stream = result.stream;
             modelToUse = candidate;
@@ -269,6 +290,7 @@ export function useAiSend() {
             break;
           } catch (err) {
             lastConnectErr = err;
+            if (isAbortError(err)) throw err;
             if (!isRetryableConnectError(err) || i === candidateChain.length - 1) throw err;
             aiLog.warn('ai.send.candidate_failed', {
               flowId,
@@ -415,16 +437,15 @@ export function useAiSend() {
         // Single atomic write: persist final content + reasoning + thinking
         // duration in place, preserving the placeholder's parentId so the
         // tree shape doesn't shift mid-finalisation.
-        if (!fullContent && chunkCount > 0) {
+        const finalizePayload = pickFinalizeMessage({
+          fullContent,
+          fullReasoning,
+          chunkCount,
+        });
+        if (finalizePayload) {
           finalizeAssistantMessage(assistantMessageId, {
-            content: '(No response received)',
+            ...finalizePayload,
             thinkingDurationSec: thinkingSec,
-          });
-        } else if (fullContent) {
-          finalizeAssistantMessage(assistantMessageId, {
-            content: fullContent,
-            thinkingDurationSec: thinkingSec,
-            reasoningContent: fullReasoning || undefined,
           });
         }
         aiLog.info('ai.send.assistant_finalized', {
@@ -444,16 +465,19 @@ export function useAiSend() {
         // actually used, so the post-stream log can quote both numbers.
         const predicted = getAffordabilityDetails(modelToUse, balanceSats, cachedModels);
         const usedModelCatalogEntry = cachedModels.find((m) => m.id === modelToUse) ?? null;
-        void checkBalance(apiKey)
+        // Track this flow's balance promise so the next streamIntoPlaceholder
+        // call awaits it before snapshotting balanceBeforeMsats — without that
+        // a retry tap during balance refresh re-uses the stale store balance
+        // and double-counts the cost diff.
+        const balancePromise = checkBalance(apiKey, { signal: controller.signal })
           .then((data) => {
             setBalance(data.balance);
             const costMsats = balanceBeforeMsats - data.balance;
             const costSats = costMsats > 0 ? Math.ceil(costMsats / 1000) : undefined;
-            if (costSats != null) {
+            if (costSats != null && finalizePayload) {
               finalizeAssistantMessage(assistantMessageId, {
-                content: fullContent || '(No response received)',
+                ...finalizePayload,
                 thinkingDurationSec: thinkingSec,
-                reasoningContent: fullReasoning || undefined,
                 costSats,
               });
             }
@@ -500,11 +524,19 @@ export function useAiSend() {
             });
           })
           .catch((err) => {
-            log.warn('ai.send.balance_refresh_failed', { flowId, err });
+            if (isAbortError(err)) return;
+            aiLog.warn('ai.send.balance_refresh_failed', { flowId, err });
           });
+        balancePromiseRef.current = balancePromise;
 
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
       } catch (err: any) {
+        if (isAbortError(err)) {
+          aiLog.info('ai.send.aborted', { flowId });
+          removeMessages(new Set([assistantMessageId]));
+          span.end({ outcome: 'aborted' });
+          return;
+        }
         aiLog.error('ai.send.failed', {
           flowId,
           status: err?.status,
@@ -542,7 +574,7 @@ export function useAiSend() {
                     provider: provider.id,
                     tier: 'auto',
                   });
-                  modelSwitchedPopup({ modelName: `${provider.label} Auto` });
+                  paramPopup('model-switched', { modelName: `${provider.label} Auto` });
                   close();
                 },
               },
@@ -557,7 +589,7 @@ export function useAiSend() {
             ],
           });
         } else {
-          sendMessageFailedPopup({ text: err?.error?.message ?? err?.message });
+          staticPopup('send-message-failed', { text: err?.error?.message ?? err?.message });
         }
       } finally {
         clearStreaming();
@@ -576,13 +608,13 @@ export function useAiSend() {
     ]
   );
 
-  const send = useCallback(
+  const sendInner = useCallback(
     async (userMessage: string) => {
       const trimmed = userMessage.trim();
       if (!trimmed) return;
 
       if (!apiKey) {
-        noApiKeyPopup();
+        staticPopup('no-api-key');
         return;
       }
 
@@ -608,6 +640,7 @@ export function useAiSend() {
         role: 'user',
         content: trimmed,
         timestamp,
+        pending: true,
       });
       addMessage({
         id: assistantMessageId,
@@ -621,22 +654,48 @@ export function useAiSend() {
       // freshly-added messages via the active path because the store has
       // already absorbed them.
       const stateAfter = useRoutstrStore.getState();
-      const apiMessages = deriveActivePath(stateAfter.conversationHistory, stateAfter.activeChildren)
+      const apiMessages = deriveActivePath(
+        stateAfter.conversationHistory,
+        stateAfter.activeChildren
+      )
         .filter((m) => m.id !== assistantMessageId && m.content)
         .map((m) => ({
           role: m.role as 'user' | 'assistant' | 'system',
           content: m.content,
         }));
 
-      await streamIntoPlaceholder({
-        assistantMessageId,
-        apiMessages,
-        flowId,
-        pendingUserMessageForTopUp: trimmed,
-      });
+      try {
+        await streamIntoPlaceholder({
+          assistantMessageId,
+          apiMessages,
+          flowId,
+          pendingUserMessageForTopUp: trimmed,
+        });
+      } finally {
+        // The user message's optimistic spinner clears the moment the
+        // streaming round-trip resolves — success or error, the request
+        // left our hands. Errors surface via the assistant placeholder /
+        // popup, not the user bubble's check.
+        setMessagePending(userMessageId, false);
+      }
     },
-    [apiKey, isAnonymous, currentSessionId, createSession, addMessage, streamIntoPlaceholder]
+    [
+      apiKey,
+      isAnonymous,
+      currentSessionId,
+      createSession,
+      addMessage,
+      setMessagePending,
+      streamIntoPlaceholder,
+    ]
   );
+
+  // `isSending` (React state) only blocks subsequent sends after the first
+  // `setStatus` flush — a rapid double-tap lands both calls into
+  // `streamIntoPlaceholder` before the disabled flag commits, billing the
+  // user twice and corrupting the active branch tree. `useSingleFlight`
+  // drops the duplicate at the ref level.
+  const send = useSingleFlight(sendInner);
 
   /**
    * Spawn a new sibling assistant under the same parent as `messageId`,
@@ -645,16 +704,16 @@ export function useAiSend() {
    * sibling (follow-up exchanges) drop out of view immediately and can be
    * brought back via the bubble's chevron nav.
    */
-  const retry = useCallback(
+  const retryInner = useCallback(
     async (messageId: string) => {
       if (!apiKey) {
-        noApiKeyPopup();
+        staticPopup('no-api-key');
         return;
       }
       const stateNow = useRoutstrStore.getState();
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
-        log.warn('ai.retry.invalid_target', { messageId, role: original?.role });
+        aiLog.warn('ai.retry.invalid_target', { messageId, role: original?.role });
         return;
       }
       // Build the context that produced `messageId`: every ancestor up to
@@ -668,7 +727,7 @@ export function useAiSend() {
           content: m.content,
         }));
       if (apiMessages.length === 0) {
-        log.warn('ai.retry.no_context', { messageId });
+        aiLog.warn('ai.retry.no_context', { messageId });
         return;
       }
 
@@ -705,6 +764,10 @@ export function useAiSend() {
     },
     [apiKey, addMessage, setActiveBranch, streamIntoPlaceholder]
   );
+
+  // Retry shares the double-tap exposure with `send`: a rapid tap on the
+  // regenerate chevron would spawn two sibling assistants and bill twice.
+  const retry = useSingleFlight(retryInner);
 
   const balance = useRoutstrStore((s) => s.balance);
   return { send, retry, ...status, balance };

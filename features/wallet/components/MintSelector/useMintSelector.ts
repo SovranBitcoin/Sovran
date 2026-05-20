@@ -11,33 +11,36 @@ import {
   getHeaderTitleWidthFromWidth,
   HEADER_LAYOUT,
 } from '@/features/wallet/lib/walletHeader';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 export interface MintSelectorProps {
   /** Mint URL to display. When omitted, reads preferredMintUrl from store. */
   selectedMintUrl?: string;
-  /** Called when user picks a mint from the quick-select dropdown. */
-  onMintSelected: (mintUrl: string) => void;
-  /** Called when user taps to open the full mint list. */
-  onRequestMintList: () => void;
-  /** Availability info from MintResolutionContext.trustedMints. Filters the dropdown. */
+  /** Called when user taps to open the full mint list. Omit to render a non-interactive pill. */
+  onRequestMintList?: () => void;
+  /** Availability info per trusted mint. Filters the dropdown. */
   trustedMints?: MintAvailability[];
   /** Unit for balance display. Default: 'sat'. */
   unit?: string;
   /** Override button width (e.g. 280 for quote screens). Otherwise auto-calculated from window. */
   width?: number;
+  /** Override pill height. Defaults to the wallet-header pill height (54). */
+  height?: number;
+  /** Override inner content height. Pair with `height` when the pill is
+   *  rendered smaller than the header default so the avatar + label row
+   *  has visible padding inside the pill. */
+  contentHeight?: number;
 }
 
-export interface MintSelectorShared {
+interface MintSelectorShared {
   mintUrl: string | undefined;
   mintName: string | undefined;
   mintIconUrl: string | undefined;
   balance: number;
   isLoading: boolean;
   unit: string;
-  onRequestMintList: () => void;
+  onRequestMintList: (() => void) | undefined;
   dimensions: {
     buttonWidth: number;
     contentWidth: number;
@@ -51,14 +54,11 @@ export function useMintSelector({
   unit = 'sat',
   width,
 }: MintSelectorProps): MintSelectorShared {
-  const { keys } = useNostrKeysContext();
-  const pubkey = keys?.pubkey;
-
   const { mints, isLoading: isMintsLoading } = useMintManagement();
   const { balances: liveBalances } = useBalanceContext();
 
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const mintUrl = selectedMintUrl ?? (pubkey ? selectedMints[pubkey] : undefined);
+  const storedSelectedMint = useMintStore((state) => state.selectedMint);
+  const mintUrl = selectedMintUrl ?? storedSelectedMint;
   const balance = mintUrl ? liveBalances.byMint[mintUrl]?.total || 0 : 0;
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
@@ -67,11 +67,8 @@ export function useMintSelector({
 
   const mintInfo = useMemo(() => {
     if (!mintData) return null;
-    const info = mintData.mintInfo as any;
-    return { name: info?.name || mintData.name, icon_url: info?.icon_url } as {
-      name?: string;
-      icon_url?: string;
-    };
+    const info = mintData.mintInfo;
+    return { name: info?.name || mintData.name, icon_url: info?.icon_url };
   }, [mintData]);
 
   const mintName = mintUrl ? getMintDisplayName(mintUrl, { name: mintInfo?.name }) : undefined;

@@ -1,7 +1,9 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { z } from 'zod';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 interface PricelistData {
   usd: {
@@ -37,12 +39,23 @@ interface PricelistActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearPricelist: () => void;
-  clearAllData: () => Promise<void>;
   getBtcPrice: (currency?: SupportedCurrency) => number | null;
   isStale: (maxAgeMinutes?: number) => boolean;
 }
 
 type PricelistStore = PricelistState & PricelistActions;
+
+const PersistedPricelistStore = z.object({
+  pricelist: z
+    .looseObject({
+      usd: z.looseObject({ btc: z.number() }).optional(),
+      eur: z.looseObject({ btc: z.number() }).optional(),
+      gbp: z.looseObject({ btc: z.number() }).optional(),
+    })
+    .nullable()
+    .default(null),
+  lastUpdated: z.number().int().nonnegative().nullable().default(null),
+});
 
 export const usePricelistStore = create<PricelistStore>()(
   persist(
@@ -112,17 +125,6 @@ export const usePricelistStore = create<PricelistStore>()(
         });
       },
 
-      clearAllData: async () => {
-        storeLog.info('store.pricelist.clear_all');
-        await AsyncStorage.removeItem('pricelist-store');
-        set({
-          pricelist: null,
-          isLoading: false,
-          lastUpdated: null,
-          error: null,
-        });
-      },
-
       getBtcPrice: (currency: SupportedCurrency = 'usd') => {
         const { pricelist } = get();
         return pricelist?.[currency]?.btc ?? null;
@@ -134,19 +136,15 @@ export const usePricelistStore = create<PricelistStore>()(
         return (Date.now() - lastUpdated) / (1000 * 60) > maxAgeMinutes;
       },
     }),
-    {
+    persistConfig({
       name: 'pricelist-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: AsyncStorage,
+      schema: PersistedPricelistStore,
       partialize: (state) => ({
         pricelist: state.pricelist,
         lastUpdated: state.lastUpdated,
       }),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          log.warn('store.pricelist.rehydrate_failed', { error });
-        }
-      },
-    }
+    })
   )
 );
 

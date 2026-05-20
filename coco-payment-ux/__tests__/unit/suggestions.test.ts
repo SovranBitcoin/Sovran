@@ -93,7 +93,7 @@ describe('computeQuickSendSuggestions', () => {
       config: { limit: 1 },
     });
     const fiatCount = result.filter((s) => s.inputMode === 'fiat').length;
-    const satCount = result.filter((s) => s.inputMode === 'sat').length;
+    const satCount = result.filter((s) => s.inputMode === 'sat' && !s.sendAll).length;
     expect(fiatCount).toBeLessThanOrEqual(1);
     expect(satCount).toBeLessThanOrEqual(1);
   });
@@ -143,5 +143,12 @@ describe('computeQuickSendSuggestions', () => {
       const composition = composeSatoshis(GAPPED_PROOFS, suggestion.satoshis);
       expect(composition.exactMatch).toBe(true);
     }
+  });
+
+  it('"Send all" label includes the sat-mode "sats" suffix', () => {
+    const result = computeQuickSendSuggestions(DEFAULT_PROOFS, 100_000);
+    const sendAll = result.find((s) => s.sendAll);
+    expect(sendAll).toBeDefined();
+    expect(sendAll!.label.endsWith(' sats')).toBe(true);
   });
 });

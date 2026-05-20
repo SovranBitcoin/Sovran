@@ -7,17 +7,16 @@ import './polyfills';
 // by White Noise / Marmot MLS) requires SubtleCrypto for KEM operations,
 // which Hermes does not provide natively.
 import { install as installQuickCrypto } from 'react-native-quick-crypto';
-installQuickCrypto();
 
 import * as c from 'expo-crypto';
+installQuickCrypto();
 
 if (
   typeof global?.Crypto === 'undefined' &&
   typeof global?.crypto === 'undefined' &&
   typeof global?.window?.crypto === 'undefined'
 ) {
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-expect-error
+  // @ts-expect-error -- crypto types do not align across polyfill + shim
   global.crypto = c;
 }
 
@@ -27,7 +26,7 @@ if (typeof process === 'undefined') {
   global.process = require('process');
 } else {
   const bProcess = require('process');
-  for (var p in bProcess) {
+  for (let p in bProcess) {
     if (!(p in process)) {
       process[p] = bProcess[p];
     }

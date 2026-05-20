@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect, memo } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Log } from '@/shared/lib/logger';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
@@ -25,6 +26,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   value,
 }) => {
   const [, setInputValue] = useState(value ?? '');
+  const foreground = useThemeColor('foreground');
 
   useEffect(() => {
     if (value !== undefined) {
@@ -39,13 +41,13 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
         let next: string;
 
         if (str === '<') {
-          EnhancedHaptics.actionHaptic();
+          void EnhancedHaptics.actionHaptic();
           next = prev.slice(0, -1);
         } else if (unit !== 'sat' && prev === '0' && str !== '.') {
-          EnhancedHaptics.buttonHaptic();
+          void EnhancedHaptics.buttonHaptic();
           next = str;
         } else {
-          EnhancedHaptics.buttonHaptic();
+          void EnhancedHaptics.buttonHaptic();
           next = prev + str;
         }
 
@@ -71,26 +73,26 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
 
   const renderButton = useCallback(
     (value: KeyboardValue) => (
-      <TouchableOpacity
+      <Pressable
         key={String(value)}
-        className="bg-background mx-0.5 w-1/3 items-center justify-center overflow-hidden"
+        className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
         style={{ opacity: loading ? 0.5 : 1 }}
         disabled={loading}
         onPress={() => handlePress(value)}>
         {value === '<' ? (
-          <Icon name="lucide:delete" size={compact ? 22 : 24} color="white" />
+          <Icon name="lucide:delete" size={compact ? 22 : 24} color={foreground} />
         ) : (
           <Text
             size={compact ? 22 : 24}
             bold
-            color="white"
+            color={foreground}
             style={{ padding: compact ? 14 : 16, paddingHorizontal: compact ? 22 : 24 }}>
             {value}
           </Text>
         )}
-      </TouchableOpacity>
+      </Pressable>
     ),
-    [compact, handlePress, loading]
+    [compact, foreground, handlePress, loading]
   );
 
   const buttons: KeyboardValue[][] = [

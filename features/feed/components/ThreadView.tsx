@@ -2,435 +2,387 @@
  * @fileoverview Thread View Component
  *
  * Displays a Nostr post in detail with its reply chain (parents above,
- * replies below). Uses Primal's cache relay thread_view API.
+ * replies below). Pure renderer — data acquisition lives in `useThread`.
  */
 
-import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
-import { StyleSheet, ActivityIndicator, InteractionManager } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet } from 'react-native';
+import Animated, { FadeIn, Easing } from 'react-native-reanimated';
+import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
+import { useHeaderHeight } from '@react-navigation/elements';
+import opacity from 'hex-color-opacity';
+
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
-import { ShortTextNote, Metadata } from 'nostr-tools/kinds';
-import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
-import { useHeaderHeight } from '@react-navigation/elements';
 
+import { type FeedEvent, type NoteMetrics, DEFAULT_METRICS } from './nostr/feedTypes';
+import { PostCard, PostCardSkeleton } from './nostr/PostCard';
 import {
-  type FeedEvent,
-  type NoteMetrics,
-  type ProfileInfo,
-  DEFAULT_METRICS,
-  PRIMAL_CACHE_RELAY_URL,
-  PRIMAL_KIND_NOTE_STATS,
-  PRIMAL_KIND_MENTIONS,
-  createPrimalRelayClient,
-  collectReferencedIds,
-  normalizeFeedEvent,
-  parseJson,
-  parseProfileFromRaw,
-  parseNoteMetrics,
-} from './nostr/shared';
-
-import { PostCard } from './nostr/PostCard';
-
+  msUntilLoadingShimmerPassEnds,
+  SKELETON_EXIT_DURATION_MS,
+} from './nostr/SkeletonExitShimmer';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
+
+import { useThread, type ThreadItem } from '@/features/feed/hooks/useThread';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log } from '@/shared/lib/logger';
-
-// ============================================================================
-// Types
-// ============================================================================
+import {
+  DEFAULT_REPLY_SKELETON_COUNT,
+  MAX_REPLY_SKELETON_COUNT,
+  sortRepliesByMeasuredHeights,
+} from '@/features/feed/lib/threadReplySkeletons';
 
 interface ThreadViewProps {
   eventId: string;
 }
 
-type ThreadItem =
-  | { type: 'parent'; event: FeedEvent }
-  | { type: 'target'; event: FeedEvent }
-  | { type: 'reply'; event: FeedEvent };
+const REPLY_MEASUREMENT_CANDIDATE_LIMIT = 12;
 
-// ============================================================================
-// Stable list helpers (module-level — no closures needed)
-// ============================================================================
+const TRANSITION_REPLY_FADE_IN = FadeIn.duration(SKELETON_EXIT_DURATION_MS).easing(
+  Easing.out(Easing.cubic)
+);
 
-function threadKeyExtractor(item: ThreadItem): string {
+type ThreadSkeletonItem =
+  | { type: 'target-skeleton'; id: string }
+  | { type: 'reply-skeleton'; id: string; skeletonIndex: number };
+
+type ThreadTransitionItem = {
+  type: 'transition-reply';
+  event: FeedEvent;
+  skeletonIndex: number;
+};
+
+type ThreadListItem = ThreadItem | ThreadSkeletonItem | ThreadTransitionItem;
+
+function threadKeyExtractor(item: ThreadListItem): string {
   switch (item.type) {
     case 'parent':
       return `p_${item.event.id}`;
     case 'target':
       return `t_${item.event.id}`;
     case 'reply':
+    case 'transition-reply':
       return `r_${item.event.id}`;
+    case 'target-skeleton':
+    case 'reply-skeleton':
+      return item.id;
   }
 }
 
-function threadItemType(item: ThreadItem): string {
+function threadItemType(item: ThreadListItem): string {
   return item.type;
 }
 
-// ============================================================================
-// Thread data fetching helpers
-// ============================================================================
-
-/**
- * Given the target eventId and all events from thread_view, build:
- * - parents: chain of ancestor posts above the target
- * - target: the focused event
- * - replies: direct replies to the target
- */
-function buildThreadStructure(
-  eventId: string,
-  allEvents: Map<string, FeedEvent>
-): { parents: FeedEvent[]; target: FeedEvent | null; replies: FeedEvent[] } {
-  const target = allEvents.get(eventId) || null;
-  if (!target) return { parents: [], target: null, replies: [] };
-
-  // Build parent chain by walking e-tags upward
-  const parents: FeedEvent[] = [];
-  let current = target;
-  const visited = new Set<string>([eventId]);
-
-  while (true) {
-    const eTags = (current.tags || []).filter((t) => t[0] === 'e');
-    const replyTag = eTags.find((t) => t[3] === 'reply');
-    const rootTag = eTags.find((t) => t[3] === 'root');
-    const parentTag = replyTag || rootTag || (eTags.length > 0 ? eTags[eTags.length - 1] : null);
-
-    if (!parentTag) break;
-    const parentId = parentTag[1];
-    if (visited.has(parentId)) break;
-    visited.add(parentId);
-
-    const parentEvent = allEvents.get(parentId);
-    if (!parentEvent) break;
-
-    parents.unshift(parentEvent);
-    current = parentEvent;
-  }
-
-  // Find direct replies: Kind 1 events with an e-tag pointing to our eventId
-  const replies: FeedEvent[] = [];
-  for (const ev of allEvents.values()) {
-    if (ev.id === eventId) continue;
-    if (ev.kind !== ShortTextNote) continue;
-    if (parents.some((p) => p.id === ev.id)) continue;
-
-    const eTags = (ev.tags || []).filter((t) => t[0] === 'e');
-    const replyTag = eTags.find((t) => t[3] === 'reply');
-    if (replyTag && replyTag[1] === eventId) {
-      replies.push(ev);
-      continue;
-    }
-    // NIP-10: if only root is present, it's a direct reply
-    if (!replyTag) {
-      const rootTag = eTags.find((t) => t[3] === 'root');
-      if (rootTag && rootTag[1] === eventId) {
-        replies.push(ev);
-        continue;
-      }
-    }
-    // NIP-10 positional: last e-tag points to our event
-    if (!replyTag && eTags.length > 0) {
-      const lastETag = eTags[eTags.length - 1];
-      if (lastETag[1] === eventId && lastETag[3] !== 'root' && lastETag[3] !== 'mention') {
-        replies.push(ev);
-        continue;
-      }
-    }
-  }
-
-  replies.sort((a, b) => a.created_at - b.created_at);
-
-  return { parents, target, replies };
+function createReplySkeletonItems(count: number): ThreadSkeletonItem[] {
+  return Array.from({ length: count }, (_, index) => ({
+    type: 'reply-skeleton' as const,
+    id: `reply-skeleton-${index}`,
+    skeletonIndex: index,
+  }));
 }
 
-// ============================================================================
-// Main ThreadView Component
-// ============================================================================
+function getTargetReplyCount(
+  items: ThreadItem[],
+  metrics: React.MutableRefObject<Map<string, NoteMetrics>>
+): number | null {
+  const target = items.find((item) => item.type === 'target');
+  if (!target) return null;
+  return metrics.current.get(target.event.id)?.replyCount ?? null;
+}
+
+function getRenderedReplyCount(items: ThreadItem[]): number {
+  return items.reduce((count, item) => count + (item.type === 'reply' ? 1 : 0), 0);
+}
 
 function ThreadViewInner({ eventId }: ThreadViewProps) {
-  const [foreground, background, mutedColor, defaultColor] = useThemeColor([
+  const [foreground, background, defaultColor] = useThemeColor([
     'foreground',
     'background',
-    'muted',
     'default',
   ] as const);
   const headerHeight = useHeaderHeight();
   const imageOverlay = useImageOverlay();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const [threadItems, setThreadItems] = useState<ThreadItem[]>([]);
-  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(new Map());
-  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
-  const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(new Map());
+  const {
+    items,
+    hiddenReplyCount,
+    isLoading,
+    isFetching,
+    error,
+    dataVersion,
+    profilesRef,
+    metricsRef,
+    quotedEventsRef,
+  } = useThread(eventId);
 
-  // Stable refs for renderItem — avoids re-creating renderItem on every Map update
-  const profilesRef = useRef(profilesMap);
-  profilesRef.current = profilesMap;
-  const metricsRef = useRef(metricsMap);
-  metricsRef.current = metricsMap;
-  const quotedRef = useRef(quotedEventsMap);
-  quotedRef.current = quotedEventsMap;
-  const [dataVersion, setDataVersion] = useState(0);
+  const skeletonHeightsRef = useRef<Map<number, number>>(new Map());
+  const replyHeightsRef = useRef<Map<string, number>>(new Map());
+  const repliesSeenWhileFetchingRef = useRef(false);
+  const shimmerStartedAtRef = useRef<number>(Date.now());
+  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [measuredOrder, setMeasuredOrder] = useState<FeedEvent[] | null>(null);
+  const measureCommittedRef = useRef(false);
+  const [measuredVersion, setMeasuredVersion] = useState(0);
+  const [transitionPhase, setTransitionPhase] = useState<'idle' | 'exiting' | 'done'>('idle');
 
-  const [hiddenReplyCount, setHiddenReplyCount] = useState(0);
+  useEffect(() => {
+    skeletonHeightsRef.current = new Map();
+    replyHeightsRef.current = new Map();
+    measureCommittedRef.current = false;
+    repliesSeenWhileFetchingRef.current = false;
+    shimmerStartedAtRef.current = Date.now();
+    if (exitTimeoutRef.current) {
+      clearTimeout(exitTimeoutRef.current);
+      exitTimeoutRef.current = null;
+    }
+    setMeasuredOrder(null);
+    setMeasuredVersion(0);
+    setTransitionPhase('idle');
+  }, [eventId]);
 
-  const targetIndex = useMemo(() => {
-    return threadItems.findIndex((item) => item.type === 'target');
-  }, [threadItems]);
+  useEffect(() => {
+    return () => {
+      if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!measuredOrder) return;
+    const handle = setTimeout(() => setTransitionPhase('done'), SKELETON_EXIT_DURATION_MS);
+    return () => clearTimeout(handle);
+  }, [measuredOrder]);
+
+  const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
+  const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
+
+  const replyEvents = useMemo(
+    () => items.filter((it): it is Extract<ThreadItem, { type: 'reply' }> => it.type === 'reply'),
+    [items]
+  );
+
+  const measurementSlotCount = useMemo(
+    () => Math.min(MAX_REPLY_SKELETON_COUNT, replyEvents.length),
+    [replyEvents.length]
+  );
+
+  const measurementCandidateCount = useMemo(
+    () => Math.min(REPLY_MEASUREMENT_CANDIDATE_LIMIT, replyEvents.length),
+    [replyEvents.length]
+  );
+
+  useEffect(() => {
+    if (isFetching && replyEvents.length > 0) {
+      repliesSeenWhileFetchingRef.current = true;
+    }
+  }, [isFetching, replyEvents.length]);
+
+  const hasSkeletonMeasurement = measuredVersion > 0 && skeletonHeightsRef.current.size > 0;
+  const isMeasuring =
+    !isFetching &&
+    measurementSlotCount > 0 &&
+    measuredOrder === null &&
+    hasSkeletonMeasurement &&
+    !repliesSeenWhileFetchingRef.current;
+
+  const displayItems = useMemo<ThreadListItem[]>(() => {
+    if (isLoading && items.length === 0) {
+      return [
+        { type: 'target-skeleton', id: 'target-skeleton' },
+        ...createReplySkeletonItems(DEFAULT_REPLY_SKELETON_COUNT),
+      ];
+    }
+
+    if (measuredOrder) {
+      const nonReplyItems = items.filter((it) => it.type !== 'reply');
+      if (transitionPhase === 'exiting') {
+        return [
+          ...nonReplyItems,
+          ...measuredOrder.map<ThreadListItem>((event, index) => ({
+            type: 'transition-reply' as const,
+            event,
+            skeletonIndex: index,
+          })),
+        ];
+      }
+      return [
+        ...nonReplyItems,
+        ...measuredOrder.map<ThreadItem>((event) => ({ type: 'reply', event })),
+      ];
+    }
+
+    if (isMeasuring) {
+      const nonReplyItems = items.filter((it) => it.type !== 'reply');
+      const targetReplyCount = getTargetReplyCount(items, metricsRef);
+      const skeletonCount =
+        targetReplyCount == null
+          ? Math.min(MAX_REPLY_SKELETON_COUNT, replyEvents.length)
+          : Math.min(MAX_REPLY_SKELETON_COUNT, Math.max(replyEvents.length, targetReplyCount));
+      return [...nonReplyItems, ...createReplySkeletonItems(skeletonCount)];
+    }
+
+    if (!isFetching) return items;
+
+    const targetReplyCount = getTargetReplyCount(items, metricsRef);
+    if (targetReplyCount === 0) return items;
+
+    const pendingReplyCount =
+      targetReplyCount == null
+        ? DEFAULT_REPLY_SKELETON_COUNT
+        : Math.max(0, targetReplyCount - getRenderedReplyCount(items));
+    const skeletonCount = Math.min(MAX_REPLY_SKELETON_COUNT, pendingReplyCount);
+
+    if (skeletonCount === 0) return items;
+
+    return [...items, ...createReplySkeletonItems(skeletonCount)];
+  }, [
+    isFetching,
+    isLoading,
+    isMeasuring,
+    items,
+    measuredOrder,
+    metricsRef,
+    replyEvents.length,
+    transitionPhase,
+  ]);
+
+  const handleSkeletonMeasured = useCallback((skeletonIndex: number, height: number) => {
+    skeletonHeightsRef.current.set(skeletonIndex, height);
+    // Only nudge React on the first capture; later layouts only update the ref.
+    // The hidden measurement tree gates on this state alone, not on every
+    // individual height, so additional re-renders here are wasted work.
+    setMeasuredVersion((v) => (v === 0 ? 1 : v));
+  }, []);
+
+  const handleReplyMeasured = useCallback(
+    (replyId: string, height: number) => {
+      if (measureCommittedRef.current) return;
+      replyHeightsRef.current.set(replyId, height);
+
+      const events = replyEvents.map((it) => it.event);
+      const slotCount = Math.min(MAX_REPLY_SKELETON_COUNT, events.length);
+      const candidateCount = Math.min(REPLY_MEASUREMENT_CANDIDATE_LIMIT, events.length);
+      if (slotCount === 0) return;
+
+      let capturedCandidates = 0;
+      for (let i = 0; i < candidateCount; i += 1) {
+        if (replyHeightsRef.current.has(events[i].id)) capturedCandidates += 1;
+      }
+
+      const skeletonHeightCount = skeletonHeightsRef.current.size;
+      if (capturedCandidates < candidateCount || skeletonHeightCount === 0) return;
+
+      const skeletonHeights = Array.from(
+        { length: Math.min(slotCount, skeletonHeightCount) },
+        (_, i) => skeletonHeightsRef.current.get(i)
+      ).filter((h): h is number => typeof h === 'number');
+
+      if (skeletonHeights.length === 0) return;
+
+      const result = sortRepliesByMeasuredHeights(events, skeletonHeights, replyHeightsRef.current);
+
+      const candidateHeights = events.slice(0, candidateCount).map((event) => ({
+        eventId: event.id.slice(0, 8),
+        originalIndex: events.indexOf(event),
+        measuredHeight: replyHeightsRef.current.get(event.id) ?? null,
+      }));
+
+      feedLog.info('thread.reply_skeleton.measured_sort', {
+        eventId,
+        skeletonHeights,
+        replyCount: events.length,
+        candidateCount,
+        candidateHeights,
+        matches: result.matches.slice(0, MAX_REPLY_SKELETON_COUNT),
+      });
+
+      measureCommittedRef.current = true;
+      const waitMs = msUntilLoadingShimmerPassEnds(shimmerStartedAtRef.current);
+      const commitExit = () => {
+        exitTimeoutRef.current = null;
+        setTransitionPhase('exiting');
+        setMeasuredOrder(result.replies);
+      };
+      if (waitMs <= 0) {
+        commitExit();
+      } else {
+        exitTimeoutRef.current = setTimeout(commitExit, waitMs);
+      }
+    },
+    [eventId, replyEvents]
+  );
 
   const getMetrics = useCallback(
     (id: string): NoteMetrics => metricsRef.current.get(id) || DEFAULT_METRICS,
-    []
+    [metricsRef]
   );
 
-  const actionableEvents = useMemo(() => threadItems.map((item) => item.event), [threadItems]);
+  const actionableEvents = useMemo(() => items.map((item) => item.event), [items]);
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 
-  // Fetch thread data
-  useEffect(() => {
-    if (!eventId) return;
-
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-
-    feedLog.info('thread.load.start', { eventId });
-
-    const fetchThread = async () => {
-      const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
-
-      try {
-        const prefix = Date.now().toString(36);
-
-        // Phase 1: thread_view
-        const rawEvents = await client.request(`${prefix}_thread`, {
-          cache: [
-            'thread_view',
-            {
-              event_id: eventId,
-              limit: 200,
-            },
-          ],
-        });
-
-        if (cancelled) return;
-
-        // Parse raw events
-        const allEvents = new Map<string, FeedEvent>();
-        const profiles = new Map<string, ProfileInfo>();
-        const metrics = new Map<string, NoteMetrics>();
-        const embeddedMentions = new Map<string, FeedEvent>();
-
-        for (const raw of rawEvents) {
-          if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-            const parsed = parseJson<Record<string, unknown>>(raw.content);
-            const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-            if (!eid || !parsed) continue;
-            metrics.set(eid, parseNoteMetrics(parsed));
-            continue;
-          }
-
-          if (raw.kind === PRIMAL_KIND_MENTIONS) {
-            const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
-            if (!mentionEvent) continue;
-            embeddedMentions.set(mentionEvent.id, mentionEvent);
-            allEvents.set(mentionEvent.id, mentionEvent);
-            continue;
-          }
-
-          if (raw.kind === Metadata) {
-            const result = parseProfileFromRaw(raw);
-            if (result) profiles.set(result[0], result[1]);
-            continue;
-          }
-
-          const ev = normalizeFeedEvent(raw);
-          if (!ev) continue;
-          if (ev.kind === ShortTextNote) {
-            allEvents.set(ev.id, ev);
-          }
-        }
-
-        if (cancelled) return;
-
-        // Build thread structure
-        let { parents, target, replies } = buildThreadStructure(eventId, allEvents);
-
-        if (!target) {
-          setError('Post not found');
-          setIsLoading(false);
-          return;
-        }
-
-        // Supplementary reply fetch: if metrics indicate more replies exist than
-        // thread_view returned, try a dedicated reply endpoint for additional coverage
-        const suppExpected = metrics.get(eventId)?.replyCount ?? 0;
-        if (suppExpected > replies.length && !cancelled) {
-          try {
-            const suppRaw = await client.request(`${prefix}_supp`, {
-              cache: ['event_replies', { event_id: eventId, limit: 50 }],
-            });
-            let foundNew = false;
-            for (const raw of suppRaw) {
-              if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-                const parsed = parseJson<Record<string, unknown>>(raw.content);
-                const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-                if (!eid || !parsed) continue;
-                metrics.set(eid, parseNoteMetrics(parsed));
-                continue;
-              }
-              if (raw.kind === PRIMAL_KIND_MENTIONS) {
-                const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
-                if (mentionEvent) {
-                  embeddedMentions.set(mentionEvent.id, mentionEvent);
-                  allEvents.set(mentionEvent.id, mentionEvent);
-                }
-                continue;
-              }
-              if (raw.kind === Metadata) {
-                const result = parseProfileFromRaw(raw);
-                if (result) profiles.set(result[0], result[1]);
-                continue;
-              }
-              const ev = normalizeFeedEvent(raw);
-              if (ev && ev.kind === ShortTextNote && !allEvents.has(ev.id)) {
-                allEvents.set(ev.id, ev);
-                foundNew = true;
-              }
-            }
-            if (foundNew && !cancelled) {
-              const rebuilt = buildThreadStructure(eventId, allEvents);
-              if (rebuilt.target) {
-                parents = rebuilt.parents;
-                target = rebuilt.target;
-                replies = rebuilt.replies;
-              }
-            }
-          } catch {
-            // event_replies not available on this Primal cache version
-          }
-        }
-
-        if (cancelled) return;
-
-        // Phase 2: Fetch missing quoted events
-        const contentSources = [target, ...parents, ...replies];
-        const { eventIds: referencedEventIds, pubkeys: inlineMentionPubkeys } =
-          collectReferencedIds(contentSources);
-        const quotedEvents = new Map<string, FeedEvent>(embeddedMentions);
-        const missingQuotedIds = referencedEventIds.filter((id) => !quotedEvents.has(id));
-
-        if (missingQuotedIds.length > 0) {
-          const quotedRawEvents = await client.request(`${prefix}_quoted`, {
-            cache: ['events', { event_ids: missingQuotedIds }],
-          });
-          if (!cancelled) {
-            for (const raw of quotedRawEvents) {
-              if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-                const parsed = parseJson<Record<string, unknown>>(raw.content);
-                const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-                if (!eid || !parsed) continue;
-                metrics.set(eid, parseNoteMetrics(parsed));
-                continue;
-              }
-              const ev = normalizeFeedEvent(raw);
-              if (ev) quotedEvents.set(ev.id, ev);
-              if (raw.kind === Metadata) {
-                const result = parseProfileFromRaw(raw);
-                if (result) profiles.set(result[0], result[1]);
-              }
-            }
-          }
-        }
-
-        // Phase 3: Fetch missing profiles
-        const neededPubkeys = new Set(inlineMentionPubkeys);
-        for (const ev of contentSources) neededPubkeys.add(ev.pubkey);
-        for (const ev of quotedEvents.values()) neededPubkeys.add(ev.pubkey);
-        const missingProfilePubkeys = Array.from(neededPubkeys).filter((pk) => !profiles.has(pk));
-
-        if (missingProfilePubkeys.length > 0) {
-          const profileRawEvents = await client.request(`${prefix}_profiles`, {
-            cache: ['user_infos', { pubkeys: missingProfilePubkeys }],
-          });
-          if (!cancelled) {
-            for (const raw of profileRawEvents) {
-              if (raw.kind === Metadata) {
-                const result = parseProfileFromRaw(raw);
-                if (result) profiles.set(result[0], result[1]);
-              }
-            }
-          }
-        }
-
-        if (cancelled) return;
-
-        // Build thread items list
-        const items: ThreadItem[] = [];
-
-        for (let i = 0; i < parents.length; i++) {
-          items.push({ type: 'parent', event: parents[i] });
-        }
-
-        items.push({ type: 'target', event: target });
-
-        for (const reply of replies) {
-          items.push({ type: 'reply', event: reply });
-        }
-
-        // Compute hidden reply count from metrics vs loaded replies
-        const targetMetrics = metrics.get(eventId);
-        const expectedReplies = targetMetrics?.replyCount ?? 0;
-        setHiddenReplyCount(Math.max(0, expectedReplies - replies.length));
-
-        feedLog.info('thread.load.done', {
-          eventId,
-          parents: parents.length,
-          replies: replies.length,
-          profiles: profiles.size,
-          hiddenReplies: Math.max(0, expectedReplies - replies.length),
-        });
-
-        setThreadItems(items);
-        setProfilesMap(profiles);
-        setMetricsMap(metrics);
-        setQuotedEventsMap(quotedEvents);
-        setDataVersion((v) => v + 1);
-        setIsLoading(false);
-      } catch (err) {
-        if (!cancelled) {
-          feedLog.error('thread.load.error', {
-            eventId,
-            error: err instanceof Error ? err : new Error(String(err)),
-          });
-          setError('Failed to load thread');
-          setIsLoading(false);
-        }
-      } finally {
-        client.close();
-      }
+  const getThreadContext = useCallback(() => {
+    const allEvents = new Map<string, FeedEvent>();
+    for (const it of items) allEvents.set(it.event.id, it.event);
+    return {
+      allEvents,
+      profiles: profilesRef.current,
+      metrics: metricsRef.current,
+      quotedEvents: quotedEventsRef.current,
     };
-
-    const task = InteractionManager.runAfterInteractions(() => {
-      fetchThread();
-    });
-
-    return () => {
-      cancelled = true;
-      task.cancel();
-    };
-  }, [eventId]);
-
-  const hasParents = useMemo(() => threadItems.some((i) => i.type === 'parent'), [threadItems]);
+  }, [items, profilesRef, metricsRef, quotedEventsRef]);
 
   const renderItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<ThreadItem, string | undefined>) => {
+    ({ item, index }: LegendListRenderItemProps<ThreadListItem, string | undefined>) => {
+      if (item.type === 'target-skeleton') {
+        return <PostCardSkeleton variant="thread-target" index={index} />;
+      }
+
+      if (item.type === 'reply-skeleton') {
+        return (
+          <PostCardSkeleton
+            variant="thread-reply"
+            index={item.skeletonIndex}
+            onMeasureHeight={handleSkeletonMeasured}
+          />
+        );
+      }
+
+      if (item.type === 'transition-reply') {
+        const metrics = getDisplayMetrics(item.event.id);
+        const engagement = getEngagementState(item.event.id);
+        return (
+          <View style={styles.transitionStack}>
+            <Animated.View entering={TRANSITION_REPLY_FADE_IN}>
+              <PostCard
+                variant="thread-reply"
+                event={item.event}
+                metrics={metrics}
+                quotedEvents={quotedEventsRef.current}
+                profiles={profilesRef.current}
+                getMetrics={getMetrics}
+                showLineAbove={false}
+                showLineBelow={false}
+                liked={engagement.liked}
+                reposted={engagement.reposted}
+                likePending={engagement.likePending}
+                repostPending={engagement.repostPending}
+                likePendingDirection={engagement.likePendingDirection}
+                repostPendingDirection={engagement.repostPendingDirection}
+                onLikePress={() => toggleLike(item.event)}
+                onRepostPress={() => toggleRepost(item.event)}
+                getThreadContext={getThreadContext}
+              />
+            </Animated.View>
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              <PostCardSkeleton variant="thread-reply" index={item.skeletonIndex} exiting />
+            </View>
+          </View>
+        );
+      }
+
       const isParent = item.type === 'parent';
       const isTarget = item.type === 'target';
 
@@ -442,7 +394,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           variant={isTarget ? 'thread-target' : 'thread-reply'}
           event={item.event}
           metrics={metrics}
-          quotedEvents={quotedRef.current}
+          quotedEvents={quotedEventsRef.current}
           profiles={profilesRef.current}
           getMetrics={getMetrics}
           showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
@@ -453,28 +405,33 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           repostPending={engagement.repostPending}
           likePendingDirection={engagement.likePendingDirection}
           repostPendingDirection={engagement.repostPendingDirection}
+          skeletonMatch={item.type === 'reply' ? item.skeletonMatch : undefined}
           onLikePress={() => toggleLike(item.event)}
           onRepostPress={() => toggleRepost(item.event)}
+          getThreadContext={getThreadContext}
         />
       );
     },
-    [getDisplayMetrics, getEngagementState, getMetrics, hasParents, toggleLike, toggleRepost]
+    [
+      getDisplayMetrics,
+      getEngagementState,
+      getMetrics,
+      handleSkeletonMeasured,
+      hasParents,
+      profilesRef,
+      quotedEventsRef,
+      toggleLike,
+      toggleRepost,
+      getThreadContext,
+    ]
   );
 
-  if (isLoading) {
-    return (
-      <View
-        style={[
-          styles.container,
-          styles.centerContent,
-          { backgroundColor: background, paddingTop: headerHeight },
-        ]}>
-        <ActivityIndicator size="small" color={mutedColor} />
-      </View>
-    );
-  }
+  const measurementTargets = useMemo(
+    () => replyEvents.slice(0, measurementCandidateCount).map((it) => it.event),
+    [measurementCandidateCount, replyEvents]
+  );
 
-  if (error) {
+  if (error && items.length === 0) {
     return (
       <View
         style={[
@@ -498,16 +455,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         getEngagementState={getEngagementState}>
         <View style={[styles.container, { backgroundColor: background }]}>
           <LegendList
-            data={threadItems}
+            data={displayItems}
             keyExtractor={threadKeyExtractor}
             getItemType={threadItemType}
             estimatedItemSize={200}
             drawDistance={500}
             renderItem={renderItem}
-            extraData={`${dataVersion}:${engagementRevision}`}
+            extraData={`${dataVersion}:${engagementRevision}:${isFetching ? 1 : 0}`}
             recycleItems
             ListFooterComponent={
-              hiddenReplyCount > 0 ? (
+              hiddenReplyCount > 0 && !isFetching ? (
                 <View style={styles.hiddenReplyFooter}>
                   <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
                     {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
@@ -527,8 +484,40 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 : undefined
             }
             scrollEventThrottle={16}
-            initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
+            initialScrollIndex={!isLoading && targetIndex > 0 ? targetIndex : undefined}
           />
+          {isMeasuring && measurementTargets.length > 0 ? (
+            <View
+              style={styles.measurementTree}
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants">
+              {measurementTargets.map((event) => {
+                const metrics = getDisplayMetrics(event.id);
+                const engagement = getEngagementState(event.id);
+                return (
+                  <PostCard
+                    key={`measure_${event.id}`}
+                    variant="thread-reply"
+                    event={event}
+                    metrics={metrics}
+                    quotedEvents={quotedEventsRef.current}
+                    profiles={profilesRef.current}
+                    getMetrics={getMetrics}
+                    liked={engagement.liked}
+                    reposted={engagement.reposted}
+                    likePending={engagement.likePending}
+                    repostPending={engagement.repostPending}
+                    likePendingDirection={engagement.likePendingDirection}
+                    repostPendingDirection={engagement.repostPendingDirection}
+                    getThreadContext={getThreadContext}
+                    onMeasureHeight={handleReplyMeasured}
+                    measurementMode
+                  />
+                );
+              })}
+            </View>
+          ) : null}
           <AnimatedImageOverlay />
         </View>
       </ImageOverlayProvider>
@@ -537,10 +526,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 }
 
 export const ThreadView = React.memo(ThreadViewInner);
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -554,5 +539,15 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     alignItems: 'center',
+  },
+  measurementTree: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    opacity: 0,
+  },
+  transitionStack: {
+    position: 'relative',
   },
 });

@@ -1,27 +1,13 @@
 /**
- * @fileoverview Transactions flow mintQuote route wrapper
- *
- * Part of the (transactions-flow) modal group - displays with back button.
+ * @fileoverview Transactions-flow mintQuote route — re-entry from the
+ * transactions list. The route body and zod schema live on
+ * `MintQuoteRoute`. Mint-pill callbacks stay undefined here: this route
+ * renders the entry read-only. `Stack.Screen` title comes from
+ * `(transactions-flow)/_layout.tsx`.
  */
 
-import React from 'react';
-import { useLocalSearchParams, Stack } from 'expo-router';
-import type { MintHistoryEntry } from '@cashu/coco-core';
-import { MintQuoteScreen } from '@/features/receive';
+import { MintQuoteRoute } from '@/features/receive';
 
-function ModalScreen() {
-  const { mintHistoryEntry: mintHistoryEntryString } = useLocalSearchParams<{
-    mintHistoryEntry: string;
-  }>();
-
-  const mintHistoryEntry = JSON.parse(mintHistoryEntryString) as MintHistoryEntry;
-
-  return (
-    <>
-      <Stack.Screen options={{ headerTitle: 'Receive' }} />
-      <MintQuoteScreen mintHistoryEntry={mintHistoryEntry} />
-    </>
-  );
+export default function ModalScreen() {
+  return <MintQuoteRoute where="transactions-flow.mintQuote" />;
 }
-
-export default ModalScreen;

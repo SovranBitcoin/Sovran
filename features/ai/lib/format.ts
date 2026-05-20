@@ -22,7 +22,7 @@ import type { RoutstrModel } from '@/shared/lib/routstr/api';
  */
 
 export type AiProviderId = 'openai' | 'claude' | 'grok';
-export type AiTierId = 'auto' | 'pro' | 'max';
+type AiTierId = 'auto' | 'pro' | 'max';
 
 export interface AiProvider {
   id: AiProviderId;
@@ -76,7 +76,7 @@ export const AI_TIERS: readonly AiTier[] = [
  * handled by `buildCandidateChain` so a missing entry in any one cell
  * just removes that fallback hop.
  */
-export const TIER_MATRIX: Readonly<Record<AiTierId, Readonly<Record<AiProviderId, string>>>> = {
+const TIER_MATRIX: Readonly<Record<AiTierId, Readonly<Record<AiProviderId, string>>>> = {
   auto: {
     openai: 'gpt-5-nano',
     claude: 'claude-3.5-haiku',
@@ -94,11 +94,11 @@ export const TIER_MATRIX: Readonly<Record<AiTierId, Readonly<Record<AiProviderId
   },
 } as const;
 
-export const DEFAULT_PROVIDER_ID: AiProviderId = 'openai';
+const DEFAULT_PROVIDER_ID: AiProviderId = 'openai';
 
 /** Default tier on app start — also the fallback when a stale (provider,
  *  tier) pair somehow names an id we don't recognise. */
-export const DEFAULT_TIER_ID: AiTierId = 'auto';
+const DEFAULT_TIER_ID: AiTierId = 'auto';
 
 /** Generic glyph used wherever we want to mean "Auto" outside the tier
  *  ladder (e.g. the 402 "Switch to Auto" button). Distinct from the Auto
@@ -183,10 +183,7 @@ export function estimateMessagesRemaining(
  * and to `null` when the model is unknown to the catalog so the caller
  * can short-circuit to "always affordable until proven otherwise".
  */
-export function estimateTurnCostSats(
-  modelId: string,
-  models: RoutstrModel[]
-): number | null {
+export function estimateTurnCostSats(modelId: string, models: RoutstrModel[]): number | null {
   const model = models.find((m) => m.id === modelId);
   if (!model) return null;
   const pricing = model.sats_pricing;
@@ -196,9 +193,7 @@ export function estimateTurnCostSats(
   const request = typeof pricing.request === 'number' ? pricing.request : 0;
   if (promptPer != null && completionPer != null) {
     const cost =
-      request +
-      promptPer * TYPICAL_PROMPT_TOKENS +
-      completionPer * TYPICAL_COMPLETION_TOKENS;
+      request + promptPer * TYPICAL_PROMPT_TOKENS + completionPer * TYPICAL_COMPLETION_TOKENS;
     return cost;
   }
   if (typeof pricing.max_cost === 'number') {
@@ -260,9 +255,7 @@ export function getAffordabilityDetails(
   };
 }
 
-export function getProviderById(
-  id: AiProviderId | string | null | undefined
-): AiProvider {
+export function getProviderById(id: AiProviderId | string | null | undefined): AiProvider {
   if (id && PROVIDER_BY_ID.has(id as AiProviderId)) {
     return PROVIDER_BY_ID.get(id as AiProviderId)!;
   }
@@ -291,10 +284,7 @@ export function modelIdForSlot(provider: AiProviderId, tier: AiTierId): string {
  * the same Auto tier) is way better than hard-failing — the user just
  * wants a working chat.
  */
-export function buildCandidateChain(
-  provider: AiProviderId,
-  tier: AiTierId
-): string[] {
+function buildCandidateChain(provider: AiProviderId, tier: AiTierId): string[] {
   const primary = modelIdForSlot(provider, tier);
   const fallbacks = AI_PROVIDERS.filter((p) => p.id !== provider).map((p) =>
     modelIdForSlot(p.id, tier)
@@ -415,40 +405,4 @@ export function getModelDisplayName(modelId: string, models: RoutstrModel[]): st
   const colonIdx = raw.indexOf(':');
   if (colonIdx >= 0 && colonIdx < raw.length - 1) return raw.slice(colonIdx + 1).trim();
   return raw;
-}
-
-/** Pull a short, readable model name. Falls back to the model id itself if
- *  the catalog hasn't loaded — used by callers that just want a label and
- *  don't have a tier in scope. */
-export function extractModelName(modelId: string, availableModels: RoutstrModel[]): string {
-  return getModelDisplayName(modelId, availableModels);
-}
-
-/** Relative timestamp suitable for the conversations list. */
-export function formatRelative(timestampMs: number): string {
-  const date = new Date(timestampMs);
-  const now = new Date();
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  if (sameDay) {
-    return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    date.getFullYear() === yesterday.getFullYear() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getDate() === yesterday.getDate();
-  if (isYesterday) {
-    return `Yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  }
-  return date.toLocaleString([], {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }

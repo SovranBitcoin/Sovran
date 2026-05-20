@@ -105,7 +105,7 @@ function paymentRequestAvailability(
 }
 
 function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMap<'amountEntry'> {
-  const numericValue = typeof entry.numericValue === 'number' ? entry.numericValue : 0;
+  const effectiveSat = typeof entry.effectiveSatAmount === 'number' ? entry.effectiveSatAmount : 0;
   const destination = entry.destination as string | undefined;
   const isSendEcash = destination === 'sendEcash';
   const isMeltQuote = destination === 'meltQuote';
@@ -125,7 +125,12 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   // so the UX is consistent across the app: users see every possible payment
   // method, learn which ones exist, and get a reason string for anything
   // currently unavailable.
-  const nextCanFire = numericValue > 0;
+  //
+  // Gate on effectiveSatAmount rather than the raw numericValue so fiat-mode
+  // entries that round to zero sats (e.g. "$0.000001") don't enable the
+  // button and produce a silent no-op when the handler — which only sees
+  // effectiveSatAmount — early-returns.
+  const nextCanFire = effectiveSat >= 1 && Number.isFinite(effectiveSat);
 
   // ── ecash ──────────────────────────────────────────────────────────
   let ecashAvailable = false;
@@ -245,9 +250,7 @@ function mintInfoAvailability(entry: Record<string, unknown>): AvailabilityMap<'
   };
 }
 
-function mintSelectorAvailability(
-  entry: Record<string, unknown>
-): AvailabilityMap<'mintSelector'> {
+function mintSelectorAvailability(entry: Record<string, unknown>): AvailabilityMap<'mintSelector'> {
   const items = entry.items;
   const hasItems = Array.isArray(items) && items.length > 0;
   const isManagement = !entry.destination;

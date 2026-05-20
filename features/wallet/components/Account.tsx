@@ -1,89 +1,52 @@
 import React from 'react';
-import 'react-native-get-random-values';
+import { StyleSheet } from 'react-native';
 
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Text } from '@/shared/ui/primitives/Text';
-import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from '@/features/wallet/components/PrimaryBalance';
 
-import { isBackgroundImageTheme } from '@/shared/stores/global/settingsStore';
-import { useUnitWallpaper } from '@/shared/providers/ProfileWallpaperProvider';
-import { NonGestureView } from './NonGestureView';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
+import { zIndex } from '@/shared/styles/tokens';
+
+const BALANCE_BOTTOM_INSET = 24;
 
 interface AccountData {
   unit: string;
 }
 
 interface AccountProps {
-  accounts: AccountData[];
   account: AccountData;
+  // Pinned, deterministic height for the header pager. Set by the wallet so
+  // the action rows below sit at a stable Y on first paint — the boot-splash
+  // → QR morph reads the QR button's window position, and a flex-driven
+  // height would let async layout (history, wallpaper image, safe-area)
+  // shift it after the splash has already locked onto a target rect.
   pagerHeight: number;
 }
 
-const CURRENCY_ICONS: Record<string, React.FC> = {
-  sat: BitcoinMaskIcon,
-  usd: DollarMaskIcon,
-  eur: EuroMaskIcon,
-  gbp: PoundMaskIcon,
-};
-
-export function Account({ accounts, account, pagerHeight }: AccountProps): React.ReactElement {
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
-  const theme = useUnitWallpaper(account.unit);
-  const hasBackgroundImage = isBackgroundImageTheme(theme);
-
-  const CurrencyIcon = CURRENCY_ICONS[account.unit];
-
+export function Account({ account, pagerHeight }: AccountProps): React.ReactElement {
   return (
     <Log name="Account">
-      <NonGestureView
-        key={account.unit}
-        style={{ overflow: 'hidden', zIndex: 10, height: pagerHeight, width: '100%' }}>
-        {/*
-         * Weighted fillers: top flex:2, bottom flex:1 pushes the primary
-         * balance + dots closer to the bottom edge of the pager so the
-         * secondary action row below (Split Bill / Soon / Soon in
-         * AccountPagerViewLayout) sits right under the balance instead of
-         * floating in empty space. Centred (flex:1/flex:1) felt too lonely
-         * after `pagerHeight` was tightened.
-         */}
-        <VStack style={{ flex: 1 }}>
-          <View style={{ flex: 2 }} />
-
+      <View style={[styles.container, { height: pagerHeight }]}>
+        <VStack style={styles.balanceSlot}>
           <VStack align="center" gap={8}>
             <PrimaryBalance account={account} />
-            <HStack spacing={2}>
-              {accounts.map((acc, index) => {
-                const isActive = acc.unit === account.unit;
-                return (
-                  <Text
-                    key={index}
-                    weight={isActive ? 'bold' : 'regular'}
-                    size={16}
-                    style={{
-                      color: isActive ? foreground : surfaceTertiary,
-                      marginTop: 3,
-                    }}>
-                    •
-                  </Text>
-                );
-              })}
-            </HStack>
           </VStack>
-
-          <View style={{ flex: 1 }} />
         </VStack>
-
-        {!hasBackgroundImage && CurrencyIcon ? (
-          <View pointerEvents="none" className="absolute bottom-6 right-0 z-[-10]">
-            <CurrencyIcon />
-          </View>
-        ) : null}
-      </NonGestureView>
+      </View>
     </Log>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    overflow: 'hidden',
+    width: '100%',
+    zIndex: zIndex.sticky,
+  },
+  balanceSlot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: BALANCE_BOTTOM_INSET,
+  },
+});

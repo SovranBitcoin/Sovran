@@ -77,6 +77,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
       return;
     }
 
+    const controller = new AbortController();
     try {
       setError(null);
 
@@ -88,7 +89,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
         { fullUrl: string; recs: MintRecommendation[] }
       >();
 
-      events.forEach((event: any) => {
+      events.forEach((event) => {
         if (!isCashuRecommendationEvent(event as NostrEvent)) return;
         const mintUrl = extractMintUrlFromEvent(event as NostrEvent);
         if (!mintUrl) return;
@@ -98,6 +99,11 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
 
         const recommendation = parseRecommendation(event.content);
         if (!recommendation) return;
+
+        // NDKEvent.created_at is optional; MintRecommendation requires it.
+        // Drop events without one rather than coerce to 0/Date.now() —
+        // they'd misorder downstream sort-by-recency.
+        if (typeof event.created_at !== 'number') return;
 
         const entry = recommendationsByKey.get(key) ?? {
           fullUrl: normalizeUrlForApi(mintUrl),
@@ -130,7 +136,8 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
         const score = averageScore(recommendations);
 
         try {
-          const mintInfoResult = await fetchMintInfo(url);
+          const mintInfoResult = await fetchMintInfo(url, { signal: controller.signal });
+          if (controller.signal.aborted) return;
           const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
           cashuLog.debug('mint.nostr.info.resolved', {
             url,
@@ -145,6 +152,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
             mintInfo: info,
           });
         } catch (err) {
+          if (controller.signal.aborted) return;
           cashuLog.warn('mint.nostr.info.error', {
             url,
             error: err instanceof Error ? err : new Error(String(err)),
@@ -158,6 +166,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
       });
       setError('Failed to process mint recommendations. Please try again.');
     }
+    return () => controller.abort();
   }, [events, knownMints, eose]);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
-import { Pressable, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, router } from 'expo-router';
 import { nip19 } from 'nostr-tools';
 import Icon from 'assets/icons';
@@ -12,7 +13,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { truncateMiddle } from '@/shared/lib/strings';
 
-export interface DmChatHeaderProps {
+interface DmChatHeaderProps {
   /**
    * Counterparty Nostr pubkey (hex). When provided, the header shows the
    * truncated npub subtitle and a QR-share button on the right. Set
@@ -31,6 +32,13 @@ export interface DmChatHeaderProps {
    * Used as the avatar seed when no `pubkey` is provided.
    */
   nickname?: string;
+  /**
+   * Explicit avatar seed. When provided, takes precedence over the
+   * `pubkey ?? nickname ?? displayName` fallback chain. Pass the same
+   * identifier used by `ChatMessageBubble`'s `senderId` (e.g. BLE peerID)
+   * so the header avatar matches in-thread message avatars.
+   */
+  seed?: string;
   /** Optional custom subtitle. Overrides the default npub-truncated line. */
   subtitle?: string;
   onBack: () => void;
@@ -53,6 +61,7 @@ export function DmChatHeader({
   pubkey,
   displayName: displayNameOverride,
   nickname,
+  seed,
   subtitle,
   onBack,
   trailing,
@@ -133,7 +142,7 @@ export function DmChatHeader({
               state={shouldShowAvatarLoading ? 'loading' : userPicture ? 'image' : 'fallback'}
               size={40}
               picture={userPicture}
-              seed={pubkey ?? nickname ?? displayName}
+              seed={seed ?? pubkey ?? nickname ?? displayName}
               name={displayName}
             />
             <VStack

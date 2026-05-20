@@ -7,6 +7,10 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
+import {
+  resolveOfflineReachability,
+  type OfflineReachabilityResult,
+} from '@/shared/lib/offlineReachability';
 
 initLog('Module', 'OfflineProvider loaded');
 
@@ -32,10 +36,6 @@ const IOS_PHONE_CORNER_RADIUS_BY_HEIGHT: readonly { height: number; radius: numb
   { height: 932, radius: 55 },
 ];
 
-type OfflineProviderProps = {
-  children: React.ReactNode;
-};
-
 function getIosCornerRadius(frameWidth: number, frameHeight: number): number {
   if (Platform.OS !== 'ios') return 0;
   if (Platform.isPad) return 18;
@@ -54,65 +54,72 @@ function getIosCornerRadius(frameWidth: number, frameHeight: number): number {
   return longEdge >= 850 ? 55 : 47.33;
 }
 
-function isOfflineFromState(state: Network.NetworkState): boolean {
-  return state.isConnected === false || state.isInternetReachable === false;
+function summarizeReachability(result: OfflineReachabilityResult) {
+  const successfulProbe = result.probes.find((probe) => probe.ok);
+  const lastProbe = result.probes.at(-1);
+  return {
+    reachabilityReason: result.reason,
+    probeStatus: result.probes.length === 0 ? 'skipped' : result.isOffline ? 'failed' : 'success',
+    probeHost: successfulProbe?.host ?? lastProbe?.host,
+    probeName: successfulProbe?.name ?? lastProbe?.name,
+    probeStatusCode: successfulProbe?.status ?? lastProbe?.status,
+    probeError: lastProbe?.ok ? undefined : lastProbe?.error,
+    probeCount: result.probes.length,
+    probeDurationMs: result.probes.reduce((total, probe) => total + probe.durationMs, 0),
+  };
 }
 
-export function OfflineProvider({ children }: OfflineProviderProps) {
-  useInitMount('OfflineProvider');
+// Context-only provider. Mount above any consumer that needs to react to live
+// network state — including coco-payment-ux's machine, which derives the
+// offline send-flow branch from getOffline(). The visual offline banner lives
+// in <OfflineShell> below and consumes this context like any other UI.
+export function OfflineStatusProvider({ children }: { children: React.ReactNode }) {
+  useInitMount('OfflineStatusProvider');
   const [networkOffline, setNetworkOffline] = useState(false);
-  const [foreground, info] = useThemeColor(['foreground', 'red-300'] as const);
-  const insets = useSafeAreaInsets();
-  const frame = useSafeAreaFrame();
   const isCheckingRef = useRef(false);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || networkOffline;
-  const offlineAccentColor = info;
-  const offlineTextColor = foreground;
-  const screenCornerRadius = useMemo(
-    () => getIosCornerRadius(frame.width, frame.height),
-    [frame.height, frame.width]
-  );
-  const shellCornerStyle = useMemo(
-    () => ({
-      borderRadius: screenCornerRadius,
-      ...(Platform.OS === 'ios'
-        ? ({
-            borderCurve: 'continuous',
-          } as const)
-        : null),
-    }),
-    [screenCornerRadius]
-  );
 
   useEffect(() => {
     let mounted = true;
     let interval: ReturnType<typeof setInterval> | null = null;
     let networkSubscription: { remove: () => void } | null = null;
     let lastOffline: boolean | null = null;
+    let lastCheckId = 0;
 
-    const applyState = (state: Network.NetworkState) => {
-      if (!mounted) return;
-      const nowOffline = isOfflineFromState(state);
-      // Only log when state actually changes to reduce noise
-      if (lastOffline !== nowOffline) {
-        log.debug('provider.offline.network_state', {
-          isConnected: state.isConnected,
-          isInternetReachable: state.isInternetReachable,
-          type: state.type,
-          resolvedOffline: nowOffline,
-        });
-        lastOffline = nowOffline;
-      }
-      setNetworkOffline((prev) => {
-        if (prev !== nowOffline) {
-          log.info('provider.offline.transition', {
-            from: prev ? 'offline' : 'online',
-            to: nowOffline ? 'offline' : 'online',
+    const applyState = async (state: Network.NetworkState) => {
+      const checkId = ++lastCheckId;
+      try {
+        const reachability = await resolveOfflineReachability(state);
+        if (!mounted || checkId !== lastCheckId) return;
+        const nowOffline = reachability.isOffline;
+        const reachabilityLog = summarizeReachability(reachability);
+        // Only log when state actually changes to reduce noise.
+        if (lastOffline !== nowOffline) {
+          log.debug('provider.offline.network_state', {
+            isConnected: state.isConnected,
+            isInternetReachable: state.isInternetReachable,
+            type: state.type,
+            resolvedOffline: nowOffline,
+            ...reachabilityLog,
           });
+          lastOffline = nowOffline;
         }
-        return nowOffline;
-      });
+        setNetworkOffline((prev) => {
+          if (prev !== nowOffline) {
+            log.info('provider.offline.transition', {
+              from: prev ? 'offline' : 'online',
+              to: nowOffline ? 'offline' : 'online',
+              ...reachabilityLog,
+            });
+          }
+          return nowOffline;
+        });
+      } catch (err) {
+        log.warn('provider.offline.check_failed', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+      }
     };
 
     const runConnectivityCheck = async () => {
@@ -120,7 +127,7 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
       isCheckingRef.current = true;
       try {
         const state = await Network.getNetworkStateAsync();
-        applyState(state);
+        await applyState(state);
       } catch (err) {
         log.warn('provider.offline.check_failed', {
           error: err instanceof Error ? err : new Error(String(err)),
@@ -131,21 +138,22 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
     };
 
     log.debug('provider.offline.init', { pollIntervalMs: CONNECTIVITY_POLL_MS });
-    runConnectivityCheck();
-    networkSubscription = Network.addNetworkStateListener(applyState);
+    void runConnectivityCheck();
+    networkSubscription = Network.addNetworkStateListener((state) => {
+      void applyState(state);
+    });
     interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
 
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
         log.debug('provider.offline.app_foregrounded', { reason: 'app_state_active' });
-        runConnectivityCheck();
+        void runConnectivityCheck();
       }
     });
 
     const onWebOnline = () => {
       log.info('provider.offline.web_event', { event: 'online' });
-      setNetworkOffline(false);
-      runConnectivityCheck();
+      void runConnectivityCheck();
     };
 
     const onWebOffline = () => {
@@ -172,20 +180,49 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
     };
   }, []);
 
+  const contextValue = useMemo(() => ({ isOffline }), [isOffline]);
+
+  return <OfflineContext.Provider value={contextValue}>{children}</OfflineContext.Provider>;
+}
+
+// Visual wrapper that renders the blue "YOU ARE OFFLINE" banner + screen
+// border around its children. Consumes the context from <OfflineStatusProvider>
+// — which must be mounted above this component. Lives inside RootLayoutContent
+// so the banner overlays the navigation Stack without affecting providers above.
+export function OfflineShell({ children }: { children: React.ReactNode }) {
+  const { isOffline } = useOfflineStatus();
+  const [foreground, info] = useThemeColor(['foreground', 'blue-300'] as const);
+  const insets = useSafeAreaInsets();
+  const frame = useSafeAreaFrame();
+  const offlineAccentColor = info;
+  const offlineTextColor = foreground;
+  const screenCornerRadius = useMemo(
+    () => getIosCornerRadius(frame.width, frame.height),
+    [frame.height, frame.width]
+  );
+  const shellCornerStyle = useMemo(
+    () => ({
+      borderRadius: screenCornerRadius,
+      ...(Platform.OS === 'ios'
+        ? ({
+            borderCurve: 'continuous',
+          } as const)
+        : null),
+    }),
+    [screenCornerRadius]
+  );
   const outerShellStyle = useMemo(
     () => ({
       backgroundColor: isOffline ? offlineAccentColor : 'transparent',
     }),
     [isOffline, offlineAccentColor]
   );
-
   const topSectionStyle = useMemo(
     () => ({
       height: isOffline ? BANNER_HEIGHT + insets.top : 0,
     }),
     [insets.top, isOffline]
   );
-
   const contentShellStyle = useMemo(() => {
     const inset = isOffline ? BORDER_WIDTH : 0;
     const contentRadius = Math.max(0, screenCornerRadius - inset);
@@ -197,30 +234,26 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
     };
   }, [isOffline, screenCornerRadius]);
 
-  const contextValue = useMemo(() => ({ isOffline }), [isOffline]);
-
   return (
-    <OfflineContext.Provider value={contextValue}>
-      <View style={[styles.outerShell, shellCornerStyle, outerShellStyle]}>
-        <View style={[styles.topSection, topSectionStyle]}>
-          {isOffline ? (
-            <View
-              style={[
-                styles.banner,
-                { paddingTop: insets.top, backgroundColor: offlineAccentColor },
-              ]}>
-              <Text style={[styles.bannerText, { color: offlineTextColor }]}>YOU ARE OFFLINE</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.contentShell}>
-          <View style={[styles.contentContainer, contentShellStyle]}>
-            <View style={styles.contentFill}>{children}</View>
+    <View style={[styles.outerShell, shellCornerStyle, outerShellStyle]}>
+      <View style={[styles.topSection, topSectionStyle]}>
+        {isOffline ? (
+          <View
+            style={[
+              styles.banner,
+              { paddingTop: insets.top, backgroundColor: offlineAccentColor },
+            ]}>
+            <Text style={[styles.bannerText, { color: offlineTextColor }]}>YOU ARE OFFLINE</Text>
           </View>
+        ) : null}
+      </View>
+
+      <View style={styles.contentShell}>
+        <View style={[styles.contentContainer, contentShellStyle]}>
+          <View style={styles.contentFill}>{children}</View>
         </View>
       </View>
-    </OfflineContext.Provider>
+    </View>
   );
 }
 

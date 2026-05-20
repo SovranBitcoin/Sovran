@@ -71,6 +71,7 @@ describe('Operations — real Manager', () => {
       unit: 'sat',
       candidates: [],
       supportedMintUrls: undefined,
+      destination: 'sendEcash',
     });
 
     const testItem = items.find((i) => i.mintUrl === TEST_MINT);
@@ -122,6 +123,33 @@ describe('Operations — real Manager', () => {
     expect((testItem as any)?.kymScore).toBe(4.5);
 
     enrichedInstance.dispose();
+  });
+
+  it('keeps trusted mint name and icon when fetchMintInfo returns null', async () => {
+    const trustedMint = (await manager.mint.getAllTrustedMints()).find(
+      (mint) => mint.mintUrl === TEST_MINT
+    );
+    expect(trustedMint).toBeDefined();
+
+    const cachedInfoInstance = createCocoPaymentUX({
+      manager,
+      fetchMintInfo: async () => null,
+    });
+    await cachedInfoInstance.tracker.refresh();
+
+    const items = await cachedInfoInstance.operations.buildMintListItems!({
+      amount: 0,
+      unit: 'sat',
+      candidates: [],
+      supportedMintUrls: undefined,
+    });
+
+    const testItem = items.find((i) => i.mintUrl === TEST_MINT);
+    expect(testItem).toBeDefined();
+    expect(testItem!.displayName).toBe(trustedMint!.mintInfo.name);
+    expect(testItem!.iconUrl).toBe(trustedMint!.mintInfo.icon_url);
+
+    cachedInfoInstance.dispose();
   });
 
   it('enrichment callbacks are applied to mint review info', async () => {

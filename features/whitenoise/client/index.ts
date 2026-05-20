@@ -12,32 +12,29 @@ import {
 import { createWhitenoiseNetwork } from './network';
 import { createWhitenoiseSigner } from './signer';
 
-// Pull `EventSigner` shape out of MarmotClient's constructor options without
-// importing it from an applesauce subpath that marmot-ts doesn't re-export.
-type MarmotSigner = ConstructorParameters<typeof MarmotClient>[0]['signer'];
-
-export type WhitenoiseClientOptions = {
+type WhitenoiseClientOptions = {
   accountIndex: number;
   privateKey: Uint8Array;
   ndk: NDK;
   fallbackRelays: readonly string[];
 };
 
-export function createWhitenoiseClient(
-  opts: WhitenoiseClientOptions
-): MarmotClient<WhitenoiseGroupHistory> {
+type WhitenoiseClientHandle = {
+  client: MarmotClient<WhitenoiseGroupHistory>;
+  disposeSigner: () => void;
+};
+
+export function createWhitenoiseClient(opts: WhitenoiseClientOptions): WhitenoiseClientHandle {
   const { groupStateBackend, keyPackageStoreBackend } = createWhitenoiseStorage(opts.accountIndex);
   const keyPackageStore = new KeyPackageStore(keyPackageStoreBackend);
-  const signer = createWhitenoiseSigner(opts.privateKey) as unknown as MarmotSigner;
+  const signer = createWhitenoiseSigner(opts.privateKey);
   const network: NostrNetworkInterface = createWhitenoiseNetwork(opts.ndk, opts.fallbackRelays);
-  return new MarmotClient<WhitenoiseGroupHistory>({
+  const client = new MarmotClient<WhitenoiseGroupHistory>({
     signer,
     groupStateBackend,
     keyPackageStore,
     network,
     historyFactory: createWhitenoiseGroupHistoryFactory(opts.accountIndex),
   });
+  return { client, disposeSigner: signer.dispose };
 }
-
-export { createWhitenoiseNetwork } from './network';
-export { createWhitenoiseSigner } from './signer';

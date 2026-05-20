@@ -5,6 +5,7 @@ import opacity from 'hex-color-opacity';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
+import { zIndex } from '@/shared/styles/tokens';
 
 type GlowVariant = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'diagonal' | 'right';
 
@@ -46,6 +47,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   content: {
-    zIndex: 1,
+    zIndex: zIndex.raised,
   },
 });

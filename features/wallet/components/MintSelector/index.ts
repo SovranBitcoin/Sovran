@@ -1,2 +1,2 @@
-export { default as MintSelector, default } from './MintSelector';
+export { default as MintSelector } from './MintSelector';
 export type { MintSelectorProps } from './useMintSelector';

@@ -9,17 +9,22 @@
  * - User feed (notes)
  */
 
-import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import {
-  Animated,
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
+import { StyleSheet, useWindowDimensions } from 'react-native';
+import Animated, {
   Easing,
-  StyleSheet,
-  TouchableOpacity,
-  useWindowDimensions,
-  Linking,
-} from 'react-native';
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
-import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
+import { Stack, Link } from 'expo-router';
+import { z } from 'zod';
+import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -27,10 +32,11 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { Card } from '@/shared/ui/composed/Card';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { truncateMiddle } from '@/shared/lib/strings';
+import { openExternalUrl } from '@/shared/lib/url';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -38,25 +44,20 @@ import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
-import {
-  copyPopup,
-  copyFailedPopup,
-  openLinkFailedPopup,
-  engagementUpdateFailedPopup,
-  type CopyTarget,
-} from '@/shared/lib/popup';
+import { copyPopup, type CopyTarget, staticPopup, paramPopup } from '@/shared/lib/popup';
 import {
   useNostrProfile,
   getFollowersWithProfiles,
   getFollowerDisplayName,
   getFollowerPicture,
-  TopFollower,
-  UserFeed,
-} from '@/features/feed';
-import { formatDate } from '@/shared/lib/time';
+  type TopFollower,
+} from '@/shared/hooks/useNostrProfile';
+import { UserFeed } from '@/features/feed';
+import { formatDate } from '@/shared/lib/date';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
 import {
   selectIsFollowingPubkey,
   useNostrSocialStore,
@@ -68,11 +69,22 @@ import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
 const AVATAR_OVERLAP = AVATAR_SIZE / 4;
+
+const UserProfileParamsSchema = z
+  .object({
+    npub: Npub.optional(),
+    pubkey: Hex64.optional(),
+    mintUrl: HttpsUrl.optional(),
+  })
+  .refine((v) => !!(v.npub || v.pubkey), {
+    message: 'either npub or pubkey is required',
+    path: ['pubkey'],
+  });
 
 function buildUpdatedContactTags(
   existingTags: string[][],
@@ -122,37 +134,11 @@ function ProfileStatsGridComponent({
     'surface-secondary',
   ] as const);
 
-  const fadeAnims = useRef([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current;
-
   const hasValidData =
     followingCount !== undefined ||
     followerCount !== undefined ||
     reputationScore !== undefined ||
     joinedDate !== undefined;
-
-  const hasAnimatedRef = useRef(false);
-  useEffect(() => {
-    if (hasValidData && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-      Animated.stagger(
-        80,
-        fadeAnims.map((anim, index) =>
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 400,
-            delay: index * 80,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          })
-        )
-      ).start();
-    }
-  }, [hasValidData, fadeAnims]);
 
   const stats = [
     {
@@ -243,8 +229,10 @@ function TopFollowersComponent({
   isLoading: boolean;
 }) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const profileFlowGroup = useActiveProfileFlowGroup();
   const { width: screenWidth } = useWindowDimensions();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useSharedValue(0);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
 
   const GRID_PADDING = 32;
   const GRID_GAP = 12;
@@ -259,26 +247,20 @@ function TopFollowersComponent({
 
   useEffect(() => {
     if (followersWithProfiles.length > 0) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+      fadeAnim.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) });
     }
   }, [followersWithProfiles.length, fadeAnim]);
 
   if (!isLoading && followersWithProfiles.length === 0) return null;
 
   const handleFollowerPress = (follower: TopFollower) => {
-    router.navigate({
-      pathname: '/(user-flow)/profile' as any,
-      params: { npub: follower.npub },
-    });
+    // push (not navigate) so each profile pushes a new stack entry; tapping
+    // through follower → follower-of-follower then back returns step by step.
+    router.push(buildProfileHref('profile', { npub: follower.npub }, profileFlowGroup) as never);
   };
 
   const renderItem = (follower: TopFollower) => (
-    <TouchableOpacity
+    <Pressable
       key={follower.pubkey}
       style={[styles.topFollowerGridItem, { width: itemWidth }]}
       onPress={() => handleFollowerPress(follower)}
@@ -302,7 +284,7 @@ function TopFollowersComponent({
         }}>
         {getFollowerDisplayName(follower)}
       </Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   const renderSkeleton = (index: number) => (
@@ -336,7 +318,7 @@ function TopFollowersComponent({
       {isLoading ? (
         <View style={styles.topFollowersGrid}>{[0, 1, 2, 3, 4, 5].map(renderSkeleton)}</View>
       ) : (
-        <Animated.View style={{ opacity: fadeAnim }}>
+        <Animated.View style={fadeStyle}>
           <View style={styles.topFollowersGrid}>{followersWithProfiles.map(renderItem)}</View>
         </Animated.View>
       )}
@@ -382,7 +364,11 @@ function BannerWithAvatarComponent({
     'surface-secondary',
     'background',
   ] as const);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useSharedValue(0);
+  const avatarStyle = useAnimatedStyle(() => ({
+    opacity: fadeAnim.value,
+    transform: [{ scale: fadeAnim.value }],
+  }));
   const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
   const fallbackIndex = useMemo(
@@ -436,12 +422,7 @@ function BannerWithAvatarComponent({
   }, [bannerUrl]);
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    fadeAnim.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.cubic) });
   }, [fadeAnim]);
 
   const avatarContent = (
@@ -493,10 +474,7 @@ function BannerWithAvatarComponent({
               />
             ) : null}
             <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: opacity(foreground, 0.5) },
-              ]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: opacity(foreground, 0.5) }]}
             />
           </>
         ) : bannerState === 'image' ? (
@@ -562,12 +540,11 @@ function BannerWithAvatarComponent({
       </View>
 
       {/* Avatar - positioned to overlap banner */}
-      <Animated.View
-        style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
+      <Animated.View style={[styles.avatarContainer, avatarStyle]}>
         {hasStories && onAvatarPress ? (
-          <TouchableOpacity activeOpacity={0.8} onPress={onAvatarPress}>
+          <Pressable activeOpacity={0.8} onPress={onAvatarPress}>
             {avatarContent}
-          </TouchableOpacity>
+          </Pressable>
         ) : (
           avatarContent
         )}
@@ -612,7 +589,7 @@ function BannerWithAvatarComponent({
               style={{ marginTop: 10 }}
             />
           ) : (
-            <TouchableOpacity
+            <Pressable
               activeOpacity={0.8}
               onPress={onToggleFollow}
               disabled={isFollowLoading}
@@ -632,7 +609,7 @@ function BannerWithAvatarComponent({
                 }}>
                 {isFollowing ? 'Following' : 'Follow'}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           ))}
       </VStack>
     </View>
@@ -648,13 +625,15 @@ export function UserProfileScreen() {
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const profileFlowGroup = useActiveProfileFlowGroup();
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const { npub: npubParam, pubkey: pubkeyParam, mintUrl: mintUrlParam } = useLocalSearchParams<{
-    npub?: string;
-    pubkey?: string;
-    mintUrl?: string;
-  }>();
+  const params = useRouteParams(UserProfileParamsSchema, {
+    where: 'user-flow.profile',
+  });
+  const npubParam = params?.npub;
+  const pubkeyParam = params?.pubkey;
+  const mintUrlParam = params?.mintUrl;
 
   const pubkey = useMemo(() => {
     if (pubkeyParam) return pubkeyParam;
@@ -687,8 +666,7 @@ export function UserProfileScreen() {
   // /(user-flow)/userMessages route avoids a duplicate kind-0
   // fetch). First open per session pays one round-trip; the cache
   // entry is shared across surfaces and persists across launches.
-  const { metadata: cachedProfile, isLoading: isMetadataLoading } =
-    useNostrProfileMetadata(pubkey);
+  const { metadata: cachedProfile, isLoading: isMetadataLoading } = useNostrProfileMetadata(pubkey);
 
   const contactListFilters = useMemo(
     () =>
@@ -734,7 +712,7 @@ export function UserProfileScreen() {
 
   const followerCount = profileData?.followers;
   const reputationScore = profileData?.score;
-  const joinedDate = formatDate((profileData?.created_at || 0) * 1000);
+  const joinedDate = formatDate((profileData?.created_at || 0) * 1000, 'long-date');
 
   const latestContactListEvent = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
@@ -786,13 +764,11 @@ export function UserProfileScreen() {
     nostrLog.info('user.profile.story.view', { pubkey, videoCount: userVideoPosts.length });
     const storyUser: StoryUser = {
       pubkey,
-      profile: cachedProfile
-        ? { name: displayName, picture: cachedProfile.picture }
-        : undefined,
+      profile: cachedProfile ? { name: displayName, picture: cachedProfile.picture } : undefined,
       videoPosts: userVideoPosts,
     };
     router.navigate({
-      pathname: '/(stories-flow)/stories' as any,
+      pathname: '/(stories-flow)/stories',
       params: {
         startIndex: '0',
         storyUsersJson: JSON.stringify([storyUser]),
@@ -814,32 +790,28 @@ export function UserProfileScreen() {
         target,
         error: e instanceof Error ? e : new Error(String(e)),
       });
-      copyFailedPopup();
+      staticPopup('copy-failed');
     }
   }, []);
 
   const handleOpenLink = useCallback(async (url: string) => {
-    try {
-      nostrLog.info('user.profile.open_link', { url });
-      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
-      await Linking.openURL(fullUrl);
-    } catch (e) {
-      nostrLog.error('user.profile.open_link.failed', {
-        url,
-        error: e instanceof Error ? e : new Error(String(e)),
-      });
-      openLinkFailedPopup();
+    nostrLog.info('user.profile.open_link', { url });
+    const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+    const result = await openExternalUrl(fullUrl);
+    if (result.isErr()) {
+      nostrLog.error('user.profile.open_link.failed', { url, reason: result.error.type });
+      staticPopup('open-link-failed');
     }
   }, []);
 
-  const handleToggleFollow = useCallback(async () => {
+  const handleToggleFollowInner = useCallback(async () => {
     if (!pubkey || !nostrKeys?.pubkey || !ndk) {
       nostrLog.warn('user.profile.follow.precondition_failed', {
         hasPubkey: !!pubkey,
         hasNostrKeys: !!nostrKeys?.pubkey,
         hasNdk: !!ndk,
       });
-      engagementUpdateFailedPopup('follow');
+      paramPopup('engagement-update-failed', 'follow');
       return;
     }
     if (nostrKeys.pubkey === pubkey || followInFlight) return;
@@ -871,7 +843,7 @@ export function UserProfileScreen() {
         error: e instanceof Error ? e : new Error(String(e)),
       });
       clearFollowOptimistic(pubkey);
-      engagementUpdateFailedPopup('follow');
+      paramPopup('engagement-update-failed', 'follow');
     }
   }, [
     pubkey,
@@ -885,6 +857,11 @@ export function UserProfileScreen() {
     setContactsFromRelay,
     clearFollowOptimistic,
   ]);
+
+  // `followInFlight` is store-derived state and lands a render too late;
+  // a rapid double-tap on Follow runs `setFollowOptimistic` twice and races
+  // a second kind-3 publish with the first's `clearFollowOptimistic`.
+  const handleToggleFollow = useSingleFlight(handleToggleFollowInner);
 
   // ===========================
   // PROFILE INFO ITEMS (data-driven)
@@ -905,7 +882,9 @@ export function UserProfileScreen() {
         prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
         title: truncateMiddle(npub, 10),
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(npub, 'npub'),
+        onPress: () => {
+          void handleCopy(npub, 'npub');
+        },
       },
     ];
 
@@ -916,7 +895,9 @@ export function UserProfileScreen() {
         prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
         title: nip05,
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(nip05, 'nip05'),
+        onPress: () => {
+          void handleCopy(nip05, 'nip05');
+        },
       });
     }
 
@@ -927,7 +908,9 @@ export function UserProfileScreen() {
         prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
         title: lud16,
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(lud16, 'lud16'),
+        onPress: () => {
+          void handleCopy(lud16, 'lud16');
+        },
       });
     }
 
@@ -938,7 +921,9 @@ export function UserProfileScreen() {
         prefix: <Icon name="mdi:web" size={20} color={iconColor} />,
         title: website,
         suffixIcon: 'mdi:open-in-new',
-        onPress: () => handleOpenLink(website),
+        onPress: () => {
+          void handleOpenLink(website);
+        },
       });
     }
 
@@ -946,7 +931,7 @@ export function UserProfileScreen() {
   }, [npub, cachedProfile, handleCopy, handleOpenLink, iconColor]);
 
   return (
-    <Screen name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: isMetadataLoading ? 'Profile' : displayName,
@@ -955,30 +940,35 @@ export function UserProfileScreen() {
               {(profileData?.mintUrl || mintUrlParam) && (
                 <Link
                   href={{
-                    pathname: '/(mint-flow)/info' as any,
+                    pathname: '/(mint-flow)/info',
                     params: {
-                      mintInfoEntry: JSON.stringify({ mintUrl: profileData?.mintUrl || mintUrlParam }),
+                      mintInfoEntry: JSON.stringify({
+                        mintUrl: profileData?.mintUrl || mintUrlParam,
+                      }),
                     },
                   }}
                   asChild>
-                  <TouchableOpacity style={{ padding: 8 }}>
+                  <Pressable style={{ padding: 8 }}>
                     <Icon name="mdi:bank" size={24} color={foreground} />
-                  </TouchableOpacity>
+                  </Pressable>
                 </Link>
               )}
               <Link
-                href={{
-                  pathname: '/(user-flow)/share' as any,
-                  params: {
-                    type: 'npub',
-                    data: npub,
-                    ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
-                  },
-                }}
+                href={
+                  buildProfileHref(
+                    'share',
+                    {
+                      type: 'npub',
+                      data: npub,
+                      ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
+                    },
+                    profileFlowGroup
+                  ) as never
+                }
                 asChild>
-                <TouchableOpacity style={{ padding: 8 }}>
+                <Pressable style={{ padding: 8 }}>
                   <Icon name="mdi:qrcode" size={24} color={foreground} />
-                </TouchableOpacity>
+                </Pressable>
               </Link>
             </HStack>
           ),
@@ -1001,7 +991,12 @@ export function UserProfileScreen() {
                 displayName={displayName}
                 nip05={cachedProfile?.nip05}
                 isLoading={isMetadataLoading}
-                showFollowButton={!isOwnProfile && !!pubkey}
+                // Wait until our own keys are known before deciding whether to
+                // show the follow button. Otherwise on own-profile open we would
+                // briefly render the skeleton (isOwnProfile=false until keys load),
+                // then unmount it once `isOwnProfile` flips true — a content shift
+                // every time you open your own profile.
+                showFollowButton={!!nostrKeys?.pubkey && !isOwnProfile && !!pubkey}
                 isFollowing={isFollowingProfile}
                 isFollowLoading={followInFlight}
                 onToggleFollow={handleToggleFollow}
@@ -1070,7 +1065,7 @@ export function UserProfileScreen() {
       <BottomButtons>
         <SendMessageMenu pubkey={pubkey} displayName={displayName} />
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }
 

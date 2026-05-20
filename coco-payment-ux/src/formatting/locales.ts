@@ -27,6 +27,7 @@ const en: TranslationMap = {
   NOT_IN_PAYMENT_REQUEST: 'Not in payment request',
   UNSUPPORTED_FOR_FLOW: 'Unsupported for this flow',
   MINT_UNREACHABLE: 'Mint unreachable',
+  NO_WEBSOCKET: 'Does not support live updates (NUT-17)',
 
   // ExecutionState messages
   OPTION_SELECTION_REQUIRED: 'Option selection is required to continue',
@@ -60,6 +61,7 @@ const ar: TranslationMap = {
   NOT_IN_PAYMENT_REQUEST: 'غير مدرج في طلب الدفع',
   UNSUPPORTED_FOR_FLOW: 'غير مدعوم لهذا التدفق',
   MINT_UNREACHABLE: 'المنت غير متاح',
+  NO_WEBSOCKET: 'لا يدعم التحديثات الفورية (NUT-17)',
 
   OPTION_SELECTION_REQUIRED: 'يجب اختيار خيار للمتابعة',
   FALLBACK_OPTION_REQUIRED: 'اختر طريقة دفع بديلة',
@@ -90,6 +92,7 @@ const de: TranslationMap = {
   NOT_IN_PAYMENT_REQUEST: 'Nicht in Zahlungsanfrage enthalten',
   UNSUPPORTED_FOR_FLOW: 'Für diesen Ablauf nicht unterstützt',
   MINT_UNREACHABLE: 'Mint nicht erreichbar',
+  NO_WEBSOCKET: 'Unterstützt keine Live-Updates (NUT-17)',
 
   OPTION_SELECTION_REQUIRED: 'Option muss ausgewählt werden',
   FALLBACK_OPTION_REQUIRED: 'Wählen Sie eine alternative Zahlungsmethode',

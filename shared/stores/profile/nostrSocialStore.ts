@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { z } from 'zod';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
-
-const profileStorage = createProfileScopedStorage();
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,11 +61,11 @@ interface NostrSocialActions {
 
   syncLikesFromRelay: (
     targetEventIds: string[],
-    likes: Array<{ targetEventId: string; reactionEventId: string; createdAt: number }>
+    likes: { targetEventId: string; reactionEventId: string; createdAt: number }[]
   ) => void;
   syncRepostsFromRelay: (
     targetEventIds: string[],
-    reposts: Array<{ targetEventId: string; repostEventId: string; createdAt: number }>
+    reposts: { targetEventId: string; repostEventId: string; createdAt: number }[]
   ) => void;
 
   setLikeOptimistic: (
@@ -91,8 +91,6 @@ interface NostrSocialActions {
   clearLikeOptimistic: (eventId: string) => void;
   clearRepostOptimistic: (eventId: string) => void;
   clearSettledEngagementOptimistic: () => void;
-
-  clearAllData: () => Promise<void>;
 }
 
 type NostrSocialStore = NostrSocialState & NostrSocialActions;
@@ -143,6 +141,54 @@ const INITIAL_STATE: NostrSocialState = {
   optimisticLikesByEventId: {},
   optimisticRepostsByEventId: {},
 };
+
+// Bounded schemas — `nostrSocialStore` persists up to three optimistic maps
+// that grow unbounded if the user hammers reactions/follows offline (audit
+// __audits__/16.json F-003). The .max() caps below stop a runaway blob from
+// hanging rehydrate; if the limits are hit the merge falls back to defaults.
+const PersistedReactionState = z.looseObject({
+  reactionEventId: z.string().max(128).optional(),
+  updatedAt: z.number().int().nonnegative(),
+});
+const PersistedRepostState = z.looseObject({
+  repostEventId: z.string().max(128).optional(),
+  updatedAt: z.number().int().nonnegative(),
+});
+const PersistedFollowOptimistic = z.looseObject({
+  value: z.boolean(),
+  pending: z.boolean(),
+  updatedAt: z.number().int().nonnegative(),
+});
+const PersistedEngagementOptimistic = z.looseObject({
+  value: z.boolean(),
+  pending: z.boolean(),
+  delta: z.number(),
+  expectedCount: z.number().int().optional(),
+  relatedEventId: z.string().max(128).optional(),
+  updatedAt: z.number().int().nonnegative(),
+});
+
+const PersistedNostrSocialStore = z.object({
+  contactsTags: z
+    .array(z.array(z.string().max(2048)).max(16))
+    .max(50_000)
+    .default([]),
+  contactsContent: z.string().max(65_536).default(''),
+  contactsUpdatedAt: z.number().int().nonnegative().default(0),
+  followingPubkeys: z.record(z.string().max(128), z.literal(true)).default({}),
+  likesByEventId: z.record(z.string().max(128), PersistedReactionState).default({}),
+  repostsByEventId: z.record(z.string().max(128), PersistedRepostState).default({}),
+  deletedRepostOriginalIds: z
+    .record(z.string().max(128), z.number().int().nonnegative())
+    .default({}),
+  optimisticFollowsByPubkey: z.record(z.string().max(128), PersistedFollowOptimistic).default({}),
+  optimisticLikesByEventId: z
+    .record(z.string().max(128), PersistedEngagementOptimistic)
+    .default({}),
+  optimisticRepostsByEventId: z
+    .record(z.string().max(128), PersistedEngagementOptimistic)
+    .default({}),
+});
 
 export const useNostrSocialStore = create<NostrSocialStore>()(
   persist(
@@ -375,18 +421,12 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
           };
         });
       },
-
-      // ---- reset ----
-
-      clearAllData: async () => {
-        storeLog.info('social.clearAll');
-        await profileStorage.removeItem('nostr-social-store');
-        set(INITIAL_STATE);
-      },
     }),
-    {
+    persistConfig({
       name: 'nostr-social-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
+      storage: createProfileScopedStorage(),
+      schema: PersistedNostrSocialStore,
+      logKey: 'nostr_social',
       partialize: (state) => ({
         contactsTags: state.contactsTags,
         contactsContent: state.contactsContent,
@@ -399,7 +439,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         optimisticLikesByEventId: state.optimisticLikesByEventId,
         optimisticRepostsByEventId: state.optimisticRepostsByEventId,
       }),
-    }
+    })
   )
 );
 
@@ -411,13 +451,4 @@ export const selectIsFollowingPubkey = (pubkey: string) => (state: NostrSocialSt
   const optimistic = state.optimisticFollowsByPubkey[pubkey];
   if (optimistic) return optimistic.value;
   return !!state.followingPubkeys[pubkey];
-};
-
-export const selectFollowingSet = (state: NostrSocialStore) => {
-  const result = new Set<string>(Object.keys(state.followingPubkeys));
-  for (const [pubkey, optimistic] of Object.entries(state.optimisticFollowsByPubkey)) {
-    if (optimistic.value) result.add(pubkey);
-    else result.delete(pubkey);
-  }
-  return result;
 };

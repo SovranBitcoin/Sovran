@@ -31,8 +31,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import type { CheckpointDotType } from './AnimatedCheckpointDot';
-import { AnimatedCheckpointDot } from './AnimatedCheckpointDot';
+import { LoadingIndicator, mapCheckpointStatusToIndicator } from '@/shared/blocks/status';
 
 type StepStatus =
   | 'pending'
@@ -147,7 +146,6 @@ const LINE_THICKNESS = 3;
 const DOT_ANIM_MS = 300;
 const LINE_ANIM_MS = 360;
 
-const DOT_TIMING = { duration: DOT_ANIM_MS, easing: Easing.out(Easing.cubic) };
 const FAST_TIMING = { duration: 200, easing: Easing.out(Easing.cubic) };
 const LINE_TIMING = { duration: LINE_ANIM_MS, easing: Easing.inOut(Easing.cubic) };
 
@@ -161,22 +159,18 @@ function timed(
   return delayMs > 0 ? withDelay(delayMs, withTiming(target, config)) : withTiming(target, config);
 }
 
-function nodeTypeToCheckpointDotType(type: NodeType): CheckpointDotType {
-  return type;
-}
-
 // ---------- Animated line ----------
 
 function AnimatedChainLine({
   filled,
   delayMs,
-  greenColor,
-  greyColor,
+  successColor,
+  mutedColor,
 }: {
   filled: boolean;
   delayMs: number;
-  greenColor: string;
-  greyColor: string;
+  successColor: string;
+  mutedColor: string;
 }) {
   const fillWidth = useSharedValue(filled ? 1 : 0);
 
@@ -189,9 +183,9 @@ function AnimatedChainLine({
   }));
 
   return (
-    <View style={[styles.line, { backgroundColor: greyColor }]}>
+    <View style={[styles.line, { backgroundColor: mutedColor }]}>
       <Animated.View
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: greenColor }, fillStyle]}
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: successColor }, fillStyle]}
       />
     </View>
   );
@@ -239,17 +233,14 @@ function AnimatedLabel({
 
 export const TransferStepChain = React.memo(
   ({ status, routingDetail, middleLabel = 'Send' }: TransferStepChainProps) => {
-    const [foreground, muted, successColor, dangerColor] = useThemeColor([
+    const [foreground, mutedColor, successColor, dangerColor, warningColor] = useThemeColor([
       'foreground',
       'muted',
       'success',
       'danger',
+      'warning',
     ] as const);
 
-    const greenColor = successColor;
-    const redColor = dangerColor;
-    const orangeColor = '#fb923c';
-    const greyColor = muted;
     const labelColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
     const dimLabelColor = useMemo(() => opacity(foreground, 0.25), [foreground]);
 
@@ -315,13 +306,13 @@ export const TransferStepChain = React.memo(
               return (
                 <React.Fragment key={node.label}>
                   <View style={styles.nodeColumn}>
-                    <AnimatedCheckpointDot
-                      type={nodeTypeToCheckpointDotType(node.type)}
-                      delayMs={nodeDelays[idx]}
-                      greenColor={greenColor}
-                      redColor={redColor}
-                      orangeColor={orangeColor}
-                      greyColor={greyColor}
+                    <LoadingIndicator
+                      size={DOT_CONTAINER}
+                      transitionDelayMs={nodeDelays[idx]}
+                      successColor={successColor}
+                      errorColor={dangerColor}
+                      revertedColor={warningColor}
+                      {...mapCheckpointStatusToIndicator(node.type)}
                     />
                     <AnimatedLabel
                       label={node.label}
@@ -337,8 +328,8 @@ export const TransferStepChain = React.memo(
                     <AnimatedChainLine
                       filled={lineFilled}
                       delayMs={lineDelays[idx]}
-                      greenColor={greenColor}
-                      greyColor={greyColor}
+                      successColor={successColor}
+                      mutedColor={mutedColor}
                     />
                   )}
                 </React.Fragment>

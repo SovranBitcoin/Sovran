@@ -1,7 +1,9 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { FlatList } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router } from 'expo-router';
+import { z } from 'zod';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -10,6 +12,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { reviewMint } from '@/shared/lib/apiClient';
+import type { MintRecommendation } from '@sovranbitcoin/schemas';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useIdentityName } from '@/shared/hooks/useIdentityName';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
@@ -17,7 +20,16 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { formatDate } from '@/shared/lib/date';
+
+const ParamsSchema = z.object({
+  mintUrl: z
+    .string()
+    .min(1)
+    .max(2048)
+    .regex(/^https?:\/\//, 'mintUrl must be http(s)'),
+});
 
 const StarRating = React.memo(function StarRating({
   score,
@@ -47,7 +59,7 @@ const ReviewItem = React.memo(function ReviewItem({
   review,
   isLast,
 }: {
-  review: any;
+  review: MintRecommendation;
   isLast: boolean;
 }) {
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -63,11 +75,7 @@ const ReviewItem = React.memo(function ReviewItem({
   const { displayName } = useIdentityName(review.pubkey);
 
   const formattedDate = review.created_at
-    ? new Date(review.created_at * 1000).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
+    ? formatDate(review.created_at * 1000, 'short-date')
     : null;
 
   return (
@@ -284,7 +292,8 @@ export function MintReviewsScreen() {
   useLifecycleLogger('MintReviewsScreen');
   const background = useThemeColor('background');
   const insets = useSafeAreaInsets();
-  const { mintUrl } = useLocalSearchParams<{ mintUrl: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'mint-flow.reviews' });
+  const mintUrl = params?.mintUrl;
 
   const [kymLoading, setKymLoading] = useState(true);
   const cached = useKYMMintStore((s) => (mintUrl ? s.getCached(mintUrl) : undefined));
@@ -292,41 +301,51 @@ export function MintReviewsScreen() {
   const kymRecommendations = cached?.recommendations;
 
   useEffect(() => {
-    if (!mintUrl) { setKymLoading(false); return; }
+    if (!mintUrl) {
+      setKymLoading(false);
+      return;
+    }
     // Show cached data immediately if available
     if (cached) setKymLoading(false);
-    // Always fetch fresh from server
-    reviewMint({ mintUrl })
+    // Always fetch fresh from server. Abort on unmount or if mintUrl changes
+    // mid-flight so a slow review fetch doesn't write into a stale screen.
+    const controller = new AbortController();
+    reviewMint({ mintUrl, signal: controller.signal })
       .then((result) => {
+        if (controller.signal.aborted) return;
         if (result.isOk() && result.value.score !== null) {
-          useKYMMintStore.getState().setCached(mintUrl, result.value.score, result.value.recommendations);
+          useKYMMintStore
+            .getState()
+            .setCached(mintUrl, result.value.score, result.value.recommendations);
         }
       })
       .catch(() => {})
-      .finally(() => setKymLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setKymLoading(false);
+      });
+    return () => controller.abort();
   }, [mintUrl]);
-
-  log.debug('mint.reviews.load', { mintUrl, kymLoading, score: kymScore });
 
   const isLoading = kymLoading;
   const reviews = useMemo(() => {
     const all = kymRecommendations || [];
     const withContent = all.filter((r) => r.comment?.trim());
     const withoutContent = all.filter((r) => !r.comment?.trim());
-    const byDate = (a: any, b: any) => (b.created_at ?? 0) - (a.created_at ?? 0);
+    const byDate = (a: MintRecommendation, b: MintRecommendation) =>
+      (b.created_at ?? 0) - (a.created_at ?? 0);
     return [...withContent.sort(byDate), ...withoutContent.sort(byDate)];
   }, [kymRecommendations]);
   const totalReviews = reviews.length;
 
   const renderItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => (
+    ({ item, index }: { item: MintRecommendation; index: number }) => (
       <ReviewItem review={item} isLast={!isLoading && index === reviews.length - 1} />
     ),
     [reviews.length, isLoading]
   );
 
   const keyExtractor = useCallback(
-    (item: any, index: number) => item.pubkey || `review-${index}`,
+    (item: MintRecommendation, index: number) => item.pubkey || `review-${index}`,
     []
   );
 
@@ -350,7 +369,7 @@ export function MintReviewsScreen() {
   const showEmptyState = !isLoading && totalReviews === 0;
 
   return (
-    <Screen name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: 'Reviews' }} />
 
       {showEmptyState ? (
@@ -388,6 +407,6 @@ export function MintReviewsScreen() {
           ]}
         />
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }

@@ -1,11 +1,12 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { StyleSheet, View, LayoutChangeEvent } from 'react-native';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { getContrastColors, FALLBACK_COLORS, useDominantColor } from './colorUtils';
+import { getContrastColors, FALLBACK_COLORS, useDominantColor } from '@/shared/lib/colorExtraction';
 import { Log } from '@/shared/lib/logger';
 
 const MIN_PERCENTAGE_FOR_AVATAR = 12;
@@ -26,7 +27,7 @@ const INNER_HIGHLIGHT_BOTTOM = ['transparent', 'rgba(0,0,0,0.03)', 'rgba(0,0,0,0
 // ============================================
 
 interface SegmentProps {
-  mintInfo: any;
+  mintInfo: GetInfoResponse | null | undefined;
   bp: number;
   totalWidth: number;
   colorIndex: number;
@@ -134,7 +135,7 @@ const AnimatedSegment: React.FC<SegmentProps> = ({
 
 interface DistributionBarProps {
   distribution: Record<string, number>;
-  mintInfoMap: Record<string, any>;
+  mintInfoMap: Record<string, GetInfoResponse | null | undefined>;
   mintUrls: string[];
 }
 

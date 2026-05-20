@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 
 import { parsePaymentError } from '@/shared/lib/popup/parsePaymentError';
-import { log } from '@/shared/lib/logger';
+import { paymentLog } from '@/shared/lib/logger';
 
-export type PaymentStatusState = 'processing' | 'delivered' | 'confirmed' | 'failed';
+type PaymentStatusState = 'processing' | 'delivered' | 'confirmed' | 'failed';
 
-export interface ActivePaymentStatus {
+interface ActivePaymentStatus {
   variant: 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
   /** quoteId (receive) or operationId (send) or receiveHistoryEntry.id (receive-ecash) */
   id: string;
@@ -32,7 +32,7 @@ type PaymentStatusStore = {
 export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   active: null,
   setActive: (payment) => {
-    log.info(
+    paymentLog.info(
       'payment.status.set_active',
       payment
         ? {
@@ -50,7 +50,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
     set((s) => {
       if (s.active?.id !== id) return s;
       if (s.active.state === 'confirmed' || s.active.state === 'failed') return s;
-      log.info('payment.status.delivered', {
+      paymentLog.info('payment.status.delivered', {
         id,
         variant: s.active.variant,
         from: s.active.state,
@@ -62,14 +62,14 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
       if (s.active?.id !== id) return s;
       if (s.active.state === 'confirmed') {
         // Already confirmed — only merge extra data (operationId, receiveEntryId)
-        log.debug('payment.status.confirmed.merge_extra', { id, hasExtra: !!extra });
+        paymentLog.debug('payment.status.confirmed.merge_extra', { id, hasExtra: !!extra });
         return extra ? { active: { ...s.active!, ...extra } } : s;
       }
       if (s.active.state === 'failed') {
-        log.debug('payment.status.confirmed.skip_failed', { id });
+        paymentLog.debug('payment.status.confirmed.skip_failed', { id });
         return s;
       }
-      log.info('payment.status.confirmed', {
+      paymentLog.info('payment.status.confirmed', {
         id,
         variant: s.active.variant,
         from: s.active.state,
@@ -83,7 +83,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
       if (s.active?.id !== id || s.active.state === 'failed' || s.active.state === 'confirmed')
         return s;
       const errorMessage = error !== undefined ? parsePaymentError(error) : undefined;
-      log.error('payment.status.failed', {
+      paymentLog.error('payment.status.failed', {
         id,
         variant: s.active.variant,
         from: s.active.state,

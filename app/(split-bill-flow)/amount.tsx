@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 
 import { AmountEntryView } from '@/shared/ui/composed/AmountEntryView';
 import { useLocalAmountEntry } from '@/shared/hooks/useLocalAmountEntry';
-import { Screen, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 
 export default function SplitBillAmountScreen() {
   useLifecycleLogger('SplitBillAmountScreen', walletLog);
@@ -41,13 +41,13 @@ export default function SplitBillAmountScreen() {
       inputMode,
     });
     router.push({
-      pathname: '/(split-bill-flow)/participants' as any,
+      pathname: '/(split-bill-flow)/participants',
       params: { totalAmount: String(effectiveSatAmount), unit: 'sat' },
     });
   }, [effectiveSatAmount, inputMode, router]);
 
   return (
-    <Screen name="SplitBillAmountScreen" style={{ flex: 1 }}>
+    <Log name="SplitBillAmountScreen" style={{ flex: 1 }}>
       <AmountEntryView
         rawInput={rawInput}
         numericValue={numericValue}
@@ -58,11 +58,11 @@ export default function SplitBillAmountScreen() {
         onNext={handleNext}
         nextDisabled={effectiveSatAmount <= 0}
         nextTestID="split-bill-amount-next"
-        transactionType="neutral"
+        transactionType="receive"
         fiatSymbol={fiatSymbol}
         secondaryDisplay={secondaryDisplay}
         onToggleMode={onToggleMode}
       />
-    </Screen>
+    </Log>
   );
 }

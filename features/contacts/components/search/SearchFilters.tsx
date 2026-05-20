@@ -1,21 +1,23 @@
 import React, { useRef } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import FilterItem from './SearchFilterItem';
-import { SEARCH_FILTERS_HEIGHT } from '../../lib/constants/styles';
 import { Log } from '@/shared/lib/logger';
 
-export const BASE_FILTERS = ['All', 'Recent', 'Requests', 'Mints'] as const;
-export const SEARCH_FILTERS = ['All', 'Recent', 'Requests', 'Mints', 'Groups'] as const;
+export const SEARCH_FILTERS_HEIGHT = 56;
+
+export type ContactsFilter = 'All' | 'Recent' | 'Requests' | 'Mints' | 'Groups';
+
+const BASE_FILTERS: readonly ContactsFilter[] = ['All', 'Recent', 'Requests', 'Mints'];
 
 type SearchFiltersProps = {
-  activeFilter: string;
-  onFilterChange: (filter: string) => void;
+  activeFilter: ContactsFilter;
+  onFilterChange: (filter: ContactsFilter) => void;
   /**
    * Filters to display, in order. Defaults to the base set.
    * The parent owns visibility rules — during search it can narrow this
    * list to only pills that have matches for the current query.
    */
-  filters?: readonly string[];
+  filters?: readonly ContactsFilter[];
 };
 
 export const SearchFilters = ({
@@ -23,14 +25,14 @@ export const SearchFilters = ({
   onFilterChange,
   filters = BASE_FILTERS,
 }: SearchFiltersProps) => {
-  const flatListRef = useRef<FlatList<string>>(null);
+  const flatListRef = useRef<FlatList<ContactsFilter>>(null);
 
   return (
     <Log name="SearchFilters">
       <View style={styles.container}>
         <FlatList
           ref={flatListRef}
-          data={filters as unknown as string[]}
+          data={filters}
           keyExtractor={(item) => item}
           renderItem={({ item, index }) => (
             <FilterItem

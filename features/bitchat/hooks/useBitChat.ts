@@ -5,28 +5,59 @@ import {
   startBLEPrivateChat,
   sendBLEPrivateMessage,
   addBLEMessageListener,
-  addBLEPrivateMessageListener,
   addBLEPeerListener,
   addBLEStateListener,
+  getBLEPeers,
   getBLEState,
-  getBLEDiagnostics,
   startNostr,
   joinGeohash,
-  leaveGeohash,
   sendGeohashMessage,
   sendGeohashPrivateMessage,
   addNostrMessageListener,
   addNostrPrivateMessageListener,
   type ChatMessage,
   type BLEMessageEvent,
-  type BLEPrivateMessageEvent,
   type NostrMessageEvent,
   type NostrPrivateMessageEvent,
 } from 'bitchat-module';
 import { useBitchatNickname } from './useBitchatNickname';
-import { log } from '@/shared/lib/logger';
+import { useBitchatDmMessagesStore, type BleDmMessage } from '../stores/bitchatDmMessages';
+import { useBitchatProfileScope } from '../lib/profileScope';
+import { bitchatLog } from '@/shared/lib/logger';
+import { mintLocalId } from '@/shared/lib/id';
 
-const bitchatLog = log.child({ module: 'bitchat' });
+const MESSAGE_BUFFER_CAP = 500;
+/**
+ * Time the JS-side watchdog gives a `sending`-state outbound DM before
+ * declaring the handshake/transport stuck. 15s comfortably covers the
+ * worst-case BLE handshake (typically < 2s) without making the user wait
+ * minutes for a peer that's simply gone.
+ */
+const BLE_DM_STUCK_TIMEOUT_MS = 15_000;
+
+function appendChatMessage(prev: ChatMessage[], msg: ChatMessage): ChatMessage[] {
+  if (prev.some((m) => m.id === msg.id)) return prev;
+  // The 'nostr' (public geohash) transport echoes our own outbound event
+  // back via the subscription. We've already shown an optimistic row keyed
+  // on a local `mintLocalId('own')` id; matching content + isOwn within a
+  // recent window means this is the relay echo and we drop it instead of
+  // duplicating the bubble. The local id never reaches the relay, so this
+  // is the only sound match key.
+  if (msg.isOwn) {
+    const localCopy = prev
+      .slice()
+      .reverse()
+      .find(
+        (m) =>
+          m.isOwn && m.content === msg.content && Math.abs(m.timestamp - msg.timestamp) < 60_000
+      );
+    if (localCopy) return prev;
+  }
+  const last = prev[prev.length - 1];
+  const inOrder = !last || msg.timestamp >= last.timestamp;
+  const next = inOrder ? [...prev, msg] : [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
+  return next.length > MESSAGE_BUFFER_CAP ? next.slice(next.length - MESSAGE_BUFFER_CAP) : next;
+}
 
 /**
  * Public channel transports: `'ble'` = BLE mesh public chat,
@@ -34,14 +65,14 @@ const bitchatLog = log.child({ module: 'bitchat' });
  * Private 1:1 transports: `'ble-dm'` = Noise-encrypted mesh DM,
  * `'nostr-dm'` = NIP-17 gift-wrapped geohash DM.
  */
-export type BitChatTransport = 'nostr' | 'ble' | 'ble-dm' | 'nostr-dm';
+type BitChatTransport = 'nostr' | 'ble' | 'ble-dm' | 'nostr-dm';
 
 /**
  * For `'ble-dm'`: pass the peer's 16-hex PeerID.
  * For `'nostr-dm'`: pass the peer's Nostr hex pubkey (from an
  * `onNostrMessage` `senderPubkey`).
  */
-export interface DMTarget {
+interface DMTarget {
   peerID: string;
   /** Optional display nickname for UI + outbound message stamp. */
   nickname?: string;
@@ -58,20 +89,28 @@ interface UseBitChatResult {
   sendMessage: (content: string) => Promise<void>;
 }
 
-const isDMTransport = (t: BitChatTransport): t is 'ble-dm' | 'nostr-dm' =>
-  t === 'ble-dm' || t === 'nostr-dm';
-
 export function useBitChat(
-  geohash: string,
+  geohash: string | undefined,
   transport: BitChatTransport = 'nostr',
   options: UseBitChatOptions = {}
 ): UseBitChatResult {
   const nickname = useBitchatNickname();
+  const profileScope = useBitchatProfileScope();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
   const dmPeerID = options.dm?.peerID;
-  const dmNickname = options.dm?.nickname;
+
+  // Reset the buffer only when the *subscription identity* changes — i.e.
+  // we're now watching a different transport / peer / geohash and the old
+  // messages no longer apply. Keying state-reset off the per-transport
+  // cleanups (the prior shape) wiped messages on any dep churn — e.g.
+  // `nickname` resolving from useBitchatNickname after first render — and,
+  // for ble-dm in particular, that loss is permanent because BLE has no
+  // replay path.
+  useEffect(() => {
+    setMessages([]);
+  }, [transport, dmPeerID, geohash]);
 
   // ===========================================================
   //  BLE public chat — transport === 'ble'
@@ -87,7 +126,9 @@ export function useBitChat(
     // on the native side and covers the case where the provider hasn't
     // fired yet (e.g. mesh-chat screen opened before the nickname was
     // available).
-    startBLE(nickname)
+    if (!profileScope) return;
+
+    startBLE(nickname, profileScope)
       .then(() => {
         const state = getBLEState();
         bitchatLog.info('bitchat.hook.ble_started', { state });
@@ -103,32 +144,29 @@ export function useBitChat(
       bitchatLog.info('bitchat.hook.ble_state', { state: event.state });
     });
     const peerSub = addBLEPeerListener((event) => {
-      bitchatLog.info('bitchat.hook.ble_peer', event);
+      // Redacted projection: peerID is a stable cross-session identifier and
+      // nickname is user-controlled (potential PII). Keep just the prefix +
+      // connection state for diagnostics.
+      bitchatLog.debug('bitchat.hook.ble_peer', {
+        peerIdPrefix: event.peerID.slice(0, 4),
+        isConnected: event.isConnected,
+      });
     });
-    const peerPoll = setInterval(() => {
-      const diag = getBLEDiagnostics();
-      bitchatLog.info('bitchat.hook.ble_diag', { ...diag });
-    }, 10_000);
 
     const sub = addBLEMessageListener((event: BLEMessageEvent) => {
       const msg: ChatMessage = {
         id: event.id,
         content: event.content,
         sender: event.sender,
-        senderPubkey: event.senderPeerID,
+        senderId: event.senderPeerID,
         timestamp: event.timestamp,
         isPrivate: event.isPrivate,
         isOwn: false,
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const next = [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-        return next.length > 500 ? next.slice(next.length - 500) : next;
-      });
+      setMessages((prev) => appendChatMessage(prev, msg));
     });
 
     return () => {
-      clearInterval(peerPoll);
       sub.remove();
       stateSub.remove();
       peerSub.remove();
@@ -136,10 +174,12 @@ export function useBitChat(
       // owns the mesh lifecycle — stopping it when a chat screen unmounts
       // would yank peers out from under the Split Bill picker and any
       // other concurrent consumer. Matches the 'ble-dm' transport below.
-      setMessages([]);
+      // Buffer reset is handled by the identity-change effect above, not
+      // here, so a transient remount or a `nickname` dep change preserves
+      // history.
       setIsConnected(false);
     };
-  }, [transport, nickname]);
+  }, [transport, nickname, profileScope]);
 
   // ===========================================================
   //  BLE DM — transport === 'ble-dm'
@@ -149,15 +189,27 @@ export function useBitChat(
   //  BLE on DM mount — a concurrent public session is fine, and upstream
   //  handshake is lazy. We DO call startBLEPrivateChat to trigger the
   //  Noise handshake eagerly so the first outbound message isn't delayed.
+  //
+  //  Message buffer is NOT owned by this hook — `BitchatBLEProvider` mounts
+  //  the app-wide `addBLEPrivateMessageListener` and pushes events into
+  //  `useBitchatDmMessagesStore` so inbound DMs aren't dropped while this
+  //  screen is closed. The store also tracks delivery-status transitions
+  //  for outbound messages.
   // ===========================================================
 
+  // Subscribe to the per-peer slice of the global DM store. The selector
+  // memoises by reference, so unrelated peer updates don't re-render.
+  const bleDmMessages = useBitchatDmMessagesStore((state) =>
+    transport === 'ble-dm' && dmPeerID ? state.byPeer[dmPeerID] : undefined
+  );
+
   useEffect(() => {
-    if (transport !== 'ble-dm' || !dmPeerID || !nickname) return;
+    if (transport !== 'ble-dm' || !dmPeerID || !nickname || !profileScope) return;
 
     bitchatLog.info('bitchat.hook.ble_dm_setup', { peerID: dmPeerID });
 
     // Reuse the mesh if it's already running (no-op); otherwise start it.
-    startBLE(nickname)
+    startBLE(nickname, profileScope)
       .then(() => setIsConnected(true))
       .catch((err) => {
         bitchatLog.error('bitchat.hook.ble_start_failed', {
@@ -173,45 +225,30 @@ export function useBitChat(
       });
     });
 
-    const sub = addBLEPrivateMessageListener((event: BLEPrivateMessageEvent) => {
-      // Only surface messages from this peer into this thread.
-      if (event.peerID !== dmPeerID) return;
-      const msg: ChatMessage = {
-        id: event.id,
-        content: event.content,
-        sender: event.sender,
-        senderPubkey: event.peerID,
-        timestamp: event.timestamp,
-        isPrivate: true,
-        isOwn: event.isOwn,
-      };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const next = [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-        return next.length > 500 ? next.slice(next.length - 500) : next;
-      });
-    });
-
     return () => {
-      sub.remove();
-      setMessages([]);
       // Deliberately DON'T stopBLE — other screens (public mesh chat,
-      // NetworkSheet) may still be using it.
+      // NetworkSheet) may still be using it. Message buffer lives in the
+      // store, so nothing per-screen to tear down.
       setIsConnected(false);
     };
-  }, [transport, dmPeerID, nickname]);
+  }, [transport, dmPeerID, nickname, profileScope]);
 
   // ===========================================================
   //  Nostr public chat — transport === 'nostr'
   // ===========================================================
 
+  // `nickname` is deliberately not in this effect's deps: the public-nostr
+  // setup path does not pass it to startNostr/joinGeohash, and it's only
+  // stamped on outbound messages by sendMessage. Including it would tear
+  // down and rebuild the subscription on every kind:0 metadata refresh,
+  // wiping the visible message buffer.
   useEffect(() => {
     if (transport !== 'nostr') return;
     if (!geohash) return;
 
     let cancelled = false;
 
-    bitchatLog.info('bitchat.hook.setup', { geohash, hasNickname: !!nickname });
+    bitchatLog.info('bitchat.hook.setup', { geohash });
 
     const sub = addNostrMessageListener((event: NostrMessageEvent) => {
       if (event.geohash !== geohash) return;
@@ -219,21 +256,18 @@ export function useBitChat(
         id: event.id,
         content: event.content,
         sender: event.sender,
-        senderPubkey: event.senderPubkey,
+        senderId: event.senderPubkey,
         timestamp: event.timestamp,
         isPrivate: false,
         isOwn: event.isOwn,
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const next = [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-        return next.length > 500 ? next.slice(next.length - 500) : next;
-      });
+      setMessages((prev) => appendChatMessage(prev, msg));
     });
 
-    (async () => {
+    void (async () => {
       try {
-        await startNostr();
+        if (!profileScope) return;
+        await startNostr(profileScope);
         if (cancelled) return;
         await joinGeohash(geohash);
         if (cancelled) return;
@@ -248,11 +282,17 @@ export function useBitChat(
     return () => {
       cancelled = true;
       sub.remove();
-      leaveGeohash().catch(() => {});
-      setMessages([]);
+      // Don't leave the geohash here — the native side keeps a single
+      // active geohash that fans out to BOTH the public chat sub
+      // (`geo-{g}`) AND the gift-wrap DM sub (`geo-dm-{g}`), so calling
+      // leaveGeohash on public-screen unmount tears down any concurrent
+      // nostr-dm thread on the same geohash. Matches the nostr-dm
+      // cleanup below. The next joinGeohash(other) replaces the active
+      // channel; full-app stop in BitChatNostrBridge.swift calls
+      // leaveGeohash() during teardown.
       setIsConnected(false);
     };
-  }, [geohash, transport, nickname]);
+  }, [geohash, transport, profileScope]);
 
   // ===========================================================
   //  Nostr DM — transport === 'nostr-dm'
@@ -281,21 +321,18 @@ export function useBitChat(
         id: event.id,
         content: event.content,
         sender: event.sender,
-        senderPubkey: event.senderPubkey,
+        senderId: event.senderPubkey,
         timestamp: event.timestamp,
         isPrivate: true,
         isOwn: event.isOwn,
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const next = [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-        return next.length > 500 ? next.slice(next.length - 500) : next;
-      });
+      setMessages((prev) => appendChatMessage(prev, msg));
     });
 
-    (async () => {
+    void (async () => {
       try {
-        await startNostr();
+        if (!profileScope) return;
+        await startNostr(profileScope);
         if (cancelled) return;
         await joinGeohash(geohash);
         if (cancelled) return;
@@ -311,10 +348,10 @@ export function useBitChat(
       cancelled = true;
       sub.remove();
       // Don't leave the geohash — other screens may be using it.
-      setMessages([]);
       setIsConnected(false);
     };
-  }, [transport, dmPeerID, geohash, nickname]);
+    // `nickname` is omitted for the same reason as the public-nostr effect.
+  }, [transport, dmPeerID, geohash, profileScope]);
 
   // ===========================================================
   //  Send
@@ -328,55 +365,161 @@ export function useBitChat(
         case 'ble': {
           // Public BLE — no own-echo, add locally.
           const ownMsg: ChatMessage = {
-            id: `own-${Date.now()}`,
+            id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
-            senderPubkey: '',
+            senderId: '',
             timestamp: Date.now(),
             isPrivate: false,
             isOwn: true,
+            isPending: true,
           };
           setMessages((prev) => [...prev, ownMsg]);
           try {
             await sendBLEMessage(content);
+            setMessages((prev) =>
+              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
+            );
           } catch (err) {
             bitchatLog.error('bitchat.hook.ble_send_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
+            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
           }
           break;
         }
 
         case 'ble-dm': {
           if (!dmPeerID) return;
-          // Noise-encrypted DM — also no own-echo, add locally.
-          const ownMsg: ChatMessage = {
-            id: `own-${Date.now()}`,
+          // Noise-encrypted DM. Add an optimistic message to the GLOBAL
+          // store (not local state) so the app-wide delivery-status
+          // listener in BitchatBLEProvider can update its
+          // status as the native side reports
+          // `sending → sent → delivered`. Empty senderId matches the ble
+          // public path so `useMessageGrouping` doesn't conflate own +
+          // peer runs.
+          const messageID = mintLocalId('ble-dm');
+          const ownMsg: BleDmMessage = {
+            id: messageID,
             content,
             sender: nickname || 'You',
-            senderPubkey: dmPeerID,
+            senderId: '',
             timestamp: Date.now(),
             isPrivate: true,
             isOwn: true,
+            isPending: true,
+            deliveryStatus: 'sending',
           };
-          setMessages((prev) => [...prev, ownMsg]);
+          const store = useBitchatDmMessagesStore.getState();
+          store.appendOutgoing(ownMsg, dmPeerID);
+
+          // Diagnostic: capture the recipient's real-time link state at send
+          // time. `isConnected` is the cached announce-state and can stay
+          // true after the BLE link silently dies; `hasDirectLink` is the
+          // authoritative flag for whether sendEncrypted can deliver without
+          // bouncing through mesh-flood + 15s spool. When users report
+          // "Network shows connected but DMs fail", this log distinguishes
+          // (a) peer genuinely reachable / handshake failing for other reason
+          // from (b) cached-state lying about reachability.
+          const peerSnapshot = getBLEPeers().find((p) => p.peerID === dmPeerID);
+          bitchatLog.info('bitchat.hook.ble_dm_link_state', {
+            peerID: dmPeerID,
+            messageID,
+            knownToNative: !!peerSnapshot,
+            isConnected: peerSnapshot?.isConnected ?? false,
+            hasDirectLink: peerSnapshot?.hasDirectLink ?? false,
+            lastSeenAgeMs: peerSnapshot ? Math.round(Date.now() - peerSnapshot.lastSeen) : null,
+          });
+
+          // Watchdog: if this message hasn't reached at least `sent` within
+          // BLE_DM_STUCK_TIMEOUT_MS, mark it `failed` so the bubble surfaces
+          // a tap-to-retry instead of spinning forever.
+          //
+          // Deliberately does NOT call `resetBLEPrivateChat` + restart the
+          // handshake on its own — upstream's `NoiseRateLimiter` enforces
+          // 10 handshakes/peer/minute (NoiseSecurityConstants.swift:31), and
+          // an auto-reset every 15s combined with the natural handshake the
+          // next send triggers can burn through that budget in < 90s. Once
+          // exhausted, BOTH sides silently reject handshake init packets at
+          // the rate-limit gate for the next minute, so EVERY following DM
+          // fails. User-initiated retry (the bubble tap) spaces attempts
+          // out enough to stay under the limit.
+          const watchdog = setTimeout(() => {
+            const current = useBitchatDmMessagesStore
+              .getState()
+              .getForPeer(dmPeerID)
+              .find((m) => m.id === messageID);
+            if (current?.deliveryStatus !== 'sending') return;
+            bitchatLog.warn('bitchat.hook.ble_dm_stuck', {
+              peerID: dmPeerID,
+              messageID,
+              timeoutMs: BLE_DM_STUCK_TIMEOUT_MS,
+            });
+            useBitchatDmMessagesStore.getState().applyDeliveryStatus({
+              messageID,
+              status: 'failed',
+              reason: 'timeout',
+            });
+          }, BLE_DM_STUCK_TIMEOUT_MS);
+
           try {
-            await sendBLEPrivateMessage(dmPeerID, content, nickname);
+            const startedAt = Date.now();
+            const returnedID = await sendBLEPrivateMessage(dmPeerID, content, nickname, messageID);
+            // Diagnostic: confirms the native AsyncFunction returned cleanly
+            // (mesh started, peerID valid, dispatch enqueued). Useful for
+            // distinguishing "native send rejected" from "native sent but no
+            // delivery-status events arrived" in log-doctor.
+            bitchatLog.info('bitchat.hook.ble_dm_send_resolved', {
+              messageID,
+              returnedID,
+              dispatchMs: Date.now() - startedAt,
+            });
+            // Delivery state transitions arrive on `onBLEDeliveryStatus`
+            // via the app-level listener — the watchdog cancels itself
+            // when applyDeliveryStatus moves the message past `sending`.
           } catch (err) {
+            clearTimeout(watchdog);
             bitchatLog.error('bitchat.hook.ble_dm_send_failed', {
               error: err instanceof Error ? err.message : String(err),
+            });
+            // Native rejected outright (e.g. mesh not started, invalid
+            // peerID). Mark the bubble failed so the user sees it.
+            store.applyDeliveryStatus({
+              messageID,
+              status: 'failed',
+              reason: err instanceof Error ? err.message : String(err),
             });
           }
           break;
         }
 
         case 'nostr': {
+          // Public geohash chat echoes our own message back via the
+          // subscription, so we add an optimistic row keyed on the local
+          // mint id; once the relay round-trip resolves we flip its pending
+          // flag. The native echo arrives later as a separate message —
+          // distinct id, harmless visual duplicate that the relay wins.
+          const ownMsg: ChatMessage = {
+            id: mintLocalId('own'),
+            content,
+            sender: nickname || 'You',
+            senderId: '',
+            timestamp: Date.now(),
+            isPrivate: false,
+            isOwn: true,
+            isPending: true,
+          };
+          setMessages((prev) => [...prev, ownMsg]);
           try {
             await sendGeohashMessage(content, nickname);
+            setMessages((prev) =>
+              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
+            );
           } catch (err) {
             bitchatLog.error('bitchat.hook.nostr_send_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
+            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
           }
           break;
         }
@@ -384,23 +527,29 @@ export function useBitChat(
         case 'nostr-dm': {
           if (!dmPeerID) return;
           // NIP-17 gift-wrap DMs don't echo back to the sender via the
-          // subscription, so add locally.
+          // subscription, so add locally. Empty senderId for the same
+          // grouping reason as 'ble-dm' above.
           const ownMsg: ChatMessage = {
-            id: `own-${Date.now()}`,
+            id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
-            senderPubkey: dmPeerID,
+            senderId: '',
             timestamp: Date.now(),
             isPrivate: true,
             isOwn: true,
+            isPending: true,
           };
           setMessages((prev) => [...prev, ownMsg]);
           try {
             await sendGeohashPrivateMessage(dmPeerID, content);
+            setMessages((prev) =>
+              prev.map((m) => (m.id === ownMsg.id ? { ...m, isPending: false } : m))
+            );
           } catch (err) {
             bitchatLog.error('bitchat.hook.nostr_dm_send_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
+            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
           }
           break;
         }
@@ -409,9 +558,11 @@ export function useBitChat(
     [transport, nickname, dmPeerID]
   );
 
-  // Silence the unused-import warning in `isDMTransport` — it's exported for
-  // consumers of the hook that want to branch on transport type.
-  void isDMTransport;
+  // For `ble-dm` the source of truth is the global store (populated by
+  // BitchatBLEProvider's listener + this hook's send path). All other
+  // transports use the local `messages` buffer.
+  const effectiveMessages: ChatMessage[] =
+    transport === 'ble-dm' ? (bleDmMessages ?? []) : messages;
 
-  return { messages, isConnected, sendMessage };
+  return { messages: effectiveMessages, isConnected, sendMessage };
 }

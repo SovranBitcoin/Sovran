@@ -5,13 +5,14 @@
  * are handled by the screen-action system.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useWindowDimensions } from 'react-native';
 
 import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { MintSelector } from '@/features/wallet';
 import { formatAmount } from '@/shared/lib/currency';
@@ -37,20 +38,21 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
+const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
+
 interface MintQuoteScreenProps {
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
-  onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
 
 export function MintQuoteScreen({
   mintHistoryEntry,
   extraButtons = [],
-  onMintSelected,
   onRequestMintList,
 }: MintQuoteScreenProps) {
   useLifecycleLogger('MintQuoteScreen');
+  const { width: windowWidth } = useWindowDimensions();
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'mintQuote',
     mintHistoryEntry
@@ -58,22 +60,30 @@ export function MintQuoteScreen({
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
+  useEffect(() => {
+    if (error) paymentLog.warn('receive.mint_quote.error', { error });
+  }, [error]);
+
+  const isPaid = entry?.state === 'ISSUED' || entry?.state === 'PAID';
+  const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
+
+  useEffect(() => {
+    if (!entry) return;
+    paymentLog.debug('receive.mint_quote.render', {
+      state: entry.state,
+      isPaid,
+      amount: entry.amount,
+      unit: entry.unit,
+    });
+  }, [entry, isPaid]);
+
   if (error) {
-    log.warn('receive.mint_quote.error', { error });
     return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
   }
 
   if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
-
-  const isPaid = entry.state === 'ISSUED' || entry.state === 'PAID';
-  log.debug('receive.mint_quote.render', {
-    state: entry.state,
-    isPaid,
-    amount: entry.amount,
-    unit: entry.unit,
-  });
 
   const bottomButtons = (
     <BottomButtons>
@@ -84,20 +94,14 @@ export function MintQuoteScreen({
               text: 'Copy',
               icon: 'lets-icons:copy',
               variant: 'primary',
-              onPress: async (close: any) => {
-                await actions.copy.execute();
-                close({});
-              },
+              onPress: () => actions.copy.execute(),
               condition: actions.copy.available,
             },
             {
               text: 'Share',
               icon: 'ri:share-fill',
               variant: 'secondary',
-              onPress: async (close: any) => {
-                close({});
-                await actions.share.execute();
-              },
+              onPress: () => actions.share.execute(),
               condition: actions.share.available,
             },
             ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
@@ -110,22 +114,22 @@ export function MintQuoteScreen({
   return (
     <Screen name="MintQuoteScreen" contentPadding={0} footer={bottomButtons}>
       {/*
-         * Id marker wraps the screen body — lets `phone test` capture
-         * the entry id of the mint currently being viewed via
-         * `capture #mint-quote-id-* suffix`. Without this, tests have
-         * to guess which row on the wallet home corresponds to the one
-         * they just created, and `findByTestIDPrefix` returns the
-         * visually topmost match — which on the wallet home is a
-         * pending mint, not the newly confirmed one (home renders
-         * Pending → Confirmed top-to-bottom). Wrapping the VStack
-         * (rather than a zero-sized sibling) guarantees a non-zero rect
-         * so the node appears in the iOS AX tree. Snapshots comparing
-         * this screen to itself within the same run see the same id on
-         * both sides so snapshot equality holds.
-         */}
+       * Id marker wraps the screen body — lets `phone test` capture
+       * the entry id of the mint currently being viewed via
+       * `capture #mint-quote-id-* suffix`. Without this, tests have
+       * to guess which row on the wallet home corresponds to the one
+       * they just created, and `findByTestIDPrefix` returns the
+       * visually topmost match — which on the wallet home is a
+       * pending mint, not the newly confirmed one (home renders
+       * Pending → Confirmed top-to-bottom). Wrapping the VStack
+       * (rather than a zero-sized sibling) guarantees a non-zero rect
+       * so the node appears in the iOS AX tree. Snapshots comparing
+       * this screen to itself within the same run see the same id on
+       * both sides so snapshot equality holds.
+       */}
       <View testID={`mint-quote-id-${entry.id}`}>
         <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} />
+          <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
           {!isPaid && (
             <PaymentInfo
               data={[{ name: 'Lightning', value: entry.paymentRequest }]}
@@ -138,11 +142,10 @@ export function MintQuoteScreen({
 
           {!isPaid ? (
             <MintSelector
-              width={280}
+              width={quoteCardWidth}
               unit={entry.unit}
               selectedMintUrl={mintUrl}
-              onMintSelected={onMintSelected ?? (() => {})}
-              onRequestMintList={onRequestMintList ?? (() => {})}
+              onRequestMintList={onRequestMintList}
             />
           ) : mintInfo ? (
             <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
@@ -159,9 +162,7 @@ export function MintQuoteScreen({
               bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
               bip321.optionKinds && {
                 title: 'Payment Methods',
-                value: (
-                  <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />
-                ),
+                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
               },
               { title: 'Date', value: entry.createdAt.datetime },
               {

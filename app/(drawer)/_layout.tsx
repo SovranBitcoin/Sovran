@@ -1,265 +1,98 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
   Pressable as GesturePressable,
 } from 'react-native-gesture-handler';
-import { StyleSheet, ScrollView, Dimensions } from 'react-native';
-import { router, usePathname } from 'expo-router';
-import { DrawerContentComponentProps } from '@react-navigation/drawer';
-import opacity from 'hex-color-opacity';
+import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { router, useSegments } from 'expo-router';
+import { DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
+import { getCornerRadiusSync } from 'expo-screen-corner-radius';
 
 import Icon from 'assets/icons';
-import {
-  AnimatedBackgroundView,
-  ScrollableGradientOverlay,
-} from '@/shared/ui/composed/BackgroundView';
-import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
-import { BackgroundProvider, useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { resolveIdentityName } from '@/shared/lib/identity';
-import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import {
-  switchToExistingProfile,
-  createAndSwitchProfile,
-  switchToImportedProfile,
-} from '@/shared/lib/profile/profileSessionOrchestrator';
-import {
-  keyImportFailedPopup,
-  profileSwitcherPopup,
-  walletStillLoadingPopup,
-  type ProfileSwitcherAction,
-} from '@/shared/lib/popup';
-import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
+import { DrawerProfileChrome } from '@/shared/blocks/DrawerProfileChrome';
+import { alpha, iconSize, radius, spacing } from '@/shared/styles/tokens';
+import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 320);
+type MenuRoute =
+  | '/(drawer)/(tabs)/feed'
+  | '/(drawer)/(tabs)/index'
+  | '/(drawer)/(tabs)/contacts'
+  | '/(drawer)/(tabs)/ai'
+  | '/(settings-flow)';
 
-const DRAWER_CLOSE_SETTLE_MS = 300;
-
-function waitForDrawerClose(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, DRAWER_CLOSE_SETTLE_MS));
-}
+type MenuIconPair = {
+  default: string;
+  selected: string;
+};
 
 type MenuItem = {
-  icon: string;
+  icon: MenuIconPair;
   label: string;
-  route: string;
-  drawerLabel: string;
+  route: MenuRoute;
+  /** Segment-prefix that, when matched against `useSegments()`, marks this menu item active. */
+  activeSegments: readonly string[];
 };
 
 const MENU_ITEMS: MenuItem[] = [
   {
-    icon: 'mingcute:home-4-fill',
+    icon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
     label: 'Feed',
-    route: '(drawer)/(tabs)/feed',
-    drawerLabel: 'feed',
+    route: '/(drawer)/(tabs)/feed',
+    activeSegments: ['(drawer)', '(tabs)', 'feed'],
   },
   {
-    icon: 'fluent:wallet-20-filled',
+    icon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
     label: 'Wallet',
-    route: '(drawer)/(tabs)',
-    drawerLabel: 'wallet',
+    route: '/(drawer)/(tabs)/index',
+    activeSegments: ['(drawer)', '(tabs)', 'index'],
   },
   {
-    icon: 'ph:user-bold',
+    icon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
     label: 'Contacts',
-    route: '(drawer)/(tabs)/contacts',
-    drawerLabel: 'contacts',
+    route: '/(drawer)/(tabs)/contacts',
+    activeSegments: ['(drawer)', '(tabs)', 'contacts'],
   },
   {
-    icon: 'material-symbols:settings-rounded',
+    icon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
+    label: 'AI',
+    route: '/(drawer)/(tabs)/ai',
+    activeSegments: ['(drawer)', '(tabs)', 'ai'],
+  },
+  {
+    icon: {
+      default: 'material-symbols:settings-rounded',
+      selected: 'material-symbols:settings-rounded',
+    },
     label: 'Settings',
-    route: '(settings-flow)',
-    drawerLabel: 'settings',
+    route: '/(settings-flow)',
+    activeSegments: ['(settings-flow)'],
   },
 ];
 
-function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
-  const [foreground, defaultColor, shade400] = useThemeColor([
-    'foreground',
-    'default',
-    'shade-400',
-  ] as const);
-  const profiles = useProfileStore((s) => s.profiles);
-  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
-  const switchingRef = useRef(false);
-
-  const executeProfileAction = useCallback(
-    async (action: ProfileSwitcherAction) => {
-      if (switchingRef.current) return;
-      switchingRef.current = true;
-
-      closeDrawer();
-      await waitForDrawerClose();
-
-      switch (action.type) {
-        case 'switch': {
-          if (action.accountIndex === activeAccountIndex) {
-            switchingRef.current = false;
-            return;
-          }
-          const switched = await switchToExistingProfile({ accountIndex: action.accountIndex });
-          if (!switched) {
-            switchingRef.current = false;
-            walletStillLoadingPopup();
-          }
-          break;
-        }
-        case 'create': {
-          const created = await createAndSwitchProfile();
-          if (!created) switchingRef.current = false;
-          break;
-        }
-        case 'import': {
-          if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
-            keyImportFailedPopup({ text: 'This identity already exists as a profile.' });
-            return;
-          }
-
-          const stored = await storeImportedNsec(action.pubkeyHex, action.nsec);
-          if (!stored) {
-            keyImportFailedPopup({ text: 'Failed to store nsec securely.' });
-            return;
-          }
-
-          if (!useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
-            useProfileStore
-              .getState()
-              .addProfile(action.accountIndex, action.pubkeyHex, 'imported');
-          }
-
-          const imported = await switchToImportedProfile({ accountIndex: action.accountIndex });
-          if (!imported) {
-            switchingRef.current = false;
-            walletStillLoadingPopup();
-          }
-          break;
-        }
-      }
-    },
-    [closeDrawer, activeAccountIndex]
-  );
-
-  const handleOpenProfileSheet = useCallback(() => {
-    profileSwitcherPopup({
-      onRequestAction: executeProfileAction,
-    });
-  }, [executeProfileAction]);
-
-  if (profiles.length === 0) return null;
-
-  return (
-    <HStack align="center" spacing={4} style={styles.profileSelector}>
-      {profiles
-        .filter((profile: ProfileEntry) => profile.accountIndex !== activeAccountIndex)
-        .sort((a, b) => (a.source === 'imported' ? 0 : 1) - (b.source === 'imported' ? 0 : 1))
-        .slice(0, 3)
-        .map((profile: ProfileEntry) => {
-          const isActive = profile.accountIndex === activeAccountIndex;
-          return (
-            <TouchableOpacity
-              key={profile.accountIndex}
-              onPress={() => {
-                if (profile.accountIndex === activeAccountIndex) return;
-                void executeProfileAction({
-                  type: 'switch',
-                  accountIndex: profile.accountIndex,
-                });
-              }}
-              style={[
-                styles.profileAvatarButton,
-                isActive && {
-                  borderColor: shade400,
-                  borderWidth: 2,
-                },
-              ]}>
-              <Avatar
-                state={profile.cachedPicture ? 'image' : 'fallback'}
-                seed={profile.pubkey}
-                picture={profile.cachedPicture}
-                name={resolveIdentityName({
-                  pubkey: profile.pubkey,
-                  overrideName: profile.cachedDisplayName,
-                })}
-                size={30}
-              />
-            </TouchableOpacity>
-          );
-        })}
-      <TouchableOpacity
-        onPress={handleOpenProfileSheet}
-        style={[
-          styles.profileAvatarButton,
-          {
-            borderColor: defaultColor,
-            borderWidth: 2,
-            backgroundColor: defaultColor,
-          },
-        ]}>
-        <Icon name="tabler:dots" size={24} color={foreground} />
-      </TouchableOpacity>
-    </HStack>
-  );
-}
-
-function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
-  const { keys: nostrKeys } = useNostrKeysContext();
-  const foreground = useThemeColor('foreground');
-  const insets = useSafeAreaInsets();
-  const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
-  const { isOffline } = useOfflineStatus();
-
-  const handlePress = useCallback(() => {
-    if (nostrKeys?.pubkey) {
-      closeDrawer();
-      router.navigate({
-        pathname: '/(user-flow)/profile' as any,
-        params: {
-          pubkey: nostrKeys.pubkey,
-        },
-      });
+/**
+ * Match the current navigation segments against a menu item's prefix. The
+ * Wallet tab is the (tabs) default, so an empty/short tabs prefix also
+ * activates it — covers `/(drawer)/(tabs)` before the initial route resolves.
+ */
+function segmentsMatch(segments: string[], prefix: readonly string[]): boolean {
+  if (prefix[0] === '(drawer)' && prefix[1] === '(tabs)' && prefix[2] === 'index') {
+    if (
+      segments[0] === '(drawer)' &&
+      segments[1] === '(tabs)' &&
+      (segments[2] === undefined || segments[2] === 'index')
+    ) {
+      return true;
     }
-  }, [nostrKeys, closeDrawer]);
-
-  return (
-    <View style={[styles.gradientContainer, { paddingTop: isOffline ? 0 : insets.top }]}>
-      <View style={styles.headerContent}>
-        <ProfileSelector closeDrawer={closeDrawer} />
-        <TouchableOpacity style={styles.profileTouchable} onPress={handlePress}>
-          {nostrKeys?.pubkey && (
-            <VStack align="center" spacing={16}>
-              <Avatar
-                state={picture ? 'image' : 'fallback'}
-                seed={nostrKeys?.pubkey}
-                picture={picture}
-                name={displayName}
-                size={64}
-              />
-              <VStack align="center" spacing={8}>
-                <Text bold size={20} style={{ textAlign: 'center', color: foreground }}>
-                  {displayName}
-                </Text>
-                <Icon size={42} name="stash:qr-code" color={foreground} />
-              </VStack>
-            </VStack>
-          )}
-        </TouchableOpacity>
-      </View>
-      <Spacer size={58} />
-    </View>
-  );
+  }
+  return prefix.every((seg, i) => segments[i] === seg);
 }
 
 function MenuButton({
@@ -268,21 +101,25 @@ function MenuButton({
   onPress,
   isActive,
 }: {
-  icon: string;
+  icon: MenuIconPair;
   label: string;
   onPress: () => void;
   isActive: boolean;
 }) {
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const foreground = useThemeColor('foreground');
 
   return (
     <GesturePressable
       disabled={isActive}
       onPress={onPress}
-      style={({ pressed }) => [styles.menuButton, pressed && { opacity: 0.6 }]}>
-      <HStack align="center" spacing={12} style={styles.menuButtonContent}>
-        <Icon name={icon} color={isActive ? foreground : opacity(foreground, 0.5)} size={24} />
-        <Text size={18} bold style={{ color: isActive ? foreground : opacity(foreground, 0.5) }}>
+      style={({ pressed }) => [styles.menuButton, pressed && { opacity: alpha.strong }]}>
+      <HStack align="center" spacing={spacing.md}>
+        <Icon
+          name={isActive ? icon.selected : icon.default}
+          color={foreground}
+          size={iconSize.xl}
+        />
+        <Text size={18} bold style={{ color: foreground }}>
           {label}
         </Text>
       </HStack>
@@ -291,50 +128,40 @@ function MenuButton({
 }
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const pathname = usePathname();
+  const segments = useSegments();
   const navInProgressRef = useRef(false);
 
+  // Fire a single Light-impact haptic the moment the drawer commits to a
+  // state change — covers gesture release that crosses the open/close
+  // threshold, the hamburger button, and overlay taps, since all three
+  // converge on the same navigation state.
+  const drawerStatus = useDrawerStatus();
+  const prevStatusRef = useRef(drawerStatus);
+  useEffect(() => {
+    if (prevStatusRef.current !== drawerStatus) {
+      void EnhancedHaptics.buttonHaptic();
+    }
+    prevStatusRef.current = drawerStatus;
+  }, [drawerStatus]);
+
   const isRouteActive = useCallback(
-    (route: string) => {
-      if (route === '(drawer)/(tabs)' || route === '(drawer)/(tabs)/index') {
-        return (
-          pathname === '/' ||
-          pathname === '/index' ||
-          pathname === '/(drawer)/(tabs)' ||
-          pathname === '/(drawer)/(tabs)/' ||
-          pathname.includes('(tabs)/index') ||
-          (pathname.includes('(tabs)') &&
-            !pathname.includes('ai') &&
-            !pathname.includes('feed') &&
-            !pathname.includes('contacts'))
-        );
-      }
-      if (route.includes('(tabs)/feed') && pathname.includes('feed')) {
-        return true;
-      }
-      if (route.includes('(tabs)/contacts') && pathname.includes('contacts')) {
-        return true;
-      }
-      if (route.includes('(tabs)/ai') && pathname.includes('/ai')) {
-        return true;
-      }
-      if (route.includes('settings') && pathname.includes('settings')) {
-        return true;
-      }
-      return false;
+    (route: MenuRoute) => {
+      const item = MENU_ITEMS.find((m) => m.route === route);
+      if (!item) return false;
+      return segmentsMatch(segments as string[], item.activeSegments);
     },
-    [pathname]
+    [segments]
   );
 
   const handleNavigation = useCallback(
-    (route: string) => {
+    (route: MenuRoute) => {
       if (navInProgressRef.current) return;
       if (isRouteActive(route)) {
         props.navigation.closeDrawer();
         return;
       }
       navInProgressRef.current = true;
-      router.navigate(`/${route}` as any);
+      router.navigate(route);
       props.navigation.closeDrawer();
       setTimeout(() => {
         navInProgressRef.current = false;
@@ -343,92 +170,67 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
     [isRouteActive, props.navigation]
   );
 
-  return (
-    <BackgroundProvider>
-      <DrawerContentInner
-        closeDrawer={() => props.navigation.closeDrawer()}
-        isRouteActive={isRouteActive}
-        handleNavigation={handleNavigation}
-      />
-    </BackgroundProvider>
-  );
-}
-
-/** Inner component so useBackgroundContext can read the provider above. */
-function DrawerContentInner({
-  closeDrawer,
-  isRouteActive,
-  handleNavigation,
-}: {
-  closeDrawer: () => void;
-  isRouteActive: (route: string) => boolean;
-  handleNavigation: (route: string) => void;
-}) {
-  const { setConfig } = useBackgroundContext();
-  const muted = useThemeColor('muted');
-  const [contentHeight, setContentHeight] = useState(0);
-
-  useEffect(() => {
-    setConfig({ blurMode: 'full' });
-  }, [setConfig]);
-
-  const onContentSizeChange = useCallback((_width: number, height: number) => {
-    setContentHeight(height);
-  }, []);
+  const surface = useThemeColor('surface');
+  const closeDrawer = useCallback(() => props.navigation.closeDrawer(), [props.navigation]);
 
   return (
-    <AnimatedBackgroundView>
-      <ScrollableGradientOverlay contentHeight={contentHeight} />
-      <View style={[styles.drawerCardBorder, { borderColor: opacity(muted, 0.3) }]}>
-        <View style={styles.drawerCardClip}>
-          <BlurCardFrame accentColor={muted} variant="right">
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              style={{ flex: 1, zIndex: 1 }}
-              contentContainerStyle={styles.scrollContent}
-              onContentSizeChange={onContentSizeChange}>
-              <ProfileHeader closeDrawer={closeDrawer} />
-              <VStack spacing={0} style={{ marginTop: -16 }}>
-                {MENU_ITEMS.map((item, index) => (
-                  <MenuButton
-                    key={index}
-                    icon={item.icon}
-                    label={item.label}
-                    onPress={() => handleNavigation(item.route)}
-                    isActive={isRouteActive(item.route)}
-                  />
-                ))}
-              </VStack>
-              <Spacer size={48} />
-            </ScrollView>
-          </BlurCardFrame>
-        </View>
-      </View>
-    </AnimatedBackgroundView>
+    <View style={{ flex: 1, backgroundColor: surface }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}>
+        <DrawerProfileChrome closeDrawer={closeDrawer} />
+        <VStack spacing={0}>
+          {MENU_ITEMS.map((item, index) => (
+            <MenuButton
+              key={index}
+              icon={item.icon}
+              label={item.label}
+              onPress={() => handleNavigation(item.route)}
+              isActive={isRouteActive(item.route)}
+            />
+          ))}
+        </VStack>
+        <Spacer size={spacing['4xl']} />
+      </ScrollView>
+    </View>
   );
 }
 
 export default function DrawerLayout() {
+  const { width } = useWindowDimensions();
+  const drawerWidth = Math.min(width * 0.82, 320);
+  const [surface, border] = useThemeColor(['surface', 'separator-secondary'] as const);
+  const overlayRgb = useColorScheme() === 'light' ? '255,255,255' : '0,0,0';
+  // Match the device's hardware screen corner radius so the scene's rounded
+  // TL/BL hug the physical display curve. Falls back to a token-driven radius
+  // when null (Android <12, or devices without rounded displays).
+  const deviceRadius = getCornerRadiusSync() ?? radius['2xl'];
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: surface }]}>
       <Drawer
         screenOptions={{
           headerShown: false,
           drawerType: 'slide',
           drawerStyle: {
-            width: DRAWER_WIDTH,
+            width: drawerWidth,
             backgroundColor: 'transparent',
-            borderTopRightRadius: 20,
-            borderBottomRightRadius: 20,
             overflow: 'hidden',
           },
           sceneStyle: {
-            borderTopLeftRadius: 20,
-            borderBottomLeftRadius: 20,
+            borderTopLeftRadius: deviceRadius,
+            borderBottomLeftRadius: deviceRadius,
+            borderCurve: 'continuous',
             overflow: 'hidden',
           },
-          overlayColor: 'rgba(0,0,0,0.6)',
-          swipeEdgeWidth: 40,
+          overlayColor: `rgba(${overlayRgb},${alpha.strong})`,
+          overlayStyle: {
+            borderTopLeftRadius: deviceRadius,
+            borderBottomLeftRadius: deviceRadius,
+            borderCurve: 'continuous',
+            boxShadow: `inset ${StyleSheet.hairlineWidth}px 0 0 0 ${border}`,
+          },
+          swipeEdgeWidth: 128,
           swipeMinDistance: 10,
         }}
         drawerContent={(props) => <CustomDrawerContent {...props} />}>
@@ -448,56 +250,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  gradientContainer: {
-    padding: 16,
-  },
-  headerContent: {
-    backgroundColor: 'transparent',
-  },
-  profileSelector: {
-    marginBottom: 16,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    borderRadius: 20,
-    justifyContent: 'flex-end',
-  },
-  profileAvatarButton: {
-    borderRadius: 18,
-    padding: 2,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  moreProfilesButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileTouchable: {
-    alignItems: 'center',
-  },
-  drawerCardBorder: {
-    flex: 1,
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-  },
-  drawerCardClip: {
-    flex: 1,
-    borderTopRightRadius: 19,
-    borderBottomRightRadius: 19,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-  },
   menuButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-  },
-  menuButtonContent: {
-    // intentionally empty — kept for the HStack wrapper
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing['2xl'],
   },
   scrollContent: {
     flexGrow: 1,

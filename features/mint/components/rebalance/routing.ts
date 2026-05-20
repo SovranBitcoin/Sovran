@@ -18,7 +18,7 @@ import type { SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
  * - We keep it cheap to compute because it runs after a failed payment.
  */
 
-export type EdgeStats = {
+type EdgeStats = {
   /** Number of successful swaps on this edge. */
   okCount: number;
   /** Total number of swaps on this edge (including failures). */
@@ -33,7 +33,7 @@ export type EdgeStats = {
   avgTimeTaken: number;
 };
 
-export type SwapGraph = Map<string, Map<string, EdgeStats>>;
+type SwapGraph = Map<string, Map<string, EdgeStats>>;
 
 function parseTs(createdAt: string): number {
   const ts = Date.parse(createdAt);
@@ -155,7 +155,7 @@ function scorePath(edges: EdgeStats[], trustedBonus = 0): number {
   return totalScore;
 }
 
-export interface RoutingResult {
+interface RoutingResult {
   /** Ordered path of mint URLs from source to destination (inclusive). */
   path: string[] | null;
   reason: string;

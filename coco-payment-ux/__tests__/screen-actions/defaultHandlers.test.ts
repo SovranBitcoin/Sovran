@@ -44,6 +44,7 @@ function createMockConfig(overrides?: {
   operations?: Partial<MachineOperations>;
   machine?: Partial<PaymentMachine>;
   navigation?: Partial<NavigationCallbacks>;
+  getOffline?: () => boolean;
 }) {
   const notifications: { event: string; args: unknown[] }[] = [];
   const ops: Partial<MachineOperations> = {
@@ -91,6 +92,7 @@ function createMockConfig(overrides?: {
   const config: DefaultScreenActionHandlersConfig = {
     getMachine: () => machine as PaymentMachine,
     getOperations: () => ops,
+    getOffline: overrides?.getOffline,
     notify: (event: string, ...args: unknown[]) => {
       notifications.push({ event, args });
     },
@@ -208,6 +210,31 @@ describe('sendToken default handlers', () => {
       });
     });
 
+    it('blocks cancellation while offline', async () => {
+      const { handlers, ops, notifications } = createMockConfig({
+        getOffline: () => true,
+      });
+      const { mgr } = createManager('sendToken', handlers, {
+        type: 'send',
+        operationId: 'op-offline',
+        token: null,
+      });
+
+      await mgr.execute('cancel');
+
+      expect(ops.rollbackSend).not.toHaveBeenCalled();
+      expect(notifications).toContainEqual({
+        event: 'onSendCancelFailed',
+        args: [
+          {
+            operationId: 'op-offline',
+            message: 'Cancel transaction is not possible while offline.',
+            offline: true,
+          },
+        ],
+      });
+    });
+
     it('notifies onSendCancelFailed on error', async () => {
       const { handlers, notifications } = createMockConfig({
         operations: {
@@ -227,7 +254,7 @@ describe('sendToken default handlers', () => {
 
       expect(notifications).toContainEqual({
         event: 'onSendCancelFailed',
-        args: [{ operationId: 'op-fail', message: 'Cannot rollback' }],
+        args: [{ operationId: 'op-fail', message: 'Cannot rollback', mintUnreachable: false }],
       });
     });
   });
@@ -691,6 +718,133 @@ describe('amountEntry default handlers', () => {
       await mgr.execute('next');
       expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
         destination: 'sendEcash',
+        meltTarget: undefined,
+        recipientPubkey: undefined,
+        amountEntryDisplay: {
+          inputMode: 'sat',
+          rawInput: '',
+          fiatCurrency: null,
+          fiatSymbol: null,
+          btcPrice: 0,
+          displayFiat: null,
+          displaySats: 100,
+          autoOptimized: false,
+        },
+      });
+    });
+
+    it('carries amount-entry display metadata to machine.enterAmount', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        effectiveSatAmount: 20,
+        selectedMintUrl: MINT1,
+        destination: 'sendEcash',
+        inputMode: 'fiat',
+        rawInput: '0.01',
+        fiatCurrency: 'usd',
+        fiatSymbol: '$',
+        btcPrice: 47_619,
+        displayFiat: 0.01,
+        displaySats: 20,
+        autoOptimized: true,
+      });
+
+      await mgr.execute('next');
+      expect(machine.enterAmount).toHaveBeenCalledWith(20, MINT1, {
+        destination: 'sendEcash',
+        meltTarget: undefined,
+        recipientPubkey: undefined,
+        amountEntryDisplay: {
+          inputMode: 'fiat',
+          rawInput: '0.01',
+          fiatCurrency: 'usd',
+          fiatSymbol: '$',
+          btcPrice: 47_619,
+          displayFiat: 0.01,
+          displaySats: 20,
+          autoOptimized: true,
+        },
+      });
+    });
+
+    it('forwards recipientPubkey from the entry to machine.enterAmount', async () => {
+      const { handlers, machine } = createMockConfig();
+      const recipientPubkey = 'a'.repeat(64);
+      const { mgr } = createManager('amountEntry', handlers, {
+        effectiveSatAmount: 100,
+        selectedMintUrl: MINT1,
+        destination: 'sendEcash',
+        recipientPubkey,
+      });
+
+      await mgr.execute('next');
+      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+        destination: 'sendEcash',
+        meltTarget: undefined,
+        recipientPubkey,
+        amountEntryDisplay: expect.any(Object),
+      });
+    });
+
+    it('prioritizes per-call recipient identity over entry identity', async () => {
+      const { handlers, machine } = createMockConfig();
+      const entryProfile = {
+        displayName: 'Entry Alice',
+        avatarUrl: null,
+        nip05: 'entry@example.com',
+      };
+      const ctxProfile = {
+        displayName: 'Fresh Alice',
+        avatarUrl: 'https://example.com/alice.png',
+        nip05: 'fresh@example.com',
+      };
+      const { mgr } = createManager('amountEntry', handlers, {
+        effectiveSatAmount: 100,
+        selectedMintUrl: MINT1,
+        destination: 'sendEcash',
+        recipientPubkey: 'a'.repeat(64),
+        recipientProfile: entryProfile,
+      });
+
+      await mgr.execute('next', {
+        recipientPubkey: 'b'.repeat(64),
+        recipientProfile: ctxProfile,
+      });
+
+      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+        destination: 'sendEcash',
+        meltTarget: undefined,
+        recipientPubkey: 'b'.repeat(64),
+        recipientProfile: ctxProfile,
+        amountEntryDisplay: expect.any(Object),
+      });
+    });
+
+    it('switches send-money to lightning with recipient identity intact', async () => {
+      const { handlers, machine } = createMockConfig();
+      const recipientProfile = {
+        displayName: 'Alice',
+        avatarUrl: 'https://example.com/alice.png',
+        nip05: 'alice@example.com',
+      };
+      const recipientPubkey = 'a'.repeat(64);
+      const { mgr } = createManager('amountEntry', handlers, {
+        effectiveSatAmount: 100,
+        selectedMintUrl: MINT1,
+        destination: 'sendEcash',
+        meltTarget: 'alice@example.com',
+        recipientPubkey,
+        recipientProfile,
+      });
+
+      await mgr.execute('next', { variantId: 'lightning' });
+
+      expect(machine.enterAmount).toHaveBeenCalledWith(100, MINT1, {
+        destination: 'meltQuote',
+        meltTarget: 'alice@example.com',
+        recipientPubkey,
+        recipientProfile,
+        amountEntryDisplay: expect.any(Object),
       });
     });
 

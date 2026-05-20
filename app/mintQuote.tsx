@@ -1,22 +1,12 @@
 /**
- * @fileoverview Standalone mintQuote route wrapper
- *
- * This is the standalone version used for direct navigation and deep linking.
+ * @fileoverview Standalone mintQuote route — used for direct
+ * navigation, deep links, and PaymentStatusToast re-entry. The route
+ * body and zod schema live on `MintQuoteRoute`. Mint-pill callbacks
+ * stay undefined here: this route renders the entry read-only.
  */
 
-import React from 'react';
-import { useLocalSearchParams } from 'expo-router';
-import type { MintHistoryEntry } from '@cashu/coco-core';
-import { MintQuoteScreen } from '@/features/receive';
+import { MintQuoteRoute } from '@/features/receive';
 
-function ModalScreen() {
-  const { mintHistoryEntry: mintHistoryEntryString } = useLocalSearchParams<{
-    mintHistoryEntry: string;
-  }>();
-
-  const mintHistoryEntry = JSON.parse(mintHistoryEntryString) as MintHistoryEntry;
-
-  return <MintQuoteScreen mintHistoryEntry={mintHistoryEntry} />;
+export default function ModalScreen() {
+  return <MintQuoteRoute where="app.mintQuote" />;
 }
-
-export default ModalScreen;

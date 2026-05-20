@@ -1,26 +1,12 @@
 /**
- * @fileoverview Transactions flow receiveToken route wrapper
- *
- * Part of the (transactions-flow) modal group - displays with back button.
- * Param parsing and error handling is done by ReceiveTokenScreen.
+ * @fileoverview Transactions-flow receiveToken route — re-entry from
+ * the transactions list. The route body and zod schema live on
+ * `ReceiveTokenRoute`. `Stack.Screen` title comes from
+ * `(transactions-flow)/_layout.tsx`.
  */
 
-import React from 'react';
-import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { ReceiveTokenScreen } from '@/features/receive';
+import { ReceiveTokenRoute } from '@/features/receive';
 
-function ModalScreen() {
-  const { receiveHistoryEntry } = useLocalSearchParams<{ receiveHistoryEntry: string }>();
-
-  return (
-    <>
-      <Stack.Screen options={{ title: 'Receive Ecash' }} />
-      <ReceiveTokenScreen
-        receiveHistoryEntry={receiveHistoryEntry}
-        onNavigateBack={() => router.back()}
-      />
-    </>
-  );
+export default function ModalScreen() {
+  return <ReceiveTokenRoute where="transactions-flow.receiveToken" />;
 }
-
-export default ModalScreen;

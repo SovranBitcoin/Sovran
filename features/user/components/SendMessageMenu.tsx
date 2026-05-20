@@ -1,12 +1,11 @@
 import React, { useMemo } from 'react';
 import { router } from 'expo-router';
-import {
-  ActionMenuButton,
-  type ActionMenuVariant,
-} from '@/shared/ui/composed/ActionMenuButton';
+import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
 import { useWhitenoiseSetup } from '@/features/whitenoise/hooks/useWhitenoiseSetup';
-import { MarmotIcon } from '@/features/whitenoise/components/MarmotIcon';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
+import Icon from 'assets/icons';
 import { nostrLog } from '@/shared/lib/logger';
 
 type Props = {
@@ -28,14 +27,14 @@ type Props = {
 export function SendMessageMenu({ pubkey, displayName }: Props) {
   const { peers } = useBLEPeers();
   const { isReady: whitenoiseReady } = useWhitenoiseSetup();
+  const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
+  const profileFlowGroup = useActiveProfileFlowGroup();
 
   const bitchatPeer = useMemo(() => {
     if (!displayName) return undefined;
     const lower = displayName.trim().toLowerCase();
     if (!lower) return undefined;
-    return peers.find(
-      (p) => p.isConnected && p.nickname.trim().toLowerCase() === lower
-    );
+    return peers.find((p) => p.isConnected && p.nickname.trim().toLowerCase() === lower);
   }, [peers, displayName]);
 
   const variants: ActionMenuVariant[] = useMemo(() => {
@@ -48,19 +47,18 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
         testID: 'send-message-menu-nostr',
         onPress: () => {
           nostrLog.info('user.profile.send_message', { pubkey, transport: 'nostr' });
-          router.navigate({
-            pathname: '/(user-flow)/userMessages' as never,
-            params: { pubkey },
-          });
+          router.navigate(buildProfileHref('userMessages', { pubkey }, profileFlowGroup) as never);
         },
       },
-      {
+    ];
+    if (whitenoiseEnabled) {
+      list.push({
         id: 'whitenoise',
         label: 'White Noise',
         description: whitenoiseReady
           ? 'MLS encrypted via Marmot'
           : 'Tap to set up MLS encrypted messaging',
-        iconNode: <MarmotIcon size={20} />,
+        iconNode: <Icon name="internal:whitenoise" size={20} />,
         testID: 'send-message-menu-whitenoise',
         onPress: () => {
           nostrLog.info('user.profile.send_message', {
@@ -69,47 +67,43 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
             ready: whitenoiseReady,
           });
           if (!whitenoiseReady) {
-            router.push('/(user-flow)/whitenoiseSetup' as never);
+            router.push(buildProfileHref('whitenoiseSetup', undefined, profileFlowGroup) as never);
             return;
           }
-          router.navigate({
-            pathname: '/(user-flow)/whitenoiseDM' as never,
-            params: { pubkey },
-          });
+          router.navigate(buildProfileHref('whitenoiseDM', { pubkey }, profileFlowGroup) as never);
         },
-      },
-      {
-        id: 'bitchat',
-        label: 'BitChat',
-        description: bitchatPeer
-          ? `Bluetooth mesh — nearby (matched by nickname)`
-          : 'Bluetooth mesh',
-        icon: 'mdi:bluetooth',
-        isDisabled: !bitchatPeer,
-        reason: bitchatPeer
-          ? undefined
-          : 'No nearby BLE peer matches this contact',
-        testID: 'send-message-menu-bitchat',
-        onPress: () => {
-          if (!bitchatPeer) return;
-          nostrLog.info('user.profile.send_message', {
-            pubkey,
-            transport: 'bitchat',
-            peerID: bitchatPeer.peerID.slice(0, 8),
-          });
-          router.push({
-            pathname: '/(user-flow)/bitchatDM' as never,
-            params: {
+      });
+    }
+    list.push({
+      id: 'bitchat',
+      label: 'BitChat',
+      description: bitchatPeer ? `Bluetooth mesh — nearby (matched by nickname)` : 'Bluetooth mesh',
+      icon: 'mdi:bluetooth',
+      isDisabled: !bitchatPeer,
+      reason: bitchatPeer ? undefined : 'No nearby BLE peer matches this contact',
+      testID: 'send-message-menu-bitchat',
+      onPress: () => {
+        if (!bitchatPeer) return;
+        nostrLog.info('user.profile.send_message', {
+          pubkey,
+          transport: 'bitchat',
+          peerID: bitchatPeer.peerID.slice(0, 8),
+        });
+        router.push(
+          buildProfileHref(
+            'bitchatDM',
+            {
               transport: 'ble-dm',
               peerID: bitchatPeer.peerID,
               nickname: bitchatPeer.nickname,
             },
-          });
-        },
+            profileFlowGroup
+          ) as never
+        );
       },
-    ];
+    });
     return list;
-  }, [pubkey, whitenoiseReady, bitchatPeer]);
+  }, [pubkey, whitenoiseEnabled, whitenoiseReady, bitchatPeer, profileFlowGroup]);
 
   return (
     <ActionMenuButton

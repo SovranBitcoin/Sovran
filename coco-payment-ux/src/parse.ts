@@ -283,8 +283,34 @@ export function parsePaymentInput(rawInput: string, detectors: Detectors): Parse
     return result;
   }
 
-  // Mint URL
-  if (/^https?:\/\//i.test(normalized)) {
+  // Mint URL — Cashu mint traffic carries blinded messages, signatures, and
+  // melt quotes; on plain HTTP a MitM can swap-race or return malformed Bs
+  // that break recovery. Reject `http://` outright unless the host is a
+  // `.onion` (where TLS would fail anyway and the transport is already
+  // anonymised). The error code is opaque to the parser; the wallet's trust
+  // flow is responsible for surfacing it to the user.
+  const httpsMatch = /^https:\/\//i.test(normalized);
+  const httpMatch = /^http:\/\//i.test(normalized);
+  if (httpsMatch || httpMatch) {
+    if (httpMatch) {
+      let host = '';
+      try {
+        host = new URL(normalized).hostname.toLowerCase();
+      } catch {
+        // fall through to unknown
+      }
+      if (!host.endsWith('.onion')) {
+        return {
+          raw: rawInput,
+          normalized,
+          type: 'unknown',
+          container: null,
+          options: [],
+          warnings,
+          errors: [...errors, 'MINT_INSECURE_HTTP'],
+        };
+      }
+    }
     return {
       raw: rawInput,
       normalized,

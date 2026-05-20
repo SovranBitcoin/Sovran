@@ -10,22 +10,21 @@
  * Tapping a row snaps the deck to that card. Tapping a failed row re-fires
  * the per-participant delivery via `retryDelivery`.
  *
- * `useSplitBillPaymentWatcher` keeps `paymentState` fresh; once a
- * participant pays, their card dims + a ✓ chip overlays.
+ * The app-root `<SplitBillPaymentReconciler />` keeps `paymentState` fresh
+ * via coco's `history:updated` events; once a participant pays, their card
+ * dims + a ✓ chip overlays.
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { LegendList, type LegendListRef } from '@legendapp/list';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useManager } from '@cashu/coco-react';
+import { z } from 'zod';
 import opacity from 'hex-color-opacity';
 
-import {
-  useSplitBillOrchestrator,
-  useSplitBillPaymentWatcher,
-} from '@/features/splitBill/hooks/useSplitBillOrchestrator';
+import { useSplitBillOrchestrator } from '@/features/splitBill/hooks/useSplitBillOrchestrator';
 import {
   useSplitBillTransactionsStore,
   type SplitBillParticipant,
@@ -36,58 +35,24 @@ import {
   ParticipantCardDeck,
   type ParticipantCardDeckRef,
 } from '@/features/splitBill/components/ParticipantCardDeck';
-import Icon from 'assets/icons';
-import { Screen, useLifecycleLogger, walletLog, paymentLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, walletLog, paymentLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
+import { ParticipantStatusIcon } from '@/features/splitBill/components/ParticipantStatusIcon';
+import { participantSubtitle } from '@/features/splitBill/lib/participantSubtitle';
 
-function StatusBadge({
-  participant,
-  foreground,
-  danger,
-  success,
-}: {
-  participant: SplitBillParticipant;
-  foreground: string;
-  danger: string;
-  success: string;
-}) {
-  if (participant.paymentState === 'paid') {
-    return <Icon name="mdi:check-circle" size={22} color={success} />;
-  }
-  if (participant.paymentState === 'expired') {
-    return <Icon name="mdi:alert-circle" size={22} color={danger} />;
-  }
-  if (participant.deliveryState === 'failed') {
-    return <Icon name="mdi:alert-circle" size={22} color={danger} />;
-  }
-  if (participant.deliveryState === 'pending') {
-    return (
-      <Icon
-        name="ant-design:loading-outlined"
-        size={22}
-        color={opacity(foreground, 0.4)}
-        spin={{ duration: 1000, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
-      />
-    );
-  }
-  return <Icon name="mdi:clock-outline" size={22} color={opacity(foreground, 0.5)} />;
-}
-
-function participantSubtitle(p: SplitBillParticipant): string {
-  if (p.paymentState === 'paid') return 'Paid ✓';
-  if (p.paymentState === 'expired') return 'Expired';
-  if (p.deliveryState === 'failed') return 'Delivery failed · tap to retry';
-  if (p.channel === 'qr-only') return 'Awaiting payment · QR only';
-  if (p.deliveryState === 'pending') return 'Sending invoice…';
-  return 'Invoice delivered · awaiting payment';
-}
+const ParamsSchema = z.object({
+  groupId: z.string().min(1).max(256).optional(),
+});
 
 export default function SplitBillDetailScreen() {
   useLifecycleLogger('SplitBillDetailScreen', walletLog);
-  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'split-bill-flow.detail' });
+  const groupId = params?.groupId;
   const [foreground, background, danger, success] = useThemeColor([
     'foreground',
     'background',
@@ -102,7 +67,6 @@ export default function SplitBillDetailScreen() {
 
   const group = useSplitBillTransactionsStore((s) => (groupId ? s.groups[groupId] : undefined));
   const { retryDelivery } = useSplitBillOrchestrator();
-  useSplitBillPaymentWatcher(groupId);
 
   const deckRef = useRef<ParticipantCardDeckRef>(null);
   const listRef = useRef<LegendListRef>(null);
@@ -126,7 +90,7 @@ export default function SplitBillDetailScreen() {
         return;
       }
       deckRef.current?.scrollToIndex(index);
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      void listRef.current?.scrollToOffset({ offset: 0, animated: true });
       setFocusedIndex(index);
     },
     [groupId, retryDelivery]
@@ -152,14 +116,8 @@ export default function SplitBillDetailScreen() {
       const p = group.participants.find((x) => x.id === participantId);
       if (!p?.mintQuoteId) return;
       try {
-        const history: Record<string, unknown>[] =
-          (await (manager as any).history?.getPaginatedHistory?.(0, 200)) ?? [];
-        const entry = history.find(
-          (h) =>
-            h.type === 'mint' &&
-            typeof (h as any).quoteId === 'string' &&
-            (h as any).quoteId === p.mintQuoteId
-        );
+        const history = await manager.history.getPaginatedHistory(0, 200);
+        const entry = history.find((h) => h.type === 'mint' && h.quoteId === p.mintQuoteId);
         if (!entry) {
           paymentLog.warn('split_bill.detail.view_lookup_failed', {
             groupId,
@@ -198,7 +156,7 @@ export default function SplitBillDetailScreen() {
   // (not a component factory) so React reconciles the same instance
   // across parent re-renders — the deck's internal ScrollView scroll
   // position therefore survives live `paymentState` updates from
-  // `useSplitBillPaymentWatcher`.
+  // the app-root SplitBillPaymentReconciler.
   const listHeader = useMemo(
     () =>
       group ? (
@@ -215,18 +173,18 @@ export default function SplitBillDetailScreen() {
 
   if (!group) {
     return (
-      <Screen name="SplitBillDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="SplitBillDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.emptyCenter}>
           <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
             Split bill not found.
           </Text>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   return (
-    <Screen name="SplitBillDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="SplitBillDetailScreen" style={{ flex: 1, backgroundColor: background }}>
       <LegendList
         ref={listRef}
         data={group.participants}
@@ -260,8 +218,8 @@ export default function SplitBillDetailScreen() {
                   p.source === 'ble'
                     ? {
                         icon: 'mdi:bluetooth',
-                        color: '#0A84FF',
-                        backgroundColor: opacity('#0A84FF', 0.12),
+                        color: BLUETOOTH_ACCENT,
+                        backgroundColor: opacity(BLUETOOTH_ACCENT, 0.12),
                       }
                     : undefined
                 }
@@ -270,12 +228,12 @@ export default function SplitBillDetailScreen() {
                   bleNickname: p.nickname,
                   fallbackName: 'Participant',
                 })}
-                subtitle={participantSubtitle(p)}
+                subtitle={participantSubtitle(p, 'detail')}
                 accent={
                   <AmountFormatter amount={p.amount} unit={group.unit} size={13} weight="heavy" />
                 }
                 trailing={
-                  <StatusBadge
+                  <ParticipantStatusIcon
                     participant={p}
                     foreground={foreground}
                     danger={danger}
@@ -290,7 +248,7 @@ export default function SplitBillDetailScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={listContent}
       />
-    </Screen>
+    </Log>
   );
 }
 

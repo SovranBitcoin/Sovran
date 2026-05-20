@@ -8,12 +8,12 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { log } from '@/shared/lib/logger';
 
-export const WALLPAPER_DIR = `${FileSystem.documentDirectory}wallpapers/`;
+const WALLPAPER_DIR = `${FileSystem.documentDirectory}wallpapers/`;
 
 /**
  * Ensure the wallpapers directory exists.
  */
-export async function ensureWallpaperDir(): Promise<void> {
+async function ensureWallpaperDir(): Promise<void> {
   const info = await FileSystem.getInfoAsync(WALLPAPER_DIR);
   if (!info.exists) {
     await FileSystem.makeDirectoryAsync(WALLPAPER_DIR, { intermediates: true });
@@ -27,7 +27,7 @@ export async function ensureWallpaperDir(): Promise<void> {
 export async function downloadWallpaper(
   url: string,
   themeName: string,
-  onProgress?: (progress: number) => void,
+  onProgress?: (progress: number) => void
 ): Promise<string> {
   if (!url) {
     throw new Error(`No download URL for wallpaper "${themeName}"`);
@@ -41,7 +41,9 @@ export async function downloadWallpaper(
 
   try {
     let resolveOnProgress: (() => void) | null = null;
-    const progressDone = new Promise<void>((r) => { resolveOnProgress = r; });
+    const progressDone = new Promise<void>((r) => {
+      resolveOnProgress = r;
+    });
 
     const downloadResumable = FileSystem.createDownloadResumable(
       url,
@@ -52,7 +54,7 @@ export async function downloadWallpaper(
           downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
         onProgress?.(progress);
         if (progress >= 1) resolveOnProgress?.();
-      },
+      }
     );
 
     const downloadPromise = downloadResumable.downloadAsync();
@@ -65,7 +67,8 @@ export async function downloadWallpaper(
     log.info('wallpaper.download.complete', { themeName, uri: localUri });
     return localUri;
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error ?? 'Unknown download error');
+    const message =
+      error instanceof Error ? error.message : String(error ?? 'Unknown download error');
     log.error('wallpaper.download.error', { themeName, url, localUri, error: message });
     throw new Error(`Download failed for "${themeName}": ${message}`);
   }
@@ -100,28 +103,10 @@ export async function deleteWallpaper(themeName: string): Promise<void> {
 }
 
 /**
- * Get total size of all downloaded wallpapers in bytes.
- */
-export async function getDownloadedSize(): Promise<number> {
-  await ensureWallpaperDir();
-  const files = await FileSystem.readDirectoryAsync(WALLPAPER_DIR);
-  let total = 0;
-  for (const file of files) {
-    const info = await FileSystem.getInfoAsync(`${WALLPAPER_DIR}${file}`);
-    if (info.exists && 'size' in info) {
-      total += info.size;
-    }
-  }
-  return total;
-}
-
-/**
  * Clean up orphaned files — files on disk that aren't tracked in the store.
  * Returns list of cleaned-up file names.
  */
-export async function cleanupOrphanedFiles(
-  trackedThemeNames: Set<string>,
-): Promise<string[]> {
+export async function cleanupOrphanedFiles(trackedThemeNames: Set<string>): Promise<string[]> {
   await ensureWallpaperDir();
   const files = await FileSystem.readDirectoryAsync(WALLPAPER_DIR);
   const cleaned: string[] = [];

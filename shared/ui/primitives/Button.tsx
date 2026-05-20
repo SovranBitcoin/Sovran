@@ -52,7 +52,7 @@
  * />
  * ```
  *
- * @see {@link ./TouchableOpacity}
+ * @see {@link ./Pressable}
  * @see {@link ./View}
  * @see {@link ./Text}
  */
@@ -64,15 +64,15 @@ import {
   Animated,
   LayoutChangeEvent,
   GestureResponderEvent,
+  Platform,
 } from 'react-native';
-import { log } from '@/shared/lib/logger';
+import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
-import { TouchableOpacity } from './TouchableOpacity';
+import { Pressable, type HapticConfig } from './Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { EnhancedHaptics } from './Haptics';
 
 // Buttons sit close to the bottom-bar gradient and the home indicator, where
 // off-by-a-few-pixel taps are common. An 8pt slop on every side is small
@@ -226,6 +226,59 @@ const useRipple = ({ enabled, config }: UseRippleOptions) => {
 type ButtonVariant = 'primary' | 'secondary' | 'dangerous';
 
 /**
+ * Button size variant.
+ *
+ * - `default` is the chunky CTA used in modal sheets / page footers.
+ * - `compact` is for inline chips that sit alongside other UI (chat
+ *   composer action row, top bars). Smaller minimum height, tighter
+ *   padding, no auto-margin so siblings stay flush.
+ */
+type ButtonSize = 'default' | 'compact';
+
+/**
+ * Per-size layout tokens. The Button rendering paths read from this map so
+ * adding a new size means adding one entry — no scattered conditionals.
+ *
+ * `iconOnlyDimension` is the square fallback for an icon-only button (no
+ * text); `iconTextSpacing` is the gap between icon and text inside the
+ * HStack when both are present.
+ */
+const SIZES: Record<
+  ButtonSize,
+  {
+    paddingVertical: number;
+    paddingHorizontal: number;
+    minHeight: number;
+    iconOnlyDimension: number;
+    iconTextSpacing: number;
+    fontSize: number;
+    margin: number;
+    marginBottom: number;
+  }
+> = {
+  default: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    minHeight: 48,
+    iconOnlyDimension: 52,
+    iconTextSpacing: 8,
+    fontSize: 14,
+    margin: 4,
+    marginBottom: 8,
+  },
+  compact: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 36,
+    iconOnlyDimension: 40,
+    iconTextSpacing: 6,
+    fontSize: 13,
+    margin: 0,
+    marginBottom: 0,
+  },
+};
+
+/**
  * Configuration for blur effects
  *
  * @interface BlurConfig
@@ -237,26 +290,6 @@ interface BlurConfig {
   intensity?: number;
   /** Tint color for the blur effect */
   tint?: 'light' | 'dark' | 'default' | 'prominent';
-}
-
-/**
- * Configuration for haptic feedback
- *
- * @interface HapticConfig
- * @description
- * Controls the type and behavior of haptic feedback when the button is pressed.
- */
-interface HapticConfig {
-  /** Type of haptic feedback to trigger */
-  type?: 'selection' | 'impact' | 'notification';
-  /** Impact style for impact haptic (only applies when type is 'impact') */
-  impactStyle?: 'light' | 'medium' | 'heavy';
-  /** Notification type for notification haptic (only applies when type is 'notification') */
-  notificationType?: 'success' | 'warning' | 'error';
-  /** Whether to trigger haptic feedback on press start (default: true) */
-  onPressStart?: boolean;
-  /** Whether to trigger haptic feedback on press end (default: false) */
-  onPressEnd?: boolean;
 }
 
 /**
@@ -276,10 +309,12 @@ interface ButtonProps {
   loading?: boolean;
   /** Button variant determining visual style */
   variant?: ButtonVariant;
+  /** Button size — `default` for CTA buttons, `compact` for inline chips. */
+  size?: ButtonSize;
   /** Text content or React node for the button */
   text?: string | React.ReactNode;
   /** Press event handler */
-  onPress: (event: any) => Promise<void> | void;
+  onPress: (event: GestureResponderEvent) => Promise<void> | void;
   /** Icon content for the button */
   icon?: React.ReactNode;
   /** Additional style overrides */
@@ -290,6 +325,11 @@ interface ButtonProps {
   blur?: boolean | BlurConfig;
   /** Haptic feedback configuration (boolean or config object) */
   haptics?: boolean | HapticConfig;
+  /** VoiceOver/TalkBack label. Defaults to `text` when `text` is a string;
+   *  required for icon-only buttons since the glyph carries no name. */
+  accessibilityLabel?: string;
+  /** Optional VoiceOver hint describing the action's outcome. */
+  accessibilityHint?: string;
 }
 
 /**
@@ -327,6 +367,7 @@ export const Button = ({
   disabled = false,
   loading = false,
   variant = 'primary',
+  size = 'default',
   text,
   onPress,
   icon,
@@ -335,16 +376,28 @@ export const Button = ({
   ripple = false,
   blur = false,
   haptics = false,
+  accessibilityLabel,
+  accessibilityHint,
 }: ButtonProps) => {
-  const [foreground, surfaceForeground, foregroundSecondary, surfaceTertiary, background, danger] =
-    useThemeColor([
-      'foreground',
-      'surface-foreground',
-      'muted',
-      'surface-tertiary',
-      'background',
-      'danger',
-    ] as const);
+  const sz = SIZES[size];
+  // Derive a sensible default label from `text` when it's a string so the
+  // common case ("primary CTA with visible copy") needs no extra prop.
+  // Icon-only and ReactNode-text callers must supply `accessibilityLabel`
+  // explicitly — we cannot read text out of a node tree.
+  const a11yLabel = accessibilityLabel ?? (typeof text === 'string' ? text : undefined);
+  const a11yProps = {
+    accessibilityRole: 'button' as const,
+    accessibilityLabel: a11yLabel,
+    accessibilityHint,
+    accessibilityState: { disabled: disabled || loading, busy: loading },
+  };
+  const [foreground, foregroundSecondary, surfaceSecondary, background, danger] = useThemeColor([
+    'foreground',
+    'muted',
+    'surface-secondary',
+    'background',
+    'danger',
+  ] as const);
 
   // Ripple hook
   const rippleConfig = typeof ripple === 'object' ? ripple : {};
@@ -364,79 +417,6 @@ export const Button = ({
 
   const shouldUseBlur = blur !== false;
 
-  // Haptic config
-  const hapticConfig = typeof haptics === 'object' ? haptics : {};
-  const {
-    type = 'selection',
-    impactStyle = 'medium',
-    notificationType = 'success',
-    onPressStart = true,
-    onPressEnd = false,
-  } = hapticConfig;
-
-  const shouldUseHaptics = haptics !== false;
-
-  /**
-   * Triggers haptic feedback based on configuration
-   *
-   * @description
-   * Executes the appropriate haptic feedback based on the configured type and parameters.
-   * Supports selection, impact, and notification haptic types with customizable options.
-   *
-   * @param {string} trigger - When the haptic should trigger ('start' or 'end')
-   */
-  const triggerHaptic = useCallback(
-    async (trigger: 'start' | 'end') => {
-      if (!shouldUseHaptics) return;
-      if (trigger === 'start' && !onPressStart) return;
-      if (trigger === 'end' && !onPressEnd) return;
-
-      try {
-        switch (type) {
-          case 'selection':
-            await EnhancedHaptics.buttonHaptic();
-            break;
-          case 'impact':
-            switch (impactStyle) {
-              case 'light':
-                await EnhancedHaptics.buttonHaptic();
-                break;
-              case 'medium':
-                await EnhancedHaptics.actionHaptic();
-                break;
-              case 'heavy':
-                await EnhancedHaptics.destructiveHaptic();
-                break;
-              default:
-                await EnhancedHaptics.buttonHaptic();
-            }
-            break;
-          case 'notification':
-            switch (notificationType) {
-              case 'success':
-                await EnhancedHaptics.successHaptic();
-                break;
-              case 'warning':
-                await EnhancedHaptics.warningHaptic();
-                break;
-              case 'error':
-                await EnhancedHaptics.errorHaptic();
-                break;
-              default:
-                await EnhancedHaptics.successHaptic();
-            }
-            break;
-          default:
-            await EnhancedHaptics.buttonHaptic();
-        }
-      } catch (error) {
-        // Silently fail if haptics are not supported
-        log.warn('ui.haptics.not_supported', { type: 'button_press', error });
-      }
-    },
-    [shouldUseHaptics, type, impactStyle, notificationType, onPressStart, onPressEnd]
-  );
-
   /**
    * Gets button styles based on variant and effect configuration
    *
@@ -455,15 +435,23 @@ export const Button = ({
    * // With blur=true: Returns base styles without border
    */
   const getButtonStyles = () => {
-    // Standard Button styling
+    const isAndroid = Platform.OS === 'android';
+    // Padding lives on the outer container so all three rendering modes
+    // (icon-only, text-only, icon+text) share the same horizontal/vertical
+    // breathing room. Inner content (icon, text) renders without its own
+    // padding, and the HStack's `spacing` controls the icon↔text gap. This
+    // is what makes the icon+text layout look balanced — previously the
+    // text wrapper carried its own paddingHorizontal while the icon had
+    // none, so the icon was always pulled to one side.
     const base = {
-      margin: 4, // m-1, but 0 if noPadding
-      marginBottom: 8, // mb-2, but 0 if noPadding
+      margin: sz.margin,
+      marginBottom: sz.marginBottom,
       alignItems: 'center' as const,
       justifyContent: 'center' as const,
-      paddingVertical: 4, // py-1
-      borderRadius: 9999, // rounded-full
-      borderWidth: 0.33, // border-[0.33px]
+      paddingVertical: sz.paddingVertical,
+      paddingHorizontal: sz.paddingHorizontal,
+      borderRadius: 9999,
+      borderWidth: isAndroid ? 1 : 0.33,
       overflow: 'hidden' as const,
       opacity: disabled || loading ? 0.5 : 1,
     };
@@ -489,13 +477,13 @@ export const Button = ({
         return {
           ...base,
           backgroundColor: foreground,
-          borderColor: surfaceForeground,
+          borderColor: opacity(foregroundSecondary, 0.25),
         };
       case 'secondary':
         return {
           ...base,
-          backgroundColor: surfaceTertiary,
-          borderColor: foregroundSecondary,
+          backgroundColor: surfaceSecondary,
+          borderColor: opacity(foregroundSecondary, 0.25),
         };
       case 'dangerous':
         return {
@@ -526,6 +514,10 @@ export const Button = ({
    * // With variant="secondary": Returns light color for dark background
    */
   const getTextColor = () => {
+    if (Platform.OS === 'android' && variant === 'secondary') {
+      return foreground;
+    }
+
     switch (variant) {
       case 'primary':
         return background;
@@ -536,28 +528,23 @@ export const Button = ({
     }
   };
 
-  const handlePress = async (e: any) => {
-    if (disabled || loading) return;
-    await triggerHaptic('end');
-    await onPress(e);
-  };
-
-  const handlePressIn = async (event: any) => {
-    if (disabled || loading) return;
-    await triggerHaptic('start');
-    handleRipplePressIn(event);
-  };
+  // Re-entrancy guard, haptic timing, and opacity feedback all live in
+  // the shared `Pressable` primitive below — Button used to reimplement
+  // each one. `onPressIn` here is purely the ripple-animation hook;
+  // Pressable runs its own haptic('start') ahead of this callback.
 
   // Ripple mode: behaves like original RippleButton (minimal styling, direct content)
   if (ripple) {
     return (
-      <TouchableOpacity
+      <Pressable
         testID={testID}
         disabled={disabled || loading}
-        onPress={handlePress}
+        onPress={onPress}
         onLayout={handleRippleLayout}
-        onPressIn={handlePressIn}
+        onPressIn={handleRipplePressIn}
+        haptics={haptics}
         hitSlop={BUTTON_HIT_SLOP}
+        {...a11yProps}
         style={[getButtonStyles(), style]}>
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
@@ -574,22 +561,36 @@ export const Button = ({
         ) : (
           text || icon
         )}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
-  // Icon only button (no text) - fixed size with centered content
+  // Icon-only: a fixed square. Override the outer paddings to 0 because the
+  // dimension *is* the visual size — extra padding would push the icon off-
+  // center and grow the hit area beyond what's drawn.
   if (!text && icon) {
     return (
-      <TouchableOpacity
+      <Pressable
         testID={testID}
         disabled={disabled || loading}
-        onPress={handlePress}
+        onPress={onPress}
         onLayout={handleRippleLayout}
-        onPressIn={handlePressIn}
-        hitSlop={BUTTON_HIT_SLOP}>
+        onPressIn={handleRipplePressIn}
+        haptics={haptics}
+        hitSlop={BUTTON_HIT_SLOP}
+        {...a11yProps}>
         <View
-          style={[getButtonStyles(), { width: 52, height: 52, position: 'relative' }, style]}
+          style={[
+            getButtonStyles(),
+            {
+              width: sz.iconOnlyDimension,
+              height: sz.iconOnlyDimension,
+              paddingVertical: 0,
+              paddingHorizontal: 0,
+              position: 'relative',
+            },
+            style,
+          ]}
           blur={shouldUseBlur}
           blurIntensity={intensity}
           blurTint={tint}>
@@ -611,29 +612,36 @@ export const Button = ({
             icon
           )}
         </View>
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
-  // Text button (with optional icon) - flexible width with proper spacing
+  // Text-only or icon+text. Padding is on the outer container (via
+  // `getButtonStyles`); the inner HStack is responsible only for the gap
+  // between icon and text. ReactNode `text` renders inline (no wrapper)
+  // so things like the ModelChip's `<HStack>label + chevron</HStack>`
+  // sit flush against the icon at the right `iconTextSpacing`.
   return (
-    <TouchableOpacity
+    <Pressable
       testID={testID}
       disabled={disabled || loading}
-      onPress={handlePress}
+      onPress={onPress}
       onLayout={handleRippleLayout}
-      onPressIn={handlePressIn}
-      hitSlop={BUTTON_HIT_SLOP}>
+      onPressIn={handleRipplePressIn}
+      haptics={haptics}
+      hitSlop={BUTTON_HIT_SLOP}
+      {...a11yProps}>
       <View
-        style={[getButtonStyles(), { position: 'relative', minHeight: 48 }, style]}
+        style={[getButtonStyles(), { position: 'relative', minHeight: sz.minHeight }, style]}
         blur={shouldUseBlur}
         blurIntensity={intensity}
         blurTint={tint}>
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
-        {/* Content layout with proper spacing */}
-        <HStack align="center" justify="center" spacing={text && icon && !loading ? 8 : 0}>
-          {/* Loading state or content */}
+        <HStack
+          align="center"
+          justify="center"
+          spacing={text && icon && !loading ? sz.iconTextSpacing : 0}>
           {loading ? (
             <Icon
               name="ant-design:loading-outlined"
@@ -647,31 +655,25 @@ export const Button = ({
             />
           ) : (
             <>
-              {/* Icon content */}
               {icon}
-              {/* Text content — string gets the default OxygenBold wrapper;
-                  ReactNode renders inline so callers can drop in custom
-                  primitives like AmountFormatter without triggering a
-                  View-in-Text nesting error on Android. */}
-              {text &&
+              {text != null &&
                 (typeof text === 'string' ? (
                   <Text
                     style={{
                       color: getTextColor(),
                       fontFamily: 'OxygenBold',
-                      paddingVertical: 12,
                       textAlign: 'center',
                     }}
-                    size={14}>
+                    size={sz.fontSize}>
                     {text}
                   </Text>
                 ) : (
-                  <View style={{ paddingVertical: 12 }}>{text}</View>
+                  text
                 ))}
             </>
           )}
         </HStack>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 };

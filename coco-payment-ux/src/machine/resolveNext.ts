@@ -1,7 +1,13 @@
 import type { LocalizedReason } from '../formatting/locales';
+import { logger } from '../logger';
 import { selectMint } from '../mint-selection';
-import { composeSatoshis } from '../offline';
 import type { ResolvedIntent, WalletContext } from '../types';
+import {
+  buildChooseAmountFallback,
+  buildChooseProofsData,
+  buildProofSuggestions,
+  findFullAmountCandidates,
+} from './amountFallback';
 import type { Destination, ErrorCode, FlowContext, FlowStep, StepDataMap } from './types';
 
 // ---------------------------------------------------------------------------
@@ -23,7 +29,7 @@ function errorResult(code: ErrorCode, message: string): StepResult<'error'> {
   return { step: 'error', data: { code, message } };
 }
 
-function toMintError(reason: LocalizedReason): StepResult<'error'> {
+export function toMintError(reason: LocalizedReason): StepResult<'error'> {
   switch (reason.code) {
     case 'INSUFFICIENT_BALANCE':
     case 'INSUFFICIENT_BALANCE_ALLOWED':
@@ -101,29 +107,19 @@ function checkProofComposition(
   // in createMachine falls back to chooseProofs.
   if (!ctx.offline) return null;
 
-  // Offline: always show the proof selector since the mint is unreachable.
-  const composition = composeSatoshis(proofAmounts, amount);
+  const built = buildProofSuggestions(proofAmounts, amount);
+  if (built.exactMatch || !built.hasSuggestion) return null;
 
   return {
     step: 'chooseProofs',
-    data: {
+    data: buildChooseProofsData({
       mintUrl,
       amount,
       unit,
       proofAmounts,
-      suggestions: {
-        roundDown: composition.exactMatch
-          ? { amount }
-          : composition.nearestLower != null
-            ? { amount: composition.nearestLower }
-            : null,
-        roundUp: composition.exactMatch
-          ? null
-          : composition.nearestUpper != null
-            ? { amount: composition.nearestUpper }
-            : null,
-      },
-    },
+      suggestions: built.suggestions,
+      ctx,
+    }),
   };
 }
 
@@ -132,8 +128,12 @@ function checkProofComposition(
 // ---------------------------------------------------------------------------
 
 function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
-  console.info('[resolveNext] → terminal | destination:', destination, '| mint:', ctx.mintUrl, '| amount:', ctx.amount);
-  const { mintUrl, amount, unit, meltTarget } = ctx;
+  logger.info('resolveNext.terminal', {
+    destination,
+    mintUrl: ctx.mintUrl,
+    amount: ctx.amount,
+  });
+  const { mintUrl, amount, unit, meltTarget, recipientPubkey, recipientProfile } = ctx;
 
   switch (destination) {
     case 'mintQuote':
@@ -144,12 +144,26 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
     case 'meltQuote':
       return {
         step: 'navigateToMeltPreview',
-        data: { mintUrl: mintUrl!, meltTarget: meltTarget!, unit, amount: amount! },
+        data: {
+          mintUrl: mintUrl!,
+          meltTarget: meltTarget!,
+          unit,
+          amount: amount!,
+          recipientPubkey,
+          recipientProfile,
+        },
       };
     case 'paymentRequest':
       return {
         step: 'navigateToPaymentRequest',
-        data: { mintUrl: mintUrl!, paymentRequest: ctx.paymentRequest!, amount: amount!, unit },
+        data: {
+          mintUrl: mintUrl!,
+          paymentRequest: ctx.paymentRequest!,
+          amount: amount!,
+          unit,
+          recipientPubkey,
+          recipientProfile,
+        },
       };
     case 'sendEcash':
       return {
@@ -207,11 +221,16 @@ export function resolveNext(
   const destination = getDestination(intent, ctx);
   const supportedMintUrls = ctx.supportedMintUrls;
   const unit = ctx.unit;
-  console.info('[resolveNext] Routing | intent:', intent.type, '| destination:', destination, '| amount:', ctx.amount, '| mint:', ctx.mintUrl || '(none)');
+  logger.info('resolveNext.routing', {
+    intentType: intent.type,
+    destination,
+    amount: ctx.amount,
+    mintUrl: ctx.mintUrl || null,
+  });
 
   // 1. Need amount?
   if (needsAmount(destination, ctx)) {
-    console.info('[resolveNext] → enterAmount (amount needed)');
+    logger.info('resolveNext.enterAmount.amountNeeded');
 
     const preselectedMintUrl = ctx.mintUrl ?? walletCtx.preferredMintUrl;
     return {
@@ -224,6 +243,14 @@ export function resolveNext(
           supportedMintUrls,
           paymentRequest: ctx.paymentRequest,
           meltTarget: ctx.meltTarget,
+          // Carry recipient identity onto the amount-entry constraints so the
+          // scan-LA flow (EXECUTE → resolveNext → enterAmount) reaches the
+          // amount screen with the same fields the chat-launched flow gets
+          // via handleStartSendEcash. Without this, the navigation handler's
+          // entry serialization loses pubkey/profile and AmountFlowScreen
+          // never shows the recipient header on first paint.
+          recipientPubkey: ctx.recipientPubkey,
+          recipientProfile: ctx.recipientProfile,
         },
       },
       contextPatch: { destination },
@@ -265,12 +292,22 @@ export function resolveNext(
     };
   } else {
     // Send/melt: need mint with balance
-    const selectionConfig = {
-      allowedMints: supportedMintUrls,
-      minAmount: amount,
-    };
+    const fullAmountCandidates = needsSpendableBalance(destination)
+      ? findFullAmountCandidates(walletCtx, amount, supportedMintUrls)
+      : [];
     const selection = needsSpendableBalance(destination)
-      ? selectMint(walletCtx, selectionConfig)
+      ? fullAmountCandidates.length === 1 && !ctx.mintUrl
+        ? {
+            type: 'selected' as const,
+            mintUrl: fullAmountCandidates[0].mintUrl,
+            balance: fullAmountCandidates[0].balance,
+          }
+        : fullAmountCandidates.length > 0
+          ? { type: 'selectionNeeded' as const, validMints: fullAmountCandidates }
+          : selectMint(walletCtx, {
+              allowedMints: supportedMintUrls,
+              minAmount: amount,
+            })
       : selectMint(walletCtx, { allowedMints: supportedMintUrls });
 
     switch (selection.type) {
@@ -286,11 +323,36 @@ export function resolveNext(
             unit,
             paymentRequest: ctx.paymentRequest,
             meltTarget: ctx.meltTarget,
+            recipientPubkey: ctx.recipientPubkey,
+            recipientProfile: ctx.recipientProfile,
             destination,
           },
           contextPatch: { destination },
         };
       case 'noValidMint':
+        if (needsSpendableBalance(destination)) {
+          const fallback = buildChooseAmountFallback({
+            walletCtx,
+            ctx: { ...ctx, destination },
+            destination,
+            amount,
+            preferredMintUrl: walletCtx.preferredMintUrl,
+          });
+          if (fallback) {
+            return {
+              step: 'chooseProofs',
+              data: buildChooseProofsData({
+                mintUrl: fallback.mintUrl,
+                amount,
+                unit,
+                proofAmounts: fallback.proofAmounts,
+                suggestions: fallback.suggestions,
+                ctx: { ...ctx, destination, mintUrl: fallback.mintUrl },
+              }),
+              contextPatch: { destination, mintUrl: fallback.mintUrl },
+            };
+          }
+        }
         return toMintError(selection.reason);
     }
   }

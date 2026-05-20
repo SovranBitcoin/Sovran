@@ -10,24 +10,48 @@ type EventSignerLike = {
   };
 };
 
-export function createWhitenoiseSigner(privateKey: Uint8Array): EventSignerLike {
-  const pubkey = getPublicKey(privateKey);
+type WhitenoiseSigner = EventSignerLike & {
+  /**
+   * Zeros the signer's owned copy of the private key and trips a guard so
+   * subsequent sign / nip44 calls throw. Defense-in-depth on profile switch
+   * — nostr-tools' `nip44.v2.utils.getConversationKey` may cache derived
+   * secrets internally (UNVERIFIED upstream); zeroing the input is the
+   * minimal step we control.
+   */
+  dispose: () => void;
+};
+
+const DISPOSED_ERROR = 'whitenoise.signer: disposed';
+
+export function createWhitenoiseSigner(privateKey: Uint8Array): WhitenoiseSigner {
+  const buf = new Uint8Array(privateKey);
+  const pubkey = getPublicKey(buf);
+  let disposed = false;
+
   return {
     getPublicKey() {
       return pubkey;
     },
     signEvent(draft) {
-      return finalizeEvent(draft as EventTemplate, privateKey);
+      if (disposed) throw new Error(DISPOSED_ERROR);
+      return finalizeEvent(draft as EventTemplate, buf);
     },
     nip44: {
       encrypt(peerPubkey, plaintext) {
-        const key = nip44.v2.utils.getConversationKey(privateKey, peerPubkey);
+        if (disposed) throw new Error(DISPOSED_ERROR);
+        const key = nip44.v2.utils.getConversationKey(buf, peerPubkey);
         return nip44.v2.encrypt(plaintext, key);
       },
       decrypt(peerPubkey, ciphertext) {
-        const key = nip44.v2.utils.getConversationKey(privateKey, peerPubkey);
+        if (disposed) throw new Error(DISPOSED_ERROR);
+        const key = nip44.v2.utils.getConversationKey(buf, peerPubkey);
         return nip44.v2.decrypt(ciphertext, key);
       },
+    },
+    dispose() {
+      if (disposed) return;
+      buf.fill(0);
+      disposed = true;
     },
   };
 }

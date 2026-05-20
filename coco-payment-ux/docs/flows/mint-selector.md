@@ -217,23 +217,25 @@ Availability is derived from the entry's `destination` field. Payment flows set 
 
 ```tsx
 <CocoPaymentUXProvider
-  actions={{
-    mintSelector: {
-      select: async (ctx) => {
-        const mintUrl = ctx.mintUrl;
-        const scope = ctx.entry.scope ?? 'selected';
-        await ctx.paymentMachine?.changeMint?.(mintUrl, { scope });
-      },
-      getInfo: async (ctx) => {
-        const mintUrl = ctx.mintUrl;
-        const info = await loadMintReviewInfo(ctx.manager, mintUrl);
-        router.navigate({
-          pathname: '/(mint-flow)/info',
-          params: { mintInfoEntry: JSON.stringify(info) },
-        });
-      },
-      addMint: async (ctx) => {
-        router.push('/(mint-flow)/add');
+  callbacks={{
+    actions: {
+      mintSelector: {
+        select: async (ctx) => {
+          const mintUrl = ctx.mintUrl;
+          const scope = ctx.entry.scope ?? 'selected';
+          await ctx.paymentMachine?.changeMint?.(mintUrl, { scope });
+        },
+        getInfo: async (ctx) => {
+          const mintUrl = ctx.mintUrl;
+          const info = await loadMintReviewInfo(ctx.manager, mintUrl);
+          router.navigate({
+            pathname: '/(mint-flow)/info',
+            params: { mintInfoEntry: JSON.stringify(info) },
+          });
+        },
+        addMint: async (ctx) => {
+          router.push('/(mint-flow)/add');
+        },
       },
     },
   }}
@@ -246,30 +248,32 @@ The `getInfo` handler fetches full mint metadata (name, icon, trust status, audi
 
 ### Live updates
 
-The mint selector entry updates reactively when audit or review data arrives after the initial load. The wallet subscribes to audit and KYM store changes via [`screenActionsBridge.onEntryUpdate`](/guide/architecture#live-updates) — when scores update, each item in the entry's `items` array is enriched with the latest `kymScore`, `auditScore`, `auditState`, and related fields. No screen-side data fetching needed.
+The mint selector entry updates reactively when audit or review data arrives after the initial load. The wallet subscribes to audit and KYM store changes via [`callbacks.screenActionsBridge.onEntryUpdate`](/guide/architecture#live-updates) — when scores update, each item in the entry's `items` array is enriched with the latest `kymScore`, `auditScore`, `auditState`, and related fields. No screen-side data fetching needed.
 
 ```tsx
 <CocoPaymentUXProvider
-  screenActionsBridge={{
-    onEntryUpdate: (screenType, callback) => {
-      if (screenType === 'mintSelector') {
-        const unsubs = [
-          auditStore.subscribe(() => callback({ _mintItemsEnrichment: true })),
-          kymStore.subscribe(() => callback({ _mintItemsEnrichment: true })),
-        ];
-        return () => unsubs.forEach((u) => u());
-      }
-      // ...
-    },
-    mergeEntryUpdate: (current, updated) => {
-      if (updated._mintItemsEnrichment && Array.isArray(current?.items)) {
-        const items = current.items.map((item) => ({
-          ...item,
-          ...getEnrichment(item.mintUrl),
-        }));
-        return { ...current, items };
-      }
-      return defaultMerge(current, updated);
+  callbacks={{
+    screenActionsBridge: {
+      onEntryUpdate: (screenType, callback) => {
+        if (screenType === 'mintSelector') {
+          const unsubs = [
+            auditStore.subscribe(() => callback({ _mintItemsEnrichment: true })),
+            kymStore.subscribe(() => callback({ _mintItemsEnrichment: true })),
+          ];
+          return () => unsubs.forEach((u) => u());
+        }
+        // ...
+      },
+      mergeEntryUpdate: (current, updated) => {
+        if (updated._mintItemsEnrichment && Array.isArray(current?.items)) {
+          const items = current.items.map((item) => ({
+            ...item,
+            ...getEnrichment(item.mintUrl),
+          }));
+          return { ...current, items };
+        }
+        return defaultMerge(current, updated);
+      },
     },
   }}
 />

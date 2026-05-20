@@ -30,7 +30,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createTestMachine, runScenario } from '../_harness';
-import { WALLETS, MINT1, MINT2 } from '../_harness/fixtures';
+import { WALLETS, MINT1, MINT2, MINT3 } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
 
 // ---------------------------------------------------------------------------
@@ -77,6 +77,186 @@ describe('manual entry — startSendEcash', () => {
     const tm = createTestMachine({ wallet: WALLETS.noBalance });
     await tm.machine.startSendEcash();
     tm.assertStep('error');
+  });
+
+  it('chat send-money: reuses send guard while seeding lightning target', async () => {
+    const recipientPubkey = 'a'.repeat(64);
+    const tm = createTestMachine();
+
+    await tm.machine.startSendEcash({
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+
+    tm.assertStep('enterAmount');
+    tm.assertContext({
+      destination: 'sendEcash',
+      mintUrl: MINT1,
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'enterAmount',
+      data: {
+        preselectedMintUrl: MINT1,
+        constraints: {
+          destination: 'sendEcash',
+          meltTarget: 'alice@example.com',
+          recipientPubkey,
+        },
+      },
+    });
+  });
+
+  it('chat send-money: keeps lightning target when mint selection is required', async () => {
+    const recipientPubkey = 'b'.repeat(64);
+    const tm = createTestMachine({
+      wallet: { ...WALLETS.default, preferredMintUrl: undefined },
+    });
+
+    await tm.machine.startSendEcash({
+      meltTarget: 'bob@example.com',
+      recipientPubkey,
+    });
+
+    tm.assertStep('selectMint');
+    tm.assertContext({
+      destination: 'sendEcash',
+      meltTarget: 'bob@example.com',
+      recipientPubkey,
+    });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'selectMint',
+      data: {
+        destination: 'sendEcash',
+        meltTarget: 'bob@example.com',
+        recipientPubkey,
+      },
+    });
+  });
+
+  it('chat send-money lightning: opens mint selector when another mint can cover the entered amount', async () => {
+    const recipientPubkey = 'c'.repeat(64);
+    const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
+
+    await tm.machine.startSendEcash({
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+    tm.assertStep('enterAmount');
+    tm.assertContext({ mintUrl: MINT2 });
+
+    await tm.machine.enterAmount(200, MINT2, {
+      destination: 'meltQuote',
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+
+    tm.assertStep('selectMint');
+    tm.assertContext({
+      amount: 200,
+      destination: 'meltQuote',
+      mintUrl: MINT2,
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+    let lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'selectMint',
+      data: {
+        amount: 200,
+        destination: 'meltQuote',
+        meltTarget: 'alice@example.com',
+        recipientPubkey,
+      },
+    });
+    expect((lastHandler.data as { candidates: unknown[] }).candidates).toEqual([
+      { mintUrl: MINT1, balance: 5000 },
+    ]);
+
+    await tm.machine.changeMint(MINT1);
+
+    tm.assertStep('navigateToMeltPreview');
+    tm.assertContext({
+      amount: 200,
+      destination: 'meltQuote',
+      mintUrl: MINT1,
+      meltTarget: 'alice@example.com',
+      recipientPubkey,
+    });
+    lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'navigateToMeltPreview',
+      data: {
+        mintUrl: MINT1,
+        amount: 200,
+        meltTarget: 'alice@example.com',
+        recipientPubkey,
+      },
+    });
+  });
+
+  it('chat send-money lightning: opens mint selector when multiple mints can cover the entered amount', async () => {
+    const recipientPubkey = 'd'.repeat(64);
+    const recipientProfile = {
+      displayName: 'Bob',
+      avatarUrl: 'https://example.com/bob.png',
+      nip05: 'bob@example.com',
+    };
+    const tm = createTestMachine({
+      wallet: {
+        trustedMintUrls: [MINT1, MINT2, MINT3],
+        mintBalances: { [MINT1]: 5000, [MINT2]: 4000, [MINT3]: 100 },
+        preferredMintUrl: MINT3,
+        proofAmounts: {
+          [MINT1]: [1024, 2048, 512, 256],
+          [MINT2]: [1024, 2048, 512],
+          [MINT3]: [64, 32, 4],
+        },
+      },
+    });
+
+    await tm.machine.startSendEcash({
+      meltTarget: 'bob@example.com',
+      recipientPubkey,
+      recipientProfile,
+    });
+    tm.assertStep('enterAmount');
+    tm.assertContext({ mintUrl: MINT3 });
+
+    await tm.machine.enterAmount(1000, MINT3, {
+      destination: 'meltQuote',
+      meltTarget: 'bob@example.com',
+      recipientPubkey,
+      recipientProfile,
+    });
+
+    tm.assertStep('selectMint');
+    tm.assertContext({
+      amount: 1000,
+      destination: 'meltQuote',
+      mintUrl: MINT3,
+      meltTarget: 'bob@example.com',
+      recipientPubkey,
+      recipientProfile,
+    });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'selectMint',
+      data: {
+        amount: 1000,
+        destination: 'meltQuote',
+        meltTarget: 'bob@example.com',
+        recipientPubkey,
+        recipientProfile,
+      },
+    });
+    expect((lastHandler.data as { candidates: unknown[] }).candidates).toEqual([
+      { mintUrl: MINT1, balance: 5000 },
+      { mintUrl: MINT2, balance: 4000 },
+    ]);
   });
 });
 
@@ -211,5 +391,22 @@ describe('manual entry — enterAmount with destination', () => {
     await tm.machine.enterAmount(1000, MINT1, { destination: 'mintQuote' });
     // Should auto-execute the mint quote operation → mintQuoteCreated
     tm.assertStep('mintQuoteCreated');
+  });
+
+  it('enterAmount with meltQuote destination from idle selects a spendable mint when none was provided', async () => {
+    const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
+
+    await tm.machine.enterAmount(200, '', {
+      destination: 'meltQuote',
+      meltTarget: 'carol@example.com',
+    });
+
+    tm.assertStep('navigateToMeltPreview');
+    tm.assertContext({
+      amount: 200,
+      destination: 'meltQuote',
+      mintUrl: MINT1,
+      meltTarget: 'carol@example.com',
+    });
   });
 });

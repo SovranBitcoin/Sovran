@@ -1,6 +1,6 @@
 type GradientPoint = { x: number; y: number };
 
-export type SeededGradientTheme = {
+type SeededGradientTheme = {
   primaryColors: readonly [string, string, string];
   overlayColors: readonly [string, string, string];
   primaryStart: GradientPoint;
@@ -61,7 +61,7 @@ export function generateSeededGradient(seedInput: string): SeededGradientTheme {
   const gloss = `rgba(255,255,255,${(0.14 + random() * 0.12).toFixed(3)})`;
   const shadow = `rgba(0,0,0,${(0.16 + random() * 0.12).toFixed(3)})`;
 
-  const axes: ReadonlyArray<readonly [GradientPoint, GradientPoint]> = [
+  const axes: readonly (readonly [GradientPoint, GradientPoint])[] = [
     [
       { x: 0, y: 0 },
       { x: 1, y: 1 },

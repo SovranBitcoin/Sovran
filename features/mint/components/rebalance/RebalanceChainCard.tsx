@@ -12,7 +12,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   TransferCard,
   TransferEntryRow,
@@ -113,7 +113,7 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
 
               <HStack gap={8} className="px-4">
                 {!isRunning && onRetry && (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={() => onRetry(failedStep)}
                     haptics
                     style={{
@@ -128,10 +128,10 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
                         Retry
                       </Text>
                     </HStack>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
                 {!isRunning && onSkip && (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={() => onSkip(failedStep)}
                     haptics
                     style={{
@@ -146,7 +146,7 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
                         Skip
                       </Text>
                     </HStack>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
               </HStack>
             </VStack>

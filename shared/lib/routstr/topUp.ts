@@ -2,13 +2,13 @@ import { apiLog } from '../logger';
 import { checkBalance, topUpBalance } from './api';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
-export interface TopUpResult {
+interface TopUpResult {
   success: true;
   balance: number;
   isNewWallet: boolean;
 }
 
-export interface TopUpFailure {
+interface TopUpFailure {
   success: false;
   error: string;
 }
@@ -27,7 +27,7 @@ export async function executeRoutstrTopUp(
   encodedToken: string
 ): Promise<TopUpResult | TopUpFailure> {
   const store = useRoutstrStore.getState();
-  const currentApiKey = store.getApiKey();
+  const currentApiKey = store.apiKey;
   let apiKey = currentApiKey;
   let isNewWallet = false;
   const start = performance.now();

@@ -102,20 +102,22 @@ function AmountScreen({ amountEntry }) {
 
 ```tsx
 <CocoPaymentUXProvider
-  actions={{
-    amountEntry: {
-      next: async (ctx) => {
-        const { effectiveSatAmount, selectedMintUrl, destination } = ctx.entry;
-        if (effectiveSatAmount <= 0 || !destination) return;
-        await ctx.paymentMachine?.enterAmount?.(effectiveSatAmount, selectedMintUrl, {
-          destination,
-        });
-      },
-      paste: async (ctx) => {
-        await ctx.paymentMachine?.scan?.(undefined, { source: 'clipboard' });
-      },
-      scanQr: async (ctx) => {
-        router.push('/camera');
+  callbacks={{
+    actions: {
+      amountEntry: {
+        next: async (ctx) => {
+          const { effectiveSatAmount, selectedMintUrl, destination } = ctx.entry;
+          if (effectiveSatAmount <= 0 || !destination) return;
+          await ctx.paymentMachine?.enterAmount?.(effectiveSatAmount, selectedMintUrl, {
+            destination,
+          });
+        },
+        paste: async (ctx) => {
+          await ctx.paymentMachine?.scan?.(undefined, { source: 'clipboard' });
+        },
+        scanQr: async (ctx) => {
+          router.push('/camera');
+        },
       },
     },
   }}

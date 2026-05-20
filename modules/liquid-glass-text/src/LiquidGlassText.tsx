@@ -23,6 +23,7 @@ export function LiquidGlassText(props: LiquidGlassTextProps): React.ReactElement
     tint = null,
     glassVariant = 'regular',
     interactive = false,
+    colorScheme,
     debugShape = 'none',
     style,
     ...rest
@@ -40,6 +41,7 @@ export function LiquidGlassText(props: LiquidGlassTextProps): React.ReactElement
         tint={tint}
         glassVariant={glassVariant}
         interactive={interactive}
+        colorScheme={colorScheme}
         debugShape={debugShape}
       />
     );

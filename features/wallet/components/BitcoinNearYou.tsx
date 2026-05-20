@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
@@ -14,6 +14,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { useShallow } from 'zustand/react/shallow';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
 
@@ -46,7 +47,10 @@ const GOOGLE_MAPS_NO_LABELS_STYLE = JSON.stringify([
 ]);
 const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-interface MapMarker {
+// Local type matching the AppleMaps / GoogleMaps `markers` prop shape
+// (coordinates as a nested object). Distinct from the clustering-library
+// MapMarker in shared/lib/map/mapClustering.ts which uses flat lat/lon.
+interface NearbyMapMarker {
   id: string;
   coordinates: { latitude: number; longitude: number };
   tintColor: string;
@@ -60,9 +64,17 @@ function MapPreview({
 }: {
   latitude: number;
   longitude: number;
-  markers: MapMarker[];
+  markers: NearbyMapMarker[];
 }) {
   const surfaceSecondary = useThemeColor('surface-secondary');
+  const scheme = useColorScheme();
+  // iOS gets the saturation / blend / gradient stack on both themes —
+  // most layers are already theme-aware (they tint with `surfaceSecondary`,
+  // and `overlay`/`color` blends lift dark Apple Maps pixels toward the
+  // light surface). Android stays plain (Google Maps doesn't honour the
+  // blend stack the same way and the result reads as a muddy smear).
+  const useChrome = Platform.OS === 'ios';
+  const isDark = scheme === 'dark';
 
   const cameraPosition = useMemo(
     () => ({ coordinates: { latitude, longitude }, zoom: MAP_ZOOM }),
@@ -83,7 +95,9 @@ function MapPreview({
         <GoogleMaps.View
           style={StyleSheet.absoluteFillObject}
           cameraPosition={cameraPosition}
-          colorScheme={GoogleMaps.MapColorScheme.DARK}
+          colorScheme={
+            scheme === 'dark' ? GoogleMaps.MapColorScheme.DARK : GoogleMaps.MapColorScheme.LIGHT
+          }
           properties={{
             isMyLocationEnabled: false,
             mapStyleOptions: { json: GOOGLE_MAPS_NO_LABELS_STYLE },
@@ -95,57 +109,72 @@ function MapPreview({
         <RNView style={StyleSheet.absoluteFillObject} />
       )}
 
-      <RNView style={overlayStyles.grayscaleOverlay} pointerEvents="none" />
-      <RNView style={overlayStyles.desaturationOverlay} pointerEvents="none" />
-      <RNView
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: opacity(surfaceSecondary, 0.35),
-            // @ts-ignore - mixBlendMode works on iOS
-            mixBlendMode: 'overlay',
-          },
-        ]}
-        pointerEvents="none"
-      />
-      <RNView
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: opacity(surfaceSecondary, 1),
-            // @ts-ignore - mixBlendMode works on iOS
-            mixBlendMode: 'color',
-          },
-        ]}
-        pointerEvents="none"
-      />
+      {useChrome && (
+        <>
+          <RNView style={overlayStyles.grayscaleOverlay} pointerEvents="none" />
+          {isDark ? (
+            // Dark veil: a hair of black to deepen the already-dark Apple
+            // Maps base before the surface tint kicks in.
+            <RNView style={overlayStyles.darkVeilOverlay} pointerEvents="none" />
+          ) : (
+            // Light lift: `screen` blend with white at 0.55 brightens the
+            // (still-dark) Apple Maps base so the `surfaceSecondary`
+            // `overlay`+`color` blends below land on a mid-tone map instead
+            // of a near-black one. Without this the chrome reads as a dark
+            // wash on a light card.
+            <RNView style={overlayStyles.lightLiftOverlay} pointerEvents="none" />
+          )}
+          <RNView
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                backgroundColor: opacity(surfaceSecondary, 0.35),
+                // @ts-ignore - mixBlendMode works on iOS
+                mixBlendMode: 'overlay',
+              },
+            ]}
+            pointerEvents="none"
+          />
+          <RNView
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                backgroundColor: opacity(surfaceSecondary, 1),
+                // @ts-ignore - mixBlendMode works on iOS
+                mixBlendMode: 'color',
+              },
+            ]}
+            pointerEvents="none"
+          />
 
-      <LinearGradient
-        colors={[
-          surfaceSecondary,
-          opacity(surfaceSecondary, 0.1),
-          opacity(surfaceSecondary, 0.1),
-          surfaceSecondary,
-        ]}
-        locations={[0, 0.3, 0.7, 1]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
-      <LinearGradient
-        colors={[
-          surfaceSecondary,
-          opacity(surfaceSecondary, 0.1),
-          opacity(surfaceSecondary, 0.1),
-          surfaceSecondary,
-        ]}
-        locations={[0, 0.25, 0.75, 1]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-        pointerEvents="none"
-      />
+          <LinearGradient
+            colors={[
+              surfaceSecondary,
+              opacity(surfaceSecondary, 0.1),
+              opacity(surfaceSecondary, 0.1),
+              surfaceSecondary,
+            ]}
+            locations={[0, 0.3, 0.7, 1]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={[
+              surfaceSecondary,
+              opacity(surfaceSecondary, 0.1),
+              opacity(surfaceSecondary, 0.1),
+              surfaceSecondary,
+            ]}
+            locations={[0, 0.25, 0.75, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+        </>
+      )}
     </RNView>
   );
 }
@@ -174,6 +203,12 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     });
   }, [morphCompleted, fetchPlaces]);
 
+  // Privacy: TRUE device coordinates never live in component state. The
+  // location effect applies the session-stable safety offset before storing,
+  // so both the camera and the marker bounding-box filter read the same
+  // offset coords. Earlier this state held TRUE coords with a separate
+  // `offsetCoords` derivation feeding only the camera — the markers were
+  // filtered around the user's actual position, leaking it on screen.
   const [coords, setCoords] = useState({
     latitude: mockMode ? MOCK_LAT : DEFAULT_LAT,
     longitude: mockMode ? MOCK_LON : DEFAULT_LON,
@@ -187,13 +222,14 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
 
     let cancelled = false;
 
-    (async () => {
+    void (async () => {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== 'granted') return;
         const loc = await Location.getLastKnownPositionAsync();
         if (loc && !cancelled) {
-          setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+          const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
+          setCoords(safe);
         }
       } catch {
         // keep default
@@ -205,12 +241,12 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     };
   }, [mockMode]);
 
-  const nearbyMarkers = useMemo((): MapMarker[] => {
+  const nearbyMarkers = useMemo((): NearbyMapMarker[] => {
     const places = placesCache?.data;
     if (!places?.length) return [];
 
     const { latitude, longitude } = coords;
-    const nearby: MapMarker[] = [];
+    const nearby: NearbyMapMarker[] = [];
 
     for (const place of places) {
       if (nearby.length >= MAX_MARKERS) break;
@@ -238,25 +274,20 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
         ? `${totalCount.toLocaleString()} worldwide`
         : '30,000+ locations';
 
-  const offsetCoords = useMemo(
-    () => applySafetyOffset(coords.latitude, coords.longitude),
-    [coords]
-  );
-
   const titleColor = opacity(foreground, 0.66);
 
   return (
     <Log name="BitcoinNearYou">
       <Link href="/(map-flow)" asChild>
-        <TouchableOpacity activeOpacity={0.85}>
+        <Pressable activeOpacity={0.85}>
           <RNView
             className="overflow-hidden rounded-[20px] border"
             style={{ borderCurve: 'continuous', borderColor: opacity(muted, 0.3) }}>
             <BlurCardFrame accentColor={muted}>
               <RNView className="relative z-[1]">
                 <MapPreview
-                  latitude={offsetCoords.latitude}
-                  longitude={offsetCoords.longitude}
+                  latitude={coords.latitude}
+                  longitude={coords.longitude}
                   markers={nearbyMarkers}
                 />
 
@@ -283,7 +314,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
               </RNView>
             </BlurCardFrame>
           </RNView>
-        </TouchableOpacity>
+        </Pressable>
       </Link>
     </Log>
   );
@@ -297,8 +328,15 @@ const overlayStyles = StyleSheet.create({
     // @ts-ignore - mixBlendMode supported on iOS
     mixBlendMode: 'saturation',
   },
-  desaturationOverlay: {
+  darkVeilOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  lightLiftOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'white',
+    opacity: 0.55,
+    // @ts-ignore - mixBlendMode supported on iOS
+    mixBlendMode: 'screen',
   },
 });

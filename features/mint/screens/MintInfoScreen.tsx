@@ -1,23 +1,26 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
-import {
-  ScrollView,
-  Animated,
-  Alert,
-  Linking,
+import { ScrollView, StyleSheet } from 'react-native';
+import Animated, {
   Easing,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
-import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Stack, Link } from 'expo-router';
+import { z } from 'zod';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { Card } from '@/shared/ui/composed/Card';
-import { Section } from '@/features/settings/screens/SettingsScreen';
+import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Badge } from '@/shared/ui/primitives/Badge';
@@ -30,7 +33,14 @@ import { useScreenActions } from 'coco-payment-ux/react';
 import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
+import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { openExternalUrl } from '@/shared/lib/url';
+
+const ParamsSchema = z.object({
+  mintInfoEntry: z.string().min(1).max(64_000).optional(),
+});
 
 function ProgressRingComponent({
   size = 84,
@@ -52,20 +62,16 @@ function ProgressRingComponent({
   const center = size / 2;
 
   const strokeDashoffset = circumference * (1 - progress);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useSharedValue(0);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+    fadeAnim.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
   }, [fadeAnim]);
 
   return (
     <View style={{ width: size, height: size, position: 'relative' }}>
-      <Animated.View style={{ opacity: fadeAnim }}>
+      <Animated.View style={fadeStyle}>
         <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
           <Circle
             cx={center}
@@ -101,6 +107,9 @@ function AnimatedAvatarComponent({
   status,
   size = 70,
   isLoading = false,
+  okBg,
+  okIcon,
+  okOutline,
 }: {
   picture?: string;
   name?: string;
@@ -108,8 +117,23 @@ function AnimatedAvatarComponent({
   status?: string;
   size?: number;
   isLoading?: boolean;
+  /** Solid-disc tint for the OK badge — overrides Badge variant="success"
+   *  (now blue) so the verified mint reads as green. */
+  okBg?: string;
+  /** Checkmark glyph color — paired with `okBg` for the OK badge. */
+  okIcon?: string;
+  /** Optional outline color for the checkmark — usually the screen background
+   *  so the glyph carries the same visual gap as the disc-to-avatar seam. */
+  okOutline?: string;
 }) {
-  const badgeAnim = useRef(new Animated.Value(0)).current;
+  const badgeAnim = useSharedValue(0);
+  const badgeStyle = useAnimatedStyle(() => ({
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    opacity: badgeAnim.value,
+    transform: [{ scale: badgeAnim.value }],
+  }));
 
   const statusBadge = useMemo(() => {
     if (!status) return null;
@@ -123,15 +147,36 @@ function AnimatedAvatarComponent({
 
   useEffect(() => {
     if (status && !isLoading) {
-      Animated.spring(badgeAnim, {
-        toValue: 1,
-        friction: 4,
-        tension: 100,
-        useNativeDriver: true,
-        delay: 300,
-      }).start();
+      badgeAnim.value = withDelay(80, withSpring(1, { damping: 14, stiffness: 260 }));
     }
   }, [status, isLoading, badgeAnim]);
+
+  const badgeSize = size * 0.33;
+  // OK gets a custom solid green disc — Badge variant="success" is hardcoded
+  // to a translucent blue wash + blue icon (deliberate app-wide retint), but
+  // the verified mint badge reads as "good" in green here.
+  // Ring around the disc in the screen background color — same visual weight
+  // as the seam between the avatar and the badge, just continued all the way
+  // around. `borderWidth` paints inside the box, so we add 2*ring to the
+  // total width to keep the green disc itself the same size as before.
+  const ring = okOutline ? 2 : 0;
+  const okOuter = badgeSize + 4 + ring * 2;
+  const okBadge =
+    statusBadge?.variant === 'success' && okBg && okIcon ? (
+      <View
+        style={{
+          width: okOuter,
+          height: okOuter,
+          borderRadius: okOuter / 2,
+          backgroundColor: okBg,
+          borderWidth: ring,
+          borderColor: okOutline,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Icon name={statusBadge.icon} size={badgeSize} color={okIcon} />
+      </View>
+    ) : null;
 
   return (
     <View className="relative">
@@ -143,15 +188,10 @@ function AnimatedAvatarComponent({
         alt={alt}
       />
       {statusBadge && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            bottom: -2,
-            right: -2,
-            opacity: badgeAnim,
-            transform: [{ scale: badgeAnim }],
-          }}>
-          <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={size * 0.33} />
+        <Animated.View style={badgeStyle}>
+          {okBadge ?? (
+            <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={badgeSize} />
+          )}
         </Animated.View>
       )}
     </View>
@@ -284,15 +324,25 @@ const StatsGrid = React.memo(StatsGridComponent);
 
 /** Score with staggered star rows and distribution bars to the edge. */
 function RatingBarChartComponent({ score }: { score: number }) {
-  const [foreground, defaultColor, surfaceTertiary, warning] = useThemeColor([
+  const [foreground, defaultColor, surfaceTertiary, starColor] = useThemeColor([
     'foreground',
     'default',
     'surface-tertiary',
     'yellow-300',
   ] as const);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const barScaleAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useSharedValue(0);
+  const barScaleAnim = useSharedValue(0);
+
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value, alignItems: 'center' }));
+  const starFadeStyle = useAnimatedStyle(() => ({ opacity: fadeAnim.value }));
+  const barFillStyle = useAnimatedStyle(() => ({
+    width: '100%',
+    height: '100%',
+    borderRadius: 4,
+    transform: [{ scaleX: barScaleAnim.value }],
+    transformOrigin: 'left center',
+  }));
 
   const isValidScore = score >= 0;
   const showSkeleton = !isValidScore;
@@ -307,23 +357,14 @@ function RatingBarChartComponent({ score }: { score: number }) {
     if (isValidScore && !hasAnimatedRef.current) {
       hasAnimatedRef.current = true;
 
-      fadeAnim.setValue(0);
-      barScaleAnim.setValue(0);
+      fadeAnim.value = 0;
+      barScaleAnim.value = 0;
 
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(barScaleAnim, {
-          toValue: goldPercentage,
-          duration: 800,
-          delay: 200,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
+      fadeAnim.value = withTiming(1, { duration: 400 });
+      barScaleAnim.value = withDelay(
+        200,
+        withTiming(goldPercentage, { duration: 800, easing: Easing.out(Easing.cubic) })
+      );
     }
   }, [isValidScore, goldPercentage, fadeAnim, barScaleAnim]);
 
@@ -356,7 +397,7 @@ function RatingBarChartComponent({ score }: { score: number }) {
   return (
     <HStack align="center" gap={16} className="w-full self-stretch px-4">
       <VStack align="center" className="shrink-0">
-        <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
+        <Animated.View style={fadeStyle}>
           <Text heavy size={28} style={{ color: foreground }}>
             {formattedScore}
           </Text>
@@ -372,15 +413,17 @@ function RatingBarChartComponent({ score }: { score: number }) {
           return (
             <HStack key={stars} align="center" gap={2} className="w-full min-w-0">
               <HStack gap={2} className="shrink-0">
-                {Array.from({ length: stars }).map((_, i) => (
-                  <Animated.View key={i} style={{ opacity: isTargetRow ? fadeAnim : 1 }}>
-                    <Icon
-                      name="ic:round-star"
-                      size={12}
-                      color={isTargetRow ? warning : opacity(foreground, 0.4)}
-                    />
-                  </Animated.View>
-                ))}
+                {Array.from({ length: stars }).map((_, i) =>
+                  isTargetRow ? (
+                    <Animated.View key={i} style={starFadeStyle}>
+                      <Icon name="ic:round-star" size={12} color={starColor} />
+                    </Animated.View>
+                  ) : (
+                    <View key={i}>
+                      <Icon name="ic:round-star" size={12} color={opacity(foreground, 0.4)} />
+                    </View>
+                  )
+                )}
               </HStack>
               <View
                 className="min-w-0 flex-1 overflow-hidden rounded"
@@ -391,16 +434,7 @@ function RatingBarChartComponent({ score }: { score: number }) {
                   borderRadius: 4,
                 }}>
                 {isTargetRow && (
-                  <Animated.View
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      backgroundColor: warning,
-                      borderRadius: 4,
-                      transform: [{ scaleX: barScaleAnim }],
-                      transformOrigin: 'left center',
-                    }}
-                  />
+                  <Animated.View style={[barFillStyle, { backgroundColor: starColor }]} />
                 )}
               </View>
             </HStack>
@@ -415,44 +449,57 @@ const RatingBarChart = React.memo(RatingBarChartComponent);
 export function MintInfoScreen() {
   useLifecycleLogger('MintInfoScreen');
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  const [danger, success, warning] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
+  // The mint-status ring + OK badge intentionally diverge from the theme
+  // `success` token (which is blue app-wide after the retint commit). A
+  // verified mint reads as "good" in green here, so pull the static green
+  // scale instead. Ring uses the vivid `green-300` (a thin stroke needs the
+  // brighter shade to register); the solid OK disc uses saturated `green-400`
+  // with a pale `green-100` checkmark for tonal contrast.
+  const [danger, success, starColor, okBadgeBg, okBadgeIcon] = useThemeColor([
+    'danger',
+    'green-300',
+    'yellow-300',
+    'green-400',
+    'green-100',
+  ] as const);
   const insets = useSafeAreaInsets();
-  const { mintInfoEntry: entryParam } = useLocalSearchParams<{ mintInfoEntry?: string }>();
-  const { entry, actions } = useScreenActions('mintInfo', entryParam);
+  const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
+  const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
 
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
 
-  log.debug('mint.info.display', { mintUrl, displayName, hasEntry: !!entry });
-
   const handleContactPress = useCallback(async (method: string, info: string) => {
     log.info('mint.info.contact.press', { method });
-    try {
-      switch (method.toLowerCase()) {
-        case 'email':
-          await Linking.openURL(`mailto:${info}`);
-          break;
-        case 'twitter':
-        case 'x':
-          await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
-          break;
-        case 'nostr':
-          router.navigate({ pathname: '/(user-flow)/profile', params: { npub: info } });
-          break;
-        default:
-          await Clipboard.setStringAsync(info);
+    const open = async (raw: string) => {
+      const result = await openExternalUrl(raw);
+      if (result.isErr()) {
+        log.warn('mint.info.contact.open_failed', { method, reason: result.error.type });
+        await Clipboard.setStringAsync(info);
       }
-    } catch {
-      await Clipboard.setStringAsync(info);
+    };
+    switch (method.toLowerCase()) {
+      case 'email':
+        await open(`mailto:${info.trim()}`);
+        break;
+      case 'twitter':
+      case 'x':
+        await open(`https://x.com/${encodeURIComponent(info.replace('@', ''))}`);
+        break;
+      case 'nostr':
+        router.push(buildModalProfileHref({ npub: info }));
+        break;
+      default:
+        await Clipboard.setStringAsync(info);
     }
   }, []);
 
   const contact = entry?.contact as
-    | Array<{ method: string; info: import('coco-payment-ux').FormattedString }>
+    | { method: string; info: import('coco-payment-ux').FormattedString }[]
     | undefined;
 
   return (
-    <Screen name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
@@ -466,9 +513,9 @@ export function MintInfoScreen() {
                       params: { mintUrl },
                     }}
                     asChild>
-                    <TouchableOpacity style={{ padding: 8 }}>
-                      <Icon name="ic:round-star" size={24} color={warning} />
-                    </TouchableOpacity>
+                    <Pressable style={{ padding: 8 }}>
+                      <Icon name="ic:round-star" size={24} color={starColor} />
+                    </Pressable>
                   </Link>
                 ),
         }}
@@ -495,6 +542,9 @@ export function MintInfoScreen() {
               status={entry?.auditState as string | undefined}
               size={70}
               isLoading={!entry}
+              okBg={okBadgeBg}
+              okIcon={okBadgeIcon}
+              okOutline={background}
             />
           </ProgressRing>
 
@@ -654,7 +704,7 @@ export function MintInfoScreen() {
           }
         />
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }
 

@@ -15,7 +15,8 @@ import type { GlassVariant } from 'liquid-glass-text';
 import { formatAmount } from '@/shared/lib/currency';
 import { Log } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/utils';
-import { supportsLiquidGlass } from '@/shared/lib/version';
+import { useCapabilities } from '@/shared/ui/capability';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -29,7 +30,12 @@ type TransactionType = 'send' | 'receive';
 // Keys are PostScript names — they must match entries registered in
 // useFonts.ts, so UIFont(name:) on iOS and the RN font resolver on Android
 // both find the face without an alias map.
-const FONT_FAMILY: Record<FontWeight, string> = {
+//
+// Exported so other amount displays (e.g. the fiat raw-input view) can lock
+// onto the same font metrics. Without this, toggling between display paths
+// shifts the rendered height because each font has its own intrinsic
+// line-box.
+export const AMOUNT_FONT_FAMILY: Record<FontWeight, string> = {
   light: 'MonaSans-Light',
   regular: 'MonaSans-Regular',
   medium: 'MonaSans-Medium',
@@ -40,6 +46,7 @@ interface AmountFormatterProps {
   amount: number;
   unit: CurrencyUnit;
   size?: number;
+  lineHeight?: number;
   weight?: FontWeight;
   /**
    * Text color (non-liquid) / glass tint (liquid).
@@ -82,6 +89,7 @@ export function AmountFormatter({
   amount,
   unit,
   size = 42,
+  lineHeight,
   weight = 'heavy',
   color,
   style,
@@ -94,7 +102,11 @@ export function AmountFormatter({
   glassVariant = 'regular',
   sign,
 }: AmountFormatterProps) {
-  const [foreground, danger] = useThemeColor(['foreground', 'danger'] as const);
+  const [foreground, danger, receiveColor] = useThemeColor([
+    'foreground',
+    'danger',
+    'success',
+  ] as const);
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
 
   const decorated = decorate(
@@ -111,9 +123,12 @@ export function AmountFormatter({
     transactionType,
     foreground,
     danger,
+    receiveColor,
   });
 
-  const useGlass = liquid && supportsLiquidGlass();
+  const { liquidGlass } = useCapabilities();
+  const useGlass = liquid && liquidGlass;
+  const colorScheme = useColorScheme();
   const containerClass = centered ? 'items-center justify-center' : 'flex-row items-center';
 
   return (
@@ -130,16 +145,20 @@ export function AmountFormatter({
             <View>
               <RNText
                 allowFontScaling={false}
-                style={[plainTextStyle(size, weight, null, centered), { color: 'transparent' }]}>
+                style={[
+                  plainTextStyle(size, lineHeight, weight, null, centered),
+                  { color: 'transparent' },
+                ]}>
                 {text}
               </RNText>
               <LiquidGlassText
                 text={text}
-                fontName={FONT_FAMILY[weight]}
+                fontName={AMOUNT_FONT_FAMILY[weight]}
                 fontSize={size}
                 fontWeight={weight}
                 tint={resolvedColor}
                 glassVariant={glassVariant}
+                colorScheme={colorScheme}
                 style={[
                   StyleSheet.absoluteFill,
                   { alignItems: 'center', justifyContent: 'center' },
@@ -149,7 +168,7 @@ export function AmountFormatter({
           ) : (
             <RNText
               allowFontScaling={false}
-              style={plainTextStyle(size, weight, resolvedColor, centered)}>
+              style={plainTextStyle(size, lineHeight, weight, resolvedColor, centered)}>
               {text}
             </RNText>
           )}
@@ -165,22 +184,27 @@ export function AmountFormatter({
 // The ⚡︎ uses U+FE0E (VS15) to request the text-presentation glyph — without
 // it, some OSes render the emoji-color variant which doesn't extract to a
 // vector path inside the glass surface.
+// U+2009 thin space sits ~\u00BD the width of a regular space and reads as the
+// natural gap between a currency glyph and the digits it labels. Mirrored in
+// FiatAmountDisplay so toggling fiat \u2194 sat keeps the symbol cadence identical.
 function decorate(formatted: string, unit: CurrencyUnit, displayBtc: number): string {
   if (unit !== 'sat') return formatted;
-  if (displayBtc === 0 || displayBtc === 3) return `\u20BF ${formatted}`;
-  if (displayBtc === 1) return `${formatted} \u26A1\uFE0E`;
+  if (displayBtc === 0 || displayBtc === 3) return `\u20BF\u2009${formatted}`;
+  if (displayBtc === 1) return `${formatted}\u2009\u26A1\uFE0E`;
   return formatted;
 }
 
 function plainTextStyle(
   size: number,
+  lineHeight: number | undefined,
   weight: FontWeight,
   color: string | null,
   centered: boolean
 ): TextStyle {
   return {
-    fontFamily: FONT_FAMILY[weight],
+    fontFamily: AMOUNT_FONT_FAMILY[weight],
     fontSize: size,
+    lineHeight,
     // The plain path has no glass surface, so a null tint collapses to the
     // theme foreground — `RNText` can't render `color: null`.
     color: color ?? undefined,
@@ -196,6 +220,7 @@ function resolveColor({
   transactionType,
   foreground,
   danger,
+  receiveColor,
 }: {
   color: string | null | undefined;
   useTypeColors: boolean;
@@ -203,6 +228,7 @@ function resolveColor({
   transactionType: TransactionType;
   foreground: string;
   danger: string;
+  receiveColor: string;
 }): string | null {
   // `color === null` is an explicit opt-out: "no tint at all" on the liquid
   // path. Must be checked before the `||` fallback, or null would coerce
@@ -211,7 +237,7 @@ function resolveColor({
   if (color) return color;
   if (useTypeColors) {
     if (!amount) return opacity(foreground, 0.4);
-    return transactionType === 'receive' ? foreground : danger;
+    return transactionType === 'receive' ? receiveColor : danger;
   }
   return foreground;
 }

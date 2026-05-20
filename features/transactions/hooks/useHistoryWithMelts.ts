@@ -1,49 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useManager, usePaginatedHistory } from '@cashu/coco-react';
-import type { HistoryEntry, MeltHistoryEntry } from '@cashu/coco-core';
+import type {
+  HistoryEntry,
+  MeltHistoryEntry,
+  MeltOperation,
+  MeltOperationState,
+} from '@cashu/coco-core';
+import { listMeltOperationsByState } from '@/shared/lib/cashu/managerInternals';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { log } from '@/shared/lib/logger';
 
-/**
- * Shape of a MeltOperation from coco's MeltOperationRepository.
- * We only declare the fields we need for conversion.
- */
-interface MeltOp {
-  id: string;
-  mintUrl: string;
-  createdAt: number;
-  state: string;
-  quoteId?: string;
-  amount?: number;
-}
-
-/**
- * Unsafe accessor for the private meltOperationRepository on the Manager.
- * This is the same pattern used elsewhere in the codebase (e.g. cancelMeltQuote
- * accesses meltOperationService).
- */
-interface UnsafeRepo {
-  getByState?: (state: string) => Promise<MeltOp[]>;
-}
-
-function opStateToQuoteState(opState: string): 'PAID' | 'PENDING' | 'UNPAID' {
+function opStateToQuoteState(opState: MeltOperationState): 'PAID' | 'PENDING' | 'UNPAID' {
   if (opState === 'finalized') return 'PAID';
   if (opState === 'pending' || opState === 'executing') return 'PENDING';
   return 'UNPAID';
 }
 
-function meltOpToHistoryEntry(op: MeltOp): MeltHistoryEntry | null {
-  if (!op.quoteId || op.amount == null) return null;
+// MeltOperation is a discriminated union by state — only some variants carry
+// `quoteId` and `amount`. Read both as optional and bail out if missing.
+function meltOpToHistoryEntry(op: MeltOperation): MeltHistoryEntry | null {
+  const opAny = op as { quoteId?: string; amount?: number };
+  if (!opAny.quoteId || opAny.amount == null) return null;
   return {
     id: op.id,
     type: 'melt',
     createdAt: op.createdAt,
     mintUrl: op.mintUrl,
     unit: 'sat',
-    quoteId: op.quoteId,
+    quoteId: opAny.quoteId,
     state: opStateToQuoteState(op.state),
-    amount: op.amount,
+    amount: opAny.amount,
   };
 }
 
@@ -76,14 +63,10 @@ export function useHistoryWithMelts(pageSize = 100) {
 
   const fetchMeltOps = useCallback(async () => {
     try {
-      const repo = (manager as unknown as { meltOperationRepository?: UnsafeRepo })
-        .meltOperationRepository;
-      if (!repo?.getByState) return;
-
       const [finalized, pending, prepared] = await Promise.all([
-        repo.getByState('finalized'),
-        repo.getByState('pending'),
-        repo.getByState('prepared'),
+        listMeltOperationsByState(manager, 'finalized'),
+        listMeltOperationsByState(manager, 'pending'),
+        listMeltOperationsByState(manager, 'prepared'),
       ]);
 
       const entries = [...finalized, ...pending, ...prepared]
@@ -108,7 +91,7 @@ export function useHistoryWithMelts(pageSize = 100) {
 
   // Initial fetch
   useEffect(() => {
-    fetchMeltOps();
+    void fetchMeltOps();
   }, [fetchMeltOps]);
 
   // Re-fetch when melt-op events fire so the list stays in sync
@@ -175,10 +158,7 @@ export function useHistoryWithMelts(pageSize = 100) {
       for (let i = 0; i < prev.length; i++) {
         const p = prev[i];
         const m = merged[i];
-        if (
-          p.id !== m.id ||
-          (p as { state?: string }).state !== (m as { state?: string }).state
-        ) {
+        if (p.id !== m.id || (p as { state?: string }).state !== (m as { state?: string }).state) {
           identical = false;
           break;
         }

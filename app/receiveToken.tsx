@@ -1,23 +1,13 @@
 /**
- * @fileoverview Standalone receiveToken route wrapper
- *
- * This is the standalone version used for direct navigation and deep linking.
- * Param parsing and error handling is done by ReceiveTokenScreen.
+ * @fileoverview Standalone receiveToken route — used for direct
+ * navigation, deep links, and PaymentStatusToast re-entry. The route
+ * body and zod schema live on `ReceiveTokenRoute` so this file shares
+ * one canonical implementation with `(receive-flow)/receiveToken` and
+ * `(transactions-flow)/receiveToken`.
  */
 
-import React from 'react';
-import { useLocalSearchParams, router } from 'expo-router';
-import { ReceiveTokenScreen } from '@/features/receive';
+import { ReceiveTokenRoute } from '@/features/receive';
 
-function ModalScreen() {
-  const { receiveHistoryEntry } = useLocalSearchParams<{ receiveHistoryEntry: string }>();
-
-  return (
-    <ReceiveTokenScreen
-      receiveHistoryEntry={receiveHistoryEntry}
-      onNavigateBack={() => router.back()}
-    />
-  );
+export default function ModalScreen() {
+  return <ReceiveTokenRoute where="app.receiveToken" />;
 }
-
-export default ModalScreen;

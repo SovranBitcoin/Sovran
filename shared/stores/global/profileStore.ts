@@ -10,9 +10,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { z } from 'zod';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export interface ProfileEntry {
   /**
@@ -81,6 +83,23 @@ interface ProfileActions {
 
 type ProfileStore = ProfileState & ProfileActions;
 
+const PersistedProfileEntry = z.looseObject({
+  accountIndex: z.number().int(),
+  pubkey: z.string().max(128),
+  addedAt: z.number().int().nonnegative(),
+  cachedBalanceSats: z.number().int().nonnegative().optional(),
+  source: z.enum(['derived', 'imported']).optional(),
+  externalChain: z.number().int().nonnegative().optional(),
+  cachedDisplayName: z.string().max(512).optional(),
+  cachedPicture: z.string().max(2048).optional(),
+});
+
+const PersistedProfileStore = z.object({
+  activeAccountIndex: z.number().int().default(0),
+  profiles: z.array(PersistedProfileEntry).max(64).default([]),
+  cocoMigrationComplete: z.record(z.string().max(32), z.boolean()).default({}),
+});
+
 export const useProfileStore = create<ProfileStore>()(
   persist(
     (set, get) => ({
@@ -122,7 +141,7 @@ export const useProfileStore = create<ProfileStore>()(
         const { profiles } = get();
         // Only switch if the profile exists
         if (!profiles.some((p) => p.accountIndex === accountIndex)) {
-          log.warn('store.profile.unknown_profile', { accountIndex });
+          storeLog.warn('store.profile.unknown_profile', { accountIndex });
           return false;
         }
         storeLog.info('store.profile.switch', { accountIndex });
@@ -134,12 +153,12 @@ export const useProfileStore = create<ProfileStore>()(
         const { profiles, activeAccountIndex } = get();
         // Cannot remove the last profile
         if (profiles.length <= 1) {
-          log.warn('store.profile.cannot_remove_last');
+          storeLog.warn('store.profile.cannot_remove_last');
           return false;
         }
         // Cannot remove the currently active profile
         if (accountIndex === activeAccountIndex) {
-          log.warn('store.profile.cannot_remove_active');
+          storeLog.warn('store.profile.cannot_remove_active');
           return false;
         }
         storeLog.info('store.profile.remove', { accountIndex });
@@ -200,14 +219,15 @@ export const useProfileStore = create<ProfileStore>()(
         return profiles.find((p) => p.accountIndex === activeAccountIndex);
       },
     }),
-    {
+    persistConfig({
       name: 'profile-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: AsyncStorage,
+      schema: PersistedProfileStore,
       partialize: (state) => ({
         activeAccountIndex: state.activeAccountIndex,
         profiles: state.profiles,
         cocoMigrationComplete: state.cocoMigrationComplete,
       }),
-    }
+    })
   )
 );

@@ -45,8 +45,12 @@ export interface AmountResolution extends CoreAmountResolution {
   keyboardUnit: string;
   /** Secondary display text (e.g. '≈ $0.02' or '≈ 42 sats'). null when fiat toggle unavailable. */
   secondaryDisplay: string | null;
+  /** Fiat currency code (e.g. 'usd'). null when fiat toggle unavailable. */
+  fiatCurrency: string | null;
   /** Fiat currency symbol (e.g. '$'). null when fiat toggle unavailable. */
   fiatSymbol: string | null;
+  /** Current BTC price in the configured fiat. 0 when unavailable. */
+  btcPrice: number;
   /** Quick send suggestions — offline-composable amounts for one-tap entry. Empty when N/A. */
   suggestions: QuickSendSuggestion[];
 }
@@ -71,7 +75,13 @@ export interface QuickSendSuggestion {
 
 /**
  * Configuration for creating an AmountActionManager.
- * Uses getter functions so the manager always reads fresh state.
+ *
+ * Reactive fields (`offlineOptimization`, `unit`, `fiatCurrency`, `fiatSymbol`)
+ * accept either a constant or a getter function. The manager re-reads getters
+ * on every `inspect()`, so callers that change destination/unit/display
+ * currency mid-flow can pass a getter and avoid rebuilding the manager (which
+ * would reset input state). Constants stay supported for the simple case
+ * where these values genuinely don't change for the manager's lifetime.
  */
 export interface CreateAmountActionManagerConfig {
   /** Returns the currently selected mint URL. */
@@ -82,15 +92,20 @@ export interface CreateAmountActionManagerConfig {
   getBtcPrice: () => number;
   /**
    * Whether offline proof analysis and fiat-window optimization apply.
-   * Set to true for ecash sends, false for receive/melt flows.
+   * Set to true for ecash sends, false for receive/melt flows. Pass a getter
+   * to track destination changes mid-flow without rebuilding the manager.
    */
-  offlineOptimization: boolean;
-  /** Base unit for sat mode (e.g. 'sat'). */
-  unit: string;
-  /** Fiat currency code (e.g. 'usd'). Enables fiat toggle when provided with fiatSymbol. */
-  fiatCurrency?: string;
-  /** Fiat currency symbol (e.g. '$'). Enables fiat toggle when provided with fiatCurrency. */
-  fiatSymbol?: string;
+  offlineOptimization: boolean | (() => boolean);
+  /** Base unit for sat mode (e.g. 'sat'). Pass a getter when the unit can change. */
+  unit: string | (() => string);
+  /**
+   * Fiat currency code (e.g. 'usd'). Enables fiat toggle when both
+   * fiatCurrency and fiatSymbol resolve to truthy values. Pass a getter to
+   * track display-currency changes mid-flow.
+   */
+  fiatCurrency?: string | (() => string | undefined);
+  /** Fiat currency symbol (e.g. '$'). Enables fiat toggle alongside fiatCurrency. */
+  fiatSymbol?: string | (() => string | undefined);
   /** Quick send suggestion config. Omit for defaults, null to disable. */
   quickSendConfig?: QuickSendConfig | null;
 }

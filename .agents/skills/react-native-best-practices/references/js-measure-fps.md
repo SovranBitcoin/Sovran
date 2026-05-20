@@ -15,7 +15,7 @@ Monitor and measure JavaScript frame rate to quantify app smoothness and identif
 # Shake device → Dev Menu → "Perf Monitor"
 
 # Method 2: Flashlight (Android, detailed reports)
-curl https://get.flashlight.dev | bash
+# Install Flashlight from an official, verified release channel first.
 flashlight measure
 ```
 
@@ -71,10 +71,7 @@ The image shows FlatList (score: 3) vs FlashList (score: 67) - a dramatic differ
 
 **Installation:**
 
-```bash
-# Install Flashlight CLI
-curl https://get.flashlight.dev | bash
-```
+Install Flashlight from the vendor's official release channel before using it. Prefer a package manager or a version-pinned binary with checksum/signature verification. Do not pipe a remote install script directly into a shell.
 
 **Usage:**
 
@@ -177,4 +174,5 @@ flashlight compare baseline.json current.json
 
 - [js-profile-react.md](./js-profile-react.md) - Find what's causing FPS drops
 - [js-animations-reanimated.md](./js-animations-reanimated.md) - Fix animation-related drops
+- [js-bottomsheet.md](./js-bottomsheet.md) - Measure bottom sheet gesture and snap performance
 - [js-lists-flatlist-flashlist.md](./js-lists-flatlist-flashlist.md) - Fix scroll-related drops

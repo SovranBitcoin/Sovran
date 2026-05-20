@@ -1,8 +1,8 @@
 diff --git a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
-index 6480cbd..d33811d 100644
+index 6480cbd..0000000 100644
 --- a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
 +++ b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
-@@ -615,12 +615,52 @@ function hs(s, t, e) {
+@@ -615,12 +615,35 @@
    throw new Error(`Unknown simple or float value: ${e}`);
  }
  const ls = De("Secp256k1_HashToCurve_Cashu_");
@@ -26,88 +26,51 @@ index 6480cbd..d33811d 100644
 +    }
 +  };
 +}
-+/* --- sovran perf: native crypto bridge (nutpatch) --- */
-+if (typeof globalThis !== "undefined" && !globalThis.__CASHU_NATIVE) {
-+  globalThis.__CASHU_NATIVE = {
-+    crypto: null,
-+    active: false,
-+    init: function(cryptoInstance) { this.crypto = cryptoInstance; this.active = true; },
-+    _toBuffer: function(u8) { return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength); },
-+    _bigintToBuf: function(n) { var buf = new Uint8Array(32); for (var i = 31; i >= 0; i--) { buf[i] = Number(n & 0xffn); n >>= 8n; } return buf.buffer; },
-+    _toPoint: function(buf) { return k.Point.fromHex(I(new Uint8Array(buf))); }
-+  };
-+}
  function pt(s) {
 +  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
-+  var _cn = globalThis.__CASHU_NATIVE;
-+  if (_cn && _cn.active) {
-+    var result = _cn._toPoint(_cn.crypto.hashToCurve(_cn._toBuffer(s)));
-+    if (_p && _p.enabled) _p.push({ op: "hashToCurve", ms: performance.now() - _t0, native: true });
-+    return result;
-+  }
    const t = B(w.concat(ls, s)), e = new Uint32Array(1), n = 2 ** 16;
    for (let r = 0; r < n; r++) {
      const i = new Uint8Array(e.buffer), o = B(w.concat(t, i));
      try {
 -      return Y(I(w.concat(new Uint8Array([2]), o)));
 +      var result = Y(I(w.concat(new Uint8Array([2]), o)));
-+      if (_p && _p.enabled) _p.push({ op: "hashToCurve", ms: performance.now() - _t0, native: false });
++      if (_p && _p.enabled) _p.push({ op: "hashToCurve", ms: performance.now() - _t0 });
 +      return result;
      } catch {
        e[0]++;
      }
-@@ -628,8 +668,18 @@ function pt(s) {
+@@ -628,8 +651,11 @@
    throw new Error("No valid point found");
  }
  function He(s) {
 +  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
-+  var _cn = globalThis.__CASHU_NATIVE;
-+  if (_cn && _cn.active && typeof _cn.crypto.hashE === "function") {
-+    var bufs = s.map(function(p) { return _cn._toBuffer(p.toBytes(true)); });
-+    var result = new Uint8Array(_cn.crypto.hashE(bufs));
-+    if (_p && _p.enabled) _p.push({ op: "hash_e", ms: performance.now() - _t0, pointCount: s.length, native: true });
-+    return result;
-+  }
    const e = s.map((n) => n.toHex(!1)).join("");
 -  return B(new TextEncoder().encode(e));
 +  var result = B(new TextEncoder().encode(e));
-+  if (_p && _p.enabled) _p.push({ op: "hash_e", ms: performance.now() - _t0, pointCount: s.length, native: false });
++  if (_p && _p.enabled) _p.push({ op: "hash_e", ms: performance.now() - _t0, pointCount: s.length });
 +  return result;
  }
  function Fr(s) {
    return k.Point.fromHex(I(s));
-@@ -656,22 +706,45 @@ function fs() {
+@@ -656,22 +682,32 @@
    return yt(t);
  }
  function yt(s, t) {
 +  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
-+  var _cn = globalThis.__CASHU_NATIVE;
-+  if (_cn && _cn.active) {
-+    t || (t = k.Point.Fn.fromBytes(ne()));
-+    var B_ = _cn._toPoint(_cn.crypto.blind(_cn._toBuffer(s), _cn._bigintToBuf(t)));
-+    if (_p && _p.enabled) _p.push({ op: "blindMessage", ms: performance.now() - _t0, native: true });
-+    return { B_: B_, r: t, secret: s };
-+  }
    const e = pt(s);
 +  var _t1 = _p && _p.enabled ? performance.now() : 0;
    t || (t = k.Point.Fn.fromBytes(ne()));
    const n = k.Point.BASE.multiply(t);
 -  return { B_: e.add(n), r: t, secret: s };
 +  var result = { B_: e.add(n), r: t, secret: s };
-+  if (_p && _p.enabled) _p.push({ op: "blindMessage", ms: performance.now() - _t0, hashToCurveMs: _t1 - _t0, native: false });
++  if (_p && _p.enabled) _p.push({ op: "blindMessage", ms: performance.now() - _t0, hashToCurveMs: _t1 - _t0 });
 +  return result;
  }
  function ps(s, t, e) {
 -  return s.subtract(e.multiply(t));
 +  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
-+  var _cn = globalThis.__CASHU_NATIVE;
-+  if (_cn && _cn.active) {
-+    var result = _cn._toPoint(_cn.crypto.unblind(_cn._toBuffer(s.toBytes(true)), _cn._bigintToBuf(t), _cn._toBuffer(e.toBytes(true))));
-+    if (_p && _p.enabled) _p.push({ op: "unblind", ms: performance.now() - _t0, native: true });
-+    return result;
-+  }
 +  var result = s.subtract(e.multiply(t));
-+  if (_p && _p.enabled) _p.push({ op: "unblind", ms: performance.now() - _t0, native: false });
++  if (_p && _p.enabled) _p.push({ op: "unblind", ms: performance.now() - _t0 });
 +  return result;
  }
  function gs(s, t, e, n) {
@@ -125,7 +88,7 @@ index 6480cbd..d33811d 100644
  }
  const ms = (s) => ({
    amount: s.amount,
-@@ -686,13 +759,19 @@ const ms = (s) => ({
+@@ -686,13 +722,19 @@
    secret: new TextEncoder().encode(s.secret),
    witness: s.witness ? JSON.parse(s.witness) : void 0
  }), We = (s, t) => {
@@ -146,7 +109,7 @@ index 6480cbd..d33811d 100644
      if (n)
        throw r;
    }
-@@ -1075,12 +1154,18 @@ function xs(s, t) {
+@@ -1075,12 +1117,18 @@
    return !0;
  }
  const Bs = (s, t, e, n) => {
@@ -167,7 +130,7 @@ index 6480cbd..d33811d 100644
  }, ti = (s, t) => {
    const e = k.Point.Fn.fromBytes(ne()), n = k.Point.BASE.multiply(e), r = s.multiply(e), i = k.Point.Fn.fromBytes(t), o = s.multiply(i), a = k.Point.BASE.multiply(i), c = He([n, r, a, o]), h = k.Point.Fn.fromBytes(c), u = k.Point.Fn.add(e, k.Point.Fn.mul(h, i));
    return { s: Nn(u, 32), e: c };
-@@ -1145,11 +1230,34 @@ const Bs = (s, t, e, n) => {
+@@ -1145,11 +1193,34 @@
      return i;
    }
    return i;
@@ -204,7 +167,7 @@ index 6480cbd..d33811d 100644
  };
  function ei(s, t) {
    return je("HTLC", s, t);
-@@ -1695,12 +1803,17 @@ function Pn(s) {
+@@ -1695,12 +1766,17 @@
    });
  }
  function ai(s, t) {
@@ -224,7 +187,7 @@ index 6480cbd..d33811d 100644
  }
  function or(s, t) {
    if (t && (s.proofs = Cn(s.proofs)), s.proofs.forEach((c) => {
-@@ -1786,8 +1899,11 @@ function En(s) {
+@@ -1786,8 +1862,11 @@
    return s.d && (e.memo = s.d), e;
  }
  function ar(s, t) {
@@ -237,7 +200,7 @@ index 6480cbd..d33811d 100644
  }
  function ci(s) {
    s = Bn(s);
-@@ -2757,6 +2873,7 @@ class ge {
+@@ -2757,6 +2836,7 @@
     * @returns Signed outputs.
     */
    async swap(t, e) {
@@ -245,7 +208,7 @@ index 6480cbd..d33811d 100644
      const n = await this.requestWithAuth(
        "POST",
        "/v1/swap",
-@@ -2765,6 +2882,7 @@ class ge {
+@@ -2765,6 +2845,7 @@
      );
      if (!U(n) || !Array.isArray(n?.signatures))
        throw this._logger.error("Invalid response from mint...", { data: n, op: "swap" }), new Error("Invalid response from mint");
@@ -253,7 +216,7 @@ index 6480cbd..d33811d 100644
      return n;
    }
    /**
-@@ -2828,6 +2946,7 @@ class ge {
+@@ -2828,6 +2909,7 @@
     * @returns Serialized blinded signatures.
     */
    async mintBolt11(t, e) {
@@ -261,7 +224,7 @@ index 6480cbd..d33811d 100644
      const n = await this.requestWithAuth(
        "POST",
        "/v1/mint/bolt11",
-@@ -2836,6 +2955,7 @@ class ge {
+@@ -2836,6 +2918,7 @@
      );
      if (!U(n) || !Array.isArray(n?.signatures))
        throw this._logger.error("Invalid response from mint...", { data: n, op: "mintBolt11" }), new Error("Invalid response from mint");
@@ -269,7 +232,7 @@ index 6480cbd..d33811d 100644
      return n;
    }
    /**
-@@ -2961,9 +3081,11 @@ class ge {
+@@ -2961,9 +3044,11 @@
     * @returns The melt response.
     */
    async meltBolt11(t, e) {
@@ -281,7 +244,7 @@ index 6480cbd..d33811d 100644
      return r;
    }
    /**
-@@ -3097,17 +3219,20 @@ class ge {
+@@ -3097,17 +3182,20 @@
      return this._logger.error("Blind Authentication Token...", { bat: r }), r;
    }
    async requestWithAuth(t, e, n = {}, r) {
@@ -303,7 +266,7 @@ index 6480cbd..d33811d 100644
    }
    isValidMethodString(t) {
      return !!(typeof t == "string" && /^[a-z0-9_-]+$/.test(t));
-@@ -3515,6 +3640,7 @@ class D {
+@@ -3515,6 +3603,7 @@
      this.secret = n, this.blindingFactor = e, this.blindedMessage = t;
    }
    toProof(t, e) {
@@ -311,7 +274,7 @@ index 6480cbd..d33811d 100644
      let n;
      t.dleq && (n = {
        s: z(t.dleq.s),
-@@ -3535,7 +3661,9 @@ class D {
+@@ -3535,7 +3624,9 @@
          }
        }
      }, c = wr(this);
@@ -322,7 +285,7 @@ index 6480cbd..d33811d 100644
    }
    static createP2PKData(t, e, n, r) {
      return Q(e, n.keys, r).map((o) => this.createSingleP2PKData(t, o, n.id));
-@@ -3576,20 +3704,61 @@ class D {
+@@ -3576,20 +3667,45 @@
      return t.blindKeys && d && yr(Z, d), Z;
    }
    static createRandomData(t, e, n) {
@@ -353,23 +316,7 @@ index 6480cbd..d33811d 100644
 +    var rid = r.id;
 +    var isLegacy = /^[a-fA-F0-9]+$/.test(rid) ? rid.startsWith("00") : true;
 +    var results;
-+    var _cn = globalThis.__CASHU_NATIVE;
-+    /* --- sovran perf: native batch derive for legacy keysets --- */
-+    if (isLegacy && _cn && _cn.active && typeof _cn.crypto.batchDeriveLegacy === "function") {
-+      var kidInt = Number(ds(rid));
-+      var seedBuf = e.buffer.slice(e.byteOffset, e.byteOffset + e.byteLength);
-+      var raw = new Uint8Array(_cn.crypto.batchDeriveLegacy(seedBuf, kidInt, n, amounts.length));
-+      results = amounts.map(function(a, c) {
-+        var off = c * 64;
-+        var secBytes = raw.subarray(off, off + 32);
-+        var bfBytes = raw.subarray(off + 32, off + 64);
-+        var secHex = W(secBytes);
-+        var secUtf8 = new TextEncoder().encode(secHex);
-+        var rVal = w.toBigInt(bfBytes);
-+        var bm = yt(secUtf8, rVal);
-+        return new D(new Ut(a, bm.B_, rid).getSerializedBlindedMessage(), bm.r, secUtf8);
-+      });
-+    } else if (isLegacy && typeof _deriveBoth === "function") {
++    if (isLegacy && typeof _deriveBoth === "function") {
 +      results = amounts.map(function(a, c) {
 +        var ctr = n + c;
 +        var both = _deriveBoth(e, rid, ctr);
@@ -384,12 +331,12 @@ index 6480cbd..d33811d 100644
 +        (a, c) => this.createSingleDeterministicData(a, e, n + c, rid)
 +      );
 +    }
-+    if (_p && _p.enabled) _p.push({ op: "createDeterministicData_batch", count: amounts.length, ms: performance.now() - _t0, keysetId: rid, startCounter: n, isLegacy: isLegacy, native: !!(isLegacy && _cn && _cn.active && typeof _cn.crypto.batchDeriveLegacy === "function") });
++    if (_p && _p.enabled) _p.push({ op: "createDeterministicData_batch", count: amounts.length, ms: performance.now() - _t0, keysetId: rid, startCounter: n, isLegacy: isLegacy });
 +    return results;
    }
    /**
     * @throws May throw if blinding factor is out of range. Caller should catch, increment counter,
-@@ -5040,10 +5209,12 @@ class me {
+@@ -5040,10 +5156,12 @@
     * @throws If fetching mint info, keysets, or keys fails.
     */
    async loadMint(t) {
@@ -402,7 +349,7 @@ index 6480cbd..d33811d 100644
    }
    /**
     * Load mint information, keysets, and keys from cached data.
-@@ -5437,7 +5608,9 @@ class me {
+@@ -5437,7 +5555,9 @@
     * @returns Newly minted proofs.
     */
    async receive(t, e, n) {
@@ -412,7 +359,7 @@ index 6480cbd..d33811d 100644
      return i;
    }
    /**
-@@ -5463,6 +5636,7 @@ class me {
+@@ -5463,6 +5583,7 @@
     * @returns SwapPreview with metadata for swap transaction.
     */
    async prepareSwapToReceive(t, e, n) {
@@ -420,7 +367,7 @@ index 6480cbd..d33811d 100644
      const { keysetId: r, requireDleq: i, proofsWeHave: o, onCountersReserved: a } = e || {};
      n = n ?? this.defaultOutputType();
      const c = typeof t == "string" ? this.decodeToken(t) : t, h = Mn(c.mint);
-@@ -5495,6 +5669,7 @@ class me {
+@@ -5495,6 +5616,7 @@
      const b = await this.addCountersToOutputTypes(d.id, m);
      [m] = b.outputTypes, b.used && this.safeCallback(a, b.used, { op: "receive" }), this._logger.debug("receive counter", { counter: b.used, receiveOT: m });
      const S = this.createOutputData(this.preparedTotal(m), d, m);
@@ -428,7 +375,7 @@ index 6480cbd..d33811d 100644
      return {
        amount: p,
        fees: f,
-@@ -5550,6 +5725,7 @@ class me {
+@@ -5550,6 +5672,7 @@
     * @throws Throws if the send cannot be completed offline or if funds are insufficient.
     */
    async send(t, e, n, r) {
@@ -436,7 +383,7 @@ index 6480cbd..d33811d 100644
      this.assertAmount(t, "send");
      const { keysetId: i, includeFees: o = !1 } = n || {};
      r = r ?? {
-@@ -5568,14 +5744,18 @@ class me {
+@@ -5568,14 +5691,18 @@
          requireDleq: !1
          // safety
        }), d = o ? this.getFeesForProofs(l) : 0;
@@ -457,7 +404,7 @@ index 6480cbd..d33811d 100644
    }
    /**
     * Prepare A Send Transaction.
-@@ -5601,6 +5781,7 @@ class me {
+@@ -5601,6 +5728,7 @@
     * @throws Throws if the send cannot be completed offline or if funds are insufficient.
     */
    async prepareSwapToSend(t, e, n, r) {
@@ -465,7 +412,7 @@ index 6480cbd..d33811d 100644
      const { keysetId: i, includeFees: o = !1, onCountersReserved: a } = n || {};
      r = r ?? {
        send: this.defaultOutputType(),
-@@ -5638,6 +5819,7 @@ class me {
+@@ -5638,6 +5766,7 @@
      const S = this.preparedTotal(b), v = await this.addCountersToOutputTypes(c.id, h, b);
      [h, b] = v.outputTypes, v.used && this.safeCallback(a, v.used, { op: "send" }), this._logger.debug("send counters", { counter: v.used, sendOT: h, keepOT: b });
      const O = this.createOutputData(u, c, h), at = this.createOutputData(S, c, b);
@@ -473,7 +420,7 @@ index 6480cbd..d33811d 100644
      return {
        amount: t,
        fees: p,
-@@ -5666,6 +5848,7 @@ class me {
+@@ -5666,6 +5795,7 @@
     * @returns SendResponse with keep/send proofs.
     */
    async completeSwap(t, e) {
@@ -481,7 +428,7 @@ index 6480cbd..d33811d 100644
      const n = t?.keepOutputs ? t.keepOutputs : [], r = t.sendOutputs ? t.sendOutputs : [], i = t.unselectedProofs ? t.unselectedProofs : [];
      e && (t.inputs = this.signP2PKProofs(t.inputs, e, [
        ...n,
-@@ -5675,7 +5858,10 @@ class me {
+@@ -5675,7 +5805,10 @@
        t.inputs,
        n,
        r
@@ -493,7 +440,7 @@ index 6480cbd..d33811d 100644
      this.failIf(
        a.length < o.outputData.length,
        `Mint returned ${a.length} signatures, expected ${o.outputData.length}`
-@@ -5685,13 +5871,16 @@ class me {
+@@ -5685,13 +5818,16 @@
        l[p] = o.keepVector[m], u[p] = h[m];
      });
      const d = [], f = [];
@@ -513,7 +460,7 @@ index 6480cbd..d33811d 100644
        keep: [...d, ...i],
        send: f
      };
-@@ -5714,6 +5903,7 @@ class me {
+@@ -5714,6 +5850,7 @@
     * @see https://crypto.ethz.ch/publications/files/Przyda02.pdf
     */
    selectProofsToSend(t, e, n = !1, r = !1) {
@@ -521,7 +468,7 @@ index 6480cbd..d33811d 100644
      this.assertAmount(e, "selectProofsToSend");
      const { keep: i, send: o } = this._selectProofs(
        t,
-@@ -5722,6 +5912,7 @@ class me {
+@@ -5722,6 +5859,7 @@
        n,
        r
      );
@@ -529,7 +476,7 @@ index 6480cbd..d33811d 100644
      return { keep: i, send: o };
    }
    /**
-@@ -5838,12 +6029,20 @@ class me {
+@@ -5838,12 +5976,20 @@
     *   default one will be used.
     */
    async batchRestore(t = 300, e = 100, n = 0, r) {
@@ -550,7 +497,7 @@ index 6480cbd..d33811d 100644
      return { proofs: o, lastCounterWithSignature: a };
    }
    /**
-@@ -5854,12 +6053,27 @@ class me {
+@@ -5854,12 +6000,27 @@
     * @param options.keysetId Set a custom keysetId to restore from. @see `keyChain)`
     */
    async restore(t, e, n) {
@@ -580,7 +527,7 @@ index 6480cbd..d33811d 100644
      c.forEach((f, p) => u[f.B_] = h[p]);
      const l = [];
      let d;
-@@ -5867,6 +6081,7 @@ class me {
+@@ -5867,6 +6028,7 @@
        const p = u[a[f].blindedMessage.B_];
        p && (d = t + f, a[f].blindedMessage.amount = p.amount, l.push(a[f].toProof(p, i)));
      }
@@ -588,7 +535,7 @@ index 6480cbd..d33811d 100644
      return {
        proofs: l,
        lastCounterWithSignature: d
-@@ -5892,12 +6107,14 @@ class me {
+@@ -5892,12 +6054,14 @@
     *   specified amount and unit.
     */
    async createMintQuoteBolt11(t, e) {
@@ -603,7 +550,7 @@ index 6480cbd..d33811d 100644
      return { ...r, amount: r.amount || t, unit: r.unit || this._unit };
    }
    /**
-@@ -6027,6 +6244,7 @@ class me {
+@@ -6027,6 +6191,7 @@
     * @throws If params are invalid or mint returns errors.
     */
    async _mintProofs(t, e, n, r, i) {
@@ -611,7 +558,7 @@ index 6480cbd..d33811d 100644
      this.assertAmount(e, `_mintProofs: ${t}`), i = i ?? this.defaultOutputType();
      const { privkey: o, keysetId: a, proofsWeHave: c, onCountersReserved: h } = r ?? {}, u = this.getKeyset(a);
      let l = this.configureOutputs(
-@@ -6039,20 +6257,28 @@ class me {
+@@ -6039,20 +6204,28 @@
      );
      const d = this.preparedTotal(l), f = await this.addCountersToOutputTypes(u.id, l);
      [l] = f.outputTypes, f.used && this.safeCallback(h, f.used, { op: "mintProofs" }), this._logger.debug("mint counter", { counter: f.used, mintOT: l });
@@ -642,7 +589,7 @@ index 6480cbd..d33811d 100644
    }
    // -----------------------------------------------------------------
    // Section: Create Melt Quote
-@@ -6074,6 +6300,7 @@ class me {
+@@ -6074,6 +6247,7 @@
     *   reserve.
     */
    async createMeltQuoteBolt11(t, e) {
@@ -650,7 +597,7 @@ index 6480cbd..d33811d 100644
      e !== void 0 && (this.failIf(
        fr(t),
        "amountMsat supplied but invoice already contains an amount. Leave amountMsat undefined for non-zero invoices."
-@@ -6089,6 +6316,7 @@ class me {
+@@ -6089,6 +6263,7 @@
          }
        } : {}
      }, i = await this.mint.createMeltQuoteBolt11(r);
@@ -658,7 +605,7 @@ index 6480cbd..d33811d 100644
      return {
        ...i,
        unit: i.unit || this._unit,
-@@ -6227,6 +6455,7 @@ class me {
+@@ -6227,6 +6402,7 @@
     * @see https://github.com/cashubtc/nuts/blob/main/08.md.
     */
    async prepareMelt(t, e, n, r, i) {
@@ -666,7 +613,7 @@ index 6480cbd..d33811d 100644
      i = i ?? this.defaultOutputType();
      const { keysetId: o, onChangeOutputsCreated: a, onCountersReserved: c } = r || {}, h = this.getKeyset(o), u = nt(n), l = u - e.amount;
      let d = [];
-@@ -6268,6 +6497,7 @@ class me {
+@@ -6268,6 +6444,7 @@
        };
        this.safeCallback(a, p, { op: "meltProofs" }), this.on._emitMeltBlanksCreated(p);
      }
@@ -674,7 +621,7 @@ index 6480cbd..d33811d 100644
      return f;
    }
    /**
-@@ -6284,6 +6514,7 @@ class me {
+@@ -6284,6 +6461,7 @@
     * @throws If melt fails or signatures don't match output count.
     */
    async completeMelt(t, e, n) {
@@ -682,7 +629,7 @@ index 6480cbd..d33811d 100644
      t = this.maybeConvertMeltBlanks(t);
      let r = t.inputs;
      const i = t.outputData.map((d) => d.blindedMessage), o = t.quote.quote, a = this.getKeyset(t.keysetId);
-@@ -6293,13 +6524,18 @@ class me {
+@@ -6293,13 +6471,18 @@
        inputs: r,
        outputs: i,
        ...n ? { prefer_async: !0 } : {}
@@ -703,7 +650,7 @@ index 6480cbd..d33811d 100644
        ...t.quote,
        ...h
      }, change: u };
-@@ -6332,9 +6568,14 @@ class me {
+@@ -6332,9 +6515,14 @@
     * @returns NUT-07 state for each proof, in same order.
     */
    async checkProofsStates(t) {
@@ -720,7 +667,7 @@ index 6480cbd..d33811d 100644
      for (let o = 0; o < n.length; o += r) {
        const a = n.slice(o, o + r), { states: c } = await this.mint.check({
          Ys: a
-@@ -6347,6 +6588,7 @@ class me {
+@@ -6347,6 +6535,7 @@
          this.failIfNullish(l, "Could not find state for proof with Y: " + a[u]), i.push(l);
        }
      }
