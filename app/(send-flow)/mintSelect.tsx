@@ -13,14 +13,14 @@
  * `useScreenActions`.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { Stack, router } from 'expo-router';
 import { z } from 'zod';
 
 import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'coco-payment-ux/react';
 import type { MintListItem, StepDataMap } from 'coco-payment-ux';
 
-import { MintListScreen } from '@/features/mint';
+import { MintListScreen, useStickyMintSelectorItems } from '@/features/mint';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -42,15 +42,11 @@ function MintSelectRoute() {
   const liveSelectMint =
     execution.step === 'selectMint' ? (execution.details as StepDataMap['selectMint']) : null;
 
-  const items = useMemo<MintListItem[]>(
-    () =>
-      Array.isArray(liveSelectMint?.mintListItems)
-        ? liveSelectMint.mintListItems
-        : Array.isArray(entry?.items)
-          ? (entry.items as MintListItem[])
-          : [],
-    [entry?.items, liveSelectMint?.mintListItems]
-  );
+  const liveItems = Array.isArray(liveSelectMint?.mintListItems)
+    ? liveSelectMint.mintListItems
+    : null;
+  const entryItems = Array.isArray(entry?.items) ? (entry.items as MintListItem[]) : null;
+  const items = useStickyMintSelectorItems(liveItems, entryItems);
 
   useEffect(() => {
     const available = items.filter((i) => i.status === 'available').length;

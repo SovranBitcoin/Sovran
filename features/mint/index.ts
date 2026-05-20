@@ -28,3 +28,4 @@ export { useAuditedMints, type AuditedMintData } from './hooks/useAuditedMints';
 export { useDebouncedMintValidation } from './hooks/useDebouncedMintValidation';
 export { useNostrDiscoveredMints } from './hooks/useNostrDiscoveredMints';
 export { useSovranDiscoveredMints } from './hooks/useSovranDiscoveredMints';
+export { useStickyMintSelectorItems } from './hooks/useStickyMintSelectorItems';
