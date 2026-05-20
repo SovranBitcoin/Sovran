@@ -1,7 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import { Menu, type MenuTriggerRef } from 'heroui-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
+import Icon from 'assets/icons';
 import {
   useHistoryWithMelts,
   ReceivedThisMonth,
@@ -18,6 +20,7 @@ import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { zIndex } from '@/shared/styles/tokens';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { QRButton } from '@/shared/ui/composed/QRButton';
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -25,6 +28,7 @@ import { useHandleCameraPermission } from '@/features/camera';
 import { usePaymentFlowMachine } from 'coco-payment-ux/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
+import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 
@@ -72,6 +76,10 @@ export function WalletScreen() {
   const { handlePermission } = useHandleCameraPermission();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: ACCOUNT.unit });
+  const moreMenuTriggerRef = useRef<MenuTriggerRef>(null);
+  const openMoreMenu = useCallback(() => {
+    setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
+  }, []);
 
   // While a multi-leg swap is running, every payment-initiating button on
   // this screen is gated. Coco's mint/melt services serialize through a
@@ -100,8 +108,20 @@ export function WalletScreen() {
 
   const handleSend = useCallback(async () => {
     walletLog.info('wallet.action.send', { unit: ACCOUNT.unit });
+    useNearPaySessionStore.getState().clear();
     await machine.startSendEcash({ reset: true });
   }, [machine]);
+
+  const handleTheme = useCallback(() => {
+    walletLog.info('wallet.theme.tap');
+    router.push('/(theme-flow)/preview');
+  }, []);
+
+  const handleNearPay = useCallback(() => {
+    walletLog.info('wallet.near_pay.tap', { unit: ACCOUNT.unit });
+    useNearPaySessionStore.getState().clear();
+    router.push('/(send-flow)/nearPay');
+  }, []);
 
   return (
     <BootEntrance>
@@ -141,16 +161,49 @@ export function WalletScreen() {
                   });
                 }}
               />
-              <CircleActionButton
-                icon="mdi:palette"
-                systemIcon="paintpalette"
-                label="Theme"
-                testID="wallet-action-theme"
-                onPress={() => {
-                  walletLog.info('wallet.theme.tap');
-                  router.push('/(theme-flow)/preview');
-                }}
-              />
+              <Menu presentation="bottom-sheet">
+                <Menu.Trigger
+                  ref={moreMenuTriggerRef}
+                  style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+                  <View style={{ width: 1, height: 1 }} />
+                </Menu.Trigger>
+                <CircleActionButton
+                  icon="tabler:dots"
+                  systemIcon="ellipsis"
+                  label="More"
+                  testID="wallet-more"
+                  onPress={openMoreMenu}
+                />
+                <Menu.Portal>
+                  <MenuScrim />
+                  <Menu.Content presentation="bottom-sheet">
+                    <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
+                      Select option
+                    </Menu.Label>
+                    <Menu.Item testID="wallet-action-theme" onPress={handleTheme}>
+                      <HStack align="center" gap={10} style={{ flex: 1 }}>
+                        <Icon name="mdi:palette" size={20} />
+                        <View style={{ flex: 1 }}>
+                          <Menu.ItemTitle>Theme</Menu.ItemTitle>
+                          <Menu.ItemDescription>Change wallet appearance</Menu.ItemDescription>
+                        </View>
+                      </HStack>
+                    </Menu.Item>
+                    <Menu.Item
+                      testID="wallet-action-near-pay"
+                      isDisabled={isSwapping}
+                      onPress={handleNearPay}>
+                      <HStack align="center" gap={10} style={{ flex: 1 }}>
+                        <Icon name="mdi:bluetooth" size={20} />
+                        <View style={{ flex: 1 }}>
+                          <Menu.ItemTitle>Near Pay</Menu.ItemTitle>
+                          <Menu.ItemDescription>Pay a nearby BitChat user</Menu.ItemDescription>
+                        </View>
+                      </HStack>
+                    </Menu.Item>
+                  </Menu.Content>
+                </Menu.Portal>
+              </Menu>
             </HStack>
 
             {/* Wrap the Receive / Send / QR row in a single pointerEvents=none

@@ -60,7 +60,11 @@ import {
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
+import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
+import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
+import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
+import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
@@ -731,6 +735,66 @@ interface CreateSovranHandlersConfig {
   getNpub?: () => string | undefined;
 }
 
+function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string | null {
+  try {
+    const parsed = JSON.parse(historyEntry) as {
+      token?: Parameters<typeof getEncodedTokenV4>[0];
+      tokenString?: unknown;
+      metadata?: { rawToken?: unknown };
+    };
+    if (typeof parsed.tokenString === 'string' && parsed.tokenString.length > 0) {
+      return parsed.tokenString;
+    }
+    if (typeof parsed.metadata?.rawToken === 'string' && parsed.metadata.rawToken.length > 0) {
+      return parsed.metadata.rawToken;
+    }
+    if (parsed.token) {
+      return getEncodedTokenV4(parsed.token);
+    }
+  } catch (err) {
+    paymentLog.warn('near_pay.token.extract_failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  return null;
+}
+
+async function deliverNearPayIfActive(historyEntry: string): Promise<void> {
+  const active = useNearPaySessionStore.getState().active;
+  if (!active) return;
+
+  try {
+    const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
+    if (!encodedToken) throw new Error('Created send entry did not contain an ecash token');
+
+    const profileScope = getBitchatProfileScope();
+    const nickname = getBitchatNickname() || 'sovran';
+    const result = await sendBLEPrivateMessageChunks({
+      peerID: active.recipient.peerID,
+      content: encodedToken,
+      nickname,
+      profileScope,
+      messageIdPrefix: 'near-pay',
+    });
+
+    paymentLog.info('near_pay.delivery.sent', {
+      peerID: active.recipient.peerID,
+      chunks: result.chunks,
+      hasDirectLink: active.recipient.hasDirectLink,
+      startupMs: Math.round(result.startupMs * 100) / 100,
+      sendMs: Math.round(result.sendMs * 100) / 100,
+      handshakeError: result.handshakeError ?? null,
+    });
+  } catch (err) {
+    paymentLog.error('near_pay.delivery.failed', {
+      peerID: active.recipient.peerID,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    useNearPaySessionStore.getState().complete();
+  }
+}
+
 export function createSovranHandlers({
   machine,
   onOptionDismiss,
@@ -805,6 +869,8 @@ export function createSovranHandlers({
           });
         }
       }
+
+      await deliverNearPayIfActive(enrichedHistoryEntry);
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',
@@ -982,6 +1048,14 @@ export function createSovranHandlers({
         ...(constraints.recipientProfile ? { recipientProfile: constraints.recipientProfile } : {}),
       };
       const params = { amountEntry: JSON.stringify(entry) };
+      const nearPaySessionStore = useNearPaySessionStore.getState();
+      if (constraints.destination === 'sendEcash' && nearPaySessionStore.active) {
+        nearPaySessionStore.setAmountEntry(params.amountEntry);
+        paymentLog.info('navigate.enterAmount.near_pay_inline', {
+          duration_ms: performance.now() - t0,
+        });
+        return;
+      }
       router.navigate(
         constraints.destination === 'mintQuote'
           ? { pathname: '/(receive-flow)/amount', params }

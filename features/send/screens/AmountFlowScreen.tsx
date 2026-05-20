@@ -20,6 +20,7 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { View } from '@/shared/ui/primitives/View/View';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 
 import { RecipientHeader } from '../components/RecipientHeader';
 
@@ -29,8 +30,17 @@ interface AmountFlowScreenProps {
   amountEntry?: string;
 }
 
+interface AmountFlowContentProps {
+  amountEntry?: string;
+  headerMode?: 'native' | 'none';
+}
+
 export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
-  useLifecycleLogger('AmountFlowScreen');
+  return <AmountFlowContent amountEntry={amountEntry} headerMode="native" />;
+}
+
+export function AmountFlowContent({ amountEntry, headerMode = 'native' }: AmountFlowContentProps) {
+  useLifecycleLogger(headerMode === 'native' ? 'AmountFlowScreen' : 'NearPayInlineAmountFlow');
   const foreground = useThemeColor('foreground');
   const background = useThemeColor('background');
 
@@ -70,6 +80,9 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
     typeof entry?.recipientPubkey === 'string' ? entry.recipientPubkey : undefined;
   const entryRecipientProfile = entry?.recipientProfile as RecipientProfile | undefined;
   const entryMeltTarget = typeof entry?.meltTarget === 'string' ? entry.meltTarget : null;
+  const nearPaySession = useNearPaySessionStore((s) => s.active);
+  const nearPayRecipient =
+    entry?.destination === 'sendEcash' ? (nearPaySession?.recipient ?? null) : null;
 
   // Path 3: local NIP-05 fallback. Kicks in only when neither the entry
   // nor the live ctx already supplied a pubkey. Cancellable so a melt
@@ -105,9 +118,23 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   const fallbackDisplayName = liveNostrMetadata
     ? resolveIdentityName({ pubkey: recipientPubkey ?? '', nostrProfile: liveNostrMetadata })
     : null;
-  const headerDisplayName = recipientProfile?.displayName ?? fallbackDisplayName ?? null;
-  const headerAvatarUrl = recipientProfile?.avatarUrl ?? liveNostrMetadata?.picture ?? null;
-  const recipientReady = !!(recipientPubkey && headerDisplayName);
+  const nostrHeaderDisplayName = recipientProfile?.displayName ?? fallbackDisplayName ?? null;
+  const headerDisplayName = nearPayRecipient?.nickname ?? nostrHeaderDisplayName;
+  const headerAvatarUrl = nearPayRecipient
+    ? null
+    : (recipientProfile?.avatarUrl ?? liveNostrMetadata?.picture ?? null);
+  const headerSeed = nearPayRecipient?.peerID ?? recipientPubkey;
+  const recipientReady = !!(headerDisplayName && (recipientPubkey || nearPayRecipient));
+
+  useEffect(() => {
+    if (!nearPayRecipient) return;
+    return () => {
+      const current = useNearPaySessionStore.getState().active;
+      if (current?.recipient.peerID === nearPayRecipient.peerID) {
+        useNearPaySessionStore.getState().clear();
+      }
+    };
+  }, [nearPayRecipient]);
 
   // Profile bundle forwarded to AmountSelector → `actions.next.execute(...)` →
   // machine.enterAmount → entry.metadata. Forwarded whenever we have a
@@ -126,10 +153,10 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
         ? {
             displayName: headerDisplayName,
             avatarUrl: headerAvatarUrl,
-            nip05: liveNostrMetadata?.nip05 ?? null,
+            nip05: nearPayRecipient ? null : (liveNostrMetadata?.nip05 ?? null),
           }
         : undefined,
-    [headerDisplayName, headerAvatarUrl, liveNostrMetadata?.nip05]
+    [headerDisplayName, headerAvatarUrl, liveNostrMetadata?.nip05, nearPayRecipient]
   );
 
   useEffect(() => {
@@ -148,8 +175,9 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
       entryRecipientProfilePresent: !!entry?.recipientProfile,
       entryMeltTarget: typeof entry?.meltTarget === 'string' ? entry.meltTarget.slice(0, 40) : null,
       entryDestination: entry?.destination ?? null,
+      nearPayPeerID: nearPayRecipient?.peerID ?? null,
     });
-  }, [entry]);
+  }, [entry, nearPayRecipient?.peerID]);
 
   // Diagnostic: subscribe to machine state changes and log ctx every time
   // the machine notifies. Lets us see if recipientPubkey/Profile lands on
@@ -183,34 +211,37 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
 
   return (
     <Log name="AmountFlowScreen">
-      <Stack.Screen
-        options={{
-          title: 'Select Amount',
-          headerTitleAlign: 'center',
-          headerTitle: () =>
-            recipientReady ? (
-              <RecipientHeader
-                pubkey={recipientPubkey!}
-                displayName={headerDisplayName!}
-                avatarUrl={headerAvatarUrl}
-              />
-            ) : (
-              <MintSelector selectedMintUrl={mintUrl} onRequestMintList={handleRequestMintList} />
-            ),
-          headerTintColor: foreground,
-          headerRight:
-            isSendOperation && mintUrl
-              ? () => (
-                  <IconSymbol
-                    name={canSendOffline === true ? 'airplane' : 'wifi'}
-                    size={18}
-                    color={foreground}
-                    style={{ opacity: canSendOffline === null ? 0.3 : 1 }}
-                  />
-                )
-              : undefined,
-        }}
-      />
+      {headerMode === 'native' ? (
+        <Stack.Screen
+          options={{
+            title: 'Select Amount',
+            headerTitleAlign: 'center',
+            headerTitle: () =>
+              recipientReady ? (
+                <RecipientHeader
+                  pubkey={recipientPubkey}
+                  seed={headerSeed}
+                  displayName={headerDisplayName!}
+                  avatarUrl={headerAvatarUrl}
+                />
+              ) : (
+                <MintSelector selectedMintUrl={mintUrl} onRequestMintList={handleRequestMintList} />
+              ),
+            headerTintColor: foreground,
+            headerRight:
+              isSendOperation && mintUrl
+                ? () => (
+                    <IconSymbol
+                      name={canSendOffline === true ? 'airplane' : 'wifi'}
+                      size={18}
+                      color={foreground}
+                      style={{ opacity: canSendOffline === null ? 0.3 : 1 }}
+                    />
+                  )
+                : undefined,
+          }}
+        />
+      ) : null}
       <View style={{ flex: 1 }}>
         <AmountSelector
           entry={entry}
@@ -223,6 +254,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
           onRequestMintList={handleRequestMintList}
           recipientPubkey={recipientPubkey}
           recipientProfile={forwardedRecipientProfile}
+          suppressNextVariants={!!nearPayRecipient}
         />
       </View>
     </Log>

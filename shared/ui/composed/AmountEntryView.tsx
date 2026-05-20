@@ -173,7 +173,7 @@ export function AmountEntryView({
   nextDisabled = false,
   nextText = 'Next',
   nextTestID = 'amount-next',
-  nextIcon = 'lucide:arrow-right',
+  nextIcon,
   fiatSymbol = null,
   secondaryDisplay = null,
   onToggleMode,

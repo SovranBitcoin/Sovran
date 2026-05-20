@@ -73,6 +73,8 @@ interface AmountSelectorProps {
    */
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
+  /** Hide variant menu when the caller owns delivery after ecash creation. */
+  suppressNextVariants?: boolean;
 }
 
 export function AmountSelector({
@@ -86,6 +88,7 @@ export function AmountSelector({
   onRequestMintList,
   recipientPubkey,
   recipientProfile,
+  suppressNextVariants = false,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
 
@@ -152,6 +155,7 @@ export function AmountSelector({
   // invokes `actions.next.execute({ variantId })`, which routes through the
   // screen-action handler to the machine.
   const nextVariants = useMemo<ActionMenuVariant[] | undefined>(() => {
+    if (suppressNextVariants) return undefined;
     const raw = actions.next.variants as ActionVariant[] | undefined;
     if (!raw || raw.length === 0) return undefined;
     return raw.map((v) => ({
@@ -174,7 +178,7 @@ export function AmountSelector({
         await actions.next.execute({ variantId: v.id, ...nextExecuteParams });
       },
     }));
-  }, [actions.next, nextExecuteParams]);
+  }, [actions.next, nextExecuteParams, suppressNextVariants]);
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled
   // navigation (`useRoutstrTopUpStore.start()` → `/(send-flow)/amount`),

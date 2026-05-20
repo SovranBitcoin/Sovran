@@ -1,5 +1,14 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { getBLEPeers, addBLEPeerListener, type BLEPeer } from 'bitchat-module';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
+import {
+  buildMockBLEPeers,
+  INITIAL_MOCK_BLE_PEER_LOOP_STATE,
+  getNextMockBLEPeerLoopState,
+  MOCK_BLE_PEER_LOOP_INTERVAL_MS,
+  type MockBLEPeerLoopState,
+} from '@/features/bitchat/lib/mockBLEPeers';
 
 interface UseBLEPeersResult {
   peers: BLEPeer[];
@@ -24,13 +33,35 @@ interface UseBLEPeersResult {
  * publisher; we mirror it with React state here.
  */
 export function useBLEPeers(): UseBLEPeersResult {
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const mockLoopRef = useRef<MockBLEPeerLoopState>(INITIAL_MOCK_BLE_PEER_LOOP_STATE);
   const [peers, setPeers] = useState<BLEPeer[]>(() => getBLEPeers());
 
-  const refresh = useCallback(() => {
-    setPeers(getBLEPeers());
+  const setPeersIfChanged = useCallback((nextPeers: BLEPeer[]) => {
+    setPeers((current) =>
+      areBLEPeerSnapshotsEquivalent(current, nextPeers) ? current : nextPeers
+    );
   }, []);
 
+  const refresh = useCallback(() => {
+    if (mockMode) {
+      setPeersIfChanged(buildMockBLEPeers(mockLoopRef.current.count));
+      return;
+    }
+    setPeersIfChanged(getBLEPeers());
+  }, [mockMode, setPeersIfChanged]);
+
   useEffect(() => {
+    if (mockMode) {
+      mockLoopRef.current = INITIAL_MOCK_BLE_PEER_LOOP_STATE;
+      setPeersIfChanged(buildMockBLEPeers(mockLoopRef.current.count));
+      const interval = setInterval(() => {
+        mockLoopRef.current = getNextMockBLEPeerLoopState(mockLoopRef.current);
+        setPeersIfChanged(buildMockBLEPeers(mockLoopRef.current.count));
+      }, MOCK_BLE_PEER_LOOP_INTERVAL_MS);
+      return () => clearInterval(interval);
+    }
+
     refresh();
     const sub = addBLEPeerListener(() => {
       refresh();
@@ -40,7 +71,7 @@ export function useBLEPeers(): UseBLEPeersResult {
       sub.remove();
       clearInterval(interval);
     };
-  }, [refresh]);
+  }, [mockMode, refresh, setPeersIfChanged]);
 
   const connectedCount = useMemo(() => peers.filter((p) => p.isConnected).length, [peers]);
 
