@@ -165,7 +165,7 @@ describe('near pay peer layout registry', () => {
     expect(targets[0].y).toBeLessThan(targets[1].y);
   });
 
-  it('uses triangle, square, and pentagon shapes for three through five peers', () => {
+  it('uses triangle and square shapes for three and four peers', () => {
     const triangleTargets = buildPeerLayoutTargets(
       reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c')], 0),
       SIZE,
@@ -176,15 +176,24 @@ describe('near pay peer layout registry', () => {
       SIZE,
       CONFIG
     );
-    const pentagonTargets = buildPeerLayoutTargets(
+
+    expect(sortedTargetAngles(triangleTargets)).toEqual([30, 150, 270]);
+    expect(sortedTargetAngles(squareTargets)).toEqual([45, 135, 225, 315]);
+  });
+
+  it('uses the four-peer square with the fifth peer in the center', () => {
+    const targets = buildPeerLayoutTargets(
       reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c'), peer('d'), peer('e')], 0),
       SIZE,
       CONFIG
     );
+    const fieldCenterX = SIZE.width / 2;
+    const fieldCenterY = SIZE.height / 2;
+    const fifthTarget = targets[4];
 
-    expect(sortedTargetAngles(triangleTargets)).toEqual([30, 150, 270]);
-    expect(sortedTargetAngles(squareTargets)).toEqual([45, 135, 225, 315]);
-    expect(sortedTargetAngles(pentagonTargets)).toEqual([54, 126, 198, 270, 342]);
+    expect(sortedTargetAngles(targets.slice(0, 4))).toEqual([45, 135, 225, 315]);
+    expect(fifthTarget.x + CONFIG.nodeWidth / 2).toBeCloseTo(fieldCenterX, 4);
+    expect(fifthTarget.y + CONFIG.nodeHeight / 2).toBeCloseTo(fieldCenterY, 4);
   });
 
   it('fills the horizontal safe width with a six-peer hex ring', () => {

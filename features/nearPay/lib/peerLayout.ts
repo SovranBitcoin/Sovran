@@ -213,6 +213,22 @@ function buildSmallShapeOffsets(
   horizontalSafeRadius: number,
   verticalSafeRadius: number
 ): PeerLayoutOffset[] {
+  if (count === 5) {
+    const squareAngles = getSmallShapeAngles(4);
+    const squareRadius = getAllowedRadiusForAngles(
+      squareAngles,
+      horizontalSafeRadius,
+      verticalSafeRadius
+    );
+    return [
+      ...squareAngles.map((angle) => ({
+        x: Math.cos(angle) * squareRadius,
+        y: Math.sin(angle) * squareRadius,
+      })),
+      { x: 0, y: 0 },
+    ];
+  }
+
   const angles = getSmallShapeAngles(count);
   const shapeRadius = getAllowedRadiusForAngles(angles, horizontalSafeRadius, verticalSafeRadius);
   const radius = count === 2 ? Math.min(shapeRadius, horizontalSafeRadius) : shapeRadius;
@@ -228,12 +244,6 @@ function getSmallShapeAngles(count: number): number[] {
   if (count === 2) return [-Math.PI / 2, Math.PI / 2];
   if (count === 3) return [-Math.PI / 2, Math.PI / 6, (Math.PI * 5) / 6];
   if (count === 4) return [(-Math.PI * 3) / 4, -Math.PI / 4, Math.PI / 4, (Math.PI * 3) / 4];
-  if (count === 5) {
-    return Array.from(
-      { length: count },
-      (_, index) => -Math.PI / 2 + (Math.PI * 2 * index) / count
-    );
-  }
   return [];
 }
 

@@ -9,6 +9,8 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withRepeat,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
@@ -39,7 +41,7 @@ import {
   type PeerLayoutSize,
   type PeerLayoutTarget,
 } from '@/features/nearPay/lib/peerLayout';
-import { buildDotFieldPathBuckets } from '@/features/nearPay/lib/dotField';
+import { buildDotFieldPathBuckets, type DotFieldMagnet } from '@/features/nearPay/lib/dotField';
 
 const AVATAR_SIZE = 48;
 const AMOUNT_HEADER_AVATAR_SIZE = 56;
@@ -51,6 +53,10 @@ const PEER_AVATAR_LEFT = (NODE_WIDTH - AVATAR_SIZE) / 2;
 const PEER_AVATAR_TOP = spacing.xs;
 const DOT_SPACING = 18;
 const DOT_RADIUS = 1;
+const DOT_MAGNET_RADIUS = AVATAR_SIZE / 2 + DOT_SPACING * 0.35;
+const DOT_MAGNET_INFLUENCE_RADIUS = AVATAR_SIZE / 2 + DOT_SPACING * 2.5;
+const DOT_MAGNET_STRENGTH = DOT_SPACING * 0.85;
+const DOT_FIELD_AMBIENT_TRANSLATE = spacing.xs / 2;
 const MIN_ARC_SPACING = 78;
 const FIELD_EDGE_PADDING = spacing.lg;
 const PEER_ENTRY_ANIMATION_MS = 460;
@@ -58,6 +64,27 @@ const PEER_REBALANCE_ANIMATION_MS = 320;
 const PEER_EXIT_SCALE = 0.94;
 const PEER_ENTRY_SCALE = 0.88;
 const SHARED_AVATAR_ANIMATION_MS = 430;
+const AMOUNT_CONTENT_ENTER_OFFSET = spacing.sm;
+const AMOUNT_CONTENT_ENTER_DELAY_MS = duration.standard;
+const AMOUNT_CONTENT_ENTER_TIMING = {
+  duration: duration.standard,
+  easing: Easing.out(Easing.cubic),
+};
+const PEER_ENTRY_SPRING = {
+  damping: 18,
+  stiffness: 160,
+  mass: 0.85,
+};
+const PEER_REBALANCE_SPRING = {
+  damping: 20,
+  stiffness: 190,
+  mass: 0.8,
+};
+const PEER_SCALE_SPRING = {
+  damping: 15,
+  stiffness: 220,
+  mass: 0.7,
+};
 const FOREGROUND_THEME_KEYS = ['foreground'] as const;
 const HEADER_BADGE_THEME_KEYS = ['foreground', 'shade-400', 'accent', 'accent-foreground'] as const;
 const PEER_LAYOUT_CONFIG = {
@@ -128,23 +155,52 @@ const HeaderBadge = React.memo(function HeaderBadge({
 const DotField = React.memo(function DotField({
   size,
   foreground,
+  magnets,
 }: {
   size: PeerLayoutSize;
   foreground: string;
+  magnets: readonly DotFieldMagnet[];
 }) {
   const { width, height } = size;
+  const ambientProgress = useSharedValue(0);
   const buckets = useMemo(
-    () => buildDotFieldPathBuckets({ width, height }, DOT_SPACING, DOT_RADIUS),
-    [height, width]
+    () => buildDotFieldPathBuckets({ width, height }, DOT_SPACING, DOT_RADIUS, magnets),
+    [height, magnets, width]
   );
+
+  useEffect(() => {
+    ambientProgress.set(
+      withRepeat(
+        withTiming(1, {
+          duration: duration.loop,
+          easing: Easing.inOut(Easing.quad),
+        }),
+        -1,
+        true
+      )
+    );
+    return () => cancelAnimation(ambientProgress);
+  }, [ambientProgress]);
+
+  const ambientStyle = useAnimatedStyle(() => ({
+    opacity: 0.94 + ambientProgress.get() * 0.06,
+    transform: [
+      { translateY: (ambientProgress.get() - 0.5) * DOT_FIELD_AMBIENT_TRANSLATE },
+      { scale: 1 + ambientProgress.get() * 0.002 },
+    ],
+  }));
+  const layerStyle = useMemo(() => [StyleSheet.absoluteFillObject, ambientStyle], [ambientStyle]);
+
   if (width <= 0 || height <= 0 || buckets.length === 0) return null;
 
   return (
-    <Svg pointerEvents="none" width={width} height={height} style={StyleSheet.absoluteFillObject}>
-      {buckets.map((bucket) => (
-        <Path key={bucket.key} d={bucket.d} fill={foreground} opacity={bucket.opacity} />
-      ))}
-    </Svg>
+    <Animated.View pointerEvents="none" style={layerStyle}>
+      <Svg width={width} height={height} style={StyleSheet.absoluteFillObject}>
+        {buckets.map((bucket) => (
+          <Path key={bucket.key} d={bucket.d} fill={foreground} opacity={bucket.opacity} />
+        ))}
+      </Svg>
+    </Animated.View>
   );
 });
 
@@ -203,14 +259,20 @@ const PeerNode = React.memo(function PeerNode({
         : PEER_REBALANCE_ANIMATION_MS;
     const timing = { duration: animationDuration, easing: Easing.out(Easing.cubic) };
     const opacityTiming = { duration: duration.quick, easing: Easing.out(Easing.cubic) };
-    translateX.set(withTiming(exiting ? target.exitX : target.x, timing));
-    translateY.set(withTiming(exiting ? target.exitY : target.y, timing));
+    if (exiting) {
+      translateX.set(withTiming(target.exitX, timing));
+      translateY.set(withTiming(target.exitY, timing));
+    } else {
+      const spring = firstPlacement ? PEER_ENTRY_SPRING : PEER_REBALANCE_SPRING;
+      translateX.set(withSpring(target.x, spring));
+      translateY.set(withSpring(target.y, spring));
+    }
     nodeOpacity.set(
       exiting
         ? withDelay(Math.round(animationDuration * 0.62), withTiming(0, opacityTiming))
         : withTiming(1, opacityTiming)
     );
-    scale.set(withTiming(exiting ? PEER_EXIT_SCALE : 1, timing));
+    scale.set(exiting ? withTiming(PEER_EXIT_SCALE, timing) : withSpring(1, PEER_SCALE_SPRING));
   }, [
     nodeOpacity,
     scale,
@@ -364,10 +426,22 @@ function NearPayPeerField({
     () => buildPeerLayoutTargets(registry, fieldSize, PEER_LAYOUT_CONFIG),
     [fieldSize, registry]
   );
+  const dotMagnets = useMemo<DotFieldMagnet[]>(
+    () =>
+      targets.map((target) => ({
+        id: target.peer.peerID,
+        cx: target.x + PEER_AVATAR_LEFT + AVATAR_SIZE / 2,
+        cy: target.y + PEER_AVATAR_TOP + AVATAR_SIZE / 2,
+        radius: DOT_MAGNET_RADIUS,
+        influenceRadius: DOT_MAGNET_INFLUENCE_RADIUS,
+        strength: DOT_MAGNET_STRENGTH,
+      })),
+    [targets]
+  );
 
   return (
     <View onLayout={handleLayout} style={styles.field}>
-      <DotField size={fieldSize} foreground={foreground} />
+      <DotField size={fieldSize} foreground={foreground} magnets={dotMagnets} />
       {registry.length === 0 ? emptyContent : null}
       {targets.map((target) => (
         <PeerNode
@@ -398,6 +472,7 @@ export function NearPayScreen() {
   const pickerOpacity = useSharedValue(1);
   const amountOpacity = useSharedValue(0);
   const amountContentOpacity = useSharedValue(0);
+  const amountContentTranslateY = useSharedValue<number>(AMOUNT_CONTENT_ENTER_OFFSET);
   const sharedAvatarX = useSharedValue(0);
   const sharedAvatarY = useSharedValue(0);
   const sharedAvatarScale = useSharedValue(1);
@@ -450,6 +525,7 @@ export function NearPayScreen() {
     cancelAnimation(pickerOpacity);
     cancelAnimation(amountOpacity);
     cancelAnimation(amountContentOpacity);
+    cancelAnimation(amountContentTranslateY);
     cancelAnimation(sharedAvatarX);
     cancelAnimation(sharedAvatarY);
     cancelAnimation(sharedAvatarScale);
@@ -457,6 +533,7 @@ export function NearPayScreen() {
   }, [
     amountOpacity,
     amountContentOpacity,
+    amountContentTranslateY,
     pickerOpacity,
     sharedAvatarOpacity,
     sharedAvatarScale,
@@ -471,6 +548,7 @@ export function NearPayScreen() {
     setSharedAvatarPeer(null);
     setAmountContentMounted(false);
     amountContentOpacity.set(0);
+    amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
     sharedAvatarOpacity.set(0);
     pickerOpacity.set(
       withTiming(1, { duration: duration.quick, easing: Easing.out(Easing.cubic) })
@@ -481,6 +559,7 @@ export function NearPayScreen() {
     useNearPaySessionStore.getState().resetToPicker();
   }, [
     amountContentOpacity,
+    amountContentTranslateY,
     amountOpacity,
     pickerOpacity,
     sharedAvatarOpacity,
@@ -499,6 +578,7 @@ export function NearPayScreen() {
       setAmountContentMounted(false);
       stopSharedElementAnimations();
       amountContentOpacity.set(0);
+      amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
       setSharedAvatarPeer(peer);
       sharedAvatarX.set(avatarRect.x);
       sharedAvatarY.set(avatarRect.y);
@@ -521,6 +601,7 @@ export function NearPayScreen() {
         setSharedAvatarPeer(null);
         setAmountContentMounted(false);
         amountContentOpacity.set(0);
+        amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
         useNearPaySessionStore.getState().clear();
         paymentLog.error('near_pay.peer.start_send_failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -530,6 +611,7 @@ export function NearPayScreen() {
     [
       machine,
       amountContentOpacity,
+      amountContentTranslateY,
       sharedAvatarOpacity,
       sharedAvatarScale,
       sharedAvatarX,
@@ -538,12 +620,32 @@ export function NearPayScreen() {
     ]
   );
 
+  const playAmountContentEnter = useCallback(
+    (delayMs = 0) => {
+      setAmountContentMounted(true);
+      amountContentOpacity.set(0);
+      amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
+      amountContentOpacity.set(
+        delayMs > 0
+          ? withDelay(delayMs, withTiming(1, AMOUNT_CONTENT_ENTER_TIMING))
+          : withTiming(1, AMOUNT_CONTENT_ENTER_TIMING)
+      );
+      amountContentTranslateY.set(
+        delayMs > 0
+          ? withDelay(delayMs, withTiming(0, AMOUNT_CONTENT_ENTER_TIMING))
+          : withTiming(0, AMOUNT_CONTENT_ENTER_TIMING)
+      );
+    },
+    [amountContentOpacity, amountContentTranslateY]
+  );
+
   useEffect(() => {
     if (!inlineAmountEntry) {
       stopSharedElementAnimations();
       setSharedAvatarPeer(null);
       setAmountContentMounted(false);
       amountContentOpacity.set(0);
+      amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
       sharedAvatarOpacity.set(0);
       pickerOpacity.set(1);
       amountOpacity.set(0);
@@ -555,10 +657,9 @@ export function NearPayScreen() {
       return;
     }
     if (!selectedPeerRect) {
-      pickerOpacity.set(0);
-      amountOpacity.set(1);
-      setAmountContentMounted(true);
-      amountContentOpacity.set(1);
+      pickerOpacity.set(withTiming(0, AMOUNT_CONTENT_ENTER_TIMING));
+      amountOpacity.set(withTiming(1, AMOUNT_CONTENT_ENTER_TIMING));
+      playAmountContentEnter();
       useNearPaySessionStore.getState().showAmount();
       return;
     }
@@ -575,6 +676,7 @@ export function NearPayScreen() {
     const panelTiming = { duration: Math.round(SHARED_AVATAR_ANIMATION_MS * 0.75), easing };
     pickerOpacity.set(withTiming(0, panelTiming));
     amountOpacity.set(withDelay(90, withTiming(1, panelTiming)));
+    playAmountContentEnter(AMOUNT_CONTENT_ENTER_DELAY_MS);
     sharedAvatarX.set(
       withTiming(headerAvatarRect.x + headerAvatarRect.size / 2 - AVATAR_SIZE / 2, sharedTiming)
     );
@@ -587,21 +689,18 @@ export function NearPayScreen() {
       useNearPaySessionStore.getState().showAmount();
       sharedAvatarOpacity.set(0);
       setSharedAvatarPeer(null);
-      setAmountContentMounted(true);
-      amountContentOpacity.set(0);
-      amountContentOpacity.set(
-        withTiming(1, { duration: duration.quick, easing: Easing.out(Easing.cubic) })
-      );
     }, SHARED_AVATAR_ANIMATION_MS + 40);
     return () => clearTimeout(timeout);
   }, [
     activeRecipientPeer,
     amountContentOpacity,
+    amountContentTranslateY,
     amountOpacity,
     headerAvatarRect,
     inlineAmountEntry,
     inlinePhase,
     pickerOpacity,
+    playAmountContentEnter,
     selectedPeerRect,
     sharedAvatarOpacity,
     sharedAvatarScale,
@@ -612,12 +711,8 @@ export function NearPayScreen() {
 
   useEffect(() => {
     if (!inlineAmountEntry || inlinePhase !== 'amount' || amountContentMounted) return;
-    setAmountContentMounted(true);
-    amountContentOpacity.set(0);
-    amountContentOpacity.set(
-      withTiming(1, { duration: duration.quick, easing: Easing.out(Easing.cubic) })
-    );
-  }, [amountContentMounted, amountContentOpacity, inlineAmountEntry, inlinePhase]);
+    playAmountContentEnter();
+  }, [amountContentMounted, inlineAmountEntry, inlinePhase, playAmountContentEnter]);
 
   const pickerPanelStyle = useAnimatedStyle(() => ({
     opacity: pickerOpacity.get(),
@@ -629,6 +724,7 @@ export function NearPayScreen() {
 
   const amountContentStyle = useAnimatedStyle(() => ({
     opacity: amountContentOpacity.get(),
+    transform: [{ translateY: amountContentTranslateY.get() }],
   }));
 
   const sharedAvatarStyle = useAnimatedStyle(() => ({
