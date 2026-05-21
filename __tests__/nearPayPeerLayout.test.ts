@@ -18,6 +18,9 @@ const CONFIG: PeerLayoutConfig = {
   avatarSize: 48,
   avatarGap: 8,
   edgePadding: 0,
+  edgeScaleFalloff: 96,
+  edgeBoundaryScale: 0.9,
+  edgeTranslationStrength: 1,
   minVisibleScale: 0.16,
 };
 
@@ -92,7 +95,7 @@ function rawAvatarFitScale(target: { x: number; y: number }, size = SIZE): numbe
     center.y - CONFIG.edgePadding,
     size.height - CONFIG.edgePadding - center.y
   );
-  return Math.max(0, Math.min(1, edgeDistance / radius));
+  return Math.max(0, Math.min(1, (edgeDistance + radius) / (radius * 2)));
 }
 
 function presentationAvatarInset(target: { x: number; y: number }, size = SIZE): number {
@@ -334,19 +337,39 @@ describe('near pay peer layout registry', () => {
     expect(new Set(sortedTargetAngles(secondRing)).size).toBe(12);
   });
 
-  it('keeps every cleanly fitting avatar at full scale', () => {
+  it('keeps comfortably fitting avatars at full scale', () => {
     const entries = reconcilePeerLayoutRegistry(
       [],
       Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
       0
     );
     const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-    const cleanTargets = targets.filter((target) => rawFullAvatarInset(target) >= 0);
+    const comfortableTargets = targets.filter(
+      (target) => rawFullAvatarInset(target) >= CONFIG.edgeScaleFalloff
+    );
 
-    expect(cleanTargets.length).toBeGreaterThan(7);
-    for (const target of cleanTargets) {
+    expect(comfortableTargets.length).toBeGreaterThan(7);
+    for (const target of comfortableTargets) {
       expect(getPeerViewportPresentation(target, SIZE, CONFIG).scale).toBe(1);
     }
+  });
+
+  it('subtly scales cleanly fitting avatars inside the edge falloff band', () => {
+    const rawCenter = {
+      x: SIZE.width - CONFIG.edgePadding - CONFIG.avatarSize / 2 - CONFIG.edgeScaleFalloff * 0.5,
+      y: SIZE.height / 2,
+    };
+    const target = {
+      x: rawCenter.x - CONFIG.nodeWidth / 2,
+      y: rawCenter.y - CONFIG.nodeHeight / 2,
+    };
+    const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
+
+    expect(rawFullAvatarInset(target)).toBeGreaterThan(0);
+    expect(rawFullAvatarInset(target)).toBeLessThan(CONFIG.edgeScaleFalloff);
+    expect(presentation.scale).toBeGreaterThan(CONFIG.edgeBoundaryScale);
+    expect(presentation.scale).toBeLessThan(1);
+    expect(presentation.labelOpacity).toBe(0);
   });
 
   it('shrinks overflowing avatars only enough to fit inside the field', () => {
@@ -361,15 +384,80 @@ describe('near pay peer layout registry', () => {
     const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
 
     expect(rawFullAvatarInset(target)).toBeLessThan(0);
-    expect(presentation.scale).toBeCloseTo(0.7, 4);
+    expect(presentation.scale).toBeCloseTo(0.85, 4);
     expect(presentation.scale).toBeGreaterThan(CONFIG.minVisibleScale);
     expect(presentation.scale).toBeLessThan(1);
-    expect(presentationAvatarInset(target)).toBeGreaterThanOrEqual(0);
+    expect(presentationAvatarInset(target)).toBeGreaterThanOrEqual(-0.001);
+  });
+
+  it('keeps inner edge peers visually no closer to the edge than outer shrunken peers', () => {
+    const innerRawCenter = {
+      x: SIZE.width - CONFIG.edgePadding - CONFIG.avatarSize / 2 - CONFIG.edgeScaleFalloff * 0.05,
+      y: SIZE.height / 2,
+    };
+    const outerRawCenter = {
+      x: SIZE.width - CONFIG.edgePadding - CONFIG.avatarSize * 0.35,
+      y: SIZE.height / 2,
+    };
+    const innerTarget = {
+      x: innerRawCenter.x - CONFIG.nodeWidth / 2,
+      y: innerRawCenter.y - CONFIG.nodeHeight / 2,
+    };
+    const outerTarget = {
+      x: outerRawCenter.x - CONFIG.nodeWidth / 2,
+      y: outerRawCenter.y - CONFIG.nodeHeight / 2,
+    };
+    const innerPresentation = getPeerViewportPresentation(innerTarget, SIZE, CONFIG);
+    const outerPresentation = getPeerViewportPresentation(outerTarget, SIZE, CONFIG);
+
+    expect(rawFullAvatarInset(innerTarget)).toBeGreaterThan(0);
+    expect(rawFullAvatarInset(outerTarget)).toBeLessThan(0);
+    expect(innerPresentation.scale).toBeGreaterThan(outerPresentation.scale);
+    expect(innerPresentation.scale).toBeLessThan(1);
+    expect(presentationAvatarInset(innerTarget)).toBeGreaterThanOrEqual(
+      presentationAvatarInset(outerTarget)
+    );
+  });
+
+  it('keeps inside-facing edges ordered through the overflow and falloff band', () => {
+    const rawFullInsets = [-20, -12, -8, -4, -2, 0, 4, 8, 12, 24, 48, 59, 72, 84];
+    const presentations = rawFullInsets.map((rawFullInset) => {
+      const avatarRadius = CONFIG.avatarSize / 2;
+      const rawCenter = {
+        x: SIZE.width - CONFIG.edgePadding - avatarRadius - rawFullInset,
+        y: SIZE.height / 2,
+      };
+      const target = {
+        x: rawCenter.x - CONFIG.nodeWidth / 2,
+        y: rawCenter.y - CONFIG.nodeHeight / 2,
+      };
+      const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
+      const scaledRadius = avatarRadius * presentation.scale;
+
+      return {
+        rawFullInset,
+        rawInsideEdge: rawCenter.x - avatarRadius,
+        insideEdge: presentation.centerX - scaledRadius,
+        scale: presentation.scale,
+      };
+    });
+
+    for (let index = 1; index < presentations.length; index++) {
+      const previous = presentations[index - 1];
+      const current = presentations[index];
+
+      expect(current.rawFullInset).toBeGreaterThan(previous.rawFullInset);
+      expect(current.insideEdge).toBeLessThanOrEqual(previous.insideEdge + 0.001);
+      expect(Math.abs(current.insideEdge - current.rawInsideEdge)).toBeLessThanOrEqual(1.25);
+    }
+    expect(
+      presentations.some((presentation) => presentation.scale > 0 && presentation.scale < 1)
+    ).toBe(true);
   });
 
   it('vanishes avatars whose fit scale is below the visible minimum', () => {
     const rawCenter = {
-      x: CONFIG.edgePadding + CONFIG.avatarSize * 0.04,
+      x: CONFIG.edgePadding - CONFIG.avatarSize * 0.45,
       y: SIZE.height / 2,
     };
     const target = {
@@ -438,9 +526,11 @@ describe('near pay peer layout registry', () => {
     expect(panBounds.maxX).toBeGreaterThan(SIZE.width / 2 - minCenterX);
   });
 
-  it('nudges shrinking edge presentations inward by no more than one avatar radius', () => {
+  it('translates shrinking edge presentations inward to preserve the honeycomb-side gap', () => {
+    const rawFullInset = 12;
+    const avatarRadius = CONFIG.avatarSize / 2;
     const rawCenter = {
-      x: SIZE.width - CONFIG.edgePadding - CONFIG.avatarSize * 0.35,
+      x: SIZE.width - CONFIG.edgePadding - avatarRadius - rawFullInset,
       y: SIZE.height / 2,
     };
     const target = {
@@ -448,18 +538,22 @@ describe('near pay peer layout registry', () => {
       y: rawCenter.y - CONFIG.nodeHeight / 2,
     };
     const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
-    const avatarRadius = CONFIG.avatarSize / 2;
-    const expectedNudge = avatarRadius * (1 - presentation.scale);
+    const scaledRadius = (CONFIG.avatarSize * presentation.scale) / 2;
+    const rightInset = SIZE.width - CONFIG.edgePadding - presentation.centerX - scaledRadius;
+    const rawInsideEdge = rawCenter.x - avatarRadius;
+    const presentedInsideEdge = presentation.centerX - scaledRadius;
 
     expect(presentation.scale).toBeGreaterThan(0);
     expect(presentation.scale).toBeLessThan(1);
-    expect(presentation.centerX).toBeCloseTo(rawCenter.x - expectedNudge, 4);
+    expect(presentation.centerX).toBeLessThan(rawCenter.x);
     expect(presentation.centerY).toBeCloseTo(rawCenter.y, 4);
     expect(Math.abs(presentation.centerX - rawCenter.x)).toBeLessThanOrEqual(avatarRadius);
+    expect(presentedInsideEdge).toBeCloseTo(rawInsideEdge, 0);
+    expect(rightInset).toBeGreaterThan(rawFullInset);
 
     const cornerRawCenter = {
-      x: CONFIG.edgePadding + CONFIG.avatarSize * 0.35,
-      y: CONFIG.edgePadding + CONFIG.avatarSize * 0.35,
+      x: CONFIG.edgePadding + avatarRadius,
+      y: CONFIG.edgePadding + avatarRadius,
     };
     const cornerTarget = {
       x: cornerRawCenter.x - CONFIG.nodeWidth / 2,

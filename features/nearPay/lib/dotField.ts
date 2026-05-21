@@ -6,7 +6,7 @@ interface DotFieldPathBucket {
   d: string;
 }
 
-export interface DotFieldMagnet {
+interface DotFieldMagnet {
   id: string;
   cx: number;
   cy: number;

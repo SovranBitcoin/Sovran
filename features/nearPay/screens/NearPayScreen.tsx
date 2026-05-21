@@ -7,12 +7,10 @@ import Svg, { Path } from 'react-native-svg';
 import Animated, {
   cancelAnimation,
   Easing,
-  runOnJS,
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -46,7 +44,7 @@ import {
   type PeerLayoutSize,
   type PeerLayoutTarget,
 } from '@/features/nearPay/lib/peerLayout';
-import { buildDotFieldPathBuckets, type DotFieldMagnet } from '@/features/nearPay/lib/dotField';
+import { buildDotFieldPathBuckets } from '@/features/nearPay/lib/dotField';
 
 const AVATAR_SIZE = 48;
 const AMOUNT_HEADER_AVATAR_SIZE = 56;
@@ -60,9 +58,10 @@ const PEER_AVATAR_GAP = spacing.sm;
 const PEER_AVATAR_NAME_SIZE = 10;
 const DOT_SPACING = 18;
 const DOT_RADIUS = 1;
-const DOT_MAGNET_STRENGTH = DOT_SPACING * 0.85;
-const DOT_FIELD_AMBIENT_TRANSLATE = spacing.xs / 2;
 const FIELD_EDGE_PADDING = 0;
+const EDGE_SCALE_FALLOFF = AVATAR_SIZE * 2;
+const EDGE_BOUNDARY_SCALE = 0.9;
+const EDGE_TRANSLATION_STRENGTH = 1;
 const MIN_VISIBLE_PEER_SCALE = 0.16;
 const PEER_PAN_RUBBER_BAND_FACTOR = 0.36;
 const PEER_PAN_MOMENTUM_SECONDS = 0.18;
@@ -98,6 +97,9 @@ const PEER_LAYOUT_CONFIG = {
   avatarSize: AVATAR_SIZE,
   avatarGap: PEER_AVATAR_GAP,
   edgePadding: FIELD_EDGE_PADDING,
+  edgeScaleFalloff: EDGE_SCALE_FALLOFF,
+  edgeBoundaryScale: EDGE_BOUNDARY_SCALE,
+  edgeTranslationStrength: EDGE_TRANSLATION_STRENGTH,
   minVisibleScale: MIN_VISIBLE_PEER_SCALE,
 };
 
@@ -162,52 +164,26 @@ const HeaderBadge = React.memo(function HeaderBadge({
 const DotField = React.memo(function DotField({
   size,
   foreground,
-  magnets,
 }: {
   size: PeerLayoutSize;
   foreground: string;
-  magnets: readonly DotFieldMagnet[];
 }) {
   const { width, height } = size;
-  const ambientProgress = useSharedValue(0);
   const buckets = useMemo(
-    () => buildDotFieldPathBuckets({ width, height }, DOT_SPACING, DOT_RADIUS, magnets),
-    [height, magnets, width]
+    () => buildDotFieldPathBuckets({ width, height }, DOT_SPACING, DOT_RADIUS),
+    [height, width]
   );
-
-  useEffect(() => {
-    ambientProgress.set(
-      withRepeat(
-        withTiming(1, {
-          duration: duration.loop,
-          easing: Easing.inOut(Easing.quad),
-        }),
-        -1,
-        true
-      )
-    );
-    return () => cancelAnimation(ambientProgress);
-  }, [ambientProgress]);
-
-  const ambientStyle = useAnimatedStyle(() => ({
-    opacity: 0.94 + ambientProgress.get() * 0.06,
-    transform: [
-      { translateY: (ambientProgress.get() - 0.5) * DOT_FIELD_AMBIENT_TRANSLATE },
-      { scale: 1 + ambientProgress.get() * 0.002 },
-    ],
-  }));
-  const layerStyle = useMemo(() => [StyleSheet.absoluteFillObject, ambientStyle], [ambientStyle]);
 
   if (width <= 0 || height <= 0 || buckets.length === 0) return null;
 
   return (
-    <Animated.View pointerEvents="none" style={layerStyle}>
+    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
       <Svg width={width} height={height} style={StyleSheet.absoluteFillObject}>
         {buckets.map((bucket) => (
           <Path key={bucket.key} d={bucket.d} fill={foreground} opacity={bucket.opacity} />
         ))}
       </Svg>
-    </Animated.View>
+    </View>
   );
 });
 
@@ -293,35 +269,66 @@ const PeerNode = React.memo(function PeerNode({
     const rightInset = fieldSize.width - FIELD_EDGE_PADDING - rawCenterX;
     const topInset = rawCenterY - FIELD_EDGE_PADDING;
     const bottomInset = fieldSize.height - FIELD_EDGE_PADDING - rawCenterY;
+    const edgeDistance = Math.min(leftInset, rightInset, topInset, bottomInset);
     const fitScale =
       fieldSize.width <= 0 || fieldSize.height <= 0
         ? 0
-        : Math.min(
-            Math.max(Math.min(leftInset, rightInset, topInset, bottomInset) / avatarRadius, 0),
-            1
-          );
-    const viewportScale = fitScale >= 1 ? 1 : fitScale < MIN_VISIBLE_PEER_SCALE ? 0 : fitScale;
+        : Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
+    const edgeProgress = Math.min(
+      Math.max((edgeDistance - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+      1
+    );
+    const edgeSmooth = edgeProgress * edgeProgress * (3 - 2 * edgeProgress);
+    const edgeLensScale = EDGE_BOUNDARY_SCALE + (1 - EDGE_BOUNDARY_SCALE) * edgeSmooth;
+    const rawViewportScale = Math.min(fitScale, edgeLensScale);
+    const viewportScale =
+      rawViewportScale >= 1 ? 1 : rawViewportScale < MIN_VISIBLE_PEER_SCALE ? 0 : rawViewportScale;
     const nudgesEdge = viewportScale > 0 && viewportScale < 1;
+    const leftProgress = Math.min(Math.max((leftInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0), 1);
+    const rightProgress = Math.min(
+      Math.max((rightInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+      1
+    );
+    const topProgress = Math.min(Math.max((topInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0), 1);
+    const bottomProgress = Math.min(
+      Math.max((bottomInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+      1
+    );
+    const leftSmooth = leftProgress * leftProgress * (3 - 2 * leftProgress);
+    const rightSmooth = rightProgress * rightProgress * (3 - 2 * rightProgress);
+    const topSmooth = topProgress * topProgress * (3 - 2 * topProgress);
+    const bottomSmooth = bottomProgress * bottomProgress * (3 - 2 * bottomProgress);
+    const leftPressure = 1 - leftSmooth;
+    const rightPressure = 1 - rightSmooth;
+    const topPressure = 1 - topSmooth;
+    const bottomPressure = 1 - bottomSmooth;
+    const scaledRadius = avatarRadius * viewportScale;
+    const lostRadius = avatarRadius - scaledRadius;
+    const edgeTranslation = lostRadius * Math.min(Math.max(EDGE_TRANSLATION_STRENGTH, 0), 1);
     const nudgeX = nudgesEdge
       ? Math.min(
-          Math.max(
-            Math.max(0, avatarRadius - leftInset) - Math.max(0, avatarRadius - rightInset),
-            -avatarRadius
-          ),
+          Math.max((leftPressure - rightPressure) * edgeTranslation, -avatarRadius),
           avatarRadius
         )
       : 0;
     const nudgeY = nudgesEdge
       ? Math.min(
-          Math.max(
-            Math.max(0, avatarRadius - topInset) - Math.max(0, avatarRadius - bottomInset),
-            -avatarRadius
-          ),
+          Math.max((topPressure - bottomPressure) * edgeTranslation, -avatarRadius),
           avatarRadius
         )
       : 0;
-    const centerX = rawCenterX + nudgeX;
-    const centerY = rawCenterY + nudgeY;
+    const centerX = nudgesEdge
+      ? Math.min(
+          Math.max(rawCenterX + nudgeX, FIELD_EDGE_PADDING + scaledRadius),
+          fieldSize.width - FIELD_EDGE_PADDING - scaledRadius
+        )
+      : rawCenterX;
+    const centerY = nudgesEdge
+      ? Math.min(
+          Math.max(rawCenterY + nudgeY, FIELD_EDGE_PADDING + scaledRadius),
+          fieldSize.height - FIELD_EDGE_PADDING - scaledRadius
+        )
+      : rawCenterY;
     const totalScale = viewportScale * visibilityScale.get();
     const scaledAvatarCenterY =
       NODE_HEIGHT / 2 + totalScale * (PEER_AVATAR_CENTER_Y - NODE_HEIGHT / 2);
@@ -339,23 +346,26 @@ const PeerNode = React.memo(function PeerNode({
   const labelAnimatedStyle = useAnimatedStyle(() => {
     const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
     const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
+    const avatarRadius = AVATAR_SIZE / 2;
+    const edgeDistance = Math.min(
+      rawCenterX - FIELD_EDGE_PADDING,
+      fieldSize.width - FIELD_EDGE_PADDING - rawCenterX,
+      rawCenterY - FIELD_EDGE_PADDING,
+      fieldSize.height - FIELD_EDGE_PADDING - rawCenterY
+    );
     const fitScale =
       fieldSize.width <= 0 || fieldSize.height <= 0
         ? 0
-        : Math.min(
-            Math.max(
-              Math.min(
-                rawCenterX - FIELD_EDGE_PADDING,
-                fieldSize.width - FIELD_EDGE_PADDING - rawCenterX,
-                rawCenterY - FIELD_EDGE_PADDING,
-                fieldSize.height - FIELD_EDGE_PADDING - rawCenterY
-              ) /
-                (AVATAR_SIZE / 2),
-              0
-            ),
-            1
-          );
-    const viewportScale = fitScale >= 1 ? 1 : fitScale < MIN_VISIBLE_PEER_SCALE ? 0 : fitScale;
+        : Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
+    const edgeProgress = Math.min(
+      Math.max((edgeDistance - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+      1
+    );
+    const edgeSmooth = edgeProgress * edgeProgress * (3 - 2 * edgeProgress);
+    const edgeLensScale = EDGE_BOUNDARY_SCALE + (1 - EDGE_BOUNDARY_SCALE) * edgeSmooth;
+    const rawViewportScale = Math.min(fitScale, edgeLensScale);
+    const viewportScale =
+      rawViewportScale >= 1 ? 1 : rawViewportScale < MIN_VISIBLE_PEER_SCALE ? 0 : rawViewportScale;
     return {
       opacity: (viewportScale >= 1 ? 1 : 0) * visibilityScale.get(),
     };
@@ -506,7 +516,6 @@ function NearPayPeerField({
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const [fieldSize, setFieldSize] = useState<PeerLayoutSize>({ width: 0, height: 0 });
   const [registry, setRegistry] = useState<PeerLayoutRegistryEntry[]>([]);
-  const [committedPan, setCommittedPan] = useState({ x: 0, y: 0 });
   const panX = useSharedValue(0);
   const panY = useSharedValue(0);
   const panStartX = useSharedValue(0);
@@ -550,12 +559,6 @@ function NearPayPeerField({
     [fieldSize, targets]
   );
 
-  const commitPanOffset = useCallback((x: number, y: number) => {
-    setCommittedPan((current) =>
-      Math.abs(current.x - x) < 0.5 && Math.abs(current.y - y) < 0.5 ? current : { x, y }
-    );
-  }, []);
-
   useEffect(() => {
     minPanX.set(panBounds.minX);
     maxPanX.set(panBounds.maxX);
@@ -571,9 +574,7 @@ function NearPayPeerField({
     const settleTiming = { duration: duration.quick, easing: Easing.out(Easing.cubic) };
     if (nextX !== currentX) panX.set(withTiming(nextX, settleTiming));
     if (nextY !== currentY) panY.set(withTiming(nextY, settleTiming));
-    commitPanOffset(nextX, nextY);
   }, [
-    commitPanOffset,
     isPanning,
     maxPanX,
     maxPanY,
@@ -653,53 +654,18 @@ function NearPayPeerField({
             })
           );
           isPanning.set(false);
-          runOnJS(commitPanOffset)(finalX, finalY);
         })
         .onFinalize(() => {
           'worklet';
           isPanning.set(false);
         }),
-    [
-      commitPanOffset,
-      isPanning,
-      maxPanX,
-      maxPanY,
-      minPanX,
-      minPanY,
-      panStartX,
-      panStartY,
-      panX,
-      panY,
-    ]
-  );
-
-  const dotMagnets = useMemo<DotFieldMagnet[]>(
-    () =>
-      targets.flatMap((target) => {
-        const avatarRect = getScaledAvatarRect(target, fieldSize, committedPan);
-        const presentation = getPeerViewportPresentation(
-          target,
-          fieldSize,
-          PEER_LAYOUT_CONFIG,
-          committedPan
-        );
-        if (presentation.scale <= 0) return [];
-        return {
-          id: target.peer.peerID,
-          cx: avatarRect.x + avatarRect.size / 2,
-          cy: avatarRect.y + avatarRect.size / 2,
-          radius: avatarRect.size / 2 + DOT_SPACING * 0.35,
-          influenceRadius: avatarRect.size / 2 + DOT_SPACING * 2.5,
-          strength: DOT_MAGNET_STRENGTH * presentation.scale,
-        };
-      }),
-    [committedPan, fieldSize, targets]
+    [isPanning, maxPanX, maxPanY, minPanX, minPanY, panStartX, panStartY, panX, panY]
   );
 
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View onLayout={handleLayout} style={styles.field}>
-        <DotField size={fieldSize} foreground={foreground} magnets={dotMagnets} />
+        <DotField size={fieldSize} foreground={foreground} />
         {registry.length === 0 ? emptyContent : null}
         {targets.map((target) => (
           <PeerNode

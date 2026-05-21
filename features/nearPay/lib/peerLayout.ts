@@ -29,6 +29,9 @@ export interface PeerLayoutConfig {
   avatarSize: number;
   avatarGap: number;
   edgePadding: number;
+  edgeScaleFalloff: number;
+  edgeBoundaryScale: number;
+  edgeTranslationStrength: number;
   minVisibleScale: number;
 }
 
@@ -381,9 +384,11 @@ function getPeerAvatarScale(
   config: PeerLayoutConfig
 ): number {
   const fitScale = getAvatarFitScale(center, size, config);
-  if (fitScale >= 1) return 1;
-  if (fitScale < config.minVisibleScale) return 0;
-  return fitScale;
+  const edgeLensScale = getAvatarEdgeLensScale(center, size, config);
+  const scale = Math.min(fitScale, edgeLensScale);
+  if (scale >= 1) return 1;
+  if (scale < config.minVisibleScale) return 0;
+  return scale;
 }
 
 function getAvatarFitScale(
@@ -393,16 +398,33 @@ function getAvatarFitScale(
 ): number {
   if (size.width <= 0 || size.height <= 0 || config.avatarSize <= 0) return 0;
   const avatarRadius = config.avatarSize / 2;
-  return clamp(
-    Math.min(
-      center.x - config.edgePadding,
-      size.width - config.edgePadding - center.x,
-      center.y - config.edgePadding,
-      size.height - config.edgePadding - center.y
-    ) / avatarRadius,
-    0,
-    1
+  const edgeDistance = Math.min(
+    center.x - config.edgePadding,
+    size.width - config.edgePadding - center.x,
+    center.y - config.edgePadding,
+    size.height - config.edgePadding - center.y
   );
+
+  return clamp((edgeDistance + avatarRadius) / (avatarRadius * 2), 0, 1);
+}
+
+function getAvatarEdgeLensScale(
+  center: PeerLayoutOffset,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): number {
+  if (size.width <= 0 || size.height <= 0 || config.avatarSize <= 0) return 0;
+  const avatarRadius = config.avatarSize / 2;
+  const edgeDistance = Math.min(
+    center.x - config.edgePadding,
+    size.width - config.edgePadding - center.x,
+    center.y - config.edgePadding,
+    size.height - config.edgePadding - center.y
+  );
+  const falloffProgress = getEdgeFalloffProgress(edgeDistance, avatarRadius, config);
+  const smoothedProgress = smoothstep(falloffProgress);
+
+  return clamp(config.edgeBoundaryScale + (1 - config.edgeBoundaryScale) * smoothedProgress, 0, 1);
 }
 
 function getPeerPresentedCenter(
@@ -418,27 +440,57 @@ function getPeerPresentedCenter(
   const rightInset = size.width - config.edgePadding - rawCenter.x;
   const topInset = rawCenter.y - config.edgePadding;
   const bottomInset = size.height - config.edgePadding - rawCenter.y;
+  const scaledRadius = avatarRadius * scale;
+  const lostRadius = avatarRadius - scaledRadius;
+  const edgeTranslation = lostRadius * clamp(config.edgeTranslationStrength, 0, 1);
+  const leftPressure = getEdgeFalloffPressure(leftInset, avatarRadius, config);
+  const rightPressure = getEdgeFalloffPressure(rightInset, avatarRadius, config);
+  const topPressure = getEdgeFalloffPressure(topInset, avatarRadius, config);
+  const bottomPressure = getEdgeFalloffPressure(bottomInset, avatarRadius, config);
   const nudgeX = clamp(
-    getAvatarRadiusOverflow(leftInset, avatarRadius) -
-      getAvatarRadiusOverflow(rightInset, avatarRadius),
+    (leftPressure - rightPressure) * edgeTranslation,
     -avatarRadius,
     avatarRadius
   );
   const nudgeY = clamp(
-    getAvatarRadiusOverflow(topInset, avatarRadius) -
-      getAvatarRadiusOverflow(bottomInset, avatarRadius),
+    (topPressure - bottomPressure) * edgeTranslation,
     -avatarRadius,
     avatarRadius
   );
 
   return {
-    x: rawCenter.x + nudgeX,
-    y: rawCenter.y + nudgeY,
+    x: clamp(
+      rawCenter.x + nudgeX,
+      config.edgePadding + scaledRadius,
+      size.width - config.edgePadding - scaledRadius
+    ),
+    y: clamp(
+      rawCenter.y + nudgeY,
+      config.edgePadding + scaledRadius,
+      size.height - config.edgePadding - scaledRadius
+    ),
   };
 }
 
-function getAvatarRadiusOverflow(inset: number, avatarRadius: number): number {
-  return Math.max(0, avatarRadius - inset);
+function getEdgeFalloffPressure(
+  inset: number,
+  avatarRadius: number,
+  config: PeerLayoutConfig
+): number {
+  return 1 - smoothstep(getEdgeFalloffProgress(inset, avatarRadius, config));
+}
+
+function getEdgeFalloffProgress(
+  inset: number,
+  avatarRadius: number,
+  config: PeerLayoutConfig
+): number {
+  if (config.edgeScaleFalloff <= 0) return inset >= avatarRadius ? 1 : 0;
+  return clamp((inset - avatarRadius) / config.edgeScaleFalloff, 0, 1);
+}
+
+function smoothstep(value: number): number {
+  return value * value * (3 - 2 * value);
 }
 
 function getPeerLabelOpacity(scale: number): number {
