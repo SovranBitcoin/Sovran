@@ -1,15 +1,51 @@
 import type { BLEPeer } from 'bitchat-module';
 
 export const MOCK_BLE_PEER_MIN_COUNT = 1;
-export const MOCK_BLE_PEER_MAX_COUNT = 10;
-export const MOCK_BLE_PEER_LOOP_INTERVAL_MS = 1_200;
+export const MOCK_BLE_PEER_MAX_COUNT = 35;
+export const MOCK_BLE_PEER_LOOP_INTERVAL_MS = 600;
 
 export interface MockBLEPeerLoopState {
   count: number;
   direction: 1 | -1;
 }
 
-const MOCK_BLE_PEER_NAMES = ['Ada', 'Ben', 'Cy', 'Dee', 'Eli', 'Flo', 'Gia', 'Hal', 'Ivy', 'Jae'];
+const MOCK_BLE_PEER_NAMES = [
+  'Ada',
+  'Ben',
+  'Cy',
+  'Dee',
+  'Eli',
+  'Flo',
+  'Gia',
+  'Hal',
+  'Ivy',
+  'Jae',
+  'Kai',
+  'Lux',
+  'Mia',
+  'Noa',
+  'Ori',
+  'Paz',
+  'Rue',
+  'Sol',
+  'Taj',
+  'Uma',
+  'Vic',
+  'Wes',
+  'Xia',
+  'Yui',
+  'Zed',
+  'Ari',
+  'Bea',
+  'Cal',
+  'Dia',
+  'Eno',
+  'Fay',
+  'Gus',
+  'Hoa',
+  'Ian',
+  'Joy',
+];
 
 export const INITIAL_MOCK_BLE_PEER_LOOP_STATE: MockBLEPeerLoopState = {
   count: MOCK_BLE_PEER_MIN_COUNT,

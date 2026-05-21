@@ -2,6 +2,7 @@ import {
   buildMockBLEPeers,
   getNextMockBLEPeerLoopState,
   INITIAL_MOCK_BLE_PEER_LOOP_STATE,
+  MOCK_BLE_PEER_LOOP_INTERVAL_MS,
   MOCK_BLE_PEER_MAX_COUNT,
   MOCK_BLE_PEER_MIN_COUNT,
   type MockBLEPeerLoopState,
@@ -20,12 +21,22 @@ function countsForSteps(steps: number): number[] {
 }
 
 describe('mock BLE peers', () => {
-  it('loops peer counts from one to ten and back down to one', () => {
-    expect(countsForSteps(19)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+  it('uses a fast loop interval for stress-testing peer churn', () => {
+    expect(MOCK_BLE_PEER_LOOP_INTERVAL_MS).toBe(600);
+  });
+
+  it('loops peer counts from one to max and back down to one', () => {
+    const ascending = Array.from({ length: MOCK_BLE_PEER_MAX_COUNT }, (_, index) => index + 1);
+    const descending = Array.from(
+      { length: MOCK_BLE_PEER_MAX_COUNT - 1 },
+      (_, index) => MOCK_BLE_PEER_MAX_COUNT - 1 - index
+    );
+
+    expect(countsForSteps(MOCK_BLE_PEER_MAX_COUNT * 2 - 1)).toEqual([...ascending, ...descending]);
   });
 
   it('continues upward after returning to one', () => {
-    expect(countsForSteps(21).slice(-3)).toEqual([1, 2, 3]);
+    expect(countsForSteps(MOCK_BLE_PEER_MAX_COUNT * 2 + 1).slice(-3)).toEqual([1, 2, 3]);
   });
 
   it('builds stable direct-link peers and clamps count to the supported range', () => {

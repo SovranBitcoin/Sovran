@@ -14,6 +14,7 @@ export interface NearPayLayoutPeer {
 export interface PeerLayoutRegistryEntry {
   peer: NearPayLayoutPeer;
   phase: PeerLayoutPhase;
+  slotIndex: number;
   exitStartedAt?: number;
 }
 
@@ -25,24 +26,44 @@ export interface PeerLayoutSize {
 export interface PeerLayoutConfig {
   nodeWidth: number;
   nodeHeight: number;
+  avatarSize: number;
+  avatarGap: number;
   edgePadding: number;
-  minArcSpacing: number;
-  reserveCenter?: boolean;
+  minVisibleScale: number;
 }
 
 export interface PeerLayoutTarget extends PeerLayoutRegistryEntry {
   x: number;
   y: number;
+  scale: number;
   entryX: number;
   entryY: number;
   exitX: number;
   exitY: number;
 }
 
-const HEX_INNER_RING_CAPACITY = 6;
+interface PeerLayoutPanOffset {
+  x: number;
+  y: number;
+}
+
+interface PeerLayoutPanBounds {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+interface PeerViewportPresentation {
+  x: number;
+  y: number;
+  centerX: number;
+  centerY: number;
+  scale: number;
+  labelOpacity: number;
+}
+
 const HEX_VERTICAL_RATIO = Math.sqrt(3) / 2;
-const MAX_HEX_RING_SEARCH = 8;
-const HEX_SPACING_SEARCH_STEPS = 48;
 const HEX_RING_COORD_CACHE = new Map<number, HexCoord[]>();
 
 function sortNearPayPeers(peers: readonly NearPayLayoutPeer[]): NearPayLayoutPeer[] {
@@ -62,23 +83,33 @@ export function reconcilePeerLayoutRegistry(
   const incomingById = new Map(incomingPeers.map((peer) => [peer.peerID, peer]));
   const previousIds = new Set(previous.map((entry) => entry.peer.peerID));
   const next: PeerLayoutRegistryEntry[] = [];
+  const usedSlotIndexes = new Set<number>();
 
   for (const entry of previous) {
+    const slotIndex = normalizeSlotIndex(entry.slotIndex, usedSlotIndexes);
+    const stableEntry = { ...entry, slotIndex };
     const incoming = incomingById.get(entry.peer.peerID);
     if (incoming) {
-      next.push({ peer: incoming, phase: 'visible' });
+      next.push({ peer: incoming, phase: 'visible', slotIndex });
+      usedSlotIndexes.add(slotIndex);
       continue;
     }
     if (entry.phase === 'exiting') {
-      if (now - (entry.exitStartedAt ?? now) < NEAR_PAY_EXIT_ANIMATION_MS) next.push(entry);
+      if (now - (entry.exitStartedAt ?? now) < NEAR_PAY_EXIT_ANIMATION_MS) {
+        next.push(stableEntry);
+        usedSlotIndexes.add(slotIndex);
+      }
       continue;
     }
-    next.push({ ...entry, phase: 'exiting', exitStartedAt: now });
+    next.push({ ...stableEntry, phase: 'exiting', exitStartedAt: now });
+    usedSlotIndexes.add(slotIndex);
   }
 
   const newPeers = sortNearPayPeers(incomingPeers).filter((peer) => !previousIds.has(peer.peerID));
   for (const peer of newPeers) {
-    next.push({ peer, phase: 'visible' });
+    const slotIndex = getFirstAvailableSlotIndex(usedSlotIndexes);
+    next.push({ peer, phase: 'visible', slotIndex });
+    usedSlotIndexes.add(slotIndex);
   }
 
   return next;
@@ -102,49 +133,26 @@ export function buildPeerLayoutTargets(
   if (size.width <= 0 || size.height <= 0) return [];
   const centerX = size.width / 2 - config.nodeWidth / 2;
   const centerY = size.height / 2 - config.nodeHeight / 2;
-  const horizontalSafeRadius = Math.max(
-    0,
-    size.width / 2 - config.nodeWidth / 2 - config.edgePadding
-  );
-  const verticalSafeRadius = Math.max(
-    0,
-    size.height / 2 - config.nodeHeight / 2 - config.edgePadding
-  );
 
-  if (
-    (entries.length === 1 && !config.reserveCenter) ||
-    horizontalSafeRadius <= 0 ||
-    verticalSafeRadius <= 0
-  ) {
-    const entry = entries[0];
-    return entry
-      ? [
-          {
-            ...entry,
-            x: centerX,
-            y: centerY,
-            ...axisOffscreenPosition(centerX, centerY, size, config),
-          },
-        ]
-      : [];
+  if (entries.length === 1) {
+    return entries.map((entry) => ({
+      ...entry,
+      x: centerX,
+      y: centerY,
+      scale: 1,
+      ...stationaryPeerPosition(centerX, centerY),
+    }));
   }
 
-  const offsets = buildHexSlotOffsets(
-    entries.length,
-    horizontalSafeRadius,
-    verticalSafeRadius,
-    config
-  );
+  const slotCount = entries.reduce((count, entry) => Math.max(count, entry.slotIndex + 1), 0);
+  const slots = buildHoneycombBaseSlots(slotCount, size, config);
 
-  return entries.map((entry, index) => {
-    const offset = offsets[index] ?? { x: 0, y: 0 };
-    const x = centerX + offset.x;
-    const y = centerY + offset.y;
+  return entries.map((entry) => {
+    const slot = slots[entry.slotIndex] ?? { x: centerX, y: centerY, scale: 1 };
     return {
       ...entry,
-      x,
-      y,
-      ...axisOffscreenPosition(x, y, size, config),
+      ...slot,
+      ...stationaryPeerPosition(slot.x, slot.y),
     };
   });
 }
@@ -159,92 +167,100 @@ interface PeerLayoutOffset {
   y: number;
 }
 
-function buildHexSlotOffsets(
+interface PeerLayoutSlot {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+function buildHoneycombBaseSlots(
   count: number,
-  horizontalSafeRadius: number,
-  verticalSafeRadius: number,
+  size: PeerLayoutSize,
   config: PeerLayoutConfig
-): PeerLayoutOffset[] {
-  const maxSpacing = Math.min(horizontalSafeRadius / HEX_VERTICAL_RATIO, verticalSafeRadius);
+): PeerLayoutSlot[] {
+  const unitOffsets = buildHoneycombUnitOffsets(count);
+  const fieldCenter = { x: size.width / 2, y: size.height / 2 };
+  const avatarSpacing = config.avatarSize + config.avatarGap;
 
-  if (count < HEX_INNER_RING_CAPACITY) {
-    return buildSmallShapeOffsets(count, horizontalSafeRadius, verticalSafeRadius);
-  }
+  return unitOffsets.map((offset) => {
+    const rawCenter = {
+      x: fieldCenter.x + offset.x * avatarSpacing,
+      y: fieldCenter.y + offset.y * avatarSpacing,
+    };
+    const scale = getPeerAvatarScale(rawCenter, size, config);
 
-  if (count === HEX_INNER_RING_CAPACITY) {
-    return buildHexSlotCandidates(count, maxSpacing, horizontalSafeRadius, verticalSafeRadius);
-  }
-
-  const minSpacing = Math.max(config.nodeWidth * 0.72, config.minArcSpacing * 0.6);
-  for (let step = 0; step <= HEX_SPACING_SEARCH_STEPS; step++) {
-    const progress = step / HEX_SPACING_SEARCH_STEPS;
-    const spacing = maxSpacing - (maxSpacing - minSpacing) * progress;
-    const slots = buildHexSlotCandidates(count, spacing, horizontalSafeRadius, verticalSafeRadius);
-    if (slots.length >= count) return slots.slice(0, count);
-  }
-
-  return buildHexSlotCandidates(count, minSpacing, horizontalSafeRadius, verticalSafeRadius).slice(
-    0,
-    count
-  );
+    return {
+      x: rawCenter.x - config.nodeWidth / 2,
+      y: rawCenter.y - config.nodeHeight / 2,
+      scale,
+    };
+  });
 }
 
-function buildHexSlotCandidates(
-  count: number,
-  spacing: number,
-  horizontalSafeRadius: number,
-  verticalSafeRadius: number
-): PeerLayoutOffset[] {
-  const slots: PeerLayoutOffset[] = [];
-  for (let ring = 1; slots.length < count && ring <= MAX_HEX_RING_SEARCH; ring++) {
-    for (const coord of buildHexRingCoordinates(ring)) {
-      const offset = hexCoordToOffset(coord, spacing);
-      if (isOffsetWithinSafeRadius(offset, horizontalSafeRadius, verticalSafeRadius)) {
-        slots.push(offset);
-      }
-      if (slots.length >= count) break;
-    }
-  }
-  return slots;
-}
-
-function buildSmallShapeOffsets(
-  count: number,
-  horizontalSafeRadius: number,
-  verticalSafeRadius: number
-): PeerLayoutOffset[] {
-  if (count === 5) {
-    const squareAngles = getSmallShapeAngles(4);
-    const squareRadius = getAllowedRadiusForAngles(
-      squareAngles,
-      horizontalSafeRadius,
-      verticalSafeRadius
-    );
-    return [
-      ...squareAngles.map((angle) => ({
-        x: Math.cos(angle) * squareRadius,
-        y: Math.sin(angle) * squareRadius,
-      })),
-      { x: 0, y: 0 },
-    ];
+export function getPeerLayoutPanBounds(
+  targets: readonly Pick<PeerLayoutTarget, 'x' | 'y'>[],
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): PeerLayoutPanBounds {
+  if (targets.length === 0 || size.width <= 0 || size.height <= 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   }
 
-  const angles = getSmallShapeAngles(count);
-  const shapeRadius = getAllowedRadiusForAngles(angles, horizontalSafeRadius, verticalSafeRadius);
-  const radius = count === 2 ? Math.min(shapeRadius, horizontalSafeRadius) : shapeRadius;
-
-  return angles.map((angle) => ({
-    x: Math.cos(angle) * radius,
-    y: Math.sin(angle) * radius,
+  const centers = targets.map((target) => ({
+    x: target.x + config.nodeWidth / 2,
+    y: target.y + config.nodeHeight / 2,
   }));
+  const minCenterX = Math.min(...centers.map((center) => center.x));
+  const maxCenterX = Math.max(...centers.map((center) => center.x));
+  const minCenterY = Math.min(...centers.map((center) => center.y));
+  const maxCenterY = Math.max(...centers.map((center) => center.y));
+  const avatarRadius = config.avatarSize / 2;
+  const minVisibleCenterX = config.edgePadding + avatarRadius;
+  const maxVisibleCenterX = size.width - config.edgePadding - avatarRadius;
+  const minVisibleCenterY = config.edgePadding + avatarRadius;
+  const maxVisibleCenterY = size.height - config.edgePadding - avatarRadius;
+
+  return {
+    minX: Math.min(0, minVisibleCenterX - maxCenterX),
+    maxX: Math.max(0, maxVisibleCenterX - minCenterX),
+    minY: Math.min(0, minVisibleCenterY - maxCenterY),
+    maxY: Math.max(0, maxVisibleCenterY - minCenterY),
+  };
 }
 
-function getSmallShapeAngles(count: number): number[] {
-  if (count === 1) return [-Math.PI / 2];
-  if (count === 2) return [-Math.PI / 2, Math.PI / 2];
-  if (count === 3) return [-Math.PI / 2, Math.PI / 6, (Math.PI * 5) / 6];
-  if (count === 4) return [(-Math.PI * 3) / 4, -Math.PI / 4, Math.PI / 4, (Math.PI * 3) / 4];
-  return [];
+export function getPeerViewportPresentation(
+  target: Pick<PeerLayoutTarget, 'x' | 'y'>,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig,
+  pan: PeerLayoutPanOffset = { x: 0, y: 0 }
+): PeerViewportPresentation {
+  const rawCenter = {
+    x: target.x + config.nodeWidth / 2 + pan.x,
+    y: target.y + config.nodeHeight / 2 + pan.y,
+  };
+  const scale = getPeerAvatarScale(rawCenter, size, config);
+  const presentedCenter = getPeerPresentedCenter(rawCenter, size, config, scale);
+  const labelOpacity = getPeerLabelOpacity(scale);
+
+  return {
+    x: presentedCenter.x - config.nodeWidth / 2,
+    y: presentedCenter.y - config.nodeHeight / 2,
+    centerX: presentedCenter.x,
+    centerY: presentedCenter.y,
+    scale,
+    labelOpacity,
+  };
+}
+
+function buildHoneycombUnitOffsets(count: number): PeerLayoutOffset[] {
+  const slots: PeerLayoutOffset[] = [{ x: 0, y: 0 }];
+  for (let ring = 1; slots.length < count; ring++) {
+    const ringOffsets = orderRingOffsetsForStableInsertion(
+      buildHexRingCoordinates(ring).map((coord) => hexCoordToOffset(coord, 1))
+    );
+    slots.push(...ringOffsets);
+  }
+  return slots.slice(0, count);
 }
 
 function buildHexRingCoordinates(ring: number): HexCoord[] {
@@ -290,57 +306,170 @@ function hexCoordToOffset(coord: HexCoord, spacing: number): PeerLayoutOffset {
   };
 }
 
-function isOffsetWithinSafeRadius(
-  offset: PeerLayoutOffset,
-  horizontalSafeRadius: number,
-  verticalSafeRadius: number
-): boolean {
-  return Math.abs(offset.x) <= horizontalSafeRadius && Math.abs(offset.y) <= verticalSafeRadius;
+function orderRingOffsetsForStableInsertion(
+  ringOffsets: readonly PeerLayoutOffset[]
+): PeerLayoutOffset[] {
+  const remaining = ringOffsets.map((offset) => ({
+    offset,
+    angle: normalizeAngle(Math.atan2(offset.y, offset.x)),
+  }));
+  const selected: PeerLayoutOffset[] = [];
+  const targetAngles = buildStableTargetAngles(ringOffsets.length);
+
+  for (const targetAngle of targetAngles) {
+    const bestIndex = getNearestAngleIndex(remaining, targetAngle);
+    const [candidate] = remaining.splice(bestIndex, 1);
+    selected.push(candidate.offset);
+  }
+
+  return selected;
 }
 
-function getAllowedRadiusForAngles(
-  angles: readonly number[],
-  horizontalSafeRadius: number,
-  verticalSafeRadius: number
+function buildStableTargetAngles(count: number): number[] {
+  const startAngle = normalizeAngle(-Math.PI / 2);
+  return Array.from({ length: count }, (_, index) =>
+    normalizeAngle(startAngle + vanDerCorput(index) * Math.PI * 2)
+  );
+}
+
+function vanDerCorput(index: number): number {
+  let value = 0;
+  let denominator = 1;
+  let current = index;
+
+  while (current > 0) {
+    denominator *= 2;
+    value += (current % 2) / denominator;
+    current = Math.floor(current / 2);
+  }
+
+  return value;
+}
+
+function getNearestAngleIndex(
+  remaining: readonly { angle: number; offset: PeerLayoutOffset }[],
+  targetAngle: number
 ): number {
-  return angles.reduce((allowedRadius, angle) => {
-    const cos = Math.abs(Math.cos(angle));
-    const sin = Math.abs(Math.sin(angle));
-    const horizontalLimit = cos < 0.001 ? Number.POSITIVE_INFINITY : horizontalSafeRadius / cos;
-    const verticalLimit = sin < 0.001 ? Number.POSITIVE_INFINITY : verticalSafeRadius / sin;
-    return Math.min(allowedRadius, horizontalLimit, verticalLimit);
-  }, Number.POSITIVE_INFINITY);
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let candidateIndex = 0; candidateIndex < remaining.length; candidateIndex++) {
+    const distance = circularAngleDistance(targetAngle, remaining[candidateIndex].angle);
+    if (
+      distance < bestDistance ||
+      (distance === bestDistance && remaining[candidateIndex].angle < remaining[bestIndex].angle)
+    ) {
+      bestDistance = distance;
+      bestIndex = candidateIndex;
+    }
+  }
+  return bestIndex;
 }
 
-function axisOffscreenPosition(
-  x: number,
-  y: number,
+function normalizeAngle(angle: number): number {
+  const fullTurn = Math.PI * 2;
+  return ((angle % fullTurn) + fullTurn) % fullTurn;
+}
+
+function circularAngleDistance(a: number, b: number): number {
+  const difference = Math.abs(a - b);
+  return Math.min(difference, Math.PI * 2 - difference);
+}
+
+function getPeerAvatarScale(
+  center: PeerLayoutOffset,
   size: PeerLayoutSize,
   config: PeerLayoutConfig
-): Pick<PeerLayoutTarget, 'entryX' | 'entryY' | 'exitX' | 'exitY'> {
-  const fieldCenterX = size.width / 2;
-  const fieldCenterY = size.height / 2;
-  const targetCenterX = x + config.nodeWidth / 2;
-  const targetCenterY = y + config.nodeHeight / 2;
-  let dx = targetCenterX - fieldCenterX;
-  let dy = targetCenterY - fieldCenterY;
-  const length = Math.hypot(dx, dy);
-  if (length < 0.001) {
-    dx = 0;
-    dy = -1;
-  } else {
-    dx /= length;
-    dy /= length;
-  }
-  const distance = Math.max(size.width, size.height) + 240;
-  const offscreenCenterX = fieldCenterX + dx * distance;
-  const offscreenCenterY = fieldCenterY + dy * distance;
-  const offscreenX = offscreenCenterX - config.nodeWidth / 2;
-  const offscreenY = offscreenCenterY - config.nodeHeight / 2;
+): number {
+  const fitScale = getAvatarFitScale(center, size, config);
+  if (fitScale >= 1) return 1;
+  if (fitScale < config.minVisibleScale) return 0;
+  return fitScale;
+}
+
+function getAvatarFitScale(
+  center: PeerLayoutOffset,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): number {
+  if (size.width <= 0 || size.height <= 0 || config.avatarSize <= 0) return 0;
+  const avatarRadius = config.avatarSize / 2;
+  return clamp(
+    Math.min(
+      center.x - config.edgePadding,
+      size.width - config.edgePadding - center.x,
+      center.y - config.edgePadding,
+      size.height - config.edgePadding - center.y
+    ) / avatarRadius,
+    0,
+    1
+  );
+}
+
+function getPeerPresentedCenter(
+  rawCenter: PeerLayoutOffset,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig,
+  scale: number
+): PeerLayoutOffset {
+  if (scale <= 0 || scale >= 1 || size.width <= 0 || size.height <= 0) return rawCenter;
+
+  const avatarRadius = config.avatarSize / 2;
+  const leftInset = rawCenter.x - config.edgePadding;
+  const rightInset = size.width - config.edgePadding - rawCenter.x;
+  const topInset = rawCenter.y - config.edgePadding;
+  const bottomInset = size.height - config.edgePadding - rawCenter.y;
+  const nudgeX = clamp(
+    getAvatarRadiusOverflow(leftInset, avatarRadius) -
+      getAvatarRadiusOverflow(rightInset, avatarRadius),
+    -avatarRadius,
+    avatarRadius
+  );
+  const nudgeY = clamp(
+    getAvatarRadiusOverflow(topInset, avatarRadius) -
+      getAvatarRadiusOverflow(bottomInset, avatarRadius),
+    -avatarRadius,
+    avatarRadius
+  );
+
   return {
-    entryX: offscreenX,
-    entryY: offscreenY,
-    exitX: offscreenX,
-    exitY: offscreenY,
+    x: rawCenter.x + nudgeX,
+    y: rawCenter.y + nudgeY,
   };
+}
+
+function getAvatarRadiusOverflow(inset: number, avatarRadius: number): number {
+  return Math.max(0, avatarRadius - inset);
+}
+
+function getPeerLabelOpacity(scale: number): number {
+  return scale >= 1 ? 1 : 0;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function stationaryPeerPosition(
+  x: number,
+  y: number
+): Pick<PeerLayoutTarget, 'entryX' | 'entryY' | 'exitX' | 'exitY'> {
+  return {
+    entryX: x,
+    entryY: y,
+    exitX: x,
+    exitY: y,
+  };
+}
+
+function normalizeSlotIndex(slotIndex: number, usedSlotIndexes: ReadonlySet<number>): number {
+  if (Number.isInteger(slotIndex) && slotIndex >= 0 && !usedSlotIndexes.has(slotIndex)) {
+    return slotIndex;
+  }
+  return getFirstAvailableSlotIndex(usedSlotIndexes);
+}
+
+function getFirstAvailableSlotIndex(usedSlotIndexes: ReadonlySet<number>): number {
+  for (let slotIndex = 0; ; slotIndex++) {
+    if (!usedSlotIndexes.has(slotIndex)) return slotIndex;
+  }
 }

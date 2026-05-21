@@ -2,10 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import type { BLEPeer } from 'bitchat-module';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
   cancelAnimation,
   Easing,
+  runOnJS,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -33,6 +36,8 @@ import { alpha, duration, iconSize, spacing, zIndex } from '@/shared/styles/toke
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import {
   buildPeerLayoutTargets,
+  getPeerLayoutPanBounds,
+  getPeerViewportPresentation,
   NEAR_PAY_EXIT_ANIMATION_MS,
   pruneExitedPeerLayoutRegistry,
   reconcilePeerLayoutRegistry,
@@ -49,20 +54,20 @@ const INLINE_AMOUNT_HEADER_TOP = spacing['4xl'];
 const INLINE_AMOUNT_HEADER_HEIGHT = 126;
 const NODE_WIDTH = 76;
 const NODE_HEIGHT = 74;
-const PEER_AVATAR_LEFT = (NODE_WIDTH - AVATAR_SIZE) / 2;
 const PEER_AVATAR_TOP = spacing.xs;
+const PEER_AVATAR_CENTER_Y = PEER_AVATAR_TOP + AVATAR_SIZE / 2;
+const PEER_AVATAR_GAP = spacing.sm;
+const PEER_AVATAR_NAME_SIZE = 10;
 const DOT_SPACING = 18;
 const DOT_RADIUS = 1;
-const DOT_MAGNET_RADIUS = AVATAR_SIZE / 2 + DOT_SPACING * 0.35;
-const DOT_MAGNET_INFLUENCE_RADIUS = AVATAR_SIZE / 2 + DOT_SPACING * 2.5;
 const DOT_MAGNET_STRENGTH = DOT_SPACING * 0.85;
 const DOT_FIELD_AMBIENT_TRANSLATE = spacing.xs / 2;
-const MIN_ARC_SPACING = 78;
-const FIELD_EDGE_PADDING = spacing.lg;
+const FIELD_EDGE_PADDING = 0;
+const MIN_VISIBLE_PEER_SCALE = 0.16;
+const PEER_PAN_RUBBER_BAND_FACTOR = 0.36;
+const PEER_PAN_MOMENTUM_SECONDS = 0.18;
 const PEER_ENTRY_ANIMATION_MS = 460;
 const PEER_REBALANCE_ANIMATION_MS = 320;
-const PEER_EXIT_SCALE = 0.94;
-const PEER_ENTRY_SCALE = 0.88;
 const SHARED_AVATAR_ANIMATION_MS = 430;
 const AMOUNT_CONTENT_ENTER_OFFSET = spacing.sm;
 const AMOUNT_CONTENT_ENTER_DELAY_MS = duration.standard;
@@ -90,8 +95,10 @@ const HEADER_BADGE_THEME_KEYS = ['foreground', 'shade-400', 'accent', 'accent-fo
 const PEER_LAYOUT_CONFIG = {
   nodeWidth: NODE_WIDTH,
   nodeHeight: NODE_HEIGHT,
+  avatarSize: AVATAR_SIZE,
+  avatarGap: PEER_AVATAR_GAP,
   edgePadding: FIELD_EDGE_PADDING,
-  minArcSpacing: MIN_ARC_SPACING,
+  minVisibleScale: MIN_VISIBLE_PEER_SCALE,
 };
 
 interface AvatarRect {
@@ -209,11 +216,13 @@ function peerTargetsEqual(a: PeerLayoutTarget, b: PeerLayoutTarget): boolean {
     a.phase === b.phase &&
     a.x === b.x &&
     a.y === b.y &&
+    a.scale === b.scale &&
     a.entryX === b.entryX &&
     a.entryY === b.entryY &&
     a.exitX === b.exitX &&
     a.exitY === b.exitY &&
     a.exitStartedAt === b.exitStartedAt &&
+    a.slotIndex === b.slotIndex &&
     a.peer.peerID === b.peer.peerID &&
     a.peer.name === b.peer.name &&
     a.peer.nickname === b.peer.nickname &&
@@ -224,33 +233,39 @@ function peerTargetsEqual(a: PeerLayoutTarget, b: PeerLayoutTarget): boolean {
 
 const PeerNode = React.memo(function PeerNode({
   target,
+  fieldSize,
+  panX,
+  panY,
   onSelect,
   hideSharedElementSource,
 }: {
   target: PeerLayoutTarget;
+  fieldSize: PeerLayoutSize;
+  panX: SharedValue<number>;
+  panY: SharedValue<number>;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   hideSharedElementSource?: boolean;
 }) {
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const hasAnimatedInRef = useRef(false);
-  const translateX = useSharedValue(target.entryX);
-  const translateY = useSharedValue(target.entryY);
+  const baseX = useSharedValue(target.x);
+  const baseY = useSharedValue(target.y);
   const nodeOpacity = useSharedValue(0);
-  const scale = useSharedValue(PEER_ENTRY_SCALE);
+  const visibilityScale = useSharedValue(0);
 
   useEffect(() => {
     const firstPlacement = !hasAnimatedInRef.current;
     if (firstPlacement) {
-      translateX.set(target.entryX);
-      translateY.set(target.entryY);
+      baseX.set(target.x);
+      baseY.set(target.y);
       nodeOpacity.set(0);
-      scale.set(PEER_ENTRY_SCALE);
+      visibilityScale.set(0);
       hasAnimatedInRef.current = true;
     }
-    cancelAnimation(translateX);
-    cancelAnimation(translateY);
+    cancelAnimation(baseX);
+    cancelAnimation(baseY);
     cancelAnimation(nodeOpacity);
-    cancelAnimation(scale);
+    cancelAnimation(visibilityScale);
     const exiting = target.phase === 'exiting';
     const animationDuration = exiting
       ? NEAR_PAY_EXIT_ANIMATION_MS
@@ -259,59 +274,114 @@ const PeerNode = React.memo(function PeerNode({
         : PEER_REBALANCE_ANIMATION_MS;
     const timing = { duration: animationDuration, easing: Easing.out(Easing.cubic) };
     const opacityTiming = { duration: duration.quick, easing: Easing.out(Easing.cubic) };
-    if (exiting) {
-      translateX.set(withTiming(target.exitX, timing));
-      translateY.set(withTiming(target.exitY, timing));
-    } else {
-      const spring = firstPlacement ? PEER_ENTRY_SPRING : PEER_REBALANCE_SPRING;
-      translateX.set(withSpring(target.x, spring));
-      translateY.set(withSpring(target.y, spring));
-    }
+    const spring = firstPlacement ? PEER_ENTRY_SPRING : PEER_REBALANCE_SPRING;
+    baseX.set(withSpring(target.x, spring));
+    baseY.set(withSpring(target.y, spring));
     nodeOpacity.set(
       exiting
-        ? withDelay(Math.round(animationDuration * 0.62), withTiming(0, opacityTiming))
+        ? withDelay(Math.round(animationDuration * 0.45), withTiming(0, opacityTiming))
         : withTiming(1, opacityTiming)
     );
-    scale.set(exiting ? withTiming(PEER_EXIT_SCALE, timing) : withSpring(1, PEER_SCALE_SPRING));
-  }, [
-    nodeOpacity,
-    scale,
-    target.entryX,
-    target.entryY,
-    target.exitX,
-    target.exitY,
-    target.phase,
-    target.x,
-    target.y,
-    translateX,
-    translateY,
-  ]);
+    visibilityScale.set(exiting ? withTiming(0, timing) : withSpring(1, PEER_SCALE_SPRING));
+  }, [baseX, baseY, nodeOpacity, visibilityScale, target.phase, target.x, target.y]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: nodeOpacity.get(),
-    transform: [
-      { translateX: translateX.get() },
-      { translateY: translateY.get() },
-      { scale: scale.get() },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
+    const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
+    const avatarRadius = AVATAR_SIZE / 2;
+    const leftInset = rawCenterX - FIELD_EDGE_PADDING;
+    const rightInset = fieldSize.width - FIELD_EDGE_PADDING - rawCenterX;
+    const topInset = rawCenterY - FIELD_EDGE_PADDING;
+    const bottomInset = fieldSize.height - FIELD_EDGE_PADDING - rawCenterY;
+    const fitScale =
+      fieldSize.width <= 0 || fieldSize.height <= 0
+        ? 0
+        : Math.min(
+            Math.max(Math.min(leftInset, rightInset, topInset, bottomInset) / avatarRadius, 0),
+            1
+          );
+    const viewportScale = fitScale >= 1 ? 1 : fitScale < MIN_VISIBLE_PEER_SCALE ? 0 : fitScale;
+    const nudgesEdge = viewportScale > 0 && viewportScale < 1;
+    const nudgeX = nudgesEdge
+      ? Math.min(
+          Math.max(
+            Math.max(0, avatarRadius - leftInset) - Math.max(0, avatarRadius - rightInset),
+            -avatarRadius
+          ),
+          avatarRadius
+        )
+      : 0;
+    const nudgeY = nudgesEdge
+      ? Math.min(
+          Math.max(
+            Math.max(0, avatarRadius - topInset) - Math.max(0, avatarRadius - bottomInset),
+            -avatarRadius
+          ),
+          avatarRadius
+        )
+      : 0;
+    const centerX = rawCenterX + nudgeX;
+    const centerY = rawCenterY + nudgeY;
+    const totalScale = viewportScale * visibilityScale.get();
+    const scaledAvatarCenterY =
+      NODE_HEIGHT / 2 + totalScale * (PEER_AVATAR_CENTER_Y - NODE_HEIGHT / 2);
+
+    return {
+      opacity: nodeOpacity.get(),
+      zIndex: zIndex.sticky + Math.round(viewportScale * 100),
+      transform: [
+        { translateX: centerX - NODE_WIDTH / 2 },
+        { translateY: centerY - scaledAvatarCenterY },
+        { scale: totalScale },
+      ],
+    };
+  });
+  const labelAnimatedStyle = useAnimatedStyle(() => {
+    const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
+    const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
+    const fitScale =
+      fieldSize.width <= 0 || fieldSize.height <= 0
+        ? 0
+        : Math.min(
+            Math.max(
+              Math.min(
+                rawCenterX - FIELD_EDGE_PADDING,
+                fieldSize.width - FIELD_EDGE_PADDING - rawCenterX,
+                rawCenterY - FIELD_EDGE_PADDING,
+                fieldSize.height - FIELD_EDGE_PADDING - rawCenterY
+              ) /
+                (AVATAR_SIZE / 2),
+              0
+            ),
+            1
+          );
+    const viewportScale = fitScale >= 1 ? 1 : fitScale < MIN_VISIBLE_PEER_SCALE ? 0 : fitScale;
+    return {
+      opacity: (viewportScale >= 1 ? 1 : 0) * visibilityScale.get(),
+    };
+  });
   const nodeStyle = useMemo(() => [styles.peerNode, animatedStyle], [animatedStyle]);
+  const peerAvatarNameOverlayStyle = useMemo(
+    () => [styles.peerAvatarNameOverlay, labelAnimatedStyle],
+    [labelAnimatedStyle]
+  );
   const peerPressableStyle = hideSharedElementSource
     ? styles.peerPressableHidden
     : styles.peerPressable;
-  const peerNameStyle = useMemo(
-    () => [styles.peerName, { color: opacity(foreground, alpha.prominent) }],
+  const peerAvatarNameStyle = useMemo(
+    () => [styles.peerAvatarName, { color: opacity(foreground, alpha.prominent) }],
     [foreground]
   );
 
   const handlePress = useCallback(() => {
     if (target.phase === 'exiting') return;
-    onSelect(target.peer, {
-      x: target.x + PEER_AVATAR_LEFT,
-      y: target.y + PEER_AVATAR_TOP,
-      size: AVATAR_SIZE,
+    const presentation = getPeerViewportPresentation(target, fieldSize, PEER_LAYOUT_CONFIG, {
+      x: panX.get(),
+      y: panY.get(),
     });
-  }, [onSelect, target.peer, target.phase, target.x, target.y]);
+    if (presentation.scale <= 0) return;
+    onSelect(target.peer, getScaledAvatarRect(target, fieldSize, { x: panX.get(), y: panY.get() }));
+  }, [fieldSize, onSelect, panX, panY, target]);
 
   return (
     <Animated.View style={nodeStyle}>
@@ -321,29 +391,64 @@ const PeerNode = React.memo(function PeerNode({
         accessibilityRole="button"
         accessibilityLabel={`Pay ${target.peer.name}`}
         style={peerPressableStyle}>
-        <Avatar
-          state="fallback"
-          size={AVATAR_SIZE}
-          name={target.peer.name}
-          seed={target.peer.peerID}
-          alt={`${target.peer.name} avatar`}
-        />
-        <Text size={11} weight="bold" numberOfLines={1} style={peerNameStyle}>
-          {target.peer.name}
-        </Text>
+        <View pointerEvents="none" style={styles.peerAvatarFrame}>
+          <Avatar
+            state="fallback"
+            size={AVATAR_SIZE}
+            name={target.peer.name}
+            seed={target.peer.peerID}
+            alt={`${target.peer.name} avatar`}
+          />
+          <Animated.View pointerEvents="none" style={peerAvatarNameOverlayStyle}>
+            <Text
+              size={PEER_AVATAR_NAME_SIZE}
+              weight="bold"
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              allowFontScaling={false}
+              style={peerAvatarNameStyle}>
+              {target.peer.name}
+            </Text>
+          </Animated.View>
+        </View>
       </Pressable>
     </Animated.View>
   );
 }, arePeerNodePropsEqual);
 
+function getScaledAvatarRect(
+  target: PeerLayoutTarget,
+  fieldSize: PeerLayoutSize,
+  pan: { x: number; y: number }
+): AvatarRect {
+  const presentation = getPeerViewportPresentation(target, fieldSize, PEER_LAYOUT_CONFIG, pan);
+  const scaledAvatarSize = AVATAR_SIZE * presentation.scale;
+
+  return {
+    x: presentation.centerX - scaledAvatarSize / 2,
+    y: presentation.centerY - scaledAvatarSize / 2,
+    size: scaledAvatarSize,
+  };
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
 function arePeerNodePropsEqual(
   prev: {
     target: PeerLayoutTarget;
+    fieldSize: PeerLayoutSize;
+    panX: SharedValue<number>;
+    panY: SharedValue<number>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
   },
   next: {
     target: PeerLayoutTarget;
+    fieldSize: PeerLayoutSize;
+    panX: SharedValue<number>;
+    panY: SharedValue<number>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
   }
@@ -351,6 +456,10 @@ function arePeerNodePropsEqual(
   return (
     prev.onSelect === next.onSelect &&
     prev.hideSharedElementSource === next.hideSharedElementSource &&
+    prev.fieldSize.width === next.fieldSize.width &&
+    prev.fieldSize.height === next.fieldSize.height &&
+    prev.panX === next.panX &&
+    prev.panY === next.panY &&
     peerTargetsEqual(prev.target, next.target)
   );
 }
@@ -397,6 +506,16 @@ function NearPayPeerField({
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const [fieldSize, setFieldSize] = useState<PeerLayoutSize>({ width: 0, height: 0 });
   const [registry, setRegistry] = useState<PeerLayoutRegistryEntry[]>([]);
+  const [committedPan, setCommittedPan] = useState({ x: 0, y: 0 });
+  const panX = useSharedValue(0);
+  const panY = useSharedValue(0);
+  const panStartX = useSharedValue(0);
+  const panStartY = useSharedValue(0);
+  const minPanX = useSharedValue(0);
+  const maxPanX = useSharedValue(0);
+  const minPanY = useSharedValue(0);
+  const maxPanY = useSharedValue(0);
+  const isPanning = useSharedValue(false);
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -426,32 +545,175 @@ function NearPayPeerField({
     () => buildPeerLayoutTargets(registry, fieldSize, PEER_LAYOUT_CONFIG),
     [fieldSize, registry]
   );
+  const panBounds = useMemo(
+    () => getPeerLayoutPanBounds(targets, fieldSize, PEER_LAYOUT_CONFIG),
+    [fieldSize, targets]
+  );
+
+  const commitPanOffset = useCallback((x: number, y: number) => {
+    setCommittedPan((current) =>
+      Math.abs(current.x - x) < 0.5 && Math.abs(current.y - y) < 0.5 ? current : { x, y }
+    );
+  }, []);
+
+  useEffect(() => {
+    minPanX.set(panBounds.minX);
+    maxPanX.set(panBounds.maxX);
+    minPanY.set(panBounds.minY);
+    maxPanY.set(panBounds.maxY);
+
+    if (isPanning.get()) return;
+
+    const currentX = panX.get();
+    const currentY = panY.get();
+    const nextX = clampNumber(currentX, panBounds.minX, panBounds.maxX);
+    const nextY = clampNumber(currentY, panBounds.minY, panBounds.maxY);
+    const settleTiming = { duration: duration.quick, easing: Easing.out(Easing.cubic) };
+    if (nextX !== currentX) panX.set(withTiming(nextX, settleTiming));
+    if (nextY !== currentY) panY.set(withTiming(nextY, settleTiming));
+    commitPanOffset(nextX, nextY);
+  }, [
+    commitPanOffset,
+    isPanning,
+    maxPanX,
+    maxPanY,
+    minPanX,
+    minPanY,
+    panBounds.maxX,
+    panBounds.maxY,
+    panBounds.minX,
+    panBounds.minY,
+    panX,
+    panY,
+  ]);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(6)
+        .onBegin(() => {
+          'worklet';
+          isPanning.set(true);
+          cancelAnimation(panX);
+          cancelAnimation(panY);
+          panStartX.set(panX.get());
+          panStartY.set(panY.get());
+        })
+        .onUpdate((event) => {
+          'worklet';
+          const rawX = panStartX.get() + event.translationX;
+          const rawY = panStartY.get() + event.translationY;
+          const minX = minPanX.get();
+          const maxX = maxPanX.get();
+          const minY = minPanY.get();
+          const maxY = maxPanY.get();
+          const nextX =
+            rawX < minX
+              ? minX + (rawX - minX) * PEER_PAN_RUBBER_BAND_FACTOR
+              : rawX > maxX
+                ? maxX + (rawX - maxX) * PEER_PAN_RUBBER_BAND_FACTOR
+                : rawX;
+          const nextY =
+            rawY < minY
+              ? minY + (rawY - minY) * PEER_PAN_RUBBER_BAND_FACTOR
+              : rawY > maxY
+                ? maxY + (rawY - maxY) * PEER_PAN_RUBBER_BAND_FACTOR
+                : rawY;
+          panX.set(nextX);
+          panY.set(nextY);
+        })
+        .onEnd((event) => {
+          'worklet';
+          const minX = minPanX.get();
+          const maxX = maxPanX.get();
+          const minY = minPanY.get();
+          const maxY = maxPanY.get();
+          const finalX = Math.min(
+            Math.max(panX.get() + event.velocityX * PEER_PAN_MOMENTUM_SECONDS, minX),
+            maxX
+          );
+          const finalY = Math.min(
+            Math.max(panY.get() + event.velocityY * PEER_PAN_MOMENTUM_SECONDS, minY),
+            maxY
+          );
+          panX.set(
+            withSpring(finalX, {
+              damping: 24,
+              stiffness: 220,
+              mass: 0.9,
+              velocity: event.velocityX,
+            })
+          );
+          panY.set(
+            withSpring(finalY, {
+              damping: 24,
+              stiffness: 220,
+              mass: 0.9,
+              velocity: event.velocityY,
+            })
+          );
+          isPanning.set(false);
+          runOnJS(commitPanOffset)(finalX, finalY);
+        })
+        .onFinalize(() => {
+          'worklet';
+          isPanning.set(false);
+        }),
+    [
+      commitPanOffset,
+      isPanning,
+      maxPanX,
+      maxPanY,
+      minPanX,
+      minPanY,
+      panStartX,
+      panStartY,
+      panX,
+      panY,
+    ]
+  );
+
   const dotMagnets = useMemo<DotFieldMagnet[]>(
     () =>
-      targets.map((target) => ({
-        id: target.peer.peerID,
-        cx: target.x + PEER_AVATAR_LEFT + AVATAR_SIZE / 2,
-        cy: target.y + PEER_AVATAR_TOP + AVATAR_SIZE / 2,
-        radius: DOT_MAGNET_RADIUS,
-        influenceRadius: DOT_MAGNET_INFLUENCE_RADIUS,
-        strength: DOT_MAGNET_STRENGTH,
-      })),
-    [targets]
+      targets.flatMap((target) => {
+        const avatarRect = getScaledAvatarRect(target, fieldSize, committedPan);
+        const presentation = getPeerViewportPresentation(
+          target,
+          fieldSize,
+          PEER_LAYOUT_CONFIG,
+          committedPan
+        );
+        if (presentation.scale <= 0) return [];
+        return {
+          id: target.peer.peerID,
+          cx: avatarRect.x + avatarRect.size / 2,
+          cy: avatarRect.y + avatarRect.size / 2,
+          radius: avatarRect.size / 2 + DOT_SPACING * 0.35,
+          influenceRadius: avatarRect.size / 2 + DOT_SPACING * 2.5,
+          strength: DOT_MAGNET_STRENGTH * presentation.scale,
+        };
+      }),
+    [committedPan, fieldSize, targets]
   );
 
   return (
-    <View onLayout={handleLayout} style={styles.field}>
-      <DotField size={fieldSize} foreground={foreground} magnets={dotMagnets} />
-      {registry.length === 0 ? emptyContent : null}
-      {targets.map((target) => (
-        <PeerNode
-          key={target.peer.peerID}
-          target={target}
-          onSelect={onSelect}
-          hideSharedElementSource={selectedPeerID === target.peer.peerID}
-        />
-      ))}
-    </View>
+    <GestureDetector gesture={panGesture}>
+      <Animated.View onLayout={handleLayout} style={styles.field}>
+        <DotField size={fieldSize} foreground={foreground} magnets={dotMagnets} />
+        {registry.length === 0 ? emptyContent : null}
+        {targets.map((target) => (
+          <PeerNode
+            key={target.peer.peerID}
+            target={target}
+            fieldSize={fieldSize}
+            panX={panX}
+            panY={panY}
+            onSelect={onSelect}
+            hideSharedElementSource={selectedPeerID === target.peer.peerID}
+          />
+        ))}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -759,6 +1021,10 @@ export function NearPayScreen() {
   const foregroundProminent = useMemo(() => opacity(foreground, alpha.prominent), [foreground]);
   const foregroundMuted = useMemo(() => opacity(foreground, alpha.muted), [foreground]);
   const emptyTitleStyle = useMemo(() => ({ color: foregroundProminent }), [foregroundProminent]);
+  const sharedAvatarNameStyle = useMemo(
+    () => [styles.peerAvatarName, { color: foregroundProminent }],
+    [foregroundProminent]
+  );
   const emptyTextStyle = useMemo(
     () => [styles.emptyText, { color: foregroundMuted }],
     [foregroundMuted]
@@ -851,13 +1117,26 @@ export function NearPayScreen() {
               ) : null}
               {sharedAvatarPeer ? (
                 <Animated.View pointerEvents="none" style={sharedAvatarCombinedStyle}>
-                  <Avatar
-                    state="fallback"
-                    size={AVATAR_SIZE}
-                    name={sharedAvatarPeer.name}
-                    seed={sharedAvatarPeer.peerID}
-                    alt={`${sharedAvatarPeer.name} avatar`}
-                  />
+                  <View pointerEvents="none" style={styles.peerAvatarFrame}>
+                    <Avatar
+                      state="fallback"
+                      size={AVATAR_SIZE}
+                      name={sharedAvatarPeer.name}
+                      seed={sharedAvatarPeer.peerID}
+                      alt={`${sharedAvatarPeer.name} avatar`}
+                    />
+                    <View pointerEvents="none" style={styles.peerAvatarNameOverlay}>
+                      <Text
+                        size={PEER_AVATAR_NAME_SIZE}
+                        weight="bold"
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        allowFontScaling={false}
+                        style={sharedAvatarNameStyle}>
+                        {sharedAvatarPeer.name}
+                      </Text>
+                    </View>
+                  </View>
                 </Animated.View>
               ) : null}
             </>
@@ -893,19 +1172,32 @@ const styles = StyleSheet.create({
     width: NODE_WIDTH,
     height: NODE_HEIGHT,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: PEER_AVATAR_TOP,
   },
   peerPressableHidden: {
     width: NODE_WIDTH,
     height: NODE_HEIGHT,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: PEER_AVATAR_TOP,
     opacity: 0,
   },
-  peerName: {
-    marginTop: spacing.xs,
+  peerAvatarFrame: {
+    position: 'relative',
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+  },
+  peerAvatarNameOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  peerAvatarName: {
+    width: '100%',
     textAlign: 'center',
-    width: NODE_WIDTH,
+    includeFontPadding: false,
   },
   sharedElementHidden: {
     opacity: 0,
@@ -921,14 +1213,12 @@ const styles = StyleSheet.create({
   inlineAmountHeader: {
     height: INLINE_AMOUNT_HEADER_HEIGHT,
     paddingTop: INLINE_AMOUNT_HEADER_TOP,
-    paddingHorizontal: spacing['2xl'],
   },
   inlineAmountBody: {
     flex: 1,
   },
   emptyState: {
     flex: 1,
-    paddingHorizontal: spacing['4xl'],
   },
   emptyText: {
     maxWidth: 280,

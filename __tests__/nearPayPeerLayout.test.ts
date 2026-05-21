@@ -1,5 +1,7 @@
 import {
   buildPeerLayoutTargets,
+  getPeerLayoutPanBounds,
+  getPeerViewportPresentation,
   NEAR_PAY_EXIT_ANIMATION_MS,
   pruneExitedPeerLayoutRegistry,
   reconcilePeerLayoutRegistry,
@@ -7,18 +9,16 @@ import {
   type PeerLayoutConfig,
   type PeerLayoutRegistryEntry,
   type PeerLayoutSize,
+  type PeerLayoutTarget,
 } from '@/features/nearPay/lib/peerLayout';
 
 const CONFIG: PeerLayoutConfig = {
   nodeWidth: 76,
   nodeHeight: 74,
-  edgePadding: 16,
-  minArcSpacing: 78,
-};
-
-const RESERVED_CENTER_CONFIG: PeerLayoutConfig = {
-  ...CONFIG,
-  reserveCenter: true,
+  avatarSize: 48,
+  avatarGap: 8,
+  edgePadding: 0,
+  minVisibleScale: 0.16,
 };
 
 const SIZE: PeerLayoutSize = {
@@ -58,6 +58,67 @@ function targetAngleDegrees(target: { x: number; y: number }, size = SIZE): numb
 
 function sortedTargetAngles(targets: { x: number; y: number }[]): number[] {
   return targets.map((target) => targetAngleDegrees(target)).sort((a, b) => a - b);
+}
+
+function targetCenter(target: { x: number; y: number }, config = CONFIG): { x: number; y: number } {
+  return {
+    x: target.x + config.nodeWidth / 2,
+    y: target.y + config.nodeHeight / 2,
+  };
+}
+
+function targetRadius(target: { x: number; y: number }, size = SIZE, config = CONFIG): number {
+  const center = targetCenter(target, config);
+  return Math.hypot(center.x - size.width / 2, center.y - size.height / 2);
+}
+
+function rawFullAvatarInset(target: { x: number; y: number }, size = SIZE): number {
+  const center = targetCenter(target);
+  const radius = CONFIG.avatarSize / 2;
+  return Math.min(
+    center.x - radius - CONFIG.edgePadding,
+    size.width - CONFIG.edgePadding - center.x - radius,
+    center.y - radius - CONFIG.edgePadding,
+    size.height - CONFIG.edgePadding - center.y - radius
+  );
+}
+
+function rawAvatarFitScale(target: { x: number; y: number }, size = SIZE): number {
+  const center = targetCenter(target);
+  const radius = CONFIG.avatarSize / 2;
+  const edgeDistance = Math.min(
+    center.x - CONFIG.edgePadding,
+    size.width - CONFIG.edgePadding - center.x,
+    center.y - CONFIG.edgePadding,
+    size.height - CONFIG.edgePadding - center.y
+  );
+  return Math.max(0, Math.min(1, edgeDistance / radius));
+}
+
+function presentationAvatarInset(target: { x: number; y: number }, size = SIZE): number {
+  const presentation = getPeerViewportPresentation(target, size, CONFIG);
+  const radius = (CONFIG.avatarSize * presentation.scale) / 2;
+  return Math.min(
+    presentation.centerX - radius - CONFIG.edgePadding,
+    size.width - CONFIG.edgePadding - presentation.centerX - radius,
+    presentation.centerY - radius - CONFIG.edgePadding,
+    size.height - CONFIG.edgePadding - presentation.centerY - radius
+  );
+}
+
+function targetCentersByPeerId(
+  targets: readonly PeerLayoutTarget[]
+): Map<string, { x: number; y: number }> {
+  return new Map(targets.map((target) => [target.peer.peerID, targetCenter(target)]));
+}
+
+function expectPeerCenterToStayPut(
+  peerID: string,
+  before: ReadonlyMap<string, { x: number; y: number }>,
+  after: ReadonlyMap<string, { x: number; y: number }>
+): void {
+  expect(after.get(peerID)?.x).toBeCloseTo(before.get(peerID)?.x ?? Number.NaN, 4);
+  expect(after.get(peerID)?.y).toBeCloseTo(before.get(peerID)?.y ?? Number.NaN, 4);
 }
 
 describe('near pay peer layout registry', () => {
@@ -111,146 +172,330 @@ describe('near pay peer layout registry', () => {
     expect(ids(pruned)).toEqual(['a', 'c']);
   });
 
-  it('uses the center-to-target axis for entry and exit origins', () => {
+  it('keeps entry and exit anchors on the target slot for scale animations', () => {
     const entries = reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c')], 0);
     const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-    const centerX = SIZE.width / 2;
-    const centerY = SIZE.height / 2;
 
     for (const target of targets) {
-      const targetVectorX = target.x + CONFIG.nodeWidth / 2 - centerX;
-      const targetVectorY = target.y + CONFIG.nodeHeight / 2 - centerY;
-      const entryVectorX = target.entryX + CONFIG.nodeWidth / 2 - centerX;
-      const entryVectorY = target.entryY + CONFIG.nodeHeight / 2 - centerY;
-      const cross = targetVectorX * entryVectorY - targetVectorY * entryVectorX;
-      const dot = targetVectorX * entryVectorX + targetVectorY * entryVectorY;
-
-      expect(Math.abs(cross)).toBeLessThan(0.001);
-      expect(dot).toBeGreaterThan(0);
-      expect(target.exitX).toBe(target.entryX);
-      expect(target.exitY).toBe(target.entryY);
+      expect(target.entryX).toBe(target.x);
+      expect(target.entryY).toBe(target.y);
+      expect(target.exitX).toBe(target.x);
+      expect(target.exitY).toBe(target.y);
     }
   });
 
-  it('uses top-center entry and exit for a centered single peer', () => {
+  it('centers a single peer', () => {
     const entries = reconcilePeerLayoutRegistry([], [peer('solo')], 0);
     const [target] = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-    const fieldCenterX = SIZE.width / 2;
-    const fieldCenterY = SIZE.height / 2;
-    const entryCenterX = target.entryX + CONFIG.nodeWidth / 2;
-    const entryCenterY = target.entryY + CONFIG.nodeHeight / 2;
+    const center = targetCenter(target);
 
-    expect(entryCenterX).toBeCloseTo(fieldCenterX, 4);
-    expect(entryCenterY).toBeLessThan(fieldCenterY);
+    expect(center.x).toBeCloseTo(SIZE.width / 2, 4);
+    expect(center.y).toBeCloseTo(SIZE.height / 2, 4);
     expect(target.exitX).toBe(target.entryX);
     expect(target.exitY).toBe(target.entryY);
   });
 
-  it('moves a single peer above center when the center is reserved', () => {
-    const entries = reconcilePeerLayoutRegistry([], [peer('solo')], 0);
-    const [target] = buildPeerLayoutTargets(entries, SIZE, RESERVED_CENTER_CONFIG);
-    const fieldCenterX = SIZE.width / 2;
-    const fieldCenterY = SIZE.height / 2;
-
-    expect(target.x + CONFIG.nodeWidth / 2).toBeCloseTo(fieldCenterX, 4);
-    expect(target.y + CONFIG.nodeHeight / 2).toBeLessThan(fieldCenterY);
-  });
-
-  it('uses a vertical line for two peers', () => {
+  it('starts every honeycomb with a centered peer', () => {
     const entries = reconcilePeerLayoutRegistry([], [peer('a'), peer('b')], 0);
     const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const firstCenter = targetCenter(targets[0]);
 
-    expect(sortedTargetAngles(targets)).toEqual([90, 270]);
-    expect(targets[0].x).toBeCloseTo(targets[1].x, 4);
-    expect(targets[0].y).toBeLessThan(targets[1].y);
+    expect(firstCenter.x).toBeCloseTo(SIZE.width / 2, 4);
+    expect(firstCenter.y).toBeCloseTo(SIZE.height / 2, 4);
+    expect(targets[0].scale).toBe(1);
+    expect(targetRadius(targets[1])).toBeGreaterThan(0);
   });
 
-  it('uses triangle and square shapes for three and four peers', () => {
-    const triangleTargets = buildPeerLayoutTargets(
-      reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c')], 0),
-      SIZE,
-      CONFIG
+  it('keeps existing peer targets stable when a peer is added', () => {
+    const firstEntries = reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c')], 0);
+    const firstTargets = buildPeerLayoutTargets(firstEntries, SIZE, CONFIG);
+    const firstCenters = targetCentersByPeerId(firstTargets);
+    const nextEntries = reconcilePeerLayoutRegistry(
+      firstEntries,
+      [peer('a'), peer('b'), peer('c'), peer('d')],
+      100
     );
-    const squareTargets = buildPeerLayoutTargets(
-      reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c'), peer('d')], 0),
-      SIZE,
-      CONFIG
-    );
+    const nextTargets = buildPeerLayoutTargets(nextEntries, SIZE, CONFIG);
+    const nextCenters = targetCentersByPeerId(nextTargets);
 
-    expect(sortedTargetAngles(triangleTargets)).toEqual([30, 150, 270]);
-    expect(sortedTargetAngles(squareTargets)).toEqual([45, 135, 225, 315]);
+    expectPeerCenterToStayPut('a', firstCenters, nextCenters);
+    expectPeerCenterToStayPut('b', firstCenters, nextCenters);
+    expectPeerCenterToStayPut('c', firstCenters, nextCenters);
   });
 
-  it('uses the four-peer square with the fifth peer in the center', () => {
+  it('keeps surviving peer targets stable when an exiting peer is pruned', () => {
+    const firstEntries = reconcilePeerLayoutRegistry(
+      [],
+      [peer('a'), peer('b'), peer('c'), peer('d')],
+      0
+    );
+    const firstTargets = buildPeerLayoutTargets(firstEntries, SIZE, CONFIG);
+    const firstCenters = targetCentersByPeerId(firstTargets);
+    const exitingEntries = reconcilePeerLayoutRegistry(
+      firstEntries,
+      [peer('a'), peer('c'), peer('d')],
+      100
+    );
+    const prunedEntries = pruneExitedPeerLayoutRegistry(
+      exitingEntries,
+      100 + NEAR_PAY_EXIT_ANIMATION_MS + 1
+    );
+    const prunedTargets = buildPeerLayoutTargets(prunedEntries, SIZE, CONFIG);
+    const prunedCenters = targetCentersByPeerId(prunedTargets);
+
+    expectPeerCenterToStayPut('a', firstCenters, prunedCenters);
+    expectPeerCenterToStayPut('c', firstCenters, prunedCenters);
+    expectPeerCenterToStayPut('d', firstCenters, prunedCenters);
+  });
+
+  it('keeps existing peer targets stable when the honeycomb grows into edge scaling', () => {
+    const firstEntries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 19 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const firstTargets = buildPeerLayoutTargets(firstEntries, SIZE, CONFIG);
+    const firstCenters = targetCentersByPeerId(firstTargets);
+    const nextEntries = reconcilePeerLayoutRegistry(
+      firstEntries,
+      Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+      100
+    );
+    const nextTargets = buildPeerLayoutTargets(nextEntries, SIZE, CONFIG);
+    const nextCenters = targetCentersByPeerId(nextTargets);
+
+    for (let index = 1; index <= 19; index++) {
+      expectPeerCenterToStayPut(`peer-${index}`, firstCenters, nextCenters);
+    }
+  });
+
+  it('balances partial first-ring honeycomb slots around the centered peer', () => {
     const targets = buildPeerLayoutTargets(
       reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c'), peer('d'), peer('e')], 0),
       SIZE,
       CONFIG
     );
-    const fieldCenterX = SIZE.width / 2;
-    const fieldCenterY = SIZE.height / 2;
-    const fifthTarget = targets[4];
+    const ringRadii = targets.slice(1).map((target) => targetRadius(target));
+    const firstRadius = ringRadii[0];
 
-    expect(sortedTargetAngles(targets.slice(0, 4))).toEqual([45, 135, 225, 315]);
-    expect(fifthTarget.x + CONFIG.nodeWidth / 2).toBeCloseTo(fieldCenterX, 4);
-    expect(fifthTarget.y + CONFIG.nodeHeight / 2).toBeCloseTo(fieldCenterY, 4);
+    expect(targetRadius(targets[0])).toBeCloseTo(0, 4);
+    for (const radius of ringRadii) {
+      expect(radius).toBeCloseTo(firstRadius, 4);
+    }
+    expect(new Set(sortedTargetAngles(targets.slice(1))).size).toBe(4);
   });
 
-  it('fills the horizontal safe width with a six-peer hex ring', () => {
-    const entries = reconcilePeerLayoutRegistry(
-      [],
-      Array.from({ length: 6 }, (_, index) => peer(`peer-${index + 1}`)),
-      0
-    );
-    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-
-    expect(Math.min(...targets.map((target) => target.x))).toBeCloseTo(CONFIG.edgePadding, 4);
-    expect(Math.max(...targets.map((target) => target.x + CONFIG.nodeWidth))).toBeCloseTo(
-      SIZE.width - CONFIG.edgePadding,
-      4
-    );
-  });
-
-  it('keeps six peers on the inner hex ring and starts a second ring at seven', () => {
+  it('uses a full first honeycomb ring after the centered peer', () => {
     const entries = reconcilePeerLayoutRegistry(
       [],
       Array.from({ length: 7 }, (_, index) => peer(`peer-${index + 1}`)),
       0
     );
     const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-    const fieldCenterX = SIZE.width / 2;
-    const fieldCenterY = SIZE.height / 2;
-    const radii = targets.map((target) =>
-      Math.hypot(
-        target.x + CONFIG.nodeWidth / 2 - fieldCenterX,
-        target.y + CONFIG.nodeHeight / 2 - fieldCenterY
-      )
-    );
-    const innerRadius = radii[0];
+    const ringRadii = targets.slice(1, 7).map((target) => targetRadius(target));
+    const firstRadius = ringRadii[0];
 
-    for (const radius of radii.slice(0, 6)) {
-      expect(radius).toBeCloseTo(innerRadius, 4);
+    expect(targetRadius(targets[0])).toBeCloseTo(0, 4);
+    for (const radius of ringRadii) {
+      expect(radius).toBeCloseTo(firstRadius, 4);
     }
-    expect(radii[6]).toBeGreaterThan(innerRadius);
+    expect(new Set(sortedTargetAngles(targets.slice(1, 7))).size).toBe(6);
   });
 
-  it('places second-ring peers on hex-aligned axes', () => {
+  it('starts a second ring after the center and first honeycomb ring are full', () => {
     const entries = reconcilePeerLayoutRegistry(
       [],
-      Array.from({ length: 12 }, (_, index) => peer(`peer-${index + 1}`)),
+      Array.from({ length: 8 }, (_, index) => peer(`peer-${index + 1}`)),
       0
     );
     const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const innerRadii = targets.slice(1, 7).map((target) => targetRadius(target));
+    const innerRadius = innerRadii[0];
 
-    const angles = targets.slice(6, 12).map((target) => targetAngleDegrees(target));
-
-    for (const angle of angles) {
-      expect(angle % 30).toBe(0);
+    for (const radius of innerRadii) {
+      expect(radius).toBeCloseTo(innerRadius, 4);
     }
-    expect(new Set(angles)).toEqual(new Set([60, 90, 120, 240, 270, 300]));
+    expect(targetRadius(targets[7])).toBeGreaterThan(innerRadius);
   });
 
-  it('keeps second-ring peer targets fully inside the field', () => {
+  it('places a full second honeycomb ring around the first ring', () => {
+    const entries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 19 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const innerRadius = targetRadius(targets[1]);
+    const secondRing = targets.slice(7, 19);
+
+    for (const target of secondRing) {
+      expect(targetRadius(target)).toBeGreaterThan(innerRadius);
+    }
+    expect(new Set(sortedTargetAngles(secondRing)).size).toBe(12);
+  });
+
+  it('keeps every cleanly fitting avatar at full scale', () => {
+    const entries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const cleanTargets = targets.filter((target) => rawFullAvatarInset(target) >= 0);
+
+    expect(cleanTargets.length).toBeGreaterThan(7);
+    for (const target of cleanTargets) {
+      expect(getPeerViewportPresentation(target, SIZE, CONFIG).scale).toBe(1);
+    }
+  });
+
+  it('shrinks overflowing avatars only enough to fit inside the field', () => {
+    const rawCenter = {
+      x: SIZE.width - CONFIG.edgePadding - CONFIG.avatarSize * 0.35,
+      y: SIZE.height / 2,
+    };
+    const target = {
+      x: rawCenter.x - CONFIG.nodeWidth / 2,
+      y: rawCenter.y - CONFIG.nodeHeight / 2,
+    };
+    const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
+
+    expect(rawFullAvatarInset(target)).toBeLessThan(0);
+    expect(presentation.scale).toBeCloseTo(0.7, 4);
+    expect(presentation.scale).toBeGreaterThan(CONFIG.minVisibleScale);
+    expect(presentation.scale).toBeLessThan(1);
+    expect(presentationAvatarInset(target)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('vanishes avatars whose fit scale is below the visible minimum', () => {
+    const rawCenter = {
+      x: CONFIG.edgePadding + CONFIG.avatarSize * 0.04,
+      y: SIZE.height / 2,
+    };
+    const target = {
+      x: rawCenter.x - CONFIG.nodeWidth / 2,
+      y: rawCenter.y - CONFIG.nodeHeight / 2,
+    };
+    const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
+
+    expect(rawAvatarFitScale(target)).toBeLessThan(CONFIG.minVisibleScale);
+    expect(presentation.scale).toBe(0);
+    expect(presentation.labelOpacity).toBe(0);
+  });
+
+  it('lets pan bring an edge peer back to full-size center focus', () => {
+    const entries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const edgeTarget = targets.reduce((nearest, target) =>
+      rawFullAvatarInset(target) < rawFullAvatarInset(nearest) ? target : nearest
+    );
+    const panBounds = getPeerLayoutPanBounds(targets, SIZE, CONFIG);
+    const panToCenter = {
+      x: SIZE.width / 2 - targetCenter(edgeTarget).x,
+      y: SIZE.height / 2 - targetCenter(edgeTarget).y,
+    };
+    const focused = getPeerViewportPresentation(edgeTarget, SIZE, CONFIG, panToCenter);
+
+    expect(panToCenter.x).toBeGreaterThanOrEqual(panBounds.minX);
+    expect(panToCenter.x).toBeLessThanOrEqual(panBounds.maxX);
+    expect(panToCenter.y).toBeGreaterThanOrEqual(panBounds.minY);
+    expect(panToCenter.y).toBeLessThanOrEqual(panBounds.maxY);
+    expect(focused.scale).toBe(1);
+    expect(focused.centerX).toBeCloseTo(SIZE.width / 2, 4);
+    expect(focused.centerY).toBeCloseTo(SIZE.height / 2, 4);
+  });
+
+  it('lets the canvas travel until edge avatar bodies reach the field edges', () => {
+    const entries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const panBounds = getPeerLayoutPanBounds(targets, SIZE, CONFIG);
+    const centers = targets.map((target) => targetCenter(target));
+    const minCenterX = Math.min(...centers.map((center) => center.x));
+    const maxCenterX = Math.max(...centers.map((center) => center.x));
+    const minCenterY = Math.min(...centers.map((center) => center.y));
+    const maxCenterY = Math.max(...centers.map((center) => center.y));
+    const avatarRadius = CONFIG.avatarSize / 2;
+
+    expect(panBounds.minX).toBeCloseTo(CONFIG.edgePadding + avatarRadius - maxCenterX, 4);
+    expect(panBounds.maxX).toBeCloseTo(
+      SIZE.width - CONFIG.edgePadding - avatarRadius - minCenterX,
+      4
+    );
+    expect(panBounds.minY).toBeCloseTo(CONFIG.edgePadding + avatarRadius - maxCenterY, 4);
+    expect(panBounds.maxY).toBeCloseTo(
+      SIZE.height - CONFIG.edgePadding - avatarRadius - minCenterY,
+      4
+    );
+    expect(panBounds.minX).toBeLessThan(SIZE.width / 2 - maxCenterX);
+    expect(panBounds.maxX).toBeGreaterThan(SIZE.width / 2 - minCenterX);
+  });
+
+  it('nudges shrinking edge presentations inward by no more than one avatar radius', () => {
+    const rawCenter = {
+      x: SIZE.width - CONFIG.edgePadding - CONFIG.avatarSize * 0.35,
+      y: SIZE.height / 2,
+    };
+    const target = {
+      x: rawCenter.x - CONFIG.nodeWidth / 2,
+      y: rawCenter.y - CONFIG.nodeHeight / 2,
+    };
+    const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
+    const avatarRadius = CONFIG.avatarSize / 2;
+    const expectedNudge = avatarRadius * (1 - presentation.scale);
+
+    expect(presentation.scale).toBeGreaterThan(0);
+    expect(presentation.scale).toBeLessThan(1);
+    expect(presentation.centerX).toBeCloseTo(rawCenter.x - expectedNudge, 4);
+    expect(presentation.centerY).toBeCloseTo(rawCenter.y, 4);
+    expect(Math.abs(presentation.centerX - rawCenter.x)).toBeLessThanOrEqual(avatarRadius);
+
+    const cornerRawCenter = {
+      x: CONFIG.edgePadding + CONFIG.avatarSize * 0.35,
+      y: CONFIG.edgePadding + CONFIG.avatarSize * 0.35,
+    };
+    const cornerTarget = {
+      x: cornerRawCenter.x - CONFIG.nodeWidth / 2,
+      y: cornerRawCenter.y - CONFIG.nodeHeight / 2,
+    };
+    const cornerPresentation = getPeerViewportPresentation(cornerTarget, SIZE, CONFIG);
+
+    expect(cornerPresentation.centerX).toBeGreaterThan(cornerRawCenter.x);
+    expect(cornerPresentation.centerY).toBeGreaterThan(cornerRawCenter.y);
+    expect(cornerPresentation.centerX - cornerRawCenter.x).toBeLessThanOrEqual(avatarRadius);
+    expect(cornerPresentation.centerY - cornerRawCenter.y).toBeLessThanOrEqual(avatarRadius);
+  });
+
+  it('keeps center and first-ring labels visible while compact edge labels hide', () => {
+    const entries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const compactTarget = {
+      x: SIZE.width - CONFIG.edgePadding - CONFIG.avatarSize * 0.35 - CONFIG.nodeWidth / 2,
+      y: SIZE.height / 2 - CONFIG.nodeHeight / 2,
+    };
+
+    expect(rawFullAvatarInset(compactTarget)).toBeLessThan(0);
+    expect(rawAvatarFitScale(compactTarget)).toBeGreaterThan(0);
+    for (const target of targets.slice(0, 7)) {
+      const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
+      expect(presentation.scale).toBe(1);
+      expect(presentation.labelOpacity).toBe(1);
+    }
+    expect(getPeerViewportPresentation(compactTarget, SIZE, CONFIG).labelOpacity).toBe(0);
+  });
+
+  it('keeps second-ring peer presentations fully inside the field', () => {
     const compactSize: PeerLayoutSize = { width: 320, height: 360 };
     const entries = reconcilePeerLayoutRegistry(
       [],
@@ -260,10 +505,18 @@ describe('near pay peer layout registry', () => {
     const targets = buildPeerLayoutTargets(entries, compactSize, CONFIG);
 
     for (const target of targets) {
-      expect(target.x).toBeGreaterThanOrEqual(0);
-      expect(target.y).toBeGreaterThanOrEqual(0);
-      expect(target.x + CONFIG.nodeWidth).toBeLessThanOrEqual(compactSize.width);
-      expect(target.y + CONFIG.nodeHeight).toBeLessThanOrEqual(compactSize.height);
+      const presentation = getPeerViewportPresentation(target, compactSize, CONFIG);
+      if (presentation.scale <= 0) continue;
+      const radius = (CONFIG.avatarSize * presentation.scale) / 2;
+
+      expect(presentation.centerX - radius).toBeGreaterThanOrEqual(CONFIG.edgePadding);
+      expect(presentation.centerY - radius).toBeGreaterThanOrEqual(CONFIG.edgePadding);
+      expect(presentation.centerX + radius).toBeLessThanOrEqual(
+        compactSize.width - CONFIG.edgePadding
+      );
+      expect(presentation.centerY + radius).toBeLessThanOrEqual(
+        compactSize.height - CONFIG.edgePadding
+      );
     }
   });
 });
