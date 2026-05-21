@@ -8,6 +8,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   type SharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -88,6 +89,16 @@ const PEER_SCALE_SPRING = {
   damping: 15,
   stiffness: 220,
   mass: 0.7,
+};
+const PEER_VIEWPORT_SCALE_GROW_SPRING = {
+  damping: 18,
+  stiffness: 360,
+  mass: 0.45,
+};
+const PEER_VIEWPORT_SCALE_MAX_OVERSHOOT = 1.025;
+const PEER_VIEWPORT_SCALE_SHRINK_TIMING = {
+  duration: duration.quick,
+  easing: Easing.out(Easing.cubic),
 };
 const FOREGROUND_THEME_KEYS = ['foreground'] as const;
 const HEADER_BADGE_THEME_KEYS = ['foreground', 'shade-400', 'accent', 'accent-foreground'] as const;
@@ -212,6 +223,7 @@ const PeerNode = React.memo(function PeerNode({
   fieldSize,
   panX,
   panY,
+  isPanning,
   onSelect,
   hideSharedElementSource,
 }: {
@@ -219,6 +231,7 @@ const PeerNode = React.memo(function PeerNode({
   fieldSize: PeerLayoutSize;
   panX: SharedValue<number>;
   panY: SharedValue<number>;
+  isPanning: SharedValue<boolean>;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   hideSharedElementSource?: boolean;
 }) {
@@ -228,6 +241,7 @@ const PeerNode = React.memo(function PeerNode({
   const baseY = useSharedValue(target.y);
   const nodeOpacity = useSharedValue(0);
   const visibilityScale = useSharedValue(0);
+  const viewportScaleProgress = useSharedValue(target.scale);
 
   useEffect(() => {
     const firstPlacement = !hasAnimatedInRef.current;
@@ -261,6 +275,62 @@ const PeerNode = React.memo(function PeerNode({
     visibilityScale.set(exiting ? withTiming(0, timing) : withSpring(1, PEER_SCALE_SPRING));
   }, [baseX, baseY, nodeOpacity, visibilityScale, target.phase, target.x, target.y]);
 
+  useAnimatedReaction(
+    () => {
+      const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
+      const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
+      const avatarRadius = AVATAR_SIZE / 2;
+      const edgeDistance = Math.min(
+        rawCenterX - FIELD_EDGE_PADDING,
+        fieldSize.width - FIELD_EDGE_PADDING - rawCenterX,
+        rawCenterY - FIELD_EDGE_PADDING,
+        fieldSize.height - FIELD_EDGE_PADDING - rawCenterY
+      );
+      const fitScale =
+        fieldSize.width <= 0 || fieldSize.height <= 0
+          ? 0
+          : Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
+      const edgeProgress = Math.min(
+        Math.max((edgeDistance - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+        1
+      );
+      const edgeSmooth = edgeProgress * edgeProgress * (3 - 2 * edgeProgress);
+      const edgeLensScale = EDGE_BOUNDARY_SCALE + (1 - EDGE_BOUNDARY_SCALE) * edgeSmooth;
+      const rawViewportScale = Math.min(fitScale, edgeLensScale);
+
+      const scale =
+        rawViewportScale >= 1
+          ? 1
+          : rawViewportScale < MIN_VISIBLE_PEER_SCALE
+            ? 0
+            : rawViewportScale;
+
+      return {
+        isTrackingPan: isPanning.get(),
+        scale,
+      };
+    },
+    (next, previous) => {
+      const nextScale = next.scale;
+      const previousScale = previous?.scale ?? null;
+
+      if (previousScale === null || next.isTrackingPan || previous?.isTrackingPan) {
+        cancelAnimation(viewportScaleProgress);
+        viewportScaleProgress.set(nextScale);
+        return;
+      }
+      if (Math.abs(nextScale - previousScale) < 0.002) return;
+
+      cancelAnimation(viewportScaleProgress);
+      viewportScaleProgress.set(
+        nextScale > previousScale
+          ? withSpring(nextScale, PEER_VIEWPORT_SCALE_GROW_SPRING)
+          : withTiming(nextScale, PEER_VIEWPORT_SCALE_SHRINK_TIMING)
+      );
+    },
+    [fieldSize.height, fieldSize.width, isPanning]
+  );
+
   const animatedStyle = useAnimatedStyle(() => {
     const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
     const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
@@ -269,21 +339,12 @@ const PeerNode = React.memo(function PeerNode({
     const rightInset = fieldSize.width - FIELD_EDGE_PADDING - rawCenterX;
     const topInset = rawCenterY - FIELD_EDGE_PADDING;
     const bottomInset = fieldSize.height - FIELD_EDGE_PADDING - rawCenterY;
-    const edgeDistance = Math.min(leftInset, rightInset, topInset, bottomInset);
-    const fitScale =
-      fieldSize.width <= 0 || fieldSize.height <= 0
-        ? 0
-        : Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
-    const edgeProgress = Math.min(
-      Math.max((edgeDistance - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
-      1
+    const animatedViewportScale = Math.min(
+      Math.max(viewportScaleProgress.get(), 0),
+      PEER_VIEWPORT_SCALE_MAX_OVERSHOOT
     );
-    const edgeSmooth = edgeProgress * edgeProgress * (3 - 2 * edgeProgress);
-    const edgeLensScale = EDGE_BOUNDARY_SCALE + (1 - EDGE_BOUNDARY_SCALE) * edgeSmooth;
-    const rawViewportScale = Math.min(fitScale, edgeLensScale);
-    const viewportScale =
-      rawViewportScale >= 1 ? 1 : rawViewportScale < MIN_VISIBLE_PEER_SCALE ? 0 : rawViewportScale;
-    const nudgesEdge = viewportScale > 0 && viewportScale < 1;
+    const layoutViewportScale = Math.min(animatedViewportScale, 1);
+    const nudgesEdge = layoutViewportScale > 0 && layoutViewportScale < 1;
     const leftProgress = Math.min(Math.max((leftInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0), 1);
     const rightProgress = Math.min(
       Math.max((rightInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
@@ -302,7 +363,7 @@ const PeerNode = React.memo(function PeerNode({
     const rightPressure = 1 - rightSmooth;
     const topPressure = 1 - topSmooth;
     const bottomPressure = 1 - bottomSmooth;
-    const scaledRadius = avatarRadius * viewportScale;
+    const scaledRadius = avatarRadius * layoutViewportScale;
     const lostRadius = avatarRadius - scaledRadius;
     const edgeTranslation = lostRadius * Math.min(Math.max(EDGE_TRANSLATION_STRENGTH, 0), 1);
     const nudgeX = nudgesEdge
@@ -329,13 +390,13 @@ const PeerNode = React.memo(function PeerNode({
           fieldSize.height - FIELD_EDGE_PADDING - scaledRadius
         )
       : rawCenterY;
-    const totalScale = viewportScale * visibilityScale.get();
+    const totalScale = animatedViewportScale * visibilityScale.get();
     const scaledAvatarCenterY =
       NODE_HEIGHT / 2 + totalScale * (PEER_AVATAR_CENTER_Y - NODE_HEIGHT / 2);
 
     return {
       opacity: nodeOpacity.get(),
-      zIndex: zIndex.sticky + Math.round(viewportScale * 100),
+      zIndex: zIndex.sticky + Math.round(layoutViewportScale * 100),
       transform: [
         { translateX: centerX - NODE_WIDTH / 2 },
         { translateY: centerY - scaledAvatarCenterY },
@@ -451,6 +512,7 @@ function arePeerNodePropsEqual(
     fieldSize: PeerLayoutSize;
     panX: SharedValue<number>;
     panY: SharedValue<number>;
+    isPanning: SharedValue<boolean>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
   },
@@ -459,6 +521,7 @@ function arePeerNodePropsEqual(
     fieldSize: PeerLayoutSize;
     panX: SharedValue<number>;
     panY: SharedValue<number>;
+    isPanning: SharedValue<boolean>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
   }
@@ -470,6 +533,7 @@ function arePeerNodePropsEqual(
     prev.fieldSize.height === next.fieldSize.height &&
     prev.panX === next.panX &&
     prev.panY === next.panY &&
+    prev.isPanning === next.isPanning &&
     peerTargetsEqual(prev.target, next.target)
   );
 }
@@ -525,6 +589,8 @@ function NearPayPeerField({
   const minPanY = useSharedValue(0);
   const maxPanY = useSharedValue(0);
   const isPanning = useSharedValue(false);
+  const isPanSettling = useSharedValue(false);
+  const panSettleRemaining = useSharedValue(0);
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -595,6 +661,8 @@ function NearPayPeerField({
         .onBegin(() => {
           'worklet';
           isPanning.set(true);
+          isPanSettling.set(false);
+          panSettleRemaining.set(0);
           cancelAnimation(panX);
           cancelAnimation(panY);
           panStartX.set(panX.get());
@@ -625,6 +693,8 @@ function NearPayPeerField({
         })
         .onEnd((event) => {
           'worklet';
+          isPanSettling.set(true);
+          panSettleRemaining.set(2);
           const minX = minPanX.get();
           const maxX = maxPanX.get();
           const minY = minPanY.get();
@@ -638,28 +708,62 @@ function NearPayPeerField({
             maxY
           );
           panX.set(
-            withSpring(finalX, {
-              damping: 24,
-              stiffness: 220,
-              mass: 0.9,
-              velocity: event.velocityX,
-            })
+            withSpring(
+              finalX,
+              {
+                damping: 24,
+                stiffness: 220,
+                mass: 0.9,
+                velocity: event.velocityX,
+              },
+              (finished) => {
+                if (!finished) return;
+                const remaining = panSettleRemaining.get() - 1;
+                panSettleRemaining.set(remaining);
+                if (remaining > 0) return;
+                isPanSettling.set(false);
+                isPanning.set(false);
+              }
+            )
           );
           panY.set(
-            withSpring(finalY, {
-              damping: 24,
-              stiffness: 220,
-              mass: 0.9,
-              velocity: event.velocityY,
-            })
+            withSpring(
+              finalY,
+              {
+                damping: 24,
+                stiffness: 220,
+                mass: 0.9,
+                velocity: event.velocityY,
+              },
+              (finished) => {
+                if (!finished) return;
+                const remaining = panSettleRemaining.get() - 1;
+                panSettleRemaining.set(remaining);
+                if (remaining > 0) return;
+                isPanSettling.set(false);
+                isPanning.set(false);
+              }
+            )
           );
-          isPanning.set(false);
         })
         .onFinalize(() => {
           'worklet';
+          if (isPanSettling.get()) return;
           isPanning.set(false);
         }),
-    [isPanning, maxPanX, maxPanY, minPanX, minPanY, panStartX, panStartY, panX, panY]
+    [
+      isPanSettling,
+      isPanning,
+      maxPanX,
+      maxPanY,
+      minPanX,
+      minPanY,
+      panSettleRemaining,
+      panStartX,
+      panStartY,
+      panX,
+      panY,
+    ]
   );
 
   return (
@@ -674,6 +778,7 @@ function NearPayPeerField({
             fieldSize={fieldSize}
             panX={panX}
             panY={panY}
+            isPanning={isPanning}
             onSelect={onSelect}
             hideSharedElementSource={selectedPeerID === target.peer.peerID}
           />
