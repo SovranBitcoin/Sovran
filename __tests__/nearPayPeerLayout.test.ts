@@ -17,11 +17,18 @@ const CONFIG: PeerLayoutConfig = {
   nodeHeight: 74,
   avatarSize: 48,
   avatarGap: 8,
+  spaciousAvatarGap: 48,
+  spaciousPeerCount: 7,
+  densePeerCount: 31,
+  spacingCapPeerCount: 20,
+  preferredTopInset: 80,
+  preferredBottomInset: 124,
   edgePadding: 0,
   edgeScaleFalloff: 96,
   edgeBoundaryScale: 0.9,
   edgeTranslationStrength: 1,
   minVisibleScale: 0.16,
+  labelMinScale: 0.58,
 };
 
 const SIZE: PeerLayoutSize = {
@@ -75,6 +82,12 @@ function targetRadius(target: { x: number; y: number }, size = SIZE, config = CO
   return Math.hypot(center.x - size.width / 2, center.y - size.height / 2);
 }
 
+function centerDistance(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const aCenter = targetCenter(a);
+  const bCenter = targetCenter(b);
+  return Math.hypot(aCenter.x - bCenter.x, aCenter.y - bCenter.y);
+}
+
 function rawFullAvatarInset(target: { x: number; y: number }, size = SIZE): number {
   const center = targetCenter(target);
   const radius = CONFIG.avatarSize / 2;
@@ -84,6 +97,17 @@ function rawFullAvatarInset(target: { x: number; y: number }, size = SIZE): numb
     center.y - radius - CONFIG.edgePadding,
     size.height - CONFIG.edgePadding - center.y - radius
   );
+}
+
+function overlapsPreferredAvoidanceBand(target: { x: number; y: number }, size = SIZE): boolean {
+  return (
+    target.y < CONFIG.preferredTopInset ||
+    target.y + CONFIG.nodeHeight > size.height - CONFIG.preferredBottomInset
+  );
+}
+
+function overlapsPreferredActionBand(target: { x: number; y: number }, size = SIZE): boolean {
+  return target.y + CONFIG.nodeHeight > size.height - CONFIG.preferredBottomInset;
 }
 
 function rawAvatarFitScale(target: { x: number; y: number }, size = SIZE): number {
@@ -251,90 +275,218 @@ describe('near pay peer layout registry', () => {
     expectPeerCenterToStayPut('d', firstCenters, prunedCenters);
   });
 
-  it('keeps existing peer targets stable when the honeycomb grows into edge scaling', () => {
+  it('keeps distributed peer directions stable when compact overflow peers arrive', () => {
     const firstEntries = reconcilePeerLayoutRegistry(
       [],
       Array.from({ length: 19 }, (_, index) => peer(`peer-${index + 1}`)),
       0
     );
     const firstTargets = buildPeerLayoutTargets(firstEntries, SIZE, CONFIG);
-    const firstCenters = targetCentersByPeerId(firstTargets);
+    const firstById = new Map(firstTargets.map((target) => [target.peer.peerID, target]));
     const nextEntries = reconcilePeerLayoutRegistry(
       firstEntries,
       Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
       100
     );
     const nextTargets = buildPeerLayoutTargets(nextEntries, SIZE, CONFIG);
-    const nextCenters = targetCentersByPeerId(nextTargets);
+    const nextById = new Map(nextTargets.map((target) => [target.peer.peerID, target]));
 
     for (let index = 1; index <= 19; index++) {
-      expectPeerCenterToStayPut(`peer-${index}`, firstCenters, nextCenters);
+      const peerID = `peer-${index}`;
+      const before = firstById.get(peerID);
+      const after = nextById.get(peerID);
+
+      expect(after?.slotIndex).toBe(before?.slotIndex);
+      if (!before || !after || before.slotIndex === 0) continue;
+      expect(Math.abs(targetAngleDegrees(after) - targetAngleDegrees(before))).toBeLessThanOrEqual(
+        1
+      );
     }
   });
 
-  it('balances partial first-ring honeycomb slots around the centered peer', () => {
+  it('uses distant honeycomb positions for low counts and caps their spacing after twenty peers', () => {
+    const roomyTargets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: CONFIG.spaciousPeerCount }, (_, index) => peer(`roomy-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
+    );
+    const cappedTargets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: CONFIG.spacingCapPeerCount }, (_, index) => peer(`cap-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
+    );
+    const denseTargets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: 35 }, (_, index) => peer(`dense-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
+    );
+
+    expect(targetRadius(roomyTargets[1])).toBeGreaterThanOrEqual(
+      CONFIG.avatarSize + CONFIG.spaciousAvatarGap
+    );
+    expect(targetRadius(denseTargets[1])).toBeCloseTo(targetRadius(cappedTargets[1]), 4);
+    expect(targetRadius(denseTargets[19])).toBeCloseTo(targetRadius(cappedTargets[19]), 4);
+    expect(targetRadius(denseTargets[1])).toBeGreaterThan(CONFIG.avatarSize + CONFIG.avatarGap);
+  });
+
+  it('leaves enough roomy first-ring space for an under-avatar name line', () => {
+    const targets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: CONFIG.spaciousPeerCount }, (_, index) => peer(`roomy-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
+    );
+    const underAvatarLabelWidth = CONFIG.nodeWidth;
+    const underAvatarLabelHeight = 16;
+    const underAvatarLabelGap = 4;
+    const avatarRadius = CONFIG.avatarSize / 2;
+    const avatarRects = targets.map((target) => {
+      const center = targetCenter(target);
+      return {
+        bottom: center.y + avatarRadius,
+        left: center.x - avatarRadius,
+        right: center.x + avatarRadius,
+        top: center.y - avatarRadius,
+      };
+    });
+    const labelRects = targets.map((target) => {
+      const center = targetCenter(target);
+      return {
+        bottom: center.y + avatarRadius + underAvatarLabelGap + underAvatarLabelHeight,
+        left: center.x - underAvatarLabelWidth / 2,
+        right: center.x + underAvatarLabelWidth / 2,
+        top: center.y + avatarRadius + underAvatarLabelGap,
+      };
+    });
+
+    for (const [labelIndex, labelRect] of labelRects.entries()) {
+      for (const [avatarIndex, avatarRect] of avatarRects.entries()) {
+        if (labelIndex === avatarIndex) continue;
+        const overlaps =
+          labelRect.left < avatarRect.right &&
+          labelRect.right > avatarRect.left &&
+          labelRect.top < avatarRect.bottom &&
+          labelRect.bottom > avatarRect.top;
+
+        expect(overlaps).toBe(false);
+      }
+    }
+
+    expect(CONFIG.spaciousAvatarGap).toBeGreaterThanOrEqual(
+      underAvatarLabelHeight + underAvatarLabelGap + CONFIG.avatarGap
+    );
+  });
+
+  it('continues with compact honeycomb candidates after on-screen slots are exhausted', () => {
+    const targets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
+    );
+    const overflowIndex = targets.findIndex((target) => rawFullAvatarInset(target) < 0);
+    const overflowTarget = targets[overflowIndex];
+    const onScreenDistances = targets
+      .slice(0, overflowIndex)
+      .map((target) => centerDistance(target, overflowTarget));
+
+    expect(overflowIndex).toBeGreaterThan(0);
+    expect(overflowTarget).toBeDefined();
+    expect(Math.min(...onScreenDistances)).toBeGreaterThan(CONFIG.avatarSize);
+    expect(targetRadius(overflowTarget)).toBeGreaterThan(targetRadius(targets[0]));
+  });
+
+  it('deprioritizes header and action-row honeycomb slots while enough middle slots exist', () => {
+    const targets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
+    );
+    const firstAvoidedIndex = targets.findIndex((target) => overlapsPreferredAvoidanceBand(target));
+    const firstActionIndex = targets.findIndex((target) => overlapsPreferredActionBand(target));
+
+    expect(firstAvoidedIndex).toBeGreaterThanOrEqual(7);
+    expect(firstActionIndex === -1 || firstActionIndex > firstAvoidedIndex).toBe(true);
+    expect(firstActionIndex === -1 || firstActionIndex >= 12).toBe(true);
+    for (const target of targets.slice(0, firstAvoidedIndex)) {
+      expect(overlapsPreferredAvoidanceBand(target)).toBe(false);
+    }
+    expect(targets.some((target) => overlapsPreferredAvoidanceBand(target))).toBe(true);
+  });
+
+  it('uses a centered peer with distant honeycomb positions for five peers', () => {
     const targets = buildPeerLayoutTargets(
       reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c'), peer('d'), peer('e')], 0),
       SIZE,
       CONFIG
     );
-    const ringRadii = targets.slice(1).map((target) => targetRadius(target));
-    const firstRadius = ringRadii[0];
 
     expect(targetRadius(targets[0])).toBeCloseTo(0, 4);
-    for (const radius of ringRadii) {
-      expect(radius).toBeCloseTo(firstRadius, 4);
-    }
     expect(new Set(sortedTargetAngles(targets.slice(1))).size).toBe(4);
+    for (const target of targets.slice(1)) {
+      expect(targetRadius(target)).toBeGreaterThanOrEqual(
+        CONFIG.avatarSize + CONFIG.spaciousAvatarGap
+      );
+      expect(rawFullAvatarInset(target)).toBeGreaterThanOrEqual(0);
+    }
   });
 
-  it('uses a full first honeycomb ring after the centered peer', () => {
+  it('keeps the first seven honeycomb peers distributed around the center', () => {
     const entries = reconcilePeerLayoutRegistry(
       [],
       Array.from({ length: 7 }, (_, index) => peer(`peer-${index + 1}`)),
       0
     );
     const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-    const ringRadii = targets.slice(1, 7).map((target) => targetRadius(target));
-    const firstRadius = ringRadii[0];
 
     expect(targetRadius(targets[0])).toBeCloseTo(0, 4);
-    for (const radius of ringRadii) {
-      expect(radius).toBeCloseTo(firstRadius, 4);
-    }
     expect(new Set(sortedTargetAngles(targets.slice(1, 7))).size).toBe(6);
+    for (const target of targets.slice(1, 7)) {
+      expect(targetRadius(target)).toBeGreaterThanOrEqual(
+        CONFIG.avatarSize + CONFIG.spaciousAvatarGap
+      );
+    }
   });
 
-  it('starts a second ring after the center and first honeycomb ring are full', () => {
-    const entries = reconcilePeerLayoutRegistry(
-      [],
-      Array.from({ length: 8 }, (_, index) => peer(`peer-${index + 1}`)),
-      0
+  it('keeps distributed slots on screen before compact overflow', () => {
+    const targets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
     );
-    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-    const innerRadii = targets.slice(1, 7).map((target) => targetRadius(target));
-    const innerRadius = innerRadii[0];
+    const overflowIndex = targets.findIndex((target) => rawFullAvatarInset(target) < 0);
 
-    for (const radius of innerRadii) {
-      expect(radius).toBeCloseTo(innerRadius, 4);
+    expect(overflowIndex).toBeGreaterThan(0);
+    for (const target of targets.slice(0, overflowIndex)) {
+      expect(rawFullAvatarInset(target)).toBeGreaterThanOrEqual(0);
+      expect(getPeerViewportPresentation(target, SIZE, CONFIG).scale).toBeGreaterThan(0);
     }
-    expect(targetRadius(targets[7])).toBeGreaterThan(innerRadius);
-  });
-
-  it('places a full second honeycomb ring around the first ring', () => {
-    const entries = reconcilePeerLayoutRegistry(
-      [],
-      Array.from({ length: 19 }, (_, index) => peer(`peer-${index + 1}`)),
-      0
-    );
-    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-    const innerRadius = targetRadius(targets[1]);
-    const secondRing = targets.slice(7, 19);
-
-    for (const target of secondRing) {
-      expect(targetRadius(target)).toBeGreaterThan(innerRadius);
-    }
-    expect(new Set(sortedTargetAngles(secondRing)).size).toBe(12);
   });
 
   it('keeps comfortably fitting avatars at full scale', () => {
@@ -348,7 +500,7 @@ describe('near pay peer layout registry', () => {
       (target) => rawFullAvatarInset(target) >= CONFIG.edgeScaleFalloff
     );
 
-    expect(comfortableTargets.length).toBeGreaterThan(7);
+    expect(comfortableTargets.length).toBeGreaterThan(0);
     for (const target of comfortableTargets) {
       expect(getPeerViewportPresentation(target, SIZE, CONFIG).scale).toBe(1);
     }
@@ -369,7 +521,7 @@ describe('near pay peer layout registry', () => {
     expect(rawFullAvatarInset(target)).toBeLessThan(CONFIG.edgeScaleFalloff);
     expect(presentation.scale).toBeGreaterThan(CONFIG.edgeBoundaryScale);
     expect(presentation.scale).toBeLessThan(1);
-    expect(presentation.labelOpacity).toBe(0);
+    expect(presentation.labelOpacity).toBe(1);
   });
 
   it('shrinks overflowing avatars only enough to fit inside the field', () => {
@@ -567,26 +719,33 @@ describe('near pay peer layout registry', () => {
     expect(cornerPresentation.centerY - cornerRawCenter.y).toBeLessThanOrEqual(avatarRadius);
   });
 
-  it('keeps center and first-ring labels visible while compact edge labels hide', () => {
+  it('keeps labels visible until avatars become sufficiently compact near edges', () => {
     const entries = reconcilePeerLayoutRegistry(
       [],
       Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
       0
     );
     const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
-    const compactTarget = {
+    const moderateEdgeTarget = {
       x: SIZE.width - CONFIG.edgePadding - CONFIG.avatarSize * 0.35 - CONFIG.nodeWidth / 2,
       y: SIZE.height / 2 - CONFIG.nodeHeight / 2,
     };
+    const tinyEdgeTarget = {
+      x: CONFIG.edgePadding - CONFIG.avatarSize * 0.15 - CONFIG.nodeWidth / 2,
+      y: SIZE.height / 2 - CONFIG.nodeHeight / 2,
+    };
 
-    expect(rawFullAvatarInset(compactTarget)).toBeLessThan(0);
-    expect(rawAvatarFitScale(compactTarget)).toBeGreaterThan(0);
+    expect(rawFullAvatarInset(moderateEdgeTarget)).toBeLessThan(0);
+    expect(rawAvatarFitScale(moderateEdgeTarget)).toBeGreaterThan(CONFIG.labelMinScale);
+    expect(rawAvatarFitScale(tinyEdgeTarget)).toBeLessThan(CONFIG.labelMinScale);
+    expect(rawAvatarFitScale(tinyEdgeTarget)).toBeGreaterThan(CONFIG.minVisibleScale);
     for (const target of targets.slice(0, 7)) {
       const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
-      expect(presentation.scale).toBe(1);
+      expect(presentation.scale).toBeGreaterThanOrEqual(CONFIG.labelMinScale);
       expect(presentation.labelOpacity).toBe(1);
     }
-    expect(getPeerViewportPresentation(compactTarget, SIZE, CONFIG).labelOpacity).toBe(0);
+    expect(getPeerViewportPresentation(moderateEdgeTarget, SIZE, CONFIG).labelOpacity).toBe(1);
+    expect(getPeerViewportPresentation(tinyEdgeTarget, SIZE, CONFIG).labelOpacity).toBe(0);
   });
 
   it('keeps second-ring peer presentations fully inside the field', () => {

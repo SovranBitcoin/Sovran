@@ -9,6 +9,7 @@ export interface NearPayLayoutPeer {
   hasDirectLink: boolean;
   lastSeen: number;
   name: string;
+  avatarUrl?: string | null;
 }
 
 export interface PeerLayoutRegistryEntry {
@@ -28,11 +29,18 @@ export interface PeerLayoutConfig {
   nodeHeight: number;
   avatarSize: number;
   avatarGap: number;
+  spaciousAvatarGap: number;
+  spaciousPeerCount: number;
+  densePeerCount: number;
+  spacingCapPeerCount: number;
+  preferredTopInset: number;
+  preferredBottomInset: number;
   edgePadding: number;
   edgeScaleFalloff: number;
   edgeBoundaryScale: number;
   edgeTranslationStrength: number;
   minVisibleScale: number;
+  labelMinScale: number;
 }
 
 export interface PeerLayoutTarget extends PeerLayoutRegistryEntry {
@@ -148,7 +156,7 @@ export function buildPeerLayoutTargets(
   }
 
   const slotCount = entries.reduce((count, entry) => Math.max(count, entry.slotIndex + 1), 0);
-  const slots = buildHoneycombBaseSlots(slotCount, size, config);
+  const slots = buildPeerLayoutSlots(slotCount, size, config);
 
   return entries.map((entry) => {
     const slot = slots[entry.slotIndex] ?? { x: centerX, y: centerY, scale: 1 };
@@ -176,28 +184,299 @@ interface PeerLayoutSlot {
   scale: number;
 }
 
-function buildHoneycombBaseSlots(
+interface PeerLayoutSlotCandidate extends PeerLayoutSlot {
+  unitOffset: PeerLayoutOffset;
+}
+
+function buildPeerLayoutSlots(
   count: number,
   size: PeerLayoutSize,
   config: PeerLayoutConfig
 ): PeerLayoutSlot[] {
-  const unitOffsets = buildHoneycombUnitOffsets(count);
+  const distributedSlots = buildDistributedOnScreenHoneycombSlots(count, size, config);
+  if (distributedSlots.length >= count) return distributedSlots.slice(0, count);
+
+  return [
+    ...distributedSlots,
+    ...buildCompactOverflowSlots(
+      count - distributedSlots.length,
+      count,
+      distributedSlots,
+      size,
+      config
+    ),
+  ];
+}
+
+function buildDistributedOnScreenHoneycombSlots(
+  count: number,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): PeerLayoutSlot[] {
+  if (count <= 0) return [];
+
+  const candidateCount = Math.max(count * 4, 160);
+  const roomyCandidates = buildHoneycombSlotCandidates(
+    candidateCount,
+    size,
+    config,
+    config.spaciousPeerCount
+  );
+  const onScreenCandidates = roomyCandidates
+    .filter((slot) => slotFullyFits(slot, size, config))
+    .map((candidate) => ({
+      ...buildHoneycombSlot(candidate.unitOffset, size, config, config.spacingCapPeerCount),
+      unitOffset: candidate.unitOffset,
+    }));
+  const preferredCandidates = onScreenCandidates.filter((slot) =>
+    slotFitsPreferredVerticalBand(slot, size, config)
+  );
+  const deferredCandidates = onScreenCandidates.filter(
+    (slot) => !slotFitsPreferredVerticalBand(slot, size, config)
+  );
+  const topDeferredCandidates = deferredCandidates.filter(
+    (slot) =>
+      slotOverlapsPreferredTopBand(slot, config) &&
+      !slotOverlapsPreferredBottomBand(slot, size, config)
+  );
+  const orderedPreferredCandidates = orderSlotsByDistantSpread(preferredCandidates, size, config);
+  const orderedTopDeferredCandidates = orderSlotsByDistantSpread(
+    topDeferredCandidates,
+    size,
+    config,
+    orderedPreferredCandidates
+  );
+  const orderedCandidates = [...orderedPreferredCandidates, ...orderedTopDeferredCandidates];
+
+  return orderedCandidates.map((candidate) =>
+    buildHoneycombSlot(candidate.unitOffset, size, config, count)
+  );
+}
+
+function buildCompactOverflowSlots(
+  neededCount: number,
+  totalCount: number,
+  featuredSlots: readonly PeerLayoutSlot[],
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): PeerLayoutSlot[] {
+  const selectedCenters = featuredSlots.map((slot) => slotCenter(slot, config));
+  const minSeparation = config.avatarSize + getPeerAvatarGap(totalCount, config) * 0.35;
+  const candidateCount = Math.max(totalCount * 4, 160, featuredSlots.length + neededCount);
+  const candidates = buildHoneycombBaseSlots(candidateCount, size, config, totalCount);
+  const preferredOverflowCandidates = candidates.filter(
+    (candidate) => !slotOverlapsPreferredBottomBand(candidate, size, config)
+  );
+  const bottomOverflowCandidates = candidates.filter((candidate) =>
+    slotOverlapsPreferredBottomBand(candidate, size, config)
+  );
+  const overflowSlots: PeerLayoutSlot[] = [];
+
+  for (const candidateGroup of [preferredOverflowCandidates, bottomOverflowCandidates]) {
+    for (const candidate of candidateGroup) {
+      const center = slotCenter(candidate, config);
+      const tooClose = selectedCenters.some(
+        (selectedCenter) => distanceBetween(center, selectedCenter) < minSeparation
+      );
+      if (tooClose) continue;
+      overflowSlots.push(candidate);
+      selectedCenters.push(center);
+      if (overflowSlots.length === neededCount) return overflowSlots;
+    }
+  }
+
+  for (const candidateGroup of [preferredOverflowCandidates, bottomOverflowCandidates]) {
+    for (const candidate of candidateGroup) {
+      const center = slotCenter(candidate, config);
+      const duplicate = selectedCenters.some(
+        (selectedCenter) => distanceBetween(center, selectedCenter) < 1
+      );
+      if (duplicate) continue;
+      overflowSlots.push(candidate);
+      selectedCenters.push(center);
+      if (overflowSlots.length === neededCount) return overflowSlots;
+    }
+  }
+
+  return overflowSlots;
+}
+
+function slotCenter(
+  slot: Pick<PeerLayoutSlot, 'x' | 'y'>,
+  config: PeerLayoutConfig
+): PeerLayoutOffset {
+  return {
+    x: slot.x + config.nodeWidth / 2,
+    y: slot.y + config.nodeHeight / 2,
+  };
+}
+
+function distanceBetween(a: PeerLayoutOffset, b: PeerLayoutOffset): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function slotFullyFits(
+  slot: Pick<PeerLayoutSlot, 'x' | 'y'>,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): boolean {
+  const center = slotCenter(slot, config);
+  const avatarRadius = config.avatarSize / 2;
+  return (
+    center.x - avatarRadius >= config.edgePadding &&
+    center.y - avatarRadius >= config.edgePadding &&
+    center.x + avatarRadius <= size.width - config.edgePadding &&
+    center.y + avatarRadius <= size.height - config.edgePadding
+  );
+}
+
+function slotFitsPreferredVerticalBand(
+  slot: Pick<PeerLayoutSlot, 'x' | 'y'>,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): boolean {
+  return (
+    slot.y >= config.preferredTopInset &&
+    slot.y + config.nodeHeight <= size.height - config.preferredBottomInset
+  );
+}
+
+function slotOverlapsPreferredTopBand(
+  slot: Pick<PeerLayoutSlot, 'y'>,
+  config: PeerLayoutConfig
+): boolean {
+  return slot.y < config.preferredTopInset;
+}
+
+function slotOverlapsPreferredBottomBand(
+  slot: Pick<PeerLayoutSlot, 'y'>,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): boolean {
+  return slot.y + config.nodeHeight > size.height - config.preferredBottomInset;
+}
+
+function orderSlotsByDistantSpread(
+  slots: readonly PeerLayoutSlotCandidate[],
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig,
+  initialSelectedSlots: readonly PeerLayoutSlotCandidate[] = []
+): PeerLayoutSlotCandidate[] {
+  const remaining = [...slots];
+  const ordered: PeerLayoutSlotCandidate[] = [];
   const fieldCenter = { x: size.width / 2, y: size.height / 2 };
-  const avatarSpacing = config.avatarSize + config.avatarGap;
+  let centerIndex = 0;
+  let centerDistance = Number.POSITIVE_INFINITY;
 
-  return unitOffsets.map((offset) => {
-    const rawCenter = {
-      x: fieldCenter.x + offset.x * avatarSpacing,
-      y: fieldCenter.y + offset.y * avatarSpacing,
-    };
-    const scale = getPeerAvatarScale(rawCenter, size, config);
+  if (initialSelectedSlots.length === 0) {
+    for (let index = 0; index < remaining.length; index++) {
+      const distance = distanceBetween(slotCenter(remaining[index], config), fieldCenter);
+      if (distance < centerDistance) {
+        centerIndex = index;
+        centerDistance = distance;
+      }
+    }
 
-    return {
-      x: rawCenter.x - config.nodeWidth / 2,
-      y: rawCenter.y - config.nodeHeight / 2,
-      scale,
-    };
-  });
+    const [centerSlot] = remaining.splice(centerIndex, 1);
+    if (centerSlot) ordered.push(centerSlot);
+  }
+
+  while (remaining.length > 0) {
+    let bestIndex = 0;
+    let bestSpreadDistance = -1;
+    let bestTieBreaker = -1;
+
+    for (let index = 0; index < remaining.length; index++) {
+      const slot = remaining[index];
+      const spreadDistance = getSlotSpreadDistance(
+        slot,
+        [...initialSelectedSlots, ...ordered],
+        config
+      );
+      const tieBreaker = getStableSlotTieBreaker(slot);
+      if (
+        spreadDistance > bestSpreadDistance ||
+        (Math.abs(spreadDistance - bestSpreadDistance) < 0.001 && tieBreaker > bestTieBreaker)
+      ) {
+        bestIndex = index;
+        bestSpreadDistance = spreadDistance;
+        bestTieBreaker = tieBreaker;
+      }
+    }
+
+    const [slot] = remaining.splice(bestIndex, 1);
+    ordered.push(slot);
+  }
+
+  return ordered;
+}
+
+function getSlotSpreadDistance(
+  slot: PeerLayoutSlotCandidate,
+  selectedSlots: readonly PeerLayoutSlotCandidate[],
+  config: PeerLayoutConfig
+): number {
+  if (selectedSlots.length === 0) return Number.POSITIVE_INFINITY;
+  const center = slotCenter(slot, config);
+  return Math.min(
+    ...selectedSlots.map((selectedSlot) =>
+      distanceBetween(center, slotCenter(selectedSlot, config))
+    )
+  );
+}
+
+function getStableSlotTieBreaker(slot: PeerLayoutSlotCandidate): number {
+  const angle = normalizeAngle(Math.atan2(slot.unitOffset.y, slot.unitOffset.x));
+  const radius = Math.hypot(slot.unitOffset.x, slot.unitOffset.y);
+  const deterministicJitter =
+    Math.sin(slot.unitOffset.x * 12.9898 + slot.unitOffset.y * 78.233) * 43758.5453;
+  return radius + angle / (Math.PI * 2) + (deterministicJitter - Math.floor(deterministicJitter));
+}
+
+function buildHoneycombBaseSlots(
+  count: number,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig,
+  spacingCount = count
+): PeerLayoutSlot[] {
+  return buildHoneycombSlotCandidates(count, size, config, spacingCount).map((candidate) => ({
+    x: candidate.x,
+    y: candidate.y,
+    scale: candidate.scale,
+  }));
+}
+
+function buildHoneycombSlotCandidates(
+  count: number,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig,
+  spacingCount = count
+): PeerLayoutSlotCandidate[] {
+  return buildHoneycombUnitOffsets(count).map((unitOffset) => ({
+    ...buildHoneycombSlot(unitOffset, size, config, spacingCount),
+    unitOffset,
+  }));
+}
+
+function buildHoneycombSlot(
+  unitOffset: PeerLayoutOffset,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig,
+  spacingCount: number
+): PeerLayoutSlot {
+  const fieldCenter = { x: size.width / 2, y: size.height / 2 };
+  const avatarSpacing = config.avatarSize + getPeerAvatarGap(spacingCount, config);
+  const rawCenter = {
+    x: fieldCenter.x + unitOffset.x * avatarSpacing,
+    y: fieldCenter.y + unitOffset.y * avatarSpacing,
+  };
+  const scale = getPeerAvatarScale(rawCenter, size, config);
+
+  return {
+    x: rawCenter.x - config.nodeWidth / 2,
+    y: rawCenter.y - config.nodeHeight / 2,
+    scale,
+  };
 }
 
 export function getPeerLayoutPanBounds(
@@ -243,7 +522,7 @@ export function getPeerViewportPresentation(
   };
   const scale = getPeerAvatarScale(rawCenter, size, config);
   const presentedCenter = getPeerPresentedCenter(rawCenter, size, config, scale);
-  const labelOpacity = getPeerLabelOpacity(scale);
+  const labelOpacity = getPeerLabelOpacity(scale, config);
 
   return {
     x: presentedCenter.x - config.nodeWidth / 2,
@@ -378,6 +657,21 @@ function circularAngleDistance(a: number, b: number): number {
   return Math.min(difference, Math.PI * 2 - difference);
 }
 
+function getPeerAvatarGap(count: number, config: PeerLayoutConfig): number {
+  const denseGap = config.avatarGap;
+  const spaciousGap = Math.max(denseGap, config.spaciousAvatarGap);
+  const effectiveCount = Math.min(count, config.spacingCapPeerCount);
+  if (effectiveCount <= config.spaciousPeerCount) return spaciousGap;
+  if (effectiveCount >= config.densePeerCount) return denseGap;
+
+  const countRange = Math.max(config.densePeerCount - config.spaciousPeerCount, 1);
+  const densityProgress = smoothstep(
+    clamp((effectiveCount - config.spaciousPeerCount) / countRange, 0, 1)
+  );
+
+  return spaciousGap + (denseGap - spaciousGap) * densityProgress;
+}
+
 function getPeerAvatarScale(
   center: PeerLayoutOffset,
   size: PeerLayoutSize,
@@ -493,8 +787,8 @@ function smoothstep(value: number): number {
   return value * value * (3 - 2 * value);
 }
 
-function getPeerLabelOpacity(scale: number): number {
-  return scale >= 1 ? 1 : 0;
+function getPeerLabelOpacity(scale: number, config: PeerLayoutConfig): number {
+  return scale >= config.labelMinScale ? 1 : 0;
 }
 
 function clamp(value: number, min: number, max: number): number {
