@@ -57,7 +57,7 @@
  * @see {@link ./Text}
  */
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   StyleProp,
   ViewStyle,
@@ -65,6 +65,7 @@ import {
   LayoutChangeEvent,
   GestureResponderEvent,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -380,6 +381,17 @@ export const Button = ({
   accessibilityHint,
 }: ButtonProps) => {
   const sz = SIZES[size];
+  const stableContentRef = useRef<{ text?: string | React.ReactNode; icon?: React.ReactNode }>({
+    text,
+    icon,
+  });
+  useEffect(() => {
+    if (!loading) {
+      stableContentRef.current = { text, icon };
+    }
+  }, [icon, loading, text]);
+  const layoutText = loading ? stableContentRef.current.text : text;
+  const layoutIcon = loading ? stableContentRef.current.icon : icon;
   // Derive a sensible default label from `text` when it's a string so the
   // common case ("primary CTA with visible copy") needs no extra prop.
   // Icon-only and ReactNode-text callers must supply `accessibilityLabel`
@@ -549,18 +561,33 @@ export const Button = ({
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
         {/* Content rendering - string text or React node */}
-        {typeof text === 'string' ? (
+        {typeof layoutText === 'string' ? (
           <Text
             size={16}
             bold
             style={{
               color: getTextColor(),
+              opacity: loading ? 0 : 1,
             }}>
-            {text}
+            {layoutText}
           </Text>
         ) : (
-          text || icon
+          <View style={loading ? styles.hiddenContent : undefined}>{layoutText ?? layoutIcon}</View>
         )}
+        {loading ? (
+          <View pointerEvents="none" style={styles.loadingOverlay}>
+            <Icon
+              name="ant-design:loading-outlined"
+              size={16}
+              spin={{
+                delay: 0,
+                duration: 1000,
+                outputRange: ['0deg', '360deg'],
+                easing: 'linear',
+              }}
+            />
+          </View>
+        ) : null}
       </Pressable>
     );
   }
@@ -568,7 +595,7 @@ export const Button = ({
   // Icon-only: a fixed square. Override the outer paddings to 0 because the
   // dimension *is* the visual size — extra padding would push the icon off-
   // center and grow the hit area beyond what's drawn.
-  if (!text && icon) {
+  if (!layoutText && layoutIcon) {
     return (
       <Pressable
         testID={testID}
@@ -609,7 +636,7 @@ export const Button = ({
               }}
             />
           ) : (
-            icon
+            layoutIcon
           )}
         </View>
       </Pressable>
@@ -641,8 +668,28 @@ export const Button = ({
         <HStack
           align="center"
           justify="center"
-          spacing={text && icon && !loading ? sz.iconTextSpacing : 0}>
-          {loading ? (
+          spacing={layoutText && layoutIcon ? sz.iconTextSpacing : 0}
+          style={loading ? styles.hiddenContent : undefined}>
+          <>
+            {layoutIcon}
+            {layoutText != null &&
+              (typeof layoutText === 'string' ? (
+                <Text
+                  style={{
+                    color: getTextColor(),
+                    fontFamily: 'OxygenBold',
+                    textAlign: 'center',
+                  }}
+                  size={sz.fontSize}>
+                  {layoutText}
+                </Text>
+              ) : (
+                layoutText
+              ))}
+          </>
+        </HStack>
+        {loading ? (
+          <View pointerEvents="none" style={styles.loadingOverlay}>
             <Icon
               name="ant-design:loading-outlined"
               size={16}
@@ -653,27 +700,20 @@ export const Button = ({
                 easing: 'linear',
               }}
             />
-          ) : (
-            <>
-              {icon}
-              {text != null &&
-                (typeof text === 'string' ? (
-                  <Text
-                    style={{
-                      color: getTextColor(),
-                      fontFamily: 'OxygenBold',
-                      textAlign: 'center',
-                    }}
-                    size={sz.fontSize}>
-                    {text}
-                  </Text>
-                ) : (
-                  text
-                ))}
-            </>
-          )}
-        </HStack>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
 };
+
+const styles = StyleSheet.create({
+  hiddenContent: {
+    opacity: 0,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

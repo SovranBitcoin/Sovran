@@ -29,6 +29,7 @@ The hero-CTA button. String `text` prop, built-in loading spinner, integrates wi
 
 - **Variants:** `primary` · `secondary` · `dangerous`. Use semantic variants, never hand-style colors.
 - **Built-in loading state:** pass `loading={true}` — the button shows a spinner inside itself; you don't need to swap a spinner in or change the label (though you can do both as `WhitenoiseSetupScreen` does for clarity).
+- **Stable loading layout:** keep the action label stable when possible. The project Button reserves the last non-loading label/icon at `opacity: 0` and overlays the spinner, so bottom bars don't resize when an action enters loading.
 - **The footer container:** wrap in `<BottomButtons>` from `@/shared/ui/composed/BottomButtons`. It handles the safe-area inset, the bottom-fade gradient over the scrollable content, and the standard footer padding.
 
 ## heroui `Button` (`heroui-native`)

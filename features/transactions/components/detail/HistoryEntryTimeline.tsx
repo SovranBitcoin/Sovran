@@ -5,10 +5,10 @@ import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import Animated, {
   Easing,
   FadeInDown,
-  useAnimatedStyle,
   useSharedValue,
   withDelay,
   withTiming,
+  useAnimatedProps,
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -57,6 +57,7 @@ const LINE_WIDTH = 3;
 const LINE_HEIGHT = 50;
 const LINE_ANIM_MS = 400;
 const LINE_TIMING = { duration: LINE_ANIM_MS, easing: Easing.out(Easing.cubic) };
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 type TimelineLineType = 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient';
 
@@ -79,6 +80,7 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
 }: AnimatedTimelineLineProps) {
   const isComplete = lineType === 'complete';
   const fillHeight = useSharedValue(isComplete ? 1 : 0);
+  const gradientId = React.useId().replace(/:/g, '');
 
   useEffect(() => {
     const target = lineType === 'complete' ? 1 : 0;
@@ -88,16 +90,20 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
         : withTiming(target, LINE_TIMING);
   }, [lineType, delayMs, fillHeight]);
 
-  const fillStyle = useAnimatedStyle(() => ({
-    height: `${fillHeight.value * 100}%`,
+  const fillProps = useAnimatedProps(() => ({
+    height: fillHeight.value * LINE_HEIGHT,
   }));
 
   if (lineType === 'expired-gradient' || lineType === 'rolled-back-gradient') {
     const endColor = lineType === 'expired-gradient' ? dangerColor : warningColor;
     return (
-      <Svg width={LINE_WIDTH} height={LINE_HEIGHT} style={{ marginVertical: 4 }}>
+      <Svg
+        testID="history-entry-timeline-line"
+        width={LINE_WIDTH}
+        height={LINE_HEIGHT}
+        style={styles.timelineLine}>
         <Defs>
-          <LinearGradient id={`gradient-${lineType}`} x1="0" y1="0" x2="0" y2="1">
+          <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={successColor} />
             <Stop offset="100%" stopColor={endColor} />
           </LinearGradient>
@@ -109,33 +115,37 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
           height={LINE_HEIGHT}
           rx={LINE_WIDTH / 2}
           ry={LINE_WIDTH / 2}
-          fill={`url(#gradient-${lineType})`}
+          fill={`url(#${gradientId})`}
         />
       </Svg>
     );
   }
 
   return (
-    <View
-      style={{
-        width: LINE_WIDTH,
-        height: LINE_HEIGHT,
-        backgroundColor: mutedColor,
-        borderRadius: LINE_WIDTH / 2,
-        marginVertical: 4,
-        overflow: 'hidden',
-      }}>
-      <Animated.View
-        style={[
-          {
-            width: LINE_WIDTH,
-            backgroundColor: successColor,
-            borderRadius: LINE_WIDTH / 2,
-          },
-          fillStyle,
-        ]}
+    <Svg
+      testID="history-entry-timeline-line"
+      width={LINE_WIDTH}
+      height={LINE_HEIGHT}
+      style={styles.timelineLine}>
+      <Rect
+        x={0}
+        y={0}
+        width={LINE_WIDTH}
+        height={LINE_HEIGHT}
+        rx={LINE_WIDTH / 2}
+        ry={LINE_WIDTH / 2}
+        fill={mutedColor}
       />
-    </View>
+      <AnimatedRect
+        x={0}
+        y={0}
+        width={LINE_WIDTH}
+        rx={LINE_WIDTH / 2}
+        ry={LINE_WIDTH / 2}
+        fill={successColor}
+        animatedProps={fillProps}
+      />
+    </Svg>
   );
 });
 
@@ -363,5 +373,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  timelineLine: {
+    marginVertical: 4,
   },
 });
