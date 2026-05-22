@@ -665,10 +665,8 @@ export function ContactRow({
         size={AVATAR_SIZE}
       />
     );
-  } else if (mint || nostr || self || picture) {
+  } else if (mint || nostr || self || ble || picture) {
     avatarProp = { picture, seed, name, size: AVATAR_SIZE, state: avatarState };
-  } else if (ble) {
-    iconCircleProp = { icon: 'mdi:bluetooth', color: BLUETOOTH_ACCENT };
   } else if (geohash) {
     const isBleTier = geohash.transport === 'ble';
     iconCircleProp = {
