@@ -1,5 +1,6 @@
 import {
   buildPeerLayoutTargets,
+  getPeerLayoutOverviewTransform,
   getPeerLayoutPanBounds,
   getPeerViewportPresentation,
   NEAR_PAY_EXIT_ANIMATION_MS,
@@ -137,6 +138,24 @@ function targetCentersByPeerId(
   targets: readonly PeerLayoutTarget[]
 ): Map<string, { x: number; y: number }> {
   return new Map(targets.map((target) => [target.peer.peerID, targetCenter(target)]));
+}
+
+function overviewCenter(
+  target: { x: number; y: number },
+  transform: { translateX: number; translateY: number; scale: number },
+  pan: { x: number; y: number },
+  size = SIZE,
+  config = CONFIG
+): { x: number; y: number } {
+  const center = targetCenter(target, config);
+  return {
+    x:
+      size.width / 2 + (center.x + pan.x - size.width / 2) * transform.scale + transform.translateX,
+    y:
+      size.height / 2 +
+      (center.y + pan.y - size.height / 2) * transform.scale +
+      transform.translateY,
+  };
 }
 
 function expectPeerCenterToStayPut(
@@ -676,6 +695,129 @@ describe('near pay peer layout registry', () => {
     );
     expect(panBounds.minX).toBeLessThan(SIZE.width / 2 - maxCenterX);
     expect(panBounds.maxX).toBeGreaterThan(SIZE.width / 2 - minCenterX);
+  });
+
+  it('builds a press-held overview transform that fits every visible avatar', () => {
+    const entries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const pan = { x: -180, y: 96 };
+    const insets = { top: 24, right: 24, bottom: 132, left: 24 };
+    const overview = getPeerLayoutOverviewTransform(targets, SIZE, CONFIG, pan, insets);
+    const scaledRadius = (CONFIG.avatarSize * overview.scale) / 2;
+
+    expect(overview.scale).toBeGreaterThan(0);
+    expect(overview.scale).toBeLessThan(1);
+    for (const target of targets) {
+      const center = overviewCenter(target, overview, pan);
+
+      expect(center.x - scaledRadius).toBeGreaterThanOrEqual(insets.left - 0.001);
+      expect(center.x + scaledRadius).toBeLessThanOrEqual(SIZE.width - insets.right + 0.001);
+      expect(center.y - scaledRadius).toBeGreaterThanOrEqual(insets.top - 0.001);
+      expect(center.y + scaledRadius).toBeLessThanOrEqual(SIZE.height - insets.bottom + 0.001);
+    }
+  });
+
+  it('keeps overview scale at one when a pan-only shift can fit every avatar', () => {
+    const targets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: 5 }, (_, index) => peer(`peer-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
+    );
+    const pan = { x: SIZE.width / 3, y: 0 };
+    const insets = { top: 24, right: 24, bottom: 24, left: 24 };
+    const overview = getPeerLayoutOverviewTransform(targets, SIZE, CONFIG, pan, insets);
+    const avatarRadius = CONFIG.avatarSize / 2;
+
+    expect(overview.scale).toBe(1);
+    expect(Math.abs(overview.translateX)).toBeGreaterThan(1);
+    for (const target of targets) {
+      const center = overviewCenter(target, overview, pan);
+
+      expect(center.x - avatarRadius).toBeGreaterThanOrEqual(insets.left - 0.001);
+      expect(center.x + avatarRadius).toBeLessThanOrEqual(SIZE.width - insets.right + 0.001);
+    }
+  });
+
+  it('can apply a stronger minimum visible zoom-out even when every avatar already fits', () => {
+    const targets = buildPeerLayoutTargets(
+      reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: 5 }, (_, index) => peer(`peer-${index + 1}`)),
+        0
+      ),
+      SIZE,
+      CONFIG
+    );
+    const pan = { x: 0, y: 0 };
+    const insets = { top: 24, right: 24, bottom: 24, left: 24 };
+    const overview = getPeerLayoutOverviewTransform(targets, SIZE, CONFIG, pan, insets, 0.84, 0.94);
+    const scaledRadius = (CONFIG.avatarSize * overview.scale) / 2;
+
+    expect(overview.scale).toBeCloseTo(0.7896, 4);
+    for (const target of targets) {
+      const center = overviewCenter(target, overview, pan);
+
+      expect(center.x - scaledRadius).toBeGreaterThanOrEqual(insets.left - 0.001);
+      expect(center.x + scaledRadius).toBeLessThanOrEqual(SIZE.width - insets.right + 0.001);
+      expect(center.y - scaledRadius).toBeGreaterThanOrEqual(insets.top - 0.001);
+      expect(center.y + scaledRadius).toBeLessThanOrEqual(SIZE.height - insets.bottom + 0.001);
+    }
+  });
+
+  it('applies the overview scale factor to dense layouts that already need fitting', () => {
+    const entries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 35 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const targets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const pan = { x: -180, y: 96 };
+    const insets = { top: 24, right: 24, bottom: 132, left: 24 };
+    const regularOverview = getPeerLayoutOverviewTransform(targets, SIZE, CONFIG, pan, insets, 1);
+    const strongerOverview = getPeerLayoutOverviewTransform(
+      targets,
+      SIZE,
+      CONFIG,
+      pan,
+      insets,
+      1,
+      0.94
+    );
+
+    expect(strongerOverview.scale).toBeCloseTo(regularOverview.scale * 0.94, 4);
+    expect(strongerOverview.scale).toBeLessThan(regularOverview.scale);
+  });
+
+  it('ignores exiting peers when fitting the press-held overview', () => {
+    const visibleTarget = {
+      x: SIZE.width / 2 - CONFIG.nodeWidth / 2,
+      y: SIZE.height / 2 - CONFIG.nodeHeight / 2,
+      phase: 'visible' as const,
+    };
+    const exitingTarget = {
+      x: SIZE.width * 4,
+      y: SIZE.height * 4,
+      phase: 'exiting' as const,
+    };
+    const overview = getPeerLayoutOverviewTransform(
+      [visibleTarget, exitingTarget],
+      SIZE,
+      CONFIG,
+      { x: 0, y: 0 },
+      { top: 24, right: 24, bottom: 24, left: 24 }
+    );
+
+    expect(overview.scale).toBe(1);
+    expect(overview.translateX).toBeCloseTo(0, 4);
+    expect(overview.translateY).toBeCloseTo(0, 4);
   });
 
   it('translates shrinking edge presentations inward to preserve the honeycomb-side gap', () => {

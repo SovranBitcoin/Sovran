@@ -7,6 +7,8 @@ export interface CircleActionButtonProps {
   /** Optional caption under the circle. Omit for icon-only (e.g. camera toolbar). */
   label?: string;
   onPress?: () => void;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
   disabled?: boolean;
   /** Override for the icon tint. Defaults to `foreground`. */
   color?: string;

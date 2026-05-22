@@ -44,6 +44,7 @@ import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   buildPeerLayoutTargets,
+  getPeerLayoutOverviewTransform,
   getPeerLayoutPanBounds,
   getPeerViewportPresentation,
   NEAR_PAY_EXIT_ANIMATION_MS,
@@ -87,6 +88,11 @@ const PEER_PAN_RUBBER_BAND_FACTOR = 0.36;
 const PEER_PAN_MOMENTUM_SECONDS = 0.18;
 const PEER_ENTRY_ANIMATION_MS = 460;
 const PEER_REBALANCE_ANIMATION_MS = 320;
+const PEER_OVERVIEW_SIDE_INSET = spacing.lg;
+const PEER_OVERVIEW_TOP_INSET = spacing.lg;
+const PEER_OVERVIEW_BOTTOM_INSET = PEER_CANDIDATE_ACTION_AVOIDANCE;
+const PEER_OVERVIEW_MAX_SCALE = 0.84;
+const PEER_OVERVIEW_SCALE_FACTOR = 0.94;
 const SHARED_AVATAR_ANIMATION_MS = 430;
 const AMOUNT_PANEL_SHIFT_MAX_X = 80;
 const AMOUNT_PANEL_SHIFT_MAX_Y = 190;
@@ -136,6 +142,10 @@ const PEER_PAN_SETTLE_SPRING = {
   damping: 24,
   stiffness: 220,
   mass: 0.9,
+};
+const PEER_OVERVIEW_TIMING = {
+  duration: duration.quick,
+  easing: Easing.out(Easing.cubic),
 };
 const FOREGROUND_THEME_KEYS = ['foreground'] as const;
 const HEADER_BADGE_THEME_KEYS = ['foreground', 'shade-400', 'accent', 'accent-foreground'] as const;
@@ -300,6 +310,9 @@ const PeerNode = React.memo(function PeerNode({
   fieldSize,
   panX,
   panY,
+  overviewScale,
+  overviewTranslateX,
+  overviewTranslateY,
   isPanning,
   onSelect,
   hideSharedElementSource,
@@ -308,6 +321,9 @@ const PeerNode = React.memo(function PeerNode({
   fieldSize: PeerLayoutSize;
   panX: SharedValue<number>;
   panY: SharedValue<number>;
+  overviewScale: SharedValue<number>;
+  overviewTranslateX: SharedValue<number>;
+  overviewTranslateY: SharedValue<number>;
   isPanning: SharedValue<boolean>;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   hideSharedElementSource?: boolean;
@@ -355,6 +371,20 @@ const PeerNode = React.memo(function PeerNode({
 
   useAnimatedReaction(
     () => {
+      const overviewScaleValue = overviewScale.get();
+      const overviewTranslateXValue = overviewTranslateX.get();
+      const overviewTranslateYValue = overviewTranslateY.get();
+      const overviewActive =
+        overviewScaleValue < 0.999 ||
+        Math.abs(overviewTranslateXValue) > 0.5 ||
+        Math.abs(overviewTranslateYValue) > 0.5;
+      if (overviewActive) {
+        return {
+          isTrackingPan: true,
+          scale: 1,
+        };
+      }
+
       const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
       const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
       const avatarRadius = AVATAR_SIZE / 2;
@@ -419,12 +449,51 @@ const PeerNode = React.memo(function PeerNode({
           : withTiming(nextScale, PEER_VIEWPORT_SCALE_SHRINK_TIMING)
       );
     },
-    [fieldSize.height, fieldSize.width, isPanning, labelOpacityProgress]
+    [
+      fieldSize.height,
+      fieldSize.width,
+      isPanning,
+      labelOpacityProgress,
+      overviewScale,
+      overviewTranslateX,
+      overviewTranslateY,
+    ]
   );
 
   const animatedStyle = useAnimatedStyle(() => {
     const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
     const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
+    const overviewScaleValue = overviewScale.get();
+    const overviewTranslateXValue = overviewTranslateX.get();
+    const overviewTranslateYValue = overviewTranslateY.get();
+    const overviewActive =
+      overviewScaleValue < 0.999 ||
+      Math.abs(overviewTranslateXValue) > 0.5 ||
+      Math.abs(overviewTranslateYValue) > 0.5;
+    if (overviewActive) {
+      const centerX =
+        fieldSize.width / 2 +
+        (rawCenterX - fieldSize.width / 2) * overviewScaleValue +
+        overviewTranslateXValue;
+      const centerY =
+        fieldSize.height / 2 +
+        (rawCenterY - fieldSize.height / 2) * overviewScaleValue +
+        overviewTranslateYValue;
+      const totalScale = overviewScaleValue * visibilityScale.get();
+      const scaledAvatarCenterY =
+        NODE_HEIGHT / 2 + totalScale * (PEER_AVATAR_CENTER_Y - NODE_HEIGHT / 2);
+
+      return {
+        opacity: nodeOpacity.get(),
+        zIndex: zIndex.sticky,
+        transform: [
+          { translateX: centerX - NODE_WIDTH / 2 },
+          { translateY: centerY - scaledAvatarCenterY },
+          { scale: totalScale },
+        ],
+      };
+    }
+
     const avatarRadius = AVATAR_SIZE / 2;
     const leftInset = rawCenterX - FIELD_EDGE_PADDING;
     const rightInset = fieldSize.width - FIELD_EDGE_PADDING - rawCenterX;
@@ -610,6 +679,9 @@ function arePeerNodePropsEqual(
     fieldSize: PeerLayoutSize;
     panX: SharedValue<number>;
     panY: SharedValue<number>;
+    overviewScale: SharedValue<number>;
+    overviewTranslateX: SharedValue<number>;
+    overviewTranslateY: SharedValue<number>;
     isPanning: SharedValue<boolean>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
@@ -619,6 +691,9 @@ function arePeerNodePropsEqual(
     fieldSize: PeerLayoutSize;
     panX: SharedValue<number>;
     panY: SharedValue<number>;
+    overviewScale: SharedValue<number>;
+    overviewTranslateX: SharedValue<number>;
+    overviewTranslateY: SharedValue<number>;
     isPanning: SharedValue<boolean>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
@@ -631,6 +706,9 @@ function arePeerNodePropsEqual(
     prev.fieldSize.height === next.fieldSize.height &&
     prev.panX === next.panX &&
     prev.panY === next.panY &&
+    prev.overviewScale === next.overviewScale &&
+    prev.overviewTranslateX === next.overviewTranslateX &&
+    prev.overviewTranslateY === next.overviewTranslateY &&
     prev.isPanning === next.isPanning &&
     peerTargetsEqual(prev.target, next.target)
   );
@@ -669,13 +747,11 @@ function NearPayPeerField({
   peers,
   emptyContent,
   onSelect,
-  onRefresh,
   selectedPeerID,
 }: {
   peers: BLEPeer[];
   emptyContent: React.ReactNode;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
-  onRefresh: () => void;
   selectedPeerID?: string | null;
 }) {
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
@@ -683,6 +759,9 @@ function NearPayPeerField({
   const [registry, setRegistry] = useState<PeerLayoutRegistryEntry[]>([]);
   const panX = useSharedValue(0);
   const panY = useSharedValue(0);
+  const overviewScale = useSharedValue(1);
+  const overviewTranslateX = useSharedValue(0);
+  const overviewTranslateY = useSharedValue(0);
   const panStartX = useSharedValue(0);
   const panStartY = useSharedValue(0);
   const minPanX = useSharedValue(0);
@@ -784,6 +863,40 @@ function NearPayPeerField({
   }, [isPanSettling, isPanning, panSettleRemaining, panX, panY]);
 
   const hasSelectablePeer = targets.some((target) => target.phase !== 'exiting');
+
+  const handleOverviewPressIn = useCallback(() => {
+    const pan = { x: panX.get(), y: panY.get() };
+    const overview = getPeerLayoutOverviewTransform(
+      targets,
+      fieldSize,
+      PEER_LAYOUT_CONFIG,
+      pan,
+      {
+        top: PEER_OVERVIEW_TOP_INSET,
+        right: PEER_OVERVIEW_SIDE_INSET,
+        bottom: PEER_OVERVIEW_BOTTOM_INSET,
+        left: PEER_OVERVIEW_SIDE_INSET,
+      },
+      PEER_OVERVIEW_MAX_SCALE,
+      PEER_OVERVIEW_SCALE_FACTOR
+    );
+
+    cancelAnimation(overviewScale);
+    cancelAnimation(overviewTranslateX);
+    cancelAnimation(overviewTranslateY);
+    overviewScale.set(withTiming(overview.scale, PEER_OVERVIEW_TIMING));
+    overviewTranslateX.set(withTiming(overview.translateX, PEER_OVERVIEW_TIMING));
+    overviewTranslateY.set(withTiming(overview.translateY, PEER_OVERVIEW_TIMING));
+  }, [fieldSize, overviewScale, overviewTranslateX, overviewTranslateY, panX, panY, targets]);
+
+  const handleOverviewPressOut = useCallback(() => {
+    cancelAnimation(overviewScale);
+    cancelAnimation(overviewTranslateX);
+    cancelAnimation(overviewTranslateY);
+    overviewScale.set(withTiming(1, PEER_OVERVIEW_TIMING));
+    overviewTranslateX.set(withTiming(0, PEER_OVERVIEW_TIMING));
+    overviewTranslateY.set(withTiming(0, PEER_OVERVIEW_TIMING));
+  }, [overviewScale, overviewTranslateX, overviewTranslateY]);
 
   const handleRandomPeer = useCallback(() => {
     const pan = { x: panX.get(), y: panY.get() };
@@ -922,6 +1035,9 @@ function NearPayPeerField({
               fieldSize={fieldSize}
               panX={panX}
               panY={panY}
+              overviewScale={overviewScale}
+              overviewTranslateX={overviewTranslateX}
+              overviewTranslateY={overviewTranslateY}
               isPanning={isPanning}
               onSelect={onSelect}
               hideSharedElementSource={selectedPeerID === target.peer.peerID}
@@ -931,12 +1047,13 @@ function NearPayPeerField({
       </GestureDetector>
       <HStack justify="space-around" style={styles.nearPayActionRow}>
         <CircleActionButton
-          icon="mdi:refresh"
-          systemIcon="arrow.clockwise"
-          label="Refresh"
-          testID="near-pay-refresh"
-          accessibilityHint="Refresh nearby peers."
-          onPress={onRefresh}
+          icon="mdi:shuffle-variant"
+          systemIcon="shuffle"
+          label="Random"
+          testID="near-pay-random"
+          accessibilityHint="Pick a random nearby peer."
+          disabled={!hasSelectablePeer}
+          onPress={handleRandomPeer}
         />
         <CircleActionButton
           icon="mdi:crosshairs-gps"
@@ -947,13 +1064,14 @@ function NearPayPeerField({
           onPress={handleFocus}
         />
         <CircleActionButton
-          icon="mdi:shuffle-variant"
-          systemIcon="shuffle"
-          label="Random"
-          testID="near-pay-random"
-          accessibilityHint="Pick a random nearby peer."
-          disabled={!hasSelectablePeer}
-          onPress={handleRandomPeer}
+          icon="mdi:fullscreen"
+          systemIcon="minus.magnifyingglass"
+          label="Zoom"
+          testID="near-pay-overview"
+          accessibilityHint="Hold to zoom out and fit all peers."
+          disabled={targets.length === 0}
+          onPressIn={handleOverviewPressIn}
+          onPressOut={handleOverviewPressOut}
         />
       </HStack>
     </View>
@@ -1329,7 +1447,7 @@ export function NearPayScreen() {
       <VStack align="center" justify="center" gap={spacing.md} style={styles.emptyState}>
         <Icon name="mdi:bluetooth" size={iconSize['3xl']} color={foregroundSoft} />
         <Text size={17} weight="bold" style={emptyTitleStyle}>
-          Near Pay is unavailable here
+          Nut Drop is unavailable here
         </Text>
         <Text size={13} style={emptyTextStyle}>
           BitChat BLE is Apple-only, so this screen stays quiet on this platform.
@@ -1353,7 +1471,7 @@ export function NearPayScreen() {
   );
   const stackOptions = useMemo(
     () => ({
-      title: amountActive ? '' : 'Near Pay',
+      title: amountActive ? '' : 'Nut Drop',
       headerTitle: amountActive ? renderEmptyHeader : undefined,
       headerBackVisible: false,
       headerLeft: amountActive ? renderHeaderLeft : undefined,
@@ -1381,7 +1499,6 @@ export function NearPayScreen() {
                   peers={peers}
                   emptyContent={emptyContent}
                   onSelect={handleSelectPeer}
-                  onRefresh={refresh}
                   selectedPeerID={sharedAvatarPeer?.peerID ?? null}
                 />
               </Animated.View>

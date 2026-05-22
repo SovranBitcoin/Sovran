@@ -425,11 +425,6 @@
       "count": 1
     }
   },
-  "shared/ui/composed/CircleActionButton/CircleActionButton.liquid.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "shared/ui/composed/RowStatsAccent.tsx": {
     "no-restricted-syntax": {
       "count": 2

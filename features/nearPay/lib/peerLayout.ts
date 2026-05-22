@@ -65,6 +65,19 @@ interface PeerLayoutPanBounds {
   maxY: number;
 }
 
+interface PeerLayoutOverviewInsets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+interface PeerLayoutOverviewTransform {
+  translateX: number;
+  translateY: number;
+  scale: number;
+}
+
 interface PeerViewportPresentation {
   x: number;
   y: number;
@@ -507,6 +520,53 @@ export function getPeerLayoutPanBounds(
     maxX: Math.max(0, maxVisibleCenterX - minCenterX),
     minY: Math.min(0, minVisibleCenterY - maxCenterY),
     maxY: Math.max(0, maxVisibleCenterY - minCenterY),
+  };
+}
+
+export function getPeerLayoutOverviewTransform(
+  targets: readonly (Pick<PeerLayoutTarget, 'x' | 'y'> & { phase?: PeerLayoutPhase })[],
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig,
+  pan: PeerLayoutPanOffset = { x: 0, y: 0 },
+  insets: PeerLayoutOverviewInsets = { top: 0, right: 0, bottom: 0, left: 0 },
+  maxScale = 1,
+  scaleFactor = 1
+): PeerLayoutOverviewTransform {
+  const visibleTargets = targets.filter((target) => target.phase !== 'exiting');
+  if (visibleTargets.length === 0 || size.width <= 0 || size.height <= 0) {
+    return { translateX: 0, translateY: 0, scale: 1 };
+  }
+
+  const avatarRadius = config.avatarSize / 2;
+  const centers = visibleTargets.map((target) => ({
+    x: target.x + config.nodeWidth / 2 + pan.x,
+    y: target.y + config.nodeHeight / 2 + pan.y,
+  }));
+  const minCenterX = Math.min(...centers.map((center) => center.x));
+  const maxCenterX = Math.max(...centers.map((center) => center.x));
+  const minCenterY = Math.min(...centers.map((center) => center.y));
+  const maxCenterY = Math.max(...centers.map((center) => center.y));
+  const contentWidth = Math.max(maxCenterX - minCenterX + avatarRadius * 2, avatarRadius * 2);
+  const contentHeight = Math.max(maxCenterY - minCenterY + avatarRadius * 2, avatarRadius * 2);
+  const leftInset = clamp(insets.left, 0, size.width / 2);
+  const rightInset = clamp(insets.right, 0, size.width / 2);
+  const topInset = clamp(insets.top, 0, size.height / 2);
+  const bottomInset = clamp(insets.bottom, 0, size.height / 2);
+  const safeWidth = Math.max(size.width - leftInset - rightInset, avatarRadius * 2);
+  const safeHeight = Math.max(size.height - topInset - bottomInset, avatarRadius * 2);
+  const fitScale = Math.min(maxScale, safeWidth / contentWidth, safeHeight / contentHeight);
+  const scale = clamp(fitScale * scaleFactor, 0, 1);
+  const fieldCenterX = size.width / 2;
+  const fieldCenterY = size.height / 2;
+  const contentCenterX = (minCenterX + maxCenterX) / 2;
+  const contentCenterY = (minCenterY + maxCenterY) / 2;
+  const safeCenterX = leftInset + safeWidth / 2;
+  const safeCenterY = topInset + safeHeight / 2;
+
+  return {
+    translateX: safeCenterX - (fieldCenterX + (contentCenterX - fieldCenterX) * scale),
+    translateY: safeCenterY - (fieldCenterY + (contentCenterY - fieldCenterY) * scale),
+    scale,
   };
 }
 

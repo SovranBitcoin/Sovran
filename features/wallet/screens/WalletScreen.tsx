@@ -196,7 +196,7 @@ export function WalletScreen() {
                       <HStack align="center" gap={10} style={{ flex: 1 }}>
                         <Icon name="mdi:bluetooth" size={20} />
                         <View style={{ flex: 1 }}>
-                          <Menu.ItemTitle>Near Pay</Menu.ItemTitle>
+                          <Menu.ItemTitle>Nut Drop</Menu.ItemTitle>
                           <Menu.ItemDescription>Pay a nearby BitChat user</Menu.ItemDescription>
                         </View>
                       </HStack>

@@ -151,10 +151,6 @@ const MOCK_BLE_PEER_PROFILE_SEEDS: readonly MockBLEPeerProfileSeed[] = [
     picture:
       'https://r2.primal.net/cache/0/c6/24/0c62490569b550c58450c392e2a972413d11320fa5696a7f79a16efa1d8ce83c.gif',
   },
-  {
-    name: 'Jimmy Song',
-    pubkey: '7b3f7803750746f455413a221f80965eecb69ef308f2ead1da89cc2c8912e968',
-  },
 ];
 
 function resolveProfilePubkey(seed: MockBLEPeerProfileSeed): string {

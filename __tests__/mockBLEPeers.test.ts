@@ -28,7 +28,7 @@ describe('mock BLE peers', () => {
   });
 
   it('keeps the stress count backed by real named profile fixtures', () => {
-    expect(MOCK_BLE_PEER_MAX_COUNT).toBe(25);
+    expect(MOCK_BLE_PEER_MAX_COUNT).toBe(24);
     expect(MOCK_BLE_PEER_PROFILES).toHaveLength(MOCK_BLE_PEER_MAX_COUNT);
     expect(new Set(MOCK_BLE_PEER_PROFILES.map((profile) => profile.peerID)).size).toBe(
       MOCK_BLE_PEER_MAX_COUNT
@@ -71,6 +71,7 @@ describe('mock BLE peers', () => {
         'Jack Mallers',
         'hodlbod',
         'Carman',
+        'Jimmy Song',
       ].some((removedName) =>
         MOCK_BLE_PEER_PROFILES.some((profile) => profile.nickname === removedName)
       )

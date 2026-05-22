@@ -14,7 +14,9 @@ import type { CircleActionButtonProps } from './CircleActionButton.types';
 export const CircleActionButton = defineVariants<CircleActionButtonProps>(
   'CircleActionButton',
   (caps, props) => {
-    if (caps.liquidGlass && props.systemIcon) return CircleActionButtonLiquid;
+    if (caps.liquidGlass && props.systemIcon) {
+      return CircleActionButtonLiquid;
+    }
     if (caps.frostedSurface) return CircleActionButtonBlur;
     return CircleActionButtonFlat;
   }

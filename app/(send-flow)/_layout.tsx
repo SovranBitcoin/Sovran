@@ -5,7 +5,7 @@
  * The parent root Stack presents this group as a modal (slides up from bottom).
  * Screens within this group push horizontally:
  * - mintSelect: Entry point when no balance (shows mint list)
- * - nearPay: Nearby BitChat peer picker before amount selection
+ * - nearPay: Nut Drop nearby BitChat peer picker before amount selection
  * - amount: Amount selection (entry point when has balance)
  * - sendToken: Ecash token display after creation
  * - meltQuote: Lightning invoice payment
@@ -21,7 +21,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const MINT_SELECT_OPTIONS = { title: 'Select Mint' };
-const NEAR_PAY_OPTIONS = { title: 'Near Pay' };
+const NEAR_PAY_OPTIONS = { title: 'Nut Drop' };
 const AMOUNT_OPTIONS = { title: 'Select Amount' };
 const SEND_TOKEN_OPTIONS = { title: 'Send Ecash' };
 const MELT_QUOTE_OPTIONS = {
