@@ -59,9 +59,13 @@ import {
   type PeerLayoutTarget,
 } from '@/features/nearPay/lib/peerLayout';
 import { buildDotFieldPathBuckets } from '@/features/nearPay/lib/dotField';
+import {
+  getCenteredAvatarRectInSlot,
+  type AvatarRect,
+} from '@/features/nearPay/lib/avatarTransition';
 
 const AVATAR_SIZE = 48;
-const AMOUNT_HEADER_AVATAR_SIZE = 56;
+const AMOUNT_HEADER_AVATAR_SLOT_SIZE = 56;
 const INLINE_AMOUNT_HEADER_TOP = spacing['4xl'];
 const INLINE_AMOUNT_HEADER_HEIGHT = 126;
 const NEAR_PAY_ACTION_ROW_HEIGHT = 76;
@@ -165,12 +169,6 @@ const PEER_LAYOUT_CONFIG = {
   minVisibleScale: MIN_VISIBLE_PEER_SCALE,
   labelMinScale: PEER_LABEL_MIN_SCALE,
 };
-
-interface AvatarRect {
-  x: number;
-  y: number;
-  size: number;
-}
 
 interface AnimatedPeerViewportPresentation {
   centerX: number;
@@ -763,11 +761,11 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
 
   return (
     <VStack align="center" gap={spacing.xs} style={styles.inlineAmountHeader}>
-      <View style={hideAvatar ? styles.sharedElementHidden : null}>
+      <View style={[styles.amountHeaderAvatarSlot, hideAvatar ? styles.sharedElementHidden : null]}>
         <Avatar
           state={recipient.avatarUrl ? 'image' : 'fallback'}
           picture={recipient.avatarUrl ?? undefined}
-          size={AMOUNT_HEADER_AVATAR_SIZE}
+          size={AVATAR_SIZE}
           name={recipient.name}
           seed={recipient.peerID}
           alt={`${recipient.name} avatar`}
@@ -1405,12 +1403,12 @@ export function NearPayScreen() {
   }, [nearPaySession?.recipient, selectedPeer]);
 
   const headerAvatarRect = useMemo<AvatarRect | null>(() => {
-    if (containerSize.width <= 0) return null;
-    return {
-      x: containerSize.width / 2 - AMOUNT_HEADER_AVATAR_SIZE / 2,
-      y: INLINE_AMOUNT_HEADER_TOP,
-      size: AMOUNT_HEADER_AVATAR_SIZE,
-    };
+    return getCenteredAvatarRectInSlot({
+      containerWidth: containerSize.width,
+      slotTop: INLINE_AMOUNT_HEADER_TOP,
+      slotSize: AMOUNT_HEADER_AVATAR_SLOT_SIZE,
+      avatarSize: AVATAR_SIZE,
+    });
   }, [containerSize.width]);
 
   const handleContainerLayout = useCallback((event: LayoutChangeEvent) => {
@@ -2002,6 +2000,12 @@ const styles = StyleSheet.create({
   inlineAmountHeader: {
     height: INLINE_AMOUNT_HEADER_HEIGHT,
     paddingTop: INLINE_AMOUNT_HEADER_TOP,
+  },
+  amountHeaderAvatarSlot: {
+    width: AMOUNT_HEADER_AVATAR_SLOT_SIZE,
+    height: AMOUNT_HEADER_AVATAR_SLOT_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   inlineAmountBody: {
     flex: 1,
