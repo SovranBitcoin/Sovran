@@ -65,6 +65,7 @@
     "@gorhom/bottom-sheet": "5.2.9",
     "@internet-privacy/marmot-ts": "file:./vendor/marmot-ts",
     "@legendapp/list": "^3.0.0-beta.44",
+    "@mealection/react-native-boring-avatars": "1.1.2",
     "@monicon/metro": "^2.0.7",
     "@monicon/native": "^1.2.2",
     "@noble/hashes": "^2.0.1",

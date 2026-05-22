@@ -15,6 +15,7 @@ const INDEX_OPTIONS = { title: 'Settings' };
 const ABOUT_OPTIONS = { title: 'About' };
 const TERMS_OPTIONS = { title: 'Terms & Conditions' };
 const PROFILE_OPTIONS = { title: 'Profile' };
+const AVATAR_OPTIONS = { title: 'Avatar Fallback' };
 const ROUTING_OPTIONS = { title: 'Swap Routing' };
 const KEYRING_OPTIONS = { title: 'P2PK Keys' };
 const STORAGE_OPTIONS = { title: 'Storage Inventory' };
@@ -35,6 +36,7 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="about" options={ABOUT_OPTIONS} />
       <Stack.Screen name="terms" options={TERMS_OPTIONS} />
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
+      <Stack.Screen name="avatar" options={AVATAR_OPTIONS} />
       <Stack.Screen name="routing" options={ROUTING_OPTIONS} />
       <Stack.Screen name="keyring" options={KEYRING_OPTIONS} />
       <Stack.Screen name="storage" options={STORAGE_OPTIONS} />

@@ -19,6 +19,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { AVATAR_FALLBACK_VARIANT_LABELS } from '@/shared/lib/avatarFallback';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -131,6 +132,7 @@ export const SettingsScreen = () => {
   const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
+  const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -174,6 +176,12 @@ export const SettingsScreen = () => {
         <Section title="Preferences">
           <ListGroup variant="secondary">
             <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap Routing" />
+            <Separator className="mx-4" />
+            <SettingsListLinkItem
+              href="/(settings-flow)/avatar"
+              title="Avatar Fallback"
+              description={AVATAR_FALLBACK_VARIANT_LABELS[avatarFallbackVariant]}
+            />
           </ListGroup>
         </Section>
         <Section title="App Information">
