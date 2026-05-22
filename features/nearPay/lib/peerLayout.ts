@@ -84,6 +84,7 @@ interface PeerViewportPresentation {
   centerX: number;
   centerY: number;
   scale: number;
+  avatarOpacity: number;
   labelOpacity: number;
 }
 
@@ -580,8 +581,11 @@ export function getPeerViewportPresentation(
     x: target.x + config.nodeWidth / 2 + pan.x,
     y: target.y + config.nodeHeight / 2 + pan.y,
   };
-  const scale = getPeerAvatarScale(rawCenter, size, config);
+  const hasValidField = size.width > 0 && size.height > 0 && config.avatarSize > 0;
+  const rawScale = getRawPeerAvatarScale(rawCenter, size, config);
+  const scale = hasValidField ? getPeerAvatarScaleFromRaw(rawScale, config) : 0;
   const presentedCenter = getPeerPresentedCenter(rawCenter, size, config, scale);
+  const avatarOpacity = hasValidField ? getPeerAvatarOpacityFromRaw(rawScale, config) : 0;
   const labelOpacity = getPeerLabelOpacity(scale, config);
 
   return {
@@ -590,6 +594,7 @@ export function getPeerViewportPresentation(
     centerX: presentedCenter.x,
     centerY: presentedCenter.y,
     scale,
+    avatarOpacity,
     labelOpacity,
   };
 }
@@ -737,12 +742,32 @@ function getPeerAvatarScale(
   size: PeerLayoutSize,
   config: PeerLayoutConfig
 ): number {
+  if (size.width <= 0 || size.height <= 0 || config.avatarSize <= 0) return 0;
+  return getPeerAvatarScaleFromRaw(getRawPeerAvatarScale(center, size, config), config);
+}
+
+function getRawPeerAvatarScale(
+  center: PeerLayoutOffset,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): number {
   const fitScale = getAvatarFitScale(center, size, config);
   const edgeLensScale = getAvatarEdgeLensScale(center, size, config);
-  const scale = Math.min(fitScale, edgeLensScale);
-  if (scale >= 1) return 1;
-  if (scale < config.minVisibleScale) return 0;
-  return scale;
+
+  return Math.min(fitScale, edgeLensScale);
+}
+
+function getPeerAvatarScaleFromRaw(rawScale: number, config: PeerLayoutConfig): number {
+  if (rawScale >= 1) return 1;
+  if (rawScale <= 0) return config.minVisibleScale;
+  return Math.max(rawScale, config.minVisibleScale);
+}
+
+function getPeerAvatarOpacityFromRaw(rawScale: number, config: PeerLayoutConfig): number {
+  if (rawScale >= config.minVisibleScale) return 1;
+  if (config.minVisibleScale <= 0) return rawScale > 0 ? 1 : 0;
+
+  return smoothstep(clamp(rawScale / config.minVisibleScale, 0, 1));
 }
 
 function getAvatarFitScale(

@@ -335,6 +335,7 @@ const PeerNode = React.memo(function PeerNode({
   const nodeOpacity = useSharedValue(0);
   const visibilityScale = useSharedValue(0);
   const viewportScaleProgress = useSharedValue(target.scale);
+  const viewportOpacityProgress = useSharedValue(target.scale > 0 ? 1 : 0);
   const labelOpacityProgress = useSharedValue(target.scale >= PEER_LABEL_MIN_SCALE ? 1 : 0);
 
   useEffect(() => {
@@ -344,12 +345,14 @@ const PeerNode = React.memo(function PeerNode({
       baseY.set(target.y);
       nodeOpacity.set(0);
       visibilityScale.set(0);
+      viewportOpacityProgress.set(target.scale > 0 ? 1 : 0);
       hasAnimatedInRef.current = true;
     }
     cancelAnimation(baseX);
     cancelAnimation(baseY);
     cancelAnimation(nodeOpacity);
     cancelAnimation(visibilityScale);
+    cancelAnimation(viewportOpacityProgress);
     const exiting = target.phase === 'exiting';
     const animationDuration = exiting
       ? NEAR_PAY_EXIT_ANIMATION_MS
@@ -367,7 +370,17 @@ const PeerNode = React.memo(function PeerNode({
         : withTiming(1, opacityTiming)
     );
     visibilityScale.set(exiting ? withTiming(0, timing) : withSpring(1, PEER_SCALE_SPRING));
-  }, [baseX, baseY, nodeOpacity, visibilityScale, target.phase, target.x, target.y]);
+  }, [
+    baseX,
+    baseY,
+    nodeOpacity,
+    target.phase,
+    target.scale,
+    target.x,
+    target.y,
+    viewportOpacityProgress,
+    visibilityScale,
+  ]);
 
   useAnimatedReaction(
     () => {
@@ -381,6 +394,7 @@ const PeerNode = React.memo(function PeerNode({
       if (overviewActive) {
         return {
           isTrackingPan: true,
+          avatarOpacity: 1,
           scale: 1,
         };
       }
@@ -394,10 +408,15 @@ const PeerNode = React.memo(function PeerNode({
         rawCenterY - FIELD_EDGE_PADDING,
         fieldSize.height - FIELD_EDGE_PADDING - rawCenterY
       );
-      const fitScale =
-        fieldSize.width <= 0 || fieldSize.height <= 0
-          ? 0
-          : Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
+      if (fieldSize.width <= 0 || fieldSize.height <= 0 || AVATAR_SIZE <= 0) {
+        return {
+          isTrackingPan: isPanning.get(),
+          avatarOpacity: 0,
+          scale: 0,
+        };
+      }
+
+      const fitScale = Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
       const edgeProgress = Math.min(
         Math.max((edgeDistance - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
         1
@@ -409,18 +428,26 @@ const PeerNode = React.memo(function PeerNode({
       const scale =
         rawViewportScale >= 1
           ? 1
-          : rawViewportScale < MIN_VISIBLE_PEER_SCALE
-            ? 0
-            : rawViewportScale;
+          : rawViewportScale <= 0
+            ? MIN_VISIBLE_PEER_SCALE
+            : Math.max(rawViewportScale, MIN_VISIBLE_PEER_SCALE);
+      const fadeProgress = Math.min(Math.max(rawViewportScale / MIN_VISIBLE_PEER_SCALE, 0), 1);
+      const avatarOpacity =
+        rawViewportScale >= MIN_VISIBLE_PEER_SCALE
+          ? 1
+          : fadeProgress * fadeProgress * (3 - 2 * fadeProgress);
 
       return {
         isTrackingPan: isPanning.get(),
+        avatarOpacity,
         scale,
       };
     },
     (next, previous) => {
       const nextScale = next.scale;
       const previousScale = previous?.scale ?? null;
+      const nextAvatarOpacity = next.avatarOpacity;
+      const previousAvatarOpacity = previous?.avatarOpacity ?? null;
       const nextLabelOpacity = nextScale >= PEER_LABEL_MIN_SCALE ? 1 : 0;
       const previousLabelOpacity =
         previousScale === null ? null : previousScale >= PEER_LABEL_MIN_SCALE ? 1 : 0;
@@ -428,6 +455,8 @@ const PeerNode = React.memo(function PeerNode({
       if (previousScale === null || next.isTrackingPan || previous?.isTrackingPan) {
         cancelAnimation(viewportScaleProgress);
         viewportScaleProgress.set(nextScale);
+        cancelAnimation(viewportOpacityProgress);
+        viewportOpacityProgress.set(nextAvatarOpacity);
         if (previousLabelOpacity === null) {
           labelOpacityProgress.set(nextLabelOpacity);
         } else if (nextLabelOpacity !== previousLabelOpacity) {
@@ -435,6 +464,13 @@ const PeerNode = React.memo(function PeerNode({
           labelOpacityProgress.set(withTiming(nextLabelOpacity, PEER_LABEL_FADE_TIMING));
         }
         return;
+      }
+      if (
+        previousAvatarOpacity === null ||
+        Math.abs(nextAvatarOpacity - previousAvatarOpacity) >= 0.01
+      ) {
+        cancelAnimation(viewportOpacityProgress);
+        viewportOpacityProgress.set(withTiming(nextAvatarOpacity, PEER_LABEL_FADE_TIMING));
       }
       if (nextLabelOpacity !== previousLabelOpacity) {
         cancelAnimation(labelOpacityProgress);
@@ -457,6 +493,7 @@ const PeerNode = React.memo(function PeerNode({
       overviewScale,
       overviewTranslateX,
       overviewTranslateY,
+      viewportOpacityProgress,
     ]
   );
 
@@ -555,7 +592,7 @@ const PeerNode = React.memo(function PeerNode({
       NODE_HEIGHT / 2 + totalScale * (PEER_AVATAR_CENTER_Y - NODE_HEIGHT / 2);
 
     return {
-      opacity: nodeOpacity.get(),
+      opacity: nodeOpacity.get() * viewportOpacityProgress.get(),
       zIndex: zIndex.sticky + Math.round(layoutViewportScale * 100),
       transform: [
         { translateX: centerX - NODE_WIDTH / 2 },
@@ -566,7 +603,7 @@ const PeerNode = React.memo(function PeerNode({
   });
   const labelAnimatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: labelOpacityProgress.get() * visibilityScale.get(),
+      opacity: labelOpacityProgress.get() * visibilityScale.get() * viewportOpacityProgress.get(),
     };
   });
   const nodeStyle = useMemo(() => [styles.peerNode, animatedStyle], [animatedStyle]);
@@ -588,7 +625,7 @@ const PeerNode = React.memo(function PeerNode({
       x: panX.get(),
       y: panY.get(),
     });
-    if (presentation.scale <= 0) return;
+    if (presentation.scale <= 0 || presentation.avatarOpacity <= 0.05) return;
     onSelect(target.peer, getScaledAvatarRect(target, fieldSize, { x: panX.get(), y: panY.get() }));
   }, [fieldSize, onSelect, panX, panY, target]);
 
@@ -903,7 +940,7 @@ function NearPayPeerField({
     const selectableTargets = targets.filter((target) => {
       if (target.phase === 'exiting') return false;
       const presentation = getPeerViewportPresentation(target, fieldSize, PEER_LAYOUT_CONFIG, pan);
-      return presentation.scale > 0;
+      return presentation.scale > 0 && presentation.avatarOpacity > 0.05;
     });
     if (selectableTargets.length === 0) return;
 

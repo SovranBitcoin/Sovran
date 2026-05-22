@@ -626,7 +626,7 @@ describe('near pay peer layout registry', () => {
     ).toBe(true);
   });
 
-  it('vanishes avatars whose fit scale is below the visible minimum', () => {
+  it('fades avatars whose fit scale is below the visible minimum', () => {
     const rawCenter = {
       x: CONFIG.edgePadding - CONFIG.avatarSize * 0.45,
       y: SIZE.height / 2,
@@ -638,7 +638,26 @@ describe('near pay peer layout registry', () => {
     const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
 
     expect(rawAvatarFitScale(target)).toBeLessThan(CONFIG.minVisibleScale);
-    expect(presentation.scale).toBe(0);
+    expect(presentation.scale).toBe(CONFIG.minVisibleScale);
+    expect(presentation.avatarOpacity).toBeGreaterThan(0);
+    expect(presentation.avatarOpacity).toBeLessThan(1);
+    expect(presentation.labelOpacity).toBe(0);
+  });
+
+  it('fully fades out avatars past the edge fade band', () => {
+    const rawCenter = {
+      x: CONFIG.edgePadding - CONFIG.avatarSize,
+      y: SIZE.height / 2,
+    };
+    const target = {
+      x: rawCenter.x - CONFIG.nodeWidth / 2,
+      y: rawCenter.y - CONFIG.nodeHeight / 2,
+    };
+    const presentation = getPeerViewportPresentation(target, SIZE, CONFIG);
+
+    expect(rawAvatarFitScale(target)).toBe(0);
+    expect(presentation.scale).toBe(CONFIG.minVisibleScale);
+    expect(presentation.avatarOpacity).toBe(0);
     expect(presentation.labelOpacity).toBe(0);
   });
 
