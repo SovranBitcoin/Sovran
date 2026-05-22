@@ -6,6 +6,7 @@
  * Screens within this group push horizontally:
  * - mintSelect: Entry point when no balance (shows mint list)
  * - nearPay: Nut Drop nearby BitChat peer picker before amount selection
+ * - nearPayPeers: Scrollable nearby BitChat peer list
  * - amount: Amount selection (entry point when has balance)
  * - sendToken: Ecash token display after creation
  * - meltQuote: Lightning invoice payment
@@ -21,7 +22,18 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const MINT_SELECT_OPTIONS = { title: 'Select Mint' };
-const NEAR_PAY_OPTIONS = { title: 'Nut Drop' };
+const NEAR_PAY_HEADER_OPTIONS = {
+  headerShadowVisible: false,
+  headerTransparent: true,
+} as const;
+const NEAR_PAY_OPTIONS = {
+  title: 'Nut Drop',
+  ...NEAR_PAY_HEADER_OPTIONS,
+};
+const NEAR_PAY_PEERS_OPTIONS = {
+  title: 'Nearby',
+  ...NEAR_PAY_HEADER_OPTIONS,
+};
 const AMOUNT_OPTIONS = { title: 'Select Amount' };
 const SEND_TOKEN_OPTIONS = { title: 'Send Ecash' };
 const MELT_QUOTE_OPTIONS = {
@@ -49,6 +61,7 @@ export default function SendFlowLayout() {
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
       <Stack.Screen name="nearPay" options={NEAR_PAY_OPTIONS} />
+      <Stack.Screen name="nearPayPeers" options={NEAR_PAY_PEERS_OPTIONS} />
       <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
       <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
       <Stack.Screen name="meltQuote" options={MELT_QUOTE_OPTIONS} />

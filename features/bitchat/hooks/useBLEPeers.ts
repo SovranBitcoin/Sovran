@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { getBLEPeers, addBLEPeerListener, type BLEPeer } from 'bitchat-module';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
@@ -14,6 +14,46 @@ interface UseBLEPeersResult {
   peers: BLEPeer[];
   connectedCount: number;
   refresh: () => void;
+}
+
+let mockLoopState: MockBLEPeerLoopState = INITIAL_MOCK_BLE_PEER_LOOP_STATE;
+let mockPeersSnapshot = buildMockBLEPeers(mockLoopState.count);
+let mockPeersInterval: ReturnType<typeof setInterval> | null = null;
+const mockPeerListeners = new Set<() => void>();
+
+function notifyMockPeerListeners() {
+  for (const listener of mockPeerListeners) listener();
+}
+
+function setMockPeersSnapshot(nextPeers: BLEPeer[]) {
+  mockPeersSnapshot = nextPeers;
+  notifyMockPeerListeners();
+}
+
+function startMockPeerLoop() {
+  if (mockPeersInterval) return;
+  setMockPeersSnapshot(buildMockBLEPeers(mockLoopState.count));
+  mockPeersInterval = setInterval(() => {
+    mockLoopState = getNextMockBLEPeerLoopState(mockLoopState);
+    setMockPeersSnapshot(buildMockBLEPeers(mockLoopState.count));
+  }, MOCK_BLE_PEER_LOOP_INTERVAL_MS);
+}
+
+function stopMockPeerLoopIfIdle() {
+  if (mockPeerListeners.size > 0 || !mockPeersInterval) return;
+  clearInterval(mockPeersInterval);
+  mockPeersInterval = null;
+  mockLoopState = INITIAL_MOCK_BLE_PEER_LOOP_STATE;
+  mockPeersSnapshot = buildMockBLEPeers(mockLoopState.count);
+}
+
+function subscribeMockPeers(listener: () => void): () => void {
+  mockPeerListeners.add(listener);
+  startMockPeerLoop();
+  return () => {
+    mockPeerListeners.delete(listener);
+    stopMockPeerLoopIfIdle();
+  };
 }
 
 /**
@@ -34,8 +74,9 @@ interface UseBLEPeersResult {
  */
 export function useBLEPeers(): UseBLEPeersResult {
   const mockMode = useSettingsStore((state) => state.mockMode);
-  const mockLoopRef = useRef<MockBLEPeerLoopState>(INITIAL_MOCK_BLE_PEER_LOOP_STATE);
-  const [peers, setPeers] = useState<BLEPeer[]>(() => getBLEPeers());
+  const [peers, setPeers] = useState<BLEPeer[]>(() =>
+    mockMode ? mockPeersSnapshot : getBLEPeers()
+  );
 
   const setPeersIfChanged = useCallback((nextPeers: BLEPeer[]) => {
     setPeers((current) =>
@@ -45,7 +86,7 @@ export function useBLEPeers(): UseBLEPeersResult {
 
   const refresh = useCallback(() => {
     if (mockMode) {
-      setPeersIfChanged(buildMockBLEPeers(mockLoopRef.current.count));
+      setPeersIfChanged(mockPeersSnapshot);
       return;
     }
     setPeersIfChanged(getBLEPeers());
@@ -53,13 +94,10 @@ export function useBLEPeers(): UseBLEPeersResult {
 
   useEffect(() => {
     if (mockMode) {
-      mockLoopRef.current = INITIAL_MOCK_BLE_PEER_LOOP_STATE;
-      setPeersIfChanged(buildMockBLEPeers(mockLoopRef.current.count));
-      const interval = setInterval(() => {
-        mockLoopRef.current = getNextMockBLEPeerLoopState(mockLoopRef.current);
-        setPeersIfChanged(buildMockBLEPeers(mockLoopRef.current.count));
-      }, MOCK_BLE_PEER_LOOP_INTERVAL_MS);
-      return () => clearInterval(interval);
+      setPeersIfChanged(mockPeersSnapshot);
+      return subscribeMockPeers(() => {
+        setPeersIfChanged(mockPeersSnapshot);
+      });
     }
 
     refresh();

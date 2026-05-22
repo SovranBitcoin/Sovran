@@ -252,6 +252,32 @@ describe('near pay peer layout registry', () => {
     expect(targetRadius(targets[1])).toBeGreaterThan(0);
   });
 
+  it('keeps repeated cached layout builds identical while using current peer data', () => {
+    const entries = reconcilePeerLayoutRegistry(
+      [],
+      Array.from({ length: 24 }, (_, index) => peer(`peer-${index + 1}`)),
+      0
+    );
+    const firstTargets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+    const secondTargets = buildPeerLayoutTargets(entries, SIZE, CONFIG);
+
+    expect(secondTargets).toEqual(firstTargets);
+
+    const renamedEntries = entries.map((entry) =>
+      entry.peer.peerID === 'peer-1'
+        ? { ...entry, peer: { ...entry.peer, name: 'Updated Peer One' } }
+        : entry
+    );
+    const renamedTargets = buildPeerLayoutTargets(renamedEntries, SIZE, CONFIG);
+    const originalPeerOne = firstTargets.find((target) => target.peer.peerID === 'peer-1');
+    const renamedPeerOne = renamedTargets.find((target) => target.peer.peerID === 'peer-1');
+
+    expect(renamedPeerOne?.peer.name).toBe('Updated Peer One');
+    expect(renamedPeerOne?.x).toBeCloseTo(originalPeerOne?.x ?? 0, 4);
+    expect(renamedPeerOne?.y).toBeCloseTo(originalPeerOne?.y ?? 0, 4);
+    expect(renamedPeerOne?.scale).toBeCloseTo(originalPeerOne?.scale ?? 0, 4);
+  });
+
   it('keeps existing peer targets stable when a peer is added', () => {
     const firstEntries = reconcilePeerLayoutRegistry([], [peer('a'), peer('b'), peer('c')], 0);
     const firstTargets = buildPeerLayoutTargets(firstEntries, SIZE, CONFIG);

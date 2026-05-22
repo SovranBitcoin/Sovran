@@ -35,6 +35,8 @@ interface AmountFlowContentProps {
   headerMode?: 'native' | 'none';
 }
 
+const AMOUNT_FLOW_DIAGNOSTIC_LOGS_ENABLED = false;
+
 export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   return <AmountFlowContent amountEntry={amountEntry} headerMode="native" />;
 }
@@ -163,11 +165,8 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     if (error) paymentLog.warn('send.amount_flow.error', { error });
   }, [error]);
 
-  // Diagnostic: dump the entry shape so we can see whether the chat seed
-  // (recipientPubkey/recipientProfile from UserMessagesScreen → startSendEcash
-  // → constraints → sovranPaymentConfig.enterAmount) actually lands on the
-  // amount-entry route param.
   useEffect(() => {
+    if (!AMOUNT_FLOW_DIAGNOSTIC_LOGS_ENABLED) return;
     paymentLog.debug('amount_flow.entry_dump', {
       entryKeys: entry ? Object.keys(entry) : null,
       entryRecipientPubkey:
@@ -179,12 +178,8 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     });
   }, [entry, nearPayRecipient?.peerID]);
 
-  // Diagnostic: subscribe to machine state changes and log ctx every time
-  // the machine notifies. Lets us see if recipientPubkey/Profile lands on
-  // ctx between AmountSelector.handleNext and Sovran's navigateToMeltPreview
-  // handler. coco-payment-ux's own logger seam isn't piping into the ring
-  // buffer for some reason — this gives us a direct, Sovran-owned read.
   useEffect(() => {
+    if (!AMOUNT_FLOW_DIAGNOSTIC_LOGS_ENABLED) return;
     const log = () => {
       const ctx = machine.getContext();
       paymentLog.debug('amount_flow.machine_ctx_snapshot', {
@@ -199,50 +194,69 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     return machine.subscribe(log);
   }, [machine]);
 
+  const emptyEntryStyle = useMemo(() => ({ flex: 1, backgroundColor: background }), [background]);
+  const amountBodyStyle = useMemo(() => ({ flex: 1 }), []);
+  const isSendOperation = entry?.destination !== 'mintQuote';
+  const offlineIconStyle = useMemo(
+    () => ({ opacity: canSendOffline === null ? 0.3 : 1 }),
+    [canSendOffline]
+  );
+  const renderHeaderTitle = useCallback(
+    () =>
+      recipientReady ? (
+        <RecipientHeader
+          pubkey={recipientPubkey}
+          seed={headerSeed}
+          displayName={headerDisplayName!}
+          avatarUrl={headerAvatarUrl}
+        />
+      ) : (
+        <MintSelector selectedMintUrl={mintUrl} onRequestMintList={handleRequestMintList} />
+      ),
+    [
+      handleRequestMintList,
+      headerAvatarUrl,
+      headerDisplayName,
+      headerSeed,
+      mintUrl,
+      recipientPubkey,
+      recipientReady,
+    ]
+  );
+  const renderHeaderRight = useCallback(
+    () => (
+      <IconSymbol
+        name={canSendOffline === true ? 'airplane' : 'wifi'}
+        size={18}
+        color={foreground}
+        style={offlineIconStyle}
+      />
+    ),
+    [canSendOffline, foreground, offlineIconStyle]
+  );
+  const stackOptions = useMemo(
+    () => ({
+      title: 'Select Amount',
+      headerTitleAlign: 'center' as const,
+      headerTitle: renderHeaderTitle,
+      headerTintColor: foreground,
+      headerRight: isSendOperation && mintUrl ? renderHeaderRight : undefined,
+    }),
+    [foreground, isSendOperation, mintUrl, renderHeaderRight, renderHeaderTitle]
+  );
+
   if (error) {
     return null;
   }
 
   if (!entry) {
-    return <View style={{ flex: 1, backgroundColor: background }} />;
+    return <View style={emptyEntryStyle} />;
   }
-
-  const isSendOperation = entry.destination !== 'mintQuote';
 
   return (
     <Log name="AmountFlowScreen">
-      {headerMode === 'native' ? (
-        <Stack.Screen
-          options={{
-            title: 'Select Amount',
-            headerTitleAlign: 'center',
-            headerTitle: () =>
-              recipientReady ? (
-                <RecipientHeader
-                  pubkey={recipientPubkey}
-                  seed={headerSeed}
-                  displayName={headerDisplayName!}
-                  avatarUrl={headerAvatarUrl}
-                />
-              ) : (
-                <MintSelector selectedMintUrl={mintUrl} onRequestMintList={handleRequestMintList} />
-              ),
-            headerTintColor: foreground,
-            headerRight:
-              isSendOperation && mintUrl
-                ? () => (
-                    <IconSymbol
-                      name={canSendOffline === true ? 'airplane' : 'wifi'}
-                      size={18}
-                      color={foreground}
-                      style={{ opacity: canSendOffline === null ? 0.3 : 1 }}
-                    />
-                  )
-                : undefined,
-          }}
-        />
-      ) : null}
-      <View style={{ flex: 1 }}>
+      {headerMode === 'native' ? <Stack.Screen options={stackOptions} /> : null}
+      <View style={amountBodyStyle}>
         <AmountSelector
           entry={entry}
           actions={actions}

@@ -108,6 +108,7 @@ interface BleIdentity {
   kind: 'ble';
   peerID: string;
   nickname?: string;
+  picture?: string;
   /** Omit these fields when the caller supplies its own `subtitle` / `trailing`. */
   /** Cached announce-time reachability (true if announce arrived directly or
    *  we had a direct link at announce time). Use `hasDirectLink` for truthful
@@ -229,6 +230,7 @@ export function mintIdentity(
 export function bleIdentity(peer: {
   peerID: string;
   nickname?: string;
+  picture?: string;
   isConnected?: boolean;
   hasDirectLink?: boolean;
   lastSeen?: number;
@@ -391,7 +393,8 @@ function derivePicture(ids: Identity[]): string | undefined {
   return (
     find(ids, 'mint')?.iconUrl ??
     find(ids, 'nostr')?.profile?.picture ??
-    find(ids, 'self')?.avatarUrl
+    find(ids, 'self')?.avatarUrl ??
+    find(ids, 'ble')?.picture
   );
 }
 

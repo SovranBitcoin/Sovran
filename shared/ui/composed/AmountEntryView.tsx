@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from 'react';
-import { ScrollView, Text as RNText, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text as RNText, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
@@ -316,7 +316,7 @@ export function AmountEntryView({
         </View>
       </View>
 
-      <BottomButtons style={{ position: 'relative' }} paddingBottom={0}>
+      <BottomButtons style={styles.bottomButtons} paddingBottom={0}>
         {suggestionsRow}
         <CustomKeyboard
           loading={nextLoading}
@@ -340,9 +340,9 @@ export function AmountEntryView({
             // When `leadingBottomButton` is set (recipient-header flow),
             // extras are suppressed and the row becomes [leading 50%] +
             // [ActionMenuButton 50%].
-            <HStack align="center" gap={0} style={{ flex: 1 }}>
+            <HStack align="center" gap={0} style={styles.bottomRow}>
               {leadingBottomButton ? (
-                <View style={{ flex: 1, alignItems: 'center' }}>{leadingBottomButton}</View>
+                <View style={styles.bottomSlotCentered}>{leadingBottomButton}</View>
               ) : null}
               <ActionMenuButton
                 label={nextText}
@@ -364,7 +364,7 @@ export function AmountEntryView({
                 menuTitle="Select option"
               />
               {!leadingBottomButton && extraButtons && extraButtons.length > 0 ? (
-                <View style={{ flex: 1 }}>
+                <View style={styles.bottomSlot}>
                   <Button
                     testID={extraButtons[0].testID}
                     text={extraButtons[0].text}
@@ -399,9 +399,9 @@ export function AmountEntryView({
             // caller-supplied leading node (e.g. MintSelector pill) can
             // render its own image-backed chrome without this primitive
             // needing to model mint internals.
-            <HStack align="center" gap={0} style={{ flex: 1 }}>
-              <View style={{ flex: 1, alignItems: 'center' }}>{leadingBottomButton}</View>
-              <View style={{ flex: 1 }}>
+            <HStack align="center" gap={0} style={styles.bottomRow}>
+              <View style={styles.bottomSlotCentered}>{leadingBottomButton}</View>
+              <View style={styles.bottomSlot}>
                 <Button
                   testID={nextTestID}
                   text={nextText}
@@ -438,3 +438,19 @@ export function AmountEntryView({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  bottomButtons: {
+    position: 'relative',
+  },
+  bottomRow: {
+    flex: 1,
+  },
+  bottomSlot: {
+    flex: 1,
+  },
+  bottomSlotCentered: {
+    flex: 1,
+    alignItems: 'center',
+  },
+});

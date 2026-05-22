@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import type { BLEPeer } from 'bitchat-module';
+import { Switch as HeroSwitch } from 'heroui-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
+import { scheduleOnRN } from 'react-native-worklets';
 import Animated, {
   cancelAnimation,
   Easing,
   type SharedValue,
   useAnimatedReaction,
+  useDerivedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -28,7 +31,7 @@ import {
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger, useRenderLogger } from '@/shared/lib/logger';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -94,10 +97,10 @@ const PEER_OVERVIEW_BOTTOM_INSET = PEER_CANDIDATE_ACTION_AVOIDANCE;
 const PEER_OVERVIEW_MAX_SCALE = 0.84;
 const PEER_OVERVIEW_SCALE_FACTOR = 0.94;
 const SHARED_AVATAR_ANIMATION_MS = 430;
+const AMOUNT_CONTENT_PREWARM_MS = 120;
 const AMOUNT_PANEL_SHIFT_MAX_X = 80;
 const AMOUNT_PANEL_SHIFT_MAX_Y = 190;
 const AMOUNT_CONTENT_ENTER_OFFSET = spacing.sm;
-const AMOUNT_CONTENT_ENTER_DELAY_MS = duration.instant;
 type MockBLEPeerProfileWithPicture = MockBLEPeerProfile & { picture: string };
 const MOCK_BLE_PEER_AVATAR_PRELOAD_PROFILES = MOCK_BLE_PEER_PROFILES.filter(
   (profile): profile is MockBLEPeerProfileWithPicture => !!profile.picture
@@ -109,6 +112,11 @@ const AMOUNT_CONTENT_ENTER_TIMING = {
   duration: duration.standard,
   easing: Easing.out(Easing.cubic),
 };
+const NEAR_PAY_LAYOUT_CYCLE_INITIAL_LOG_COUNT = 8;
+const NEAR_PAY_LAYOUT_CYCLE_PERIODIC_MS = 10_000;
+const NEAR_PAY_LAYOUT_CYCLE_SLOW_LAYOUT_MS = 2;
+const NEAR_PAY_LAYOUT_CYCLE_SLOW_TARGETS_MS = 4;
+const NEAR_PAY_LAYOUT_CYCLE_SLOW_PAN_BOUNDS_MS = 1;
 const PEER_ENTRY_SPRING = {
   damping: 18,
   stiffness: 160,
@@ -123,16 +131,6 @@ const PEER_SCALE_SPRING = {
   damping: 15,
   stiffness: 220,
   mass: 0.7,
-};
-const PEER_VIEWPORT_SCALE_GROW_SPRING = {
-  damping: 18,
-  stiffness: 360,
-  mass: 0.45,
-};
-const PEER_VIEWPORT_SCALE_MAX_OVERSHOOT = 1.025;
-const PEER_VIEWPORT_SCALE_SHRINK_TIMING = {
-  duration: duration.quick,
-  easing: Easing.out(Easing.cubic),
 };
 const PEER_LABEL_FADE_TIMING = {
   duration: duration.quick,
@@ -172,6 +170,34 @@ interface AvatarRect {
   x: number;
   y: number;
   size: number;
+}
+
+interface AnimatedPeerViewportPresentation {
+  centerX: number;
+  centerY: number;
+  scale: number;
+  layoutScale: number;
+  avatarOpacity: number;
+  overviewScale: number;
+  overviewActive: boolean;
+}
+
+type NearPayPerfSpan = {
+  end: (params?: Record<string, unknown>) => void;
+};
+
+function nowMs(): number {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
+}
+
+function durationSinceMs(startedAtMs: number): number {
+  return Math.round((nowMs() - startedAtMs) * 100) / 100;
+}
+
+function roundMetric(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function peerDisplayName(peer: BLEPeer): string {
@@ -229,6 +255,35 @@ const HeaderBadge = React.memo(function HeaderBadge({
   );
 });
 
+const HeaderMockModeToggle = React.memo(function HeaderMockModeToggle() {
+  const mockMode = useSettingsStore((state) => state.mockMode);
+  const setMockMode = useSettingsStore((state) => state.setMockMode);
+  const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
+  const labelStyle = useMemo(
+    () => [styles.headerMockModeLabel, { color: foreground }],
+    [foreground]
+  );
+  const handleSelectedChange = useCallback(
+    (isSelected: boolean) => {
+      setMockMode(isSelected);
+    },
+    [setMockMode]
+  );
+
+  return (
+    <HStack align="center" gap={spacing.xs} style={styles.headerMockModeToggle}>
+      <Text size={11} weight="bold" style={labelStyle}>
+        Mock
+      </Text>
+      <HeroSwitch
+        isSelected={mockMode}
+        onSelectedChange={handleSelectedChange}
+        accessibilityLabel="Mock Mode"
+      />
+    </HStack>
+  );
+});
+
 const MockPeerAvatarPreloader = React.memo(function MockPeerAvatarPreloader({
   profiles,
 }: {
@@ -267,10 +322,28 @@ const DotField = React.memo(function DotField({
   foreground: string;
 }) {
   const { width, height } = size;
-  const buckets = useMemo(
-    () => buildDotFieldPathBuckets({ width, height }, DOT_SPACING, DOT_RADIUS),
-    [height, width]
-  );
+  const bucketResult = useMemo(() => {
+    const startedAt = nowMs();
+    const value = buildDotFieldPathBuckets({ width, height }, DOT_SPACING, DOT_RADIUS);
+    return {
+      value,
+      bucketCount: value.length,
+      pathChars: value.reduce((total, bucket) => total + bucket.d.length, 0),
+      duration_ms: durationSinceMs(startedAt),
+    };
+  }, [height, width]);
+  const buckets = bucketResult.value;
+
+  useEffect(() => {
+    if (width <= 0 || height <= 0) return;
+    paymentLog.debug('near_pay.perf.dot_field_built', {
+      width: roundMetric(width),
+      height: roundMetric(height),
+      bucketCount: bucketResult.bucketCount,
+      pathChars: bucketResult.pathChars,
+      duration_ms: bucketResult.duration_ms,
+    });
+  }, [bucketResult, height, width]);
 
   if (width <= 0 || height <= 0 || buckets.length === 0) return null;
 
@@ -313,7 +386,6 @@ const PeerNode = React.memo(function PeerNode({
   overviewScale,
   overviewTranslateX,
   overviewTranslateY,
-  isPanning,
   onSelect,
   hideSharedElementSource,
 }: {
@@ -324,7 +396,6 @@ const PeerNode = React.memo(function PeerNode({
   overviewScale: SharedValue<number>;
   overviewTranslateX: SharedValue<number>;
   overviewTranslateY: SharedValue<number>;
-  isPanning: SharedValue<boolean>;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   hideSharedElementSource?: boolean;
 }) {
@@ -334,8 +405,6 @@ const PeerNode = React.memo(function PeerNode({
   const baseY = useSharedValue(target.y);
   const nodeOpacity = useSharedValue(0);
   const visibilityScale = useSharedValue(0);
-  const viewportScaleProgress = useSharedValue(target.scale);
-  const viewportOpacityProgress = useSharedValue(target.scale > 0 ? 1 : 0);
   const labelOpacityProgress = useSharedValue(target.scale >= PEER_LABEL_MIN_SCALE ? 1 : 0);
 
   useEffect(() => {
@@ -345,14 +414,12 @@ const PeerNode = React.memo(function PeerNode({
       baseY.set(target.y);
       nodeOpacity.set(0);
       visibilityScale.set(0);
-      viewportOpacityProgress.set(target.scale > 0 ? 1 : 0);
       hasAnimatedInRef.current = true;
     }
     cancelAnimation(baseX);
     cancelAnimation(baseY);
     cancelAnimation(nodeOpacity);
     cancelAnimation(visibilityScale);
-    cancelAnimation(viewportOpacityProgress);
     const exiting = target.phase === 'exiting';
     const animationDuration = exiting
       ? NEAR_PAY_EXIT_ANIMATION_MS
@@ -370,134 +437,9 @@ const PeerNode = React.memo(function PeerNode({
         : withTiming(1, opacityTiming)
     );
     visibilityScale.set(exiting ? withTiming(0, timing) : withSpring(1, PEER_SCALE_SPRING));
-  }, [
-    baseX,
-    baseY,
-    nodeOpacity,
-    target.phase,
-    target.scale,
-    target.x,
-    target.y,
-    viewportOpacityProgress,
-    visibilityScale,
-  ]);
+  }, [baseX, baseY, nodeOpacity, target.phase, target.x, target.y, visibilityScale]);
 
-  useAnimatedReaction(
-    () => {
-      const overviewScaleValue = overviewScale.get();
-      const overviewTranslateXValue = overviewTranslateX.get();
-      const overviewTranslateYValue = overviewTranslateY.get();
-      const overviewActive =
-        overviewScaleValue < 0.999 ||
-        Math.abs(overviewTranslateXValue) > 0.5 ||
-        Math.abs(overviewTranslateYValue) > 0.5;
-      if (overviewActive) {
-        return {
-          isTrackingPan: true,
-          avatarOpacity: 1,
-          scale: 1,
-        };
-      }
-
-      const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
-      const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
-      const avatarRadius = AVATAR_SIZE / 2;
-      const edgeDistance = Math.min(
-        rawCenterX - FIELD_EDGE_PADDING,
-        fieldSize.width - FIELD_EDGE_PADDING - rawCenterX,
-        rawCenterY - FIELD_EDGE_PADDING,
-        fieldSize.height - FIELD_EDGE_PADDING - rawCenterY
-      );
-      if (fieldSize.width <= 0 || fieldSize.height <= 0 || AVATAR_SIZE <= 0) {
-        return {
-          isTrackingPan: isPanning.get(),
-          avatarOpacity: 0,
-          scale: 0,
-        };
-      }
-
-      const fitScale = Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
-      const edgeProgress = Math.min(
-        Math.max((edgeDistance - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
-        1
-      );
-      const edgeSmooth = edgeProgress * edgeProgress * (3 - 2 * edgeProgress);
-      const edgeLensScale = EDGE_BOUNDARY_SCALE + (1 - EDGE_BOUNDARY_SCALE) * edgeSmooth;
-      const rawViewportScale = Math.min(fitScale, edgeLensScale);
-
-      const scale =
-        rawViewportScale >= 1
-          ? 1
-          : rawViewportScale <= 0
-            ? MIN_VISIBLE_PEER_SCALE
-            : Math.max(rawViewportScale, MIN_VISIBLE_PEER_SCALE);
-      const fadeProgress = Math.min(Math.max(rawViewportScale / MIN_VISIBLE_PEER_SCALE, 0), 1);
-      const avatarOpacity =
-        rawViewportScale >= MIN_VISIBLE_PEER_SCALE
-          ? 1
-          : fadeProgress * fadeProgress * (3 - 2 * fadeProgress);
-
-      return {
-        isTrackingPan: isPanning.get(),
-        avatarOpacity,
-        scale,
-      };
-    },
-    (next, previous) => {
-      const nextScale = next.scale;
-      const previousScale = previous?.scale ?? null;
-      const nextAvatarOpacity = next.avatarOpacity;
-      const previousAvatarOpacity = previous?.avatarOpacity ?? null;
-      const nextLabelOpacity = nextScale >= PEER_LABEL_MIN_SCALE ? 1 : 0;
-      const previousLabelOpacity =
-        previousScale === null ? null : previousScale >= PEER_LABEL_MIN_SCALE ? 1 : 0;
-
-      if (previousScale === null || next.isTrackingPan || previous?.isTrackingPan) {
-        cancelAnimation(viewportScaleProgress);
-        viewportScaleProgress.set(nextScale);
-        cancelAnimation(viewportOpacityProgress);
-        viewportOpacityProgress.set(nextAvatarOpacity);
-        if (previousLabelOpacity === null) {
-          labelOpacityProgress.set(nextLabelOpacity);
-        } else if (nextLabelOpacity !== previousLabelOpacity) {
-          cancelAnimation(labelOpacityProgress);
-          labelOpacityProgress.set(withTiming(nextLabelOpacity, PEER_LABEL_FADE_TIMING));
-        }
-        return;
-      }
-      if (
-        previousAvatarOpacity === null ||
-        Math.abs(nextAvatarOpacity - previousAvatarOpacity) >= 0.01
-      ) {
-        cancelAnimation(viewportOpacityProgress);
-        viewportOpacityProgress.set(withTiming(nextAvatarOpacity, PEER_LABEL_FADE_TIMING));
-      }
-      if (nextLabelOpacity !== previousLabelOpacity) {
-        cancelAnimation(labelOpacityProgress);
-        labelOpacityProgress.set(withTiming(nextLabelOpacity, PEER_LABEL_FADE_TIMING));
-      }
-      if (Math.abs(nextScale - previousScale) < 0.002) return;
-
-      cancelAnimation(viewportScaleProgress);
-      viewportScaleProgress.set(
-        nextScale > previousScale
-          ? withSpring(nextScale, PEER_VIEWPORT_SCALE_GROW_SPRING)
-          : withTiming(nextScale, PEER_VIEWPORT_SCALE_SHRINK_TIMING)
-      );
-    },
-    [
-      fieldSize.height,
-      fieldSize.width,
-      isPanning,
-      labelOpacityProgress,
-      overviewScale,
-      overviewTranslateX,
-      overviewTranslateY,
-      viewportOpacityProgress,
-    ]
-  );
-
-  const animatedStyle = useAnimatedStyle(() => {
+  const viewportPresentation = useDerivedValue<AnimatedPeerViewportPresentation>(() => {
     const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
     const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
     const overviewScaleValue = overviewScale.get();
@@ -508,26 +450,32 @@ const PeerNode = React.memo(function PeerNode({
       Math.abs(overviewTranslateXValue) > 0.5 ||
       Math.abs(overviewTranslateYValue) > 0.5;
     if (overviewActive) {
-      const centerX =
-        fieldSize.width / 2 +
-        (rawCenterX - fieldSize.width / 2) * overviewScaleValue +
-        overviewTranslateXValue;
-      const centerY =
-        fieldSize.height / 2 +
-        (rawCenterY - fieldSize.height / 2) * overviewScaleValue +
-        overviewTranslateYValue;
-      const totalScale = overviewScaleValue * visibilityScale.get();
-      const scaledAvatarCenterY =
-        NODE_HEIGHT / 2 + totalScale * (PEER_AVATAR_CENTER_Y - NODE_HEIGHT / 2);
-
       return {
-        opacity: nodeOpacity.get(),
-        zIndex: zIndex.sticky,
-        transform: [
-          { translateX: centerX - NODE_WIDTH / 2 },
-          { translateY: centerY - scaledAvatarCenterY },
-          { scale: totalScale },
-        ],
+        centerX:
+          fieldSize.width / 2 +
+          (rawCenterX - fieldSize.width / 2) * overviewScaleValue +
+          overviewTranslateXValue,
+        centerY:
+          fieldSize.height / 2 +
+          (rawCenterY - fieldSize.height / 2) * overviewScaleValue +
+          overviewTranslateYValue,
+        scale: 1,
+        layoutScale: 1,
+        avatarOpacity: 1,
+        overviewScale: overviewScaleValue,
+        overviewActive: true,
+      };
+    }
+
+    if (fieldSize.width <= 0 || fieldSize.height <= 0 || AVATAR_SIZE <= 0) {
+      return {
+        centerX: rawCenterX,
+        centerY: rawCenterY,
+        scale: 0,
+        layoutScale: 0,
+        avatarOpacity: 0,
+        overviewScale: 1,
+        overviewActive: false,
       };
     }
 
@@ -536,12 +484,41 @@ const PeerNode = React.memo(function PeerNode({
     const rightInset = fieldSize.width - FIELD_EDGE_PADDING - rawCenterX;
     const topInset = rawCenterY - FIELD_EDGE_PADDING;
     const bottomInset = fieldSize.height - FIELD_EDGE_PADDING - rawCenterY;
-    const animatedViewportScale = Math.min(
-      Math.max(viewportScaleProgress.get(), 0),
-      PEER_VIEWPORT_SCALE_MAX_OVERSHOOT
+    const edgeDistance = Math.min(leftInset, rightInset, topInset, bottomInset);
+    const fitScale = Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
+    const edgeProgress = Math.min(
+      Math.max((edgeDistance - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+      1
     );
-    const layoutViewportScale = Math.min(animatedViewportScale, 1);
-    const nudgesEdge = layoutViewportScale > 0 && layoutViewportScale < 1;
+    const edgeSmooth = edgeProgress * edgeProgress * (3 - 2 * edgeProgress);
+    const edgeLensScale = EDGE_BOUNDARY_SCALE + (1 - EDGE_BOUNDARY_SCALE) * edgeSmooth;
+    const rawViewportScale = Math.min(fitScale, edgeLensScale);
+    const scale =
+      rawViewportScale >= 1
+        ? 1
+        : rawViewportScale <= 0
+          ? MIN_VISIBLE_PEER_SCALE
+          : Math.max(rawViewportScale, MIN_VISIBLE_PEER_SCALE);
+    const layoutScale = Math.min(scale, 1);
+    const fadeProgress = Math.min(Math.max(rawViewportScale / MIN_VISIBLE_PEER_SCALE, 0), 1);
+    const avatarOpacity =
+      rawViewportScale >= MIN_VISIBLE_PEER_SCALE
+        ? 1
+        : fadeProgress * fadeProgress * (3 - 2 * fadeProgress);
+    const nudgesEdge = layoutScale > 0 && layoutScale < 1;
+
+    if (!nudgesEdge) {
+      return {
+        centerX: rawCenterX,
+        centerY: rawCenterY,
+        scale,
+        layoutScale,
+        avatarOpacity,
+        overviewScale: 1,
+        overviewActive: false,
+      };
+    }
+
     const leftProgress = Math.min(Math.max((leftInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0), 1);
     const rightProgress = Math.min(
       Math.max((rightInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
@@ -560,50 +537,76 @@ const PeerNode = React.memo(function PeerNode({
     const rightPressure = 1 - rightSmooth;
     const topPressure = 1 - topSmooth;
     const bottomPressure = 1 - bottomSmooth;
-    const scaledRadius = avatarRadius * layoutViewportScale;
+    const scaledRadius = avatarRadius * layoutScale;
     const lostRadius = avatarRadius - scaledRadius;
     const edgeTranslation = lostRadius * Math.min(Math.max(EDGE_TRANSLATION_STRENGTH, 0), 1);
-    const nudgeX = nudgesEdge
-      ? Math.min(
-          Math.max((leftPressure - rightPressure) * edgeTranslation, -avatarRadius),
-          avatarRadius
-        )
-      : 0;
-    const nudgeY = nudgesEdge
-      ? Math.min(
-          Math.max((topPressure - bottomPressure) * edgeTranslation, -avatarRadius),
-          avatarRadius
-        )
-      : 0;
-    const centerX = nudgesEdge
-      ? Math.min(
-          Math.max(rawCenterX + nudgeX, FIELD_EDGE_PADDING + scaledRadius),
-          fieldSize.width - FIELD_EDGE_PADDING - scaledRadius
-        )
-      : rawCenterX;
-    const centerY = nudgesEdge
-      ? Math.min(
-          Math.max(rawCenterY + nudgeY, FIELD_EDGE_PADDING + scaledRadius),
-          fieldSize.height - FIELD_EDGE_PADDING - scaledRadius
-        )
-      : rawCenterY;
-    const totalScale = animatedViewportScale * visibilityScale.get();
+    const nudgeX = Math.min(
+      Math.max((leftPressure - rightPressure) * edgeTranslation, -avatarRadius),
+      avatarRadius
+    );
+    const nudgeY = Math.min(
+      Math.max((topPressure - bottomPressure) * edgeTranslation, -avatarRadius),
+      avatarRadius
+    );
+
+    return {
+      centerX: Math.min(
+        Math.max(rawCenterX + nudgeX, FIELD_EDGE_PADDING + scaledRadius),
+        fieldSize.width - FIELD_EDGE_PADDING - scaledRadius
+      ),
+      centerY: Math.min(
+        Math.max(rawCenterY + nudgeY, FIELD_EDGE_PADDING + scaledRadius),
+        fieldSize.height - FIELD_EDGE_PADDING - scaledRadius
+      ),
+      scale,
+      layoutScale,
+      avatarOpacity,
+      overviewScale: 1,
+      overviewActive: false,
+    };
+  });
+
+  useAnimatedReaction(
+    () => (viewportPresentation.get().scale >= PEER_LABEL_MIN_SCALE ? 1 : 0),
+    (nextLabelOpacity, previousLabelOpacity) => {
+      if (previousLabelOpacity === null) {
+        labelOpacityProgress.set(nextLabelOpacity);
+        return;
+      }
+      if (nextLabelOpacity !== previousLabelOpacity) {
+        cancelAnimation(labelOpacityProgress);
+        labelOpacityProgress.set(withTiming(nextLabelOpacity, PEER_LABEL_FADE_TIMING));
+      }
+    },
+    [labelOpacityProgress, viewportPresentation]
+  );
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const presentation = viewportPresentation.get();
+    const totalScale =
+      (presentation.overviewActive ? presentation.overviewScale : presentation.scale) *
+      visibilityScale.get();
     const scaledAvatarCenterY =
       NODE_HEIGHT / 2 + totalScale * (PEER_AVATAR_CENTER_Y - NODE_HEIGHT / 2);
 
     return {
-      opacity: nodeOpacity.get() * viewportOpacityProgress.get(),
-      zIndex: zIndex.sticky + Math.round(layoutViewportScale * 100),
+      opacity: nodeOpacity.get() * presentation.avatarOpacity,
+      zIndex: presentation.overviewActive
+        ? zIndex.sticky
+        : zIndex.sticky + Math.round(presentation.layoutScale * 100),
       transform: [
-        { translateX: centerX - NODE_WIDTH / 2 },
-        { translateY: centerY - scaledAvatarCenterY },
+        { translateX: presentation.centerX - NODE_WIDTH / 2 },
+        { translateY: presentation.centerY - scaledAvatarCenterY },
         { scale: totalScale },
       ],
     };
   });
   const labelAnimatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: labelOpacityProgress.get() * visibilityScale.get() * viewportOpacityProgress.get(),
+      opacity:
+        labelOpacityProgress.get() *
+        visibilityScale.get() *
+        viewportPresentation.get().avatarOpacity,
     };
   });
   const nodeStyle = useMemo(() => [styles.peerNode, animatedStyle], [animatedStyle]);
@@ -719,7 +722,6 @@ function arePeerNodePropsEqual(
     overviewScale: SharedValue<number>;
     overviewTranslateX: SharedValue<number>;
     overviewTranslateY: SharedValue<number>;
-    isPanning: SharedValue<boolean>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
   },
@@ -731,7 +733,6 @@ function arePeerNodePropsEqual(
     overviewScale: SharedValue<number>;
     overviewTranslateX: SharedValue<number>;
     overviewTranslateY: SharedValue<number>;
-    isPanning: SharedValue<boolean>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
   }
@@ -746,7 +747,6 @@ function arePeerNodePropsEqual(
     prev.overviewScale === next.overviewScale &&
     prev.overviewTranslateX === next.overviewTranslateX &&
     prev.overviewTranslateY === next.overviewTranslateY &&
-    prev.isPanning === next.isPanning &&
     peerTargetsEqual(prev.target, next.target)
   );
 }
@@ -780,7 +780,7 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
   );
 });
 
-function NearPayPeerField({
+const NearPayPeerField = React.memo(function NearPayPeerField({
   peers,
   emptyContent,
   onSelect,
@@ -791,6 +791,7 @@ function NearPayPeerField({
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   selectedPeerID?: string | null;
 }) {
+  useRenderLogger('NearPayPeerField', 30, paymentLog);
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const [fieldSize, setFieldSize] = useState<PeerLayoutSize>({ width: 0, height: 0 });
   const [registry, setRegistry] = useState<PeerLayoutRegistryEntry[]>([]);
@@ -808,6 +809,22 @@ function NearPayPeerField({
   const isPanning = useSharedValue(false);
   const isPanSettling = useSharedValue(false);
   const panSettleRemaining = useSharedValue(0);
+  const layoutCycleCountRef = useRef(0);
+  const lastLayoutCycleLogAtRef = useRef(0);
+  const dotFieldAnimatedStyle = useAnimatedStyle(() => {
+    const scale = overviewScale.get();
+    return {
+      transform: [
+        { translateX: overviewTranslateX.get() + panX.get() * scale },
+        { translateY: overviewTranslateY.get() + panY.get() * scale },
+        { scale },
+      ],
+    };
+  }, [overviewScale, overviewTranslateX, overviewTranslateY, panX, panY]);
+  const dotFieldLayerStyle = useMemo(
+    () => [styles.dotFieldLayer, dotFieldAnimatedStyle],
+    [dotFieldAnimatedStyle]
+  );
 
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -818,7 +835,46 @@ function NearPayPeerField({
     );
   }, []);
 
-  const layoutPeers = useMemo(() => peers.map(toLayoutPeer), [peers]);
+  const peerStats = useMemo(() => {
+    let connectedCount = 0;
+    let directCount = 0;
+    let reachableCount = 0;
+    for (const peer of peers) {
+      if (peer.isConnected) connectedCount += 1;
+      if (peer.hasDirectLink) directCount += 1;
+      if (peer.isConnected || peer.hasDirectLink) reachableCount += 1;
+    }
+    return {
+      peerCount: peers.length,
+      connectedCount,
+      directCount,
+      reachableCount,
+    };
+  }, [peers]);
+
+  const layoutPeersResult = useMemo(() => {
+    const startedAt = nowMs();
+    return {
+      value: peers.map(toLayoutPeer),
+      peerCount: peerStats.peerCount,
+      connectedCount: peerStats.connectedCount,
+      directCount: peerStats.directCount,
+      reachableCount: peerStats.reachableCount,
+      duration_ms: durationSinceMs(startedAt),
+    };
+  }, [
+    peerStats.connectedCount,
+    peerStats.directCount,
+    peerStats.peerCount,
+    peerStats.reachableCount,
+    peers,
+  ]);
+  const layoutPeers = layoutPeersResult.value;
+  const layoutPeersResultRef = useRef(layoutPeersResult);
+
+  useEffect(() => {
+    layoutPeersResultRef.current = layoutPeersResult;
+  }, [layoutPeersResult]);
 
   useEffect(() => {
     setRegistry((current) => reconcilePeerLayoutRegistry(current, layoutPeers, Date.now()));
@@ -833,14 +889,81 @@ function NearPayPeerField({
     return () => clearTimeout(timeout);
   }, [hasExitingPeer, registry]);
 
-  const targets = useMemo(
-    () => buildPeerLayoutTargets(registry, fieldSize, PEER_LAYOUT_CONFIG),
-    [fieldSize, registry]
-  );
-  const panBounds = useMemo(
-    () => getPeerLayoutPanBounds(targets, fieldSize, PEER_LAYOUT_CONFIG),
-    [fieldSize, targets]
-  );
+  useEffect(() => {
+    if (fieldSize.width <= 0 || fieldSize.height <= 0) return;
+    paymentLog.debug('near_pay.perf.field_layout', {
+      width: roundMetric(fieldSize.width),
+      height: roundMetric(fieldSize.height),
+    });
+  }, [fieldSize.height, fieldSize.width]);
+
+  const targetsResult = useMemo(() => {
+    const startedAt = nowMs();
+    const value = buildPeerLayoutTargets(registry, fieldSize, PEER_LAYOUT_CONFIG);
+    let exitingCount = 0;
+    for (const target of value) {
+      if (target.phase === 'exiting') exitingCount += 1;
+    }
+    return {
+      value,
+      targetCount: value.length,
+      registryCount: registry.length,
+      exitingCount,
+      fieldWidth: roundMetric(fieldSize.width),
+      fieldHeight: roundMetric(fieldSize.height),
+      duration_ms: durationSinceMs(startedAt),
+    };
+  }, [fieldSize, registry]);
+  const targets = targetsResult.value;
+
+  const panBoundsResult = useMemo(() => {
+    const startedAt = nowMs();
+    const value = getPeerLayoutPanBounds(targets, fieldSize, PEER_LAYOUT_CONFIG);
+    return {
+      value,
+      targetCount: targets.length,
+      minX: roundMetric(value.minX),
+      maxX: roundMetric(value.maxX),
+      minY: roundMetric(value.minY),
+      maxY: roundMetric(value.maxY),
+      duration_ms: durationSinceMs(startedAt),
+    };
+  }, [fieldSize, targets]);
+  const panBounds = panBoundsResult.value;
+
+  useEffect(() => {
+    if (fieldSize.width <= 0 || fieldSize.height <= 0) return;
+    const currentLayoutPeersResult = layoutPeersResultRef.current;
+    const cycleIndex = layoutCycleCountRef.current + 1;
+    layoutCycleCountRef.current = cycleIndex;
+    const loggedAt = nowMs();
+    const isInitial = cycleIndex <= NEAR_PAY_LAYOUT_CYCLE_INITIAL_LOG_COUNT;
+    const isSlow =
+      currentLayoutPeersResult.duration_ms >= NEAR_PAY_LAYOUT_CYCLE_SLOW_LAYOUT_MS ||
+      targetsResult.duration_ms >= NEAR_PAY_LAYOUT_CYCLE_SLOW_TARGETS_MS ||
+      panBoundsResult.duration_ms >= NEAR_PAY_LAYOUT_CYCLE_SLOW_PAN_BOUNDS_MS;
+    const isPeriodic =
+      loggedAt - lastLayoutCycleLogAtRef.current >= NEAR_PAY_LAYOUT_CYCLE_PERIODIC_MS;
+    if (!isInitial && !isSlow && !isPeriodic) return;
+
+    lastLayoutCycleLogAtRef.current = loggedAt;
+    paymentLog.debug('near_pay.perf.layout_cycle', {
+      sample: isSlow ? 'slow' : isInitial ? 'initial' : 'periodic',
+      cycleIndex,
+      peerCount: currentLayoutPeersResult.peerCount,
+      connectedCount: currentLayoutPeersResult.connectedCount,
+      directCount: currentLayoutPeersResult.directCount,
+      reachableCount: currentLayoutPeersResult.reachableCount,
+      registryCount: targetsResult.registryCount,
+      targetCount: targetsResult.targetCount,
+      exitingCount: targetsResult.exitingCount,
+      fieldWidth: targetsResult.fieldWidth,
+      fieldHeight: targetsResult.fieldHeight,
+      layoutPeersDuration_ms: currentLayoutPeersResult.duration_ms,
+      targetsDuration_ms: targetsResult.duration_ms,
+      panBoundsDuration_ms: panBoundsResult.duration_ms,
+    });
+  }, [fieldSize.height, fieldSize.width, panBoundsResult, targetsResult]);
 
   useEffect(() => {
     minPanX.set(panBounds.minX);
@@ -871,7 +994,18 @@ function NearPayPeerField({
     panY,
   ]);
 
+  const targetCount = targets.length;
+
   const handleFocus = useCallback(() => {
+    paymentLog.debug('near_pay.perf.focus_start', {
+      targetCount,
+      panX: roundMetric(panX.get()),
+      panY: roundMetric(panY.get()),
+      minX: roundMetric(panBounds.minX),
+      maxX: roundMetric(panBounds.maxX),
+      minY: roundMetric(panBounds.minY),
+      maxY: roundMetric(panBounds.maxY),
+    });
     isPanning.set(true);
     isPanSettling.set(true);
     panSettleRemaining.set(2);
@@ -897,11 +1031,23 @@ function NearPayPeerField({
         isPanning.set(false);
       })
     );
-  }, [isPanSettling, isPanning, panSettleRemaining, panX, panY]);
+  }, [
+    isPanSettling,
+    isPanning,
+    panBounds.maxX,
+    panBounds.maxY,
+    panBounds.minX,
+    panBounds.minY,
+    panSettleRemaining,
+    panX,
+    panY,
+    targetCount,
+  ]);
 
   const hasSelectablePeer = targets.some((target) => target.phase !== 'exiting');
 
   const handleOverviewPressIn = useCallback(() => {
+    const startedAt = nowMs();
     const pan = { x: panX.get(), y: panY.get() };
     const overview = getPeerLayoutOverviewTransform(
       targets,
@@ -917,6 +1063,15 @@ function NearPayPeerField({
       PEER_OVERVIEW_MAX_SCALE,
       PEER_OVERVIEW_SCALE_FACTOR
     );
+    paymentLog.debug('near_pay.perf.overview_transform', {
+      targetCount,
+      panX: roundMetric(pan.x),
+      panY: roundMetric(pan.y),
+      scale: roundMetric(overview.scale),
+      translateX: roundMetric(overview.translateX),
+      translateY: roundMetric(overview.translateY),
+      duration_ms: durationSinceMs(startedAt),
+    });
 
     cancelAnimation(overviewScale);
     cancelAnimation(overviewTranslateX);
@@ -924,7 +1079,16 @@ function NearPayPeerField({
     overviewScale.set(withTiming(overview.scale, PEER_OVERVIEW_TIMING));
     overviewTranslateX.set(withTiming(overview.translateX, PEER_OVERVIEW_TIMING));
     overviewTranslateY.set(withTiming(overview.translateY, PEER_OVERVIEW_TIMING));
-  }, [fieldSize, overviewScale, overviewTranslateX, overviewTranslateY, panX, panY, targets]);
+  }, [
+    fieldSize,
+    overviewScale,
+    overviewTranslateX,
+    overviewTranslateY,
+    panX,
+    panY,
+    targetCount,
+    targets,
+  ]);
 
   const handleOverviewPressOut = useCallback(() => {
     cancelAnimation(overviewScale);
@@ -936,20 +1100,49 @@ function NearPayPeerField({
   }, [overviewScale, overviewTranslateX, overviewTranslateY]);
 
   const handleRandomPeer = useCallback(() => {
+    const startedAt = nowMs();
     const pan = { x: panX.get(), y: panY.get() };
     const selectableTargets = targets.filter((target) => {
       if (target.phase === 'exiting') return false;
       const presentation = getPeerViewportPresentation(target, fieldSize, PEER_LAYOUT_CONFIG, pan);
       return presentation.scale > 0 && presentation.avatarOpacity > 0.05;
     });
-    if (selectableTargets.length === 0) return;
+    if (selectableTargets.length === 0) {
+      paymentLog.debug('near_pay.perf.random_peer_pick', {
+        targetCount,
+        selectableCount: 0,
+        selected: false,
+        duration_ms: durationSinceMs(startedAt),
+      });
+      return;
+    }
 
     const randomIndex = Math.floor(Math.random() * selectableTargets.length);
     const target = selectableTargets[randomIndex];
-    if (!target) return;
+    if (!target) {
+      paymentLog.debug('near_pay.perf.random_peer_pick', {
+        targetCount,
+        selectableCount: selectableTargets.length,
+        selected: false,
+        duration_ms: durationSinceMs(startedAt),
+      });
+      return;
+    }
+
+    paymentLog.debug('near_pay.perf.random_peer_pick', {
+      targetCount,
+      selectableCount: selectableTargets.length,
+      selected: true,
+      peerID: target.peer.peerID,
+      duration_ms: durationSinceMs(startedAt),
+    });
 
     onSelect(target.peer, getScaledAvatarRect(target, fieldSize, pan));
-  }, [fieldSize, onSelect, panX, panY, targets]);
+  }, [fieldSize, onSelect, panX, panY, targetCount, targets]);
+
+  const logPanEnd = useCallback((payload: Record<string, number>) => {
+    paymentLog.debug('near_pay.perf.pan_end', payload);
+  }, []);
 
   const panGesture = useMemo(
     () =>
@@ -1004,6 +1197,19 @@ function NearPayPeerField({
             Math.max(panY.get() + event.velocityY * PEER_PAN_MOMENTUM_SECONDS, minY),
             maxY
           );
+          scheduleOnRN(logPanEnd, {
+            targetCount,
+            translationX: event.translationX,
+            translationY: event.translationY,
+            velocityX: event.velocityX,
+            velocityY: event.velocityY,
+            finalX,
+            finalY,
+            minX,
+            maxX,
+            minY,
+            maxY,
+          });
           panX.set(
             withSpring(
               finalX,
@@ -1047,6 +1253,7 @@ function NearPayPeerField({
     [
       isPanSettling,
       isPanning,
+      logPanEnd,
       maxPanX,
       maxPanY,
       minPanX,
@@ -1056,6 +1263,7 @@ function NearPayPeerField({
       panStartY,
       panX,
       panY,
+      targetCount,
     ]
   );
 
@@ -1063,7 +1271,9 @@ function NearPayPeerField({
     <View onLayout={handleLayout} style={styles.field}>
       <GestureDetector gesture={panGesture}>
         <Animated.View style={styles.fieldCanvas}>
-          <DotField size={fieldSize} foreground={foreground} />
+          <Animated.View pointerEvents="none" style={dotFieldLayerStyle}>
+            <DotField size={fieldSize} foreground={foreground} />
+          </Animated.View>
           {registry.length === 0 ? emptyContent : null}
           {targets.map((target) => (
             <PeerNode
@@ -1075,7 +1285,6 @@ function NearPayPeerField({
               overviewScale={overviewScale}
               overviewTranslateX={overviewTranslateX}
               overviewTranslateY={overviewTranslateY}
-              isPanning={isPanning}
               onSelect={onSelect}
               hideSharedElementSource={selectedPeerID === target.peer.peerID}
             />
@@ -1106,30 +1315,31 @@ function NearPayPeerField({
           label="Zoom"
           testID="near-pay-overview"
           accessibilityHint="Hold to zoom out and fit all peers."
-          disabled={targets.length === 0}
+          disabled={targetCount === 0}
           onPressIn={handleOverviewPressIn}
           onPressOut={handleOverviewPressOut}
         />
       </HStack>
     </View>
   );
-}
+});
 
 export function NearPayScreen() {
   useLifecycleLogger('NearPayScreen');
+  useRenderLogger('NearPayScreen', 30, paymentLog);
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  const { peers, refresh } = useBLEPeers();
+  const { peers } = useBLEPeers();
   const mockMode = useSettingsStore((state) => state.mockMode);
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
   const inlineAmountEntry = nearPaySession?.amountEntry ?? null;
   const inlinePhase = nearPaySession?.phase ?? 'picking';
+  const hasInlineAmountEntry = !!inlineAmountEntry;
   const [containerSize, setContainerSize] = useState<PeerLayoutSize>({ width: 0, height: 0 });
   const [selectedPeer, setSelectedPeer] = useState<NearPayLayoutPeer | null>(null);
   const [selectedPeerRect, setSelectedPeerRect] = useState<AvatarRect | null>(null);
   const [sharedAvatarPeer, setSharedAvatarPeer] = useState<NearPayLayoutPeer | null>(null);
-  const [amountContentMounted, setAmountContentMounted] = useState(false);
   const pickerOpacity = useSharedValue(1);
   const amountOpacity = useSharedValue(0);
   const amountPanelTranslateX = useSharedValue(0);
@@ -1140,10 +1350,31 @@ export function NearPayScreen() {
   const sharedAvatarY = useSharedValue(0);
   const sharedAvatarScale = useSharedValue(1);
   const sharedAvatarOpacity = useSharedValue(0);
+  const sharedAvatarTransitionTokenRef = useRef(0);
+  const sharedAvatarTransitionSpanRef = useRef<NearPayPerfSpan | null>(null);
+  const sharedAvatarStartFrameRef = useRef<number | null>(null);
+  const sharedAvatarStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reachableCount = useMemo(
     () => peers.filter((peer) => peer.hasDirectLink || peer.isConnected).length,
     [peers]
   );
+  const pickerPeersRef = useRef(peers);
+
+  useEffect(() => {
+    if (!inlineAmountEntry) pickerPeersRef.current = peers;
+  }, [inlineAmountEntry, peers]);
+
+  const pickerPeers = inlineAmountEntry ? pickerPeersRef.current : peers;
+  const headerBadgeCount = hasInlineAmountEntry ? 0 : reachableCount;
+
+  useEffect(() => {
+    paymentLog.debug('near_pay.perf.session_state', {
+      phase: inlinePhase,
+      hasAmountEntry: hasInlineAmountEntry,
+      selectedPeerID: selectedPeer?.peerID ?? null,
+      sharedAvatarPeerID: sharedAvatarPeer?.peerID ?? null,
+    });
+  }, [hasInlineAmountEntry, inlinePhase, selectedPeer?.peerID, sharedAvatarPeer?.peerID]);
 
   useEffect(() => {
     useNearPaySessionStore.getState().clear();
@@ -1191,7 +1422,60 @@ export function NearPayScreen() {
     );
   }, []);
 
+  const endSharedAvatarTransitionSpan = useCallback((params: Record<string, unknown>) => {
+    sharedAvatarTransitionSpanRef.current?.end(params);
+    sharedAvatarTransitionSpanRef.current = null;
+  }, []);
+
+  const playAmountContentEnter = useCallback(
+    (delayMs = 0) => {
+      amountContentOpacity.set(0);
+      amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
+      amountContentOpacity.set(
+        delayMs > 0
+          ? withDelay(delayMs, withTiming(1, AMOUNT_CONTENT_ENTER_TIMING))
+          : withTiming(1, AMOUNT_CONTENT_ENTER_TIMING)
+      );
+      amountContentTranslateY.set(
+        delayMs > 0
+          ? withDelay(delayMs, withTiming(0, AMOUNT_CONTENT_ENTER_TIMING))
+          : withTiming(0, AMOUNT_CONTENT_ENTER_TIMING)
+      );
+    },
+    [amountContentOpacity, amountContentTranslateY]
+  );
+
+  const finishSharedAvatarTransition = useCallback(
+    (transitionToken: number) => {
+      if (sharedAvatarTransitionTokenRef.current !== transitionToken) return;
+      sharedAvatarTransitionTokenRef.current = transitionToken + 1;
+      endSharedAvatarTransitionSpan({
+        completed: true,
+        transitionToken,
+      });
+      useNearPaySessionStore.getState().showAmount();
+      sharedAvatarOpacity.set(0);
+      setSharedAvatarPeer(null);
+    },
+    [endSharedAvatarTransitionSpan, sharedAvatarOpacity]
+  );
+
   const stopSharedElementAnimations = useCallback(() => {
+    if (sharedAvatarStartTimerRef.current !== null) {
+      clearTimeout(sharedAvatarStartTimerRef.current);
+      sharedAvatarStartTimerRef.current = null;
+    }
+    if (sharedAvatarStartFrameRef.current !== null) {
+      cancelAnimationFrame(sharedAvatarStartFrameRef.current);
+      sharedAvatarStartFrameRef.current = null;
+    }
+    const interruptedToken = sharedAvatarTransitionTokenRef.current;
+    sharedAvatarTransitionTokenRef.current = interruptedToken + 1;
+    endSharedAvatarTransitionSpan({
+      canceled: true,
+      reason: 'interrupted',
+      transitionToken: interruptedToken,
+    });
     cancelAnimation(pickerOpacity);
     cancelAnimation(amountOpacity);
     cancelAnimation(amountPanelTranslateX);
@@ -1208,6 +1492,7 @@ export function NearPayScreen() {
     amountPanelTranslateY,
     amountContentOpacity,
     amountContentTranslateY,
+    endSharedAvatarTransitionSpan,
     pickerOpacity,
     sharedAvatarOpacity,
     sharedAvatarScale,
@@ -1220,7 +1505,6 @@ export function NearPayScreen() {
     setSelectedPeer(null);
     setSelectedPeerRect(null);
     setSharedAvatarPeer(null);
-    setAmountContentMounted(false);
     amountPanelTranslateX.set(0);
     amountPanelTranslateY.set(0);
     amountContentOpacity.set(0);
@@ -1253,7 +1537,6 @@ export function NearPayScreen() {
       });
       setSelectedPeer(peer);
       setSelectedPeerRect(avatarRect);
-      setAmountContentMounted(false);
       stopSharedElementAnimations();
       amountContentOpacity.set(0);
       amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
@@ -1271,6 +1554,21 @@ export function NearPayScreen() {
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
       });
+      const startSendSpan = paymentLog
+        .child({ flowId: `near-pay-start-send-${Date.now()}` })
+        .startSpan(
+          'near_pay.perf.start_send_ecash',
+          {
+            peerID: peer.peerID,
+            hasAvatar: !!peer.avatarUrl,
+            hasDirectLink: peer.hasDirectLink,
+            isConnected: peer.isConnected,
+          },
+          {
+            warnAtMs: 250,
+            errorAtMs: 1000,
+          }
+        );
       try {
         await machine.startSendEcash({
           reset: true,
@@ -1280,11 +1578,17 @@ export function NearPayScreen() {
             nip05: null,
           },
         });
+        startSendSpan.end({
+          completed: true,
+        });
       } catch (err) {
+        startSendSpan.end({
+          completed: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
         setSelectedPeer(null);
         setSelectedPeerRect(null);
         setSharedAvatarPeer(null);
-        setAmountContentMounted(false);
         amountPanelTranslateX.set(0);
         amountPanelTranslateY.set(0);
         amountContentOpacity.set(0);
@@ -1309,30 +1613,10 @@ export function NearPayScreen() {
     ]
   );
 
-  const playAmountContentEnter = useCallback(
-    (delayMs = 0) => {
-      setAmountContentMounted(true);
-      amountContentOpacity.set(0);
-      amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
-      amountContentOpacity.set(
-        delayMs > 0
-          ? withDelay(delayMs, withTiming(1, AMOUNT_CONTENT_ENTER_TIMING))
-          : withTiming(1, AMOUNT_CONTENT_ENTER_TIMING)
-      );
-      amountContentTranslateY.set(
-        delayMs > 0
-          ? withDelay(delayMs, withTiming(0, AMOUNT_CONTENT_ENTER_TIMING))
-          : withTiming(0, AMOUNT_CONTENT_ENTER_TIMING)
-      );
-    },
-    [amountContentOpacity, amountContentTranslateY]
-  );
-
   useEffect(() => {
     if (!inlineAmountEntry) {
       stopSharedElementAnimations();
       setSharedAvatarPeer(null);
-      setAmountContentMounted(false);
       amountPanelTranslateX.set(0);
       amountPanelTranslateY.set(0);
       amountContentOpacity.set(0);
@@ -1358,35 +1642,83 @@ export function NearPayScreen() {
     }
 
     stopSharedElementAnimations();
+    const transitionToken = sharedAvatarTransitionTokenRef.current + 1;
+    sharedAvatarTransitionTokenRef.current = transitionToken;
     setSharedAvatarPeer(activeRecipientPeer);
     const sharedAvatarStart = getSharedAvatarTransform(selectedPeerRect);
     const sharedAvatarEnd = getSharedAvatarTransform(headerAvatarRect);
     const amountPanelStartShift = getAmountPanelStartShift(selectedPeerRect, headerAvatarRect);
+    sharedAvatarTransitionSpanRef.current = paymentLog
+      .child({ flowId: `near-pay-shared-avatar-${transitionToken}` })
+      .startSpan(
+        'near_pay.perf.shared_avatar_transition',
+        {
+          transitionToken,
+          peerID: activeRecipientPeer.peerID,
+          sourceX: roundMetric(selectedPeerRect.x),
+          sourceY: roundMetric(selectedPeerRect.y),
+          sourceSize: roundMetric(selectedPeerRect.size),
+          targetX: roundMetric(headerAvatarRect.x),
+          targetY: roundMetric(headerAvatarRect.y),
+          targetSize: roundMetric(headerAvatarRect.size),
+          shiftX: roundMetric(amountPanelStartShift.x),
+          shiftY: roundMetric(amountPanelStartShift.y),
+          animation_ms: SHARED_AVATAR_ANIMATION_MS,
+        },
+        {
+          warnAtMs: 750,
+          errorAtMs: 1500,
+        }
+      );
     sharedAvatarX.set(sharedAvatarStart.x);
     sharedAvatarY.set(sharedAvatarStart.y);
     sharedAvatarScale.set(sharedAvatarStart.scale);
     sharedAvatarOpacity.set(1);
     amountPanelTranslateX.set(amountPanelStartShift.x);
     amountPanelTranslateY.set(amountPanelStartShift.y);
+    amountContentOpacity.set(0);
+    amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
 
     const easing = Easing.out(Easing.cubic);
     const sharedTiming = { duration: SHARED_AVATAR_ANIMATION_MS, easing };
     const panelTiming = { duration: Math.round(SHARED_AVATAR_ANIMATION_MS * 0.75), easing };
-    pickerOpacity.set(withTiming(0, panelTiming));
-    amountOpacity.set(withTiming(1, panelTiming));
-    amountPanelTranslateX.set(withTiming(0, sharedTiming));
-    amountPanelTranslateY.set(withTiming(0, sharedTiming));
-    playAmountContentEnter(AMOUNT_CONTENT_ENTER_DELAY_MS);
-    sharedAvatarX.set(withTiming(sharedAvatarEnd.x, sharedTiming));
-    sharedAvatarY.set(withTiming(sharedAvatarEnd.y, sharedTiming));
-    sharedAvatarScale.set(withTiming(sharedAvatarEnd.scale, sharedTiming));
-
-    const timeout = setTimeout(() => {
-      useNearPaySessionStore.getState().showAmount();
-      sharedAvatarOpacity.set(0);
-      setSharedAvatarPeer(null);
-    }, SHARED_AVATAR_ANIMATION_MS + 40);
-    return () => clearTimeout(timeout);
+    sharedAvatarStartTimerRef.current = setTimeout(() => {
+      sharedAvatarStartTimerRef.current = null;
+      if (sharedAvatarTransitionTokenRef.current !== transitionToken) return;
+      sharedAvatarStartFrameRef.current = requestAnimationFrame(() => {
+        sharedAvatarStartFrameRef.current = null;
+        if (sharedAvatarTransitionTokenRef.current !== transitionToken) return;
+        pickerOpacity.set(withTiming(0, panelTiming));
+        amountOpacity.set(withTiming(1, panelTiming));
+        amountPanelTranslateX.set(withTiming(0, sharedTiming));
+        amountPanelTranslateY.set(withTiming(0, sharedTiming));
+        playAmountContentEnter();
+        sharedAvatarX.set(withTiming(sharedAvatarEnd.x, sharedTiming));
+        sharedAvatarY.set(withTiming(sharedAvatarEnd.y, sharedTiming));
+        sharedAvatarScale.set(withTiming(sharedAvatarEnd.scale, sharedTiming));
+        sharedAvatarOpacity.set(
+          withDelay(
+            SHARED_AVATAR_ANIMATION_MS + 40,
+            withTiming(0, { duration: 0, easing }, (finished) => {
+              if (finished) scheduleOnRN(finishSharedAvatarTransition, transitionToken);
+            })
+          )
+        );
+      });
+    }, AMOUNT_CONTENT_PREWARM_MS);
+    return () => {
+      if (sharedAvatarStartTimerRef.current !== null) {
+        clearTimeout(sharedAvatarStartTimerRef.current);
+        sharedAvatarStartTimerRef.current = null;
+      }
+      if (sharedAvatarStartFrameRef.current !== null) {
+        cancelAnimationFrame(sharedAvatarStartFrameRef.current);
+        sharedAvatarStartFrameRef.current = null;
+      }
+      if (sharedAvatarTransitionTokenRef.current === transitionToken) {
+        stopSharedElementAnimations();
+      }
+    };
   }, [
     activeRecipientPeer,
     amountContentOpacity,
@@ -1397,6 +1729,7 @@ export function NearPayScreen() {
     headerAvatarRect,
     inlineAmountEntry,
     inlinePhase,
+    finishSharedAvatarTransition,
     pickerOpacity,
     playAmountContentEnter,
     selectedPeerRect,
@@ -1406,11 +1739,6 @@ export function NearPayScreen() {
     sharedAvatarY,
     stopSharedElementAnimations,
   ]);
-
-  useEffect(() => {
-    if (!inlineAmountEntry || inlinePhase !== 'amount' || amountContentMounted) return;
-    playAmountContentEnter();
-  }, [amountContentMounted, inlineAmountEntry, inlinePhase, playAmountContentEnter]);
 
   const pickerPanelStyle = useAnimatedStyle(() => ({
     opacity: pickerOpacity.get(),
@@ -1455,7 +1783,7 @@ export function NearPayScreen() {
   );
 
   const unavailable = Platform.OS !== 'ios';
-  const amountActive = !!inlineAmountEntry;
+  const amountActive = hasInlineAmountEntry;
   const sharedAvatarVisible = !!sharedAvatarPeer || inlinePhase === 'transitioning';
   const foregroundSoft = useMemo(() => opacity(foreground, alpha.soft), [foreground]);
   const foregroundProminent = useMemo(() => opacity(foreground, alpha.prominent), [foreground]);
@@ -1501,20 +1829,26 @@ export function NearPayScreen() {
     ),
     [foreground, resetToPicker]
   );
+  const renderMockModeHeaderLeft = useCallback(() => <HeaderMockModeToggle />, []);
   const renderEmptyHeader = useCallback(() => null, []);
+  const openPeerList = useCallback(() => {
+    router.push('/(send-flow)/nearPayPeers');
+  }, []);
   const renderHeaderRight = useCallback(
-    () => <HeaderBadge count={reachableCount} onPress={refresh} />,
-    [reachableCount, refresh]
+    () => <HeaderBadge count={headerBadgeCount} onPress={openPeerList} />,
+    [headerBadgeCount, openPeerList]
   );
   const stackOptions = useMemo(
     () => ({
       title: amountActive ? '' : 'Nut Drop',
+      headerShadowVisible: false,
+      headerTransparent: true,
       headerTitle: amountActive ? renderEmptyHeader : undefined,
       headerBackVisible: false,
-      headerLeft: amountActive ? renderHeaderLeft : undefined,
+      headerLeft: amountActive ? renderHeaderLeft : renderMockModeHeaderLeft,
       headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
     }),
-    [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
+    [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight, renderMockModeHeaderLeft]
   );
 
   return (
@@ -1533,7 +1867,7 @@ export function NearPayScreen() {
                 pointerEvents={amountActive ? 'none' : 'auto'}
                 style={pickerPanelCombinedStyle}>
                 <NearPayPeerField
-                  peers={peers}
+                  peers={pickerPeers}
                   emptyContent={emptyContent}
                   onSelect={handleSelectPeer}
                   selectedPeerID={sharedAvatarPeer?.peerID ?? null}
@@ -1548,9 +1882,7 @@ export function NearPayScreen() {
                     hideAvatar={sharedAvatarVisible}
                   />
                   <Animated.View style={amountContentCombinedStyle}>
-                    {amountContentMounted ? (
-                      <AmountFlowContent amountEntry={inlineAmountEntry} headerMode="none" />
-                    ) : null}
+                    <AmountFlowContent amountEntry={inlineAmountEntry} headerMode="none" />
                   </Animated.View>
                 </Animated.View>
               ) : null}
@@ -1592,6 +1924,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fieldCanvas: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  dotFieldLayer: {
     ...StyleSheet.absoluteFillObject,
   },
   mockAvatarPreloader: {
@@ -1696,6 +2031,12 @@ const styles = StyleSheet.create({
   headerBadgeText: {
     fontWeight: '700',
     lineHeight: 12,
+  },
+  headerMockModeToggle: {
+    paddingLeft: spacing.xs,
+  },
+  headerMockModeLabel: {
+    fontWeight: '700',
   },
   flowHeaderButton: {
     padding: spacing.sm,

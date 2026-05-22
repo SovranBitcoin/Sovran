@@ -5,7 +5,14 @@
  */
 
 import { useCallback, useMemo } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import {
+  PixelRatio,
+  type StyleProp,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import type { ActionVariant, RecipientProfile, ScreenActionName } from 'coco-payment-ux';
 import type { BoundAction, QuickSendSuggestion } from 'coco-payment-ux/react';
@@ -22,6 +29,8 @@ import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore'
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
 type AmountEntryActions = Record<ScreenActionName['amountEntry'], BoundAction>;
+
+const EMPTY_QUICK_SEND_SUGGESTIONS: QuickSendSuggestion[] = [];
 
 function readAmountEntryFields(entry: Record<string, unknown>) {
   const rawInput = typeof entry.rawInput === 'string' ? entry.rawInput : '';
@@ -80,7 +89,7 @@ interface AmountSelectorProps {
 export function AmountSelector({
   entry,
   actions,
-  suggestions = [],
+  suggestions = EMPTY_QUICK_SEND_SUGGESTIONS,
   transactionType,
   machineBusy = false,
   showMintBottomButton = false,
@@ -241,11 +250,27 @@ export function AmountSelector({
   //     visible padding inside the SwiftUI liquid-glass button instead
   //     of crowding the avatar + label + chevron row at 48 px.
   const { width: windowWidth } = useWindowDimensions();
-  const mintBottomPillWidth = Math.max(0, windowWidth / 2 - 8);
+  const mintBottomSlotWidth = useMemo(
+    () => PixelRatio.roundToNearestPixel(windowWidth / 2),
+    [windowWidth]
+  );
+  const mintBottomPillWidth = useMemo(
+    () => Math.max(0, mintBottomSlotWidth - 8),
+    [mintBottomSlotWidth]
+  );
+  const mintBottomPillWrapperStyle = useMemo<StyleProp<ViewStyle>>(() => {
+    return [
+      styles.mintBottomPillWrapper,
+      {
+        width: mintBottomPillWidth,
+        height: 48,
+      },
+    ];
+  }, [mintBottomPillWidth]);
   const leadingBottomButton = useMemo(() => {
     if (!showMintBottomButton || !onRequestMintList) return undefined;
     return (
-      <View style={{ margin: 4, marginBottom: 8 }}>
+      <View style={mintBottomPillWrapperStyle}>
         <MintSelector
           selectedMintUrl={mintUrl}
           onRequestMintList={onRequestMintList}
@@ -255,10 +280,16 @@ export function AmountSelector({
         />
       </View>
     );
-  }, [showMintBottomButton, onRequestMintList, mintUrl, mintBottomPillWidth]);
+  }, [
+    showMintBottomButton,
+    onRequestMintList,
+    mintUrl,
+    mintBottomPillWidth,
+    mintBottomPillWrapperStyle,
+  ]);
 
   return (
-    <Log name="AmountSelector" style={{ flex: 1 }}>
+    <Log name="AmountSelector" style={styles.amountSelectorRoot}>
       <AmountEntryView
         rawInput={rawInput}
         numericValue={numericValue}
@@ -283,3 +314,13 @@ export function AmountSelector({
     </Log>
   );
 }
+
+const styles = StyleSheet.create({
+  amountSelectorRoot: {
+    flex: 1,
+  },
+  mintBottomPillWrapper: {
+    margin: 4,
+    marginBottom: 8,
+  },
+});

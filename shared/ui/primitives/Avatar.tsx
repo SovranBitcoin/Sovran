@@ -72,12 +72,16 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
   }, [picture]);
 
   const [imageStatus, setImageStatus] = useState<ImageStatus>('loading');
+  const [loadedPicture, setLoadedPicture] = useState<string | null>(null);
 
   useEffect(() => {
     setImageStatus('loading');
   }, [picture]);
 
-  const handleImageLoad = useCallback(() => setImageStatus('loaded'), []);
+  const handleImageLoad = useCallback(() => {
+    if (picture) setLoadedPicture(picture);
+    setImageStatus('loaded');
+  }, [picture]);
   const handleImageError = useCallback(() => setImageStatus('failed'), []);
 
   const borderRadius = size / 2;
@@ -177,13 +181,25 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
     );
   }
 
-  // 5. Image state — image still loading → show loading state with invisible image underneath.
+  // 5. Image state — image still loading. Keep the previous decoded image in
+  // place while the next URL warms, avoiding a fallback/loading flash when a
+  // profile picture changes during a transition.
   if (imageStatus !== 'loaded') {
+    const previousPicture = loadedPicture && loadedPicture !== picture ? loadedPicture : null;
     return (
       <View style={{ position: 'relative', overflow: 'hidden' }}>
-        <View style={containerStyle}>
-          <LoadingContent borderRadius={borderRadius} color={loadingColor} />
-        </View>
+        {previousPicture ? (
+          <ExpoImage
+            source={{ uri: previousPicture }}
+            cachePolicy="memory-disk"
+            style={avatarStyle}
+            accessibilityLabel={imageAlt}
+          />
+        ) : (
+          <View style={containerStyle}>
+            <LoadingContent borderRadius={borderRadius} color={loadingColor} />
+          </View>
+        )}
         <ExpoImage
           source={{ uri: picture }}
           cachePolicy="memory-disk"

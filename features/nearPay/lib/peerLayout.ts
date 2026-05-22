@@ -170,7 +170,7 @@ export function buildPeerLayoutTargets(
   }
 
   const slotCount = entries.reduce((count, entry) => Math.max(count, entry.slotIndex + 1), 0);
-  const slots = buildPeerLayoutSlots(slotCount, size, config);
+  const slots = getCachedPeerLayoutSlots(slotCount, size, config);
 
   return entries.map((entry) => {
     const slot = slots[entry.slotIndex] ?? { x: centerX, y: centerY, scale: 1 };
@@ -202,6 +202,9 @@ interface PeerLayoutSlotCandidate extends PeerLayoutSlot {
   unitOffset: PeerLayoutOffset;
 }
 
+const PEER_LAYOUT_SLOT_CACHE_MAX_ENTRIES = 48;
+const PEER_LAYOUT_SLOT_CACHE = new Map<string, readonly PeerLayoutSlot[]>();
+
 function buildPeerLayoutSlots(
   count: number,
   size: PeerLayoutSize,
@@ -220,6 +223,56 @@ function buildPeerLayoutSlots(
       config
     ),
   ];
+}
+
+function getCachedPeerLayoutSlots(
+  count: number,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): readonly PeerLayoutSlot[] {
+  const key = getPeerLayoutSlotCacheKey(count, size, config);
+  const cached = PEER_LAYOUT_SLOT_CACHE.get(key);
+  if (cached) {
+    PEER_LAYOUT_SLOT_CACHE.delete(key);
+    PEER_LAYOUT_SLOT_CACHE.set(key, cached);
+    return cached;
+  }
+
+  const slots = buildPeerLayoutSlots(count, size, config);
+  PEER_LAYOUT_SLOT_CACHE.set(key, slots);
+  if (PEER_LAYOUT_SLOT_CACHE.size > PEER_LAYOUT_SLOT_CACHE_MAX_ENTRIES) {
+    const oldestKey = PEER_LAYOUT_SLOT_CACHE.keys().next().value;
+    if (oldestKey) PEER_LAYOUT_SLOT_CACHE.delete(oldestKey);
+  }
+  return slots;
+}
+
+function getPeerLayoutSlotCacheKey(
+  count: number,
+  size: PeerLayoutSize,
+  config: PeerLayoutConfig
+): string {
+  return [
+    count,
+    size.width,
+    size.height,
+    config.nodeWidth,
+    config.nodeHeight,
+    config.avatarSize,
+    config.avatarGap,
+    config.spaciousAvatarGap,
+    config.spaciousPeerCount,
+    config.densePeerCount,
+    config.spacingCapPeerCount,
+    config.preferredTopInset,
+    config.preferredBottomInset,
+    config.edgePadding,
+    config.edgeScaleFalloff,
+    config.edgeBoundaryScale,
+    config.edgeTranslationStrength,
+    config.minVisibleScale,
+    config.labelMinScale,
+  ].join('|');
 }
 
 function buildDistributedOnScreenHoneycombSlots(
@@ -378,6 +431,7 @@ function orderSlotsByDistantSpread(
 ): PeerLayoutSlotCandidate[] {
   const remaining = [...slots];
   const ordered: PeerLayoutSlotCandidate[] = [];
+  const selectedForSpread = [...initialSelectedSlots];
   const fieldCenter = { x: size.width / 2, y: size.height / 2 };
   let centerIndex = 0;
   let centerDistance = Number.POSITIVE_INFINITY;
@@ -392,7 +446,10 @@ function orderSlotsByDistantSpread(
     }
 
     const [centerSlot] = remaining.splice(centerIndex, 1);
-    if (centerSlot) ordered.push(centerSlot);
+    if (centerSlot) {
+      ordered.push(centerSlot);
+      selectedForSpread.push(centerSlot);
+    }
   }
 
   while (remaining.length > 0) {
@@ -402,11 +459,7 @@ function orderSlotsByDistantSpread(
 
     for (let index = 0; index < remaining.length; index++) {
       const slot = remaining[index];
-      const spreadDistance = getSlotSpreadDistance(
-        slot,
-        [...initialSelectedSlots, ...ordered],
-        config
-      );
+      const spreadDistance = getSlotSpreadDistance(slot, selectedForSpread, config);
       const tieBreaker = getStableSlotTieBreaker(slot);
       if (
         spreadDistance > bestSpreadDistance ||
@@ -420,6 +473,7 @@ function orderSlotsByDistantSpread(
 
     const [slot] = remaining.splice(bestIndex, 1);
     ordered.push(slot);
+    selectedForSpread.push(slot);
   }
 
   return ordered;
@@ -432,11 +486,14 @@ function getSlotSpreadDistance(
 ): number {
   if (selectedSlots.length === 0) return Number.POSITIVE_INFINITY;
   const center = slotCenter(slot, config);
-  return Math.min(
-    ...selectedSlots.map((selectedSlot) =>
+  let spreadDistance = Number.POSITIVE_INFINITY;
+  for (const selectedSlot of selectedSlots) {
+    spreadDistance = Math.min(
+      spreadDistance,
       distanceBetween(center, slotCenter(selectedSlot, config))
-    )
-  );
+    );
+  }
+  return spreadDistance;
 }
 
 function getStableSlotTieBreaker(slot: PeerLayoutSlotCandidate): number {
@@ -502,14 +559,18 @@ export function getPeerLayoutPanBounds(
     return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
   }
 
-  const centers = targets.map((target) => ({
-    x: target.x + config.nodeWidth / 2,
-    y: target.y + config.nodeHeight / 2,
-  }));
-  const minCenterX = Math.min(...centers.map((center) => center.x));
-  const maxCenterX = Math.max(...centers.map((center) => center.x));
-  const minCenterY = Math.min(...centers.map((center) => center.y));
-  const maxCenterY = Math.max(...centers.map((center) => center.y));
+  let minCenterX = Number.POSITIVE_INFINITY;
+  let maxCenterX = Number.NEGATIVE_INFINITY;
+  let minCenterY = Number.POSITIVE_INFINITY;
+  let maxCenterY = Number.NEGATIVE_INFINITY;
+  for (const target of targets) {
+    const centerX = target.x + config.nodeWidth / 2;
+    const centerY = target.y + config.nodeHeight / 2;
+    minCenterX = Math.min(minCenterX, centerX);
+    maxCenterX = Math.max(maxCenterX, centerX);
+    minCenterY = Math.min(minCenterY, centerY);
+    maxCenterY = Math.max(maxCenterY, centerY);
+  }
   const avatarRadius = config.avatarSize / 2;
   const minVisibleCenterX = config.edgePadding + avatarRadius;
   const maxVisibleCenterX = size.width - config.edgePadding - avatarRadius;
@@ -533,20 +594,31 @@ export function getPeerLayoutOverviewTransform(
   maxScale = 1,
   scaleFactor = 1
 ): PeerLayoutOverviewTransform {
-  const visibleTargets = targets.filter((target) => target.phase !== 'exiting');
-  if (visibleTargets.length === 0 || size.width <= 0 || size.height <= 0) {
+  if (size.width <= 0 || size.height <= 0) {
     return { translateX: 0, translateY: 0, scale: 1 };
   }
 
   const avatarRadius = config.avatarSize / 2;
-  const centers = visibleTargets.map((target) => ({
-    x: target.x + config.nodeWidth / 2 + pan.x,
-    y: target.y + config.nodeHeight / 2 + pan.y,
-  }));
-  const minCenterX = Math.min(...centers.map((center) => center.x));
-  const maxCenterX = Math.max(...centers.map((center) => center.x));
-  const minCenterY = Math.min(...centers.map((center) => center.y));
-  const maxCenterY = Math.max(...centers.map((center) => center.y));
+  let visibleCount = 0;
+  let minCenterX = Number.POSITIVE_INFINITY;
+  let maxCenterX = Number.NEGATIVE_INFINITY;
+  let minCenterY = Number.POSITIVE_INFINITY;
+  let maxCenterY = Number.NEGATIVE_INFINITY;
+  for (const target of targets) {
+    if (target.phase === 'exiting') continue;
+    visibleCount += 1;
+    const centerX = target.x + config.nodeWidth / 2 + pan.x;
+    const centerY = target.y + config.nodeHeight / 2 + pan.y;
+    minCenterX = Math.min(minCenterX, centerX);
+    maxCenterX = Math.max(maxCenterX, centerX);
+    minCenterY = Math.min(minCenterY, centerY);
+    maxCenterY = Math.max(maxCenterY, centerY);
+  }
+
+  if (visibleCount === 0) {
+    return { translateX: 0, translateY: 0, scale: 1 };
+  }
+
   const contentWidth = Math.max(maxCenterX - minCenterX + avatarRadius * 2, avatarRadius * 2);
   const contentHeight = Math.max(maxCenterY - minCenterY + avatarRadius * 2, avatarRadius * 2);
   const leftInset = clamp(insets.left, 0, size.width / 2);
