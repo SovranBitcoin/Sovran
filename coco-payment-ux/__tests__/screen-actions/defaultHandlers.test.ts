@@ -132,6 +132,60 @@ function createManager(
 }
 
 // ---------------------------------------------------------------------------
+// built-in copy/share targets
+// ---------------------------------------------------------------------------
+
+describe('built-in copy/share targets', () => {
+  it('labels mint quote clipboard copies as Lightning invoices', async () => {
+    const writeClipboard = vi.fn(async () => {});
+    const notify = vi.fn();
+    const mgr = createScreenActionManager({
+      screenType: 'mintQuote',
+      handlers: {} as any,
+      getContext: () =>
+        ({
+          entry: {},
+          manager: null,
+          setEntry: () => {},
+          writeClipboard,
+          notify,
+        }) as ScreenActionContext,
+    });
+
+    mgr.setEntry({ paymentRequest: 'lnbc1invoice' });
+
+    await mgr.execute('copy');
+
+    expect(writeClipboard).toHaveBeenCalledWith('lnbc1invoice');
+    expect(notify).toHaveBeenCalledWith('onCopied', 'lightningInvoice', 'lnbc1invoice');
+  });
+
+  it('labels mint quote shares as Lightning invoices', async () => {
+    const shareContent = vi.fn(async () => {});
+    const notify = vi.fn();
+    const mgr = createScreenActionManager({
+      screenType: 'mintQuote',
+      handlers: {} as any,
+      getContext: () =>
+        ({
+          entry: {},
+          manager: null,
+          setEntry: () => {},
+          shareContent,
+          notify,
+        }) as ScreenActionContext,
+    });
+
+    mgr.setEntry({ paymentRequest: 'lnbc1invoice' });
+
+    await mgr.execute('share');
+
+    expect(shareContent).toHaveBeenCalledWith({ message: 'lnbc1invoice', url: undefined });
+    expect(notify).toHaveBeenCalledWith('onShared', 'lightningInvoice', 'lnbc1invoice');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // sendToken
 // ---------------------------------------------------------------------------
 

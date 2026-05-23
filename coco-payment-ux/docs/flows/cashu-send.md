@@ -451,7 +451,7 @@ function SendCashuScreen({ sendHistoryEntry }) {
 
 ### Action handlers
 
-Both `copy` and `share` are **built-in** — when `platform.writeClipboard` and `platform.shareContent` are provided on the provider, they work automatically for all screen types. The library extracts the correct text per screen type (encoded token V4 for `sendToken`, payment request for `mintQuote`, address for `receive`, mint URL for `mintInfo`). Tokens are shared with a `cashu://` URL for deep link support.
+Both `copy` and `share` are **built-in** — when `platform.writeClipboard` and `platform.shareContent` are provided on the provider, they work automatically for all screen types. The library extracts the correct text per screen type (encoded token V4 for `sendToken`, Lightning invoice for `mintQuote`, address for `receive`, mint URL for `mintInfo`). Tokens are shared with a `cashu://` URL for deep link support.
 
 ```tsx
 <CocoPaymentUXProvider

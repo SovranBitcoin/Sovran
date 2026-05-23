@@ -276,7 +276,7 @@ const CONTENT_EXTRACTORS: Partial<Record<ScreenType, ContentExtractor>> = {
   },
   mintQuote: (entry) => {
     const pr = entry.paymentRequest;
-    return typeof pr === 'string' ? { text: pr, target: 'paymentRequest' } : null;
+    return typeof pr === 'string' ? { text: pr, target: 'lightningInvoice' } : null;
   },
   receive: (entry, ctx) => {
     const source = (ctx.source ?? 'npc') as string;

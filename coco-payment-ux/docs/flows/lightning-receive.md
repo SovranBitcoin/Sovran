@@ -295,7 +295,7 @@ function MintQuoteScreen({ mintHistoryEntry }) {
 
 ### Action handlers
 
-Both `copy` and `share` are **built-in** — when `platform.writeClipboard` and `platform.shareContent` are provided on the provider, they work automatically. The `onCopied` / `onShared` notification fires with `target` set to `'paymentRequest'`.
+Both `copy` and `share` are **built-in** — when `platform.writeClipboard` and `platform.shareContent` are provided on the provider, they work automatically. The `onCopied` / `onShared` notification fires with `target` set to `'lightningInvoice'`.
 
 ```tsx
 <CocoPaymentUXProvider

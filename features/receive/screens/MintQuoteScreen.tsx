@@ -134,7 +134,7 @@ export function MintQuoteScreen({
             <PaymentInfo
               data={[{ name: 'Lightning', value: entry.paymentRequest }]}
               unit={entry.unit}
-              copyTarget="paymentRequest"
+              copyTarget="lightningInvoice"
             />
           )}
 

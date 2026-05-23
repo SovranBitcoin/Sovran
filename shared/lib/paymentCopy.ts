@@ -33,7 +33,7 @@ export const SEND_COPY = {
   rolledBack: { label: 'Cancelled', info: 'Token funds returned to your balance' },
 } as const;
 
-// ── Payment request (NUT-18 / Nostr) ──────────────────────────────────
+// ── Payment request (NUT-18 / transport-backed) ───────────────────────
 
 export const PAYMENT_REQUEST_COPY = {
   prepared: { label: 'Created', info: 'Creating token...' },

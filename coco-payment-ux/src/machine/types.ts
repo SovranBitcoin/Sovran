@@ -418,7 +418,7 @@ export type NotificationHandlerMap = {
    * present the feedback (toast, haptic, etc.).
    *
    * `target` identifies what was copied: `'token'`, `'paymentRequest'`,
-   * `'address'`, `'p2pk'`, `'mintUrl'`.
+   * `'lightningInvoice'`, `'address'`, `'p2pk'`, `'mintUrl'`.
    */
   onCopied?: (target: string, text: string) => MaybeAsync;
   /**
@@ -426,7 +426,7 @@ export type NotificationHandlerMap = {
    * to present feedback (toast, haptic, etc.).
    *
    * `target` identifies what was shared: `'token'`, `'paymentRequest'`,
-   * `'address'`, `'p2pk'`, `'mintUrl'`.
+   * `'lightningInvoice'`, `'address'`, `'p2pk'`, `'mintUrl'`.
    */
   onShared?: (target: string, text: string) => MaybeAsync;
   /**

@@ -10,7 +10,7 @@ Patterns for rendering QR codes across payment flows — tokens, invoices, addre
 | [Mint Quote](/flows/lightning-receive#mint-quote-screen) | Lightning invoice (BOLT11)            | `entry.paymentRequest`     |
 | [Quick Receive](/flows/quick-receive) — NPC tab          | NPC Lightning address                 | `entry.npcAddress`         |
 | [Quick Receive](/flows/quick-receive) — P2PK tab         | P2PK public key                       | `entry.p2pkPubkey`         |
-| [Melt Quote](/flows/lightning-send#melt-quote-screen)    | Payment request (for payer reference) | `entry.paymentRequest`     |
+| [Melt Quote](/flows/lightning-send#melt-quote-screen)    | Lightning target (payer reference)    | `entry.paymentRequest`     |
 | [Payment Request](/flows/cashu-send#payment-requests)    | Cashu payment request (NUT-18)        | `entry.paymentRequestInfo` |
 
 ## Static QR
