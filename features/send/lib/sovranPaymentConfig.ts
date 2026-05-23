@@ -41,6 +41,10 @@ import {
 } from 'coco-payment-ux';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
+import {
+  getP2PKImportExtension,
+  resolvePrimaryReceiveP2PKPublicKey,
+} from 'coco-cashu-plugin-p2pk-import';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
 import { writeTokenToNFC, NfcError, isUserCancelError } from '@/shared/lib/nfc';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
@@ -647,6 +651,10 @@ export function createSovranNotifications(
       if (hadP2PKProofs && useSettingsStore.getState().regenerateP2PKOnReceive) {
         const mgr = config?.getManager?.();
         if (mgr) {
+          if ((getP2PKImportExtension(mgr)?.getPublicKeys() ?? []).length > 0) {
+            return;
+          }
+
           try {
             await mgr.keyring.generateKeyPair();
             const keypair = await mgr.keyring.getLatestKeyPair();
@@ -1007,8 +1015,7 @@ export function createSovranHandlers({
       const currentMgr = getManager();
       if (currentMgr) {
         try {
-          const keypair = await currentMgr.keyring.getLatestKeyPair();
-          p2pkKey = keypair?.publicKeyHex ?? undefined;
+          p2pkKey = await resolvePrimaryReceiveP2PKPublicKey(currentMgr);
         } catch {
           /* ignore */
         }

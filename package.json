@@ -88,6 +88,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "coco-cashu-plugin-npc": "^2.4.1",
+    "coco-cashu-plugin-p2pk-import": "file:./coco-cashu-plugin-p2pk-import",
     "coco-payment-ux": "file:./coco-payment-ux",
     "expo": "^55.0.4",
     "expo-application": "~55.0.8",

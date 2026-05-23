@@ -43,6 +43,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "coco-cashu-plugin-npc": "^2.4.1",
+        "coco-cashu-plugin-p2pk-import": "file:./coco-cashu-plugin-p2pk-import",
         "coco-payment-ux": "file:./coco-payment-ux",
         "expo": "^55.0.4",
         "expo-application": "~55.0.8",
@@ -1523,6 +1524,8 @@
     "coco-cashu-core": ["coco-cashu-core@1.1.2-rc.50", "", { "dependencies": { "@cashu/cashu-ts": "^3.5.0", "@noble/curves": "^2.0.1", "@noble/hashes": "^2.0.1", "@scure/bip32": "^2.0.1" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eK5YuwvCWpeCwF/GEkMo90FCyek2mS+smQ51wKjkjTKzpkVVlNln52l2h1Wwce4VMnW6GSeL2IgT8IksM8Umuw=="],
 
     "coco-cashu-plugin-npc": ["coco-cashu-plugin-npc@2.4.1", "", { "dependencies": { "npubcash-sdk": "^0.3.2" }, "peerDependencies": { "coco-cashu-core": "^1.1.2-rc.50", "typescript": "^5.0.0" } }, "sha512-0OhqXXRLBq/2VkeuyqHrTINCEQYEk9+dCD9Vq7+M94CDf7kLKQZmoDL6leTuHJ45pIVnALcOFnjIcRoJwV7iiA=="],
+
+    "coco-cashu-plugin-p2pk-import": ["coco-cashu-plugin-p2pk-import@file:coco-cashu-plugin-p2pk-import", { "dependencies": { "@noble/hashes": "^2.0.1", "nostr-tools": "^2.0.0" }, "devDependencies": { "typescript": "^5.0.0", "vitest": "^3.0.0" }, "peerDependencies": { "@cashu/coco-core": ">=1.0.0" } }],
 
     "coco-payment-ux": ["coco-payment-ux@file:coco-payment-ux", { "dependencies": { "@cashu/cashu-ts": "^3.5.0", "@gandlaf21/bolt11-decode": "^3.1.1", "nostr-tools": "^2.0.0" }, "devDependencies": { "fast-check": "^4.0.0", "typescript": "^5.0.0", "vitest": "^3.0.0" }, "peerDependencies": { "@cashu/coco-core": ">=1.0.0", "react": ">=18.0.0" }, "optionalPeers": ["@cashu/coco-core", "react"] }],
 

@@ -29,6 +29,8 @@
     "coco/**",
     "eNuts/**",
     "heroui-native/**",
+    "coco-cashu-plugin-p2pk-import/node_modules/**",
+    "coco-cashu-plugin-p2pk-import/dist/**",
     "coco-payment-ux/docs/references/**",
     "coco-payment-ux/docs/node_modules/**",
     "coco-payment-ux/docs/.vitepress/cache/**"

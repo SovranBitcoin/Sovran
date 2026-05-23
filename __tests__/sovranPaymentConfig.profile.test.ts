@@ -3,9 +3,13 @@
  */
 
 import type { PaymentMachine } from 'coco-payment-ux';
-import { createSovranHandlers } from '@/features/send/lib/sovranPaymentConfig';
+import {
+  createSovranHandlers,
+  createSovranNotifications,
+} from '@/features/send/lib/sovranPaymentConfig';
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 const mockNavigate = jest.fn();
 const mockNearPayComplete = jest.fn();
@@ -258,5 +262,61 @@ describe('createSovranHandlers profile routing', () => {
       pathname: '/(send-flow)/sendToken',
       params: { sendHistoryEntry: historyEntry },
     });
+  });
+
+  it('skips P2PK key regeneration when the current-profile P2PK plugin is active', async () => {
+    const generateKeyPair = jest.fn();
+    const getLatestKeyPair = jest.fn();
+    const onP2pkKeyRefreshed = jest.fn();
+    (useSettingsStore.getState as jest.Mock).mockReturnValue({
+      regenerateP2PKOnReceive: true,
+    });
+
+    const notifications = createSovranNotifications({
+      getManager: () =>
+        ({
+          ext: { p2pkImport: { getPublicKeys: () => [`02${'44'.repeat(32)}`] } },
+          keyring: { generateKeyPair, getLatestKeyPair },
+        }) as never,
+      onP2pkKeyRefreshed,
+    });
+
+    await notifications.onP2PKReceiveCompleted?.({
+      transactionId: 'tx-current-profile-p2pk',
+      mintUrl: 'https://mint.example.com',
+      hadP2PKProofs: true,
+    });
+
+    expect(generateKeyPair).not.toHaveBeenCalled();
+    expect(getLatestKeyPair).not.toHaveBeenCalled();
+    expect(onP2pkKeyRefreshed).not.toHaveBeenCalled();
+  });
+
+  it('keeps regenerating P2PK keys after receive when no current-profile P2PK plugin key is active', async () => {
+    const nextPublicKey = `02${'33'.repeat(32)}`;
+    const generateKeyPair = jest.fn(async () => ({ publicKeyHex: nextPublicKey }));
+    const getLatestKeyPair = jest.fn(async () => ({ publicKeyHex: nextPublicKey }));
+    const onP2pkKeyRefreshed = jest.fn();
+    (useSettingsStore.getState as jest.Mock).mockReturnValue({
+      regenerateP2PKOnReceive: true,
+    });
+
+    const notifications = createSovranNotifications({
+      getManager: () =>
+        ({
+          ext: {},
+          keyring: { generateKeyPair, getLatestKeyPair },
+        }) as never,
+      onP2pkKeyRefreshed,
+    });
+
+    await notifications.onP2PKReceiveCompleted?.({
+      transactionId: 'tx-rotating-p2pk',
+      mintUrl: 'https://mint.example.com',
+      hadP2PKProofs: true,
+    });
+
+    expect(generateKeyPair).toHaveBeenCalledTimes(1);
+    expect(onP2pkKeyRefreshed).toHaveBeenCalledWith(nextPublicKey);
   });
 });

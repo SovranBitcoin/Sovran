@@ -17,7 +17,7 @@
 const APP_CONFIG_PATH = '../app.config.js';
 
 type ConfigFn = (args: { config: Record<string, unknown> }) => Record<string, unknown> & {
-  extra?: { debugMnemonic?: unknown };
+  extra?: { debugMnemonic?: unknown; sharedP2PKSecretKeys?: unknown };
 };
 
 function loadAppConfig(): ConfigFn {
@@ -25,7 +25,14 @@ function loadAppConfig(): ConfigFn {
   return require(APP_CONFIG_PATH) as ConfigFn;
 }
 
-const ENV_KEYS = ['EAS_BUILD_PROFILE', 'APP_VARIANT', 'EXPO_PUBLIC_ENV', 'DEBUG_MNEMONIC'] as const;
+const ENV_KEYS = [
+  'EAS_BUILD_PROFILE',
+  'APP_VARIANT',
+  'EXPO_PUBLIC_ENV',
+  'DEBUG_MNEMONIC',
+  'SOVRAN_SHARED_P2PK_SECRET_KEYS',
+  'EXPO_PUBLIC_SOVRAN_SHARED_P2PK_SECRET_KEYS',
+] as const;
 
 const VALID_MNEMONIC =
   'cute clutch where initial orphan arena fashion silk minute endless middle own';
@@ -97,5 +104,14 @@ describe('app.config.js: extra.debugMnemonic gating', () => {
     // The new mechanism must not re-introduce the inlining bug by reading
     // the EXPO_PUBLIC_* var as a fallback.
     expect(config.extra?.debugMnemonic).toBeUndefined();
+  });
+
+  it('does not inject P2PK private-key env vars into Expo config', () => {
+    process.env.SOVRAN_SHARED_P2PK_SECRET_KEYS = 'private-env-should-not-be-read';
+    process.env.EXPO_PUBLIC_SOVRAN_SHARED_P2PK_SECRET_KEYS = 'public-env-should-not-be-read';
+
+    const config = loadAppConfig()({ config: {} });
+
+    expect(config.extra?.sharedP2PKSecretKeys).toBeUndefined();
   });
 });
