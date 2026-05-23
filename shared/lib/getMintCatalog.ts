@@ -83,7 +83,9 @@ function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unkn
 
   if (profile) {
     entry.contactFollowers = profile.followers;
-    entry.contactReputation = Math.round(profile.reputation);
+    if (typeof profile.reputation === 'number') {
+      entry.contactReputation = Math.round(profile.reputation);
+    }
   }
 
   return { entry, info };
@@ -93,7 +95,7 @@ async function resolveNostrProfile(
   mintUrl: string,
   pubkey: string,
   signal?: AbortSignal
-): Promise<{ followers: number; reputation: number } | undefined> {
+): Promise<{ followers: number; reputation: number | null } | undefined> {
   const profileStore = useMintProfileStore.getState();
   const cached = profileStore.getCached(mintUrl);
   if (cached && !profileStore.isStale(mintUrl)) {
@@ -170,7 +172,9 @@ async function fetchEntry(
     const profile = await resolveNostrProfile(mintUrl, pubkey, signal);
     if (profile) {
       entry.contactFollowers = profile.followers;
-      entry.contactReputation = Math.round(profile.reputation);
+      if (typeof profile.reputation === 'number') {
+        entry.contactReputation = Math.round(profile.reputation);
+      }
     }
   }
 

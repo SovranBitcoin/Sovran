@@ -51,7 +51,7 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
               mintUrl: key,
               pubkey,
               followers,
-              reputation: Math.round(score),
+              reputation: typeof score === 'number' ? Math.round(score) : null,
             });
             useMintProfileStore.getState().setCached(mint.url, followers, score);
           }

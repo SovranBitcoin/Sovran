@@ -9,8 +9,9 @@ import {
   LatestVersionResponse,
   MintReviewsResponse,
   MintSearchResponse,
-  NostrProfileFull,
+  NostrProfileFull as NostrProfileFullStrict,
   SearchUsersResponse,
+  TopFollower as TopFollowerStrict,
   loggableIssues,
   parseWith,
   type MintRecommendation,
@@ -31,6 +32,22 @@ const AuditMintResponse = AuditMintResponseStrict.extend({
 });
 type AuditMintResponseType = z.infer<typeof AuditMintResponse>;
 
+// Local compatibility while the shared package release catches up to the
+// live `/nostr/profile` wire shape. Vertex can return `null` when pagerank,
+// created_at, or node count are not computable; rejecting the whole profile
+// would drop otherwise useful follower/name/picture data.
+const NullableVertexMetric = z.number().nullable();
+const TopFollower = TopFollowerStrict.extend({
+  score: NullableVertexMetric.optional(),
+});
+const NostrProfileFull = NostrProfileFullStrict.extend({
+  score: NullableVertexMetric,
+  created_at: z.number().int().nullable(),
+  nodes: z.number().int().nonnegative().nullable().optional(),
+  topFollowers: z.array(TopFollower).max(500),
+});
+type NostrProfileFullType = z.infer<typeof NostrProfileFull>;
+
 const BASE_URL = 'https://api.sovran.money/api';
 
 /**
@@ -45,8 +62,13 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 
 // Re-export schema-derived types for callers that previously imported them
 // from this module.
-export type { AuditMintResponseType as AuditMintResponse, MintRecommendation, MintSearchResult };
-export type { NostrProfileFull, NostrSearchResult } from '@sovranbitcoin/schemas';
+export type {
+  AuditMintResponseType as AuditMintResponse,
+  MintRecommendation,
+  MintSearchResult,
+  NostrProfileFullType as NostrProfileFull,
+};
+export type { NostrSearchResult } from '@sovranbitcoin/schemas';
 
 // Re-export coco-payment-ux's cancellable-fetch primitives so existing
 // `@/shared/lib/apiClient` consumers don't have to learn the new import

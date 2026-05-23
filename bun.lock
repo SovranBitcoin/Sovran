@@ -36,7 +36,7 @@
         "@scure/base": "^2.0.0",
         "@scure/bip32": "^1.3.3",
         "@scure/bip39": "^1.2.2",
-        "@sovranbitcoin/schemas": "2.0.3",
+        "@sovranbitcoin/schemas": "2.0.5",
         "bitchat-module": "file:./modules/bitchat-module",
         "buffer": "^6.0.3",
         "cashu-kym": "^0.4.1",
@@ -1084,7 +1084,7 @@
 
     "@sinonjs/fake-timers": ["@sinonjs/fake-timers@10.3.0", "", { "dependencies": { "@sinonjs/commons": "^3.0.0" } }, "sha512-V4BG07kuYSUkTCSBHG8G8TNhM+F19jXFWnQtzj+we8DrkpSBCee9Z3Ms8yiGer/dlmhe35/Xdgyo3/0rQKg7YA=="],
 
-    "@sovranbitcoin/schemas": ["@sovranbitcoin/schemas@2.0.3", "https://npm.pkg.github.com/download/@sovranbitcoin/schemas/2.0.3/385f5a8db6cd5a98aaf024e0926b2de987ef6350", { "peerDependencies": { "neverthrow": "^8.0.0", "zod": "^4.0.0" } }, "sha512-vafPRmO4Mycrteiudkas4+yWFTYcu8W9al/JF3vs/P2smoH3WYDt4Pbwf21MUonrUn/nThpyIcgRXr0ICDys8A=="],
+    "@sovranbitcoin/schemas": ["@sovranbitcoin/schemas@2.0.5", "https://npm.pkg.github.com/download/@sovranbitcoin/schemas/2.0.5/695f63d16e8badaade8414cdb7a49f2c43687b35", { "peerDependencies": { "neverthrow": "^8.0.0", "zod": "^4.0.0" } }, "sha512-Z29kEn3gY6LcnPEZK7NSOyIVx/z5yZQ485Z8MfMZb8G2yQxE2JUV0ywVKq1FxNRucDEjSos6S+TlbzqSW3Ss8g=="],
 
     "@tailwindcss/node": ["@tailwindcss/node@4.2.1", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "enhanced-resolve": "^5.19.0", "jiti": "^2.6.1", "lightningcss": "1.31.1", "magic-string": "^0.30.21", "source-map-js": "^1.2.1", "tailwindcss": "4.2.1" } }, "sha512-jlx6sLk4EOwO6hHe1oCGm1Q4AN/s0rSrTTPBGPM0/RQ6Uylwq17FuU8IeJJKEjtc6K6O07zsvP+gDO6MMWo7pg=="],
 

@@ -92,7 +92,10 @@ function adaptSearchResult(result: MintSearchResult): DisplayMint {
       contact: Array.isArray(info.contact) ? info.contact : undefined,
     },
     contactFollowers: profile?.followers,
-    contactReputation: profile ? Math.round(profile.reputation) : undefined,
+    contactReputation:
+      profile && typeof profile.reputation === 'number'
+        ? Math.round(profile.reputation)
+        : undefined,
     auditState: result.state,
     serverStats: {
       n_mints: result.n_mints,

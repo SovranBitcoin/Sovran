@@ -146,4 +146,21 @@ describe('getMintCatalog cache-first behavior', () => {
     expect(useMintProfileStore.getState().getCached(MINT_URL)?.followers).toBe(55);
     expect(getMintInfo).not.toHaveBeenCalled();
   });
+
+  it('keeps operator followers when Vertex reputation is null', async () => {
+    (auditMint as jest.Mock).mockResolvedValue(ok(auditData()));
+    (fetchNostrProfile as jest.Mock).mockResolvedValue(ok({ followers: 55, score: null }));
+    const getMintInfo = jest.fn();
+
+    const catalog = await getMintCatalog([MINT_URL], getMintInfo, {
+      networkMode: 'network-first',
+    });
+
+    expect(catalog[MINT_URL]).toMatchObject({
+      auditState: 'OK',
+      contactFollowers: 55,
+    });
+    expect(catalog[MINT_URL]).not.toHaveProperty('contactReputation');
+    expect(useMintProfileStore.getState().getCached(MINT_URL)?.reputation).toBeNull();
+  });
 });

@@ -711,8 +711,11 @@ export function UserProfileScreen() {
   const displayName = resolveIdentityName({ pubkey, nostrProfile: cachedProfile });
 
   const followerCount = profileData?.followers;
-  const reputationScore = profileData?.score;
-  const joinedDate = formatDate((profileData?.created_at || 0) * 1000, 'long-date');
+  const reputationScore = typeof profileData?.score === 'number' ? profileData.score : undefined;
+  const joinedDate =
+    typeof profileData?.created_at === 'number'
+      ? formatDate(profileData.created_at * 1000, 'long-date')
+      : undefined;
 
   const latestContactListEvent = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;

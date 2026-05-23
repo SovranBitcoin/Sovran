@@ -55,7 +55,9 @@ export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo
   const profile = useMintProfileStore.getState().getCached(normalized);
   if (profile) {
     enrichment.contactFollowers = profile.followers;
-    enrichment.contactReputation = Math.round(profile.reputation);
+    if (typeof profile.reputation === 'number') {
+      enrichment.contactReputation = Math.round(profile.reputation);
+    }
   }
 
   if (audit) {

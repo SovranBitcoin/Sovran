@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { fetchNostrProfile, type NostrProfileFull } from '@/shared/lib/apiClient';
-import type { TopFollower } from '@sovranbitcoin/schemas';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { log } from '@/shared/lib/logger';
 
-export type { TopFollower };
+export type TopFollower = NostrProfileFull['topFollowers'][number];
 
 interface UseNostrProfileResult {
   data: NostrProfileFull | null;
