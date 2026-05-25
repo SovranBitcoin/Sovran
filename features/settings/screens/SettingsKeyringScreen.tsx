@@ -20,7 +20,7 @@ import type { Keypair } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { getPublicKey, nip19 } from 'nostr-tools';
-import { parseP2PKSecretInput, rememberP2PKImportPublicKeys } from 'coco-cashu-plugin-p2pk-import';
+import { parseP2PKSecretInput } from 'coco-cashu-plugin-p2pk-import';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import QRCode from 'react-native-qrcode-svg';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
@@ -282,13 +282,6 @@ export const SettingsKeyringScreen: React.FC = () => {
     }
 
     const keypair = await manager.keyring.addKeyPair(parsed.secretKey);
-    const currentNostrPublicKeyHex = nostrKeys?.privateKey
-      ? `02${getPublicKey(nostrKeys.privateKey)}`
-      : null;
-    if (keypair.publicKeyHex === currentNostrPublicKeyHex) {
-      rememberP2PKImportPublicKeys(manager, [keypair.publicKeyHex]);
-    }
-
     log.info('settings.keyring.import.key_imported', {
       publicKeyHex: keypair.publicKeyHex,
       source: parsed.source,
@@ -386,7 +379,6 @@ export const SettingsKeyringScreen: React.FC = () => {
 
       if (existingKeypairs.some((keypair) => keypair.publicKeyHex === publicKeyHex)) {
         setKeypairs(existingKeypairs);
-        rememberP2PKImportPublicKeys(manager, [publicKeyHex]);
         staticPopup('key-imported', {
           text: 'Your active Nostr key is already available for P2PK-locked ecash.',
         });
@@ -394,7 +386,6 @@ export const SettingsKeyringScreen: React.FC = () => {
       }
 
       const keypair = await manager.keyring.addKeyPair(nostrKeys.privateKey);
-      rememberP2PKImportPublicKeys(manager, [keypair.publicKeyHex]);
       log.info('settings.keyring.import_current_nsec.key_imported', {
         publicKeyHex: keypair.publicKeyHex,
       });
