@@ -32,6 +32,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ListRow, type ListRowAvatar, type ListRowIconCircle } from '@/shared/ui/composed/ListRow';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import {
   RowStatsAccent,
   STAT_ICONS,
@@ -652,7 +653,11 @@ export function ContactRow({
   let avatarProp: ListRowAvatar | undefined;
   let iconCircleProp: ListRowIconCircle | undefined;
 
-  if (nostr?.verified) {
+  if (mint) {
+    leadingNode = (
+      <MintIcon iconUrl={mint.iconUrl} name={name} size={AVATAR_SIZE} isLoading={resolvedLoading} />
+    );
+  } else if (nostr?.verified) {
     // Routes through `leading` so Avatar's `status` prop survives — ListRow's
     // `avatar` slot doesn't expose it.
     leadingNode = (
@@ -665,7 +670,7 @@ export function ContactRow({
         size={AVATAR_SIZE}
       />
     );
-  } else if (mint || nostr || self || ble || picture) {
+  } else if (nostr || self || ble || picture) {
     avatarProp = { picture, seed, name, size: AVATAR_SIZE, state: avatarState };
   } else if (geohash) {
     const isBleTier = geohash.transport === 'ble';

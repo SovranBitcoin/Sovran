@@ -11,7 +11,7 @@ import { useMints } from '@cashu/coco-react';
 import { z } from 'zod';
 
 import Icon from 'assets/icons';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Text } from '@/shared/ui/primitives/Text';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -114,15 +114,7 @@ const MintSelectorChip: React.FC<{
           borderColor: isSelected ? opacity(foreground, 0.25) : opacity(foreground, 0.08),
         },
       ]}>
-      {showIcon ? (
-        <Avatar
-          state={iconUrl ? 'image' : 'fallback'}
-          picture={iconUrl}
-          size={22}
-          name={name}
-          alt={`${name} icon`}
-        />
-      ) : null}
+      {showIcon ? <MintIcon iconUrl={iconUrl} size={22} name={name} alt={`${name} icon`} /> : null}
       <Text
         size={13}
         numberOfLines={1}

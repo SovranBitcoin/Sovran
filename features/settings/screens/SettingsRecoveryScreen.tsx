@@ -7,7 +7,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Switch, Button, Card } from 'heroui-native';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -424,12 +424,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             const displayName = getMintDisplayName(mint, mint.mintUrl);
             return (
               <HStack key={mint.mintUrl} spacing={12} className="items-center">
-                <Avatar
-                  state={mint.mintInfo?.icon_url ? 'image' : 'fallback'}
-                  picture={mint.mintInfo?.icon_url}
-                  name={displayName}
-                  size={36}
-                />
+                <MintIcon iconUrl={mint.mintInfo?.icon_url} name={displayName} size={36} />
                 <Text size={14} bold numberOfLines={1} style={{ color: foreground, flex: 1 }}>
                   {displayName}
                 </Text>
@@ -672,12 +667,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                     const displayName = getMintDisplayName(mint, result.mint);
                     return (
                       <HStack key={index} spacing={12} className="items-center">
-                        <Avatar
-                          state={mint?.mintInfo?.icon_url ? 'image' : 'fallback'}
-                          picture={mint?.mintInfo?.icon_url}
-                          name={displayName}
-                          size={36}
-                        />
+                        <MintIcon iconUrl={mint?.mintInfo?.icon_url} name={displayName} size={36} />
                         <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
                           <Text size={14} bold numberOfLines={1} style={{ color: foreground }}>
                             {displayName}
@@ -771,12 +761,7 @@ const MintRecoveryRow: React.FC<{
 
   return (
     <HStack spacing={12} className="items-center">
-      <Avatar
-        state={mint?.mintInfo?.icon_url ? 'image' : 'fallback'}
-        picture={mint?.mintInfo?.icon_url}
-        name={displayName}
-        size={36}
-      />
+      <MintIcon iconUrl={mint?.mintInfo?.icon_url} name={displayName} size={36} />
       <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
         <Text
           size={14}

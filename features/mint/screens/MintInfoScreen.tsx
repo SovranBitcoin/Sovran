@@ -22,8 +22,8 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Badge } from '@/shared/ui/primitives/Badge';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -180,13 +180,7 @@ function AnimatedAvatarComponent({
 
   return (
     <View className="relative">
-      <Avatar
-        state={isLoading ? 'loading' : picture ? 'image' : 'fallback'}
-        picture={picture}
-        size={size}
-        name={name}
-        alt={alt}
-      />
+      <MintIcon iconUrl={picture} size={size} name={name} alt={alt} isLoading={isLoading} />
       {statusBadge && (
         <Animated.View style={badgeStyle}>
           {okBadge ?? (

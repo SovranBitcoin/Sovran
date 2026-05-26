@@ -36,8 +36,8 @@ import {
 } from '@/shared/stores/profile/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
 import { DetailsList } from '@/shared/ui/composed/DetailsList';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import {
   TransferEntryRow,
   TransferSeparator,
@@ -173,12 +173,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
       {/* Row 1: [mint a] → [mint b] — equal width */}
       <HStack spacing={8} align="center">
         <HStack spacing={8} align="center" flex={1}>
-          <Avatar
-            state={srcInfo?.icon_url ? 'image' : 'fallback'}
-            picture={srcInfo?.icon_url}
-            size={28}
-            name={srcName}
-          />
+          <MintIcon iconUrl={srcInfo?.icon_url} size={28} name={srcName} />
           <UntranslatedText
             bold
             size={13}
@@ -192,12 +187,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <Icon name="mdi:arrow-right" size={10} color="#fff" />
         </View>
         <HStack spacing={8} align="center" flex={1}>
-          <Avatar
-            state={dstInfo?.icon_url ? 'image' : 'fallback'}
-            picture={dstInfo?.icon_url}
-            size={28}
-            name={dstName}
-          />
+          <MintIcon iconUrl={dstInfo?.icon_url} size={28} name={dstName} />
           <UntranslatedText
             bold
             size={13}

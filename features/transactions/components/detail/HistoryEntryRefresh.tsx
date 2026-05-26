@@ -8,7 +8,7 @@ import opacity from 'hex-color-opacity';
 import type { HistoryEntry } from '@cashu/coco-core';
 
 import Icon from 'assets/icons';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -38,11 +38,11 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
   const row = (
     <ListGroup.Item disabled>
       <ListGroup.ItemPrefix>
-        <Avatar
-          state={loading ? 'loading' : mintInfo?.icon_url ? 'image' : 'fallback'}
-          picture={mintInfo?.icon_url || undefined}
+        <MintIcon
+          iconUrl={mintInfo?.icon_url}
           size={40}
           name={mintInfo?.name}
+          isLoading={loading}
           alt={`${mintInfo?.name || 'Mint'} icon`}
         />
       </ListGroup.ItemPrefix>
