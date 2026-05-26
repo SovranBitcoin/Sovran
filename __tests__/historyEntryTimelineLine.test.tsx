@@ -56,7 +56,6 @@ jest.mock('@/shared/ui/composed/GradientCard', () => {
 
 jest.mock('@/shared/blocks/status', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   const { mapCheckpointStatusToIndicator } = jest.requireActual<
     typeof import('@/shared/blocks/status/mapCheckpointStatus')
   >('@/shared/blocks/status/mapCheckpointStatus');
@@ -67,10 +66,10 @@ jest.mock('@/shared/blocks/status', () => {
       result?: string;
       confirmationProgress?: unknown;
     }) =>
-      ReactActual.createElement(View, {
+      ReactActual.createElement('LoadingIndicatorMock', {
         testID: `indicator-${props.phase}-${props.result}`,
         confirmationProgress: props.confirmationProgress,
-      } as React.ComponentProps<typeof View> & { confirmationProgress?: unknown }),
+      }),
     mapCheckpointStatusToIndicator,
   };
 });
