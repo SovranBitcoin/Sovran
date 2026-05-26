@@ -13,6 +13,7 @@ export const MINT_COPY = {
   PAID: { label: 'Payment received', info: 'Adding to wallet...' },
   ISSUED: { label: 'Complete', info: (amount: number) => `+${amount} sats added to wallet` },
   expired: { label: 'Expired', info: 'Invoice expired without payment' },
+  failed: { label: 'Failed', info: 'Receive could not be completed' },
 } as const;
 
 // ── Melt quote (send via Lightning) ────────────────────────────────────

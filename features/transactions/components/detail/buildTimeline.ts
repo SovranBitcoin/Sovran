@@ -8,9 +8,16 @@ import {
   PAYMENT_REQUEST_COPY,
   RECEIVE_COPY,
 } from '@/shared/lib/paymentCopy';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
+import {
+  getOnchainConfirmationInfo,
+  type OnchainConfirmationProgress,
+} from '@/shared/lib/bitcoin/onchainPaymentStatus';
 import { meltQuoteExpired, mintHistoryEntryExpired } from '@/shared/lib/utils';
 
 const EXPIRED_STATE = 'expired';
+const FAILED_STATE = 'failed';
 
 export type TimelineStepType =
   | 'complete'
@@ -36,6 +43,32 @@ interface BuildTimelineInput {
   currentTime: number;
   tokenCreated?: boolean;
   nostrSent?: boolean;
+  onchainConfirmationProgress?: OnchainConfirmationProgress | null;
+}
+
+type MintTimelineState = MintQuoteState | typeof FAILED_STATE | string;
+
+function isMintQuoteState(value: unknown): value is MintQuoteState {
+  return (
+    value === MintQuoteState.UNPAID ||
+    value === MintQuoteState.PAID ||
+    value === MintQuoteState.ISSUED
+  );
+}
+
+function getMintTimelineState(historyEntry: HistoryEntry): MintTimelineState {
+  if (historyEntry.type !== 'mint') return String(historyEntry.state);
+
+  const rawState = String(historyEntry.state);
+  if (rawState === 'finalized') return MintQuoteState.ISSUED;
+  if (rawState === 'executing') return MintQuoteState.PAID;
+  if (rawState === 'failed') return FAILED_STATE;
+
+  const remoteState = 'remoteState' in historyEntry ? historyEntry.remoteState : undefined;
+  if (isMintQuoteState(remoteState)) return remoteState;
+  if (rawState === 'pending') return MintQuoteState.UNPAID;
+  if (isMintQuoteState(rawState)) return rawState;
+  return rawState;
 }
 
 export function buildTimeline({
@@ -44,11 +77,19 @@ export function buildTimeline({
   currentTime,
   tokenCreated,
   nostrSent,
+  onchainConfirmationProgress,
 }: BuildTimelineInput): TimelineItem[] {
   switch (historyEntry.type) {
     case 'mint': {
+      const mintState = getMintTimelineState(historyEntry);
+      const isOnchainMint = !!getOnchainMintAddress(historyEntry);
+      const waitingInfo = isOnchainMint
+        ? 'Pay the address to receive funds'
+        : MINT_COPY.UNPAID.info;
       const isExpired =
-        historyEntry.state === MintQuoteState.UNPAID && mintHistoryEntryExpired(historyEntry);
+        !isOnchainMint &&
+        mintState === MintQuoteState.UNPAID &&
+        mintHistoryEntryExpired(historyEntry);
 
       if (isExpired) {
         return [
@@ -67,14 +108,53 @@ export function buildTimeline({
         ];
       }
 
-      switch (historyEntry.state) {
+      if (mintState === FAILED_STATE) {
+        return [
+          {
+            state: MintQuoteState.UNPAID,
+            displayLabel: MINT_COPY.UNPAID.label,
+            stepType: 'complete',
+            timestamp: historyEntry.createdAt,
+          },
+          {
+            state: FAILED_STATE,
+            displayLabel: MINT_COPY.failed.label,
+            stepType: 'expired',
+            info: historyEntry.error ?? MINT_COPY.failed.info,
+          },
+        ];
+      }
+
+      switch (mintState) {
         case MintQuoteState.UNPAID:
+          if (isOnchainMint && onchainConfirmationProgress?.hasPayment) {
+            return [
+              {
+                state: MintQuoteState.UNPAID,
+                displayLabel: MINT_COPY.UNPAID.label,
+                stepType: 'complete',
+                timestamp: historyEntry.createdAt,
+              },
+              {
+                state: MintQuoteState.PAID,
+                displayLabel: MINT_COPY.PAID.label,
+                stepType: 'next-pending',
+                info: getOnchainConfirmationInfo(onchainConfirmationProgress),
+              },
+              {
+                state: MintQuoteState.ISSUED,
+                displayLabel: MINT_COPY.ISSUED.label,
+                stepType: 'future-small',
+              },
+            ];
+          }
+
           return [
             {
               state: MintQuoteState.UNPAID,
               displayLabel: MINT_COPY.UNPAID.label,
               stepType: 'next-pending',
-              info: MINT_COPY.UNPAID.info,
+              info: waitingInfo,
             },
             {
               state: MintQuoteState.PAID,
@@ -99,7 +179,10 @@ export function buildTimeline({
               state: MintQuoteState.PAID,
               displayLabel: MINT_COPY.PAID.label,
               stepType: 'next-pending',
-              info: MINT_COPY.PAID.info,
+              info:
+                isOnchainMint && onchainConfirmationProgress
+                  ? getOnchainConfirmationInfo(onchainConfirmationProgress)
+                  : MINT_COPY.PAID.info,
             },
             {
               state: MintQuoteState.ISSUED,
@@ -125,7 +208,7 @@ export function buildTimeline({
               state: MintQuoteState.ISSUED,
               displayLabel: MINT_COPY.ISSUED.label,
               stepType: 'success',
-              info: MINT_COPY.ISSUED.info(historyEntry.amount),
+              info: MINT_COPY.ISSUED.info(amountToNumber(historyEntry.amount)),
             },
           ];
         default:
@@ -134,9 +217,18 @@ export function buildTimeline({
     }
 
     case 'melt': {
+      const rawMeltState = String(historyEntry.state);
+      const meltState =
+        rawMeltState === 'finalized'
+          ? MeltQuoteState.PAID
+          : rawMeltState === 'pending' || rawMeltState === 'executing'
+            ? MeltQuoteState.PENDING
+            : rawMeltState === 'PAID' || rawMeltState === 'PENDING' || rawMeltState === 'UNPAID'
+              ? rawMeltState
+              : MeltQuoteState.UNPAID;
       const isExpired =
         meltQuote &&
-        historyEntry.state === MeltQuoteState.UNPAID &&
+        meltState === MeltQuoteState.UNPAID &&
         meltQuoteExpired(meltQuote, currentTime);
 
       if (isExpired) {
@@ -156,7 +248,7 @@ export function buildTimeline({
         ];
       }
 
-      switch (historyEntry.state) {
+      switch (meltState) {
         case MeltQuoteState.UNPAID:
           return [
             {
@@ -225,7 +317,7 @@ export function buildTimeline({
     case 'send': {
       const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
 
-      if (historyEntry.state === 'rolledBack') {
+      if (historyEntry.state === 'rolledBack' || historyEntry.state === 'rolled_back') {
         const copy = isPaymentRequestMode ? PAYMENT_REQUEST_COPY : SEND_COPY;
         const rolledBackTimeline: TimelineItem[] = [
           {
@@ -411,7 +503,7 @@ export function buildTimeline({
     }
 
     case 'receive': {
-      if (historyEntry.state === 'rolledBack') {
+      if (historyEntry.state === 'rolledBack' || historyEntry.state === 'rolled_back') {
         return [
           {
             state: 'pending',
@@ -455,7 +547,7 @@ export function buildTimeline({
           state: 'redeemed',
           displayLabel: RECEIVE_COPY.redeemed.label,
           stepType: 'success',
-          info: RECEIVE_COPY.redeemed.info(historyEntry.amount),
+          info: RECEIVE_COPY.redeemed.info(amountToNumber(historyEntry.amount)),
         },
       ];
     }
@@ -482,11 +574,17 @@ export function getCardLabel(
 
   switch (historyEntry.type) {
     case 'mint': {
+      const mintState = getMintTimelineState(historyEntry);
+      const hasObservedPayment = timeline.some(
+        (item) =>
+          item.state === MintQuoteState.PAID &&
+          (item.stepType === 'next-pending' || item.stepType === 'current')
+      );
       if (isFailed) {
         status = 'Failed';
-      } else if (historyEntry.state === MintQuoteState.ISSUED) {
+      } else if (mintState === MintQuoteState.ISSUED) {
         status = 'Complete';
-      } else if (historyEntry.state === MintQuoteState.PAID) {
+      } else if (mintState === MintQuoteState.PAID || hasObservedPayment) {
         status = 'In Progress';
       } else {
         status = 'Awaiting Payment';

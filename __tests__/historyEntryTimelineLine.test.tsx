@@ -5,7 +5,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import type { MintHistoryEntry } from '@cashu/coco-core';
+import { Amount, type LegacyMintHistoryEntry } from '@cashu/coco-core';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/HistoryEntryTimeline';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -26,7 +26,7 @@ jest.mock('hex-color-opacity', () => jest.fn((color: string) => color));
 jest.mock('@/shared/lib/utils', () => ({
   meltQuoteExpired: () => false,
   getMeltQuoteTimeUntilExpiry: () => null,
-  mintHistoryEntryExpired: () => false,
+  mintHistoryEntryExpired: jest.fn(() => false),
   getMintHistoryEntryTimeUntilExpiry: () => null,
 }));
 
@@ -62,8 +62,15 @@ jest.mock('@/shared/blocks/status', () => {
   >('@/shared/blocks/status/mapCheckpointStatus');
 
   return {
-    LoadingIndicator: (props: { phase?: string; result?: string }) =>
-      ReactActual.createElement(View, { testID: `indicator-${props.phase}-${props.result}` }),
+    LoadingIndicator: (props: {
+      phase?: string;
+      result?: string;
+      confirmationProgress?: unknown;
+    }) =>
+      ReactActual.createElement(View, {
+        testID: `indicator-${props.phase}-${props.result}`,
+        confirmationProgress: props.confirmationProgress,
+      } as React.ComponentProps<typeof View> & { confirmationProgress?: unknown }),
     mapCheckpointStatusToIndicator,
   };
 });
@@ -132,16 +139,48 @@ function collectNodesByTestID(
   return matches;
 }
 
-const unpaidMintEntry: MintHistoryEntry = {
+function collectNodesByTestIDPrefix(
+  node: JsonNode,
+  prefix: string,
+  matches: JsonNode[] = []
+): JsonNode[] {
+  if (!node || typeof node === 'string') return matches;
+  if (Array.isArray(node)) {
+    node.forEach((child) => collectNodesByTestIDPrefix(child, prefix, matches));
+    return matches;
+  }
+  const testID = node.props?.testID ?? node.props?.['data-testid'];
+  if (typeof testID === 'string' && testID.startsWith(prefix)) {
+    matches.push(node);
+  }
+  node.children?.forEach((child) => collectNodesByTestIDPrefix(child as JsonNode, prefix, matches));
+  return matches;
+}
+
+const unpaidMintEntry: LegacyMintHistoryEntry = {
   id: 'mint-entry',
+  source: 'legacy',
+  legacyHistoryId: 'mint-entry',
   type: 'mint',
   createdAt: 1_779_430_133,
+  updatedAt: 1_779_430_133,
   mintUrl: 'https://mint.example',
   unit: 'sat',
   paymentRequest: 'lnbc1test',
   quoteId: 'quote-id',
   state: 'UNPAID',
-  amount: 21,
+  amount: Amount.from(21),
+};
+
+const onchainUnpaidMintEntry: LegacyMintHistoryEntry = {
+  ...unpaidMintEntry,
+  id: 'mint-onchain-entry',
+  legacyHistoryId: 'mint-onchain-entry',
+  paymentRequest: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
+  metadata: {
+    method: 'onchain',
+    onchainAddress: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
+  },
 };
 
 describe('HistoryEntryTimeline connector rail', () => {
@@ -154,6 +193,7 @@ describe('HistoryEntryTimeline connector rail', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    jest.clearAllMocks();
   });
 
   it('renders connector rails as fixed-size SVG lines', () => {
@@ -177,6 +217,116 @@ describe('HistoryEntryTimeline connector rail', () => {
         line && typeof line !== 'string' && !Array.isArray(line) ? line.props.style : undefined
       );
       expect(style).toEqual(expect.objectContaining({ marginVertical: 4 }));
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not run Lightning expiry checks for legacy-shaped onchain rows', () => {
+    const utils = jest.requireMock('@/shared/lib/utils') as {
+      mintHistoryEntryExpired: jest.Mock;
+    };
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <HistoryEntryTimeline historyEntry={onchainUnpaidMintEntry} />
+      );
+    });
+
+    expect(utils.mintHistoryEntryExpired).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('passes confirmation progress only to the onchain payment-received indicator', () => {
+    const progress = {
+      hasPayment: true,
+      hasUnconfirmedPayment: false,
+      receivedSats: 21,
+      currentConfirmations: 2,
+      requiredConfirmations: 6,
+      isSatisfied: false,
+    };
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <HistoryEntryTimeline
+          historyEntry={onchainUnpaidMintEntry}
+          onchainConfirmationProgress={progress}
+        />
+      );
+    });
+
+    const indicators = collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-');
+    const progressIndicators = indicators.filter(
+      (indicator) =>
+        indicator &&
+        typeof indicator !== 'string' &&
+        !Array.isArray(indicator) &&
+        indicator.props.confirmationProgress != null
+    );
+
+    expect(progressIndicators).toHaveLength(1);
+    expect(
+      progressIndicators[0] &&
+        typeof progressIndicators[0] !== 'string' &&
+        !Array.isArray(progressIndicators[0])
+        ? progressIndicators[0].props.confirmationProgress
+        : null
+    ).toEqual({
+      currentConfirmations: 2,
+      requiredConfirmations: 6,
+    });
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('passes pending confirmation segments to the onchain payment-received indicator before payment', () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <HistoryEntryTimeline
+          historyEntry={onchainUnpaidMintEntry}
+          onchainConfirmationProgress={{
+            hasPayment: false,
+            hasUnconfirmedPayment: false,
+            receivedSats: 0,
+            currentConfirmations: null,
+            requiredConfirmations: 3,
+            isSatisfied: false,
+          }}
+        />
+      );
+    });
+
+    const indicators = collectNodesByTestIDPrefix(renderer!.toJSON(), 'indicator-');
+    const progressIndicators = indicators.filter(
+      (indicator) =>
+        indicator &&
+        typeof indicator !== 'string' &&
+        !Array.isArray(indicator) &&
+        indicator.props.confirmationProgress != null
+    );
+
+    expect(progressIndicators).toHaveLength(1);
+    expect(
+      progressIndicators[0] &&
+        typeof progressIndicators[0] !== 'string' &&
+        !Array.isArray(progressIndicators[0])
+        ? progressIndicators[0].props.confirmationProgress
+        : null
+    ).toEqual({
+      currentConfirmations: null,
+      requiredConfirmations: 3,
     });
 
     act(() => {

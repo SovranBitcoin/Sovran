@@ -26,6 +26,9 @@ const CYCLE: CycleStep[] = [
 ];
 
 const STEP_DURATION_MS = 1700;
+const SEGMENT_STEP_DURATION_MS = 850;
+const SEGMENT_COMPLETE_HOLD_STEPS = 2;
+const SEGMENT_COUNT_OPTIONS = [2, 3, 4, 5, 6, 10, 16, 24] as const;
 
 const STATE_LABEL: Record<string, string> = {
   idle: 'Idle',
@@ -41,7 +44,12 @@ export function SettingsDesignSystemScreen() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [result, setResult] = useState<Result>('success');
   const [auto, setAuto] = useState(true);
+  const [segmentCount, setSegmentCount] = useState<(typeof SEGMENT_COUNT_OPTIONS)[number]>(6);
+  const [completedSegments, setCompletedSegments] = useState(0);
+  const [segmentsAuto, setSegmentsAuto] = useState(true);
   const cycleRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const segmentCycleRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const segmentCompleteHoldRef = useRef(0);
 
   useEffect(() => {
     if (!auto) {
@@ -72,6 +80,37 @@ export function SettingsDesignSystemScreen() {
     };
   }, [auto]);
 
+  useEffect(() => {
+    if (!segmentsAuto) {
+      if (segmentCycleRef.current) clearInterval(segmentCycleRef.current);
+      segmentCycleRef.current = null;
+      return;
+    }
+
+    segmentCompleteHoldRef.current = 0;
+    segmentCycleRef.current = setInterval(() => {
+      setCompletedSegments((value) => {
+        if (value >= segmentCount) {
+          if (segmentCompleteHoldRef.current < SEGMENT_COMPLETE_HOLD_STEPS) {
+            segmentCompleteHoldRef.current += 1;
+            return value;
+          }
+
+          segmentCompleteHoldRef.current = 0;
+          return 0;
+        }
+
+        segmentCompleteHoldRef.current = 0;
+        return value + 1;
+      });
+    }, SEGMENT_STEP_DURATION_MS);
+
+    return () => {
+      if (segmentCycleRef.current) clearInterval(segmentCycleRef.current);
+      segmentCycleRef.current = null;
+    };
+  }, [segmentCount, segmentsAuto]);
+
   const onLockPhase = (p: Phase) => {
     setAuto(false);
     setPhase(p);
@@ -81,8 +120,23 @@ export function SettingsDesignSystemScreen() {
     setResult(r);
     setPhase('done');
   };
+  const onSelectSegmentCount = (count: (typeof SEGMENT_COUNT_OPTIONS)[number]) => {
+    setSegmentCount(count);
+    setCompletedSegments(0);
+    setSegmentsAuto(true);
+  };
+  const onStepSegment = () => {
+    setSegmentsAuto(false);
+    setCompletedSegments((value) => (value >= segmentCount ? 0 : value + 1));
+  };
+  const onResetSegments = () => {
+    setSegmentsAuto(false);
+    setCompletedSegments(0);
+  };
 
   const displayKey = phase === 'done' ? result : phase;
+  const visibleCompletedSegments = Math.min(completedSegments, segmentCount);
+  const segmentedPhase: Phase = visibleCompletedSegments >= segmentCount ? 'done' : 'loading';
 
   return (
     <ScreenWrapper name="SettingsDesignSystemScreen" scroll="custom" safeArea>
@@ -114,6 +168,73 @@ export function SettingsDesignSystemScreen() {
                 {STATE_LABEL[displayKey] ?? displayKey}
               </Text>
             </VStack>
+          </Card.Body>
+        </Card>
+
+        <Card variant="secondary" className="mb-4">
+          <Card.Body className="gap-4 py-6">
+            <View
+              className="items-center justify-center self-center rounded-full"
+              style={{
+                width: 168,
+                height: 168,
+                backgroundColor: surfaceSecondary,
+              }}>
+              <LoadingIndicator
+                size={118}
+                phase={segmentedPhase}
+                result="success"
+                segmentedProgress={{
+                  completedSegments: visibleCompletedSegments,
+                  segmentCount,
+                }}
+              />
+            </View>
+            <VStack align="center" spacing={2}>
+              <Text size={11} bold className="text-foreground/50 tracking-widest">
+                SEGMENTED
+              </Text>
+              <Text size={18} bold className="text-foreground">
+                {visibleCompletedSegments}/{segmentCount} Complete
+              </Text>
+            </VStack>
+
+            <Text size={11} bold className="text-foreground/50 mt-2 tracking-widest">
+              SEGMENTS
+            </Text>
+            <HStack gap={8} wrap="wrap">
+              {SEGMENT_COUNT_OPTIONS.map((count) => (
+                <View key={count} style={{ width: 58 }}>
+                  <Button
+                    variant={segmentCount === count ? 'primary' : 'secondary'}
+                    size="sm"
+                    onPress={() => onSelectSegmentCount(count)}>
+                    <Button.Label>{count}</Button.Label>
+                  </Button>
+                </View>
+              ))}
+            </HStack>
+
+            <HStack spacing={8}>
+              <View className="flex-1">
+                <Button
+                  variant={segmentsAuto ? 'primary' : 'secondary'}
+                  size="sm"
+                  onPress={() => setSegmentsAuto((value) => !value)}>
+                  <Button.Label>{segmentsAuto ? 'Pause' : 'Play'}</Button.Label>
+                </Button>
+              </View>
+              <View className="flex-1">
+                <Button variant="secondary" size="sm" onPress={onStepSegment}>
+                  <Button.Label>Step</Button.Label>
+                </Button>
+              </View>
+              <View className="flex-1">
+                <Button variant="secondary" size="sm" onPress={onResetSegments}>
+                  <Button.Label>Reset</Button.Label>
+                </Button>
+              </View>
+            </HStack>
           </Card.Body>
         </Card>
 

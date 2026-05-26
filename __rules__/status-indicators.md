@@ -7,12 +7,14 @@ Every "loading → resolved" UI in the app renders through `LoadingIndicator` fr
 - A spinner that resolves into a checkmark, cross, or counter-clockwise revert arrow (payment toasts, mint validation, recovery flow, transaction timeline checkpoints).
 - A static "decoration" check for a non-interactive completion screen — pass `playOnMount` so the draw-in animation plays on entry instead of the terminal-state short-circuit kicking in.
 - A bare loading spinner — pass `phase="loading"` and don't worry about the result. Visually equivalent to a small spinner, keeps the codebase using one component.
+- Step-count progress that resolves into the same status choreography — pass `segmentedProgress` with `{ completedSegments, segmentCount }`. Completed segments animate in sequence; when `completedSegments >= segmentCount`, the component switches into the success animation.
+- Onchain receive confirmation progress — pass `confirmationProgress` with `{ currentConfirmations, requiredConfirmations }`. This is a domain-named convenience over `segmentedProgress`, so onchain callers do not have to translate confirmation vocabulary at the call site.
 
 ## When NOT to reach for it
 
 - ❌ **Selection checkmarks** ("is this option selected?") — use `SelectableCheck` from `shared/ui/primitives/SelectableCheck`. Different semantic register entirely.
 - ❌ **Static decorative checks at sizes < 18px in tight layouts** where you want the check to fill the box (e.g. a 16px bullet). The disc is ~76% of size, the glyph ~28% — at very small sizes a static `<Icon name="fluent:checkmark-16-filled" />` reads more boldly. The split-bill `ParticipantStatusIcon` for the "scheduled" fallback is an example of the legitimate exception.
-- ❌ **Pure progress** (download bars, upload percentages). `LoadingIndicator` is a binary loading-vs-resolved indicator, not a progress meter.
+- ❌ **Pure continuous progress** (download bars, upload percentages). `LoadingIndicator` supports discrete status steps, not arbitrary percentages.
 
 ## The mapping for status-like domain types
 
@@ -33,6 +35,8 @@ If your domain status is one of those literals (timeline/chain integrations), ca
 - **`successColor` / `errorColor` / `revertedColor`** — default from theme `success` / `danger` / `warning`. Override only when matching a non-theme palette (e.g. the recovery hero, which deliberately uses `green-400` / `red-400`).
 - **`transitionDelayMs`** — for cascading multiple indicators in a row (timeline steps fanning open left-to-right). Don't use for entrance animations — wrap in `Animated.View entering={…}` instead.
 - **`playOnMount`** — overrides the default terminal-state short-circuit so a fresh mount in `phase='done'` plays the draw-in animation. Use for static decorations. Don't use for re-rendering an already-resolved row (e.g. the recovery per-mint rows depend on the short-circuit).
+- **`segmentedProgress`** — for discrete progress where every segment is meaningful and completion should resolve through the success state. The component caps visible segments at the shared visual limit, fills completed segments with success, and leaves the rest in the pending ring color.
+- **`confirmationProgress`** — for onchain confirmation checkpoints only. Use this instead of `segmentedProgress` when the source data is `{ currentConfirmations, requiredConfirmations }`.
 
 ## Don't reinvent
 

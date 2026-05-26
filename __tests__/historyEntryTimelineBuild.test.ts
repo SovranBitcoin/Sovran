@@ -1,9 +1,11 @@
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-import type {
-  MintHistoryEntry,
-  MeltHistoryEntry,
-  SendHistoryEntry,
-  ReceiveHistoryEntry,
+import {
+  Amount,
+  type MintHistoryEntry,
+  type LegacyMintHistoryEntry,
+  type LegacyMeltHistoryEntry,
+  type LegacySendHistoryEntry,
+  type LegacyReceiveHistoryEntry,
 } from '@cashu/coco-core';
 
 import {
@@ -15,51 +17,75 @@ import {
 
 const baseFields = {
   id: 'h1',
+  source: 'legacy' as const,
+  legacyHistoryId: 'h1',
   createdAt: 1_700_000_000_000,
+  updatedAt: 1_700_000_000_000,
   mintUrl: 'https://mint.example',
   unit: 'sat',
 };
 
-function mintEntry(overrides: Partial<MintHistoryEntry> = {}): MintHistoryEntry {
+function mintEntry(overrides: Partial<LegacyMintHistoryEntry> = {}): LegacyMintHistoryEntry {
   return {
     ...baseFields,
     type: 'mint',
     paymentRequest: '',
     quoteId: 'q1',
     state: MintQuoteState.UNPAID,
-    amount: 100,
+    amount: Amount.from(100),
     ...overrides,
   };
 }
 
-function meltEntry(overrides: Partial<MeltHistoryEntry> = {}): MeltHistoryEntry {
+function operationMintEntry(overrides: Partial<MintHistoryEntry> = {}): MintHistoryEntry {
+  return {
+    ...baseFields,
+    id: 'mint:op1',
+    source: 'operation',
+    type: 'mint',
+    operationId: 'op1',
+    paymentRequest: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
+    quoteId: 'q1',
+    state: 'pending',
+    amount: Amount.from(100),
+    metadata: {
+      method: 'onchain',
+      onchainAddress: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
+    },
+    ...overrides,
+  };
+}
+
+function meltEntry(overrides: Partial<LegacyMeltHistoryEntry> = {}): LegacyMeltHistoryEntry {
   return {
     ...baseFields,
     type: 'melt',
     quoteId: 'q1',
     state: MeltQuoteState.UNPAID,
-    amount: 100,
+    amount: Amount.from(100),
     ...overrides,
   };
 }
 
-function sendEntry(overrides: Partial<SendHistoryEntry> = {}): SendHistoryEntry {
+function sendEntry(overrides: Partial<LegacySendHistoryEntry> = {}): LegacySendHistoryEntry {
   return {
     ...baseFields,
     type: 'send',
     operationId: 'op1',
     state: 'prepared',
-    amount: 100,
+    amount: Amount.from(100),
     ...overrides,
   };
 }
 
-function receiveEntry(overrides: Partial<ReceiveHistoryEntry> = {}): ReceiveHistoryEntry {
+function receiveEntry(
+  overrides: Partial<LegacyReceiveHistoryEntry> = {}
+): LegacyReceiveHistoryEntry {
   return {
     ...baseFields,
     type: 'receive',
     state: 'finalized',
-    amount: 100,
+    amount: Amount.from(100),
     ...overrides,
   };
 }
@@ -91,11 +117,89 @@ describe('buildTimeline (audit 61.json F-006)', () => {
 
     it('ISSUED marks every step complete with success on the last', () => {
       const t = buildTimeline({
-        historyEntry: mintEntry({ state: MintQuoteState.ISSUED, amount: 250 }),
+        historyEntry: mintEntry({ state: MintQuoteState.ISSUED, amount: Amount.from(250) }),
         currentTime: NOW,
       });
       expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
       expect(t[2].info).toContain('250');
+    });
+
+    it('operation-backed pending onchain mint waits for address payment', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'pending' }),
+        currentTime: NOW,
+      });
+      expect(t).toHaveLength(3);
+      expect(t[0]).toMatchObject({
+        state: MintQuoteState.UNPAID,
+        stepType: 'next-pending',
+        info: 'Pay the address to receive funds',
+      });
+      expect(t[1].stepType).toBe('future-small');
+      expect(t[2].stepType).toBe('future-small');
+    });
+
+    it('operation-backed pending onchain mint shows compact confirmation progress', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'pending' }),
+        currentTime: NOW,
+        onchainConfirmationProgress: {
+          hasPayment: true,
+          hasUnconfirmedPayment: false,
+          receivedSats: 100,
+          currentConfirmations: 1,
+          requiredConfirmations: 6,
+          isSatisfied: false,
+        },
+      });
+
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'next-pending', 'future-small']);
+      expect(t[1]).toMatchObject({
+        state: MintQuoteState.PAID,
+        displayLabel: 'Payment received',
+        info: '1/6 confirmations',
+      });
+    });
+
+    it('operation-backed executing mint maps to payment received', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'executing' }),
+        currentTime: NOW,
+        onchainConfirmationProgress: {
+          hasPayment: true,
+          hasUnconfirmedPayment: false,
+          receivedSats: 100,
+          currentConfirmations: 6,
+          requiredConfirmations: 6,
+          isSatisfied: true,
+        },
+      });
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'next-pending', 'future-small']);
+      expect(t[1].state).toBe(MintQuoteState.PAID);
+      expect(t[1].info).toBe('6/6 confirmations');
+    });
+
+    it('operation-backed finalized mint maps to issued success', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'finalized', amount: Amount.from(321) }),
+        currentTime: NOW,
+      });
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
+      expect(t[2].info).toContain('321');
+    });
+
+    it('operation-backed failed mint shows a terminal failure', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'failed', error: 'Quote expired' }),
+        currentTime: NOW,
+      });
+      expect(t).toHaveLength(2);
+      expect(t[1]).toMatchObject({
+        state: 'failed',
+        displayLabel: 'Failed',
+        stepType: 'expired',
+        info: 'Quote expired',
+      });
     });
   });
 
@@ -128,8 +232,8 @@ describe('buildTimeline (audit 61.json F-006)', () => {
       const expiredQuote: MeltQuoteBolt11Response = {
         quote: 'q1',
         request: 'lnbc1...',
-        amount: 100,
-        fee_reserve: 0,
+        amount: Amount.from(100),
+        fee_reserve: Amount.from(0),
         state: MeltQuoteState.UNPAID,
         expiry: Math.floor(NOW / 1000) - 60,
         unit: 'sat',
@@ -235,7 +339,7 @@ describe('buildTimeline (audit 61.json F-006)', () => {
 
     it('finalized is fully successful', () => {
       const t = buildTimeline({
-        historyEntry: receiveEntry({ state: 'finalized', amount: 750 }),
+        historyEntry: receiveEntry({ state: 'finalized', amount: Amount.from(750) }),
         currentTime: NOW,
       });
       expect(t.map((s) => s.stepType)).toEqual(['complete', 'success']);
@@ -264,6 +368,30 @@ describe('getCardLabel (audit 61.json F-009)', () => {
         { state: 's', displayLabel: '', stepType: 'success' },
       ])
     ).toBe('Receive • Complete');
+  });
+
+  it('operation-backed mint labels use normalized operation state', () => {
+    expect(
+      getCardLabel(operationMintEntry({ state: 'finalized' }), [
+        { state: 's', displayLabel: '', stepType: 'success' },
+      ])
+    ).toBe('Receive • Complete');
+    expect(
+      getCardLabel(operationMintEntry({ state: 'executing' }), [
+        { state: 's', displayLabel: '', stepType: 'current' },
+      ])
+    ).toBe('Receive • In Progress');
+    expect(
+      getCardLabel(operationMintEntry({ state: 'pending' }), [
+        { state: 's', displayLabel: '', stepType: 'next-pending' },
+      ])
+    ).toBe('Receive • Awaiting Payment');
+    expect(
+      getCardLabel(operationMintEntry({ state: 'pending' }), [
+        { state: MintQuoteState.UNPAID, displayLabel: '', stepType: 'complete' },
+        { state: MintQuoteState.PAID, displayLabel: '', stepType: 'next-pending' },
+      ])
+    ).toBe('Receive • In Progress');
   });
 
   it('payment-request-mode send labels as "Payment • …"', () => {

@@ -26,12 +26,14 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
+import type { OnchainConfirmationProgress } from '@/shared/lib/bitcoin/onchainPaymentStatus';
 import {
   meltQuoteExpired,
   getMeltQuoteTimeUntilExpiry,
   mintHistoryEntryExpired,
   getMintHistoryEntryTimeUntilExpiry,
 } from '@/shared/lib/utils';
+import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
@@ -51,6 +53,8 @@ interface HistoryEntryTimelineProps {
   tokenCreated?: boolean;
   /** For NUT-18 payment requests - indicates Nostr DM was sent */
   nostrSent?: boolean;
+  /** For onchain mint quotes - network confirmations observed for the funding tx. */
+  onchainConfirmationProgress?: OnchainConfirmationProgress | null;
 }
 
 const LINE_WIDTH = 3;
@@ -158,6 +162,7 @@ export function HistoryEntryTimeline({
   meltQuote,
   tokenCreated,
   nostrSent,
+  onchainConfirmationProgress,
 }: HistoryEntryTimelineProps) {
   const [foreground, mutedColor, successColor, dangerColor, warningColor] = useThemeColor([
     'foreground',
@@ -173,11 +178,12 @@ export function HistoryEntryTimeline({
 
   const meltExpiry = meltQuote?.expiry;
   const mintState = historyEntry.type === 'mint' ? historyEntry.state : null;
+  const isOnchainMint = historyEntry.type === 'mint' && !!getOnchainMintAddress(historyEntry);
 
   useEffect(() => {
     const shouldUpdate =
       (historyEntry.type === 'melt' && meltExpiry) ||
-      (historyEntry.type === 'mint' && mintState === MintQuoteState.UNPAID);
+      (historyEntry.type === 'mint' && !isOnchainMint && mintState === MintQuoteState.UNPAID);
 
     if (shouldUpdate) {
       const interval = setInterval(() => {
@@ -186,11 +192,19 @@ export function HistoryEntryTimeline({
 
       return () => clearInterval(interval);
     }
-  }, [historyEntry.type, meltExpiry, mintState]);
+  }, [historyEntry.type, isOnchainMint, meltExpiry, mintState]);
 
   const timeline = useMemo(
-    () => buildTimeline({ historyEntry, meltQuote, currentTime, tokenCreated, nostrSent }),
-    [historyEntry, meltQuote, currentTime, tokenCreated, nostrSent]
+    () =>
+      buildTimeline({
+        historyEntry,
+        meltQuote,
+        currentTime,
+        tokenCreated,
+        nostrSent,
+        onchainConfirmationProgress,
+      }),
+    [historyEntry, meltQuote, currentTime, tokenCreated, nostrSent, onchainConfirmationProgress]
   );
 
   const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent);
@@ -205,7 +219,8 @@ export function HistoryEntryTimeline({
 
     if (
       historyEntry.type === 'mint' &&
-      historyEntry.state === MintQuoteState.UNPAID &&
+      !isOnchainMint &&
+      String(historyEntry.state) === MintQuoteState.UNPAID &&
       !mintHistoryEntryExpired(historyEntry)
     ) {
       const expiryInfo = getMintHistoryEntryTimeUntilExpiry(historyEntry);
@@ -294,6 +309,13 @@ export function HistoryEntryTimeline({
             const lineType = nextItem ? getLineType(item, nextItem) : null;
             const isFutureState =
               item.stepType === 'next-pending' || item.stepType === 'future-small';
+            const confirmationProgress =
+              isOnchainMint && item.state === MintQuoteState.PAID && onchainConfirmationProgress
+                ? {
+                    currentConfirmations: onchainConfirmationProgress.currentConfirmations,
+                    requiredConfirmations: onchainConfirmationProgress.requiredConfirmations,
+                  }
+                : undefined;
 
             const dotDelay = index * 300;
             const lineDelay = dotDelay + 150;
@@ -310,6 +332,7 @@ export function HistoryEntryTimeline({
                       successColor={successColor}
                       errorColor={dangerColor}
                       revertedColor={warningColor}
+                      confirmationProgress={confirmationProgress}
                       {...mapCheckpointStatusToIndicator(
                         timelineStepTypeToCheckpointStatus(item.stepType)
                       )}
