@@ -261,6 +261,7 @@ function renderMenuPortal(
             isDisabled={v.isDisabled}
             variant={v.isDestructive ? 'danger' : 'default'}
             onPress={() => {
+              if (v.isDisabled) return;
               void v.onPress();
             }}>
             <HStack align="center" gap={10} style={{ flex: 1 }}>
