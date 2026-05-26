@@ -28,7 +28,7 @@
  */
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import type { MintCatalogEntry } from 'coco-payment-ux';
+import type { MintCatalogEntry } from 'colada';
 
 import { transformAuditData } from '@/features/mint/lib/auditInfo';
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
@@ -113,7 +113,7 @@ async function resolveNostrProfile(
 /**
  * Fetcher signature exposed by the wallet. The Manager-bound `getMintInfo`
  * is passed in so this module stays standalone (callable from React hooks
- * and from coco-payment-ux's machine-driven code path).
+ * and from colada's machine-driven code path).
  */
 type MintInfoLookup = (mintUrl: string) => Promise<GetInfoResponse | null>;
 

@@ -1,7 +1,7 @@
 /**
  * Canonical Type 4 Tag NDEF write.
  *
- * Both the standalone token writer and the coco-payment-ux adapter route
+ * Both the standalone token writer and the colada adapter route
  * through this helper so the wire-level write protocol is implemented once.
  *
  * Caller must hold an active IsoDep session AND have already issued

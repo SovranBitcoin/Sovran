@@ -4,7 +4,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { LegendList } from '@legendapp/list';
 import { router, Stack } from 'expo-router';
 import type { BLEPeer } from 'bitchat-module';
-import { usePaymentFlowMachine } from 'coco-payment-ux/react';
+import { usePaymentFlowMachine } from 'colada/react';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';

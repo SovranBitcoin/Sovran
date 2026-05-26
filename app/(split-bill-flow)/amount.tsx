@@ -3,7 +3,7 @@
  *
  * Local-state consumer of the shared `AmountEntryView` primitive. Sat/fiat
  * toggle, keyboard-unit switching, and secondary-display formatting all come
- * from `useLocalAmountEntry`, which wraps coco-payment-ux's
+ * from `useLocalAmountEntry`, which wraps colada's
  * `createAmountActionManager` — identical math to the send/receive flow.
  */
 

@@ -1,5 +1,5 @@
 /**
- * NfcIOAdapter — platform implementation for coco-payment-ux NFC flows.
+ * NfcIOAdapter — platform implementation for colada NFC flows.
  *
  * Wraps APDU/NDEF primitives into the adapter interface that the payment
  * machine consumes. Session lifetime is owned by `./session.ts`; this file
@@ -9,7 +9,7 @@
  * invariants as the one-shot writer.
  */
 
-import type { NfcIOAdapter } from 'coco-payment-ux';
+import type { NfcIOAdapter } from 'colada';
 
 import { NfcError } from './errors';
 import { SELECT_AID, SELECT_NDEF, readBinary, MAX_CHUNK_SIZE } from './constants';

@@ -17,8 +17,8 @@ import React, { useEffect } from 'react';
 import { Stack, router } from 'expo-router';
 import { z } from 'zod';
 
-import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'coco-payment-ux/react';
-import type { MintListItem, StepDataMap } from 'coco-payment-ux';
+import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'colada/react';
+import type { MintListItem, StepDataMap } from 'colada';
 
 import { MintListScreen, useStickyMintSelectorItems } from '@/features/mint';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';

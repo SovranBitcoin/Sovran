@@ -2,8 +2,8 @@
  * @fileoverview Shared Receive screen component
  *
  * Receive hub UI — entry, copy, and hub actions come from `useScreenActions`;
- * paste / fixed amount / scan / NPC mint change run through coco-payment-ux handlers
- * with the payment machine from CocoPaymentUXProvider (wallet context binds in
+ * paste / fixed amount / scan / NPC mint change run through colada handlers
+ * with the payment machine from ColadaProvider (wallet context binds in
  * usePaymentFlowMachine after entry is available).
  */
 
@@ -14,10 +14,10 @@ import { router } from 'expo-router';
 
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
-import { useScreenActions, type UseScreenActionsResult } from 'coco-payment-ux/react';
+import { useScreenActions, type UseScreenActionsResult } from 'colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
-import type { FormattedString } from 'coco-payment-ux';
+import type { FormattedString } from 'colada';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';

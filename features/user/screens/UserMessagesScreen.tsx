@@ -43,7 +43,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { usePaymentFlowMachine } from 'coco-payment-ux/react';
+import { usePaymentFlowMachine } from 'colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 const SURFACE = 'nostr-dm' as const;
@@ -161,7 +161,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
   const displayName = resolveIdentityName({ pubkey, nostrProfile: counterpartyMetadata });
   const userPicture = counterpartyMetadata?.picture;
   // lud16 is relay-supplied kind:0 metadata — validate the `name@host` shape
-  // before plumbing it into router params / coco-payment-ux. A malformed
+  // before plumbing it into router params / colada. A malformed
   // value should hide the Send Money affordance, not surface as a confusing
   // error inside LNURL resolution.
   const rawLud16 = counterpartyMetadata?.lud16;
@@ -474,7 +474,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     });
     if (!lud16 || !counterpartyMetadata) return;
 
-    // Enter through coco-payment-ux's normal Send entrypoint so no-balance
+    // Enter through colada's normal Send entrypoint so no-balance
     // and multi-mint selection behavior stays identical to the wallet Send
     // button. The chat-specific fields are carried into amount entry so the
     // Lightning variant remains available at Next time.

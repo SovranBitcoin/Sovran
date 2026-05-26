@@ -52,7 +52,7 @@ import { reconcileSplitBillHistoryUpdate } from '@/features/splitBill/lib/reconc
  *     recipient's name.
  *   - Both `label` and `message` MUST NOT appear more than once per URI.
  *
- * Wallets that parse BIP-321 (including Sovran's `coco-payment-ux/src/parse.ts`)
+ * Wallets that parse BIP-321 (including Sovran's `colada/src/parse.ts`)
  * surface the `message` to the payer, so we put the "pay your share…" text
  * there and drop any in-band plaintext preface — the URI is the whole body.
  *
@@ -87,7 +87,7 @@ function formatDeliveryBody(group: SplitBillGroup, p: SplitBillParticipant): str
 // contact DMs (shared/lib/nostr/nip17.ts + NDK publish). By sending split-bill
 // invoices through the same pipeline, the recipient sees the invoice as a
 // normal chat bubble in their existing Contacts thread (the
-// `bitcoin:?lightning=…` URI is auto-linkified by coco-payment-ux's parser
+// `bitcoin:?lightning=…` URI is auto-linkified by colada's parser
 // and pops the pay-confirm sheet on tap). The `senderWrap` self-copy is
 // best-effort — it lets the sender's own Contacts thread render the sent
 // invoice; a relay-publish failure on the self-copy is logged but does not

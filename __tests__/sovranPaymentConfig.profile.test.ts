@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import type { PaymentMachine } from 'coco-payment-ux';
+import type { PaymentMachine } from 'colada';
 import {
   createSovranHandlers,
   createSovranNotifications,
@@ -16,7 +16,7 @@ const mockNearPayComplete = jest.fn();
 const mockNearPaySetAmountEntry = jest.fn();
 let mockNearPayActive: unknown = null;
 
-jest.mock('coco-payment-ux', () => ({
+jest.mock('colada', () => ({
   withTimeout: jest.fn((promise: Promise<unknown>) => promise),
 }));
 

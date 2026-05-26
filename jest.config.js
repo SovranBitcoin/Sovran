@@ -2,6 +2,13 @@
 module.exports = {
   preset: 'jest-expo/node',
   moduleNameMapper: {
+    '^@babel/runtime/(.*)$': '<rootDir>/node_modules/@babel/runtime/$1',
+    '^@cashu/cashu-ts$': '<rootDir>/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js',
+    '^@cashu/coco-core$': '<rootDir>/node_modules/@cashu/coco-core/dist/index.js',
+    '^@cashu/coco-expo-sqlite$': '<rootDir>/node_modules/@cashu/coco-expo-sqlite/dist/index.js',
+    '^@cashu/coco-react$': '<rootDir>/node_modules/@cashu/coco-react/dist/index.js',
+    '^@scure/bip32$':
+      '<rootDir>/../coco/node_modules/.bun/@scure+bip32@2.2.0/node_modules/@scure/bip32/index.js',
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',
@@ -15,11 +22,10 @@ module.exports = {
     '/node_modules/',
     '/coco/',
     '/eNuts/',
-    '/coco-payment-ux/',
     '/coco-cashu-plugin-p2pk-import/',
   ],
-  modulePathIgnorePatterns: ['/coco-payment-ux/', '/coco-cashu-plugin-p2pk-import/'],
+  modulePathIgnorePatterns: ['/coco-cashu-plugin-p2pk-import/'],
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@sovranbitcoin/.*)',
+    'node_modules/(?!(?:\\.bun/[^/]+/node_modules/)?(?:(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts|@cashu/coco-core|@cashu/coco-expo-sqlite|@cashu/coco-react|@sovranbitcoin/.*))',
   ],
 };

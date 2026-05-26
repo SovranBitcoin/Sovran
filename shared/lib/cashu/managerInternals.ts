@@ -14,9 +14,9 @@
 // the helper signatures — not on the cast — so a coco internals change trips
 // the type-checker here (one file) instead of breaking N callers at runtime.
 //
-// Lives in sovran-app rather than coco-payment-ux because every caller is
+// Lives in sovran-app rather than colada because every caller is
 // sovran-side (cashu-manager bootstrap, recovery screen, rebalance plan,
-// transactions hooks, wallet context provider). coco-payment-ux's own
+// transactions hooks, wallet context provider). colada's own
 // internals stay inside that package.
 //
 // When coco promotes any of these to its public API, delete the corresponding

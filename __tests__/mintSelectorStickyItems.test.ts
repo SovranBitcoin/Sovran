@@ -1,5 +1,5 @@
 import { resolveStickyMintSelectorItems } from '@/features/mint/hooks/useStickyMintSelectorItems';
-import type { MintListItem } from 'coco-payment-ux';
+import type { MintListItem } from 'colada';
 
 function mintItem(mintUrl: string, displayName: string, iconUrl?: string): MintListItem {
   return {

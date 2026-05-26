@@ -5,7 +5,7 @@
  * acquire, release-on-throw, and release-on-success are owned by the deep
  * module. This file orchestrates the AID/NDEF select sequence and delegates
  * the wire-level write to `writeNdefTextRecord`, the same helper the
- * coco-payment-ux adapter uses.
+ * colada adapter uses.
  *
  * Throws `NfcError` on any failure; callers should match on `error.code`
  * (e.g. `'TAG_LOST'`, `'TRANSCEIVE_FAILED'`).

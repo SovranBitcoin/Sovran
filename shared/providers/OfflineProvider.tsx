@@ -70,7 +70,7 @@ function summarizeReachability(result: OfflineReachabilityResult) {
 }
 
 // Context-only provider. Mount above any consumer that needs to react to live
-// network state — including coco-payment-ux's machine, which derives the
+// network state — including colada's machine, which derives the
 // offline send-flow branch from getOffline(). The visual offline banner lives
 // in <OfflineShell> below and consumes this context like any other UI.
 export function OfflineStatusProvider({ children }: { children: React.ReactNode }) {

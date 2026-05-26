@@ -52,7 +52,7 @@ type TransactionSource = ScanSource | DistributionSource;
  *
  * Adding a new source means: extend the union types in `scanHistoryStore.ts`
  * / `transactionDistributionStore.ts`, add an entry here, and add a label in
- * `getSourceLabel` in `CocoPaymentUX.tsx` — three touchpoints, all close
+ * `getSourceLabel` in `Colada.tsx` — three touchpoints, all close
  * together.
  */
 const SOURCE_ICONS: Record<TransactionSource, string> = {

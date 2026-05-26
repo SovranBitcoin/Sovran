@@ -18,9 +18,6 @@ module.exports = defineConfig([
       // Per-package build-time scripts — same shape as top-level scripts/,
       // Node-only tooling.
       'packages/*/scripts/**',
-      // coco-payment-ux is a file-dep with its own docs site (Vitepress) +
-      // vendored reference apps. `src/` and `__tests__/` are still linted.
-      'coco-payment-ux/docs/**',
       // Native module subprojects — not part of the JS lint surface.
       'modules/**',
       // Tooling scripts run under Node, not the app TS project.
@@ -152,7 +149,7 @@ module.exports = defineConfig([
       // Raw `console.*` calls bypass the scoped-logger registry, escape
       // log redaction (secret/PII scrubbing), don't get tagged with the
       // calling module/profile, and ship as production hot-path overhead.
-      // Slices that kept hitting this: `inject logger at coco-payment-ux
+      // Slices that kept hitting this: `inject logger at colada
       // seam, drop raw console`, `scope domain logs through the registered
       // child loggers`, `drop render-body log calls from screen
       // components`, `drop module-load side effects`. Use the scoped
@@ -349,10 +346,6 @@ module.exports = defineConfig([
     },
     ignores: [
       'dist/*',
-      // Vendored reference apps inside the local coco-payment-ux dep —
-      // not our code, kept verbatim for protocol cross-checking. Lint
-      // rules have no jurisdiction over them.
-      'coco-payment-ux/docs/references/**',
     ],
   },
   // The shared Pressable IS the wrapper — it must import the raw RN
@@ -380,13 +373,11 @@ module.exports = defineConfig([
       'no-restricted-syntax': 'off',
     },
   },
-  // The fetch-wrapper files ARE the legitimate callers of raw `fetch`.
-  //   - shared/lib/apiClient.ts hosts the canonical `fetchJson` used by
-  //     the rest of the app.
-  //   - coco-payment-ux/src/safeFetch.ts is the equivalent wrapper inside
-  //     the coco-payment-ux file-dep (adds timeout + abort).
+  // The fetch-wrapper file IS the legitimate caller of raw `fetch`.
+  // shared/lib/apiClient.ts hosts the canonical `fetchJson` used by
+  // the rest of the app.
   {
-    files: ['shared/lib/apiClient.ts', 'coco-payment-ux/src/safeFetch.ts'],
+    files: ['shared/lib/apiClient.ts'],
     rules: {
       'no-restricted-globals': 'off',
     },

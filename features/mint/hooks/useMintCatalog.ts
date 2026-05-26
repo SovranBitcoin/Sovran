@@ -1,6 +1,6 @@
 /**
  * React wrapper around `getMintCatalog`. Surfaces outside the
- * coco-payment-ux flow (currently the Mint Manager) use this to pull the
+ * colada flow (currently the Mint Manager) use this to pull the
  * same audit / KYM / operator-profile data the Send / Receive Select Mint
  * screens get through the library callback.
  *
@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
-import type { MintCatalogEntry } from 'coco-payment-ux';
+import type { MintCatalogEntry } from 'colada';
 
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';

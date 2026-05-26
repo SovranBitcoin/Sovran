@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 
-import { usePaymentFlowMachine } from 'coco-payment-ux/react';
+import { usePaymentFlowMachine } from 'colada/react';
 import { MintSelector } from '@/features/wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';

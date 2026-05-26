@@ -1,12 +1,12 @@
 import type { MutableRefObject } from 'react';
 
-import type { Manager, MeltOperationLike, MintReviewInfo, ScreenType } from 'coco-payment-ux';
+import type { Manager, MeltOperationLike, MintReviewInfo, ScreenType } from 'colada';
 import {
   meltOperationToScreenActionEntry,
   mergeEntryUpdate as defaultMerge,
   shouldApplyEntryUpdate as defaultShouldApply,
-} from 'coco-payment-ux';
-import type { ScreenActionsBridge } from 'coco-payment-ux/react';
+} from 'colada';
+import type { ScreenActionsBridge } from 'colada/react';
 
 import { paymentLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';

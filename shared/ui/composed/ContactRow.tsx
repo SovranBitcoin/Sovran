@@ -20,7 +20,7 @@
 
 import React, { ReactNode } from 'react';
 import opacity from 'hex-color-opacity';
-import type { MintListItem } from 'coco-payment-ux';
+import type { MintListItem } from 'colada';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';

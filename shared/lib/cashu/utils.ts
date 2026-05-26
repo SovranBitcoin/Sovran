@@ -161,7 +161,7 @@ export function isCancellablePendingEcash(entry: HistoryEntry): entry is SendHis
 
 /**
  * State-aware rollback. Mirrors `attemptRollback` from
- * `coco-payment-ux/src/operations/defaultOperations.ts` so the in-app sweep
+ * `colada/src/operations/defaultOperations.ts` so the in-app sweep
  * surface (Transactions) and the offline-payment-rollback path agree on
  * which RPC to call: `cancel` for `prepared`, `reclaim` for `pending`/
  * `executing`. Returns `true` on success, `false` otherwise (errors logged).

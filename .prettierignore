@@ -6,7 +6,6 @@ dist/**
 modules/**
 ios/**
 node_modules/**
-coco-payment-ux/**
 expo-env.d.ts
 uniwind-types.d.ts
 vendor/**

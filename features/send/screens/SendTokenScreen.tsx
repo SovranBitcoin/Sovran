@@ -11,8 +11,8 @@ import { StyleSheet } from 'react-native';
 
 import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
-import { useScreenActions } from 'coco-payment-ux/react';
-import type { ActionVariant } from 'coco-payment-ux';
+import { useScreenActions } from 'colada/react';
+import type { ActionVariant } from 'colada';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,

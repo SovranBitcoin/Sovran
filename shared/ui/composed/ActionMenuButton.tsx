@@ -20,7 +20,7 @@
  *
  * Disabled variants remain visible in the menu with their `reason` rendered as a
  * `Menu.ItemDescription`, matching the pattern used by availability.ts in
- * coco-payment-ux.
+ * colada.
  */
 
 import React, { useCallback, useRef } from 'react';

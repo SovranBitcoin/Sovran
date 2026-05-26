@@ -1,4 +1,4 @@
-jest.mock('coco-payment-ux', () => ({
+jest.mock('colada', () => ({
   combineSignals: (...signals: Array<AbortSignal | undefined>) =>
     signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
   isAbortError: () => false,

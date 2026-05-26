@@ -18,7 +18,7 @@
 
 import { nip19, SimplePool } from 'nostr-tools';
 
-import { withTimeout } from 'coco-payment-ux';
+import { withTimeout } from 'colada';
 
 import { nostrLog } from '@/shared/lib/logger';
 

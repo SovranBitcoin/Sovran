@@ -22,90 +22,6 @@
       "count": 1
     }
   },
-  "coco-payment-ux/__tests__/_harness/createTestMachine.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/__tests__/integration/operations.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    }
-  },
-  "coco-payment-ux/__tests__/screen-actions/defaultHandlers.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 13
-    }
-  },
-  "coco-payment-ux/__tests__/screen-actions/entry-matching.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 6
-    }
-  },
-  "coco-payment-ux/__tests__/unit/core-factory.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
-  "coco-payment-ux/__tests__/unit/default-operations.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 5
-    }
-  },
-  "coco-payment-ux/__tests__/unit/guards.test.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/__tests__/unit/transitions.test.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/src/core/walletContextTracker.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
-  "coco-payment-ux/src/machine/createMachine.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/src/machine/transitions.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    },
-    "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    }
-  },
-  "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    }
-  },
-  "coco-payment-ux/src/react/useScreenActions.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 3
-    },
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
-  "coco-payment-ux/src/screen-actions/createManager.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 2
-    }
-  },
-  "coco-payment-ux/src/screen-actions/defaultHandlers.ts": {
-    "@typescript-eslint/consistent-type-assertions": {
-      "count": 1
-    },
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "config/modalScreens.ts": {
     "no-restricted-syntax": {
       "count": 1
@@ -199,7 +115,7 @@
       "count": 1
     }
   },
-  "features/send/providers/CocoPaymentUX.tsx": {
+  "features/send/providers/Colada.tsx": {
     "@typescript-eslint/consistent-type-assertions": {
       "count": 1
     }

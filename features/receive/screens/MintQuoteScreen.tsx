@@ -11,7 +11,7 @@ import { useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';
-import { useScreenActions } from 'coco-payment-ux/react';
+import { useScreenActions } from 'colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { MintSelector } from '@/features/wallet';

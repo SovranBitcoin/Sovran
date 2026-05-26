@@ -1,6 +1,6 @@
 /**
  * Machine-driven adapter over the shared AmountEntryView primitive.
- * Unpacks coco-payment-ux's amountEntry screen state into the primitive's
+ * Unpacks colada's amountEntry screen state into the primitive's
  * typed contract and wires the bound actions through.
  */
 
@@ -14,8 +14,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import type { ActionVariant, RecipientProfile, ScreenActionName } from 'coco-payment-ux';
-import type { BoundAction, QuickSendSuggestion } from 'coco-payment-ux/react';
+import type { ActionVariant, RecipientProfile, ScreenActionName } from 'colada';
+import type { BoundAction, QuickSendSuggestion } from 'colada/react';
 
 import { MintSelector } from '@/features/wallet';
 import type { ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
@@ -65,7 +65,7 @@ interface AmountSelectorProps {
    * by a recipient avatar + "Pay <name>") and should render as a 50/50
    * bottom-bar pill alongside Next. The wallet flips this on once the
    * payment machine has resolved a Nostr identity for the melt target
-   * (see `coco-payment-ux`'s `resolveRecipientPubkey` / `resolveRecipientProfile`
+   * (see `colada`'s `resolveRecipientPubkey` / `resolveRecipientProfile`
    * operations).
    */
   showMintBottomButton?: boolean;
@@ -76,7 +76,7 @@ interface AmountSelectorProps {
   /**
    * Resolved Nostr recipient identity for the current melt target. When
    * present, forwarded to `actions.next.execute(...)` as part of the params
-   * so coco-payment-ux's default `next` handler can pass it into the
+   * so colada's default `next` handler can pass it into the
    * machine via `enterAmount`. Lets MeltQuoteScreen render the "Pay <name>"
    * header on first paint instead of paying a second NIP-05 round-trip.
    */
@@ -133,7 +133,7 @@ export function AmountSelector({
   }, [actions.toggle, inputMode]);
 
   // Pack recipient identity into the execute params on every `next` call.
-  // Spread by the action manager into `ctx`, then read by coco-payment-ux's
+  // Spread by the action manager into `ctx`, then read by colada's
   // default `next` handler — undefined values are ignored downstream, so
   // safe to always include.
   const nextExecuteParams = useMemo(
@@ -159,7 +159,7 @@ export function AmountSelector({
     await actions.next.execute(nextExecuteParams);
   }, [actions.next, numericValue, inputMode, unit, transactionType, nextExecuteParams]);
 
-  // Map the coco-payment-ux availability variants (ecash/lightning/onchain on
+  // Map the colada availability variants (ecash/lightning/onchain on
   // send-money flows) into ActionMenuButton's variant shape. Each variant
   // invokes `actions.next.execute({ variantId })`, which routes through the
   // screen-action handler to the machine.

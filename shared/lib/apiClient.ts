@@ -1,5 +1,5 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
-import { combineSignals, isAbortError, timeoutSignal, type RequestControls } from 'coco-payment-ux';
+import { combineSignals, isAbortError, timeoutSignal, type RequestControls } from 'colada';
 import { ok, err, Result } from 'neverthrow';
 import { z } from 'zod';
 import { apiLog } from './logger';
@@ -55,7 +55,7 @@ const BASE_URL = 'https://api.sovran.money/api';
  * a request that never settles wedges the screen's loading state until the
  * OS reaps the socket — minutes on cellular. Every helper enforces this
  * unless the caller passes a tighter signal. The wallet endpoints sit
- * behind sovran.money so use a tighter budget than coco-payment-ux's
+ * behind sovran.money so use a tighter budget than colada's
  * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
  */
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -70,9 +70,9 @@ export type {
 };
 export type { NostrSearchResult } from '@sovranbitcoin/schemas';
 
-// Re-export coco-payment-ux's cancellable-fetch primitives so existing
+// Re-export colada's cancellable-fetch primitives so existing
 // `@/shared/lib/apiClient` consumers don't have to learn the new import
-// path. `coco-payment-ux/safeFetch` is the canonical implementation.
+// path. `colada/safeFetch` is the canonical implementation.
 export { isAbortError };
 
 type FetchOrParseError = Error | ParseError;

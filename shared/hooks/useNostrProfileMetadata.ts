@@ -61,8 +61,8 @@ export function useNostrProfileMetadata(pubkey: string | undefined): UseNostrPro
 
 /**
  * Parse a raw kind-0 `content` JSON string into the cache's profile shape.
- * Exported so other surfaces (e.g. coco-payment-ux's `resolveRecipientProfile`
- * operation in `features/send/providers/CocoPaymentUX.tsx`) reuse the exact
+ * Exported so other surfaces (e.g. colada's `resolveRecipientProfile`
+ * operation in `features/send/providers/Colada.tsx`) reuse the exact
  * same Zod schema + field-mapping as the hook — keeps `display_name` /
  * `displayName` aliasing and the rest of the metadata interpretation in one
  * place.

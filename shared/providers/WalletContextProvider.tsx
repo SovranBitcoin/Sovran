@@ -1,5 +1,5 @@
 /**
- * WalletContextProvider — aggregates coco wallet state for coco-payment-ux.
+ * WalletContextProvider — aggregates coco wallet state for colada.
  *
  * Provides a pre-built WalletContext (trustedMintUrls, mintBalances, proofAmounts,
  * preferredMintUrl) so call sites don't need to construct it or fetch proofs.
@@ -20,7 +20,7 @@ import React, {
 } from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
-import { type WalletContext } from 'coco-payment-ux';
+import { type WalletContext } from 'colada';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';

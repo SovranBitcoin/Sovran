@@ -1,14 +1,14 @@
 /**
- * @fileoverview Sovran payment flow config — single source for coco-payment-ux glue
+ * @fileoverview Sovran payment flow config — single source for colada glue
  *
- * Factory functions that inject Sovran-specific behavior into coco-payment-ux:
+ * Factory functions that inject Sovran-specific behavior into colada:
  * - createSovranNotifications: error/notification popups + state updates
  * - createSovranHandlers: step handlers (navigation, popups, dismiss)
  * - createSovranScreenActionHandlers: post-terminal actions (NFC, emoji picker)
  * - createSovranScanSources: scan input sources (clipboard, gallery, NFC)
  *
  * Operations (executeSend, executeMelt, buildMintListItems, etc.) are now built-in
- * via createCocoPaymentUX in the library.
+ * via createColada in the library.
  */
 
 import { Share } from 'react-native';
@@ -38,7 +38,7 @@ import {
   type ScreenActionHandlerMap,
   type StepHandlerMap,
   type NfcIOAdapter,
-} from 'coco-payment-ux';
+} from 'colada';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import {
@@ -83,11 +83,11 @@ import { useTransactionDistributionStore } from '@/shared/stores/profile/transac
 // =============================================================================
 
 /**
- * Sovran-side override for coco-payment-ux's default `executeReceive`.
+ * Sovran-side override for colada's default `executeReceive`.
  *
  * Why this exists:
  *
- * coco-payment-ux's default `executeReceive` (defaultOperations.ts:502) calls
+ * colada's default `executeReceive` (defaultOperations.ts:502) calls
  * `mgr.wallet.receive(token)`, then tries to find the resulting persisted
  * history entry by matching `metadata.rawToken === tokenString || h.token ===
  * tokenString`. When the lookup fails (race against coco's history write, or
@@ -233,9 +233,9 @@ export function createSovranExecuteReceive(
 const MINT_QUOTE_PREPARE_TIMEOUT_MS = 10_000;
 
 /**
- * Sovran-side override for coco-payment-ux's default `executeMintQuote`.
+ * Sovran-side override for colada's default `executeMintQuote`.
  *
- * coco-payment-ux's default (defaultOperations.ts:275) calls
+ * colada's default (defaultOperations.ts:275) calls
  * `mgr.ops.mint.prepare(...)` and constructs the history entry directly from
  * the returned operation, using `mintOp.id` as the entry id. The comment at
  * defaultOperations.ts:291 acknowledges the race: it builds from the
@@ -1155,7 +1155,7 @@ function meltQuoteCtx(ctx: ScreenActionContext): Ctx<MeltHistoryEntry> {
 
 /**
  * App-specific screen action overrides. Only actions that require platform
- * primitives not available in coco-payment-ux (NFC writer, emoji picker).
+ * primitives not available in colada (NFC writer, emoji picker).
  * All other actions are handled by the built-in default handlers.
  */
 export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
@@ -1257,7 +1257,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
     // method for the resulting transaction. The other wallet's payment
     // method is unknowable, but we can capture which channel WE used to
     // share the lightning invoice. The 'displayed' fallback is written by
-    // a global subscription in CocoPaymentUX.tsx when the quote transitions
+    // a global subscription in Colada.tsx when the quote transitions
     // to PAID/ISSUED without any explicit copy/share action.
     //
     // The distribution store is keyed by `quoteId` (NOT historyEntry.id)
@@ -1311,7 +1311,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         }
         try {
           // Read the share result so we can detect AirDrop on iOS. The
-          // built-in coco-payment-ux platform.share at CocoPaymentUX.tsx
+          // built-in colada platform.share at Colada.tsx
           // discards the result, so we can't piggyback on it.
           const result = await Share.share({ message: paymentRequest });
           if (result.action !== Share.sharedAction) {

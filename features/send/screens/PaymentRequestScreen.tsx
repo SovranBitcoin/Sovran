@@ -12,8 +12,8 @@
 import React from 'react';
 
 import type { SendHistoryEntry } from '@cashu/coco-core';
-import { isPaymentRequestPreview } from 'coco-payment-ux';
-import { useScreenActions } from 'coco-payment-ux/react';
+import { isPaymentRequestPreview } from 'colada';
+import { useScreenActions } from 'colada/react';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatAmount } from '@/shared/lib/currency';

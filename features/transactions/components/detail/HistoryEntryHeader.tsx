@@ -33,7 +33,7 @@ interface HistoryEntryHeaderProps {
    * with an outgoing-arrow overlay in place of the default transaction
    * icon. Profile picture / display name are resolved from the metadata
    * cache. Set by the chat→send-money flow via
-   * `entry.metadata.recipientPubkey` (see `coco-payment-ux` types).
+   * `entry.metadata.recipientPubkey` (see `colada` types).
    */
   recipientPubkey?: string;
   /** Whether recipientPubkey should replace the transaction icon with an avatar. */

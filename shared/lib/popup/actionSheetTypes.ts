@@ -1,4 +1,4 @@
-import type { AnnotatedOption, PaymentMachine, StepDataMap } from 'coco-payment-ux';
+import type { AnnotatedOption, PaymentMachine, StepDataMap } from 'colada';
 
 export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }

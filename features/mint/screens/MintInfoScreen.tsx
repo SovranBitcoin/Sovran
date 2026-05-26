@@ -29,7 +29,7 @@ import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
-import { useScreenActions } from 'coco-payment-ux/react';
+import { useScreenActions } from 'colada/react';
 import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -495,7 +495,7 @@ export function MintInfoScreen() {
   }, []);
 
   const contact = entry?.contact as
-    | { method: string; info: import('coco-payment-ux').FormattedString }[]
+    | { method: string; info: import('colada').FormattedString }[]
     | undefined;
 
   return (

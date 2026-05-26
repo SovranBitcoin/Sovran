@@ -1,7 +1,7 @@
 /**
- * @fileoverview Sovran CocoPaymentUXProvider — wires coco-payment-ux to the app
+ * @fileoverview Sovran ColadaProvider — wires colada to the app
  *
- * Uses createCocoPaymentUX for built-in operations and wallet context tracking.
+ * Uses createColada for built-in operations and wallet context tracking.
  * Sovran only provides: handlers (navigation), notifications (UI + state),
  * platform primitives, and app-specific enrichment.
  */
@@ -20,12 +20,12 @@ import { useManager } from '@cashu/coco-react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 
-import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'coco-payment-ux';
-import { createCocoPaymentUX, withTimeout } from 'coco-payment-ux';
+import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'colada';
+import { createColada, withTimeout } from 'colada';
 import {
-  CocoPaymentUXProvider as PaymentUXProviderBase,
+  ColadaProvider as ColadaProviderBase,
   type DeepLinkConfig,
-} from 'coco-payment-ux/react';
+} from 'colada/react';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -41,6 +41,7 @@ import {
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
+import { deriveBitchatBLEIdentityMaterial } from '@/features/bitchat/lib/bleIdentity';
 import {
   createSovranScreenActionsBridge,
   getSovranMintEnrichment,
@@ -63,7 +64,7 @@ const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' }
 // 10s `updateMint` timeout so one dead mint can't visibly gate the list.
 const FIRST_OPEN_DEADLINE_MS = 3000;
 
-export function SovranPaymentUXProvider({ children }: { children: React.ReactNode }) {
+export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
   const { keys } = useNostrKeysContext();
   const { ndk } = useNDK();
@@ -98,6 +99,12 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
   // instead of clobbering the prior subscriber's slot.
   const p2pkKeyRefreshedSubscribers = useRef(new Set<(newKey: string | null) => void>());
   const getNpub = useCallback(() => npubRef.current, [npubRef]);
+  const getBitchatIdentityMaterial = useCallback(() => {
+    const privateKey = privateKeyRef.current;
+    const pubkey = pubkeyRef.current;
+    if (!privateKey || !pubkey) return null;
+    return deriveBitchatBLEIdentityMaterial({ privateKey, pubkey });
+  }, [privateKeyRef, pubkeyRef]);
 
   const getBtcPrice = useCallback(() => {
     const currency = useSettingsStore.getState().displayCurrency;
@@ -111,7 +118,7 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
 
   const instance = useMemo(
     () =>
-      createCocoPaymentUX({
+      createColada({
         manager,
         platform: {
           clipboard: { write: (text: string) => Clipboard.setStringAsync(text).then(() => {}) },
@@ -182,32 +189,25 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
   // first from the screen action or 'displayed' from this subscription.
   useEffect(() => {
     if (!manager) return;
-    const handler = (payload: {
-      mintUrl: string;
-      operationId: string;
-      quoteId: string;
-      state: string;
-    }) => {
-      if (payload.state !== 'PAID' && payload.state !== 'ISSUED') return;
+    const unsub = manager.on('mint-quote:updated', (payload) => {
+      const state = payload.quote.method === 'bolt11' ? payload.quote.state : undefined;
+      if (state !== 'PAID' && state !== 'ISSUED') return;
       if (!payload.quoteId) {
         paymentLog.warn('payment.mint_quote.displayed_inference.no_quote_id', {
-          operationId: payload.operationId,
-          state: payload.state,
+          state,
         });
         return;
       }
       useTransactionDistributionStore.getState().setDistribution(payload.quoteId, 'displayed');
       paymentLog.debug('payment.mint_quote.displayed_inference.applied', {
         quoteId: payload.quoteId,
-        operationId: payload.operationId,
-        state: payload.state,
+        state,
       });
-    };
-    const unsub = manager.on('mint-op:quote-state-changed', handler);
+    });
     return unsub;
   }, [manager]);
 
-  // Override coco-payment-ux's default executeReceive and executeMintQuote so
+  // Override colada's default executeReceive and executeMintQuote so
   // they always return entries with coco's REAL persisted history ids — never
   // synthesized fallbacks (`redeemed-${Date.now()}`) or unverified operation
   // ids. This guarantees the location stamp + scan-history link captured
@@ -222,7 +222,7 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
         executeReceive: createSovranExecuteReceive(() => manager),
         executeMintQuote: createSovranExecuteMintQuote(() => manager),
         // Stage 2 of recipient resolution: hex pubkey → Nostr kind-0 profile.
-        // Stage 1 (NIP-05 → pubkey) is shipped by coco-payment-ux's default
+        // Stage 1 (NIP-05 → pubkey) is shipped by colada's default
         // operation set; this one has no default because NDK / cache wiring
         // is app-specific. Returning null on any failure is the contract:
         // the machine's resolver treats it as best-effort cosmetic data and
@@ -319,13 +319,14 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
   );
 
   return (
-    <PaymentUXProviderBase
+    <ColadaProviderBase
       handlers={(machine, refs) =>
         createSovranHandlers({
           machine,
           onOptionDismiss: () => refs.getOptionDismiss()?.(),
           getManager: () => manager,
           getNpub,
+          getBitchatIdentityMaterial,
         })
       }
       engine={{
@@ -351,6 +352,6 @@ export function SovranPaymentUXProvider({ children }: { children: React.ReactNod
         navigation,
       }}>
       {children}
-    </PaymentUXProviderBase>
+    </ColadaProviderBase>
   );
 }

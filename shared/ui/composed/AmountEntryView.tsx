@@ -4,7 +4,7 @@
  *
  * Consumed by the send/receive flow's AmountSelector adapter (machine-driven)
  * and by the Split-Bill step-1 screen (local-state). Keep it framework-neutral:
- * no coco-payment-ux imports, no feature imports that would create cycles.
+ * no colada imports, no feature imports that would create cycles.
  */
 
 import { useMemo } from 'react';
@@ -13,7 +13,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 
-import type { QuickSendSuggestion } from 'coco-payment-ux/react';
+import type { QuickSendSuggestion } from 'colada/react';
 
 import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import { AMOUNT_FONT_FAMILY, AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
