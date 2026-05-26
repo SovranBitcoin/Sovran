@@ -117,6 +117,7 @@ interface AmountEntryViewProps {
   nextText?: string;
   nextTestID?: string;
   nextIcon?: string;
+  noticeText?: string | null;
 
   /** Fiat currency symbol (e.g. '$'). Required when inputMode === 'fiat'. */
   fiatSymbol?: string | null;
@@ -174,6 +175,7 @@ export function AmountEntryView({
   nextText = 'Next',
   nextTestID = 'amount-next',
   nextIcon,
+  noticeText = null,
   fiatSymbol = null,
   secondaryDisplay = null,
   onToggleMode,
@@ -312,6 +314,11 @@ export function AmountEntryView({
             {secondaryDisplay && (
               <CurrencySwapperPill inputMode={inputMode} onPress={onToggleMode} />
             )}
+            {noticeText != null && noticeText.length > 0 ? (
+              <Text size={13} weight="bold" style={[styles.noticeText, { color: danger }]}>
+                {noticeText}
+              </Text>
+            ) : null}
           </VStack>
         </View>
       </View>
@@ -452,5 +459,9 @@ const styles = StyleSheet.create({
   bottomSlotCentered: {
     flex: 1,
     alignItems: 'center',
+  },
+  noticeText: {
+    maxWidth: 280,
+    textAlign: 'center',
   },
 });

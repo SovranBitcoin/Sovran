@@ -3,6 +3,7 @@ import { useManager, usePaginatedHistory } from '@cashu/coco-react';
 import type {
   HistoryEntry,
   MeltHistoryEntry,
+  MeltHistoryState,
   MeltOperation,
   MeltOperationState,
 } from '@cashu/coco-core';
@@ -11,25 +12,27 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { log } from '@/shared/lib/logger';
 
-function opStateToQuoteState(opState: MeltOperationState): 'PAID' | 'PENDING' | 'UNPAID' {
-  if (opState === 'finalized') return 'PAID';
-  if (opState === 'pending' || opState === 'executing') return 'PENDING';
-  return 'UNPAID';
+function opStateToHistoryState(opState: MeltOperationState): MeltHistoryState {
+  if (opState === 'init' || opState === 'failed') return 'prepared';
+  return opState;
 }
 
 // MeltOperation is a discriminated union by state — only some variants carry
 // `quoteId` and `amount`. Read both as optional and bail out if missing.
 function meltOpToHistoryEntry(op: MeltOperation): MeltHistoryEntry | null {
-  const opAny = op as { quoteId?: string; amount?: number };
+  const opAny = op as Pick<MeltHistoryEntry, 'quoteId' | 'amount'>;
   if (!opAny.quoteId || opAny.amount == null) return null;
   return {
     id: op.id,
     type: 'melt',
+    source: 'operation',
+    operationId: op.id,
     createdAt: op.createdAt,
+    updatedAt: op.updatedAt,
     mintUrl: op.mintUrl,
     unit: 'sat',
     quoteId: opAny.quoteId,
-    state: opStateToQuoteState(op.state),
+    state: opStateToHistoryState(op.state),
     amount: opAny.amount,
   };
 }

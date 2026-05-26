@@ -4,6 +4,7 @@ import { useManager } from '@cashu/coco-react';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
 import { mintLocalId } from '@/shared/lib/id';
@@ -80,9 +81,16 @@ export function useMintRebalanceOrchestrator({
 }: UseMintRebalanceOrchestratorArgs): UseMintRebalanceOrchestratorResult {
   const manager = useManager();
   const requestLightningInvoice = useCallback(
-    (mintUrl: string, amount: number) =>
-      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
-    [manager]
+    async (mintUrl: string, amount: number) => {
+      const quote = await manager.quotes.mint.create({ mintUrl, amount, method: 'bolt11', unit });
+      return manager.ops.mint.prepare({
+        mintUrl,
+        method: 'bolt11',
+        quoteId: quote.quoteId,
+        unit,
+      });
+    },
+    [manager, unit]
   );
 
   const [runPlan, setRunPlan] = useState<RebalancePlan | null>(null);
@@ -203,7 +211,7 @@ export function useMintRebalanceOrchestrator({
       };
 
       const initialBalances = await getBalances();
-      const startBalance = initialBalances[mintUrl]?.total || 0;
+      const startBalance = amountToNumber(initialBalances[mintUrl]?.total);
       const startTime = Date.now();
       const pollInterval = 1000; // Check every 1 second
 
@@ -211,7 +219,7 @@ export function useMintRebalanceOrchestrator({
         await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
         const currentBalances = await getBalances();
-        const currentBalance = currentBalances[mintUrl]?.total || 0;
+        const currentBalance = amountToNumber(currentBalances[mintUrl]?.total);
 
         // Allow for some fee variance - consider success if balance increased
         if (currentBalance > startBalance) {
@@ -320,7 +328,7 @@ export function useMintRebalanceOrchestrator({
       try {
         // Get fresh balances to check source mint
         const currentBalances = await manager.wallet.balances.byMint();
-        const sourceBalance = currentBalances[fromMintUrl]?.total || 0;
+        const sourceBalance = amountToNumber(currentBalances[fromMintUrl]?.total);
 
         appendDebug({
           event: 'balances_fetched',
@@ -340,7 +348,7 @@ export function useMintRebalanceOrchestrator({
         try {
           const proofs = await getReadyProofs(manager, fromMintUrl);
           const wallet = await getWallet(manager, fromMintUrl);
-          worstCaseInputFee = wallet.getFeesForProofs(proofs as unknown as Proof[]);
+          worstCaseInputFee = amountToNumber(wallet.getFeesForProofs(proofs as unknown as Proof[]));
           // fee_reserve (conservative floor) + worst-case input fee (all proofs selected)
           feeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + worstCaseInputFee);
           appendDebug({
@@ -472,10 +480,17 @@ export function useMintRebalanceOrchestrator({
         setLegLocalStatus('invoiceReady');
 
         const prepareForInvoice = async (invoiceToPay: string) => {
-          const prepared = await manager.ops.melt.prepare({
+          const quote = await manager.quotes.melt.create({
             mintUrl: fromMintUrl,
             method: 'bolt11',
             methodData: { invoice: invoiceToPay },
+            unit,
+          });
+          const prepared = await manager.ops.melt.prepare({
+            mintUrl: fromMintUrl,
+            method: 'bolt11',
+            quoteId: quote.quoteId,
+            unit,
           });
           updateStepState(id, { operationId: prepared.id });
           {
@@ -531,9 +546,9 @@ export function useMintRebalanceOrchestrator({
         }
         preparedMeltOp = preparedForFees;
 
-        const invoiceAmount = Number(preparedForFees.amount ?? transferAmount);
-        const feeReserve = Number(preparedForFees.fee_reserve ?? 0);
-        const swapFee = Number(preparedForFees.swap_fee ?? 0);
+        const invoiceAmount = amountToNumber(preparedForFees.amount ?? transferAmount);
+        const feeReserve = amountToNumber(preparedForFees.fee_reserve);
+        const swapFee = amountToNumber(preparedForFees.swap_fee);
         const totalRequired = invoiceAmount + feeReserve + swapFee;
 
         appendDebug({
@@ -791,7 +806,7 @@ export function useMintRebalanceOrchestrator({
 
                 // Get fresh balance for this hop's source
                 const hopBalances = await manager.wallet.balances.byMint();
-                const hopSourceBalance = hopBalances[hopFrom]?.total || 0;
+                const hopSourceBalance = amountToNumber(hopBalances[hopFrom]?.total);
 
                 // ── Per-hop dynamic fee headroom ──
                 // Each hop's source mint may have different input_fee_ppk, so
@@ -800,7 +815,9 @@ export function useMintRebalanceOrchestrator({
                 try {
                   const hopProofs = await getReadyProofs(manager, hopFrom);
                   const hopWallet = await getWallet(manager, hopFrom);
-                  const hopInputFee = hopWallet.getFeesForProofs(hopProofs as unknown as Proof[]);
+                  const hopInputFee = amountToNumber(
+                    hopWallet.getFeesForProofs(hopProofs as unknown as Proof[])
+                  );
                   hopFeeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + hopInputFee);
                 } catch {
                   // Fallback to static headroom if proof query fails
@@ -854,7 +871,9 @@ export function useMintRebalanceOrchestrator({
                     try {
                       const hpProofs = await getReadyProofs(manager, hopFrom);
                       const hpWallet = await getWallet(manager, hopFrom);
-                      hopProbeInputFee = hpWallet.getFeesForProofs(hpProofs as unknown as Proof[]);
+                      hopProbeInputFee = amountToNumber(
+                        hpWallet.getFeesForProofs(hpProofs as unknown as Proof[])
+                      );
                     } catch {
                       /* use 0 */
                     }
@@ -911,10 +930,17 @@ export function useMintRebalanceOrchestrator({
                 let hopTransferAmt = hopAmount;
                 for (let att = 0; att <= MAX_PREPARE_RETRIES; att++) {
                   try {
-                    hopPrepared = await manager.ops.melt.prepare({
+                    const hopQuote = await manager.quotes.melt.create({
                       mintUrl: hopFrom,
                       method: 'bolt11',
                       methodData: { invoice: hopInvoice },
+                      unit,
+                    });
+                    hopPrepared = await manager.ops.melt.prepare({
+                      mintUrl: hopFrom,
+                      method: 'bolt11',
+                      quoteId: hopQuote.quoteId,
+                      unit,
                     });
                     break;
                   } catch (pErr) {

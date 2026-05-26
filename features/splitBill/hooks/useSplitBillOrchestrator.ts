@@ -205,8 +205,20 @@ async function sendNostrDM(
 export function useSplitBillOrchestrator() {
   const manager = useManager();
   const requestLightningInvoice = useCallback(
-    (mintUrl: string, amount: number) =>
-      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+    async (mintUrl: string, amount: number) => {
+      const quote = await manager.quotes.mint.create({
+        mintUrl,
+        amount,
+        method: 'bolt11',
+        unit: 'sat',
+      });
+      return manager.ops.mint.prepare({
+        mintUrl,
+        method: 'bolt11',
+        quoteId: quote.quoteId,
+        unit: 'sat',
+      });
+    },
     [manager]
   );
   const nickname = useBitchatNickname();

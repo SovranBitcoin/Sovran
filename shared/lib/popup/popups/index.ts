@@ -139,6 +139,12 @@ const STATIC_POPUPS = {
     icon: ALERT_ICON,
     type: 'error',
   },
+  'unsupported-payment-method': {
+    message: 'Payment Method Not Available',
+    text: 'This payment method is not available for the selected mint.',
+    icon: ALERT_ICON,
+    type: 'warning',
+  },
   'all-options-disabled': {
     message: 'No Options Available',
     text: 'All payment options are disabled.',

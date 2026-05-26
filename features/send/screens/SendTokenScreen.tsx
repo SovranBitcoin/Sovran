@@ -283,7 +283,7 @@ export function SendTokenScreen({
        * Id marker wraps the screen body — lets `phone test` capture
        * the entry id of the send currently being viewed via
        * `capture #send-token-id-* suffix`. Same rationale as the
-       * MintQuoteScreen marker: without an in-screen source of the
+       * LightningReceiveScreen marker: without an in-screen source of the
        * entry id, tests have to guess from the transaction list on
        * the wallet home, where `findByTestIDPrefix` returns the
        * visually-topmost match and can pick up a stale row from a
@@ -306,7 +306,7 @@ export function SendTokenScreen({
             </View>
           )}
 
-          {entry.state !== 'finalized' && entry.state !== 'rolledBack' && entry.tokenString && (
+          {entry.state !== 'finalized' && entry.state !== 'rolled_back' && entry.tokenString && (
             <PaymentInfo
               copyTarget="token"
               unit={entry.unit}

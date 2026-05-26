@@ -184,13 +184,12 @@ export function createSovranScreenActionsBridge({
         const subscribeMeltOperation = (
           eventName: 'melt-op:prepared' | 'melt-op:pending' | 'melt-op:finalized'
         ) =>
-          manager.on(
-            eventName,
-            ({ operation }: { mintUrl: string; operation: MeltOperationLike }) => {
-              const updatedEntry = meltOperationToScreenActionEntry(operation);
-              if (updatedEntry) callback(updatedEntry);
-            }
-          );
+          manager.on(eventName, ({ operation }) => {
+            const updatedEntry = meltOperationToScreenActionEntry(
+              operation as unknown as MeltOperationLike
+            );
+            if (updatedEntry) callback(updatedEntry);
+          });
         unsubscribes.push(subscribeMeltOperation('melt-op:prepared'));
         unsubscribes.push(subscribeMeltOperation('melt-op:pending'));
         unsubscribes.push(subscribeMeltOperation('melt-op:finalized'));
@@ -198,34 +197,23 @@ export function createSovranScreenActionsBridge({
 
       if (screenType === 'mintQuote') {
         unsubscribes.push(
-          manager.on(
-            'mint-op:quote-state-changed',
-            ({
-              operationId,
+          manager.on('mint-quote:updated', ({ quoteId, quote }) => {
+            const state = quote.method === 'bolt11' ? quote.state : undefined;
+            paymentLog.info('send.mint_quote_state_changed', {
+              screenType,
               quoteId,
-              state,
-            }: {
-              mintUrl: string;
-              operationId: string;
-              quoteId: string;
-              state: string;
-            }) => {
-              paymentLog.info('send.mint_quote_state_changed', {
-                screenType,
-                operationId,
-                quoteId,
-                state,
-              });
-              callback({ type: 'mint', quoteId, state, operationId });
-            }
-          )
+              method: quote.method,
+              state: state ?? null,
+            });
+            callback({ type: 'mint', quoteId, state, remoteState: state });
+          })
         );
         unsubscribes.push(
           manager.on(
             'mint-op:finalized',
             ({ operationId }: { mintUrl: string; operationId: string }) => {
               paymentLog.info('send.mint_op_finalized', { screenType, operationId });
-              callback({ type: 'mint', operationId, state: 'ISSUED' });
+              callback({ type: 'mint', operationId, state: 'finalized' });
             }
           )
         );

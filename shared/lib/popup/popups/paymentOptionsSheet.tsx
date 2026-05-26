@@ -32,12 +32,14 @@ const LIGHTNING_KINDS: readonly OptionKind[] = ['lightningInvoice', 'lightningAd
 function getMethodLabel(kind: OptionKind): string {
   if (CASHU_KINDS.includes(kind)) return 'Cashu';
   if (LIGHTNING_KINDS.includes(kind)) return 'Lightning';
+  if (kind === 'onchainAddress') return 'Onchain';
   return kind;
 }
 
 function getMethodIcon(kind: OptionKind): string {
   if (CASHU_KINDS.includes(kind)) return 'majesticons:coins';
   if (LIGHTNING_KINDS.includes(kind)) return 'mdi:lightning-bolt';
+  if (kind === 'onchainAddress') return 'hugeicons:blockchain-01';
   return 'ph:contactless-payment-fill';
 }
 

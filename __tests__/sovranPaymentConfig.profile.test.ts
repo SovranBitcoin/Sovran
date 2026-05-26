@@ -3,11 +3,12 @@
  */
 
 import type { PaymentMachine } from 'colada';
+import type { Manager } from '@cashu/coco-core';
 import {
   createSovranHandlers,
   createSovranNotifications,
 } from '@/features/send/lib/sovranPaymentConfig';
-import { getEncodedTokenV4 } from '@cashu/cashu-ts';
+import { getEncodedToken } from '@cashu/cashu-ts';
 import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
@@ -33,7 +34,7 @@ jest.mock('expo-camera', () => ({ scanFromURLAsync: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
-jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedTokenV4: jest.fn() }));
+jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedToken: jest.fn() }));
 jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
   sendBLEPrivateMessageChunks: jest.fn(),
 }));
@@ -124,7 +125,7 @@ describe('createSovranHandlers profile routing', () => {
     mockNearPayComplete.mockReset();
     mockNearPaySetAmountEntry.mockReset();
     mockNearPayActive = null;
-    (getEncodedTokenV4 as jest.Mock).mockReset();
+    (getEncodedToken as jest.Mock).mockReset();
     (sendBLEPrivateMessageChunks as jest.Mock).mockReset();
   });
 
@@ -221,7 +222,7 @@ describe('createSovranHandlers profile routing', () => {
         lastSeen: 2,
       },
     };
-    (getEncodedTokenV4 as jest.Mock).mockReturnValue('cashuA-near-pay-token');
+    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-near-pay-token');
     (sendBLEPrivateMessageChunks as jest.Mock).mockResolvedValue({
       chunks: 2,
       messageIds: ['m-1', 'm-2'],
@@ -272,12 +273,12 @@ describe('createSovranHandlers profile routing', () => {
       regenerateP2PKOnReceive: true,
     });
 
+    const manager = {
+      ext: { p2pkImport: { getPublicKeys: () => [`02${'44'.repeat(32)}`] } },
+      keyring: { generateKeyPair, getLatestKeyPair },
+    };
     const notifications = createSovranNotifications({
-      getManager: () =>
-        ({
-          ext: { p2pkImport: { getPublicKeys: () => [`02${'44'.repeat(32)}`] } },
-          keyring: { generateKeyPair, getLatestKeyPair },
-        }) as never,
+      getManager: () => manager as unknown as Manager,
       onP2pkKeyRefreshed,
     });
 
@@ -301,12 +302,12 @@ describe('createSovranHandlers profile routing', () => {
       regenerateP2PKOnReceive: true,
     });
 
+    const manager = {
+      ext: {},
+      keyring: { generateKeyPair, getLatestKeyPair },
+    };
     const notifications = createSovranNotifications({
-      getManager: () =>
-        ({
-          ext: {},
-          keyring: { generateKeyPair, getLatestKeyPair },
-        }) as never,
+      getManager: () => manager as unknown as Manager,
       onP2pkKeyRefreshed,
     });
 

@@ -20,8 +20,9 @@ import React, {
 } from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
-import { type WalletContext } from 'colada';
+import { deriveMintMethodCapabilityMapFromTrustedMints, type WalletContext } from 'colada';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
@@ -60,7 +61,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   const rawMintBalances = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(rawBalanceCtx.byMint).map(([url, snap]) => [url, snap.total])
+        Object.entries(rawBalanceCtx.byMint).map(([url, snap]) => [url, amountToNumber(snap.total)])
       ) as Record<string, number>,
     [rawBalanceCtx]
   );
@@ -74,6 +75,16 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
 
   // Stabilise trustedMintUrls by comparing the serialised URL list
   const trustedMintUrls = useMemo(() => rawTrustedMints.map((m) => m.mintUrl), [rawTrustedMints]);
+  const mintMethodCapabilities = useMemo(
+    () =>
+      deriveMintMethodCapabilityMapFromTrustedMints(
+        rawTrustedMints.map((mint) => ({
+          mintUrl: mint.mintUrl,
+          mintInfo: mint.mintInfo,
+        }))
+      ),
+    [rawTrustedMints]
+  );
   const prevMintUrlsRef = useRef<string[]>(trustedMintUrls);
   const stableMintUrls = useMemo(() => {
     const prev = prevMintUrlsRef.current;
@@ -111,7 +122,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     for (const url of stableMintUrls) {
       try {
         const proofs = await getReadyProofs(manager, url);
-        next[url] = proofs.map((p) => p.amount).sort((a, b) => a - b);
+        next[url] = proofs.map((p) => amountToNumber(p.amount)).sort((a, b) => a - b);
         totalReady += next[url].reduce((sum, n) => sum + n, 0);
       } catch (err) {
         walletLog.warn('provider.wallet_context.proof_fetch_failed', {
@@ -144,9 +155,10 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       trustedMintUrls: stableMintUrls,
       mintBalances: mintBalancesOnly,
       preferredMintUrl,
+      mintMethodCapabilities,
       proofAmounts,
     };
-  }, [stableMintUrls, mintBalancesOnly, preferredMintUrl, proofAmounts]);
+  }, [stableMintUrls, mintBalancesOnly, preferredMintUrl, mintMethodCapabilities, proofAmounts]);
 
   return <WalletContextCtx.Provider value={value}>{children}</WalletContextCtx.Provider>;
 }

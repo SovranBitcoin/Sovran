@@ -77,7 +77,7 @@ interface AmountSelectorProps {
    * Resolved Nostr recipient identity for the current melt target. When
    * present, forwarded to `actions.next.execute(...)` as part of the params
    * so colada's default `next` handler can pass it into the
-   * machine via `enterAmount`. Lets MeltQuoteScreen render the "Pay <name>"
+   * machine via `enterAmount`. Lets LightningSendScreen render the "Pay <name>"
    * header on first paint instead of paying a second NIP-05 round-trip.
    */
   recipientPubkey?: string;
@@ -232,6 +232,7 @@ export function AmountSelector({
 
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
+  const nextNoticeText = nextDisabled ? actions.next.reason : undefined;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
 
   // When the recipient header is in play, surface the mint as a 50/50
@@ -300,6 +301,7 @@ export function AmountSelector({
         onNext={handleNext}
         nextLoading={nextLoading}
         nextDisabled={nextDisabled}
+        noticeText={nextNoticeText}
         nextTestID="amount-next"
         fiatSymbol={fiatSymbol}
         secondaryDisplay={secondaryDisplay}

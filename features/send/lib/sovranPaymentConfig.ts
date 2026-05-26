@@ -19,14 +19,13 @@ import { router } from 'expo-router';
 import { paymentLog } from '@/shared/lib/logger';
 import { mintLocalId } from '@/shared/lib/id';
 
-import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
+import { Amount, getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
 import type {
   HistoryEntry,
   Manager,
   SendHistoryEntry,
-  MeltHistoryEntry,
+  LegacyMeltHistoryEntry,
   MintHistoryEntry,
-  ReceiveHistoryEntry,
 } from '@cashu/coco-core';
 import {
   withTimeout,
@@ -41,6 +40,7 @@ import {
 } from 'colada';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
+import { getMintQuotePaymentValue, getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import {
   getP2PKImportExtension,
   resolvePrimaryReceiveP2PKPublicKey,
@@ -141,8 +141,8 @@ export function createSovranExecuteReceive(
     // `regenerateP2PKOnReceive` enabled.
     let hadP2PKProofs = false;
     try {
-      const decoded = getDecodedToken(tokenString);
-      hadP2PKProofs = decoded.proofs.some((p) => {
+      const metadata = getTokenMetadata(tokenString);
+      hadP2PKProofs = metadata.incompleteProofs.some((p) => {
         try {
           const parsed = JSON.parse(p.secret);
           return Array.isArray(parsed) && parsed[0] === 'P2PK';
@@ -204,20 +204,27 @@ export function createSovranExecuteReceive(
       mintUrl,
       polledMs: MAX_ATTEMPTS * DELAY_MS,
     });
-    let tokenAmount = 0;
+    let tokenAmount = Amount.zero();
+    let tokenUnit = 'sat';
     try {
-      const decoded = getDecodedToken(tokenString);
-      tokenAmount = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
+      const metadata = getTokenMetadata(tokenString);
+      tokenAmount = metadata.amount;
+      tokenUnit = metadata.unit ?? 'sat';
     } catch {
       /* ignore */
     }
+    const now = Date.now();
     const fallbackEntry = {
       id: mintLocalId('redeemed'),
       type: 'receive' as const,
-      createdAt: Date.now(),
+      source: 'legacy' as const,
+      legacyHistoryId: mintLocalId('redeemed'),
+      createdAt: now,
+      updatedAt: now,
       mintUrl,
-      unit: 'sat',
+      unit: tokenUnit,
       amount: tokenAmount,
+      state: 'finalized',
       metadata: { rawToken: tokenString },
     };
     return {
@@ -252,16 +259,123 @@ const MINT_QUOTE_PREPARE_TIMEOUT_MS = 10_000;
  * history for the persisted row by `quoteId` (deterministic — no race) and
  * fall back to set-difference. Use coco's persisted row as authoritative for
  * the id, while preserving `paymentRequest` from the operation result so
- * the MintQuoteScreen still has a lightning invoice to display.
+ * the LightningReceiveScreen still has a lightning invoice to display.
  */
 export function createSovranExecuteMintQuote(
   getManager: () => Manager | null
 ): NonNullable<MachineOperations['executeMintQuote']> {
-  return async (mintUrl, amount, _unit) => {
+  return async (mintUrl, amount, _unit, method = 'bolt11') => {
     const manager = getManager();
     if (!manager) {
       paymentLog.error('payment.execute_mint_quote.no_manager');
       throw new Error('Wallet manager is not available');
+    }
+
+    if (method === 'onchain') {
+      let beforeIds: Set<string>;
+      try {
+        const beforeHistory: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
+        beforeIds = new Set(
+          beforeHistory.filter((h) => h.type === 'mint' && h.mintUrl === mintUrl).map((h) => h.id)
+        );
+      } catch (e) {
+        paymentLog.warn('payment.execute_mint_quote.onchain_snapshot_failed', {
+          error: e instanceof Error ? e.message : String(e),
+        });
+        beforeIds = new Set();
+      }
+
+      paymentLog.info('payment.execute_mint_quote.onchain.start', { mintUrl, amount });
+      const quote = await withTimeout(
+        manager.quotes.mint.create({
+          mintUrl,
+          method: 'onchain',
+          unit: _unit ?? 'sat',
+        }),
+        MINT_QUOTE_PREPARE_TIMEOUT_MS,
+        'executeMintQuote.createOnchainQuote'
+      );
+      if (quote.method !== 'onchain') {
+        throw new Error(`Mint returned ${quote.method} quote for onchain request`);
+      }
+
+      const mintOp = await withTimeout(
+        manager.ops.mint.prepare({
+          mintUrl,
+          method: 'onchain',
+          quoteId: quote.quoteId,
+          amount,
+          unit: _unit ?? 'sat',
+          methodData: {},
+        }),
+        MINT_QUOTE_PREPARE_TIMEOUT_MS,
+        'executeMintQuote.prepareOnchain'
+      );
+      paymentLog.info('payment.execute_mint_quote.onchain.prepared', {
+        operationId: mintOp.id,
+        quoteId: mintOp.quoteId,
+      });
+
+      const constructedEntry: MintHistoryEntry = {
+        id: `mint:${mintOp.id}`,
+        type: 'mint',
+        source: 'operation',
+        operationId: mintOp.id,
+        createdAt: mintOp.createdAt,
+        updatedAt: mintOp.updatedAt,
+        mintUrl: mintOp.mintUrl,
+        unit: mintOp.unit,
+        quoteId: mintOp.quoteId,
+        state: 'pending',
+        amount: mintOp.amount,
+        paymentRequest: mintOp.request,
+        metadata: {
+          operationId: mintOp.id,
+          method: 'onchain',
+          onchainAddress: quote.request,
+          requestedAmount: String(amount),
+          amountPaid: quote.quoteData.amountPaid.toString(),
+          amountIssued: quote.quoteData.amountIssued.toString(),
+        },
+      };
+
+      const MAX_ATTEMPTS = 50;
+      const DELAY_MS = 200;
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        try {
+          const after: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
+          const persisted = after.find((h): h is MintHistoryEntry => {
+            if (h.type !== 'mint' || h.mintUrl !== mintUrl) return false;
+            if (mintOp.quoteId && h.quoteId === mintOp.quoteId) return true;
+            if (mintOp.id && h.operationId === mintOp.id) return true;
+            return !beforeIds.has(h.id);
+          });
+          if (persisted) {
+            return {
+              historyEntry: JSON.stringify({
+                ...persisted,
+                metadata: {
+                  ...(persisted.metadata ?? {}),
+                  ...constructedEntry.metadata,
+                },
+              }),
+            };
+          }
+        } catch (e) {
+          paymentLog.warn('payment.execute_mint_quote.onchain_poll_failed', {
+            attempt,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+        await new Promise((r) => setTimeout(r, DELAY_MS));
+      }
+
+      paymentLog.error('payment.execute_mint_quote.onchain_timeout_fallback', {
+        mintUrl,
+        operationId: mintOp.id,
+        polledMs: MAX_ATTEMPTS * DELAY_MS,
+      });
+      return { historyEntry: JSON.stringify(constructedEntry) };
     }
 
     // Snapshot existing mint ids for this mint URL so we can detect the
@@ -280,8 +394,23 @@ export function createSovranExecuteMintQuote(
     }
 
     paymentLog.info('payment.execute_mint_quote.start', { mintUrl, amount });
+    const quote = await withTimeout(
+      manager.quotes.mint.create({
+        mintUrl,
+        amount,
+        method: 'bolt11',
+        unit: _unit ?? 'sat',
+      }),
+      MINT_QUOTE_PREPARE_TIMEOUT_MS,
+      'executeMintQuote.createQuote'
+    );
     const mintOp = await withTimeout(
-      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+      manager.ops.mint.prepare({
+        mintUrl,
+        method: 'bolt11',
+        quoteId: quote.quoteId,
+        unit: _unit ?? 'sat',
+      }),
       MINT_QUOTE_PREPARE_TIMEOUT_MS,
       'executeMintQuote.prepare'
     );
@@ -295,11 +424,15 @@ export function createSovranExecuteMintQuote(
     const constructedEntry: MintHistoryEntry = {
       id: mintOp.id,
       type: 'mint',
+      source: 'operation',
+      operationId: mintOp.id,
       createdAt: mintOp.createdAt,
+      updatedAt: mintOp.updatedAt,
       mintUrl: mintOp.mintUrl,
       unit: mintOp.unit,
       quoteId: mintOp.quoteId,
-      state: 'UNPAID',
+      state: 'pending',
+      remoteState: quote.state,
       amount: mintOp.amount,
       paymentRequest: mintOp.request,
       metadata: { operationId: mintOp.id },
@@ -382,6 +515,9 @@ export function createSovranNotifications(
     },
     UNSUPPORTED_INPUT: ({ code: _code, message, data: _data }) => {
       staticPopup('unsupported-input', { text: message });
+    },
+    UNSUPPORTED_PAYMENT_METHOD: ({ code: _code, message, data: _data }) => {
+      staticPopup('unsupported-payment-method', { text: message });
     },
     ALL_OPTIONS_DISABLED: ({ code: _code, message: _message, data: _data }) => {
       staticPopup('all-options-disabled');
@@ -748,7 +884,7 @@ interface CreateSovranHandlersConfig {
 function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string | null {
   try {
     const parsed = JSON.parse(historyEntry) as {
-      token?: Parameters<typeof getEncodedTokenV4>[0];
+      token?: Parameters<typeof getEncodedToken>[0];
       tokenString?: unknown;
       metadata?: { rawToken?: unknown };
     };
@@ -759,7 +895,7 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
       return parsed.metadata.rawToken;
     }
     if (parsed.token) {
-      return getEncodedTokenV4(parsed.token);
+      return getEncodedToken(parsed.token);
     }
   } catch (err) {
     paymentLog.warn('near_pay.token.extract_failed', {
@@ -840,7 +976,7 @@ export function createSovranHandlers({
       if (topUpState.active) {
         try {
           const entry = JSON.parse(historyEntry);
-          const encodedToken = getEncodedTokenV4(entry.token);
+          const encodedToken = getEncodedToken(entry.token);
           const result = await executeRoutstrTopUp(encodedToken);
 
           if (result.success) {
@@ -947,16 +1083,21 @@ export function createSovranHandlers({
       // `MeltHistoryEntry.metadata` is typed `Record<string, string>` upstream
       // in `@cashu/coco-core`, so the resolved profile is flattened into
       // individual string keys instead of stored as a nested object.
-      // `MeltQuoteScreen` re-assembles them on read.
-      const entry: MeltHistoryEntry = {
-        id: mintLocalId('melt-preview'),
+      // `LightningSendScreen` re-assembles them on read.
+      const id = mintLocalId('melt-preview');
+      const now = Date.now();
+      const entry: LegacyMeltHistoryEntry = {
+        id,
         type: 'melt',
-        createdAt: Date.now(),
+        source: 'legacy',
+        legacyHistoryId: id,
+        createdAt: now,
+        updatedAt: now,
         mintUrl,
         unit: unit ?? 'sat',
         quoteId: '',
         state: 'UNPAID',
-        amount,
+        amount: Amount.from(amount),
         metadata: {
           phase: 'preview',
           meltTarget,
@@ -973,14 +1114,23 @@ export function createSovranHandlers({
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
       nav({
-        pathname: '/(send-flow)/meltQuote',
+        pathname: '/(send-flow)/lightningSend',
         params: { meltHistoryEntry: JSON.stringify(entry) },
       });
     },
 
     mintQuoteCreated: ({ historyEntry, unit }) => {
+      let pathname: '/(receive-flow)/lightningReceive' | '/(receive-flow)/onchainReceive' =
+        '/(receive-flow)/lightningReceive';
+      try {
+        pathname = getOnchainMintAddress(JSON.parse(historyEntry) as HistoryEntry)
+          ? '/(receive-flow)/onchainReceive'
+          : '/(receive-flow)/lightningReceive';
+      } catch {
+        pathname = '/(receive-flow)/lightningReceive';
+      }
       router.replace({
-        pathname: '/(receive-flow)/mintQuote',
+        pathname,
         params: { mintHistoryEntry: historyEntry, unit },
       });
     },
@@ -1014,7 +1164,7 @@ export function createSovranHandlers({
       router.navigate(buildModalProfileHref({ npub }));
     },
 
-    navigateToReceive: async ({ unit }) => {
+    navigateToReceive: async ({ unit, methodContext }) => {
       const t0 = performance.now();
       const npub = getNpub?.();
       const selectedMintUrl = useNpcMintStore.getState().getActiveMintUrl();
@@ -1037,6 +1187,7 @@ export function createSovranHandlers({
         npcAddress: npub ? getNpcAddress(undefined, npub) : undefined,
         p2pkKey,
         selectedMintUrl,
+        ...(methodContext ? { methodContext } : {}),
         unit,
       };
       router.navigate({
@@ -1054,6 +1205,7 @@ export function createSovranHandlers({
         selectedMintUrl: preselectedMintUrl ?? '',
         ...(constraints.paymentRequest ? { paymentRequest: constraints.paymentRequest } : {}),
         ...(constraints.meltTarget ? { meltTarget: constraints.meltTarget } : {}),
+        ...(constraints.methodContext ? { methodContext: constraints.methodContext } : {}),
         // Snapshot the machine-resolved recipient identity onto the entry so
         // the amount screen renders "Pay <name>" + avatar on first paint
         // when the resolver beat the navigation. AmountFlowScreen also
@@ -1087,6 +1239,9 @@ export function createSovranHandlers({
       paymentRequest: _paymentRequest,
       meltTarget: _meltTarget,
       destination,
+      mintQuoteMethod,
+      meltQuoteMethod,
+      methodRequirement,
       mintListItems,
       scope,
     }) => {
@@ -1094,6 +1249,9 @@ export function createSovranHandlers({
         items: mintListItems ?? [],
         scope: scope ?? 'selected',
         destination,
+        ...(mintQuoteMethod ? { mintQuoteMethod } : {}),
+        ...(meltQuoteMethod ? { meltQuoteMethod } : {}),
+        ...(methodRequirement ? { methodRequirement } : {}),
         unit,
       };
 
@@ -1153,14 +1311,6 @@ function mintQuoteCtx(ctx: ScreenActionContext): Ctx<MintHistoryEntry> {
   return ctx as Ctx<MintHistoryEntry>;
 }
 
-function receiveTokenCtx(ctx: ScreenActionContext): Ctx<ReceiveHistoryEntry> {
-  return ctx as Ctx<ReceiveHistoryEntry>;
-}
-
-function meltQuoteCtx(ctx: ScreenActionContext): Ctx<MeltHistoryEntry> {
-  return ctx as Ctx<MeltHistoryEntry>;
-}
-
 /**
  * App-specific screen action overrides. Only actions that require platform
  * primitives not available in colada (NFC writer, emoji picker).
@@ -1178,7 +1328,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         }
 
         try {
-          await writeTokenToNFC(getEncodedTokenV4(entry.token));
+          await writeTokenToNFC(getEncodedToken(entry.token));
           paymentLog.info('payment.screen_action.nfc.success');
           nfcEcashSharedPopup();
           return;
@@ -1234,12 +1384,12 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         // narrow it directly without a cast.
         const variantId = typeof rawCtx.variantId === 'string' ? rawCtx.variantId : 'text';
         if (variantId === 'emoji') {
-          emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
+          emojiPickerPopup({ token: getEncodedToken(entry.token) });
           return;
         }
         // Default — text clipboard copy.
         try {
-          await Clipboard.setStringAsync(getEncodedTokenV4(entry.token));
+          await Clipboard.setStringAsync(getEncodedToken(entry.token));
           copyPopup('token');
           paymentLog.info('payment.send_token.copy.text.success', { entryId: entry.id });
         } catch (e) {
@@ -1255,7 +1405,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       copyAsEmoji: async (rawCtx) => {
         const { entry } = sendCtx(rawCtx);
         if (!entry.token) return;
-        emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
+        emojiPickerPopup({ token: getEncodedToken(entry.token) });
       },
     },
 
@@ -1282,23 +1432,23 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
     mintQuote: {
       copy: async (rawCtx) => {
         const { entry } = mintQuoteCtx(rawCtx);
-        const paymentRequest = entry.paymentRequest;
+        const paymentValue = getMintQuotePaymentValue(entry);
         const quoteId = entry.quoteId;
-        if (!paymentRequest || !quoteId) {
+        if (!paymentValue || !quoteId) {
           paymentLog.warn('payment.mint_quote.copy.no_payment_request', {
-            hasPaymentRequest: !!paymentRequest,
+            hasPaymentRequest: !!paymentValue,
             hasQuoteId: !!quoteId,
           });
           return;
         }
         try {
-          await Clipboard.setStringAsync(paymentRequest);
+          await Clipboard.setStringAsync(paymentValue);
           useTransactionDistributionStore.getState().setDistribution(quoteId, 'copy');
           paymentLog.info('payment.mint_quote.copy.success', {
             quoteId,
             entryId: entry.id,
           });
-          copyPopup('paymentRequest');
+          copyPopup(getOnchainMintAddress(entry) ? 'address' : 'lightningInvoice');
         } catch (e) {
           paymentLog.error('payment.mint_quote.copy.failed', {
             error: e instanceof Error ? e.message : String(e),
@@ -1308,11 +1458,11 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
       share: async (rawCtx) => {
         const { entry } = mintQuoteCtx(rawCtx);
-        const paymentRequest = entry.paymentRequest;
+        const paymentValue = getMintQuotePaymentValue(entry);
         const quoteId = entry.quoteId;
-        if (!paymentRequest || !quoteId) {
+        if (!paymentValue || !quoteId) {
           paymentLog.warn('payment.mint_quote.share.no_payment_request', {
-            hasPaymentRequest: !!paymentRequest,
+            hasPaymentRequest: !!paymentValue,
             hasQuoteId: !!quoteId,
           });
           return;
@@ -1321,7 +1471,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           // Read the share result so we can detect AirDrop on iOS. The
           // built-in colada platform.share at Colada.tsx
           // discards the result, so we can't piggyback on it.
-          const result = await Share.share({ message: paymentRequest });
+          const result = await Share.share({ message: paymentValue });
           if (result.action !== Share.sharedAction) {
             paymentLog.debug('payment.mint_quote.share.dismissed', { quoteId });
             return;
