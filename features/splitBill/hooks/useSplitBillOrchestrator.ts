@@ -30,6 +30,7 @@ import { startBLE } from 'bitchat-module';
 
 import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
+import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitchatBLEIdentityMaterial';
 import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { buildRecipientGiftWrap, buildSenderSelfCopyWrap } from '@/shared/lib/nostr/nip17';
@@ -214,6 +215,9 @@ export function useSplitBillOrchestrator() {
   const bitchatProfileScope = useBitchatProfileScope();
   const bitchatProfileScopeRef = useRef(bitchatProfileScope);
   bitchatProfileScopeRef.current = bitchatProfileScope;
+  const bitchatIdentityMaterial = useBitchatBLEIdentityMaterial();
+  const bitchatIdentityMaterialRef = useRef(bitchatIdentityMaterial);
+  bitchatIdentityMaterialRef.current = bitchatIdentityMaterial;
 
   // NDK + main Nostr private key — same sources UserMessagesScreen uses
   // for its DM send. Held behind refs so `confirm` / `retryDelivery` can
@@ -425,6 +429,7 @@ export function useSplitBillOrchestrator() {
               content: body,
               nickname: effectiveNick,
               profileScope: bitchatProfileScopeRef.current,
+              identityMaterial: bitchatIdentityMaterialRef.current,
               messageIdPrefix: 'split-bill',
             });
             if (result.handshakeError) {
@@ -486,13 +491,13 @@ export function useSplitBillOrchestrator() {
 
       // BLE worker — sequential per-peer handshake + send.
       //
-      // `startBLE` is idempotent (no-op if the BitchatBLEProvider has
-      // already started the mesh); we call it once up front instead of
-      // per-peer so we don't pay its native-bridge round-trip N times.
+      // `startBLE` is idempotent; call it once up front instead of per-peer
+      // so we don't pay its native-bridge round-trip N times.
       const bleWorker = (async (): Promise<DeliveryOutcome[]> => {
         if (bleParticipants.length > 0) {
           const effectiveNick = nicknameRef.current || 'sovran';
           const profileScope = bitchatProfileScopeRef.current;
+          const identityMaterial = bitchatIdentityMaterialRef.current;
           if (!profileScope) {
             flow.warn('split_bill.deliver.ble.no_profile_scope');
             for (const p of bleParticipants) {
@@ -502,8 +507,17 @@ export function useSplitBillOrchestrator() {
             }
             return bleParticipants.map(() => 'failed' as const);
           }
+          if (!identityMaterial) {
+            flow.warn('split_bill.deliver.ble.no_identity_material');
+            for (const p of bleParticipants) {
+              useSplitBillTransactionsStore
+                .getState()
+                .markDelivered(groupId, p.id, false, 'BitChat identity material unavailable');
+            }
+            return bleParticipants.map(() => 'failed' as const);
+          }
           const startupAt = performance.now();
-          await startBLE(effectiveNick, profileScope).catch((err) => {
+          await startBLE(effectiveNick, profileScope, identityMaterial).catch((err) => {
             flow.warn('split_bill.deliver.ble.start_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
@@ -596,14 +610,19 @@ export function useSplitBillOrchestrator() {
         // Same bring-up sequence as the confirm path — see comments there.
         const effectiveNick = nicknameRef.current || 'sovran';
         const profileScope = bitchatProfileScopeRef.current;
+        const identityMaterial = bitchatIdentityMaterialRef.current;
         if (!profileScope) {
           throw new Error('BitChat profile scope unavailable');
+        }
+        if (!identityMaterial) {
+          throw new Error('BitChat identity material unavailable');
         }
         const result = await sendBLEPrivateMessageChunks({
           peerID: p.peerID,
           content: body,
           nickname: effectiveNick,
           profileScope,
+          identityMaterial,
           messageIdPrefix: 'split-bill',
         });
         if (result.handshakeError) {

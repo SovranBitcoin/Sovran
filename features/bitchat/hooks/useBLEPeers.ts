@@ -1,7 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { getBLEPeers, addBLEPeerListener, type BLEPeer } from 'bitchat-module';
+import { getBLEPeers, addBLEPeerListener, startBLE, type BLEPeer } from 'bitchat-module';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
+import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
+import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitchatBLEIdentityMaterial';
+import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
+import { bitchatLog } from '@/shared/lib/logger';
 import {
   buildMockBLEPeers,
   INITIAL_MOCK_BLE_PEER_LOOP_STATE,
@@ -59,6 +63,8 @@ function subscribeMockPeers(listener: () => void): () => void {
 /**
  * Tracks the set of BLE mesh peers currently known to upstream bitchat's
  * `BLEService` — i.e. peers that have exchanged announce packets with us.
+ * Mounting this hook is an explicit discovery action: it starts BLE with the
+ * active Nostr-derived BitChat identity, which means upstream will announce.
  *
  * Sources:
  *  - Initial snapshot on mount via `getBLEPeers()`.
@@ -74,6 +80,9 @@ function subscribeMockPeers(listener: () => void): () => void {
  */
 export function useBLEPeers(): UseBLEPeersResult {
   const mockMode = useSettingsStore((state) => state.mockMode);
+  const nickname = useBitchatNickname();
+  const profileScope = useBitchatProfileScope();
+  const identityMaterial = useBitchatBLEIdentityMaterial();
   const [peers, setPeers] = useState<BLEPeer[]>(() =>
     mockMode ? mockPeersSnapshot : getBLEPeers()
   );
@@ -110,6 +119,26 @@ export function useBLEPeers(): UseBLEPeersResult {
       clearInterval(interval);
     };
   }, [mockMode, refresh, setPeersIfChanged]);
+
+  useEffect(() => {
+    if (mockMode || !nickname || !profileScope || !identityMaterial) return;
+
+    let cancelled = false;
+    startBLE(nickname, profileScope, identityMaterial)
+      .then(() => {
+        if (cancelled) return;
+        refresh();
+      })
+      .catch((err) => {
+        bitchatLog.error('bitchat.peers.ble_start_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [identityMaterial, mockMode, nickname, profileScope, refresh]);
 
   const connectedCount = useMemo(() => peers.filter((p) => p.isConnected).length, [peers]);
 

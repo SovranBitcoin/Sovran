@@ -29,8 +29,19 @@ public class BitChatModule: Module {
 
         // --- BLE Mesh ---
 
-        AsyncFunction("startBLE") { (nickname: String, profileScope: String) in
-            await BitChatBLEBridge.shared.start(nickname: nickname, profileScope: profileScope)
+        AsyncFunction("startBLE") {
+            (
+                nickname: String,
+                profileScope: String,
+                noisePrivateKeyHex: String,
+                signingPrivateKeyHex: String
+            ) in
+            try await BitChatBLEBridge.shared.start(
+                nickname: nickname,
+                profileScope: profileScope,
+                noisePrivateKeyHex: noisePrivateKeyHex,
+                signingPrivateKeyHex: signingPrivateKeyHex
+            )
         }
 
         AsyncFunction("sendBLEMessage") { (content: String) in

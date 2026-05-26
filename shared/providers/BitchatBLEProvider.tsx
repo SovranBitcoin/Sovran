@@ -1,36 +1,20 @@
 /**
- * @fileoverview App-wide bitchat BLE mesh lifecycle.
+ * @fileoverview App-wide bitchat BLE DM listener lifecycle.
  *
- * Starts the BLE mesh once at app boot so peers populate throughout the app
- * without requiring the user to open the mesh-chat or Network screens. The
- * mesh stays alive for the lifetime of the account scope — it only stops
- * when the user switches profiles (the provider unmounts with the account
- * scope).
+ * Keeps inbound DM and delivery-status listeners mounted for the lifetime of
+ * the account scope without starting the BLE mesh at app boot. Starting BLE
+ * immediately announces to nearby bitchat clients, so discovery is now owned
+ * by explicit peer-list/chat surfaces instead of ordinary app launch.
  *
  * Why a provider instead of per-screen start/stop:
- *   - The Split-Bill participant picker, contacts-screen peer hints, and any
- *     future "who's nearby?" affordances all want to see peers without
- *     bouncing through the BLE chat screen first.
- *   - `getBLEPeers()` and `addBLEPeerListener` are cheap once the mesh is
- *     running. Starting it once costs a BLE permission prompt and ~1s of
- *     advertising setup — amortised across the session.
- *   - `useBitChat(transport='ble')` previously called `stopBLE()` on
- *     cleanup, which would yank the mesh from underneath any other
- *     consumer. That's why this provider exists at all — see the comment
- *     in `useBitChat` where the public-BLE cleanup is now a no-op.
- *
- * Parity with `useBLEPeers`: this module only starts the mesh; peer-list
- * consumers still use `useBLEPeers()` as before.
+ *   - Inbound DMs and delivery-status events should be captured once BLE has
+ *     been explicitly started, even if the DM screen is closed.
+ *   - `useBitChat(transport='ble')` does not call `stopBLE()` on cleanup,
+ *     because other explicit BLE consumers may still be using the mesh.
  */
 
 import React, { useEffect } from 'react';
-import {
-  addBLEDeliveryStatusListener,
-  addBLEPrivateMessageListener,
-  startBLE,
-} from 'bitchat-module';
-import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
-import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
+import { addBLEDeliveryStatusListener, addBLEPrivateMessageListener } from 'bitchat-module';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
 import { bitchatLog, initLog, useInitMount } from '@/shared/lib/logger';
 
@@ -38,45 +22,10 @@ initLog('Module', 'BitchatBLEProvider loaded');
 
 /**
  * Invisible component. Mount inside `AccountScopedProviders` (not outer
- * providers) so BLE restarts when the profile switches — each profile has
- * its own identity keys and therefore its own advertised peerID.
+ * providers) so listeners reset when the profile switches.
  */
 export function BitchatBLEProvider({ children }: { children: React.ReactNode }) {
   useInitMount('BitchatBLEProvider');
-  const nickname = useBitchatNickname();
-  const profileScope = useBitchatProfileScope();
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // Nickname is derived async from the profile; skip first render until
-    // we have something to advertise. A missing nickname still starts BLE
-    // (upstream bitchat generates one), but we prefer to avoid the
-    // re-announce that happens when nickname changes post-start.
-    if (!nickname || !profileScope) return;
-
-    bitchatLog.info('bitchat.provider.ble_start', { hasNickname: !!nickname });
-    startBLE(nickname, profileScope)
-      .then(() => {
-        if (cancelled) return;
-        bitchatLog.info('bitchat.provider.ble_started');
-      })
-      .catch((err) => {
-        bitchatLog.error('bitchat.provider.ble_start_failed', {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-
-    return () => {
-      cancelled = true;
-      // Deliberately DON'T stopBLE here either. The provider is mounted
-      // inside AccountScopedProviders, so it only unmounts on profile
-      // switch. Native `startBLE(nickname, profileScope)` owns the actual
-      // scope transition: a different profileScope stops the old mesh and
-      // recreates it with profile-scoped identity keys/history. Calling an
-      // unconditional stop here would race that explicit handoff.
-    };
-  }, [nickname, profileScope]);
 
   // App-wide BLE-DM message + delivery-status listeners. Mounted here (not
   // on the DM screen) so:

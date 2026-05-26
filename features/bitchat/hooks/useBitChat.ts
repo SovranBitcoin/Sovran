@@ -22,6 +22,7 @@ import {
 } from 'bitchat-module';
 import { useBitchatNickname } from './useBitchatNickname';
 import { useBitchatDmMessagesStore, type BleDmMessage } from '../stores/bitchatDmMessages';
+import { useBitchatBLEIdentityMaterial } from './useBitchatBLEIdentityMaterial';
 import { useBitchatProfileScope } from '../lib/profileScope';
 import { bitchatLog } from '@/shared/lib/logger';
 import { mintLocalId } from '@/shared/lib/id';
@@ -96,6 +97,7 @@ export function useBitChat(
 ): UseBitChatResult {
   const nickname = useBitchatNickname();
   const profileScope = useBitchatProfileScope();
+  const identityMaterial = useBitchatBLEIdentityMaterial();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -120,15 +122,12 @@ export function useBitChat(
     if (transport !== 'ble') return;
 
     bitchatLog.info('bitchat.hook.ble_start', { hasNickname: !!nickname });
-    // BLE lifecycle is owned by `BitchatBLEProvider` (mounted in
-    // AccountScopedProviders) so the mesh stays running across the whole
-    // app. We still call `startBLE` here as a safety net — it's idempotent
-    // on the native side and covers the case where the provider hasn't
-    // fired yet (e.g. mesh-chat screen opened before the nickname was
-    // available).
-    if (!profileScope) return;
+    // Opening an explicit BLE chat starts the mesh. App launch deliberately
+    // does not start BLE because upstream announces as soon as services
+    // start.
+    if (!profileScope || !identityMaterial) return;
 
-    startBLE(nickname, profileScope)
+    startBLE(nickname, profileScope, identityMaterial)
       .then(() => {
         const state = getBLEState();
         bitchatLog.info('bitchat.hook.ble_started', { state });
@@ -170,16 +169,15 @@ export function useBitChat(
       sub.remove();
       stateSub.remove();
       peerSub.remove();
-      // Deliberately DON'T stopBLE here. The app-wide `BitchatBLEProvider`
-      // owns the mesh lifecycle — stopping it when a chat screen unmounts
-      // would yank peers out from under the Split Bill picker and any
-      // other concurrent consumer. Matches the 'ble-dm' transport below.
+      // Deliberately DON'T stopBLE here. Other explicit BLE consumers
+      // (NetworkSheet, Near Pay, Split Bill) may still be using the mesh.
+      // Matches the 'ble-dm' transport below.
       // Buffer reset is handled by the identity-change effect above, not
       // here, so a transient remount or a `nickname` dep change preserves
       // history.
       setIsConnected(false);
     };
-  }, [transport, nickname, profileScope]);
+  }, [identityMaterial, transport, nickname, profileScope]);
 
   // ===========================================================
   //  BLE DM — transport === 'ble-dm'
@@ -204,12 +202,14 @@ export function useBitChat(
   );
 
   useEffect(() => {
-    if (transport !== 'ble-dm' || !dmPeerID || !nickname || !profileScope) return;
+    if (transport !== 'ble-dm' || !dmPeerID || !nickname || !profileScope || !identityMaterial) {
+      return;
+    }
 
     bitchatLog.info('bitchat.hook.ble_dm_setup', { peerID: dmPeerID });
 
     // Reuse the mesh if it's already running (no-op); otherwise start it.
-    startBLE(nickname, profileScope)
+    startBLE(nickname, profileScope, identityMaterial)
       .then(() => setIsConnected(true))
       .catch((err) => {
         bitchatLog.error('bitchat.hook.ble_start_failed', {
@@ -231,7 +231,7 @@ export function useBitChat(
       // store, so nothing per-screen to tear down.
       setIsConnected(false);
     };
-  }, [transport, dmPeerID, nickname, profileScope]);
+  }, [identityMaterial, transport, dmPeerID, nickname, profileScope]);
 
   // ===========================================================
   //  Nostr public chat — transport === 'nostr'

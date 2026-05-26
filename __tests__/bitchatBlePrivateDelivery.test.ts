@@ -11,10 +11,18 @@ jest.mock('@/shared/lib/id', () => ({
 }));
 
 import { chunkUtf8, sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
+import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
 function byteLength(text: string): number {
   return new TextEncoder().encode(text).length;
 }
+
+const IDENTITY_MATERIAL: BitchatBLEIdentityMaterial = {
+  version: 'sovran-bitchat-ble-v1',
+  nostrPubkey: '11'.repeat(32),
+  noisePrivateKeyHex: '22'.repeat(32),
+  signingPrivateKeyHex: '33'.repeat(32),
+};
 
 describe('BitChat BLE private delivery', () => {
   it('chunks UTF-8 payloads at the byte limit', () => {
@@ -43,7 +51,10 @@ describe('BitChat BLE private delivery', () => {
       .fn<Promise<string>, [string, string, string, string]>()
       .mockImplementationOnce(() => firstSend)
       .mockResolvedValueOnce('message-2');
-    const startBLE = jest.fn<Promise<void>, [string, string]>().mockResolvedValue(undefined);
+    const startBLE =
+      jest.fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>().mockResolvedValue(
+        undefined
+      );
     const startBLEPrivateChat = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
     const sleep = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
     let nextId = 0;
@@ -53,6 +64,7 @@ describe('BitChat BLE private delivery', () => {
       content: 'abcdef',
       nickname: 'sender',
       profileScope: 'profile-a',
+      identityMaterial: IDENTITY_MATERIAL,
       maxBytes: 3,
       deps: {
         startBLE,
@@ -85,12 +97,15 @@ describe('BitChat BLE private delivery', () => {
       'sender',
       'message-2'
     );
-    expect(startBLE).toHaveBeenCalledWith('sender', 'profile-a');
+    expect(startBLE).toHaveBeenCalledWith('sender', 'profile-a', IDENTITY_MATERIAL);
     expect(startBLEPrivateChat).toHaveBeenCalledWith('peer-a');
   });
 
   it('fails safely before native calls when profile scope is missing', async () => {
-    const startBLE = jest.fn<Promise<void>, [string, string]>().mockResolvedValue(undefined);
+    const startBLE =
+      jest.fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>().mockResolvedValue(
+        undefined
+      );
 
     await expect(
       sendBLEPrivateMessageChunks({
@@ -98,9 +113,30 @@ describe('BitChat BLE private delivery', () => {
         content: 'cashuA...',
         nickname: 'sender',
         profileScope: '',
+        identityMaterial: IDENTITY_MATERIAL,
         deps: { startBLE },
       })
     ).rejects.toThrow('BitChat profile scope unavailable');
+
+    expect(startBLE).not.toHaveBeenCalled();
+  });
+
+  it('fails safely before native calls when identity material is missing', async () => {
+    const startBLE =
+      jest.fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>().mockResolvedValue(
+        undefined
+      );
+
+    await expect(
+      sendBLEPrivateMessageChunks({
+        peerID: 'peer-a',
+        content: 'cashuA...',
+        nickname: 'sender',
+        profileScope: 'profile-a',
+        identityMaterial: null,
+        deps: { startBLE },
+      })
+    ).rejects.toThrow('BitChat identity material unavailable');
 
     expect(startBLE).not.toHaveBeenCalled();
   });

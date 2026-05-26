@@ -67,6 +67,7 @@ import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/
 import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
 import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
+import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -741,6 +742,7 @@ interface CreateSovranHandlersConfig {
   onOptionDismiss?: () => void;
   getManager: () => Manager | null;
   getNpub?: () => string | undefined;
+  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null;
 }
 
 function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string | null {
@@ -767,7 +769,10 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
   return null;
 }
 
-async function deliverNearPayIfActive(historyEntry: string): Promise<void> {
+async function deliverNearPayIfActive(
+  historyEntry: string,
+  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null
+): Promise<void> {
   const active = useNearPaySessionStore.getState().active;
   if (!active) return;
 
@@ -776,12 +781,14 @@ async function deliverNearPayIfActive(historyEntry: string): Promise<void> {
     if (!encodedToken) throw new Error('Created send entry did not contain an ecash token');
 
     const profileScope = getBitchatProfileScope();
+    const identityMaterial = getBitchatIdentityMaterial?.() ?? null;
     const nickname = getBitchatNickname() || 'sovran';
     const result = await sendBLEPrivateMessageChunks({
       peerID: active.recipient.peerID,
       content: encodedToken,
       nickname,
       profileScope,
+      identityMaterial,
       messageIdPrefix: 'near-pay',
     });
 
@@ -808,6 +815,7 @@ export function createSovranHandlers({
   onOptionDismiss,
   getManager,
   getNpub,
+  getBitchatIdentityMaterial,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   paymentLog.debug('payment.handlers.created');
 
@@ -878,7 +886,7 @@ export function createSovranHandlers({
         }
       }
 
-      await deliverNearPayIfActive(enrichedHistoryEntry);
+      await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',

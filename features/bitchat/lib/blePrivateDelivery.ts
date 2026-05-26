@@ -1,4 +1,5 @@
 import { sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
+import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
 import { mintLocalId } from '@/shared/lib/id';
 
@@ -16,6 +17,7 @@ interface SendBLEPrivateMessageChunksOptions {
   content: string;
   nickname: string;
   profileScope: string;
+  identityMaterial: BitchatBLEIdentityMaterial | null | undefined;
   messageIdPrefix?: string;
   maxBytes?: number;
   handshakeDelayMs?: number;
@@ -76,12 +78,14 @@ export async function sendBLEPrivateMessageChunks({
   content,
   nickname,
   profileScope,
+  identityMaterial,
   messageIdPrefix = 'bitchat',
   maxBytes = DEFAULT_MAX_BYTES,
   handshakeDelayMs = DEFAULT_HANDSHAKE_DELAY_MS,
   deps,
 }: SendBLEPrivateMessageChunksOptions): Promise<SendBLEPrivateMessageChunksResult> {
   if (!profileScope) throw new Error('BitChat profile scope unavailable');
+  if (!identityMaterial) throw new Error('BitChat identity material unavailable');
   if (!peerID) throw new Error('BitChat peer unavailable');
 
   const startBLEFn = deps?.startBLE ?? startBLE;
@@ -96,7 +100,7 @@ export async function sendBLEPrivateMessageChunks({
   const chunks = chunkUtf8(content, maxBytes);
 
   const startupAt = now();
-  await startBLEFn(effectiveNickname, profileScope);
+  await startBLEFn(effectiveNickname, profileScope, identityMaterial);
   const startupMs = now() - startupAt;
 
   const handshakeAt = now();

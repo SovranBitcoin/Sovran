@@ -150,11 +150,9 @@ function AccountScopedProviders({
         SovranColadaProvider,
         ActionSheetProvider,
         PricelistProvider,
-        // Starts the bitchat BLE mesh once per account scope so peers
-        // populate app-wide (Split Bill picker, future "who's nearby?"
-        // surfaces) without needing a chat screen open to keep the mesh
-        // running. Mounted after keys/NDK so the advertised nickname is
-        // derived from the active profile.
+        // Mounts BitChat DM listeners once per account scope without
+        // starting BLE on app launch. BLE discovery announces to nearby
+        // bitchat clients, so explicit peer-list/chat surfaces own startup.
         BitchatBLEProvider,
         AppGate,
       ]),
