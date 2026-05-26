@@ -24,7 +24,7 @@ export {
 } from './payment';
 
 const KEY_ICON = 'icon:solar:key-bold';
-const BANK_ICON = 'icon:mdi:bank';
+const BANK_ICON = 'icon:mingcute:bank-fill';
 const WALLET_ICON = 'icon:solar:wallet-bold';
 const ALERT_ICON = 'icon:mdi:alert-circle-outline';
 const CAMERA_ICON = 'icon:mdi:camera';

@@ -624,7 +624,11 @@ const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
 export function UserProfileScreen() {
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, background, muted] = useThemeColor([
+    'foreground',
+    'background',
+    'muted',
+  ] as const);
   const profileFlowGroup = useActiveProfileFlowGroup();
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -952,7 +956,7 @@ export function UserProfileScreen() {
                   }}
                   asChild>
                   <Pressable style={{ padding: 8 }}>
-                    <Icon name="mdi:bank" size={24} color={foreground} />
+                    <Icon name="mingcute:bank-fill" size={24} color={muted} />
                   </Pressable>
                 </Link>
               )}
