@@ -5,12 +5,12 @@ const { withUniwindConfig } = require('uniwind/metro');
 
 const config = getDefaultConfig(__dirname);
 
-// `@sovranbitcoin/schemas` lives as a sibling repo and is wired in via
-// `file:../sovran-schemas`. Metro needs the linked target in `watchFolders`
-// so transform/resolve can walk its source files; otherwise the `node_modules`
-// symlink resolves but the target falls outside Metro's project roots.
-// `extraNodeModules` pins the schemas package's peer-deps (zod, neverthrow)
-// to the app's own copies so we don't ship two realms of ZodObject.
+// `@sovranbitcoin/schemas`, the local Coco PR packages, and local P2PK helper
+// live as sibling repos wired in via `file:../...`. Metro needs linked targets
+// in `watchFolders` so transform/resolve can walk their built files; otherwise
+// the `node_modules` symlink can resolve outside Metro's project roots.
+// `extraNodeModules` pins shared package names and schemas peer-deps (zod,
+// neverthrow) to the app's own copies so we don't ship duplicate realms.
 //
 // On EAS / CI builds the sibling source isn't checked out — the npm package
 // is installed from node_modules directly. Adding a non-existent watchFolder
@@ -19,15 +19,46 @@ const config = getDefaultConfig(__dirname);
 // Only add the watchFolder when the directory actually exists locally.
 const sovranSchemasPath = path.resolve(__dirname, '..', 'sovran-schemas');
 const appNodeModules = path.resolve(__dirname, 'node_modules');
-if (fs.existsSync(sovranSchemasPath)) {
-  config.watchFolders = [...(config.watchFolders ?? []), sovranSchemasPath];
-}
+const localCocoPackages = {
+  '@cashu/coco-core': path.resolve(__dirname, '..', 'coco', 'packages', 'core'),
+  '@cashu/coco-expo-sqlite': path.resolve(__dirname, '..', 'coco', 'packages', 'expo-sqlite'),
+  '@cashu/coco-react': path.resolve(__dirname, '..', 'coco', 'packages', 'react'),
+};
+const localP2PKImportPluginPath = path.resolve(__dirname, '..', 'coco-p2pk-plugin-helper');
+const localP2PKImportPluginEntryPath = path.join(localP2PKImportPluginPath, 'src', 'index.ts');
+const existingSiblingPackagePaths = [
+  sovranSchemasPath,
+  ...Object.values(localCocoPackages),
+  localP2PKImportPluginPath,
+].filter(fs.existsSync);
+const existingLocalCocoPackages = Object.fromEntries(
+  Object.entries(localCocoPackages).filter(([, packagePath]) => fs.existsSync(packagePath))
+);
+const localCocoEntryPaths = Object.fromEntries(
+  Object.entries(existingLocalCocoPackages)
+    .map(([packageName, packagePath]) => [packageName, path.join(packagePath, 'dist', 'index.js')])
+    .filter(([, entryPath]) => fs.existsSync(entryPath))
+);
+const localPackageEntryPaths = {
+  ...localCocoEntryPaths,
+  ...(fs.existsSync(localP2PKImportPluginEntryPath)
+    ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginEntryPath }
+    : {}),
+};
+
+config.watchFolders = Array.from(
+  new Set([...(config.watchFolders ?? []), ...existingSiblingPackagePaths])
+);
 config.resolver = {
   ...config.resolver,
   unstable_enableSymlinks: true,
   nodeModulesPaths: [...(config.resolver?.nodeModulesPaths ?? []), appNodeModules],
   extraNodeModules: {
     ...(config.resolver?.extraNodeModules ?? {}),
+    ...existingLocalCocoPackages,
+    ...(fs.existsSync(localP2PKImportPluginPath)
+      ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginPath }
+      : {}),
     zod: path.resolve(appNodeModules, 'zod'),
     neverthrow: path.resolve(appNodeModules, 'neverthrow'),
   },
@@ -147,6 +178,12 @@ uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: cashuTsEsmPath,
+    };
+  }
+  if (localPackageEntryPaths[moduleName]) {
+    return {
+      type: 'sourceFile',
+      filePath: localPackageEntryPaths[moduleName],
     };
   }
   // Chain to Uniwind's resolver to preserve CSS interop styling
