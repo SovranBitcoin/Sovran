@@ -7,8 +7,13 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { toCocoAmount } from '@/shared/lib/cashu/amount';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import {
+  getMeltDetailPathname,
+  getMintDetailPathname,
+} from '@/shared/lib/nav/transactionDetailRoutes';
 import { useToastSurface } from './useToastSurface';
 import { fmt, isAmountSegment, type PopupTextSegment } from './format';
 import { StatusToast, type StatusToastStatus } from './StatusToast';
@@ -51,7 +56,7 @@ const CASES = {
       fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
     submessageFailed: TOAST_COPY.receive.failed,
     history: { type: 'mint' as const, idField: 'quoteId' as const },
-    route: { pathname: '/mintQuote' as const, paramKey: 'mintHistoryEntry' },
+    route: { pathname: '/lightningReceive' as const, paramKey: 'mintHistoryEntry' },
   },
   send: {
     message: TOAST_COPY.send.message,
@@ -78,7 +83,7 @@ const CASES = {
       fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
     submessageFailed: TOAST_COPY.melt.failed,
     history: { type: 'melt' as const, idField: 'quoteId' as const },
-    route: { pathname: '/meltQuote' as const, paramKey: 'meltHistoryEntry' },
+    route: { pathname: '/lightningSend' as const, paramKey: 'meltHistoryEntry' },
   },
   'receive-ecash': {
     message: TOAST_COPY['receive-ecash'].message,
@@ -178,22 +183,38 @@ export function PaymentStatusToast({
       );
       // v3 melts are not in history; construct MeltHistoryEntry from operationId
       if (!entry && variant === 'melt' && effectiveOperationId) {
+        const now = Date.now();
         entry = {
           type: 'melt',
           id: effectiveOperationId,
+          source: 'legacy',
+          legacyHistoryId: effectiveOperationId,
           quoteId: paymentId,
           mintUrl,
-          amount,
+          amount: toCocoAmount(amount),
           unit,
           state: 'PAID',
-          createdAt: Date.now(),
+          createdAt: now,
+          updatedAt: now,
         } as const;
       }
       if (entry) {
-        guardedRouter.navigate({
-          pathname: config.route.pathname,
-          params: { [config.route.paramKey]: JSON.stringify(entry) },
-        });
+        if (entry.type === 'mint') {
+          guardedRouter.navigate({
+            pathname: getMintDetailPathname(entry),
+            params: { mintHistoryEntry: JSON.stringify(entry) },
+          });
+        } else if (entry.type === 'melt') {
+          guardedRouter.navigate({
+            pathname: getMeltDetailPathname(entry),
+            params: { meltHistoryEntry: JSON.stringify(entry) },
+          });
+        } else {
+          guardedRouter.navigate({
+            pathname: config.route.pathname,
+            params: { [config.route.paramKey]: JSON.stringify(entry) },
+          });
+        }
       }
     } catch (e) {
       popupLog.warn('popup.open_transaction_failed', { error: e });

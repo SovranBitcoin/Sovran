@@ -35,6 +35,7 @@ import {
   ParticipantCardDeck,
   type ParticipantCardDeckRef,
 } from '@/features/splitBill/components/ParticipantCardDeck';
+import { getMintDetailPathname } from '@/shared/lib/nav/transactionDetailRoutes';
 import { Log, useLifecycleLogger, walletLog, paymentLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -128,7 +129,7 @@ export default function SplitBillDetailScreen() {
         }
         paymentLog.info('split_bill.detail.view', { groupId, participantId });
         router.navigate({
-          pathname: '/mintQuote',
+          pathname: getMintDetailPathname(entry),
           params: { mintHistoryEntry: JSON.stringify(entry) },
         });
       } catch (err) {

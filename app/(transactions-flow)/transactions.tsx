@@ -21,11 +21,15 @@ import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import {
+  getMeltDetailPathname,
+  getMintDetailPathname,
+} from '@/shared/lib/nav/transactionDetailRoutes';
 import opacity from 'hex-color-opacity';
 
 const ParamsSchema = z.object({
   filterCurrency: z.string().max(16).optional(),
-  filterPaymentType: z.enum(['all', 'lightning', 'ecash']).optional(),
+  filterPaymentType: z.enum(['all', 'lightning', 'ecash', 'onchain']).optional(),
   filterDirection: z.enum(['all', 'incoming', 'outgoing']).optional(),
   filterStatus: z.enum(['All', 'Confirmed', 'Pending', 'Expired']).optional(),
   filterMintUrl: z.string().max(2048).optional(),
@@ -113,7 +117,7 @@ function TransactionsRoute() {
     switch (historyEntry.type) {
       case 'mint': {
         router.navigate({
-          pathname: '/mintQuote',
+          pathname: getMintDetailPathname(historyEntry),
           params: {
             mintHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -122,7 +126,7 @@ function TransactionsRoute() {
       }
       case 'melt': {
         router.navigate({
-          pathname: '/meltQuote',
+          pathname: getMeltDetailPathname(historyEntry),
           params: {
             meltHistoryEntry: JSON.stringify(historyEntry),
           },

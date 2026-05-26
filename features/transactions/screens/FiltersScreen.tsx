@@ -6,7 +6,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { router } from 'expo-router';
-import { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import { HistoryEntry } from '@cashu/coco-core';
 import { useMints } from '@cashu/coco-react';
 import { z } from 'zod';
 
@@ -24,16 +24,20 @@ import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactio
 import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import {
+  isPendingTransaction,
+  matchesTransactionFilters,
+  type TransactionDirection,
+  type TransactionPaymentType,
+} from '@/features/transactions/historyFilters';
 
-type PaymentType = 'all' | 'lightning' | 'ecash';
-type Direction = 'all' | 'incoming' | 'outgoing';
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 const SUPPORTED_CURRENCIES = ['ALL', 'SAT', 'USD', 'EUR', 'GBP'];
 
 const ParamsSchema = z.object({
   currency: z.string().max(16).optional(),
-  paymentType: z.enum(['all', 'lightning', 'ecash']).optional(),
+  paymentType: z.enum(['all', 'lightning', 'ecash', 'onchain']).optional(),
   direction: z.enum(['all', 'incoming', 'outgoing']).optional(),
   status: z.enum(['All', 'Confirmed', 'Pending', 'Expired']).optional(),
   mintUrl: z.string().max(2048).optional(),
@@ -140,8 +144,10 @@ export function FiltersScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'filter-flow.filters' });
 
   const [currency, setCurrency] = useState<string>(params?.currency || 'sat');
-  const [paymentType, setPaymentType] = useState<PaymentType>(params?.paymentType || 'all');
-  const [direction, setDirection] = useState<Direction>(params?.direction || 'all');
+  const [paymentType, setPaymentType] = useState<TransactionPaymentType>(
+    params?.paymentType || 'all'
+  );
+  const [direction, setDirection] = useState<TransactionDirection>(params?.direction || 'all');
   const [status, setStatus] = useState<Status>(params?.status || 'All');
   const [mintUrl, setMintUrl] = useState<string>(params?.mintUrl || 'all');
 
@@ -202,38 +208,15 @@ export function FiltersScreen() {
         if (quoteId && quoteIdToGroup[quoteId]) return false;
       }
 
-      if (
-        direction === 'incoming' &&
-        historyEntry.type !== 'mint' &&
-        historyEntry.type !== 'receive'
-      )
-        return false;
-      if (direction === 'outgoing' && historyEntry.type !== 'send' && historyEntry.type !== 'melt')
-        return false;
-      if (
-        paymentType === 'lightning' &&
-        historyEntry.type !== 'mint' &&
-        historyEntry.type !== 'melt'
-      )
-        return false;
-      if (
-        paymentType === 'ecash' &&
-        historyEntry.type !== 'send' &&
-        historyEntry.type !== 'receive'
-      )
-        return false;
+      if (!matchesTransactionFilters(historyEntry, { paymentType, direction })) return false;
 
       if (status === 'All') return true;
 
-      const isPending =
-        (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
-        (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') ||
-        (historyEntry.type === 'send' &&
-          (historyEntry.state === 'pending' || historyEntry.state === 'prepared'));
+      const isPending = isPendingTransaction(historyEntry);
       const isExpired =
         historyEntry.type === 'mint' &&
-        historyEntry.state === 'UNPAID' &&
-        mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+        String(historyEntry.state) === 'UNPAID' &&
+        mintHistoryEntryExpired(historyEntry);
 
       if (status === 'Expired') return isExpired;
       if (status === 'Pending') return isPending && !isExpired;
@@ -331,6 +314,12 @@ export function FiltersScreen() {
             icon="majesticons:coins"
             isSelected={paymentType === 'ecash'}
             onPress={() => setPaymentType('ecash')}
+          />
+          <Chip
+            label="Onchain"
+            icon="hugeicons:blockchain-01"
+            isSelected={paymentType === 'onchain'}
+            onPress={() => setPaymentType('onchain')}
           />
         </Section>
 

@@ -8,15 +8,14 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import type { TransactionDirection, TransactionPaymentType } from '../historyFilters';
 
-type PaymentType = 'all' | 'lightning' | 'ecash';
-type Direction = 'all' | 'incoming' | 'outgoing';
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 interface TransactionsFilterState {
   currency: string;
-  paymentType: PaymentType;
-  direction: Direction;
+  paymentType: TransactionPaymentType;
+  direction: TransactionDirection;
   status: Status;
   mintUrl: string;
   selectedMonth: string | null;
@@ -24,8 +23,8 @@ interface TransactionsFilterState {
 
 interface TransactionsFilterContextValue extends TransactionsFilterState {
   setCurrency: (currency: string) => void;
-  setPaymentType: (type: PaymentType) => void;
-  setDirection: (dir: Direction) => void;
+  setPaymentType: (type: TransactionPaymentType) => void;
+  setDirection: (dir: TransactionDirection) => void;
   setStatus: (status: Status) => void;
   setMintUrl: (mintUrl: string) => void;
   setSelectedMonth: (month: string | null) => void;
@@ -39,8 +38,8 @@ const TransactionsFilterContext = createContext<TransactionsFilterContextValue |
 interface TransactionsFilterProviderProps {
   children: ReactNode;
   initialCurrency?: string;
-  initialPaymentType?: PaymentType;
-  initialDirection?: Direction;
+  initialPaymentType?: TransactionPaymentType;
+  initialDirection?: TransactionDirection;
   initialStatus?: Status;
   initialMintUrl?: string;
 }
@@ -54,8 +53,8 @@ export function TransactionsFilterProvider({
   initialMintUrl = 'all',
 }: TransactionsFilterProviderProps) {
   const [currency, setCurrency] = useState(initialCurrency);
-  const [paymentType, setPaymentType] = useState<PaymentType>(initialPaymentType);
-  const [direction, setDirection] = useState<Direction>(initialDirection);
+  const [paymentType, setPaymentType] = useState<TransactionPaymentType>(initialPaymentType);
+  const [direction, setDirection] = useState<TransactionDirection>(initialDirection);
   const [status, setStatus] = useState<Status>(initialStatus);
   const [mintUrl, setMintUrl] = useState(initialMintUrl);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);

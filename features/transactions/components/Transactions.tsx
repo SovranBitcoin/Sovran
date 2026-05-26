@@ -27,6 +27,12 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
+import {
+  isPendingTransaction,
+  matchesTransactionFilters,
+  type TransactionDirection,
+  type TransactionPaymentType,
+} from '@/features/transactions/historyFilters';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { duration, spacing, zIndex } from '@/shared/styles/tokens';
@@ -84,8 +90,8 @@ interface Props {
   history: HistoryEntry[];
   isFetching?: boolean; // Loading state for fetching transactions
   // Filtering options
-  filter?: 'all' | 'incoming' | 'outgoing';
-  type?: 'all' | 'lightning' | 'ecash';
+  filter?: TransactionDirection;
+  type?: TransactionPaymentType;
   mintUrlFilter?: string;
   at?: 'all' | 'at';
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
@@ -180,29 +186,20 @@ export const Transactions = React.memo(
           if (quoteId && quoteIdToSplitBill[quoteId]) return false;
         }
 
-        if (
-          filter === 'incoming' &&
-          historyEntry.type !== 'mint' &&
-          historyEntry.type !== 'receive'
-        )
+        if (!matchesTransactionFilters(historyEntry, { paymentType: type, direction: filter })) {
           return false;
-        if (filter === 'outgoing' && historyEntry.type !== 'send' && historyEntry.type !== 'melt')
-          return false;
-        if (type === 'lightning' && historyEntry.type !== 'mint' && historyEntry.type !== 'melt')
-          return false;
-        if (type === 'ecash' && historyEntry.type !== 'send' && historyEntry.type !== 'receive')
-          return false;
+        }
 
         // Filter out expired transactions if hideExpired is true
         if (hideExpired) {
           const isExpired =
             historyEntry.type === 'mint' &&
-            historyEntry.state === 'UNPAID' &&
-            mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+            String(historyEntry.state) === 'UNPAID' &&
+            mintHistoryEntryExpired(historyEntry);
           if (isExpired) return false;
 
           // Filter out unpaid melt quotes
-          if (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') {
+          if (historyEntry.type === 'melt' && String(historyEntry.state) === 'UNPAID') {
             return false;
           }
         }
@@ -298,17 +295,13 @@ export const Transactions = React.memo(
           const isCollapsingGhost =
             historyEntry.type === 'send' &&
             collapsing.has((historyEntry as SendHistoryEntry).operationId);
-          const isPending =
-            (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
-            (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') ||
-            isCancellablePendingEcash(historyEntry) ||
-            isCollapsingGhost;
+          const isPending = isPendingTransaction(historyEntry, { isCollapsingGhost });
 
           // Check if it's an expired mint transaction
           const isExpired =
             historyEntry.type === 'mint' &&
-            historyEntry.state === 'UNPAID' &&
-            mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+            String(historyEntry.state) === 'UNPAID' &&
+            mintHistoryEntryExpired(historyEntry);
 
           if (isExpired) return 'expired';
           return isPending ? 'pending' : 'confirmed';

@@ -23,6 +23,7 @@ import {
   extractMonthsFromHistory,
 } from '@/features/transactions/components/MonthSelector';
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -33,10 +34,13 @@ import { useManager } from '@cashu/coco-react';
 import { attemptRollback } from '@/shared/lib/cashu/utils';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import {
+  matchesTransactionFilters,
+  type TransactionDirection,
+  type TransactionPaymentType,
+} from '@/features/transactions/historyFilters';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
-type PaymentType = 'all' | 'lightning' | 'ecash';
-type Direction = 'all' | 'incoming' | 'outgoing';
 
 const MONTH_SELECTOR_HEIGHT = 48;
 
@@ -47,9 +51,9 @@ interface TransactionsScreenProps {
   /** External filter: currency (from filter flow) */
   filterCurrency?: string;
   /** External filter: payment type (from filter flow) */
-  filterPaymentType?: PaymentType;
+  filterPaymentType?: TransactionPaymentType;
   /** External filter: direction (from filter flow) */
-  filterDirection?: Direction;
+  filterDirection?: TransactionDirection;
   /** External filter: mint URL (from filter flow) */
   filterMintUrl?: string;
   /** External filter: selected month key (format: "YYYY-MM") */
@@ -146,49 +150,22 @@ export function TransactionsScreen({
   }, [isOffline, isSweeping, visiblePendingEcash, reclaimOne]);
 
   const totalVisiblePendingAmount = useMemo(
-    () => visiblePendingEcash.reduce((sum, tx) => sum + tx.amount, 0),
+    () => visiblePendingEcash.reduce((sum, tx) => sum + amountToNumber(tx.amount), 0),
     [visiblePendingEcash]
   );
   const visibleUnit = visiblePendingEcash[0]?.unit || selectedCurrency;
-
-  const getCocoTransactionTypes = useCallback((): HistoryEntry['type'][] => {
-    if (paymentType === 'all' && direction === 'all') {
-      return ['mint', 'melt', 'send', 'receive'];
-    }
-
-    if (paymentType === 'lightning') {
-      if (direction === 'all') return ['mint', 'melt'];
-      if (direction === 'incoming') return ['mint'];
-      if (direction === 'outgoing') return ['melt'];
-    }
-
-    if (paymentType === 'ecash') {
-      if (direction === 'all') return ['send', 'receive'];
-      if (direction === 'incoming') return ['receive'];
-      if (direction === 'outgoing') return ['send'];
-    }
-
-    if (paymentType === 'all') {
-      if (direction === 'incoming') return ['mint', 'receive'];
-      if (direction === 'outgoing') return ['melt', 'send'];
-    }
-
-    return [];
-  }, [paymentType, direction]);
 
   const { history, isFetching } = useHistoryWithMelts();
 
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}-${selectedMonth}`;
 
   const filteredByTypeHistory = useMemo(() => {
-    const allowedTypes = getCocoTransactionTypes();
-
     return history.filter((historyEntry) => {
-      if (historyEntry.unit !== selectedCurrency) return false;
-      if (allowedTypes.length > 0 && !allowedTypes.includes(historyEntry.type)) return false;
+      if (selectedCurrency !== 'all' && historyEntry.unit !== selectedCurrency) return false;
+      if (!matchesTransactionFilters(historyEntry, { paymentType, direction })) return false;
       return true;
     });
-  }, [history, selectedCurrency, getCocoTransactionTypes]);
+  }, [history, selectedCurrency, paymentType, direction]);
 
   const parsedAccount = { unit: selectedCurrency };
 

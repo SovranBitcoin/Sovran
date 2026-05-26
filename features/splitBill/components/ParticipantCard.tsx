@@ -14,9 +14,9 @@
  * generous padding. The deck's outer ScrollView absorbs the tallest card's
  * rendered height.
  *
- * Footer: a tappable "View" pill that navigates to `/mintQuote` for the
- * underlying coco `MintHistoryEntry` — the same destination `Transaction`
- * rows on the wallet home point to.
+ * Footer: a tappable "View" pill that navigates to the receive detail route
+ * for the underlying coco `MintHistoryEntry` — the same destination
+ * `Transaction` rows on the wallet home point to.
  *
  * State treatments:
  *   - `paymentState === 'paid'`    → QR dims to 0.4 and a ✓ chip overlays.
@@ -235,9 +235,9 @@ export function ParticipantCard({
             ) : null}
           </View>
 
-          {/* View button — links to `/mintQuote`, same destination a
-              Transaction row on the wallet home points to. Text-only; a
-              trailing arrow glyph felt cluttered next to the QR. */}
+          {/* View button — links to the same destination a Transaction row
+              on the wallet home points to. Text-only; a trailing arrow glyph
+              felt cluttered next to the QR. */}
           <Pressable
             onPress={canView ? () => onView(participant.id) : undefined}
             disabled={!canView}

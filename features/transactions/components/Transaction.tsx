@@ -15,6 +15,7 @@ import Icon from 'assets/icons';
 import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
 import TransactionIcon from '@/features/transactions/components/TransactionIcon';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
 import {
   COLLAPSE_DURATION_MS,
@@ -29,12 +30,19 @@ import { formatAmount } from '@/shared/lib/currency';
 import { formatDate } from '@/shared/lib/date';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
+import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
+import {
+  getMeltDetailPathname,
+  getMintDetailPathname,
+} from '@/shared/lib/nav/transactionDetailRoutes';
 import { log, Log } from '@/shared/lib/logger';
 import { useScanEntryForTransactionId, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useTransactionDistributionStore,
   DistributionSource,
 } from '@/shared/stores/profile/transactionDistributionStore';
+import { getOnchainTransactionStatusLabel } from '../lib/onchainTransactionStatus';
 
 /**
  * Unified source for the row badge. Combines inbound (scan history) and
@@ -114,10 +122,10 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
 
   // Check if this is a rolled back send transaction
   const isRolledBack =
-    historyEntry.type === 'send' && (historyEntry as SendHistoryEntry).state === 'rolledBack';
+    historyEntry.type === 'send' && (historyEntry as SendHistoryEntry).state === 'rolled_back';
 
   const fiatAmount = formatAmount(
-    { amount: Math.abs(historyEntry.amount), unit: historyEntry.unit },
+    { amount: Math.abs(amountToNumber(historyEntry.amount)), unit: historyEntry.unit },
     { displayAs: 'usd' }
   );
 
@@ -126,9 +134,8 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
 
     switch (historyEntry.type) {
       case 'mint': {
-        // Coco uses 'mint' for Lightning-to-ecash (Lightning receive)
         router.navigate({
-          pathname: '/mintQuote',
+          pathname: getMintDetailPathname(historyEntry),
           params: {
             mintHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -136,9 +143,8 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
         return;
       }
       case 'melt': {
-        // Coco uses 'melt' for ecash-to-Lightning (Lightning send)
         router.navigate({
-          pathname: '/meltQuote',
+          pathname: getMeltDetailPathname(historyEntry),
           params: {
             meltHistoryEntry: JSON.stringify(historyEntry),
           },
@@ -209,6 +215,9 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
   // options — subscribes to both stores for reactivity.
   const transactionSource = useTransactionSource(historyEntry);
   const bip321Options = useBip321Options(historyEntry.id);
+  const onchainAddress = getOnchainMintAddress(historyEntry);
+  const mempool = useMempoolAddressSummary(onchainAddress);
+  const onchainStatusLabel = getOnchainTransactionStatusLabel(mempool);
 
   // testID encodes both type and unique id so log-doctor `phone test`
   // can target a row by prefix (`transaction-mint-`, `transaction-send-`,
@@ -282,11 +291,15 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
                   const hasEcash = bip321Options.some(
                     (k) => k === 'paymentRequest' || k === 'ecashToken'
                   );
+                  const hasOnchain = bip321Options.some((k) => k === 'onchainAddress');
+                  const usedOnchain = !!onchainAddress;
                   const usedLightning = historyEntry.type === 'melt';
+                  const usedEcash = !usedLightning && !usedOnchain;
                   // Sort: used method first
                   const items = [
                     hasLightning && { name: 'mdi:lightning-bolt', used: usedLightning },
-                    hasEcash && { name: 'majesticons:coins', used: !usedLightning },
+                    hasEcash && { name: 'majesticons:coins', used: usedEcash },
+                    hasOnchain && { name: 'hugeicons:blockchain-01', used: usedOnchain },
                   ].filter(Boolean) as { name: string; used: boolean }[];
                   items.sort((a, b) => (a.used === b.used ? 0 : a.used ? -1 : 1));
                   return items.map((item) => (
@@ -298,6 +311,14 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
                     />
                   ));
                 })()}
+              {onchainStatusLabel && (
+                <>
+                  <Icon name="hugeicons:blockchain-01" size={10} color={opacity(foreground, 0.8)} />
+                  <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
+                    {onchainStatusLabel}
+                  </UntranslatedText>
+                </>
+              )}
             </HStack>
             <UntranslatedText
               overpass
