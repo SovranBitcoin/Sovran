@@ -17,6 +17,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 
 import {
   EMPTY_DISTRIBUTION,
@@ -120,7 +121,7 @@ export function MintRebalancePlanScreen() {
   const computedPlan = useMemo(() => {
     const mintBalances = mintUrls.map((mintUrl) => ({
       mintUrl,
-      balance: liveBalances[mintUrl]?.total || 0,
+      balance: amountToNumber(liveBalances[mintUrl]?.total),
     }));
     return computeRebalancePlan(mintBalances, distribution, minTransferThreshold);
   }, [mintUrls, liveBalances, distribution, minTransferThreshold]);

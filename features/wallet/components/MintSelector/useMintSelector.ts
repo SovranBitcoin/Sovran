@@ -12,6 +12,7 @@ import {
   HEADER_LAYOUT,
 } from '@/features/wallet/lib/walletHeader';
 import { getMintDisplayName } from '@/shared/lib/url';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 export interface MintSelectorProps {
@@ -59,7 +60,7 @@ export function useMintSelector({
 
   const storedSelectedMint = useMintStore((state) => state.selectedMint);
   const mintUrl = selectedMintUrl ?? storedSelectedMint;
-  const balance = mintUrl ? liveBalances.byMint[mintUrl]?.total || 0 : 0;
+  const balance = mintUrl ? amountToNumber(liveBalances.byMint[mintUrl]?.total) : 0;
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
     [mints, mintUrl]

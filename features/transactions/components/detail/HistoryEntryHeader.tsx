@@ -12,6 +12,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatAmount } from '@/shared/lib/currency';
+import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -24,7 +25,7 @@ interface HistoryEntryHeaderProps {
   historyEntry?: HistoryEntry;
   /** Pending data for payment request mode before token is created */
   pendingData?: {
-    amount: number;
+    amount: AmountValue;
     unit: string;
     type: 'send' | 'receive';
   };
@@ -61,6 +62,7 @@ export function HistoryEntryHeader({
 
   // Determine values from either historyEntry or pendingData
   const amount = historyEntry?.amount ?? pendingData?.amount ?? 0;
+  const numericAmount = amountToNumber(amount);
   const unit = historyEntry?.unit ?? pendingData?.unit ?? 'sat';
   const type = historyEntry?.type ?? pendingData?.type ?? 'send';
 
@@ -150,7 +152,7 @@ export function HistoryEntryHeader({
           </HStack>
           <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
             {formatAmount(
-              { amount: Math.abs(amount), unit },
+              { amount: Math.abs(numericAmount), unit },
               {
                 displayAs: unit === 'usd' ? 'sats' : 'usd',
                 currencyDisplay: unit === 'usd' ? 'name' : 'symbol',

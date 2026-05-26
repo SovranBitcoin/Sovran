@@ -3,8 +3,7 @@ import { ColorValue } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import { Proof } from '@cashu/cashu-ts';
-import { getDecodedToken, ReceiveHistoryEntry } from '@cashu/coco-core';
+import { getTokenMetadata } from '@cashu/coco-core';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -15,7 +14,7 @@ import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatAmount } from '@/shared/lib/currency';
-import { mintLocalId } from '@/shared/lib/id';
+import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { staticPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 
@@ -48,8 +47,8 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
   let isValid = false;
 
   try {
-    const decoded = getDecodedToken(token);
-    amount = decoded.proofs.reduce((sum: number, proof: Proof) => sum + proof.amount, 0);
+    const decoded = getTokenMetadata(token);
+    amount = decoded.amount.toNumber();
     unit = decoded.unit || 'sats';
     mintUrl = decoded.mint || '';
     isValid = true;
@@ -68,18 +67,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
       return;
     }
 
-    const decodedToken = getDecodedToken(token);
-    const receiveHistoryEntry: ReceiveHistoryEntry = {
-      id: mintLocalId('receive'),
-      type: 'receive',
-      amount,
-      unit,
-      mintUrl,
-      createdAt: Date.now(),
-      metadata: {},
-      state: 'prepared',
-      token: decodedToken,
-    };
+    const receiveHistoryEntry = buildReceiveHistoryEntry(token, unit);
 
     router.navigate({
       pathname: '/receiveToken',

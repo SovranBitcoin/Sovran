@@ -37,6 +37,7 @@ import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog, Log } from '@/shared/lib/logger';
 
 interface Account {
@@ -213,7 +214,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   );
   const pendingTotal = mockMode
     ? mockPendingAmount
-    : pendingSends.reduce((sum, tx) => sum + tx.amount, 0);
+    : pendingSends.reduce((sum, tx) => sum + amountToNumber(tx.amount), 0);
   const pendingUnit = pendingSends[0]?.unit || 'sat';
 
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;

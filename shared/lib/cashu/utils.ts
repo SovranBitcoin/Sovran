@@ -12,10 +12,10 @@
  */
 
 import {
-  getDecodedToken,
+  getTokenMetadata,
   type HistoryEntry,
+  type LegacyReceiveHistoryEntry,
   type Manager,
-  type ReceiveHistoryEntry,
   type SendHistoryEntry,
 } from '@cashu/coco-core';
 
@@ -27,7 +27,7 @@ import { mintLocalId } from '../id';
  *
  * @description Checks if the provided string can be successfully decoded as an ecash token
  *
- * **Process:** getDecodedToken() → return success/failure
+ * **Process:** getTokenMetadata() → return success/failure
  * **Effects:** None (pure validation function)
  *
  * @param {string} token - The token string to validate
@@ -42,7 +42,7 @@ import { mintLocalId } from '../id';
  */
 export function isValidEcashToken(token: string): boolean {
   try {
-    getDecodedToken(token);
+    getTokenMetadata(token);
     log.debug('cashu.utils.validate_ecash_token', { valid: true, tokenLen: token.length });
     return true;
   } catch {
@@ -56,25 +56,15 @@ export function isValidEcashToken(token: string): boolean {
 // ============================================================================
 
 /**
- * Sums the amounts of all proofs in an array.
- * Eliminates repeated `.reduce((sum, p) => sum + p.amount, 0)` across the codebase.
- */
-function sumProofAmounts(proofs: readonly { amount: number }[]): number {
-  let total = 0;
-  for (const p of proofs) total += p.amount;
-  return total;
-}
-
-/**
  * Extracts the amount in sats from an ecash token.
  */
 export function getEcashTokenAmount(token: string): number | undefined {
   try {
-    const decoded = getDecodedToken(token);
-    const amount = sumProofAmounts(decoded.proofs);
+    const decoded = getTokenMetadata(token);
+    const amount = decoded.amount.toNumber();
     log.debug('cashu.utils.get_ecash_token_amount', {
       amount,
-      proofCount: decoded.proofs.length,
+      proofCount: decoded.incompleteProofs.length,
       mint: decoded.mint,
     });
     return amount;
@@ -114,30 +104,34 @@ function extractP2PKPubkey(proofs: readonly { secret: string }[]): string | null
 export function buildReceiveHistoryEntry(
   rawToken: string,
   unitOverride?: string
-): ReceiveHistoryEntry {
+): LegacyReceiveHistoryEntry {
   log.info('cashu.utils.build_receive_history_entry', { tokenLen: rawToken.length, unitOverride });
-  const decodedToken = getDecodedToken(rawToken);
-  const p2pkPubkey = extractP2PKPubkey(decodedToken.proofs);
-  const amount = sumProofAmounts(decodedToken.proofs);
+  const decodedToken = getTokenMetadata(rawToken);
+  const p2pkPubkey = extractP2PKPubkey(decodedToken.incompleteProofs);
+  const amount = decodedToken.amount;
   log.debug('cashu.utils.build_receive_history_entry.decoded', {
-    amount,
-    proofCount: decodedToken.proofs.length,
+    amount: amount.toString(),
+    proofCount: decodedToken.incompleteProofs.length,
     mint: decodedToken.mint,
     hasP2pk: !!p2pkPubkey,
   });
+  const now = Date.now();
+  const id = mintLocalId('receive');
   return {
-    id: mintLocalId('receive'),
+    id,
     type: 'receive',
-    amount: sumProofAmounts(decodedToken.proofs),
+    source: 'legacy',
+    legacyHistoryId: id,
+    amount,
     unit: unitOverride ?? decodedToken.unit ?? 'sat',
     mintUrl: decodedToken.mint,
-    createdAt: Date.now(),
+    createdAt: now,
+    updatedAt: now,
     metadata: {
       rawToken,
       ...(p2pkPubkey ? { p2pkPubkey } : {}),
     },
     state: 'prepared',
-    token: decodedToken,
   };
 }
 

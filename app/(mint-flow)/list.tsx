@@ -23,6 +23,7 @@ import { MintListScreen } from '@/features/mint';
 import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';
 import { buildMintListItems } from '@/features/send';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
@@ -65,7 +66,7 @@ function MintListRoute() {
     () =>
       trustedMints.map((m) => ({
         mintUrl: m.mintUrl,
-        balance: mintBalances[m.mintUrl]?.total ?? 0,
+        balance: amountToNumber(mintBalances[m.mintUrl]?.total),
         status: 'available' as const,
         reason: null,
         isPreferred: false,

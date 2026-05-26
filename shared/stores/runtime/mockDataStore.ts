@@ -26,6 +26,7 @@ import {
   type NostrProfileMetadata,
 } from '@/shared/stores/global/nostrMetadataCache';
 import { withSkippedPersistWrites } from '@/shared/lib/cashu/profileScopedStorage';
+import { amountToNumber, toCocoAmount } from '@/shared/lib/cashu/amount';
 import type { HistoryEntry } from '@cashu/coco-core';
 // Type-only import — `useRecentContacts` does not import this file at runtime
 // (it reads mock state via getMockState() below), so there's no cycle.
@@ -112,7 +113,16 @@ function buildMockData() {
       return;
     }
 
-    const base = { id, createdAt, mintUrl, unit: 'sat' as const, amount: row.amount };
+    const base = {
+      id,
+      source: 'legacy' as const,
+      legacyHistoryId: id,
+      createdAt,
+      updatedAt: createdAt,
+      mintUrl,
+      unit: 'sat' as const,
+      amount: toCocoAmount(row.amount),
+    };
 
     if (row.type === 'melt') {
       history.push({ ...base, type: 'melt', quoteId: `${id}-q`, state: 'PAID' as const });
@@ -178,7 +188,7 @@ function buildMockData() {
 
   const pendingAmount = history
     .filter((e) => e.type === 'send' && 'state' in e && e.state === 'pending')
-    .reduce((sum, e) => sum + e.amount, 0);
+    .reduce((sum, e) => sum + amountToNumber(e.amount), 0);
 
   return { history, scanEntries, swapGroups, locations, balance: 247_382, pendingAmount };
 }

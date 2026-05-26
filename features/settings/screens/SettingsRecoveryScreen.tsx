@@ -16,6 +16,7 @@ import { useNavigation, router } from 'expo-router';
 import { Mint } from '@cashu/coco-core';
 import { useBalanceContext } from '@cashu/coco-react';
 import { deleteMintOperation } from '@/shared/lib/cashu/managerInternals';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { LoadingIndicator } from '@/shared/blocks/status';
@@ -283,7 +284,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         const balances = await manager.wallet.balances
           .byMint()
           .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
-        const mintBalance = balances[mintUrl]?.total ?? 0;
+        const mintBalance = amountToNumber(balances[mintUrl]?.total);
         const fundsFound = mintBalance > 0;
         const mintMs = Math.round((performance.now() - mintT0) * 100) / 100;
 

@@ -5,6 +5,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { formatAmount } from '@/shared/lib/currency';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -202,7 +203,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
       for (const entry of matching) {
         const day = new Date(entry.createdAt).getDate();
-        dailyAmounts[day - 1] += entry.amount;
+        dailyAmounts[day - 1] += amountToNumber(entry.amount);
       }
     }
 

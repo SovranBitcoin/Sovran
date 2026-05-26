@@ -8,9 +8,10 @@
 
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 
 interface AmountWithUnit {
-  amount: number;
+  amount: AmountValue;
   unit: string;
 }
 
@@ -68,16 +69,17 @@ function getRate(unit: string): number {
 export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions = {}): string {
   const inputUnit = input.unit.toLowerCase() === 'sat' ? 'sats' : input.unit.toLowerCase();
   const outputUnit = options.displayAs?.toLowerCase() || inputUnit;
+  const amount = amountToNumber(input.amount);
 
   if (options.useUserPreference && inputUnit === 'sats') {
     const displayBtc = useSettingsStore.getState().getDisplayBtc();
     const asBtc = displayBtc === 0;
-    const value = asBtc ? input.amount / 100_000_000 : input.amount;
+    const value = asBtc ? amount / 100_000_000 : amount;
     const formatted = (asBtc ? btcFormatter : satsFormatter).format(value);
     return displayBtc === 2 ? `${formatted} sats` : formatted;
   }
 
-  const adjustedInput = FIAT_UNITS.includes(inputUnit) ? input.amount / 100 : input.amount;
+  const adjustedInput = FIAT_UNITS.includes(inputUnit) ? amount / 100 : amount;
   const inBtc = adjustedInput / getRate(inputUnit);
   const outputValue = inBtc * getRate(outputUnit);
 

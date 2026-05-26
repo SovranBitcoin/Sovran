@@ -13,6 +13,7 @@ import { LiquidGlassText } from 'liquid-glass-text';
 import type { GlassVariant } from 'liquid-glass-text';
 
 import { formatAmount } from '@/shared/lib/currency';
+import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 import { Log } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/utils';
 import { useCapabilities } from '@/shared/ui/capability';
@@ -43,7 +44,7 @@ export const AMOUNT_FONT_FAMILY: Record<FontWeight, string> = {
 };
 
 interface AmountFormatterProps {
-  amount: number;
+  amount: AmountValue;
   unit: CurrencyUnit;
   size?: number;
   lineHeight?: number;
@@ -108,6 +109,7 @@ export function AmountFormatter({
     'success',
   ] as const);
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
+  const numericAmount = amountToNumber(amount);
 
   const decorated = decorate(
     formatAmount({ amount, unit }, { useUserPreference: true }),
@@ -119,7 +121,7 @@ export function AmountFormatter({
   const resolvedColor = resolveColor({
     color,
     useTypeColors,
-    amount,
+    amount: numericAmount,
     transactionType,
     foreground,
     danger,

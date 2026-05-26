@@ -1,6 +1,7 @@
 import { extractDomain } from '@/shared/lib/url';
+import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 
-type BalanceMap = Record<string, { total?: number } | undefined>;
+type BalanceMap = Record<string, { total?: AmountValue } | undefined>;
 
 interface ManagerLike {
   wallet: { balances: { byMint: () => Promise<BalanceMap> } };
@@ -36,7 +37,7 @@ export async function releaseTrustWindow(
   const stranded: StrandedMint[] = [];
   const untrustErrors: { url: string; error: unknown }[] = [];
   for (const url of temporarilyTrusted) {
-    const balance = balances[url]?.total ?? 0;
+    const balance = amountToNumber(balances[url]?.total);
     if (balance > 0) stranded.push({ url, balance });
     try {
       await manager.mint.untrustMint(url);
