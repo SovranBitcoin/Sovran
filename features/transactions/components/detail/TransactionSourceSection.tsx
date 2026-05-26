@@ -21,6 +21,10 @@ function isEcashKind(k: string) {
   return k === 'paymentRequest' || k === 'ecashToken';
 }
 
+function isOnchainKind(k: string) {
+  return k === 'onchainAddress';
+}
+
 /**
  * Returns the human-readable source label for a transaction, or null if none is linked.
  * Intended for use as a row in DetailsSection.
@@ -52,17 +56,19 @@ export function Bip321MethodIcons({
   usedKind,
 }: {
   optionKinds: string[];
-  /** 'lightning' | 'ecash' — which category was actually used */
-  usedKind?: 'lightning' | 'ecash';
+  /** Which payment category was actually used. */
+  usedKind?: 'lightning' | 'ecash' | 'onchain';
 }) {
   const foreground = useThemeColor('foreground');
   const hasLightning = optionKinds.some(isLightningKind);
   const hasEcash = optionKinds.some(isEcashKind);
+  const hasOnchain = optionKinds.some(isOnchainKind);
 
   // Sort: used method first
   const items = [
     hasLightning && { name: 'mdi:lightning-bolt', used: usedKind === 'lightning' },
     hasEcash && { name: 'majesticons:coins', used: usedKind === 'ecash' },
+    hasOnchain && { name: 'hugeicons:blockchain-01', used: usedKind === 'onchain' },
   ].filter(Boolean) as { name: string; used: boolean }[];
   items.sort((a, b) => (a.used === b.used ? 0 : a.used ? -1 : 1));
 

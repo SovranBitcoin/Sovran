@@ -28,7 +28,7 @@ The `<Screen>` props depend on what the screen contains. Three common shapes:
 - **Settings-list / inventory screens** (long scrolling content, no footer CTA):
   `<Screen name="..." scroll="custom" safeArea>` followed by `<ScrollView className="px-4">`. The `safeArea` prop is required here — without it the content runs under the modal's safe-area inset. See `SettingsStorageScreen`, `SettingsRecoveryScreen`, `SettingsRoutingScreen` for canonical examples.
 - **Action screens with a footer CTA** (form + a "Submit" button at the bottom):
-  `<Screen name="..." contentPadding={0} footer={bottomButtons}>` where `bottomButtons` is a `<BottomButtons>` block holding the project Button. The Screen handles safe-area itself in this mode — **do not** add `safeArea`. See `MeltQuoteScreen`, `SendTokenScreen`, `WhitenoiseSetupScreen`.
+  `<Screen name="..." contentPadding={0} footer={bottomButtons}>` where `bottomButtons` is a `<BottomButtons>` block holding the project Button. The Screen handles safe-area itself in this mode — **do not** add `safeArea`. See `LightningSendScreen`, `SendTokenScreen`, `WhitenoiseSetupScreen`.
 - **Full-bleed screens** (camera, chat, map): `<Screen name="..." scroll="none">` — no scroll, no safe area, the screen owns its own insets.
 
 If you're not sure which shape fits, find the closest existing screen in the same feature and copy its wrapper line.

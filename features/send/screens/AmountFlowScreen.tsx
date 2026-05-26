@@ -1,7 +1,7 @@
 /**
  * Shared send/receive amount route shell: mint header, amount entry screen actions, AmountSelector.
  *
- * Follows the same pattern as MeltQuoteScreen, SendTokenScreen, etc:
+ * Follows the same pattern as LightningSendScreen, SendTokenScreen, etc:
  * receives a single serialized entry from the machine's step handler,
  * passes it to useScreenActions, and renders UI.
  */
@@ -140,7 +140,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
 
   // Profile bundle forwarded to AmountSelector → `actions.next.execute(...)` →
   // machine.enterAmount → entry.metadata. Forwarded whenever we have a
-  // display name (with or without an avatar), so MeltQuoteScreen renders
+  // display name (with or without an avatar), so LightningSendScreen renders
   // the recipient header on first paint instead of paying a second kind-0
   // round-trip. The previous gate (`recipientReady && headerDisplayName`)
   // dropped the whole profile when `headerDisplayName` was momentarily

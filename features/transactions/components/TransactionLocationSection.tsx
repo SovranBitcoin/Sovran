@@ -9,7 +9,8 @@
  * - Grayscale styling: Map uses desaturated colors to blend with UI
  * - Cross-platform: Supports both Apple Maps (iOS) and Google Maps (Android)
  *
- * Used across SendTokenScreen, ReceiveTokenScreen, MintQuoteScreen, MeltQuoteScreen.
+ * Used across SendTokenScreen, ReceiveTokenScreen, LightningReceiveScreen,
+ * OnchainReceiveScreen, and LightningSendScreen.
  */
 
 import React from 'react';

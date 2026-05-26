@@ -1,23 +1,19 @@
 /**
- * @fileoverview Canonical meltQuote route shell
+ * @fileoverview Legacy meltQuote route dispatcher
  *
- * Single body for the three meltQuote expo-router files. The active
- * (send-flow) wrapper threads the mint-pill callbacks through the
- * payment machine so the user can swap mints mid-flow; standalone and
- * transactions-flow re-entries leave them undefined so `MeltQuoteScreen`
- * renders the entry read-only.
- *
- * Validates the JSON-encoded `meltHistoryEntry` deep-link param at the
- * route boundary per AUDIT.md dim-5 (audit 23#F-002): the param is
- * `JSON.parse`d by the screen, so unguarded forwarding crashes on
- * malformed input or renders a spoofed melt entry.
+ * `meltQuote` is the internal colada operation contract. User-facing
+ * routes are rail-specific (`lightningSend` / `onchainSend`), but this
+ * dispatcher keeps older links and transaction references valid.
  */
 
 import React from 'react';
-import { router } from 'expo-router';
 import { z } from 'zod';
-import { MeltQuoteScreen } from './MeltQuoteScreen';
+import type { HistoryEntry } from '@cashu/coco-core';
+
+import { getOnchainMeltAddress } from '@/shared/lib/cashu/onchainMelt';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { LightningSendRoute } from './LightningSendRoute';
+import { OnchainSendRoute } from './OnchainSendRoute';
 
 const ParamsSchema = z.object({
   meltHistoryEntry: z.string().min(1).max(64_000).optional(),
@@ -34,18 +30,23 @@ interface MeltQuoteRouteProps {
   onRequestMintList?: () => void;
 }
 
+function isOnchainMeltParam(meltHistoryEntry: string | null | undefined): boolean {
+  if (!meltHistoryEntry) return false;
+
+  try {
+    return !!getOnchainMeltAddress(JSON.parse(meltHistoryEntry) as HistoryEntry);
+  } catch {
+    return false;
+  }
+}
+
 export function MeltQuoteRoute({ where, onRequestMintList }: MeltQuoteRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
 
-  return (
-    <MeltQuoteScreen
-      key={params.meltHistoryEntry}
-      meltHistoryEntry={params.meltHistoryEntry}
-      onCancel={() => {
-        router.dismissTo('/');
-      }}
-      onRequestMintList={onRequestMintList}
-    />
+  return isOnchainMeltParam(params.meltHistoryEntry) ? (
+    <OnchainSendRoute where={where} />
+  ) : (
+    <LightningSendRoute where={where} onRequestMintList={onRequestMintList} />
   );
 }

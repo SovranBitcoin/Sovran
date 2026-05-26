@@ -1,5 +1,5 @@
 /**
- * @fileoverview Shared MeltQuote screen component
+ * @fileoverview Shared Lightning send screen component
  *
  * Display component for Lightning melt quotes (sending). Supports two phases:
  * - Preview (quoteId='') — synthetic entry, "Pay" runs prepare+execute
@@ -44,18 +44,18 @@ import { RecipientHeader } from '../components/RecipientHeader';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 
-interface MeltQuoteScreenProps {
+interface LightningSendScreenProps {
   meltHistoryEntry?: MeltHistoryEntry | string;
   onCancel: () => void;
   onRequestMintList?: () => void;
 }
 
-export function MeltQuoteScreen({
+export function LightningSendScreen({
   meltHistoryEntry,
   onCancel,
   onRequestMintList,
-}: MeltQuoteScreenProps) {
-  useLifecycleLogger('MeltQuoteScreen');
+}: LightningSendScreenProps) {
+  useLifecycleLogger('LightningSendScreen');
   const { width: windowWidth } = useWindowDimensions();
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'meltQuote',
@@ -104,7 +104,7 @@ export function MeltQuoteScreen({
   const headerAvatarUrl = entryAvatarUrl ?? liveNostrMetadata?.picture ?? null;
 
   if (error) {
-    log.warn('send.melt_quote.error', { error });
+    log.warn('send.lightning.error', { error });
     return <ScreenErrorState message={error} onGoBack={onCancel} />;
   }
 
@@ -115,7 +115,10 @@ export function MeltQuoteScreen({
   const isPreview = !entry.quoteId;
   const anyLoading = actions.pay.loading || actions.cancel.loading;
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
-  log.debug('send.melt_quote.render', {
+  const state = String(entry.state);
+  const isPaid = state === 'finalized' || state === 'PAID';
+  const isUnpaid = state === 'prepared' || state === 'UNPAID';
+  log.debug('send.lightning.render', {
     state: entry.state,
     isPreview,
     amount: entry.amount,
@@ -133,7 +136,7 @@ export function MeltQuoteScreen({
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => onCancel(),
-              condition: entry.state === 'PAID',
+              condition: isPaid,
             },
             {
               testID: 'melt-pay',
@@ -163,7 +166,7 @@ export function MeltQuoteScreen({
   );
 
   return (
-    <Screen name="MeltQuoteScreen" contentPadding={0} footer={bottomButtons}>
+    <Screen name="LightningSendScreen" contentPadding={0} footer={bottomButtons}>
       {recipientPubkey && headerDisplayName ? (
         // Override the layout's static "Send Lightning" title with the
         // resolved recipient identity. Expo Router lets a screen body
@@ -186,9 +189,9 @@ export function MeltQuoteScreen({
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
 
-          {entry.state === 'PAID' && <TransactionLocationSection transactionId={entry.id} />}
+          {isPaid && <TransactionLocationSection transactionId={entry.id} />}
 
-          {entry.state === 'UNPAID' ? (
+          {isUnpaid ? (
             <MintSelector
               width={quoteCardWidth}
               unit={entry.unit}

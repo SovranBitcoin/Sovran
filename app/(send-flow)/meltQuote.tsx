@@ -1,6 +1,5 @@
 /**
- * @fileoverview Send-flow meltQuote route — final screen of an active
- * Lightning send. The route body and zod schema live on
+ * @fileoverview Send-flow legacy meltQuote route dispatcher. The route body and zod schema live on
  * `MeltQuoteRoute`; this wrapper threads the mint-pill callbacks through
  * the active payment machine so the user can swap mints mid-flow.
  * `Stack.Screen` title comes from `(send-flow)/_layout.tsx`.

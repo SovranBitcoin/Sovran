@@ -1,5 +1,5 @@
 /**
- * @fileoverview Shared MintQuote screen component
+ * @fileoverview Shared Lightning receive screen component
  *
  * Display component for Lightning mint quotes (receiving). Actions (copy, share)
  * are handled by the screen-action system.
@@ -37,21 +37,22 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { isMintQuotePaymentObserved } from '../lib/mintQuoteState';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 
-interface MintQuoteScreenProps {
+interface LightningReceiveScreenProps {
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
   onRequestMintList?: () => void;
 }
 
-export function MintQuoteScreen({
+export function LightningReceiveScreen({
   mintHistoryEntry,
   extraButtons = [],
   onRequestMintList,
-}: MintQuoteScreenProps) {
-  useLifecycleLogger('MintQuoteScreen');
+}: LightningReceiveScreenProps) {
+  useLifecycleLogger('LightningReceiveScreen');
   const { width: windowWidth } = useWindowDimensions();
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'mintQuote',
@@ -61,15 +62,15 @@ export function MintQuoteScreen({
   const bip321 = useBip321Info(entry?.id);
 
   useEffect(() => {
-    if (error) paymentLog.warn('receive.mint_quote.error', { error });
+    if (error) paymentLog.warn('receive.lightning.error', { error });
   }, [error]);
 
-  const isPaid = entry?.state === 'ISSUED' || entry?.state === 'PAID';
+  const isPaid = isMintQuotePaymentObserved(entry);
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
 
   useEffect(() => {
     if (!entry) return;
-    paymentLog.debug('receive.mint_quote.render', {
+    paymentLog.debug('receive.lightning.render', {
       state: entry.state,
       isPaid,
       amount: entry.amount,
@@ -112,7 +113,7 @@ export function MintQuoteScreen({
   );
 
   return (
-    <Screen name="MintQuoteScreen" contentPadding={0} footer={bottomButtons}>
+    <Screen name="LightningReceiveScreen" contentPadding={0} footer={bottomButtons}>
       {/*
        * Id marker wraps the screen body — lets `phone test` capture
        * the entry id of the mint currently being viewed via

@@ -9,7 +9,9 @@
  * - nearPayPeers: Scrollable nearby BitChat peer list
  * - amount: Amount selection (entry point when has balance)
  * - sendToken: Ecash token display after creation
- * - meltQuote: Lightning invoice payment
+ * - lightningSend: Lightning invoice payment
+ * - onchainSend: Onchain payment
+ * - meltQuote: legacy send quote dispatcher
  * - paymentRequest: NUT-18 payment request confirmation and delivery
  * - camera: QR code scanning
  *
@@ -36,8 +38,16 @@ const NEAR_PAY_PEERS_OPTIONS = {
 };
 const AMOUNT_OPTIONS = { title: 'Select Amount' };
 const SEND_TOKEN_OPTIONS = { title: 'Send Ecash' };
-const MELT_QUOTE_OPTIONS = {
+const LIGHTNING_SEND_OPTIONS = {
   title: 'Send Lightning',
+  headerBackButtonMenuEnabled: false,
+};
+const ONCHAIN_SEND_OPTIONS = {
+  title: 'Send Onchain',
+  headerBackButtonMenuEnabled: false,
+};
+const MELT_QUOTE_OPTIONS = {
+  title: 'Send',
   headerBackButtonMenuEnabled: false,
 };
 const PAYMENT_REQUEST_OPTIONS = {
@@ -64,6 +74,8 @@ export default function SendFlowLayout() {
       <Stack.Screen name="nearPayPeers" options={NEAR_PAY_PEERS_OPTIONS} />
       <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
       <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
+      <Stack.Screen name="lightningSend" options={LIGHTNING_SEND_OPTIONS} />
+      <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
       <Stack.Screen name="meltQuote" options={MELT_QUOTE_OPTIONS} />
       <Stack.Screen name="paymentRequest" options={PAYMENT_REQUEST_OPTIONS} />
       <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
