@@ -140,6 +140,10 @@ interface SearchHitStats {
   follows?: number;
 }
 
+function optionalNumber(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' ? value : undefined;
+}
+
 function bleCandidate(peer: BLEPeer): PickerCandidate {
   const nickname = peer.nickname?.trim() || peer.peerID.slice(0, 12);
   return {
@@ -486,9 +490,9 @@ export function useSplitBillParticipantPicker(
       for (const r of displayResults) {
         if (!r?.pubkey || r.pubkey.startsWith('placeholder-')) continue;
         const fresh: SearchHitStats = {
-          score: r.profile?.score,
-          followers: r.profile?.followers,
-          follows: r.profile?.follows,
+          score: optionalNumber(r.profile?.score),
+          followers: optionalNumber(r.profile?.followers),
+          follows: optionalNumber(r.profile?.follows),
         };
         if (
           fresh.score === undefined &&
@@ -651,9 +655,9 @@ export function useSplitBillParticipantPicker(
         // `followers` / `follows` / `score` / `created_at` from the server's
         // cached `/profile` records (cache-only — the server never fetches
         // per search hit), so each field flows through as an optional.
-        const score = r.profile?.score;
-        const followers = r.profile?.followers;
-        const follows = r.profile?.follows;
+        const score = optionalNumber(r.profile?.score);
+        const followers = optionalNumber(r.profile?.followers);
+        const follows = optionalNumber(r.profile?.follows);
         seen.add(r.pubkey);
         const cached = cache.get(r.pubkey);
         if (

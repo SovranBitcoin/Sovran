@@ -1,25 +1,33 @@
+import { fetchNostrProfile } from '@/shared/lib/apiClient';
+
 jest.mock('colada', () => ({
-  combineSignals: (...signals: Array<AbortSignal | undefined>) =>
+  combineSignals: (...signals: (AbortSignal | undefined)[]) =>
     signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
   isAbortError: () => false,
   timeoutSignal: () => new AbortController().signal,
 }));
 
-import { fetchNostrProfile } from '@/shared/lib/apiClient';
-
 const PUBKEY = '82341f05fdb1dffbc78894993292171ed03abbed34a95f22f55f9b6371723ee6';
 
-const originalFetch = global.fetch;
+const originalFetchDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'fetch');
 const mockFetch = jest.fn();
 
 describe('fetchNostrProfile', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    global.fetch = mockFetch as unknown as typeof fetch;
+    Object.defineProperty(globalThis, 'fetch', {
+      configurable: true,
+      writable: true,
+      value: mockFetch as unknown as typeof fetch,
+    });
   });
 
   afterAll(() => {
-    global.fetch = originalFetch;
+    if (originalFetchDescriptor) {
+      Object.defineProperty(globalThis, 'fetch', originalFetchDescriptor);
+      return;
+    }
+    Reflect.deleteProperty(globalThis, 'fetch');
   });
 
   it('accepts live Vertex profile responses with null metrics', async () => {

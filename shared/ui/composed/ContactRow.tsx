@@ -60,9 +60,9 @@ interface NostrProfileLike {
   about?: string;
   lud16?: string;
   /** Pagerank reputation (0–100). Present on REST-search profiles; sparse elsewhere. */
-  score?: number;
-  followers?: number;
-  follows?: number;
+  score?: number | null;
+  followers?: number | null;
+  follows?: number | null;
 }
 
 interface NostrIdentity {
@@ -163,13 +163,17 @@ export function nostrIdentity(
   profile?: NostrProfileLike,
   opts?: { isLoadingProfile?: boolean; verified?: boolean }
 ): NostrIdentity {
+  const score = typeof profile?.score === 'number' ? profile.score : undefined;
+  const followerCount = typeof profile?.followers === 'number' ? profile.followers : undefined;
+  const followingCount = typeof profile?.follows === 'number' ? profile.follows : undefined;
+
   return {
     kind: 'nostr',
     pubkey,
     profile,
-    score: profile?.score,
-    followerCount: profile?.followers,
-    followingCount: profile?.follows,
+    score,
+    followerCount,
+    followingCount,
     isLoadingProfile: opts?.isLoadingProfile,
     verified: opts?.verified,
   };
