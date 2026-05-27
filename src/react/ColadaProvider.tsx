@@ -53,6 +53,8 @@ import type {
 } from '../machine/types';
 import type { ScreenActionHandlerMap, ScreenType } from '../screen-actions/types';
 import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
+import { createSubscriptionBus } from '../subscriptions';
+import type { ColadaSubscriptionBus } from '../subscriptions';
 import type { Detectors, WalletContext } from '../types';
 import type { ColadaInstance } from '../core/createColada';
 
@@ -86,12 +88,18 @@ export interface ScreenActionsBridge {
   /** Merged into action context after `paymentMachine` (from context). */
   getExtraContext?: () => Record<string, unknown>;
   /**
-   * Subscribe to entry updates for this screen type (e.g. history + melt ops).
-   * Return unsubscribe.
+   * Bind app-owned stores/native sources to Colada's subscription bus once
+   * for the provider lifetime.
    */
-  onEntryUpdate?: (
+  bindSubscriptionBus?: (bus: ColadaSubscriptionBus) => () => void;
+  /**
+   * Subscribe this screen to Colada bus events and map those events into
+   * entry updates for the screen-action manager. Return unsubscribe.
+   */
+  subscribeEntryUpdates?: (
     screenType: ScreenType,
     callback: (entry: Record<string, unknown>) => void,
+    bus: ColadaSubscriptionBus,
   ) => () => void;
   shouldApplyEntryUpdate?: (
     currentEntry: Record<string, unknown> | null,
@@ -107,11 +115,6 @@ export interface ScreenActionsBridge {
     ctx: { language: string },
   ) => Record<string, unknown> | null;
   getLocale?: () => string;
-  /**
-   * When set, useScreenActions subscribes so `getSourceLabel` can react to
-   * store updates (e.g. scan history) without the package importing Zustand.
-   */
-  subscribeGlobalScreenActions?: (listener: () => void) => () => void;
   /** Scan / NFC provenance label for the current entry. */
   getSourceLabel?: (entry: Record<string, unknown> | null) => string | null;
 }
@@ -195,6 +198,7 @@ interface ColadaContextValue {
     (() => { code: string; symbol: string } | null) | undefined
   >;
   adaptersRef: React.MutableRefObject<ColadaAdapters>;
+  subscriptionBusRef: React.MutableRefObject<ColadaSubscriptionBus>;
   notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
   operationsRef: React.MutableRefObject<Partial<MachineOperations> | undefined>;
   navigationRef: React.MutableRefObject<NavigationCallbacks | undefined>;
@@ -335,6 +339,7 @@ export function ColadaProvider({
   const scanSources = scanSourcesProp ?? adapterScanSources ?? ic?.platform?.scanSources;
   const nfcAdapter = nfcAdapterProp ?? ic?.platform?.nfc;
   const createURDecoder = qrDecoderAdapter?.createUrDecoder ?? ic?.platform?.createURDecoder;
+  const subscriptionBus = useMemo(() => createSubscriptionBus(), []);
   const baseOperations = operationsProp ?? instance?.operations;
   const operations = useMemo<Partial<MachineOperations> | undefined>(() => {
     if (!nostrAdapter?.sendDirectMessage && !nostrAdapter?.resolveProfile) {
@@ -350,6 +355,7 @@ export function ColadaProvider({
 
   const getLocaleRef = useLatestRef(getLocale);
   const adaptersRef = useLatestRef(adapters);
+  const subscriptionBusRef = useLatestRef(subscriptionBus);
   const notificationsRef = useLatestRef(notifications);
   const operationsRef = useLatestRef<Partial<MachineOperations> | undefined>(operations);
   const navigationRef = useLatestRef<NavigationCallbacks | undefined>(navigation);
@@ -382,6 +388,10 @@ export function ColadaProvider({
     setLogger(loggerAdapter);
     return () => setLogger(null);
   }, [loggerAdapter]);
+
+  useEffect(() => {
+    return screenActionsBridge?.bindSubscriptionBus?.(subscriptionBus);
+  }, [screenActionsBridge, subscriptionBus]);
 
   if (!machineRef.current) {
     machineRef.current = createPaymentMachine({
@@ -477,13 +487,14 @@ export function ColadaProvider({
       getBtcPriceRef,
       getDisplayCurrencyRef,
       adaptersRef,
+      subscriptionBusRef,
       notificationsRef,
       operationsRef,
       navigationRef,
       writeClipboardRef,
       shareContentRef,
     }),
-    [walletContextRef, screenActionHandlers, screenActionsBridge, adaptersRef],
+    [walletContextRef, screenActionHandlers, screenActionsBridge, adaptersRef, subscriptionBusRef],
   );
 
   return <ColadaContext.Provider value={value}>{children}</ColadaContext.Provider>;
@@ -499,6 +510,10 @@ export function useColadaContext(): ColadaContextValue {
     throw new Error('ColadaProvider is missing. Wrap the app with ColadaProvider.');
   }
   return ctx;
+}
+
+export function useColadaSubscriptions(): ColadaSubscriptionBus {
+  return useColadaContext().subscriptionBusRef.current;
 }
 
 function usePaymentFlowContext(): ColadaContextValue {

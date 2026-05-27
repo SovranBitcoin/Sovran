@@ -48,6 +48,29 @@ export type {
   StorageAdapter,
 } from './adapters';
 
+// Subscription bus
+export { createSubscriptionBus, matchesSubscriptionFilter } from './subscriptions';
+export type {
+  ColadaSubscriptionBus,
+  ColadaSubscriptionEvent,
+  HistoryEntryType,
+  HistoryUpdatedEvent,
+  MeltUpdatedEvent,
+  MintInfoEnrichmentChangedEvent,
+  MintInfoFetchedEvent,
+  MintSelectorItemAddedEvent,
+  MintUpdatedEvent,
+  ReceiveNpcMintChangedEvent,
+  ReceiveP2pkKeyChangedEvent,
+  ScreenActionsChangedEvent,
+  ScreenActionsChangedReason,
+  SubscriptionEventForFilter,
+  SubscriptionEventForType,
+  SubscriptionEventType,
+  SubscriptionFilter,
+  SubscriptionListener,
+} from './subscriptions';
+
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';

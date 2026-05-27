@@ -6,6 +6,7 @@
 export {
   ColadaProvider,
   useColadaContext,
+  useColadaSubscriptions,
   usePaymentFlowMachine,
   type DeepLinkConfig,
   type ColadaProviderProps,
@@ -32,6 +33,15 @@ export type {
   ShareAdapter,
   StorageAdapter,
 } from '../adapters';
+
+export type {
+  ColadaSubscriptionBus,
+  ColadaSubscriptionEvent,
+  HistoryEntryType,
+  SubscriptionEventType,
+  SubscriptionFilter,
+  SubscriptionListener,
+} from '../subscriptions';
 
 // Scan types (machine.scan uses these)
 export type {

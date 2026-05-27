@@ -245,6 +245,7 @@ export function useScreenActions(
     getBtcPriceRef,
     getDisplayCurrencyRef,
     adaptersRef,
+    subscriptionBusRef,
     notificationsRef,
     operationsRef,
     navigationRef,
@@ -279,10 +280,10 @@ export function useScreenActions(
   const onEntryUpdate = useCallback(
     (callback: (entry: Record<string, unknown>) => void) => {
       const bridge = bridgeRef.current;
-      if (!bridge?.onEntryUpdate) return () => {};
-      return bridge.onEntryUpdate(screenType, callback);
+      if (!bridge?.subscribeEntryUpdates) return () => {};
+      return bridge.subscribeEntryUpdates(screenType, callback, subscriptionBusRef.current);
     },
-    [screenType]
+    [screenType, subscriptionBusRef]
   );
 
   const handlersRaw = isAmountEntry
@@ -325,11 +326,11 @@ export function useScreenActions(
   const mergeEntry = screenActionsBridge?.mergeEntryUpdate ?? defaultMerge;
 
   const [, bumpGlobal] = useReducer((n: number) => n + 1, 0);
-  const subscribeGlobal = screenActionsBridge?.subscribeGlobalScreenActions;
   useEffect(() => {
-    const sub = subscribeGlobal?.(() => bumpGlobal());
-    return () => sub?.();
-  }, [subscribeGlobal]);
+    return subscriptionBusRef.current.subscribe({ type: 'screenActions.changed' }, () =>
+      bumpGlobal()
+    );
+  }, [subscriptionBusRef]);
 
   // Auto-derive amountConfig from provider context when not explicitly provided.
   // Every reactive field is a getter so the manager — created once and held
