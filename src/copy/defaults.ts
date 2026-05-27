@@ -56,10 +56,23 @@ export const paymentCopyDefaults = {
   'timeline.status.cancelled': 'Cancelled',
   'timeline.status.alreadySpent': 'Already Spent',
   'timeline.status.pending': 'Pending',
+  'timeline.onchain.waitingFirstConfirmation': 'Waiting for first confirmation',
+  'timeline.onchain.paymentConfirmed': 'Payment confirmed onchain',
+  'timeline.onchain.confirmations': '{current}/{required} confirmations',
   'timeline.flow.receive': 'Receive',
   'timeline.flow.send': 'Send',
   'timeline.flow.payment': 'Payment',
   'timeline.flow.transaction': 'Transaction',
+
+  'send.warning.mintOffline.title': 'Mint was offline',
+  'send.warning.mintOffline.description':
+    'This token was created offline. The recipient may have trouble redeeming it until the mint is back online.',
+  'send.warning.deviceOffline.title': 'You were offline',
+  'send.warning.deviceOffline.description':
+    'This token was created from local proofs while your device was offline. The recipient can redeem it after they can reach the mint.',
+  'send.warning.mintUnreachable.title': 'Mint appears offline',
+  'send.warning.mintUnreachable.description':
+    'This token was created from local proofs. The mint did not respond to a quick reachability check, so redemption may wait until it is reachable.',
 
   'history.refresh.sentWith': 'Sent with',
   'history.refresh.sendingWith': 'Sending with',

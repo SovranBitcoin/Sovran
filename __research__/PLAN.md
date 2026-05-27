@@ -44,3 +44,5 @@
 - Slice 3 verification: `colada` type-check/tests passed, `sovran-app` type-check/tests passed, focused timeline tests passed, app tests passed, touched-file lint had warnings only, app error-only lint passed, and both diffs passed `git diff --check`.
 - Copy invariant remains unticked: detail/timeline/history/toast copy now comes from Colada, but flow-screen action/error copy should move when those states are declared in the machine and fallback slices.
 - Avoid importing `colada/react` hooks in app render-tested surfaces while `colada` is a local `file:` dependency; Jest resolves Colada's dev React copy. App surfaces use the root Colada resolver instead.
+- Slice 4 progress: send/receive entry transitions now delegate to per-flow modules with state/action/copy-key declarations; transaction timeline, filter, and detail-screen state predicates moved from `sovran-app` into Colada history.
+- Slice 4 verification so far: `colada` type-check/tests passed; `sovran-app` type-check/tests passed; focused timeline tests passed; touched-file lint has existing perf warnings only; app error-only lint passed.

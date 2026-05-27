@@ -45,6 +45,44 @@ export type {
   PaymentCopyVariables,
 } from './copy';
 
+// History / payment-state timeline
+export {
+  buildTimeline,
+  getCardLabel,
+  getHistoryEntryRefreshLabel,
+  getSendTokenReachabilityWarning,
+  getHistoryEntryOnchainMintAddress,
+  getStatusColorType,
+  getStatusHeader,
+  isCancellablePendingEcash,
+  isMeltQuotePaid,
+  isMeltQuoteReadyToPay,
+  isMintQuotePaymentObserved,
+  isOnchainHistoryEntry,
+  isPendingTransaction,
+  isReceiveTokenRedeemed,
+  isReservedSendHistoryEntry,
+  isSendTokenCancelled,
+  isSendTokenComplete,
+  isSettledReceiveHistoryEntry,
+  isSettledSpendHistoryEntry,
+  matchesTransactionDirection,
+  matchesTransactionFilters,
+  matchesTransactionPaymentType,
+  shouldShowMintOfflineWarning,
+} from './history';
+export type {
+  BuildTimelineInput,
+  OnchainConfirmationProgress,
+  SendTokenReachabilityStatus,
+  SendTokenReachabilityWarningOptions,
+  SendTokenWarningCopy,
+  TimelineItem,
+  TimelineStepType,
+  TransactionDirection,
+  TransactionPaymentType,
+} from './history';
+
 // Adapter contracts
 export type {
   BleAdapter,
