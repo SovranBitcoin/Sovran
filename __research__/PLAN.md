@@ -2,7 +2,7 @@
 
 ## Current slice
 
-10. README + CONVENTIONS: rewrite docs to match the shipped architecture.
+11. Final sweep: rerun gates, tick invariants, and record slice commit SHAs.
 
 ## Completed slices
 
@@ -15,10 +15,10 @@
 7. Renames/dead code: deleted the deprecated `copyAsEmoji` action path, removed the unused NFC fallback export/module, and cleaned strict-unused Colada locals without moving responsibility boundaries unnecessarily.
 8. Backcompat sweep: removed implicit bolt11/sat support for mints missing NUT method-unit metadata, tightened tests to advertise methods explicitly, and removed remaining backcompat wording from shipped Colada APIs.
 9. Tests reconciliation: added shipped-API coverage that emoji token copy is a `copy` variant rather than a sibling action; updated capability fixtures to reflect explicit mint method support.
+10. README + CONVENTIONS: rewrote shipped docs around the flat provider, adapter contracts, copy/action/bus/chain ownership, explicit mint method metadata, and deleted obsolete flow/guide/pipeline/method docs that still described removed APIs.
 
 ## Remaining slices
 
-10. README + CONVENTIONS: rewrite docs to match the shipped architecture.
 11. Final sweep: rerun gates, tick invariants, and record slice commit SHAs.
 
 ## Invariants
@@ -58,3 +58,4 @@
 - Slice 8 verification: `colada` type-check, strict no-unused type-check, and 612 tests passed; `sovran-app` type-check, 379 tests, app error-only lint, and both `git diff --check` runs passed.
 - Slice 9 progress: send-token availability now asserts emoji copy stays under `copy.variants` and `copyAsEmoji` is not a runtime action.
 - Slice 9 verification: `colada` type-check, strict no-unused type-check, and 613 tests passed; `sovran-app` type-check, 379 tests, app error-only lint, and both `git diff --check` runs passed.
+- Slice 10 progress: `README.md` and `docs/CONVENTIONS.md` now describe the shipped flat React API, adapter philosophy, subscription bus, default chain adapter, screen-action contract, and explicit mint method support; obsolete docs pages under `docs/flows`, `docs/guide`, `docs/methods`, and `docs/pipeline` were deleted instead of patched around stale examples.

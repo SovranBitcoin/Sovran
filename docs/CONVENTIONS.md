@@ -1,148 +1,159 @@
-# Doc Conventions
+# Colada Documentation Conventions
 
-Rules and reusable patterns for writing `colada` flow documentation.
+These conventions keep Colada docs aligned with the shipped package. They are
+not a roadmap and should not describe APIs that do not exist in source.
 
-## Code disambiguation
+## Scope
 
-Machine calls, handler callbacks, and operations share method names. Always make the owner clear.
+The shipped docs are:
 
-**In prose**, prefix with the owner:
+- `README.md`: public package overview and integration guide.
+- `docs/CONVENTIONS.md`: rules for maintaining the docs.
 
-- `handler.enterAmount()` — the machine calls this; the wallet implements it on the [provider](/guide/getting-started#provider)
-- `machine.enterAmount()` — the screen calls this; the machine consumes it
-- `operations.executeSend()` — async operation the wallet provides on the [provider](/guide/getting-started#provider)
+Do not add flow, guide, pipeline, or method pages unless the content is generated
+from source or kept current by tests. Delete stale docs instead of leaving
+examples that compile only against old APIs.
 
-**In section headings**, handler sections use `### handler.name()`.
+## Accuracy Rules
 
-**In code blocks**, show the provider context:
+- Describe shipped APIs only.
+- Use flat `ColadaProvider` props. Never document grouped `engine`,
+  `callbacks`, `runtime`, or `platform` props.
+- Use adapter names from `ColadaProviderProps`, such as `clipboardAdapter`,
+  `shareAdapter`, `imagePickerAdapter`, and `chainAdapter`.
+- Show `useScreenActions(screenType, entryParam)` for terminal screens.
+- Show the third `useScreenActions` argument only for `amountEntry`.
+- Treat `sendToken.copy` emoji output as a copy variant. Never document a
+  sibling emoji-copy action.
+- Show `back` as part of every screen-action surface.
+- Show `cancel` only where the action contract includes it.
+- State that missing mint method-unit metadata is unsupported.
+- State that apps own presentation, routing, storage, native modules, and
+  product-specific enrichment.
+
+## Naming
+
+Disambiguate owners in prose:
+
+- `machine.scan()` means a screen called the `PaymentMachine`.
+- `handler.enterAmount()` means Colada called an app-provided step handler.
+- `operations.executeSend()` means Colada called wallet I/O.
+- `notifications.onReceiveConfirmed()` means Colada fired an optional
+  side-effect callback.
+- `actions.sendToken.copy()` means the wallet registered a handler.
+- `boundActions.copy.execute()` means a screen invoked the bound action from
+  `useScreenActions`.
+
+Use exact public names from source. Link or mention the source file when a
+contract matters:
+
+- `src/react/ColadaProvider.tsx`
+- `src/machine/types.ts`
+- `src/screen-actions/types.ts`
+- `src/adapters/types.ts`
+- `src/subscriptions/types.ts`
+- `src/mint-capabilities.ts`
+
+## Examples
+
+Examples should be short and should compile against the exported types with only
+app-owned placeholders such as `router`, `toast`, or `walletOperations`.
+
+Provider examples use flat props:
 
 ```tsx
 <ColadaProvider
-  handlers={(machine, refs) => ({
-    // ...
-    enterAmount: (stepData) => {
-      router.push({ ... });
-    },
-    // ...
-  })}
-/>
+  handlers={createHandlers}
+  operations={walletOperations}
+  notifications={walletNotifications}
+  actions={walletActions}
+  clipboardAdapter={clipboardAdapter}
+  shareAdapter={shareAdapter}
+  chainAdapter={chainAdapter}
+  navigation={{ goBack: () => router.back() }}
+>
+  <App />
+</ColadaProvider>
 ```
 
-Machine calls are always on a screen, always via the `machine` variable:
+Flow-screen examples bind wallet context explicitly:
 
 ```tsx
-const machine = usePaymentFlowMachine({ walletContext, unit });
-machine.enterAmount(amount, mintUrl, 'sendEcash');
+const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+machine.scan(input, { source: 'clipboard' });
 ```
 
-Operations and actions follow the same provider pattern:
+Terminal-screen examples use bound actions:
 
 ```tsx
-<ColadaProvider
-  engine={{
-    operations: {
-      // ...
-      executeSend: async (mintUrl, amount) => { ... },
-      // ...
-    },
-  }}
-  callbacks={{
-    actions: {
-      sendToken: {
-        copy: async (ctx) => { ... },
-        // ...
-      },
-    },
-  }}
-/>
+const { entry, error, actions } = useScreenActions('sendToken', sendHistoryEntry);
+
+if (error) return <ErrorState message={error} />;
+if (!entry) return <LoadingState />;
+
+return (
+  <Button
+    disabled={!actions.copy.available || actions.copy.loading}
+    onPress={() => actions.copy.execute({ variantId: 'text' })}
+    title="Copy"
+  />
+);
 ```
 
-## Page structure
+Amount-screen examples may include an amount config:
 
-Every flow page follows this layout:
-
-1. **Title + one-line summary**
-2. **Flow diagram** — top-level mermaid flowchart with collapsible legend
-3. **Entry point** — `machine.startX()` call and bullet points for each branch
-4. **Handler sections** — one per handler, in flow order
-5. **Execution** — the operation that runs after all steps resolve
-6. **Screen section** — post-flow screen using `useScreenActions`
-
-## Handler section
-
-Every handler follows this structure. No sub-headings — connect elements with natural prose transitions.
-
-| Order | Element                                                                                    | Include when                                   |
-| ----- | ------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| 1     | Heading: `### handler.name()`                                                              | Always                                         |
-| 2     | Description: when it fires, what it means (1-3 sentences)                                  | Always                                         |
-| 3     | Conditions: bullet points — **bold label** → outcome                                       | When there's branching                         |
-| 4     | Interaction diagram: sequence diagram                                                      | When the screen calls back to the machine      |
-| 5     | Step data: code block with the full shape                                                  | Always                                         |
-| 6     | Field table: \| Field \| What it means \|                                                  | Always                                         |
-| 7     | Handler declaration: inside `<ColadaProvider handlers={...} />`                     | Always                                         |
-| 8     | Machine callback: what the screen calls back                                               | When not already visible in a screen component |
-| 9     | Screen component: proof-of-concept (default RN elements). Inline or link to dedicated page | When this flow page owns the screen            |
-| 10    | UI tips: `::: info` box with bullet list                                                   | Always                                         |
-
-## Screen section
-
-Post-flow screens (send token, receive, etc.):
-
-| Order | Element                                                           | Include when |
-| ----- | ----------------------------------------------------------------- | ------------ |
-| 1     | Heading: `## Screen Name`                                         | Always       |
-| 2     | Description: what data is available, entry point                  | Always       |
-| 3     | Component: proof-of-concept using `useScreenActions`              | Always       |
-| 4     | UI tips: `::: info` box                                           | Always       |
-| 5     | Actions table: \| Action \| Available when \| What it does \|     | Always       |
-| 6     | Action handlers: inside `<ColadaProvider callbacks={{ actions: ... }} />` | Always       |
-
-## Diagrams
-
-### Top-level flow
-
-Every flow page opens with a flowchart. Use these node classes consistently across all pages:
-
-```
-classDef method fill:none,stroke:#818cf8,stroke-width:2px,color:#818cf8
-classDef handler fill:none,stroke:#38bdf8,stroke-width:2px,color:#38bdf8
-classDef operation fill:none,stroke:#a78bfa,stroke-width:2px,stroke-dasharray:6 3,color:#a78bfa
-classDef decision fill:none,stroke:#fbbf24,stroke-width:2px,color:#fbbf24
-classDef user fill:none,stroke:#4ade80,stroke-width:2px,stroke-dasharray:4 2,color:#4ade80
-classDef error fill:none,stroke:#f87171,stroke-width:2px,stroke-dasharray:6 3,color:#f87171
+```tsx
+const { entry, actions, suggestions } = useScreenActions('amountEntry', entrySeed, {
+  amountConfig,
+});
 ```
 
-Follow the diagram with a `::: details Diagram legend` block mapping colors to roles.
+## Ownership Language
 
-### Interaction diagrams
+Use "Colada owns" only for behavior that lives in this package:
 
-Small sequence diagrams for handler sections where the screen calls back to the machine. Three participants, consistent naming:
+- payment-flow sequencing
+- payment-state copy defaults and key resolution
+- screen-action availability and default handlers
+- typed subscription events
+- chain adapter contracts and default mempool.space helpers
+- JSON-shaped adapter contracts
 
-```mermaid
-sequenceDiagram
-  participant M as Machine
-  participant W as Wallet
-  participant U as User
+Use "the app owns" for:
 
-  M->>W: handler.name(stepData)
-  Note over W: Opens screen
-  U->>W: User action
-  W->>M: machine.callback(data)
-```
+- route names and navigation components
+- UI components and layout
+- persistent stores and profile state
+- platform adapter implementations
+- Coco manager instances and wallet-specific operations
+- product-specific entry decoration
 
-Skip for one-shot handlers (e.g., `sendComplete`) that navigate without expecting a machine callback.
+## Compatibility Language
 
-## Info boxes
+Do not use public docs to justify keeping retired API paths, duplicate shapes,
+or speculative fallbacks. Colada has one app consumer in this workspace, so the
+docs should describe the current shape only.
 
-- `::: info` — UI implementation tips (always bullet lists, never paragraphs)
-- `::: tip` — general advice, optional context
-- `::: warning` — gotchas, common mistakes
+Allowed carve-outs are outside these docs unless the source contract requires
+them:
 
-## Links
+- seed derivation paths that are frozen forever
+- one Zustand persist migration per existing store shape change
+- released sovran.money client compatibility
 
-Every inline code reference links to its definition — either an anchor on the current page or another page.
+## Style
 
-## Proof-of-concept screens
+- ASCII only unless quoting an existing API name that requires otherwise.
+- No emoji.
+- No marketing claims.
+- No roadmap wording about planned API shapes.
+- Prefer concrete lists and tables over long prose.
+- Keep code blocks small enough to audit.
+- Do not mention implementation details from `sovran-app` unless they explain a
+  public Colada seam.
 
-Screen components use only default React Native elements (`View`, `Text`, `Pressable`, `ScrollView`, `ActivityIndicator`). No styles, no custom components. The goal is to show data flow, not UI design.
+## Stale-Doc Sweep
+
+Before committing docs changes, search `README.md` and `docs/` for removed
+provider, callback, and action names. Any hit must be either deleted or
+rewritten to match the shipped API.
