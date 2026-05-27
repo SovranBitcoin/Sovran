@@ -19,8 +19,6 @@ import type { QuickSendSuggestion ,
   CreateAmountActionManagerConfig,
 } from './types';
 
-const SATS_PER_BTC = 100_000_000;
-
 /**
  * Convert a fiat number to the most natural raw input string.
  *

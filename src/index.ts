@@ -193,8 +193,6 @@ export {
   isValidSatAmount,
   MAX_SAT_AMOUNT,
 } from './guards';
-export { getNfcFallback, getAllFallbacks } from './nfc-fallback';
-
 // Normalization
 export {
   sanitizeInput,

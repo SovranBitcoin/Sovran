@@ -18,7 +18,6 @@ import { getTokenMetadata } from '@cashu/cashu-ts';
 import type {
   Manager,
   Mint,
-  MintHistoryEntry,
   ReceiveHistoryEntry,
   SendHistoryEntry,
 } from '@cashu/coco-core';
@@ -65,23 +64,6 @@ async function findSendHistoryEntryByOperationId(
       (h.operationId === operationId || h.metadata?.operationId === operationId)
   );
   return entry ? JSON.stringify(entry) : null;
-}
-
-async function findMintHistoryEntry(
-  mgr: Manager,
-  operationId: string,
-  quoteId: string
-): Promise<MintHistoryEntry | null> {
-  const history = await mgr.history.getPaginatedHistory(0, 50);
-  return (
-    history.find(
-      (h): h is MintHistoryEntry =>
-        h.type === 'mint' &&
-        (h.operationId === operationId ||
-          h.metadata?.operationId === operationId ||
-          h.quoteId === quoteId)
-    ) ?? null
-  );
 }
 
 function mapMeltOperationState(state: string): string {

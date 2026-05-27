@@ -37,7 +37,7 @@ export type ScreenType =
  * Screens use this to get type-safe action names; the wallet implements handlers for each.
  */
 export type ScreenActionName = {
-  sendToken: 'copy' | 'share' | 'nfc' | 'copyAsEmoji' | 'checkStatus' | 'cancel' | 'back';
+  sendToken: 'copy' | 'share' | 'nfc' | 'checkStatus' | 'cancel' | 'back';
   receiveToken: 'redeem' | 'back';
   mintQuote: 'copy' | 'share' | 'back';
   meltQuote: 'pay' | 'cancel' | 'back';

@@ -113,11 +113,7 @@ export interface ColadaInstance {
 export function createColada(config: ColadaConfig): ColadaInstance {
   const {
     manager,
-    platform,
     sendNostrDM,
-    unit = 'sat',
-    getOffline,
-    getLocale,
     enrichMintReviewInfo,
   } = config;
 

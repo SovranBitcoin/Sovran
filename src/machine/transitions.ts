@@ -4,7 +4,7 @@ import { parsePaymentInput } from '../parse';
 import { isValidSatAmount } from '../guards';
 import type { Detectors, WalletContext } from '../types';
 import { resolveNext, type StepResult } from './resolveNext';
-import { buildChooseProofsData, buildProofSuggestions } from './amountFallback';
+import { buildProofSuggestions } from './amountFallback';
 import type { FlowContext, FlowEvent, FlowStep } from './types';
 import { startSendEcashFlow } from './flows/send';
 import { startReceiveFlow, startReceiveLightningFlow } from './flows/receive';

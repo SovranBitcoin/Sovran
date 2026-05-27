@@ -87,10 +87,6 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
     },
     share: { available: canAct },
     nfc: { available: canAct },
-    // Deprecated — surfaced via `copy.variants[emoji]` instead. Retained so
-    // the wallet's existing handler (emojiPickerPopup) can still be invoked
-    // under the hood when the variant fires. Remove in Phase 5.
-    copyAsEmoji: { available: canAct },
     checkStatus: {
       available: canAct && state === 'pending',
     },

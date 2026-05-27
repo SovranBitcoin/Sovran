@@ -2,7 +2,7 @@
 
 ## Current slice
 
-7. Renames/dead code: restructure folders around responsibilities and delete unused exports.
+8. Backcompat sweep: remove old/legacy/dual-shape paths except allowed carve-outs.
 
 ## Completed slices
 
@@ -12,10 +12,10 @@
 4. State machines: split send/receive entry flows and context resolution into Colada machine modules; moved app-owned transaction state predicates and warning/refresh labels into Colada history helpers.
 5. Chain watcher: moved mempool.space address stats, address summaries, confirmation progress, and default chain adapter into Colada; updated `sovran-app` to consume Colada chain helpers.
 6. Fault-tolerance fallbacks: added a generic non-destructive `back` action to Colada screen actions, kept amount/mint selector `cancel` in the contract, and moved receive/mint dead-end close paths through Colada actions.
+7. Renames/dead code: deleted the deprecated `copyAsEmoji` action path, removed the unused NFC fallback export/module, and cleaned strict-unused Colada locals without moving responsibility boundaries unnecessarily.
 
 ## Remaining slices
 
-7. Renames/dead code: restructure folders around responsibilities and delete unused exports.
 8. Backcompat sweep: remove old/legacy/dual-shape paths except allowed carve-outs.
 9. Tests reconciliation: rewrite tests for the shipped API and add coverage for new seams.
 10. README + CONVENTIONS: rewrite docs to match the shipped architecture.
@@ -52,3 +52,5 @@
 - Slice 5 verification: `colada` type-check passed and 590 tests passed; `sovran-app` type-check passed, 379 tests passed, and app error-only lint passed.
 - Slice 6 progress: every Colada screen-action surface now exposes a default `back` handler; amount entry and mint selector also expose `cancel`; receive-token, mint-quote, onchain receive, payment-request terminal, amount-entry error, receive hub error, and mint-info close/reject paths now route through Colada actions instead of direct screen-local back calls.
 - Slice 6 verification: focused Colada screen-action tests passed; `colada` type-check passed and 612 tests passed; `sovran-app` type-check passed, 379 tests passed, app error-only lint passed, and both diffs passed `git diff --check`; `colada` still has no lint script.
+- Slice 7 progress: `copy.variants[emoji]` is now the only emoji-token path; `copyAsEmoji` was removed from Colada and Sovran overrides; unused config destructures/helpers/imports and the unused `nfc-fallback` public export were deleted.
+- Slice 7 verification: `colada` type-check, strict no-unused type-check, and 612 tests passed; `sovran-app` type-check, 379 tests, app error-only lint, and both `git diff --check` runs passed.

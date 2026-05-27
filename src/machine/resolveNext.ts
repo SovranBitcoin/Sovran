@@ -65,7 +65,7 @@ function getDestination(intent: ResolvedIntent, ctx: FlowContext): Destination {
   }
 }
 
-function needsAmount(destination: Destination, ctx: FlowContext): boolean {
+function needsAmount(ctx: FlowContext): boolean {
   return ctx.amount == null || ctx.amount <= 0;
 }
 
@@ -303,7 +303,7 @@ export function resolveNext(
   });
 
   // 1. Need amount?
-  if (needsAmount(destination, ctx)) {
+  if (needsAmount(ctx)) {
     logger.info('resolveNext.enterAmount.amountNeeded');
 
     const preselectedMintUrl = ctx.mintUrl ?? walletCtx.preferredMintUrl;

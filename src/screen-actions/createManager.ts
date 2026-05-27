@@ -229,7 +229,7 @@ export function createScreenActionManager<S extends ScreenType>(
 // ---------------------------------------------------------------------------
 
 const ACTION_NAMES: Record<ScreenType, string[]> = {
-  sendToken: ['copy', 'share', 'nfc', 'copyAsEmoji', 'checkStatus', 'cancel', 'back'],
+  sendToken: ['copy', 'share', 'nfc', 'checkStatus', 'cancel', 'back'],
   receiveToken: ['redeem', 'back'],
   mintQuote: ['copy', 'share', 'back'],
   meltQuote: ['pay', 'cancel', 'back'],
