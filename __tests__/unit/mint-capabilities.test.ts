@@ -22,7 +22,7 @@ describe('mint method capabilities', () => {
     expect(support.melt.onchain?.supported).toBe(false);
   });
 
-  it('requires explicit onchain NUT-04 metadata for receive', () => {
+  it('recognizes onchain NUT-04 metadata but reports it as not implemented', () => {
     const capabilities = deriveMintMethodCapabilityMapFromTrustedMints([
       {
         mintUrl: MINT1,
@@ -46,7 +46,10 @@ describe('mint method capabilities', () => {
     );
 
     expect(capability.supported).toBe(true);
-    expect(getCapabilityUnavailableReason(capability, requirement, 50)).toBeNull();
+    expect(getCapabilityUnavailableReason(capability, requirement, 50)).toMatchObject({
+      code: 'PAYMENT_METHOD_NOT_IMPLEMENTED',
+      message: 'onchain receive is not supported yet',
+    });
   });
 
   it('treats disabled NUT settings as unavailable', () => {
@@ -88,7 +91,7 @@ describe('mint method capabilities', () => {
 
     expect(candidates).toMatchObject([
       { mintUrl: MINT1, status: 'disabled' },
-      { mintUrl: MINT2, status: 'available' },
+      { mintUrl: MINT2, status: 'disabled' },
     ]);
   });
 

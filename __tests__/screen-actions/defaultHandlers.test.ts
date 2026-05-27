@@ -981,7 +981,7 @@ describe('amountEntry default handlers', () => {
       });
     });
 
-    it('enters onchain receive even when the selected mint advertises a higher minimum', async () => {
+    it('does not enter unsupported onchain receive from the default next handler', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
         effectiveSatAmount: 500,
@@ -1011,16 +1011,10 @@ describe('amountEntry default handlers', () => {
 
       await mgr.execute('next', { variantId: 'onchain' });
 
-      expect(machine.enterAmount).toHaveBeenCalledWith(500, MINT1, {
-        destination: 'mintQuote',
-        mintQuoteMethod: 'onchain',
-        meltTarget: undefined,
-        recipientPubkey: undefined,
-        amountEntryDisplay: expect.any(Object),
-      });
+      expect(machine.enterAmount).not.toHaveBeenCalled();
     });
 
-    it('enters onchain receive when a trusted alternate satisfies the amount', async () => {
+    it('does not enter unsupported onchain receive even when an alternate advertises it', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
         effectiveSatAmount: 500,
@@ -1058,13 +1052,7 @@ describe('amountEntry default handlers', () => {
 
       await mgr.execute('next', { variantId: 'onchain' });
 
-      expect(machine.enterAmount).toHaveBeenCalledWith(500, MINT1, {
-        destination: 'mintQuote',
-        mintQuoteMethod: 'onchain',
-        meltTarget: undefined,
-        recipientPubkey: undefined,
-        amountEntryDisplay: expect.any(Object),
-      });
+      expect(machine.enterAmount).not.toHaveBeenCalled();
     });
 
     it('does nothing when effectiveSatAmount is 0', async () => {

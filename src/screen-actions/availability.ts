@@ -5,6 +5,7 @@
 import type { ActionAvailability, ScreenActionName, ScreenType } from './types';
 import {
   evaluateMintMethodAmountAvailability,
+  isMethodImplemented,
   methodContextHasSupportingMint,
   type MintMethodAmountAvailability,
 } from '../mint-capabilities';
@@ -307,8 +308,10 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   // ── onchain ────────────────────────────────────────────────────────
   // Coco currently supports reusable onchain mint quotes only. Only surface
   // onchain when at least one trusted mint advertises the relevant NUT method.
-  const showOnchainReceive = isMintQuote && receiveOnchainSupported;
-  const showOnchainSend = !isMintQuote && sendOnchainSupported;
+  const receiveOnchainImplemented = isMethodImplemented(receiveOnchainRequirement);
+  const sendOnchainImplemented = isMethodImplemented(sendOnchainRequirement);
+  const showOnchainReceive = isMintQuote && receiveOnchainImplemented && receiveOnchainSupported;
+  const showOnchainSend = !isMintQuote && sendOnchainImplemented && sendOnchainSupported;
   const onchainAvailable = showOnchainReceive ? nextCanFire && receiveOnchainCompatible : false;
   const onchainDescription = showOnchainReceive
     ? 'Create an onchain receive address'

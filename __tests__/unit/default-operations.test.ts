@@ -14,7 +14,6 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { Amount } from '@cashu/cashu-ts';
 import type { Manager } from '@cashu/coco-core';
 import { createDefaultOperations } from '../../src/operations/defaultOperations';
 
@@ -246,58 +245,11 @@ describe('executePaymentRequest — inband fallback', () => {
 });
 
 describe('executeMintQuote — onchain', () => {
-  it('prepares a durable mint operation for reusable onchain receive quotes', async () => {
-    const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
-    const quote = {
-      method: 'onchain',
-      quoteId: 'onchain-q-1',
-      request: address,
-      mintUrl: MINT1,
-      unit: 'sat',
-      createdAt: 1,
-      updatedAt: 2,
-      quoteData: {
-        amountPaid: Amount.from(0),
-        amountIssued: Amount.from(0),
-      },
-    };
-    const mintOp = {
-      id: 'op-onchain-1',
-      state: 'pending',
-      createdAt: 3,
-      updatedAt: 4,
-      mintUrl: MINT1,
-      unit: 'sat',
-      quoteId: quote.quoteId,
-      amount: Amount.from(123),
-      request: address,
-    };
-    const persistedEntry = {
-      id: `mint:${mintOp.id}`,
-      type: 'mint',
-      source: 'operation',
-      operationId: mintOp.id,
-      createdAt: mintOp.createdAt,
-      updatedAt: mintOp.updatedAt,
-      mintUrl: MINT1,
-      unit: 'sat',
-      quoteId: quote.quoteId,
-      state: 'pending',
-      amount: mintOp.amount,
-      paymentRequest: address,
-    };
+  it('reports onchain mint quotes as unsupported by the published Coco default manager', async () => {
     const mockManager = createMockManager({
-      history: {
-        getPaginatedHistory: vi.fn().mockResolvedValue([persistedEntry]),
-      },
-      quotes: {
-        mint: {
-          create: vi.fn().mockResolvedValue(quote),
-        },
-      },
       ops: {
         mint: {
-          prepare: vi.fn().mockResolvedValue(mintOp),
+          prepare: vi.fn(),
         },
       },
     });
@@ -306,34 +258,10 @@ describe('executeMintQuote — onchain', () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    const result = await ops.executeMintQuote!(MINT1, 123, 'sat', 'onchain');
-    const entry = JSON.parse(result.historyEntry);
+    await expect(ops.executeMintQuote!(MINT1, 123, 'sat', 'onchain')).rejects.toThrow(
+      'Onchain mint quotes are not supported by @cashu/coco-core 1.0.1'
+    );
 
-    expect(mockManager.quotes.mint.create).toHaveBeenCalledWith({
-      mintUrl: MINT1,
-      method: 'onchain',
-      unit: 'sat',
-    });
-    expect(mockManager.ops.mint.prepare).toHaveBeenCalledWith({
-      mintUrl: MINT1,
-      method: 'onchain',
-      quoteId: quote.quoteId,
-      amount: 123,
-      unit: 'sat',
-      methodData: {},
-    });
-    expect(entry).toMatchObject({
-      id: `mint:${mintOp.id}`,
-      type: 'mint',
-      source: 'operation',
-      operationId: mintOp.id,
-      quoteId: quote.quoteId,
-      paymentRequest: address,
-      metadata: {
-        method: 'onchain',
-        onchainAddress: address,
-        requestedAmount: '123',
-      },
-    });
+    expect(mockManager.ops.mint.prepare).not.toHaveBeenCalled();
   });
 });

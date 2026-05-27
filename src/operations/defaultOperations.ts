@@ -14,7 +14,7 @@
 //                           injected via enrichMintReviewInfo
 // ---------------------------------------------------------------------------
 
-import { getEncodedToken, getTokenMetadata, type AmountLike, type Token } from '@cashu/cashu-ts';
+import { getTokenMetadata } from '@cashu/cashu-ts';
 import type {
   Manager,
   Mint,
@@ -22,13 +22,14 @@ import type {
   ReceiveHistoryEntry,
   SendHistoryEntry,
 } from '@cashu/coco-core';
+import { getEncodedToken } from '@cashu/coco-core';
 import type { MachineOperations, StepDataMap } from '../machine/types';
 import type { MintCatalogEntry, MintListItem, MintReviewInfo } from '../types';
 import { defaultDetectors } from '../detectors';
 import { errField, logger } from '../logger';
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
 import { resolveRecipientPubkey } from '../recipient';
-import { amountToNumber, toCashuAmount } from '../amount';
+import { amountToNumber, type AmountLike } from '../amount';
 import {
   buildMethodAwareMintCandidates,
   deriveMintMethodCapabilityMapFromTrustedMints,
@@ -39,6 +40,7 @@ import { parseHistoryEntryOnce } from './historyEntry';
 // not export it as a named type, so we infer it from the manager API to
 // stay aligned with whatever shape mgr.mint.getMintInfo actually returns.
 type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
+type CoreToken = NonNullable<SendHistoryEntry['token']>;
 
 function hasMintInfo(value: MintInfo | undefined): value is MintInfo {
   return (
@@ -88,6 +90,11 @@ function mapMeltOperationState(state: string): string {
   return 'UNPAID';
 }
 
+function requireSatUnit(unit: string | undefined): 'sat' {
+  if (unit == null || unit === 'sat') return 'sat';
+  throw new Error(`Unsupported unit ${unit}; only sat is supported`);
+}
+
 // ---------------------------------------------------------------------------
 // Synthetic history-entry builders — used when coco's history row hasn't
 // been persisted yet (race) or when we need to thread token data through
@@ -103,45 +110,22 @@ interface SendOperationLike {
   amount: AmountLike;
 }
 
-function buildSyntheticSendEntry(operation: SendOperationLike, token: Token): SendHistoryEntry {
+function buildSyntheticSendEntry(operation: SendOperationLike, token: CoreToken): SendHistoryEntry {
   return {
     id: operation.id,
     type: 'send',
-    source: 'operation',
     createdAt: operation.createdAt,
-    updatedAt: operation.updatedAt ?? Date.now(),
     mintUrl: operation.mintUrl,
     unit: 'sat',
     state: 'pending',
-    amount: toCashuAmount(operation.amount),
+    amount: amountToNumber(operation.amount),
     operationId: operation.id,
     token,
     metadata: { operationId: operation.id },
   };
 }
 
-function withOnchainMintMetadata(
-  entry: MintHistoryEntry,
-  quote: {
-    request: string;
-    quoteData: { amountPaid: { toString(): string }; amountIssued: { toString(): string } };
-  },
-  requestedAmount: number
-): MintHistoryEntry {
-  return {
-    ...entry,
-    metadata: {
-      ...(entry.metadata ?? {}),
-      method: 'onchain',
-      onchainAddress: quote.request,
-      requestedAmount: String(requestedAmount),
-      amountPaid: quote.quoteData.amountPaid.toString(),
-      amountIssued: quote.quoteData.amountIssued.toString(),
-    },
-  };
-}
-
-function ensureSendEntryToken(historyEntry: string, token: Token): string {
+function ensureSendEntryToken(historyEntry: string, token: CoreToken): string {
   // The DB row may not have the token yet due to a race between execute
   // resolving and HistoryService persisting; inject it before returning so
   // the caller never sees a tokenless send entry.
@@ -384,70 +368,15 @@ export function createDefaultOperations(
       const mgr = requireManager();
       logger.info('operations.executeMintQuote.prepare', { mintUrl, amount, method });
       if (method === 'onchain') {
-        const quote = await mgr.quotes.mint.create({
-          mintUrl,
-          method: 'onchain',
-          unit: _unit ?? 'sat',
-        });
-        if (quote.method !== 'onchain') {
-          throw new Error(`Mint returned ${quote.method} quote for onchain request`);
-        }
-        logger.info('operations.executeMintQuote.onchain.created', {
-          quoteId: quote.quoteId,
-          addressPreview: quote.request.slice(0, 12) + '…',
-        });
-
-        const mintOp = await mgr.ops.mint.prepare({
-          mintUrl,
-          method: 'onchain',
-          quoteId: quote.quoteId,
-          amount,
-          unit: _unit ?? 'sat',
-          methodData: {},
-        });
-        logger.info('operations.executeMintQuote.onchain.prepared', {
-          operationId: mintOp.id,
-          quoteId: mintOp.quoteId,
-        });
-
-        const persisted = await findMintHistoryEntry(mgr, mintOp.id, mintOp.quoteId);
-        if (persisted) {
-          return {
-            historyEntry: JSON.stringify(withOnchainMintMetadata(persisted, quote, amount)),
-          };
-        }
-
-        const entry: MintHistoryEntry = {
-          id: `mint:${mintOp.id}`,
-          type: 'mint',
-          source: 'operation',
-          operationId: mintOp.id,
-          createdAt: mintOp.createdAt,
-          updatedAt: mintOp.updatedAt,
-          mintUrl: mintOp.mintUrl,
-          unit: mintOp.unit,
-          quoteId: mintOp.quoteId,
-          state: 'pending',
-          amount: mintOp.amount,
-          paymentRequest: mintOp.request,
-          metadata: { operationId: mintOp.id },
-        };
-        return {
-          historyEntry: JSON.stringify(withOnchainMintMetadata(entry, quote, amount)),
-        };
+        throw new Error('Onchain mint quotes are not supported by @cashu/coco-core 1.0.1');
       }
 
-      const quote = await mgr.quotes.mint.create({
+      const mintOp = await mgr.ops.mint.prepare({
         mintUrl,
         amount,
         method: 'bolt11',
-        unit: _unit ?? 'sat',
-      });
-      const mintOp = await mgr.ops.mint.prepare({
-        mintUrl,
-        method: 'bolt11',
-        quoteId: quote.quoteId,
-        unit: _unit ?? 'sat',
+        unit: requireSatUnit(_unit),
+        methodData: {},
       });
       logger.info('operations.executeMintQuote.created', {
         operationId: mintOp.id,
@@ -459,15 +388,12 @@ export function createDefaultOperations(
       const entry = {
         id: mintOp.id,
         type: 'mint' as const,
-        source: 'operation' as const,
         operationId: mintOp.id,
         createdAt: mintOp.createdAt,
-        updatedAt: mintOp.updatedAt,
         mintUrl: mintOp.mintUrl,
         unit: mintOp.unit,
         quoteId: mintOp.quoteId,
-        state: 'pending' as const,
-        remoteState: quote.state,
+        state: mintOp.lastObservedRemoteState ?? ('UNPAID' as const),
         amount: mintOp.amount,
         paymentRequest: mintOp.request,
         metadata: { operationId: mintOp.id },
@@ -734,7 +660,7 @@ export function createDefaultOperations(
       try {
         const metadata = getTokenMetadata(tokenString);
         hadP2PK = hasP2PKProofs(metadata.incompleteProofs);
-        tokenAmount = metadata.amount.toNumber();
+        tokenAmount = amountToNumber(metadata.amount);
       } catch (e) {
         logger.warn('operations.executeReceive.p2pkDetectionFailed', { error: errField(e) });
       }
@@ -767,6 +693,7 @@ export function createDefaultOperations(
 
     executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
+      requireSatUnit(_unit);
       logger.info('operations.executeMelt.start', {
         mintUrl,
         amount,
@@ -779,17 +706,10 @@ export function createDefaultOperations(
             timeoutMs: config.lightningTimeoutMs,
           });
 
-      const quote = await mgr.quotes.melt.create({
-        mintUrl,
-        method: 'bolt11',
-        methodData: { invoice: bolt11 },
-        unit: 'sat',
-      });
       const operation = await mgr.ops.melt.prepare({
         mintUrl,
         method: 'bolt11',
-        quoteId: quote.quoteId,
-        unit: 'sat',
+        methodData: { invoice: bolt11 },
       });
       logger.info('operations.executeMelt.execute', { operationId: operation.id });
       // prepare() reserves proofs at the mint. If execute() throws — mint
@@ -1057,12 +977,10 @@ function buildSyntheticPaymentRequestEntry(
   return {
     id: operationId,
     type: 'send',
-    source: 'operation',
     createdAt: now,
-    updatedAt: now,
     mintUrl,
     unit: 'sat',
-    amount: toCashuAmount(amount),
+    amount,
     operationId,
     state: 'pending',
   };

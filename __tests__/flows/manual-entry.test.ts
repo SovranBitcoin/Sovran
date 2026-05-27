@@ -172,8 +172,20 @@ describe('manual entry — startSendEcash', () => {
         recipientPubkey,
       },
     });
-    expect((lastHandler.data as { candidates: unknown[] }).candidates).toEqual([
-      { mintUrl: MINT1, balance: 5000 },
+    expect((lastHandler.data as { candidates: unknown[] }).candidates).toMatchObject([
+      { mintUrl: MINT1, balance: 5000, status: 'available', reason: null },
+      {
+        mintUrl: MINT2,
+        balance: 100,
+        status: 'disabled',
+        reason: { code: 'INSUFFICIENT_BALANCE' },
+      },
+      {
+        mintUrl: MINT3,
+        balance: 0,
+        status: 'disabled',
+        reason: { code: 'INSUFFICIENT_BALANCE' },
+      },
     ]);
 
     await tm.machine.changeMint(MINT1);
@@ -253,9 +265,15 @@ describe('manual entry — startSendEcash', () => {
         recipientProfile,
       },
     });
-    expect((lastHandler.data as { candidates: unknown[] }).candidates).toEqual([
-      { mintUrl: MINT1, balance: 5000 },
-      { mintUrl: MINT2, balance: 4000 },
+    expect((lastHandler.data as { candidates: unknown[] }).candidates).toMatchObject([
+      { mintUrl: MINT1, balance: 5000, status: 'available', reason: null },
+      { mintUrl: MINT2, balance: 4000, status: 'available', reason: null },
+      {
+        mintUrl: MINT3,
+        balance: 100,
+        status: 'disabled',
+        reason: { code: 'INSUFFICIENT_BALANCE' },
+      },
     ]);
   });
 });

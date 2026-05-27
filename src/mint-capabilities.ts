@@ -157,7 +157,7 @@ export function getMintMethodCapability(
 }
 
 export function isMethodImplemented(requirement: MintMethodRequirement): boolean {
-  if (requirement.operation === 'melt' && requirement.method === 'onchain') return false;
+  if (requirement.method === 'onchain') return false;
   return true;
 }
 

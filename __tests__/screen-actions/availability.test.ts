@@ -240,7 +240,7 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     expect(actions.next.variants?.some((variant) => variant.id === 'onchain')).toBe(false);
   });
 
-  it('shows onchain receive only when a trusted mint advertises NUT-04 onchain', () => {
+  it('hides onchain receive even when a trusted mint advertises NUT-04 onchain', () => {
     const entry = {
       destination: 'mintQuote',
       effectiveSatAmount: 100,
@@ -262,9 +262,8 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     };
 
     const actions = getAvailableActions('amountEntry', entry);
-    const onchain = actions.next.variants?.find((variant) => variant.id === 'onchain');
 
-    expect(onchain).toMatchObject({ available: true });
+    expect(actions.next.variants?.some((variant) => variant.id === 'onchain')).toBe(false);
   });
 
   it('disables Lightning receive when no trusted mint advertises NUT-04 bolt11', () => {
@@ -361,7 +360,7 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     expect(lightning).toMatchObject({ available: true });
   });
 
-  it('ignores NUT-04 min amount for onchain receive availability', () => {
+  it('hides onchain receive regardless of advertised NUT-04 min amount', () => {
     const entry = {
       destination: 'mintQuote',
       selectedMintUrl: MINT1,
@@ -384,12 +383,11 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     };
 
     const actions = getAvailableActions('amountEntry', entry);
-    const onchain = actions.next.variants?.find((variant) => variant.id === 'onchain');
 
-    expect(onchain).toMatchObject({ available: true });
+    expect(actions.next.variants?.some((variant) => variant.id === 'onchain')).toBe(false);
   });
 
-  it('keeps Lightning and onchain receive available despite advertised NUT-04 minimums', () => {
+  it('keeps Lightning receive available and hides unsupported onchain receive', () => {
     const entry = {
       destination: 'mintQuote',
       selectedMintUrl: MINT1,
@@ -422,7 +420,7 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
 
     expect(actions.next.available).toBe(true);
     expect(lightning).toMatchObject({ available: true });
-    expect(onchain).toMatchObject({ available: true });
+    expect(onchain).toBeUndefined();
   });
 
   it('disables Lightning send when no trusted mint advertises NUT-05 bolt11', () => {
