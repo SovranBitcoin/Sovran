@@ -344,9 +344,7 @@ module.exports = defineConfig([
         },
       ],
     },
-    ignores: [
-      'dist/*',
-    ],
+    ignores: ['dist/*'],
   },
   // The shared Pressable IS the wrapper — it must import the raw RN
   // name. Allow only that one file to break the rule above.

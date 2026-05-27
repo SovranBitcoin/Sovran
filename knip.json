@@ -9,12 +9,7 @@
     "scripts/*.{js,ts}"
   ],
   "project": ["**/*.{ts,tsx,js,jsx}"],
-  "ignore": [
-    ".agents/**",
-    ".monicon/**",
-    "modules/**",
-    "targets/**"
-  ],
+  "ignore": [".agents/**", ".monicon/**", "modules/**", "targets/**"],
   "ignoreDependencies": [
     "^@iconify-json/",
     "buffer",
@@ -22,10 +17,8 @@
     "@expo/metro-config",
     "@sovranbitcoin/schemas",
     "cashu-kym",
-    "@internet-privacy/marmot-ts",
-    "bitchat-module",
     "coco-cashu-plugin-p2pk-import",
-    "liquid-glass-text",
+    "colada",
     "@monicon/metro",
     "metro-minify-terser",
     "number-flow-react-native",
