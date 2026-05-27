@@ -22,7 +22,11 @@ import { Metadata } from 'nostr-tools/kinds';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'colada';
 import { createColada, withTimeout } from 'colada';
-import { ColadaProvider as ColadaProviderBase, type DeepLinkConfig } from 'colada/react';
+import {
+  ColadaProvider as ColadaProviderBase,
+  type ColadaProviderProps,
+  type DeepLinkConfig,
+} from 'colada/react';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -315,39 +319,37 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     [manager, requestCameraPermission]
   );
 
+  const handlers = useCallback<ColadaProviderProps['handlers']>(
+    (machine, refs) =>
+      createSovranHandlers({
+        machine,
+        onOptionDismiss: () => refs.getOptionDismiss()?.(),
+        getManager: () => manager,
+        getNpub,
+        getBitchatIdentityMaterial,
+      }),
+    [manager, getNpub, getBitchatIdentityMaterial]
+  );
+
   return (
     <ColadaProviderBase
-      handlers={(machine, refs) =>
-        createSovranHandlers({
-          machine,
-          onOptionDismiss: () => refs.getOptionDismiss()?.(),
-          getManager: () => manager,
-          getNpub,
-          getBitchatIdentityMaterial,
-        })
-      }
-      engine={{
-        instance,
-        operations: operationsOverride,
-      }}
-      callbacks={{
-        notifications: createSovranNotifications({
-          getPubkey: () => pubkeyRef.current,
-          getPrivateKey: () => privateKeyRef.current,
-          getManager: () => manager,
-          onP2pkKeyRefreshed: (newKey) => {
-            for (const subscriber of p2pkKeyRefreshedSubscribers.current) {
-              subscriber(newKey);
-            }
-          },
-        }),
-        actions,
-        screenActionsBridge,
-      }}
-      platform={{
-        deepLinks,
-        navigation,
-      }}>
+      handlers={handlers}
+      instance={instance}
+      operations={operationsOverride}
+      notifications={createSovranNotifications({
+        getPubkey: () => pubkeyRef.current,
+        getPrivateKey: () => privateKeyRef.current,
+        getManager: () => manager,
+        onP2pkKeyRefreshed: (newKey) => {
+          for (const subscriber of p2pkKeyRefreshedSubscribers.current) {
+            subscriber(newKey);
+          }
+        },
+      })}
+      actions={actions}
+      screenActionsBridge={screenActionsBridge}
+      deepLinks={deepLinks}
+      navigation={navigation}>
       {children}
     </ColadaProviderBase>
   );
