@@ -3,7 +3,7 @@ import { useWindowDimensions } from 'react-native';
 
 import type { MintInfo } from '@cashu/cashu-ts';
 import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
-import { isMintQuotePaymentObserved } from 'colada';
+import { getOnchainConfirmationProgress, isMintQuotePaymentObserved } from 'colada';
 import type { BoundAction } from 'colada/react';
 
 import { MintSelector } from '@/features/wallet';
@@ -17,7 +17,6 @@ import {
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { useMempoolAddressSummary } from '@/shared/hooks/useMempoolAddressSummary';
-import { getOnchainConfirmationProgress } from '@/shared/lib/bitcoin/onchainPaymentStatus';
 import {
   buildOnchainRequiredConfirmationProgress,
   buildSatisfiedOnchainConfirmationProgress,

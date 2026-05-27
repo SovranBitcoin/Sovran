@@ -21,7 +21,7 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'colada';
-import { createColada, withTimeout } from 'colada';
+import { createColada, createMempoolSpaceChainAdapter, withTimeout } from 'colada';
 import {
   ColadaProvider as ColadaProviderBase,
   type ColadaProviderProps,
@@ -92,6 +92,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   const privateKeyRef = useLatestRef(keys?.privateKey);
 
   const [nfcAdapter] = useState(() => createNfcAdapter());
+  const chainAdapter = useMemo(() => createMempoolSpaceChainAdapter(), []);
   // Receive-screen subscribers register a callback here so the notifications
   // factory can fan a p2pk-keypair regeneration out to every mounted receive
   // surface. A Set (not a single slot) lets co-mounted receive screens — e.g.
@@ -316,6 +317,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       })}
       actions={actions}
       screenActionsBridge={screenActionsBridge}
+      chainAdapter={chainAdapter}
       deepLinks={deepLinks}
       navigation={navigation}>
       {children}

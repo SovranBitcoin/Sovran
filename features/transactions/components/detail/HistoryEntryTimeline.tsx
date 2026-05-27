@@ -7,6 +7,7 @@ import {
   getCardLabel,
   getStatusColorType,
   getStatusHeader,
+  type ChainOnchainConfirmationProgress as OnchainConfirmationProgress,
   type TimelineItem,
   type TimelineStepType,
 } from 'colada';
@@ -34,7 +35,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
-import type { OnchainConfirmationProgress } from '@/shared/lib/bitcoin/onchainPaymentStatus';
 import {
   meltQuoteExpired,
   getMeltQuoteTimeUntilExpiry,

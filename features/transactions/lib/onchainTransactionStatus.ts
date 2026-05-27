@@ -1,4 +1,4 @@
-import type { MempoolAddressSummary } from '@/shared/lib/bitcoin/mempool';
+import type { MempoolAddressSummary } from 'colada';
 
 export function getOnchainTransactionStatusLabel({
   summary,

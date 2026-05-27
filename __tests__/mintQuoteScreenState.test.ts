@@ -1,12 +1,12 @@
 import type { HistoryEntry } from '@cashu/coco-core';
 import { isMintQuotePaymentObserved } from 'colada';
+import type { MempoolAddressSummary } from 'colada';
 
 import {
   getMintQuoteRouteTitle,
   getReceiveQuoteScreenTitle,
   getOnchainStatusProgress,
 } from '@/features/receive/lib/mintQuotePresentation';
-import type { MempoolAddressSummary } from '@/shared/lib/bitcoin/mempool';
 import {
   getMintQuotePaymentValue,
   getOnchainMintQuoteRequiredConfirmations,

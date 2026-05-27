@@ -1,8 +1,12 @@
 import type { HistoryEntry } from '@cashu/coco-core';
-import { buildBip321OnchainUri, defaultDetectors, parsePaymentInput } from 'colada';
+import {
+  buildBip321OnchainUri,
+  defaultDetectors,
+  DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
+  parsePaymentInput,
+} from 'colada';
 
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
-import { DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS } from '@/shared/lib/bitcoin/onchainPaymentStatus';
 
 type EntryRecord = Record<string, unknown>;
 

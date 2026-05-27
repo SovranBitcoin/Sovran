@@ -1,4 +1,4 @@
-import { summarizeMempoolAddress, type MempoolAddressStats } from '@/shared/lib/bitcoin/mempool';
+import { summarizeMempoolAddress, type MempoolAddressStats } from 'colada';
 import {
   getCachedMempoolAddressStats,
   useMempoolAddressCache,
@@ -8,13 +8,6 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
   setItem: jest.fn(async () => {}),
   removeItem: jest.fn(async () => {}),
-}));
-
-jest.mock('colada', () => ({
-  combineSignals: (...signals: (AbortSignal | undefined)[]) =>
-    signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
-  isAbortError: () => false,
-  timeoutSignal: () => new AbortController().signal,
 }));
 
 const ADDRESS = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';

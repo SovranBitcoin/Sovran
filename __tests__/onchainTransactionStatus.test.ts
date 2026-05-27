@@ -1,5 +1,5 @@
 import { getOnchainTransactionStatusLabel } from '@/features/transactions/lib/onchainTransactionStatus';
-import type { MempoolAddressSummary } from '@/shared/lib/bitcoin/mempool';
+import type { MempoolAddressSummary } from 'colada';
 
 const emptySummary: MempoolAddressSummary = {
   address: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',

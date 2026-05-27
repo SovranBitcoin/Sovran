@@ -5,7 +5,7 @@ import {
   MempoolAddressStatsSchema,
   summarizeMempoolAddress,
   type MempoolAddressSummary,
-} from '@/shared/lib/bitcoin/mempool';
+} from 'colada';
 import {
   getCachedMempoolAddressStats,
   useMempoolAddressCache,

@@ -12,7 +12,7 @@ import { persist } from 'zustand/middleware';
 
 import { log, storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-import { MempoolAddressStatsSchema, type MempoolAddressStats } from '@/shared/lib/bitcoin/mempool';
+import { MempoolAddressStatsSchema, type MempoolAddressStats } from 'colada';
 
 const STALE_TTL_MS = 60_000;
 const MAX_ENTRIES = 100;

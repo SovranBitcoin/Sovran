@@ -1,11 +1,11 @@
 import type { HistoryEntry } from '@cashu/coco-core';
-
-import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
-import type { MempoolAddressSummary } from '@/shared/lib/bitcoin/mempool';
 import {
   getOnchainConfirmationProgress,
-  type OnchainConfirmationProgress,
-} from '@/shared/lib/bitcoin/onchainPaymentStatus';
+  type MempoolAddressSummary,
+  type ChainOnchainConfirmationProgress as OnchainConfirmationProgress,
+} from 'colada';
+
+import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 
 export function getReceiveQuoteScreenTitle(isOnchainQuote: boolean): string {
   return isOnchainQuote ? 'Receive Onchain' : 'Receive Lightning';
