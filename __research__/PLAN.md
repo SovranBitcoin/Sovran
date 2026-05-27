@@ -2,7 +2,7 @@
 
 ## Current slice
 
-8. Backcompat sweep: remove old/legacy/dual-shape paths except allowed carve-outs.
+9. Tests reconciliation: rewrite tests for the shipped API and add coverage for new seams.
 
 ## Completed slices
 
@@ -13,10 +13,10 @@
 5. Chain watcher: moved mempool.space address stats, address summaries, confirmation progress, and default chain adapter into Colada; updated `sovran-app` to consume Colada chain helpers.
 6. Fault-tolerance fallbacks: added a generic non-destructive `back` action to Colada screen actions, kept amount/mint selector `cancel` in the contract, and moved receive/mint dead-end close paths through Colada actions.
 7. Renames/dead code: deleted the deprecated `copyAsEmoji` action path, removed the unused NFC fallback export/module, and cleaned strict-unused Colada locals without moving responsibility boundaries unnecessarily.
+8. Backcompat sweep: removed implicit bolt11/sat support for mints missing NUT method-unit metadata, tightened tests to advertise methods explicitly, and removed remaining backcompat wording from shipped Colada APIs.
 
 ## Remaining slices
 
-8. Backcompat sweep: remove old/legacy/dual-shape paths except allowed carve-outs.
 9. Tests reconciliation: rewrite tests for the shipped API and add coverage for new seams.
 10. README + CONVENTIONS: rewrite docs to match the shipped architecture.
 11. Final sweep: rerun gates, tick invariants, and record slice commit SHAs.
@@ -54,3 +54,5 @@
 - Slice 6 verification: focused Colada screen-action tests passed; `colada` type-check passed and 612 tests passed; `sovran-app` type-check passed, 379 tests passed, app error-only lint passed, and both diffs passed `git diff --check`; `colada` still has no lint script.
 - Slice 7 progress: `copy.variants[emoji]` is now the only emoji-token path; `copyAsEmoji` was removed from Colada and Sovran overrides; unused config destructures/helpers/imports and the unused `nfc-fallback` public export were deleted.
 - Slice 7 verification: `colada` type-check, strict no-unused type-check, and 612 tests passed; `sovran-app` type-check, 379 tests, app error-only lint, and both `git diff --check` runs passed.
+- Slice 8 progress: missing NUT method-unit metadata now means unavailable instead of assuming bolt11/sat; test wallets now declare bolt11 support explicitly; Sovran copy override comments no longer describe legacy callers.
+- Slice 8 verification: `colada` type-check, strict no-unused type-check, and 612 tests passed; `sovran-app` type-check, 379 tests, app error-only lint, and both `git diff --check` runs passed.

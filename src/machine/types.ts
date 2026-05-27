@@ -660,9 +660,6 @@ export type NotificationHandlerMap = {
  * createMintQuote, selectMint). When provided, the machine handles
  * success/failure routing and only dispatches external handlers for the
  * resulting navigation/UI step.
- *
- * Backward compatible: when omitted, external handlers receive the raw
- * action step data (old behavior).
  */
 export interface MachineOperations {
   executeSend: (mintUrl: string, amount: number) => Promise<{ historyEntry: string }>;

@@ -25,6 +25,7 @@
  *   - Others are format-matched strings that pass detector regex
  */
 
+import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import type { WalletContext } from '../../src/types';
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,19 @@ export const MINT_METADATA: Record<string, { displayName: string; iconUrl: strin
   [MINT3]: { displayName: 'Mint Three', iconUrl: 'https://mint3.example.com/icon.png' },
 };
 
+const BOLT11_SAT_MINT_INFO = {
+  nuts: {
+    '4': { methods: [{ method: 'bolt11', unit: 'sat' }] },
+    '5': { methods: [{ method: 'bolt11', unit: 'sat' }] },
+  },
+};
+
+function bolt11SatCapabilities(mintUrls: readonly string[]): WalletContext['mintMethodCapabilities'] {
+  return deriveMintMethodCapabilityMapFromTrustedMints(
+    mintUrls.map((mintUrl) => ({ mintUrl, mintInfo: BOLT11_SAT_MINT_INFO }))
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Wallet state fixtures
 // ---------------------------------------------------------------------------
@@ -70,6 +84,7 @@ export const WALLETS = {
   default: {
     trustedMintUrls: [MINT1, MINT2],
     mintBalances: { [MINT1]: 1000, [MINT2]: 500 },
+    mintMethodCapabilities: bolt11SatCapabilities([MINT1, MINT2]),
     preferredMintUrl: MINT1,
     proofAmounts: {
       [MINT1]: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
@@ -84,6 +99,7 @@ export const WALLETS = {
   singleMint: {
     trustedMintUrls: [MINT1],
     mintBalances: { [MINT1]: 1000 },
+    mintMethodCapabilities: bolt11SatCapabilities([MINT1]),
     preferredMintUrl: MINT1,
     proofAmounts: {
       [MINT1]: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
@@ -97,6 +113,7 @@ export const WALLETS = {
   noBalance: {
     trustedMintUrls: [MINT1],
     mintBalances: { [MINT1]: 0 },
+    mintMethodCapabilities: bolt11SatCapabilities([MINT1]),
     preferredMintUrl: MINT1,
     proofAmounts: {},
   },
@@ -124,6 +141,7 @@ export const WALLETS = {
   multiMintUnbalanced: {
     trustedMintUrls: [MINT1, MINT2, MINT3],
     mintBalances: { [MINT1]: 5000, [MINT2]: 100, [MINT3]: 0 },
+    mintMethodCapabilities: bolt11SatCapabilities([MINT1, MINT2, MINT3]),
     preferredMintUrl: MINT2,
     proofAmounts: {
       [MINT1]: [1024, 2048, 512, 256, 128, 32],
@@ -138,6 +156,7 @@ export const WALLETS = {
   insufficientBalance: {
     trustedMintUrls: [MINT1],
     mintBalances: { [MINT1]: 50 },
+    mintMethodCapabilities: bolt11SatCapabilities([MINT1]),
     preferredMintUrl: MINT1,
     proofAmounts: { [MINT1]: [32, 16, 2] },
   },
@@ -153,6 +172,7 @@ export const WALLETS = {
   noExactProofs: {
     trustedMintUrls: [MINT1],
     mintBalances: { [MINT1]: 1000 },
+    mintMethodCapabilities: bolt11SatCapabilities([MINT1]),
     preferredMintUrl: MINT1,
     proofAmounts: { [MINT1]: [512, 256, 128, 64, 32, 8] },
   },

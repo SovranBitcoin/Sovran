@@ -12,12 +12,11 @@ import type { MintMethodRequirement, WalletContext } from '../../src/types';
 import { MINT1, MINT2 } from '../_harness/fixtures';
 
 describe('mint method capabilities', () => {
-  it('allows legacy bolt11 sat when NUT method-unit metadata is missing', () => {
+  it('requires explicit method-unit metadata', () => {
     const support = deriveMintMethodSupportFromInfo({});
 
-    expect(support.mint.bolt11?.supported).toBe(true);
-    expect(support.mint.bolt11?.legacySatAllowed).toBe(true);
-    expect(support.melt.bolt11?.supported).toBe(true);
+    expect(support.mint.bolt11?.supported).toBe(false);
+    expect(support.melt.bolt11?.supported).toBe(false);
     expect(support.mint.onchain?.supported).toBe(false);
     expect(support.melt.onchain?.supported).toBe(false);
   });

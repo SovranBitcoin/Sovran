@@ -164,9 +164,8 @@ function revalidateMintForAmount(
     }
 
     if (requirement.method === 'bolt11' && hasOnlyBalanceFailures(methodCandidates)) {
-      // Preserve the balance fallback path for legacy Lightning melts: if the
-      // method is supported but the amount is too high, offer nearby proof
-      // amounts instead of reporting method incompatibility.
+      // If the method is supported but the amount is too high, offer nearby
+      // proof amounts instead of reporting method incompatibility.
     } else {
       const reason = methodCandidates.find((candidate) => candidate.reason)?.reason;
       return {

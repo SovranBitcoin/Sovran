@@ -83,8 +83,7 @@ export interface ActionAvailability {
   reason?: string;
   /**
    * Optional alternate forms of this action. When present, the UI can surface a
-   * split-button menu and pass `{ variantId }` to `execute`. Back-compat: if
-   * omitted, existing screens behave identically.
+   * split-button menu and pass `{ variantId }` to `execute`.
    */
   variants?: ActionVariant[];
 }

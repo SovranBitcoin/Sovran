@@ -40,9 +40,8 @@ export interface WalletContext {
    * Per-mint NUT-04/NUT-05 payment-method support derived from NUT-06 info.
    *
    * NUT-04 ("mint") gates receive quote creation. NUT-05 ("melt") gates
-   * outbound payments. Omitted entries are treated like legacy NUT metadata:
-   * bolt11/sat is allowed for compatibility, non-legacy methods require an
-   * explicit advertised method-unit pair.
+   * outbound payments. Missing method-unit metadata is treated as unavailable;
+   * mints must advertise the method/unit pair they support.
    */
   mintMethodCapabilities?: MintMethodCapabilityMap;
   /**
@@ -68,7 +67,6 @@ export interface MintMethodUnitCapability {
   disabled: boolean;
   method: MintPaymentMethod;
   unit: string;
-  legacySatAllowed?: boolean;
   reason?: string;
 }
 

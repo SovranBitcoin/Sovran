@@ -92,7 +92,7 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
     },
     cancel: {
       available: canAct && operationId != null,
-      ...(!operationId && canAct ? { reason: 'Legacy entry — cannot cancel' } : {}),
+      ...(!operationId && canAct ? { reason: 'Missing operation ID — cannot cancel' } : {}),
     },
     back: { available: true },
   };
