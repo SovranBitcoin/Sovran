@@ -1285,15 +1285,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           });
         }
       },
-      /**
-       * @deprecated — reach this via `copy({ variantId: 'emoji' })` now. The
-       * action name is retained for a release so any extant callers still work.
-       */
-      copyAsEmoji: async (rawCtx) => {
-        const { entry } = sendCtx(rawCtx);
-        if (!entry.token) return;
-        emojiPickerPopup({ token: getEncodedToken(entry.token) });
-      },
     },
 
     // ── mintQuote (Lightning receive) ────────────────────────────────

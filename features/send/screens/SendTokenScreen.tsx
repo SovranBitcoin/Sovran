@@ -140,10 +140,10 @@ export function SendTokenScreen({
           label: 'as Emoji',
           description: 'Copy as an emoji-packed string',
           icon: 'fluent:emoji-24-filled',
-          available: actions.copyAsEmoji.available,
+          available: actions.copy.available,
         },
       ],
-    [actions.copy.variants, actions.copy.available, actions.copyAsEmoji.available]
+    [actions.copy.variants, actions.copy.available]
   );
 
   const copyMenuTriggerRef = useRef<MenuTriggerRef>(null);
