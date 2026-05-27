@@ -41,6 +41,24 @@ describe('screen action availability — back', () => {
   });
 });
 
+describe('sendTokenAvailability — copy variants', () => {
+  it('surfaces emoji copy as a copy variant, not a sibling action', () => {
+    const actions = getAvailableActions('sendToken', {
+      token: { token: [] },
+      state: 'pending',
+      operationId: 'op-1',
+    });
+
+    expect(actions.copy.variants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'text', available: true }),
+        expect.objectContaining({ id: 'emoji', available: true }),
+      ])
+    );
+    expect('copyAsEmoji' in actions).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // paymentRequest — Confirm availability
 // ---------------------------------------------------------------------------

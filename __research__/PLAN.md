@@ -2,7 +2,7 @@
 
 ## Current slice
 
-9. Tests reconciliation: rewrite tests for the shipped API and add coverage for new seams.
+10. README + CONVENTIONS: rewrite docs to match the shipped architecture.
 
 ## Completed slices
 
@@ -14,10 +14,10 @@
 6. Fault-tolerance fallbacks: added a generic non-destructive `back` action to Colada screen actions, kept amount/mint selector `cancel` in the contract, and moved receive/mint dead-end close paths through Colada actions.
 7. Renames/dead code: deleted the deprecated `copyAsEmoji` action path, removed the unused NFC fallback export/module, and cleaned strict-unused Colada locals without moving responsibility boundaries unnecessarily.
 8. Backcompat sweep: removed implicit bolt11/sat support for mints missing NUT method-unit metadata, tightened tests to advertise methods explicitly, and removed remaining backcompat wording from shipped Colada APIs.
+9. Tests reconciliation: added shipped-API coverage that emoji token copy is a `copy` variant rather than a sibling action; updated capability fixtures to reflect explicit mint method support.
 
 ## Remaining slices
 
-9. Tests reconciliation: rewrite tests for the shipped API and add coverage for new seams.
 10. README + CONVENTIONS: rewrite docs to match the shipped architecture.
 11. Final sweep: rerun gates, tick invariants, and record slice commit SHAs.
 
@@ -56,3 +56,5 @@
 - Slice 7 verification: `colada` type-check, strict no-unused type-check, and 612 tests passed; `sovran-app` type-check, 379 tests, app error-only lint, and both `git diff --check` runs passed.
 - Slice 8 progress: missing NUT method-unit metadata now means unavailable instead of assuming bolt11/sat; test wallets now declare bolt11 support explicitly; Sovran copy override comments no longer describe legacy callers.
 - Slice 8 verification: `colada` type-check, strict no-unused type-check, and 612 tests passed; `sovran-app` type-check, 379 tests, app error-only lint, and both `git diff --check` runs passed.
+- Slice 9 progress: send-token availability now asserts emoji copy stays under `copy.variants` and `copyAsEmoji` is not a runtime action.
+- Slice 9 verification: `colada` type-check, strict no-unused type-check, and 613 tests passed; `sovran-app` type-check, 379 tests, app error-only lint, and both `git diff --check` runs passed.
