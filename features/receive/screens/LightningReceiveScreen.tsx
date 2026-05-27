@@ -11,6 +11,7 @@ import { useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';
+import { isMintQuotePaymentObserved } from 'colada';
 import { useScreenActions } from 'colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
@@ -37,7 +38,6 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
-import { isMintQuotePaymentObserved } from '../lib/mintQuoteState';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 

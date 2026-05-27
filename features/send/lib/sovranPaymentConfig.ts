@@ -28,6 +28,8 @@ import type {
   MintHistoryEntry,
 } from '@cashu/coco-core';
 import {
+  isSendTokenCancelled,
+  isSendTokenComplete,
   withTimeout,
   type MachineOperations,
   type NotificationHandlerMap,
@@ -543,9 +545,9 @@ export function createSovranNotifications(
     // ── Screen action notifications ─────────────────────────────────
 
     onSendStatusChecked: ({ operationId: _operationId, state, redeemed }) => {
-      if (redeemed || state === 'finalized') {
+      if (redeemed || isSendTokenComplete({ state })) {
         staticPopup('token-redeemed-by-recipient');
-      } else if (state === 'rolled_back') {
+      } else if (isSendTokenCancelled({ state })) {
         staticPopup('transaction-already-cancelled');
       } else if (state === 'not_found') {
         staticPopup('operation-not-found');

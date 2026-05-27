@@ -3,6 +3,7 @@ import { useWindowDimensions } from 'react-native';
 
 import type { MintInfo } from '@cashu/cashu-ts';
 import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import { isMintQuotePaymentObserved } from 'colada';
 import type { BoundAction } from 'colada/react';
 
 import { MintSelector } from '@/features/wallet';
@@ -36,8 +37,6 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-
-import { isMintQuotePaymentObserved } from '../lib/mintQuoteState';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 

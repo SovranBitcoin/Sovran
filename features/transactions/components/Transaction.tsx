@@ -16,7 +16,7 @@ import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
 import TransactionIcon from '@/features/transactions/components/TransactionIcon';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
+import { isCancellablePendingEcash, isSendTokenCancelled } from 'colada';
 import {
   COLLAPSE_DURATION_MS,
   useIsCollapsing,
@@ -120,11 +120,7 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
   const isSend = isOutgoingTransaction(historyEntry);
   const isReceive = !isSend;
 
-  // Check if this is a rolled back send transaction
-  const sendState =
-    historyEntry.type === 'send' ? String((historyEntry as SendHistoryEntry).state) : '';
-  const isRolledBack =
-    historyEntry.type === 'send' && (sendState === 'rolledBack' || sendState === 'rolled_back');
+  const isRolledBack = historyEntry.type === 'send' && isSendTokenCancelled(historyEntry);
 
   const fiatAmount = formatAmount(
     { amount: Math.abs(amountToNumber(historyEntry.amount)), unit: historyEntry.unit },

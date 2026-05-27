@@ -26,13 +26,13 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
-import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
 import {
+  isCancellablePendingEcash,
   isPendingTransaction,
   matchesTransactionFilters,
   type TransactionDirection,
   type TransactionPaymentType,
-} from '@/features/transactions/historyFilters';
+} from 'colada';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { duration, spacing, zIndex } from '@/shared/styles/tokens';

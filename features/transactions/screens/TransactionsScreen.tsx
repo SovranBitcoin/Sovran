@@ -38,7 +38,7 @@ import {
   matchesTransactionFilters,
   type TransactionDirection,
   type TransactionPaymentType,
-} from '@/features/transactions/historyFilters';
+} from 'colada';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 

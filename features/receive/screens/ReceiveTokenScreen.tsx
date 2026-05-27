@@ -9,6 +9,7 @@
 import React, { useEffect } from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
+import { isReceiveTokenRedeemed } from 'colada';
 import { useScreenActions } from 'colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
@@ -51,7 +52,7 @@ export function ReceiveTokenScreen({
     if (error) paymentLog.warn('receive.token.error', { error });
   }, [error]);
 
-  const isRedeemed = entry?.state === 'finalized';
+  const isRedeemed = isReceiveTokenRedeemed(entry);
 
   useEffect(() => {
     if (!entry) return;

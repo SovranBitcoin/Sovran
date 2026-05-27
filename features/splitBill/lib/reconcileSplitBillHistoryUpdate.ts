@@ -8,6 +8,8 @@
  * outcome; the live hook just discards the value.
  */
 
+import { isMintQuotePaymentObserved } from 'colada';
+
 interface ReconcilerStore {
   quoteIdToSplitBill: Record<string, { groupId: string; participantId: string }>;
   markPaymentPaidByQuoteId: (quoteId: string) => void;
@@ -31,10 +33,7 @@ export function reconcileSplitBillHistoryUpdate(
   if (!quoteId) return 'ignored';
   const ref = store.quoteIdToSplitBill[quoteId];
   if (!ref) return 'ignored';
-  // Coco's MintQuoteState is 'UNPAID' | 'PAID' | 'ISSUED' — but mints
-  // may surface 'EXPIRED' via legacy or upstream paths the type does
-  // not enumerate yet. Read as string so both branches stay reachable.
-  if (entry.state === 'PAID' || entry.state === 'ISSUED') {
+  if (isMintQuotePaymentObserved(entry)) {
     store.markPaymentPaidByQuoteId(quoteId);
     return 'paid';
   }

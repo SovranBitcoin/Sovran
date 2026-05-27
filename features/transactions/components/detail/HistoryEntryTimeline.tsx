@@ -2,6 +2,14 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
+import {
+  buildTimeline,
+  getCardLabel,
+  getStatusColorType,
+  getStatusHeader,
+  type TimelineItem,
+  type TimelineStepType,
+} from 'colada';
 import Animated, {
   Easing,
   FadeInDown,
@@ -37,15 +45,6 @@ import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { Log } from '@/shared/lib/logger';
-
-import {
-  buildTimeline,
-  getCardLabel,
-  getStatusHeader,
-  getStatusColorType,
-  type TimelineItem,
-  type TimelineStepType,
-} from './buildTimeline';
 
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;

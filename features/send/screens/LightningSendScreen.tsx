@@ -17,6 +17,7 @@ import { useWindowDimensions, View } from 'react-native';
 import { Stack } from 'expo-router';
 
 import type { MeltHistoryEntry } from '@cashu/coco-core';
+import { isMeltQuotePaid, isMeltQuoteReadyToPay } from 'colada';
 import { useScreenActions } from 'colada/react';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
@@ -115,9 +116,8 @@ export function LightningSendScreen({
   const isPreview = !entry.quoteId;
   const anyLoading = actions.pay.loading || actions.cancel.loading;
   const quoteCardWidth = Math.max(0, windowWidth - QUOTE_CARD_HORIZONTAL_MARGIN * 2);
-  const state = String(entry.state);
-  const isPaid = state === 'finalized' || state === 'PAID';
-  const isUnpaid = state === 'prepared' || state === 'UNPAID';
+  const isPaid = isMeltQuotePaid(entry);
+  const isReadyToPay = isMeltQuoteReadyToPay(entry);
   log.debug('send.lightning.render', {
     state: entry.state,
     isPreview,
@@ -191,7 +191,7 @@ export function LightningSendScreen({
 
           {isPaid && <TransactionLocationSection transactionId={entry.id} />}
 
-          {isUnpaid ? (
+          {isReadyToPay ? (
             <MintSelector
               width={quoteCardWidth}
               unit={entry.unit}

@@ -11,12 +11,7 @@
  * @see {@link https://github.com/bitcoinvault/coco-cashu-core} Coco Cashu Core
  */
 
-import {
-  type HistoryEntry,
-  type Manager,
-  type ReceiveHistoryEntry,
-  type SendHistoryEntry,
-} from '@cashu/coco-core';
+import { type Manager, type ReceiveHistoryEntry } from '@cashu/coco-core';
 import { getTokenMetadata } from '@cashu/cashu-ts';
 
 import { log } from '../logger';
@@ -139,20 +134,6 @@ export function buildReceiveHistoryEntry(
 // ============================================================================
 // Pending Ecash Send Helpers
 // ============================================================================
-
-/**
- * Send-operation states that can be rolled back. `prepared` operations need
- * `cancel`; `pending`/`executing` need `reclaim` (see `attemptRollback`).
- */
-const CANCELLABLE_SEND_STATES = new Set(['pending', 'prepared']);
-
-/**
- * Type guard: a history entry that can be cancelled by the user via swipe
- * or the bulk-sweep button on Transactions.
- */
-export function isCancellablePendingEcash(entry: HistoryEntry): entry is SendHistoryEntry {
-  return entry.type === 'send' && CANCELLABLE_SEND_STATES.has((entry as SendHistoryEntry).state);
-}
 
 /**
  * State-aware rollback. Mirrors `attemptRollback` from

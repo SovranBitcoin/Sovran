@@ -1,6 +1,6 @@
 import type { HistoryEntry } from '@cashu/coco-core';
+import { isMintQuotePaymentObserved } from 'colada';
 
-import { isMintQuotePaymentObserved } from '@/features/receive/lib/mintQuoteState';
 import {
   getMintQuoteRouteTitle,
   getReceiveQuoteScreenTitle,

@@ -6,9 +6,9 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import type { TransactionDirection, TransactionPaymentType } from 'colada';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
-import type { TransactionDirection, TransactionPaymentType } from '../historyFilters';
 
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 

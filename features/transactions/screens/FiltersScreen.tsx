@@ -29,7 +29,7 @@ import {
   matchesTransactionFilters,
   type TransactionDirection,
   type TransactionPaymentType,
-} from '@/features/transactions/historyFilters';
+} from 'colada';
 
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 

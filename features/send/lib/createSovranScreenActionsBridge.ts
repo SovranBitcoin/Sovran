@@ -10,6 +10,7 @@ import type {
   ScreenType,
 } from 'colada';
 import {
+  isMintQuotePaymentObserved,
   meltOperationToScreenActionEntry,
   mergeEntryUpdate as defaultMerge,
   shouldApplyEntryUpdate as defaultShouldApply,
@@ -306,7 +307,7 @@ export function createSovranScreenActionsBridge({
             quoteId,
             state: state ?? null,
           });
-          if ((state === 'PAID' || state === 'ISSUED') && quoteId) {
+          if (isMintQuotePaymentObserved({ state }) && quoteId) {
             useTransactionDistributionStore.getState().setDistribution(quoteId, 'displayed');
             bus.publish({ type: 'screenActions.changed', reason: 'transactionDistribution' });
             paymentLog.debug('payment.mint_quote.displayed_inference.applied', {

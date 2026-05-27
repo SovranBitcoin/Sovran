@@ -35,6 +35,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
 import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
+import { isReservedSendHistoryEntry } from 'colada';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
@@ -208,9 +209,8 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   const [foreground, warning] = useThemeColor(['foreground', 'warning'] as const);
   const balanceTint = opacity(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
   const { reservedTotal } = useReservedProofs();
-  const pendingSends = history.filter(
-    (entry): entry is SendHistoryEntry =>
-      entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
+  const pendingSends = history.filter((entry): entry is SendHistoryEntry =>
+    isReservedSendHistoryEntry(entry)
   );
   const pendingTotal = mockMode
     ? mockPendingAmount

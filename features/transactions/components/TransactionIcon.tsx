@@ -1,8 +1,9 @@
 import React from 'react';
+import { isSendTokenCancelled } from 'colada';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
-import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
+import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
@@ -20,12 +21,8 @@ export default function TransactionIcon({
 
   const getIconName = () => {
     // Check if this is a rolled back send transaction
-    if (historyEntry.type === 'send') {
-      const sendEntry = historyEntry as SendHistoryEntry;
-      const sendState = String(sendEntry.state);
-      if (sendState === 'rolledBack' || sendState === 'rolled_back') {
-        return 'mdi:cancel'; // Cancelled/rolled back icon
-      }
+    if (historyEntry.type === 'send' && isSendTokenCancelled(historyEntry)) {
+      return 'mdi:cancel'; // Cancelled/rolled back icon
     }
 
     switch (historyEntry.type) {

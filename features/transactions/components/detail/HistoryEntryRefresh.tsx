@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
+import { getHistoryEntryRefreshLabel } from 'colada';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 
@@ -26,17 +27,7 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
   const paymentCopy = usePaymentCopyResolver();
   const loading = !mintInfo;
   const text = paymentCopy.text;
-
-  const statusLabel =
-    historyEntry.type === 'send'
-      ? historyEntry.state === 'finalized'
-        ? text('history.refresh.sentWith')
-        : text('history.refresh.sendingWith')
-      : historyEntry.type === 'receive'
-        ? historyEntry.state === 'finalized'
-          ? text('history.refresh.receivedWith')
-          : text('history.refresh.receivingWith')
-        : text('history.refresh.processingWith');
+  const statusLabel = getHistoryEntryRefreshLabel(historyEntry, paymentCopy);
 
   const row = (
     <ListGroup.Item disabled>

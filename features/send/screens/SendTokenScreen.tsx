@@ -12,7 +12,12 @@ import { StyleSheet } from 'react-native';
 import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'colada/react';
-import type { ActionVariant } from 'colada';
+import {
+  getSendTokenReachabilityWarning,
+  isSendTokenCancelled,
+  isSendTokenComplete,
+  type ActionVariant,
+} from 'colada';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
@@ -43,7 +48,6 @@ import {
   useSendReachabilityStore,
 } from '@/shared/stores/profile/sendReachabilityStore';
 import { spacing } from '@/shared/styles/tokens';
-import { getSendTokenReachabilityWarning } from '../lib/sendTokenWarning';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -175,6 +179,8 @@ export function SendTokenScreen({
     mintWasOffline,
     reachabilityStatus: reachability?.status,
   });
+  const isComplete = isSendTokenComplete(entry);
+  const isCancelled = isSendTokenCancelled(entry);
 
   const bottomButtons = (
     <BottomButtons>
@@ -306,19 +312,16 @@ export function SendTokenScreen({
             </View>
           )}
 
-          {entry.state !== 'finalized' &&
-            String(entry.state) !== 'rolledBack' &&
-            String(entry.state) !== 'rolled_back' &&
-            entry.tokenString && (
-              <PaymentInfo
-                copyTarget="token"
-                unit={entry.unit}
-                data={entry.tokenString.toString()}
-                animated={(entry.tokenString.length ?? 0) >= 500}
-              />
-            )}
+          {!isComplete && !isCancelled && entry.tokenString && (
+            <PaymentInfo
+              copyTarget="token"
+              unit={entry.unit}
+              data={entry.tokenString.toString()}
+              animated={(entry.tokenString.length ?? 0) >= 500}
+            />
+          )}
 
-          {entry.state === 'finalized' && <TransactionLocationSection transactionId={entry.id} />}
+          {isComplete && <TransactionLocationSection transactionId={entry.id} />}
 
           <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
 
