@@ -334,17 +334,17 @@ export function ColadaProvider({
   const getOffline = getOfflineProp ?? ic?.getOffline;
   const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
   const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
-  const writeClipboard = clipboardAdapter?.writeText ?? ic?.platform?.clipboard?.write;
+  const writeClipboard = clipboardAdapter?.writeText;
   const shareContent = shareAdapter
     ? (content: { message: string; url?: string }) => shareAdapter.share(content)
-    : ic?.platform?.share;
+    : undefined;
   const adapterScanSources = buildAdapterScanSources({
     clipboardAdapter,
     imagePickerAdapter,
   });
-  const scanSources = scanSourcesProp ?? adapterScanSources ?? ic?.platform?.scanSources;
-  const nfcAdapter = nfcAdapterProp ?? ic?.platform?.nfc;
-  const createURDecoder = qrDecoderAdapter?.createUrDecoder ?? ic?.platform?.createURDecoder;
+  const scanSources = scanSourcesProp ?? adapterScanSources;
+  const nfcAdapter = nfcAdapterProp;
+  const createURDecoder = qrDecoderAdapter?.createUrDecoder;
   const subscriptionBus = useMemo(() => createSubscriptionBus(), []);
   const baseOperations = operationsProp ?? instance?.operations;
   const operations = useMemo<Partial<MachineOperations> | undefined>(() => {

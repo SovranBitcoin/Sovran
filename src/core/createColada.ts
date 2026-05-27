@@ -5,7 +5,7 @@
 // with built-in operations, WalletContext tracking, and the PaymentMachine.
 //
 // This is the primary entry point for integrating colada. The wallet
-// provides a Manager (from coco-cashu-core) and optional platform primitives;
+// provides a Manager (from coco-cashu-core) and app-owned enrichment callbacks;
 // the instance does everything else.
 // ---------------------------------------------------------------------------
 
@@ -36,14 +36,6 @@ type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
 
 export interface ColadaConfig {
   manager: Manager;
-
-  platform?: {
-    clipboard?: { write: (text: string) => Promise<void> };
-    share?: (content: { message: string; url?: string }) => Promise<void>;
-    nfc?: NfcIOAdapter;
-    scanSources?: ScanSources;
-    createURDecoder?: () => URDecoderLike;
-  };
 
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
 
