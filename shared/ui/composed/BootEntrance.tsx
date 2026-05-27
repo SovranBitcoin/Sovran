@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
@@ -55,28 +55,43 @@ export function BootEntrance({ children, style }: BootEntranceProps): React.Reac
     hasArmedRef.current = true;
     // Step 1: snap to the entrance start state. This happens UNDER the
     // still-opaque splash overlay, so the snap itself is invisible.
-    scale.value = 1.08;
-    opacity.value = 0;
+    scale.set(1.08);
+    opacity.set(0);
     // Step 2: animate to the final state. By this frame the splash has
     // begun morphing, so the user sees the wallet emerge at 1.08 → 1.
-    scale.value = withSpring(1, {
-      damping: 18,
-      stiffness: 90,
-      mass: 1,
-    });
-    opacity.value = withTiming(1, {
-      duration: 550,
-      easing: Easing.out(Easing.quad),
-    });
+    scale.set(
+      withSpring(1, {
+        damping: 18,
+        stiffness: 90,
+        mass: 1,
+      })
+    );
+    opacity.set(
+      withTiming(1, {
+        duration: 550,
+        easing: Easing.out(Easing.quad),
+      })
+    );
+
+    const fallback = setTimeout(() => {
+      scale.set(1);
+      opacity.set(1);
+    }, 800);
+
+    return () => clearTimeout(fallback);
   }, [handoff, scale, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
+    opacity: opacity.get(),
+    transform: [{ scale: scale.get() }],
   }));
+  const containerStyle = useMemo(
+    () => [styles.container, style, animatedStyle],
+    [animatedStyle, style]
+  );
 
   return (
-    <Animated.View style={[styles.container, style, animatedStyle]} collapsable={false}>
+    <Animated.View style={containerStyle} collapsable={false}>
       {children}
     </Animated.View>
   );
