@@ -8,8 +8,30 @@ export {
   useColadaContext,
   usePaymentFlowMachine,
   type DeepLinkConfig,
+  type ColadaProviderProps,
+  type PaymentFlowRefs,
   type ScreenActionsBridge,
 } from './ColadaProvider';
+
+export type {
+  BleAdapter,
+  CameraAdapter,
+  ChainAdapter,
+  ClipboardAdapter,
+  ClockAdapter,
+  ColadaAdapters,
+  HapticsAdapter,
+  ImagePickerAdapter,
+  NfcAdapter,
+  NostrAdapter,
+  NotificationsAdapter,
+  QrDecoderAdapter,
+  QrEncoderAdapter,
+  RandomAdapter,
+  SecureStorageAdapter,
+  ShareAdapter,
+  StorageAdapter,
+} from '../adapters';
 
 // Scan types (machine.scan uses these)
 export type {

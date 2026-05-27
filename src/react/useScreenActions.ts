@@ -244,6 +244,7 @@ export function useScreenActions(
     getOfflineRef,
     getBtcPriceRef,
     getDisplayCurrencyRef,
+    adaptersRef,
     notificationsRef,
     operationsRef,
     navigationRef,
@@ -261,6 +262,7 @@ export function useScreenActions(
       paymentMachine: machineRef.current,
       writeClipboard: writeClipboardRef.current,
       shareContent: shareContentRef.current,
+      adapters: adaptersRef.current,
       notify: (event: string, ...args: unknown[]) => {
         const notifications = notificationsRef.current;
         if (!notifications) return;

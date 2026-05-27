@@ -20,6 +20,34 @@ export type { Manager } from '@cashu/coco-core';
 // on `createColada`; tests and standalone consumers get a no-op default.
 export { setLogger, type CocoLogger } from './logger';
 
+// Adapter contracts
+export type {
+  BleAdapter,
+  CameraAdapter,
+  ChainAdapter,
+  ChainFeeEstimate,
+  ChainNetwork,
+  ChainTransactionStatus,
+  ClipboardAdapter,
+  ClockAdapter,
+  ColadaAdapters,
+  HapticsAdapter,
+  ImagePickerAdapter,
+  JsonPrimitive,
+  JsonRecord,
+  JsonValue,
+  LoggerAdapter,
+  NfcAdapter,
+  NostrAdapter,
+  NotificationsAdapter,
+  QrDecoderAdapter,
+  QrEncoderAdapter,
+  RandomAdapter,
+  SecureStorageAdapter,
+  ShareAdapter,
+  StorageAdapter,
+} from './adapters';
+
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';

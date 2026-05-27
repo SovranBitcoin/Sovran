@@ -21,16 +21,35 @@ import React, {
 
 import { useLatestRef } from './useLatestRef';
 import { registerLocale } from '../formatting/locales';
-import { errField, logger } from '../logger';
+import { errField, logger, setLogger } from '../logger';
 import { createPaymentMachine } from '../machine/createMachine';
 import type {
+  BleAdapter,
+  CameraAdapter,
+  ChainAdapter,
+  ClipboardAdapter,
+  ClockAdapter,
+  HapticsAdapter,
+  ImagePickerAdapter,
+  LoggerAdapter,
+  NfcAdapter,
+  NotificationsAdapter as SideEffectNotificationsAdapter,
+  NostrAdapter,
+  QrDecoderAdapter,
+  QrEncoderAdapter,
+  RandomAdapter,
+  SecureStorageAdapter,
+  ShareAdapter,
+  StorageAdapter,
+  ColadaAdapters,
+} from '../adapters/types';
+import type {
   MachineOperations,
-  NfcIOAdapter,
   NotificationHandlerMap,
   PaymentMachine,
+  ScanSourceResult,
   ScanSources,
   StepHandlerMap,
-  URDecoderLike,
 } from '../machine/types';
 import type { ScreenActionHandlerMap, ScreenType } from '../screen-actions/types';
 import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
@@ -72,20 +91,20 @@ export interface ScreenActionsBridge {
    */
   onEntryUpdate?: (
     screenType: ScreenType,
-    callback: (entry: Record<string, unknown>) => void
+    callback: (entry: Record<string, unknown>) => void,
   ) => () => void;
   shouldApplyEntryUpdate?: (
     currentEntry: Record<string, unknown> | null,
-    updatedEntry: Record<string, unknown>
+    updatedEntry: Record<string, unknown>,
   ) => boolean;
   mergeEntryUpdate?: (
     currentEntry: Record<string, unknown> | null,
-    updatedEntry: Record<string, unknown>
+    updatedEntry: Record<string, unknown>,
   ) => Record<string, unknown>;
   /** When omitted, raw manager entry is returned. */
   decorateEntry?: (
     entry: Record<string, unknown> | null,
-    ctx: { language: string }
+    ctx: { language: string },
   ) => Record<string, unknown> | null;
   getLocale?: () => string;
   /**
@@ -105,95 +124,57 @@ export interface ScreenActionsBridge {
  * Live refs exposed to the handler factory so handlers can read
  * values that change after creation (e.g. option dismiss callback).
  */
-interface PaymentFlowRefs {
+export interface PaymentFlowRefs {
   getOptionDismiss: () => (() => void) | undefined;
 }
 
-// ---------------------------------------------------------------------------
-// Provider props — grouped by concern (see README)
-// ---------------------------------------------------------------------------
-
-/**
- * Wallet engine wiring. Supplies the engine instance produced by
- * `createColada()` along with optional overrides for the operations
- * map and any custom protocol detectors.
- *
- * The instance is the recommended path for non-trivial consumers — it
- * carries the operations map, wallet-context tracker, and (via
- * `instance.config`) the runtime getters and platform adapters too.
- * `operations` and `detectors` here override the corresponding instance
- * fields when both are present.
- */
-interface EngineConfig {
-  instance?: ColadaInstance;
-  operations?: MachineOperations;
-  detectors?: Detectors;
-}
-
-/**
- * Behavior callbacks — error/validation notifications, post-terminal
- * screen-action handlers, and the optional bridge for `useScreenActions`
- * extras (history subscriptions, decoration, scan provenance).
- */
-interface CallbackConfig {
-  notifications?: NotificationHandlerMap;
-  actions?: ScreenActionHandlerMap;
-  screenActionsBridge?: ScreenActionsBridge;
-}
-
-/**
- * Runtime values read on each machine event (current offline state, BTC
- * price, display currency, locale) plus localization translation
- * dictionaries.
- *
- * The getters are read through `useLatestRef`, so updating any of them
- * does not trigger a render — the latest value is observed at the next
- * machine event. Each getter falls back to the matching field on
- * `engine.instance.config` when omitted; `getLocale` defaults to `'en'`.
- *
- * `translations` is registered against the module-level locale map on
- * mount and on every change; missing keys fall back to English.
- */
-interface RuntimeConfig {
-  getOffline?: () => boolean;
-  getBtcPrice?: () => number;
-  getDisplayCurrency?: () => { code: string; symbol: string } | null;
-  getLocale?: () => string;
-  translations?: Record<string, Record<string, string>>;
-}
-
-/**
- * Platform integrations — clipboard write, share sheet, NFC adapter,
- * URDecoder factory, scan sources, deep-link config, and navigation
- * callbacks. Each may also be supplied via
- * `engine.instance.config.platform`; the top-level value wins when both
- * are set.
- */
-interface PlatformConfig {
-  writeClipboard?: (text: string) => Promise<void>;
-  shareContent?: (content: { message: string; url?: string }) => Promise<void>;
-  nfcAdapter?: NfcIOAdapter;
-  createURDecoder?: () => URDecoderLike;
-  scanSources?: ScanSources;
-  deepLinks?: DeepLinkConfig;
-  navigation?: NavigationCallbacks;
-}
-
-interface ColadaProviderProps {
+export interface ColadaProviderProps {
   children: React.ReactNode;
   /**
    * Required step-handler factory. Called once after the machine is
    * created — returns the `StepHandlerMap` it will use.
    */
   handlers: (machine: PaymentMachine, refs: PaymentFlowRefs) => StepHandlerMap;
-  /** Engine wiring (instance + operations override + custom detectors). */
-  engine?: EngineConfig;
-  /** Behavior callbacks (notifications, screen actions, screen-actions bridge). */
-  callbacks?: CallbackConfig;
-  /** Runtime values + locale (getters + translations). */
-  runtime?: RuntimeConfig;
-  /** Platform integrations (clipboard, share, NFC, scan, deep-links, navigation). */
-  platform?: PlatformConfig;
+  /** Engine instance from `createColada()`. */
+  instance?: ColadaInstance;
+  /** Operation overrides. Top-level value wins over `instance.operations`. */
+  operations?: MachineOperations;
+  /** Custom protocol detectors. */
+  detectors?: Detectors;
+  /** Error/validation/state notifications emitted by the payment machine. */
+  notifications?: NotificationHandlerMap;
+  /** Post-terminal screen action handlers. */
+  actions?: ScreenActionHandlerMap;
+  /** Optional app bridge for `useScreenActions` enrichment/subscriptions. */
+  screenActionsBridge?: ScreenActionsBridge;
+  getOffline?: () => boolean;
+  getBtcPrice?: () => number;
+  getDisplayCurrency?: () => { code: string; symbol: string } | null;
+  getLocale?: () => string;
+  translations?: Record<string, Record<string, string>>;
+  clipboardAdapter?: ClipboardAdapter;
+  shareAdapter?: ShareAdapter;
+  cameraAdapter?: CameraAdapter;
+  imagePickerAdapter?: ImagePickerAdapter;
+  hapticsAdapter?: HapticsAdapter;
+  notificationsAdapter?: SideEffectNotificationsAdapter;
+  nostrAdapter?: NostrAdapter;
+  bleAdapter?: BleAdapter;
+  nfcAdapter?: NfcAdapter;
+  chainAdapter?: ChainAdapter;
+  storageAdapter?: StorageAdapter;
+  secureStorageAdapter?: SecureStorageAdapter;
+  qrEncoderAdapter?: QrEncoderAdapter;
+  qrDecoderAdapter?: QrDecoderAdapter;
+  clockAdapter?: ClockAdapter;
+  randomAdapter?: RandomAdapter;
+  loggerAdapter?: LoggerAdapter;
+  /** Explicit scan sources override adapter-derived scan sources. */
+  scanSources?: ScanSources;
+  /** Automatic deep-link processing. */
+  deepLinks?: DeepLinkConfig;
+  /** Default screen-action navigation callbacks. */
+  navigation?: NavigationCallbacks;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +194,7 @@ interface ColadaContextValue {
   getDisplayCurrencyRef: React.MutableRefObject<
     (() => { code: string; symbol: string } | null) | undefined
   >;
+  adaptersRef: React.MutableRefObject<ColadaAdapters>;
   notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
   operationsRef: React.MutableRefObject<Partial<MachineOperations> | undefined>;
   navigationRef: React.MutableRefObject<NavigationCallbacks | undefined>;
@@ -226,6 +208,34 @@ const ColadaContext = createContext<ColadaContextValue | null>(null);
 
 const EMPTY_SCREEN_ACTIONS = {} as ScreenActionHandlerMap;
 
+function scanSourceFromClipboard(adapter: ClipboardAdapter): () => Promise<ScanSourceResult> {
+  return async () => {
+    if (!adapter.readText) return { empty: true };
+    try {
+      const data = await adapter.readText();
+      return data && data.trim() ? { data } : { empty: true };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
+  };
+}
+
+function buildAdapterScanSources(args: {
+  clipboardAdapter?: ClipboardAdapter;
+  imagePickerAdapter?: ImagePickerAdapter;
+}): ScanSources | undefined {
+  const sources: ScanSources = {};
+  if (args.clipboardAdapter?.readText) {
+    sources.clipboard = scanSourceFromClipboard(args.clipboardAdapter);
+  }
+  if (args.imagePickerAdapter) {
+    sources.gallery = args.imagePickerAdapter.pickQrImage;
+  }
+  return Object.keys(sources).length > 0 ? sources : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -233,48 +243,114 @@ const EMPTY_SCREEN_ACTIONS = {} as ScreenActionHandlerMap;
 export function ColadaProvider({
   children,
   handlers: handlersFactory,
-  engine,
-  callbacks,
-  runtime,
-  platform,
+  instance,
+  operations: operationsProp,
+  detectors,
+  notifications,
+  actions,
+  screenActionsBridge,
+  getOffline: getOfflineProp,
+  getBtcPrice: getBtcPriceProp,
+  getDisplayCurrency: getDisplayCurrencyProp,
+  getLocale: getLocaleProp,
+  translations,
+  clipboardAdapter,
+  shareAdapter,
+  cameraAdapter,
+  imagePickerAdapter,
+  hapticsAdapter,
+  notificationsAdapter,
+  nostrAdapter,
+  bleAdapter,
+  nfcAdapter: nfcAdapterProp,
+  chainAdapter,
+  storageAdapter,
+  secureStorageAdapter,
+  qrEncoderAdapter,
+  qrDecoderAdapter,
+  clockAdapter,
+  randomAdapter,
+  loggerAdapter,
+  scanSources: scanSourcesProp,
+  deepLinks,
+  navigation,
 }: ColadaProviderProps) {
-  // Pull individual fields out of each group, then fall back to the engine
-  // instance's config (`createColada(...).config`) where the package
-  // already structures the same values. The top-level prop wins when both
-  // are set.
-  const { instance, operations: operationsProp, detectors } = engine ?? {};
-  const { notifications, actions, screenActionsBridge } = callbacks ?? {};
-  const {
-    getOffline: getOfflineProp,
-    getBtcPrice: getBtcPriceProp,
-    getDisplayCurrency: getDisplayCurrencyProp,
-    getLocale: getLocaleProp,
-    translations,
-  } = runtime ?? {};
-  const {
-    writeClipboard: writeClipboardProp,
-    shareContent: shareContentProp,
-    nfcAdapter: nfcAdapterProp,
-    createURDecoder: createURDecoderProp,
-    scanSources: scanSourcesProp,
-    deepLinks,
-    navigation,
-  } = platform ?? {};
+  const adapters = useMemo<ColadaAdapters>(
+    () => ({
+      clipboardAdapter,
+      shareAdapter,
+      cameraAdapter,
+      imagePickerAdapter,
+      hapticsAdapter,
+      notificationsAdapter,
+      nostrAdapter,
+      bleAdapter,
+      nfcAdapter: nfcAdapterProp,
+      chainAdapter,
+      storageAdapter,
+      secureStorageAdapter,
+      qrEncoderAdapter,
+      qrDecoderAdapter,
+      clockAdapter,
+      randomAdapter,
+      loggerAdapter,
+    }),
+    [
+      clipboardAdapter,
+      shareAdapter,
+      cameraAdapter,
+      imagePickerAdapter,
+      hapticsAdapter,
+      notificationsAdapter,
+      nostrAdapter,
+      bleAdapter,
+      nfcAdapterProp,
+      chainAdapter,
+      storageAdapter,
+      secureStorageAdapter,
+      qrEncoderAdapter,
+      qrDecoderAdapter,
+      clockAdapter,
+      randomAdapter,
+      loggerAdapter,
+    ],
+  );
 
+  // Flat props win over values carried by the createColada instance. The
+  // instance fallback lets core operations keep owning wallet context while
+  // provider consumers move away from grouped React props.
   const ic = instance?.config;
   const getLocale = getLocaleProp ?? ic?.getLocale;
   const getOffline = getOfflineProp ?? ic?.getOffline;
   const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
   const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
-  const writeClipboard = writeClipboardProp ?? ic?.platform?.clipboard?.write;
-  const shareContent = shareContentProp ?? ic?.platform?.share;
-  const scanSources = scanSourcesProp ?? ic?.platform?.scanSources;
+  const writeClipboard = clipboardAdapter?.writeText ?? ic?.platform?.clipboard?.write;
+  const shareContent = shareAdapter
+    ? (content: { message: string; url?: string }) => shareAdapter.share(content)
+    : ic?.platform?.share;
+  const adapterScanSources = buildAdapterScanSources({
+    clipboardAdapter,
+    imagePickerAdapter,
+  });
+  const scanSources = scanSourcesProp ?? adapterScanSources ?? ic?.platform?.scanSources;
   const nfcAdapter = nfcAdapterProp ?? ic?.platform?.nfc;
-  const createURDecoder = createURDecoderProp ?? ic?.platform?.createURDecoder;
+  const createURDecoder = qrDecoderAdapter?.createUrDecoder ?? ic?.platform?.createURDecoder;
+  const baseOperations = operationsProp ?? instance?.operations;
+  const operations = useMemo<Partial<MachineOperations> | undefined>(() => {
+    if (!nostrAdapter?.sendDirectMessage && !nostrAdapter?.resolveProfile) {
+      return baseOperations;
+    }
+    return {
+      ...baseOperations,
+      sendNostrDM: nostrAdapter.sendDirectMessage ?? baseOperations?.sendNostrDM,
+      resolveRecipientProfile:
+        nostrAdapter.resolveProfile ?? baseOperations?.resolveRecipientProfile,
+    };
+  }, [baseOperations, nostrAdapter]);
 
   const getLocaleRef = useLatestRef(getLocale);
+  const adaptersRef = useLatestRef(adapters);
   const notificationsRef = useLatestRef(notifications);
-  const operations = operationsProp ?? instance?.operations;
   const operationsRef = useLatestRef<Partial<MachineOperations> | undefined>(operations);
   const navigationRef = useLatestRef<NavigationCallbacks | undefined>(navigation);
   const writeClipboardRef = useLatestRef(writeClipboard);
@@ -301,13 +377,19 @@ export function ColadaProvider({
     }
   }, [translations]);
 
+  useEffect(() => {
+    if (!loggerAdapter) return undefined;
+    setLogger(loggerAdapter);
+    return () => setLogger(null);
+  }, [loggerAdapter]);
+
   if (!machineRef.current) {
     machineRef.current = createPaymentMachine({
       handlers: new Proxy(
         {},
         {
           get: (_target, key: string) => (handlersRef.current as Record<string, unknown>)[key],
-        }
+        },
       ) as StepHandlerMap,
       detectors,
       getContext: instance
@@ -394,13 +476,14 @@ export function ColadaProvider({
       getOfflineRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
+      adaptersRef,
       notificationsRef,
       operationsRef,
       navigationRef,
       writeClipboardRef,
       shareContentRef,
     }),
-    [walletContextRef, screenActionHandlers, screenActionsBridge]
+    [walletContextRef, screenActionHandlers, screenActionsBridge, adaptersRef],
   );
 
   return <ColadaContext.Provider value={value}>{children}</ColadaContext.Provider>;
