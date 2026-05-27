@@ -122,6 +122,40 @@ export interface ChainTransactionStatus {
   confirmations: number;
 }
 
+export interface ChainAddressCounter {
+  tx_count: number;
+  funded_txo_count: number;
+  funded_txo_sum: number;
+  spent_txo_count: number;
+  spent_txo_sum: number;
+}
+
+export interface ChainAddressFundingTx {
+  txid: string;
+  valueSats: number;
+  confirmations: number;
+}
+
+export interface ChainAddressStats {
+  address: string;
+  chain_stats: ChainAddressCounter;
+  mempool_stats: ChainAddressCounter;
+  fundingTxs?: ChainAddressFundingTx[];
+}
+
+export interface ChainAddressSummary {
+  address: string;
+  confirmedTxCount: number;
+  confirmedReceivedSats: number;
+  confirmedBalanceSats: number;
+  confirmedFundingConfirmations: number | null;
+  unconfirmedTxCount: number;
+  unconfirmedReceivedSats: number;
+  unconfirmedNetSats: number;
+  totalReceivedSats: number;
+  explorerUrl: string;
+}
+
 /**
  * Chain adapter.
  *
@@ -133,6 +167,8 @@ export interface ChainAdapter {
   network: ChainNetwork;
   estimateFees: () => Promise<ChainFeeEstimate>;
   getAddressTransactions: (address: string) => Promise<ChainTransactionStatus[]>;
+  getAddressStats?: (address: string) => Promise<ChainAddressStats>;
+  getAddressSummary?: (address: string) => Promise<ChainAddressSummary>;
   getTransactionStatus: (txid: string) => Promise<ChainTransactionStatus | null>;
   broadcastTransaction: (rawTxHex: string) => Promise<{ txid: string }>;
   subscribeAddress?: (

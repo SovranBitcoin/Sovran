@@ -2,18 +2,18 @@
 
 ## Current slice
 
-4. State machines: split payment flows into per-flow discriminated-union machines.
+6. Fault-tolerance fallbacks: ensure every state has forward and cancel/back actions.
 
 ## Completed slices
 
 1. Adapter contracts: defined JSON-shaped adapter interfaces, flattened `ColadaProvider` props, updated Sovran provider wiring, and verified both repos.
 2. Subscription bus: added a typed Colada bus, bound Sovran Coco/store publishers once at the provider, and moved screen-action, transaction-detail, melt-history, and split-bill history consumers onto bus subscriptions.
 3. Copy + i18n surface: added a typed Colada payment-copy catalog/resolver with overrides and locale registration; moved transaction detail timeline, history refresh, and payment-status toast copy out of `sovran-app`.
+4. State machines: split send/receive entry flows and context resolution into Colada machine modules; moved app-owned transaction state predicates and warning/refresh labels into Colada history helpers.
+5. Chain watcher: moved mempool.space address stats, address summaries, confirmation progress, and default chain adapter into Colada; updated `sovran-app` to consume Colada chain helpers.
 
 ## Remaining slices
 
-4. State machines: split payment flows into per-flow discriminated-union machines.
-5. Chain watcher: move mempool/chain watching behind a chain adapter.
 6. Fault-tolerance fallbacks: ensure every state has forward and cancel/back actions.
 7. Renames/dead code: restructure folders around responsibilities and delete unused exports.
 8. Backcompat sweep: remove old/legacy/dual-shape paths except allowed carve-outs.
@@ -45,4 +45,8 @@
 - Copy invariant remains unticked: detail/timeline/history/toast copy now comes from Colada, but flow-screen action/error copy should move when those states are declared in the machine and fallback slices.
 - Avoid importing `colada/react` hooks in app render-tested surfaces while `colada` is a local `file:` dependency; Jest resolves Colada's dev React copy. App surfaces use the root Colada resolver instead.
 - Slice 4 progress: send/receive entry transitions now delegate to per-flow modules with state/action/copy-key declarations; transaction timeline, filter, and detail-screen state predicates moved from `sovran-app` into Colada history.
-- Slice 4 verification so far: `colada` type-check/tests passed; `sovran-app` type-check/tests passed; focused timeline tests passed; touched-file lint has existing perf warnings only; app error-only lint passed.
+- Slice 4 progress: send-token reachability warnings, history refresh labels, chart predicates, pending-send balance predicates, and notification/reconciliation state checks now use Colada history helpers instead of app-owned payment-state branches.
+- Slice 4 progress: amount/mint context resolution, mint selector routing, mint capability revalidation, and proof-selector fallback moved from `transitions.ts` into a dedicated Colada machine resolver module.
+- Slice 5 progress: mempool.space address stats, address summaries, onchain confirmation progress, and the default chain adapter moved into Colada; `sovran-app` now imports those helpers from Colada and passes a Colada chain adapter to the provider.
+- Slice 4 verification: `colada` type-check/tests passed; `sovran-app` type-check/tests passed; focused and full app tests passed; touched-file lint had existing perf warnings only; app error-only lint passed.
+- Slice 5 verification: `colada` type-check passed and 590 tests passed; `sovran-app` type-check passed, 379 tests passed, and app error-only lint passed.

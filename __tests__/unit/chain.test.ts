@@ -1,0 +1,74 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  getOnchainConfirmationProgress,
+  summarizeMempoolAddress,
+  type MempoolAddressStats,
+} from '../../src/chain';
+
+const ADDRESS = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
+
+function stats(overrides: Partial<MempoolAddressStats> = {}): MempoolAddressStats {
+  return {
+    address: ADDRESS,
+    chain_stats: {
+      tx_count: 2,
+      funded_txo_count: 2,
+      funded_txo_sum: 5_000,
+      spent_txo_count: 1,
+      spent_txo_sum: 1_000,
+    },
+    mempool_stats: {
+      tx_count: 1,
+      funded_txo_count: 1,
+      funded_txo_sum: 2_000,
+      spent_txo_count: 1,
+      spent_txo_sum: 500,
+    },
+    ...overrides,
+  };
+}
+
+describe('chain address summaries', () => {
+  it('summarizes confirmed and unconfirmed address stats', () => {
+    expect(summarizeMempoolAddress(stats())).toMatchObject({
+      address: ADDRESS,
+      confirmedTxCount: 2,
+      confirmedReceivedSats: 5_000,
+      confirmedBalanceSats: 4_000,
+      confirmedFundingConfirmations: null,
+      unconfirmedTxCount: 1,
+      unconfirmedReceivedSats: 2_000,
+      unconfirmedNetSats: 1_500,
+      totalReceivedSats: 7_000,
+      explorerUrl: `https://mempool.space/address/${ADDRESS}`,
+    });
+  });
+
+  it('summarizes funding transaction confirmations', () => {
+    const summary = summarizeMempoolAddress(
+      stats({
+        fundingTxs: [
+          { txid: 'a', valueSats: 3_000, confirmations: 6 },
+          { txid: 'b', valueSats: 2_000, confirmations: 2 },
+        ],
+      }),
+    );
+
+    expect(summary.confirmedFundingConfirmations).toBe(2);
+  });
+
+  it('builds onchain confirmation progress from an address summary', () => {
+    const summary = summarizeMempoolAddress(
+      stats({ mempool_stats: { ...stats().mempool_stats, tx_count: 0, funded_txo_sum: 0 } }),
+    );
+
+    expect(getOnchainConfirmationProgress(summary, 6)).toMatchObject({
+      hasPayment: true,
+      hasUnconfirmedPayment: false,
+      currentConfirmations: null,
+      requiredConfirmations: 6,
+      isSatisfied: false,
+    });
+  });
+});

@@ -1,6 +1,10 @@
 export type {
   BleAdapter,
   CameraAdapter,
+  ChainAddressCounter,
+  ChainAddressFundingTx,
+  ChainAddressStats,
+  ChainAddressSummary,
   ChainAdapter,
   ChainFeeEstimate,
   ChainNetwork,

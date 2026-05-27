@@ -22,6 +22,23 @@ export { setLogger, type CocoLogger } from './logger';
 
 // Copy / i18n
 export {
+  DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
+  createMempoolSpaceChainAdapter,
+  defaultChainAdapter,
+  fetchMempoolAddressStats,
+  getOnchainConfirmationInfo,
+  getOnchainConfirmationProgress,
+  MempoolAddressStatsSchema,
+  summarizeMempoolAddress,
+} from './chain';
+export type {
+  MempoolAddressSummary,
+  MempoolAddressStats,
+  MempoolSpaceChainAdapterOptions,
+  OnchainConfirmationProgress as ChainOnchainConfirmationProgress,
+} from './chain';
+
+export {
   createPaymentCopyGroups,
   createPaymentCopyResolver,
   getPaymentCopy,
@@ -87,6 +104,10 @@ export type {
 export type {
   BleAdapter,
   CameraAdapter,
+  ChainAddressCounter,
+  ChainAddressFundingTx,
+  ChainAddressStats,
+  ChainAddressSummary,
   ChainAdapter,
   ChainFeeEstimate,
   ChainNetwork,
