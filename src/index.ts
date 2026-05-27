@@ -20,6 +20,31 @@ export type { Manager } from '@cashu/coco-core';
 // on `createColada`; tests and standalone consumers get a no-op default.
 export { setLogger, type CocoLogger } from './logger';
 
+// Copy / i18n
+export {
+  createPaymentCopyGroups,
+  createPaymentCopyResolver,
+  getPaymentCopy,
+  MELT_COPY,
+  MINT_COPY,
+  PAYMENT_REQUEST_COPY,
+  paymentCopyDefaults,
+  RECEIVE_COPY,
+  registerPaymentCopyLocale,
+  resolvePaymentCopy,
+  SEND_COPY,
+  TOAST_COPY,
+} from './copy';
+export type {
+  PaymentCopyCatalog,
+  PaymentCopyError,
+  PaymentCopyKey,
+  PaymentCopyOptions,
+  PaymentCopyResolver,
+  PaymentCopyResult,
+  PaymentCopyVariables,
+} from './copy';
+
 // Adapter contracts
 export type {
   BleAdapter,

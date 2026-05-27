@@ -20,6 +20,8 @@ import React, {
 } from 'react';
 
 import { useLatestRef } from './useLatestRef';
+import { createPaymentCopyResolver, registerPaymentCopyLocale } from '../copy';
+import type { PaymentCopyCatalog, PaymentCopyResolver } from '../copy';
 import { registerLocale } from '../formatting/locales';
 import { errField, logger, setLogger } from '../logger';
 import { createPaymentMachine } from '../machine/createMachine';
@@ -155,6 +157,8 @@ export interface ColadaProviderProps {
   getDisplayCurrency?: () => { code: string; symbol: string } | null;
   getLocale?: () => string;
   translations?: Record<string, Record<string, string>>;
+  /** Per-key app copy overrides for the active locale. */
+  paymentCopyOverrides?: Partial<PaymentCopyCatalog>;
   clipboardAdapter?: ClipboardAdapter;
   shareAdapter?: ShareAdapter;
   cameraAdapter?: CameraAdapter;
@@ -197,6 +201,7 @@ interface ColadaContextValue {
   getDisplayCurrencyRef: React.MutableRefObject<
     (() => { code: string; symbol: string } | null) | undefined
   >;
+  paymentCopyOverridesRef: React.MutableRefObject<Partial<PaymentCopyCatalog> | undefined>;
   adaptersRef: React.MutableRefObject<ColadaAdapters>;
   subscriptionBusRef: React.MutableRefObject<ColadaSubscriptionBus>;
   notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
@@ -258,6 +263,7 @@ export function ColadaProvider({
   getDisplayCurrency: getDisplayCurrencyProp,
   getLocale: getLocaleProp,
   translations,
+  paymentCopyOverrides,
   clipboardAdapter,
   shareAdapter,
   cameraAdapter,
@@ -354,6 +360,8 @@ export function ColadaProvider({
   }, [baseOperations, nostrAdapter]);
 
   const getLocaleRef = useLatestRef(getLocale);
+  const paymentCopyOverridesRef =
+    useLatestRef<Partial<PaymentCopyCatalog> | undefined>(paymentCopyOverrides);
   const adaptersRef = useLatestRef(adapters);
   const subscriptionBusRef = useLatestRef(subscriptionBus);
   const notificationsRef = useLatestRef(notifications);
@@ -380,6 +388,7 @@ export function ColadaProvider({
     if (!translations) return;
     for (const [lang, dict] of Object.entries(translations)) {
       registerLocale(lang, dict);
+      registerPaymentCopyLocale(lang, dict);
     }
   }, [translations]);
 
@@ -486,6 +495,7 @@ export function ColadaProvider({
       getOfflineRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
+      paymentCopyOverridesRef,
       adaptersRef,
       subscriptionBusRef,
       notificationsRef,
@@ -494,7 +504,14 @@ export function ColadaProvider({
       writeClipboardRef,
       shareContentRef,
     }),
-    [walletContextRef, screenActionHandlers, screenActionsBridge, adaptersRef, subscriptionBusRef],
+    [
+      walletContextRef,
+      screenActionHandlers,
+      screenActionsBridge,
+      paymentCopyOverridesRef,
+      adaptersRef,
+      subscriptionBusRef,
+    ],
   );
 
   return <ColadaContext.Provider value={value}>{children}</ColadaContext.Provider>;
@@ -514,6 +531,13 @@ export function useColadaContext(): ColadaContextValue {
 
 export function useColadaSubscriptions(): ColadaSubscriptionBus {
   return useColadaContext().subscriptionBusRef.current;
+}
+
+export function usePaymentCopy(): PaymentCopyResolver {
+  const ctx = useContext(ColadaContext);
+  const locale = ctx?.getLocaleRef.current?.() ?? 'en';
+  const overrides = ctx?.paymentCopyOverridesRef.current;
+  return useMemo(() => createPaymentCopyResolver({ locale, overrides }), [locale, overrides]);
 }
 
 function usePaymentFlowContext(): ColadaContextValue {

@@ -2,16 +2,16 @@
 
 ## Current slice
 
-3. Copy + i18n surface: move payment-state copy defaults and overrides into Colada.
+4. State machines: split payment flows into per-flow discriminated-union machines.
 
 ## Completed slices
 
 1. Adapter contracts: defined JSON-shaped adapter interfaces, flattened `ColadaProvider` props, updated Sovran provider wiring, and verified both repos.
 2. Subscription bus: added a typed Colada bus, bound Sovran Coco/store publishers once at the provider, and moved screen-action, transaction-detail, melt-history, and split-bill history consumers onto bus subscriptions.
+3. Copy + i18n surface: added a typed Colada payment-copy catalog/resolver with overrides and locale registration; moved transaction detail timeline, history refresh, and payment-status toast copy out of `sovran-app`.
 
 ## Remaining slices
 
-3. Copy + i18n surface: move payment-state copy defaults and overrides into Colada.
 4. State machines: split payment flows into per-flow discriminated-union machines.
 5. Chain watcher: move mempool/chain watching behind a chain adapter.
 6. Fault-tolerance fallbacks: ensure every state has forward and cancel/back actions.
@@ -41,3 +41,6 @@
 - Slice 1 verification: `colada` type-check/tests passed, `sovran-app` type-check/tests passed, touched-file lint passed, and app error-only lint passed.
 - Slice 2 verification: `colada` type-check/tests passed, `sovran-app` type-check/tests passed, touched-file lint had warnings only, app tests passed, and app error-only lint passed.
 - Payment-status toasts still listen to Coco directly; fold them into Colada's side-effect channel slice instead of overloading the detail-update bus slice.
+- Slice 3 verification: `colada` type-check/tests passed, `sovran-app` type-check/tests passed, focused timeline tests passed, app tests passed, touched-file lint had warnings only, app error-only lint passed, and both diffs passed `git diff --check`.
+- Copy invariant remains unticked: detail/timeline/history/toast copy now comes from Colada, but flow-screen action/error copy should move when those states are declared in the machine and fallback slices.
+- Avoid importing `colada/react` hooks in app render-tested surfaces while `colada` is a local `file:` dependency; Jest resolves Colada's dev React copy. App surfaces use the root Colada resolver instead.

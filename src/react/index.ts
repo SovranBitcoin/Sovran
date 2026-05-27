@@ -7,6 +7,7 @@ export {
   ColadaProvider,
   useColadaContext,
   useColadaSubscriptions,
+  usePaymentCopy,
   usePaymentFlowMachine,
   type DeepLinkConfig,
   type ColadaProviderProps,
@@ -42,6 +43,12 @@ export type {
   SubscriptionFilter,
   SubscriptionListener,
 } from '../subscriptions';
+
+export type {
+  PaymentCopyKey,
+  PaymentCopyResolver,
+  PaymentCopyVariables,
+} from '../copy';
 
 // Scan types (machine.scan uses these)
 export type {
