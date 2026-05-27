@@ -51,10 +51,9 @@ describe('BitChat BLE private delivery', () => {
       .fn<Promise<string>, [string, string, string, string]>()
       .mockImplementationOnce(() => firstSend)
       .mockResolvedValueOnce('message-2');
-    const startBLE =
-      jest.fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>().mockResolvedValue(
-        undefined
-      );
+    const startBLE = jest
+      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .mockResolvedValue(undefined);
     const startBLEPrivateChat = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
     const sleep = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
     let nextId = 0;
@@ -102,10 +101,9 @@ describe('BitChat BLE private delivery', () => {
   });
 
   it('fails safely before native calls when profile scope is missing', async () => {
-    const startBLE =
-      jest.fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>().mockResolvedValue(
-        undefined
-      );
+    const startBLE = jest
+      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .mockResolvedValue(undefined);
 
     await expect(
       sendBLEPrivateMessageChunks({
@@ -122,10 +120,9 @@ describe('BitChat BLE private delivery', () => {
   });
 
   it('fails safely before native calls when identity material is missing', async () => {
-    const startBLE =
-      jest.fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>().mockResolvedValue(
-        undefined
-      );
+    const startBLE = jest
+      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .mockResolvedValue(undefined);
 
     await expect(
       sendBLEPrivateMessageChunks({

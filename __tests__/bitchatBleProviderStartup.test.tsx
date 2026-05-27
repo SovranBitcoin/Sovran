@@ -1,6 +1,10 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { startBLE, addBLEDeliveryStatusListener, addBLEPrivateMessageListener } from 'bitchat-module';
+import {
+  startBLE,
+  addBLEDeliveryStatusListener,
+  addBLEPrivateMessageListener,
+} from 'bitchat-module';
 
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
 

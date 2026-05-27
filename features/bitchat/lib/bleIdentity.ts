@@ -3,7 +3,7 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 
-export const BITCHAT_BLE_IDENTITY_VERSION = 'sovran-bitchat-ble-v1' as const;
+const BITCHAT_BLE_IDENTITY_VERSION = 'sovran-bitchat-ble-v1' as const;
 
 const BITCHAT_BLE_SALT_LABEL = 'sovran:bitchat:ble:v1';
 const BITCHAT_BLE_NOISE_LABEL = 'sovran:bitchat:ble:noise:v1';
@@ -57,16 +57,4 @@ export function deriveBitchatBLEIdentityMaterial({
     noisePrivateKeyHex,
     signingPrivateKeyHex,
   };
-}
-
-export function isBitchatBLEIdentityMaterial(
-  value: BitchatBLEIdentityMaterial | null | undefined
-): value is BitchatBLEIdentityMaterial {
-  return (
-    !!value &&
-    value.version === BITCHAT_BLE_IDENTITY_VERSION &&
-    HEX_32_BYTES_RE.test(value.nostrPubkey) &&
-    HEX_32_BYTES_RE.test(value.noisePrivateKeyHex) &&
-    HEX_32_BYTES_RE.test(value.signingPrivateKeyHex)
-  );
 }
