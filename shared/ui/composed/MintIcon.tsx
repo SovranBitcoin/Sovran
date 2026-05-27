@@ -7,7 +7,7 @@ import Icon from '@/assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { prefetchImage } from '@/shared/lib/imageCache';
 
-const MINT_DEFAULT_ICON = 'mdi:bank';
+const MINT_DEFAULT_ICON = 'mingcute:bank-fill';
 
 interface MintIconProps {
   iconUrl?: string | null;
