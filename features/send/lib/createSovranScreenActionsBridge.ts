@@ -1,6 +1,14 @@
 import type { MutableRefObject } from 'react';
 
-import type { Manager, MeltOperationLike, MintReviewInfo, ScreenType } from 'colada';
+import type {
+  ColadaSubscriptionBus,
+  ColadaSubscriptionEvent,
+  JsonRecord,
+  Manager,
+  MeltOperationLike,
+  MintReviewInfo,
+  ScreenType,
+} from 'colada';
 import {
   meltOperationToScreenActionEntry,
   mergeEntryUpdate as defaultMerge,
@@ -40,6 +48,119 @@ const SOURCE_LABELS: Record<string, string> = {
   airdrop: 'AirDrop',
   displayed: 'QR Code',
 };
+
+function asEntryRecord(value: unknown): EntryRecord | null {
+  return typeof value === 'object' && value !== null ? (value as EntryRecord) : null;
+}
+
+function getStringField(entry: EntryRecord | null, key: string): string | undefined {
+  const value = entry?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function getHistoryType(
+  entry: EntryRecord | null
+): 'send' | 'receive' | 'melt' | 'mint' | undefined {
+  const type = getStringField(entry, 'type');
+  return type === 'send' || type === 'receive' || type === 'melt' || type === 'mint'
+    ? type
+    : undefined;
+}
+
+function publishHistoryUpdated(bus: ColadaSubscriptionBus, updated: unknown): void {
+  const entry = asEntryRecord(updated);
+  if (!entry) return;
+  bus.publish({
+    type: 'history.updated',
+    entry: entry as JsonRecord,
+    historyType: getHistoryType(entry),
+    entryId: getStringField(entry, 'id'),
+    quoteId: getStringField(entry, 'quoteId'),
+    operationId: getStringField(entry, 'operationId'),
+    mintUrl: getStringField(entry, 'mintUrl'),
+  });
+}
+
+function publishMeltUpdated(
+  bus: ColadaSubscriptionBus,
+  operation: MeltOperationLike | unknown
+): void {
+  const entry = meltOperationToScreenActionEntry(operation as unknown as MeltOperationLike);
+  const operationRecord = asEntryRecord(operation);
+  const operationId = getStringField(operationRecord, 'id');
+  const mintUrl = getStringField(operationRecord, 'mintUrl');
+  const state = getStringField(operationRecord, 'state');
+  if (!entry) {
+    bus.publish({
+      type: 'melt.updated',
+      entry: {
+        type: 'melt',
+        ...(operationId ? { operationId } : {}),
+        ...(state ? { state } : {}),
+      },
+      operationId,
+      mintUrl,
+    });
+    return;
+  }
+  bus.publish({
+    type: 'melt.updated',
+    entry: entry as JsonRecord,
+    entryId: getStringField(entry, 'id'),
+    quoteId: getStringField(entry, 'quoteId'),
+    operationId: getStringField(entry, 'operationId') ?? operationId,
+    mintUrl: getStringField(entry, 'mintUrl') ?? mintUrl,
+  });
+}
+
+function subscriptionEventToEntryUpdate(
+  screenType: ScreenType,
+  event: ColadaSubscriptionEvent
+): EntryRecord | null {
+  const expectedHistoryType = HISTORY_TYPE_BY_SCREEN[screenType];
+
+  if (event.type === 'history.updated') {
+    if (expectedHistoryType !== undefined && event.historyType !== expectedHistoryType) return null;
+    paymentLog.info('send.entry_updated', {
+      screenType,
+      type: event.historyType,
+      id: event.entryId,
+      state: event.entry.state,
+      quoteId: event.quoteId,
+    });
+    return event.entry as EntryRecord;
+  }
+
+  if (screenType === 'meltQuote' && event.type === 'melt.updated') {
+    return event.entry as EntryRecord;
+  }
+
+  if (screenType === 'mintQuote' && event.type === 'mint.updated') {
+    return event.entry as EntryRecord;
+  }
+
+  if (screenType === 'receive' && event.type === 'receive.npcMintChanged') {
+    return { _npcMintUpdate: true, mintUrl: event.mintUrl ?? undefined };
+  }
+
+  if (screenType === 'receive' && event.type === 'receive.p2pkKeyChanged') {
+    return { _p2pkKeyUpdate: true, p2pkKey: event.p2pkKey };
+  }
+
+  if (screenType === 'mintInfo' && event.type === 'mintInfo.enrichmentChanged') {
+    return { _mintEnrichment: true };
+  }
+
+  if (screenType === 'mintInfo' && event.type === 'mintInfo.fetched') {
+    return { _mintInfoFetched: true, ...event.entry };
+  }
+
+  if (screenType === 'mintSelector' && event.type === 'mintSelector.itemAdded') {
+    return { _mintItemAdded: true, _newMintItem: event.item };
+  }
+
+  return null;
+}
 
 export function getSovranMintEnrichment(mintUrl: string): Partial<MintReviewInfo> {
   const normalized = normalizeMintUrlKey(mintUrl);
@@ -155,162 +276,194 @@ export function createSovranScreenActionsBridge({
       manager,
       requestCameraPermission,
     }),
-    onEntryUpdate: (screenType, callback) => {
+    bindSubscriptionBus: (bus) => {
       const unsubscribes: (() => void)[] = [];
-      const expectedHistoryType = HISTORY_TYPE_BY_SCREEN[screenType];
 
-      if (expectedHistoryType !== undefined) {
-        unsubscribes.push(
-          manager.on(
-            'history:updated',
-            ({ entry: updated }: { mintUrl: string; entry: unknown }) => {
-              const updatedRecord =
-                typeof updated === 'object' && updated !== null ? (updated as EntryRecord) : null;
-              if (updatedRecord?.type !== expectedHistoryType) return;
-              paymentLog.info('send.entry_updated', {
-                screenType,
-                type: updatedRecord.type,
-                id: updatedRecord.id,
-                state: updatedRecord.state,
-                quoteId: updatedRecord.quoteId,
-              });
-              callback(updatedRecord);
-            }
-          )
-        );
-      }
+      unsubscribes.push(
+        manager.on('history:updated', ({ entry: updated }: { mintUrl: string; entry: unknown }) =>
+          publishHistoryUpdated(bus, updated)
+        )
+      );
 
-      if (screenType === 'meltQuote') {
-        const subscribeMeltOperation = (
-          eventName: 'melt-op:prepared' | 'melt-op:pending' | 'melt-op:finalized'
-        ) =>
-          manager.on(eventName, ({ operation }) => {
-            const updatedEntry = meltOperationToScreenActionEntry(
-              operation as unknown as MeltOperationLike
-            );
-            if (updatedEntry) callback(updatedEntry);
+      const subscribeMeltOperation = (
+        eventName:
+          | 'melt-op:prepared'
+          | 'melt-op:pending'
+          | 'melt-op:finalized'
+          | 'melt-op:rolled-back'
+      ) =>
+        manager.on(eventName, ({ operation }) => {
+          publishMeltUpdated(bus, operation);
+        });
+      unsubscribes.push(subscribeMeltOperation('melt-op:prepared'));
+      unsubscribes.push(subscribeMeltOperation('melt-op:pending'));
+      unsubscribes.push(subscribeMeltOperation('melt-op:finalized'));
+      unsubscribes.push(subscribeMeltOperation('melt-op:rolled-back'));
+
+      unsubscribes.push(
+        manager.on('mint-op:quote-state-changed', ({ quoteId, state, operation }) => {
+          paymentLog.info('send.mint_quote_state_changed', {
+            quoteId,
+            state: state ?? null,
           });
-        unsubscribes.push(subscribeMeltOperation('melt-op:prepared'));
-        unsubscribes.push(subscribeMeltOperation('melt-op:pending'));
-        unsubscribes.push(subscribeMeltOperation('melt-op:finalized'));
-      }
-
-      if (screenType === 'mintQuote') {
-        unsubscribes.push(
-          manager.on('mint-op:quote-state-changed', ({ quoteId, state, operation }) => {
-            paymentLog.info('send.mint_quote_state_changed', {
-              screenType,
+          if ((state === 'PAID' || state === 'ISSUED') && quoteId) {
+            useTransactionDistributionStore.getState().setDistribution(quoteId, 'displayed');
+            bus.publish({ type: 'screenActions.changed', reason: 'transactionDistribution' });
+            paymentLog.debug('payment.mint_quote.displayed_inference.applied', {
               quoteId,
-              state: state ?? null,
+              state,
             });
-            callback({
+          }
+          bus.publish({
+            type: 'mint.updated',
+            entry: {
               type: 'mint',
               quoteId,
               operationId: operation.id,
               state,
               remoteState: state,
+            },
+            quoteId,
+            operationId: operation.id,
+          });
+        })
+      );
+      unsubscribes.push(
+        manager.on(
+          'mint-op:finalized',
+          ({ operationId }: { mintUrl: string; operationId: string }) => {
+            paymentLog.info('send.mint_op_finalized', { operationId });
+            bus.publish({
+              type: 'mint.updated',
+              entry: { type: 'mint', operationId, state: 'finalized' },
+              operationId,
             });
-          })
-        );
-        unsubscribes.push(
-          manager.on(
-            'mint-op:finalized',
-            ({ operationId }: { mintUrl: string; operationId: string }) => {
-              paymentLog.info('send.mint_op_finalized', { screenType, operationId });
-              callback({ type: 'mint', operationId, state: 'finalized' });
-            }
-          )
-        );
-      }
+          }
+        )
+      );
 
-      if (screenType === 'receive') {
-        unsubscribes.push(
-          useNpcMintStore.subscribe(
-            (state) => state.mintUrl,
-            () => callback({ _npcMintUpdate: true })
-          )
-        );
-        const subscriber = (newKey: string | null) => {
-          callback({ _p2pkKeyUpdate: true, p2pkKey: newKey });
-        };
-        p2pkKeyRefreshedSubscribers.current.add(subscriber);
-        unsubscribes.push(() => p2pkKeyRefreshedSubscribers.current.delete(subscriber));
-      }
+      unsubscribes.push(
+        useNpcMintStore.subscribe(
+          (state) => state.mintUrl,
+          (mintUrl) => bus.publish({ type: 'receive.npcMintChanged', mintUrl: mintUrl ?? null })
+        )
+      );
+
+      const p2pkSubscriber = (newKey: string | null) => {
+        bus.publish({ type: 'receive.p2pkKeyChanged', p2pkKey: newKey });
+      };
+      p2pkKeyRefreshedSubscribers.current.add(p2pkSubscriber);
+      unsubscribes.push(() => p2pkKeyRefreshedSubscribers.current.delete(p2pkSubscriber));
+
+      const publishMintEnrichment = () =>
+        bus.publish({
+          type: 'mintInfo.enrichmentChanged',
+          mintUrl: mintInfoFetchingUrl ?? undefined,
+        });
+      unsubscribes.push(useAuditMintStore.subscribe((state) => state.cache, publishMintEnrichment));
+      unsubscribes.push(useKYMMintStore.subscribe((state) => state.cache, publishMintEnrichment));
+      unsubscribes.push(
+        useMintProfileStore.subscribe((state) => state.cache, publishMintEnrichment)
+      );
+
+      unsubscribes.push(
+        manager.on('mint:added', ({ mint }: { mint: { mintUrl: string } }) => {
+          const mintUrl = mint.mintUrl;
+          void (async () => {
+            try {
+              const [info, balances] = await Promise.all([
+                getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch(() => null),
+                manager.wallet.balances.byMint({ mintUrls: [mintUrl] }).catch(() => ({})),
+              ]);
+              const balancesByMint = balances as Record<string, { total?: number } | undefined>;
+              bus.publish({
+                type: 'mintSelector.itemAdded',
+                mintUrl,
+                item: {
+                  mintUrl,
+                  displayName: info?.name ?? mintUrl,
+                  ...(info?.icon_url ? { iconUrl: info.icon_url } : {}),
+                  balance: balancesByMint[mintUrl]?.total ?? 0,
+                  unit: 'sat',
+                  status: 'available',
+                  reason: null,
+                  isPreferred: false,
+                },
+              });
+            } catch {
+              bus.publish({
+                type: 'mintSelector.itemAdded',
+                mintUrl,
+                item: {
+                  mintUrl,
+                  displayName: mintUrl,
+                  balance: 0,
+                  unit: 'sat',
+                  status: 'available',
+                  reason: null,
+                  isPreferred: false,
+                },
+              });
+            }
+          })();
+        })
+      );
+
+      unsubscribes.push(
+        useScanHistoryStore.subscribe(
+          (state) => state.entries,
+          () => bus.publish({ type: 'screenActions.changed', reason: 'scanHistory' })
+        )
+      );
+      unsubscribes.push(
+        useTransactionDistributionStore.subscribe(
+          (state) => state.distributions,
+          () => bus.publish({ type: 'screenActions.changed', reason: 'transactionDistribution' })
+        )
+      );
+      unsubscribes.push(
+        useSettingsStore.subscribe(
+          (state) => state.language,
+          () => bus.publish({ type: 'screenActions.changed', reason: 'settings' })
+        )
+      );
+
+      return () => {
+        unsubscribes.forEach((unsubscribe) => unsubscribe());
+      };
+    },
+    subscribeEntryUpdates: (screenType, callback, bus) => {
+      const unsubscribes: (() => void)[] = [];
 
       if (screenType === 'mintInfo') {
-        const pushEnrichment = () => callback({ _mintEnrichment: true });
-        const cacheSliceForCurrentMint = <T>(cache: Record<string, T>): T | undefined =>
-          mintInfoFetchingUrl ? cache[mintInfoFetchingUrl] : undefined;
-
-        unsubscribes.push(
-          useAuditMintStore.subscribe(
-            (state) => cacheSliceForCurrentMint(state.cache),
-            pushEnrichment
-          )
-        );
-        unsubscribes.push(
-          useKYMMintStore.subscribe(
-            (state) => cacheSliceForCurrentMint(state.cache),
-            pushEnrichment
-          )
-        );
-        unsubscribes.push(
-          useMintProfileStore.subscribe(
-            (state) => cacheSliceForCurrentMint(state.cache),
-            pushEnrichment
-          )
-        );
-
         mintInfoCallback = callback;
+        callback({ _mintEnrichment: true });
         unsubscribes.push(() => {
           mintInfoCallback = null;
           mintInfoFetchingUrl = null;
         });
-        pushEnrichment();
       }
 
-      if (screenType === 'mintSelector') {
-        unsubscribes.push(
-          manager.on('mint:added', ({ mint }: { mint: { mintUrl: string } }) => {
-            const mintUrl = mint.mintUrl;
-            void (async () => {
-              try {
-                const [info, balances] = await Promise.all([
-                  getCachedMintInfo((u) => manager.mint.getMintInfo(u), mintUrl).catch(() => null),
-                  manager.wallet.balances.byMint({ mintUrls: [mintUrl] }).catch(() => ({})),
-                ]);
-                const balancesByMint = balances as Record<string, { total?: number } | undefined>;
-                callback({
-                  _mintItemAdded: true,
-                  _newMintItem: {
-                    mintUrl,
-                    displayName: info?.name ?? mintUrl,
-                    iconUrl: info?.icon_url,
-                    balance: balancesByMint[mintUrl]?.total ?? 0,
-                    unit: 'sat',
-                    status: 'available',
-                    reason: null,
-                    isPreferred: false,
-                  },
-                });
-              } catch {
-                callback({
-                  _mintItemAdded: true,
-                  _newMintItem: {
-                    mintUrl,
-                    displayName: mintUrl,
-                    balance: 0,
-                    unit: 'sat',
-                    status: 'available',
-                    reason: null,
-                    isPreferred: false,
-                  },
-                });
-              }
-            })();
-          })
-        );
-      }
+      const eventTypesByScreen: Partial<Record<ScreenType, ColadaSubscriptionEvent['type'][]>> = {
+        meltQuote: ['history.updated', 'melt.updated'],
+        mintQuote: ['history.updated', 'mint.updated'],
+        paymentRequest: ['history.updated'],
+        receive: ['history.updated', 'receive.npcMintChanged', 'receive.p2pkKeyChanged'],
+        receiveToken: ['history.updated'],
+        sendToken: ['history.updated'],
+        mintInfo: ['mintInfo.enrichmentChanged', 'mintInfo.fetched'],
+        mintSelector: ['mintSelector.itemAdded'],
+      };
+
+      const types = eventTypesByScreen[screenType];
+      if (!types) return () => {};
+
+      unsubscribes.push(
+        bus.subscribe({ type: types }, (event) => {
+          const update = subscriptionEventToEntryUpdate(screenType, event);
+          if (update) callback(update);
+        })
+      );
 
       return () => {
         unsubscribes.forEach((unsubscribe) => unsubscribe());
@@ -378,19 +531,6 @@ export function createSovranScreenActionsBridge({
       return defaultMerge(current, updated);
     },
     getLocale: () => useSettingsStore.getState().language || 'en',
-    subscribeGlobalScreenActions: (listener) => {
-      const unScan = useScanHistoryStore.subscribe((state) => state.entries, listener);
-      const unDistribution = useTransactionDistributionStore.subscribe(
-        (state) => state.distributions,
-        listener
-      );
-      const unSettings = useSettingsStore.subscribe((state) => state.language, listener);
-      return () => {
-        unScan();
-        unDistribution();
-        unSettings();
-      };
-    },
     getSourceLabel,
   };
 }

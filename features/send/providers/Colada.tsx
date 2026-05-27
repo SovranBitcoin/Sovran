@@ -52,7 +52,6 @@ import { staticPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
@@ -176,37 +175,6 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     return () => instance.dispose();
   }, [instance]);
-
-  // Mint-quote distribution source: when a Lightning mint quote transitions
-  // to PAID/ISSUED, infer 'displayed' as the source if no explicit copy/share
-  // action was recorded. The first-write-wins guard in the distribution store
-  // ensures this is a no-op when copy/share/airdrop was already recorded by
-  // the mintQuote.copy or mintQuote.share screen-action overrides.
-  //
-  // We key the distribution write by `payload.quoteId` (NOT a looked-up
-  // historyEntry.id). quoteId is the deterministic identifier carried by
-  // the lightning quote — it's identical no matter which path resolves it,
-  // so the first-write-wins guard correctly engages whether we wrote 'copy'
-  // first from the screen action or 'displayed' from this subscription.
-  useEffect(() => {
-    if (!manager) return;
-    const unsub = manager.on('mint-op:quote-state-changed', (payload) => {
-      const state = payload.state;
-      if (state !== 'PAID' && state !== 'ISSUED') return;
-      if (!payload.quoteId) {
-        paymentLog.warn('payment.mint_quote.displayed_inference.no_quote_id', {
-          state,
-        });
-        return;
-      }
-      useTransactionDistributionStore.getState().setDistribution(payload.quoteId, 'displayed');
-      paymentLog.debug('payment.mint_quote.displayed_inference.applied', {
-        quoteId: payload.quoteId,
-        state,
-      });
-    });
-    return unsub;
-  }, [manager]);
 
   // Override colada's default executeReceive and executeMintQuote so
   // they always return entries with coco's REAL persisted history ids — never

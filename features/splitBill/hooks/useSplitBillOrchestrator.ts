@@ -16,8 +16,8 @@
  *      don't abort the overall flow; the user can retry per-participant
  *      from the detail screen.
  *
- * Also exposes `useSplitBillPaymentReconciler()` — subscribes to coco's
- * `history:updated` event bus and flips participants' `paymentState` to
+ * Also exposes `useSplitBillPaymentReconciler()` — subscribes to Colada's
+ * payment event bus and flips participants' `paymentState` to
  * `paid`/`expired` when their mint quote hits ISSUED/PAID/EXPIRED. Mount
  * once at app root so reconciliation runs regardless of which screen the
  * user has open.
@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useManager } from '@cashu/coco-react';
+import { useColadaSubscriptions } from 'colada/react';
 import NDK, { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { startBLE } from 'bitchat-module';
 
@@ -669,7 +670,7 @@ export function useSplitBillOrchestrator() {
 // ---------------------------------------------------------------------------
 
 /**
- * Subscribe to coco's `history:updated` event bus and flip split-bill
+ * Subscribe to Colada's payment event bus and flip split-bill
  * participants to `paid`/`expired` when their tracked mint quote reaches
  * a terminal state. Mount once at app root (`<SplitBillPaymentReconciler />`
  * in `app/_layout.tsx`) — runs regardless of which screen is foregrounded.
@@ -681,19 +682,22 @@ export function useSplitBillOrchestrator() {
  *     matched (43.json#F-007)
  *   - 8s polling kept ticking when the app was backgrounded (43.json#F-013)
  *
- * Pattern matches the other 3 in-tree consumers of this event:
- * `useHistoryWithMelts`, `useHistoryEntry`, `usePaymentStatusListener`.
+ * Pattern matches the other in-tree detail consumers: `useHistoryWithMelts`
+ * and `useHistoryEntry`.
  */
 export function useSplitBillPaymentReconciler() {
-  const manager = useManager();
+  const bus = useColadaSubscriptions();
 
   useEffect(() => {
-    if (!manager) return;
     paymentLog.info('split_bill.reconciler.start');
 
-    const off = manager.on('history:updated', ({ entry }) => {
+    const off = bus.subscribe({ type: 'history.updated' }, ({ entry }) => {
+      if (typeof entry.type !== 'string') return;
       const store = useSplitBillTransactionsStore.getState();
-      const outcome = reconcileSplitBillHistoryUpdate(entry, store);
+      const outcome = reconcileSplitBillHistoryUpdate(
+        entry as unknown as { type: string; quoteId?: string; state?: string },
+        store
+      );
       if (outcome !== 'ignored') {
         paymentLog.info('split_bill.reconciler.flip', {
           quoteId: (entry as { quoteId?: string }).quoteId,
@@ -706,5 +710,5 @@ export function useSplitBillPaymentReconciler() {
       off();
       paymentLog.info('split_bill.reconciler.stop');
     };
-  }, [manager]);
+  }, [bus]);
 }

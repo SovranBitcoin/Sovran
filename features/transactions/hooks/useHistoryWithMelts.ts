@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useManager, usePaginatedHistory } from '@cashu/coco-react';
+import { useColadaSubscriptions } from 'colada/react';
 import { MeltQuoteState } from '@cashu/cashu-ts';
 import type {
   HistoryEntry,
@@ -52,6 +53,7 @@ function meltOpToHistoryEntry(op: MeltOperation): MeltHistoryEntry | null {
 export function useHistoryWithMelts(pageSize = 100) {
   const paginatedResult = usePaginatedHistory(pageSize);
   const manager = useManager();
+  const bus = useColadaSubscriptions();
   const mockMode = useSettingsStore((s) => s.mockMode);
   const mockHistory = useMockDataStore((s) => s.mockHistory);
   const [meltEntries, setMeltEntries] = useState<MeltHistoryEntry[]>([]);
@@ -96,29 +98,20 @@ export function useHistoryWithMelts(pageSize = 100) {
     void fetchMeltOps();
   }, [fetchMeltOps]);
 
-  // Re-fetch when melt-op events fire so the list stays in sync
+  // Re-fetch when melt operation events reach Colada's bus so the list stays in sync.
   useEffect(() => {
     const handler = () => {
       void fetchMeltOps();
     };
-    const unsubs = [
-      manager.on('melt-op:prepared', handler),
-      manager.on('melt-op:finalized', handler),
-      manager.on('melt-op:pending', handler),
-      manager.on('melt-op:rolled-back', handler),
-    ];
-    return () => {
-      unsubs.forEach((u) => u());
-    };
-  }, [manager, fetchMeltOps]);
+    return bus.subscribe({ type: 'melt.updated' }, handler);
+  }, [bus, fetchMeltOps]);
 
   // Re-fetch history when any transaction state changes (pending → confirmed, etc.)
   useEffect(() => {
-    const unsub = manager.on('history:updated', () => {
+    return bus.subscribe({ type: 'history.updated' }, () => {
       void paginatedResult.refresh();
     });
-    return unsub;
-  }, [manager, paginatedResult.refresh]);
+  }, [bus, paginatedResult.refresh]);
 
   // Merge melt operations into history, deduplicating by quoteId.
   // Stabilise: only return a new array ref if entries actually changed.

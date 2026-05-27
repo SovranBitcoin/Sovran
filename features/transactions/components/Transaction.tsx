@@ -113,7 +113,7 @@ const useBip321Options = (transactionId: string): string[] | null => {
  * Row-UI state for the Transaction component. Renamed from `useHistoryEntry`
  * to avoid colliding with the canonical `useHistoryEntry` exported from
  * `features/transactions/hooks/useHistoryEntry.ts` (different semantics:
- * that one parses route params and subscribes to `history:updated`; this
+ * that one parses route params and subscribes to Colada's bus; this
  * one bundles row-display state + the navigate handler).
  */
 const useTransactionRow = (historyEntry: HistoryEntry) => {
