@@ -19,6 +19,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { View } from '@/shared/ui/primitives/View/View';
+import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 
@@ -246,7 +247,14 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   );
 
   if (error) {
-    return null;
+    return (
+      <ScreenErrorState
+        message={error}
+        onGoBack={() => {
+          void actions.back.execute();
+        }}
+      />
+    );
   }
 
   if (!entry) {

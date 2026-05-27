@@ -14,7 +14,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { z } from 'zod';
 
 import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'colada/react';
@@ -103,7 +103,7 @@ function ReceiveMintSelectRoute() {
                 })
             : undefined
         }
-        onClose={() => router.back()}
+        onClose={() => actions.cancel.execute()}
       />
     </>
   );

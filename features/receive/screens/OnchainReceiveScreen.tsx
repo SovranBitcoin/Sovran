@@ -46,7 +46,7 @@ export type OnchainReceiveEntry = Omit<MintHistoryEntry, 'createdAt' | 'updatedA
 
 interface OnchainReceiveScreenProps {
   entry: OnchainReceiveEntry;
-  actions: Record<'copy' | 'share', BoundAction>;
+  actions: Record<'copy' | 'share' | 'back', BoundAction>;
   source: string | null;
   mintUrl?: string;
   mintInfo: MintInfo | null;
@@ -95,6 +95,13 @@ export function OnchainReceiveScreen({
       <HStack justify="center" align="center">
         <ButtonHandler
           buttons={[
+            {
+              text: isPaid ? 'Close' : 'Cancel',
+              icon: 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: () => actions.back.execute(),
+              condition: actions.back.available,
+            },
             {
               text: 'Copy',
               icon: 'lets-icons:copy',

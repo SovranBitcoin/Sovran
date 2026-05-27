@@ -13,7 +13,6 @@
  */
 
 import React from 'react';
-import { router } from 'expo-router';
 import { z } from 'zod';
 import { ReceiveTokenScreen } from './ReceiveTokenScreen';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -31,10 +30,5 @@ export function ReceiveTokenRoute({ where }: ReceiveTokenRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
 
-  return (
-    <ReceiveTokenScreen
-      receiveHistoryEntry={params.receiveHistoryEntry}
-      onNavigateBack={() => router.back()}
-    />
-  );
+  return <ReceiveTokenScreen receiveHistoryEntry={params.receiveHistoryEntry} />;
 }

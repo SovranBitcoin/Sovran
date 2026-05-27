@@ -660,7 +660,7 @@ export function MintInfoScreen() {
                     text: 'Reject',
                     variant: 'secondary',
                     onPress: async () => {
-                      router.back();
+                      await actions.back.execute();
                     },
                   },
                   {
@@ -676,7 +676,7 @@ export function MintInfoScreen() {
                       text: 'Close',
                       variant: 'secondary',
                       onPress: async () => {
-                        router.back();
+                        await actions.back.execute();
                       },
                     },
                     {
@@ -691,7 +691,7 @@ export function MintInfoScreen() {
                       text: 'Close',
                       variant: 'secondary',
                       onPress: async () => {
-                        router.back();
+                        await actions.back.execute();
                       },
                     },
                   ]

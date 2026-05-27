@@ -73,13 +73,22 @@ export function PaymentRequestScreen({
     nostrSent,
   });
 
-  const anyLoading = actions.confirm.loading || actions.cancel.loading;
+  const anyLoading = actions.confirm.loading || actions.cancel.loading || actions.back.loading;
 
   const bottomButtons = (
     <BottomButtons>
       <HStack justify="center" align="center">
         <ButtonHandler
           buttons={[
+            {
+              testID: 'payment-request-close',
+              text: 'Close',
+              icon: 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: () => actions.back.execute(),
+              condition: !isPreview && actions.back.available,
+              disabled: anyLoading,
+            },
             {
               testID: 'payment-request-confirm',
               text: actions.confirm.loading ? 'Sending...' : 'Confirm',

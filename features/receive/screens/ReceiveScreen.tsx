@@ -10,8 +10,6 @@
 import React, { memo, useEffect, useState } from 'react';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import { router } from 'expo-router';
-
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import { useScreenActions, type UseScreenActionsResult } from 'colada/react';
@@ -208,7 +206,14 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   }, [error]);
 
   if (error) {
-    return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
+    return (
+      <ScreenErrorState
+        message={error}
+        onGoBack={() => {
+          void actions.back.execute();
+        }}
+      />
+    );
   }
 
   if (!receiveEntryData) {

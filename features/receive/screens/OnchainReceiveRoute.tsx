@@ -7,7 +7,7 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { useScreenActions, type BoundAction } from 'colada/react';
 
@@ -70,7 +70,14 @@ function OnchainReceiveRouteContent({
   }, [error]);
 
   if (error) {
-    return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
+    return (
+      <ScreenErrorState
+        message={error}
+        onGoBack={() => {
+          void actions.back.execute();
+        }}
+      />
+    );
   }
 
   if (!typedEntry) {
@@ -82,7 +89,7 @@ function OnchainReceiveRouteContent({
       <Stack.Screen options={screenOptions} />
       <OnchainReceiveScreen
         entry={typedEntry}
-        actions={actions as Record<'copy' | 'share', BoundAction>}
+        actions={actions as Record<'copy' | 'share' | 'back', BoundAction>}
         source={source}
         mintUrl={mintUrl}
         mintInfo={mintInfo}

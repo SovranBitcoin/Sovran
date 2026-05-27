@@ -33,13 +33,9 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface ReceiveTokenScreenProps {
   receiveHistoryEntry?: ReceiveHistoryEntry | string;
-  onNavigateBack: () => void;
 }
 
-export function ReceiveTokenScreen({
-  receiveHistoryEntry,
-  onNavigateBack,
-}: ReceiveTokenScreenProps) {
+export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenProps) {
   useLifecycleLogger('ReceiveTokenScreen');
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'receiveToken',
@@ -64,7 +60,14 @@ export function ReceiveTokenScreen({
   }, [entry, isRedeemed]);
 
   if (error) {
-    return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
+    return (
+      <ScreenErrorState
+        message={error}
+        onGoBack={() => {
+          void actions.back.execute();
+        }}
+      />
+    );
   }
 
   if (!entry) {
@@ -80,14 +83,14 @@ export function ReceiveTokenScreen({
             text: 'Close',
             icon: 'ri:close-circle-line',
             variant: 'secondary',
-            onPress: async () => onNavigateBack(),
+            onPress: async () => actions.back.execute(),
             condition: isRedeemed,
           },
           {
             testID: 'receive-token-cancel',
             text: 'Cancel',
             variant: 'secondary',
-            onPress: async () => onNavigateBack(),
+            onPress: async () => actions.back.execute(),
             condition: !isRedeemed,
           },
           {

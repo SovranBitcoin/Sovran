@@ -8,8 +8,6 @@
 import React, { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 
-import { router } from 'expo-router';
-
 import type { MintHistoryEntry } from '@cashu/coco-core';
 import { isMintQuotePaymentObserved } from 'colada';
 import { useScreenActions } from 'colada/react';
@@ -79,7 +77,14 @@ export function LightningReceiveScreen({
   }, [entry, isPaid]);
 
   if (error) {
-    return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
+    return (
+      <ScreenErrorState
+        message={error}
+        onGoBack={() => {
+          void actions.back.execute();
+        }}
+      />
+    );
   }
 
   if (!entry) {
@@ -91,6 +96,13 @@ export function LightningReceiveScreen({
       <HStack justify="center" align="center">
         <ButtonHandler
           buttons={[
+            {
+              text: isPaid ? 'Close' : 'Cancel',
+              icon: 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: () => actions.back.execute(),
+              condition: actions.back.available,
+            },
             {
               text: 'Copy',
               icon: 'lets-icons:copy',
