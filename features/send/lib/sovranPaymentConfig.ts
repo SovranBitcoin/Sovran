@@ -4,7 +4,7 @@
  * Factory functions that inject Sovran-specific behavior into colada:
  * - createSovranNotifications: error/notification popups + state updates
  * - createSovranHandlers: step handlers (navigation, popups, dismiss)
- * - createSovranScreenActionHandlers: post-terminal actions (NFC, emoji picker)
+ * - createSovranScreenActionHandlers: post-terminal actions (NFC, emoji token picker)
  * - createSovranScanSources: scan input sources (clipboard, gallery, NFC)
  *
  * Operations (executeSend, executeMelt, buildMintListItems, etc.) are now built-in
@@ -1260,8 +1260,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       /**
        * Route text vs emoji copy on the sendToken screen. Split-menu UI
        * (`ActionMenuButton`) calls `actions.copy.execute({ variantId })` with
-       * `'text'` or `'emoji'`. An omitted `variantId` (legacy callers) falls
-       * through to the text path, preserving prior behavior.
+       * `'text'` or `'emoji'`. An omitted `variantId` uses the text path.
        */
       copy: async (rawCtx) => {
         const { entry } = sendCtx(rawCtx);
