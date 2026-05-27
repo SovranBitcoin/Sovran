@@ -7,8 +7,7 @@ module.exports = {
     '^@cashu/coco-core$': '<rootDir>/node_modules/@cashu/coco-core/dist/index.js',
     '^@cashu/coco-expo-sqlite$': '<rootDir>/node_modules/@cashu/coco-expo-sqlite/dist/index.js',
     '^@cashu/coco-react$': '<rootDir>/node_modules/@cashu/coco-react/dist/index.js',
-    '^@scure/bip32$':
-      '<rootDir>/../coco/node_modules/.bun/@scure+bip32@2.2.0/node_modules/@scure/bip32/index.js',
+    '^@scure/bip32$': '<rootDir>/node_modules/@scure/bip32/lib/esm/index.js',
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
     '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',

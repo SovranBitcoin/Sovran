@@ -150,9 +150,7 @@ export class DataMigration {
             continue;
           }
 
-          await saveProofs(this.manager, mintUrl, [
-            { ...proof, mintUrl, unit: 'sat', state: 'ready' as const },
-          ]);
+          await saveProofs(this.manager, mintUrl, [{ ...proof, mintUrl, state: 'ready' as const }]);
           result.proofsMigrated++;
         }
 

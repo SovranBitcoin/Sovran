@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
+import { MeltQuoteState } from '@cashu/cashu-ts';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -30,7 +31,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
-import { amountToNumber, toCocoAmount } from '@/shared/lib/cashu/amount';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import {
   getMeltDetailPathname,
   getMintDetailPathname,
@@ -463,16 +464,17 @@ export function SwapTransactionScreen({ groupId }: Props) {
                         (leg.meltQuoteId
                           ? {
                               id: leg.meltOperationId ?? leg.id,
-                              source: 'operation' as const,
                               operationId: leg.meltOperationId ?? leg.id,
                               createdAt: group.createdAt,
-                              updatedAt: group.createdAt,
                               mintUrl: leg.fromMintUrl,
                               unit: group.unit,
                               type: 'melt' as const,
                               quoteId: leg.meltQuoteId,
-                              state: leg.localStatus === 'done' ? 'finalized' : 'prepared',
-                              amount: toCocoAmount(leg.amount),
+                              state:
+                                leg.localStatus === 'done'
+                                  ? MeltQuoteState.PAID
+                                  : MeltQuoteState.UNPAID,
+                              amount: leg.amount,
                             }
                           : undefined);
 

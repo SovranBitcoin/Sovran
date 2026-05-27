@@ -19,12 +19,12 @@ import { router } from 'expo-router';
 import { paymentLog } from '@/shared/lib/logger';
 import { mintLocalId } from '@/shared/lib/id';
 
-import { Amount, getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
+import { getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
 import type {
   HistoryEntry,
   Manager,
+  MeltHistoryEntry,
   SendHistoryEntry,
-  LegacyMeltHistoryEntry,
   MintHistoryEntry,
 } from '@cashu/coco-core';
 import {
@@ -40,6 +40,8 @@ import {
 } from 'colada';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { getMintQuotePaymentValue, getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import {
   getP2PKImportExtension,
@@ -204,11 +206,11 @@ export function createSovranExecuteReceive(
       mintUrl,
       polledMs: MAX_ATTEMPTS * DELAY_MS,
     });
-    let tokenAmount = Amount.zero();
+    let tokenAmount = 0;
     let tokenUnit = 'sat';
     try {
       const metadata = getTokenMetadata(tokenString);
-      tokenAmount = metadata.amount;
+      tokenAmount = amountToNumber(metadata.amount);
       tokenUnit = metadata.unit ?? 'sat';
     } catch {
       /* ignore */
@@ -272,110 +274,7 @@ export function createSovranExecuteMintQuote(
     }
 
     if (method === 'onchain') {
-      let beforeIds: Set<string>;
-      try {
-        const beforeHistory: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
-        beforeIds = new Set(
-          beforeHistory.filter((h) => h.type === 'mint' && h.mintUrl === mintUrl).map((h) => h.id)
-        );
-      } catch (e) {
-        paymentLog.warn('payment.execute_mint_quote.onchain_snapshot_failed', {
-          error: e instanceof Error ? e.message : String(e),
-        });
-        beforeIds = new Set();
-      }
-
-      paymentLog.info('payment.execute_mint_quote.onchain.start', { mintUrl, amount });
-      const quote = await withTimeout(
-        manager.quotes.mint.create({
-          mintUrl,
-          method: 'onchain',
-          unit: _unit ?? 'sat',
-        }),
-        MINT_QUOTE_PREPARE_TIMEOUT_MS,
-        'executeMintQuote.createOnchainQuote'
-      );
-      if (quote.method !== 'onchain') {
-        throw new Error(`Mint returned ${quote.method} quote for onchain request`);
-      }
-
-      const mintOp = await withTimeout(
-        manager.ops.mint.prepare({
-          mintUrl,
-          method: 'onchain',
-          quoteId: quote.quoteId,
-          amount,
-          unit: _unit ?? 'sat',
-          methodData: {},
-        }),
-        MINT_QUOTE_PREPARE_TIMEOUT_MS,
-        'executeMintQuote.prepareOnchain'
-      );
-      paymentLog.info('payment.execute_mint_quote.onchain.prepared', {
-        operationId: mintOp.id,
-        quoteId: mintOp.quoteId,
-      });
-
-      const constructedEntry: MintHistoryEntry = {
-        id: `mint:${mintOp.id}`,
-        type: 'mint',
-        source: 'operation',
-        operationId: mintOp.id,
-        createdAt: mintOp.createdAt,
-        updatedAt: mintOp.updatedAt,
-        mintUrl: mintOp.mintUrl,
-        unit: mintOp.unit,
-        quoteId: mintOp.quoteId,
-        state: 'pending',
-        amount: mintOp.amount,
-        paymentRequest: mintOp.request,
-        metadata: {
-          operationId: mintOp.id,
-          method: 'onchain',
-          onchainAddress: quote.request,
-          requestedAmount: String(amount),
-          amountPaid: quote.quoteData.amountPaid.toString(),
-          amountIssued: quote.quoteData.amountIssued.toString(),
-        },
-      };
-
-      const MAX_ATTEMPTS = 50;
-      const DELAY_MS = 200;
-      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        try {
-          const after: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
-          const persisted = after.find((h): h is MintHistoryEntry => {
-            if (h.type !== 'mint' || h.mintUrl !== mintUrl) return false;
-            if (mintOp.quoteId && h.quoteId === mintOp.quoteId) return true;
-            if (mintOp.id && h.operationId === mintOp.id) return true;
-            return !beforeIds.has(h.id);
-          });
-          if (persisted) {
-            return {
-              historyEntry: JSON.stringify({
-                ...persisted,
-                metadata: {
-                  ...(persisted.metadata ?? {}),
-                  ...constructedEntry.metadata,
-                },
-              }),
-            };
-          }
-        } catch (e) {
-          paymentLog.warn('payment.execute_mint_quote.onchain_poll_failed', {
-            attempt,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-        await new Promise((r) => setTimeout(r, DELAY_MS));
-      }
-
-      paymentLog.error('payment.execute_mint_quote.onchain_timeout_fallback', {
-        mintUrl,
-        operationId: mintOp.id,
-        polledMs: MAX_ATTEMPTS * DELAY_MS,
-      });
-      return { historyEntry: JSON.stringify(constructedEntry) };
+      throw new Error('Onchain mint quotes are not supported by @cashu/coco-core 1.0.1');
     }
 
     // Snapshot existing mint ids for this mint URL so we can detect the
@@ -394,23 +293,8 @@ export function createSovranExecuteMintQuote(
     }
 
     paymentLog.info('payment.execute_mint_quote.start', { mintUrl, amount });
-    const quote = await withTimeout(
-      manager.quotes.mint.create({
-        mintUrl,
-        amount,
-        method: 'bolt11',
-        unit: _unit ?? 'sat',
-      }),
-      MINT_QUOTE_PREPARE_TIMEOUT_MS,
-      'executeMintQuote.createQuote'
-    );
     const mintOp = await withTimeout(
-      manager.ops.mint.prepare({
-        mintUrl,
-        method: 'bolt11',
-        quoteId: quote.quoteId,
-        unit: _unit ?? 'sat',
-      }),
+      prepareBolt11MintQuote(manager, mintUrl, amount, _unit),
       MINT_QUOTE_PREPARE_TIMEOUT_MS,
       'executeMintQuote.prepare'
     );
@@ -424,15 +308,12 @@ export function createSovranExecuteMintQuote(
     const constructedEntry: MintHistoryEntry = {
       id: mintOp.id,
       type: 'mint',
-      source: 'operation',
       operationId: mintOp.id,
       createdAt: mintOp.createdAt,
-      updatedAt: mintOp.updatedAt,
       mintUrl: mintOp.mintUrl,
       unit: mintOp.unit,
       quoteId: mintOp.quoteId,
-      state: 'pending',
-      remoteState: quote.state,
+      state: mintOp.lastObservedRemoteState ?? 'UNPAID',
       amount: mintOp.amount,
       paymentRequest: mintOp.request,
       metadata: { operationId: mintOp.id },
@@ -1086,7 +967,11 @@ export function createSovranHandlers({
       // `LightningSendScreen` re-assembles them on read.
       const id = mintLocalId('melt-preview');
       const now = Date.now();
-      const entry: LegacyMeltHistoryEntry = {
+      const entry: MeltHistoryEntry & {
+        source: 'legacy';
+        legacyHistoryId: string;
+        updatedAt: number;
+      } = {
         id,
         type: 'melt',
         source: 'legacy',
@@ -1097,7 +982,7 @@ export function createSovranHandlers({
         unit: unit ?? 'sat',
         quoteId: '',
         state: 'UNPAID',
-        amount: Amount.from(amount),
+        amount: amountToNumber(amount),
         metadata: {
           phase: 'preview',
           meltTarget,

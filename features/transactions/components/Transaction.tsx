@@ -121,8 +121,10 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
   const isReceive = !isSend;
 
   // Check if this is a rolled back send transaction
+  const sendState =
+    historyEntry.type === 'send' ? String((historyEntry as SendHistoryEntry).state) : '';
   const isRolledBack =
-    historyEntry.type === 'send' && (historyEntry as SendHistoryEntry).state === 'rolled_back';
+    historyEntry.type === 'send' && (sendState === 'rolledBack' || sendState === 'rolled_back');
 
   const fiatAmount = formatAmount(
     { amount: Math.abs(amountToNumber(historyEntry.amount)), unit: historyEntry.unit },

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useManager, usePaginatedHistory } from '@cashu/coco-react';
+import { MeltQuoteState } from '@cashu/cashu-ts';
 import type {
   HistoryEntry,
   MeltHistoryEntry,
-  MeltHistoryState,
   MeltOperation,
   MeltOperationState,
 } from '@cashu/coco-core';
@@ -12,9 +12,10 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { log } from '@/shared/lib/logger';
 
-function opStateToHistoryState(opState: MeltOperationState): MeltHistoryState {
-  if (opState === 'init' || opState === 'failed') return 'prepared';
-  return opState;
+function opStateToHistoryState(opState: MeltOperationState): MeltHistoryEntry['state'] {
+  if (opState === 'finalized') return MeltQuoteState.PAID;
+  if (opState === 'pending' || opState === 'executing') return MeltQuoteState.PENDING;
+  return MeltQuoteState.UNPAID;
 }
 
 // MeltOperation is a discriminated union by state — only some variants carry
@@ -25,10 +26,8 @@ function meltOpToHistoryEntry(op: MeltOperation): MeltHistoryEntry | null {
   return {
     id: op.id,
     type: 'melt',
-    source: 'operation',
     operationId: op.id,
     createdAt: op.createdAt,
-    updatedAt: op.updatedAt,
     mintUrl: op.mintUrl,
     unit: 'sat',
     quoteId: opAny.quoteId,

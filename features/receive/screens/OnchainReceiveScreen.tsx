@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MintInfo } from '@cashu/cashu-ts';
-import { useManager } from '@cashu/coco-react';
 import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import type { BoundAction } from 'colada/react';
 
@@ -26,7 +25,7 @@ import {
   getOnchainMintQuoteRequiredConfirmations,
 } from '@/shared/lib/cashu/onchainMint';
 import { formatAmount } from '@/shared/lib/currency';
-import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { useLifecycleLogger } from '@/shared/lib/logger';
 import { truncateMiddle } from '@/shared/lib/strings';
 import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -68,7 +67,6 @@ export function OnchainReceiveScreen({
 }: OnchainReceiveScreenProps) {
   useLifecycleLogger('OnchainReceiveScreen');
   const { width: windowWidth } = useWindowDimensions();
-  const manager = useManager();
   const onchainAddress = getOnchainMintAddress(entry as unknown as HistoryEntry);
   const mempool = useMempoolAddressSummary(onchainAddress);
   const bip321 = useBip321Info(entry.id);
@@ -93,38 +91,6 @@ export function OnchainReceiveScreen({
   );
   const paymentInfoValue =
     getMintQuotePaymentValue(entry as unknown as HistoryEntry) ?? entry.paymentRequest;
-  const lastOnchainQuoteRefreshKey = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!onchainConfirmationProgress?.hasPayment || isPaid) return;
-    if (!entry.mintUrl || !entry.quoteId) return;
-    if (
-      onchainConfirmationProgress.currentConfirmations == null &&
-      onchainConfirmationProgress.hasUnconfirmedPayment
-    ) {
-      return;
-    }
-
-    const confirmationKey = onchainConfirmationProgress.currentConfirmations ?? 'confirmed';
-    const refreshKey = `${entry.mintUrl}:${entry.quoteId}:${confirmationKey}`;
-    if (lastOnchainQuoteRefreshKey.current === refreshKey) return;
-    lastOnchainQuoteRefreshKey.current = refreshKey;
-
-    manager.quotes.mint
-      .refresh({
-        mintUrl: entry.mintUrl,
-        method: 'onchain',
-        quoteId: entry.quoteId,
-      })
-      .catch((refreshError) => {
-        paymentLog.warn('receive.onchain.quote_refresh_failed', {
-          mintUrl: entry.mintUrl,
-          quoteId: entry.quoteId,
-          confirmations: onchainConfirmationProgress.currentConfirmations,
-          error: refreshError instanceof Error ? refreshError.message : String(refreshError),
-        });
-      });
-  }, [entry, isPaid, manager, onchainConfirmationProgress]);
 
   const bottomButtons = (
     <BottomButtons>

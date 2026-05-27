@@ -22,10 +22,7 @@ import { Metadata } from 'nostr-tools/kinds';
 
 import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'colada';
 import { createColada, withTimeout } from 'colada';
-import {
-  ColadaProvider as ColadaProviderBase,
-  type DeepLinkConfig,
-} from 'colada/react';
+import { ColadaProvider as ColadaProviderBase, type DeepLinkConfig } from 'colada/react';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';
@@ -189,8 +186,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
   // first from the screen action or 'displayed' from this subscription.
   useEffect(() => {
     if (!manager) return;
-    const unsub = manager.on('mint-quote:updated', (payload) => {
-      const state = payload.quote.method === 'bolt11' ? payload.quote.state : undefined;
+    const unsub = manager.on('mint-op:quote-state-changed', (payload) => {
+      const state = payload.state;
       if (state !== 'PAID' && state !== 'ISSUED') return;
       if (!payload.quoteId) {
         paymentLog.warn('payment.mint_quote.displayed_inference.no_quote_id', {

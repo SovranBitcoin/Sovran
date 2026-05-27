@@ -3,7 +3,7 @@ import { ColorValue } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import { getTokenMetadata } from '@cashu/coco-core';
+import { getTokenMetadata } from '@cashu/cashu-ts';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -15,6 +15,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatAmount } from '@/shared/lib/currency';
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { staticPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 
@@ -48,7 +49,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
 
   try {
     const decoded = getTokenMetadata(token);
-    amount = decoded.amount.toNumber();
+    amount = amountToNumber(decoded.amount);
     unit = decoded.unit || 'sats';
     mintUrl = decoded.mint || '';
     isValid = true;

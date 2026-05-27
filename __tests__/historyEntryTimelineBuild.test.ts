@@ -1,12 +1,5 @@
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-import {
-  Amount,
-  type MintHistoryEntry,
-  type LegacyMintHistoryEntry,
-  type LegacyMeltHistoryEntry,
-  type LegacySendHistoryEntry,
-  type LegacyReceiveHistoryEntry,
-} from '@cashu/coco-core';
+import type { HistoryEntry } from '@cashu/coco-core';
 
 import {
   buildTimeline,
@@ -25,19 +18,19 @@ const baseFields = {
   unit: 'sat',
 };
 
-function mintEntry(overrides: Partial<LegacyMintHistoryEntry> = {}): LegacyMintHistoryEntry {
+function mintEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     type: 'mint',
     paymentRequest: '',
     quoteId: 'q1',
     state: MintQuoteState.UNPAID,
-    amount: Amount.from(100),
+    amount: 100,
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
-function operationMintEntry(overrides: Partial<MintHistoryEntry> = {}): MintHistoryEntry {
+function operationMintEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     id: 'mint:op1',
@@ -47,47 +40,45 @@ function operationMintEntry(overrides: Partial<MintHistoryEntry> = {}): MintHist
     paymentRequest: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
     quoteId: 'q1',
     state: 'pending',
-    amount: Amount.from(100),
+    amount: 100,
     metadata: {
       method: 'onchain',
       onchainAddress: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
     },
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
-function meltEntry(overrides: Partial<LegacyMeltHistoryEntry> = {}): LegacyMeltHistoryEntry {
+function meltEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     type: 'melt',
     quoteId: 'q1',
     state: MeltQuoteState.UNPAID,
-    amount: Amount.from(100),
+    amount: 100,
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
-function sendEntry(overrides: Partial<LegacySendHistoryEntry> = {}): LegacySendHistoryEntry {
+function sendEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     type: 'send',
     operationId: 'op1',
     state: 'prepared',
-    amount: Amount.from(100),
+    amount: 100,
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
-function receiveEntry(
-  overrides: Partial<LegacyReceiveHistoryEntry> = {}
-): LegacyReceiveHistoryEntry {
+function receiveEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     type: 'receive',
     state: 'finalized',
-    amount: Amount.from(100),
+    amount: 100,
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
 const NOW = 2_000_000_000_000;
@@ -117,7 +108,7 @@ describe('buildTimeline (audit 61.json F-006)', () => {
 
     it('ISSUED marks every step complete with success on the last', () => {
       const t = buildTimeline({
-        historyEntry: mintEntry({ state: MintQuoteState.ISSUED, amount: Amount.from(250) }),
+        historyEntry: mintEntry({ state: MintQuoteState.ISSUED, amount: 250 }),
         currentTime: NOW,
       });
       expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
@@ -181,7 +172,7 @@ describe('buildTimeline (audit 61.json F-006)', () => {
 
     it('operation-backed finalized mint maps to issued success', () => {
       const t = buildTimeline({
-        historyEntry: operationMintEntry({ state: 'finalized', amount: Amount.from(321) }),
+        historyEntry: operationMintEntry({ state: 'finalized', amount: 321 }),
         currentTime: NOW,
       });
       expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
@@ -232,8 +223,8 @@ describe('buildTimeline (audit 61.json F-006)', () => {
       const expiredQuote: MeltQuoteBolt11Response = {
         quote: 'q1',
         request: 'lnbc1...',
-        amount: Amount.from(100),
-        fee_reserve: Amount.from(0),
+        amount: 100,
+        fee_reserve: 0,
         state: MeltQuoteState.UNPAID,
         expiry: Math.floor(NOW / 1000) - 60,
         unit: 'sat',
@@ -339,7 +330,7 @@ describe('buildTimeline (audit 61.json F-006)', () => {
 
     it('finalized is fully successful', () => {
       const t = buildTimeline({
-        historyEntry: receiveEntry({ state: 'finalized', amount: Amount.from(750) }),
+        historyEntry: receiveEntry({ state: 'finalized', amount: 750 }),
         currentTime: NOW,
       });
       expect(t.map((s) => s.stepType)).toEqual(['complete', 'success']);

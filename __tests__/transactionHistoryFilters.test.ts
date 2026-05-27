@@ -1,4 +1,4 @@
-import { Amount, type HistoryEntry } from '@cashu/coco-core';
+import type { HistoryEntry } from '@cashu/coco-core';
 
 import {
   isPendingTransaction,
@@ -15,7 +15,7 @@ const baseFields = {
   updatedAt: 1_700_000_000_000,
   mintUrl: 'https://mint.example',
   unit: 'sat',
-  amount: Amount.from(100),
+  amount: 100,
 };
 
 function entry(overrides: Record<string, unknown>): HistoryEntry {

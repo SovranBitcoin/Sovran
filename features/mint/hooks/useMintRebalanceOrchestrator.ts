@@ -5,6 +5,7 @@ import { useManager } from '@cashu/coco-react';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { prepareBolt11MeltQuote, prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
 import { mintLocalId } from '@/shared/lib/id';
@@ -82,13 +83,7 @@ export function useMintRebalanceOrchestrator({
   const manager = useManager();
   const requestLightningInvoice = useCallback(
     async (mintUrl: string, amount: number) => {
-      const quote = await manager.quotes.mint.create({ mintUrl, amount, method: 'bolt11', unit });
-      return manager.ops.mint.prepare({
-        mintUrl,
-        method: 'bolt11',
-        quoteId: quote.quoteId,
-        unit,
-      });
+      return prepareBolt11MintQuote(manager, mintUrl, amount, unit);
     },
     [manager, unit]
   );
@@ -480,18 +475,7 @@ export function useMintRebalanceOrchestrator({
         setLegLocalStatus('invoiceReady');
 
         const prepareForInvoice = async (invoiceToPay: string) => {
-          const quote = await manager.quotes.melt.create({
-            mintUrl: fromMintUrl,
-            method: 'bolt11',
-            methodData: { invoice: invoiceToPay },
-            unit,
-          });
-          const prepared = await manager.ops.melt.prepare({
-            mintUrl: fromMintUrl,
-            method: 'bolt11',
-            quoteId: quote.quoteId,
-            unit,
-          });
+          const prepared = await prepareBolt11MeltQuote(manager, fromMintUrl, invoiceToPay);
           updateStepState(id, { operationId: prepared.id });
           {
             const legId = ensureLegId();
@@ -575,16 +559,15 @@ export function useMintRebalanceOrchestrator({
           const MAX_EXECUTE_RETRIES = 2;
           for (let execAttempt = 0; execAttempt <= MAX_EXECUTE_RETRIES; execAttempt++) {
             try {
-              if (!preparedMeltOp) {
-                preparedMeltOp = await prepareForInvoice(invoice);
-              }
+              const operationToExecute = preparedMeltOp ?? (await prepareForInvoice(invoice));
+              preparedMeltOp = operationToExecute;
 
-              const result = (await manager.ops.melt.execute(preparedMeltOp.id)) as unknown as
+              const result = (await manager.ops.melt.execute(operationToExecute.id)) as unknown as
                 | { state?: string; id?: string }
                 | undefined;
 
               if (result?.state === 'pending') {
-                const opId = result.id ?? preparedMeltOp.id;
+                const opId = result.id ?? operationToExecute.id;
                 const maxWaitMs = 20000;
                 const pollIntervalMs = 2000;
                 const start = Date.now();
@@ -610,7 +593,8 @@ export function useMintRebalanceOrchestrator({
               if (msg.includes('Melt operation already in progress')) {
                 await new Promise((resolve) => setTimeout(resolve, 900));
                 preparedMeltOp = await prepareForInvoice(invoice);
-                await manager.ops.melt.execute(preparedMeltOp.id);
+                const retryOperation = preparedMeltOp;
+                await manager.ops.melt.execute(retryOperation.id);
                 return;
               }
 
@@ -930,18 +914,7 @@ export function useMintRebalanceOrchestrator({
                 let hopTransferAmt = hopAmount;
                 for (let att = 0; att <= MAX_PREPARE_RETRIES; att++) {
                   try {
-                    const hopQuote = await manager.quotes.melt.create({
-                      mintUrl: hopFrom,
-                      method: 'bolt11',
-                      methodData: { invoice: hopInvoice },
-                      unit,
-                    });
-                    hopPrepared = await manager.ops.melt.prepare({
-                      mintUrl: hopFrom,
-                      method: 'bolt11',
-                      quoteId: hopQuote.quoteId,
-                      unit,
-                    });
+                    hopPrepared = await prepareBolt11MeltQuote(manager, hopFrom, hopInvoice);
                     break;
                   } catch (pErr) {
                     const pm = pErr instanceof Error ? pErr.message : String(pErr);

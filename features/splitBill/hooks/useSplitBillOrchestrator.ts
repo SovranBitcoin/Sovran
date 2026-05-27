@@ -41,6 +41,7 @@ import type {
 } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { paymentLog } from '@/shared/lib/logger';
 import { reconcileSplitBillHistoryUpdate } from '@/features/splitBill/lib/reconcileSplitBillHistoryUpdate';
+import { prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 
 // ---------------------------------------------------------------------------
 
@@ -206,18 +207,7 @@ export function useSplitBillOrchestrator() {
   const manager = useManager();
   const requestLightningInvoice = useCallback(
     async (mintUrl: string, amount: number) => {
-      const quote = await manager.quotes.mint.create({
-        mintUrl,
-        amount,
-        method: 'bolt11',
-        unit: 'sat',
-      });
-      return manager.ops.mint.prepare({
-        mintUrl,
-        method: 'bolt11',
-        quoteId: quote.quoteId,
-        unit: 'sat',
-      });
+      return prepareBolt11MintQuote(manager, mintUrl, amount, 'sat');
     },
     [manager]
   );

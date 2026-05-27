@@ -12,15 +12,16 @@
  */
 
 import {
-  getTokenMetadata,
   type HistoryEntry,
-  type LegacyReceiveHistoryEntry,
   type Manager,
+  type ReceiveHistoryEntry,
   type SendHistoryEntry,
 } from '@cashu/coco-core';
+import { getTokenMetadata } from '@cashu/cashu-ts';
 
 import { log } from '../logger';
 import { mintLocalId } from '../id';
+import { amountToNumber } from './amount';
 
 /**
  * Validates if a string is a valid ecash token by attempting to decode it
@@ -61,7 +62,7 @@ export function isValidEcashToken(token: string): boolean {
 export function getEcashTokenAmount(token: string): number | undefined {
   try {
     const decoded = getTokenMetadata(token);
-    const amount = decoded.amount.toNumber();
+    const amount = amountToNumber(decoded.amount);
     log.debug('cashu.utils.get_ecash_token_amount', {
       amount,
       proofCount: decoded.incompleteProofs.length,
@@ -104,13 +105,13 @@ function extractP2PKPubkey(proofs: readonly { secret: string }[]): string | null
 export function buildReceiveHistoryEntry(
   rawToken: string,
   unitOverride?: string
-): LegacyReceiveHistoryEntry {
+): ReceiveHistoryEntry & { source: 'legacy'; legacyHistoryId: string; updatedAt: number } {
   log.info('cashu.utils.build_receive_history_entry', { tokenLen: rawToken.length, unitOverride });
   const decodedToken = getTokenMetadata(rawToken);
   const p2pkPubkey = extractP2PKPubkey(decodedToken.incompleteProofs);
-  const amount = decodedToken.amount;
+  const amount = amountToNumber(decodedToken.amount);
   log.debug('cashu.utils.build_receive_history_entry.decoded', {
-    amount: amount.toString(),
+    amount: String(amount),
     proofCount: decodedToken.incompleteProofs.length,
     mint: decodedToken.mint,
     hasP2pk: !!p2pkPubkey,

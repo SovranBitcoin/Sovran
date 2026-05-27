@@ -97,7 +97,7 @@ function getPositiveSatAmount(entry: HistoryEntry | null | undefined): number | 
   return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
 }
 
-export function getOnchainMintBip321Uri(entry: HistoryEntry | null | undefined): string | null {
+function getOnchainMintBip321Uri(entry: HistoryEntry | null | undefined): string | null {
   const address = getOnchainMintAddress(entry);
   if (!address) return null;
 
@@ -117,7 +117,7 @@ export function getMintQuotePaymentValue(entry: HistoryEntry | null | undefined)
   return typeof paymentRequest === 'string' && paymentRequest.trim() ? paymentRequest : null;
 }
 
-export function getOnchainRequiredConfirmationsFromMintInfo(
+function getOnchainRequiredConfirmationsFromMintInfo(
   mintInfo: unknown,
   unit = 'sat'
 ): number | null {

@@ -11,10 +11,6 @@ export function getReceiveQuoteScreenTitle(isOnchainQuote: boolean): string {
   return isOnchainQuote ? 'Receive Onchain' : 'Receive Lightning';
 }
 
-export function getMintQuoteEntryScreenTitle(entry: HistoryEntry | null | undefined): string {
-  return getReceiveQuoteScreenTitle(!!getOnchainMintAddress(entry));
-}
-
 export function isOnchainMintQuoteParam(mintHistoryEntry: string | null | undefined): boolean {
   if (!mintHistoryEntry) return false;
 

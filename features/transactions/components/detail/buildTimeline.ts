@@ -1,5 +1,5 @@
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-import type { HistoryEntry } from '@cashu/coco-core';
+import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 
 import {
   MINT_COPY,
@@ -120,7 +120,9 @@ export function buildTimeline({
             state: FAILED_STATE,
             displayLabel: MINT_COPY.failed.label,
             stepType: 'expired',
-            info: historyEntry.error ?? MINT_COPY.failed.info,
+            info:
+              (historyEntry as MintHistoryEntry & { error?: string }).error ??
+              MINT_COPY.failed.info,
           },
         ];
       }
@@ -317,7 +319,8 @@ export function buildTimeline({
     case 'send': {
       const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
 
-      if (historyEntry.state === 'rolledBack' || historyEntry.state === 'rolled_back') {
+      const sendState = String(historyEntry.state);
+      if (sendState === 'rolledBack' || sendState === 'rolled_back') {
         const copy = isPaymentRequestMode ? PAYMENT_REQUEST_COPY : SEND_COPY;
         const rolledBackTimeline: TimelineItem[] = [
           {
@@ -503,7 +506,8 @@ export function buildTimeline({
     }
 
     case 'receive': {
-      if (historyEntry.state === 'rolledBack' || historyEntry.state === 'rolled_back') {
+      const receiveState = String(historyEntry.state);
+      if (receiveState === 'rolledBack' || receiveState === 'rolled_back') {
         return [
           {
             state: 'pending',

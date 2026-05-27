@@ -306,14 +306,17 @@ export function SendTokenScreen({
             </View>
           )}
 
-          {entry.state !== 'finalized' && entry.state !== 'rolled_back' && entry.tokenString && (
-            <PaymentInfo
-              copyTarget="token"
-              unit={entry.unit}
-              data={entry.tokenString.toString()}
-              animated={(entry.tokenString.length ?? 0) >= 500}
-            />
-          )}
+          {entry.state !== 'finalized' &&
+            String(entry.state) !== 'rolledBack' &&
+            String(entry.state) !== 'rolled_back' &&
+            entry.tokenString && (
+              <PaymentInfo
+                copyTarget="token"
+                unit={entry.unit}
+                data={entry.tokenString.toString()}
+                animated={(entry.tokenString.length ?? 0) >= 500}
+              />
+            )}
 
           {entry.state === 'finalized' && <TransactionLocationSection transactionId={entry.id} />}
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text as RNText, View } from 'react-native';
+import { MeltQuoteState } from '@cashu/cashu-ts';
 
 import { popupLog } from '../logger';
 import { formatAmount } from '@/shared/lib/currency';
@@ -7,7 +8,6 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { toCocoAmount } from '@/shared/lib/cashu/amount';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import {
@@ -187,15 +187,12 @@ export function PaymentStatusToast({
         entry = {
           type: 'melt',
           id: effectiveOperationId,
-          source: 'legacy',
-          legacyHistoryId: effectiveOperationId,
           quoteId: paymentId,
           mintUrl,
-          amount: toCocoAmount(amount),
+          amount,
           unit,
-          state: 'PAID',
+          state: MeltQuoteState.PAID,
           createdAt: now,
-          updatedAt: now,
         } as const;
       }
       if (entry) {

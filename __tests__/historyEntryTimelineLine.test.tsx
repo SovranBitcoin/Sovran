@@ -5,7 +5,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { Amount, type LegacyMintHistoryEntry } from '@cashu/coco-core';
+import type { HistoryEntry } from '@cashu/coco-core';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/HistoryEntryTimeline';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -156,7 +156,7 @@ function collectNodesByTestIDPrefix(
   return matches;
 }
 
-const unpaidMintEntry: LegacyMintHistoryEntry = {
+const unpaidMintEntry = {
   id: 'mint-entry',
   source: 'legacy',
   legacyHistoryId: 'mint-entry',
@@ -168,10 +168,10 @@ const unpaidMintEntry: LegacyMintHistoryEntry = {
   paymentRequest: 'lnbc1test',
   quoteId: 'quote-id',
   state: 'UNPAID',
-  amount: Amount.from(21),
-};
+  amount: 21,
+} as unknown as HistoryEntry;
 
-const onchainUnpaidMintEntry: LegacyMintHistoryEntry = {
+const onchainUnpaidMintEntry = {
   ...unpaidMintEntry,
   id: 'mint-onchain-entry',
   legacyHistoryId: 'mint-onchain-entry',
@@ -180,7 +180,7 @@ const onchainUnpaidMintEntry: LegacyMintHistoryEntry = {
     method: 'onchain',
     onchainAddress: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
   },
-};
+} as unknown as HistoryEntry;
 
 describe('HistoryEntryTimeline connector rail', () => {
   beforeEach(() => {

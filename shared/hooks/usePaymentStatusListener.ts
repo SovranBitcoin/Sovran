@@ -10,7 +10,6 @@
 import { useEffect } from 'react';
 
 import { useManagerContext } from '@cashu/coco-react';
-import { getMintQuoteAvailableAmount } from '@cashu/coco-core';
 
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
@@ -52,63 +51,64 @@ export function usePaymentStatusListener(): void {
     }
     paymentLog.info('hook.payment_status.subscribing');
 
-    const offStateChanged = manager.on('mint-quote:updated', ({ mintUrl, quoteId, quote }) => {
-      const remoteState = quote.method === 'bolt11' ? quote.state : undefined;
-      const amountValue =
-        quote.method === 'onchain' ? getMintQuoteAvailableAmount(quote) : quote.amount;
-      paymentLog.debug('hook.payment_status.mint_quote_state_changed', {
-        quoteId,
-        state: remoteState ?? null,
-        method: quote.method,
-        mintUrl,
-      });
-      if (quote.method === 'bolt11' && remoteState !== 'PAID') return;
-      if (quote.method === 'onchain' && !amountValue.greaterThan(0)) return;
+    const offStateChanged = manager.on(
+      'mint-op:quote-state-changed',
+      ({ mintUrl, quoteId, state: remoteState, operation }) => {
+        if (operation.state === 'init') return;
 
-      // Suppress per-leg toasts while a swap is running — the unified
-      // SwapStatusToast owns the user-facing surface for the duration.
-      if (isSwapStatusActive()) {
-        paymentLog.info('hook.payment_status.suppressed_for_swap', {
+        paymentLog.debug('hook.payment_status.mint_quote_state_changed', {
+          quoteId,
+          state: remoteState ?? null,
+          method: operation.method,
+          mintUrl,
+        });
+        if (remoteState !== 'PAID') return;
+
+        // Suppress per-leg toasts while a swap is running — the unified
+        // SwapStatusToast owns the user-facing surface for the duration.
+        if (isSwapStatusActive()) {
+          paymentLog.info('hook.payment_status.suppressed_for_swap', {
+            quoteId,
+            mintUrl,
+            phase: 'mint_quote_state_changed',
+          });
+          return;
+        }
+
+        const amount = amountToNumber(operation.amount);
+        const unit = operation.unit;
+
+        const existingActive = usePaymentStatusStore.getState().active;
+        const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
+
+        paymentLog.info('hook.payment_status.receive_processing', {
           quoteId,
           mintUrl,
-          phase: 'mint_quote_state_changed',
+          amount,
+          unit,
+          isDuplicate,
         });
-        return;
-      }
-
-      const amount = amountToNumber(amountValue);
-      const unit = quote.unit;
-
-      const existingActive = usePaymentStatusStore.getState().active;
-      const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
-
-      paymentLog.info('hook.payment_status.receive_processing', {
-        quoteId,
-        mintUrl,
-        amount,
-        unit,
-        isDuplicate,
-      });
-      usePaymentStatusStore.getState().setActive({
-        variant: 'receive',
-        id: quoteId,
-        mintUrl,
-        amount,
-        unit,
-        state: 'processing',
-      });
-
-      if (isDuplicate) {
-        paymentLog.info('hook.payment_status.receive_popup_suppressed', {
-          quoteId,
+        usePaymentStatusStore.getState().setActive({
+          variant: 'receive',
+          id: quoteId,
           mintUrl,
-          reason: 'already_active',
+          amount,
+          unit,
+          state: 'processing',
         });
-        return;
-      }
 
-      paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
-    });
+        if (isDuplicate) {
+          paymentLog.info('hook.payment_status.receive_popup_suppressed', {
+            quoteId,
+            mintUrl,
+            reason: 'already_active',
+          });
+          return;
+        }
+
+        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+      }
+    );
 
     const offAdded = manager.on('mint-op:pending', ({ mintUrl, operationId, operation }) => {
       // The MintOperation union includes `init` (no quoteId/observed state); only

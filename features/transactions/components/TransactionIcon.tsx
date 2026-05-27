@@ -22,7 +22,8 @@ export default function TransactionIcon({
     // Check if this is a rolled back send transaction
     if (historyEntry.type === 'send') {
       const sendEntry = historyEntry as SendHistoryEntry;
-      if (sendEntry.state === 'rolled_back') {
+      const sendState = String(sendEntry.state);
+      if (sendState === 'rolledBack' || sendState === 'rolled_back') {
         return 'mdi:cancel'; // Cancelled/rolled back icon
       }
     }

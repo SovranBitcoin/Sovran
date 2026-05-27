@@ -1,0 +1,44 @@
+diff --git a/node_modules/@cashu/coco-expo-sqlite/dist/index.cjs b/node_modules/@cashu/coco-expo-sqlite/dist/index.cjs
+index 2da4c5e..0b8920d 100644
+--- a/node_modules/@cashu/coco-expo-sqlite/dist/index.cjs
++++ b/node_modules/@cashu/coco-expo-sqlite/dist/index.cjs
+@@ -1006,11 +1006,16 @@ var ExpoCounterRepository = class {
+ 
+ //#endregion
+ //#region src/repositories/ProofRepository.ts
+ const MAX_PROOF_SECRET_LOOKUP_BATCH_SIZE = 900;
++function coercePersistedProofAmount(value) {
++	const amount = typeof value === "number" ? value : Number(value);
++	if (!Number.isFinite(amount)) throw new Error(`Invalid persisted Cashu proof amount: ${String(value)}`);
++	return amount;
++}
+ function rowToProof(r) {
+ 	return {
+ 		id: r.id,
+-		amount: r.amount,
++		amount: coercePersistedProofAmount(r.amount),
+ 		secret: r.secret,
+ 		C: r.C,
+ 		...r.dleqJson ? { dleq: JSON.parse(r.dleqJson) } : {},
+diff --git a/node_modules/@cashu/coco-expo-sqlite/dist/index.js b/node_modules/@cashu/coco-expo-sqlite/dist/index.js
+index 1962919..693ea15 100644
+--- a/node_modules/@cashu/coco-expo-sqlite/dist/index.js
++++ b/node_modules/@cashu/coco-expo-sqlite/dist/index.js
+@@ -1006,11 +1006,16 @@ var ExpoCounterRepository = class {
+ 
+ //#endregion
+ //#region src/repositories/ProofRepository.ts
+ const MAX_PROOF_SECRET_LOOKUP_BATCH_SIZE = 900;
++function coercePersistedProofAmount(value) {
++	const amount = typeof value === "number" ? value : Number(value);
++	if (!Number.isFinite(amount)) throw new Error(`Invalid persisted Cashu proof amount: ${String(value)}`);
++	return amount;
++}
+ function rowToProof(r) {
+ 	return {
+ 		id: r.id,
+-		amount: r.amount,
++		amount: coercePersistedProofAmount(r.amount),
+ 		secret: r.secret,
+ 		C: r.C,
+ 		...r.dleqJson ? { dleq: JSON.parse(r.dleqJson) } : {},

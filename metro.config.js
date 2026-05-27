@@ -5,7 +5,7 @@ const { withUniwindConfig } = require('uniwind/metro');
 
 const config = getDefaultConfig(__dirname);
 
-// `@sovranbitcoin/schemas`, the local Coco PR packages, and local P2PK helper
+// `@sovranbitcoin/schemas`, Colada, and the local P2PK helper
 // live as sibling repos wired in via `file:../...`. Metro needs linked targets
 // in `watchFolders` so transform/resolve can walk their built files; otherwise
 // the `node_modules` symlink can resolve outside Metro's project roots.
@@ -19,28 +19,40 @@ const config = getDefaultConfig(__dirname);
 // Only add the watchFolder when the directory actually exists locally.
 const sovranSchemasPath = path.resolve(__dirname, '..', 'sovran-schemas');
 const appNodeModules = path.resolve(__dirname, 'node_modules');
-const localCocoPackages = {
-  '@cashu/coco-core': path.resolve(__dirname, '..', 'coco', 'packages', 'core'),
-  '@cashu/coco-expo-sqlite': path.resolve(__dirname, '..', 'coco', 'packages', 'expo-sqlite'),
-  '@cashu/coco-react': path.resolve(__dirname, '..', 'coco', 'packages', 'react'),
+const appCocoPackages = {
+  '@cashu/coco-core': path.resolve(appNodeModules, '@cashu', 'coco-core'),
+  '@cashu/coco-expo-sqlite': path.resolve(appNodeModules, '@cashu', 'coco-expo-sqlite'),
+  '@cashu/coco-react': path.resolve(appNodeModules, '@cashu', 'coco-react'),
 };
+const localColadaPath = path.resolve(__dirname, '..', 'colada');
+const localColadaEntryPath = path.join(localColadaPath, 'src', 'index.ts');
+const localColadaReactEntryPath = path.join(localColadaPath, 'src', 'react', 'index.ts');
+const localColadaOperationsEntryPath = path.join(localColadaPath, 'src', 'operations', 'index.ts');
 const localP2PKImportPluginPath = path.resolve(__dirname, '..', 'coco-p2pk-plugin-helper');
 const localP2PKImportPluginEntryPath = path.join(localP2PKImportPluginPath, 'src', 'index.ts');
+// Pin React singleton entry points for sibling packages, but let `react-native`
+// continue through Uniwind's resolver so className/css interop stays installed.
+const appReactEntryPaths = Object.fromEntries(
+  [
+    ['react', path.join(appNodeModules, 'react', 'index.js')],
+    ['react/jsx-runtime', path.join(appNodeModules, 'react', 'jsx-runtime.js')],
+    ['react/jsx-dev-runtime', path.join(appNodeModules, 'react', 'jsx-dev-runtime.js')],
+    ['react/compiler-runtime', path.join(appNodeModules, 'react', 'compiler-runtime.js')],
+  ].filter(([, filePath]) => fs.existsSync(filePath))
+);
 const existingSiblingPackagePaths = [
   sovranSchemasPath,
-  ...Object.values(localCocoPackages),
+  localColadaPath,
   localP2PKImportPluginPath,
 ].filter(fs.existsSync);
-const existingLocalCocoPackages = Object.fromEntries(
-  Object.entries(localCocoPackages).filter(([, packagePath]) => fs.existsSync(packagePath))
-);
-const localCocoEntryPaths = Object.fromEntries(
-  Object.entries(existingLocalCocoPackages)
-    .map(([packageName, packagePath]) => [packageName, path.join(packagePath, 'dist', 'index.js')])
-    .filter(([, entryPath]) => fs.existsSync(entryPath))
-);
 const localPackageEntryPaths = {
-  ...localCocoEntryPaths,
+  ...(fs.existsSync(localColadaEntryPath) ? { colada: localColadaEntryPath } : {}),
+  ...(fs.existsSync(localColadaReactEntryPath)
+    ? { 'colada/react': localColadaReactEntryPath }
+    : {}),
+  ...(fs.existsSync(localColadaOperationsEntryPath)
+    ? { 'colada/operations': localColadaOperationsEntryPath }
+    : {}),
   ...(fs.existsSync(localP2PKImportPluginEntryPath)
     ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginEntryPath }
     : {}),
@@ -55,10 +67,14 @@ config.resolver = {
   nodeModulesPaths: [...(config.resolver?.nodeModulesPaths ?? []), appNodeModules],
   extraNodeModules: {
     ...(config.resolver?.extraNodeModules ?? {}),
-    ...existingLocalCocoPackages,
+    react: path.resolve(appNodeModules, 'react'),
+    'react-native': path.resolve(appNodeModules, 'react-native'),
+    ...appCocoPackages,
+    ...(fs.existsSync(localColadaPath) ? { colada: localColadaPath } : {}),
     ...(fs.existsSync(localP2PKImportPluginPath)
       ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginPath }
       : {}),
+    ...(fs.existsSync(sovranSchemasPath) ? { '@sovranbitcoin/schemas': sovranSchemasPath } : {}),
     zod: path.resolve(appNodeModules, 'zod'),
     neverthrow: path.resolve(appNodeModules, 'neverthrow'),
   },
@@ -178,6 +194,12 @@ uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: cashuTsEsmPath,
+    };
+  }
+  if (appReactEntryPaths[moduleName]) {
+    return {
+      type: 'sourceFile',
+      filePath: appReactEntryPaths[moduleName],
     };
   }
   if (localPackageEntryPaths[moduleName]) {

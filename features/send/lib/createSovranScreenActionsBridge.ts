@@ -197,15 +197,19 @@ export function createSovranScreenActionsBridge({
 
       if (screenType === 'mintQuote') {
         unsubscribes.push(
-          manager.on('mint-quote:updated', ({ quoteId, quote }) => {
-            const state = quote.method === 'bolt11' ? quote.state : undefined;
+          manager.on('mint-op:quote-state-changed', ({ quoteId, state, operation }) => {
             paymentLog.info('send.mint_quote_state_changed', {
               screenType,
               quoteId,
-              method: quote.method,
               state: state ?? null,
             });
-            callback({ type: 'mint', quoteId, state, remoteState: state });
+            callback({
+              type: 'mint',
+              quoteId,
+              operationId: operation.id,
+              state,
+              remoteState: state,
+            });
           })
         );
         unsubscribes.push(
