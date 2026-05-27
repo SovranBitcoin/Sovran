@@ -93,6 +93,31 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
 
   const [nfcAdapter] = useState(() => createNfcAdapter());
   const chainAdapter = useMemo(() => createMempoolSpaceChainAdapter(), []);
+  const scanSources = useMemo(() => createSovranScanSources(nfcAdapter), [nfcAdapter]);
+  const clipboardAdapter = useMemo<NonNullable<ColadaProviderProps['clipboardAdapter']>>(
+    () => ({
+      writeText: (text) => Clipboard.setStringAsync(text).then(() => {}),
+    }),
+    []
+  );
+  const shareAdapter = useMemo<NonNullable<ColadaProviderProps['shareAdapter']>>(
+    () => ({
+      share: (content) =>
+        Share.share({
+          message: content.message,
+          url: content.url,
+          title: content.title,
+        }).then(() => {}),
+    }),
+    []
+  );
+  const qrDecoderAdapter = useMemo<NonNullable<ColadaProviderProps['qrDecoderAdapter']>>(
+    () => ({
+      decode: async (_input) => null,
+      createUrDecoder: () => new URDecoder(),
+    }),
+    []
+  );
   // Receive-screen subscribers register a callback here so the notifications
   // factory can fan a p2pk-keypair regeneration out to every mounted receive
   // surface. A Set (not a single slot) lets co-mounted receive screens — e.g.
@@ -121,14 +146,6 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     () =>
       createColada({
         manager,
-        platform: {
-          clipboard: { write: (text: string) => Clipboard.setStringAsync(text).then(() => {}) },
-          share: (content) =>
-            Share.share({ message: content.message, url: content.url }).then(() => {}),
-          nfc: nfcAdapter,
-          scanSources: createSovranScanSources(nfcAdapter),
-          createURDecoder: () => new URDecoder(),
-        },
         sendNostrDM: async (nprofile, message) => {
           const pk = privateKeyRef.current;
           if (!pk) throw new Error('Nostr keys not available');
@@ -170,7 +187,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         shouldMockFailSend: () => useSettingsStore.getState().mockFailSend,
         logger: paymentLog,
       }),
-    [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency, privateKeyRef]
+    [manager, getOffline, getBtcPrice, getDisplayCurrency, privateKeyRef]
   );
 
   useEffect(() => {
@@ -317,7 +334,12 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       })}
       actions={actions}
       screenActionsBridge={screenActionsBridge}
+      clipboardAdapter={clipboardAdapter}
+      shareAdapter={shareAdapter}
+      nfcAdapter={nfcAdapter}
       chainAdapter={chainAdapter}
+      scanSources={scanSources}
+      qrDecoderAdapter={qrDecoderAdapter}
       deepLinks={deepLinks}
       navigation={navigation}>
       {children}

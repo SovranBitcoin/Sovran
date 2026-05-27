@@ -1346,8 +1346,8 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         }
         try {
           // Read the share result so we can detect AirDrop on iOS. The
-          // built-in colada platform.share at Colada.tsx
-          // discards the result, so we can't piggyback on it.
+          // provider share adapter intentionally returns void, so this
+          // action override owns the result inspection.
           const result = await Share.share({ message: paymentValue });
           if (result.action !== Share.sharedAction) {
             paymentLog.debug('payment.mint_quote.share.dismissed', { quoteId });
