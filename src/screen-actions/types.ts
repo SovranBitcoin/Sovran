@@ -37,17 +37,17 @@ export type ScreenType =
  * Screens use this to get type-safe action names; the wallet implements handlers for each.
  */
 export type ScreenActionName = {
-  sendToken: 'copy' | 'share' | 'nfc' | 'copyAsEmoji' | 'checkStatus' | 'cancel';
-  receiveToken: 'redeem';
-  mintQuote: 'copy' | 'share';
-  meltQuote: 'pay' | 'cancel';
-  paymentRequest: 'confirm' | 'cancel';
-  receive: 'copy' | 'share' | 'paste' | 'fixedAmount' | 'scanQr' | 'changeNpcMint';
-  mintInfo: 'trust' | 'copy' | 'share';
+  sendToken: 'copy' | 'share' | 'nfc' | 'copyAsEmoji' | 'checkStatus' | 'cancel' | 'back';
+  receiveToken: 'redeem' | 'back';
+  mintQuote: 'copy' | 'share' | 'back';
+  meltQuote: 'pay' | 'cancel' | 'back';
+  paymentRequest: 'confirm' | 'cancel' | 'back';
+  receive: 'copy' | 'share' | 'paste' | 'fixedAmount' | 'scanQr' | 'changeNpcMint' | 'back';
+  mintInfo: 'trust' | 'copy' | 'share' | 'back';
   /** Flow amount screen — keyboard + submit; `setInput`/`toggle` are handled inside the manager. */
-  amountEntry: 'setInput' | 'toggle' | 'next' | 'paste' | 'scanQr';
+  amountEntry: 'setInput' | 'toggle' | 'next' | 'paste' | 'scanQr' | 'cancel' | 'back';
   /** Mint selector screen — select a mint, inspect details, or add new mints. */
-  mintSelector: 'select' | 'getInfo' | 'addMint';
+  mintSelector: 'select' | 'getInfo' | 'addMint' | 'cancel' | 'back';
 };
 
 /**

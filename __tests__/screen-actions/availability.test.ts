@@ -21,6 +21,26 @@ import {
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import { MINT1, MINT2 } from '../_harness/fixtures';
 
+describe('screen action availability — back', () => {
+  const screens = [
+    'sendToken',
+    'receiveToken',
+    'mintQuote',
+    'meltQuote',
+    'paymentRequest',
+    'receive',
+    'mintInfo',
+    'amountEntry',
+    'mintSelector',
+  ] as const;
+
+  it.each(screens)('%s always exposes back as available', (screen) => {
+    const actions = getAvailableActions(screen, {});
+
+    expect(actions.back.available).toBe(true);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // paymentRequest — Confirm availability
 // ---------------------------------------------------------------------------
@@ -216,6 +236,15 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     };
     const actions = getAvailableActions('amountEntry', entry);
     expect(actions.next.available).toBe(true);
+  });
+
+  it('always exposes cancel as available', () => {
+    const actions = getAvailableActions('amountEntry', {
+      destination: 'sendEcash',
+      effectiveSatAmount: 0,
+    });
+
+    expect(actions.cancel.available).toBe(true);
   });
 
   it('hides onchain receive when no trusted mint advertises NUT-04 onchain', () => {
@@ -449,5 +478,16 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
       reason: 'No trusted mint can pay over Lightning',
     });
     expect(actions.next.available).toBe(false);
+  });
+});
+
+describe('mintSelectorAvailability', () => {
+  it('always exposes cancel as available', () => {
+    const actions = getAvailableActions('mintSelector', {
+      items: [],
+      destination: 'sendEcash',
+    });
+
+    expect(actions.cancel.available).toBe(true);
   });
 });

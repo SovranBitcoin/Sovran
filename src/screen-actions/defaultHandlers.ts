@@ -110,10 +110,15 @@ export function createDefaultScreenActionHandlers(
   config: DefaultScreenActionHandlersConfig
 ): ScreenActionHandlerMap {
   const { getMachine, getOperations, getOffline, notify, navigation } = config;
+  const goBack = async () => {
+    navigation.goBack?.();
+  };
 
   return {
     // ── sendToken ────────────────────────────────────────────────────
     sendToken: {
+      back: goBack,
+
       checkStatus: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
         const operationId = getString(entry, 'operationId');
@@ -176,6 +181,8 @@ export function createDefaultScreenActionHandlers(
 
     // ── receiveToken ─────────────────────────────────────────────────
     receiveToken: {
+      back: goBack,
+
       redeem: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
         const mintUrl = getString(entry, 'mintUrl');
@@ -304,8 +311,15 @@ export function createDefaultScreenActionHandlers(
       },
     },
 
+    // ── mintQuote ────────────────────────────────────────────────────
+    mintQuote: {
+      back: goBack,
+    },
+
     // ── meltQuote ────────────────────────────────────────────────────
     meltQuote: {
+      back: goBack,
+
       pay: async (_ctx: ScreenActionContext) => {
         logger.info('screenAction.meltQuote.pay');
         const machine = getMachine();
@@ -355,6 +369,8 @@ export function createDefaultScreenActionHandlers(
 
     // ── paymentRequest ───────────────────────────────────────────────
     paymentRequest: {
+      back: goBack,
+
       confirm: async (ctx: ScreenActionContext) => {
         const machine = getMachine();
         if (!machine?.confirmPaymentRequest) return;
@@ -424,13 +440,13 @@ export function createDefaultScreenActionHandlers(
         }
       },
 
-      cancel: async () => {
-        navigation.goBack?.();
-      },
+      cancel: goBack,
     },
 
     // ── receive ──────────────────────────────────────────────────────
     receive: {
+      back: goBack,
+
       paste: async () => {
         const machine = getMachine();
         await machine?.scan?.();
@@ -455,6 +471,8 @@ export function createDefaultScreenActionHandlers(
 
     // ── mintInfo ─────────────────────────────────────────────────────
     mintInfo: {
+      back: goBack,
+
       trust: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
         const mintUrl = getString(entry, 'mintUrl');
@@ -475,6 +493,8 @@ export function createDefaultScreenActionHandlers(
 
     // ── mintSelector ─────────────────────────────────────────────────
     mintSelector: {
+      back: goBack,
+
       select: async (ctx: ScreenActionContext) => {
         const machine = getMachine();
         const mintUrl = (ctx as EntryLike).mintUrl as string | undefined;
@@ -513,10 +533,16 @@ export function createDefaultScreenActionHandlers(
       addMint: async () => {
         navigation.addMint?.();
       },
+
+      cancel: goBack,
     },
 
     // ── amountEntry ──────────────────────────────────────────────────
     amountEntry: {
+      back: goBack,
+
+      cancel: goBack,
+
       next: async (ctx: ScreenActionContext) => {
         const machine = getMachine();
         if (!machine) return;

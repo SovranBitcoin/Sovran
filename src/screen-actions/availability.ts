@@ -98,6 +98,7 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
       available: canAct && operationId != null,
       ...(!operationId && canAct ? { reason: 'Legacy entry — cannot cancel' } : {}),
     },
+    back: { available: true },
   };
 }
 
@@ -109,6 +110,7 @@ function receiveTokenAvailability(entry: Record<string, unknown>): AvailabilityM
 
   return {
     redeem: { available: !isRedeemed && token != null },
+    back: { available: true },
   };
 }
 
@@ -119,6 +121,7 @@ function mintQuoteAvailability(entry: Record<string, unknown>): AvailabilityMap<
   return {
     copy: { available: !isPaid },
     share: { available: !isPaid },
+    back: { available: true },
   };
 }
 
@@ -132,6 +135,7 @@ function meltQuoteAvailability(entry: Record<string, unknown>): AvailabilityMap<
   return {
     pay: { available: !isPaid && !isPending && state === 'UNPAID' },
     cancel: { available: !isPreview && (state === 'UNPAID' || isPending) },
+    back: { available: true },
   };
 }
 
@@ -147,6 +151,7 @@ function paymentRequestAvailability(
   return {
     confirm: { available: isPreview },
     cancel: { available: !isDelivered },
+    back: { available: true },
   };
 }
 
@@ -387,6 +392,8 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
     },
     paste: { available: isSendEcash },
     scanQr: { available: isSendEcash },
+    cancel: { available: true },
+    back: { available: true },
   };
 }
 
@@ -397,6 +404,7 @@ function mintInfoAvailability(entry: Record<string, unknown>): AvailabilityMap<'
     trust: { available: !isTrusted },
     copy: { available: hasMintUrl },
     share: { available: hasMintUrl },
+    back: { available: true },
   };
 }
 
@@ -409,6 +417,8 @@ function mintSelectorAvailability(entry: Record<string, unknown>): AvailabilityM
     select: { available: hasItems },
     getInfo: { available: isManagement },
     addMint: { available: isManagement },
+    cancel: { available: true },
+    back: { available: true },
   };
 }
 
@@ -436,6 +446,7 @@ function receiveAvailability(entry: Record<string, unknown>): AvailabilityMap<'r
     },
     scanQr: { available: hubLoaded },
     changeNpcMint: { available: hubLoaded && hasNpc && unit === 'sat' },
+    back: { available: true },
   };
 }
 

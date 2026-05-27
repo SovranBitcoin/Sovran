@@ -2,7 +2,7 @@
 
 ## Current slice
 
-6. Fault-tolerance fallbacks: ensure every state has forward and cancel/back actions.
+7. Renames/dead code: restructure folders around responsibilities and delete unused exports.
 
 ## Completed slices
 
@@ -11,10 +11,10 @@
 3. Copy + i18n surface: added a typed Colada payment-copy catalog/resolver with overrides and locale registration; moved transaction detail timeline, history refresh, and payment-status toast copy out of `sovran-app`.
 4. State machines: split send/receive entry flows and context resolution into Colada machine modules; moved app-owned transaction state predicates and warning/refresh labels into Colada history helpers.
 5. Chain watcher: moved mempool.space address stats, address summaries, confirmation progress, and default chain adapter into Colada; updated `sovran-app` to consume Colada chain helpers.
+6. Fault-tolerance fallbacks: added a generic non-destructive `back` action to Colada screen actions, kept amount/mint selector `cancel` in the contract, and moved receive/mint dead-end close paths through Colada actions.
 
 ## Remaining slices
 
-6. Fault-tolerance fallbacks: ensure every state has forward and cancel/back actions.
 7. Renames/dead code: restructure folders around responsibilities and delete unused exports.
 8. Backcompat sweep: remove old/legacy/dual-shape paths except allowed carve-outs.
 9. Tests reconciliation: rewrite tests for the shipped API and add coverage for new seams.
@@ -50,3 +50,5 @@
 - Slice 5 progress: mempool.space address stats, address summaries, onchain confirmation progress, and the default chain adapter moved into Colada; `sovran-app` now imports those helpers from Colada and passes a Colada chain adapter to the provider.
 - Slice 4 verification: `colada` type-check/tests passed; `sovran-app` type-check/tests passed; focused and full app tests passed; touched-file lint had existing perf warnings only; app error-only lint passed.
 - Slice 5 verification: `colada` type-check passed and 590 tests passed; `sovran-app` type-check passed, 379 tests passed, and app error-only lint passed.
+- Slice 6 progress: every Colada screen-action surface now exposes a default `back` handler; amount entry and mint selector also expose `cancel`; receive-token, mint-quote, onchain receive, payment-request terminal, amount-entry error, receive hub error, and mint-info close/reject paths now route through Colada actions instead of direct screen-local back calls.
+- Slice 6 verification: focused Colada screen-action tests passed; `colada` type-check passed and 612 tests passed; `sovran-app` type-check passed, 379 tests passed, app error-only lint passed, and both diffs passed `git diff --check`; `colada` still has no lint script.

@@ -138,6 +138,29 @@ function createManager(
 // built-in copy/share targets
 // ---------------------------------------------------------------------------
 
+describe('back default handlers', () => {
+  const screens: ScreenType[] = [
+    'sendToken',
+    'receiveToken',
+    'mintQuote',
+    'meltQuote',
+    'paymentRequest',
+    'receive',
+    'mintInfo',
+    'amountEntry',
+    'mintSelector',
+  ];
+
+  it.each(screens)('%s delegates to navigation.goBack', async (screenType) => {
+    const { handlers, navigation } = createMockConfig();
+    const { mgr } = createManager(screenType, handlers, {});
+
+    await mgr.execute('back');
+
+    expect(navigation.goBack).toHaveBeenCalled();
+  });
+});
+
 describe('built-in copy/share targets', () => {
   it('labels mint quote clipboard copies as Lightning invoices', async () => {
     const writeClipboard = vi.fn(async () => {});
@@ -831,6 +854,16 @@ describe('mintSelector default handlers', () => {
       expect(navigation.addMint).toHaveBeenCalled();
     });
   });
+
+  describe('cancel', () => {
+    it('calls navigation.goBack', async () => {
+      const { handlers, navigation } = createMockConfig();
+      const { mgr } = createManager('mintSelector', handlers, {});
+
+      await mgr.execute('cancel');
+      expect(navigation.goBack).toHaveBeenCalled();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -838,6 +871,18 @@ describe('mintSelector default handlers', () => {
 // ---------------------------------------------------------------------------
 
 describe('amountEntry default handlers', () => {
+  describe('cancel', () => {
+    it('calls navigation.goBack', async () => {
+      const { handlers, navigation } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        destination: 'sendEcash',
+      });
+
+      await mgr.execute('cancel');
+      expect(navigation.goBack).toHaveBeenCalled();
+    });
+  });
+
   describe('next', () => {
     it('delegates to machine.enterAmount', async () => {
       const { handlers, machine } = createMockConfig();
