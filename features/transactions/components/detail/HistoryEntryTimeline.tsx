@@ -35,6 +35,7 @@ import {
 } from '@/shared/lib/utils';
 import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { Log } from '@/shared/lib/logger';
 
 import {
@@ -172,6 +173,7 @@ export function HistoryEntryTimeline({
     'warning',
   ] as const);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const paymentCopy = usePaymentCopyResolver();
 
   const foreground66 = opacity(foreground, 0.66);
   const foreground50 = opacity(foreground, 0.5);
@@ -203,11 +205,20 @@ export function HistoryEntryTimeline({
         tokenCreated,
         nostrSent,
         onchainConfirmationProgress,
+        paymentCopy,
       }),
-    [historyEntry, meltQuote, currentTime, tokenCreated, nostrSent, onchainConfirmationProgress]
+    [
+      historyEntry,
+      meltQuote,
+      currentTime,
+      tokenCreated,
+      nostrSent,
+      onchainConfirmationProgress,
+      paymentCopy,
+    ]
   );
 
-  const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent);
+  const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent, paymentCopy);
   const statusHeader = getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
 

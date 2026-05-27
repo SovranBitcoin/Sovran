@@ -1,13 +1,11 @@
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
-
 import {
-  MINT_COPY,
-  MELT_COPY,
-  SEND_COPY,
-  PAYMENT_REQUEST_COPY,
-  RECEIVE_COPY,
-} from '@/shared/lib/paymentCopy';
+  createPaymentCopyGroups,
+  createPaymentCopyResolver,
+  type PaymentCopyResolver,
+} from 'colada';
+
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import {
@@ -44,7 +42,10 @@ interface BuildTimelineInput {
   tokenCreated?: boolean;
   nostrSent?: boolean;
   onchainConfirmationProgress?: OnchainConfirmationProgress | null;
+  paymentCopy?: PaymentCopyResolver;
 }
+
+const DEFAULT_PAYMENT_COPY = createPaymentCopyResolver();
 
 type MintTimelineState = MintQuoteState | typeof FAILED_STATE | string;
 
@@ -78,14 +79,16 @@ export function buildTimeline({
   tokenCreated,
   nostrSent,
   onchainConfirmationProgress,
+  paymentCopy = DEFAULT_PAYMENT_COPY,
 }: BuildTimelineInput): TimelineItem[] {
+  const { MINT_COPY, MELT_COPY, SEND_COPY, PAYMENT_REQUEST_COPY, RECEIVE_COPY } =
+    createPaymentCopyGroups(paymentCopy);
+
   switch (historyEntry.type) {
     case 'mint': {
       const mintState = getMintTimelineState(historyEntry);
       const isOnchainMint = !!getOnchainMintAddress(historyEntry);
-      const waitingInfo = isOnchainMint
-        ? 'Pay the address to receive funds'
-        : MINT_COPY.UNPAID.info;
+      const waitingInfo = isOnchainMint ? MINT_COPY.UNPAID.onchainInfo : MINT_COPY.UNPAID.info;
       const isExpired =
         !isOnchainMint &&
         mintState === MintQuoteState.UNPAID &&
@@ -565,8 +568,10 @@ export function getCardLabel(
   historyEntry: HistoryEntry,
   timeline: TimelineItem[],
   tokenCreated?: boolean,
-  nostrSent?: boolean
+  nostrSent?: boolean,
+  paymentCopy: PaymentCopyResolver = DEFAULT_PAYMENT_COPY
 ): string {
+  const text = paymentCopy.text;
   const isFailed = timeline.some(
     (item) =>
       item.stepType === 'expired' ||
@@ -585,56 +590,58 @@ export function getCardLabel(
           (item.stepType === 'next-pending' || item.stepType === 'current')
       );
       if (isFailed) {
-        status = 'Failed';
+        status = text('timeline.status.failed');
       } else if (mintState === MintQuoteState.ISSUED) {
-        status = 'Complete';
+        status = text('timeline.status.complete');
       } else if (mintState === MintQuoteState.PAID || hasObservedPayment) {
-        status = 'In Progress';
+        status = text('timeline.status.inProgress');
       } else {
-        status = 'Awaiting Payment';
+        status = text('timeline.status.awaitingPayment');
       }
       // Intentional collapse with the 'receive' branch: a Lightning mint quote and a
       // token-redemption receive both surface to the user as 'incoming payment'.
-      return `Receive • ${status}`;
+      return `${text('timeline.flow.receive')} • ${status}`;
     }
     case 'melt': {
       if (isFailed) {
-        status = 'Failed';
+        status = text('timeline.status.failed');
       } else if (historyEntry.state === MeltQuoteState.PAID) {
-        status = 'Complete';
+        status = text('timeline.status.complete');
       } else if (historyEntry.state === MeltQuoteState.PENDING) {
-        status = 'In Progress';
+        status = text('timeline.status.inProgress');
       } else {
-        status = 'Ready';
+        status = text('timeline.status.ready');
       }
-      return `Send • ${status}`;
+      return `${text('timeline.flow.send')} • ${status}`;
     }
     case 'send': {
       const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
-      const label = isPaymentRequestMode ? 'Payment' : 'Send';
+      const label = isPaymentRequestMode
+        ? text('timeline.flow.payment')
+        : text('timeline.flow.send');
       if (historyEntry.state === 'rolledBack') {
-        status = 'Cancelled';
+        status = text('timeline.status.cancelled');
       } else if (historyEntry.state === 'finalized') {
-        status = 'Complete';
+        status = text('timeline.status.complete');
       } else if (historyEntry.state === 'pending') {
-        status = 'In Progress';
+        status = text('timeline.status.inProgress');
       } else {
-        status = 'Ready';
+        status = text('timeline.status.ready');
       }
       return `${label} • ${status}`;
     }
     case 'receive': {
       if (historyEntry.state === 'finalized') {
-        status = 'Complete';
+        status = text('timeline.status.complete');
       } else if (historyEntry.state === 'rolledBack') {
-        status = 'Already Spent';
+        status = text('timeline.status.alreadySpent');
       } else {
-        status = 'Pending';
+        status = text('timeline.status.pending');
       }
-      return `Receive • ${status}`;
+      return `${text('timeline.flow.receive')} • ${status}`;
     }
     default:
-      return 'Transaction';
+      return text('timeline.flow.transaction');
   }
 }
 

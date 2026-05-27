@@ -12,6 +12,7 @@ import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { Log } from '@/shared/lib/logger';
 
 interface HistoryEntryRefreshProps {
@@ -22,18 +23,20 @@ interface HistoryEntryRefreshProps {
 
 export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: HistoryEntryRefreshProps) {
   const foreground = useThemeColor('foreground');
+  const paymentCopy = usePaymentCopyResolver();
   const loading = !mintInfo;
+  const text = paymentCopy.text;
 
   const statusLabel =
     historyEntry.type === 'send'
       ? historyEntry.state === 'finalized'
-        ? 'Sent with'
-        : 'Sending with'
+        ? text('history.refresh.sentWith')
+        : text('history.refresh.sendingWith')
       : historyEntry.type === 'receive'
         ? historyEntry.state === 'finalized'
-          ? 'Received with'
-          : 'Receiving with'
-        : 'Processing with';
+          ? text('history.refresh.receivedWith')
+          : text('history.refresh.receivingWith')
+        : text('history.refresh.processingWith');
 
   const row = (
     <ListGroup.Item disabled>
@@ -43,7 +46,7 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
           size={40}
           name={mintInfo?.name}
           isLoading={loading}
-          alt={`${mintInfo?.name || 'Mint'} icon`}
+          alt={`${mintInfo?.name || text('history.refresh.mintAlt')} icon`}
         />
       </ListGroup.ItemPrefix>
       <ListGroup.ItemContent>
