@@ -152,6 +152,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           await sendDirectMessageToRelays({ senderPrivateKey: pk, nprofile, message });
         },
         getOffline,
+        enableEcashSendMemo: true,
         getLocale: () => useSettingsStore.getState().language || 'en',
         getBtcPrice,
         getDisplayCurrency,

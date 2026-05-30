@@ -8,6 +8,7 @@ import {
   createSovranHandlers,
   createSovranNotifications,
 } from '@/features/send/lib/sovranPaymentConfig';
+import { sendMemoPopup } from '@/shared/lib/popup';
 import { getEncodedToken } from '@cashu/cashu-ts';
 import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -69,6 +70,7 @@ jest.mock('@/shared/lib/popup', () => ({
   paymentOptionsPopup: jest.fn(),
   paymentStatusPopup: jest.fn(),
   proofSelectorPopup: jest.fn(),
+  sendMemoPopup: jest.fn(),
   staticPopup: jest.fn(),
   paramPopup: jest.fn(),
 }));
@@ -127,6 +129,7 @@ describe('createSovranHandlers profile routing', () => {
     mockNearPayActive = null;
     (getEncodedToken as jest.Mock).mockReset();
     (sendBLEPrivateMessageChunks as jest.Mock).mockReset();
+    (sendMemoPopup as jest.Mock).mockReset();
   });
 
   it('opens scanned npubs in the modal profile flow', () => {
@@ -209,6 +212,34 @@ describe('createSovranHandlers profile routing', () => {
         amountEntry: expect.any(String),
       },
     });
+  });
+
+  it('opens the ecash memo sheet without submitting the memo on display', () => {
+    const submitSendMemo = jest.fn();
+    const machine = {
+      getContext: jest.fn(() => ({})),
+      submitSendMemo,
+    } as unknown as PaymentMachine;
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+    });
+
+    void handlers.enterSendMemo?.({
+      mintUrl: 'https://mint.example',
+      amount: 21,
+      unit: 'sat',
+      memo: 'coffee',
+    });
+
+    expect(sendMemoPopup).toHaveBeenCalledWith({
+      mintUrl: 'https://mint.example',
+      amount: 21,
+      unit: 'sat',
+      memo: 'coffee',
+      machine,
+    });
+    expect(submitSendMemo).not.toHaveBeenCalled();
   });
 
   it('delivers an active Near Pay token over BitChat before showing the send token screen', async () => {

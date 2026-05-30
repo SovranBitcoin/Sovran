@@ -16,6 +16,7 @@ interface GradientCardProps {
   /** Style applied to the content layer above the gradient. */
   contentStyle?: StyleProp<ViewStyle>;
   variant?: GlowVariant;
+  testID?: string;
 }
 
 /**
@@ -24,13 +25,13 @@ interface GradientCardProps {
  * details list, etc.) so quote/token screens share the wallet's signature
  * look instead of rendering a flat `surface-secondary` block.
  */
-export function GradientCard({ children, style, contentStyle, variant }: GradientCardProps) {
+export function GradientCard({ children, style, contentStyle, variant, testID }: GradientCardProps) {
   const muted = useThemeColor('muted');
   const borderColor = opacity(muted, 0.3);
 
   return (
     <Log name="GradientCard">
-      <RNView style={[styles.card, { borderColor }, style]}>
+      <RNView testID={testID} style={[styles.card, { borderColor }, style]}>
         <BlurCardFrame accentColor={muted} variant={variant}>
           <RNView style={[styles.content, contentStyle]}>{children}</RNView>
         </BlurCardFrame>

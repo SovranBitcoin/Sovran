@@ -11,4 +11,5 @@ export const SHEET_LAYOUT_CONFIG: Record<CustomSheetId, SheetLayoutConfig> = {
   'payment-options': { mode: 'contentHeight' },
   'payment-fallback': { mode: 'contentHeight' },
   'proof-selector': { mode: 'contentHeight' },
+  'send-memo': { mode: 'contentHeight' },
 };

@@ -5,7 +5,7 @@
  *
  * @description
  * **Comprehensive button component with advanced visual effects and multiple modes**
- * - Multiple variants (primary, secondary, dangerous)
+ * - Multiple variants (primary, secondary, dangerous, underline)
  * - Ripple effect animations with customizable configuration
  * - Blur effects for enhanced visual appeal
  * - Icon-only, text-only, and combined modes
@@ -15,7 +15,7 @@
  * **Features:**
  * - Ripple effect animations with position tracking
  * - Blur effects with customizable intensity and tint
- * - Three button variants with theme-aware colors
+ * - Button variants with theme-aware colors
  * - Loading states with animated spinners
  * - Icon and text content support
  * - Accessibility and testing support
@@ -218,13 +218,14 @@ const useRipple = ({ enabled, config }: UseRippleOptions) => {
 /**
  * Button variant types
  *
- * @typedef {'primary' | 'secondary' | 'dangerous'} ButtonVariant
+ * @typedef {'primary' | 'secondary' | 'dangerous' | 'underline'} ButtonVariant
  * @description
  * - 'primary': Light background with dark text (high contrast)
  * - 'secondary': Dark background with light text (medium contrast)
  * - 'dangerous': Red background with light text (warning/danger actions)
+ * - 'underline': Text action with no background and an underline
  */
-type ButtonVariant = 'primary' | 'secondary' | 'dangerous';
+type ButtonVariant = 'primary' | 'secondary' | 'dangerous' | 'underline';
 
 /**
  * Button size variant.
@@ -427,7 +428,7 @@ export const Button = ({
   const blurConfig = typeof blur === 'object' ? blur : {};
   const { intensity = 75, tint = 'dark' } = blurConfig;
 
-  const shouldUseBlur = blur !== false;
+  const shouldUseBlur = variant === 'underline' ? false : blur !== false;
 
   /**
    * Gets button styles based on variant and effect configuration
@@ -485,6 +486,13 @@ export const Button = ({
     }
 
     switch (variant) {
+      case 'underline':
+        return {
+          ...base,
+          backgroundColor: 'transparent',
+          borderWidth: 0,
+          overflow: 'visible' as const,
+        };
       case 'primary':
         return {
           ...base,
@@ -535,8 +543,9 @@ export const Button = ({
         return background;
       case 'secondary':
       case 'dangerous':
+      case 'underline':
       default:
-        return foreground;
+        return variant === 'underline' ? foregroundSecondary : foreground;
     }
   };
 
@@ -568,6 +577,9 @@ export const Button = ({
             style={{
               color: getTextColor(),
               opacity: loading ? 0 : 1,
+              ...(variant === 'underline'
+                ? { textDecorationLine: 'underline' as const }
+                : undefined),
             }}>
             {layoutText}
           </Text>
@@ -679,6 +691,9 @@ export const Button = ({
                     color: getTextColor(),
                     fontFamily: 'OxygenBold',
                     textAlign: 'center',
+                    ...(variant === 'underline'
+                      ? { textDecorationLine: 'underline' as const }
+                      : undefined),
                   }}
                   size={sz.fontSize}>
                   {layoutText}

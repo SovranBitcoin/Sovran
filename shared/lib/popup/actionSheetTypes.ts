@@ -25,6 +25,10 @@ type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
   machine: PaymentMachine;
 };
 
+type SendMemoPayload = StepDataMap['enterSendMemo'] & {
+  machine: PaymentMachine;
+};
+
 /**
  * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
  * should stay internal to that sheet.
@@ -80,6 +84,12 @@ type BaseActionSheetPayloads = {
    * as `payment-options`.
    */
   'proof-selector': ProofSelectorPayload;
+  /**
+   * Optional memo before creating an ecash token. This is reached from the
+   * send-flow amount route, which is itself an iOS route modal, so it needs
+   * the same FullWindowOverlay-backed lane as the other send-flow sheets.
+   */
+  'send-memo': SendMemoPayload;
 };
 
 /** Payload types for custom action sheets. */

@@ -9,6 +9,7 @@ export { copyPopup } from './copy';
 export { profileSwitcherPopup } from './actionSheets';
 export { paymentOptionsPopup, paymentFallbackPopup } from './paymentOptionsSheet';
 export { proofSelectorPopup } from './proofSelectorSheet';
+export { sendMemoPopup } from './sendMemoSheet';
 export { emojiPickerPopup } from './emojiPicker';
 export { modelPickerPopup } from './modelPicker';
 export type { ProfileSwitcherAction } from '../actionSheetTypes';

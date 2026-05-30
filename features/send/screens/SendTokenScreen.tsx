@@ -34,11 +34,14 @@ import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
+import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { Text } from '@/shared/ui/primitives/Text';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
@@ -48,6 +51,12 @@ import {
   useSendReachabilityStore,
 } from '@/shared/stores/profile/sendReachabilityStore';
 import { spacing } from '@/shared/styles/tokens';
+import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
+import {
+  extractMemoNprofileReferences,
+  formatMemoForDisplay,
+} from '@/shared/lib/nostr/memoMentions';
+import { resolveIdentityName } from '@/shared/lib/identity';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -70,6 +79,7 @@ export function SendTokenScreen({
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
   const { isOffline } = useOfflineStatus();
+  const muted = useThemeColor('muted');
   const transactionId = typeof entry?.id === 'string' ? entry.id : undefined;
   const reachability = useSendReachability(transactionId);
 
@@ -158,7 +168,6 @@ export function SendTokenScreen({
     // animation doesn't race with the menu's trigger-position measure call.
     setTimeout(() => copyMenuTriggerRef.current?.open(), 0);
   }, []);
-
   if (error) {
     log.warn('send.token.error', { error });
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
@@ -181,6 +190,10 @@ export function SendTokenScreen({
   });
   const isComplete = isSendTokenComplete(entry);
   const isCancelled = isSendTokenCancelled(entry);
+  const tokenMemo =
+    typeof entry.token?.memo === 'string' && entry.token.memo.trim().length > 0
+      ? entry.token.memo.trim()
+      : null;
 
   const bottomButtons = (
     <BottomButtons>
@@ -321,6 +334,18 @@ export function SendTokenScreen({
             />
           )}
 
+          {tokenMemo ? (
+            <GradientCard
+              testID="send-token-memo"
+              style={styles.memoCard}
+              contentStyle={styles.memoContent}>
+              <Text size={12} weight="bold" style={[styles.memoLabel, { color: muted }]}>
+                Memo
+              </Text>
+              <SendTokenMemoText memo={tokenMemo} />
+            </GradientCard>
+          ) : null}
+
           {isComplete && <TransactionLocationSection transactionId={entry.id} />}
 
           <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
@@ -358,8 +383,44 @@ export function SendTokenScreen({
   );
 }
 
+function SendTokenMemoText({ memo }: { memo: string }): React.ReactElement {
+  const references = useMemo(() => extractMemoNprofileReferences(memo), [memo]);
+  const pubkeys = useMemo(
+    () => [...new Set(references.map((reference) => reference.pubkey))],
+    [references]
+  );
+  const { metadata } = useNostrProfileMetadataMany(pubkeys);
+  const displayMemo = useMemo(
+    () =>
+      formatMemoForDisplay(memo, (pubkey) =>
+        resolveIdentityName({
+          pubkey,
+          nostrProfile: metadata.get(pubkey),
+        })
+      ),
+    [memo, metadata]
+  );
+
+  return (
+    <Text size={15} selectable>
+      {displayMemo}
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
   reachabilityWarning: {
     marginHorizontal: spacing.lg,
+  },
+  memoCard: {
+    marginHorizontal: spacing.lg,
+  },
+  memoContent: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  memoLabel: {
+    textTransform: 'uppercase',
   },
 });

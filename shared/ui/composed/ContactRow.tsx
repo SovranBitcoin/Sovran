@@ -55,6 +55,7 @@ interface NostrProfileLike {
   display_name?: string;
   displayName?: string;
   picture?: string;
+  image?: string;
   nip05?: string;
   nip05Valid?: boolean;
   about?: string;
@@ -398,6 +399,7 @@ function derivePicture(ids: Identity[]): string | undefined {
   return (
     find(ids, 'mint')?.iconUrl ??
     find(ids, 'nostr')?.profile?.picture ??
+    find(ids, 'nostr')?.profile?.image ??
     find(ids, 'self')?.avatarUrl ??
     find(ids, 'ble')?.picture
   );

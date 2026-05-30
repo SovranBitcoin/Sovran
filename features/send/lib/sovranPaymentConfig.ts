@@ -63,6 +63,7 @@ import {
   paymentOptionsPopup,
   paymentStatusPopup,
   proofSelectorPopup,
+  sendMemoPopup,
   staticPopup,
   paramPopup,
 } from '@/shared/lib/popup';
@@ -1160,6 +1161,10 @@ export function createSovranHandlers({
 
     chooseProofs: (stepData) => {
       proofSelectorPopup({ ...stepData, machine });
+    },
+
+    enterSendMemo: (stepData) => {
+      sendMemoPopup({ ...stepData, machine });
     },
 
     dismiss: () => {
