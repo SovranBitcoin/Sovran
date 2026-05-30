@@ -107,13 +107,23 @@ function buildSyntheticSendEntry(operation: SendOperationLike, token: CoreToken)
   };
 }
 
+function normalizeMemo(memo: string | undefined): string | undefined {
+  const trimmed = memo?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function applyTokenMemo(token: CoreToken, memo: string | undefined): CoreToken {
+  const normalized = normalizeMemo(memo);
+  return normalized ? { ...token, memo: normalized } : token;
+}
+
 function ensureSendEntryToken(historyEntry: string, token: CoreToken): string {
   // The DB row may not have the token yet due to a race between execute
   // resolving and HistoryService persisting; inject it before returning so
   // the caller never sees a tokenless send entry.
   const parsed = parseHistoryEntryOnce(historyEntry);
   if (!parsed || parsed.type !== 'send') return historyEntry;
-  if (parsed.token) return historyEntry;
+  if (parsed.token) return JSON.stringify({ ...parsed, token: { ...parsed.token, ...token } });
   return JSON.stringify({ ...parsed, token });
 }
 
@@ -294,7 +304,7 @@ export function createDefaultOperations(
   };
 
   return {
-    executeSend: async (mintUrl, amount) => {
+    executeSend: async (mintUrl, amount, memo) => {
       const mgr = requireManager();
       // send.execute is atomic — there is no rollback to exercise — so the
       // mock-fail gate runs before prepare to leave no reservation behind.
@@ -305,6 +315,7 @@ export function createDefaultOperations(
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
       logger.info('operations.executeSend.execute', { operationId: prepared.id });
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      const tokenWithMemo = applyTokenMemo(token, memo);
       logger.info('operations.executeSend.complete', {
         operationId: operation.id,
         state: operation.state,
@@ -314,14 +325,14 @@ export function createDefaultOperations(
       // constructing from the operation result to avoid a race.
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
       if (historyEntry) {
-        return { historyEntry: ensureSendEntryToken(historyEntry, token) };
+        return { historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo) };
       }
 
       logger.warn('operations.executeSend.historyMissing', { operationId: operation.id });
-      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, token)) };
+      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, tokenWithMemo)) };
     },
 
-    executeOfflineSend: async (mintUrl, amount) => {
+    executeOfflineSend: async (mintUrl, amount, memo) => {
       const mgr = requireManager();
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
 
@@ -336,14 +347,15 @@ export function createDefaultOperations(
       }
 
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      const tokenWithMemo = applyTokenMemo(token, memo);
 
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
       if (historyEntry) {
-        return { historyEntry: ensureSendEntryToken(historyEntry, token) };
+        return { historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo) };
       }
 
       logger.warn('operations.executeOfflineSend.historyMissing', { operationId: operation.id });
-      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, token)) };
+      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, tokenWithMemo)) };
     },
 
     executeMintQuote: async (mintUrl, amount, _unit, method = 'bolt11') => {

@@ -188,7 +188,11 @@ function checkProofComposition(
 // Terminal step builders
 // ---------------------------------------------------------------------------
 
-function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
+function terminalStep(
+  destination: Destination,
+  ctx: FlowContext,
+  enableEcashSendMemo: boolean
+): StepResult {
   logger.info('resolveNext.terminal', {
     destination,
     mintUrl: ctx.mintUrl,
@@ -227,9 +231,20 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
         },
       };
     case 'sendEcash':
+      if (enableEcashSendMemo && !ctx.sendMemoHandled) {
+        return {
+          step: 'enterSendMemo',
+          data: {
+            mintUrl: mintUrl!,
+            amount: amount!,
+            unit,
+            ...(ctx.memo ? { memo: ctx.memo } : {}),
+          },
+        };
+      }
       return {
         step: 'confirmSend',
-        data: { mintUrl: mintUrl!, amount: amount! },
+        data: { mintUrl: mintUrl!, amount: amount!, ...(ctx.memo ? { memo: ctx.memo } : {}) },
       };
   }
 }
@@ -250,7 +265,8 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
 export function resolveNext(
   intent: ResolvedIntent,
   ctx: FlowContext,
-  walletCtx: WalletContext
+  walletCtx: WalletContext,
+  enableEcashSendMemo = false
 ): StepResult {
   // --- Terminal intents ---
   if (intent.type === 'receiveToken') {
@@ -354,7 +370,15 @@ export function resolveNext(
       mint &&
       isMintValidForFlow(mint, walletCtx, amount, supportedMintUrls, destination, ctx)
     ) {
-      return resolveWithMint(mint, destination, amount, unit, ctx, walletCtx);
+      return resolveWithMint(
+        mint,
+        destination,
+        amount,
+        unit,
+        ctx,
+        walletCtx,
+        enableEcashSendMemo
+      );
     }
     if (
       !requirement &&
@@ -366,7 +390,8 @@ export function resolveNext(
         amount,
         unit,
         ctx,
-        walletCtx
+        walletCtx,
+        enableEcashSendMemo
       );
     }
     if (requirement && (!availableMethodCandidates || availableMethodCandidates.length === 0)) {
@@ -433,7 +458,15 @@ export function resolveNext(
 
     switch (selection.type) {
       case 'selected':
-        return resolveWithMint(selection.mintUrl, destination, amount, unit, ctx, walletCtx);
+        return resolveWithMint(
+          selection.mintUrl,
+          destination,
+          amount,
+          unit,
+          ctx,
+          walletCtx,
+          enableEcashSendMemo
+        );
       case 'selectionNeeded':
         return {
           step: 'selectMint',
@@ -490,7 +523,7 @@ export function resolveNext(
   }
 
   // 4. Terminal step
-  return { ...terminalStep(destination, ctx), contextPatch: { destination } };
+  return { ...terminalStep(destination, ctx, enableEcashSendMemo), contextPatch: { destination } };
 }
 
 /** Internal helper: set mintUrl in context patch and continue to proofs/terminal. */
@@ -500,7 +533,8 @@ function resolveWithMint(
   amount: number,
   unit: string,
   ctx: FlowContext,
-  walletCtx: WalletContext
+  walletCtx: WalletContext,
+  enableEcashSendMemo: boolean
 ): StepResult {
   const merged = { ...ctx, mintUrl, destination };
 
@@ -510,7 +544,7 @@ function resolveWithMint(
   }
 
   return {
-    ...terminalStep(destination, merged),
+    ...terminalStep(destination, merged, enableEcashSendMemo),
     contextPatch: { mintUrl, destination },
   };
 }

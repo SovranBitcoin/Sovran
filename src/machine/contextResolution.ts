@@ -296,6 +296,7 @@ export function requestMintSelector(
 export function resolveFromContext(
   ctx: FlowContext,
   walletCtx: WalletContext,
+  enableEcashSendMemo = false,
 ): ContextResolutionResult {
   const destination = ctx.destination ?? 'sendEcash';
   const unit = ctx.unit;
@@ -458,9 +459,21 @@ export function resolveFromContext(
       },
     };
   }
+  if (destination === 'sendEcash' && enableEcashSendMemo && !ctx.sendMemoHandled) {
+    return {
+      step: 'enterSendMemo',
+      context: { ...ctx, mintUrl: effectiveMintUrl, destination },
+      data: {
+        mintUrl: effectiveMintUrl,
+        amount,
+        unit,
+        ...(ctx.memo ? { memo: ctx.memo } : {}),
+      },
+    };
+  }
   return {
     step: 'confirmSend',
     context: { ...ctx, mintUrl: effectiveMintUrl, destination },
-    data: { mintUrl: effectiveMintUrl, amount },
+    data: { mintUrl: effectiveMintUrl, amount, ...(ctx.memo ? { memo: ctx.memo } : {}) },
   };
 }

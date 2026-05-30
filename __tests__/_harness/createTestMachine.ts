@@ -92,6 +92,7 @@ const ALL_STEPS: FlowStep[] = [
   'enterAmount',
   'selectMint',
   'chooseProofs',
+  'enterSendMemo',
   'receiveToken',
   'confirmSend',
   'sendComplete',
@@ -182,6 +183,7 @@ export function createTestMachine(config?: TestMachineConfig): TestMachine {
     getUnit: () => config?.unit ?? 'sat',
     getOffline: () => config?.offline ?? false,
     getLocale: () => config?.locale ?? 'en',
+    enableEcashSendMemo: config?.enableEcashSendMemo ?? false,
     // Mock operations with recording — see mockOperations.ts
     operations: createMockOperations(config?.operations, operationCalls),
     notifications: createRecordingNotifications(notificationCalls),
@@ -301,6 +303,9 @@ async function executeAction(machine: PaymentMachine, action: FlowAction): Promi
     case 'chooseProofs':
       await machine.chooseProofs(action.amount);
       break;
+    case 'submitSendMemo':
+      await machine.submitSendMemo(action.memo);
+      break;
     case 'requestMintSelector':
       await machine.requestMintSelector({ scope: action.scope });
       break;
@@ -349,6 +354,7 @@ export async function runScenario(
   const tm = createTestMachine({
     wallet: scenario.wallet,
     offline: scenario.offline,
+    enableEcashSendMemo: scenario.enableEcashSendMemo,
     ...configOverrides,
   });
 

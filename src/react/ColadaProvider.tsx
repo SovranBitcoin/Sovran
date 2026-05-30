@@ -153,6 +153,7 @@ export interface ColadaProviderProps {
   /** Optional app bridge for `useScreenActions` enrichment/subscriptions. */
   screenActionsBridge?: ScreenActionsBridge;
   getOffline?: () => boolean;
+  enableEcashSendMemo?: boolean;
   getBtcPrice?: () => number;
   getDisplayCurrency?: () => { code: string; symbol: string } | null;
   getLocale?: () => string;
@@ -259,6 +260,7 @@ export function ColadaProvider({
   actions,
   screenActionsBridge,
   getOffline: getOfflineProp,
+  enableEcashSendMemo: enableEcashSendMemoProp,
   getBtcPrice: getBtcPriceProp,
   getDisplayCurrency: getDisplayCurrencyProp,
   getLocale: getLocaleProp,
@@ -332,6 +334,7 @@ export function ColadaProvider({
   const ic = instance?.config;
   const getLocale = getLocaleProp ?? ic?.getLocale;
   const getOffline = getOfflineProp ?? ic?.getOffline;
+  const enableEcashSendMemo = enableEcashSendMemoProp ?? ic?.enableEcashSendMemo ?? false;
   const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
   const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
   const writeClipboard = clipboardAdapter?.writeText;
@@ -421,6 +424,7 @@ export function ColadaProvider({
           },
       getUnit: () => unitRef.current,
       getOffline: () => getOfflineRef.current?.() ?? false,
+      enableEcashSendMemo,
       getLocale: () => getLocaleRef.current?.() ?? 'en',
       operations: operations as MachineOperations | undefined,
       notifications,

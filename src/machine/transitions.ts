@@ -167,7 +167,8 @@ function handleOptionChosen(
 function handleAmountEntered(
   event: FlowEvent & { type: 'AMOUNT_ENTERED' },
   currentCtx: FlowContext,
-  walletCtx: WalletContext
+  walletCtx: WalletContext,
+  enableEcashSendMemo: boolean
 ): TransitionResult {
   logger.info('transitions.amountEntered', {
     amount: event.amount,
@@ -188,6 +189,8 @@ function handleAmountEntered(
         recipientPubkey: event.recipientPubkey,
         recipientProfile: event.recipientProfile,
         amountEntryDisplay: event.amountEntryDisplay,
+        memo: undefined,
+        sendMemoHandled: false,
       }
     : {
         ...currentCtx,
@@ -201,21 +204,24 @@ function handleAmountEntered(
         recipientPubkey: event.recipientPubkey ?? currentCtx.recipientPubkey,
         recipientProfile: event.recipientProfile ?? currentCtx.recipientProfile,
         amountEntryDisplay: event.amountEntryDisplay ?? currentCtx.amountEntryDisplay,
+        memo: undefined,
+        sendMemoHandled: false,
       };
 
   if (!ctx.intent) {
     const destination = ctx.destination ?? 'sendEcash';
     ctx.destination = destination;
-    return resolveFromContext(ctx, walletCtx);
+    return resolveFromContext(ctx, walletCtx, enableEcashSendMemo);
   }
 
-  return apply(resolveNext(ctx.intent, ctx, walletCtx), ctx);
+  return apply(resolveNext(ctx.intent, ctx, walletCtx, enableEcashSendMemo), ctx);
 }
 
 function handleMintSelected(
   event: FlowEvent & { type: 'MINT_SELECTED' },
   currentCtx: FlowContext,
-  walletCtx: WalletContext
+  walletCtx: WalletContext,
+  enableEcashSendMemo: boolean
 ): TransitionResult {
   logger.info('transitions.mintSelected', {
     mintUrl: event.mintUrl,
@@ -251,16 +257,17 @@ function handleMintSelected(
 
   if (!ctx.intent) {
     ctx.destination = ctx.destination ?? 'sendEcash';
-    return resolveFromContext(ctx, walletCtx);
+    return resolveFromContext(ctx, walletCtx, enableEcashSendMemo);
   }
 
-  return apply(resolveNext(ctx.intent, ctx, walletCtx), ctx);
+  return apply(resolveNext(ctx.intent, ctx, walletCtx, enableEcashSendMemo), ctx);
 }
 
 function handleProofsChosen(
   event: FlowEvent & { type: 'PROOFS_CHOSEN' },
   currentCtx: FlowContext,
-  walletCtx: WalletContext
+  walletCtx: WalletContext,
+  enableEcashSendMemo: boolean
 ): TransitionResult {
   const destination = currentCtx.destination ?? 'sendEcash';
   const proofAmounts = currentCtx.mintUrl ? (walletCtx.proofAmounts[currentCtx.mintUrl] ?? []) : [];
@@ -307,10 +314,53 @@ function handleProofsChosen(
     };
   }
 
+  if (destination === 'sendEcash' && enableEcashSendMemo && !ctx.sendMemoHandled) {
+    return {
+      step: 'enterSendMemo',
+      context: ctx,
+      data: { mintUrl, amount: event.amount, unit: ctx.unit, memo: ctx.memo },
+    };
+  }
+
   return {
     step: 'confirmSend',
     context: ctx,
-    data: { mintUrl, amount: event.amount },
+    data: { mintUrl, amount: event.amount, memo: ctx.memo },
+  };
+}
+
+function handleSendMemoSubmitted(
+  event: FlowEvent & { type: 'SEND_MEMO_SUBMITTED' },
+  currentCtx: FlowContext
+): TransitionResult {
+  const mintUrl = currentCtx.mintUrl;
+  const amount = currentCtx.amount;
+  if (!mintUrl || typeof amount !== 'number' || amount <= 0) {
+    return {
+      step: 'error',
+      context: currentCtx,
+      data: {
+        code: 'SEND_FAILED',
+        message: 'Cannot create token without a mint and amount',
+      },
+    };
+  }
+
+  const trimmed = typeof event.memo === 'string' ? event.memo.trim() : '';
+  const ctx: FlowContext = {
+    ...currentCtx,
+    memo: trimmed.length > 0 ? trimmed : undefined,
+    sendMemoHandled: true,
+  };
+
+  return {
+    step: 'confirmSend',
+    context: ctx,
+    data: {
+      mintUrl,
+      amount,
+      ...(ctx.memo ? { memo: ctx.memo } : {}),
+    },
   };
 }
 
@@ -328,7 +378,8 @@ export function transition(
   /** Current offline status from the provider. Stamped onto every result
    *  context so that proof-composition checks always see the real-time
    *  value — even when a handler creates a fresh FlowContext. */
-  offline?: boolean
+  offline?: boolean,
+  enableEcashSendMemo = false
 ): TransitionResult {
   function stamp(result: TransitionResult): TransitionResult {
     if (offline != null) result.context.offline = offline;
@@ -343,6 +394,8 @@ export function transition(
       return stamp({ step: 'idle', context: { unit }, data: {} as any });
     case 'REQUEST_MINT_SELECTOR':
       return stamp(requestMintSelector(event, currentCtx, walletCtx));
+    case 'SEND_MEMO_SUBMITTED':
+      return stamp(handleSendMemoSubmitted(event, currentCtx));
     case 'START_SEND_ECASH':
       logger.info('transitions.startSendEcash', {
         unit,
@@ -392,11 +445,11 @@ export function transition(
     case 'OPTION_CHOSEN':
       return stamp(handleOptionChosen(event, currentCtx, detectors, walletCtx));
     case 'AMOUNT_ENTERED':
-      return stamp(handleAmountEntered(event, currentCtx, walletCtx));
+      return stamp(handleAmountEntered(event, currentCtx, walletCtx, enableEcashSendMemo));
     case 'MINT_SELECTED':
-      return stamp(handleMintSelected(event, currentCtx, walletCtx));
+      return stamp(handleMintSelected(event, currentCtx, walletCtx, enableEcashSendMemo));
     case 'PROOFS_CHOSEN':
-      return stamp(handleProofsChosen(event, currentCtx, walletCtx));
+      return stamp(handleProofsChosen(event, currentCtx, walletCtx, enableEcashSendMemo));
   }
 
   // Unhandled events (e.g. CONFIRM_MELT, CONFIRM_PAYMENT_REQUEST that

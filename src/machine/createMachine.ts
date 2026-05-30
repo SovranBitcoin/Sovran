@@ -88,10 +88,14 @@ function deriveExecutionState(
       };
 
     case 'chooseProofs':
+    case 'enterSendMemo':
       return {
         status: 'needsInput',
-        code: 'PROOF_SELECTION_REQUIRED',
-        message: t('PROOF_SELECTION_REQUIRED', locale),
+        code: step === 'chooseProofs' ? 'PROOF_SELECTION_REQUIRED' : 'SEND_MEMO_REQUIRED',
+        message:
+          step === 'chooseProofs'
+            ? t('PROOF_SELECTION_REQUIRED', locale)
+            : t('SEND_MEMO_REQUIRED', locale),
         isExecutable: false,
         isExecuting: false,
         step,
@@ -151,6 +155,7 @@ const INPUT_STEPS = new Set<FlowStep>([
   'chooseOption',
   'chooseFallbackOption',
   'chooseProofs',
+  'enterSendMemo',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -164,6 +169,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     getContext,
     getUnit,
     getOffline,
+    enableEcashSendMemo = false,
     getLocale,
     unit: configUnit = 'sat',
     operations,
@@ -760,7 +766,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     // post-transition resolver only fires when something actually changed.
     const prevMeltTarget = flowCtx.meltTarget;
     const prevRecipientPubkey = flowCtx.recipientPubkey;
-    const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit, offline);
+    const result = transition(
+      step,
+      flowCtx,
+      eventForTransition,
+      detectors,
+      walletCtx,
+      unit,
+      offline,
+      enableEcashSendMemo
+    );
 
     flowCtx = result.context;
     setStep(result.step, result.data);
@@ -842,7 +857,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           if (best) {
             const walletCtxInner = getContext();
             const unitInner = getUnit?.() ?? configUnit;
-            const r = transition(step, flowCtx, { type: 'OPTION_CHOSEN', option: best.option }, detectors, walletCtxInner, unitInner, offline);
+            const r = transition(
+              step,
+              flowCtx,
+              { type: 'OPTION_CHOSEN', option: best.option },
+              detectors,
+              walletCtxInner,
+              unitInner,
+              offline,
+              enableEcashSendMemo
+            );
             flowCtx = r.context;
             flowCtx.source = 'nfc';
             setStep(r.step, r.data);
@@ -857,7 +881,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             void notifications?.onNfcPaymentProgress?.({ phase: 'selecting' });
             const walletCtxInner = getContext();
             const unitInner = getUnit?.() ?? configUnit;
-            const r = transition(step, flowCtx, { type: 'MINT_SELECTED', mintUrl: best.mintUrl }, detectors, walletCtxInner, unitInner, offline);
+            const r = transition(
+              step,
+              flowCtx,
+              { type: 'MINT_SELECTED', mintUrl: best.mintUrl },
+              detectors,
+              walletCtxInner,
+              unitInner,
+              offline,
+              enableEcashSendMemo
+            );
             flowCtx = r.context;
             flowCtx.source = 'nfc';
             setStep(r.step, r.data);
@@ -975,7 +1008,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         notify();
         try {
           if (shouldCreateLocalTokenFirst) {
-            const result = await operations.executeOfflineSend!(data.mintUrl, data.amount);
+            const result = data.memo
+              ? await operations.executeOfflineSend!(data.mintUrl, data.amount, data.memo)
+              : await operations.executeOfflineSend!(data.mintUrl, data.amount);
             if (isStaleGeneration(sendGeneration, 'executeOfflineSend.localFirst')) return;
             logger.info('machine.send.localFirst.success');
             setStep('sendComplete', {
@@ -1003,7 +1038,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             error.name = 'MintFetchError';
             throw error;
           } else {
-            const result = await operations.executeSend(data.mintUrl, data.amount);
+            const result = data.memo
+              ? await operations.executeSend(data.mintUrl, data.amount, data.memo)
+              : await operations.executeSend(data.mintUrl, data.amount);
             if (isStaleGeneration(sendGeneration, 'executeSend')) return;
             logger.info('machine.send.success');
             setStep('sendComplete', {
@@ -1044,7 +1081,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             const built = buildProofSuggestions(proofAmounts, data.amount);
             if (built.exactMatch) {
               try {
-                const result = await operations.executeOfflineSend(data.mintUrl, data.amount);
+                const result = data.memo
+                  ? await operations.executeOfflineSend(data.mintUrl, data.amount, data.memo)
+                  : await operations.executeOfflineSend(data.mintUrl, data.amount);
                 if (isStaleGeneration(sendGeneration, 'executeOfflineSend')) return;
                 logger.info('machine.send.offlineFallback.success');
                 setStep('sendComplete', {
@@ -1409,6 +1448,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   const chooseProofs = (amount: number) => send({ type: 'PROOFS_CHOSEN', amount });
 
+  const submitSendMemo = (memo?: string) => send({ type: 'SEND_MEMO_SUBMITTED', memo });
+
   const startSendEcash = (opts?: {
     reset?: boolean;
     meltTarget?: string;
@@ -1467,6 +1508,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     enterAmount,
     chooseOption,
     chooseProofs,
+    submitSendMemo,
     changeMint,
     requestMintSelector,
     startSendEcash,

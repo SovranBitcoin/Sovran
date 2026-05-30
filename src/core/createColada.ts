@@ -44,6 +44,7 @@ export interface ColadaConfig {
   getLocale?: () => string;
   getBtcPrice?: () => number;
   getDisplayCurrency?: () => { code: string; symbol: string } | null;
+  enableEcashSendMemo?: boolean;
 
   getPreferredMintUrl?: () => string | undefined;
 
@@ -172,6 +173,7 @@ export function createMachineFromInstance(config: CreateMachineFromInstanceConfi
     getLocale: getLocale ?? (() => 'en'),
     unit,
     operations: instance.operations as MachineOperations,
+    enableEcashSendMemo: instance.config.enableEcashSendMemo,
     notifications,
     createURDecoder,
     scanSources,
