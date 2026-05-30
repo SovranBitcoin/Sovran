@@ -4,6 +4,7 @@ import {
   ExpoSqliteRepositories,
   type ExpoSqliteRepositoriesOptions,
 } from '@cashu/coco-expo-sqlite';
+import { createSovranCocoRepositories } from './cocoRepositories';
 import * as SQLite from 'expo-sqlite';
 import {
   retrieveMnemonic,
@@ -157,7 +158,7 @@ export class CocoManager {
         );
         this.db = db;
         const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
-        const repositories = new ExpoSqliteRepositories({ database });
+        const repositories = createSovranCocoRepositories(new ExpoSqliteRepositories({ database }));
         await initPhase('CocoManager.reposInit', () => repositories.init());
 
         // 2. Seed getter (lazy — no crypto work until first call, cached after)

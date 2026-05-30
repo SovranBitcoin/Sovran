@@ -4,7 +4,7 @@ import { useManager } from '@cashu/coco-react';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber, toSafeSatAmount } from '@/shared/lib/cashu/amount';
 import { prepareBolt11MeltQuote, prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
@@ -83,7 +83,7 @@ export function useMintRebalanceOrchestrator({
   const manager = useManager();
   const requestLightningInvoice = useCallback(
     async (mintUrl: string, amount: number) => {
-      return prepareBolt11MintQuote(manager, mintUrl, amount, unit);
+      return prepareBolt11MintQuote(manager, mintUrl, amount, unit, cashuLog);
     },
     [manager, unit]
   );
@@ -448,7 +448,7 @@ export function useMintRebalanceOrchestrator({
 
             // Re-cap transfer amount if the probed headroom reveals we're over budget
             if (transferAmount + feeHeadroom > sourceBalance) {
-              const capped = sourceBalance - feeHeadroom;
+              const capped = toSafeSatAmount(sourceBalance - feeHeadroom) ?? 0;
               if (capped >= minTransferThreshold) {
                 appendDebug({
                   event: 'amount_recapped_after_probe',
@@ -810,10 +810,12 @@ export function useMintRebalanceOrchestrator({
                 // Determine hop amount
                 let hopAmount: number;
                 if (hopIdx === 0) {
-                  hopAmount = Math.min(transferAmount, hopSourceBalance - hopFeeHeadroom);
+                  hopAmount = toSafeSatAmount(
+                    Math.min(transferAmount, hopSourceBalance - hopFeeHeadroom)
+                  ) ?? 0;
                 } else {
                   // Use whatever landed on the intermediary, minus fee headroom
-                  hopAmount = hopSourceBalance - hopFeeHeadroom;
+                  hopAmount = toSafeSatAmount(hopSourceBalance - hopFeeHeadroom) ?? 0;
                 }
 
                 if (hopAmount < minTransferThreshold) {
@@ -864,7 +866,8 @@ export function useMintRebalanceOrchestrator({
                     const hopProbedHeadroom = hopActualFeeReserve + hopProbeInputFee;
 
                     if (hopAmount + hopProbedHeadroom > hopSourceBalance) {
-                      const cappedHop = hopSourceBalance - hopProbedHeadroom;
+                      const cappedHop =
+                        toSafeSatAmount(hopSourceBalance - hopProbedHeadroom) ?? 0;
                       if (cappedHop >= minTransferThreshold) {
                         appendDebug({
                           event: 'hop_amount_recapped_after_probe',

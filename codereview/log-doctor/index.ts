@@ -30,7 +30,7 @@
  *   renders      Re-render analysis (counts, why-did-update hints)
  *   screens      Screen navigation flow, content snapshots, and durations
  *   startup      Initialization waterfall, stage timing, gate sequence
- *   coco         Coco wallet module breakdown, issues, mint requests
+ *   coco         Coco/Colada wallet module breakdown, issues, mint requests
  *   network      Network request/response pairs with latency
  *   full         Full entries but deduplicated and trimmed
  *   diff         Compare latest session against previous to isolate failure-specific entries
@@ -1081,12 +1081,23 @@ function modeStartup(entries: LogEntry[], _opts: Options): string {
 
 // ─── Mode: coco ─────────────────────────────────────────────────────────────
 
+function isCocoDiagnosticEvent(e: LogEntry): boolean {
+  return e.event.startsWith('coco.') || e.event.startsWith('colada.');
+}
+
+function cocoModuleName(event: string): string {
+  const parts = event.split('.');
+  if (parts[0] === 'colada') return `${parts[0]}.${parts[1] ?? 'unknown'}`;
+  return parts[1] ?? 'unknown';
+}
+
 function modeCoco(entries: LogEntry[], opts: Options): string {
-  // Coco events come from CocoLogger: event starts with "coco."
-  const cocoEntries = entries.filter((e) => e.event.startsWith('coco.'));
+  // Coco events come from CocoLogger; Colada emits wallet-boundary diagnostics
+  // under "colada." so this mode can trace a user action across both layers.
+  const cocoEntries = entries.filter(isCocoDiagnosticEvent);
 
   if (cocoEntries.length === 0)
-    return 'No coco events found. Ensure CocoLogger is wired into Manager (replaces ConsoleLogger).';
+    return 'No coco/colada events found. Ensure CocoLogger and Colada logger are wired into the app logger.';
 
   const lines: string[] = [];
 
@@ -1096,16 +1107,15 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
     { debug: number; info: number; warn: number; error: number }
   >();
   for (const e of cocoEntries) {
-    // event format: coco.<module>.<event_key>
-    const parts = e.event.split('.');
-    const module = parts[1] ?? 'unknown';
+    // event format: coco.<module>.<event_key> or colada.<module>.<event_key>
+    const module = cocoModuleName(e.event);
     const counts = moduleCounts.get(module) ?? { debug: 0, info: 0, warn: 0, error: 0 };
     const level = e.level as keyof typeof counts;
     if (level in counts) counts[level]++;
     moduleCounts.set(module, counts);
   }
 
-  lines.push('COCO MODULE BREAKDOWN:');
+  lines.push('COCO/COLADA MODULE BREAKDOWN:');
   lines.push('');
   const sortedModules = [...moduleCounts.entries()].sort((a, b) => {
     const aTotal = a[1].debug + a[1].info + a[1].warn + a[1].error;
@@ -1124,7 +1134,7 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
   // ── Section 2: Warnings and errors with context ──
   const issues = cocoEntries.filter((e) => e.level === 'warn' || e.level === 'error');
   if (issues.length > 0) {
-    lines.push(`COCO ISSUES (${issues.length} warnings/errors):`);
+    lines.push(`COCO/COLADA ISSUES (${issues.length} warnings/errors):`);
     lines.push('');
     // Deduplicate by message
     const byMsg = new Map<
@@ -1147,7 +1157,28 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
     lines.push('');
   }
 
-  // ── Section 3: Mint request summary ──
+  // ── Section 3: Amount boundary diagnostics ──
+  const amountEvents = cocoEntries.filter(
+    (e) =>
+      e.event.includes('amount') ||
+      e.params?.rawAmount != null ||
+      e.params?.satAmount != null ||
+      e.params?.effectiveSatAmount != null
+  );
+  if (amountEvents.length > 0) {
+    lines.push(`AMOUNT DIAGNOSTICS (${amountEvents.length} events):`);
+    lines.push('');
+    const notable = amountEvents
+      .filter((e) => e.level !== 'debug' || e.event.includes('boundary'))
+      .slice(-25);
+    for (const e of notable) {
+      const t = e._t ? `[${Math.round(e._t)}ms] ` : '';
+      lines.push(`  ${t}${levelIcon(e.level)} ${e.event} ${shortParams(e.params, 8)}`);
+    }
+    lines.push('');
+  }
+
+  // ── Section 4: Mint request summary ──
   const mintRequests = cocoEntries.filter((e) => {
     const msg = (e.params?.msg as string) ?? '';
     return msg.includes('Mint request') || msg.includes('Mint response');
@@ -1172,10 +1203,10 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
     lines.push('');
   }
 
-  // ── Section 4: Timeline of key coco events (non-debug) ──
+  // ── Section 5: Timeline of key coco/colada events (non-debug) ──
   const keyEvents = cocoEntries.filter((e) => e.level !== 'debug');
   if (keyEvents.length > 0) {
-    lines.push('COCO KEY EVENTS (info/warn/error):');
+    lines.push('COCO/COLADA KEY EVENTS (info/warn/error):');
     lines.push('');
     const { page, footer } = paginate(keyEvents, opts);
     let prevT: number | null = null;
@@ -1184,7 +1215,8 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
       const delta = prevT !== null ? t - prevT : 0;
       prevT = t;
       const msg = (e.params?.msg as string) ?? '';
-      const shortMsg = msg.length > 60 ? msg.slice(0, 57) + '...' : msg;
+      const params = msg || shortParams(e.params);
+      const shortMsg = params.length > 60 ? params.slice(0, 57) + '...' : params;
       lines.push(
         `${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(40).slice(0, 40)} ${shortMsg}`
       );
@@ -1849,6 +1881,15 @@ function modeCrypto(entries: LogEntry[], opts: Options): string {
 function modeOps(entries: LogEntry[], opts: Options): string {
   // Operation phase tracking for mint/melt/send/receive flows
   const opPatterns = [
+    { prefix: 'colada.operations.', name: 'Colada Operations' },
+    { prefix: 'colada.amount.', name: 'Colada Amount' },
+    { prefix: 'colada.amount_actions.', name: 'Colada Amount Actions' },
+    { prefix: 'colada.amount_boundary.', name: 'Colada Amount Boundary' },
+    { prefix: 'colada.bolt11.', name: 'Colada Bolt11' },
+    { prefix: 'colada.lnurl.', name: 'Colada LNURL' },
+    { prefix: 'colada.flow.', name: 'Colada Flow' },
+    { prefix: 'colada.screen.', name: 'Colada Screen' },
+    { prefix: 'colada.sovran.', name: 'Sovran Colada Boundary' },
     { prefix: 'coco.mint.', name: 'Mint' },
     { prefix: 'coco.melt.', name: 'Melt' },
     { prefix: 'coco.send.', name: 'Send' },

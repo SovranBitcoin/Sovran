@@ -183,6 +183,26 @@ describe('rebalanceRunState', () => {
     ).toEqual({ status: 'skip', minRequired: 15 });
   });
 
+  it('keeps rebalance transfer amounts whole before invoice creation', () => {
+    expect(
+      computeInitialTransferAmount({
+        requestedAmount: 100.9,
+        sourceBalance: 150,
+        minTransferThreshold: 10,
+        feeHeadroom: 5,
+      })
+    ).toEqual({ status: 'ready', amount: 100, capped: false });
+
+    expect(
+      computeInitialTransferAmount({
+        requestedAmount: 100,
+        sourceBalance: 102.5,
+        minTransferThreshold: 10,
+        feeHeadroom: 5,
+      })
+    ).toEqual({ status: 'capped', amount: 97, capped: true });
+  });
+
   it('normalizes common mint and Lightning errors for the row UI', () => {
     expect(normalizeRebalanceTransferError(new Error('lnd is not ready for payments'))).toMatch(
       /Mint Lightning node is not ready/
