@@ -13,7 +13,7 @@ export type MemoMentionEntity = {
   nprofile: string;
 };
 
-export type MemoNprofileReference = {
+type MemoNprofileReference = {
   raw: string;
   start: number;
   end: number;
@@ -74,7 +74,7 @@ export function findActiveMemoMention(value: string, cursor: number): MemoMentio
   return null;
 }
 
-export function createMemoMentionDisplay(displayName: string, fallbackName: string): string {
+function createMemoMentionDisplay(displayName: string, fallbackName: string): string {
   const normalized = (displayName || fallbackName).replace(/^@+/, '').trim().replace(/\s+/g, ' ');
   return `@${normalized || fallbackName || 'user'}`;
 }

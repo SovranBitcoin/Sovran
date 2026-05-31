@@ -45,7 +45,6 @@ import {
   reconcileMemoMentionEntities,
   serializeMemoWithMentions,
   type MemoMentionEntity,
-  type MemoMentionToken,
 } from './sendMemoMention';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';

@@ -13,15 +13,15 @@ import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const INDEX_OPTIONS = { title: 'Settings' };
 const ABOUT_OPTIONS = { title: 'About' };
-const TERMS_OPTIONS = { title: 'Terms & Conditions' };
+const TERMS_OPTIONS = { title: 'Terms & conditions' };
 const PROFILE_OPTIONS = { title: 'Profile' };
-const AVATAR_OPTIONS = { title: 'Avatar Fallback' };
-const ROUTING_OPTIONS = { title: 'Swap Routing' };
+const AVATAR_OPTIONS = { title: 'Avatar fallback' };
+const ROUTING_OPTIONS = { title: 'Swap routing' };
 const KEYRING_OPTIONS = { title: 'P2PK Keys' };
-const STORAGE_OPTIONS = { title: 'Storage Inventory' };
-const DESIGN_SYSTEM_OPTIONS = { title: 'Design System' };
-const RECOVERY_OPTIONS = { title: 'Recover Wallet' };
-const DELETE_OPTIONS = { title: 'Delete Account' };
+const STORAGE_OPTIONS = { title: 'Storage inventory' };
+const DESIGN_SYSTEM_OPTIONS = { title: 'Design system' };
+const RECOVERY_OPTIONS = { title: 'Recover wallet' };
+const DELETE_OPTIONS = { title: 'Delete account' };
 
 export default function SettingsFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);

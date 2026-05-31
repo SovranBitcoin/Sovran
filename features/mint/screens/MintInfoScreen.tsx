@@ -233,7 +233,7 @@ function StatsGridComponent({
   const stats = useMemo(
     () => [
       {
-        label: 'Success Rate',
+        label: 'Success rate',
         description:
           typeof swapSuccess === 'number' && typeof swapTotal === 'number'
             ? `${swapSuccess} of ${swapTotal} swaps`
@@ -242,19 +242,19 @@ function StatsGridComponent({
         accent: true,
       },
       {
-        label: 'Average Time',
+        label: 'Average time',
         description: 'For successful swaps',
         value: `${displayValues.avgTimeMs} ms`,
         accent: true,
       },
       {
-        label: 'Total Mints',
+        label: 'Total mints',
         description: 'Total mint operations',
         value: displayValues.totalMints,
         accent: false,
       },
       {
-        label: 'Total Melts',
+        label: 'Total melts',
         description: 'Total melt operations',
         value: displayValues.totalMelts,
         accent: false,

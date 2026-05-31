@@ -20,12 +20,12 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const RECEIVE_OPTIONS = { title: 'Receive' };
-const AMOUNT_OPTIONS = { title: 'Select Amount' };
-const MINT_SELECT_OPTIONS = { title: 'Select Mint' };
+const AMOUNT_OPTIONS = { title: 'Select amount' };
+const MINT_SELECT_OPTIONS = { title: 'Select mint' };
 const LIGHTNING_RECEIVE_OPTIONS = { title: 'Receive Lightning' };
-const ONCHAIN_RECEIVE_OPTIONS = { title: 'Receive Onchain' };
+const ONCHAIN_RECEIVE_OPTIONS = { title: 'Receive onchain' };
 const MINT_QUOTE_OPTIONS = { title: 'Receive' };
-const RECEIVE_TOKEN_OPTIONS = { title: 'Receive Ecash' };
+const RECEIVE_TOKEN_OPTIONS = { title: 'Receive ecash' };
 const CAMERA_HEADER_STYLE = { backgroundColor: 'transparent' };
 const CAMERA_OPTIONS = {
   title: 'Scan QR',

@@ -83,7 +83,7 @@ export function useMintRebalanceOrchestrator({
   const manager = useManager();
   const requestLightningInvoice = useCallback(
     async (mintUrl: string, amount: number) => {
-      return prepareBolt11MintQuote(manager, mintUrl, amount, unit, cashuLog);
+      return prepareBolt11MintQuote(manager, mintUrl, amount, unit);
     },
     [manager, unit]
   );
@@ -810,9 +810,9 @@ export function useMintRebalanceOrchestrator({
                 // Determine hop amount
                 let hopAmount: number;
                 if (hopIdx === 0) {
-                  hopAmount = toSafeSatAmount(
-                    Math.min(transferAmount, hopSourceBalance - hopFeeHeadroom)
-                  ) ?? 0;
+                  hopAmount =
+                    toSafeSatAmount(Math.min(transferAmount, hopSourceBalance - hopFeeHeadroom)) ??
+                    0;
                 } else {
                   // Use whatever landed on the intermediary, minus fee headroom
                   hopAmount = toSafeSatAmount(hopSourceBalance - hopFeeHeadroom) ?? 0;
@@ -866,8 +866,7 @@ export function useMintRebalanceOrchestrator({
                     const hopProbedHeadroom = hopActualFeeReserve + hopProbeInputFee;
 
                     if (hopAmount + hopProbedHeadroom > hopSourceBalance) {
-                      const cappedHop =
-                        toSafeSatAmount(hopSourceBalance - hopProbedHeadroom) ?? 0;
+                      const cappedHop = toSafeSatAmount(hopSourceBalance - hopProbedHeadroom) ?? 0;
                       if (cappedHop >= minTransferThreshold) {
                         appendDebug({
                           event: 'hop_amount_recapped_after_probe',

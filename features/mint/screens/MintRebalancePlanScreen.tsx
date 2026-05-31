@@ -213,7 +213,7 @@ export function MintRebalancePlanScreen() {
                 onPress: async () => handleDone(),
               },
               {
-                text: 'Start Rebalancing',
+                text: 'Start rebalancing',
                 variant: 'primary' as const,
                 onPress: async () => handleStart(),
               },
@@ -260,7 +260,7 @@ export function MintRebalancePlanScreen() {
       bgColor={background}>
       <Stack.Screen
         options={{
-          title: 'Rebalance Plan',
+          title: 'Rebalance plan',
           headerRight: () => null,
         }}
       />

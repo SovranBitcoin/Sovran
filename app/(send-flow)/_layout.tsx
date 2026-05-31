@@ -23,7 +23,7 @@ import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
-const MINT_SELECT_OPTIONS = { title: 'Select Mint' };
+const MINT_SELECT_OPTIONS = { title: 'Select mint' };
 const NEAR_PAY_HEADER_OPTIONS = {
   headerShadowVisible: false,
   headerTransparent: true,
@@ -36,14 +36,14 @@ const NEAR_PAY_PEERS_OPTIONS = {
   title: 'Nearby',
   ...NEAR_PAY_HEADER_OPTIONS,
 };
-const AMOUNT_OPTIONS = { title: 'Select Amount' };
-const SEND_TOKEN_OPTIONS = { title: 'Send Ecash' };
+const AMOUNT_OPTIONS = { title: 'Select amount' };
+const SEND_TOKEN_OPTIONS = { title: 'Send ecash' };
 const LIGHTNING_SEND_OPTIONS = {
   title: 'Send Lightning',
   headerBackButtonMenuEnabled: false,
 };
 const ONCHAIN_SEND_OPTIONS = {
-  title: 'Send Onchain',
+  title: 'Send onchain',
   headerBackButtonMenuEnabled: false,
 };
 const MELT_QUOTE_OPTIONS = {
@@ -51,7 +51,7 @@ const MELT_QUOTE_OPTIONS = {
   headerBackButtonMenuEnabled: false,
 };
 const PAYMENT_REQUEST_OPTIONS = {
-  title: 'Payment Request',
+  title: 'Payment request',
   headerBackButtonMenuEnabled: false,
 };
 const CAMERA_HEADER_STYLE = { backgroundColor: 'transparent' };

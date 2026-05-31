@@ -13,7 +13,7 @@ import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
 const USER_MESSAGES_OPTIONS = { headerShown: false };
-const SHARE_OPTIONS = { title: 'Share Profile' };
+const SHARE_OPTIONS = { title: 'Share profile' };
 const THREAD_OPTIONS = { title: 'Thread' };
 const WHITENOISE_SETUP_OPTIONS = { title: 'White Noise' };
 const WHITENOISE_DM_OPTIONS = { headerShown: false };

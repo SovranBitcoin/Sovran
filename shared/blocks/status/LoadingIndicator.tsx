@@ -85,8 +85,16 @@ export interface LoadingIndicatorProps {
 const RING_R = 38;
 const CIRC = 2 * Math.PI * RING_R;
 const RING_STROKE = 3.5;
-const SEGMENT_STROKE = 4.5;
-const SEGMENT_RESULT_DISC_R = RING_R + SEGMENT_STROKE / 2;
+// Segment arc thickness scales inversely with the segment count: a handful
+// of onchain-confirmation segments render thick and chunky, while a dense
+// 24-segment ring stays legible. See `segmentStroke()`.
+const SEGMENT_STROKE_MIN = 4.5;
+const SEGMENT_STROKE_MAX = 8.5;
+const SEGMENT_RESULT_DISC_R = RING_R + SEGMENT_STROKE_MAX / 2;
+
+function segmentStroke(segmentCount: number): number {
+  return Math.max(SEGMENT_STROKE_MIN, Math.min(SEGMENT_STROKE_MAX, 54 / segmentCount));
+}
 const ICON_STROKE = 6.5;
 const DEFAULT_SEGMENT_COUNT = 6;
 const MAX_SEGMENT_COUNT = 24;
@@ -220,7 +228,10 @@ function ConfirmationSegment({
   const pulse = useSharedValue(0);
   const hasMountedRef = React.useRef(false);
   const step = CIRC / segmentCount;
-  const gap = segmentCount === 1 ? 0 : Math.min(10, Math.max(4.5, step * 0.22));
+  const stroke = segmentStroke(segmentCount);
+  // Widen the gap with the stroke so round line caps don't close the seams
+  // between thick segments and blur the ring into one continuous arc.
+  const gap = segmentCount === 1 ? 0 : Math.min(step * 0.5, Math.max(stroke + 4, step * 0.22));
   const dash = Math.max(1, step - gap);
 
   useEffect(() => {
@@ -261,7 +272,9 @@ function ConfirmationSegment({
   const animatedProps = useAnimatedProps(() => ({
     opacity: 0.45 + progress.get() * 0.55,
     stroke: interpolateColor(progress.get(), [0, 1], [pendingColor, successColor]),
-    strokeWidth: SEGMENT_STROKE + pulse.get() * 1.2,
+    // Grow from a thinner pending arc to the full thickness as it fills, with
+    // a brief pulse-thicken at the moment of completion.
+    strokeWidth: stroke * (0.72 + progress.get() * 0.28) + pulse.get() * 1.6,
   }));
 
   return (

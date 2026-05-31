@@ -175,11 +175,11 @@ export const SettingsScreen = () => {
         </Section>
         <Section title="Preferences">
           <ListGroup variant="secondary">
-            <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap Routing" />
+            <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap routing" />
             <Separator className="mx-4" />
             <SettingsListLinkItem
               href="/(settings-flow)/avatar"
-              title="Avatar Fallback"
+              title="Avatar fallback"
               description={AVATAR_FALLBACK_VARIANT_LABELS[avatarFallbackVariant]}
             />
           </ListGroup>
@@ -187,7 +187,7 @@ export const SettingsScreen = () => {
         <Section title="App Information">
           <ListGroup variant="secondary">
             <SettingsListActionItem
-              title="View Source on GitHub"
+              title="View source on GitHub"
               onPress={() => {
                 void openExternalUrl('https://github.com/SovranBitcoin/Sovran');
               }}
@@ -207,7 +207,7 @@ export const SettingsScreen = () => {
             <Separator className="mx-4" />
             <SettingsListLinkItem
               href="/(settings-flow)/recovery"
-              title="Recover Wallet"
+              title="Recover wallet"
               description="Restore ecash from all mints using your seed"
             />
           </ListGroup>
@@ -243,18 +243,18 @@ export const SettingsScreen = () => {
         {devMode ? (
           <Section title="Developer">
             <ListGroup variant="secondary">
-              <SettingsListActionItem title="Export Database" onPress={handleExportDatabase} />
+              <SettingsListActionItem title="Export database" onPress={handleExportDatabase} />
               <Separator className="mx-4" />
               <Separator className="mx-4" />
               <SettingsListLinkItem
                 href="/(settings-flow)/storage"
-                title="Storage Inventory"
+                title="Storage inventory"
                 description="View persisted storage keys and coco database files"
               />
               <Separator className="mx-4" />
               <SettingsListLinkItem
                 href="/(settings-flow)/design-system"
-                title="Design System"
+                title="Design system"
                 description="Preview shared UI components"
               />
               <Separator className="mx-4" />
@@ -371,7 +371,7 @@ export const SettingsScreen = () => {
 
         <Section title="Danger Zone" isDanger>
           <ListGroup variant="secondary">
-            <SettingsListLinkItem href="/(settings-flow)/delete" title="Delete Account" isDanger />
+            <SettingsListLinkItem href="/(settings-flow)/delete" title="Delete account" isDanger />
           </ListGroup>
         </Section>
 

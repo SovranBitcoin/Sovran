@@ -267,7 +267,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         buttons: [
           {
             testID: 'reserved-proofs-recover',
-            text: 'Recover Pending Operations',
+            text: 'Recover pending operations',
             description: 'Checks pending send and melt operations',
             icon: 'mdi:wrench',
             onPress: async () => {

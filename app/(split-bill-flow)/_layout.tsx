@@ -41,15 +41,15 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const PickerContext = createContext<UseSplitBillParticipantPickerResult | null>(null);
-const AMOUNT_OPTIONS = { title: 'Split Bill' };
-const PARTICIPANTS_OPTIONS = { title: 'Who Pays' };
+const AMOUNT_OPTIONS = { title: 'Split bill' };
+const PARTICIPANTS_OPTIONS = { title: 'Who pays' };
 const SEARCH_OPTIONS = {
   title: 'Search Nostr',
   presentation: 'modal',
   headerTransparent: false,
 } as const;
 const SUMMARY_OPTIONS = { title: 'Review' };
-const DETAIL_OPTIONS = { title: 'Split Bill' };
+const DETAIL_OPTIONS = { title: 'Split bill' };
 
 export function useSplitBillPickerContext(): UseSplitBillParticipantPickerResult {
   const ctx = useContext(PickerContext);

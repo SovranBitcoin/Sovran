@@ -237,7 +237,7 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   );
   const stackOptions = useMemo(
     () => ({
-      title: 'Select Amount',
+      title: 'Select amount',
       headerTitleAlign: 'center' as const,
       headerTitle: renderHeaderTitle,
       headerTintColor: foreground,

@@ -47,7 +47,14 @@ jest.mock('@/shared/ui/primitives/Pressable', () => ({ Pressable: 'Pressable' })
 jest.mock('@/shared/ui/primitives/Text', () => ({ Text: 'Text' }));
 jest.mock('@/shared/ui/primitives/View/View', () => ({ View: 'View' }));
 jest.mock('@/shared/hooks/useThemeColor', () => ({
-  useThemeColor: jest.fn(() => ['#fff', '#000', '#111', '#222', '#333', '#444']),
+  useThemeColor: jest.fn(() => [
+    'foreground',
+    'background',
+    'muted',
+    'mutedForeground',
+    'border',
+    'accent',
+  ]),
 }));
 jest.mock('@/shared/hooks/useNostrProfileMetadata', () => ({
   useNostrProfileMetadataMany: jest.fn(() => ({

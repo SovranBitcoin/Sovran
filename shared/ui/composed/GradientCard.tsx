@@ -25,7 +25,13 @@ interface GradientCardProps {
  * details list, etc.) so quote/token screens share the wallet's signature
  * look instead of rendering a flat `surface-secondary` block.
  */
-export function GradientCard({ children, style, contentStyle, variant, testID }: GradientCardProps) {
+export function GradientCard({
+  children,
+  style,
+  contentStyle,
+  variant,
+  testID,
+}: GradientCardProps) {
   const muted = useThemeColor('muted');
   const borderColor = opacity(muted, 0.3);
 

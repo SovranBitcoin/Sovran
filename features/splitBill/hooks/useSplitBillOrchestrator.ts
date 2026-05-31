@@ -208,7 +208,7 @@ export function useSplitBillOrchestrator() {
   const manager = useManager();
   const requestLightningInvoice = useCallback(
     async (mintUrl: string, amount: number) => {
-      return prepareBolt11MintQuote(manager, mintUrl, amount, 'sat', paymentLog);
+      return prepareBolt11MintQuote(manager, mintUrl, amount, 'sat');
     },
     [manager]
   );

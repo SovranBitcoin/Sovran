@@ -139,7 +139,7 @@ describe('buildTimeline (audit 61.json F-006)', () => {
         },
       });
 
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'next-pending', 'future-small']);
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
       expect(t[1]).toMatchObject({
         state: MintQuoteState.PAID,
         displayLabel: 'Payment received',
@@ -160,7 +160,7 @@ describe('buildTimeline (audit 61.json F-006)', () => {
           isSatisfied: true,
         },
       });
-      expect(t.map((s) => s.stepType)).toEqual(['complete', 'next-pending', 'future-small']);
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
       expect(t[1].state).toBe(MintQuoteState.PAID);
       expect(t[1].info).toBe('6/6 confirmations');
     });

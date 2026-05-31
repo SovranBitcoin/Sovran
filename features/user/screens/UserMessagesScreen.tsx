@@ -497,7 +497,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         composerActions={
           lud16 ? (
             <Button
-              text="Send Money"
+              text="Send money"
               variant="primary"
               size="compact"
               icon={<Icon name="mingcute:lightning-fill" size={16} color={background} />}

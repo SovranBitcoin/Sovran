@@ -40,7 +40,7 @@ export function useHandleCameraPermission() {
       title: permission.canAskAgain ? 'Camera Permission Denied' : 'Camera Permission Blocked',
       buttons: [
         {
-          text: 'Open Settings',
+          text: 'Open settings',
           icon: 'material-symbols:settings-rounded',
           variant: 'primary',
           onPress: async () => {

@@ -51,7 +51,7 @@ const STATIC_POPUPS = {
   // mint
   'no-mint-selected': { message: 'No mint selected', icon: BANK_ICON, type: 'error' },
   'no-valid-mint': {
-    message: 'No Valid Mint',
+    message: 'No mint available',
     text: 'No mint is available for this payment.',
     icon: BANK_ICON,
     type: 'error',
@@ -69,7 +69,7 @@ const STATIC_POPUPS = {
     type: 'error',
   },
   'recovery-failed': {
-    message: 'Recovery Failed',
+    message: 'Recovery failed',
     text: 'An error occurred during recovery.',
     icon: 'icon:mdi:shield-remove',
     type: 'error',
@@ -77,8 +77,8 @@ const STATIC_POPUPS = {
 
   // general
   'general-error': {
-    message: 'Error Occurred',
-    text: 'Something went wrong. Please try again.',
+    message: 'Something went wrong',
+    text: 'Please try again.',
     icon: 'icon:mdi:alert-circle',
     type: 'error',
   },
@@ -129,31 +129,31 @@ const STATIC_POPUPS = {
     type: 'error',
   },
   'no-amount': {
-    message: 'Amount Required',
+    message: 'Amount required',
     text: 'Please enter an amount.',
     icon: 'icon:mdi:currency-usd',
     type: 'error',
   },
   'unsupported-input': {
-    message: 'Unsupported Input',
+    message: 'Unsupported input',
     text: 'This input format is not supported.',
     icon: ALERT_ICON,
     type: 'error',
   },
   'unsupported-payment-method': {
-    message: 'Payment Method Not Available',
+    message: 'Payment method not available',
     text: 'This payment method is not available for the selected mint.',
     icon: ALERT_ICON,
     type: 'warning',
   },
   'all-options-disabled': {
-    message: 'No Options Available',
+    message: 'No options available',
     text: 'All payment options are disabled.',
     icon: ALERT_ICON,
     type: 'warning',
   },
   'missing-melt-target': {
-    message: 'Missing Payment Target',
+    message: 'Missing payment target',
     text: 'A Lightning invoice or address is required for this flow.',
     icon: 'icon:mingcute:lightning-fill',
     type: 'error',
@@ -198,12 +198,12 @@ const STATIC_POPUPS = {
 
   // token
   'token-redeemed-by-recipient': {
-    message: 'Token was redeemed by recipient',
+    message: 'Recipient redeemed your token',
     icon: 'icon:mdi:check-circle',
     type: 'success',
   },
   'token-pending-not-redeemed': {
-    message: 'Token is still pending - not yet redeemed',
+    message: 'Token is still pending — not yet redeemed',
     icon: 'icon:mdi:clock-outline',
     type: 'info',
   },
@@ -219,24 +219,24 @@ const STATIC_POPUPS = {
 
   // wallet
   'balance-too-low': {
-    message: 'Insufficient Balance',
+    message: 'Insufficient balance',
     text: 'You do not have enough funds to complete this transaction.',
     icon: WALLET_ICON,
     type: 'error',
   },
   'no-clipboard-address': {
-    message: 'No Address Found',
+    message: 'No address found',
     text: 'No valid address was found in your clipboard.',
     icon: ALERT_ICON,
     type: 'error',
   },
   'reserved-proofs-freed': {
-    message: 'Reserved proofs freed',
+    message: 'Funds returned to your balance',
     icon: 'icon:mdi:shield-check',
     type: 'success',
   },
   'reserved-proofs-failed': {
-    message: 'Failed to free reserved proofs',
+    message: 'Could not return your funds',
     icon: 'icon:mdi:shield',
     type: 'error',
   },
@@ -283,21 +283,21 @@ const PARAM_POPUPS = {
         },
 
   'recovery-success': (p: { mintCount: number; durationSec: string }): PopupSpec => ({
-    message: 'Recovery Complete',
+    message: 'Recovery complete',
     text: `Recovered from ${p.mintCount} mint${p.mintCount !== 1 ? 's' : ''} in ${p.durationSec}s.`,
     icon: 'icon:mdi:shield-check',
     type: 'success',
   }),
 
   'recovery-partial': (p: { successCount: number; failureCount: number }): PopupSpec => ({
-    message: 'Recovery Partial',
+    message: 'Partial recovery',
     text: `Recovered from ${p.successCount}, failed for ${p.failureCount}.`,
     icon: 'icon:mdi:shield',
     type: 'warning',
   }),
 
   'new-version': (p: { version: string }): PopupSpec => ({
-    message: 'New Version Available',
+    message: 'New version available',
     text: `A new version (${p.version}) is available. Please update to the latest version.`,
     icon: 'icon:mdi:download',
     variant: 'sheet',
@@ -317,8 +317,8 @@ const PARAM_POPUPS = {
   }),
 
   'unsupported-token-unit': (p: { unit: string }): PopupSpec => ({
-    message: 'Unsupported Token Unit',
-    text: `"${p.unit}" tokens cannot be redeemed. Only sat tokens are supported.`,
+    message: 'Unsupported token',
+    text: `This token is in "${p.unit}". Only Bitcoin (sat) tokens can be received.`,
     icon: 'icon:mdi:currency-usd',
     type: 'error',
   }),
@@ -344,7 +344,7 @@ const PARAM_POPUPS = {
   'camera-permission': (status: 'granted' | 'denied' | 'blocked'): PopupSpec => {
     if (status === 'granted') {
       return {
-        message: 'Camera Permission Granted',
+        message: 'Camera permission granted',
         text: 'Camera access has been granted.',
         icon: CAMERA_ICON,
         type: 'success',
@@ -352,17 +352,17 @@ const PARAM_POPUPS = {
     }
     if (status === 'denied') {
       return {
-        message: 'Camera Permission Denied',
+        message: 'Camera permission denied',
         text: 'Camera access is denied. Please enable it in your device settings.',
         icon: CAMERA_ICON,
         type: 'error',
       };
     }
     return {
-      message: 'Camera Permission Blocked',
+      message: 'Camera permission blocked',
       text: 'Camera access is blocked. Please enable it in your device settings.',
       icon: CAMERA_ICON,
-      buttons: [{ text: 'Open Settings', page: 'settings' }],
+      buttons: [{ text: 'Open settings', page: 'settings' }],
       type: 'error',
     };
   },

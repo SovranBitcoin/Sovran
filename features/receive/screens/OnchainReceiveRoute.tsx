@@ -57,7 +57,7 @@ function OnchainReceiveRouteContent({
   extraButtons: ButtonHandlerButton[];
   onRequestMintList?: () => void;
 }) {
-  const screenOptions = useMemo(() => ({ title: 'Receive Onchain' }), []);
+  const screenOptions = useMemo(() => ({ title: 'Receive onchain' }), []);
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'mintQuote',
     mintHistoryEntry

@@ -141,14 +141,14 @@ export function SendTokenScreen({
         {
           id: 'text',
           label: 'as Text',
-          description: 'Copy the token string',
+          description: 'Copy the token as plain text',
           icon: 'lets-icons:copy',
           available: actions.copy.available,
         },
         {
           id: 'emoji',
           label: 'as Emoji',
-          description: 'Copy as an emoji-packed string',
+          description: 'Copy the token as emoji',
           icon: 'fluent:emoji-24-filled',
           available: actions.copy.available,
         },
@@ -283,8 +283,8 @@ export function SendTokenScreen({
             },
             {
               testID: 'send-token-cancel-transaction',
-              text: 'Cancel Transaction',
-              description: 'Reclaim proofs and void this token',
+              text: 'Cancel transaction',
+              description: 'Return the funds to your balance',
               icon: 'mdi:cancel',
               variant: 'dangerous',
               onPress: () => actions.cancel.execute(),

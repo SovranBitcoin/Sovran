@@ -13,8 +13,8 @@ import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
-const INDEX_OPTIONS = { title: 'Bitcoin Map' };
-const DETAIL_OPTIONS = { title: 'Merchant Details' };
+const INDEX_OPTIONS = { title: 'Bitcoin map' };
+const DETAIL_OPTIONS = { title: 'Merchant details' };
 
 export default function MapFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);

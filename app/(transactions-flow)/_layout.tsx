@@ -25,22 +25,22 @@ import { TransactionsFilterProvider } from '@/features/transactions';
 
 const TRANSPARENT_HEADER_STYLE = { backgroundColor: 'transparent' };
 const LIGHTNING_RECEIVE_OPTIONS = { title: 'Receive Lightning' };
-const ONCHAIN_RECEIVE_OPTIONS = { title: 'Receive Onchain' };
+const ONCHAIN_RECEIVE_OPTIONS = { title: 'Receive onchain' };
 const MINT_QUOTE_OPTIONS = { title: 'Receive' };
 const LIGHTNING_SEND_OPTIONS = {
   title: 'Send Lightning',
   headerBackButtonMenuEnabled: false,
 };
 const ONCHAIN_SEND_OPTIONS = {
-  title: 'Send Onchain',
+  title: 'Send onchain',
   headerBackButtonMenuEnabled: false,
 };
 const MELT_QUOTE_OPTIONS = {
   title: 'Send',
   headerBackButtonMenuEnabled: false,
 };
-const SEND_TOKEN_OPTIONS = { title: 'Send Ecash' };
-const RECEIVE_TOKEN_OPTIONS = { title: 'Receive Ecash' };
+const SEND_TOKEN_OPTIONS = { title: 'Send ecash' };
+const RECEIVE_TOKEN_OPTIONS = { title: 'Receive ecash' };
 const SWAP_OPTIONS = { title: 'Swap' };
 
 function TransactionsFlowContent() {
