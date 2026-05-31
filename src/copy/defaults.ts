@@ -29,7 +29,7 @@ export const paymentCopyDefaults = {
   'timeline.send.finalized.label': 'Claimed',
   'timeline.send.finalized.info': 'Claimed by recipient',
   'timeline.send.rolledBack.label': 'Cancelled',
-  'timeline.send.rolledBack.info': 'Token funds returned to your balance',
+  'timeline.send.rolledBack.info': 'Funds returned to your balance',
 
   'timeline.paymentRequest.prepared.label': 'Created',
   'timeline.paymentRequest.prepared.info': 'Creating token...',
@@ -38,8 +38,8 @@ export const paymentCopyDefaults = {
   'timeline.paymentRequest.nostrSent.infoSent': 'Sent via Nostr',
   'timeline.paymentRequest.finalized.label': 'Claimed',
   'timeline.paymentRequest.finalized.info': 'Claimed by recipient',
-  'timeline.paymentRequest.rolledBack.label': 'Rolled Back',
-  'timeline.paymentRequest.rolledBack.info': 'Delivery failed - funds returned to your balance',
+  'timeline.paymentRequest.rolledBack.label': 'Cancelled',
+  'timeline.paymentRequest.rolledBack.info': 'Delivery failed — funds returned to your balance',
 
   'timeline.receive.pending.label': 'Pending',
   'timeline.receive.pending.info': 'Tap Redeem to add to wallet',

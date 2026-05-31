@@ -125,6 +125,18 @@ function getOnchainConfirmationInfo(
   });
 }
 
+function onchainPaidStepType(
+  progress: OnchainConfirmationProgress | null | undefined,
+): TimelineStepType {
+  // Once the first confirmation lands the payment has effectively been
+  // received, so promote the step from 'next-pending' to 'current'. That lets
+  // the connector line from "Waiting for payment" fill into "Payment received"
+  // even though issuance is still pending the remaining confirmations.
+  return progress?.currentConfirmations != null && progress.currentConfirmations >= 1
+    ? 'current'
+    : 'next-pending';
+}
+
 function mintHistoryEntryExpired(historyEntry: Extract<HistoryEntry, { type: 'mint' }>): boolean {
   try {
     if (!historyEntry.paymentRequest) return false;
@@ -245,7 +257,7 @@ export function buildTimeline({
               {
                 state: MintQuoteState.PAID,
                 displayLabel: MINT_COPY.PAID.label,
-                stepType: 'next-pending',
+                stepType: onchainPaidStepType(onchainConfirmationProgress),
                 info: getOnchainConfirmationInfo(onchainConfirmationProgress, paymentCopy),
               },
               {
@@ -285,7 +297,9 @@ export function buildTimeline({
             {
               state: MintQuoteState.PAID,
               displayLabel: MINT_COPY.PAID.label,
-              stepType: 'next-pending',
+              stepType: isOnchainMint
+                ? onchainPaidStepType(onchainConfirmationProgress)
+                : 'next-pending',
               info:
                 isOnchainMint && onchainConfirmationProgress
                   ? getOnchainConfirmationInfo(onchainConfirmationProgress, paymentCopy)

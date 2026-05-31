@@ -72,14 +72,14 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
         {
           id: 'text',
           label: 'as Text',
-          description: 'Copy the token string',
+          description: 'Copy the token as plain text',
           icon: 'lets-icons:copy',
           available: canAct,
         },
         {
           id: 'emoji',
           label: 'as Emoji',
-          description: 'Copy as an emoji-packed string',
+          description: 'Copy the token as emoji',
           icon: 'fluent:emoji-24-filled',
           available: canAct,
         },
