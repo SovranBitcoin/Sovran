@@ -7,6 +7,7 @@ import type {
   Manager,
   MeltOperationLike,
   MintReviewInfo,
+  ScreenActionsBridge,
   ScreenType,
 } from 'colada';
 import {
@@ -15,7 +16,6 @@ import {
   mergeEntryUpdate as defaultMerge,
   shouldApplyEntryUpdate as defaultShouldApply,
 } from 'colada';
-import type { ScreenActionsBridge } from 'colada/react';
 
 import { paymentLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';

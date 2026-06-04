@@ -103,10 +103,7 @@ export function PaymentRequestScreen({
               text: actions.cancel.loading ? 'Cancelling...' : 'Cancel',
               icon: actions.cancel.loading ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',
-              onPress: async () => {
-                await actions.cancel.execute();
-                onCancel();
-              },
+              onPress: onCancel,
               condition: actions.cancel.available,
               disabled: anyLoading,
             },
