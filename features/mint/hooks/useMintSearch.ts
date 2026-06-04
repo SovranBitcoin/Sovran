@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-import { searchMints, type MintSearchResult } from '@/shared/lib/apiClient';
+import { reviewMint, searchMints, type MintSearchResult } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
 
 interface UseMintSearchReturn {
@@ -18,10 +18,53 @@ function hasMintIconUrl(result: MintSearchResult): boolean {
   return typeof iconUrl === 'string' && iconUrl.trim().length > 0;
 }
 
+const REVIEW_HYDRATION_CONCURRENCY = 8;
+
+async function hydrateReviewFields(
+  results: MintSearchResult[],
+  signal: AbortSignal
+): Promise<MintSearchResult[]> {
+  const hydrated: MintSearchResult[] = results.map((result) => ({
+    ...result,
+    review_score: null,
+    review_count: 0,
+  }));
+  let index = 0;
+
+  const hydrateNext = async (): Promise<void> => {
+    if (signal.aborted) return;
+    const currentIndex = index++;
+    const result = hydrated[currentIndex];
+    if (!result) return;
+
+    const reviews = await reviewMint({ mintUrl: result.url, signal }).catch(() => null);
+    if (signal.aborted) return;
+    if (reviews?.isOk()) {
+      hydrated[currentIndex] = {
+        ...result,
+        review_score: reviews.value.score,
+        review_count: reviews.value.recommendations.length,
+      };
+    }
+
+    await hydrateNext();
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(REVIEW_HYDRATION_CONCURRENCY, hydrated.length) }, () =>
+      hydrateNext()
+    )
+  );
+
+  return hydrated;
+}
+
 /**
  * Server-backed mint search hook.
  *
- * Calls GET /api/cashu/mints/search with optional query and currency filter.
+ * Calls GET /api/cashu/mints/search with optional query and currency filter,
+ * then hydrates review score/count through the Nagg-backed reviewMint()
+ * wrapper. The search API can discover mints; Nagg owns review display data.
  * Debounces the query by 300ms to avoid excessive API calls during typing.
  * On empty query, fetches the default list (all mints sorted by reliability).
  */
@@ -65,7 +108,7 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
         fields: 'name,icon_url,description,contact',
         signal: controller.signal,
       })
-        .then((res) => {
+        .then(async (res) => {
           if (controller.signal.aborted) {
             cashuLog.debug('mint.search.cancelled', {
               fetchId,
@@ -75,13 +118,16 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
           }
           const duration = Math.round(performance.now() - t0);
           if (res.isOk()) {
-            const withIcons = res.value.results.filter(hasMintIconUrl).length;
-            const withReviews = res.value.results.filter((r) => r.review_score !== null).length;
+            const results = await hydrateReviewFields(res.value.results, controller.signal);
+            if (controller.signal.aborted) return;
+
+            const withIcons = results.filter(hasMintIconUrl).length;
+            const withReviews = results.filter((r) => r.review_score !== null).length;
             cashuLog.info('mint.search.results', {
               fetchId,
               query,
               currency,
-              count: res.value.results.length,
+              count: results.length,
               total: res.value.total,
               withIcons,
               withReviews,
@@ -90,7 +136,7 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
             if (duration > 2000) {
               cashuLog.warn('mint.search.slow', { fetchId, duration_ms: duration, query });
             }
-            setResults(res.value.results);
+            setResults(results);
           } else {
             cashuLog.warn('mint.search.api_error', {
               fetchId,

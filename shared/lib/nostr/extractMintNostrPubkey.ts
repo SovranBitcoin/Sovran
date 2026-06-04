@@ -26,7 +26,7 @@ export function extractMintNostrPubkey(mintInfo: MintInfoForNostr): string | und
   const contacts = mintInfo?.contact;
   if (!Array.isArray(contacts)) return undefined;
   for (const c of contacts) {
-    if (c?.method !== 'nostr') continue;
+    if (typeof c?.method !== 'string' || c.method.toLowerCase() !== 'nostr') continue;
     if (typeof c.info !== 'string') continue;
     const value = c.info.trim();
     if (!value) continue;

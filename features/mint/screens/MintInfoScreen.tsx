@@ -21,9 +21,10 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
-import Icon, { CurrencyIcon } from 'assets/icons';
+import Icon from 'assets/icons';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -37,6 +38,13 @@ import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { openExternalUrl } from '@/shared/lib/url';
+import { useNostrProfile } from '@/shared/hooks/useNostrProfile';
+import {
+  formatMintInfoNostrFallback,
+  getMintInfoNostrContactPubkey,
+  getMintInfoNostrDisplayName,
+  getSortedMintInfoContacts,
+} from '../lib/mintInfoContacts';
 
 const ParamsSchema = z.object({
   mintInfoEntry: z.string().min(1).max(64_000).optional(),
@@ -159,7 +167,7 @@ function AnimatedAvatarComponent({
   // as the seam between the avatar and the badge, just continued all the way
   // around. `borderWidth` paints inside the box, so we add 2*ring to the
   // total width to keep the green disc itself the same size as before.
-  const ring = okOutline ? 2 : 0;
+  const ring = okOutline ? 4 : 0;
   const okOuter = badgeSize + 4 + ring * 2;
   const okBadge =
     statusBadge?.variant === 'success' && okBg && okIcon ? (
@@ -462,8 +470,26 @@ export function MintInfoScreen() {
 
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
+  const contact = entry?.contact as
+    | { method: string; info: import('colada').FormattedString }[]
+    | undefined;
+  const contactRows = useMemo(() => getSortedMintInfoContacts(contact), [contact]);
+  const nostrContactPubkey = useMemo(
+    () => getMintInfoNostrContactPubkey(contactRows),
+    [contactRows]
+  );
+  const { data: nostrContactProfile, isLoading: nostrContactLoading } = useNostrProfile(
+    nostrContactPubkey ?? null
+  );
+  const nostrContactPicture = nostrContactProfile?.picture || nostrContactProfile?.image;
 
-  const handleContactPress = useCallback(async (method: string, info: string) => {
+  const handleMintUrlPress = useCallback(async () => {
+    if (!mintUrl) return;
+    log.info('mint.info.address.copy');
+    await Clipboard.setStringAsync(mintUrl);
+  }, [mintUrl]);
+
+  const handleContactPress = useCallback(async (method: string, info: string, pubkey?: string) => {
     log.info('mint.info.contact.press', { method });
     const open = async (raw: string) => {
       const result = await openExternalUrl(raw);
@@ -481,16 +507,16 @@ export function MintInfoScreen() {
         await open(`https://x.com/${encodeURIComponent(info.replace('@', ''))}`);
         break;
       case 'nostr':
-        router.push(buildModalProfileHref({ npub: info }));
+        if (pubkey) {
+          router.push(buildModalProfileHref({ pubkey }));
+        } else {
+          await Clipboard.setStringAsync(info);
+        }
         break;
       default:
         await Clipboard.setStringAsync(info);
     }
   }, []);
-
-  const contact = entry?.contact as
-    | { method: string; info: import('colada').FormattedString }[]
-    | undefined;
 
   return (
     <Log name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
@@ -581,46 +607,91 @@ export function MintInfoScreen() {
           </>
         )}
 
-        {contact && contact.length > 0 && (
+        {mintUrl && (
+          <Section title="Mint address">
+            <ListGroup variant="secondary">
+              <PressableFeedback animation={false} onPress={handleMintUrlPress}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon name="humbleicons:url" size={20} color={opacity(foreground, 0.4)} />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle numberOfLines={3}>{mintUrl}</ListGroup.ItemTitle>
+                      <ListGroup.ItemDescription>Tap to copy</ListGroup.ItemDescription>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Icon name="lets-icons:copy" size={18} color={opacity(foreground, 0.4)} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
+          </Section>
+        )}
+
+        {contactRows.length > 0 && (
           <Section title="Contact">
             <ListGroup variant="secondary">
-              {contact.map((c, index) => (
-                <PressableFeedback
-                  key={index}
-                  animation={false}
-                  onPress={() => handleContactPress(c.method, c.info.toString())}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemPrefix>
-                        {c.method.toUpperCase() === 'NOSTR' ? (
-                          <CurrencyIcon
-                            colors={[opacity(foreground, 0.4)]}
-                            width={20}
-                            currency="nostr"
-                          />
-                        ) : ['X', 'TWITTER'].includes(c.method.toUpperCase()) ? (
-                          <Icon
-                            name="hugeicons:new-twitter"
-                            size={20}
-                            color={opacity(foreground, 0.4)}
-                          />
-                        ) : c.method.toUpperCase() === 'EMAIL' ? (
-                          <Icon name="mdi:at" size={20} color={opacity(foreground, 0.4)} />
-                        ) : undefined}
-                      </ListGroup.ItemPrefix>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>
-                          {c.method.toUpperCase() === 'NOSTR'
-                            ? c.info.truncate(10)
-                            : c.info.toString()}
-                        </ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix />
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-              ))}
+              {contactRows.map((c) => {
+                const rowNostrPubkey = c.isNostr ? getMintInfoNostrContactPubkey([c]) : undefined;
+                const rowProfile =
+                  rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
+                    ? nostrContactProfile
+                    : null;
+                const rowPicture =
+                  rowNostrPubkey && rowNostrPubkey === nostrContactPubkey
+                    ? nostrContactPicture
+                    : undefined;
+                const fallbackNpub = c.isNostr
+                  ? formatMintInfoNostrFallback(c.info, rowNostrPubkey)
+                  : undefined;
+                const title = c.isNostr
+                  ? getMintInfoNostrDisplayName(rowProfile, fallbackNpub ?? c.info)
+                  : c.info;
+                return (
+                  <PressableFeedback
+                    key={`${c.method}:${c.info}:${c.originalIndex}`}
+                    animation={false}
+                    onPress={() => handleContactPress(c.method, c.info, rowNostrPubkey)}>
+                    <PressableFeedback.Scale>
+                      <ListGroup.Item disabled>
+                        <ListGroup.ItemPrefix>
+                          {c.isNostr ? (
+                            <Avatar
+                              state={
+                                nostrContactLoading && rowNostrPubkey === nostrContactPubkey
+                                  ? 'loading'
+                                  : rowPicture
+                                    ? 'image'
+                                    : 'fallback'
+                              }
+                              picture={rowPicture}
+                              seed={rowNostrPubkey ?? c.info}
+                              name={title}
+                              size={32}
+                            />
+                          ) : ['X', 'TWITTER'].includes(c.method.toUpperCase()) ? (
+                            <Icon
+                              name="hugeicons:new-twitter"
+                              size={20}
+                              color={opacity(foreground, 0.4)}
+                            />
+                          ) : c.method.toUpperCase() === 'EMAIL' ? (
+                            <Icon name="mdi:at" size={20} color={opacity(foreground, 0.4)} />
+                          ) : undefined}
+                        </ListGroup.ItemPrefix>
+                        <ListGroup.ItemContent>
+                          <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
+                        </ListGroup.ItemContent>
+                        <ListGroup.ItemSuffix />
+                      </ListGroup.Item>
+                    </PressableFeedback.Scale>
+                    <PressableFeedback.Ripple />
+                  </PressableFeedback>
+                );
+              })}
             </ListGroup>
           </Section>
         )}
