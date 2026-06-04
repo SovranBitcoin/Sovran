@@ -8,7 +8,7 @@ routing, storage, native modules, and product-specific enrichment.
 The package has two public entry points:
 
 - `colada` for framework-agnostic machine, adapters, copy, history, chain,
-  subscription, and capability helpers.
+  subscription, screen-action session, and capability helpers.
 - `colada/react` for `ColadaProvider`, `usePaymentFlowMachine`,
   `useScreenActions`, `useExecutionState`, and `useColadaSubscriptions`.
 
@@ -34,6 +34,7 @@ The package has two public entry points:
 - Persistent stores, profile state, selected mint state, and app settings.
 - Platform implementations for every adapter.
 - Wallet operations that touch Coco, native modules, APIs, or private state.
+- App-specific seed derivation paths and secret storage policy.
 - Optional copy overrides and screen-entry enrichment.
 
 Colada should not import Expo, Nitro, React Native native modules, Nostr relay
@@ -120,6 +121,55 @@ Important props:
 
 Flat provider props win over values carried by `instance`.
 
+## Nostr GraphQL Enrichment
+
+Colada stays backend-agnostic for Nostr-indexed mint data. Pass
+`nostrGraphqlEndpoint` to `createColada()` when the wallet has an indexer that
+serves the generic Nostr GraphQL schema:
+
+```ts
+const instance = createColada({
+  manager,
+  nostrGraphqlEndpoint: 'https://nostr-index.example.com/graphql',
+});
+```
+
+With that URL, Colada's default operations can resolve mint operator kind-0
+profiles and mint review events through `events(input:)` and
+`pubkeyEvents(kinds: [0])`. Wallets can still override the behavior by passing
+`resolveMintContactProfile` or `fetchMintReviews` directly.
+
+## Cashu Seed Helpers
+
+Colada exports wallet seed helpers for Coco `seedGetter` setup:
+
+- `generateCashuMnemonic()` creates a standard 12-word BIP-39 mnemonic.
+- `deriveStandardCashuSeed(mnemonic)` returns the standard 64-byte BIP-39 seed.
+- `createCashuSeedGetter({ getMnemonic })` returns a lazy Coco-compatible
+  `() => Promise<Uint8Array>`.
+
+Use the default path when a wallet stores a Cashu mnemonic directly:
+
+```ts
+const seedGetter = createCashuSeedGetter({
+  getMnemonic: () => loadCashuMnemonic(),
+});
+```
+
+Apps with frozen custom derivation can keep that derivation app-owned by
+passing `deriveSeed`. The callback receives a normalized, validated BIP-39
+mnemonic and must return the 64-byte seed Coco expects.
+
+```ts
+const seedGetter = createCashuSeedGetter({
+  getMnemonic: () => loadRootMnemonic(),
+  deriveSeed: (rootMnemonic) => deriveSeedForProfile(rootMnemonic, accountIndex),
+});
+```
+
+Optional `cache.load` and `cache.store` hooks let apps keep expensive PBKDF2 or
+custom derivation out of the hot path without moving secret storage into Colada.
+
 ## Flow Machine
 
 `usePaymentFlowMachine({ walletContext, unit })` binds the current screen's
@@ -185,6 +235,18 @@ distinct operation or flow meaning.
 
 Emoji token copy is a `sendToken.copy` variant with `variantId: 'emoji'`.
 There is no sibling emoji-copy runtime action.
+
+Frameworks that are not React should use `createScreenActionSession()`. A
+session owns entry parsing, subscription-driven entry updates, merge/decorate
+rules, source refreshes, action inspection, action execution, and disposal. It
+exposes `inspect()`, `subscribe()`, `execute(action, params?)`, `setEntry()`,
+`setEntrySeed()`, and `dispose()`. React's `useScreenActions()` is only an
+adapter around that session via `useSyncExternalStore`.
+
+`screenActionsBridge` remains app-owned. It can publish from stores/native
+sources into Colada's bus and provide entry update mapping, merge rules,
+decoration, locale, source labels, and extra action context without depending on
+React.
 
 ## Copy And Localization
 

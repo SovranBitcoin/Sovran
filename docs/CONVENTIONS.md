@@ -118,6 +118,8 @@ Use "Colada owns" only for behavior that lives in this package:
 - typed subscription events
 - chain adapter contracts and default mempool.space helpers
 - JSON-shaped adapter contracts
+- standard BIP-39 Cashu mnemonic and seed helper functions
+- generic Nostr GraphQL query recipes when the app provides an endpoint URL
 
 Use "the app owns" for:
 
@@ -126,7 +128,9 @@ Use "the app owns" for:
 - persistent stores and profile state
 - platform adapter implementations
 - Coco manager instances and wallet-specific operations
+- app-specific seed derivation paths, seed cache policy, and secret storage
 - product-specific entry decoration
+- backend selection and Nostr GraphQL endpoint configuration
 
 ## Compatibility Language
 

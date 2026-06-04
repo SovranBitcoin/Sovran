@@ -16,6 +16,26 @@ export {
 // Re-export Manager type so consumers don't need to import coco-cashu-core
 export type { Manager } from '@cashu/coco-core';
 
+// Wallet seed helpers
+export {
+  CashuSeedError,
+  createCashuSeedGetter,
+  deriveStandardCashuSeed,
+  generateCashuMnemonic,
+  isValidCashuMnemonic,
+  normalizeCashuMnemonic,
+  tryDeriveStandardCashuSeed,
+} from './wallet-seed';
+export type {
+  CashuSeedCache,
+  CashuSeedCacheContext,
+  CashuSeedErrorCode,
+  CashuSeedResult,
+  CreateCashuSeedGetterConfig,
+  DeriveStandardCashuSeedOptions,
+  GenerateCashuMnemonicOptions,
+} from './wallet-seed';
+
 // Logger seam — consumers inject a structured logger via the `logger` option
 // on `createColada`; tests and standalone consumers get a no-op default.
 export { setLogger, type CocoLogger } from './logger';
@@ -133,7 +153,10 @@ export type {
 } from './adapters';
 
 // Subscription bus
-export { createSubscriptionBus, matchesSubscriptionFilter } from './subscriptions';
+export {
+  createSubscriptionBus,
+  matchesSubscriptionFilter,
+} from './subscriptions';
 export type {
   ColadaSubscriptionBus,
   ColadaSubscriptionEvent,
@@ -169,7 +192,11 @@ export {
 export { resolveIntent } from './intent';
 export { defaultDetectors } from './detectors';
 export { annotateOptions } from './annotate';
-export { selectMint, selectMintForMelt, type MintSelectionConfig } from './mint-selection';
+export {
+  selectMint,
+  selectMintForMelt,
+  type MintSelectionConfig,
+} from './mint-selection';
 export {
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
@@ -258,6 +285,7 @@ export type {
 
 // Screen actions (post-terminal screen action system)
 export {
+  createScreenActionSession,
   createScreenActionManager,
   getAvailableActions,
   isPaymentRequestPreview,
@@ -272,14 +300,20 @@ export type {
   ActionHandler,
   ActionState,
   ActionVariant,
+  CreateScreenActionSessionConfig,
   DecoratedEntryFields,
   DefaultScreenActionHandlersConfig,
   MeltOperationLike,
   NavigationCallbacks,
+  ScreenActionEntrySeed,
+  ScreenActionEntryUpdateSubscriber,
   ScreenActionContext,
   ScreenActionHandlerMap,
   ScreenActionManager,
   ScreenActionName,
+  ScreenActionsBridge,
+  ScreenActionSession,
+  ScreenActionSessionSnapshot,
   ScreenType,
 } from './screen-actions';
 
@@ -318,6 +352,12 @@ export {
   type RequestControls,
 } from './safeFetch';
 
+export { createNostrGraphqlMintEnrichment } from './nostr-graphql';
+export type {
+  NostrGraphqlMintEnrichment,
+  NostrGraphqlMintEnrichmentConfig,
+} from './nostr-graphql';
+
 // Domain types
 export type {
   Detectors,
@@ -343,9 +383,14 @@ export type {
   AmountEntryConstraints,
   MintListItem,
   MintCatalogEntry,
+  MintContactProfile,
+  MintContactProfileResolver,
   MintSelectionResult,
   MintCandidate,
   MintReviewInfo,
+  MintReviewRecommendation,
+  MintReviewsFetcher,
+  MintReviewsSummary,
   GuardResult,
   WalletCapability,
   CapabilityCheckResult,
