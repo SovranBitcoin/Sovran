@@ -102,8 +102,16 @@ const SEGMENT_ANIM_MS = 340;
 const SEGMENT_STAGGER_MS = 55;
 const SEGMENT_PULSE_MS = 180;
 
+// Idle ring reads as a handful of discrete arc segments (echoing the
+// segmented confirmation ring) rather than a fine dotted hairline. Six
+// evenly spaced dashes around the circumference — `dash + gap` divides
+// CIRC exactly, so the seams land symmetrically and don't drift.
+const IDLE_SEGMENT_COUNT = 6;
+const IDLE_SEGMENT_GAP = 13;
+const IDLE_SEGMENT_DASH = CIRC / IDLE_SEGMENT_COUNT - IDLE_SEGMENT_GAP;
+
 const DASH: Record<Phase, [number, number]> = {
-  idle: [5, 9],
+  idle: [IDLE_SEGMENT_DASH, IDLE_SEGMENT_GAP],
   loading: [70, CIRC - 70],
   done: [CIRC, 0],
 };

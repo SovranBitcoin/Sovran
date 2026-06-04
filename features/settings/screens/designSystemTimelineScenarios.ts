@@ -38,6 +38,25 @@ interface TimelineScenario {
   frames: TimelineFrame[];
 }
 
+/**
+ * Debug readout of the coco / cashu-ts state behind a {@link TimelineFrame}.
+ *
+ * The Timeline copy ("Payment received", "Sending", …) is deliberately friendly, which makes
+ * it hard to tell which protocol state a given label maps to. {@link describeFrameState} derives
+ * this from the exact same inputs `buildTimeline()` consumes, so the readout can never drift from
+ * what the Timeline actually renders.
+ */
+interface FrameStateInsight {
+  /** Where the state lives in the stack, e.g. "cashu-ts · MintQuoteState". */
+  source: string;
+  /** The precise code-level token a debugger would see, e.g. "MintQuoteState.PAID". */
+  code: string;
+  /** What that state means at the protocol level. */
+  meaning: string;
+  /** Secondary signals that refine the step (confirmations, expiry, NUT-18 flags). */
+  detail?: { label: string; value: string }[];
+}
+
 interface BaseFields {
   createdAt: number;
 }
@@ -275,4 +294,175 @@ export function buildTimelineScenarios(createdAt: number): TimelineScenario[] {
       ],
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Code-state introspection
+// ---------------------------------------------------------------------------
+
+function entryState(entry: HistoryEntry): string {
+  return String((entry as unknown as Record<string, unknown>).state ?? '');
+}
+
+function isOnchainEntry(entry: HistoryEntry): boolean {
+  const metadata = (entry as unknown as Record<string, unknown>).metadata;
+  const meta =
+    metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : undefined;
+  return meta?.method === 'onchain';
+}
+
+/** Mirror of colada's `getMintTimelineState` for the states the fixtures produce. */
+function normalizeMintState(raw: string): string {
+  if (raw === 'finalized') return MintQuoteState.ISSUED;
+  if (raw === 'executing') return MintQuoteState.PAID;
+  if (raw === 'failed') return 'failed';
+  if (raw === 'pending') return MintQuoteState.UNPAID;
+  return raw; // UNPAID / PAID / ISSUED pass through unchanged.
+}
+
+/** Mirror of colada's melt-state normalization. */
+function normalizeMeltState(raw: string): string {
+  if (raw === 'finalized') return MeltQuoteState.PAID;
+  if (raw === 'pending' || raw === 'executing') return MeltQuoteState.PENDING;
+  if (raw === 'PAID' || raw === 'PENDING' || raw === 'UNPAID') return raw;
+  return MeltQuoteState.UNPAID;
+}
+
+const BOLT11_MINT_MEANING: Record<string, string> = {
+  [MintQuoteState.UNPAID]: 'Mint quote issued — the Lightning invoice has not been paid yet.',
+  [MintQuoteState.PAID]: 'Invoice paid at the mint — proofs not yet minted into the wallet.',
+  [MintQuoteState.ISSUED]: 'Proofs minted and stored — the receive is complete.',
+};
+
+const ONCHAIN_MINT_MEANING: Record<string, string> = {
+  [MintQuoteState.UNPAID]: 'Deposit address issued — watching the chain for an incoming tx.',
+  [MintQuoteState.PAID]: 'Required confirmations reached — the mint will issue ecash.',
+  [MintQuoteState.ISSUED]: 'Proofs minted and stored — the receive is complete.',
+};
+
+const MELT_MEANING: Record<string, string> = {
+  [MeltQuoteState.UNPAID]: 'Melt quote accepted — the wallet has not started paying yet.',
+  [MeltQuoteState.PENDING]: 'Mint is paying the Lightning invoice — settlement in flight.',
+  [MeltQuoteState.PAID]: 'Lightning invoice settled — the send is complete.',
+};
+
+const SEND_MEANING: Record<string, string> = {
+  prepared: 'Token built and reserved from your balance — not yet claimed by anyone.',
+  pending: 'Token is outstanding — waiting for the recipient to claim it.',
+  finalized: 'Recipient claimed the token — the proofs are now spent.',
+  rolledBack: 'Send reversed — the reserved proofs returned to your balance.',
+};
+
+const RECEIVE_MEANING: Record<string, string> = {
+  prepared: 'Incoming token parsed — the swap with the mint is not finalized yet.',
+  finalized: 'Proofs swapped into your wallet — the receive is complete.',
+  rolledBack: 'Swap rejected — these proofs were already spent at the mint.',
+};
+
+function onchainDetail(p: ChainOnchainConfirmationProgress): { label: string; value: string }[] {
+  const mempool = !p.hasPayment
+    ? 'no tx seen yet'
+    : p.hasUnconfirmedPayment && p.currentConfirmations == null
+      ? 'tx in mempool · 0 conf'
+      : 'tx mined';
+  return [
+    { label: 'mempool', value: mempool },
+    {
+      label: 'confirmations',
+      value: `${p.currentConfirmations ?? 0} / ${p.requiredConfirmations}`,
+    },
+    { label: 'isSatisfied', value: p.isSatisfied ? 'true → minting ecash' : 'false' },
+  ];
+}
+
+function meltQuoteExpired(quote: MeltQuoteBolt11Response): boolean {
+  if (!quote.expiry) return false;
+  return Math.floor(Date.now() / 1000) > quote.expiry;
+}
+
+/**
+ * Resolve the coco / cashu-ts state a given Timeline frame represents, for the Design System
+ * debug readout. Derived from the frame's own inputs — the same data `buildTimeline()` reads.
+ */
+export function describeFrameState(frame: TimelineFrame): FrameStateInsight {
+  const entry = frame.historyEntry;
+  const raw = entryState(entry);
+
+  switch (entry.type) {
+    case 'mint': {
+      if (normalizeMintState(raw) === 'failed') {
+        return {
+          source: 'coco · mint operation',
+          code: 'op.state = "failed"',
+          meaning: 'Mint operation failed — the quote never completed and no ecash was issued.',
+        };
+      }
+      const onchain = isOnchainEntry(entry);
+      const state = normalizeMintState(raw);
+      const progress = frame.onchainConfirmationProgress;
+      return {
+        source: onchain
+          ? 'cashu-ts · MintQuoteState (onchain mint)'
+          : 'cashu-ts · MintQuoteState (bolt11 mint)',
+        code: `MintQuoteState.${state}`,
+        meaning: (onchain ? ONCHAIN_MINT_MEANING : BOLT11_MINT_MEANING)[state] ?? '',
+        detail: onchain && progress ? onchainDetail(progress) : undefined,
+      };
+    }
+
+    case 'melt': {
+      const state = normalizeMeltState(raw);
+      const expired = frame.meltQuote ? meltQuoteExpired(frame.meltQuote) : false;
+      return {
+        source: 'cashu-ts · MeltQuoteState',
+        code: `MeltQuoteState.${state}`,
+        meaning: expired
+          ? 'Quote expiry timestamp passed — still UNPAID at the mint, surfaced to the user as expired.'
+          : (MELT_MEANING[state] ?? ''),
+        detail: frame.meltQuote
+          ? [{ label: 'quote expiry', value: expired ? 'elapsed → expired' : 'valid' }]
+          : undefined,
+      };
+    }
+
+    case 'send': {
+      const isPaymentRequest = frame.tokenCreated !== undefined || !!frame.nostrSent;
+      if (isPaymentRequest) {
+        let meaning = SEND_MEANING[raw] ?? '';
+        if (raw === 'prepared') {
+          meaning = frame.tokenCreated
+            ? 'Token built — not yet published to Nostr.'
+            : 'Building the cashu token to enclose in the request.';
+        } else if (raw === 'pending') {
+          meaning = frame.nostrSent
+            ? 'DM accepted by the relays — waiting for the recipient to claim.'
+            : 'Publishing the encrypted DM (the token) to the relays.';
+        }
+        return {
+          source: 'coco · send operation + NUT-18',
+          code: `op.state = "${raw}"`,
+          meaning,
+          detail: [
+            { label: 'tokenCreated', value: String(!!frame.tokenCreated) },
+            { label: 'nostrSent', value: String(!!frame.nostrSent) },
+          ],
+        };
+      }
+      return {
+        source: 'coco · send operation',
+        code: `op.state = "${raw}"`,
+        meaning: SEND_MEANING[raw] ?? '',
+      };
+    }
+
+    case 'receive':
+      return {
+        source: 'coco · receive operation',
+        code: `op.state = "${raw}"`,
+        meaning: RECEIVE_MEANING[raw] ?? '',
+      };
+
+    default:
+      return { source: 'unknown', code: raw, meaning: '' };
+  }
 }
