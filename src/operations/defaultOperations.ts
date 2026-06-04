@@ -10,8 +10,10 @@
 //   linkTransaction       — needs app-specific scan history store
 //   Mint catalog data     — bulk fetch (audit / KYM / operator profile),
 //                           injected via fetchMintCatalog
-//   Mint review detail    — per-mint enrichment for the trust review screen,
-//                           injected via enrichMintReviewInfo
+//   Mint review detail    — local per-mint trust metrics injected via
+//                           enrichMintReviewInfo; Nostr profile/review event
+//                           enrichment can default to generic GraphQL via
+//                           createColada({ nostrGraphqlEndpoint })
 // ---------------------------------------------------------------------------
 
 import { getTokenMetadata } from '@cashu/cashu-ts';
@@ -22,8 +24,15 @@ import type {
   SendHistoryEntry,
 } from '@cashu/coco-core';
 import { getEncodedToken } from '@cashu/coco-core';
+import { nip19 } from 'nostr-tools';
 import type { MachineOperations, StepDataMap } from '../machine/types';
-import type { MintCatalogEntry, MintListItem, MintReviewInfo } from '../types';
+import type {
+  MintCatalogEntry,
+  MintContactProfileResolver,
+  MintListItem,
+  MintReviewInfo,
+  MintReviewsFetcher,
+} from '../types';
 import { defaultDetectors } from '../detectors';
 import { errField, logger } from '../logger';
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
@@ -47,6 +56,40 @@ function hasMintInfo(value: MintInfo | undefined): value is MintInfo {
     value !== null &&
     Object.keys(value as Record<string, unknown>).length > 0
   );
+}
+
+function normalizeNostrPubkey(input: string): string | undefined {
+  const value = input.trim().replace(/^nostr:/i, '');
+  if (/^[0-9a-f]{64}$/i.test(value)) {
+    return value.toLowerCase();
+  }
+  try {
+    const decoded = nip19.decode(value);
+    if (decoded.type === 'npub') {
+      return decoded.data;
+    }
+    if (decoded.type === 'nprofile') {
+      return decoded.data.pubkey;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function extractMintNostrContactPubkey(mintInfo: MintInfo | undefined): string | undefined {
+  const contacts = (mintInfo as { contact?: unknown } | undefined)?.contact;
+  if (!Array.isArray(contacts)) return undefined;
+  for (const contact of contacts) {
+    if (typeof contact !== 'object' || contact === null) continue;
+    const method = (contact as { method?: unknown }).method;
+    const info = (contact as { info?: unknown }).info;
+    if (typeof method !== 'string' || typeof info !== 'string') continue;
+    if (method.trim().toLowerCase() !== 'nostr') continue;
+    const pubkey = normalizeNostrPubkey(info);
+    if (pubkey) return pubkey;
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,6 +289,10 @@ export interface DefaultOperationsConfig {
    * needed the same audit data earlier in the session).
    */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
+  /** Resolve a NUT-06 Nostr contact pubkey into display metadata. */
+  resolveMintContactProfile?: MintContactProfileResolver;
+  /** Fetch aggregated review rows for the trust-review screen. */
+  fetchMintReviews?: MintReviewsFetcher;
   /**
    * Dev-only: when true, executePaymentRequest simulates a delivery failure
    * to test rollback. Ignored unless NODE_ENV !== 'production' so a hostile
@@ -786,6 +833,47 @@ export function createDefaultOperations(
         if (item.auditState !== undefined) rowCatalog.auditState = item.auditState;
       }
 
+      const contactPubkey = extractMintNostrContactPubkey(mintInfo);
+      const [contactProfile, reviews] = await Promise.all([
+        contactPubkey && config.resolveMintContactProfile
+          ? config.resolveMintContactProfile(contactPubkey, mintUrl).catch((e) => {
+              logger.warn('operations.buildMintReviewInfo.contactProfile.failed', {
+                mintUrl,
+                pubkey: contactPubkey,
+                error: errField(e),
+              });
+              return undefined;
+            })
+          : Promise.resolve(undefined),
+        config.fetchMintReviews
+          ? config.fetchMintReviews(mintUrl).catch((e) => {
+              logger.warn('operations.buildMintReviewInfo.reviews.failed', {
+                mintUrl,
+                error: errField(e),
+              });
+              return undefined;
+            })
+          : Promise.resolve(undefined),
+      ]);
+
+      const asyncEnrichment: Partial<MintReviewInfo> = {};
+      if (contactProfile) {
+        asyncEnrichment.contactProfile = contactProfile;
+        if (typeof contactProfile.followers === 'number') {
+          asyncEnrichment.contactFollowers = contactProfile.followers;
+        }
+        if (typeof contactProfile.score === 'number') {
+          asyncEnrichment.contactReputation = Math.round(contactProfile.score);
+        }
+      }
+      if (reviews) {
+        asyncEnrichment.reviews = reviews;
+        asyncEnrichment.reviewCount = reviews.recommendations.length;
+        if (typeof reviews.score === 'number') {
+          asyncEnrichment.kymScore = reviews.score;
+        }
+      }
+
       const result: MintReviewInfo = {
         mintUrl,
         displayName: mintInfo?.name ?? item?.displayName ?? mintUrl,
@@ -801,6 +889,7 @@ export function createDefaultOperations(
         isTrusted,
         ...enrichment,
         ...rowCatalog,
+        ...asyncEnrichment,
       };
 
       // Detail metrics (avgTimeMs, swap counts, totals) only exist in the

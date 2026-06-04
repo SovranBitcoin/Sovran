@@ -1,3 +1,5 @@
+import type { RequestControls } from './safeFetch';
+
 // ---------------------------------------------------------------------------
 // Detectors — provided by the wallet to enable protocol-specific parsing.
 // The library performs normalization and orchestration; detectors handle
@@ -206,6 +208,49 @@ export interface MintCatalogEntry {
   contactReputation?: number;
 }
 
+export interface MintContactProfile {
+  pubkey: string;
+  npub?: string;
+  name?: string;
+  displayName?: string;
+  picture?: string;
+  image?: string;
+  followers?: number;
+  follows?: number;
+  score?: number | null;
+}
+
+export interface MintReviewRecommendation {
+  score: number;
+  comment: string;
+  pubkey: string;
+  eventId: string;
+  created_at: number;
+  name?: string;
+  displayName?: string;
+  picture?: string;
+  image?: string;
+}
+
+export interface MintReviewsSummary {
+  mintUrl?: string;
+  score: number | null;
+  recommendations: MintReviewRecommendation[];
+  lastUpdated?: number | null;
+  fromCache?: boolean;
+}
+
+export type MintContactProfileResolver = (
+  pubkey: string,
+  mintUrl: string,
+  controls?: RequestControls
+) => Promise<MintContactProfile | undefined>;
+
+export type MintReviewsFetcher = (
+  mintUrl: string,
+  controls?: RequestControls
+) => Promise<MintReviewsSummary | undefined>;
+
 /**
  * A fully-resolved mint row ready for display. Built by the wallet before navigation so
  * the mint list screen requires no data fetching — all balances, scores, and availability
@@ -283,6 +328,10 @@ export interface MintReviewInfo {
   contactFollowers?: number;
   /** Reputation score (0-100) of the mint operator's Nostr identity. */
   contactReputation?: number;
+  /** Resolved Nostr profile for the mint operator contact in NUT-06 metadata. */
+  contactProfile?: MintContactProfile;
+  /** Aggregated Nostr mint reviews for this mint. */
+  reviews?: MintReviewsSummary;
 }
 
 export type MintSelectionResult =

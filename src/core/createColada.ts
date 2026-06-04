@@ -21,9 +21,16 @@ import type {
   StepHandlerMap,
   URDecoderLike,
 } from '../machine/types';
-import type { MintCatalogEntry, MintReviewInfo, WalletContext } from '../types';
+import type {
+  MintCatalogEntry,
+  MintContactProfileResolver,
+  MintReviewInfo,
+  MintReviewsFetcher,
+  WalletContext,
+} from '../types';
 import { createDefaultOperations } from '../operations/defaultOperations';
 import { createWalletContextTracker, type WalletContextTracker } from './walletContextTracker';
+import { createNostrGraphqlMintEnrichment } from '../nostr-graphql';
 
 // NUT-06 mint info as returned by coco's `Manager`. Re-derived here (rather than
 // imported from cashu-ts) so the type tracks whatever shape `mgr.mint.getMintInfo`
@@ -62,6 +69,16 @@ export interface ColadaConfig {
   fetchMintInfo?: (mintUrl: string) => Promise<MintInfo | null>;
   /** Per-mint enrichment for the trust-review screen. Read from local caches. */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
+  /**
+   * Optional generic Nostr GraphQL endpoint. When set, Colada can resolve mint
+   * contact profiles and mint reviews from indexed Nostr events without
+   * knowing which backend serves the GraphQL schema.
+   */
+  nostrGraphqlEndpoint?: string;
+  /** Resolve a mint operator Nostr pubkey from NUT-06 contact metadata. */
+  resolveMintContactProfile?: MintContactProfileResolver;
+  /** Fetch aggregated Nostr reviews for a mint. */
+  fetchMintReviews?: MintReviewsFetcher;
 
   /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
@@ -116,6 +133,10 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     getPreferredMintUrl: config.getPreferredMintUrl,
   });
 
+  const graphqlEnrichment = config.nostrGraphqlEndpoint
+    ? createNostrGraphqlMintEnrichment({ endpoint: config.nostrGraphqlEndpoint })
+    : null;
+
   const operations = createDefaultOperations({
     getManager: () => manager,
     getProofAmounts: () => tracker.getContext().proofAmounts,
@@ -124,6 +145,9 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
     fetchMintInfo: config.fetchMintInfo,
+    resolveMintContactProfile:
+      config.resolveMintContactProfile ?? graphqlEnrichment?.resolveMintContactProfile,
+    fetchMintReviews: config.fetchMintReviews ?? graphqlEnrichment?.fetchMintReviews,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
     shouldMockFailMelt: config.shouldMockFailMelt,
     shouldMockFailSend: config.shouldMockFailSend,
