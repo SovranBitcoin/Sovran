@@ -14,66 +14,33 @@
 //   );
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import { useLatestRef } from './useLatestRef';
-import type { CreateAmountActionManagerConfig , QuickSendSuggestion } from '../amount-actions/types';
+import type {
+  CreateAmountActionManagerConfig,
+  QuickSendSuggestion,
+} from '../amount-actions/types';
 import {
-  createScreenActionManager,
-  shouldApplyEntryUpdate as defaultShouldApply,
-  mergeEntryUpdate as defaultMerge,
+  createScreenActionSession,
+  type ScreenActionSession,
+} from '../screen-actions/session';
+import {
   decorateEntry as defaultDecorate,
+  mergeEntryUpdate as defaultMerge,
+  shouldApplyEntryUpdate as defaultShouldApply,
 } from '../screen-actions/createManager';
 import { createDefaultScreenActionHandlers } from '../screen-actions/defaultHandlers';
 import type {
   ActionState,
   DecoratedEntryFields,
   ScreenActionHandlerMap,
-  ScreenActionManager,
   ScreenActionName,
+  ScreenActionsBridge,
   ScreenType,
 } from '../screen-actions/types';
 
 import { useColadaContext } from './ColadaProvider';
-
-// ---------------------------------------------------------------------------
-// Entry parsing
-// ---------------------------------------------------------------------------
-
-function parseEntryParam(param: Record<string, unknown> | string | undefined): {
-  parsed: Record<string, unknown> | null;
-  error: string | null;
-} {
-  if (!param) {
-    return { parsed: null, error: 'Missing transaction data. Please try again.' };
-  }
-  if (typeof param === 'string') {
-    try {
-      return { parsed: JSON.parse(param) as Record<string, unknown>, error: null };
-    } catch {
-      return { parsed: null, error: 'Invalid transaction data. Please try again.' };
-    }
-  }
-  return { parsed: param, error: null };
-}
-
-function parseAmountEntryParam(param: Record<string, unknown> | string | undefined): {
-  parsed: Record<string, unknown> | null;
-  error: string | null;
-} {
-  if (param == null) {
-    return { parsed: {}, error: null };
-  }
-  if (typeof param === 'string') {
-    if (!param.trim()) return { parsed: {}, error: null };
-    try {
-      return { parsed: JSON.parse(param) as Record<string, unknown>, error: null };
-    } catch {
-      return { parsed: null, error: 'Invalid amount screen data.' };
-    }
-  }
-  return { parsed: param, error: null };
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,19 +61,24 @@ export interface UseScreenActionsConfig<S extends ScreenType> {
   defaultHandlers?: ScreenActionHandlerMap[S];
   entryParam: Record<string, unknown> | string | undefined;
   getExtraContext?: () => Record<string, unknown>;
-  onEntryUpdate?: (callback: (entry: Record<string, unknown>) => void) => () => void;
+  onEntryUpdate?: (
+    callback: (entry: Record<string, unknown>) => void,
+  ) => () => void;
   shouldApplyEntryUpdate?: (
     currentEntry: Record<string, unknown> | null,
-    updatedEntry: Record<string, unknown>
+    updatedEntry: Record<string, unknown>,
   ) => boolean;
   mergeEntryUpdate?: (
     currentEntry: Record<string, unknown> | null,
-    updatedEntry: Record<string, unknown>
+    updatedEntry: Record<string, unknown>,
   ) => Record<string, unknown>;
   amountConfig?: CreateAmountActionManagerConfig;
 }
 
-export type UseScreenActionsResult<S extends ScreenType, E = Record<string, unknown>> = {
+export type UseScreenActionsResult<
+  S extends ScreenType,
+  E = Record<string, unknown>,
+> = {
   entry: E | null;
   error: string | null;
   actions: Record<ScreenActionName[S], BoundAction>;
@@ -121,7 +93,7 @@ export type UseScreenActionsResult<S extends ScreenType, E = Record<string, unkn
 // ---------------------------------------------------------------------------
 
 export function useScreenActionsWithConfig<S extends ScreenType>(
-  config: UseScreenActionsConfig<S>
+  config: UseScreenActionsConfig<S>,
 ): Omit<UseScreenActionsResult<S>, 'source'> {
   const {
     screenType,
@@ -139,87 +111,85 @@ export function useScreenActionsWithConfig<S extends ScreenType>(
   const shouldApplyEntryUpdateRef = useLatestRef(shouldApplyEntryUpdate);
   const mergeEntryUpdateRef = useLatestRef(mergeEntryUpdate);
   const amountConfigRef = useLatestRef(amountConfig);
+  const onEntryUpdateRef = useLatestRef(onEntryUpdate);
 
-  const { parsed, error } = useMemo(
-    () =>
-      screenType === 'amountEntry'
-        ? parseAmountEntryParam(entryParam as Record<string, unknown> | string | undefined)
-        : parseEntryParam(entryParam),
-    [screenType, entryParam]
-  );
+  const sessionRef = useRef<ScreenActionSession<S> | null>(null);
 
-  const managerRef = useRef<ScreenActionManager<S> | null>(null);
-
-  if (!managerRef.current) {
-    managerRef.current = createScreenActionManager<S>({
+  if (!sessionRef.current) {
+    sessionRef.current = createScreenActionSession<S>({
       screenType,
       handlers,
       defaultHandlers,
-      getContext: () => ({
-        entry: managerRef.current?.getEntry() ?? {},
-        manager: null,
-        setEntry: (e: Record<string, unknown>) => managerRef.current?.setEntry(e),
-        ...getExtraContextRef.current?.(),
-      }),
+      entrySeed: entryParam,
+      getExtraContext: () => getExtraContextRef.current?.() ?? {},
+      subscribeEntryUpdates: onEntryUpdate
+        ? (callback) => onEntryUpdateRef.current?.(callback) ?? (() => {})
+        : undefined,
+      shouldApplyEntryUpdate: shouldApplyEntryUpdate
+        ? (current, updated) =>
+            shouldApplyEntryUpdateRef.current!(current, updated)
+        : undefined,
+      mergeEntryUpdate: mergeEntryUpdate
+        ? (current, updated) => mergeEntryUpdateRef.current!(current, updated)
+        : undefined,
       amountConfig:
-        screenType === 'amountEntry' ? (amountConfigRef.current ?? undefined) : undefined,
+        screenType === 'amountEntry'
+          ? (amountConfigRef.current ?? undefined)
+          : undefined,
+      decorateEntry: (entry) => entry,
     });
   }
 
-  const actionManager = managerRef.current;
+  const session = sessionRef.current;
 
   useEffect(() => {
-    if (parsed != null) {
-      actionManager.setEntry(parsed);
-    }
-  }, [parsed, actionManager]);
+    session.setEntrySeed(entryParam);
+  }, [entryParam, session]);
 
   useEffect(() => {
-    if (parsed == null || !onEntryUpdate) return;
+    return () => session.dispose();
+  }, [session]);
 
-    return onEntryUpdate((updated) => {
-      const currentEntry = actionManager.getEntry();
-      const shouldApply = shouldApplyEntryUpdateRef.current ?? defaultShouldApply;
-      if (shouldApply(currentEntry, updated)) {
-        const merge = mergeEntryUpdateRef.current ?? defaultMerge;
-        actionManager.setEntry(merge(currentEntry, updated));
-      }
-    });
-  }, [parsed, onEntryUpdate, actionManager]);
-
-  const rawState = useSyncExternalStore(
-    actionManager.subscribe,
-    actionManager.inspect,
-    actionManager.inspect
+  const snapshot = useSyncExternalStore(
+    session.subscribe,
+    session.inspect,
+    session.inspect,
   );
 
   const actions = useMemo(() => {
     const bound = {} as Record<ScreenActionName[S], BoundAction>;
-    for (const [name, state] of Object.entries(rawState) as [ScreenActionName[S], ActionState][]) {
+    for (const [name, state] of Object.entries(snapshot.actions) as [
+      ScreenActionName[S],
+      ActionState,
+    ][]) {
       bound[name] = {
         ...state,
-        execute: (params?: Record<string, unknown>) => actionManager.execute(name, params),
+        execute: (params?: Record<string, unknown>) =>
+          session.execute(name, params),
       };
     }
     return bound;
-  }, [rawState, actionManager]);
+  }, [snapshot.actions, session]);
 
-  const entry = actionManager.getEntry();
-  const suggestions: QuickSendSuggestion[] = Array.isArray(entry?.suggestions)
-    ? (entry.suggestions as QuickSendSuggestion[])
-    : [];
-
-  return { entry, error, actions, mintUrl: undefined, suggestions };
+  return {
+    entry: snapshot.entry,
+    error: snapshot.error,
+    actions,
+    mintUrl: snapshot.mintUrl,
+    suggestions: snapshot.suggestions,
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Public API — handlers + bridge from ColadaProvider
 // ---------------------------------------------------------------------------
 
-export function useScreenActions<E extends Record<string, unknown> = Record<string, unknown>>(
+export function useScreenActions<
+  E extends Record<string, unknown> = Record<string, unknown>,
+>(
   screenType: 'amountEntry',
   entryParam?: E | string | undefined,
-  options?: { amountConfig?: CreateAmountActionManagerConfig }
+  options?: { amountConfig?: CreateAmountActionManagerConfig },
 ): UseScreenActionsResult<'amountEntry', E>;
 
 export function useScreenActions<
@@ -227,13 +197,13 @@ export function useScreenActions<
   E extends Record<string, unknown> = Record<string, unknown>,
 >(
   screenType: S,
-  entryParam: E | string | undefined
+  entryParam: E | string | undefined,
 ): UseScreenActionsResult<S, E & DecoratedEntryFields>;
 
 export function useScreenActions(
   screenType: ScreenType,
   entryParam: Record<string, unknown> | string | undefined,
-  options?: { amountConfig?: CreateAmountActionManagerConfig }
+  options?: { amountConfig?: CreateAmountActionManagerConfig },
 ): UseScreenActionsResult<ScreenType, any> {
   const {
     machine,
@@ -253,43 +223,53 @@ export function useScreenActions(
     shareContentRef,
   } = useColadaContext();
   const isAmountEntry = screenType === 'amountEntry';
-  const skipDecoration = isAmountEntry || screenType === 'mintSelector';
 
   const machineRef = useLatestRef(machine);
   const bridgeRef = useLatestRef(screenActionsBridge);
 
-  const getExtraContext = useCallback(
-    () => ({
-      paymentMachine: machineRef.current,
-      writeClipboard: writeClipboardRef.current,
-      shareContent: shareContentRef.current,
-      adapters: adaptersRef.current,
-      notify: (event: string, ...args: unknown[]) => {
-        const notifications = notificationsRef.current;
-        if (!notifications) return;
-        const handler = (notifications as Record<string, ((...a: unknown[]) => void) | undefined>)[
-          event
-        ];
-        if (typeof handler === 'function') handler(...args);
-      },
-      ...(bridgeRef.current?.getExtraContext?.() ?? {}),
-    }),
-    []
-  );
-
-  const onEntryUpdate = useCallback(
-    (callback: (entry: Record<string, unknown>) => void) => {
-      const bridge = bridgeRef.current;
-      if (!bridge?.subscribeEntryUpdates) return () => {};
-      return bridge.subscribeEntryUpdates(screenType, callback, subscriptionBusRef.current);
+  const getExtraContextRef = useLatestRef(() => ({
+    paymentMachine: machineRef.current,
+    writeClipboard: writeClipboardRef.current,
+    shareContent: shareContentRef.current,
+    adapters: adaptersRef.current,
+    notify: (event: string, ...args: unknown[]) => {
+      const notifications = notificationsRef.current;
+      if (!notifications) return;
+      const handler = (
+        notifications as Record<string, ((...a: unknown[]) => void) | undefined>
+      )[event];
+      if (typeof handler === 'function') handler(...args);
     },
-    [screenType, subscriptionBusRef]
-  );
+  }));
+
+  const sessionBridgeRef = useRef<ScreenActionsBridge | null>(null);
+  if (!sessionBridgeRef.current) {
+    sessionBridgeRef.current = {
+      getExtraContext: () => bridgeRef.current?.getExtraContext?.() ?? {},
+      subscribeEntryUpdates: (type, callback, bus) =>
+        bridgeRef.current?.subscribeEntryUpdates?.(type, callback, bus) ??
+        (() => {}),
+      shouldApplyEntryUpdate: (current, updated) =>
+        bridgeRef.current?.shouldApplyEntryUpdate?.(current, updated) ??
+        defaultShouldApply(current, updated),
+      mergeEntryUpdate: (current, updated) =>
+        bridgeRef.current?.mergeEntryUpdate?.(current, updated) ??
+        defaultMerge(current, updated),
+      decorateEntry: (entry, ctx) =>
+        bridgeRef.current?.decorateEntry?.(entry, ctx) ??
+        defaultDecorate(entry, ctx.language),
+      getLocale: () =>
+        bridgeRef.current?.getLocale?.() ?? getLocaleRef.current?.() ?? 'en',
+      getSourceLabel: (entry) =>
+        bridgeRef.current?.getSourceLabel?.(entry) ?? null,
+    };
+  }
 
   const handlersRaw = isAmountEntry
     ? screenActionHandlers.amountEntry
     : screenActionHandlers[screenType as Exclude<ScreenType, 'amountEntry'>];
-  const handlers = (handlersRaw ?? {}) as ScreenActionHandlerMap[typeof screenType];
+  const handlers = (handlersRaw ??
+    {}) as ScreenActionHandlerMap[typeof screenType];
 
   // Build default handlers from operations + notifications + navigation.
   // Uses refs so the handlers always read fresh values.
@@ -303,7 +283,10 @@ export function useScreenActions(
           const notifications = notificationsRef.current;
           if (!notifications) return;
           const handler = (
-            notifications as Record<string, ((...a: unknown[]) => void) | undefined>
+            notifications as Record<
+              string,
+              ((...a: unknown[]) => void) | undefined
+            >
           )[event];
           if (typeof handler === 'function') handler(...args);
         },
@@ -314,7 +297,7 @@ export function useScreenActions(
           goBack: () => navigationRef.current?.goBack?.(),
         },
       }),
-    [] // eslint-disable-line react-hooks/exhaustive-deps
+    [], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const defaultHandlersForScreen = (
     isAmountEntry
@@ -322,23 +305,15 @@ export function useScreenActions(
       : allDefaults[screenType as Exclude<ScreenType, 'amountEntry'>]
   ) as ScreenActionHandlerMap[typeof screenType];
 
-  const shouldApply = screenActionsBridge?.shouldApplyEntryUpdate ?? defaultShouldApply;
-  const mergeEntry = screenActionsBridge?.mergeEntryUpdate ?? defaultMerge;
-
-  const [, bumpGlobal] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    return subscriptionBusRef.current.subscribe({ type: 'screenActions.changed' }, () =>
-      bumpGlobal()
-    );
-  }, [subscriptionBusRef]);
-
   // Auto-derive amountConfig from provider context when not explicitly provided.
   // Every reactive field is a getter so the manager — created once and held
   // in managerRef across the screen's lifetime — re-reads destination, unit,
   // and display currency on every inspect(). Without this, opening amountEntry
   // a second time from a different destination (sendEcash → meltQuote) or
   // after a settings currency change keeps the first-render snapshot.
-  const derivedAmountConfig = useMemo((): CreateAmountActionManagerConfig | undefined => {
+  const derivedAmountConfig = useMemo(():
+    | CreateAmountActionManagerConfig
+    | undefined => {
     if (!isAmountEntry || options?.amountConfig) return undefined;
     return {
       getMintUrl: () => machineRef.current.getContext().mintUrl,
@@ -347,7 +322,8 @@ export function useScreenActions(
         return mint ? (walletContextRef.current?.proofAmounts[mint] ?? []) : [];
       },
       getBtcPrice: () => getBtcPriceRef.current?.() ?? 0,
-      offlineOptimization: () => machineRef.current.getContext().destination === 'sendEcash',
+      offlineOptimization: () =>
+        machineRef.current.getContext().destination === 'sendEcash',
       unit: () => machineRef.current.getContext().unit,
       fiatCurrency: () => getDisplayCurrencyRef.current?.()?.code,
       fiatSymbol: () => getDisplayCurrencyRef.current?.()?.symbol,
@@ -361,58 +337,68 @@ export function useScreenActions(
     ? (options?.amountConfig ?? derivedAmountConfig)
     : undefined;
 
-  const base = useScreenActionsWithConfig({
-    screenType: screenType as ScreenType,
-    handlers,
-    defaultHandlers: defaultHandlersForScreen,
-    entryParam,
-    getExtraContext,
-    onEntryUpdate: isAmountEntry ? undefined : onEntryUpdate,
-    shouldApplyEntryUpdate: isAmountEntry ? undefined : shouldApply,
-    mergeEntryUpdate: isAmountEntry ? undefined : mergeEntry,
-    amountConfig: effectiveAmountConfig,
-  });
+  const sessionRef = useRef<ScreenActionSession<ScreenType> | null>(null);
+  if (!sessionRef.current) {
+    sessionRef.current = createScreenActionSession({
+      screenType,
+      handlers,
+      defaultHandlers: defaultHandlersForScreen,
+      entrySeed: entryParam,
+      getExtraContext: () => getExtraContextRef.current(),
+      amountConfig: effectiveAmountConfig,
+      subscriptionBus: subscriptionBusRef.current,
+      bridge: sessionBridgeRef.current ?? undefined,
+    });
+  }
 
-  const language = screenActionsBridge?.getLocale?.() ?? getLocaleRef.current?.() ?? 'en';
+  const session = sessionRef.current;
 
-  const entry = useMemo(() => {
-    if (skipDecoration) return base.entry;
-    if (screenActionsBridge?.decorateEntry) {
-      return screenActionsBridge.decorateEntry(base.entry, { language });
+  useEffect(() => {
+    session.setEntrySeed(entryParam);
+  }, [entryParam, session]);
+
+  useEffect(() => {
+    return () => session.dispose();
+  }, [session]);
+
+  const snapshot = useSyncExternalStore(
+    session.subscribe,
+    session.inspect,
+    session.inspect,
+  );
+
+  const actions = useMemo(() => {
+    const bound = {} as Record<ScreenActionName[ScreenType], BoundAction>;
+    for (const [name, state] of Object.entries(snapshot.actions) as [
+      ScreenActionName[ScreenType],
+      ActionState,
+    ][]) {
+      bound[name] = {
+        ...state,
+        execute: (params?: Record<string, unknown>) =>
+          session.execute(name, params),
+      };
     }
-    return defaultDecorate(base.entry, language);
-  }, [skipDecoration, base.entry, screenActionsBridge, language]);
-
-  const source = useMemo((): string | null => {
-    if (skipDecoration) return null;
-    return screenActionsBridge?.getSourceLabel?.(base.entry) ?? null;
-  }, [skipDecoration, base.entry, screenActionsBridge]);
-
-  // Derive mintUrl from the raw entry (before decoration converts it to FormattedString).
-  const mintUrl = useMemo((): string | undefined => {
-    const raw = base.entry;
-    if (!raw) return undefined;
-    const url = raw.mintUrl ?? raw.selectedMintUrl;
-    return typeof url === 'string' && url.length > 0 ? url : undefined;
-  }, [base.entry]);
+    return bound;
+  }, [snapshot.actions, session]);
 
   if (isAmountEntry) {
     return {
-      entry,
-      error: base.error,
-      actions: base.actions as Record<ScreenActionName['amountEntry'], BoundAction>,
-      mintUrl,
+      entry: snapshot.entry,
+      error: snapshot.error,
+      actions: actions as Record<ScreenActionName['amountEntry'], BoundAction>,
+      mintUrl: snapshot.mintUrl,
       source: null,
-      suggestions: base.suggestions,
+      suggestions: snapshot.suggestions,
     } as UseScreenActionsResult<ScreenType, any>;
   }
 
   return {
-    entry,
-    error: base.error,
-    actions: base.actions,
-    mintUrl,
-    source,
+    entry: snapshot.entry,
+    error: snapshot.error,
+    actions,
+    mintUrl: snapshot.mintUrl,
+    source: snapshot.source,
     suggestions: [],
   } as UseScreenActionsResult<ScreenType, any>;
 }

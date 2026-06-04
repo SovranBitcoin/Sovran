@@ -53,12 +53,14 @@ import type {
   ScanSources,
   StepHandlerMap,
 } from '../machine/types';
-import type { ScreenActionHandlerMap, ScreenType } from '../screen-actions/types';
+import type { ScreenActionHandlerMap, ScreenActionsBridge } from '../screen-actions/types';
 import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
 import { createSubscriptionBus } from '../subscriptions';
 import type { ColadaSubscriptionBus } from '../subscriptions';
 import type { Detectors, WalletContext } from '../types';
 import type { ColadaInstance } from '../core/createColada';
+
+export type { ScreenActionsBridge } from '../screen-actions/types';
 
 /**
  * Defence-in-depth cap on deep-link host length. The OS typically caps intent
@@ -66,10 +68,6 @@ import type { ColadaInstance } from '../core/createColada';
  * unbounded scan-pipeline work via a prepared intent.
  */
 const DEEP_LINK_HOST_MAX_LENGTH = 16384;
-
-// ---------------------------------------------------------------------------
-// ScreenActionsBridge — optional wallet hooks for useScreenActions
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // DeepLinkConfig — automatic deep link processing
@@ -85,45 +83,6 @@ export interface DeepLinkConfig {
   /** Called when deep link processing fails. */
   onError?: (error: Error) => void;
 }
-
-export interface ScreenActionsBridge {
-  /** Merged into action context after `paymentMachine` (from context). */
-  getExtraContext?: () => Record<string, unknown>;
-  /**
-   * Bind app-owned stores/native sources to Colada's subscription bus once
-   * for the provider lifetime.
-   */
-  bindSubscriptionBus?: (bus: ColadaSubscriptionBus) => () => void;
-  /**
-   * Subscribe this screen to Colada bus events and map those events into
-   * entry updates for the screen-action manager. Return unsubscribe.
-   */
-  subscribeEntryUpdates?: (
-    screenType: ScreenType,
-    callback: (entry: Record<string, unknown>) => void,
-    bus: ColadaSubscriptionBus,
-  ) => () => void;
-  shouldApplyEntryUpdate?: (
-    currentEntry: Record<string, unknown> | null,
-    updatedEntry: Record<string, unknown>,
-  ) => boolean;
-  mergeEntryUpdate?: (
-    currentEntry: Record<string, unknown> | null,
-    updatedEntry: Record<string, unknown>,
-  ) => Record<string, unknown>;
-  /** When omitted, raw manager entry is returned. */
-  decorateEntry?: (
-    entry: Record<string, unknown> | null,
-    ctx: { language: string },
-  ) => Record<string, unknown> | null;
-  getLocale?: () => string;
-  /** Scan / NFC provenance label for the current entry. */
-  getSourceLabel?: (entry: Record<string, unknown> | null) => string | null;
-}
-
-// ---------------------------------------------------------------------------
-// Refs passed to the handler factory
-// ---------------------------------------------------------------------------
 
 /**
  * Live refs exposed to the handler factory so handlers can read

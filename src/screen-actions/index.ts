@@ -1,4 +1,12 @@
 export {
+  createScreenActionSession,
+  type CreateScreenActionSessionConfig,
+  type ScreenActionEntrySeed,
+  type ScreenActionEntryUpdateSubscriber,
+  type ScreenActionSession,
+  type ScreenActionSessionSnapshot,
+} from './session';
+export {
   createScreenActionManager,
   shouldApplyEntryUpdate,
   mergeEntryUpdate,
@@ -18,6 +26,7 @@ export type {
   ActionState,
   ActionVariant,
   DecoratedEntryFields,
+  ScreenActionsBridge,
   ScreenActionContext,
   ScreenActionHandlerMap,
   ScreenActionManager,
