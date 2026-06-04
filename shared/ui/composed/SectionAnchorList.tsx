@@ -15,7 +15,7 @@
  * content clears it.
  *
  * Internals:
- *   - The body uses `@legendapp/list` (LegendList) under the hood for
+ *   - The body uses `@legendapp/list/react-native` (LegendList) under the hood for
  *     virtualization with item recycling. With `recycleItems` plus
  *     per-type estimated sizes, this handles 400+ equal-cell grids
  *     (emoji picker) at 60fps even on older devices.
@@ -54,7 +54,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { LegendList, type LegendListRef, type ViewToken } from '@legendapp/list';
+import { LegendList, type LegendListRef, type ViewToken } from '@legendapp/list/react-native';
 import opacity from 'hex-color-opacity';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
@@ -464,7 +464,7 @@ export function SectionAnchorList<T>({
 
   const getItemType = useCallback((item: FlatRow<T>) => item.kind, []);
 
-  const getEstimatedItemSize = useCallback(
+  const getFixedItemSize = useCallback(
     (_item: FlatRow<T>, _index: number, type: string | undefined) => {
       return type === 'header' ? estimatedHeaderSize : estimatedItemSize;
     },
@@ -499,7 +499,7 @@ export function SectionAnchorList<T>({
           renderItem={renderListItem}
           keyExtractor={listKeyExtractor}
           getItemType={getItemType}
-          getEstimatedItemSize={getEstimatedItemSize}
+          getFixedItemSize={getFixedItemSize}
           recycleItems
           extraData={extraData}
           // Tuned down from 250 → 150 after a stress test showed that

@@ -423,7 +423,7 @@ export const Transactions = React.memo(
       [onTransactionPress, onCancelPendingEcash]
     );
 
-    const getEstimatedItemSize = useCallback(
+    const getFixedItemSize = useCallback(
       (section: Section) => HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16,
       []
     );
@@ -619,7 +619,7 @@ export const Transactions = React.memo(
           style={{ flex: 1 }}
           data={sectionsToDisplay}
           keyExtractor={(section) => section.index!}
-          getEstimatedItemSize={getEstimatedItemSize}
+          getFixedItemSize={getFixedItemSize}
           maintainVisibleContentPosition
           // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
           // triggers a fresh LinearTransition on every measured-position

@@ -13,7 +13,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';

@@ -17,7 +17,7 @@
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import { LegendList, type LegendListRef } from '@legendapp/list';
+import { LegendList, type LegendListRef } from '@legendapp/list/react-native';
 import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useManager } from '@cashu/coco-react';

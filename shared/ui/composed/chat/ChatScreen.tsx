@@ -13,7 +13,7 @@ import {
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -97,7 +97,7 @@ interface ChatScreenProps {
 const ESTIMATED_BUBBLE_HEIGHT = 80;
 
 /**
- * Shared chat surface backed by `@legendapp/list`. Used by BitChat, Nostr
+ * Shared chat surface backed by `@legendapp/list/react-native`. Used by BitChat, Nostr
  * DM, WhiteNoise, geohash — every DM-like chat surface. Architecture mirrors
  * `AiChatScreen` (which uses LegendList directly): forward-ordered data,
  * `alignItemsAtEnd` for the chat-style bottom dock, `maintainScrollAtEnd`

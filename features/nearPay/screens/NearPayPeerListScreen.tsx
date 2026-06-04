@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 import { router, Stack } from 'expo-router';
 import type { BLEPeer } from 'bitchat-module';
 import { usePaymentFlowMachine } from 'colada/react';

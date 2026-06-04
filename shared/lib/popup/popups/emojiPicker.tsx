@@ -24,7 +24,7 @@ import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { BottomSheet } from 'heroui-native';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 import * as Clipboard from 'expo-clipboard';
 import opacity from 'hex-color-opacity';
 
@@ -361,7 +361,9 @@ export function EmojiPickerContent({
         contentContainerStyle={{ paddingBottom: 24 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        renderScrollComponent={(props) => <BottomSheetScrollView {...props} />}
+        renderScrollComponent={({ children, ...props }) => (
+          <BottomSheetScrollView {...props}>{children}</BottomSheetScrollView>
+        )}
       />
     );
   }, [isSearching, searchResults.length, searchRows, foreground, handleEmojiSelect]);

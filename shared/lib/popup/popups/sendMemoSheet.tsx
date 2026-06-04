@@ -15,7 +15,7 @@ import {
   type TextInputSelectionChangeEventData,
 } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 import { BottomSheet } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';

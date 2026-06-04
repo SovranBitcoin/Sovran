@@ -9,7 +9,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { StyleSheet } from 'react-native';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 import { router, Stack } from 'expo-router';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

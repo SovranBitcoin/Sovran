@@ -10,7 +10,11 @@
 
 import React, { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
-import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
+import {
+  LegendList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from '@legendapp/list/react-native';
 
 import type { MintListItem } from 'colada';
 

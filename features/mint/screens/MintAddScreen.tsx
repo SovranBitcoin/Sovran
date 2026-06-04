@@ -26,7 +26,11 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
-import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
+import {
+  LegendList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from '@legendapp/list/react-native';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
