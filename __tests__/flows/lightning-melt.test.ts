@@ -37,6 +37,9 @@ import { createTestMachine, runScenario } from '../_harness';
 import { WALLETS, MINT1, MINT2, INPUTS } from '../_harness/fixtures';
 import type { FlowScenario } from '../_harness/types';
 
+const USER_LIGHTNING_INVOICE =
+  'lnbc10u1p4pcn75pp5nx5zweympssrmvmecek6n3ynhj7emfe3dynls8q3yu62uhje9rksdqqcqzzsxqyz5vqsp5lersjjw2atsnqhzhqac00xvvcelcw6gqfy7u2jka25q9y2dhczns9qxpqysgqckuv826yw544mrwgnt6k0r529wrczsj03hwrtgg0ch4gewreqt75gg838wrd6twg5dp7n9m9eze6km22svvx8jq5jmrv4pvr0q4dffqpp0ftc3';
+
 // ---------------------------------------------------------------------------
 // Lightning address — needs amount first
 // ---------------------------------------------------------------------------
@@ -74,19 +77,14 @@ const LIGHTNING_ADDRESS_NO_BALANCE: FlowScenario = {
   // lightning addresses always need an amount first. The balance error
   // only surfaces when the user tries to select a mint or confirm.
   wallet: WALLETS.noBalance,
-  steps: [
-    { type: 'execute', input: INPUTS.lightningAddress },
-  ],
+  steps: [{ type: 'execute', input: INPUTS.lightningAddress }],
   expect: {
     step: 'enterAmount',
   },
 };
 
 describe('lightning melt — lightning address scenarios', () => {
-  it.each([
-    LIGHTNING_ADDRESS_HAPPY,
-    LIGHTNING_ADDRESS_NO_BALANCE,
-  ])('$name', async (scenario) => {
+  it.each([LIGHTNING_ADDRESS_HAPPY, LIGHTNING_ADDRESS_NO_BALANCE])('$name', async (scenario) => {
     await runScenario(scenario);
   });
 });
@@ -206,6 +204,68 @@ describe('lightning melt — no proof selector', () => {
     await tm.machine.enterAmount(100, MINT1);
 
     tm.assertStep('error');
+  });
+});
+
+describe('lightning melt — pasted invoice mint selection', () => {
+  it('selects a full-balance alternate mint instead of offering a round-down', async () => {
+    const tm = createTestMachine({ wallet: WALLETS.multiMintUnbalanced });
+
+    await tm.machine.execute(USER_LIGHTNING_INVOICE, { reset: true });
+
+    tm.assertStep('navigateToMeltPreview');
+    tm.assertContext({
+      amount: 1000,
+      mintUrl: MINT1,
+      destination: 'meltQuote',
+      meltTarget: USER_LIGHTNING_INVOICE,
+    });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'navigateToMeltPreview',
+      data: {
+        mintUrl: MINT1,
+        amount: 1000,
+        meltTarget: USER_LIGHTNING_INVOICE,
+      },
+    });
+  });
+
+  it('uses the highest partial mint for the Lightning round-down fallback', async () => {
+    const tm = createTestMachine({
+      wallet: {
+        trustedMintUrls: [MINT1, MINT2],
+        mintBalances: { [MINT1]: 980, [MINT2]: 990 },
+        mintMethodCapabilities: WALLETS.default.mintMethodCapabilities,
+        preferredMintUrl: MINT1,
+        proofAmounts: {
+          [MINT1]: [512, 256, 128, 64, 16, 4],
+          [MINT2]: [512, 256, 128, 64, 16, 8, 4, 2],
+        },
+      },
+    });
+
+    await tm.machine.execute(USER_LIGHTNING_INVOICE, { reset: true });
+
+    tm.assertStep('chooseProofs');
+    tm.assertContext({
+      amount: 1000,
+      mintUrl: MINT2,
+      destination: 'meltQuote',
+      meltTarget: USER_LIGHTNING_INVOICE,
+    });
+    const lastHandler = tm.handlerCalls[tm.handlerCalls.length - 1];
+    expect(lastHandler).toMatchObject({
+      step: 'chooseProofs',
+      data: {
+        mintUrl: MINT2,
+        meltTarget: USER_LIGHTNING_INVOICE,
+        suggestions: {
+          roundDown: { amount: 990 },
+          roundUp: null,
+        },
+      },
+    });
   });
 });
 
@@ -377,7 +437,9 @@ describe('lightning melt — confirmMelt notification sequence', () => {
   it('full failure sequence: only onPaymentProcessing → onPaymentFailed (no txCreated, no meltQuoteCreated)', async () => {
     const tm = createTestMachine({
       operations: {
-        executeMelt: async () => { throw new Error('Route not found'); },
+        executeMelt: async () => {
+          throw new Error('Route not found');
+        },
       },
     });
     await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
@@ -388,9 +450,6 @@ describe('lightning melt — confirmMelt notification sequence', () => {
     await tm.machine.confirmMelt();
 
     const keys = tm.notificationCalls.map((c) => c.key);
-    expect(keys).toEqual([
-      'onPaymentProcessing',
-      'onPaymentFailed',
-    ]);
+    expect(keys).toEqual(['onPaymentProcessing', 'onPaymentFailed']);
   });
 });
