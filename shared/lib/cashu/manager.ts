@@ -1,4 +1,5 @@
 import { Manager, type Plugin } from '@cashu/coco-core';
+import { createCashuSeedGetter, deriveStandardCashuSeed } from 'colada';
 import { CocoCoreLogger } from './cocoLogger';
 import {
   ExpoSqliteRepositories,
@@ -21,9 +22,8 @@ import {
 } from './npc';
 import {
   deriveNostrKeys,
-  deriveCashuWalletSeed,
-  deriveCashuWalletSeedFromRoot,
-  deriveCashuWalletSeedForImported,
+  deriveCashuMnemonic,
+  deriveCashuMnemonicForImported,
 } from '@/shared/lib/nostr/keyDerivation';
 import { getInflightProofs, restoreProofsToReady } from './managerInternals';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -165,46 +165,37 @@ export class CocoManager {
         // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
         const accountIndex = this.accountIndex;
         const isImported = this.isImportedProfile;
-        let cachedSeed: Uint8Array | null = null;
-        const seedGetter = async (): Promise<Uint8Array> => {
-          if (cachedSeed) return cachedSeed;
-
-          // Fast path: check SecureStore for a previously derived seed
-          const mnemonicForHash = this.cashuMnemonic ?? (await retrieveMnemonic());
-          const mHash = mnemonicForHash ? hashMnemonic(mnemonicForHash) : null;
-          if (mHash) {
-            const cached = await retrieveCashuSeed(accountIndex);
-            if (cached && cached.mnemonicHash === mHash) {
-              initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
-              cachedSeed = cached.seed;
-              return cached.seed;
+        const cashuMnemonic = this.cashuMnemonic;
+        const seedGetter = createCashuSeedGetter({
+          getMnemonic: async () => cashuMnemonic ?? (await retrieveMnemonic()),
+          deriveSeed: (mnemonic) => {
+            if (cashuMnemonic) {
+              return deriveStandardCashuSeed(mnemonic);
             }
-          }
 
-          // Slow path: derive via PBKDF2
-          let seed: Uint8Array;
-          if (this.cashuMnemonic) {
-            seed = deriveCashuWalletSeed(this.cashuMnemonic);
-          } else {
-            const mnemonic = mnemonicForHash ?? (await retrieveMnemonic());
-            if (!mnemonic) throw new Error('No mnemonic found in secure storage');
-            if (isImported) {
-              seed = deriveCashuWalletSeedForImported(mnemonic, accountIndex);
-            } else {
-              seed = deriveCashuWalletSeedFromRoot(mnemonic, accountIndex);
-            }
-          }
-          cachedSeed = seed;
-
-          // Persist for next cold start (fire-and-forget)
-          if (mHash) {
-            storeCashuSeed(accountIndex, seed, mHash).catch((e) =>
-              cashuLog.warn('cashu.manager.seed_cache_store_failed', { error: e })
-            );
-          }
-
-          return seed;
-        };
+            const cashuChildMnemonic = isImported
+              ? deriveCashuMnemonicForImported(mnemonic, accountIndex)
+              : deriveCashuMnemonic(mnemonic, accountIndex);
+            return deriveStandardCashuSeed(cashuChildMnemonic);
+          },
+          cache: {
+            load: async ({ mnemonic }) => {
+              const mnemonicHash = hashMnemonic(mnemonic);
+              const cached = await retrieveCashuSeed(accountIndex);
+              if (cached && cached.mnemonicHash === mnemonicHash) {
+                initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
+                return cached.seed;
+              }
+              return null;
+            },
+            store: (seed, { mnemonic }) => {
+              const mnemonicHash = hashMnemonic(mnemonic);
+              storeCashuSeed(accountIndex, seed, mnemonicHash).catch((e) =>
+                cashuLog.warn('cashu.manager.seed_cache_store_failed', { error: e })
+              );
+            },
+          },
+        });
 
         this.seedGetter = seedGetter;
 

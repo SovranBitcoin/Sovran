@@ -8,6 +8,7 @@ import {
   pubkeyToAccountNumber,
 } from '@/shared/lib/nostr/keyDerivation';
 import { getUsername } from '@/shared/lib/username';
+import { deriveStandardCashuSeed } from 'colada';
 import { getPublicKey, nip19 } from 'nostr-tools';
 
 function toHex(bytes: Uint8Array): string {
@@ -62,6 +63,7 @@ describe('key derivation', () => {
         const nostr = deriveNostrKeys(ROOT_MNEMONIC, profile.accountIndex);
         const cashuMnemonic = deriveCashuMnemonic(ROOT_MNEMONIC, profile.accountIndex);
         const walletSeed = deriveCashuWalletSeed(cashuMnemonic);
+        const walletSeedFromColada = deriveStandardCashuSeed(cashuMnemonic);
         const walletSeedFromRoot = deriveCashuWalletSeedFromRoot(
           ROOT_MNEMONIC,
           profile.accountIndex
@@ -74,6 +76,7 @@ describe('key derivation', () => {
 
         expect(cashuMnemonic).toBe(profile.cashuMnemonic);
         expect(toHex(walletSeed)).toBe(profile.walletSeedHex);
+        expect(toHex(walletSeedFromColada)).toBe(profile.walletSeedHex);
         expect(toHex(walletSeedFromRoot)).toBe(profile.walletSeedHex);
       });
     }
@@ -108,6 +111,7 @@ describe('key derivation', () => {
         IMPORTED_NSEC_VECTOR.npubNumber
       );
       const walletSeed = deriveCashuWalletSeed(cashuMnemonic);
+      const walletSeedFromColada = deriveStandardCashuSeed(cashuMnemonic);
       const walletSeedFromRoot = deriveCashuWalletSeedForImported(
         ROOT_MNEMONIC,
         IMPORTED_NSEC_VECTOR.npubNumber
@@ -115,6 +119,7 @@ describe('key derivation', () => {
 
       expect(cashuMnemonic).toBe(IMPORTED_NSEC_VECTOR.cashuMnemonic);
       expect(toHex(walletSeed)).toBe(IMPORTED_NSEC_VECTOR.walletSeedHex);
+      expect(toHex(walletSeedFromColada)).toBe(IMPORTED_NSEC_VECTOR.walletSeedHex);
       expect(toHex(walletSeedFromRoot)).toBe(IMPORTED_NSEC_VECTOR.walletSeedHex);
     });
 
