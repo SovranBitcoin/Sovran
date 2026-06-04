@@ -158,6 +158,7 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   const isMeltQuote = destination === 'meltQuote';
   const isMintQuote = destination === 'mintQuote';
   const isPaymentRequest = destination === 'paymentRequest';
+  const isSendSideAmountEntry = isSendEcash || isMeltQuote;
   const meltTarget = typeof entry.meltTarget === 'string' ? entry.meltTarget : '';
   const hasMeltTarget = meltTarget.length > 0;
   const hasFiatToggle =
@@ -386,8 +387,8 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
         : {}),
       variants: nextVariants,
     },
-    paste: { available: isSendEcash },
-    scanQr: { available: isSendEcash },
+    paste: { available: isSendSideAmountEntry },
+    scanQr: { available: isSendSideAmountEntry },
     cancel: { available: true },
     back: { available: true },
   };

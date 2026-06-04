@@ -1135,7 +1135,17 @@ describe('amountEntry default handlers', () => {
       expect(machine.scan).toHaveBeenCalled();
     });
 
-    it('does nothing for non-sendEcash destinations', async () => {
+    it('delegates to machine.scan for meltQuote', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        destination: 'meltQuote',
+      });
+
+      await mgr.execute('paste');
+      expect(machine.scan).toHaveBeenCalled();
+    });
+
+    it('does nothing for receive destinations', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
         destination: 'mintQuote',
@@ -1158,7 +1168,18 @@ describe('amountEntry default handlers', () => {
       expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'amount' });
     });
 
-    it('does nothing for non-sendEcash destinations', async () => {
+    it('calls navigation.scanQr for meltQuote', async () => {
+      const { handlers, navigation } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        destination: 'meltQuote',
+        unit: 'sat',
+      });
+
+      await mgr.execute('scanQr');
+      expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'amount' });
+    });
+
+    it('does nothing for receive destinations', async () => {
       const { handlers, navigation } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
         destination: 'mintQuote',

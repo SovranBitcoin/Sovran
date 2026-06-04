@@ -678,14 +678,14 @@ export function createDefaultScreenActionHandlers(
 
       paste: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        if (entry.destination !== 'sendEcash') return;
+        if (entry.destination !== 'sendEcash' && entry.destination !== 'meltQuote') return;
         const machine = getMachine();
         await machine?.scan?.();
       },
 
       scanQr: async (ctx: ScreenActionContext) => {
         const entry = ctx.entry as EntryLike;
-        if (entry.destination !== 'sendEcash') return;
+        if (entry.destination !== 'sendEcash' && entry.destination !== 'meltQuote') return;
         const unit = getString(entry, 'unit') ?? 'sat';
         navigation.scanQr?.({ unit, context: 'amount' });
       },

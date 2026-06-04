@@ -265,6 +265,41 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     expect(actions.cancel.available).toBe(true);
   });
 
+  it('exposes paste and scan on send-side amount entries only', () => {
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'sendEcash',
+      }).paste.available
+    ).toBe(true);
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'sendEcash',
+      }).scanQr.available
+    ).toBe(true);
+
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'meltQuote',
+      }).paste.available
+    ).toBe(true);
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'meltQuote',
+      }).scanQr.available
+    ).toBe(true);
+
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'mintQuote',
+      }).paste.available
+    ).toBe(false);
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'mintQuote',
+      }).scanQr.available
+    ).toBe(false);
+  });
+
   it('hides onchain receive when no trusted mint advertises NUT-04 onchain', () => {
     const entry = {
       destination: 'mintQuote',
