@@ -1,6 +1,6 @@
 /**
  * Pins the trust-boundary predicate that gates Nostr pubkey strings
- * before they cross into NDK / Primal filters (audit 26#F-005).
+ * before they cross into NDK / Nostr filters (audit 26#F-005).
  *
  * The previous inline check at HomeFeed.tsx accepted any 64-char string,
  * including arbitrary UTF-8 / mojibake / `01javascript:alert(1)01…`

@@ -1,23 +1,31 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
-import { combineSignals, isAbortError, timeoutSignal, type RequestControls } from 'colada';
-import { ok, err, Result } from 'neverthrow';
+import {
+  combineSignals,
+  createNostrGraphqlMintEnrichment,
+  isAbortError,
+  timeoutSignal,
+  type MintReviewRecommendation,
+  type MintReviewsSummary,
+  type RequestControls,
+} from 'colada';
+import { ok, err, Result, ResultAsync } from 'neverthrow';
 import { z } from 'zod';
 import { apiLog } from './logger';
 import {
   AuditMintResponse as AuditMintResponseStrict,
   CatalogResponse,
   LatestVersionResponse,
-  MintReviewsResponse,
   MintSearchResponse,
   NostrProfileFull as NostrProfileFullStrict,
   SearchUsersResponse,
   TopFollower as TopFollowerStrict,
   loggableIssues,
   parseWith,
-  type MintRecommendation,
+  type MintRecommendation as SchemaMintRecommendation,
   type MintSearchResult,
   type ParseError,
 } from '@sovranbitcoin/schemas';
+import { backendConfig } from '@/shared/config/backend';
 
 // Local relaxation: the auditor returns `info` in several shapes depending
 // on the upstream mint state — sometimes a NUT-06 object, sometimes null,
@@ -47,8 +55,18 @@ const NostrProfileFull = NostrProfileFullStrict.extend({
   topFollowers: z.array(TopFollower).max(500),
 });
 type NostrProfileFullType = z.infer<typeof NostrProfileFull>;
+export type MintRecommendation = SchemaMintRecommendation &
+  Partial<Pick<MintReviewRecommendation, 'name' | 'displayName' | 'picture' | 'image'>>;
+type MintReviewsResponseType = {
+  mintUrl: string;
+  score: number | null;
+  recommendations: MintRecommendation[];
+  lastUpdated: number | null;
+  fromCache: boolean;
+};
 
-const BASE_URL = 'https://api.sovran.money/api';
+const API_BASE_URL = backendConfig.apiBaseUrl;
+const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
 
 /**
  * Default per-request budget. React Native's `fetch` has no native timeout;
@@ -59,12 +77,16 @@ const BASE_URL = 'https://api.sovran.money/api';
  * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
  */
 const DEFAULT_TIMEOUT_MS = 10_000;
+const mintReviewsEnrichment = createNostrGraphqlMintEnrichment({
+  endpoint: backendConfig.nostrGraphqlEndpoint,
+  timeoutMs: DEFAULT_TIMEOUT_MS,
+});
 
 // Re-export schema-derived types for callers that previously imported them
 // from this module.
 export type {
   AuditMintResponseType as AuditMintResponse,
-  MintRecommendation,
+  MintReviewsResponseType as MintReviewsResponse,
   MintSearchResult,
   NostrProfileFullType as NostrProfileFull,
 };
@@ -84,6 +106,33 @@ function toError(e: FetchOrParseError): Error {
     return new Error(`${(e as ParseError).where}: ${issues} schema issue(s)`);
   }
   return new Error('unknown error');
+}
+
+function toUnknownError(e: unknown): Error {
+  return e instanceof Error ? e : new Error(typeof e === 'string' ? e : 'Unknown error');
+}
+
+function normalizeMintReviewsSummary(
+  mintUrl: string,
+  summary: MintReviewsSummary | undefined
+): MintReviewsResponseType {
+  return {
+    mintUrl: summary?.mintUrl ?? mintUrl,
+    score: summary?.score ?? null,
+    recommendations: (summary?.recommendations ?? []).map((review) => ({
+      score: review.score,
+      comment: review.comment,
+      pubkey: review.pubkey,
+      eventId: review.eventId,
+      created_at: review.created_at,
+      ...(review.name ? { name: review.name } : {}),
+      ...(review.displayName ? { displayName: review.displayName } : {}),
+      ...(review.picture ? { picture: review.picture } : {}),
+      ...(review.image ? { image: review.image } : {}),
+    })),
+    lastUpdated: summary?.lastUpdated ?? null,
+    fromCache: summary?.fromCache ?? true,
+  };
 }
 
 /**
@@ -195,7 +244,6 @@ function describeRoute(url: string): { host: string; path: string } {
 
 const parseSearchUsers = parseWith(SearchUsersResponse, 'nostr/search');
 const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
-const parseMintReviews = parseWith(MintReviewsResponse, 'cashu/mint/reviews');
 const parseMintSearch = parseWith(MintSearchResponse, 'cashu/mints/search');
 const parseNostrProfile = parseWith(NostrProfileFull, 'nostr/profile');
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
@@ -243,7 +291,7 @@ export const searchUsers = ({
 }) => {
   const params = new URLSearchParams({ query, limit: String(limit) });
   return fetchJson(
-    `${BASE_URL}/nostr/search?${params}`,
+    `${SCORE_API_BASE_URL}/nostr/search?${params}`,
     parseSearchUsers,
     'nostr/search',
     undefined,
@@ -253,21 +301,26 @@ export const searchUsers = ({
 
 export const auditMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
   fetchJson(
-    `${BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
+    `${API_BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
     parseAuditMint,
     'cashu/mint/audit',
     undefined,
     { signal }
   );
 
-export const reviewMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
-  fetchJson(
-    `${BASE_URL}/cashu/mint/reviews?mintUrl=${encodeURIComponent(mintUrl)}`,
-    parseMintReviews,
-    'cashu/mint/reviews',
-    undefined,
-    { signal }
-  );
+export const reviewMint = async ({
+  mintUrl,
+  signal,
+}: {
+  mintUrl: string;
+  signal?: AbortSignal;
+}): Promise<Result<MintReviewsResponseType, Error>> => {
+  const result = await ResultAsync.fromThrowable<[], MintReviewsSummary | undefined, Error>(
+    () => mintReviewsEnrichment.fetchMintReviews(mintUrl, { signal }),
+    toUnknownError
+  )();
+  return result.map((summary) => normalizeMintReviewsSummary(mintUrl, summary));
+};
 
 export const searchMints = ({
   query,
@@ -284,7 +337,7 @@ export const searchMints = ({
   signal?: AbortSignal;
 }) =>
   fetchJson(
-    `${BASE_URL}/cashu/mints/search?${new URLSearchParams({
+    `${API_BASE_URL}/cashu/mints/search?${new URLSearchParams({
       ...(query && { q: query }),
       ...(currency && currency !== 'ALL' && { currency }),
       ...(limit && { limit: String(limit) }),
@@ -304,7 +357,7 @@ export const getLatestVersion = ({
   signal?: AbortSignal;
 }) =>
   fetchJson(
-    `${BASE_URL}/app/latest-version`,
+    `${API_BASE_URL}/app/latest-version`,
     parseLatestVersion,
     'app/latest-version',
     {
@@ -317,7 +370,7 @@ export const getLatestVersion = ({
 
 export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}) =>
   fetchJson(
-    `${BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
+    `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
     parseNostrProfile,
     'nostr/profile',
     undefined,
@@ -332,7 +385,7 @@ export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}
  */
 export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
   fetchJson(
-    `${BASE_URL}/wallpapers/catalog`,
+    `${API_BASE_URL}/wallpapers/catalog`,
     parseCatalog,
     'wallpapers/catalog',
     undefined,

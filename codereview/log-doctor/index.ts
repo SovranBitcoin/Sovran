@@ -32,6 +32,7 @@
  *   startup      Initialization waterfall, stage timing, gate sequence
  *   coco         Coco/Colada wallet module breakdown, issues, mint requests
  *   network      Network request/response pairs with latency
+ *   feed         Feed/thread GraphQL, page mapping, and reply seed/render flow
  *   full         Full entries but deduplicated and trimmed
  *   diff         Compare latest session against previous to isolate failure-specific entries
  *   flows        Reconstruct cross-async traces using flowId in ctx
@@ -1254,6 +1255,107 @@ function modeNetwork(entries: LogEntry[], opts: Options): string {
   return lines.join('\n');
 }
 
+function modeFeed(entries: LogEntry[], opts: Options): string {
+  const feedEntries = entries.filter(
+    (e) =>
+      e.event.startsWith('feed.') ||
+      e.event.startsWith('thread.') ||
+      e.event.startsWith('nagg.graphql.') ||
+      e.event === 'api.fetch' ||
+      e.event.startsWith('api.fetch_') ||
+      e.event === 'api.parse_failed'
+  );
+
+  if (feedEntries.length === 0) return 'No feed/thread entries found.';
+
+  const lines: string[] = [];
+  const warnings = feedEntries.filter((e) => e.level === 'warn').length;
+  const errors = feedEntries.filter((e) => e.level === 'error' || e.level === 'fatal').length;
+  const gqlEntries = feedEntries.filter((e) => e.event.startsWith('nagg.graphql.'));
+  const feedPages = feedEntries.filter((e) => e.event === 'feed.nagg.page.done');
+  const threadResults = feedEntries.filter(
+    (e) => e.event === 'thread.nagg.graphql.result' || e.event === 'thread.load.done'
+  );
+  const threadSeeds = feedEntries.filter((e) => e.event.startsWith('thread.seed.'));
+
+  lines.push('FEED/THREAD LOG:');
+  lines.push(
+    `  entries=${feedEntries.length} warnings=${warnings} errors=${errors} graphql=${gqlEntries.length} feedPages=${feedPages.length} threadResults=${threadResults.length}`
+  );
+  lines.push('');
+
+  if (gqlEntries.length > 0) {
+    const opCounts = new Map<string, number>();
+    for (const e of gqlEntries) {
+      const op = String(e.params?.operationName ?? '?');
+      const suffix = e.event.replace('nagg.graphql.request.', '').replace('nagg.graphql.', '');
+      const key = `${op}:${suffix}`;
+      opCounts.set(key, (opCounts.get(key) ?? 0) + 1);
+    }
+    lines.push('GRAPHQL OPS:');
+    for (const [key, count] of Array.from(opCounts.entries()).slice(0, 16)) {
+      lines.push(`  ${key} x${count}`);
+    }
+    lines.push('');
+  }
+
+  if (feedPages.length > 0) {
+    lines.push('FEED PAGES:');
+    for (const e of feedPages.slice(-12)) {
+      const p = e.params ?? {};
+      const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+      lines.push(
+        `${t} ${p.source ?? '?'} items=${p.items ?? '?'} previews=${p.replyPreviews ?? '?'} ` +
+          `profiles=${p.profiles ?? '?'} missingProfiles=${p.missingProfiles ?? '?'} ` +
+          `offset=${p.offset ?? '?'} duration=${p.durationMs ?? '?'}ms`
+      );
+    }
+    lines.push('');
+  }
+
+  if (threadSeeds.length > 0 || threadResults.length > 0) {
+    lines.push('THREADS:');
+    for (const e of [...threadSeeds.slice(-6), ...threadResults.slice(-12)]) {
+      const p = e.params ?? {};
+      const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+      lines.push(
+        `${t} ${e.event} event=${p.eventId ?? '?'} sort=${p.replySort ?? p.sort ?? '?'} ` +
+          `nodes=${p.replyNodeCount ?? '?'} rendered=${p.renderedReplies ?? p.replies ?? '?'} ` +
+          `hidden=${p.hiddenReplies ?? '?'} expected=${p.expectedReplies ?? p.targetReplyCount ?? '?'} ` +
+          `hasMore=${p.hasMoreReplies ?? '?'} duration=${p.durationMs ?? '?'}ms`
+      );
+    }
+    lines.push('');
+  }
+
+  const problemEntries = feedEntries.filter(
+    (e) =>
+      e.level === 'warn' ||
+      e.level === 'error' ||
+      e.level === 'fatal' ||
+      e.event.endsWith('.error') ||
+      e.event.endsWith('.graphql_error') ||
+      e.event.endsWith('.aborted')
+  );
+  if (problemEntries.length > 0) {
+    lines.push('PROBLEMS:');
+    for (const e of problemEntries.slice(-16)) {
+      const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+      lines.push(`${t} ${levelIcon(e.level)} ${e.event} ${shortParams(e.params)}`);
+    }
+    lines.push('');
+  }
+
+  const { page, footer } = paginate(feedEntries, opts);
+  lines.push('TIMELINE:');
+  for (const e of page) {
+    const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+    lines.push(`${t} ${levelIcon(e.level)} ${e.event} ${shortParams(e.params)}`);
+  }
+  lines.push(footer);
+  return lines.join('\n');
+}
+
 // ─── Mode: full ──────────────────────────────────────────────────────────────
 
 function modeFull(entries: LogEntry[], opts: Options): string {
@@ -2089,6 +2191,7 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'startup', fn: modeStartup },
     { name: 'coco', fn: modeCoco },
     { name: 'network', fn: modeNetwork },
+    { name: 'feed', fn: modeFeed },
     { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
     { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
     { name: 'full (yaml)', fn: (e, o) => modeFull(e, { ...o, format: 'yaml' }) },
@@ -2681,7 +2784,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget, phone'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, flows, ws, gc, budget, phone'
     );
     process.exit(1);
   }
@@ -2737,6 +2840,9 @@ async function main() {
     case 'network':
       output = modeNetwork(entries, opts);
       break;
+    case 'feed':
+      output = modeFeed(entries, opts);
+      break;
     case 'full':
       output = modeFull(entries, opts);
       break;
@@ -2764,7 +2870,7 @@ async function main() {
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget, crypto, ops, perf, phone'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, flows, ws, gc, budget, crypto, ops, perf, phone'
       );
       process.exit(1);
   }

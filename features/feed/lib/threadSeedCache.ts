@@ -24,6 +24,7 @@ export type ThreadSeed = {
   profiles: Map<string, ProfileInfo>;
   metrics: Map<string, NoteMetrics>;
   quotedEvents: Map<string, FeedEvent>;
+  replyPreviewEventIds?: string[];
 };
 
 const MAX_ENTRIES = 40;

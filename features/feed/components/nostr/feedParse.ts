@@ -1,11 +1,5 @@
 import { nip19 } from 'nostr-tools';
-import type {
-  ContentSegment,
-  FeedEvent,
-  NoteMetrics,
-  ProfileInfo,
-  RawPrimalEvent,
-} from './feedTypes';
+import type { ContentSegment, FeedEvent } from './feedTypes';
 
 export const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i;
 export const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?.*)?$/i;
@@ -17,11 +11,10 @@ const LIGHTNING_INVOICE_REGEX = /\b(lnbc[a-z0-9]{20,700})\b/gi;
 const HASHTAG_REGEX = /#([a-zA-Z][a-zA-Z0-9_]{0,31})/g;
 export const URL_REGEX = /https?:\/\/[^\s<>"')\]]{1,2048}/gi;
 const NOSTR_URI_REGEX = /nostr:(npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]{1,512}/gi;
+const HEX_EVENT_ID_REGEX = /^[0-9a-f]{64}$/i;
 
-// Sanity ceiling on raw note content. Public Nostr DM limits and the Primal
-// pipeline already drop oversize events; this is the defensive client-side
-// bound that keeps parseContent and _contentCache from retaining hostile
-// inputs beyond the cap.
+// Sanity ceiling on raw note content. This defensive client-side bound keeps
+// parseContent and _contentCache from retaining hostile inputs beyond the cap.
 const MAX_FEED_CONTENT_LEN = 32_768;
 
 const _contentCache = new Map<string, ContentSegment[]>();
@@ -164,18 +157,23 @@ export function collectReferencedIds(notes: FeedEvent[]): {
       if (seg.kind === 'nevent' || seg.kind === 'note') eventIdSet.add(seg.eventId);
       else if (seg.kind === 'npub' || seg.kind === 'nprofile') pubkeySet.add(seg.pubkey);
     }
+    for (const id of collectQuoteTagIds(note)) eventIdSet.add(id);
   }
 
   return { eventIds: Array.from(eventIdSet), pubkeys: Array.from(pubkeySet) };
 }
 
-export function parseNoteMetrics(parsed: Record<string, unknown>): NoteMetrics {
-  return {
-    likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
-    repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
-    replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
-    satsZapped: typeof parsed?.satszapped === 'number' ? parsed.satszapped : 0,
-  };
+export function collectQuoteTagIds(event: FeedEvent): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const tag of event.tags || []) {
+    if (tag[0] !== 'q' || !tag[1]) continue;
+    const id = tag[1].trim().toLowerCase();
+    if (!HEX_EVENT_ID_REGEX.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
 }
 
 export function tryNpubEncode(hex: string): string {
@@ -232,22 +230,6 @@ export function normalizeFeedEvent(value: unknown): FeedEvent | null {
   };
 }
 
-export function normalizeRawPrimalEvent(value: unknown): RawPrimalEvent | null {
-  if (!value || typeof value !== 'object') return null;
-  const input = value as Record<string, unknown>;
-  if (typeof input.kind !== 'number' || typeof input.content !== 'string') {
-    return null;
-  }
-  return {
-    kind: input.kind,
-    content: input.content,
-    id: typeof input.id === 'string' ? input.id : undefined,
-    pubkey: typeof input.pubkey === 'string' ? input.pubkey : undefined,
-    created_at: typeof input.created_at === 'number' ? input.created_at : undefined,
-    tags: Array.isArray(input.tags) ? (input.tags.filter(Array.isArray) as string[][]) : undefined,
-  };
-}
-
 export function parseJson<T>(raw: string): T | null {
   try {
     return JSON.parse(raw) as T;
@@ -259,15 +241,4 @@ export function parseJson<T>(raw: string): T | null {
 export function getFirstTagValue(event: FeedEvent, tagName: string): string | undefined {
   const tag = event.tags.find((t) => t[0] === tagName);
   return tag?.[1];
-}
-
-export function parseProfileFromRaw(raw: RawPrimalEvent): [string, ProfileInfo] | null {
-  if (!raw.pubkey) return null;
-  const parsed = parseJson<Record<string, unknown>>(raw.content);
-  const name =
-    (typeof parsed?.display_name === 'string' && parsed.display_name) ||
-    (typeof parsed?.name === 'string' && parsed.name);
-  const picture = typeof parsed?.picture === 'string' ? parsed.picture : undefined;
-  if (!name) return null;
-  return [raw.pubkey, { name, picture }];
 }

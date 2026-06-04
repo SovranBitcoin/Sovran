@@ -19,8 +19,8 @@
  *      DB). Returns NUT-06 info directly from the mint, so we still get the
  *      operator pubkey and can resolve their Nostr profile.
  *
- *   3. **Reviews endpoint** (`/cashu/mint/reviews`) — independent of audit,
- *      runs in parallel for every mint. Provides KYM score + review count.
+ *   3. **Nostr GraphQL mint reviews** — independent of audit, runs in
+ *      parallel for every mint. Provides KYM score + review count.
  *
  * Side effects: populates the audit / KYM / mint-profile Zustand stores
  * along the way so the trust-review screen and other surfaces that read

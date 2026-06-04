@@ -117,7 +117,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
   - [x] **NIP-17 Private Direct Messages** — `kind 14` rumors sealed and gift-wrapped per NIP-59 (`kind 1059`), encrypted with NIP-44 v2
 - [x] **Relays & search**
   - [x] **NDK Mobile** — relay management via [`@nostr-dev-kit/ndk-mobile`](https://github.com/nostr-dev-kit/ndk-mobile)
-  - [x] **Primal cache relay** — `cache.primal.net` for fast feed loading and profile lookups
+  - [x] **Nostr app-view** — Sovran-owned feed, profile, metrics, thread cache, and GraphQL endpoint for fast app views. The default deployment is Nagg, but Colada receives only the GraphQL URL.
   - [x] **Vertex** — [Vertex](https://vertexlab.io) trust-ranked Nostr search and follower-graph reputation scores
   - [x] **Vertex credibility on rows** — reputation + followers shown inline on contact search and payment-recipient confirmations
 - [x] **`nostr-tools`** — low-level signing, encoding, NIP utilities

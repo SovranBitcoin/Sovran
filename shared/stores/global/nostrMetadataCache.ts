@@ -47,7 +47,7 @@ const METADATA_FIELDS = [
 
 type MetadataPartial = Partial<Omit<NostrProfileMetadata, 'fetchedAt'>>;
 
-const STALE_TTL_MS = 24 * 60 * 60 * 1000;
+export const NOSTR_METADATA_STALE_TTL_MS = 24 * 60 * 60 * 1000;
 /** Once an entry is this fresh, identical kind-0 events skip the write. */
 const FETCHED_AT_GRACE_MS = 60 * 60 * 1000;
 const MAX_ENTRIES = 500;
@@ -237,6 +237,6 @@ export function useCachedNostrProfile(pubkey: string): {
 } {
   const metadata = useNostrMetadataCache((s) => s.byPubkey[pubkey]);
   const isMissing = !metadata;
-  const isStale = !!metadata && Date.now() - metadata.fetchedAt > STALE_TTL_MS;
+  const isStale = !!metadata && Date.now() - metadata.fetchedAt > NOSTR_METADATA_STALE_TTL_MS;
   return { metadata, isStale, isMissing };
 }

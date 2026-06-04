@@ -40,6 +40,7 @@ import { openExternalUrl } from '@/shared/lib/url';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
@@ -58,10 +59,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { buildProfileHref, useActiveProfileFlowGroup } from '@/shared/lib/nav/profileRoutes';
+import { buildMintInfoHref, getProfileMintInfoUrl } from '@/shared/lib/nav/mintInfoRoutes';
 import {
   selectIsFollowingPubkey,
   useNostrSocialStore,
 } from '@/shared/stores/profile/nostrSocialStore';
+import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { useDominantColor, getContrastColors } from '@/shared/lib/colorExtraction';
@@ -624,11 +627,7 @@ const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
 export function UserProfileScreen() {
   useLifecycleLogger('UserProfileScreen', nostrLog);
 
-  const [foreground, background, muted] = useThemeColor([
-    'foreground',
-    'background',
-    'muted',
-  ] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const profileFlowGroup = useActiveProfileFlowGroup();
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -644,6 +643,11 @@ export function UserProfileScreen() {
     if (npubParam) return npubToPubkey(npubParam);
     return '';
   }, [npubParam, pubkeyParam]);
+  const addRecentPerson = useRecentPeopleStore((state) => state.addRecentPerson);
+
+  useEffect(() => {
+    if (pubkey) addRecentPerson(pubkey);
+  }, [addRecentPerson, pubkey]);
 
   const npub = useMemo(() => {
     if (npubParam) return npubParam;
@@ -703,6 +707,7 @@ export function UserProfileScreen() {
   });
 
   const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
+  const profileMintUrl = getProfileMintInfoUrl(profileData?.mintUrl, mintUrlParam);
 
   // ===========================
   // DERIVED STATE
@@ -870,6 +875,11 @@ export function UserProfileScreen() {
   // a second kind-3 publish with the first's `clearFollowOptimistic`.
   const handleToggleFollow = useSingleFlight(handleToggleFollowInner);
 
+  const handleMintInfoPress = useCallback(() => {
+    if (!profileMintUrl) return;
+    router.navigate(buildMintInfoHref(profileMintUrl));
+  }, [profileMintUrl]);
+
   // ===========================
   // PROFILE INFO ITEMS (data-driven)
   // ===========================
@@ -944,21 +954,12 @@ export function UserProfileScreen() {
           title: isMetadataLoading ? 'Profile' : displayName,
           headerRight: () => (
             <HStack gap={4}>
-              {(profileData?.mintUrl || mintUrlParam) && (
-                <Link
-                  href={{
-                    pathname: '/(mint-flow)/info',
-                    params: {
-                      mintInfoEntry: JSON.stringify({
-                        mintUrl: profileData?.mintUrl || mintUrlParam,
-                      }),
-                    },
-                  }}
-                  asChild>
-                  <Pressable style={{ padding: 8 }}>
-                    <Icon name="mingcute:bank-fill" size={24} color={muted} />
-                  </Pressable>
-                </Link>
+              {profileMintUrl && (
+                <ScreenHeaderAction
+                  icon="mingcute:bank-fill"
+                  onPress={handleMintInfoPress}
+                  testID="profile-mint-info"
+                />
               )}
               <Link
                 href={

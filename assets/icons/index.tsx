@@ -209,6 +209,7 @@ export const icons: string[] = [
   'mdi:calendar',
   'mdi:account-group',
   'mdi:arrow-right',
+  'mdi:trending-up',
   'mdi:gamepad-variant',
   'mdi:food',
   'mdi:airplane',

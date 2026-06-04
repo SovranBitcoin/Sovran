@@ -630,6 +630,11 @@ module.exports = {
     "width": 16,
     "height": 16
   },
+  "mdi:trending-up": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"m16 6l2.29 2.29l-4.88 4.88l-4-4L2 16.59L3.41 18l6-6l4 4l6.3-6.29L22 12V6z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
   "mdi:gamepad-variant": {
     "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M7 6h10a6 6 0 0 1 6 6a6 6 0 0 1-6 6c-1.78 0-3.37-.77-4.47-2h-1.06c-1.1 1.23-2.69 2-4.47 2a6 6 0 0 1-6-6a6 6 0 0 1 6-6M6 9v2H4v2h2v2h2v-2h2v-2H8V9zm9.5 3a1.5 1.5 0 0 0-1.5 1.5a1.5 1.5 0 0 0 1.5 1.5a1.5 1.5 0 0 0 1.5-1.5a1.5 1.5 0 0 0-1.5-1.5m3-3a1.5 1.5 0 0 0-1.5 1.5a1.5 1.5 0 0 0 1.5 1.5a1.5 1.5 0 0 0 1.5-1.5A1.5 1.5 0 0 0 18.5 9\"/></svg>",
     "width": 16,

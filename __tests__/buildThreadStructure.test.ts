@@ -7,9 +7,10 @@ function note(
   id: string,
   pubkey: string,
   tags: string[][] = [],
-  createdAt = 1700000000
+  createdAt = 1700000000,
+  kind = ShortTextNote
 ): FeedEvent {
-  return { id, kind: ShortTextNote, pubkey, content: '', tags, created_at: createdAt };
+  return { id, kind, pubkey, content: '', tags, created_at: createdAt };
 }
 
 function makeMap(events: FeedEvent[]): Map<string, FeedEvent> {
@@ -51,6 +52,14 @@ describe('buildThreadStructure (audit 59.json F-001)', () => {
     const result = buildThreadStructure('target', makeMap([target, directReply, quotingPost]));
 
     expect(result.replies.map((r) => r.id)).toEqual(['direct']);
+  });
+
+  it('discovers NIP-22 comment replies fetched by GraphQL', () => {
+    const target = note('target', 'alice');
+    const commentReply = note('comment', 'bob', [['e', 'target', '', 'reply']], 1700000010, 1111);
+    const result = buildThreadStructure('target', makeMap([target, commentReply]));
+
+    expect(result.replies.map((r) => r.id)).toEqual(['comment']);
   });
 
   it('returns null target when the eventId is missing from the map', () => {

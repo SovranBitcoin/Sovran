@@ -1,0 +1,69 @@
+import { z } from 'zod';
+
+const DEFAULT_NOSTR_APPVIEW_BASE_URL = 'https://nagg.up.railway.app';
+const DEFAULT_API_BASE_URL = 'https://api.sovran.money/api';
+
+const emptyStringToUndefined = (value: unknown) =>
+  typeof value === 'string' && value.trim() === '' ? undefined : value;
+
+const stripTrailingSlashes = (value: string) => value.replace(/\/+$/, '');
+
+const RequiredUrl = (fallback: string) =>
+  z
+    .preprocess(emptyStringToUndefined, z.string().trim().url().default(fallback))
+    .transform(stripTrailingSlashes);
+
+const OptionalUrl = z
+  .preprocess(emptyStringToUndefined, z.string().trim().url().optional())
+  .transform((value) => (value ? stripTrailingSlashes(value) : undefined));
+
+const BackendEnv = z.object({
+  EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: OptionalUrl,
+  EXPO_PUBLIC_NAGG_BASE_URL: OptionalUrl,
+  EXPO_PUBLIC_API_BASE_URL: RequiredUrl(DEFAULT_API_BASE_URL),
+  EXPO_PUBLIC_SCORE_API_BASE_URL: OptionalUrl,
+  EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: OptionalUrl,
+});
+
+type BackendEnvInput = Partial<Record<keyof z.input<typeof BackendEnv>, string | undefined>>;
+
+type BackendConfig = {
+  nostrAppViewBaseUrl: string;
+  apiBaseUrl: string;
+  scoreApiBaseUrl: string;
+  nostrGraphqlEndpoint: string;
+};
+
+function readBackendEnv(): BackendEnvInput {
+  return {
+    EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL: process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL,
+    EXPO_PUBLIC_NAGG_BASE_URL: process.env.EXPO_PUBLIC_NAGG_BASE_URL,
+    EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
+    EXPO_PUBLIC_SCORE_API_BASE_URL: process.env.EXPO_PUBLIC_SCORE_API_BASE_URL,
+    EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: process.env.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT,
+  };
+}
+
+export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): BackendConfig {
+  const parsed = BackendEnv.safeParse(env);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.code}`)
+      .join('; ');
+    throw new Error(`Invalid backend config: ${issues}`);
+  }
+
+  const nostrAppViewBaseUrl =
+    parsed.data.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL ??
+    parsed.data.EXPO_PUBLIC_NAGG_BASE_URL ??
+    DEFAULT_NOSTR_APPVIEW_BASE_URL;
+  return {
+    nostrAppViewBaseUrl,
+    apiBaseUrl: parsed.data.EXPO_PUBLIC_API_BASE_URL,
+    scoreApiBaseUrl: parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl,
+    nostrGraphqlEndpoint:
+      parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
+  };
+}
+
+export const backendConfig = parseBackendConfig();

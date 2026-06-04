@@ -1,1 +1,1 @@
-export const relays = ['wss://relay.primal.net', 'wss://relay.damus.io', 'wss://nos.lol'];
+export const relays = ['wss://relay.damus.io', 'wss://nos.lol', 'wss://relay.nostr.band'];

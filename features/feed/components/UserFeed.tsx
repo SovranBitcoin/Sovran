@@ -20,7 +20,7 @@
  * - Lightning invoices (lnbc…)  → tappable payment card
  * - Newlines                    → preserved
  *
- * Uses Primal's cache relay API for bundled feed lookups.
+ * Uses the swappable FeedClient boundary for bundled feed lookups.
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
@@ -38,7 +38,11 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { LegendList, LegendListRef, type LegendListRenderItemProps } from '@legendapp/list';
+import {
+  LegendList,
+  LegendListRef,
+  type LegendListRenderItemProps,
+} from '@legendapp/list/react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   useSharedValue,
@@ -58,18 +62,24 @@ import type {
   FeedItem,
   NoteMetrics,
   ProfileInfo,
-  RawPrimalEvent,
   VideoPostRecord,
 } from './nostr/feedTypes';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
-import { createPrimalRelayClient, PRIMAL_CACHE_RELAY_URL } from './nostr/primalRelay';
 import {
   buildVideoOverlayLayout,
   computeFeedIndicesWithVideo,
   buildDedupedVideoPosts,
   MAX_VIDEO_FEED_PAGES,
 } from './nostr/videoLayout';
-import { enrichFeedPage, parseFeedPage } from './nostr/parseFeedPage';
+import { getFeedClient } from '@/features/feed/data/useFeedClient';
+import {
+  buildFeedRows,
+  DEFAULT_ENGAGEMENT_STATE,
+  feedRowsAreEqual,
+  getFeedRowItemType,
+  getFeedRowKey,
+  type FeedRow,
+} from '@/features/feed/lib/feedRows';
 
 import { PostCard } from './nostr/PostCard';
 import {
@@ -93,31 +103,6 @@ interface UserFeedProps {
   isOwnProfile?: boolean;
   ListHeaderComponent?: React.ReactElement | null;
   onVideoPostsReady?: (videoPosts: VideoPostRecord[]) => void;
-}
-
-// ============================================================================
-// UserFeed-only helpers
-// ============================================================================
-
-function isRootNote(event: FeedEvent): boolean {
-  const eTags = (event.tags || []).filter((t) => t[0] === 'e');
-  if (eTags.length === 0) return true;
-  return eTags.every((t) => t[3] === 'mention');
-}
-
-function parseUserFeedPage(
-  feedRawEvents: RawPrimalEvent[],
-  pubkey: string,
-  authorName?: string,
-  authorPicture?: string
-) {
-  return parseFeedPage(feedRawEvents, {
-    includeNote: (ev) => ev.pubkey === pubkey && isRootNote(ev),
-    includeRepost: (ev) => ev.pubkey === pubkey,
-    extraProfile: authorName
-      ? { pubkey, profile: { name: authorName, picture: authorPicture } }
-      : undefined,
-  });
 }
 
 // ============================================================================
@@ -147,6 +132,8 @@ export const RepostCard = React.memo(function RepostCard({
   onRepostPress,
   skipAnimation,
   getThreadContext,
+  showLineAbove = false,
+  fullBleedFooterBorder = false,
 }: {
   repostEvent: FeedEvent;
   originalEvent: FeedEvent | undefined;
@@ -170,6 +157,8 @@ export const RepostCard = React.memo(function RepostCard({
   onRepostPress?: () => void;
   skipAnimation?: boolean;
   getThreadContext?: () => ThreadSeed | null;
+  showLineAbove?: boolean;
+  fullBleedFooterBorder?: boolean;
 }) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -285,6 +274,8 @@ export const RepostCard = React.memo(function RepostCard({
             onNestedProfilePressIn={suppressThreadTapStart}
             onNestedProfilePressOut={suppressThreadTapEnd}
             getThreadContext={getThreadContext}
+            showLineAbove={showLineAbove}
+            fullBleedFooterBorder={fullBleedFooterBorder}
           />
         ) : (
           <View
@@ -356,22 +347,22 @@ export function UserFeed({
   const paginationOffsetRef = useRef(0);
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(new Set<string>());
-  // Tracks the prefix of the most recent loadMoreItems request so its
-  // enrichFeedPage onUpdate cannot write into a feed reset by a later author switch.
+  // Tracks the prefix of the most recent loadMoreItems request so enrichment
+  // cannot write into a feed reset by a later author switch.
   const activeLoadMoreIdRef = useRef<string | null>(null);
 
   // Stable refs for renderItem — avoids re-creating renderItem on every Map update
   const metricsRef = useLatestRef(metricsMap);
   const quotedRef = useLatestRef(quotedEventsMap);
   const profilesRef = useLatestRef(profilesMap);
-  const [dataVersion, setDataVersion] = useState(0);
+  const feedRowsRef = useRef<FeedRow[]>([]);
 
   // Track whether initial load has completed — skip fade-in for items after first render
   const isFirstRender = useRef(true);
 
   // Snapshot of deleted-repost IDs taken at first feed load. Using a snapshot
   // rather than live state means unreposting while viewing won't yank items away
-  // (protects against accidental taps). Primal's cache will catch up eventually.
+  // (protects against accidental taps). Nagg's app-view cache will catch up eventually.
   const deletedRepostIdsRef = useRef<Record<string, number> | null>(null);
 
   const feedListRef = useRef<LegendListRef>(null);
@@ -398,17 +389,17 @@ export function UserFeed({
     activeLoadMoreIdRef.current = null;
     deletedRepostIdsRef.current = null;
 
-    const loadFeedFromPrimal = async () => {
-      const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
+    const loadFeedFromClient = async () => {
+      const client = getFeedClient();
 
       try {
-        const requestPrefix = Date.now().toString(36);
-        const feedRawEvents = await client.request(`${requestPrefix}_feed`, {
-          cache: ['feed', { pubkey, notes: 'authored', limit: 50 }],
+        const phase1 = await client.getUserFeed({
+          pubkey,
+          authorName,
+          authorPicture,
+          limit: 50,
         });
         if (cancelled) return;
-
-        const phase1 = parseUserFeedPage(feedRawEvents, pubkey, authorName, authorPicture);
 
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
@@ -435,7 +426,6 @@ export function UserFeed({
         setMetricsMap(phase1.metricsMap);
         setQuotedEventsMap(phase1.quotedEventsMap);
         setProfilesMap(phase1.profilesMap);
-        setDataVersion((v) => v + 1);
         setIsLoading(false);
         // After initial render, mark first render done so subsequent items skip animation
         requestAnimationFrame(() => {
@@ -443,41 +433,34 @@ export function UserFeed({
         });
 
         if (!cancelled) {
-          await enrichFeedPage(
-            client,
-            requestPrefix,
-            phase1.missingQuotedIds,
-            phase1.missingProfilePubkeys,
-            phase1.quotedEventsMap,
-            phase1.profilesMap,
-            (updates) => {
-              if (cancelled) return;
-              startTransition(() => {
-                if (updates.quotedEvents) {
-                  setQuotedEventsMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of updates.quotedEvents!) n.set(k, v);
-                    return n;
-                  });
-                }
-                if (updates.metrics) {
-                  setMetricsMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of updates.metrics!) n.set(k, v);
-                    return n;
-                  });
-                }
-                if (updates.profiles) {
-                  setProfilesMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of updates.profiles!) n.set(k, v);
-                    return n;
-                  });
-                }
-                setDataVersion((v) => v + 1);
+          const updates = await client.enrich({
+            missingQuotedIds: phase1.missingQuotedIds,
+            missingProfilePubkeys: phase1.missingProfilePubkeys,
+          });
+          if (cancelled) return;
+          startTransition(() => {
+            if (updates.quotedEvents) {
+              setQuotedEventsMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.quotedEvents!) n.set(k, v);
+                return n;
               });
             }
-          );
+            if (updates.metrics) {
+              setMetricsMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.metrics!) n.set(k, v);
+                return n;
+              });
+            }
+            if (updates.profiles) {
+              setProfilesMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.profiles!) n.set(k, v);
+                return n;
+              });
+            }
+          });
         }
       } catch (error) {
         log.error('feed.user.load_failed', { error });
@@ -489,12 +472,12 @@ export function UserFeed({
           setIsLoading(false);
         }
       } finally {
-        client.close();
+        client.dispose?.();
       }
     };
 
     const task = InteractionManager.runAfterInteractions(() => {
-      void loadFeedFromPrimal();
+      void loadFeedFromClient();
     });
 
     return () => {
@@ -516,21 +499,19 @@ export function UserFeed({
 
     loadingMoreRef.current = true;
     setIsLoadingMore(true);
-    const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
     const rp = Date.now().toString(36);
     activeLoadMoreIdRef.current = rp;
+    const client = getFeedClient();
 
     try {
-      const payload: Record<string, unknown> = {
+      const page = await client.getUserFeed({
         pubkey,
-        notes: 'authored',
+        authorName,
+        authorPicture,
         limit: 30,
         until: paginationUntilRef.current,
-      };
-      if (paginationOffsetRef.current > 0) payload.offset = paginationOffsetRef.current;
-
-      const rawEvents = await client.request(`${rp}_more`, { cache: ['feed', payload] });
-      const page = parseUserFeedPage(rawEvents, pubkey, authorName, authorPicture);
+        offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
+      });
 
       if (page.orderedFeedItems.length === 0) {
         hasMoreRef.current = false;
@@ -596,52 +577,44 @@ export function UserFeed({
           for (const [k, v] of page.profilesMap) n.set(k, v);
           return n;
         });
-        setDataVersion((v) => v + 1);
       });
 
       const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
       const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
-      await enrichFeedPage(
-        client,
-        rp,
-        missingQ,
-        missingP,
-        quotedRef.current,
-        profilesRef.current,
-        (updates) => {
-          if (activeLoadMoreIdRef.current !== rp) return;
-          startTransition(() => {
-            if (updates.quotedEvents) {
-              setQuotedEventsMap((prev) => {
-                const n = new Map(prev);
-                for (const [k, v] of updates.quotedEvents!) n.set(k, v);
-                return n;
-              });
-            }
-            if (updates.metrics) {
-              setMetricsMap((prev) => {
-                const n = new Map(prev);
-                for (const [k, v] of updates.metrics!) n.set(k, v);
-                return n;
-              });
-            }
-            if (updates.profiles) {
-              setProfilesMap((prev) => {
-                const n = new Map(prev);
-                for (const [k, v] of updates.profiles!) n.set(k, v);
-                return n;
-              });
-            }
-            setDataVersion((v) => v + 1);
+      const updates = await client.enrich({
+        missingQuotedIds: missingQ,
+        missingProfilePubkeys: missingP,
+      });
+      if (activeLoadMoreIdRef.current !== rp) return dedupedItems;
+      startTransition(() => {
+        if (updates.quotedEvents) {
+          setQuotedEventsMap((prev) => {
+            const n = new Map(prev);
+            for (const [k, v] of updates.quotedEvents!) n.set(k, v);
+            return n;
           });
         }
-      );
+        if (updates.metrics) {
+          setMetricsMap((prev) => {
+            const n = new Map(prev);
+            for (const [k, v] of updates.metrics!) n.set(k, v);
+            return n;
+          });
+        }
+        if (updates.profiles) {
+          setProfilesMap((prev) => {
+            const n = new Map(prev);
+            for (const [k, v] of updates.profiles!) n.set(k, v);
+            return n;
+          });
+        }
+      });
       return dedupedItems;
     } catch (error) {
       log.error('feed.user.load_more_failed', { error });
       return [];
     } finally {
-      client.close();
+      client.dispose?.();
       loadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
@@ -659,6 +632,9 @@ export function UserFeed({
   const actionableEvents = useMemo(() => {
     const map = new Map<string, FeedEvent>();
     for (const item of feedItems) {
+      if (item.rootEvent) {
+        map.set(item.rootEvent.id, item.rootEvent);
+      }
       if (item.type === 'note') {
         map.set(item.event.id, item.event);
       } else if (item.originalEvent) {
@@ -668,12 +644,17 @@ export function UserFeed({
     return Array.from(map.values());
   }, [feedItems]);
 
-  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
-    useNostrEngagement(actionableEvents, getMetrics);
+  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost } = useNostrEngagement(
+    actionableEvents,
+    getMetrics
+  );
+  const toggleLikeRef = useLatestRef(toggleLike);
+  const toggleRepostRef = useLatestRef(toggleRepost);
 
   const videoPosts = useMemo((): VideoPostRecord[] => {
     const sourceEvents: FeedEvent[] = [];
     for (const item of feedItems) {
+      if (item.rootEvent) sourceEvents.push(item.rootEvent);
       const event = item.type === 'note' ? item.event : item.originalEvent;
       if (event) sourceEvents.push(event);
     }
@@ -727,6 +708,9 @@ export function UserFeed({
   const getThreadContext = useCallback(() => {
     const allEvents = new Map<string, FeedEvent>();
     for (const it of feedItems) {
+      if (it.rootEvent) {
+        allEvents.set(it.rootEvent.id, it.rootEvent);
+      }
       if (it.type === 'note') {
         allEvents.set(it.event.id, it.event);
       } else if (it.originalEvent) {
@@ -740,12 +724,101 @@ export function UserFeed({
       quotedEvents: quotedRef.current,
     };
   }, [feedItems, profilesRef, metricsRef, quotedRef]);
+  const getThreadContextRef = useLatestRef(getThreadContext);
+
+  const resolveReposter = useCallback(
+    () => ({
+      name: displayName,
+      pubkey,
+    }),
+    [displayName, pubkey]
+  );
+
+  const feedRows = useMemo(
+    () =>
+      buildFeedRows({
+        items: feedItems,
+        previousRows: feedRowsRef.current,
+        profilesMap,
+        quotedEventsMap,
+        getDisplayMetrics,
+        getEngagementState,
+        resolveReposter,
+      }),
+    [
+      feedItems,
+      metricsMap,
+      profilesMap,
+      quotedEventsMap,
+      getDisplayMetrics,
+      getEngagementState,
+      resolveReposter,
+    ]
+  );
+
+  useEffect(() => {
+    feedRowsRef.current = feedRows;
+  }, [feedRows]);
 
   const renderFeedItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
+    ({ item: row, index }: LegendListRenderItemProps<FeedRow, string | undefined>) => {
+      const item = row.item;
       if (item.type === 'note') {
-        const metrics = getDisplayMetrics(item.event.id);
-        const engagement = getEngagementState(item.event.id);
+        const metrics = row.metrics;
+        const engagement = row.engagement;
+        const contextRootEvent = row.rootEvent;
+        if (contextRootEvent) {
+          const rootEvent = contextRootEvent;
+          const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
+          const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
+          return (
+            <View>
+              <PostCard
+                variant="feed"
+                event={rootEvent}
+                metrics={rootMetrics}
+                index={index}
+                feedIndex={index}
+                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                quotedEvents={row.quotedEvents}
+                profiles={row.profiles}
+                getMetrics={getMetrics}
+                liked={rootEngagement.liked}
+                reposted={rootEngagement.reposted}
+                likePending={rootEngagement.likePending}
+                repostPending={rootEngagement.repostPending}
+                likePendingDirection={rootEngagement.likePendingDirection}
+                repostPendingDirection={rootEngagement.repostPendingDirection}
+                onLikePress={() => toggleLikeRef.current(rootEvent)}
+                onRepostPress={() => toggleRepostRef.current(rootEvent)}
+                skipAnimation={!isFirstRender.current}
+                showLineBelow
+                getThreadContext={() => getThreadContextRef.current()}
+              />
+              <PostCard
+                variant="thread-reply"
+                event={item.event}
+                metrics={metrics}
+                index={index}
+                feedIndex={index}
+                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                quotedEvents={row.quotedEvents}
+                profiles={row.profiles}
+                getMetrics={getMetrics}
+                liked={engagement.liked}
+                reposted={engagement.reposted}
+                likePending={engagement.likePending}
+                repostPending={engagement.repostPending}
+                likePendingDirection={engagement.likePendingDirection}
+                repostPendingDirection={engagement.repostPendingDirection}
+                onLikePress={() => toggleLikeRef.current(item.event)}
+                onRepostPress={() => toggleRepostRef.current(item.event)}
+                showLineAbove
+                getThreadContext={() => getThreadContextRef.current()}
+              />
+            </View>
+          );
+        }
         return (
           <PostCard
             variant="feed"
@@ -754,8 +827,8 @@ export function UserFeed({
             index={index}
             feedIndex={index}
             onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-            quotedEvents={quotedRef.current}
-            profiles={profilesRef.current}
+            quotedEvents={row.quotedEvents}
+            profiles={row.profiles}
             getMetrics={getMetrics}
             liked={engagement.liked}
             reposted={engagement.reposted}
@@ -763,51 +836,105 @@ export function UserFeed({
             repostPending={engagement.repostPending}
             likePendingDirection={engagement.likePendingDirection}
             repostPendingDirection={engagement.repostPendingDirection}
-            onLikePress={() => toggleLike(item.event)}
-            onRepostPress={() => toggleRepost(item.event)}
+            onLikePress={() => toggleLikeRef.current(item.event)}
+            onRepostPress={() => toggleRepostRef.current(item.event)}
             skipAnimation={!isFirstRender.current}
-            getThreadContext={getThreadContext}
+            getThreadContext={() => getThreadContextRef.current()}
           />
         );
       }
-      const engagement = getEngagementState(item.originalEventId);
+      const engagement = row.engagement;
       const originalEvent = item.originalEvent;
+      const contextRootEvent = row.rootEvent;
+      if (contextRootEvent && originalEvent) {
+        const rootEvent = contextRootEvent;
+        const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
+        const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
+        return (
+          <View>
+            <PostCard
+              variant="feed"
+              event={rootEvent}
+              metrics={rootMetrics}
+              index={index}
+              feedIndex={index}
+              onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+              quotedEvents={row.quotedEvents}
+              profiles={row.profiles}
+              getMetrics={getMetrics}
+              liked={rootEngagement.liked}
+              reposted={rootEngagement.reposted}
+              likePending={rootEngagement.likePending}
+              repostPending={rootEngagement.repostPending}
+              likePendingDirection={rootEngagement.likePendingDirection}
+              repostPendingDirection={rootEngagement.repostPendingDirection}
+              onLikePress={() => toggleLikeRef.current(rootEvent)}
+              onRepostPress={() => toggleRepostRef.current(rootEvent)}
+              skipAnimation={!isFirstRender.current}
+              showLineBelow
+              getThreadContext={() => getThreadContextRef.current()}
+            />
+            <RepostCard
+              repostEvent={item.repostEvent}
+              originalEvent={item.originalEvent}
+              originalMetrics={row.metrics}
+              index={index}
+              feedIndex={index}
+              onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+              quotedEvents={row.quotedEvents}
+              profiles={row.profiles}
+              getMetrics={getMetrics}
+              reposterName={row.reposterName ?? displayName}
+              reposterPubkey={row.reposterPubkey ?? pubkey}
+              liked={engagement.liked}
+              reposted={engagement.reposted}
+              likePending={engagement.likePending}
+              repostPending={engagement.repostPending}
+              likePendingDirection={engagement.likePendingDirection}
+              repostPendingDirection={engagement.repostPendingDirection}
+              onLikePress={() => toggleLikeRef.current(originalEvent)}
+              onRepostPress={() => toggleRepostRef.current(originalEvent)}
+              skipAnimation={!isFirstRender.current}
+              getThreadContext={() => getThreadContextRef.current()}
+              showLineAbove
+            />
+          </View>
+        );
+      }
       return (
         <RepostCard
           repostEvent={item.repostEvent}
           originalEvent={item.originalEvent}
-          originalMetrics={getDisplayMetrics(item.originalEventId)}
+          originalMetrics={row.metrics}
           index={index}
           feedIndex={index}
           onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-          quotedEvents={quotedRef.current}
-          profiles={profilesRef.current}
+          quotedEvents={row.quotedEvents}
+          profiles={row.profiles}
           getMetrics={getMetrics}
-          reposterName={displayName}
-          reposterPubkey={pubkey}
+          reposterName={row.reposterName ?? displayName}
+          reposterPubkey={row.reposterPubkey ?? pubkey}
           liked={engagement.liked}
           reposted={engagement.reposted}
           likePending={engagement.likePending}
           repostPending={engagement.repostPending}
           likePendingDirection={engagement.likePendingDirection}
           repostPendingDirection={engagement.repostPendingDirection}
-          onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
-          onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
+          onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
+          onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
-          getThreadContext={getThreadContext}
+          getThreadContext={() => getThreadContextRef.current()}
         />
       );
     },
     [
-      getDisplayMetrics,
-      getEngagementState,
       getMetrics,
+      onOverlayOpenedFromIndex,
       displayName,
       pubkey,
-      toggleLike,
-      toggleRepost,
-      onOverlayOpenedFromIndex,
-      getThreadContext,
+      toggleLikeRef,
+      toggleRepostRef,
+      getThreadContextRef,
     ]
   );
 
@@ -850,14 +977,14 @@ export function UserFeed({
     ) : (
       <LegendList
         ref={feedListRef}
-        data={feedItems}
-        keyExtractor={feedKeyExtractor}
-        getItemType={feedItemType}
+        data={feedRows}
+        keyExtractor={getFeedRowKey}
+        getItemType={getFeedRowItemType}
         estimatedItemSize={300}
         drawDistance={500}
         maintainVisibleContentPosition
         renderItem={renderFeedItem}
-        extraData={`${dataVersion}:${engagementRevision}`}
+        itemsAreEqual={feedRowsAreEqual}
         recycleItems
         ListHeaderComponent={feedHeader}
         ListFooterComponent={
@@ -909,10 +1036,6 @@ export function UserFeed({
 // ============================================================================
 // Stable list references
 // ============================================================================
-
-const feedKeyExtractor = (item: FeedItem) =>
-  item.type === 'note' ? item.event.id : item.repostEvent.id;
-const feedItemType = (item: FeedItem) => item.type;
 
 // ============================================================================
 // Styles (UserFeed-specific only — shared styles live in nostr/shared.tsx)

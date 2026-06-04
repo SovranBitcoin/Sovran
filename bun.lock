@@ -19,7 +19,7 @@
         "@gandlaf21/bolt11-decode": "^3.1.1",
         "@gorhom/bottom-sheet": "5.2.9",
         "@internet-privacy/marmot-ts": "file:./vendor/marmot-ts",
-        "@legendapp/list": "^3.0.0-beta.44",
+        "@legendapp/list": "3.0.0",
         "@mealection/react-native-boring-avatars": "1.1.2",
         "@monicon/metro": "^2.0.7",
         "@monicon/native": "^1.2.2",
@@ -836,7 +836,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@legendapp/list": ["@legendapp/list@3.0.0-beta.44", "", { "dependencies": { "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "react": "*" } }, "sha512-loGRve78NuZ5k8Z54ZSDNOtv3dVBM1SeBCRtm1EYtZiDIZ8SyMVcYpUGgFpGuNKk71+9/NuM9hvScrgf7+4E+A=="],
+    "@legendapp/list": ["@legendapp/list@3.0.0", "", { "dependencies": { "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "react": "*" } }, "sha512-b5PzA2OUQrBATFqFi0978N7pNuMPRiANfLWuYzKsl6+CWEN8o5KSDlor2CrLNtxDbIirHJVionON5vQCS4bF2A=="],
 
     "@manypkg/find-root": ["@manypkg/find-root@1.1.0", "", { "dependencies": { "@babel/runtime": "^7.5.5", "@types/node": "^12.7.1", "find-up": "^4.1.0", "fs-extra": "^8.1.0" } }, "sha512-mki5uBvhHzO8kYYix/WRy2WX8S3B5wdVSc9D6KcU5lQNglP2yt58/VfLuAK49glRXChosY8ap2oJ1qgma3GUVA=="],
 
@@ -3555,6 +3555,8 @@
     "cliui/strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
 
     "coco-cashu-core/@scure/bip32": ["@scure/bip32@2.0.1", "", { "dependencies": { "@noble/curves": "2.0.1", "@noble/hashes": "2.0.1", "@scure/base": "2.0.0" } }, "sha512-4Md1NI5BzoVP+bhyJaY3K6yMesEFzNS1sE/cP+9nuvE7p/b0kx9XbpDHHFl8dHtufcbdHRUUQdRqLIPHN/s7yA=="],
+
+    "colada/@sovranbitcoin/schemas": ["@sovranbitcoin/schemas@file:../sovran-schemas", { "devDependencies": { "@types/bun": "latest", "neverthrow": "^8.2.0", "typescript": "^5.9.2", "zod": "^4.3.6" }, "peerDependencies": { "neverthrow": "^8.0.0", "zod": "^4.0.0" } }],
 
     "compressible/mime-db": ["mime-db@1.54.0", "", {}, "sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ=="],
 

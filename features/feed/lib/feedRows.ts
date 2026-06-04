@@ -1,0 +1,232 @@
+import type { EngagementViewState } from '@/features/feed/hooks/useNostrEngagement';
+import { getFeedItemRootContext } from '@/features/feed/lib/rootContext';
+import { collectQuoteTagIds, parseContent, tryNpubEncode } from '../components/nostr/feedParse';
+import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
+
+export type FeedRow = {
+  key: string;
+  item: FeedItem;
+  rootEvent?: FeedEvent;
+  metrics: NoteMetrics;
+  engagement: EngagementViewState;
+  rootMetrics?: NoteMetrics;
+  rootEngagement?: EngagementViewState;
+  profiles: Map<string, ProfileInfo>;
+  quotedEvents: Map<string, FeedEvent>;
+  reposterName?: string;
+  reposterPubkey?: string;
+};
+
+export const DEFAULT_ENGAGEMENT_STATE: EngagementViewState = Object.freeze({
+  liked: false,
+  reposted: false,
+  likePending: false,
+  repostPending: false,
+});
+
+export type BuildFeedRowsOptions = {
+  items: FeedItem[];
+  previousRows: FeedRow[];
+  profilesMap: Map<string, ProfileInfo>;
+  quotedEventsMap: Map<string, FeedEvent>;
+  getDisplayMetrics: (eventId: string) => NoteMetrics;
+  getEngagementState: (eventId: string) => EngagementViewState;
+  resolveReposter?: (item: Extract<FeedItem, { type: 'repost' }>) => {
+    name: string;
+    pubkey: string;
+  };
+};
+
+export function buildFeedRows({
+  items,
+  previousRows,
+  profilesMap,
+  quotedEventsMap,
+  getDisplayMetrics,
+  getEngagementState,
+  resolveReposter = defaultResolveReposter,
+}: BuildFeedRowsOptions): FeedRow[] {
+  const previousByKey = new Map(previousRows.map((row) => [row.key, row]));
+
+  return items.map((item) => {
+    const key = getFeedItemKey(item);
+    const rootEvent = getFeedItemRootContext(item);
+    const primaryEventId = getPrimaryEventId(item);
+    const localMaps = buildRowLocalMaps(item, rootEvent, profilesMap, quotedEventsMap);
+    const reposter = item.type === 'repost' ? resolveReposter(item) : undefined;
+    const candidate: FeedRow = {
+      key,
+      item,
+      rootEvent,
+      metrics: getDisplayMetrics(primaryEventId),
+      engagement: getEngagementState(primaryEventId),
+      rootMetrics: rootEvent ? getDisplayMetrics(rootEvent.id) : undefined,
+      rootEngagement: rootEvent ? getEngagementState(rootEvent.id) : undefined,
+      profiles: localMaps.profiles,
+      quotedEvents: localMaps.quotedEvents,
+      reposterName: reposter?.name,
+      reposterPubkey: reposter?.pubkey,
+    };
+
+    const previous = previousByKey.get(key);
+    return previous && feedRowContentEqual(previous, candidate) ? previous : candidate;
+  });
+}
+
+export function getFeedItemKey(item: FeedItem): string {
+  return item.type === 'note' ? item.event.id : item.repostEvent.id;
+}
+
+export function getFeedRowKey(row: FeedRow): string {
+  return row.key;
+}
+
+export function getFeedRowItemType(row: FeedRow): string {
+  const hasReplyPreview =
+    row.item.type === 'note' && (row.item.replyPreviewEvents?.length ?? 0) > 0;
+  return `${row.item.type}${row.rootEvent ? '-with-root' : ''}${
+    hasReplyPreview ? '-with-preview' : ''
+  }`;
+}
+
+export function feedRowsAreEqual(previous: FeedRow, next: FeedRow): boolean {
+  return previous === next;
+}
+
+function getPrimaryEventId(item: FeedItem): string {
+  return item.type === 'note' ? item.event.id : item.originalEventId;
+}
+
+function getDisplayEvents(item: FeedItem, rootEvent: FeedEvent | undefined): FeedEvent[] {
+  const events: FeedEvent[] = [];
+  if (rootEvent) events.push(rootEvent);
+  if (item.type === 'note') {
+    events.push(item.event);
+    for (const replyPreviewEvent of item.replyPreviewEvents ?? []) {
+      events.push(replyPreviewEvent);
+    }
+  } else {
+    events.push(item.repostEvent);
+    if (item.originalEvent) events.push(item.originalEvent);
+  }
+  return events;
+}
+
+function buildRowLocalMaps(
+  item: FeedItem,
+  rootEvent: FeedEvent | undefined,
+  profilesMap: Map<string, ProfileInfo>,
+  quotedEventsMap: Map<string, FeedEvent>
+): {
+  profiles: Map<string, ProfileInfo>;
+  quotedEvents: Map<string, FeedEvent>;
+} {
+  const profilePubkeys = new Set<string>();
+  const quoteIds = new Set<string>();
+  const displayEvents = getDisplayEvents(item, rootEvent);
+
+  for (const event of displayEvents) {
+    collectProfilePubkeys(event, profilePubkeys);
+    collectQuotedEventIds(event, quoteIds);
+  }
+
+  const quotedEvents = new Map<string, FeedEvent>();
+  for (const id of quoteIds) {
+    const quoted = quotedEventsMap.get(id);
+    if (!quoted) continue;
+    quotedEvents.set(id, quoted);
+    collectProfilePubkeys(quoted, profilePubkeys);
+  }
+
+  const profiles = new Map<string, ProfileInfo>();
+  for (const pubkey of profilePubkeys) {
+    const profile = profilesMap.get(pubkey);
+    if (profile) profiles.set(pubkey, profile);
+  }
+
+  return { profiles, quotedEvents };
+}
+
+function collectProfilePubkeys(event: FeedEvent, out: Set<string>): void {
+  out.add(event.pubkey);
+  for (const segment of parseContent(event.content)) {
+    if (segment.kind === 'npub' || segment.kind === 'nprofile') {
+      out.add(segment.pubkey);
+    }
+  }
+}
+
+function collectQuotedEventIds(event: FeedEvent, out: Set<string>): void {
+  for (const segment of parseContent(event.content)) {
+    if (segment.kind === 'nevent' || segment.kind === 'note') {
+      out.add(segment.eventId);
+    }
+  }
+  for (const id of collectQuoteTagIds(event)) out.add(id);
+}
+
+function defaultResolveReposter(item: Extract<FeedItem, { type: 'repost' }>): {
+  name: string;
+  pubkey: string;
+} {
+  const pubkey = item.repostEvent.pubkey;
+  return {
+    name: `${tryNpubEncode(pubkey).slice(0, 12)}…`,
+    pubkey,
+  };
+}
+
+function feedRowContentEqual(previous: FeedRow, next: FeedRow): boolean {
+  return (
+    previous.item === next.item &&
+    previous.rootEvent === next.rootEvent &&
+    optionalMetricsEqual(previous.metrics, next.metrics) &&
+    optionalMetricsEqual(previous.rootMetrics, next.rootMetrics) &&
+    engagementEqual(previous.engagement, next.engagement) &&
+    optionalEngagementEqual(previous.rootEngagement, next.rootEngagement) &&
+    mapEntriesEqual(previous.profiles, next.profiles) &&
+    mapEntriesEqual(previous.quotedEvents, next.quotedEvents) &&
+    previous.reposterName === next.reposterName &&
+    previous.reposterPubkey === next.reposterPubkey
+  );
+}
+
+function optionalMetricsEqual(a: NoteMetrics | undefined, b: NoteMetrics | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.likeCount === b.likeCount &&
+    a.repostCount === b.repostCount &&
+    a.replyCount === b.replyCount &&
+    a.satsZapped === b.satsZapped
+  );
+}
+
+function engagementEqual(a: EngagementViewState, b: EngagementViewState): boolean {
+  return (
+    a.liked === b.liked &&
+    a.reposted === b.reposted &&
+    a.likePending === b.likePending &&
+    a.repostPending === b.repostPending &&
+    a.likePendingDirection === b.likePendingDirection &&
+    a.repostPendingDirection === b.repostPendingDirection
+  );
+}
+
+function optionalEngagementEqual(
+  a: EngagementViewState | undefined,
+  b: EngagementViewState | undefined
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return engagementEqual(a, b);
+}
+
+function mapEntriesEqual<K, V>(a: Map<K, V>, b: Map<K, V>): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const [key, value] of a) {
+    if (b.get(key) !== value) return false;
+  }
+  return true;
+}

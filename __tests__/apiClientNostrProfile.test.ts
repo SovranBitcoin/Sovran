@@ -3,6 +3,10 @@ import { fetchNostrProfile } from '@/shared/lib/apiClient';
 jest.mock('colada', () => ({
   combineSignals: (...signals: (AbortSignal | undefined)[]) =>
     signals.find((signal): signal is AbortSignal => !!signal) ?? new AbortController().signal,
+  createNostrGraphqlMintEnrichment: jest.fn(() => ({
+    fetchMintReviews: jest.fn(),
+    resolveMintContactProfile: jest.fn(),
+  })),
   isAbortError: () => false,
   timeoutSignal: () => new AbortController().signal,
 }));

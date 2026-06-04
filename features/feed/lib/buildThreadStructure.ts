@@ -2,6 +2,9 @@ import { ShortTextNote } from 'nostr-tools/kinds';
 
 import type { FeedEvent } from '@/features/feed/components/nostr/feedTypes';
 
+const NIP22_COMMENT_KIND = 1111;
+const THREAD_REPLY_KINDS: ReadonlySet<number> = new Set([ShortTextNote, NIP22_COMMENT_KIND]);
+
 type ParentMarker = 'reply' | 'root';
 type ReplyMarker = 'reply' | 'root' | 'mention';
 
@@ -15,7 +18,7 @@ function eTagsOf(event: FeedEvent): string[][] {
 export function buildThreadStructure(
   eventId: string,
   allEvents: ReadonlyMap<string, FeedEvent>
-): { parents: FeedEvent[]; target: FeedEvent | null; replies: FeedEvent[] } {
+): ThreadStructure {
   const target = allEvents.get(eventId) || null;
   if (!target) return { parents: [], target: null, replies: [] };
 
@@ -48,7 +51,7 @@ export function buildThreadStructure(
   const replies: FeedEvent[] = [];
   for (const ev of allEvents.values()) {
     if (ev.id === eventId) continue;
-    if (ev.kind !== ShortTextNote) continue;
+    if (!THREAD_REPLY_KINDS.has(ev.kind)) continue;
     if (parentIds.has(ev.id)) continue;
 
     const eTags = eTagsOf(ev);
@@ -77,3 +80,9 @@ export function buildThreadStructure(
 
   return { parents, target, replies };
 }
+
+export type ThreadStructure = {
+  parents: FeedEvent[];
+  target: FeedEvent | null;
+  replies: FeedEvent[];
+};

@@ -37,6 +37,7 @@ import {
   TARGET_SKELETON_VARIANT,
   type ReplySkeletonMatch,
 } from '@/features/feed/lib/threadReplySkeletons';
+import { THREAD_CONNECTOR_LINE_STYLE } from './threadConnectorStyle';
 
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
 
@@ -54,6 +55,8 @@ interface PostCardProps {
 
   showLineAbove?: boolean;
   showLineBelow?: boolean;
+  showFooterBorder?: boolean;
+  fullBleedFooterBorder?: boolean;
 
   index?: number;
   skipAnimation?: boolean;
@@ -101,6 +104,8 @@ export const PostCard = React.memo(function PostCard({
   variant,
   showLineAbove = false,
   showLineBelow = false,
+  showFooterBorder = true,
+  fullBleedFooterBorder = false,
   index = 0,
   skipAnimation = true,
   feedIndex,
@@ -168,6 +173,7 @@ export const PostCard = React.memo(function PostCard({
       profiles: ctx?.profiles ?? new Map(),
       metrics: ctx?.metrics ?? new Map(),
       quotedEvents: ctx?.quotedEvents ?? new Map(),
+      replyPreviewEventIds: ctx?.replyPreviewEventIds,
     });
     router.push({
       pathname: '/(user-flow)/thread',
@@ -278,6 +284,7 @@ export const PostCard = React.memo(function PostCard({
               quotedEvents={quotedEvents}
               profiles={profiles}
               getMetrics={getMetrics}
+              event={event}
               onVideoTap={onVideoTap}
               onQuotedPressIn={handleNestedPressIn}
               onQuotedPressOut={handleNestedPressOut}
@@ -316,13 +323,20 @@ export const PostCard = React.memo(function PostCard({
 
   // ── Gutter layout (feed, repost-original, thread-reply) ──
   const hasConnectingBars = showLineAbove || showLineBelow;
+  const showMetricsBorder = showFooterBorder && (isThread ? !hasConnectingBars : true);
   const lineColor = defaultColor;
 
   const gutterContent = (
     <View style={pcStyles.gutterRow}>
       <View style={pcStyles.gutterCol}>
         {showLineAbove ? (
-          <View style={[pcStyles.lineAbove, { backgroundColor: lineColor }]} />
+          <View
+            style={[
+              pcStyles.lineAbove,
+              THREAD_CONNECTOR_LINE_STYLE,
+              { borderLeftColor: lineColor },
+            ]}
+          />
         ) : null}
         <Pressable
           onPressIn={handleNestedPressIn}
@@ -337,7 +351,13 @@ export const PostCard = React.memo(function PostCard({
           />
         </Pressable>
         {showLineBelow ? (
-          <View style={[pcStyles.lineBelow, { backgroundColor: lineColor }]} />
+          <View
+            style={[
+              pcStyles.lineBelow,
+              THREAD_CONNECTOR_LINE_STYLE,
+              { borderLeftColor: lineColor },
+            ]}
+          />
         ) : null}
       </View>
 
@@ -400,12 +420,20 @@ export const PostCard = React.memo(function PostCard({
 
         <Spacer size={8} />
 
-        <View style={pcStyles.inlineMetricsWrap}>
+        <View
+          style={[
+            fullBleedFooterBorder
+              ? pcStyles.inlineMetricsWrapFullBleed
+              : pcStyles.inlineMetricsWrap,
+            fullBleedFooterBorder && showMetricsBorder && pcStyles.inlineMetricsWrapFullBleedBorder,
+            fullBleedFooterBorder &&
+              showMetricsBorder && { borderBottomColor: opacity(foreground, 0.1) },
+          ]}>
           <MetricsFooter
             metrics={metrics}
             borderColor={foreground}
             compact={isThread}
-            showBorder={isThread ? !hasConnectingBars : true}
+            showBorder={!fullBleedFooterBorder && showMetricsBorder}
             onCommentPress={isThread ? (onCommentPress ?? navigateToThread) : undefined}
             onRepostPress={onRepostPress}
             onLikePress={onLikePress}
@@ -652,20 +680,27 @@ const pcStyles = StyleSheet.create({
     paddingLeft: AVATAR_SIZE + 12,
     paddingRight: 16,
   },
+  inlineMetricsWrapFullBleed: {
+    marginLeft: -(AVATAR_SIZE + 12 + 16),
+    marginRight: -16,
+    paddingLeft: AVATAR_SIZE + 12 + 16,
+    paddingRight: 16,
+  },
+  inlineMetricsWrapFullBleedBorder: {
+    borderBottomWidth: 1,
+    paddingBottom: 10,
+  },
   noteTextLine: {
     lineHeight: 22,
   },
   lineAbove: {
     position: 'absolute',
     top: 0,
-    width: 2,
+    left: AVATAR_SIZE / 2 - 1,
     height: AVATAR_SIZE / 2,
-    borderRadius: 1,
   },
   lineBelow: {
-    width: 2,
     flex: 1,
     marginTop: 6,
-    borderRadius: 1,
   },
 });

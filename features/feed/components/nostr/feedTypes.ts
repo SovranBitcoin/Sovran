@@ -14,15 +14,6 @@ export interface FeedEvent {
   created_at: number;
 }
 
-export interface RawPrimalEvent {
-  kind: number;
-  content: string;
-  id?: string;
-  pubkey?: string;
-  created_at?: number;
-  tags?: string[][];
-}
-
 export interface ProfileInfo {
   name: string;
   picture?: string;
@@ -52,12 +43,21 @@ export interface VideoPostRecord {
 
 /** Unified feed item — either an original note or a repost (Kind 6/16) */
 export type FeedItem =
-  | { type: 'note'; event: FeedEvent; timestamp: number }
+  | {
+      type: 'note';
+      event: FeedEvent;
+      rootEvent?: FeedEvent;
+      rootEventId?: string;
+      replyPreviewEvents?: FeedEvent[];
+      timestamp: number;
+    }
   | {
       type: 'repost';
       repostEvent: FeedEvent;
       originalEvent: FeedEvent | undefined;
       originalEventId: string;
+      rootEvent?: FeedEvent;
+      rootEventId?: string;
       timestamp: number;
     };
 
