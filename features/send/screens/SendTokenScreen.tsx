@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
@@ -210,7 +210,7 @@ export function SendTokenScreen({
           style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
           <View style={{ width: 1, height: 1 }} />
         </Menu.Trigger>
-        <Menu.Portal>
+        <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
           <MenuScrim />
           <Menu.Content presentation="bottom-sheet">
             <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">

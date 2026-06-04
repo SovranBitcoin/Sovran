@@ -94,6 +94,7 @@ export function BottomButtons({
   const resolvedGradientColor =
     gradientColor === null ? null : (gradientColor ?? screenBackground ?? themeBackground);
   const { setFooterHeight } = useScreenFooter();
+  const shouldRenderBlur = blur && Platform.OS !== 'android';
   const handleLayout = useCallback(
     (event: LayoutChangeEvent) => {
       setFooterHeight(event.nativeEvent.layout.height);
@@ -125,7 +126,7 @@ export function BottomButtons({
         ]}>
         {resolvedGradientColor !== null && (
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            {blur && (
+            {shouldRenderBlur && (
               <MaskedView
                 style={StyleSheet.absoluteFill}
                 maskElement={

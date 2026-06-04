@@ -55,9 +55,9 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
-import { Log } from '@/shared/lib/logger';
+import { Log, log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -186,12 +186,19 @@ export function ButtonHandler({
     setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
   }, []);
 
-  // The Menu closes itself on select (shouldCloseOnSelect default); async
-  // work runs in the background — callers still get their own per-button
-  // `loading` state.
-  const handleMenuItemPress = (button: ButtonHandlerActionButton): void => {
+  // The Menu closes itself on select (shouldCloseOnSelect default); keep
+  // async action failures contained so overflow actions do not surface as
+  // unhandled promise rejections on Android.
+  const handleMenuItemPress = async (button: ButtonHandlerActionButton): Promise<void> => {
     if (button.disabled) return;
-    void button.onPress?.();
+    try {
+      await button.onPress?.();
+    } catch (error) {
+      log.error('ui.button_handler.menu_action_failed', {
+        testID: button.testID,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
 
   // The inner shared `Button` already routes its onPress through
@@ -200,11 +207,14 @@ export function ButtonHandler({
   // so siblings keep their own visual state while one action runs.
   const handleButtonPress = async (button: ButtonHandlerActionButton, idx: number) => {
     if (button.disabled) return;
-    const result = button.onPress?.();
-    if (!(result instanceof Promise)) return;
     setLoadingIdx(idx);
     try {
-      await result;
+      await button.onPress?.();
+    } catch (error) {
+      log.error('ui.button_handler.action_failed', {
+        testID: button.testID,
+        error: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setLoadingIdx((current) => (current === idx ? null : current));
     }
@@ -261,7 +271,7 @@ export function ButtonHandler({
                 style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
                 <View style={{ width: 1, height: 1 }} />
               </Menu.Trigger>
-              <Menu.Portal>
+              <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
                 <MenuScrim />
                 <Menu.Content presentation="bottom-sheet">
                   <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
@@ -279,7 +289,9 @@ export function ButtonHandler({
                         testID={button.testID ? `overflow-${button.testID}` : undefined}
                         isDisabled={button.disabled}
                         variant={isDanger ? 'danger' : 'default'}
-                        onPress={() => handleMenuItemPress(button)}>
+                        onPress={() => {
+                          void handleMenuItemPress(button);
+                        }}>
                         <HStack align="center" gap={10} style={{ flex: 1 }}>
                           {button.icon ? (
                             <Icon

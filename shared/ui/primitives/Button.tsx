@@ -678,6 +678,7 @@ export const Button = ({
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
         <HStack
+          collapsable={false}
           align="center"
           justify="center"
           spacing={layoutText && layoutIcon ? sz.iconTextSpacing : 0}

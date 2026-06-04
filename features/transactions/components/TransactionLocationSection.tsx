@@ -43,11 +43,6 @@ const DISABLED_MAP_UI_SETTINGS = {
   rotationGesturesEnabled: false,
 };
 
-const GOOGLE_MAPS_NO_LABELS_STYLE = JSON.stringify([
-  { featureType: 'all', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-]);
 const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const MAP_CONTAINER_CN = 'mx-4 rounded-xl overflow-hidden h-[150px]';
@@ -57,6 +52,8 @@ const MAP_CONTAINER_CN = 'mx-4 rounded-xl overflow-hidden h-[150px]';
  */
 function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
   const surfaceSecondary = useThemeColor('surface-secondary');
+
+  if (Platform.OS === 'android') return null;
 
   return (
     <>
@@ -132,8 +129,11 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
  * Shows a blurred, grayscale preview of a fake location to hint it's a map.
  */
 function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
-  const foreground = useThemeColor('foreground');
-  const isIOS = Platform.OS === 'ios';
+  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'surface-tertiary',
+  ] as const);
 
   const previewCameraPosition = {
     coordinates: { latitude: 51.5074, longitude: -0.1278 },
@@ -142,31 +142,24 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
 
   return (
     <Pressable onPress={onReveal} activeOpacity={0.7}>
-      <View className={MAP_CONTAINER_CN}>
-        <View className="absolute inset-0" pointerEvents="none">
-          {isIOS ? (
+      <View
+        className={MAP_CONTAINER_CN}
+        style={
+          Platform.OS === 'android'
+            ? { backgroundColor: surfaceSecondary, borderWidth: 1, borderColor: surfaceTertiary }
+            : undefined
+        }>
+        {Platform.OS === 'ios' ? (
+          <View className="absolute inset-0" pointerEvents="none">
             <AppleMaps.View
               style={StyleSheet.absoluteFillObject}
               cameraPosition={previewCameraPosition}
               properties={{ isMyLocationEnabled: false, pointsOfInterest: { including: [] } }}
               uiSettings={DISABLED_MAP_UI_SETTINGS}
             />
-          ) : HAS_ANDROID_GOOGLE_MAPS_KEY ? (
-            <GoogleMaps.View
-              style={StyleSheet.absoluteFillObject}
-              cameraPosition={previewCameraPosition}
-              colorScheme={GoogleMaps.MapColorScheme.DARK}
-              properties={{
-                isMyLocationEnabled: false,
-                mapStyleOptions: { json: GOOGLE_MAPS_NO_LABELS_STYLE },
-              }}
-              uiSettings={DISABLED_MAP_UI_SETTINGS}
-            />
-          ) : (
-            <View className="absolute inset-0" />
-          )}
-          <MapGrayscaleOverlay withBlur />
-        </View>
+            <MapGrayscaleOverlay withBlur />
+          </View>
+        ) : null}
 
         <View className="absolute inset-0 items-center justify-center">
           <VStack align="center" gap={6}>

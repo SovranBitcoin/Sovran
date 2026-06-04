@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Log } from '@/shared/lib/logger';
-import { Keyboard, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import {
+  Keyboard,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { BottomSheetFooter } from '@gorhom/bottom-sheet';
 import { BottomSheet, Button, useToast } from 'heroui-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -705,7 +712,7 @@ function SheetPopup() {
 
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
-      <BottomSheet.Portal>
+      <BottomSheet.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
         <BottomSheet.Overlay
           isCloseOnPress={standardPayload?.dismissable ?? true}
           onPress={() => Keyboard.dismiss()}

@@ -15,6 +15,7 @@
     "buffer",
     "process",
     "@expo/metro-config",
+    "expo-screen-corner-radius",
     "@sovranbitcoin/schemas",
     "cashu-kym",
     "coco-cashu-plugin-p2pk-import",

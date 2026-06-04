@@ -7,16 +7,19 @@
  */
 
 import React from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { Platform, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import { useDrawerProgress } from '@react-navigation/drawer';
+import opacity from 'hex-color-opacity';
 
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 const HEADER_BUTTON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+const ANDROID_BUTTON_SIZE = 44;
 const AVATAR_SIZE = 32;
 
 type HeaderProfileButtonProps = {
@@ -28,6 +31,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey ?? '';
   const { displayName, picture } = useProfileDisplay(pubkey);
+  const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
   // Drives in lockstep with the drawer overlay + scene border-shadow:
   // 0 = closed (visible), 1 = open (hidden).
   const progress = useDrawerProgress();
@@ -36,11 +40,26 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
     opacity: interpolate(progress.value, [0, 1], [1, 0]),
   }));
 
+  const androidStyle =
+    Platform.OS === 'android'
+      ? {
+          width: ANDROID_BUTTON_SIZE,
+          height: ANDROID_BUTTON_SIZE,
+          borderRadius: ANDROID_BUTTON_SIZE / 2,
+          backgroundColor: flatSurface,
+          borderWidth: 1,
+          borderColor: opacity(muted, 0.3),
+          alignItems: 'center' as const,
+          justifyContent: 'center' as const,
+        }
+      : null;
+
   return (
     <Animated.View style={[animatedStyle, style]}>
       <Pressable
         onPress={onPress}
         hitSlop={HEADER_BUTTON_HIT_SLOP}
+        style={androidStyle}
         accessibilityRole="button"
         accessibilityLabel="Open drawer">
         <Avatar

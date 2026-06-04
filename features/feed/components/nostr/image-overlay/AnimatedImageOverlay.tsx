@@ -4,12 +4,13 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   type GestureType,
   Gesture,
   GestureDetector,
+  GestureHandlerRootView,
   ScrollView as GHScrollView,
 } from 'react-native-gesture-handler';
 import { FullWindowOverlay } from 'react-native-screens';
@@ -1319,23 +1320,48 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
 }
 
 /**
- * Renders the image overlay. On native, wraps in FullWindowOverlay (from
- * react-native-screens) so it appears above the Expo Router tab bar and
- * header — same approach as VideoFeedOverlay.
+ * Renders the image overlay. iOS wraps in FullWindowOverlay so it appears
+ * above the Expo Router tab bar and header. Android uses a native transparent
+ * Modal: react-native-screens falls back to a constrained plain View for
+ * FullWindowOverlay there, while an in-route absolute overlay can be torn
+ * down during native-stack navigation.
  */
 export function AnimatedImageOverlay() {
   const ctx = useImageOverlay();
   if (!ctx) return null;
   const content = <AnimatedImageOverlayContent ctx={ctx} />;
-  if (Platform.OS === 'web') return content;
-  return (
-    <Log name="AnimatedImageOverlay">
-      <FullWindowOverlay>{content}</FullWindowOverlay>
-    </Log>
-  );
+  if (Platform.OS === 'ios') {
+    return (
+      <Log name="AnimatedImageOverlay">
+        <FullWindowOverlay>{content}</FullWindowOverlay>
+      </Log>
+    );
+  }
+  if (Platform.OS === 'android') {
+    return (
+      <Modal
+        visible={ctx.activeUrl != null}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        navigationBarTranslucent
+        hardwareAccelerated
+        onRequestClose={() => ctx.close()}>
+        <Log name="AnimatedImageOverlay">
+          <GestureHandlerRootView style={overlayStyles.androidModalRoot}>
+            {content}
+          </GestureHandlerRootView>
+        </Log>
+      </Modal>
+    );
+  }
+  return <Log name="AnimatedImageOverlay">{content}</Log>;
 }
 
 const overlayStyles = StyleSheet.create({
+  androidModalRoot: {
+    flex: 1,
+  },
   closeButton: {
     position: 'absolute',
     left: CLOSE_BUTTON_LEFT,

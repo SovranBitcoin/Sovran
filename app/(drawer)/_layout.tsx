@@ -7,7 +7,7 @@ import {
 import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { router, useSegments } from 'expo-router';
 import { DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
-import { getCornerRadiusSync } from 'expo-screen-corner-radius';
+import { getScreenCornerRadius } from '@/shared/lib/screenCornerRadius';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -205,7 +205,7 @@ export default function DrawerLayout() {
   // Match the device's hardware screen corner radius so the scene's rounded
   // TL/BL hug the physical display curve. Falls back to a token-driven radius
   // when null (Android <12, or devices without rounded displays).
-  const deviceRadius = getCornerRadiusSync() ?? radius['2xl'];
+  const deviceRadius = getScreenCornerRadius(radius['2xl']);
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: surface }]}>
       <Drawer
