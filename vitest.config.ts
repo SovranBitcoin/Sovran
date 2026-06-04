@@ -37,6 +37,14 @@ export default defineConfig({
         replacement: resolve(localNodeModules, '@noble/hashes/hmac.js'),
       },
       {
+        find: '@noble/hashes/pbkdf2.js',
+        replacement: resolve(localNodeModules, '@noble/hashes/pbkdf2.js'),
+      },
+      {
+        find: '@noble/hashes/webcrypto.js',
+        replacement: resolve(localNodeModules, '@noble/hashes/webcrypto.js'),
+      },
+      {
         find: '@noble/hashes/legacy.js',
         replacement: resolve(localNodeModules, '@noble/hashes/legacy.js'),
       },
