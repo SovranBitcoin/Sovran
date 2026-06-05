@@ -68,7 +68,12 @@ async function hydrateReviewFields(
  * Debounces the query by 300ms to avoid excessive API calls during typing.
  * On empty query, fetches the default list (all mints sorted by reliability).
  */
-export function useMintSearch(query: string, currency: string): UseMintSearchReturn {
+export function useMintSearch(
+  query: string,
+  currency: string,
+  options?: { enabled?: boolean }
+): UseMintSearchReturn {
+  const enabled = options?.enabled ?? true;
   const [results, setResults] = useState<MintSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +81,18 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
   const fetchCountRef = useRef(0);
 
   useEffect(() => {
+    // Gated off (e.g. query too short to bother the mint search API): clear any
+    // prior results and skip the network entirely. An empty query would
+    // otherwise fetch the *default* mint catalog, which is wrong for an
+    // aggregated search surface.
+    if (!enabled) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setResults([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     // Debounce search queries (300ms), but fire immediately for empty/currency-only changes
     const delay = query.trim() ? 300 : 0;
 
@@ -167,7 +184,7 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
       if (timerRef.current) clearTimeout(timerRef.current);
       controller.abort();
     };
-  }, [query, currency]);
+  }, [query, currency, enabled]);
 
   return { results, loading, error };
 }

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Aggregate search hook for the "All" pill in Contacts search.
  *
- * Composes Nostr-profile contact hits (REST API via `useContactSearch`) with
+ * Composes Nostr-profile contact hits (Nagg GraphQL via `useContactSearch`) with
  * location-tier matches and geohash jump cards, so a single query like
  * "Province", "London", "Bluetooth", or a bare geohash surfaces the right
  * result regardless of category.
@@ -17,7 +17,7 @@ import { useMemo } from 'react';
 
 import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
-import type { NostrSearchResult } from '@/shared/lib/apiClient';
+import type { MintSearchResult, NostrSearchResult } from '@/shared/lib/apiClient';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { parseGeohashQuery } from '../lib/parseGeohashQuery';
 import { matchTiers } from '../lib/matchTiers';
@@ -32,10 +32,21 @@ export type AllSearchResult =
       profile?: NostrSearchResult;
       isLoadingProfile: boolean;
       score: number;
-    };
+    }
+  // `mint` rows are not produced here (this hook never hits the mint search
+  // API) — they're merged in by `useSearchAggregates`. The arm lives on the
+  // shared union so the row renderer can dispatch on it.
+  | { type: 'mint'; id: string; mint: MintSearchResult; score: number };
 
 interface UseAllSearchResultsResult {
+  /** People + places (geohash + tier), relevance-sorted. The unscoped feed. */
   results: AllSearchResult[];
+  /** Contact rows only (for the People scope + post-author derivation). */
+  people: AllSearchResult[];
+  /** Geohash-jump + tier rows only (for the Groups scope). */
+  groups: AllSearchResult[];
+  /** Real (non-placeholder) pubkeys behind the contact rows, for the Posts scope. */
+  postsAuthors: string[];
   loading: boolean;
 }
 
@@ -50,7 +61,7 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
   const { displayResults, searchLoading, hasSearched } = useContactSearch(query);
   const { tiers } = useLocationTiers();
 
-  // Pubkeys with a real (non-placeholder) row. The REST `/nostr/search`
+  // Pubkeys with a real (non-placeholder) row. The GraphQL profile search
   // endpoint can return sparse / stale profile data — sometimes just a
   // pubkey with none of `displayName`/`picture`/`nip05` populated — so we
   // layer the shared kind-0 metadata cache on top. Cache hits paint
@@ -76,17 +87,17 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
       ? { type: 'geohash', id: `geohash:${geohash}`, geohash, score: SCORE_GEOHASH }
       : null;
 
-    // --- contacts (REST API, score preserves API order) ---
+    // --- contacts (GraphQL profile search, score preserves API order) ---
     // `isLoadingProfile` reflects whether *this row's* profile is absent —
     // not whether *some* query is in flight. `useContactSearch` keeps the
     // prior results visible during a new query (stale-while-revalidate), so
     // flagging every row loading on every keystroke would re-skeleton real
     // results and cause the jarring flash we see on rapid typing.
     const contactRows: AllSearchResult[] = displayResults.map((r: DisplayResult, i) => {
-      // Overlay relay-cached kind-0 metadata over the REST snapshot:
+      // Overlay relay-cached kind-0 metadata over the GraphQL snapshot:
       // cache values win when defined (they're authoritative), falling
       // back to the API row otherwise. Without this, search hits whose
-      // REST response carries only a pubkey render as fallback gradient
+      // GraphQL response carries only a pubkey render as fallback gradient
       // + abbreviated pubkey title even though we already have the
       // profile cached from another surface.
       const cached = r.profile ? cachedMetadata.get(r.pubkey) : undefined;
@@ -125,15 +136,23 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
       };
     });
 
-    const combined: AllSearchResult[] = [
-      ...(geohashRow ? [geohashRow] : []),
-      ...contactRows,
-      ...tierRows,
-    ];
+    // Places (geohash jump + tier matches) bucket — drives the Groups scope.
+    const groups: AllSearchResult[] = [...(geohashRow ? [geohashRow] : []), ...tierRows];
+
+    const combined: AllSearchResult[] = [...groups, ...contactRows];
     combined.sort((a, b) => b.score - a.score);
+
+    // Pubkeys with a real (non-placeholder) profile — the authors the Posts
+    // scope fetches recent posts for, and the gate for showing the Posts tab.
+    const postsAuthors = contactRows.flatMap((r) =>
+      r.type === 'contact' && !r.pubkey.startsWith('placeholder-') ? [r.pubkey] : []
+    );
 
     return {
       results: combined,
+      people: contactRows,
+      groups,
+      postsAuthors,
       loading: searchLoading,
     };
   }, [query, displayResults, searchLoading, hasSearched, tiers, cachedMetadata]);

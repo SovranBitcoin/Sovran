@@ -60,7 +60,7 @@ interface NostrProfileLike {
   nip05Valid?: boolean;
   about?: string;
   lud16?: string;
-  /** Pagerank reputation (0–100). Present on REST-search profiles; sparse elsewhere. */
+  /** Vertex reputation (0-100). Present on Nagg profile-search profiles; sparse elsewhere. */
   score?: number | null;
   followers?: number | null;
   follows?: number | null;
@@ -287,6 +287,9 @@ interface ContactRowProps {
   identity: Identity | Identity[];
 
   title?: string;
+  /** Rendered inline at the end of the title row, right-aligned next to the
+   *  name (e.g. a relative last-message timestamp on the conversation list). */
+  titleTrailing?: ReactNode;
   /** `null` suppresses the subtitle entirely (pairs with `hideMetadata` for
    *  replies-mode: show the last message, hide the stat pills). */
   subtitle?: string | ReactNode | null;
@@ -608,6 +611,7 @@ function buildStats(
 export function ContactRow({
   identity,
   title: titleOverride,
+  titleTrailing,
   subtitle: subtitleOverride,
   hideMetadata = false,
   showNip05 = true,
@@ -692,8 +696,15 @@ export function ContactRow({
   const titleFallback = deriveTitleFallback(identities);
   const isCurrentSelf = !!self?.isActive;
 
-  const titleNode: string | ReactNode | undefined =
-    isCurrentSelf && titleBase ? (
+  // While loading, keep the title a plain string so ListRow renders the title
+  // *skeleton* (a node title bypasses the placeholder, which would otherwise
+  // leak the deterministic word-pair name as a fake "loaded" name). The CURRENT
+  // badge / titleTrailing decorations only make sense once real data is in.
+  let titleNode: string | ReactNode | undefined = titleBase;
+  if (resolvedLoading) {
+    titleNode = titleBase;
+  } else if (isCurrentSelf && titleBase) {
+    titleNode = (
       <HStack align="center" spacing={8}>
         <Text size={16} bold numberOfLines={1} color={foreground}>
           {titleBase}
@@ -710,9 +721,19 @@ export function ContactRow({
           </Text>
         </View>
       </HStack>
-    ) : (
-      titleBase
     );
+  } else if (titleTrailing != null && titleBase) {
+    // Name on the left (ellipsizes), titleTrailing (e.g. relative date) pinned
+    // to the right edge of the title column.
+    titleNode = (
+      <HStack align="center" style={{ justifyContent: 'space-between', gap: 8 }}>
+        <Text size={16} bold numberOfLines={1} color={foreground} style={{ flexShrink: 1 }}>
+          {titleBase}
+        </Text>
+        {titleTrailing}
+      </HStack>
+    );
+  }
 
   // ---- Subtitle ---------------------------------------------------------
 
@@ -841,6 +862,7 @@ export function ContactRow({
       loading={resolvedLoading}
       disabled={disabled}
       padding={padding}
+      accessibilityLabel={typeof titleBase === 'string' ? titleBase : undefined}
       testID={testID}
     />
   );

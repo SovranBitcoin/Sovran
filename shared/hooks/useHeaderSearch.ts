@@ -12,6 +12,10 @@ export function useHeaderSearch() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [clearKey, setClearKey] = useState(0);
+  // Text to seed the (uncontrolled) search input with on its next remount.
+  // Bumping `clearKey` remounts the TextInput; it reads this as its
+  // `defaultValue`. Used to re-run a tapped recent-search chip.
+  const [seedText, setSeedText] = useState('');
   const openedAtRef = useRef<number>(0);
 
   const onOpenSearch = useCallback(() => {
@@ -29,6 +33,7 @@ export function useHeaderSearch() {
     });
     setIsSearching(false);
     setSearchQuery('');
+    setSeedText('');
     setClearKey((prev) => prev + 1);
     Keyboard.dismiss();
   }, [searchQuery]);
@@ -37,5 +42,22 @@ export function useHeaderSearch() {
     setSearchQuery(query);
   }, []);
 
-  return { isSearching, searchQuery, clearKey, onOpenSearch, onCloseSearch, onSearchChange };
+  // Programmatically run a query (e.g. tapping a recent-search chip): set the
+  // results immediately and remount the input seeded with the text.
+  const setQuery = useCallback((query: string) => {
+    setSearchQuery(query);
+    setSeedText(query);
+    setClearKey((prev) => prev + 1);
+  }, []);
+
+  return {
+    isSearching,
+    searchQuery,
+    clearKey,
+    seedText,
+    onOpenSearch,
+    onCloseSearch,
+    onSearchChange,
+    setQuery,
+  };
 }

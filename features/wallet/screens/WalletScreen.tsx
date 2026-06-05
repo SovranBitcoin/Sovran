@@ -31,6 +31,10 @@ import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
+import { UnifiedSearch } from '@/shared/ui/composed/search/UnifiedSearch';
 
 const ACCOUNT = { unit: 'sat' } as const;
 
@@ -52,6 +56,12 @@ const SEND_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.up.right' : undefined;
 export function WalletScreen() {
   useLifecycleLogger('WalletScreen');
   useBackgroundConfig({ blurMode: 'partial' });
+
+  // Inline header search (shared with Feed). While searching, the wallet body is
+  // replaced by the people-search view — see the render branch below.
+  const { isSearching } = useSearchContext();
+  const headerHeight = useHeaderHeight();
+  const surface = useThemeColor('surface');
 
   const { height: windowHeight } = useWindowDimensions();
   // Deterministic header height — locked so the QR button below it lands at
@@ -123,6 +133,25 @@ export function WalletScreen() {
     router.push('/(send-flow)/nearPay');
   }, []);
 
+  const handleNfc = useCallback(() => {
+    walletLog.info('wallet.action.nfc', { unit: ACCOUNT.unit });
+    void machine.scan?.(undefined, { source: 'nfc' });
+  }, [machine]);
+
+  // Keep BootEntrance mounted across the search toggle so the splash→QR morph
+  // never replays; swap only the inner body. The transparent wallet header means
+  // the search view must paint its own surface and inset below the header.
+  if (isSearching) {
+    return (
+      <BootEntrance>
+        <View
+          style={[styles.searchContainer, { backgroundColor: surface, paddingTop: headerHeight }]}>
+          <UnifiedSearch recentContext="wallet" />
+        </View>
+      </BootEntrance>
+    );
+  }
+
   return (
     <BootEntrance>
       <LayoutDebugWrapper
@@ -137,17 +166,6 @@ export function WalletScreen() {
 
             <HStack justify="space-around" style={styles.secondaryActions}>
               <CircleActionButton
-                icon="mdi:silverware-fork-knife"
-                systemIcon="fork.knife"
-                label="Split Bill"
-                testID="wallet-split-bill"
-                disabled={isSwapping}
-                onPress={() => {
-                  walletLog.info('wallet.split_bill.tap');
-                  router.push('/(split-bill-flow)/amount');
-                }}
-              />
-              <CircleActionButton
                 icon="mdi:swap-horizontal"
                 systemIcon="arrow.left.arrow.right"
                 label="Swap"
@@ -160,6 +178,14 @@ export function WalletScreen() {
                     params: { unit: ACCOUNT.unit },
                   });
                 }}
+              />
+              <CircleActionButton
+                icon="lucide:nfc"
+                systemIcon="wave.3.right"
+                label="NFC"
+                testID="wallet-nfc"
+                disabled={isSwapping}
+                onPress={handleNfc}
               />
               <Menu presentation="bottom-sheet">
                 <Menu.Trigger
@@ -254,6 +280,9 @@ export function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
+  searchContainer: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     padding: 0,

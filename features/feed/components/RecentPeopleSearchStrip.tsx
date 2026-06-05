@@ -11,20 +11,41 @@ import { useRecentPeopleStore } from '@/shared/stores/profile/recentPeopleStore'
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
 
-export function RecentPeopleSearchStrip() {
+export function RecentPeopleSearchStrip({
+  showClear = false,
+  title = 'Recent searches',
+}: {
+  showClear?: boolean;
+  title?: string;
+}) {
   const entries = useRecentPeopleStore((state) => state.entries);
+  const clearRecentPeople = useRecentPeopleStore((state) => state.clearRecentPeople);
   const pubkeys = useMemo(() => entries.map((entry) => entry.pubkey), [entries]);
   const rows = useRecentPeopleProfiles(pubkeys);
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const [foreground, muted, accent] = useThemeColor(['foreground', 'muted', 'accent'] as const);
 
   if (rows.length === 0) return null;
 
   return (
     <View style={styles.section}>
-      <Text bold size={15} color={foreground} style={styles.title}>
-        Recent searches
-      </Text>
+      <HStack align="center" justify="space-between" style={styles.title}>
+        <Text bold size={15} color={foreground}>
+          {title}
+        </Text>
+        {showClear ? (
+          <Pressable
+            onPress={clearRecentPeople}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Clear recent searches">
+            <Text size={13} color={accent}>
+              Clear
+            </Text>
+          </Pressable>
+        ) : null}
+      </HStack>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
