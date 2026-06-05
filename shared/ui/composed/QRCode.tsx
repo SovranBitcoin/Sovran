@@ -9,8 +9,9 @@ import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { useWindowDimensions, ActivityIndicator } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -234,7 +235,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
         justifyContent: 'center',
         alignItems: 'center',
       }}>
-      <ActivityIndicator size="large" color={QR_DARK} />
+      <Spinner size={32} color={QR_DARK} />
     </View>
   ) : showError ? (
     <View
@@ -268,7 +269,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
         alignItems: 'center',
         padding: 20,
       }}>
-      <ActivityIndicator size="large" color={QR_DARK} />
+      <Spinner size={32} color={QR_DARK} />
     </View>
   );
 

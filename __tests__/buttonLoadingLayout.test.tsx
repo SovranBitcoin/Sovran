@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { Button } from '@/shared/ui/primitives/Button';
 
@@ -38,6 +38,17 @@ jest.mock('@/shared/ui/primitives/Haptics', () => ({
     warningHaptic: jest.fn(),
   },
 }));
+
+jest.mock('@/shared/ui/primitives/Spinner', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+
+  return {
+    __esModule: true,
+    Spinner: ({ style }: { style?: StyleProp<ViewStyle> }) =>
+      ReactActual.createElement(View, { testID: 'spinner-loading-indicator', style }),
+  };
+});
 
 jest.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
@@ -132,7 +143,7 @@ describe('Button loading layout', () => {
     expect(nodeContainsText(tree, 'Confirm')).toBe(true);
     expect(nodeContainsText(tree, 'Sending...')).toBe(false);
     expect(hasHiddenContainerForText(tree, 'Confirm')).toBe(true);
-    expect(findNodeByTestID(tree, 'icon-ant-design:loading-outlined')).not.toBeNull();
+    expect(findNodeByTestID(tree, 'spinner-loading-indicator')).not.toBeNull();
 
     act(() => {
       renderer.unmount();

@@ -5,6 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import Icon from 'assets/icons';
 import type { RoutstrMessage } from '@/shared/stores/profile/routstrStore';
 import { Text } from '@/shared/ui/primitives/Text';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -127,17 +128,7 @@ function ThinkingHeader({
   const headerRow = (
     <HStack align="center" spacing={4}>
       {isLive ? (
-        <Icon
-          name="ant-design:loading-outlined"
-          size={14}
-          color={color}
-          spin={{
-            duration: duration.spin,
-            outputRange: ['0deg', '360deg'],
-            delay: 0,
-            easing: 'linear',
-          }}
-        />
+        <Spinner size={14} color={color} />
       ) : (
         <Icon name="mdi:brain" size={14} color={color} />
       )}
@@ -222,11 +213,11 @@ function UserBubble({ message }: { message: RoutstrMessage }) {
         <Text size={11} style={{ color: shade400 }}>
           {formatRelative(message.timestamp, 'chat-bubble')}
         </Text>
-        <Icon
-          name={isSending ? 'ant-design:loading-outlined' : 'simple-line-icons:check'}
-          size={12}
-          color={shade500}
-        />
+        {isSending ? (
+          <Spinner size={12} color={shade500} />
+        ) : (
+          <Icon name="simple-line-icons:check" size={12} color={shade500} />
+        )}
       </HStack>
     </VStack>
   );

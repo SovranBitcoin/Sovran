@@ -70,10 +70,10 @@ import {
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import Icon from 'assets/icons';
 import { Pressable, type HapticConfig } from './Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 
 // Buttons sit close to the bottom-bar gradient and the home indicator, where
 // off-by-a-few-pixel taps are common. An 8pt slop on every side is small
@@ -588,16 +588,7 @@ export const Button = ({
         )}
         {loading ? (
           <View pointerEvents="none" style={styles.loadingOverlay}>
-            <Icon
-              name="ant-design:loading-outlined"
-              size={16}
-              spin={{
-                delay: 0,
-                duration: 1000,
-                outputRange: ['0deg', '360deg'],
-                easing: 'linear',
-              }}
-            />
+            <Spinner size={16} />
           </View>
         ) : null}
       </Pressable>
@@ -636,20 +627,7 @@ export const Button = ({
           {/* Ripple effect overlay */}
           {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
           {/* Loading spinner or icon content */}
-          {loading ? (
-            <Icon
-              name="ant-design:loading-outlined"
-              size={16}
-              spin={{
-                delay: 0,
-                duration: 1000,
-                outputRange: ['0deg', '360deg'],
-                easing: 'linear',
-              }}
-            />
-          ) : (
-            layoutIcon
-          )}
+          {loading ? <Spinner size={16} /> : layoutIcon}
         </View>
       </Pressable>
     );
@@ -706,16 +684,7 @@ export const Button = ({
         </HStack>
         {loading ? (
           <View pointerEvents="none" style={styles.loadingOverlay}>
-            <Icon
-              name="ant-design:loading-outlined"
-              size={16}
-              spin={{
-                delay: 0,
-                duration: 1000,
-                outputRange: ['0deg', '360deg'],
-                easing: 'linear',
-              }}
-            />
+            <Spinner size={16} />
           </View>
         ) : null}
       </View>

@@ -24,7 +24,6 @@ import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   InteractionManager,
   Platform,
   StyleSheet,
@@ -33,6 +32,7 @@ import {
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { StatsCard, type CategoryFilter } from '../components/StatsCard';
 import { useMapCamera } from '../hooks/useMapCamera';
@@ -234,10 +234,10 @@ export function MapScreen() {
         <View
           style={[
             StyleSheet.absoluteFillObject,
-            styles.mapSkeleton,
-            { backgroundColor: skeleton },
-          ]}>
-          <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
+          styles.mapSkeleton,
+          { backgroundColor: skeleton },
+        ]}>
+          <Spinner size={32} color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: opacity(foreground, 0.8), marginTop: 16 }}>
             Loading map...
           </Text>

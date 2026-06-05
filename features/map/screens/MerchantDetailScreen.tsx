@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
@@ -15,6 +15,7 @@ import { Section } from '@/shared/ui/composed/Section';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -178,7 +179,7 @@ export function MerchantDetailScreen() {
     return (
       <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={BITCOIN_ACCENT} />
+          <Spinner size={32} color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
@@ -337,7 +338,7 @@ export function MerchantDetailScreen() {
           </Section>
         )}
 
-        <View style={styles.sourceInfo}>
+        <View style={[styles.sourceInfo, { borderTopColor: opacity(foreground, 0.1) }]}>
           <Text size={11} style={{ color: defaultColor, textAlign: 'center' }}>
             Data from BTCMap.org • Last updated {formatDate(place.updated_at, 'short-date')}
           </Text>
@@ -372,6 +373,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.1)',
   },
 });

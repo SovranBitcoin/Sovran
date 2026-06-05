@@ -1,8 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface RequestActionsProps {
@@ -29,7 +30,7 @@ export function RequestActions({ onAccept, onDecline, isBusy }: RequestActionsPr
   if (isBusy) {
     return (
       <HStack align="center" justify="center" style={{ width: 110 }}>
-        <ActivityIndicator size="small" color={accent} />
+        <Spinner size={18} color={accent} />
       </HStack>
     );
   }
