@@ -4,7 +4,7 @@
  * card per unit) and the Gallery album cards (one card per album cover).
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,6 +16,23 @@ import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { THEMES } from '@/themes';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
+
+/** A thumbUrl is only usable if it's a real http(s) URL — empty/whitespace/junk
+ *  must fall through to the gradient rather than render a blank `<Image>`. */
+function isLikelyImageUrl(url: string | undefined | null): url is string {
+  return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
+}
+
+function describeImageLoadError(event: unknown): string {
+  if (event && typeof event === 'object') {
+    const directError = (event as { error?: unknown }).error;
+    if (typeof directError === 'string') return directError;
+    const nativeEvent = (event as { nativeEvent?: { error?: unknown } }).nativeEvent;
+    if (typeof nativeEvent?.error === 'string') return nativeEvent.error;
+  }
+  return String(event ?? 'unknown');
+}
 
 interface UnitPreviewCardProps {
   themeName: string;
@@ -52,13 +69,68 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   // ignores the user's choice.
   const foreground = useThemeColor('foreground');
 
-  const imageSource = bundledImage
-    ? bundledImage
-    : downloaded
-      ? { uri: downloaded.localUri }
-      : catalogEntry?.thumbUrl
-        ? { uri: catalogEntry.thumbUrl }
+  // Track a failed remote/local source by URI so a broken thumb falls back to
+  // the palette gradient instead of a blank box (and a recycled card with a
+  // different thumb retries). Bundled requires can't fail, so they bypass this.
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+  const rawThumbUrl = catalogEntry?.thumbUrl;
+  const downloadedLocalUri = downloaded?.localUri;
+  const hasBundledImage = !!bundledImage;
+  const hasCatalogEntry = !!catalogEntry;
+  const hasDownloaded = !!downloaded;
+  const hasPalette = !!palette;
+  const remoteThumb = isLikelyImageUrl(rawThumbUrl) ? rawThumbUrl.trim() : undefined;
+  const uriSource = downloadedLocalUri ?? remoteThumb;
+  const useDownloadedUri =
+    hasDownloaded && !!downloadedLocalUri && downloadedLocalUri !== failedUri;
+  const useBundledImage = !hasDownloaded && hasBundledImage;
+  const useRemoteUri = !useBundledImage && !!remoteThumb && remoteThumb !== failedUri;
+  const imageSource = useDownloadedUri
+    ? { uri: downloadedLocalUri }
+    : useBundledImage
+      ? bundledImage
+      : useRemoteUri
+        ? { uri: remoteThumb }
         : null;
+  const hasImageSource = !!imageSource;
+  const sourceKind = useDownloadedUri || hasDownloaded
+    ? 'downloaded-file'
+    : useBundledImage
+      ? 'bundled-require'
+      : remoteThumb
+        ? 'remote-thumb'
+        : hasPalette
+          ? 'palette-gradient'
+          : 'solid-fallback';
+
+  useEffect(() => {
+    if (rawThumbUrl?.trim() && !remoteThumb) {
+      log.warn('wallpaper.preview.invalid_url', { themeName, thumbUrl: rawThumbUrl });
+    }
+    if (!hasImageSource) {
+      log.debug('wallpaper.preview.fallback', {
+        themeName,
+        sourceKind,
+        hasCatalogEntry,
+        hasBundledImage,
+        hasDownloaded,
+        hasPalette,
+        failedUri,
+      });
+    }
+  }, [
+    failedUri,
+    hasBundledImage,
+    hasCatalogEntry,
+    hasDownloaded,
+    hasImageSource,
+    hasPalette,
+    rawThumbUrl,
+    remoteThumb,
+    sourceKind,
+    themeName,
+    useBundledImage,
+  ]);
 
   const card = (
     <View
@@ -66,7 +138,23 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
       className="overflow-hidden rounded-3xl bg-[#1a1a1a]"
       style={[{ width, height }, selected && { borderWidth: 2, borderColor: foreground }]}>
       {imageSource ? (
-        <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+        <Image
+          source={imageSource}
+          style={StyleSheet.absoluteFillObject}
+          contentFit="cover"
+          onLoad={() => {
+            log.info('wallpaper.preview.loaded', { themeName, sourceKind, sourceUri: uriSource });
+          }}
+          onError={(event) => {
+            log.warn('wallpaper.preview.load_failed', {
+              themeName,
+              sourceKind,
+              sourceUri: uriSource,
+              error: describeImageLoadError(event),
+            });
+            if (uriSource) setFailedUri(uriSource);
+          }}
+        />
       ) : palette ? (
         <LinearGradient
           colors={[

@@ -67,7 +67,13 @@ export function registerDownloadedTheme(data: DownloadedThemeData): boolean {
   // 7. Set gradient colors
   (backgroundThemeGradientColors as Record<string, GradientColor[]>)[themeName] = gradientColors;
 
-  log.info('theme.register.downloaded', { themeName, displayName });
+  log.info('theme.register.downloaded', {
+    themeName,
+    displayName,
+    localUri,
+    hasImageSource: !!backgroundImageThemes[themeName],
+    registeredBackgroundThemes: BACKGROUND_THEME_NAMES.length,
+  });
   return true;
 }
 
@@ -89,5 +95,8 @@ export function unregisterDownloadedTheme(themeName: string): void {
   delete (backgroundThemeDominantColors as Record<string, DominantColor[]>)[themeName];
   delete (backgroundThemeGradientColors as Record<string, GradientColor[]>)[themeName];
 
-  log.info('theme.unregister.downloaded', { themeName });
+  log.info('theme.unregister.downloaded', {
+    themeName,
+    registeredBackgroundThemes: BACKGROUND_THEME_NAMES.length,
+  });
 }

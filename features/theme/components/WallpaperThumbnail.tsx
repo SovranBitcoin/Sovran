@@ -6,7 +6,7 @@
  * gradient derived from the palette when no image asset is available.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +18,24 @@ import { THEMES } from '@/themes';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import type { WallpaperCatalogEntry } from '@/shared/stores/global/wallpaperStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
+
+/** A thumbUrl is only usable if it's a real http(s) URL — empty strings,
+ *  whitespace, or junk like "null" must fall through to the gradient rather
+ *  than render a blank `<Image>`. */
+function isLikelyImageUrl(url: string | undefined | null): url is string {
+  return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
+}
+
+function describeImageLoadError(event: unknown): string {
+  if (event && typeof event === 'object') {
+    const directError = (event as { error?: unknown }).error;
+    if (typeof directError === 'string') return directError;
+    const nativeEvent = (event as { nativeEvent?: { error?: unknown } }).nativeEvent;
+    if (typeof nativeEvent?.error === 'string') return nativeEvent.error;
+  }
+  return String(event ?? 'unknown');
+}
 
 interface WallpaperThumbnailProps {
   themeName: string;
@@ -47,11 +65,54 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   // reflects the user's choice instead of a hardcoded blue.
   const foreground = useThemeColor('foreground');
 
-  const imageSource = downloaded
-    ? { uri: downloaded.localUri }
-    : entry?.thumbUrl
-      ? { uri: entry.thumbUrl }
-      : null;
+  // Track the source that failed to load so we fall back to the palette
+  // gradient instead of a blank box. Keyed by URI (not a boolean) so a
+  // recycled list row with a *different* thumb retries instead of staying
+  // blank.
+  const [failedUri, setFailedUri] = useState<string | null>(null);
+
+  const rawThumbUrl = entry?.thumbUrl;
+  const downloadedLocalUri = downloaded?.localUri;
+  const hasEntry = !!entry;
+  const hasDownloaded = !!downloaded;
+  const hasPalette = !!paletteColors;
+  const remoteThumb = isLikelyImageUrl(rawThumbUrl) ? rawThumbUrl.trim() : undefined;
+  const sourceUri = downloadedLocalUri ?? remoteThumb;
+  const imageSource = sourceUri && sourceUri !== failedUri ? { uri: sourceUri } : null;
+  const hasImageSource = !!imageSource;
+  const sourceKind = hasDownloaded
+    ? 'downloaded-file'
+    : remoteThumb
+      ? 'remote-thumb'
+      : hasPalette
+        ? 'palette-gradient'
+        : 'solid-fallback';
+
+  useEffect(() => {
+    if (rawThumbUrl?.trim() && !remoteThumb) {
+      log.warn('wallpaper.thumb.invalid_url', { themeName, thumbUrl: rawThumbUrl });
+    }
+    if (!hasImageSource) {
+      log.debug('wallpaper.thumb.fallback', {
+        themeName,
+        sourceKind,
+        hasEntry,
+        hasDownloaded,
+        hasPalette,
+        failedUri,
+      });
+    }
+  }, [
+    failedUri,
+    hasDownloaded,
+    hasEntry,
+    hasImageSource,
+    hasPalette,
+    rawThumbUrl,
+    remoteThumb,
+    sourceKind,
+    themeName,
+  ]);
 
   const inProgress = activeDownloadProgress !== undefined && activeDownloadProgress < 1;
 
@@ -66,7 +127,23 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
           className="overflow-hidden rounded-2xl bg-[#1a1a1a]"
           style={[{ width, height }, selected && { borderWidth: 2, borderColor: foreground }]}>
           {imageSource ? (
-            <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+            <Image
+              source={imageSource}
+              style={StyleSheet.absoluteFillObject}
+              contentFit="cover"
+              onLoad={() => {
+                log.info('wallpaper.thumb.loaded', { themeName, sourceKind, sourceUri });
+              }}
+              onError={(event) => {
+                log.warn('wallpaper.thumb.load_failed', {
+                  themeName,
+                  sourceKind,
+                  sourceUri,
+                  error: describeImageLoadError(event),
+                });
+                if (sourceUri) setFailedUri(sourceUri);
+              }}
+            />
           ) : paletteColors ? (
             <LinearGradient
               colors={[
