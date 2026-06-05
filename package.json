@@ -9,6 +9,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./map": "./src/map/index.ts",
     "./schemas": "./src/schemas.ts",
     "./recipes": "./src/recipes/index.ts"
   },
