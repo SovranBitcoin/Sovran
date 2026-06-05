@@ -24,6 +24,7 @@
     "@gandlaf21/bolt11-decode": "^3.1.1",
     "@scure/bip39": "2.0.1",
     "@sovranbitcoin/schemas": "file:../sovran-schemas",
+    "nagg-ts": "file:../nagg-ts",
     "neverthrow": "^8.2.0",
     "nostr-tools": "^2.0.0",
     "zod": "^4.3.6"

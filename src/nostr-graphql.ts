@@ -1,5 +1,6 @@
+import { createNaggClient, NaggUnknownDataSchema, type NaggError } from 'nagg-ts';
 import { z } from 'zod';
-import { safeFetch, type RequestControls } from './safeFetch';
+import type { RequestControls } from './safeFetch';
 import type { MintContactProfile, MintReviewRecommendation, MintReviewsSummary } from './types';
 
 export interface NostrGraphqlMintEnrichmentConfig {
@@ -63,21 +64,6 @@ const MintReviewsData = z.object({
   events: EventsConnection,
 });
 
-const GraphqlError = z
-  .object({
-    message: z.string().optional(),
-  })
-  .passthrough();
-
-function graphqlEnvelope<T extends z.ZodType>(data: T) {
-  return z
-    .object({
-      data: data.optional(),
-      errors: z.array(GraphqlError).optional(),
-    })
-    .passthrough();
-}
-
 const CONTACT_PROFILE_QUERY = `
 query ColadaMintContactProfile($pubkey: String!) {
   events(input: { pubkeys: [$pubkey], kinds: [0], limit: 1 }) {
@@ -128,10 +114,14 @@ export function createNostrGraphqlMintEnrichment(
 ): NostrGraphqlMintEnrichment {
   const endpoint = config.endpoint.trim();
   const reviewLimit = Math.max(1, Math.min(config.reviewLimit ?? 100, 500));
+  const client = createNaggClient({
+    endpoint,
+    defaultTimeoutMs: config.timeoutMs,
+  });
 
   return {
     resolveMintContactProfile: async (pubkey, _mintUrl, controls = {}) => {
-      const data = await postGraphql(endpoint, CONTACT_PROFILE_QUERY, { pubkey }, ContactProfileData, {
+      const data = await postGraphql(client, CONTACT_PROFILE_QUERY, { pubkey }, ContactProfileData, {
         ...controls,
         timeoutMs: controls.timeoutMs ?? config.timeoutMs,
       });
@@ -147,7 +137,7 @@ export function createNostrGraphqlMintEnrichment(
     fetchMintReviews: async (mintUrl, controls = {}) => {
       const mintUrls = mintURLCandidates(mintUrl);
       const data = await postGraphql(
-        endpoint,
+        client,
         MINT_REVIEWS_QUERY,
         { mintUrls, limit: reviewLimit },
         MintReviewsData,
@@ -183,36 +173,36 @@ export function createNostrGraphqlMintEnrichment(
 }
 
 async function postGraphql<T extends z.ZodType>(
-  endpoint: string,
+  client: ReturnType<typeof createNaggClient>,
   query: string,
   variables: Record<string, unknown>,
   dataSchema: T,
   controls: RequestControls
 ): Promise<z.infer<T>> {
-  if (!endpoint) {
-    throw new Error('GraphQL endpoint is required');
-  }
-  const response = await safeFetch(endpoint, controls, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
+  const result = await client.query({
+    query,
+    variables,
+    dataSchema: NaggUnknownDataSchema,
+    signal: controls.signal,
+    timeoutMs: controls.timeoutMs,
   });
-  if (!response.ok) {
-    throw new Error(`GraphQL fetch failed: ${response.status} ${response.statusText}`);
+  if (result.isErr()) {
+    throw errorFromNaggError(result.error);
   }
-
-  const raw: unknown = await response.json();
-  const parsed = graphqlEnvelope(dataSchema).safeParse(raw);
+  const parsed = dataSchema.safeParse(result.value);
   if (!parsed.success) {
     throw new Error('GraphQL response did not match the expected shape');
   }
-  if (parsed.data.errors?.length) {
-    throw new Error(parsed.data.errors[0]?.message ?? 'GraphQL request failed');
-  }
-  if (!parsed.data.data) {
-    throw new Error('GraphQL response did not include data');
-  }
-  return parsed.data.data;
+  return parsed.data;
+}
+
+function errorFromNaggError(error: NaggError): Error {
+  const out = new Error(error.message);
+  out.name =
+    error.type === 'network' && /abort|timed out|timeout/i.test(error.message)
+      ? 'AbortError'
+      : 'NaggGraphqlError';
+  return out;
 }
 
 function parseProfileEvent(content: string):
