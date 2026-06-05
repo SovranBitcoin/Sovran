@@ -233,6 +233,25 @@ const SECRET_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] =
   { name: 'lightning_invoice', test: (s) => /^ln(bc|tb|tbs)[0-9a-z]{50,}/i.test(s) },
 ];
 
+const EMBEDDED_SECRET_PATTERNS: { replacement: string; pattern: RegExp }[] = [
+  {
+    replacement: '<REDACTED:nsec>',
+    pattern: /\bnsec1[023456789acdefghjklmnpqrstuvwxyz]{58}\b/g,
+  },
+  {
+    replacement: '<REDACTED:cashu-token>',
+    pattern: /\bcashu[AB][A-Za-z0-9_-]{20,}/g,
+  },
+  {
+    replacement: '<REDACTED:lightning-invoice>',
+    pattern: /\bln(bc|tb|tbs)[0-9a-z]{50,}/gi,
+  },
+  {
+    replacement: '<REDACTED:jwt>',
+    pattern: /\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g,
+  },
+];
+
 const LONG_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] = [
   { name: 'npub', test: (s) => /^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s) },
   { name: 'base64', test: (s) => /^[A-Za-z0-9+/]{60,}={0,2}$/.test(s) },
@@ -260,18 +279,90 @@ function classifyString(s: string): StringClass {
 
 type Compact = string | { _kind: string; len: number; preview?: string };
 
+function redactKnownSecretSubstrings(s: string): string {
+  let out = s;
+  for (const { pattern, replacement } of EMBEDDED_SECRET_PATTERNS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}
+
 function summarizeString(s: string, maxLen: number): Compact {
-  if (s.length <= maxLen) return s;
   const c = classifyString(s);
   if (c.kind === 'secret') return { _kind: c.name, len: s.length };
+  const redacted = redactKnownSecretSubstrings(s);
+  if (redacted !== s) {
+    if (redacted.length <= maxLen) return redacted;
+    return { _kind: 'redacted_string', len: s.length, preview: redacted.slice(0, 32) + '…' };
+  }
+  if (s.length <= maxLen) return s;
   return { _kind: c.name, len: s.length, preview: s.slice(0, 32) + '…' };
+}
+
+function normalizeFieldName(name: string): string {
+  return name.replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
+function sensitiveFieldKind(fieldName: string): string | null {
+  const normalized = normalizeFieldName(fieldName);
+  if (
+    normalized === 'secret' ||
+    normalized === 'nsec' ||
+    normalized.endsWith('nsec') ||
+    normalized === 'privkey' ||
+    normalized.endsWith('privatekey') ||
+    normalized.endsWith('privatekeyhex') ||
+    normalized.endsWith('secretkey') ||
+    normalized.endsWith('signerkey')
+  ) {
+    return 'private_key';
+  }
+  if (
+    normalized === 'mnemonic' ||
+    normalized.endsWith('mnemonic') ||
+    normalized === 'seed' ||
+    normalized.endsWith('seed') ||
+    normalized.endsWith('seedhex') ||
+    normalized.endsWith('xpriv') ||
+    normalized.endsWith('passphrase') ||
+    normalized.endsWith('password')
+  ) {
+    return 'secret';
+  }
+  if (
+    normalized === 'token' ||
+    normalized.endsWith('token') ||
+    normalized === 'authorization' ||
+    normalized.endsWith('authorization')
+  ) {
+    return 'secret';
+  }
+  return null;
+}
+
+function compactSensitiveField(value: unknown, fieldName: string | undefined): unknown | undefined {
+  if (!fieldName) return undefined;
+  const kind = sensitiveFieldKind(fieldName);
+  if (!kind) return undefined;
+  if (typeof value === 'string') {
+    const c = classifyString(value);
+    return { _kind: c.kind === 'secret' ? c.name : kind, len: value.length };
+  }
+  if (value instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(value))) {
+    return { _kind: kind, bytes: (value as Uint8Array).byteLength };
+  }
+  if (value === null || value === undefined) return value;
+  return { _kind: kind };
 }
 
 function compactValue(
   value: unknown,
   opts: { maxStringLength: number; maxArrayItems: number; maxDepth: number; maxObjectKeys: number },
-  depth: number = 0
+  depth: number = 0,
+  fieldName?: string
 ): unknown {
+  const sensitive = compactSensitiveField(value, fieldName);
+  if (sensitive !== undefined) return sensitive;
   if (
     value === null ||
     value === undefined ||
@@ -304,7 +395,8 @@ function compactValue(
         obj[`…${value.size - count}_more`] = true;
         break;
       }
-      obj[String(k)] = compactValue(v, opts, depth + 1);
+      const entryKey = String(k);
+      obj[entryKey] = compactValue(v, opts, depth + 1, entryKey);
       count++;
     }
     return { _kind: 'map', size: value.size, entries: obj };
@@ -341,7 +433,9 @@ function compactPlainObject(
   const keys = Object.keys(obj);
   const result: Record<string, unknown> = {};
   const limit = Math.min(keys.length, opts.maxObjectKeys);
-  for (let i = 0; i < limit; i++) result[keys[i]] = compactValue(obj[keys[i]], opts, depth + 1);
+  for (let i = 0; i < limit; i++) {
+    result[keys[i]] = compactValue(obj[keys[i]], opts, depth + 1, keys[i]);
+  }
   if (keys.length > opts.maxObjectKeys) result[`…${keys.length - opts.maxObjectKeys}_more`] = true;
   return result;
 }
@@ -568,15 +662,16 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
         if (val instanceof Error) {
           errorInfo = {
             name: val.name,
-            message: val.message,
+            message: redactKnownSecretSubstrings(val.message),
             stack: (val.stack ?? '')
               .split('\n')
+              .map(redactKnownSecretSubstrings)
               .map((l) => l.trim())
               .filter(Boolean)
               .slice(0, 10),
           };
         } else {
-          cleanParams[key] = compactValue(val, core.compactOpts);
+          cleanParams[key] = compactValue(val, core.compactOpts, 0, key);
         }
       }
       if (Object.keys(cleanParams).length === 0) cleanParams = undefined;
@@ -937,14 +1032,17 @@ export const mapLog = log.child({ module: 'map' });
  * through this helper.
  */
 export function redactError(e: unknown): { name: string; message: string } {
-  if (e instanceof Error) return { name: e.name, message: e.message };
-  if (typeof e === 'string') return { name: 'NonError', message: e };
+  if (e instanceof Error) return { name: e.name, message: redactKnownSecretSubstrings(e.message) };
+  if (typeof e === 'string') return { name: 'NonError', message: redactKnownSecretSubstrings(e) };
   if (e && typeof e === 'object') {
     const o = e as { name?: unknown; message?: unknown };
     return {
       name: typeof o.name === 'string' ? o.name : 'NonError',
-      message: typeof o.message === 'string' ? o.message : '[non-error object]',
+      message:
+        typeof o.message === 'string'
+          ? redactKnownSecretSubstrings(o.message)
+          : '[non-error object]',
     };
   }
-  return { name: 'NonError', message: String(e) };
+  return { name: 'NonError', message: redactKnownSecretSubstrings(String(e)) };
 }
