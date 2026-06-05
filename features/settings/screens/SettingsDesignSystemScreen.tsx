@@ -30,6 +30,11 @@ const COMPONENTS: ComponentEntry[] = [
     title: 'Timeline',
     description: 'State-driven payment flow, stepped through its states',
   },
+  {
+    href: '/(settings-flow)/design-system-empty-states',
+    title: 'Empty states',
+    description: 'Every "nothing to show" surface, unified via EmptyState',
+  },
 ];
 
 const DesignSystemLinkItem: React.FC<ComponentEntry> = ({ href, title, description }) => (

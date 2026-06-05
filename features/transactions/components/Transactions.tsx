@@ -19,6 +19,7 @@ import { SwapTransactionRow } from '@/features/transactions/components/SwapTrans
 import { SplitBillTransactionRow } from '@/features/transactions/components/SplitBillTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
@@ -35,7 +36,7 @@ import {
 } from 'colada';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { duration, spacing, zIndex } from '@/shared/styles/tokens';
+import { spacing, zIndex } from '@/shared/styles/tokens';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import {
   useSwapTransactionsStore,
@@ -423,10 +424,19 @@ export const Transactions = React.memo(
       [onTransactionPress, onCancelPendingEcash]
     );
 
-    const getFixedItemSize = useCallback(
-      (section: Section) => HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16,
-      []
-    );
+    const getFixedItemSize = useCallback((section: Section): number | undefined => {
+      // Pure transaction sections are uniform-height, so we can hand LegendList
+      // an exact fixed size (fast path, no measurement). Sections containing
+      // swap or split-bill rows have content-dependent heights — trusting the
+      // 69px-per-row constant there mis-sized them and caused overlap, gaps,
+      // and scroll jumps. Returning `undefined` tells LegendList to measure
+      // those sections instead.
+      const hasVariableRow = section.data.some(
+        (item) => item.kind === 'swap' || item.kind === 'split-bill'
+      );
+      if (hasVariableRow) return undefined;
+      return HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16;
+    }, []);
 
     const renderSection = useCallback(
       ({ item: section }: { item: Section }) => (
@@ -490,17 +500,7 @@ export const Transactions = React.memo(
               minHeight: screenHeight / 2,
             }}>
             <Spacer size={24} />
-            <Icon
-              name="ant-design:loading-outlined"
-              size={32}
-              color={opacity(foreground, 0.33)}
-              spin={{
-                duration: duration.spin,
-                outputRange: ['0deg', '360deg'],
-                delay: 0,
-                easing: 'linear',
-              }}
-            />
+            <Spinner size={32} color={opacity(foreground, 0.33)} />
             <Text heavy size={16} style={{ color: opacity(foreground, 0.66) }}>
               Loading Transactions...
             </Text>
@@ -618,8 +618,9 @@ export const Transactions = React.memo(
           key={listKey}
           style={{ flex: 1 }}
           data={sectionsToDisplay}
-          keyExtractor={(section) => section.index!}
+          keyExtractor={(section) => section.index ?? section.title}
           getFixedItemSize={getFixedItemSize}
+          estimatedItemSize={HEADER_HEIGHT + ITEM_HEIGHT + 16}
           maintainVisibleContentPosition
           // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
           // triggers a fresh LinearTransition on every measured-position
