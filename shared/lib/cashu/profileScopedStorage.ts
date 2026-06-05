@@ -133,6 +133,15 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'nostr-metadata-cache',
   'theme-store',
   'bitchat-dm-messages-store',
+  'feed-ignore-store',
+  'notification-policy-store',
+  // Generic query caches (createQueryCacheStore). Profile-scoped because their
+  // entries are keyed by the viewer pubkey.
+  'feed-cache',
+  'notifications-cache',
+  'dm-conversations-cache',
+  'dm-messages-cache',
+  'own-profile-stats-cache',
 ];
 
 /**
@@ -167,6 +176,9 @@ async function rehydrateProfileStores(): Promise<void> {
   const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
   const { useThemeStore } = await import('@/shared/stores/profile/themeStore');
   const { useBitchatDmMessagesStore } = await import('@/features/bitchat/stores/bitchatDmMessages');
+  const { useFeedIgnoreStore } = await import('@/features/feed/stores/ignoreStore');
+  const { useNotificationPolicyStore } =
+    await import('@/features/feed/stores/notificationPolicyStore');
 
   // Reset each store to its initial state. Batched to reduce re-render cascade.
   // Skip persist writes so the empty reset state doesn't overwrite
@@ -216,6 +228,8 @@ async function rehydrateProfileStores(): Promise<void> {
         unitWallpapers: {},
       });
       useBitchatDmMessagesStore.setState({ byPeer: {} });
+      useFeedIgnoreStore.setState({ ignoredPubkeys: [], ignoredEventIds: [] });
+      useNotificationPolicyStore.setState({ policy: 'STRICT' });
     });
   } finally {
     _skipPersistWrite = false;
@@ -237,6 +251,8 @@ async function rehydrateProfileStores(): Promise<void> {
     useNostrSocialStore.persist.rehydrate(),
     useThemeStore.persist.rehydrate(),
     useBitchatDmMessagesStore.persist.rehydrate(),
+    useFeedIgnoreStore.persist.rehydrate(),
+    useNotificationPolicyStore.persist.rehydrate(),
   ]);
 
   log.info('cashu.storage.rehydrated');

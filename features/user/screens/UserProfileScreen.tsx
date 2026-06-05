@@ -149,24 +149,28 @@ function ProfileStatsGridComponent({
       description: 'Users followed',
       value: followingCount?.toString() ?? '0',
       smallValue: false,
+      valueLoading: isLoading && followingCount === undefined,
     },
     {
       label: 'Followers',
       description: 'Total count',
       value: followerCount?.toString() ?? '0',
       smallValue: false,
+      valueLoading: isLoading && followerCount === undefined,
     },
     {
       label: 'Reputation',
       description: 'Network score',
       value: reputationScore !== undefined ? `${Math.round(reputationScore)} / 100` : 'N/A',
       smallValue: false,
+      valueLoading: isLoading && reputationScore === undefined,
     },
     {
       label: 'Joined',
       description: 'Account created',
       value: joinedDate || 'Unknown',
       smallValue: true,
+      valueLoading: isLoading && joinedDate === undefined,
     },
   ];
 
@@ -188,7 +192,7 @@ function ProfileStatsGridComponent({
           {stat.label.toUpperCase()}
         </Text>
         <Text
-          loading={showSkeleton}
+          loading={showSkeleton || stat.valueLoading}
           placeholder="1,234"
           bold
           size={stat.smallValue ? 16 : 20}
@@ -754,7 +758,14 @@ export function UserProfileScreen() {
     clearSettledFollowOptimistic();
   }, [latestContactListEvent, setContactsFromRelay, clearSettledFollowOptimistic]);
 
-  const followingCount = isOwnProfile ? ownFollowingCount : profileData?.follows;
+  // Displayed aggregation counts come from Vertex (nagg) everywhere for
+  // consistency — both follower and following. On the own profile we fall back
+  // to the local kind-3 count only while Vertex is still loading, so the number
+  // never flashes blank. The local `followingPubkeys` set still drives
+  // follow/unfollow membership logic; only the displayed total uses Vertex.
+  const followingCount = isOwnProfile
+    ? (profileData?.follows ?? ownFollowingCount)
+    : profileData?.follows;
   const isFollowingProfile = useNostrSocialStore(
     useMemo(() => selectIsFollowingPubkey(pubkey || ''), [pubkey])
   );

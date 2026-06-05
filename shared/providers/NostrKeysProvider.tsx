@@ -426,6 +426,22 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mnemonic, mnemonicLoading, stage.canStart, refreshMnemonic]);
 
+  // Non-blocking: once keys are ready, refresh the user's own-account profiles
+  // (kind-0 + follower/following counts) so the drawer/account switcher stay
+  // fresh. Runs after interactions so it never holds the splash. Own accounts
+  // only — not the follow graph.
+  const ownProfileSyncedRef = useRef(false);
+  useEffect(() => {
+    if (!isReady || ownProfileSyncedRef.current) return;
+    ownProfileSyncedRef.current = true;
+    const task = InteractionManager.runAfterInteractions(() => {
+      void import('@/shared/lib/profile/ownProfileSync')
+        .then(({ syncOwnProfiles }) => syncOwnProfiles())
+        .catch((e) => initLog('NostrKeys', `syncOwnProfiles failed: ${e}`));
+    });
+    return () => task.cancel();
+  }, [isReady]);
+
   // Update error state based on mnemonic error
   useEffect(() => {
     if (mnemonicError) {
