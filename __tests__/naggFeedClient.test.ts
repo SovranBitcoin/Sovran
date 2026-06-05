@@ -9,6 +9,14 @@ jest.mock('colada', () => ({
   timeoutSignal: () => new AbortController().signal,
 }));
 
+jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
+  createProfileScopedStorage: () => ({
+    getItem: async () => null,
+    setItem: async () => {},
+    removeItem: async () => {},
+  }),
+}));
+
 const ENV_KEYS = [
   'EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL',
   'EXPO_PUBLIC_NAGG_BASE_URL',
@@ -50,6 +58,14 @@ const rootGql = {
   reposts: { rows: [] },
   replyStats: { rows: [] },
   zaps: { rows: [] },
+};
+
+const AUTHORED_REPLY_CHAIN_INPUT = {
+  kinds: [1, 1111],
+  via: { key: 'e' },
+  target: 'EVENT_ID',
+  maxDepth: 8,
+  maxBranchFanout: 32,
 };
 
 describe('createNaggFeedClient', () => {
@@ -120,6 +136,324 @@ describe('createNaggFeedClient', () => {
       pubkeys: ['viewer'],
       kinds: [1, 6, 16],
       limit: 12,
+    });
+  });
+
+  it('applies content exclusions to GraphQL input and filters ignored local events', async () => {
+    const blockedPubkey = 'b'.repeat(64);
+    const blockedEventId = 'c'.repeat(64);
+    const blockedPubkeyNode = {
+      ...rootGql,
+      id: 'd'.repeat(64),
+      pubkey: blockedPubkey,
+      content: 'blocked pubkey',
+      authorMetadata: [],
+    };
+    const blockedEventNode = {
+      ...rootGql,
+      id: blockedEventId,
+      pubkey: 'e'.repeat(64),
+      content: 'blocked event',
+      authorMetadata: [],
+    };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          events: {
+            nodes: [rootGql, blockedPubkeyNode, blockedEventNode],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    });
+
+    const { useFeedIgnoreStore } = jest.requireActual<
+      typeof import('@/features/feed/stores/ignoreStore')
+    >('@/features/feed/stores/ignoreStore');
+    useFeedIgnoreStore.setState({
+      ignoredPubkeys: [blockedPubkey],
+      ignoredEventIds: [blockedEventId],
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getFeed({
+      spec: JSON.stringify({ id: 'feed' }),
+      limit: 3,
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.variables.input).toMatchObject({
+      kinds: [1],
+      limit: 3,
+      excludeIds: [blockedEventId],
+      excludePubkeys: [blockedPubkey],
+    });
+    expect(result.orderedFeedItems).toHaveLength(1);
+    expect(result.orderedFeedItems[0]).toMatchObject({
+      type: 'note',
+      event: expect.objectContaining({ id: 'root' }),
+    });
+  });
+
+  it('loads notifications with policy and maps hydrated events', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          notifications: {
+            nodes: [
+              {
+                reason: 'mention',
+                actorVertexScore: 77,
+                event: rootGql,
+              },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getNotifications({
+      viewerPubkey: 'viewer'.padEnd(64, '0'),
+      tab: 'MENTIONS',
+      policy: 'STRICT',
+      limit: 12,
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.query).toContain('notifications(input: $input)');
+    expect(body.variables.input).toEqual({
+      viewer: 'viewer'.padEnd(64, '0'),
+      tab: 'MENTIONS',
+      policy: 'STRICT',
+      replyScope: 'THREAD',
+      limit: 12,
+    });
+    expect(result.notifications).toEqual([
+      {
+        event: expect.objectContaining({ id: 'root' }),
+        reason: 'mention',
+        actorVertexScore: 77,
+      },
+    ]);
+    expect(result.profilesMap.get('alice')).toEqual({ name: 'Alice' });
+    expect(result.paginationUntil).toBe(100);
+  });
+
+  it('orders notifications newest first after GraphQL mapping', async () => {
+    const older = {
+      ...rootGql,
+      id: 'older',
+      content: 'older',
+      createdAt: 90,
+    };
+    const newer = {
+      ...rootGql,
+      id: 'newer',
+      content: 'newer',
+      createdAt: 110,
+    };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          notifications: {
+            nodes: [
+              {
+                reason: 'mention',
+                actorVertexScore: 1,
+                event: older,
+              },
+              {
+                reason: 'mention',
+                actorVertexScore: 2,
+                event: newer,
+              },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getNotifications({
+      viewerPubkey: 'viewer'.padEnd(64, '0'),
+      limit: 12,
+    });
+
+    expect(result.notifications.map((notification) => notification.event.id)).toEqual([
+      'newer',
+      'older',
+    ]);
+    expect(result.paginationUntil).toBe(90);
+  });
+
+  it('maps notification target posts from selected references', async () => {
+    const reactionGql = {
+      id: 'reaction',
+      kind: 7,
+      pubkey: 'bob',
+      content: '+',
+      tags: [
+        ['e', 'root'],
+        ['p', 'alice'],
+      ],
+      createdAt: 101,
+      authorMetadata: [
+        {
+          id: 'profile-bob',
+          kind: 0,
+          pubkey: 'bob',
+          content: JSON.stringify({ name: 'Bob' }),
+          tags: [],
+          createdAt: 100,
+        },
+      ],
+      eventRefs: { nodes: [rootGql] },
+      rootContext: { nodes: [] },
+      quotedContent: { nodes: [] },
+      likes: { rows: [] },
+      reposts: { rows: [] },
+      replyStats: { rows: [] },
+      zaps: { rows: [] },
+    };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          notifications: {
+            nodes: [
+              {
+                reason: 'reaction',
+                actorVertexScore: 12,
+                event: reactionGql,
+              },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getNotifications({
+      viewerPubkey: 'alice'.padEnd(64, '0'),
+      tab: 'ALL',
+      policy: 'RELAXED',
+      replyScope: 'DIRECT',
+      limit: 12,
+    });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.query).toContain('eventRefs: selectedReferences');
+    expect(body.variables.input.replyScope).toBe('DIRECT');
+    expect(result.notifications[0]).toMatchObject({
+      event: expect.objectContaining({ id: 'reaction' }),
+      targetEvent: expect.objectContaining({ id: 'root', content: 'root' }),
+      targetEventId: 'root',
+      reason: 'reaction',
+      actorVertexScore: 12,
+    });
+    expect(result.profilesMap.get('alice')).toEqual({ name: 'Alice' });
+    expect(result.profilesMap.get('bob')).toEqual({ name: 'Bob' });
+  });
+
+  it('uses the direct NIP-10 parent as the reply notification target', async () => {
+    const parentGql = {
+      ...rootGql,
+      id: 'parent'.padEnd(64, '0'),
+      content: 'direct parent',
+      pubkey: 'alice',
+    };
+    const replyGql = {
+      id: 'reply'.padEnd(64, '0'),
+      kind: 1,
+      pubkey: 'bob',
+      content: 'reply body',
+      tags: [
+        ['e', rootGql.id.padEnd(64, '0'), '', 'root'],
+        ['e', parentGql.id, '', 'reply'],
+        ['p', 'alice'.padEnd(64, '0')],
+      ],
+      createdAt: 102,
+      authorMetadata: [
+        {
+          id: 'profile-bob',
+          kind: 0,
+          pubkey: 'bob',
+          content: JSON.stringify({ name: 'Bob' }),
+          tags: [],
+          createdAt: 100,
+        },
+      ],
+      eventRefs: { nodes: [{ ...rootGql, id: rootGql.id.padEnd(64, '0') }, parentGql] },
+      rootContext: { nodes: [{ ...rootGql, id: rootGql.id.padEnd(64, '0') }] },
+      quotedContent: { nodes: [] },
+      likes: { rows: [] },
+      reposts: { rows: [] },
+      replyStats: { rows: [] },
+      zaps: { rows: [] },
+    };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          notifications: {
+            nodes: [
+              {
+                reason: 'reply',
+                actorVertexScore: 12,
+                event: replyGql,
+              },
+            ],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getNotifications({
+      viewerPubkey: 'alice'.padEnd(64, '0'),
+      tab: 'MENTIONS',
+      policy: 'RELAXED',
+      limit: 12,
+    });
+
+    expect(result.notifications[0]).toMatchObject({
+      event: expect.objectContaining({ id: replyGql.id, content: 'reply body' }),
+      targetEvent: expect.objectContaining({ id: parentGql.id, content: 'direct parent' }),
+      targetEventId: parentGql.id,
+      reason: 'reply',
     });
   });
 
@@ -202,9 +536,89 @@ describe('createNaggFeedClient', () => {
     expect(result.profilesMap.get('bob')).toEqual({ name: 'Bob' });
   });
 
+  it('collapses multiple reposts of the same original into one feed item', async () => {
+    const repostA = {
+      id: 'repost-a',
+      kind: 6,
+      pubkey: 'alice',
+      content: '',
+      tags: [['e', 'root']],
+      createdAt: 110,
+      authorMetadata: rootGql.authorMetadata,
+      eventRefs: { nodes: [rootGql] },
+      quotedContent: { nodes: [] },
+      likes: { rows: [] },
+      reposts: { rows: [] },
+      replyStats: { rows: [] },
+      zaps: { rows: [] },
+    };
+    const repostB = {
+      id: 'repost-b',
+      kind: 6,
+      pubkey: 'bob',
+      content: '',
+      tags: [['e', 'root']],
+      createdAt: 109,
+      authorMetadata: [
+        {
+          id: 'profile-bob',
+          kind: 0,
+          pubkey: 'bob',
+          content: JSON.stringify({ name: 'Bob' }),
+          tags: [],
+          createdAt: 108,
+        },
+      ],
+      eventRefs: { nodes: [rootGql] },
+      quotedContent: { nodes: [] },
+      likes: { rows: [] },
+      reposts: { rows: [] },
+      replyStats: { rows: [] },
+      zaps: { rows: [] },
+    };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          events: {
+            nodes: [repostA, repostB],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getFeed({
+      spec: JSON.stringify({ id: 'feed' }),
+      limit: 2,
+    });
+
+    expect(result.orderedFeedItems).toHaveLength(1);
+    expect(result.orderedFeedItems[0]).toMatchObject({
+      type: 'repost',
+      originalEventId: 'root',
+      reposters: [
+        expect.objectContaining({
+          pubkey: 'alice',
+          event: expect.objectContaining({ id: 'repost-a' }),
+        }),
+        expect.objectContaining({
+          pubkey: 'bob',
+          event: expect.objectContaining({ id: 'repost-b' }),
+        }),
+      ],
+    });
+  });
+
   it('sends explicit refresh feed requests as uncached network reads', async () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1234567890);
-    const trendingRootGql = {
+    const rankedRootGql = {
       ...rootGql,
       likes: { rows: [{ metrics: { pubkeys: 42 } }] },
     };
@@ -215,7 +629,7 @@ describe('createNaggFeedClient', () => {
       json: async () => ({
         data: {
           rankedEvents: {
-            nodes: [trendingRootGql],
+            nodes: [rankedRootGql],
             pageInfo: { hasNextPage: false, endCursor: null },
           },
         },
@@ -228,13 +642,21 @@ describe('createNaggFeedClient', () => {
       >('@/features/feed/data/naggFeedClient');
 
       const result = await createNaggFeedClient().getFeed({
-        spec: JSON.stringify({ id: 'global-trending', kind: 'notes' }),
+        spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
+        userPubkey: 'viewer',
         refresh: true,
       });
       expect(result.metricsMap.get('root')?.likeCount).toBe(42);
 
+      const requestUrl = String(mockFetch.mock.calls[0][0]);
+      const parsedRequestUrl = new URL(requestUrl);
+      expect(`${parsedRequestUrl.origin}${parsedRequestUrl.pathname}`).toBe(
+        'http://nagg.test/graphql'
+      );
+      expect(parsedRequestUrl.searchParams.get('refresh')).toBe('1');
+      expect(parsedRequestUrl.searchParams.get('_refresh')).toBe('1234567890');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://nagg.test/graphql',
+        requestUrl,
         expect.objectContaining({
           method: 'POST',
           cache: 'no-store',
@@ -247,22 +669,79 @@ describe('createNaggFeedClient', () => {
       expect(headers.get('Pragma')).toBe('no-cache');
       const body = JSON.parse(init.body as string);
       expect(body.query).toContain('rankedEvents');
-      expect(body.variables.input).toEqual({
+      expect(body.variables.input).toMatchObject({
         references: {
-          kinds: [7],
+          kinds: [7, 9735, 6, 16, 1, 1111],
           since: Math.floor(1234567890 / 1000) - 86_400,
+          limit: 1000,
         },
-        via: { key: 'e' },
-        target: { kinds: [1] },
-        metric: { name: 'likers', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+        target: { kinds: [1, 1111], limit: 30, offset: 0 },
+        metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
         limit: 30,
+        offset: 0,
       });
     } finally {
       nowSpy.mockRestore();
     }
   });
 
-  it('requests and maps a viewer-derived ranked reply for trending feeds', async () => {
+  it('requests For You through the composite nagg-ts recipe', async () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1234567890);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          rankedEvents: {
+            nodes: [rootGql],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    });
+
+    try {
+      const { createNaggFeedClient } = jest.requireActual<
+        typeof import('@/features/feed/data/naggFeedClient')
+      >('@/features/feed/data/naggFeedClient');
+
+      await createNaggFeedClient().getFeed({
+        spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
+        userPubkey: 'viewer',
+        limit: 12,
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.query).toContain('authoredReplyChain');
+      expect(body.variables.authorChain).toEqual(AUTHORED_REPLY_CHAIN_INPUT);
+      expect(body.variables.input).toMatchObject({
+        references: {
+          kinds: [7, 9735, 6, 16, 1, 1111],
+          since: Math.floor(1234567890 / 1000) - 86_400,
+          limit: 1000,
+        },
+        target: { kinds: [1, 1111], limit: 12, offset: 0 },
+        metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+        limit: 12,
+        offset: 0,
+      });
+      expect(body.variables.input.terms).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ pubkeyScore: { source: 'vertex', target: 'AUTHOR' } }),
+          expect.objectContaining({
+            candidateField: 'CREATED_AT',
+            transform: 'RECENCY_HALFLIFE',
+          }),
+        ])
+      );
+      expect(body.variables.input.candidatePubkeyBoosts).toHaveLength(1);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('requests and maps a viewer-derived ranked reply for For You feeds', async () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1234567890);
     const replyGql = {
       id: 'reply',
@@ -283,7 +762,7 @@ describe('createNaggFeedClient', () => {
       ],
       quotedContent: { nodes: [] },
     };
-    const trendingRootGql = {
+    const rankedRootGql = {
       ...rootGql,
       likes: { rows: [{ metrics: { pubkeys: 42 } }] },
       followedReply: { nodes: [replyGql] },
@@ -295,7 +774,7 @@ describe('createNaggFeedClient', () => {
       json: async () => ({
         data: {
           rankedEvents: {
-            nodes: [trendingRootGql],
+            nodes: [rankedRootGql],
             pageInfo: { hasNextPage: false, endCursor: null },
           },
         },
@@ -308,26 +787,29 @@ describe('createNaggFeedClient', () => {
       >('@/features/feed/data/naggFeedClient');
 
       const result = await createNaggFeedClient().getFeed({
-        spec: JSON.stringify({ id: 'global-trending', kind: 'notes' }),
+        spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
         userPubkey: 'viewer',
       });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.query).toContain('rankedReferencedBy');
       expect(body.query).toContain('latestEventTags');
-      expect(body.query).toContain('sourceEventAuthor');
-      expect(body.variables).toEqual({
+      expect(body.query).toContain('authoredReplyChain');
+      expect(body.query).not.toContain('sourceEventAuthor');
+      expect(body.variables).toMatchObject({
         input: {
           references: {
-            kinds: [7],
+            kinds: [7, 9735, 6, 16, 1, 1111],
             since: Math.floor(1234567890 / 1000) - 86_400,
+            limit: 1000,
           },
-          via: { key: 'e' },
-          target: { kinds: [1] },
-          metric: { name: 'likers', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+          target: { kinds: [1, 1111], limit: 30, offset: 0 },
+          metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
           limit: 30,
+          offset: 0,
         },
         viewerPubkey: 'viewer',
+        authorChain: AUTHORED_REPLY_CHAIN_INPUT,
       });
       expect(result.orderedFeedItems).toHaveLength(1);
       expect(result.orderedFeedItems[0]).toMatchObject({
@@ -369,9 +851,7 @@ describe('createNaggFeedClient', () => {
         status: 200,
         statusText: 'OK',
         json: async () => ({
-          errors: [
-            { message: 'Field "sourceEventAuthor" is not defined by type PubkeySourceInput' },
-          ],
+          errors: [{ message: 'Cannot query field "authoredReplyChain" on type "NostrEvent"' }],
         }),
       })
       .mockResolvedValueOnce({
@@ -393,14 +873,16 @@ describe('createNaggFeedClient', () => {
     >('@/features/feed/data/naggFeedClient');
 
     const result = await createNaggFeedClient().getFeed({
-      spec: JSON.stringify({ id: 'global-trending', kind: 'notes' }),
+      spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
       userPubkey: 'viewer',
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const firstBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     const secondBody = JSON.parse(mockFetch.mock.calls[1][1].body);
-    expect(firstBody.query).toContain('sourceEventAuthor');
+    expect(firstBody.query).toContain('authoredReplyChain');
+    expect(firstBody.query).not.toContain('sourceEventAuthor');
+    expect(secondBody.query).not.toContain('authoredReplyChain');
     expect(secondBody.query).not.toContain('sourceEventAuthor');
     expect(result.orderedFeedItems[0]).toMatchObject({
       type: 'note',
@@ -484,7 +966,7 @@ describe('createNaggFeedClient', () => {
     >('@/features/feed/data/naggFeedClient');
 
     const result = await createNaggFeedClient().getFeed({
-      spec: JSON.stringify({ id: 'global-trending', kind: 'notes' }),
+      spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
       userPubkey: 'viewer',
     });
 
@@ -668,10 +1150,11 @@ describe('createNaggFeedClient', () => {
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.query).toContain('query NaggGraphqlFollowingPopular');
       expect(body.query).toContain('rankedEvents');
-      expect(body.variables.input).toEqual({
+      expect(body.variables.input).toMatchObject({
         references: {
-          kinds: [7],
+          kinds: [7, 9735, 6, 16, 1, 1111],
           since: Math.floor(1234567890 / 1000) - 86_400,
+          limit: 1000,
         },
         via: { key: 'e' },
         target: {
@@ -687,10 +1170,21 @@ describe('createNaggFeedClient', () => {
               },
             },
           ],
+          limit: 12,
         },
-        metric: { name: 'likers', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+        metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
         limit: 12,
+        offset: 0,
       });
+      expect(body.variables.input.terms).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ pubkeyScore: { source: 'vertex', target: 'AUTHOR' } }),
+          expect.objectContaining({
+            candidateField: 'CREATED_AT',
+            transform: 'RECENCY_HALFLIFE',
+          }),
+        ])
+      );
       expect(result.orderedFeedItems).toHaveLength(1);
       expect(result.orderedFeedItems[0]).toMatchObject({
         type: 'note',
@@ -755,7 +1249,9 @@ describe('createNaggFeedClient', () => {
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.query).toContain('followedReply');
-    expect(body.query).toContain('sourceEventAuthor');
+    expect(body.query).toContain('authoredReplyChain');
+    expect(body.query).not.toContain('sourceEventAuthor');
+    expect(body.variables.authorChain).toEqual(AUTHORED_REPLY_CHAIN_INPUT);
     expect(result.orderedFeedItems).toHaveLength(1);
     expect(result.orderedFeedItems[0]).toMatchObject({
       type: 'note',
@@ -764,7 +1260,7 @@ describe('createNaggFeedClient', () => {
     });
   });
 
-  it('falls back to a lightweight trending query after a GraphQL deadline', async () => {
+  it('falls back to a lightweight For You query after a GraphQL deadline', async () => {
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
@@ -780,7 +1276,7 @@ describe('createNaggFeedClient', () => {
         statusText: 'OK',
         json: async () => ({
           data: {
-            rankedEvents: {
+            events: {
               nodes: [rootGql],
               pageInfo: { hasNextPage: false, endCursor: null },
             },
@@ -793,17 +1289,26 @@ describe('createNaggFeedClient', () => {
     >('@/features/feed/data/naggFeedClient');
 
     const result = await createNaggFeedClient().getFeed({
-      spec: JSON.stringify({ id: 'global-trending', kind: 'notes' }),
+      spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
       userPubkey: 'viewer',
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const firstBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     const secondBody = JSON.parse(mockFetch.mock.calls[1][1].body);
-    expect(firstBody.query).toContain('sourceEventAuthor');
+    expect(firstBody.query).toContain('authoredReplyChain');
+    expect(firstBody.query).not.toContain('sourceEventAuthor');
+    expect(secondBody.query).toContain('query NaggGraphqlFeed');
+    expect(secondBody.query).not.toContain('authoredReplyChain');
     expect(secondBody.query).not.toContain('sourceEventAuthor');
     expect(secondBody.query).not.toContain('followedReply');
-    expect(secondBody.variables).toEqual({ input: firstBody.variables.input });
+    expect(secondBody.variables).toEqual({
+      input: {
+        kinds: [1, 1111],
+        since: expect.any(Number),
+        limit: 30,
+      },
+    });
     expect(result.orderedFeedItems).toHaveLength(1);
     expect(result.orderedFeedItems[0]).toMatchObject({
       type: 'note',
@@ -827,7 +1332,7 @@ describe('createNaggFeedClient', () => {
         statusText: 'OK',
         json: async () => ({
           data: {
-            rankedEvents: {
+            events: {
               nodes: [rootGql],
               pageInfo: { hasNextPage: false, endCursor: null },
             },
@@ -847,10 +1352,29 @@ describe('createNaggFeedClient', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const firstBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     const secondBody = JSON.parse(mockFetch.mock.calls[1][1].body);
-    expect(firstBody.query).toContain('sourceEventAuthor');
+    expect(firstBody.query).toContain('authoredReplyChain');
+    expect(firstBody.query).not.toContain('sourceEventAuthor');
+    expect(secondBody.query).toContain('query NaggGraphqlFeed');
+    expect(secondBody.query).not.toContain('authoredReplyChain');
     expect(secondBody.query).not.toContain('sourceEventAuthor');
     expect(secondBody.query).not.toContain('followedReply');
-    expect(secondBody.variables).toEqual({ input: firstBody.variables.input });
+    expect(secondBody.variables).toEqual({
+      input: {
+        kinds: [1, 1111],
+        pubkeysFrom: [
+          {
+            latestEventTags: {
+              pubkey: 'viewer',
+              kinds: [3],
+              tag: { key: 'p' },
+              limit: 1,
+              maxValues: 2000,
+            },
+          },
+        ],
+        limit: 30,
+      },
+    });
     expect(result.orderedFeedItems).toHaveLength(1);
     expect(result.orderedFeedItems[0]).toMatchObject({
       type: 'note',
@@ -1082,37 +1606,61 @@ describe('createNaggFeedClient', () => {
       references: { kinds: [7], limit: 500 },
       via: { key: 'e' },
       metric: { name: 'likes', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
-      weight: 3,
-      transform: 'LOG1P',
-      terms: [
-        {
+    });
+    expect(body.variables.rank.terms).toHaveLength(7);
+    expect(body.variables.rank.terms).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          derivedMetric: 'contribution_quality',
+          weight: 3,
+        }),
+        expect.objectContaining({
+          references: { kinds: [7], limit: 500 },
+          via: { key: 'e' },
+          metric: { name: 'likes', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+          weight: 3,
+          transform: 'LOG1P',
+        }),
+        expect.objectContaining({
           references: { kinds: [1, 1111], limit: 500 },
           via: { key: 'e' },
-          metric: { name: 'replies', op: 'COUNT_DISTINCT', distinctField: 'ID' },
+          metric: { name: 'replies', op: 'COUNT' },
           weight: 2.5,
           transform: 'LOG1P',
-        },
-        {
+        }),
+        expect.objectContaining({
           references: { kinds: [6, 16], limit: 500 },
           via: { key: 'e' },
           metric: { name: 'reposts', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
           weight: 2,
           transform: 'LOG1P',
-        },
-        {
+        }),
+        expect.objectContaining({
           references: { kinds: [9735], limit: 500 },
           via: { key: 'e' },
           metric: { name: 'zapSats', op: 'SUM', derived: 'nip57.amount_sats' },
           weight: 1.5,
           transform: 'LOG1P',
-        },
-      ],
-    });
+        }),
+        expect.objectContaining({
+          pubkeyScore: { source: 'vertex', target: 'AUTHOR' },
+          weight: 0.25,
+        }),
+        expect.objectContaining({
+          candidateField: 'CREATED_AT',
+          weight: 0.8,
+          transform: 'RECENCY_HALFLIFE',
+          halfLifeSeconds: 86_400,
+        }),
+      ])
+    );
     expect(body.query).toContain('rankedReferencedBy');
     expect(body.query).toContain('rank: $rank');
     expect(body.query).toContain('allReplies: referencedBy');
-    expect(body.query).toContain('sourceEventAuthor');
+    expect(body.query).toContain('authoredReplyChain');
+    expect(body.query).not.toContain('sourceEventAuthor');
     expect(body.query).toContain('followedReply');
+    expect(body.variables.authorChain).toEqual(AUTHORED_REPLY_CHAIN_INPUT);
     expect(body.query).not.toContain('offset: $offset');
     expect(body.query).not.toContain('childReplies');
     expect(result.thread.target?.id).toBe('root');
@@ -1344,9 +1892,7 @@ describe('createNaggFeedClient', () => {
         status: 200,
         statusText: 'OK',
         json: async () => ({
-          errors: [
-            { message: 'Field "sourceEventAuthor" is not defined by type PubkeySourceInput' },
-          ],
+          errors: [{ message: 'Cannot query field "authoredReplyChain" on type "NostrEvent"' }],
         }),
       })
       .mockResolvedValueOnce({
@@ -1377,7 +1923,9 @@ describe('createNaggFeedClient', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     const firstBody = JSON.parse(mockFetch.mock.calls[0][1].body);
     const secondBody = JSON.parse(mockFetch.mock.calls[1][1].body);
-    expect(firstBody.query).toContain('sourceEventAuthor');
+    expect(firstBody.query).toContain('authoredReplyChain');
+    expect(firstBody.query).not.toContain('sourceEventAuthor');
+    expect(secondBody.query).not.toContain('authoredReplyChain');
     expect(secondBody.query).not.toContain('sourceEventAuthor');
     expect(secondBody.query).toContain('offset: $offset');
     expect(result.replyPageEventIds).toEqual(['reply']);

@@ -15,6 +15,7 @@ export type FeedRow = {
   quotedEvents: Map<string, FeedEvent>;
   reposterName?: string;
   reposterPubkey?: string;
+  reposters?: Array<{ name: string; pubkey: string }>;
 };
 
 export const DEFAULT_ENGAGEMENT_STATE: EngagementViewState = Object.freeze({
@@ -53,7 +54,8 @@ export function buildFeedRows({
     const rootEvent = getFeedItemRootContext(item);
     const primaryEventId = getPrimaryEventId(item);
     const localMaps = buildRowLocalMaps(item, rootEvent, profilesMap, quotedEventsMap);
-    const reposter = item.type === 'repost' ? resolveReposter(item) : undefined;
+    const reposters = item.type === 'repost' ? resolveReposters(item, resolveReposter) : undefined;
+    const reposter = reposters?.[0];
     const candidate: FeedRow = {
       key,
       item,
@@ -66,6 +68,7 @@ export function buildFeedRows({
       quotedEvents: localMaps.quotedEvents,
       reposterName: reposter?.name,
       reposterPubkey: reposter?.pubkey,
+      reposters,
     };
 
     const previous = previousByKey.get(key);
@@ -74,7 +77,7 @@ export function buildFeedRows({
 }
 
 export function getFeedItemKey(item: FeedItem): string {
-  return item.type === 'note' ? item.event.id : item.repostEvent.id;
+  return item.type === 'note' ? item.event.id : item.originalEventId;
 }
 
 export function getFeedRowKey(row: FeedRow): string {
@@ -107,6 +110,7 @@ function getDisplayEvents(item: FeedItem, rootEvent: FeedEvent | undefined): Fee
     }
   } else {
     events.push(item.repostEvent);
+    for (const reposter of item.reposters ?? []) events.push(reposter.event);
     if (item.originalEvent) events.push(item.originalEvent);
   }
   return events;
@@ -176,6 +180,17 @@ function defaultResolveReposter(item: Extract<FeedItem, { type: 'repost' }>): {
   };
 }
 
+function resolveReposters(
+  item: Extract<FeedItem, { type: 'repost' }>,
+  resolveReposter: NonNullable<BuildFeedRowsOptions['resolveReposter']>
+): Array<{ name: string; pubkey: string }> {
+  const reposterEvents =
+    item.reposters && item.reposters.length > 0
+      ? item.reposters.map((reposter) => reposter.event)
+      : [item.repostEvent];
+  return reposterEvents.map((repostEvent) => resolveReposter({ ...item, repostEvent }));
+}
+
 function feedRowContentEqual(previous: FeedRow, next: FeedRow): boolean {
   return (
     previous.item === next.item &&
@@ -187,8 +202,21 @@ function feedRowContentEqual(previous: FeedRow, next: FeedRow): boolean {
     mapEntriesEqual(previous.profiles, next.profiles) &&
     mapEntriesEqual(previous.quotedEvents, next.quotedEvents) &&
     previous.reposterName === next.reposterName &&
-    previous.reposterPubkey === next.reposterPubkey
+    previous.reposterPubkey === next.reposterPubkey &&
+    repostersEqual(previous.reposters, next.reposters)
   );
+}
+
+function repostersEqual(
+  a: Array<{ name: string; pubkey: string }> | undefined,
+  b: Array<{ name: string; pubkey: string }> | undefined
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((reposter, index) => {
+    const other = b[index];
+    return other?.name === reposter.name && other.pubkey === reposter.pubkey;
+  });
 }
 
 function optionalMetricsEqual(a: NoteMetrics | undefined, b: NoteMetrics | undefined): boolean {

@@ -19,6 +19,11 @@ export interface ProfileInfo {
   picture?: string;
 }
 
+export interface ReposterInfo {
+  pubkey: string;
+  event: FeedEvent;
+}
+
 export type ContentSegment =
   | { kind: 'text'; text: string }
   | { kind: 'newline' }
@@ -58,6 +63,7 @@ export type FeedItem =
       originalEventId: string;
       rootEvent?: FeedEvent;
       rootEventId?: string;
+      reposters?: ReposterInfo[];
       timestamp: number;
     };
 

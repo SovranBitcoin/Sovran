@@ -1,7 +1,35 @@
-import { parseWith } from '@sovranbitcoin/schemas';
-import type { Result } from 'neverthrow';
+import {
+  createNaggClient,
+  NAGG_CAPABILITIES,
+  NaggUnknownDataSchema,
+  type NaggCapability,
+  type NaggError,
+} from 'nagg-ts';
+import {
+  authoredReplyChainInput,
+  followingRecentEventsInput,
+  followingRepliesEventsInput,
+  followingPopularRankedEventsInput,
+  forYouRankedEventsInput,
+  mergeRelevantReplyNodes as mergeNaggRelevantReplyNodes,
+  notificationsInput,
+  recentNotesEventsInput,
+  threadReplyRankInput as buildThreadReplyRankInput,
+  withEventExclusions,
+  withRankedTargetExclusions,
+  type EventQueryInput,
+  type RankedEventsInput,
+  type ReferenceRankInput,
+} from 'nagg-ts/recipes';
+import {
+  graphqlNodesToNaggPage,
+  metricsFromGraphqlNode,
+  normalizeGraphqlEvent,
+  profileFromMetadataEvent,
+  type NaggGraphqlConnection as GraphqlConnection,
+  type NaggGraphqlEventNode as GraphqlEventNode,
+} from 'nagg-ts/map';
 import { backendConfig } from '@/shared/config/backend';
-import { fetchJson } from '@/shared/lib/apiClient';
 import { apiLog, feedLog, redactError } from '@/shared/lib/logger';
 import {
   buildThreadStructure,
@@ -14,19 +42,20 @@ import type {
   FeedEnrichmentUpdates,
   FeedParseResult,
   FeedPageRequest,
+  FeedNotificationsRequest,
+  FeedNotificationsResult,
   ThreadRequest,
   ThreadReplySort,
   ThreadResult,
   UserFeedPageRequest,
+  PostsByPubkeysRequest,
 } from './feedClient';
 import { emptyFeedParseResult } from './feedClient';
 import { hasEmptyExplicitPubkeys, hydrateSpecWithPubkey } from './feedSpec';
-import { NaggGraphqlEnvelope } from './naggSchemas';
-import type { NaggFeedResponseData } from './naggSchemas';
-import { getFirstTagValue, parseJson } from '../components/nostr/feedParse';
+import { parseJson } from '../components/nostr/feedParse';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../components/nostr/feedTypes';
+import { useFeedIgnoreStore } from '../stores/ignoreStore';
 
-const parseNaggGraphqlEnvelope = parseWith(NaggGraphqlEnvelope, 'nagg/graphql');
 const RELEVANT_AUTHOR_REPLY_LIMIT = 50;
 
 const BASE_EVENT_SELECTION = `
@@ -96,19 +125,6 @@ const FEED_REPLY_PREVIEW_CHILD_SELECTION = `
 
 const FEED_REPLY_PREVIEW_SOURCE_SELECTION = `
   ${FEED_REPLY_PREVIEW_BASE_SELECTION}
-  childAuthorReplies: referencedBy(input: {
-    via: { key: "e" }
-    events: {
-      kinds: [1, 1111]
-      pubkeysFrom: [{ sourceEventAuthor: true }]
-      limit: 50
-    }
-    limit: 50
-  }) {
-    nodes {
-      ${FEED_REPLY_PREVIEW_CHILD_SELECTION}
-    }
-  }
   childFollowedReply: rankedReferencedBy(input: {
     via: { key: "e" }
     events: {
@@ -139,6 +155,17 @@ const FEED_REPLY_PREVIEW_SOURCE_SELECTION = `
 
 const EVENT_REFS_SELECTION = `
   eventRefs: selectedReferences(input: { fallback: { key: "e" }, limit: 2 }) {
+    nodes {
+      ${BASE_EVENT_SELECTION}
+      ${AUTHOR_METADATA_SELECTION}
+      ${QUOTED_CONTENT_SELECTION}
+      ${METRIC_SELECTION}
+    }
+  }
+`;
+
+const NOTIFICATION_EVENT_REFS_SELECTION = `
+  eventRefs: selectedReferences(input: { fallback: { key: "e" }, limit: 8 }) {
     nodes {
       ${BASE_EVENT_SELECTION}
       ${AUTHOR_METADATA_SELECTION}
@@ -180,8 +207,8 @@ query NaggGraphqlFeed($input: EventQueryInput!) {
 }
 `;
 
-const TRENDING_FEED_QUERY = `
-query NaggGraphqlTrendingFeed($input: RankedEventsInput!) {
+const RANKED_FEED_QUERY = `
+query NaggGraphqlRankedFeed($input: RankedEventsInput!) {
   rankedEvents(input: $input) {
     nodes {
       ${BASE_EVENT_SELECTION}
@@ -196,8 +223,8 @@ query NaggGraphqlTrendingFeed($input: RankedEventsInput!) {
 }
 `;
 
-const TRENDING_FEED_WITH_VIEWER_QUERY = `
-query NaggGraphqlTrendingFeed($input: RankedEventsInput!, $viewerPubkey: String!) {
+const RANKED_FEED_WITH_VIEWER_QUERY = `
+query NaggGraphqlRankedFeed($input: RankedEventsInput!, $viewerPubkey: String!, $authorChain: AuthoredReplyChainInput!) {
   rankedEvents(input: $input) {
     nodes {
       ${BASE_EVENT_SELECTION}
@@ -205,15 +232,7 @@ query NaggGraphqlTrendingFeed($input: RankedEventsInput!, $viewerPubkey: String!
       ${ROOT_CONTEXT_SELECTION}
       ${EVENT_REFS_SELECTION}
       ${QUOTED_CONTENT_SELECTION}
-      authorReplies: referencedBy(input: {
-        via: { key: "e" }
-        events: {
-          kinds: [1, 1111]
-          pubkeysFrom: [{ sourceEventAuthor: true }]
-          limit: 50
-        }
-        limit: 50
-      }) {
+      authorReplies: authoredReplyChain(input: $authorChain) {
         nodes {
           ${FEED_REPLY_PREVIEW_SOURCE_SELECTION}
         }
@@ -251,8 +270,8 @@ query NaggGraphqlTrendingFeed($input: RankedEventsInput!, $viewerPubkey: String!
 }
 `;
 
-const TRENDING_FEED_WITH_VIEWER_LEGACY_QUERY = `
-query NaggGraphqlTrendingFeed($input: RankedEventsInput!, $viewerPubkey: String!) {
+const RANKED_FEED_WITH_VIEWER_LEGACY_QUERY = `
+query NaggGraphqlRankedFeed($input: RankedEventsInput!, $viewerPubkey: String!) {
   rankedEvents(input: $input) {
     nodes {
       ${BASE_EVENT_SELECTION}
@@ -325,7 +344,7 @@ query NaggGraphqlFollowingPopular($input: RankedEventsInput!) {
 `;
 
 const FOLLOWING_POPULAR_WITH_VIEWER_QUERY = `
-query NaggGraphqlFollowingPopular($input: RankedEventsInput!, $viewerPubkey: String!) {
+query NaggGraphqlFollowingPopular($input: RankedEventsInput!, $viewerPubkey: String!, $authorChain: AuthoredReplyChainInput!) {
   rankedEvents(input: $input) {
     nodes {
       ${BASE_EVENT_SELECTION}
@@ -333,15 +352,7 @@ query NaggGraphqlFollowingPopular($input: RankedEventsInput!, $viewerPubkey: Str
       ${ROOT_CONTEXT_SELECTION}
       ${EVENT_REFS_SELECTION}
       ${QUOTED_CONTENT_SELECTION}
-      authorReplies: referencedBy(input: {
-        via: { key: "e" }
-        events: {
-          kinds: [1, 1111]
-          pubkeysFrom: [{ sourceEventAuthor: true }]
-          limit: 50
-        }
-        limit: 50
-      }) {
+      authorReplies: authoredReplyChain(input: $authorChain) {
         nodes {
           ${FEED_REPLY_PREVIEW_SOURCE_SELECTION}
         }
@@ -454,6 +465,26 @@ query NaggGraphqlProfiles($input: EventQueryInput!) {
 }
 `;
 
+const NOTIFICATIONS_QUERY = `
+query NaggGraphqlNotifications($input: NotificationInput!) {
+  notifications(input: $input) {
+    nodes {
+      reason
+      actorVertexScore
+      event {
+        ${BASE_EVENT_SELECTION}
+        ${AUTHOR_METADATA_SELECTION}
+        ${ROOT_CONTEXT_SELECTION}
+        ${NOTIFICATION_EVENT_REFS_SELECTION}
+        ${QUOTED_CONTENT_SELECTION}
+        ${METRIC_SELECTION}
+      }
+    }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+`;
+
 const THREAD_REPLY_SELECTION = `
   ${BASE_EVENT_SELECTION}
   authorMetadata: pubkeyEvents(kinds: [0], limit: 1) {
@@ -473,19 +504,6 @@ const THREAD_REPLY_SELECTION = `
 
 const THREAD_RELEVANT_REPLY_SELECTION = `
   ${THREAD_REPLY_SELECTION}
-  childAuthorReplies: referencedBy(input: {
-    via: { key: "e" }
-    events: {
-      kinds: [1, 1111]
-      pubkeysFrom: [{ sourceEventAuthor: true }]
-      limit: 50
-    }
-    limit: 50
-  }) {
-    nodes {
-      ${THREAD_REPLY_SELECTION}
-    }
-  }
   childFollowedReply: rankedReferencedBy(input: {
     via: { key: "e" }
     events: {
@@ -515,15 +533,7 @@ const THREAD_RELEVANT_REPLY_SELECTION = `
 `;
 
 const AUTHOR_REPLIES_SELECTION = `
-  authorReplies: referencedBy(input: {
-    via: { key: "e" }
-    events: {
-      kinds: [1, 1111]
-      pubkeysFrom: [{ sourceEventAuthor: true }]
-      limit: 50
-    }
-    limit: 50
-  }) {
+  authorReplies: authoredReplyChain(input: $authorChain) {
     nodes {
       ${THREAD_RELEVANT_REPLY_SELECTION}
     }
@@ -636,6 +646,7 @@ query NaggGraphqlThreadRelevant(
   $rankedLimit: Int!
   $rank: ReferenceRankInput!
   $viewerPubkey: String!
+  $authorChain: AuthoredReplyChainInput!
 ) {
   event(id: $id) {
     ${THREAD_EVENT_SELECTION}
@@ -665,116 +676,28 @@ query NaggGraphqlThreadRelevant(
 }
 `;
 
-type GraphqlAggregate = {
-  rows?: { dimensions?: Record<string, string>; metrics?: Record<string, number> }[];
-};
-
-type GraphqlConnection<T> = {
-  nodes?: T[];
-  pageInfo?: { endCursor?: string | null; hasNextPage?: boolean };
-};
-
-type GraphqlEventNode = {
-  id: string;
-  pubkey: string;
-  kind: number;
-  createdAt: string | number | Date;
-  content: string;
-  tags: string[][];
-  authorMetadata?: GraphqlEventNode[];
-  eventRefs?: GraphqlConnection<GraphqlEventNode>;
-  rootContext?: GraphqlConnection<GraphqlEventNode>;
-  parentReplyRefs?: GraphqlConnection<GraphqlEventNode>;
-  parentRootRefs?: GraphqlConnection<GraphqlEventNode>;
-  parentRefs?: GraphqlConnection<GraphqlEventNode>;
-  quotedContent?: GraphqlConnection<GraphqlEventNode>;
-  authorReplies?: GraphqlConnection<GraphqlEventNode>;
-  followedReply?: GraphqlConnection<GraphqlEventNode>;
-  childAuthorReplies?: GraphqlConnection<GraphqlEventNode>;
-  childFollowedReply?: GraphqlConnection<GraphqlEventNode>;
-  allReplies?: GraphqlConnection<GraphqlEventNode>;
-  replies?: GraphqlConnection<GraphqlEventNode>;
-  childReplies?: GraphqlConnection<GraphqlEventNode>;
-  likes?: GraphqlAggregate;
-  reposts?: GraphqlAggregate;
-  replyStats?: GraphqlAggregate;
-  zaps?: GraphqlAggregate;
-  [key: string]: unknown;
-};
-
 type GraphqlFeedData = {
   events?: GraphqlConnection<GraphqlEventNode>;
   rankedEvents?: GraphqlConnection<GraphqlEventNode>;
+};
+
+type GraphqlNotificationNode = {
+  reason?: string | null;
+  actorVertexScore?: number | null;
+  event?: GraphqlEventNode | null;
+};
+
+type GraphqlNotificationsData = {
+  notifications?: GraphqlConnection<GraphqlNotificationNode>;
 };
 
 type GraphqlThreadData = {
   event?: GraphqlEventNode | null;
 };
 
-type EventQueryInput = {
-  ids?: string[];
-  pubkeys?: string[];
-  pubkeysFrom?: {
-    latestEventTags?: {
-      pubkey: string;
-      kinds: number[];
-      tag: { key: string; value?: string; values?: string[] };
-      limit?: number;
-      maxValues?: number;
-    };
-    sourceEventAuthor?: boolean;
-  }[];
-  kinds?: number[];
-  tags?: { key: string; value?: string; values?: string[] }[];
-  since?: number;
-  until?: number;
-  limit?: number;
-  offset?: number;
-};
-
-type TagFilterInput = { key: string; value?: string; values?: string[] };
-
-type GenericMetricInput = {
-  name: string;
-  op: string;
-  field?: string;
-  tagKey?: string;
-  tagIndex?: number;
-  derived?: string;
-  distinctField?: string;
-};
-
-type WeightedRankTermInput = {
-  references: EventQueryInput;
-  via: TagFilterInput;
-  metric?: GenericMetricInput;
-  weight?: number;
-  transform?: 'IDENTITY' | 'LOG1P';
-};
-
-type CandidatePubkeyBoostInput = {
-  pubkeys?: string[];
-  pubkeysFrom?: NonNullable<EventQueryInput['pubkeysFrom']>;
-  weight?: number;
-};
-
-type ReferenceRankInput = WeightedRankTermInput & {
-  candidatePubkeyBoosts?: CandidatePubkeyBoostInput[];
-  terms?: WeightedRankTermInput[];
-};
-
-type RankedEventsInput = {
-  references: EventQueryInput;
-  via: TagFilterInput;
-  target?: EventQueryInput;
-  metric?: GenericMetricInput;
-  limit?: number;
-  offset?: number;
-};
-
 type FeedQueryOptions = {
-  includeNote?: (event: FeedEvent) => boolean;
-  includeRepost?: (event: FeedEvent) => boolean;
+  includeNote?: (event: FeedEvent, rootEvent?: FeedEvent) => boolean;
+  includeRepost?: (event: FeedEvent, originalEvent?: FeedEvent, rootEvent?: FeedEvent) => boolean;
   extraProfile?: { pubkey: string; profile: ProfileInfo };
 };
 
@@ -782,31 +705,10 @@ function graphqlEndpoint(): string {
   return backendConfig.nostrGraphqlEndpoint;
 }
 
-function withRefreshInit(
-  init: RequestInit | undefined,
-  refresh: boolean | undefined
-): RequestInit | undefined {
-  if (!refresh) return init;
-  const headers = new Headers(init?.headers);
-  headers.set('Cache-Control', 'no-cache');
-  headers.set('Pragma', 'no-cache');
-  return {
-    ...init,
-    cache: 'no-store',
-    headers,
-  };
-}
-
 function isRootNote(event: { tags: string[][] }): boolean {
   const eTags = (event.tags || []).filter((tag) => tag[0] === 'e');
   if (eTags.length === 0) return true;
   return eTags.every((tag) => tag[3] === 'mention');
-}
-
-async function unwrap<T>(promise: Promise<Result<T, Error>>): Promise<T> {
-  const result = await promise;
-  if (result.isOk()) return result.value;
-  throw result.error;
 }
 
 function graphqlOperationName(query: string): string {
@@ -915,48 +817,58 @@ async function postGraphql<T>(
 
   apiLog.info('nagg.graphql.request.start', requestFields);
 
-  try {
-    const envelope = await unwrap(
-      fetchJson(
-        graphqlEndpoint(),
-        parseNaggGraphqlEnvelope,
-        'nagg/graphql',
-        withRefreshInit(
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, variables }),
-          },
-          refresh
-        ),
-        controls
-      )
-    );
-    const durationMs = Date.now() - startedAt;
-    if (envelope.errors?.length) {
-      failureLogged = true;
+  const client = createNaggClient({ endpoint: graphqlEndpoint() });
+  const result = await client.query({
+    query,
+    variables,
+    operationName,
+    dataSchema: NaggUnknownDataSchema,
+    refresh,
+    signal: controls.signal,
+    timeoutMs: controls.timeoutMs,
+  });
+  const durationMs = Date.now() - startedAt;
+
+  if (result.isErr()) {
+    const error = result.error;
+    failureLogged = true;
+    if (error.type === 'graphql') {
       apiLog.error('nagg.graphql.request.graphql_error', {
         ...requestFields,
         durationMs,
-        errorCount: envelope.errors.length,
-        messages: envelope.errors.slice(0, 3).map((error) => error.message),
+        errorCount: error.errors.length,
+        messages: error.errors.slice(0, 3).map((graphqlError) => graphqlError.message),
       });
-      throw new Error(envelope.errors[0]?.message ?? 'GraphQL request failed');
-    }
-    if (!envelope.data) {
-      failureLogged = true;
+    } else if (error.type === 'missing_data') {
       apiLog.error('nagg.graphql.request.missing_data', {
         ...requestFields,
         durationMs,
       });
-      throw new Error('GraphQL response did not include data');
+    } else {
+      const thrown = errorFromNaggError(error);
+      const params = {
+        ...requestFields,
+        durationMs,
+        error: redactError(thrown),
+      };
+      if (redactError(thrown).message === 'Aborted') {
+        apiLog.warn('nagg.graphql.request.aborted', params);
+      } else {
+        apiLog.error('nagg.graphql.request.error', params);
+      }
     }
+    throw errorFromNaggError(error);
+  }
+
+  const data = result.value as T;
+  try {
+    const durationMs = Date.now() - startedAt;
     apiLog.info('nagg.graphql.request.done', {
       ...requestFields,
       durationMs,
-      dataKeys: graphqlDataKeys(envelope.data),
+      dataKeys: graphqlDataKeys(data),
     });
-    return envelope.data as T;
+    return data;
   } catch (error) {
     if (!failureLogged) {
       const params = {
@@ -974,19 +886,53 @@ async function postGraphql<T>(
   }
 }
 
-async function postGraphqlWithSourceAuthorFallback<T>(
-  query: string,
-  variables: Record<string, unknown>,
-  fallbackQuery: string,
-  fallbackVariables: Record<string, unknown>,
-  refresh: boolean | undefined,
-  controls: { signal?: AbortSignal; timeoutMs?: number } = {}
-): Promise<T> {
+function errorFromNaggError(error: NaggError): Error {
+  const out = new Error(error.message);
+  out.name =
+    error.type === 'network' && /abort|timed out|timeout/i.test(error.message)
+      ? 'AbortError'
+      : 'NaggGraphqlError';
+  return out;
+}
+
+const unsupportedGraphqlCapabilities = new Set<NaggCapability>();
+
+async function postGraphqlWithCapabilityFallback<T>({
+  capability,
+  query,
+  variables,
+  fallbackQuery,
+  fallbackVariables,
+  refresh,
+  controls,
+  isCapabilityError,
+}: {
+  capability: NaggCapability;
+  query: string;
+  variables: Record<string, unknown>;
+  fallbackQuery: string;
+  fallbackVariables: Record<string, unknown>;
+  refresh: boolean | undefined;
+  controls?: { signal?: AbortSignal; timeoutMs?: number };
+  isCapabilityError: (error: unknown) => boolean;
+}): Promise<T> {
+  if (unsupportedGraphqlCapabilities.has(capability)) {
+    apiLog.warn('nagg.graphql.capability_fallback', {
+      capability,
+      operationName: graphqlOperationName(query),
+      fallbackOperationName: graphqlOperationName(fallbackQuery),
+      reason: 'cached_unsupported_capability',
+    });
+    return postGraphql<T>(fallbackQuery, fallbackVariables, refresh, controls);
+  }
+
   try {
     return await postGraphql<T>(query, variables, refresh, controls);
   } catch (error) {
-    if (!isSourceEventAuthorSchemaError(error)) throw error;
-    apiLog.warn('nagg.graphql.source_author_fallback', {
+    if (!isCapabilityError(error)) throw error;
+    unsupportedGraphqlCapabilities.add(capability);
+    apiLog.warn('nagg.graphql.capability_fallback', {
+      capability,
       operationName: graphqlOperationName(query),
       fallbackOperationName: graphqlOperationName(fallbackQuery),
       reason: redactError(error),
@@ -995,22 +941,42 @@ async function postGraphqlWithSourceAuthorFallback<T>(
   }
 }
 
-async function postGraphqlWithSourceAuthorAndTimeoutFallback<T>(
+async function postGraphqlWithAuthorReplyFallback<T>(
   query: string,
   variables: Record<string, unknown>,
-  sourceAuthorFallbackQuery: string,
-  sourceAuthorFallbackVariables: Record<string, unknown>,
+  fallbackQuery: string,
+  fallbackVariables: Record<string, unknown>,
+  refresh: boolean | undefined,
+  controls: { signal?: AbortSignal; timeoutMs?: number } = {}
+): Promise<T> {
+  return postGraphqlWithCapabilityFallback({
+    capability: NAGG_CAPABILITIES.AUTHORED_REPLY_CHAIN,
+    query,
+    variables,
+    fallbackQuery,
+    fallbackVariables,
+    refresh,
+    controls,
+    isCapabilityError: isAuthorReplyCapabilityError,
+  });
+}
+
+async function postGraphqlWithAuthorReplyAndTimeoutFallback<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  authorReplyFallbackQuery: string,
+  authorReplyFallbackVariables: Record<string, unknown>,
   timeoutFallbackQuery: string,
   timeoutFallbackVariables: Record<string, unknown>,
   refresh: boolean | undefined,
   controls: { signal?: AbortSignal; timeoutMs?: number } = {}
 ): Promise<T> {
   try {
-    return await postGraphqlWithSourceAuthorFallback<T>(
+    return await postGraphqlWithAuthorReplyFallback<T>(
       query,
       variables,
-      sourceAuthorFallbackQuery,
-      sourceAuthorFallbackVariables,
+      authorReplyFallbackQuery,
+      authorReplyFallbackVariables,
       refresh,
       controls
     );
@@ -1025,9 +991,13 @@ async function postGraphqlWithSourceAuthorAndTimeoutFallback<T>(
   }
 }
 
-function isSourceEventAuthorSchemaError(error: unknown): boolean {
+function isAuthorReplyCapabilityError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes('sourceEventAuthor') || message.includes('PubkeySourceInput');
+  return (
+    message.includes('authoredReplyChain') ||
+    message.includes('AuthoredReplyChainInput') ||
+    message.includes('PubkeySourceInput')
+  );
 }
 
 function isGraphqlTimeoutError(error: unknown): boolean {
@@ -1062,7 +1032,28 @@ function feedInputFromSpec({
   return input;
 }
 
-function trendingInputFromSpec({
+function forYouInputFromSpec({
+  parsed,
+  viewerPubkey,
+  limit,
+  offset,
+}: {
+  parsed: Record<string, unknown> | null;
+  viewerPubkey?: string;
+  limit: number;
+  offset?: number;
+}): RankedEventsInput {
+  const hours = feedWindowHours(parsed);
+  const since = Math.floor(Date.now() / 1000) - hours * 60 * 60;
+  return forYouRankedEventsInput({
+    viewerPubkey,
+    since,
+    limit,
+    offset,
+  }) as RankedEventsInput;
+}
+
+function recentInputFromSpec({
   parsed,
   limit,
   offset,
@@ -1070,24 +1061,17 @@ function trendingInputFromSpec({
   parsed: Record<string, unknown> | null;
   limit: number;
   offset?: number;
-}): RankedEventsInput {
-  const hours = trendingHours(parsed);
-  const since = Math.floor(Date.now() / 1000) - hours * 60 * 60;
-  return {
-    references: {
-      kinds: [7],
-      since,
-    },
-    via: { key: 'e' },
-    target: { kinds: [1] },
-    metric: { name: 'likers', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+}): EventQueryInput {
+  const hours = feedWindowHours(parsed);
+  return recentNotesEventsInput({
+    since: Math.floor(Date.now() / 1000) - hours * 60 * 60,
     limit,
-    ...(offset && { offset }),
-  };
+    offset,
+  }) as EventQueryInput;
 }
 
-function isTrendingSpec(parsed: Record<string, unknown> | null): boolean {
-  return parsed?.id === 'global-trending' && parsed.kind === 'notes';
+function isForYouSpec(parsed: Record<string, unknown> | null): boolean {
+  return parsed?.id === 'for-you' && parsed.kind === 'notes';
 }
 
 function isFollowingRepliesSpec(parsed: Record<string, unknown> | null): boolean {
@@ -1102,36 +1086,8 @@ function isFollowingRecentSpec(parsed: Record<string, unknown> | null): boolean 
   return parsed?.id === 'following-recent' && parsed.kind === 'notes';
 }
 
-function followedPubkeySource(viewerPubkey: string): NonNullable<EventQueryInput['pubkeysFrom']> {
-  return [
-    {
-      latestEventTags: {
-        pubkey: viewerPubkey,
-        kinds: [3],
-        tag: { key: 'p' },
-        limit: 1,
-        maxValues: 2000,
-      },
-    },
-  ];
-}
-
 function threadRankCandidateLimit(limit: number, offset: number): number {
   return Math.max(100, offset + limit + RELEVANT_AUTHOR_REPLY_LIMIT + 1);
-}
-
-function eventETags(event: FeedEvent): string[][] {
-  return (event.tags || []).filter((tag) => tag[0] === 'e');
-}
-
-function directReplyParentId(event: FeedEvent): string | undefined {
-  const eTags = eventETags(event);
-  const replyTag = eTags.find((tag) => tag[3] === 'reply');
-  if (replyTag?.[1]) return replyTag[1];
-  const nonMentionTags = eTags.filter((tag) => tag[3] !== 'mention');
-  const lastNonMentionTag = nonMentionTags[nonMentionTags.length - 1];
-  if (lastNonMentionTag?.[1]) return lastNonMentionTag[1];
-  return undefined;
 }
 
 function childAuthorReplyNodes(node: GraphqlEventNode | undefined): GraphqlEventNode[] {
@@ -1142,120 +1098,15 @@ function childFollowedReplyNodes(node: GraphqlEventNode | undefined): GraphqlEve
   return node?.childFollowedReply?.nodes ?? [];
 }
 
-function collectNestedReplyNodes(
-  roots: readonly GraphqlEventNode[],
-  childNodesFor: (node: GraphqlEventNode) => readonly GraphqlEventNode[]
-): GraphqlEventNode[] {
-  const out: GraphqlEventNode[] = [];
-  const seen = new Set<string>();
-  const visit = (node: GraphqlEventNode | undefined): void => {
-    const event = normalizeGraphqlEvent(node);
-    if (!node || !event || seen.has(event.id)) return;
-    seen.add(event.id);
-    out.push(node);
-    for (const child of childNodesFor(node)) visit(child);
+function replyGraphEventFromNode(node: GraphqlEventNode | null | undefined) {
+  const event = normalizeGraphqlEvent(node);
+  if (!event) return undefined;
+  return {
+    id: event.id,
+    pubkey: event.pubkey,
+    tags: event.tags,
+    createdAt: event.created_at,
   };
-  for (const root of roots) visit(root);
-  return out;
-}
-
-function nodeEventPairs(nodes: readonly GraphqlEventNode[]): Array<{
-  node: GraphqlEventNode;
-  event: FeedEvent;
-}> {
-  const seen = new Set<string>();
-  const pairs: Array<{ node: GraphqlEventNode; event: FeedEvent }> = [];
-  for (const node of nodes) {
-    const event = normalizeGraphqlEvent(node);
-    if (!event || seen.has(event.id)) continue;
-    seen.add(event.id);
-    pairs.push({ node, event });
-  }
-  return pairs;
-}
-
-function compareReplyPairs(a: { event: FeedEvent }, b: { event: FeedEvent }): number {
-  return a.event.created_at - b.event.created_at || a.event.id.localeCompare(b.event.id);
-}
-
-function compareReplyChains(
-  a: Array<{ event: FeedEvent }>,
-  b: Array<{ event: FeedEvent }>
-): number {
-  if (a.length !== b.length) return b.length - a.length;
-  const aLast = a[a.length - 1]?.event;
-  const bLast = b[b.length - 1]?.event;
-  if (aLast && bLast && aLast.created_at !== bLast.created_at) {
-    return aLast.created_at - bLast.created_at;
-  }
-  const aFirst = a[0]?.event;
-  const bFirst = b[0]?.event;
-  if (aFirst && bFirst) return compareReplyPairs({ event: aFirst }, { event: bFirst });
-  return 0;
-}
-
-function selectAuthorThreadChain({
-  sourceEvent,
-  authorNodes,
-}: {
-  sourceEvent: FeedEvent | undefined;
-  authorNodes: readonly GraphqlEventNode[];
-}): GraphqlEventNode[] {
-  if (!sourceEvent) return [];
-  const authorPairs = nodeEventPairs(
-    collectNestedReplyNodes(authorNodes, childAuthorReplyNodes)
-  ).filter(({ event }) => event.pubkey === sourceEvent.pubkey && event.id !== sourceEvent.id);
-  const childrenByParent = new Map<string, Array<{ node: GraphqlEventNode; event: FeedEvent }>>();
-  for (const pair of authorPairs) {
-    const parentId = directReplyParentId(pair.event);
-    if (!parentId) continue;
-    const children = childrenByParent.get(parentId) ?? [];
-    children.push(pair);
-    childrenByParent.set(parentId, children);
-  }
-  for (const children of childrenByParent.values()) children.sort(compareReplyPairs);
-
-  const bestFrom = (
-    parentId: string,
-    visited: ReadonlySet<string>
-  ): Array<{ node: GraphqlEventNode; event: FeedEvent }> => {
-    const candidates = childrenByParent.get(parentId) ?? [];
-    let best: Array<{ node: GraphqlEventNode; event: FeedEvent }> = [];
-    for (const candidate of candidates) {
-      if (visited.has(candidate.event.id)) continue;
-      const nextVisited = new Set(visited);
-      nextVisited.add(candidate.event.id);
-      const chain = [candidate, ...bestFrom(candidate.event.id, nextVisited)];
-      if (compareReplyChains(chain, best) < 0) best = chain;
-    }
-    return best;
-  };
-
-  return bestFrom(sourceEvent.id, new Set([sourceEvent.id])).map(({ node }) => node);
-}
-
-function selectFollowedTailReply({
-  sourceEvent,
-  authorChain,
-  followedNodes,
-}: {
-  sourceEvent: FeedEvent | undefined;
-  authorChain: readonly GraphqlEventNode[];
-  followedNodes: readonly GraphqlEventNode[];
-}): GraphqlEventNode | undefined {
-  if (!sourceEvent) return undefined;
-  const tailEvent = normalizeGraphqlEvent(authorChain[authorChain.length - 1]);
-  const parentId = tailEvent?.id ?? sourceEvent.id;
-  const tailChildFollowedNodes =
-    authorChain.length > 0 ? childFollowedReplyNodes(authorChain[authorChain.length - 1]) : [];
-  const followedPairs = nodeEventPairs([
-    ...followedNodes,
-    ...tailChildFollowedNodes,
-    ...collectNestedReplyNodes(authorChain, childFollowedReplyNodes),
-  ]).filter(
-    ({ event }) => event.pubkey !== sourceEvent.pubkey && directReplyParentId(event) === parentId
-  );
-  return followedPairs[0]?.node;
 }
 
 function mergeRelevantReplyNodes({
@@ -1280,40 +1131,26 @@ function mergeRelevantReplyNodes({
   pageEventIds: string[];
   hasMore: boolean;
 } {
-  const sourceEvent = normalizeGraphqlEvent(sourceNode);
-  const sourceId = sourceEvent?.id;
-  const seen = new Set<string>(sourceId ? [sourceId] : []);
-  const merged: GraphqlEventNode[] = [];
-
-  const append = (node: GraphqlEventNode | undefined): void => {
-    const event = normalizeGraphqlEvent(node);
-    if (!node || !event || seen.has(event.id)) return;
-    seen.add(event.id);
-    merged.push(node);
-  };
-
-  const authorThreadChain = selectAuthorThreadChain({ sourceEvent, authorNodes });
-  for (const node of authorThreadChain) append(node);
-  append(
-    selectFollowedTailReply({
-      sourceEvent,
-      authorChain: authorThreadChain,
-      followedNodes,
-    })
-  );
-
-  for (const node of rankedNodes) append(node);
-  for (const node of allNodes) append(node);
-
-  const pageEnd = limit == null ? merged.length : offset + limit;
-  const pageNodes = merged.slice(offset, pageEnd);
+  const merged = mergeNaggRelevantReplyNodes({
+    sourceNode,
+    authorNodes,
+    followedNodes,
+    rankedNodes,
+    allNodes,
+    offset,
+    limit,
+    toEvent: replyGraphEventFromNode,
+    childAuthorNodesFor: childAuthorReplyNodes,
+    childFollowedNodesFor: childFollowedReplyNodes,
+  });
+  const pageEnd = limit == null ? merged.nodes.length : offset + limit;
   return {
-    nodes: merged,
-    pageNodes,
-    pageEventIds: pageNodes
+    nodes: merged.nodes,
+    pageNodes: merged.pageNodes,
+    pageEventIds: merged.pageNodes
       .map((node) => normalizeGraphqlEvent(node)?.id)
       .filter((id): id is string => !!id),
-    hasMore: merged.length > pageEnd,
+    hasMore: merged.nodes.length > pageEnd,
   };
 }
 
@@ -1321,134 +1158,7 @@ function threadReplyRankInput(
   sort: ThreadReplySort,
   viewerPubkey?: string
 ): ReferenceRankInput | null {
-  const likedByMetric: GenericMetricInput = {
-    name: 'likes',
-    op: 'COUNT_DISTINCT',
-    distinctField: 'PUBKEY',
-  };
-  const repostedByMetric: GenericMetricInput = {
-    name: 'reposts',
-    op: 'COUNT_DISTINCT',
-    distinctField: 'PUBKEY',
-  };
-  const zapAmountMetric: GenericMetricInput = {
-    name: 'zapSats',
-    op: 'SUM',
-    derived: 'nip57.amount_sats',
-  };
-  const replyCountMetric: GenericMetricInput = {
-    name: 'replies',
-    op: 'COUNT_DISTINCT',
-    distinctField: 'ID',
-  };
-
-  if (sort === 'new') return null;
-
-  if (sort === 'likes') {
-    return {
-      references: { kinds: [7], limit: 500 },
-      via: { key: 'e' },
-      metric: likedByMetric,
-    };
-  }
-
-  if (sort === 'zaps') {
-    return {
-      references: { kinds: [9735], limit: 500 },
-      via: { key: 'e' },
-      metric: zapAmountMetric,
-    };
-  }
-
-  if (sort === 'reposts') {
-    return {
-      references: { kinds: [6, 16], limit: 500 },
-      via: { key: 'e' },
-      metric: repostedByMetric,
-    };
-  }
-
-  return {
-    references: { kinds: [7], limit: 500 },
-    via: { key: 'e' },
-    metric: likedByMetric,
-    weight: 3,
-    transform: 'LOG1P',
-    terms: [
-      {
-        references: { kinds: [1, 1111], limit: 500 },
-        via: { key: 'e' },
-        metric: replyCountMetric,
-        weight: 2.5,
-        transform: 'LOG1P',
-      },
-      {
-        references: { kinds: [6, 16], limit: 500 },
-        via: { key: 'e' },
-        metric: repostedByMetric,
-        weight: 2,
-        transform: 'LOG1P',
-      },
-      {
-        references: { kinds: [9735], limit: 500 },
-        via: { key: 'e' },
-        metric: zapAmountMetric,
-        weight: 1.5,
-        transform: 'LOG1P',
-      },
-    ],
-    ...(viewerPubkey
-      ? {
-          candidatePubkeyBoosts: [
-            {
-              pubkeysFrom: followedPubkeySource(viewerPubkey),
-              weight: 6,
-            },
-          ],
-        }
-      : {}),
-  };
-}
-
-function followingRepliesInput({
-  viewerPubkey,
-  limit,
-  until,
-  offset,
-}: {
-  viewerPubkey: string;
-  limit: number;
-  until?: number;
-  offset?: number;
-}): EventQueryInput {
-  return {
-    kinds: [1, 1111],
-    tags: [{ key: 'e' }],
-    pubkeysFrom: followedPubkeySource(viewerPubkey),
-    limit,
-    ...(until && { until }),
-    ...(offset && { offset }),
-  };
-}
-
-function followingRecentInput({
-  viewerPubkey,
-  limit,
-  until,
-  offset,
-}: {
-  viewerPubkey: string;
-  limit: number;
-  until?: number;
-  offset?: number;
-}): EventQueryInput {
-  return {
-    kinds: [1, 1111],
-    pubkeysFrom: followedPubkeySource(viewerPubkey),
-    limit,
-    ...(until && { until }),
-    ...(offset && { offset }),
-  };
+  return buildThreadReplyRankInput(sort, { viewerPubkey }) as ReferenceRankInput | null;
 }
 
 function followingPopularInput({
@@ -1462,25 +1172,17 @@ function followingPopularInput({
   limit: number;
   offset?: number;
 }): RankedEventsInput {
-  const hours = trendingHours(parsed);
+  const hours = feedWindowHours(parsed);
   const since = Math.floor(Date.now() / 1000) - hours * 60 * 60;
-  return {
-    references: {
-      kinds: [7],
-      since,
-    },
-    via: { key: 'e' },
-    target: {
-      kinds: [1, 1111],
-      pubkeysFrom: followedPubkeySource(viewerPubkey),
-    },
-    metric: { name: 'likers', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+  return followingPopularRankedEventsInput({
+    viewerPubkey,
+    since,
     limit,
-    ...(offset && { offset }),
-  };
+    offset,
+  }) as RankedEventsInput;
 }
 
-function trendingHours(parsed: Record<string, unknown> | null): number {
+function feedWindowHours(parsed: Record<string, unknown> | null): number {
   const hours = typeof parsed?.hours === 'number' ? parsed.hours : 24;
   if (!Number.isFinite(hours) || hours <= 0 || hours > 168) return 24;
   return Math.floor(hours);
@@ -1498,12 +1200,65 @@ function pubkeysFromSpec(parsed: Record<string, unknown> | null): string[] {
   return Array.from(out);
 }
 
+type FeedPreferenceFilters = {
+  ignoredPubkeys: string[];
+  ignoredEventIds: string[];
+};
+
+function currentFeedPreferenceFilters(): FeedPreferenceFilters {
+  const ignoreState = useFeedIgnoreStore.getState();
+  return {
+    ignoredPubkeys: ignoreState.ignoredPubkeys,
+    ignoredEventIds: ignoreState.ignoredEventIds,
+  };
+}
+
+function withPreferenceEventFilters(
+  input: EventQueryInput,
+  filters: FeedPreferenceFilters
+): EventQueryInput {
+  return withEventExclusions(input, {
+    excludeIds: filters.ignoredEventIds,
+    excludePubkeys: filters.ignoredPubkeys,
+  });
+}
+
+function withPreferenceRankedFilters(
+  input: RankedEventsInput,
+  filters: FeedPreferenceFilters
+): RankedEventsInput {
+  return withRankedTargetExclusions(input, {
+    excludeIds: filters.ignoredEventIds,
+    excludePubkeys: filters.ignoredPubkeys,
+  });
+}
+
+function feedQueryOptionsFromPreferences(filters: FeedPreferenceFilters): FeedQueryOptions {
+  const ignoredPubkeys = new Set(filters.ignoredPubkeys.map((pubkey) => pubkey.toLowerCase()));
+  const ignoredEventIds = new Set(filters.ignoredEventIds.map((id) => id.toLowerCase()));
+  if (ignoredPubkeys.size === 0 && ignoredEventIds.size === 0) return {};
+
+  const includeEvent = (event: FeedEvent | undefined) => {
+    if (!event) return true;
+    return (
+      !ignoredPubkeys.has(event.pubkey.toLowerCase()) &&
+      !ignoredEventIds.has(event.id.toLowerCase())
+    );
+  };
+
+  return {
+    includeNote: (event, rootEvent) => includeEvent(event) && includeEvent(rootEvent),
+    includeRepost: (event, originalEvent, rootEvent) =>
+      includeEvent(event) && includeEvent(originalEvent) && includeEvent(rootEvent),
+  };
+}
+
 function mapGraphqlFeed(nodes: GraphqlEventNode[], options: FeedQueryOptions = {}) {
   return mapNaggFeedPage(graphqlNodesToNaggPage(nodes), options);
 }
 
-function mapTrendingGraphqlFeed(nodes: GraphqlEventNode[]) {
-  const result = mapGraphqlFeed(nodes);
+function mapRankedGraphqlFeed(nodes: GraphqlEventNode[], options: FeedQueryOptions = {}) {
+  const result = mapGraphqlFeed(nodes, options);
   return {
     ...result,
     paginationUntil: nodes.length > 0 ? 1 : 0,
@@ -1511,7 +1266,17 @@ function mapTrendingGraphqlFeed(nodes: GraphqlEventNode[]) {
   };
 }
 
-function mapFollowingRepliesGraphqlFeed(nodes: GraphqlEventNode[]) {
+function mapRankedOrEventGraphqlFeed(
+  data: GraphqlFeedData,
+  options: FeedQueryOptions = {}
+): FeedParseResult {
+  if (data.rankedEvents) {
+    return mapRankedGraphqlFeed(data.rankedEvents.nodes ?? [], options);
+  }
+  return mapGraphqlFeed(data.events?.nodes ?? [], options);
+}
+
+function mapFollowingRepliesGraphqlFeed(nodes: GraphqlEventNode[], options: FeedQueryOptions = {}) {
   const page = graphqlNodesToNaggPage(nodes, {
     parentForNode: (node) =>
       node.rootContext?.nodes?.[0] ??
@@ -1519,7 +1284,7 @@ function mapFollowingRepliesGraphqlFeed(nodes: GraphqlEventNode[]) {
       node.parentRootRefs?.nodes?.[0] ??
       node.eventRefs?.nodes?.[0],
   });
-  return mapNaggFeedPage(page);
+  return mapNaggFeedPage(page, options);
 }
 
 function replyPreviewCount(result: FeedParseResult): number {
@@ -1585,149 +1350,6 @@ function includeSelectedReplyNodesInThread(
   };
 }
 
-function graphqlNodesToNaggPage(
-  nodes: GraphqlEventNode[],
-  options: { parentForNode?: (node: GraphqlEventNode) => GraphqlEventNode | undefined } = {}
-): NaggFeedResponseData {
-  const metrics: Record<string, NoteMetrics> = {};
-  const profiles: Record<string, ProfileInfo> = {};
-  const quoted: Record<string, FeedEvent> = {};
-  const items: unknown[] = [];
-  let paginationUntil = 0;
-
-  const hydrate = (node: GraphqlEventNode | undefined) => {
-    if (!node) return;
-    const event = normalizeGraphqlEvent(node);
-    if (!event) return;
-    metrics[event.id] = metricsFromGraphqlNode(node);
-    const profile = profileFromMetadataEvent(node.authorMetadata?.[0]);
-    if (profile) profiles[event.pubkey] = profile;
-    for (const quoteNode of node.quotedContent?.nodes ?? []) {
-      const quote = normalizeGraphqlEvent(quoteNode);
-      if (!quote) continue;
-      quoted[quote.id] = quote;
-      hydrate(quoteNode);
-    }
-  };
-
-  for (const node of nodes) {
-    const event = normalizeGraphqlEvent(node);
-    if (!event) continue;
-    hydrate(node);
-    paginationUntil =
-      paginationUntil === 0 ? event.created_at : Math.min(paginationUntil, event.created_at);
-
-    const eventRefs = (node.eventRefs?.nodes ?? []).map(normalizeGraphqlEvent).filter(Boolean);
-    const explicitParent = normalizeGraphqlEvent(options.parentForNode?.(node));
-    const resolvedRoot = normalizeGraphqlEvent(node.rootContext?.nodes?.[0]);
-    const rootEvent =
-      explicitParent ??
-      (resolvedRoot && resolvedRoot.id !== event.id ? resolvedRoot : undefined) ??
-      eventRefs.find((ref) => ref && ref.id !== event.id) ??
-      undefined;
-    for (const refNode of node.eventRefs?.nodes ?? []) hydrate(refNode);
-    for (const refNode of node.parentReplyRefs?.nodes ?? []) hydrate(refNode);
-    for (const refNode of node.parentRootRefs?.nodes ?? []) hydrate(refNode);
-    for (const refNode of node.rootContext?.nodes ?? []) hydrate(refNode);
-    const replyPreviewNodes = mergeRelevantReplyNodes({
-      sourceNode: node,
-      authorNodes: node.authorReplies?.nodes,
-      followedNodes: node.followedReply?.nodes,
-    }).nodes;
-    for (const replyNode of replyPreviewNodes) hydrate(replyNode);
-    const replyPreviewEvents = replyPreviewNodes
-      .map(normalizeGraphqlEvent)
-      .filter((replyEvent): replyEvent is FeedEvent => !!replyEvent && replyEvent.id !== event.id);
-
-    if (event.kind === 6 || event.kind === 16) {
-      const originalEvent = eventRefs[0] ?? undefined;
-      const originalEventId = originalEvent?.id ?? getFirstTagValue(event, 'e') ?? '';
-      if (!originalEventId) continue;
-      items.push({
-        type: 'repost',
-        repostEvent: event,
-        originalEvent,
-        originalEventId,
-        rootEvent,
-        rootEventId: rootEvent?.id,
-      });
-      continue;
-    }
-
-    items.push({
-      type: 'note',
-      event,
-      rootEvent,
-      rootEventId: rootEvent?.id,
-      ...(replyPreviewEvents.length > 0 ? { replyPreviewEvents } : {}),
-    });
-  }
-
-  return {
-    items,
-    metrics,
-    profiles,
-    quoted,
-    paginationUntil,
-    paginationOffset: nodes.length,
-  } as unknown as NaggFeedResponseData;
-}
-
-function normalizeGraphqlEvent(node: GraphqlEventNode | null | undefined): FeedEvent | undefined {
-  if (!node || typeof node.id !== 'string' || typeof node.pubkey !== 'string') return undefined;
-  if (
-    typeof node.kind !== 'number' ||
-    typeof node.content !== 'string' ||
-    !Array.isArray(node.tags)
-  ) {
-    return undefined;
-  }
-  return {
-    id: node.id,
-    pubkey: node.pubkey,
-    kind: node.kind,
-    content: node.content,
-    tags: node.tags.filter(Array.isArray),
-    created_at: createdAtSeconds(node.createdAt),
-  };
-}
-
-function profileFromMetadataEvent(node: GraphqlEventNode | undefined): ProfileInfo | undefined {
-  if (!node || node.kind !== 0) return undefined;
-  const parsed = parseJson<Record<string, unknown>>(node.content);
-  if (!parsed) return undefined;
-  const displayName = stringField(parsed.display_name) ?? stringField(parsed.displayName);
-  const name = displayName ?? stringField(parsed.name) ?? '';
-  const picture = stringField(parsed.picture) ?? stringField(parsed.image);
-  return { name, ...(picture ? { picture } : {}) };
-}
-
-function stringField(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
-}
-
-function metricsFromGraphqlNode(node: GraphqlEventNode): NoteMetrics {
-  return {
-    likeCount: aggregateMetric(node.likes, 'pubkeys'),
-    repostCount: aggregateMetric(node.reposts, 'pubkeys'),
-    replyCount: aggregateMetric(node.replyStats, 'events'),
-    satsZapped: aggregateMetric(node.zaps, 'amountSats'),
-  };
-}
-
-function aggregateMetric(aggregate: GraphqlAggregate | undefined, key: string): number {
-  const value = aggregate?.rows?.[0]?.metrics?.[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
-
-function createdAtSeconds(value: string | number | Date): number {
-  if (value instanceof Date) return Math.floor(value.getTime() / 1000);
-  if (typeof value === 'number')
-    return value > 1_000_000_000_000 ? Math.floor(value / 1000) : value;
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
-}
-
 function collectHydrationFromGraphqlNodes(nodes: GraphqlEventNode[]): {
   metrics: Map<string, NoteMetrics>;
   profiles: Map<string, ProfileInfo>;
@@ -1739,6 +1361,96 @@ function collectHydrationFromGraphqlNodes(nodes: GraphqlEventNode[]): {
     profiles: new Map(Object.entries(page.profiles)),
     quotedEvents: new Map(Object.entries(page.quoted)),
   };
+}
+
+function compareNotificationsNewestFirst(
+  left: FeedNotificationsResult['notifications'][number],
+  right: FeedNotificationsResult['notifications'][number]
+): number {
+  return (
+    right.event.created_at - left.event.created_at || right.event.id.localeCompare(left.event.id)
+  );
+}
+
+function notificationTargetFromGraphqlNode(
+  node: GraphqlEventNode | null | undefined,
+  reason: string
+): { targetEvent?: FeedEvent; targetEventId?: string } {
+  if (!node) return {};
+  const event = normalizeGraphqlEvent(node);
+  const ownId = event?.id;
+  const eventRefs = node.eventRefs?.nodes ?? [];
+  const quoteRefs = node.quotedContent?.nodes ?? [];
+  const rootRefs = node.rootContext?.nodes ?? [];
+  const refById = new Map<string, GraphqlEventNode>();
+
+  for (const ref of [...eventRefs, ...quoteRefs, ...rootRefs]) {
+    const refEvent = normalizeGraphqlEvent(ref);
+    if (!refEvent || refEvent.id === ownId) continue;
+    refById.set(refEvent.id.toLowerCase(), ref);
+  }
+
+  const eventForId = (id: string | undefined): FeedEvent | undefined => {
+    if (!id) return undefined;
+    return normalizeGraphqlEvent(refById.get(id.toLowerCase()));
+  };
+  const firstEvent = (refs: readonly GraphqlEventNode[]): FeedEvent | undefined => {
+    for (const ref of refs) {
+      const refEvent = normalizeGraphqlEvent(ref);
+      if (refEvent && refEvent.id !== ownId) return refEvent;
+    }
+    return undefined;
+  };
+  const firstTagId = (key: string, markers?: readonly string[]): string | undefined => {
+    for (const tag of node.tags ?? []) {
+      if (tag[0] !== key || typeof tag[1] !== 'string' || tag[1].length !== 64) continue;
+      if (markers && !markers.includes(tag[3] ?? '')) continue;
+      return tag[1];
+    }
+    return undefined;
+  };
+  const directReplyParentId = (): string | undefined => {
+    const eTags = (node.tags ?? []).filter(
+      (tag) => tag[0] === 'e' && typeof tag[1] === 'string' && tag[1].length === 64
+    );
+    const replyMarker = eTags.find((tag) => (tag[3] ?? '').toLowerCase() === 'reply');
+    if (replyMarker?.[1]) return replyMarker[1];
+    const lastUnmarked = [...eTags].reverse().find((tag) => !tag[3]);
+    if (lastUnmarked?.[1]) return lastUnmarked[1];
+    const rootMarker = eTags.find((tag) => (tag[3] ?? '').toLowerCase() === 'root');
+    return rootMarker?.[1];
+  };
+  const withId = (targetEvent?: FeedEvent, targetEventId?: string) => {
+    const id = targetEvent?.id ?? targetEventId;
+    if (!id) return {};
+    return targetEvent ? { targetEvent, targetEventId: id } : { targetEventId: id };
+  };
+
+  switch (reason) {
+    case 'quote': {
+      const qId = firstTagId('q');
+      const mentionId = firstTagId('e', ['mention']);
+      return withId(
+        eventForId(qId) ?? firstEvent(quoteRefs) ?? eventForId(mentionId) ?? firstEvent(eventRefs),
+        qId ?? mentionId
+      );
+    }
+    case 'reply': {
+      const parentId = directReplyParentId();
+      return withId(
+        eventForId(parentId) ?? firstEvent(eventRefs) ?? firstEvent(rootRefs),
+        parentId
+      );
+    }
+    case 'reaction':
+    case 'repost':
+    case 'zap': {
+      const targetId = firstTagId('e');
+      return withId(eventForId(targetId) ?? firstEvent(eventRefs), targetId);
+    }
+    default:
+      return {};
+  }
 }
 
 function addThreadNode(
@@ -1792,84 +1504,134 @@ export function createNaggFeedClient(): FeedClient {
         return logResult('empty-explicit-pubkeys', emptyFeedParseResult());
       }
       const parsedSpec = parseJson<Record<string, unknown>>(hydratedSpec);
-      if (isTrendingSpec(parsedSpec)) {
-        const variables = {
-          input: trendingInputFromSpec({ parsed: parsedSpec, limit, offset }),
+      const preferenceFilters = currentFeedPreferenceFilters();
+      const feedOptions = feedQueryOptionsFromPreferences(preferenceFilters);
+      if (isForYouSpec(parsedSpec)) {
+        const input = withPreferenceRankedFilters(
+          forYouInputFromSpec({
+            parsed: parsedSpec,
+            viewerPubkey: userPubkey,
+            limit,
+            offset,
+          }),
+          preferenceFilters
+        );
+        const timeoutFallbackInput = withPreferenceEventFilters(
+          recentInputFromSpec({ parsed: parsedSpec, limit, offset }),
+          preferenceFilters
+        );
+        const viewerVariables = {
+          input,
           ...(userPubkey ? { viewerPubkey: userPubkey } : {}),
         };
+        const variables = {
+          ...viewerVariables,
+          authorChain: authoredReplyChainInput(),
+        };
         const data = userPubkey
-          ? await postGraphqlWithSourceAuthorAndTimeoutFallback<GraphqlFeedData>(
-              TRENDING_FEED_WITH_VIEWER_QUERY,
+          ? await postGraphqlWithAuthorReplyAndTimeoutFallback<GraphqlFeedData>(
+              RANKED_FEED_WITH_VIEWER_QUERY,
               variables,
-              TRENDING_FEED_WITH_VIEWER_LEGACY_QUERY,
-              variables,
-              TRENDING_FEED_QUERY,
-              { input: variables.input },
+              RANKED_FEED_WITH_VIEWER_LEGACY_QUERY,
+              viewerVariables,
+              FEED_QUERY,
+              { input: timeoutFallbackInput },
               refresh,
               { signal, timeoutMs }
             )
-          : await postGraphql<GraphqlFeedData>(TRENDING_FEED_QUERY, variables, refresh, {
+          : await postGraphql<GraphqlFeedData>(RANKED_FEED_QUERY, { input }, refresh, {
               signal,
               timeoutMs,
             });
-        return logResult('global-trending', mapTrendingGraphqlFeed(data.rankedEvents?.nodes ?? []));
+        return logResult('for-you', mapRankedOrEventGraphqlFeed(data, feedOptions));
       }
       if (isFollowingRepliesSpec(parsedSpec)) {
         if (!userPubkey) return logResult('following-replies-no-viewer', emptyFeedParseResult());
+        const input = withPreferenceEventFilters(
+          followingRepliesEventsInput({
+            viewerPubkey: userPubkey,
+            limit,
+            until,
+            offset,
+          }) as EventQueryInput,
+          preferenceFilters
+        );
         const data = await postGraphql<GraphqlFeedData>(
           FOLLOWING_REPLIES_QUERY,
-          { input: followingRepliesInput({ viewerPubkey: userPubkey, limit, until, offset }) },
+          { input },
           refresh,
           { signal, timeoutMs }
         );
         return logResult(
           'following-replies',
-          mapFollowingRepliesGraphqlFeed(data.events?.nodes ?? [])
+          mapFollowingRepliesGraphqlFeed(data.events?.nodes ?? [], feedOptions)
         );
       }
       if (isFollowingPopularSpec(parsedSpec)) {
         if (!userPubkey) return logResult('following-popular-no-viewer', emptyFeedParseResult());
-        const variables = {
-          input: followingPopularInput({
+        const input = withPreferenceRankedFilters(
+          followingPopularInput({
             viewerPubkey: userPubkey,
             parsed: parsedSpec,
             limit,
             offset,
           }),
+          preferenceFilters
+        );
+        const timeoutFallbackInput = withPreferenceEventFilters(
+          followingRecentEventsInput({
+            viewerPubkey: userPubkey,
+            limit,
+            offset,
+          }) as EventQueryInput,
+          preferenceFilters
+        );
+        const viewerVariables = {
+          input,
           viewerPubkey: userPubkey,
         };
-        const data = await postGraphqlWithSourceAuthorAndTimeoutFallback<GraphqlFeedData>(
+        const variables = {
+          ...viewerVariables,
+          authorChain: authoredReplyChainInput(),
+        };
+        const data = await postGraphqlWithAuthorReplyAndTimeoutFallback<GraphqlFeedData>(
           FOLLOWING_POPULAR_WITH_VIEWER_QUERY,
           variables,
           FOLLOWING_POPULAR_WITH_VIEWER_LEGACY_QUERY,
-          variables,
-          FOLLOWING_POPULAR_QUERY,
-          { input: variables.input },
+          viewerVariables,
+          FEED_QUERY,
+          { input: timeoutFallbackInput },
           refresh,
           { signal, timeoutMs }
         );
-        return logResult(
-          'following-popular',
-          mapTrendingGraphqlFeed(data.rankedEvents?.nodes ?? [])
-        );
+        return logResult('following-popular', mapRankedOrEventGraphqlFeed(data, feedOptions));
       }
       if (isFollowingRecentSpec(parsedSpec)) {
         if (!userPubkey) return logResult('following-recent-no-viewer', emptyFeedParseResult());
-        const data = await postGraphql<GraphqlFeedData>(
-          FEED_QUERY,
-          { input: followingRecentInput({ viewerPubkey: userPubkey, limit, until, offset }) },
-          refresh,
-          { signal, timeoutMs }
+        const input = withPreferenceEventFilters(
+          followingRecentEventsInput({
+            viewerPubkey: userPubkey,
+            limit,
+            until,
+            offset,
+          }) as EventQueryInput,
+          preferenceFilters
         );
-        return logResult('following-recent', mapGraphqlFeed(data.events?.nodes ?? []));
+        const data = await postGraphql<GraphqlFeedData>(FEED_QUERY, { input }, refresh, {
+          signal,
+          timeoutMs,
+        });
+        return logResult('following-recent', mapGraphqlFeed(data.events?.nodes ?? [], feedOptions));
       }
-      const data = await postGraphql<GraphqlFeedData>(
-        FEED_QUERY,
-        { input: feedInputFromSpec({ spec: hydratedSpec, limit, until, offset }) },
-        refresh,
-        { signal, timeoutMs }
+      const input = withPreferenceEventFilters(
+        feedInputFromSpec({ spec: hydratedSpec, limit, until, offset }),
+        preferenceFilters
       );
-      return logResult('generic', mapGraphqlFeed(data.events?.nodes ?? []));
+      const data = await postGraphql<GraphqlFeedData>(FEED_QUERY, { input }, refresh, {
+        signal,
+        timeoutMs,
+      });
+      return logResult('generic', mapGraphqlFeed(data.events?.nodes ?? [], feedOptions));
     },
 
     async getUserFeed({
@@ -1903,6 +1665,39 @@ export function createNaggFeedClient(): FeedClient {
         extraProfile: authorName
           ? { pubkey, profile: { name: authorName, picture: authorPicture } }
           : undefined,
+      });
+    },
+
+    async getPostsByPubkeys({
+      pubkeys,
+      limit = 30,
+      until,
+      offset,
+      refresh,
+      signal,
+      timeoutMs,
+    }: PostsByPubkeysRequest) {
+      if (pubkeys.length === 0) {
+        return mapGraphqlFeed([], { includeNote: () => false, includeRepost: () => false });
+      }
+      const pubkeySet = new Set(pubkeys);
+      const data = await postGraphql<GraphqlFeedData>(
+        FEED_QUERY,
+        {
+          input: {
+            pubkeys,
+            kinds: [1, 6, 16],
+            limit,
+            ...(until && { until }),
+            ...(offset && { offset }),
+          },
+        },
+        refresh,
+        { signal, timeoutMs }
+      );
+      return mapGraphqlFeed(data.events?.nodes ?? [], {
+        includeNote: (event) => pubkeySet.has(event.pubkey) && isRootNote(event),
+        includeRepost: (event) => pubkeySet.has(event.pubkey),
       });
     },
 
@@ -1970,6 +1765,68 @@ export function createNaggFeedClient(): FeedClient {
       return updates;
     },
 
+    async getNotifications({
+      viewerPubkey,
+      tab = 'ALL',
+      policy = 'STRICT',
+      replyScope = 'THREAD',
+      since,
+      until,
+      limit = 50,
+      refresh,
+      signal,
+      timeoutMs,
+    }: FeedNotificationsRequest): Promise<FeedNotificationsResult> {
+      const input = notificationsInput({
+        viewer: viewerPubkey,
+        tab,
+        policy,
+        replyScope,
+        since,
+        until,
+        limit,
+      });
+      const data = await postGraphql<GraphqlNotificationsData>(
+        NOTIFICATIONS_QUERY,
+        { input },
+        refresh,
+        { signal, timeoutMs }
+      );
+      const nodes = data.notifications?.nodes ?? [];
+      const eventNodes = nodes
+        .map((node) => node.event)
+        .filter((event): event is GraphqlEventNode => !!event);
+      const hydration = collectHydrationFromGraphqlNodes(eventNodes);
+      const notifications = nodes
+        .map((node) => {
+          const event = normalizeGraphqlEvent(node.event);
+          if (!event) return undefined;
+          const reason = node.reason || 'mention';
+          const target = notificationTargetFromGraphqlNode(node.event, reason);
+          return {
+            event,
+            ...target,
+            reason,
+            actorVertexScore:
+              typeof node.actorVertexScore === 'number' && Number.isFinite(node.actorVertexScore)
+                ? node.actorVertexScore
+                : 0,
+          };
+        })
+        .filter((notification): notification is NonNullable<typeof notification> => !!notification)
+        .sort(compareNotificationsNewestFirst);
+      return {
+        notifications,
+        metricsMap: hydration.metrics,
+        profilesMap: hydration.profiles,
+        quotedEventsMap: hydration.quotedEvents,
+        paginationUntil:
+          notifications.length > 0
+            ? Math.min(...notifications.map((notification) => notification.event.created_at))
+            : 0,
+      };
+    },
+
     async getThread({
       eventId,
       limit = 10,
@@ -1997,6 +1854,7 @@ export function createNaggFeedClient(): FeedClient {
             rankedLimit,
             rank,
             viewerPubkey: viewerPubkey ?? '',
+            authorChain: authoredReplyChainInput(),
           }
         : rank
           ? {
@@ -2018,7 +1876,7 @@ export function createNaggFeedClient(): FeedClient {
             }
           : variables;
       const data = isRelevantSort
-        ? await postGraphqlWithSourceAuthorFallback<GraphqlThreadData>(
+        ? await postGraphqlWithAuthorReplyFallback<GraphqlThreadData>(
             query,
             variables,
             THREAD_RANKED_QUERY,

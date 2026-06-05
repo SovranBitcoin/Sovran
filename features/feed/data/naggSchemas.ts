@@ -45,6 +45,16 @@ const NaggRepostItem = z
     originalEventId: z.string().min(1).optional(),
     rootEvent: NaggFeedEvent.nullable().optional(),
     rootEventId: z.string().min(1).optional(),
+    reposters: z
+      .array(
+        z
+          .object({
+            pubkey: z.string().min(1),
+            event: NaggFeedEvent,
+          })
+          .passthrough()
+      )
+      .optional(),
   })
   .passthrough();
 

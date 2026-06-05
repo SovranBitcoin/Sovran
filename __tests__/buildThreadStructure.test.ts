@@ -66,4 +66,32 @@ describe('buildThreadStructure (audit 59.json F-001)', () => {
     const result = buildThreadStructure('missing', makeMap([note('other', 'alice')]));
     expect(result).toEqual({ parents: [], target: null, replies: [] });
   });
+
+  it('walks the LAST unmarked e-tag as the immediate parent (A→B→A, not A→A)', () => {
+    // Deprecated positional NIP-10: first unmarked e-tag is the root, last is
+    // the immediate parent. For an A→B→A chain the leaf (second A) must show
+    // both B and the root A — not skip B and render A→A.
+    const rootA = note('rootA', 'alice');
+    const replyB = note('replyB', 'bob', [['e', 'rootA']]);
+    const leafA = note('leafA', 'alice', [
+      ['e', 'rootA'],
+      ['e', 'replyB'],
+    ]);
+    const result = buildThreadStructure('leafA', makeMap([rootA, replyB, leafA]));
+
+    expect(result.parents.map((p) => p.id)).toEqual(['rootA', 'replyB']);
+  });
+
+  it('prefers an unmarked immediate parent over a `root`-marked ancestor', () => {
+    // Some clients mark only the root and leave the immediate parent unmarked.
+    const rootA = note('rootA', 'alice');
+    const parentB = note('parentB', 'bob', [['e', 'rootA', '', 'root']]);
+    const target = note('target', 'carol', [
+      ['e', 'rootA', '', 'root'],
+      ['e', 'parentB'],
+    ]);
+    const result = buildThreadStructure('target', makeMap([rootA, parentB, target]));
+
+    expect(result.parents.map((p) => p.id)).toEqual(['rootA', 'parentB']);
+  });
 });

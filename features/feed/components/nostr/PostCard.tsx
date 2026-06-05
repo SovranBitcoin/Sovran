@@ -3,6 +3,7 @@ import { type LayoutChangeEvent, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import Icon from '@/assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -69,6 +70,7 @@ interface PostCardProps {
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onLikePress?: () => void;
+  onMorePress?: () => void;
   reposted?: boolean;
   liked?: boolean;
   repostPending?: boolean;
@@ -114,6 +116,7 @@ export const PostCard = React.memo(function PostCard({
   onCommentPress,
   onRepostPress,
   onLikePress,
+  onMorePress,
   reposted = false,
   liked = false,
   repostPending = false,
@@ -207,6 +210,10 @@ export const PostCard = React.memo(function PostCard({
     if (suppressThreadTapRef.current) return;
     navigateToThread();
   }, [navigateToThread]);
+
+  const handleMorePress = useCallback(() => {
+    onMorePress?.();
+  }, [onMorePress]);
 
   const tapGesture = useMemo(
     () =>
@@ -363,28 +370,42 @@ export const PostCard = React.memo(function PostCard({
 
       <View style={sharedStyles.flex1}>
         <HStack align="center" gap={6} style={sharedStyles.mb4}>
-          <Pressable
-            onPressIn={handleNestedPressIn}
-            onPressOut={handleNestedPressOut}
-            onPress={navigateToProfile}>
-            <Text
-              bold
-              size={14}
-              style={textPrimary}
-              numberOfLines={isThread ? 1 : undefined}
-              fallback={nameFallback}>
-              {displayName}
-            </Text>
-          </Pressable>
-          {shortTime ? (
-            <>
-              <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
-                {'•'}
+          <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
+            <Pressable
+              onPressIn={handleNestedPressIn}
+              onPressOut={handleNestedPressOut}
+              onPress={navigateToProfile}>
+              <Text
+                bold
+                size={14}
+                style={textPrimary}
+                numberOfLines={isThread ? 1 : undefined}
+                fallback={nameFallback}>
+                {displayName}
               </Text>
-              <Text size={13} style={textMuted}>
-                {shortTime}
-              </Text>
-            </>
+            </Pressable>
+            {shortTime ? (
+              <>
+                <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
+                  {'•'}
+                </Text>
+                <Text size={13} style={textMuted}>
+                  {shortTime}
+                </Text>
+              </>
+            ) : null}
+          </HStack>
+          {onMorePress ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="More post actions"
+              onPressIn={handleNestedPressIn}
+              onPressOut={handleNestedPressOut}
+              onPress={handleMorePress}
+              haptics
+              style={pcStyles.moreButton}>
+              <Icon name="tabler:dots" size={18} color={opacity(foreground, 0.5)} />
+            </Pressable>
           ) : null}
         </HStack>
 
@@ -673,6 +694,19 @@ const pcStyles = StyleSheet.create({
   },
   dotSeparator: {
     marginRight: 4,
+  },
+  headerTextRow: {
+    flex: 1,
+    minWidth: 0,
+  },
+  moreButton: {
+    width: 30,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -4,
+    marginRight: -6,
+    borderRadius: 14,
   },
   inlineMetricsWrap: {
     marginLeft: -(AVATAR_SIZE + 12),

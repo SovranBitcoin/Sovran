@@ -26,11 +26,6 @@ const eventId = process.env.NAGG_PROBE_EVENT_ID;
 const probes: Probe[] = [
   { name: 'healthz', path: '/healthz' },
   {
-    name: 'trending feed',
-    path: '/nostr/feed?kind=trending&limit=5',
-    schema: NaggFeedResponse,
-  },
-  {
     name: 'follows feed',
     path: pubkey ? `/nostr/feed?kind=follows&pubkeys=${encodeURIComponent(pubkey)}&limit=5` : '',
     schema: NaggFeedResponse,

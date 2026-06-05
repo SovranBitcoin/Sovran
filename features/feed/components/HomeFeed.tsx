@@ -13,7 +13,7 @@ import {
   useTransition,
   type ReactNode,
 } from 'react';
-import { StyleSheet, ActivityIndicator, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -31,6 +31,10 @@ import {
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
+import type { FeedParseResult } from '@/features/feed/data/feedClient';
+import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
+import { actionMenuPopup } from '@/shared/lib/popup';
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feedTypes';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
@@ -59,6 +63,7 @@ import {
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 
 // ============================================================================
 // Types
@@ -91,6 +96,38 @@ const FEED_THREAD_CONNECTOR_TOP =
   FEED_CARD_VERTICAL_PADDING + FEED_AVATAR_SIZE + FEED_THREAD_CONNECTOR_AVATAR_GAP;
 const FEED_REPOST_HEADER_HEIGHT = 27;
 const FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y = FEED_REPOST_HEADER_HEIGHT + FEED_AVATAR_CENTER_Y;
+
+type IgnoreTarget = {
+  eventId?: string;
+  pubkey?: string;
+};
+
+function feedItemEvents(item: FeedItem): FeedEvent[] {
+  const events: FeedEvent[] = [];
+  if (item.type === 'note') {
+    events.push(item.event);
+    if (item.rootEvent) events.push(item.rootEvent);
+    events.push(...(item.replyPreviewEvents ?? []));
+    return events;
+  }
+
+  events.push(item.repostEvent);
+  if (item.originalEvent) events.push(item.originalEvent);
+  if (item.rootEvent) events.push(item.rootEvent);
+  for (const reposter of item.reposters ?? []) events.push(reposter.event);
+  return events;
+}
+
+function feedItemMatchesIgnoreTarget(item: FeedItem, target: IgnoreTarget): boolean {
+  const eventId = target.eventId?.toLowerCase();
+  const pubkey = target.pubkey?.toLowerCase();
+  if (!eventId && !pubkey) return false;
+  return feedItemEvents(item).some(
+    (event) =>
+      (eventId ? event.id.toLowerCase() === eventId : false) ||
+      (pubkey ? event.pubkey.toLowerCase() === pubkey : false)
+  );
+}
 
 // ============================================================================
 // Empty / Error States
@@ -162,6 +199,10 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const imageOverlay = useImageOverlay();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;
+  const ignoreEvent = useFeedIgnoreStore((state) => state.ignoreEvent);
+  const ignorePubkey = useFeedIgnoreStore((state) => state.ignorePubkey);
+  const ignoredPubkeysKey = useFeedIgnoreStore((state) => state.ignoredPubkeys.join('\u0000'));
+  const ignoredEventIdsKey = useFeedIgnoreStore((state) => state.ignoredEventIds.join('\u0000'));
   const [, startTransition] = useTransition();
   const feedSpecs = DEFAULT_FEED_SPECS;
   const activeSpecIndex = useMemo(() => {
@@ -169,18 +210,47 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     const idx = feedSpecs.findIndex((s) => s.name === activeFilter);
     return idx >= 0 ? idx : 0;
   }, [activeFilter, feedSpecs]);
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
-  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
-  const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(new Map());
-  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(new Map());
-  const [isLoading, setIsLoading] = useState(true);
+  // Warm-navigation seed: if this spec's page-0 was cached earlier this session
+  // (not a cold start), initialise state + pagination refs straight from it so a
+  // remount (e.g. closing search) paints instantly instead of flashing a
+  // spinner. The trigger effect below still runs loadFeed, but its isFresh gate
+  // makes that a no-op (fresh) or a silent revalidate (stale). Consumed only by
+  // the lazy initialisers / ref defaults, so it's captured once at mount.
+  const initialSpec = feedSpecs[activeSpecIndex]?.spec;
+  const initialCacheKey = initialSpec ? feedPageKey(initialSpec, userPubkey) : null;
+  const seed =
+    initialCacheKey && !feedPageCache.isColdStart(initialCacheKey)
+      ? feedPageCache.getEntry(initialCacheKey)?.data
+      : undefined;
+
+  const [feedItems, setFeedItems] = useState<FeedItem[]>(() => seed?.orderedFeedItems ?? []);
+  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(
+    () => seed?.metricsMap ?? new Map()
+  );
+  const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(
+    () => seed?.quotedEventsMap ?? new Map()
+  );
+  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(
+    () => seed?.profilesMap ?? new Map()
+  );
+  const [isLoading, setIsLoading] = useState(() => !seed);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const hasMoreRef = useRef(true);
-  const paginationUntilRef = useRef(0);
-  const paginationOffsetRef = useRef(0);
+  const hasMoreRef = useRef(
+    seed ? seed.paginationUntil > 0 && seed.orderedFeedItems.length > 0 : true
+  );
+  const paginationUntilRef = useRef(seed?.paginationUntil ?? 0);
+  const paginationOffsetRef = useRef(seed?.paginationOffset ?? 0);
   const loadingMoreRef = useRef(false);
-  const feedItemIdsRef = useRef(new Set<string>());
+  const feedItemIdsRef = useRef(
+    new Set<string>(
+      seed
+        ? seed.orderedFeedItems.map((item) =>
+            item.type === 'note' ? item.event.id : item.repostEvent.id
+          )
+        : []
+    )
+  );
   // Tracks the request prefix of the most recently started loadFeed/loadMoreItems
   // — onUpdate callbacks captured by an older request bail out when this drifts.
   const activeLoadIdRef = useRef<string | null>(null);
@@ -226,18 +296,76 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     async (specIndex: number, isRefresh = false) => {
       const spec = feedSpecs[specIndex]?.spec;
       if (!spec) return;
-      if (!isRefresh) setIsLoading(true);
+      const cacheKey = feedPageKey(spec, userPubkey);
+
+      // Applies a page-0 result to state + pagination refs. Used both for the
+      // instant warm-nav paint and for the fresh fetch.
+      const applyPhase1 = (phase1: FeedParseResult) => {
+        paginationUntilRef.current = phase1.paginationUntil;
+        hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
+        paginationOffsetRef.current = phase1.paginationOffset;
+        feedItemIdsRef.current = new Set(
+          phase1.orderedFeedItems.map((item) =>
+            item.type === 'note' ? item.event.id : item.repostEvent.id
+          )
+        );
+        setFeedItems(phase1.orderedFeedItems);
+        setMetricsMap(phase1.metricsMap);
+        setQuotedEventsMap(phase1.quotedEventsMap);
+        setProfilesMap(phase1.profilesMap);
+      };
+
       isFirstRender.current = true;
-      hasMoreRef.current = true;
-      paginationUntilRef.current = 0;
-      paginationOffsetRef.current = 0;
-      feedItemIdsRef.current.clear();
       loadingMoreRef.current = false;
       setIsLoadingMore(false);
 
+      // Warm navigation (key touched earlier this session): paint the cached
+      // page-0 instantly (keeping its pagination cursor). If it's still fresh,
+      // that paint is authoritative and we skip the network entirely; if stale,
+      // we revalidate silently below (no spinner). Cold start / refresh: show
+      // loading, never a stale first paint.
+      let paintedFromCache = false;
+      const cachedEntry =
+        !isRefresh && !feedPageCache.isColdStart(cacheKey)
+          ? feedPageCache.getEntry(cacheKey)
+          : undefined;
+      if (cachedEntry) {
+        applyPhase1(cachedEntry.data);
+        setIsLoading(false);
+        paintedFromCache = true;
+      }
+      if (!paintedFromCache) {
+        if (!isRefresh) {
+          setIsLoading(true);
+          // Cold load for this spec: clear the previous spec's rows so they don't
+          // linger under the spinner. (Replaces the old reset effect, which clobbered
+          // the warm paint on every tab change.) On pull-to-refresh we keep the
+          // current rows visible while the refresh spinner runs.
+          setFeedItems([]);
+          setMetricsMap(new Map());
+          setQuotedEventsMap(new Map());
+          setProfilesMap(new Map());
+        }
+        hasMoreRef.current = true;
+        paginationUntilRef.current = 0;
+        paginationOffsetRef.current = 0;
+        feedItemIdsRef.current.clear();
+      } else if (feedPageCache.isFresh(cachedEntry)) {
+        // Warm + fresh: the instant paint above is complete and authoritative.
+        // Cancel any in-flight load so a slower previous fetch can't overwrite
+        // this paint, then skip the network — no spinner, no request.
+        activeAbortControllerRef.current?.abort();
+        activeAbortControllerRef.current = null;
+        activeLoadIdRef.current = null;
+        requestAnimationFrame(() => {
+          isFirstRender.current = false;
+        });
+        return;
+      }
+
       const { requestId, controller } = beginNetworkLoad();
       const client = getFeedClient();
-      let didApplyPage = false;
+      let didApplyPage = paintedFromCache;
 
       try {
         const phase1 = await client.getFeed({
@@ -250,19 +378,9 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
         if (!isActiveLoad(requestId)) return;
 
-        paginationUntilRef.current = phase1.paginationUntil;
-        hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
-        paginationOffsetRef.current = phase1.paginationOffset;
-        feedItemIdsRef.current = new Set(
-          phase1.orderedFeedItems.map((item) =>
-            item.type === 'note' ? item.event.id : item.repostEvent.id
-          )
-        );
-
-        setFeedItems(phase1.orderedFeedItems);
-        setMetricsMap(phase1.metricsMap);
-        setQuotedEventsMap(phase1.quotedEventsMap);
-        setProfilesMap(phase1.profilesMap);
+        applyPhase1(phase1);
+        feedPageCache.setEntry(cacheKey, phase1, { viewerKey: userPubkey || '' });
+        feedPageCache.markTouched(cacheKey);
         didApplyPage = true;
         setIsLoading(false);
         setIsRefreshing(false);
@@ -327,29 +445,27 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const currentSpec = feedSpecs[activeSpecIndex]?.spec;
   const prevSpecRef = useRef<string | undefined>(undefined);
   const prevPubkeyRef = useRef<string | undefined>(undefined);
+  const prevPreferenceKeyRef = useRef<string | undefined>(undefined);
+  const preferenceKey = `${ignoredPubkeysKey}|${ignoredEventIdsKey}`;
   useEffect(() => {
     if (!currentSpec) return;
-    if (currentSpec === prevSpecRef.current && userPubkey === prevPubkeyRef.current) return;
+    if (
+      currentSpec === prevSpecRef.current &&
+      userPubkey === prevPubkeyRef.current &&
+      preferenceKey === prevPreferenceKeyRef.current
+    )
+      return;
     prevSpecRef.current = currentSpec;
     prevPubkeyRef.current = userPubkey;
+    prevPreferenceKeyRef.current = preferenceKey;
     void loadFeed(activeSpecIndex);
-  }, [activeSpecIndex, currentSpec, userPubkey, loadFeed]);
+  }, [activeSpecIndex, currentSpec, userPubkey, preferenceKey, loadFeed]);
 
   const handleRefresh = useCallback(() => {
     if (!currentSpec || isRefreshing) return;
     setIsRefreshing(true);
     void loadFeed(activeSpecIndex, true);
   }, [activeSpecIndex, currentSpec, isRefreshing, loadFeed]);
-
-  // Reset feed items when the active filter changes
-  const prevActiveSpecIndex = useRef(activeSpecIndex);
-  useEffect(() => {
-    if (prevActiveSpecIndex.current !== activeSpecIndex) {
-      prevActiveSpecIndex.current = activeSpecIndex;
-      setIsLoading(true);
-      setFeedItems([]);
-    }
-  }, [activeSpecIndex]);
 
   // ── Pagination: load older items ──
 
@@ -484,8 +600,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   }, [beginNetworkLoad, currentSpec, isActiveLoad, userPubkey, startTransition]);
 
   const handleEndReached = useCallback(() => {
+    // Don't start pagination while the first page is still loading or a refresh
+    // is in flight — otherwise the footer spinner stacks on top of the
+    // empty-state / refresh spinner (duplicate spinners).
+    if (isLoading || isRefreshing) return;
     void loadMoreItems();
-  }, [loadMoreItems]);
+  }, [loadMoreItems, isLoading, isRefreshing]);
 
   // ── Derived data ──
 
@@ -560,6 +680,44 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       openNext(layout);
     },
     [feedIndicesWithVideo, buildLayoutForVideoIndex]
+  );
+
+  const removeIgnoredItems = useCallback((target: IgnoreTarget) => {
+    setFeedItems((prev) => prev.filter((item) => !feedItemMatchesIgnoreTarget(item, target)));
+  }, []);
+
+  const openPostActions = useCallback(
+    (event: FeedEvent) => {
+      const profile = profilesRef.current.get(event.pubkey);
+      const fallback = tryNpubEncode(event.pubkey).slice(0, 12) + '…';
+      actionMenuPopup({
+        title: 'Post',
+        buttons: [
+          {
+            text: 'Ignore post',
+            icon: 'mdi:eye-off-outline',
+            testID: 'feed-ignore-post',
+            onPress: (close) => {
+              close();
+              ignoreEvent(event.id);
+              removeIgnoredItems({ eventId: event.id });
+            },
+          },
+          {
+            text: 'Ignore person',
+            description: profile?.name ?? fallback,
+            icon: 'mdi:account-cancel-outline',
+            testID: 'feed-ignore-person',
+            onPress: (close) => {
+              close();
+              ignorePubkey(event.pubkey);
+              removeIgnoredItems({ pubkey: event.pubkey });
+            },
+          },
+        ],
+      });
+    },
+    [ignoreEvent, ignorePubkey, profilesRef, removeIgnoredItems]
   );
 
   // ── Render ──
@@ -665,6 +823,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPendingDirection={engagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
+                  onMorePress={() => openPostActions(item.event)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
                   showFooterBorder={false}
@@ -697,6 +856,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                         repostPendingDirection={replyEngagement.repostPendingDirection}
                         onLikePress={() => toggleLikeRef.current(replyEvent)}
                         onRepostPress={() => toggleRepostRef.current(replyEvent)}
+                        onMorePress={() => openPostActions(replyEvent)}
                         getThreadContext={() => getThreadContextRef.current()}
                         showFooterBorder={isLastReply}
                         fullBleedFooterBorder
@@ -733,6 +893,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPendingDirection={rootEngagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(rootEvent)}
                   onRepostPress={() => toggleRepostRef.current(rootEvent)}
+                  onMorePress={() => openPostActions(rootEvent)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current()}
                   showFooterBorder={false}
@@ -758,6 +919,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPendingDirection={engagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
+                  onMorePress={() => openPostActions(item.event)}
                   getThreadContext={() => getThreadContextRef.current()}
                   fullBleedFooterBorder
                 />
@@ -784,6 +946,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             repostPendingDirection={engagement.repostPendingDirection}
             onLikePress={() => toggleLikeRef.current(item.event)}
             onRepostPress={() => toggleRepostRef.current(item.event)}
+            onMorePress={() => openPostActions(item.event)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
             fullBleedFooterBorder
@@ -820,6 +983,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 repostPendingDirection={rootEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(rootEvent)}
                 onRepostPress={() => toggleRepostRef.current(rootEvent)}
+                onMorePress={() => openPostActions(rootEvent)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 showFooterBorder={false}
@@ -839,6 +1003,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 getMetrics={getMetrics}
                 reposterName={row.reposterName ?? ''}
                 reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
+                reposters={row.reposters}
                 liked={repostEngagement.liked}
                 reposted={repostEngagement.reposted}
                 likePending={repostEngagement.likePending}
@@ -847,6 +1012,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 repostPendingDirection={repostEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(originalEvent)}
                 onRepostPress={() => toggleRepostRef.current(originalEvent)}
+                onMorePress={() => openPostActions(originalEvent)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 fullBleedFooterBorder
@@ -868,6 +1034,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           getMetrics={getMetrics}
           reposterName={row.reposterName ?? ''}
           reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
+          reposters={row.reposters}
           liked={repostEngagement.liked}
           reposted={repostEngagement.reposted}
           likePending={repostEngagement.likePending}
@@ -876,6 +1043,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           repostPendingDirection={repostEngagement.repostPendingDirection}
           onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
+          onMorePress={originalEvent ? () => openPostActions(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
           fullBleedFooterBorder
@@ -890,13 +1058,16 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       toggleLikeRef,
       toggleRepostRef,
       getThreadContextRef,
+      openPostActions,
     ]
   );
 
   const refreshTintColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
 
   const pullToAi = usePullToAiRefreshControl({
-    refreshing: isRefreshing,
+    // Suppress the pull-to-refresh spinner during the initial (cold-start) load
+    // so it never stacks on the centered empty-state spinner.
+    refreshing: isRefreshing && !isLoading,
     onRefresh: handleRefresh,
     tintColor: refreshTintColor,
   });
@@ -936,10 +1107,14 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             itemsAreEqual={feedRowsAreEqual}
             recycleItems
             ListEmptyComponent={
-              isLoading ? <ActivityIndicator style={styles.loader} /> : <EmptyFeed />
+              isLoading ? <Spinner size={22} style={styles.loader} /> : <EmptyFeed />
             }
             ListFooterComponent={
-              isLoadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} /> : null
+              // Only show the pagination spinner once there's content — never
+              // alongside the empty-state spinner.
+              isLoadingMore && feedRows.length > 0 ? (
+                <Spinner size={18} style={styles.loadMoreSpinner} />
+              ) : null
             }
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.4}
@@ -966,7 +1141,7 @@ const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 export const DEFAULT_FEED_SPECS: FeedSpec[] = [
   {
     name: FEED_FILTER_FOR_YOU,
-    spec: JSON.stringify({ id: 'global-trending', kind: 'notes', hours: 24 }),
+    spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
   },
   {
     name: FEED_FILTER_FOLLOWING_POPULAR,
@@ -992,9 +1167,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.33)',
   },
   loader: {
+    alignSelf: 'center',
     marginTop: 48,
   },
   loadMoreSpinner: {
+    alignSelf: 'center',
     paddingVertical: 24,
   },
   threadPair: {

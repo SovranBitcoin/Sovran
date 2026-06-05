@@ -43,10 +43,49 @@ export type UserFeedPageRequest = RequestControls & {
   refresh?: boolean;
 };
 
+export type PostsByPubkeysRequest = RequestControls & {
+  pubkeys: string[];
+  limit?: number;
+  until?: number;
+  offset?: number;
+  refresh?: boolean;
+};
+
 export type FeedEnrichmentRequest = RequestControls & {
   missingQuotedIds: string[];
   missingProfilePubkeys: string[];
   refresh?: boolean;
+};
+
+export type FeedNotificationPolicy = 'RELAXED' | 'MODERATE' | 'STRICT';
+export type FeedNotificationReplyScope = 'DIRECT' | 'THREAD';
+export type FeedNotificationTab = 'ALL' | 'MENTIONS';
+
+export type FeedNotificationsRequest = RequestControls & {
+  viewerPubkey: string;
+  tab?: FeedNotificationTab;
+  policy?: FeedNotificationPolicy;
+  replyScope?: FeedNotificationReplyScope;
+  since?: number;
+  until?: number;
+  limit?: number;
+  refresh?: boolean;
+};
+
+export type FeedNotification = {
+  event: FeedEvent;
+  targetEvent?: FeedEvent;
+  targetEventId?: string;
+  reason: string;
+  actorVertexScore: number;
+};
+
+export type FeedNotificationsResult = {
+  notifications: FeedNotification[];
+  profilesMap: Map<string, ProfileInfo>;
+  metricsMap: Map<string, NoteMetrics>;
+  quotedEventsMap: Map<string, FeedEvent>;
+  paginationUntil: number;
 };
 
 export type ThreadSeedBuckets = {
@@ -79,7 +118,10 @@ export type ThreadResult = ThreadSeedBuckets & {
 export interface FeedClient {
   getFeed(request: FeedPageRequest): Promise<FeedParseResult>;
   getUserFeed(request: UserFeedPageRequest): Promise<FeedParseResult>;
+  /** Recent posts authored by an explicit set of pubkeys (search "Posts" tab). */
+  getPostsByPubkeys(request: PostsByPubkeysRequest): Promise<FeedParseResult>;
   enrich(request: FeedEnrichmentRequest): Promise<FeedEnrichmentUpdates>;
+  getNotifications(request: FeedNotificationsRequest): Promise<FeedNotificationsResult>;
   getThread(request: ThreadRequest): Promise<ThreadResult>;
   dispose?(): void;
 }

@@ -24,7 +24,7 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, InteractionManager, ActivityIndicator } from 'react-native';
+import { StyleSheet, InteractionManager } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { seedThread, type ThreadSeed } from '@/features/feed/lib/threadSeedCache';
@@ -32,10 +32,10 @@ import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import {
@@ -119,6 +119,7 @@ export const RepostCard = React.memo(function RepostCard({
   getMetrics,
   reposterName,
   reposterPubkey,
+  reposters,
   feedIndex,
   onOverlayOpenedFromIndex,
   onVideoTap,
@@ -130,6 +131,7 @@ export const RepostCard = React.memo(function RepostCard({
   repostPendingDirection,
   onLikePress,
   onRepostPress,
+  onMorePress,
   skipAnimation,
   getThreadContext,
   showLineAbove = false,
@@ -144,6 +146,7 @@ export const RepostCard = React.memo(function RepostCard({
   getMetrics: (eventId: string) => NoteMetrics;
   reposterName: string;
   reposterPubkey: string;
+  reposters?: Array<{ name: string; pubkey: string }>;
   feedIndex?: number;
   onOverlayOpenedFromIndex?: (index: number) => void;
   onVideoTap?: (url: string) => void;
@@ -155,6 +158,7 @@ export const RepostCard = React.memo(function RepostCard({
   repostPendingDirection?: 'activating' | 'deactivating';
   onLikePress?: () => void;
   onRepostPress?: () => void;
+  onMorePress?: () => void;
   skipAnimation?: boolean;
   getThreadContext?: () => ThreadSeed | null;
   showLineAbove?: boolean;
@@ -183,6 +187,13 @@ export const RepostCard = React.memo(function RepostCard({
   }));
 
   const threadEventId = originalEvent?.id || _repostEvent.id;
+  const primaryReposter = reposters?.[0] ?? { name: reposterName, pubkey: reposterPubkey };
+  const repostHeaderText =
+    reposters && reposters.length > 1
+      ? `${primaryReposter.name} and ${reposters.length - 1} ${
+          reposters.length === 2 ? 'other' : 'others'
+        } reposted`
+      : `${primaryReposter.name} reposted`;
 
   const navigateToThread = useCallback(() => {
     const ctx = getThreadContext?.() ?? null;
@@ -238,7 +249,7 @@ export const RepostCard = React.memo(function RepostCard({
           onPress={() =>
             router.push({
               pathname: '/(user-flow)/profile',
-              params: { pubkey: reposterPubkey },
+              params: { pubkey: primaryReposter.pubkey },
             })
           }>
           <HStack
@@ -247,7 +258,7 @@ export const RepostCard = React.memo(function RepostCard({
             style={{ paddingHorizontal: 16, paddingTop: 10, marginLeft: 36 + 12 }}>
             <Icon name="garden:arrow-retweet-fill-16" size={14} color={opacity(foreground, 0.33)} />
             <Text size={12} semibold style={{ color: opacity(foreground, 0.33) }}>
-              {reposterName} reposted
+              {repostHeaderText}
             </Text>
           </HStack>
         </Pressable>
@@ -271,6 +282,7 @@ export const RepostCard = React.memo(function RepostCard({
             repostPendingDirection={repostPendingDirection}
             onLikePress={onLikePress}
             onRepostPress={onRepostPress}
+            onMorePress={onMorePress}
             onNestedProfilePressIn={suppressThreadTapStart}
             onNestedProfilePressOut={suppressThreadTapEnd}
             getThreadContext={getThreadContext}
@@ -304,20 +316,12 @@ export const RepostCard = React.memo(function RepostCard({
 // ============================================================================
 
 function EmptyFeed() {
-  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
-
   return (
-    <VStack align="center" style={styles.emptyState}>
-      <Icon name="mdi:message-text" size={40} color={defaultColor} />
-      <Spacer size={8} />
-      <Text bold size={16} style={{ color: opacity(foreground, 0.5) }}>
-        No posts yet
-      </Text>
-      <Spacer size={4} />
-      <Text size={13} style={[styles.textAlignCenter, { color: opacity(foreground, 0.33) }]}>
-        {"This user hasn't posted any notes."}
-      </Text>
-    </VStack>
+    <EmptyState
+      icon="mdi:message-text"
+      title="No posts yet"
+      subtitle="This user hasn't posted any notes."
+    />
   );
 }
 
@@ -621,8 +625,11 @@ export function UserFeed({
   }, [pubkey, authorName, authorPicture, isOwnProfile, startTransition]);
 
   const handleEndReached = useCallback(() => {
+    // Defensive: never paginate during the first load (the footer spinner would
+    // otherwise be able to stack on the header/empty spinner).
+    if (isLoading) return;
     void loadMoreItems();
-  }, [loadMoreItems]);
+  }, [loadMoreItems, isLoading]);
 
   const getMetrics = useCallback(
     (noteId: string): NoteMetrics => metricsRef.current.get(noteId) || DEFAULT_METRICS,
@@ -886,6 +893,7 @@ export function UserFeed({
               getMetrics={getMetrics}
               reposterName={row.reposterName ?? displayName}
               reposterPubkey={row.reposterPubkey ?? pubkey}
+              reposters={row.reposters}
               liked={engagement.liked}
               reposted={engagement.reposted}
               likePending={engagement.likePending}
@@ -914,6 +922,7 @@ export function UserFeed({
           getMetrics={getMetrics}
           reposterName={row.reposterName ?? displayName}
           reposterPubkey={row.reposterPubkey ?? pubkey}
+          reposters={row.reposters}
           liked={engagement.liked}
           reposted={engagement.reposted}
           likePending={engagement.likePending}
@@ -946,7 +955,7 @@ export function UserFeed({
           Notes
         </Text>
         {isLoading ? (
-          <ActivityIndicator style={{ marginTop: 32 }} />
+          <Spinner size={22} style={{ marginTop: 32 }} />
         ) : feedItems.length === 0 ? (
           <EmptyFeed />
         ) : null}
@@ -988,7 +997,7 @@ export function UserFeed({
         recycleItems
         ListHeaderComponent={feedHeader}
         ListFooterComponent={
-          isLoadingMore ? <ActivityIndicator style={{ paddingVertical: 24 }} /> : null
+          isLoadingMore ? <Spinner size={18} style={{ paddingVertical: 24 }} /> : null
         }
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}

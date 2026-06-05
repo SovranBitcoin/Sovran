@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, { FadeIn, Easing } from 'react-native-reanimated';
 import { LegendList, type LegendListRenderItemProps } from '@legendapp/list/react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -16,6 +16,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import Icon from 'assets/icons';
 
 import { type FeedEvent, type NoteMetrics, DEFAULT_METRICS } from './nostr/feedTypes';
@@ -590,8 +591,12 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   );
 
   const handleEndReached = useCallback(() => {
+    // Don't start reply pagination while the initial fetch or the skeleton
+    // measurement pass is running — the footer spinner would otherwise overlay
+    // the measurement tree / exit shimmer (duplicate spinners).
+    if (isFetching || isMeasuring) return;
     void loadMoreReplies();
-  }, [loadMoreReplies]);
+  }, [loadMoreReplies, isFetching, isMeasuring]);
 
   if (error && items.length === 0) {
     return (
@@ -633,9 +638,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
             ].join(':')}
             recycleItems
             ListFooterComponent={
-              isLoadingMoreReplies ? (
+              isLoadingMoreReplies && !isMeasuring ? (
                 <View style={styles.hiddenReplyFooter}>
-                  <ActivityIndicator color={opacity(foreground, 0.45)} />
+                  <Spinner size={18} color={opacity(foreground, 0.45)} />
                 </View>
               ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
                 <View style={styles.hiddenReplyFooter}>

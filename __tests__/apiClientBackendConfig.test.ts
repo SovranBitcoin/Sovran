@@ -61,7 +61,7 @@ describe('apiClient backend config routing', () => {
     Reflect.deleteProperty(globalThis, 'fetch');
   });
 
-  it('routes only Nostr score/profile calls through the score API base URL', async () => {
+  it('routes Nostr profile through app-view REST and search through GraphQL', async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test/api/';
     process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL = 'http://localhost:8080/';
 
@@ -74,32 +74,61 @@ describe('apiClient backend config routing', () => {
 
     expect(mockFetch.mock.calls.map(([url]) => url)).toEqual([
       `http://localhost:8080/nostr/profile?pubkey=${PUBKEY}`,
-      'http://localhost:8080/nostr/search?query=jack&limit=10',
+      'http://localhost:8080/graphql',
       'https://api.example.test/api/cashu/mint/audit?mintUrl=https%3A%2F%2Fmint.example.test',
     ]);
+    expect(JSON.parse(mockFetch.mock.calls[1]?.[1]?.body as string)).toMatchObject({
+      operationName: 'ProfileSearch',
+      variables: {
+        input: {
+          query: 'jack',
+          limit: 10,
+          sort: 'globalPagerank',
+        },
+      },
+    });
   });
 
-  it('parses app-view search responses through the existing searchUsers schema', async () => {
+  it('parses GraphQL profile search responses through the existing searchUsers schema', async () => {
     process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL = 'http://localhost:8080/';
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
       statusText: 'OK',
       json: async () => ({
-        query: 'jack',
-        limit: 1,
-        sort: 'globalPagerank',
-        fromCache: true,
-        results: [
-          {
-            pubkey: PUBKEY,
-            npub: 'npub1sg6p7p0ak80lh3ugjjvn9yshrmgr4wldxj547gh4t7dkxutj8mnqalaspq',
-            rank: 0.01,
-            score: null,
-            name: 'jack',
-            picture: 'https://example.test/avatar.png',
+        data: {
+          profileSearch: {
+            query: 'jack',
+            limit: 1,
+            sort: 'globalPagerank',
+            fromCache: true,
+            nodes: [
+              {
+                pubkey: PUBKEY,
+                npub: 'npub1sg6p7p0ak80lh3ugjjvn9yshrmgr4wldxj547gh4t7dkxutj8mnqalaspq',
+                rank: 0.01,
+                score: null,
+                searchRank: 0.2,
+                searchScore: 35,
+                profileScore: null,
+                name: 'jack',
+                displayName: null,
+                picture: 'https://example.test/avatar.png',
+                image: null,
+                banner: null,
+                about: null,
+                nip05: null,
+                nip05Valid: null,
+                website: null,
+                lud16: null,
+                lud06: null,
+                followers: null,
+                follows: null,
+                createdAt: '2026-06-01T12:00:00Z',
+              },
+            ],
           },
-        ],
+        },
       }),
     });
 
@@ -114,7 +143,9 @@ describe('apiClient backend config routing', () => {
         pubkey: PUBKEY,
         score: null,
         name: 'jack',
+        created_at: 1780315200,
       });
+      expect(result.value.results[0]).not.toHaveProperty('displayName');
     }
   });
 
