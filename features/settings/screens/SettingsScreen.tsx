@@ -20,6 +20,8 @@ import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'h
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { AVATAR_FALLBACK_VARIANT_LABELS } from '@/shared/lib/avatarFallback';
+import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
+import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -133,6 +135,7 @@ export const SettingsScreen = () => {
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
   const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
+  const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -181,6 +184,12 @@ export const SettingsScreen = () => {
               href="/(settings-flow)/avatar"
               title="Avatar fallback"
               description={AVATAR_FALLBACK_VARIANT_LABELS[avatarFallbackVariant]}
+            />
+            <Separator className="mx-4" />
+            <SettingsListLinkItem
+              href="/(settings-flow)/notification-policy"
+              title="Notifications"
+              description={notificationPolicyLabel(notificationPolicy)}
             />
           </ListGroup>
         </Section>

@@ -11,7 +11,7 @@ export const unstable_settings = {
   initialRouteName: 'index',
 };
 
-type TabName = 'feed' | 'index' | 'contacts' | 'ai';
+type TabName = 'feed' | 'index' | 'contacts' | 'notifications' | 'ai';
 
 type TabDef = {
   name: TabName;
@@ -30,16 +30,22 @@ const TAB_DEFS: readonly TabDef[] = [
     monicon: { default: 'mingcute:home-4-line', selected: 'mingcute:home-4-fill' },
   },
   {
+    name: 'contacts',
+    title: 'Contacts',
+    sf: { default: 'person.2', selected: 'person.2.fill' },
+    monicon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
+  },
+  {
     name: 'index',
     title: 'Wallet',
     sf: { default: 'wallet.bifold', selected: 'wallet.bifold' },
     monicon: { default: 'fluent:wallet-20-regular', selected: 'fluent:wallet-20-filled' },
   },
   {
-    name: 'contacts',
-    title: 'Contacts',
-    sf: { default: 'person.2', selected: 'person.2.fill' },
-    monicon: { default: 'mdi:account-group-outline', selected: 'mdi:account-group' },
+    name: 'notifications',
+    title: 'Notifications',
+    sf: { default: 'bell', selected: 'bell.fill' },
+    monicon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },
   },
   {
     name: 'ai',
@@ -56,6 +62,7 @@ export default function TabLayout() {
       <BackgroundProvider>
         <View style={{ flex: 1 }}>
           <Expo55NativeTabs
+            labelVisibilityMode="unlabeled"
             labelStyle={{
               color: Platform.select({
                 ios: DynamicColorIOS({
@@ -73,8 +80,8 @@ export default function TabLayout() {
             disableTransparentOnScrollEdge>
             {TAB_DEFS.map((tab) => (
               <Expo55NativeTabs.Trigger key={tab.name} name={tab.name}>
+                <Expo55NativeTabs.Trigger.Label hidden />
                 <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
-                <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
               </Expo55NativeTabs.Trigger>
             ))}
           </Expo55NativeTabs>
@@ -97,6 +104,8 @@ export default function TabLayout() {
               name={tab.name}
               options={{
                 title: tab.title,
+                tabBarAccessibilityLabel: tab.title,
+                tabBarShowLabel: false,
                 tabBarIcon: ({ focused, color }) => (
                   <Icon
                     name={focused ? tab.monicon.selected : tab.monicon.default}

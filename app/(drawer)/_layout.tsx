@@ -25,6 +25,7 @@ type MenuRoute =
   | '/(drawer)/(tabs)/feed'
   | '/(drawer)/(tabs)/index'
   | '/(drawer)/(tabs)/contacts'
+  | '/(drawer)/(tabs)/notifications'
   | '/(drawer)/(tabs)/ai'
   | '/(settings-flow)';
 
@@ -59,6 +60,12 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'Contacts',
     route: '/(drawer)/(tabs)/contacts',
     activeSegments: ['(drawer)', '(tabs)', 'contacts'],
+  },
+  {
+    icon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },
+    label: 'Notifications',
+    route: '/(drawer)/(tabs)/notifications',
+    activeSegments: ['(drawer)', '(tabs)', 'notifications'],
   },
   {
     icon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },

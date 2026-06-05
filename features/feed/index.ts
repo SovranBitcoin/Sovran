@@ -1,6 +1,8 @@
 // feed feature barrel
 
 export { FeedScreen } from './screens/FeedScreen';
+export { NotificationFollowersScreen } from './screens/NotificationFollowersScreen';
+export { NotificationsScreen } from './screens/NotificationsScreen';
 export { ThreadScreen } from './screens/ThreadScreen';
 export { StoriesScreen } from './screens/StoriesScreen';
 export { HomeFeed } from './components/HomeFeed';
