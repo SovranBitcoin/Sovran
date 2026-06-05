@@ -10,17 +10,23 @@ export type TagFilterInput = {
   key: string;
   value?: string;
   values?: string[];
+  excludeValues?: string[];
+  dataset?: 'TAGS' | 'DERIVED_TAGS' | string;
 };
 
 export type EventQueryInput = {
   ids?: string[];
   pubkeys?: string[];
+  excludeIds?: string[];
+  excludePubkeys?: string[];
   kinds?: number[];
   tags?: TagFilterInput[];
+  search?: string;
   since?: number;
   until?: number;
   limit?: number;
   offset?: number;
+  shuffle?: ShuffleInput;
   pubkeysFrom?: unknown[];
 };
 
@@ -35,6 +41,7 @@ export type WeightedRankTermInput = {
     fallback?: number;
   };
   candidateField?: 'CREATED_AT' | string;
+  derivedMetric?: string;
   weight?: number;
   transform?: 'IDENTITY' | 'LOG1P' | 'RECENCY_HALFLIFE' | string;
   halfLifeSeconds?: number;
@@ -108,6 +115,13 @@ export function recencyTerm(weight = 1.2, halfLifeSeconds = 86_400): WeightedRan
     candidateField: 'CREATED_AT',
     transform: 'RECENCY_HALFLIFE',
     halfLifeSeconds,
+    weight,
+  };
+}
+
+export function contributionQualityTerm(weight = 3): WeightedRankTermInput {
+  return {
+    derivedMetric: 'contribution_quality',
     weight,
   };
 }
