@@ -1,5 +1,11 @@
 import type { ReferenceRankInput, ShuffleInput } from './rank';
-import { engagementRankTerms, recencyTerm, vertexAuthorScoreTerm, viewerFollowBoost } from './rank';
+import {
+  contributionQualityTerm,
+  engagementRankTerms,
+  recencyTerm,
+  vertexAuthorScoreTerm,
+  viewerFollowBoost,
+} from './rank';
 
 export type ThreadReplySort = 'relevant' | 'new' | 'likes' | 'zaps' | 'reposts';
 
@@ -31,7 +37,7 @@ export function authoredReplyChainInput(
     via: { key: 'e' },
     target: 'EVENT_ID',
     maxDepth: options.maxDepth ?? 8,
-    maxBranchFanout: options.maxBranchFanout ?? 50,
+    maxBranchFanout: options.maxBranchFanout ?? 32,
   };
 }
 
@@ -67,7 +73,12 @@ export function threadReplyRankInput(
     references: { kinds: [7], limit: 500 },
     via: { key: 'e' },
     metric: { name: 'likes', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
-    terms: [...engagementRankTerms(), vertexAuthorScoreTerm(0.25), recencyTerm(0.8)],
+    terms: [
+      contributionQualityTerm(3),
+      ...engagementRankTerms(),
+      vertexAuthorScoreTerm(0.25),
+      recencyTerm(0.8),
+    ],
     candidatePubkeyBoosts: options.viewerPubkey ? [viewerFollowBoost(options.viewerPubkey)] : undefined,
     shuffle: options.shuffle,
   };

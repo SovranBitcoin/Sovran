@@ -11,9 +11,10 @@ export type ReplyGraphNode<TNode> = {
 };
 
 export type ReplyGraphMapper<TNode> = (node: TNode | null | undefined) => ReplyGraphEvent | undefined;
+export type ReplyGraphChildrenMapper<TNode> = (node: TNode) => readonly TNode[];
 
 export function directReplyParentId(event: ReplyGraphEvent): string | undefined {
-  const eTags = event.tags.filter((tag) => tag[0] === 'e' && typeof tag[1] === 'string' && tag[1].length === 64);
+  const eTags = event.tags.filter((tag) => tag[0] === 'e' && typeof tag[1] === 'string');
   const replyMarker = eTags.find((tag) => tag[3] === 'reply');
   if (replyMarker?.[1]) return replyMarker[1];
   const rootMarker = eTags.find((tag) => tag[3] === 'root');
@@ -27,11 +28,13 @@ export function selectAuthorThreadChain<TNode>(input: {
   sourceEvent?: ReplyGraphEvent;
   authorNodes: readonly TNode[];
   toEvent: ReplyGraphMapper<TNode>;
+  childAuthorNodesFor?: ReplyGraphChildrenMapper<TNode>;
 }): TNode[] {
   if (!input.sourceEvent) return [];
-  const pairs = nodeEventPairs(input.authorNodes, input.toEvent).filter(
-    ({ event }) => event.pubkey === input.sourceEvent?.pubkey
-  );
+  const pairs = nodeEventPairs(
+    collectNestedReplyNodes(input.authorNodes, input.childAuthorNodesFor, input.toEvent),
+    input.toEvent
+  ).filter(({ event }) => event.pubkey === input.sourceEvent?.pubkey);
   const childrenByParent = new Map<string, Array<ReplyGraphNode<TNode>>>();
   for (const pair of pairs) {
     const parentId = directReplyParentId(pair.event);
@@ -58,10 +61,14 @@ export function selectFollowedTailReply<TNode>(input: {
   authorChain: readonly TNode[];
   followedNodes: readonly TNode[];
   toEvent: ReplyGraphMapper<TNode>;
+  childFollowedNodesFor?: ReplyGraphChildrenMapper<TNode>;
 }): TNode | undefined {
   const tail = input.toEvent(input.authorChain[input.authorChain.length - 1]) ?? input.sourceEvent;
   if (!tail) return undefined;
-  return nodeEventPairs(input.followedNodes, input.toEvent).find(
+  const nestedFollowedNodes = input.authorChain.flatMap((node) =>
+    input.childFollowedNodesFor?.(node) ?? []
+  );
+  return nodeEventPairs([...input.followedNodes, ...nestedFollowedNodes], input.toEvent).find(
     ({ event }) => directReplyParentId(event) === tail.id
   )?.node;
 }
@@ -76,6 +83,8 @@ export function mergeRelevantReplyNodes<TNode>(input: {
   offset?: number;
   limit?: number;
   toEvent: ReplyGraphMapper<TNode>;
+  childAuthorNodesFor?: ReplyGraphChildrenMapper<TNode>;
+  childFollowedNodesFor?: ReplyGraphChildrenMapper<TNode>;
 }): { nodes: TNode[]; pageNodes: TNode[]; authorChainIds: string[] } {
   const sourceEvent = input.sourceEvent ?? input.toEvent(input.sourceNode);
   const merged: TNode[] = [];
@@ -90,6 +99,7 @@ export function mergeRelevantReplyNodes<TNode>(input: {
     sourceEvent,
     authorNodes: input.authorNodes ?? [],
     toEvent: input.toEvent,
+    childAuthorNodesFor: input.childAuthorNodesFor,
   });
   for (const node of authorChain) append(node);
   append(
@@ -98,6 +108,7 @@ export function mergeRelevantReplyNodes<TNode>(input: {
       authorChain,
       followedNodes: input.followedNodes ?? [],
       toEvent: input.toEvent,
+      childFollowedNodesFor: input.childFollowedNodesFor,
     })
   );
   for (const node of input.rankedNodes ?? []) append(node);
@@ -121,6 +132,26 @@ function nodeEventPairs<TNode>(
     const event = toEvent(node);
     return event ? [{ node, event }] : [];
   });
+}
+
+function collectNestedReplyNodes<TNode>(
+  roots: readonly TNode[],
+  childNodesFor: ReplyGraphChildrenMapper<TNode> | undefined,
+  toEvent: ReplyGraphMapper<TNode>
+): TNode[] {
+  if (!childNodesFor) return [...roots];
+  const out: TNode[] = [];
+  const seen = new Set<string>();
+  const visit = (node: TNode | undefined): void => {
+    if (!node) return;
+    const key = toEvent(node)?.id ?? `node:${out.length}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(node);
+    for (const child of childNodesFor(node)) visit(child);
+  };
+  for (const root of roots) visit(root);
+  return out;
 }
 
 function bestChild<TNode>(
