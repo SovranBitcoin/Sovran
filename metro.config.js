@@ -28,6 +28,11 @@ const localColadaPath = path.resolve(__dirname, '..', 'colada');
 const localColadaEntryPath = path.join(localColadaPath, 'src', 'index.ts');
 const localColadaReactEntryPath = path.join(localColadaPath, 'src', 'react', 'index.ts');
 const localColadaOperationsEntryPath = path.join(localColadaPath, 'src', 'operations', 'index.ts');
+const localNaggTsPath = path.resolve(__dirname, '..', 'nagg-ts');
+const localNaggTsEntryPath = path.join(localNaggTsPath, 'src', 'index.ts');
+const localNaggTsMapEntryPath = path.join(localNaggTsPath, 'src', 'map', 'index.ts');
+const localNaggTsRecipesEntryPath = path.join(localNaggTsPath, 'src', 'recipes', 'index.ts');
+const localNaggTsSchemasEntryPath = path.join(localNaggTsPath, 'src', 'schemas.ts');
 const localP2PKImportPluginPath = path.resolve(__dirname, '..', 'coco-p2pk-plugin-helper');
 const localP2PKImportPluginEntryPath = path.join(localP2PKImportPluginPath, 'src', 'index.ts');
 // Pin React singleton entry points for sibling packages, but let `react-native`
@@ -43,6 +48,7 @@ const appReactEntryPaths = Object.fromEntries(
 const existingSiblingPackagePaths = [
   sovranSchemasPath,
   localColadaPath,
+  localNaggTsPath,
   localP2PKImportPluginPath,
 ].filter(fs.existsSync);
 const localPackageEntryPaths = {
@@ -52,6 +58,14 @@ const localPackageEntryPaths = {
     : {}),
   ...(fs.existsSync(localColadaOperationsEntryPath)
     ? { 'colada/operations': localColadaOperationsEntryPath }
+    : {}),
+  ...(fs.existsSync(localNaggTsEntryPath) ? { 'nagg-ts': localNaggTsEntryPath } : {}),
+  ...(fs.existsSync(localNaggTsMapEntryPath) ? { 'nagg-ts/map': localNaggTsMapEntryPath } : {}),
+  ...(fs.existsSync(localNaggTsRecipesEntryPath)
+    ? { 'nagg-ts/recipes': localNaggTsRecipesEntryPath }
+    : {}),
+  ...(fs.existsSync(localNaggTsSchemasEntryPath)
+    ? { 'nagg-ts/schemas': localNaggTsSchemasEntryPath }
     : {}),
   ...(fs.existsSync(localP2PKImportPluginEntryPath)
     ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginEntryPath }
@@ -71,6 +85,7 @@ config.resolver = {
     'react-native': path.resolve(appNodeModules, 'react-native'),
     ...appCocoPackages,
     ...(fs.existsSync(localColadaPath) ? { colada: localColadaPath } : {}),
+    ...(fs.existsSync(localNaggTsPath) ? { 'nagg-ts': localNaggTsPath } : {}),
     ...(fs.existsSync(localP2PKImportPluginPath)
       ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginPath }
       : {}),

@@ -132,6 +132,7 @@
     "intl": "^1.2.5",
     "liquid-glass-text": "file:./modules/liquid-glass-text",
     "lodash": "^4.17.21",
+    "nagg-ts": "file:../nagg-ts",
     "neverthrow": "^8.2.0",
     "nostr-tools": "^2.10.4",
     "npubcash-sdk": "^0.3.2",
