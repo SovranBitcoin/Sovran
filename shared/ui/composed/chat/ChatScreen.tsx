@@ -89,6 +89,13 @@ interface ChatScreenProps {
   counterpartyAvatar?: React.ReactNode | null;
   historyExtras?: (last: ChatBubbleMessage | undefined) => Record<string, unknown>;
   kbStateExtras?: () => Record<string, unknown>;
+  /**
+   * Fired when the user scrolls to the START (top) of the history — used to
+   * load older messages (server-paginated threads). `maintainVisibleContentPosition`
+   * already keeps the viewport anchored when older bubbles prepend.
+   */
+  onStartReached?: () => void;
+  onStartReachedThreshold?: number;
 }
 
 /** Hint for LegendList's virtualization math. Real bubble heights are
@@ -142,6 +149,8 @@ export function ChatScreen({
   counterpartyAvatar,
   historyExtras,
   kbStateExtras,
+  onStartReached,
+  onStartReachedThreshold,
 }: ChatScreenProps) {
   const headerHeight = useHeaderHeight();
   const safeAreaInsets = useSafeAreaInsets();
@@ -378,6 +387,8 @@ export function ChatScreen({
                 maintainScrollAtEnd
                 maintainScrollAtEndThreshold={0.1}
                 maintainVisibleContentPosition
+                onStartReached={onStartReached}
+                onStartReachedThreshold={onStartReachedThreshold}
                 recycleItems
                 contentContainerStyle={listContentContainerStyle}
               />

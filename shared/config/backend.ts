@@ -23,6 +23,9 @@ const BackendEnv = z.object({
   EXPO_PUBLIC_API_BASE_URL: RequiredUrl(DEFAULT_API_BASE_URL),
   EXPO_PUBLIC_SCORE_API_BASE_URL: OptionalUrl,
   EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: OptionalUrl,
+  // Flip the contacts/DM-list fetch from GraphQL `dmEnvelopes` to the dedicated
+  // REST app-view `/nostr/dm/envelopes` once it's deployed. Defaults to GraphQL.
+  EXPO_PUBLIC_NOSTR_DM_APPVIEW: z.preprocess(emptyStringToUndefined, z.string().optional()),
 });
 
 type BackendEnvInput = Partial<Record<keyof z.input<typeof BackendEnv>, string | undefined>>;
@@ -32,6 +35,8 @@ type BackendConfig = {
   apiBaseUrl: string;
   scoreApiBaseUrl: string;
   nostrGraphqlEndpoint: string;
+  /** Prefer the REST app-view `/nostr/dm/envelopes` for the contacts/DM list. */
+  nostrDmAppView: boolean;
 };
 
 function readBackendEnv(): BackendEnvInput {
@@ -41,6 +46,7 @@ function readBackendEnv(): BackendEnvInput {
     EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
     EXPO_PUBLIC_SCORE_API_BASE_URL: process.env.EXPO_PUBLIC_SCORE_API_BASE_URL,
     EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT: process.env.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT,
+    EXPO_PUBLIC_NOSTR_DM_APPVIEW: process.env.EXPO_PUBLIC_NOSTR_DM_APPVIEW,
   };
 }
 
@@ -63,6 +69,7 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     scoreApiBaseUrl: parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl,
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
+    nostrDmAppView: parsed.data.EXPO_PUBLIC_NOSTR_DM_APPVIEW === 'true',
   };
 }
 

@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { searchUsers as apiSearchUsers, type NostrSearchResult } from '@/shared/lib/apiClient';
-import { paymentLog } from '@/shared/lib/logger';
-import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStore';
+import { paymentLog, redactError } from '@/shared/lib/logger';
 import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 
 interface SearchResultData {
@@ -30,7 +29,6 @@ const SEARCH_DEBOUNCE_MS = 250;
 export const CONTACT_SEARCH_MIN_LENGTH = 3;
 
 export function useContactSearch(searchQuery: string) {
-  const addSearchToHistory = useSearchHistoryStore((state) => state.addSearch);
   const seedFromSearchResults = useNostrMetadataCache((s) => s.seedFromSearchResults);
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
@@ -89,19 +87,22 @@ export function useContactSearch(searchQuery: string) {
             setSearchResults(formatted);
             if (formatted.length > 0) {
               seedFromSearchResults(formatted);
-              addSearchToHistory(debouncedQuery, 'payments');
             }
           } else {
             setSearchResults([]);
           }
         } else {
+          paymentLog.warn('payment.contacts.search.failed', {
+            query: debouncedQuery,
+            error: redactError(result.error),
+          });
           setSearchResults([]);
         }
       } catch (err) {
         if (controller.signal.aborted) return;
         paymentLog.error('payment.contacts.search.error', {
           query: debouncedQuery,
-          error: err instanceof Error ? err : new Error(String(err)),
+          error: redactError(err),
         });
         setSearchResults([]);
       } finally {
@@ -111,7 +112,7 @@ export function useContactSearch(searchQuery: string) {
 
     void search();
     return () => controller.abort();
-  }, [debouncedQuery, addSearchToHistory, seedFromSearchResults]);
+  }, [debouncedQuery, seedFromSearchResults]);
 
   // Stale-while-revalidate: once the first response has landed we keep
   // showing those results while the next query is in flight. Skeletons

@@ -2,7 +2,6 @@ import React, { createContext, useEffect, useMemo, useRef, useState, ReactNode }
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from '@/shared/ndk';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
-import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { useInitializationStage } from './InitializationProvider';
 import { useNostrKeysContext } from './NostrKeysProvider';
 import { initLog, initPhaseSync, nostrLog, useInitMount } from '@/shared/lib/logger';
@@ -46,13 +45,12 @@ export function NostrNDKProvider({
     blocking: false,
   });
 
-  // Hydrate ahead of NDK init — the unwrap useMemo in UserMessagesScreen
-  // reads the cache synchronously, so a late hydration would race the
-  // first mount and force every wrap to re-decrypt.
+  // Hydrate the NIP-17 unwrap cache ahead of NDK init — the DM thread/contacts
+  // decrypt path reads it synchronously, so a late hydration would race the
+  // first fetch and force every wrap to re-decrypt.
   useEffect(() => {
     if (!nostrKeys?.pubkey) return;
     void giftWrapCache.cache.hydrate(nostrKeys.pubkey);
-    void nip04Cache.hydrate(nostrKeys.pubkey);
   }, [nostrKeys?.pubkey]);
 
   useEffect(() => {

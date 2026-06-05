@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 import type { Mint } from '@cashu/coco-core';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { paymentLog } from '@/shared/lib/logger';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { prefetchImages } from '@/shared/lib/imageCache';
-import { decryptNip04Events } from '../lib/decryptNip04Events';
+import type { DmConversation } from './useDmConversations';
 
 interface NostrKeys {
   pubkey?: string;
@@ -22,19 +21,20 @@ export interface MintContact {
   pubkey: string | null;
   mint: Mint;
   mintInfo: GetInfoResponse;
-  dmEvent: NDKEvent | { content: string } | undefined;
+  dmEvent: { content: string } | undefined;
   timestamp: number;
 }
 
 export function useMintContacts(
-  nostrKeys: NostrKeys | null,
+  _nostrKeys: NostrKeys | null,
   mints: Mint[],
   getMintInfo: (url: string) => Promise<GetInfoResponse>,
-  dmEvents: NDKEvent[] | null | undefined
+  // NIP-17 conversations (already decrypted + bucketed by counterparty) supply the
+  // mint's last-DM preview. Replaces the legacy kind-4 relay events.
+  conversations?: DmConversation[]
 ) {
   const [mintsWithInfo, setMintsWithInfo] = useState<MintWithInfo[]>([]);
   const [mintInfoLoading, setMintInfoLoading] = useState(false);
-  const [decryptedMints, setDecryptedMints] = useState<MintContact[]>([]);
 
   // Coco's mint:* event cascade replaces the `mints` array reference on every
   // event (mint:added / mint:updated / mint:trusted / mint:untrusted), even
@@ -110,34 +110,12 @@ export function useMintContacts(
     void prefetchImages(mintsWithInfo.map(({ mintInfo }) => mintInfo?.icon_url));
   }, [mintsWithInfo]);
 
-  // NDK's useSubscribe returns a fresh `dmEvents` array reference on every
-  // relay flush even when the event-id set is unchanged. Key the metadata
-  // memo on the sorted id-set so unchanged relay output does not cascade
-  // into a fresh decryption pass downstream.
-  const dmEventsKey = useMemo(
-    () =>
-      dmEvents
-        ?.map((e) => e.id)
-        .sort()
-        .join(',') ?? '',
-    [dmEvents]
-  );
-
-  // Build mints with most recent DM metadata
-  const mintsWithMetadata = useMemo<MintContact[]>(() => {
-    const dmMap = new Map<string, NDKEvent>();
-    dmEvents?.forEach((event) => {
-      const otherPubkey =
-        event.pubkey === nostrKeys?.pubkey
-          ? event.tags.find((tag) => tag[0] === 'p')?.[1]
-          : event.pubkey;
-      if (!otherPubkey) return;
-
-      const existing = dmMap.get(otherPubkey);
-      if (!existing || (event.created_at && event.created_at > (existing.created_at ?? 0))) {
-        dmMap.set(otherPubkey, event);
-      }
-    });
+  // Resolve each mint's nostr contact pubkey and attach its latest NIP-17 DM
+  // preview (if any). Conversations are already decrypted, so there's no
+  // per-mint decryption pass anymore.
+  const displayMints = useMemo<MintContact[]>(() => {
+    const dmByPubkey = new Map<string, DmConversation>();
+    for (const c of conversations ?? []) dmByPubkey.set(c.counterparty, c);
 
     return mintsWithInfo.map(({ mint, mintInfo }) => {
       let mintPubkey: string | null = null;
@@ -153,68 +131,21 @@ export function useMintContacts(
         }
       }
 
-      const dmEvent = mintPubkey ? dmMap.get(mintPubkey) : undefined;
+      const convo = mintPubkey ? dmByPubkey.get(mintPubkey) : undefined;
       return {
         type: 'mint',
         pubkey: mintPubkey,
         mint,
         mintInfo,
-        dmEvent,
-        timestamp: dmEvent?.created_at ?? 0,
+        dmEvent: convo ? { content: convo.lastMessagePreview } : undefined,
+        timestamp: convo?.lastMessageAt ?? 0,
       };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mintsWithInfo, dmEventsKey, nostrKeys?.pubkey]);
-
-  // Decrypt mint DM events
-  useEffect(() => {
-    let cancelled = false;
-
-    const run = async () => {
-      if (!mintsWithMetadata.length || !nostrKeys?.pubkey || !nostrKeys?.privateKey) {
-        setDecryptedMints([]);
-        return;
-      }
-      try {
-        const results = await decryptNip04Events(mintsWithMetadata, {
-          privateKey: nostrKeys.privateKey,
-          recipientPubkey: nostrKeys.pubkey,
-        });
-        paymentLog.debug('payment.mint.contacts.decrypt', { decryptedCount: results.length });
-        if (!cancelled) setDecryptedMints(results);
-      } catch (err) {
-        paymentLog.error('payment.mint.contacts.decrypt.error', {
-          error: err instanceof Error ? err : new Error(String(err)),
-        });
-        if (!cancelled) setDecryptedMints(mintsWithMetadata);
-      }
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [mintsWithMetadata, nostrKeys?.pubkey, nostrKeys?.privateKey]);
-
-  // Merge display mints
-  const displayMints = useMemo<MintContact[]>(() => {
-    const decryptedByKey = new Map<string, MintContact>();
-    decryptedMints.forEach((m) => {
-      const key = m.pubkey || m.mint?.mintUrl;
-      if (key) decryptedByKey.set(key, m);
-    });
-
-    return mintsWithMetadata.map((m) => {
-      const key = m.pubkey || m.mint?.mintUrl;
-      const decrypted = key ? decryptedByKey.get(key) : undefined;
-      if (decrypted) return decrypted;
-      return { ...m, dmEvent: undefined };
-    });
-  }, [decryptedMints, mintsWithMetadata]);
+  }, [mintsWithInfo, conversations]);
 
   const mintPubkeys = useMemo(
-    () => mintsWithMetadata.map((m) => m.pubkey).filter((p): p is string => !!p),
-    [mintsWithMetadata]
+    () => displayMints.map((m) => m.pubkey).filter((p): p is string => !!p),
+    [displayMints]
   );
 
   return { displayMints, mintPubkeys, mintInfoLoading };

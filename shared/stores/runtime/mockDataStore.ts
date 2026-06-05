@@ -30,7 +30,7 @@ import { amountToNumber, toCocoAmount } from '@/shared/lib/cashu/amount';
 import type { HistoryEntry } from '@cashu/coco-core';
 // Type-only import — `useRecentContacts` does not import this file at runtime
 // (it reads mock state via getMockState() below), so there's no cycle.
-import type { RecentContact } from '@/features/payments/hooks/useRecentContacts';
+import type { RecentContact } from '@/features/payments/hooks/useNip17RecentContacts';
 
 // ---------------------------------------------------------------------------
 // Demo row definition — single source of truth for all mock data.
