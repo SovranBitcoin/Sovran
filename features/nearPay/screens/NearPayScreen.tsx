@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
 import { router, Stack } from 'expo-router';
 import type { BLEPeer } from 'bitchat-module';
-import { Switch as HeroSwitch } from 'heroui-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -23,16 +22,10 @@ import { usePaymentFlowMachine } from 'colada/react';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
-import {
-  getMockBLEPeerProfile,
-  MOCK_BLE_PEER_PROFILES,
-  type MockBLEPeerProfile,
-} from '@/features/bitchat/lib/mockBLEPeers';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, useLifecycleLogger, useRenderLogger } from '@/shared/lib/logger';
-import { prefetchImages } from '@/shared/lib/imageCache';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -44,7 +37,6 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { alpha, duration, iconSize, spacing, zIndex } from '@/shared/styles/tokens';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   buildPeerLayoutTargets,
   getPeerLayoutOverviewTransform,
@@ -105,13 +97,6 @@ const AMOUNT_CONTENT_PREWARM_MS = 120;
 const AMOUNT_PANEL_SHIFT_MAX_X = 80;
 const AMOUNT_PANEL_SHIFT_MAX_Y = 190;
 const AMOUNT_CONTENT_ENTER_OFFSET = spacing.sm;
-type MockBLEPeerProfileWithPicture = MockBLEPeerProfile & { picture: string };
-const MOCK_BLE_PEER_AVATAR_PRELOAD_PROFILES = MOCK_BLE_PEER_PROFILES.filter(
-  (profile): profile is MockBLEPeerProfileWithPicture => !!profile.picture
-);
-const MOCK_BLE_PEER_AVATAR_PRELOAD_URLS = MOCK_BLE_PEER_AVATAR_PRELOAD_PROFILES.map(
-  (profile) => profile.picture
-);
 const AMOUNT_CONTENT_ENTER_TIMING = {
   duration: duration.standard,
   easing: Easing.out(Easing.cubic),
@@ -206,8 +191,6 @@ function peerDisplayName(peer: BLEPeer): string {
 }
 
 function toLayoutPeer(peer: BLEPeer): NearPayLayoutPeer {
-  const mockProfile = getMockBLEPeerProfile(peer.peerID);
-
   return {
     peerID: peer.peerID,
     nickname: peer.nickname,
@@ -215,7 +198,7 @@ function toLayoutPeer(peer: BLEPeer): NearPayLayoutPeer {
     hasDirectLink: peer.hasDirectLink,
     lastSeen: peer.lastSeen,
     name: peerDisplayName(peer),
-    avatarUrl: mockProfile?.picture ?? null,
+    avatarUrl: null,
   };
 }
 
@@ -250,65 +233,6 @@ const HeaderBadge = React.memo(function HeaderBadge({
         ) : null}
       </View>
     </Pressable>
-  );
-});
-
-const HeaderMockModeToggle = React.memo(function HeaderMockModeToggle() {
-  const mockMode = useSettingsStore((state) => state.mockMode);
-  const setMockMode = useSettingsStore((state) => state.setMockMode);
-  const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
-  const labelStyle = useMemo(
-    () => [styles.headerMockModeLabel, { color: foreground }],
-    [foreground]
-  );
-  const handleSelectedChange = useCallback(
-    (isSelected: boolean) => {
-      setMockMode(isSelected);
-    },
-    [setMockMode]
-  );
-
-  return (
-    <HStack align="center" gap={spacing.xs} style={styles.headerMockModeToggle}>
-      <Text size={11} weight="bold" style={labelStyle}>
-        Mock
-      </Text>
-      <HeroSwitch
-        isSelected={mockMode}
-        onSelectedChange={handleSelectedChange}
-        accessibilityLabel="Mock Mode"
-      />
-    </HStack>
-  );
-});
-
-const MockPeerAvatarPreloader = React.memo(function MockPeerAvatarPreloader({
-  profiles,
-}: {
-  profiles: readonly MockBLEPeerProfileWithPicture[];
-}) {
-  if (profiles.length === 0) return null;
-
-  return (
-    <View
-      pointerEvents="none"
-      accessible={false}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      collapsable={false}
-      style={styles.mockAvatarPreloader}>
-      {profiles.map((profile) => (
-        <Avatar
-          key={profile.peerID}
-          state="image"
-          picture={profile.picture}
-          size={AVATAR_SIZE}
-          name={profile.nickname}
-          seed={profile.peerID}
-          alt=""
-        />
-      ))}
-    </View>
   );
 });
 
@@ -1328,7 +1252,6 @@ export function NearPayScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   const { peers } = useBLEPeers();
-  const mockMode = useSettingsStore((state) => state.mockMode);
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
   const inlineAmountEntry = nearPaySession?.amountEntry ?? null;
@@ -1381,16 +1304,10 @@ export function NearPayScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!mockMode) return;
-    void prefetchImages(MOCK_BLE_PEER_AVATAR_PRELOAD_URLS);
-  }, [mockMode]);
-
   const activeRecipientPeer = useMemo<NearPayLayoutPeer | null>(() => {
     const recipient = nearPaySession?.recipient;
     if (!recipient) return null;
     if (selectedPeer?.peerID === recipient.peerID) return selectedPeer;
-    const mockProfile = getMockBLEPeerProfile(recipient.peerID);
     return {
       peerID: recipient.peerID,
       nickname: recipient.nickname,
@@ -1398,7 +1315,7 @@ export function NearPayScreen() {
       isConnected: true,
       hasDirectLink: recipient.hasDirectLink,
       lastSeen: recipient.lastSeen,
-      avatarUrl: mockProfile?.picture ?? null,
+      avatarUrl: null,
     };
   }, [nearPaySession?.recipient, selectedPeer]);
 
@@ -1827,7 +1744,6 @@ export function NearPayScreen() {
     ),
     [foreground, resetToPicker]
   );
-  const renderMockModeHeaderLeft = useCallback(() => <HeaderMockModeToggle />, []);
   const renderEmptyHeader = useCallback(() => null, []);
   const openPeerList = useCallback(() => {
     router.push('/(send-flow)/nearPayPeers');
@@ -1843,10 +1759,10 @@ export function NearPayScreen() {
       headerTransparent: true,
       headerTitle: amountActive ? renderEmptyHeader : undefined,
       headerBackVisible: false,
-      headerLeft: amountActive ? renderHeaderLeft : renderMockModeHeaderLeft,
+      headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
       headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
     }),
-    [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight, renderMockModeHeaderLeft]
+    [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
   );
 
   return (
@@ -1858,9 +1774,6 @@ export function NearPayScreen() {
             unavailableContent
           ) : (
             <>
-              {mockMode ? (
-                <MockPeerAvatarPreloader profiles={MOCK_BLE_PEER_AVATAR_PRELOAD_PROFILES} />
-              ) : null}
               <Animated.View
                 pointerEvents={amountActive ? 'none' : 'auto'}
                 style={pickerPanelCombinedStyle}>
@@ -1926,15 +1839,6 @@ const styles = StyleSheet.create({
   },
   dotFieldLayer: {
     ...StyleSheet.absoluteFillObject,
-  },
-  mockAvatarPreloader: {
-    position: 'absolute',
-    left: -AVATAR_SIZE * 3,
-    top: -AVATAR_SIZE * 3,
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    opacity: 0,
-    overflow: 'hidden',
   },
   nearPayActionRow: {
     alignItems: 'flex-start',
@@ -2035,12 +1939,6 @@ const styles = StyleSheet.create({
   headerBadgeText: {
     fontWeight: '700',
     lineHeight: 12,
-  },
-  headerMockModeToggle: {
-    paddingLeft: spacing.xs,
-  },
-  headerMockModeLabel: {
-    fontWeight: '700',
   },
   flowHeaderButton: {
     padding: spacing.sm,

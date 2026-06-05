@@ -9,7 +9,6 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
-import { getMockBLEPeerProfile } from '@/features/bitchat/lib/mockBLEPeers';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
@@ -42,13 +41,7 @@ interface NearPayPeerRowProps {
 
 function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
   const handlePress = useCallback(() => onSelect(peer), [onSelect, peer]);
-  const identity = useMemo(() => {
-    const mockProfile = getMockBLEPeerProfile(peer.peerID);
-    return bleIdentity({
-      ...peer,
-      ...(mockProfile?.picture ? { picture: mockProfile.picture } : {}),
-    });
-  }, [peer]);
+  const identity = useMemo(() => bleIdentity({ ...peer }), [peer]);
 
   return (
     <ContactRow
@@ -108,7 +101,6 @@ export function NearPayPeerListScreen() {
   const handleSelectPeer = useCallback(
     (peer: BLEPeer) => {
       const displayName = peerDisplayName(peer);
-      const mockProfile = getMockBLEPeerProfile(peer.peerID);
       paymentLog.info('near_pay.peer.list_select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
@@ -126,7 +118,7 @@ export function NearPayPeerListScreen() {
           reset: true,
           recipientProfile: {
             displayName,
-            avatarUrl: mockProfile?.picture ?? null,
+            avatarUrl: null,
             nip05: null,
           },
         })
