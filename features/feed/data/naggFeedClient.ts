@@ -2,13 +2,12 @@ import {
   createNaggClient,
   NAGG_CAPABILITIES,
   NaggFeedPageSchema,
-  NaggThreadSchema,
   NaggNotificationsPageSchema,
+  NaggUnknownDataSchema,
   type NaggAppViewBinding,
   type NaggCapability,
   type NaggError,
   type NaggNotificationsPage,
-  type NaggThread,
 } from '@sovranbitcoin/nagg-ts';
 import {
   authoredReplyChainInput,
@@ -17,11 +16,11 @@ import {
   followingPopularRankedEventsInput,
   followsFeedAppView,
   forYouRankedEventsInput,
+  mergeRelevantReplyNodes as mergeNaggRelevantReplyNodes,
   notificationsAppView,
   notificationsInput,
   rankedFeedAppView,
   recentNotesEventsInput,
-  threadAppView,
   threadReplyRankInput as buildThreadReplyRankInput,
   userFeedAppView,
   withEventExclusions,
@@ -42,7 +41,10 @@ import {
 import type { z } from 'zod';
 import { backendConfig } from '@/shared/config/backend';
 import { apiLog, feedLog, redactError } from '@/shared/lib/logger';
-import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
+import {
+  buildThreadStructure,
+  type ThreadStructure,
+} from '@/features/feed/lib/buildThreadStructure';
 import { mapNaggFeedPage } from './mapNaggFeedPage';
 import type {
   FeedClient,
@@ -1053,6 +1055,61 @@ async function postGraphqlWithAuthorReplyAndTimeoutFallback<TSchema extends z.Zo
   }
 }
 
+/**
+ * Thread is the documented exception to "prefer app-view": nagg's REST
+ * `/nostr/thread` cannot reproduce the viewer-specific relevance ranking
+ * (`authoredReplyChain` + `rankedReferencedBy` over the follow graph) that the
+ * GraphQL thread relies on. So the thread path stays GraphQL-only and consumes
+ * the raw GraphQL node tree directly — `runNaggQuery` with the passthrough
+ * `NaggUnknownDataSchema` and no app-view binding gives us that raw tree while
+ * reusing the shared client/logging.
+ */
+function postGraphqlThread<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  refresh: boolean | undefined,
+  controls: { signal?: AbortSignal; timeoutMs?: number } = {}
+): Promise<T> {
+  return runNaggQuery(query, variables, refresh, {
+    dataSchema: NaggUnknownDataSchema,
+    signal: controls.signal,
+    timeoutMs: controls.timeoutMs,
+  }) as Promise<T>;
+}
+
+async function postGraphqlThreadWithAuthorReplyFallback<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  fallbackQuery: string,
+  fallbackVariables: Record<string, unknown>,
+  refresh: boolean | undefined,
+  controls: { signal?: AbortSignal; timeoutMs?: number } = {}
+): Promise<T> {
+  const capability = NAGG_CAPABILITIES.AUTHORED_REPLY_CHAIN;
+  if (unsupportedGraphqlCapabilities.has(capability)) {
+    apiLog.warn('nagg.graphql.capability_fallback', {
+      capability,
+      operationName: graphqlOperationName(query),
+      fallbackOperationName: graphqlOperationName(fallbackQuery),
+      reason: 'cached_unsupported_capability',
+    });
+    return postGraphqlThread<T>(fallbackQuery, fallbackVariables, refresh, controls);
+  }
+  try {
+    return await postGraphqlThread<T>(query, variables, refresh, controls);
+  } catch (error) {
+    if (!isAuthorReplyCapabilityError(error)) throw error;
+    unsupportedGraphqlCapabilities.add(capability);
+    apiLog.warn('nagg.graphql.capability_fallback', {
+      capability,
+      operationName: graphqlOperationName(query),
+      fallbackOperationName: graphqlOperationName(fallbackQuery),
+      reason: redactError(error),
+    });
+    return postGraphqlThread<T>(fallbackQuery, fallbackVariables, refresh, controls);
+  }
+}
+
 function isAuthorReplyCapabilityError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
@@ -1150,6 +1207,70 @@ function isFollowingRecentSpec(parsed: Record<string, unknown> | null): boolean 
 
 function threadRankCandidateLimit(limit: number, offset: number): number {
   return Math.max(100, offset + limit + RELEVANT_AUTHOR_REPLY_LIMIT + 1);
+}
+
+function childAuthorReplyNodes(node: GraphqlEventNode | undefined): GraphqlEventNode[] {
+  return node?.childAuthorReplies?.nodes ?? [];
+}
+
+function childFollowedReplyNodes(node: GraphqlEventNode | undefined): GraphqlEventNode[] {
+  return node?.childFollowedReply?.nodes ?? [];
+}
+
+function replyGraphEventFromNode(node: GraphqlEventNode | null | undefined) {
+  const event = normalizeGraphqlEvent(node);
+  if (!event) return undefined;
+  return {
+    id: event.id,
+    pubkey: event.pubkey,
+    tags: event.tags,
+    createdAt: event.created_at,
+  };
+}
+
+function mergeRelevantReplyNodes({
+  sourceNode,
+  authorNodes = [],
+  followedNodes = [],
+  rankedNodes = [],
+  allNodes = [],
+  offset = 0,
+  limit,
+}: {
+  sourceNode?: GraphqlEventNode | null;
+  authorNodes?: GraphqlEventNode[];
+  followedNodes?: GraphqlEventNode[];
+  rankedNodes?: GraphqlEventNode[];
+  allNodes?: GraphqlEventNode[];
+  offset?: number;
+  limit?: number;
+}): {
+  nodes: GraphqlEventNode[];
+  pageNodes: GraphqlEventNode[];
+  pageEventIds: string[];
+  hasMore: boolean;
+} {
+  const merged = mergeNaggRelevantReplyNodes({
+    sourceNode,
+    authorNodes,
+    followedNodes,
+    rankedNodes,
+    allNodes,
+    offset,
+    limit,
+    toEvent: replyGraphEventFromNode,
+    childAuthorNodesFor: childAuthorReplyNodes,
+    childFollowedNodesFor: childFollowedReplyNodes,
+  });
+  const pageEnd = limit == null ? merged.nodes.length : offset + limit;
+  return {
+    nodes: merged.nodes,
+    pageNodes: merged.pageNodes,
+    pageEventIds: merged.pageNodes
+      .map((node) => normalizeGraphqlEvent(node)?.id)
+      .filter((id): id is string => !!id),
+    hasMore: merged.nodes.length > pageEnd,
+  };
 }
 
 function threadReplyRankInput(
@@ -1364,6 +1485,39 @@ function logFeedPageResult(
   return result;
 }
 
+function graphqlNodeKindCounts(nodes: GraphqlEventNode[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const node of nodes) {
+    const kind = typeof node.kind === 'number' ? String(node.kind) : 'unknown';
+    counts[kind] = (counts[kind] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function includeSelectedReplyNodesInThread(
+  thread: ThreadStructure,
+  replyNodes: readonly GraphqlEventNode[]
+): ThreadStructure {
+  if (!thread.target || replyNodes.length === 0) return thread;
+  const existingIds = new Set([
+    thread.target.id,
+    ...thread.parents.map((event) => event.id),
+    ...thread.replies.map((event) => event.id),
+  ]);
+  const selectedReplies: FeedEvent[] = [];
+  for (const node of replyNodes) {
+    const event = normalizeGraphqlEvent(node);
+    if (!event || existingIds.has(event.id)) continue;
+    existingIds.add(event.id);
+    selectedReplies.push(event);
+  }
+  if (selectedReplies.length === 0) return thread;
+  return {
+    ...thread,
+    replies: [...thread.replies, ...selectedReplies],
+  };
+}
+
 function collectHydrationFromGraphqlNodes(nodes: GraphqlEventNode[]): {
   metrics: Map<string, NoteMetrics>;
   profiles: Map<string, ProfileInfo>;
@@ -1567,92 +1721,6 @@ function notificationsResultFromPage(page: NaggNotificationsPage): FeedNotificat
       notifications.length > 0
         ? Math.min(...notifications.map((notification) => notification.event.created_at))
         : 0,
-  };
-}
-
-/**
- * The thread distiller (`graphqlToData`): walks the GraphQL thread node tree
- * (root + parent refs + every reply variant the query selects) into the canonical
- * {@link NaggThread} flat shape (`root` + descendant `events` + hydration side
- * maps) — exactly what nagg's REST `/nostr/thread` route emits. Reply structure
- * and order are derived downstream by a single `buildThreadStructure`.
- */
-function threadToCanonical(data: unknown): NaggThread {
-  const thread = data as GraphqlThreadData;
-  const buckets = {
-    allEvents: new Map<string, FeedEvent>(),
-    profiles: new Map<string, ProfileInfo>(),
-    metrics: new Map<string, NoteMetrics>(),
-    quotedEvents: new Map<string, FeedEvent>(),
-  };
-  const eventNode = thread.event ?? undefined;
-  addThreadNode(eventNode, buckets);
-  for (const parent of eventNode?.parentRefs?.nodes ?? []) addThreadNode(parent, buckets);
-  for (const reply of eventNode?.authorReplies?.nodes ?? []) addThreadNode(reply, buckets);
-  for (const reply of eventNode?.followedReply?.nodes ?? []) addThreadNode(reply, buckets);
-  for (const reply of eventNode?.replies?.nodes ?? []) addThreadNode(reply, buckets);
-  for (const reply of eventNode?.allReplies?.nodes ?? []) addThreadNode(reply, buckets);
-
-  const root = normalizeGraphqlEvent(eventNode);
-  const events = Array.from(buckets.allEvents.values()).filter((event) => event.id !== root?.id);
-  return {
-    // The schema requires a `root`; an empty/invalid event id surfaces as a
-    // miss downstream (buildThreadStructure returns an empty thread).
-    root: (root ?? {
-      id: '',
-      kind: 1,
-      pubkey: '',
-      content: '',
-      tags: [],
-      created_at: 0,
-    }) as NaggThread['root'],
-    events: events as NaggThread['events'],
-    metrics: Object.fromEntries(buckets.metrics),
-    profiles: Object.fromEntries(buckets.profiles) as NaggThread['profiles'],
-    quoted: Object.fromEntries(buckets.quotedEvents) as NaggThread['quoted'],
-  };
-}
-
-/**
- * Build a {@link ThreadResult} from the parsed canonical {@link NaggThread},
- * identically for both transports: seed the buckets, run one
- * {@link buildThreadStructure} to derive parents/replies (time-ordered), and page
- * over the resulting replies.
- */
-function threadResultFromCanonical(
-  eventId: string,
-  limit: number,
-  thread: NaggThread,
-  seed: ThreadRequest['seed']
-): ThreadResult {
-  const buckets = {
-    allEvents: seed ? new Map(seed.allEvents) : new Map<string, FeedEvent>(),
-    profiles: seed ? new Map(seed.profiles) : new Map<string, ProfileInfo>(),
-    metrics: seed ? new Map(seed.metrics) : new Map<string, NoteMetrics>(),
-    quotedEvents: seed ? new Map(seed.quotedEvents) : new Map<string, FeedEvent>(),
-  };
-  const allEvents = [thread.root, ...thread.events].filter(
-    (event): event is NaggThread['root'] => !!event && !!event.id
-  );
-  for (const event of allEvents) buckets.allEvents.set(event.id, event as FeedEvent);
-  for (const [id, metrics] of Object.entries(thread.metrics)) buckets.metrics.set(id, metrics);
-  for (const [pubkey, profile] of Object.entries(thread.profiles)) {
-    buckets.profiles.set(pubkey, profile);
-  }
-  for (const [id, quote] of Object.entries(thread.quoted)) {
-    buckets.quotedEvents.set(id, quote as FeedEvent);
-  }
-
-  const structure = buildThreadStructure(eventId, buckets.allEvents);
-  const replyPageEventIds = structure.replies.slice(0, limit).map((event) => event.id);
-  const hasMoreReplies = structure.replies.length > limit;
-  return {
-    ...buckets,
-    thread: structure,
-    replyPageEventIds,
-    replyPageSize: limit,
-    loadedReplyCount: replyPageEventIds.length,
-    hasMoreReplies,
   };
 }
 
@@ -2076,49 +2144,103 @@ export function createNaggFeedClient(): FeedClient {
               rank,
             }
           : variables;
-      const transport = feedTransport();
-      const threadControls = {
-        dataSchema: NaggThreadSchema,
-        graphqlToData: threadToCanonical,
-        signal,
-        timeoutMs,
-      };
-      const appView = threadAppView({ id: eventId, limit });
-      const canonical = isRelevantSort
-        ? await postGraphqlWithAuthorReplyFallback(
-            { query, variables, appView, transport },
-            { query: THREAD_RANKED_QUERY, variables: fallbackVariables },
+      // Thread is the documented exception to "prefer app-view": it stays on the
+      // GraphQL relevance-ranked path because nagg's REST `/nostr/thread` cannot
+      // reproduce the viewer-specific ranking (authoredReplyChain +
+      // rankedReferencedBy over the follow graph). The reply order is derived
+      // here by the relevant-reply merge, NOT by buildThreadStructure.
+      const data = isRelevantSort
+        ? await postGraphqlThreadWithAuthorReplyFallback<GraphqlThreadData>(
+            query,
+            variables,
+            THREAD_RANKED_QUERY,
+            fallbackVariables,
             false,
-            threadControls
+            { signal, timeoutMs }
           )
-        : await runNaggQuery(query, variables, false, {
-            ...threadControls,
-            appView,
-            transport,
+        : await postGraphqlThread<GraphqlThreadData>(query, variables, false, {
+            signal,
+            timeoutMs,
           });
 
-      const result = threadResultFromCanonical(eventId, limit, canonical, seed);
+      const rankedReplyNodes = data.event?.replies?.nodes ?? [];
+      const allReplyNodes = data.event?.allReplies?.nodes ?? [];
+      const supportsSourceAuthorReplies = isRelevantSort && !!data.event?.authorReplies;
+      const relevantReplies = supportsSourceAuthorReplies
+        ? mergeRelevantReplyNodes({
+            sourceNode: data.event,
+            authorNodes: data.event?.authorReplies?.nodes,
+            followedNodes: data.event?.followedReply?.nodes,
+            rankedNodes: rankedReplyNodes,
+            allNodes: allReplyNodes,
+            offset,
+            limit,
+          })
+        : null;
+      const replyNodes = relevantReplies?.pageNodes ?? rankedReplyNodes;
+      const replyPageEventIds =
+        relevantReplies?.pageEventIds ??
+        replyNodes
+          .map((node) => normalizeGraphqlEvent(node)?.id)
+          .filter((id): id is string => !!id);
+      const buckets = {
+        allEvents: seed ? new Map(seed.allEvents) : new Map<string, FeedEvent>(),
+        profiles: seed ? new Map(seed.profiles) : new Map<string, ProfileInfo>(),
+        metrics: seed ? new Map(seed.metrics) : new Map<string, NoteMetrics>(),
+        quotedEvents: seed ? new Map(seed.quotedEvents) : new Map<string, FeedEvent>(),
+      };
+      addThreadNode(data.event ?? undefined, buckets);
+      for (const parent of data.event?.parentRefs?.nodes ?? []) addThreadNode(parent, buckets);
+      if (supportsSourceAuthorReplies) {
+        for (const reply of data.event?.authorReplies?.nodes ?? []) addThreadNode(reply, buckets);
+        for (const reply of data.event?.followedReply?.nodes ?? []) addThreadNode(reply, buckets);
+        for (const reply of rankedReplyNodes) addThreadNode(reply, buckets);
+        for (const reply of allReplyNodes) addThreadNode(reply, buckets);
+      } else {
+        for (const reply of replyNodes) addThreadNode(reply, buckets);
+      }
 
-      feedLog.info('thread.nagg.result', {
+      const thread = includeSelectedReplyNodesInThread(
+        buildThreadStructure(eventId, buckets.allEvents),
+        replyNodes
+      );
+      const hasMoreReplies = relevantReplies
+        ? relevantReplies.hasMore || allReplyNodes.length >= candidateLimit
+        : replyNodes.length >= limit;
+      const targetMetrics = buckets.metrics.get(eventId);
+
+      feedLog.info('thread.nagg.graphql.result', {
         eventId,
         sort,
         limit,
         offset,
         candidateLimit,
         rankedLimit,
-        transport: transport === 'appview' && appView ? 'appview' : 'graphql',
         query: graphqlOperationName(query),
         durationMs: Date.now() - startedAt,
         seedEvents: seed?.allEvents.size ?? 0,
-        allEvents: result.allEvents.size,
-        replyPageEventIds: result.replyPageEventIds.map(shortId),
-        renderedReplies: result.thread.replies.length,
-        targetReplyCount: result.metrics.get(eventId)?.replyCount ?? null,
-        loadedReplyCount: result.loadedReplyCount,
-        hasMoreReplies: result.hasMoreReplies,
+        allEvents: buckets.allEvents.size,
+        replyNodeCount: replyNodes.length,
+        rankedReplyNodeCount: rankedReplyNodes.length,
+        allReplyNodeCount: allReplyNodes.length,
+        authorReplyNodeCount: data.event?.authorReplies?.nodes?.length ?? 0,
+        followedReplyNodeCount: data.event?.followedReply?.nodes?.length ?? 0,
+        supportsSourceAuthorReplies,
+        replyPageEventIds: replyPageEventIds.map(shortId),
+        replyNodeKinds: graphqlNodeKindCounts(replyNodes),
+        renderedReplies: thread.replies.length,
+        targetReplyCount: targetMetrics?.replyCount ?? null,
+        hasMoreReplies,
       });
 
-      return result;
+      return {
+        ...buckets,
+        thread,
+        replyPageEventIds,
+        replyPageSize: limit,
+        loadedReplyCount: replyPageEventIds.length,
+        hasMoreReplies,
+      };
     },
   };
 }

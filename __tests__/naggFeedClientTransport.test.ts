@@ -167,80 +167,10 @@ describe('naggFeedClient transport equivalence', () => {
     expect(appViewResult.paginationOffset).toBe(graphqlResult.paginationOffset);
   });
 
-  it('getThread yields identical output from GraphQL and app-view transports', async () => {
-    const replyGql = {
-      id: PAD('reply'),
-      kind: 1,
-      pubkey: PAD('bob'),
-      content: 'reply',
-      tags: [['e', PAD('root'), '', 'reply']],
-      createdAt: 101,
-      authorMetadata: [],
-      likes: { rows: [] },
-      reposts: { rows: [] },
-      replyStats: { rows: [] },
-      zaps: { rows: [] },
-    };
-
-    setupEnv();
-    mockFetch.mockResolvedValueOnce(
-      jsonResponse({
-        data: {
-          event: {
-            ...rootGql,
-            replies: { nodes: [replyGql] },
-            parentRefs: { nodes: [] },
-            quotedContent: { nodes: [] },
-          },
-        },
-      })
-    );
-    const graphqlThread = await loadClient().getThread({ eventId: PAD('root'), sort: 'new' });
-    const graphqlUrl = String(mockFetch.mock.calls[0][0]);
-
-    // Canonical thread body the REST `/nostr/thread` route emits.
-    const canonicalThread = {
-      root: {
-        id: PAD('root'),
-        kind: 1,
-        pubkey: PAD('alice'),
-        content: 'root',
-        tags: [],
-        created_at: 100,
-      },
-      events: [
-        {
-          id: PAD('reply'),
-          kind: 1,
-          pubkey: PAD('bob'),
-          content: 'reply',
-          tags: [['e', PAD('root'), '', 'reply']],
-          created_at: 101,
-        },
-      ],
-      metrics: {
-        [PAD('root')]: { likeCount: 5, repostCount: 0, replyCount: 0, satsZapped: 0 },
-        [PAD('reply')]: { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 },
-      },
-      profiles: { [PAD('alice')]: { name: 'Alice' } },
-      quoted: {},
-    };
-
-    jest.resetModules();
-    mockFetch.mockReset();
-    setupEnv({ EXPO_PUBLIC_NOSTR_FEED_APPVIEW: 'true' });
-    mockFetch.mockResolvedValueOnce(jsonResponse(canonicalThread));
-    const appViewThread = await loadClient().getThread({ eventId: PAD('root'), sort: 'new' });
-    const appViewUrl = String(mockFetch.mock.calls[0][0]);
-
-    expect(graphqlUrl).toContain('/graphql');
-    expect(appViewUrl).toContain('/v1/nostr/thread');
-    expect(appViewThread.thread).toEqual(graphqlThread.thread);
-    expect(appViewThread.replyPageEventIds).toEqual(graphqlThread.replyPageEventIds);
-    expect(appViewThread.hasMoreReplies).toBe(graphqlThread.hasMoreReplies);
-    expect([...appViewThread.metrics]).toEqual([...graphqlThread.metrics]);
-    expect([...appViewThread.profiles]).toEqual([...graphqlThread.profiles]);
-  });
+  // Thread intentionally has NO dual-transport equivalence case: it is the
+  // documented exception to "prefer app-view" and stays GraphQL-only, because
+  // nagg's REST `/nostr/thread` cannot reproduce the viewer-specific relevance
+  // ranking (authoredReplyChain + rankedReferencedBy over the follow graph).
 
   it('getNotifications yields identical output from GraphQL and app-view transports', async () => {
     const notificationNodes = [{ reason: 'mention', actorVertexScore: 7, event: rootGql }];

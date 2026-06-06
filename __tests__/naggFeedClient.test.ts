@@ -1673,7 +1673,7 @@ describe('createNaggFeedClient', () => {
     expect(result.hasMoreReplies).toBe(false);
   });
 
-  it('derives time-ordered direct replies from the canonical thread tree', async () => {
+  it('orders relevant thread replies as the author thread chain, followed tail, then ranked remainder', async () => {
     const authorSecond: any = {
       id: 'author-second',
       kind: 1,
@@ -1774,18 +1774,12 @@ describe('createNaggFeedClient', () => {
       limit: 3,
     });
 
-    // One collapsed path: the canonical thread (root + all distilled descendants)
-    // is built by a single buildThreadStructure. Only DIRECT replies to the
-    // target surface as top-level replies, ordered by created_at ascending
-    // (author-direct@102, ranked@104). The nested author-second / followed events
-    // are descendants of those replies, not direct children of root.
-    expect(result.replyPageEventIds).toEqual(['author-direct', 'ranked']);
-    expect(result.loadedReplyCount).toBe(2);
-    expect(result.hasMoreReplies).toBe(false);
-    expect(result.thread.replies.map((event) => event.id)).toEqual(['author-direct', 'ranked']);
-    // All distilled events (including the nested chain) are seeded into the buckets.
-    expect(result.allEvents.has('author-second')).toBe(true);
-    expect(result.allEvents.has('followed')).toBe(true);
+    expect(result.replyPageEventIds).toEqual(['author-direct', 'author-second', 'followed']);
+    expect(result.loadedReplyCount).toBe(3);
+    expect(result.hasMoreReplies).toBe(true);
+    expect(result.thread.replies.map((event) => event.id).sort()).toEqual(
+      ['author-direct', 'author-second', 'followed', 'ranked'].sort()
+    );
   });
 
   it('fills relevant thread pages from plain replies when ranked replies under-return', async () => {
@@ -1870,18 +1864,12 @@ describe('createNaggFeedClient', () => {
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.variables.rankedLimit).toBe(50);
     expect(body.query).toContain('allReplies: referencedBy');
-    // Both `replies` and `allReplies` are distilled into the canonical thread, so
-    // the plain replies fill the page. buildThreadStructure orders them by
-    // created_at ascending (plain-c@101, plain-b@102, plain-a@103, ranked-top@104).
-    expect(result.replyPageEventIds).toEqual(['plain-c', 'plain-b', 'plain-a']);
+    expect(result.replyPageEventIds).toEqual(['ranked-top', 'plain-a', 'plain-b']);
     expect(result.loadedReplyCount).toBe(3);
     expect(result.hasMoreReplies).toBe(true);
-    expect(result.thread.replies.map((event) => event.id)).toEqual([
-      'plain-c',
-      'plain-b',
-      'plain-a',
-      'ranked-top',
-    ]);
+    expect(result.thread.replies.map((event) => event.id).sort()).toEqual(
+      ['ranked-top', 'plain-a', 'plain-b', 'plain-c'].sort()
+    );
   });
 
   it('falls back to ranked thread replies when source author pubkeys are not deployed', async () => {
@@ -1989,7 +1977,7 @@ describe('createNaggFeedClient', () => {
     ]);
   });
 
-  it('requests new thread reply pages with offset and time-orders the page', async () => {
+  it('requests new thread reply pages with offset and reports more pages', async () => {
     const replies = Array.from({ length: 10 }, (_, index) => ({
       id: `reply-${index}`,
       kind: 1,
@@ -2051,13 +2039,10 @@ describe('createNaggFeedClient', () => {
     expect(body.query).toContain('offset: $offset');
     expect(body.query).not.toContain('childReplies');
     expect(result.thread.target?.id).toBe('root');
-    // The collapsed path pages over the canonical thread's direct replies,
-    // ordered by created_at ascending (createdAt: 200 - index → reply-9 oldest).
-    expect(result.replyPageEventIds).toEqual([...replies].reverse().map((reply) => reply.id));
+    expect(result.replyPageEventIds).toEqual(replies.map((reply) => reply.id));
     expect(result.loadedReplyCount).toBe(10);
     expect(result.replyPageSize).toBe(10);
-    // All 10 direct replies fit within the limit, so there is no further page.
-    expect(result.hasMoreReplies).toBe(false);
+    expect(result.hasMoreReplies).toBe(true);
   });
 
   it('builds metric-specific thread reply sort rank inputs', async () => {
