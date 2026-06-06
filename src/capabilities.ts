@@ -16,8 +16,6 @@ export const NAGG_CAPABILITIES = {
   RANK_SHUFFLE: 'graphql.rank.shuffle',
   TAGS_DERIVED_DATASET: 'graphql.tags.derivedDataset',
   TAGS_EXCLUDE_VALUES: 'graphql.tags.excludeValues',
-  AVAILABLE_TOPICS: 'graphql.availableTopics',
-  TRENDING: 'graphql.trending',
   NOTIFICATIONS: 'graphql.notifications',
   PROFILE_SEARCH: 'graphql.profileSearch',
 } as const;

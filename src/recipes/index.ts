@@ -2,8 +2,6 @@ export * from './feed';
 export * from './rank';
 export * from './reply-graph';
 export * from './thread';
-export * from './topics';
-export * from './trending';
 export * from './notifications';
 export * from './profile-search';
 export * from './dm';

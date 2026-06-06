@@ -49,32 +49,6 @@ export const NaggEventConnectionSchema = z.object({
     .optional(),
 });
 
-export const NaggTopicSchema = z
-  .object({
-    value: z.string(),
-    parent: z.string(),
-    label: z.string(),
-    isDefault: z.boolean(),
-    count: z.number().int().nonnegative(),
-  })
-  .passthrough();
-
-export const NaggTrendingClusterSchema = z
-  .object({
-    id: z.string(),
-    window: z.string(),
-    startedAt: z.union([z.string(), z.number(), z.date()]),
-    category: z.string(),
-    subcategory: z.string(),
-    title: z.string(),
-    description: z.string(),
-    eventCount: z.number().int().nonnegative(),
-    score: z.number(),
-    computedAt: z.union([z.string(), z.number(), z.date()]),
-    sampleEvents: NaggEventConnectionSchema.optional(),
-  })
-  .passthrough();
-
 export const NaggNotificationSchema = z
   .object({
     event: NaggEventSchema,
@@ -221,8 +195,6 @@ export type NaggGraphqlEnvelope = z.infer<typeof NaggGraphqlEnvelopeSchema>;
 export type NaggEvent = z.infer<typeof NaggEventSchema>;
 export type NaggAggregateRow = z.infer<typeof NaggAggregateRowSchema>;
 export type NaggEventConnection = z.infer<typeof NaggEventConnectionSchema>;
-export type NaggTopic = z.infer<typeof NaggTopicSchema>;
-export type NaggTrendingCluster = z.infer<typeof NaggTrendingClusterSchema>;
 export type NaggNotification = z.infer<typeof NaggNotificationSchema>;
 export type NaggNotificationConnection = z.infer<typeof NaggNotificationConnectionSchema>;
 export type NaggProfileSearchResult = z.infer<typeof NaggProfileSearchResultSchema>;
