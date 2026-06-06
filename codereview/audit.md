@@ -79,7 +79,12 @@ CWD is `sovran-app/`. All paths below are relative to it unless noted.
    assertions. Skill names go in `references` as `skill:<name>`.
 5. Treat relays, mints, and any user-generated content as untrusted input.
 6. Persist-shape changes (Zustand persist, redux-persist, SQLite) without a
-   `version` bump + `migrate` are Critical.
+   `version` bump + `migrate` are Critical. Conversely, backwards-compatibility
+   cruft (shims, legacy aliases, re-exports for old names, fallback paths,
+   deprecated wrappers, dead code "kept just in case") for behaviour that never
+   reached `main`/a release is a finding — the fix is to delete it and update
+   callers. colada / nagg-ts / nagg are Sovran-only, so they need no dual API.
+   See `skill:no-backwards-compatibility`.
 7. Never edit `coco/`, `cashu-ts/`, `nuts/`, `nips/`, `luds/`,
    `coco-cashu-plugin-npc/`, `sovran-schemas/`. Wallet-side coco changes go
    through `sovran-app/patches/`.
