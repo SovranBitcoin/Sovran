@@ -3,7 +3,7 @@ import { View, StyleSheet, Platform } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { Easing, Keyframe } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
@@ -25,8 +25,7 @@ import Icon from 'assets/icons';
  *   2. `running`  → spinner replaces label while bootstrap publishes
  *                   key packages
  *   3. `success`  → green check scales in with overshoot, hold ~900ms,
- *                   then the whole card slides + fades down off the
- *                   screen and unmounts
+ *                   then the whole card fades out and unmounts
  *
  * Mounted at the tabs layout level (`app/(drawer)/(tabs)/_layout.tsx`)
  * with `position: absolute`, anchored above the native tab bar via the
@@ -44,19 +43,11 @@ const SUCCESS_HOLD_MS = 1400;
 
 type Phase = 'idle' | 'running' | 'success' | 'gone';
 
-// Card-exit keyframe: responsive slide-down with `Easing.out(Easing.cubic)`.
-// `Easing.in` was back-loaded — for the first ~50% of the duration the
-// card barely moved (~12% of the distance), which read as lag. The `out`
-// curve starts immediately and decelerates as it approaches the end,
-// matching how iOS/Android system dismiss gestures feel.
-const cardExit = new Keyframe({
-  0: { opacity: 1, transform: [{ translateY: 0 }] },
-  100: {
-    opacity: 0,
-    transform: [{ translateY: 140 }],
-    easing: Easing.out(Easing.cubic),
-  },
-}).duration(450);
+// The card fades in on mount and fades out on dismiss — no slide. A plain
+// opacity cross-fade reads calmer than the previous slide-down and matches
+// how the rest of the app's transient surfaces appear/disappear.
+const cardEnter = FadeIn.duration(250);
+const cardExit = FadeOut.duration(400);
 
 export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
   const pathname = usePathname();
@@ -108,7 +99,7 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
   return (
     <View pointerEvents="box-none" style={[styles.host, { bottom: bottomOffset }]}>
       {shouldRenderCard ? (
-        <Animated.View exiting={cardExit} style={styles.cardWrap}>
+        <Animated.View entering={cardEnter} exiting={cardExit} style={styles.cardWrap}>
           <BannerCard
             phase={phase}
             onPress={onPress}
