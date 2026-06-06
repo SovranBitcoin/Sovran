@@ -59,6 +59,52 @@ describe('sendTokenAvailability — copy variants', () => {
   });
 });
 
+describe('receiveTokenAvailability — redeem', () => {
+  it('redeem is available for a scanned/pasted entry carrying metadata.rawToken', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'receive-1700000000-1',
+      type: 'receive',
+      amount: 21,
+      metadata: { rawToken: 'cashuBexampletoken' },
+    });
+
+    expect(actions.redeem.available).toBe(true);
+  });
+
+  it('redeem is available when the decoded token is on entry.token', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'receive-1700000000-2',
+      type: 'receive',
+      amount: 21,
+      token: { mint: 'https://mint1.example.com', proofs: [] },
+    });
+
+    expect(actions.redeem.available).toBe(true);
+  });
+
+  it('redeem is unavailable for a placeholder entry with no token at all', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'receive-1700000000-3',
+      type: 'receive',
+      amount: 21,
+      metadata: {},
+    });
+
+    expect(actions.redeem.available).toBe(false);
+  });
+
+  it('redeem is unavailable for a finalized (already redeemed) entry', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'op-finalized-123',
+      type: 'receive',
+      amount: 21,
+      metadata: { rawToken: 'cashuBexampletoken' },
+    });
+
+    expect(actions.redeem.available).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // paymentRequest — Confirm availability
 // ---------------------------------------------------------------------------

@@ -99,13 +99,21 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
 }
 
 function receiveTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<'receiveToken'> {
-  const token = entry.token;
+  const metadata = entry.metadata;
+  const rawToken =
+    typeof metadata === 'object' && metadata !== null
+      ? (metadata as Record<string, unknown>).rawToken
+      : undefined;
+  // Entries built by buildReceiveHistoryEntry carry the token in
+  // metadata.rawToken rather than entry.token, so accept either.
+  const hasToken =
+    entry.token != null || (typeof rawToken === 'string' && rawToken.length > 0);
   const id = entry.id as string | undefined;
   const isScanPlaceholder = id?.startsWith('receive-') ?? false;
   const isRedeemed = !isScanPlaceholder;
 
   return {
-    redeem: { available: !isRedeemed && token != null },
+    redeem: { available: !isRedeemed && hasToken },
     back: { available: true },
   };
 }

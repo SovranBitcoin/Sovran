@@ -93,13 +93,17 @@ function getMetadata(entry: EntryLike | null | undefined): EntryLike | undefined
 
 function encodeToken(entry: EntryLike): string | null {
   const token = entry.token;
-  if (!token) return null;
-  try {
-    return getEncodedToken(token as Parameters<typeof getEncodedToken>[0]);
-  } catch (e) {
-    logger.warn('screenAction.encodeToken.failed', { error: errField(e) });
-    return null;
+  if (token) {
+    try {
+      return getEncodedToken(token as Parameters<typeof getEncodedToken>[0]);
+    } catch (e) {
+      logger.warn('screenAction.encodeToken.failed', { error: errField(e) });
+    }
   }
+  // Fall back to the raw scanned/pasted token string captured at receive time
+  // (mirrors getReceiveTokenString in createManager) — entries built by
+  // buildReceiveHistoryEntry carry the token in metadata.rawToken, not entry.token.
+  return getString(getMetadata(entry), 'rawToken') ?? null;
 }
 
 // ---------------------------------------------------------------------------

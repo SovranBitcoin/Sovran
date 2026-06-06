@@ -457,6 +457,23 @@ describe('receiveToken default handlers', () => {
       expect(notifications.find((n) => n.event === 'onReceiveConfirmed')).toBeTruthy();
     });
 
+    it('redeems an entry whose token is only in metadata.rawToken (scan/paste)', async () => {
+      const { handlers, ops } = createMockConfig();
+      const rawToken = 'cashuBexampletoken';
+      const { mgr } = createManager('receiveToken', handlers, {
+        id: 'receive-preview-2',
+        type: 'receive',
+        mintUrl: MINT1,
+        amount: 1,
+        unit: 'sat',
+        metadata: { rawToken },
+      });
+
+      await mgr.execute('redeem');
+
+      expect(ops.executeReceive).toHaveBeenCalledWith(rawToken, MINT1, 1);
+    });
+
     it('notification sequence: onReceiveProcessing → onReceiveConfirmed → onTransactionCreated', async () => {
       const { handlers, notifications } = createMockConfig();
       const { mgr } = createManager('receiveToken', handlers, tokenEntry());
