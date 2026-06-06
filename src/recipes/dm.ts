@@ -69,10 +69,11 @@ export function dmConversationInput(options: DmConversationInput): DmConversatio
 
 /**
  * App-view binding for {@link DM_ENVELOPES_QUERY}: routes a `transport:'appview'`
- * request to the dedicated REST endpoint `GET /nostr/dm/envelopes` and normalizes
- * its `{ envelopes, hasNextPage }` body back into the same GraphQL connection
- * shape (`{ dmEnvelopes: { nodes, pageInfo } }`) the `dataSchema` validates — so
- * the caller gets an identical result whichever transport runs.
+ * request to the dedicated REST endpoint `GET /nostr/dm/envelopes`. nagg now emits
+ * the canonical `{ dmEnvelopes: { nodes, pageInfo } }` connection shape directly
+ * (nodes are raw `EventView`s, matching the GraphQL selection), so the body is
+ * parsed by the request's `dataSchema` with no per-transport normalize — the
+ * caller gets an identical result whichever transport runs.
  */
 export function dmEnvelopesAppView(options: DmEnvelopesInput): NaggAppViewBinding {
   const kinds = options.kinds ?? [4, 1059];
@@ -85,31 +86,6 @@ export function dmEnvelopesAppView(options: DmEnvelopesInput): NaggAppViewBindin
       kinds: kinds.join(','),
       ...(options.until ? { until: options.until } : {}),
       limit: options.limit ?? 50,
-    },
-    normalize: normalizeDmEnvelopesRest,
-  };
-}
-
-function normalizeDmEnvelopesRest(raw: unknown): unknown {
-  const body = (raw ?? {}) as { envelopes?: unknown[]; hasNextPage?: boolean };
-  const nodes = Array.isArray(body.envelopes)
-    ? body.envelopes.map((entry) => {
-        const e = (entry ?? {}) as Record<string, unknown>;
-        return {
-          id: e.id,
-          pubkey: e.pubkey,
-          kind: e.kind,
-          createdAt: e.createdAt,
-          content: e.content,
-          tags: e.tags,
-          sig: e.sig,
-        };
-      })
-    : [];
-  return {
-    dmEnvelopes: {
-      nodes,
-      pageInfo: { hasNextPage: body.hasNextPage ?? false, endCursor: null },
     },
   };
 }

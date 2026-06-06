@@ -322,7 +322,7 @@ describe("reply graph", () => {
     expect(merged.authorChainIds).toEqual([authorOne.id, authorTwo.id]);
   });
 
-  test("dmEnvelopesAppView builds the REST binding and normalizes to the connection shape", () => {
+  test("dmEnvelopesAppView builds the simplified REST binding (no normalize)", () => {
     const viewer = "a".repeat(64);
     const binding = dmEnvelopesAppView({ viewer, kinds: [1059], until: 1700, limit: 25 });
 
@@ -334,34 +334,7 @@ describe("reply graph", () => {
       until: 1700,
       limit: 25,
     });
-
-    const normalized = binding.normalize({
-      envelopes: [
-        {
-          id: "b".repeat(64),
-          pubkey: "c".repeat(64),
-          kind: 1059,
-          createdAt: "2026-01-01T00:00:00.000Z",
-          content: "wrap",
-          tags: [["p", viewer]],
-          sig: "d".repeat(128),
-          updatedAt: "2026-01-02T00:00:00.000Z",
-        },
-      ],
-      hasNextPage: true,
-    }) as { dmEnvelopes: { nodes: Array<Record<string, unknown>>; pageInfo: Record<string, unknown> } };
-
-    expect(normalized.dmEnvelopes.pageInfo).toEqual({ hasNextPage: true, endCursor: null });
-    expect(normalized.dmEnvelopes.nodes).toHaveLength(1);
-    // `updatedAt` is dropped; the node matches the GraphQL selection.
-    expect(normalized.dmEnvelopes.nodes[0]).toEqual({
-      id: "b".repeat(64),
-      pubkey: "c".repeat(64),
-      kind: 1059,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      content: "wrap",
-      tags: [["p", viewer]],
-      sig: "d".repeat(128),
-    });
+    // The REST body is the canonical shape — the binding carries no normalize step.
+    expect("normalize" in binding).toBe(false);
   });
 });

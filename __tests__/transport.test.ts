@@ -28,6 +28,22 @@ describe('GraphQL transport', () => {
     expect(result._unsafeUnwrapErr().type).toBe('graphql');
   });
 
+  test('distils data via graphqlToData before the schema parse', () => {
+    const result = parseGraphqlData(
+      { data: { nodes: [{ count: 21 }, { count: 21 }] } },
+      z.object({ total: z.number() }),
+      (data) => ({
+        total: (data as { nodes: Array<{ count: number }> }).nodes.reduce(
+          (sum, node) => sum + node.count,
+          0
+        ),
+      })
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toEqual({ total: 42 });
+  });
+
   test('posts with timeout controls and parses data', async () => {
     const requests: Request[] = [];
     const client = createNaggClient({
@@ -140,12 +156,13 @@ describe('App-view transport switch', () => {
     }) as unknown as typeof fetch;
   }
 
-  test('routes to the REST app-view and normalizes into the dataSchema shape', async () => {
+  test('routes to the REST app-view and parses the raw body with the dataSchema', async () => {
     const requests: Request[] = [];
     const client = createNaggClient({
       endpoint: 'https://nagg.example/graphql',
       appView: { baseUrl: 'https://nagg.example', version: 'v1' },
-      fetchImpl: jsonFetch(requests, { count: 7 }),
+      // The REST body IS the canonical shape — no normalize step.
+      fetchImpl: jsonFetch(requests, { followers: 7 }),
     });
 
     const result = await client.query({
@@ -155,7 +172,6 @@ describe('App-view transport switch', () => {
       appView: {
         path: '/nostr/follows',
         searchParams: { pubkey: 'abc' },
-        normalize: (raw) => ({ followers: (raw as { count: number }).count }),
       },
     });
 
@@ -232,7 +248,6 @@ describe('App-view transport switch', () => {
         path: 'nostr/events', // no leading slash — client normalizes it
         searchParams: { ids: ['a', 'b'], empty: [], skip: undefined },
         body: { ids: ['a', 'b'] },
-        normalize: (raw) => raw,
       },
     });
 
