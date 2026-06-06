@@ -17,7 +17,7 @@
 const APP_CONFIG_PATH = '../app.config.js';
 
 type ConfigFn = (args: { config: Record<string, unknown> }) => Record<string, unknown> & {
-  extra?: { debugMnemonic?: unknown; sharedP2PKSecretKeys?: unknown };
+  extra?: { debugMnemonic?: unknown; giveawayP2pkSecret?: unknown };
 };
 
 function loadAppConfig(): ConfigFn {
@@ -30,12 +30,14 @@ const ENV_KEYS = [
   'APP_VARIANT',
   'EXPO_PUBLIC_ENV',
   'DEBUG_MNEMONIC',
-  'SOVRAN_SHARED_P2PK_SECRET_KEYS',
-  'EXPO_PUBLIC_SOVRAN_SHARED_P2PK_SECRET_KEYS',
+  'GIVEAWAY_P2PK_SECRET',
+  'EXPO_PUBLIC_GIVEAWAY_P2PK_SECRET',
 ] as const;
 
 const VALID_MNEMONIC =
   'cute clutch where initial orphan arena fashion silk minute endless middle own';
+
+const GIVEAWAY_SECRET = 'a'.repeat(64);
 
 describe('app.config.js: extra.debugMnemonic gating', () => {
   let originalEnv: Record<string, string | undefined>;
@@ -106,12 +108,34 @@ describe('app.config.js: extra.debugMnemonic gating', () => {
     expect(config.extra?.debugMnemonic).toBeUndefined();
   });
 
-  it('does not inject P2PK private-key env vars into Expo config', () => {
-    process.env.SOVRAN_SHARED_P2PK_SECRET_KEYS = 'private-env-should-not-be-read';
-    process.env.EXPO_PUBLIC_SOVRAN_SHARED_P2PK_SECRET_KEYS = 'public-env-should-not-be-read';
-
+  // The shared giveaway P2PK key is the deliberate exception to "don't inject
+  // key material into Expo config": giveaway ecash is P2PK-locked to it and
+  // every shipped install must redeem it, so unlike debugMnemonic it is injected
+  // for ALL build profiles. It must still come only from the non-EXPO_PUBLIC var.
+  it('injects giveawayP2pkSecret on production when GIVEAWAY_P2PK_SECRET is set', () => {
+    process.env.EAS_BUILD_PROFILE = 'production';
+    process.env.GIVEAWAY_P2PK_SECRET = GIVEAWAY_SECRET;
     const config = loadAppConfig()({ config: {} });
+    expect(config.extra?.giveawayP2pkSecret).toBe(GIVEAWAY_SECRET);
+  });
 
-    expect(config.extra?.sharedP2PKSecretKeys).toBeUndefined();
+  it('injects giveawayP2pkSecret on the development profile too', () => {
+    process.env.EAS_BUILD_PROFILE = 'development';
+    process.env.GIVEAWAY_P2PK_SECRET = GIVEAWAY_SECRET;
+    const config = loadAppConfig()({ config: {} });
+    expect(config.extra?.giveawayP2pkSecret).toBe(GIVEAWAY_SECRET);
+  });
+
+  it('omits giveawayP2pkSecret when GIVEAWAY_P2PK_SECRET is unset', () => {
+    process.env.EAS_BUILD_PROFILE = 'production';
+    const config = loadAppConfig()({ config: {} });
+    expect(config.extra?.giveawayP2pkSecret).toBeUndefined();
+  });
+
+  it('does not read EXPO_PUBLIC_GIVEAWAY_P2PK_SECRET — only the non-prefixed var', () => {
+    process.env.EAS_BUILD_PROFILE = 'production';
+    (process.env as Record<string, string>).EXPO_PUBLIC_GIVEAWAY_P2PK_SECRET = GIVEAWAY_SECRET;
+    const config = loadAppConfig()({ config: {} });
+    expect(config.extra?.giveawayP2pkSecret).toBeUndefined();
   });
 });

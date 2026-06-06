@@ -30,7 +30,24 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase } from '../logger';
-import { createP2PKImportPlugin } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
+import {
+  createP2PKImportPlugin,
+  type P2PKSecretKeyInput,
+} from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
+import Constants from 'expo-constants';
+
+// Shared giveaway P2PK key, injected at build time via app.config.js `extra`
+// (from the non-EXPO_PUBLIC `GIVEAWAY_P2PK_SECRET`). This is intentionally
+// GLOBAL across every profile and install — it is NOT a stored profile nsec —
+// so any install can redeem giveaway ecash P2PK-locked to its public key. The
+// plugin accepts an nsec or 64-hex string and decodes it. SECURITY: a bundled
+// key is extractable; only lock low-value, rotatable giveaways to it. See
+// .cursor/rules/secure-storage-key-derivation.mdc.
+const GIVEAWAY_P2PK_SECRET: string | null =
+  typeof Constants.expoConfig?.extra?.giveawayP2pkSecret === 'string' &&
+  Constants.expoConfig.extra.giveawayP2pkSecret.length > 0
+    ? Constants.expoConfig.extra.giveawayP2pkSecret
+    : null;
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
@@ -199,13 +216,21 @@ export class CocoManager {
 
         this.seedGetter = seedGetter;
 
-        // 3. Core plugins. The P2PK import uses only the active profile signer
-        // snapshot captured for this manager initialization. Do not read global
-        // env/config or stored profile nsecs here, otherwise one profile's nsec
-        // can be imported into another profile's Coco database.
+        // 3. Core plugins. The P2PK import imports two kinds of key:
+        //   - The active profile's signer snapshot (captured for THIS manager
+        //     init). Never read a *stored* profile nsec here — that would let
+        //     one profile's nsec leak into another profile's Coco database.
+        //   - The shared, build-time GIVEAWAY_P2PK_SECRET (module constant
+        //     above). This is intentionally global across all profiles so any
+        //     install can redeem giveaway ecash; it is not a profile secret.
         const plugins: Plugin[] = [
           createP2PKImportPlugin({
-            getSecretKeys: () => (p2pkImportSecretKey ? [new Uint8Array(p2pkImportSecretKey)] : []),
+            getSecretKeys: () => {
+              const keys: P2PKSecretKeyInput[] = [];
+              if (p2pkImportSecretKey) keys.push(new Uint8Array(p2pkImportSecretKey));
+              if (GIVEAWAY_P2PK_SECRET) keys.push(GIVEAWAY_P2PK_SECRET);
+              return keys;
+            },
           }),
         ];
 
