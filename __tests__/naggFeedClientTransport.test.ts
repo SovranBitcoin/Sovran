@@ -167,6 +167,25 @@ describe('naggFeedClient transport equivalence', () => {
     expect(appViewResult.paginationOffset).toBe(graphqlResult.paginationOffset);
   });
 
+  it('sends the query document operation name on the GraphQL path, not the app-view binding label', async () => {
+    // Regression: runNaggQuery used to send the app-view binding's REST label
+    // ('UserFeed' / 'RankedFeed' / 'Notifications') as the GraphQL operationName.
+    // nagg rejects that with "Unknown operation named …", silently EMPTYING the
+    // feed. The GraphQL request must use the query document's operation name.
+    setupEnv(); // flags off -> GraphQL transport, with the userFeedAppView binding present
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ data: { events: { nodes: [rootGql], pageInfo: { hasNextPage: false } } } })
+    );
+    await loadClient().getUserFeed({ pubkey: PAD('alice') });
+
+    const requestInit = mockFetch.mock.calls[0][1] as { body?: string };
+    const body = JSON.parse(requestInit.body ?? '{}') as { query?: string; operationName?: string };
+    expect(body.operationName).toMatch(/^NaggGraphql/);
+    expect(body.operationName).not.toBe('UserFeed');
+    // …and the document actually defines that operation (so nagg can run it).
+    expect(body.query).toContain(`query ${body.operationName}`);
+  });
+
   // Thread intentionally has NO dual-transport equivalence case: it is the
   // documented exception to "prefer app-view" and stays GraphQL-only, because
   // nagg's REST `/nostr/thread` cannot reproduce the viewer-specific relevance
