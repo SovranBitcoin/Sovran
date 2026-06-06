@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback, useState } from 'react';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
 import { ShareScreen, SHARE_CONFIGS, ShareType } from '@/features/user';

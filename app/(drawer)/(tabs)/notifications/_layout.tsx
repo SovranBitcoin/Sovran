@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';

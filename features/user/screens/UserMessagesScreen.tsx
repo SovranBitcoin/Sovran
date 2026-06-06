@@ -11,7 +11,7 @@
  */
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from '@react-navigation/native';
 import { staticPopup } from '@/shared/lib/popup';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import opacity from 'hex-color-opacity';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { z } from 'zod';

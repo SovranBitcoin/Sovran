@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { ScrollView } from 'react-native';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { SlideToConfirm } from '@/shared/ui/composed/SlideToConfirm';

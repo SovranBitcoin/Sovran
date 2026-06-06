@@ -9,7 +9,8 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';

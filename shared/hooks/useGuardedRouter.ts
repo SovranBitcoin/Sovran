@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 
 import { paymentLog } from '@/shared/lib/logger';
 
@@ -30,140 +29,58 @@ function shouldSuppress(signature: string): boolean {
   return false;
 }
 
-interface GuardedRouter {
-  push: (typeof router)['push'];
-  navigate: (typeof router)['navigate'];
-  replace: (typeof router)['replace'];
-  back: (typeof router)['back'];
-  dismiss: (typeof router)['dismiss'];
-  dismissAll: (typeof router)['dismissAll'];
-  dismissTo: (typeof router)['dismissTo'];
-  /** The unwrapped router for cases where guarding is undesirable. */
-  raw: typeof router;
+// Navigation methods that open / replace / dismiss a route get the double-tap
+// cooldown. Every other property on `router` (canGoBack, canDismiss, setParams,
+// reload, prefetch, …) passes straight through, so the guarded router is a
+// complete drop-in for expo-router's `router`.
+const GUARDED_METHODS = new Set([
+  'push',
+  'navigate',
+  'replace',
+  'back',
+  'dismiss',
+  'dismissAll',
+  'dismissTo',
+]);
+
+/** A complete `router` plus `raw` (the unwrapped router, for the rare case guarding is undesirable). */
+export type GuardedRouter = typeof router & { raw: typeof router };
+
+function createGuardedRouter(target: typeof router): GuardedRouter {
+  return new Proxy(target as object, {
+    get(t, prop, receiver) {
+      if (prop === 'raw') return t;
+      const value = Reflect.get(t, prop, receiver);
+      if (typeof prop === 'string' && GUARDED_METHODS.has(prop) && typeof value === 'function') {
+        return (...args: unknown[]) => {
+          const signature = `${prop}:${args.map(signatureFor).join(',')}`;
+          if (shouldSuppress(signature)) {
+            paymentLog.debug('navigation.guard.suppressed', { method: prop });
+            return undefined;
+          }
+          return (value as (...a: unknown[]) => unknown).apply(t, args);
+        };
+      }
+      return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(t) : value;
+    },
+  }) as GuardedRouter;
 }
 
 /**
- * Debounced wrapper around expo-router's `router`. Suppresses repeated calls
- * with the same destination within a short cooldown so a double-tap on a
- * button does not push the same modal twice. Use everywhere a Pressable's
- * `onPress` calls into `router.push` / `router.navigate` to open a modal
- * route.
+ * Debounced drop-in for expo-router's `router`. Suppresses repeated navigation
+ * calls with the same destination within a short cooldown so a double-tap on a
+ * button cannot push the same modal twice. Use it anywhere a Pressable's
+ * `onPress` opens a route — either via this hook (`const router =
+ * useGuardedRouter()`) or the imperative `guardedRouter` (for non-React
+ * modules / `import { guardedRouter as router }`).
  */
+export const guardedRouter: GuardedRouter = createGuardedRouter(router);
+
 export function useGuardedRouter(): GuardedRouter {
-  return useMemo<GuardedRouter>(
-    () => ({
-      raw: router,
-      push: ((href: Href) => {
-        if (shouldSuppress(`push:${signatureFor(href)}`)) {
-          paymentLog.debug('navigation.guard.suppressed', { method: 'push', href });
-          return;
-        }
-        return router.push(href as Parameters<typeof router.push>[0]);
-      }) as (typeof router)['push'],
-      navigate: ((href: Href) => {
-        if (shouldSuppress(`navigate:${signatureFor(href)}`)) {
-          paymentLog.debug('navigation.guard.suppressed', { method: 'navigate', href });
-          return;
-        }
-        return router.navigate(href as Parameters<typeof router.navigate>[0]);
-      }) as (typeof router)['navigate'],
-      replace: ((href: Href) => {
-        if (shouldSuppress(`replace:${signatureFor(href)}`)) {
-          paymentLog.debug('navigation.guard.suppressed', { method: 'replace', href });
-          return;
-        }
-        return router.replace(href as Parameters<typeof router.replace>[0]);
-      }) as (typeof router)['replace'],
-      back: () => {
-        if (shouldSuppress('back:')) {
-          paymentLog.debug('navigation.guard.suppressed', { method: 'back' });
-          return;
-        }
-        return router.back();
-      },
-      dismiss: ((count?: number) => {
-        if (shouldSuppress(`dismiss:${count ?? ''}`)) {
-          paymentLog.debug('navigation.guard.suppressed', { method: 'dismiss', count });
-          return;
-        }
-        return router.dismiss(count);
-      }) as (typeof router)['dismiss'],
-      dismissAll: () => {
-        if (shouldSuppress('dismissAll:')) {
-          paymentLog.debug('navigation.guard.suppressed', { method: 'dismissAll' });
-          return;
-        }
-        return router.dismissAll();
-      },
-      dismissTo: ((href: Href) => {
-        if (shouldSuppress(`dismissTo:${signatureFor(href)}`)) {
-          paymentLog.debug('navigation.guard.suppressed', { method: 'dismissTo', href });
-          return;
-        }
-        return router.dismissTo(href as Parameters<typeof router.dismissTo>[0]);
-      }) as (typeof router)['dismissTo'],
-    }),
-    []
-  );
+  // Module singleton — referentially stable across renders, so it is safe in
+  // dependency arrays and as a `router` substitute.
+  return guardedRouter;
 }
-
-/**
- * Imperative variant for non-React modules (helpers, lib functions). Same
- * cooldown as `useGuardedRouter` so double-clicks routed through helpers
- * are also caught.
- */
-export const guardedRouter: GuardedRouter = {
-  raw: router,
-  push: ((href: Href) => {
-    if (shouldSuppress(`push:${signatureFor(href)}`)) {
-      paymentLog.debug('navigation.guard.suppressed', { method: 'push', href });
-      return;
-    }
-    return router.push(href as Parameters<typeof router.push>[0]);
-  }) as (typeof router)['push'],
-  navigate: ((href: Href) => {
-    if (shouldSuppress(`navigate:${signatureFor(href)}`)) {
-      paymentLog.debug('navigation.guard.suppressed', { method: 'navigate', href });
-      return;
-    }
-    return router.navigate(href as Parameters<typeof router.navigate>[0]);
-  }) as (typeof router)['navigate'],
-  replace: ((href: Href) => {
-    if (shouldSuppress(`replace:${signatureFor(href)}`)) {
-      paymentLog.debug('navigation.guard.suppressed', { method: 'replace', href });
-      return;
-    }
-    return router.replace(href as Parameters<typeof router.replace>[0]);
-  }) as (typeof router)['replace'],
-  back: () => {
-    if (shouldSuppress('back:')) {
-      paymentLog.debug('navigation.guard.suppressed', { method: 'back' });
-      return;
-    }
-    return router.back();
-  },
-  dismiss: ((count?: number) => {
-    if (shouldSuppress(`dismiss:${count ?? ''}`)) {
-      paymentLog.debug('navigation.guard.suppressed', { method: 'dismiss', count });
-      return;
-    }
-    return router.dismiss(count);
-  }) as (typeof router)['dismiss'],
-  dismissAll: () => {
-    if (shouldSuppress('dismissAll:')) {
-      paymentLog.debug('navigation.guard.suppressed', { method: 'dismissAll' });
-      return;
-    }
-    return router.dismissAll();
-  },
-  dismissTo: ((href: Href) => {
-    if (shouldSuppress(`dismissTo:${signatureFor(href)}`)) {
-      paymentLog.debug('navigation.guard.suppressed', { method: 'dismissTo', href });
-      return;
-    }
-    return router.dismissTo(href as Parameters<typeof router.dismissTo>[0]);
-  }) as (typeof router)['dismissTo'],
-};
 
 /** Reset the cooldown gate. Test-only. */
 export function __resetGuardForTests(): void {

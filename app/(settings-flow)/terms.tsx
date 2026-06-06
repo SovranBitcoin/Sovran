@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { TermsAndConditionsScreen } from '@/features/onboarding';
 

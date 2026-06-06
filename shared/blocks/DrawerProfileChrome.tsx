@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback, useMemo, useRef } from 'react';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { nip19 } from 'nostr-tools';
 import opacity from 'hex-color-opacity';

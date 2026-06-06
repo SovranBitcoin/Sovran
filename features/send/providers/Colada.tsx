@@ -11,7 +11,7 @@ import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera/hooks/useHandleCameraPermission';
 
 import { URDecoder } from '@gandlaf21/bc-ur';
@@ -20,7 +20,11 @@ import { useManager } from '@cashu/coco-react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 
-import type { MachineOperations, NavigationCallbacks, RecipientProfile } from '@sovranbitcoin/colada';
+import type {
+  MachineOperations,
+  NavigationCallbacks,
+  RecipientProfile,
+} from '@sovranbitcoin/colada';
 import { createColada, createMempoolSpaceChainAdapter, withTimeout } from '@sovranbitcoin/colada';
 import {
   ColadaProvider as ColadaProviderBase,

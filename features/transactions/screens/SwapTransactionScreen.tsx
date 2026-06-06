@@ -55,7 +55,7 @@ import { formatAmount } from '@/shared/lib/currency';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintManagement } from '@/features/mint';
 import Icon from 'assets/icons';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

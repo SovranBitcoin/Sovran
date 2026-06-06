@@ -19,16 +19,11 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import * as Location from 'expo-location';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  InteractionManager,
-  Platform,
-  StyleSheet,
-  useWindowDimensions,
-} from 'react-native';
+import { InteractionManager, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -234,9 +229,9 @@ export function MapScreen() {
         <View
           style={[
             StyleSheet.absoluteFillObject,
-          styles.mapSkeleton,
-          { backgroundColor: skeleton },
-        ]}>
+            styles.mapSkeleton,
+            { backgroundColor: skeleton },
+          ]}>
           <Spinner size={32} color={BITCOIN_ACCENT} />
           <Text size={14} style={{ color: opacity(foreground, 0.8), marginTop: 16 }}>
             Loading map...
