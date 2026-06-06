@@ -3,6 +3,21 @@ const { defineConfig } = require('eslint/config');
 const expoConfig = require('eslint-config-expo/flat');
 const eslintPluginPrettierRecommended = require('eslint-plugin-prettier/recommended');
 
+// eslint-plugin-react-compiler@19.1.0-rc.2 calls zod@3's `z.function().args()`,
+// which the repo-wide `zod@4` override (package.json `overrides`) removes — so
+// `require`-ing it throws at config-load and crashes the ENTIRE lint run. Load
+// it defensively: lint must keep working (the dozens of correctness rules below
+// matter far more than this single non-blocking `warn`). Re-enable
+// unconditionally once the plugin supports zod 4, or migrate the rule to
+// eslint-plugin-react-hooks v6 (`react-hooks/react-compiler`).
+// Tracked in __research__/architecture-review-2026-06.md.
+let reactCompilerPlugin = null;
+try {
+  reactCompilerPlugin = require('eslint-plugin-react-compiler');
+} catch {
+  reactCompilerPlugin = null;
+}
+
 module.exports = defineConfig([
   // Global ignores — apply to every config below. Listed first because a
   // flat-config block with only `ignores` (no `files`) is treated as a
@@ -123,13 +138,17 @@ module.exports = defineConfig([
   // future audit-fix slice). Warnings don't appear in
   // `eslint-suppressions.json`; they show up in the lint output and
   // surface in editor integrations.
-  {
-    files: ['**/*.ts', '**/*.tsx'],
-    plugins: { 'react-compiler': require('eslint-plugin-react-compiler') },
-    rules: {
-      'react-compiler/react-compiler': 'warn',
-    },
-  },
+  ...(reactCompilerPlugin
+    ? [
+        {
+          files: ['**/*.ts', '**/*.tsx'],
+          plugins: { 'react-compiler': reactCompilerPlugin },
+          rules: {
+            'react-compiler/react-compiler': 'warn',
+          },
+        },
+      ]
+    : []),
   {
     plugins: {
       'unused-imports': require('eslint-plugin-unused-imports'),
