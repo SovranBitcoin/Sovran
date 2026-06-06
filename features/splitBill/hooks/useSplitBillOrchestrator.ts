@@ -16,8 +16,8 @@
  *      don't abort the overall flow; the user can retry per-participant
  *      from the detail screen.
  *
- * Also exposes `useSplitBillPaymentReconciler()` — subscribes to coco's
- * `history:updated` event bus and flips participants' `paymentState` to
+ * Also exposes `useSplitBillPaymentReconciler()` — subscribes to Colada's
+ * payment event bus and flips participants' `paymentState` to
  * `paid`/`expired` when their mint quote hits ISSUED/PAID/EXPIRED. Mount
  * once at app root so reconciliation runs regardless of which screen the
  * user has open.
@@ -25,13 +25,15 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useManager } from '@cashu/coco-react';
+import { useColadaSubscriptions } from '@sovranbitcoin/colada/react';
 import NDK, { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
-import { sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
+import { startBLE } from 'bitchat-module';
 
 import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
+import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitchatBLEIdentityMaterial';
+import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { mintLocalId } from '@/shared/lib/id';
 import { buildRecipientGiftWrap, buildSenderSelfCopyWrap } from '@/shared/lib/nostr/nip17';
 import { useSplitBillTransactionsStore } from '@/shared/stores/profile/splitBillTransactionsStore';
 import type {
@@ -40,6 +42,7 @@ import type {
 } from '@/shared/stores/profile/splitBillTransactionsStore';
 import { paymentLog } from '@/shared/lib/logger';
 import { reconcileSplitBillHistoryUpdate } from '@/features/splitBill/lib/reconcileSplitBillHistoryUpdate';
+import { prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 
 // ---------------------------------------------------------------------------
 
@@ -52,7 +55,7 @@ import { reconcileSplitBillHistoryUpdate } from '@/features/splitBill/lib/reconc
  *     recipient's name.
  *   - Both `label` and `message` MUST NOT appear more than once per URI.
  *
- * Wallets that parse BIP-321 (including Sovran's `coco-payment-ux/src/parse.ts`)
+ * Wallets that parse BIP-321 (including Sovran's `colada/src/parse.ts`)
  * surface the `message` to the payer, so we put the "pay your share…" text
  * there and drop any in-band plaintext preface — the URI is the whole body.
  *
@@ -82,55 +85,12 @@ function formatDeliveryBody(group: SplitBillGroup, p: SplitBillParticipant): str
   });
 }
 
-/**
- * Split `text` into chunks whose UTF-8 byte length is ≤ `maxBytes`.
- *
- * Upstream bitchat's `PrivateMessagePacket` encodes `content` as a TLV with a
- * 1-byte length prefix (Packets.swift, content TLV 0x01) — anything over 255
- * bytes makes `encode()` return nil and the send silently drops. We chunk at
- * the app layer and send each piece as its own DM; the recipient sees a
- * short run of consecutive bubbles in order.
- *
- * Prefers to split on the most recent `\n` within the 64-byte tail of the
- * candidate slice so a `"preface\nbitcoin:?lightning=…"` body produces one
- * bubble per line when the preface fits under the cap. Always respects
- * UTF-8 code-point boundaries (never severs a multi-byte codepoint).
- */
-function chunkUtf8(text: string, maxBytes = 255): string[] {
-  if (!text) return [];
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-  const bytes = encoder.encode(text);
-  if (bytes.length <= maxBytes) return [text];
-
-  const chunks: string[] = [];
-  let i = 0;
-  while (i < bytes.length) {
-    let end = Math.min(i + maxBytes, bytes.length);
-    if (end < bytes.length) {
-      // Back off continuation bytes (0b10xxxxxx) to land on a codepoint boundary.
-      while (end > i && (bytes[end] & 0xc0) === 0x80) end--;
-      // Prefer the most recent newline in the last 64 bytes for readability.
-      const floor = Math.max(i + 1, end - 64);
-      for (let j = end - 1; j >= floor; j--) {
-        if (bytes[j] === 0x0a) {
-          end = j + 1;
-          break;
-        }
-      }
-    }
-    chunks.push(decoder.decode(bytes.subarray(i, end)));
-    i = end;
-  }
-  return chunks;
-}
-
 // ---------------------------------------------------------------------------
 // Nostr DM delivery — identical to what UserMessagesScreen does for 1:1
 // contact DMs (shared/lib/nostr/nip17.ts + NDK publish). By sending split-bill
 // invoices through the same pipeline, the recipient sees the invoice as a
 // normal chat bubble in their existing Contacts thread (the
-// `bitcoin:?lightning=…` URI is auto-linkified by coco-payment-ux's parser
+// `bitcoin:?lightning=…` URI is auto-linkified by colada's parser
 // and pops the pay-confirm sheet on tap). The `senderWrap` self-copy is
 // best-effort — it lets the sender's own Contacts thread render the sent
 // invoice; a relay-publish failure on the self-copy is logged but does not
@@ -247,8 +207,9 @@ async function sendNostrDM(
 export function useSplitBillOrchestrator() {
   const manager = useManager();
   const requestLightningInvoice = useCallback(
-    (mintUrl: string, amount: number) =>
-      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+    async (mintUrl: string, amount: number) => {
+      return prepareBolt11MintQuote(manager, mintUrl, amount, 'sat');
+    },
     [manager]
   );
   const nickname = useBitchatNickname();
@@ -257,6 +218,9 @@ export function useSplitBillOrchestrator() {
   const bitchatProfileScope = useBitchatProfileScope();
   const bitchatProfileScopeRef = useRef(bitchatProfileScope);
   bitchatProfileScopeRef.current = bitchatProfileScope;
+  const bitchatIdentityMaterial = useBitchatBLEIdentityMaterial();
+  const bitchatIdentityMaterialRef = useRef(bitchatIdentityMaterial);
+  bitchatIdentityMaterialRef.current = bitchatIdentityMaterial;
 
   // NDK + main Nostr private key — same sources UserMessagesScreen uses
   // for its DM send. Held behind refs so `confirm` / `retryDelivery` can
@@ -462,68 +426,38 @@ export function useSplitBillOrchestrator() {
               pendingTimersRef.current
             );
           } else if (p.channel === 'ble-dm' && p.peerID) {
-            // Per-peer bring-up: trigger the lazy Noise XX handshake and
-            // wait a short beat for the init packet to hit the air before
-            // queuing encrypted payloads. `startBLE` itself is lifted out
-            // of this loop — done once before the bleWorker starts.
-            //
-            //   - `startBLEPrivateChat` — triggers the handshake eagerly.
-            //     Without this, `sendBLEPrivateMessage` would queue the
-            //     payload on the native side and only actually transmit
-            //     once a handshake happens to complete for some other
-            //     reason — manifests as "message never arrives" for fresh
-            //     peer pairs.
-            //   - 250ms sleep — so the handshake init packet gets on the
-            //     air before we queue the first encrypted payload. BLE
-            //     handshake completes in <500ms for already-connected
-            //     peers; 250ms is enough headroom for the init+response
-            //     round-trip to start without being blocking for the
-            //     common case.
             const effectiveNick = nicknameRef.current || 'sovran';
-            const bleHandshakeStartAt = performance.now();
-            await startBLEPrivateChat(p.peerID).catch((err) => {
+            const result = await sendBLEPrivateMessageChunks({
+              peerID: p.peerID,
+              content: body,
+              nickname: effectiveNick,
+              profileScope: bitchatProfileScopeRef.current,
+              identityMaterial: bitchatIdentityMaterialRef.current,
+              messageIdPrefix: 'split-bill',
+            });
+            if (result.handshakeError) {
               flow.warn('split_bill.deliver.ble.handshake_failed', {
                 participantId: p.id,
                 peerID: p.peerID,
-                error: err instanceof Error ? err.message : String(err),
+                error: result.handshakeError,
               });
-            });
+            }
             flow.debug('split_bill.deliver.ble.handshake_done', {
               participantId: p.id,
               peerID: p.peerID,
-              handshake_ms: Math.round((performance.now() - bleHandshakeStartAt) * 100) / 100,
+              handshake_ms: Math.round(result.handshakeMs * 100) / 100,
             });
-            await new Promise((resolve) => setTimeout(resolve, 250));
-            const chunks = chunkUtf8(body, 255);
             flow.info('split_bill.deliver.ble', {
               participantId: p.id,
               peerID: p.peerID,
               bodyLen: body.length,
-              chunks: chunks.length,
+              chunks: result.chunks,
               nickname: effectiveNick,
             });
-            // Serial `await` is load-bearing: it preserves chunk order end
-            // to end. `sendBLEPrivateMessage` returns as soon as BLEService
-            // enqueues onto its internal `messageQueue` (a serial
-            // DispatchQueue, BLEService.swift:428-435), which is FIFO by
-            // construction, so chunk N is encrypted + broadcast before
-            // chunk N+1. Noise's per-session nonce also increments
-            // strictly with encrypt order, and the receiver drops any
-            // out-of-order packets — so anything parallel here would risk
-            // silent drops as well as scrambled bubbles.
-            const chunksStartAt = performance.now();
-            for (const chunk of chunks) {
-              await sendBLEPrivateMessage(
-                p.peerID,
-                chunk,
-                effectiveNick,
-                mintLocalId('split-bill')
-              );
-            }
             flow.debug('split_bill.deliver.ble.chunks_sent', {
               participantId: p.id,
-              chunks: chunks.length,
-              duration_ms: Math.round((performance.now() - chunksStartAt) * 100) / 100,
+              chunks: result.chunks,
+              duration_ms: Math.round(result.sendMs * 100) / 100,
             });
           } else {
             throw new Error('Missing delivery target');
@@ -560,13 +494,13 @@ export function useSplitBillOrchestrator() {
 
       // BLE worker — sequential per-peer handshake + send.
       //
-      // `startBLE` is idempotent (no-op if the BitchatBLEProvider has
-      // already started the mesh); we call it once up front instead of
-      // per-peer so we don't pay its native-bridge round-trip N times.
+      // `startBLE` is idempotent; call it once up front instead of per-peer
+      // so we don't pay its native-bridge round-trip N times.
       const bleWorker = (async (): Promise<DeliveryOutcome[]> => {
         if (bleParticipants.length > 0) {
           const effectiveNick = nicknameRef.current || 'sovran';
           const profileScope = bitchatProfileScopeRef.current;
+          const identityMaterial = bitchatIdentityMaterialRef.current;
           if (!profileScope) {
             flow.warn('split_bill.deliver.ble.no_profile_scope');
             for (const p of bleParticipants) {
@@ -576,8 +510,17 @@ export function useSplitBillOrchestrator() {
             }
             return bleParticipants.map(() => 'failed' as const);
           }
+          if (!identityMaterial) {
+            flow.warn('split_bill.deliver.ble.no_identity_material');
+            for (const p of bleParticipants) {
+              useSplitBillTransactionsStore
+                .getState()
+                .markDelivered(groupId, p.id, false, 'BitChat identity material unavailable');
+            }
+            return bleParticipants.map(() => 'failed' as const);
+          }
           const startupAt = performance.now();
-          await startBLE(effectiveNick, profileScope).catch((err) => {
+          await startBLE(effectiveNick, profileScope, identityMaterial).catch((err) => {
             flow.warn('split_bill.deliver.ble.start_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
@@ -670,28 +613,34 @@ export function useSplitBillOrchestrator() {
         // Same bring-up sequence as the confirm path — see comments there.
         const effectiveNick = nicknameRef.current || 'sovran';
         const profileScope = bitchatProfileScopeRef.current;
+        const identityMaterial = bitchatIdentityMaterialRef.current;
         if (!profileScope) {
           throw new Error('BitChat profile scope unavailable');
         }
-        await startBLE(effectiveNick, profileScope).catch(() => undefined);
-        await startBLEPrivateChat(p.peerID).catch((err) => {
+        if (!identityMaterial) {
+          throw new Error('BitChat identity material unavailable');
+        }
+        const result = await sendBLEPrivateMessageChunks({
+          peerID: p.peerID,
+          content: body,
+          nickname: effectiveNick,
+          profileScope,
+          identityMaterial,
+          messageIdPrefix: 'split-bill',
+        });
+        if (result.handshakeError) {
           flow.warn('split_bill.retry_delivery.ble.handshake_failed', {
             participantId,
             peerID: p.peerID,
-            error: err instanceof Error ? err.message : String(err),
+            error: result.handshakeError,
           });
-        });
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        const chunks = chunkUtf8(body, 255);
+        }
         flow.info('split_bill.retry_delivery.ble', {
           participantId,
           peerID: p.peerID,
           bodyLen: body.length,
-          chunks: chunks.length,
+          chunks: result.chunks,
         });
-        for (const chunk of chunks) {
-          await sendBLEPrivateMessage(p.peerID, chunk, effectiveNick, mintLocalId('split-bill'));
-        }
       } else {
         throw new Error('QR-only: no delivery channel');
       }
@@ -721,7 +670,7 @@ export function useSplitBillOrchestrator() {
 // ---------------------------------------------------------------------------
 
 /**
- * Subscribe to coco's `history:updated` event bus and flip split-bill
+ * Subscribe to Colada's payment event bus and flip split-bill
  * participants to `paid`/`expired` when their tracked mint quote reaches
  * a terminal state. Mount once at app root (`<SplitBillPaymentReconciler />`
  * in `app/_layout.tsx`) — runs regardless of which screen is foregrounded.
@@ -733,19 +682,22 @@ export function useSplitBillOrchestrator() {
  *     matched (43.json#F-007)
  *   - 8s polling kept ticking when the app was backgrounded (43.json#F-013)
  *
- * Pattern matches the other 3 in-tree consumers of this event:
- * `useHistoryWithMelts`, `useHistoryEntry`, `usePaymentStatusListener`.
+ * Pattern matches the other in-tree detail consumers: `useHistoryWithMelts`
+ * and `useHistoryEntry`.
  */
 export function useSplitBillPaymentReconciler() {
-  const manager = useManager();
+  const bus = useColadaSubscriptions();
 
   useEffect(() => {
-    if (!manager) return;
     paymentLog.info('split_bill.reconciler.start');
 
-    const off = manager.on('history:updated', ({ entry }) => {
+    const off = bus.subscribe({ type: 'history.updated' }, ({ entry }) => {
+      if (typeof entry.type !== 'string') return;
       const store = useSplitBillTransactionsStore.getState();
-      const outcome = reconcileSplitBillHistoryUpdate(entry, store);
+      const outcome = reconcileSplitBillHistoryUpdate(
+        entry as unknown as { type: string; quoteId?: string; state?: string },
+        store
+      );
       if (outcome !== 'ignored') {
         paymentLog.info('split_bill.reconciler.flip', {
           quoteId: (entry as { quoteId?: string }).quoteId,
@@ -758,5 +710,5 @@ export function useSplitBillPaymentReconciler() {
       off();
       paymentLog.info('split_bill.reconciler.stop');
     };
-  }, [manager]);
+  }, [bus]);
 }

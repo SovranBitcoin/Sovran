@@ -35,8 +35,10 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
 import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
+import { isReservedSendHistoryEntry } from '@sovranbitcoin/colada';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog, Log } from '@/shared/lib/logger';
 
 interface Account {
@@ -207,13 +209,12 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   const [foreground, warning] = useThemeColor(['foreground', 'warning'] as const);
   const balanceTint = opacity(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
   const { reservedTotal } = useReservedProofs();
-  const pendingSends = history.filter(
-    (entry): entry is SendHistoryEntry =>
-      entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
+  const pendingSends = history.filter((entry): entry is SendHistoryEntry =>
+    isReservedSendHistoryEntry(entry)
   );
   const pendingTotal = mockMode
     ? mockPendingAmount
-    : pendingSends.reduce((sum, tx) => sum + tx.amount, 0);
+    : pendingSends.reduce((sum, tx) => sum + amountToNumber(tx.amount), 0);
   const pendingUnit = pendingSends[0]?.unit || 'sat';
 
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
@@ -266,7 +267,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         buttons: [
           {
             testID: 'reserved-proofs-recover',
-            text: 'Recover Pending Operations',
+            text: 'Recover pending operations',
             description: 'Checks pending send and melt operations',
             icon: 'mdi:wrench',
             onPress: async () => {

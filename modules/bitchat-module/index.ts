@@ -26,6 +26,7 @@ export {
 export { encodeGeohash, isValidGeohash } from './src/geohash';
 
 export type {
+  BitchatBLEIdentityMaterial,
   BLEDeliveryStatus,
   BLEDeliveryStatusEvent,
   BLEDmContact,

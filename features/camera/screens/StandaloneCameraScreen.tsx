@@ -12,7 +12,7 @@ import Icon from 'assets/icons';
 import { CameraScreen } from '@/features/camera';
 import { cameraRouteParamsSchema } from './CameraScreen/CameraScreen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useCocoPaymentUXContext } from 'coco-payment-ux/react';
+import { useColadaContext } from '@sovranbitcoin/colada/react';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
@@ -27,7 +27,7 @@ export function StandaloneCameraScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'camera.standalone' });
   const action = params?.action;
   const foreground = useThemeColor('foreground');
-  const { machine } = useCocoPaymentUXContext();
+  const { machine } = useColadaContext();
 
   const nfcFiredRef = useRef(false);
   const shouldAutoStartNfc = action === 'nfc-pay';

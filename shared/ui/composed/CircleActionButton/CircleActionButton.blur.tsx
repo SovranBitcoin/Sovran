@@ -10,13 +10,15 @@ import { CircleActionButtonShell } from './CircleActionButtonShell';
 
 export function CircleActionButtonBlur(props: CircleActionButtonProps): React.ReactElement {
   const [foreground] = useThemeColor(['foreground'] as const);
-  const { icon, onPress, disabled = false, color } = props;
+  const { icon, onPress, onPressIn, onPressOut, disabled = false, color } = props;
   const iconColor = color ?? foreground;
-  const interactive = !disabled && !!onPress;
+  const interactive = !disabled && !!(onPress || onPressIn || onPressOut);
   return (
     <CircleActionButtonShell {...props}>
       <Pressable
         onPress={interactive ? onPress : undefined}
+        onPressIn={interactive ? onPressIn : undefined}
+        onPressOut={interactive ? onPressOut : undefined}
         disabled={!interactive}
         style={({ pressed }) => [
           styles.blurPressable,

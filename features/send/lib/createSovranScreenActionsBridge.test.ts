@@ -1,6 +1,6 @@
 /* eslint-disable import/first */
 
-jest.mock('coco-payment-ux', () => ({
+jest.mock('@sovranbitcoin/colada', () => ({
   meltOperationToScreenActionEntry: jest.fn(),
   mergeEntryUpdate: (
     current: Record<string, unknown> | null,
@@ -105,7 +105,7 @@ describe('shouldApplySovranEntryUpdate', () => {
     expect(shouldApplySovranEntryUpdate({ type: 'mint' }, { _mintEnrichment: true })).toBe(false);
   });
 
-  it('delegates normal history matching to coco-payment-ux', () => {
+  it('delegates normal history matching to colada', () => {
     expect(
       shouldApplySovranEntryUpdate(
         { type: 'mint', quoteId: 'quote-1' },

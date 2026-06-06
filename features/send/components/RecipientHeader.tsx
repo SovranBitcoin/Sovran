@@ -13,13 +13,15 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 interface RecipientHeaderProps {
-  pubkey: string;
+  pubkey?: string;
+  seed?: string;
   displayName: string;
   avatarUrl?: string | null;
 }
 
-export function RecipientHeader({ pubkey, displayName, avatarUrl }: RecipientHeaderProps) {
+export function RecipientHeader({ pubkey, seed, displayName, avatarUrl }: RecipientHeaderProps) {
   const foreground = useThemeColor('foreground');
+  const avatarSeed = seed ?? pubkey ?? displayName;
   return (
     <VStack align="center" gap={4} style={{ paddingTop: 20 }}>
       <Avatar
@@ -27,7 +29,7 @@ export function RecipientHeader({ pubkey, displayName, avatarUrl }: RecipientHea
         picture={avatarUrl ?? undefined}
         size={HEADER_LAYOUT.TOOLBAR_BUTTON_WIDTH}
         name={displayName}
-        seed={pubkey}
+        seed={avatarSeed}
         alt={`${displayName} avatar`}
       />
       <Text size={14} weight="bold" style={{ color: foreground }}>

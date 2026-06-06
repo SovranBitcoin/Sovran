@@ -1,13 +1,19 @@
 /**
  * @fileoverview Home Feed ("For You") Component
  *
- * Algorithmic feed powered by Primal's mega_feed_directive endpoint.
- * Fetches available feed configurations, then loads a paginated
- * multi-author feed using the same event format as UserFeed.
+ * Algorithmic feed powered by Nagg's GraphQL API.
  */
 
-import { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  useMemo,
+  useRef,
+  useEffect,
+  useCallback,
+  useState,
+  useTransition,
+  type ReactNode,
+} from 'react';
+import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -17,26 +23,35 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log } from '@/shared/lib/logger';
-import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
+import {
+  LegendList,
+  type LegendListRenderItemProps,
+  type LegendListRef,
+} from '@legendapp/list/react-native';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { getFeedClient } from '@/features/feed/data/useFeedClient';
+import type { FeedParseResult } from '@/features/feed/data/feedClient';
+import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
+import { actionMenuPopup } from '@/shared/lib/popup';
+import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feedTypes';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
-import {
-  createPrimalRelayClient,
-  PRIMAL_CACHE_RELAY_URL,
-  PRIMAL_KIND_FEED_RANGE,
-} from './nostr/primalRelay';
-import { parseJson, tryNpubEncode } from './nostr/feedParse';
+import { tryNpubEncode } from './nostr/feedParse';
 import {
   buildVideoOverlayLayout,
   computeFeedIndicesWithVideo,
   MAX_VIDEO_FEED_PAGES,
 } from './nostr/videoLayout';
-import { enrichFeedPage, parseFeedPage } from './nostr/parseFeedPage';
-import { CATEGORY_PUBKEYS } from './nostr/categoryNpubs';
+import {
+  buildFeedRows,
+  DEFAULT_ENGAGEMENT_STATE,
+  feedRowsAreEqual,
+  getFeedRowItemType,
+  getFeedRowKey,
+  type FeedRow,
+} from '@/features/feed/lib/feedRows';
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard } from './UserFeed';
@@ -48,6 +63,7 @@ import {
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 
 // ============================================================================
 // Types
@@ -65,50 +81,52 @@ interface FeedSpec {
   feedkind?: string;
 }
 
+export const FEED_FILTER_FOR_YOU = 'For You';
+export const FEED_FILTER_FOLLOWING_POPULAR = 'Following Popular';
+export const FEED_FILTER_FOLLOWING_RECENT = 'Following Recent';
+
 // Stable config object — avoids re-triggering useBackgroundConfig every render
 const BG_CONFIG = { blurMode: 'full' as const };
+const FEED_AVATAR_SIZE = 36;
+const FEED_CARD_HORIZONTAL_PADDING = 16;
+const FEED_CARD_VERTICAL_PADDING = 10;
+const FEED_AVATAR_CENTER_Y = FEED_CARD_VERTICAL_PADDING + FEED_AVATAR_SIZE / 2;
+const FEED_THREAD_CONNECTOR_AVATAR_GAP = 6;
+const FEED_THREAD_CONNECTOR_TOP =
+  FEED_CARD_VERTICAL_PADDING + FEED_AVATAR_SIZE + FEED_THREAD_CONNECTOR_AVATAR_GAP;
+const FEED_REPOST_HEADER_HEIGHT = 27;
+const FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y = FEED_REPOST_HEADER_HEIGHT + FEED_AVATAR_CENTER_Y;
 
-// ============================================================================
-// Helpers
-// ============================================================================
+type IgnoreTarget = {
+  eventId?: string;
+  pubkey?: string;
+};
 
-/**
- * Inject user pubkey into feed specs that require it.
- * Specs with `"id":"feed"` are user-specific (latest from follows, etc.)
- * and need a `pubkey` field to know whose network to query.
- */
-function hydrateSpecWithPubkey(spec: string, pubkey: string): string {
-  const parsed = parseJson<Record<string, unknown>>(spec);
-  if (!parsed || typeof parsed !== 'object') return spec;
-  const hasExplicitPubkeys = Array.isArray(parsed.pubkeys);
-  if (parsed.id === 'feed' && !parsed.pubkey && !hasExplicitPubkeys) {
-    return JSON.stringify({ ...parsed, pubkey });
+function feedItemEvents(item: FeedItem): FeedEvent[] {
+  const events: FeedEvent[] = [];
+  if (item.type === 'note') {
+    events.push(item.event);
+    if (item.rootEvent) events.push(item.rootEvent);
+    events.push(...(item.replyPreviewEvents ?? []));
+    return events;
   }
-  return spec;
+
+  events.push(item.repostEvent);
+  if (item.originalEvent) events.push(item.originalEvent);
+  if (item.rootEvent) events.push(item.rootEvent);
+  for (const reposter of item.reposters ?? []) events.push(reposter.event);
+  return events;
 }
 
-export function categoryToLabel(category: string): string {
-  return category
-    .split('_')
-    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
-    .join(' ');
-}
-
-function getCategoryPubkeysFromSpec(spec: string): string[] {
-  const parsed = parseJson<Record<string, unknown>>(spec);
-  if (!parsed) return [];
-  if (parsed.id !== 'feed' || parsed.kind !== 'notes' || parsed.notes !== 'authored') return [];
-  if (!Array.isArray(parsed.pubkeys)) return [];
-
-  const seen = new Set<string>();
-  const pubkeys: string[] = [];
-  for (const value of parsed.pubkeys) {
-    if (!isNostrPubkeyHex(value)) continue;
-    if (seen.has(value)) continue;
-    seen.add(value);
-    pubkeys.push(value);
-  }
-  return pubkeys;
+function feedItemMatchesIgnoreTarget(item: FeedItem, target: IgnoreTarget): boolean {
+  const eventId = target.eventId?.toLowerCase();
+  const pubkey = target.pubkey?.toLowerCase();
+  if (!eventId && !pubkey) return false;
+  return feedItemEvents(item).some(
+    (event) =>
+      (eventId ? event.id.toLowerCase() === eventId : false) ||
+      (pubkey ? event.pubkey.toLowerCase() === pubkey : false)
+  );
 }
 
 // ============================================================================
@@ -133,6 +151,44 @@ function EmptyFeed() {
   );
 }
 
+function FeedThreadPair({
+  first,
+  second,
+  secondAvatarCenterY = FEED_AVATAR_CENTER_Y,
+}: {
+  first: ReactNode;
+  second: ReactNode;
+  secondAvatarCenterY?: number;
+}) {
+  const foreground = useThemeColor('foreground');
+  const [firstHeight, setFirstHeight] = useState(0);
+
+  const handleFirstLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.round(event.nativeEvent.layout.height);
+    setFirstHeight((currentHeight) => (currentHeight === nextHeight ? currentHeight : nextHeight));
+  }, []);
+
+  const connectorStyle = useMemo(() => {
+    const secondAvatarTop = firstHeight + secondAvatarCenterY - FEED_AVATAR_SIZE / 2;
+    const connectorBottom = secondAvatarTop - FEED_THREAD_CONNECTOR_AVATAR_GAP;
+    return [
+      styles.threadPairConnector,
+      {
+        backgroundColor: opacity(foreground, 0.28),
+        height: Math.max(0, connectorBottom - FEED_THREAD_CONNECTOR_TOP),
+      },
+    ];
+  }, [firstHeight, foreground, secondAvatarCenterY]);
+
+  return (
+    <View style={styles.threadPair}>
+      {firstHeight > 0 ? <View pointerEvents="none" style={connectorStyle} /> : null}
+      <View onLayout={handleFirstLayout}>{first}</View>
+      {second}
+    </View>
+  );
+}
+
 // ============================================================================
 // Main HomeFeed Component
 // ============================================================================
@@ -143,25 +199,58 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const imageOverlay = useImageOverlay();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;
+  const ignoreEvent = useFeedIgnoreStore((state) => state.ignoreEvent);
+  const ignorePubkey = useFeedIgnoreStore((state) => state.ignorePubkey);
+  const ignoredPubkeysKey = useFeedIgnoreStore((state) => state.ignoredPubkeys.join('\u0000'));
+  const ignoredEventIdsKey = useFeedIgnoreStore((state) => state.ignoredEventIds.join('\u0000'));
   const [, startTransition] = useTransition();
-  const [feedSpecs, setFeedSpecs] = useState<FeedSpec[]>([]);
+  const feedSpecs = DEFAULT_FEED_SPECS;
   const activeSpecIndex = useMemo(() => {
     if (!activeFilter) return 0;
     const idx = feedSpecs.findIndex((s) => s.name === activeFilter);
     return idx >= 0 ? idx : 0;
   }, [activeFilter, feedSpecs]);
-  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
-  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
-  const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(new Map());
-  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(new Map());
-  const [isLoading, setIsLoading] = useState(true);
+  // Warm-navigation seed: if this spec's page-0 was cached earlier this session
+  // (not a cold start), initialise state + pagination refs straight from it so a
+  // remount (e.g. closing search) paints instantly instead of flashing a
+  // spinner. The trigger effect below still runs loadFeed, but its isFresh gate
+  // makes that a no-op (fresh) or a silent revalidate (stale). Consumed only by
+  // the lazy initialisers / ref defaults, so it's captured once at mount.
+  const initialSpec = feedSpecs[activeSpecIndex]?.spec;
+  const initialCacheKey = initialSpec ? feedPageKey(initialSpec, userPubkey) : null;
+  const seed =
+    initialCacheKey && !feedPageCache.isColdStart(initialCacheKey)
+      ? feedPageCache.getEntry(initialCacheKey)?.data
+      : undefined;
+
+  const [feedItems, setFeedItems] = useState<FeedItem[]>(() => seed?.orderedFeedItems ?? []);
+  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(
+    () => seed?.metricsMap ?? new Map()
+  );
+  const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(
+    () => seed?.quotedEventsMap ?? new Map()
+  );
+  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(
+    () => seed?.profilesMap ?? new Map()
+  );
+  const [isLoading, setIsLoading] = useState(() => !seed);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const hasMoreRef = useRef(true);
-  const paginationUntilRef = useRef(0);
-  const paginationOffsetRef = useRef(0);
+  const hasMoreRef = useRef(
+    seed ? seed.paginationUntil > 0 && seed.orderedFeedItems.length > 0 : true
+  );
+  const paginationUntilRef = useRef(seed?.paginationUntil ?? 0);
+  const paginationOffsetRef = useRef(seed?.paginationOffset ?? 0);
   const loadingMoreRef = useRef(false);
-  const feedItemIdsRef = useRef(new Set<string>());
+  const feedItemIdsRef = useRef(
+    new Set<string>(
+      seed
+        ? seed.orderedFeedItems.map((item) =>
+            item.type === 'note' ? item.event.id : item.repostEvent.id
+          )
+        : []
+    )
+  );
   // Tracks the request prefix of the most recently started loadFeed/loadMoreItems
   // — onUpdate callbacks captured by an older request bail out when this drifts.
   const activeLoadIdRef = useRef<string | null>(null);
@@ -169,31 +258,37 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const metricsRef = useLatestRef(metricsMap);
   const quotedRef = useLatestRef(quotedEventsMap);
   const profilesRef = useLatestRef(profilesMap);
-  const [dataVersion, setDataVersion] = useState(0);
+  const feedRowsRef = useRef<FeedRow[]>([]);
 
   const isFirstRender = useRef(true);
 
   const listRef = useRef<LegendListRef>(null);
 
   const scrollOffsetRef = useRef(0);
+  const loadSequenceRef = useRef(0);
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
 
-  const categoryFeedSpecs = useMemo<FeedSpec[]>(() => {
-    return Object.entries(CATEGORY_PUBKEYS).map(([category, pubkeys]) => ({
-      name: categoryToLabel(category),
-      spec: JSON.stringify({
-        id: 'feed',
-        kind: 'notes',
-        notes: 'authored',
-        pubkeys,
-      }),
-    }));
+  const beginNetworkLoad = useCallback(() => {
+    const requestId = `${Date.now().toString(36)}:${++loadSequenceRef.current}`;
+    activeLoadIdRef.current = requestId;
+    activeAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeAbortControllerRef.current = controller;
+    return { requestId, controller };
   }, []);
 
-  // ── Phase 0: Fetch available feed specs ──
+  const isActiveLoad = useCallback(
+    (requestId: string) => activeLoadIdRef.current === requestId,
+    []
+  );
 
   useEffect(() => {
-    setFeedSpecs([...PRIMAL_FEED_SPECS, ...categoryFeedSpecs]);
-  }, [categoryFeedSpecs]);
+    return () => {
+      activeLoadIdRef.current = null;
+      activeAbortControllerRef.current?.abort();
+      activeAbortControllerRef.current = null;
+    };
+  }, []);
 
   // ── Phase 1–3: Load feed content for selected spec ──
 
@@ -201,65 +296,11 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     async (specIndex: number, isRefresh = false) => {
       const spec = feedSpecs[specIndex]?.spec;
       if (!spec) return;
-      if (!isRefresh) setIsLoading(true);
-      isFirstRender.current = true;
-      hasMoreRef.current = true;
-      paginationUntilRef.current = 0;
-      paginationOffsetRef.current = 0;
-      feedItemIdsRef.current.clear();
-      loadingMoreRef.current = false;
+      const cacheKey = feedPageKey(spec, userPubkey);
 
-      const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
-      const requestPrefix = Date.now().toString(36);
-      activeLoadIdRef.current = requestPrefix;
-
-      try {
-        // Hydrate spec with user pubkey for personalized feeds
-        const hydratedSpec = userPubkey ? hydrateSpecWithPubkey(spec, userPubkey) : spec;
-        const parsedHydrated = parseJson<Record<string, unknown>>(hydratedSpec);
-        if (
-          parsedHydrated &&
-          Array.isArray(parsedHydrated.pubkeys) &&
-          parsedHydrated.pubkeys.length === 0
-        ) {
-          setFeedItems([]);
-          setMetricsMap(new Map());
-          setQuotedEventsMap(new Map());
-          setProfilesMap(new Map());
-          setDataVersion((v) => v + 1);
-          setIsLoading(false);
-          setIsRefreshing(false);
-          hasMoreRef.current = false;
-          return;
-        }
-
-        const categoryPubkeys = getCategoryPubkeysFromSpec(hydratedSpec);
-        const feedRawEvents =
-          categoryPubkeys.length > 0
-            ? (
-                await Promise.all(
-                  categoryPubkeys.map((pubkey, index) =>
-                    client.request(`${requestPrefix}_author_${index}`, {
-                      cache: ['feed', { pubkey, notes: 'authored', limit: 6 }],
-                    })
-                  )
-                )
-              )
-                .flat()
-                .filter((event) => event.kind !== PRIMAL_KIND_FEED_RANGE)
-            : await (async () => {
-                const megaFeedPayload: Record<string, unknown> = {
-                  spec: hydratedSpec,
-                  limit: 30,
-                };
-                if (userPubkey) megaFeedPayload.user_pubkey = userPubkey;
-                return client.request(`${requestPrefix}_mega`, {
-                  cache: ['mega_feed_directive', megaFeedPayload],
-                });
-              })();
-
-        const phase1 = parseFeedPage(feedRawEvents, { perfLogTag: 'feed.parse' });
-
+      // Applies a page-0 result to state + pagination refs. Used both for the
+      // instant warm-nav paint and for the fresh fetch.
+      const applyPhase1 = (phase1: FeedParseResult) => {
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
         paginationOffsetRef.current = phase1.paginationOffset;
@@ -268,97 +309,163 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             item.type === 'note' ? item.event.id : item.repostEvent.id
           )
         );
-
         setFeedItems(phase1.orderedFeedItems);
         setMetricsMap(phase1.metricsMap);
         setQuotedEventsMap(phase1.quotedEventsMap);
         setProfilesMap(phase1.profilesMap);
-        setDataVersion((v) => v + 1);
+      };
+
+      isFirstRender.current = true;
+      loadingMoreRef.current = false;
+      setIsLoadingMore(false);
+
+      // Warm navigation (key touched earlier this session): paint the cached
+      // page-0 instantly (keeping its pagination cursor). If it's still fresh,
+      // that paint is authoritative and we skip the network entirely; if stale,
+      // we revalidate silently below (no spinner). Cold start / refresh: show
+      // loading, never a stale first paint.
+      let paintedFromCache = false;
+      const cachedEntry =
+        !isRefresh && !feedPageCache.isColdStart(cacheKey)
+          ? feedPageCache.getEntry(cacheKey)
+          : undefined;
+      if (cachedEntry) {
+        applyPhase1(cachedEntry.data);
+        setIsLoading(false);
+        paintedFromCache = true;
+      }
+      if (!paintedFromCache) {
+        if (!isRefresh) {
+          setIsLoading(true);
+          // Cold load for this spec: clear the previous spec's rows so they don't
+          // linger under the spinner. (Replaces the old reset effect, which clobbered
+          // the warm paint on every tab change.) On pull-to-refresh we keep the
+          // current rows visible while the refresh spinner runs.
+          setFeedItems([]);
+          setMetricsMap(new Map());
+          setQuotedEventsMap(new Map());
+          setProfilesMap(new Map());
+        }
+        hasMoreRef.current = true;
+        paginationUntilRef.current = 0;
+        paginationOffsetRef.current = 0;
+        feedItemIdsRef.current.clear();
+      } else if (feedPageCache.isFresh(cachedEntry)) {
+        // Warm + fresh: the instant paint above is complete and authoritative.
+        // Cancel any in-flight load so a slower previous fetch can't overwrite
+        // this paint, then skip the network — no spinner, no request.
+        activeAbortControllerRef.current?.abort();
+        activeAbortControllerRef.current = null;
+        activeLoadIdRef.current = null;
+        requestAnimationFrame(() => {
+          isFirstRender.current = false;
+        });
+        return;
+      }
+
+      const { requestId, controller } = beginNetworkLoad();
+      const client = getFeedClient();
+      let didApplyPage = paintedFromCache;
+
+      try {
+        const phase1 = await client.getFeed({
+          spec,
+          userPubkey,
+          limit: 30,
+          refresh: isRefresh,
+          signal: controller.signal,
+        });
+
+        if (!isActiveLoad(requestId)) return;
+
+        applyPhase1(phase1);
+        feedPageCache.setEntry(cacheKey, phase1, { viewerKey: userPubkey || '' });
+        feedPageCache.markTouched(cacheKey);
+        didApplyPage = true;
         setIsLoading(false);
         setIsRefreshing(false);
         requestAnimationFrame(() => {
           isFirstRender.current = false;
         });
 
-        await enrichFeedPage(
-          client,
-          requestPrefix,
-          phase1.missingQuotedIds,
-          phase1.missingProfilePubkeys,
-          phase1.quotedEventsMap,
-          phase1.profilesMap,
-          (updates) => {
-            if (activeLoadIdRef.current !== requestPrefix) return;
-            startTransition(() => {
-              if (updates.quotedEvents) {
-                setQuotedEventsMap((prev) => {
-                  const n = new Map(prev);
-                  for (const [k, v] of updates.quotedEvents!) n.set(k, v);
-                  return n;
-                });
-              }
-              if (updates.metrics) {
-                setMetricsMap((prev) => {
-                  const n = new Map(prev);
-                  for (const [k, v] of updates.metrics!) n.set(k, v);
-                  return n;
-                });
-              }
-              if (updates.profiles) {
-                setProfilesMap((prev) => {
-                  const n = new Map(prev);
-                  for (const [k, v] of updates.profiles!) n.set(k, v);
-                  return n;
-                });
-              }
-              setDataVersion((v) => v + 1);
+        const updates = await client.enrich({
+          missingQuotedIds: phase1.missingQuotedIds,
+          missingProfilePubkeys: phase1.missingProfilePubkeys,
+          refresh: isRefresh,
+          signal: controller.signal,
+        });
+        if (!isActiveLoad(requestId)) return;
+        startTransition(() => {
+          if (updates.quotedEvents) {
+            setQuotedEventsMap((prev) => {
+              const n = new Map(prev);
+              for (const [k, v] of updates.quotedEvents!) n.set(k, v);
+              return n;
             });
           }
-        );
+          if (updates.metrics) {
+            setMetricsMap((prev) => {
+              const n = new Map(prev);
+              for (const [k, v] of updates.metrics!) n.set(k, v);
+              return n;
+            });
+          }
+          if (updates.profiles) {
+            setProfilesMap((prev) => {
+              const n = new Map(prev);
+              for (const [k, v] of updates.profiles!) n.set(k, v);
+              return n;
+            });
+          }
+        });
       } catch (error) {
+        if (!isActiveLoad(requestId)) return;
         log.error('feed.home.load_failed', {
           message: error instanceof Error ? error.message : String(error),
         });
-        setFeedItems([]);
-        setMetricsMap(new Map());
-        setQuotedEventsMap(new Map());
-        setProfilesMap(new Map());
+        if (!isRefresh && !didApplyPage) {
+          setFeedItems([]);
+          setMetricsMap(new Map());
+          setQuotedEventsMap(new Map());
+          setProfilesMap(new Map());
+        }
         setIsLoading(false);
         setIsRefreshing(false);
       } finally {
-        client.close();
+        if (activeAbortControllerRef.current === controller) {
+          activeAbortControllerRef.current = null;
+        }
+        client.dispose?.();
       }
     },
-    [feedSpecs, userPubkey]
+    [beginNetworkLoad, feedSpecs, isActiveLoad, userPubkey]
   );
 
   // Trigger feed load when spec (page) changes
   const currentSpec = feedSpecs[activeSpecIndex]?.spec;
   const prevSpecRef = useRef<string | undefined>(undefined);
   const prevPubkeyRef = useRef<string | undefined>(undefined);
+  const prevPreferenceKeyRef = useRef<string | undefined>(undefined);
+  const preferenceKey = `${ignoredPubkeysKey}|${ignoredEventIdsKey}`;
   useEffect(() => {
     if (!currentSpec) return;
-    if (currentSpec === prevSpecRef.current && userPubkey === prevPubkeyRef.current) return;
+    if (
+      currentSpec === prevSpecRef.current &&
+      userPubkey === prevPubkeyRef.current &&
+      preferenceKey === prevPreferenceKeyRef.current
+    )
+      return;
     prevSpecRef.current = currentSpec;
     prevPubkeyRef.current = userPubkey;
+    prevPreferenceKeyRef.current = preferenceKey;
     void loadFeed(activeSpecIndex);
-  }, [activeSpecIndex, currentSpec, userPubkey, loadFeed]);
+  }, [activeSpecIndex, currentSpec, userPubkey, preferenceKey, loadFeed]);
 
   const handleRefresh = useCallback(() => {
-    if (!currentSpec) return;
+    if (!currentSpec || isRefreshing) return;
     setIsRefreshing(true);
     void loadFeed(activeSpecIndex, true);
-  }, [activeSpecIndex, currentSpec, loadFeed]);
-
-  // Reset feed items when the active filter changes
-  const prevActiveSpecIndex = useRef(activeSpecIndex);
-  useEffect(() => {
-    if (prevActiveSpecIndex.current !== activeSpecIndex) {
-      prevActiveSpecIndex.current = activeSpecIndex;
-      setIsLoading(true);
-      setFeedItems([]);
-    }
-  }, [activeSpecIndex]);
+  }, [activeSpecIndex, currentSpec, isRefreshing, loadFeed]);
 
   // ── Pagination: load older items ──
 
@@ -373,67 +480,27 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
     loadingMoreRef.current = true;
     setIsLoadingMore(true);
-    const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
-    const rp = Date.now().toString(36);
-    activeLoadIdRef.current = rp;
+    const { requestId, controller } = beginNetworkLoad();
+    const client = getFeedClient();
 
     try {
-      const hydratedSpec = userPubkey
-        ? hydrateSpecWithPubkey(currentSpec, userPubkey)
-        : currentSpec;
-      const categoryPubkeys = getCategoryPubkeysFromSpec(hydratedSpec);
-      const rawEvents =
-        categoryPubkeys.length > 0
-          ? (
-              await Promise.all(
-                categoryPubkeys.map((pubkey, index) =>
-                  client.request(`${rp}_author_more_${index}`, {
-                    cache: [
-                      'feed',
-                      {
-                        pubkey,
-                        notes: 'authored',
-                        limit: 5,
-                        until: paginationUntilRef.current,
-                      },
-                    ],
-                  })
-                )
-              )
-            )
-              .flat()
-              .filter((event) => event.kind !== PRIMAL_KIND_FEED_RANGE)
-          : await (async () => {
-              const payload: Record<string, unknown> = {
-                spec: hydratedSpec,
-                limit: 20,
-                until: paginationUntilRef.current,
-              };
-              if (paginationOffsetRef.current > 0) payload.offset = paginationOffsetRef.current;
-              if (userPubkey) payload.user_pubkey = userPubkey;
-              return client.request(`${rp}_more`, {
-                cache: ['mega_feed_directive', payload],
-              });
-            })();
-      const page = parseFeedPage(rawEvents, { perfLogTag: 'feed.parse' });
+      const page = await client.getFeed({
+        spec: currentSpec,
+        userPubkey,
+        limit: 20,
+        until: paginationUntilRef.current,
+        offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
+        signal: controller.signal,
+      });
+
+      if (!isActiveLoad(requestId)) return [];
 
       if (page.orderedFeedItems.length === 0) {
         hasMoreRef.current = false;
         return [];
       }
 
-      if (categoryPubkeys.length > 0) {
-        const oldest = page.orderedFeedItems.reduce(
-          (acc, item) => (item.timestamp < acc ? item.timestamp : acc),
-          paginationUntilRef.current
-        );
-        if (oldest >= paginationUntilRef.current) {
-          hasMoreRef.current = false;
-          return [];
-        }
-        paginationUntilRef.current = oldest;
-        paginationOffsetRef.current = 0;
-      } else if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
+      if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
         paginationUntilRef.current = page.paginationUntil;
         paginationOffsetRef.current = page.paginationOffset;
       } else if (page.paginationUntil === paginationUntilRef.current) {
@@ -482,62 +549,63 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           for (const [k, v] of page.profilesMap) n.set(k, v);
           return n;
         });
-        setDataVersion((v) => v + 1);
       });
 
       const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
       const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
-      await enrichFeedPage(
-        client,
-        rp,
-        missingQ,
-        missingP,
-        quotedRef.current,
-        profilesRef.current,
-        (updates) => {
-          if (activeLoadIdRef.current !== rp) return;
-          startTransition(() => {
-            if (updates.quotedEvents) {
-              setQuotedEventsMap((prev) => {
-                const n = new Map(prev);
-                for (const [k, v] of updates.quotedEvents!) n.set(k, v);
-                return n;
-              });
-            }
-            if (updates.metrics) {
-              setMetricsMap((prev) => {
-                const n = new Map(prev);
-                for (const [k, v] of updates.metrics!) n.set(k, v);
-                return n;
-              });
-            }
-            if (updates.profiles) {
-              setProfilesMap((prev) => {
-                const n = new Map(prev);
-                for (const [k, v] of updates.profiles!) n.set(k, v);
-                return n;
-              });
-            }
-            setDataVersion((v) => v + 1);
+      const updates = await client.enrich({
+        missingQuotedIds: missingQ,
+        missingProfilePubkeys: missingP,
+        signal: controller.signal,
+      });
+      if (!isActiveLoad(requestId)) return newItems;
+      startTransition(() => {
+        if (updates.quotedEvents) {
+          setQuotedEventsMap((prev) => {
+            const n = new Map(prev);
+            for (const [k, v] of updates.quotedEvents!) n.set(k, v);
+            return n;
           });
         }
-      );
+        if (updates.metrics) {
+          setMetricsMap((prev) => {
+            const n = new Map(prev);
+            for (const [k, v] of updates.metrics!) n.set(k, v);
+            return n;
+          });
+        }
+        if (updates.profiles) {
+          setProfilesMap((prev) => {
+            const n = new Map(prev);
+            for (const [k, v] of updates.profiles!) n.set(k, v);
+            return n;
+          });
+        }
+      });
       return newItems;
     } catch (error) {
+      if (!isActiveLoad(requestId)) return [];
       log.error('feed.home.load_more_failed', {
         message: error instanceof Error ? error.message : String(error),
       });
       return [];
     } finally {
-      client.close();
+      if (activeAbortControllerRef.current === controller) {
+        activeAbortControllerRef.current = null;
+      }
+      client.dispose?.();
       loadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [currentSpec, userPubkey, startTransition]);
+  }, [beginNetworkLoad, currentSpec, isActiveLoad, userPubkey, startTransition]);
 
   const handleEndReached = useCallback(() => {
+    // Don't start pagination while the first page is still loading or a refresh
+    // is in flight — otherwise the footer spinner stacks on top of the
+    // empty-state / refresh spinner (duplicate spinners).
+    if (isLoading || isRefreshing) return;
     void loadMoreItems();
-  }, [loadMoreItems]);
+  }, [loadMoreItems, isLoading, isRefreshing]);
 
   // ── Derived data ──
 
@@ -549,6 +617,9 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const actionableEvents = useMemo(() => {
     const map = new Map<string, FeedEvent>();
     for (const item of feedItems) {
+      if (item.rootEvent) {
+        map.set(item.rootEvent.id, item.rootEvent);
+      }
       if (item.type === 'note') {
         map.set(item.event.id, item.event);
       } else if (item.originalEvent) {
@@ -558,8 +629,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     return Array.from(map.values());
   }, [feedItems]);
 
-  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
-    useNostrEngagement(actionableEvents, getMetrics);
+  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost } = useNostrEngagement(
+    actionableEvents,
+    getMetrics
+  );
+  const toggleLikeRef = useLatestRef(toggleLike);
+  const toggleRepostRef = useLatestRef(toggleRepost);
 
   const overlaySourceIndexRef = useRef(-1);
   const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
@@ -607,31 +682,251 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     [feedIndicesWithVideo, buildLayoutForVideoIndex]
   );
 
+  const removeIgnoredItems = useCallback((target: IgnoreTarget) => {
+    setFeedItems((prev) => prev.filter((item) => !feedItemMatchesIgnoreTarget(item, target)));
+  }, []);
+
+  const openPostActions = useCallback(
+    (event: FeedEvent) => {
+      const profile = profilesRef.current.get(event.pubkey);
+      const fallback = tryNpubEncode(event.pubkey).slice(0, 12) + '…';
+      actionMenuPopup({
+        title: 'Post',
+        buttons: [
+          {
+            text: 'Ignore post',
+            icon: 'mdi:eye-off-outline',
+            testID: 'feed-ignore-post',
+            onPress: (close) => {
+              close();
+              ignoreEvent(event.id);
+              removeIgnoredItems({ eventId: event.id });
+            },
+          },
+          {
+            text: 'Ignore person',
+            description: profile?.name ?? fallback,
+            icon: 'mdi:account-cancel-outline',
+            testID: 'feed-ignore-person',
+            onPress: (close) => {
+              close();
+              ignorePubkey(event.pubkey);
+              removeIgnoredItems({ pubkey: event.pubkey });
+            },
+          },
+        ],
+      });
+    },
+    [ignoreEvent, ignorePubkey, profilesRef, removeIgnoredItems]
+  );
+
   // ── Render ──
 
-  const getThreadContext = useCallback(() => {
-    const allEvents = new Map<string, FeedEvent>();
-    for (const it of feedItems) {
-      if (it.type === 'note') {
-        allEvents.set(it.event.id, it.event);
-      } else if (it.originalEvent) {
-        allEvents.set(it.originalEvent.id, it.originalEvent);
+  const getThreadContext = useCallback(
+    (replyPreviewEvents?: readonly FeedEvent[]) => {
+      const allEvents = new Map<string, FeedEvent>();
+      for (const it of feedItems) {
+        if (it.rootEvent) {
+          allEvents.set(it.rootEvent.id, it.rootEvent);
+        }
+        if (it.type === 'note') {
+          allEvents.set(it.event.id, it.event);
+          for (const replyPreviewEvent of it.replyPreviewEvents ?? []) {
+            allEvents.set(replyPreviewEvent.id, replyPreviewEvent);
+          }
+        } else if (it.originalEvent) {
+          allEvents.set(it.originalEvent.id, it.originalEvent);
+        }
       }
-    }
-    return {
-      allEvents,
-      profiles: profilesRef.current,
-      metrics: metricsRef.current,
-      quotedEvents: quotedRef.current,
-    };
-  }, [feedItems, profilesRef, metricsRef, quotedRef]);
+      for (const replyPreviewEvent of replyPreviewEvents ?? []) {
+        allEvents.set(replyPreviewEvent.id, replyPreviewEvent);
+      }
+      return {
+        allEvents,
+        profiles: profilesRef.current,
+        metrics: metricsRef.current,
+        quotedEvents: quotedRef.current,
+        replyPreviewEventIds: replyPreviewEvents?.map((event) => event.id),
+      };
+    },
+    [feedItems, profilesRef, metricsRef, quotedRef]
+  );
+  const getThreadContextRef = useLatestRef(getThreadContext);
+
+  const resolveReposter = useCallback(
+    (item: Extract<FeedItem, { type: 'repost' }>) => {
+      const reposterProfile = profilesMap.get(item.repostEvent.pubkey);
+      const reposterName =
+        reposterProfile?.name || tryNpubEncode(item.repostEvent.pubkey).slice(0, 12) + '…';
+      return {
+        name: reposterName,
+        pubkey: item.repostEvent.pubkey,
+      };
+    },
+    [profilesMap]
+  );
+
+  const feedRows = useMemo(
+    () =>
+      buildFeedRows({
+        items: feedItems,
+        previousRows: feedRowsRef.current,
+        profilesMap,
+        quotedEventsMap,
+        getDisplayMetrics,
+        getEngagementState,
+        resolveReposter,
+      }),
+    [
+      feedItems,
+      metricsMap,
+      profilesMap,
+      quotedEventsMap,
+      getDisplayMetrics,
+      getEngagementState,
+      resolveReposter,
+    ]
+  );
+
+  useEffect(() => {
+    feedRowsRef.current = feedRows;
+  }, [feedRows]);
 
   const renderFeedItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
+    ({ item: row, index }: LegendListRenderItemProps<FeedRow, string | undefined>) => {
+      const item = row.item;
       const feedIndex = index;
       if (item.type === 'note') {
-        const metrics = getDisplayMetrics(item.event.id);
-        const engagement = getEngagementState(item.event.id);
+        const metrics = row.metrics;
+        const engagement = row.engagement;
+        const contextRootEvent = row.rootEvent;
+        const replyPreviewEvents = item.replyPreviewEvents ?? [];
+        if (!contextRootEvent && replyPreviewEvents.length > 0) {
+          return (
+            <FeedThreadPair
+              first={
+                <PostCard
+                  variant="feed"
+                  event={item.event}
+                  metrics={metrics}
+                  index={index}
+                  feedIndex={feedIndex}
+                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                  quotedEvents={row.quotedEvents}
+                  profiles={row.profiles}
+                  getMetrics={getMetrics}
+                  liked={engagement.liked}
+                  reposted={engagement.reposted}
+                  likePending={engagement.likePending}
+                  repostPending={engagement.repostPending}
+                  likePendingDirection={engagement.likePendingDirection}
+                  repostPendingDirection={engagement.repostPendingDirection}
+                  onLikePress={() => toggleLikeRef.current(item.event)}
+                  onRepostPress={() => toggleRepostRef.current(item.event)}
+                  onMorePress={() => openPostActions(item.event)}
+                  skipAnimation={!isFirstRender.current}
+                  getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
+                  showFooterBorder={false}
+                  fullBleedFooterBorder
+                />
+              }
+              second={
+                <>
+                  {replyPreviewEvents.map((replyEvent, replyIndex) => {
+                    const replyMetrics = getDisplayMetrics(replyEvent.id);
+                    const replyEngagement = getEngagementState(replyEvent.id);
+                    const isLastReply = replyIndex === replyPreviewEvents.length - 1;
+                    return (
+                      <PostCard
+                        key={replyEvent.id}
+                        variant="feed"
+                        event={replyEvent}
+                        metrics={replyMetrics}
+                        index={index}
+                        feedIndex={feedIndex}
+                        onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                        quotedEvents={row.quotedEvents}
+                        profiles={row.profiles}
+                        getMetrics={getMetrics}
+                        liked={replyEngagement.liked}
+                        reposted={replyEngagement.reposted}
+                        likePending={replyEngagement.likePending}
+                        repostPending={replyEngagement.repostPending}
+                        likePendingDirection={replyEngagement.likePendingDirection}
+                        repostPendingDirection={replyEngagement.repostPendingDirection}
+                        onLikePress={() => toggleLikeRef.current(replyEvent)}
+                        onRepostPress={() => toggleRepostRef.current(replyEvent)}
+                        onMorePress={() => openPostActions(replyEvent)}
+                        getThreadContext={() => getThreadContextRef.current()}
+                        showFooterBorder={isLastReply}
+                        fullBleedFooterBorder
+                      />
+                    );
+                  })}
+                </>
+              }
+            />
+          );
+        }
+        if (contextRootEvent) {
+          const rootEvent = contextRootEvent;
+          const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
+          const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
+          return (
+            <FeedThreadPair
+              first={
+                <PostCard
+                  variant="feed"
+                  event={rootEvent}
+                  metrics={rootMetrics}
+                  index={index}
+                  feedIndex={feedIndex}
+                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                  quotedEvents={row.quotedEvents}
+                  profiles={row.profiles}
+                  getMetrics={getMetrics}
+                  liked={rootEngagement.liked}
+                  reposted={rootEngagement.reposted}
+                  likePending={rootEngagement.likePending}
+                  repostPending={rootEngagement.repostPending}
+                  likePendingDirection={rootEngagement.likePendingDirection}
+                  repostPendingDirection={rootEngagement.repostPendingDirection}
+                  onLikePress={() => toggleLikeRef.current(rootEvent)}
+                  onRepostPress={() => toggleRepostRef.current(rootEvent)}
+                  onMorePress={() => openPostActions(rootEvent)}
+                  skipAnimation={!isFirstRender.current}
+                  getThreadContext={() => getThreadContextRef.current()}
+                  showFooterBorder={false}
+                  fullBleedFooterBorder
+                />
+              }
+              second={
+                <PostCard
+                  variant="feed"
+                  event={item.event}
+                  metrics={metrics}
+                  index={index}
+                  feedIndex={feedIndex}
+                  onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                  quotedEvents={row.quotedEvents}
+                  profiles={row.profiles}
+                  getMetrics={getMetrics}
+                  liked={engagement.liked}
+                  reposted={engagement.reposted}
+                  likePending={engagement.likePending}
+                  repostPending={engagement.repostPending}
+                  likePendingDirection={engagement.likePendingDirection}
+                  repostPendingDirection={engagement.repostPendingDirection}
+                  onLikePress={() => toggleLikeRef.current(item.event)}
+                  onRepostPress={() => toggleRepostRef.current(item.event)}
+                  onMorePress={() => openPostActions(item.event)}
+                  getThreadContext={() => getThreadContextRef.current()}
+                  fullBleedFooterBorder
+                />
+              }
+            />
+          );
+        }
         return (
           <PostCard
             variant="feed"
@@ -640,8 +935,8 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             index={index}
             feedIndex={feedIndex}
             onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-            quotedEvents={quotedRef.current}
-            profiles={profilesRef.current}
+            quotedEvents={row.quotedEvents}
+            profiles={row.profiles}
             getMetrics={getMetrics}
             liked={engagement.liked}
             reposted={engagement.reposted}
@@ -649,61 +944,130 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             repostPending={engagement.repostPending}
             likePendingDirection={engagement.likePendingDirection}
             repostPendingDirection={engagement.repostPendingDirection}
-            onLikePress={() => toggleLike(item.event)}
-            onRepostPress={() => toggleRepost(item.event)}
+            onLikePress={() => toggleLikeRef.current(item.event)}
+            onRepostPress={() => toggleRepostRef.current(item.event)}
+            onMorePress={() => openPostActions(item.event)}
             skipAnimation={!isFirstRender.current}
-            getThreadContext={getThreadContext}
+            getThreadContext={() => getThreadContextRef.current()}
+            fullBleedFooterBorder
           />
         );
       }
 
-      const reposterProfile = profilesRef.current.get(item.repostEvent.pubkey);
-      const reposterName =
-        reposterProfile?.name || tryNpubEncode(item.repostEvent.pubkey).slice(0, 12) + '…';
-
       const originalEvent = item.originalEvent;
-      const repostEngagement = getEngagementState(item.originalEventId);
+      const repostEngagement = row.engagement;
+      const contextRootEvent = row.rootEvent;
+      if (contextRootEvent && originalEvent) {
+        const rootEvent = contextRootEvent;
+        const rootMetrics = row.rootMetrics ?? DEFAULT_METRICS;
+        const rootEngagement = row.rootEngagement ?? DEFAULT_ENGAGEMENT_STATE;
+        return (
+          <FeedThreadPair
+            secondAvatarCenterY={FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y}
+            first={
+              <PostCard
+                variant="feed"
+                event={rootEvent}
+                metrics={rootMetrics}
+                index={index}
+                feedIndex={feedIndex}
+                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                quotedEvents={row.quotedEvents}
+                profiles={row.profiles}
+                getMetrics={getMetrics}
+                liked={rootEngagement.liked}
+                reposted={rootEngagement.reposted}
+                likePending={rootEngagement.likePending}
+                repostPending={rootEngagement.repostPending}
+                likePendingDirection={rootEngagement.likePendingDirection}
+                repostPendingDirection={rootEngagement.repostPendingDirection}
+                onLikePress={() => toggleLikeRef.current(rootEvent)}
+                onRepostPress={() => toggleRepostRef.current(rootEvent)}
+                onMorePress={() => openPostActions(rootEvent)}
+                skipAnimation={!isFirstRender.current}
+                getThreadContext={() => getThreadContextRef.current()}
+                showFooterBorder={false}
+                fullBleedFooterBorder
+              />
+            }
+            second={
+              <RepostCard
+                repostEvent={item.repostEvent}
+                originalEvent={item.originalEvent}
+                originalMetrics={row.metrics}
+                index={index}
+                feedIndex={feedIndex}
+                onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
+                quotedEvents={row.quotedEvents}
+                profiles={row.profiles}
+                getMetrics={getMetrics}
+                reposterName={row.reposterName ?? ''}
+                reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
+                reposters={row.reposters}
+                liked={repostEngagement.liked}
+                reposted={repostEngagement.reposted}
+                likePending={repostEngagement.likePending}
+                repostPending={repostEngagement.repostPending}
+                likePendingDirection={repostEngagement.likePendingDirection}
+                repostPendingDirection={repostEngagement.repostPendingDirection}
+                onLikePress={() => toggleLikeRef.current(originalEvent)}
+                onRepostPress={() => toggleRepostRef.current(originalEvent)}
+                onMorePress={() => openPostActions(originalEvent)}
+                skipAnimation={!isFirstRender.current}
+                getThreadContext={() => getThreadContextRef.current()}
+                fullBleedFooterBorder
+              />
+            }
+          />
+        );
+      }
       return (
         <RepostCard
           repostEvent={item.repostEvent}
           originalEvent={item.originalEvent}
-          originalMetrics={getDisplayMetrics(item.originalEventId)}
+          originalMetrics={row.metrics}
           index={index}
           feedIndex={feedIndex}
           onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
-          quotedEvents={quotedRef.current}
-          profiles={profilesRef.current}
+          quotedEvents={row.quotedEvents}
+          profiles={row.profiles}
           getMetrics={getMetrics}
-          reposterName={reposterName}
-          reposterPubkey={item.repostEvent.pubkey}
+          reposterName={row.reposterName ?? ''}
+          reposterPubkey={row.reposterPubkey ?? item.repostEvent.pubkey}
+          reposters={row.reposters}
           liked={repostEngagement.liked}
           reposted={repostEngagement.reposted}
           likePending={repostEngagement.likePending}
           repostPending={repostEngagement.repostPending}
           likePendingDirection={repostEngagement.likePendingDirection}
           repostPendingDirection={repostEngagement.repostPendingDirection}
-          onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
-          onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
+          onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
+          onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
+          onMorePress={originalEvent ? () => openPostActions(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
-          getThreadContext={getThreadContext}
+          getThreadContext={() => getThreadContextRef.current()}
+          fullBleedFooterBorder
         />
       );
     },
     [
+      getMetrics,
       getDisplayMetrics,
       getEngagementState,
-      getMetrics,
       onOverlayOpenedFromIndex,
-      toggleLike,
-      toggleRepost,
-      getThreadContext,
+      toggleLikeRef,
+      toggleRepostRef,
+      getThreadContextRef,
+      openPostActions,
     ]
   );
 
   const refreshTintColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
 
   const pullToAi = usePullToAiRefreshControl({
-    refreshing: isRefreshing,
+    // Suppress the pull-to-refresh spinner during the initial (cold-start) load
+    // so it never stacks on the centered empty-state spinner.
+    refreshing: isRefreshing && !isLoading,
     onRefresh: handleRefresh,
     tintColor: refreshTintColor,
   });
@@ -734,19 +1098,23 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         <View style={styles.flex1}>
           <LegendList
             ref={listRef}
-            data={feedItems}
-            keyExtractor={listKeyExtractor}
-            getItemType={listGetItemType}
+            data={feedRows}
+            keyExtractor={getFeedRowKey}
+            getItemType={getFeedRowItemType}
             estimatedItemSize={300}
             drawDistance={400}
             renderItem={renderItem}
-            extraData={`${dataVersion}:${engagementRevision}`}
+            itemsAreEqual={feedRowsAreEqual}
             recycleItems
             ListEmptyComponent={
-              isLoading ? <ActivityIndicator style={styles.loader} /> : <EmptyFeed />
+              isLoading ? <Spinner size={22} style={styles.loader} /> : <EmptyFeed />
             }
             ListFooterComponent={
-              isLoadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} /> : null
+              // Only show the pagination spinner once there's content — never
+              // alongside the empty-state spinner.
+              isLoadingMore && feedRows.length > 0 ? (
+                <Spinner size={18} style={styles.loadMoreSpinner} />
+              ) : null
             }
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.4}
@@ -770,22 +1138,18 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
 const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 
-const listKeyExtractor = (item: FeedItem) =>
-  item.type === 'note' ? item.event.id : item.repostEvent.id;
-const listGetItemType = (item: FeedItem) => item.type;
-
-export const PRIMAL_FEED_SPECS: FeedSpec[] = [
+export const DEFAULT_FEED_SPECS: FeedSpec[] = [
   {
-    name: 'Trending',
-    spec: JSON.stringify({ id: 'global-trending', kind: 'notes', hours: 24 }),
+    name: FEED_FILTER_FOR_YOU,
+    spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
   },
   {
-    name: 'Latest',
-    spec: JSON.stringify({ id: 'feed', kind: 'notes', notes: 'follows' }),
+    name: FEED_FILTER_FOLLOWING_POPULAR,
+    spec: JSON.stringify({ id: 'following-popular', kind: 'notes', hours: 24 }),
   },
   {
-    name: 'Latest with Replies',
-    spec: JSON.stringify({ id: 'feed', kind: 'notes', notes: 'follows_replies' }),
+    name: FEED_FILTER_FOLLOWING_RECENT,
+    spec: JSON.stringify({ id: 'following-recent', kind: 'notes' }),
   },
 ];
 
@@ -803,10 +1167,22 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.33)',
   },
   loader: {
+    alignSelf: 'center',
     marginTop: 48,
   },
   loadMoreSpinner: {
+    alignSelf: 'center',
     paddingVertical: 24,
+  },
+  threadPair: {
+    position: 'relative',
+  },
+  threadPairConnector: {
+    position: 'absolute',
+    left: FEED_CARD_HORIZONTAL_PADDING + FEED_AVATAR_SIZE / 2 - 1,
+    top: FEED_THREAD_CONNECTOR_TOP,
+    width: 2,
+    borderRadius: 1,
   },
   flex1: {
     flex: 1,

@@ -21,7 +21,7 @@ On-chain Bitcoin inputs are recognized by the parser and by BIP-321 option ranki
 
 ## Current status
 
-<!-- code: app.json; app.config.js; eas.json; package.json; targets/widget/expo-target.config.js; plugins/withLowerPodDeploymentTarget.js; modules/liquid-glass-text/src/LiquidGlassText.tsx; modules/bitchat-module/src/BitChatModule.ts; features/map/screens/MapScreen.tsx; coco-payment-ux/src/screen-actions/availability.ts -->
+<!-- code: app.json; app.config.js; eas.json; package.json; targets/widget/expo-target.config.js; plugins/withLowerPodDeploymentTarget.js; modules/liquid-glass-text/src/LiquidGlassText.tsx; modules/bitchat-module/src/BitChatModule.ts; features/map/screens/MapScreen.tsx; ../colada/src/screen-actions/availability.ts -->
 
 - **Primary target:** iOS app, minimum iOS 16.4.
 - **Version in `app.json`:** 0.1.0.
@@ -58,27 +58,27 @@ Sovran uses the names below in the same sense as the sibling protocol repositori
 
 ## Feature inventory
 
-<!-- code: features/; shared/; coco-payment-ux/; modules/; targets/widget/ -->
+<!-- code: features/; shared/; ../colada/; modules/; targets/widget/ -->
 
 _Reference — every capability Sovran ships today, organized by concern. Each item is either checked (`[x]` — shipping) or unchecked (`[ ]` — recognized in the code but not yet enabled)._
 
 ### Payment rails
 
-<!-- code: coco-payment-ux/src/parse.ts; coco-payment-ux/src/detectors.ts; coco-payment-ux/src/machine/createMachine.ts; coco-payment-ux/src/operations/defaultOperations.ts; features/send/lib/sovranPaymentConfig.ts; shared/lib/cashu/manager.ts; shared/lib/cashu/npc.ts; shared/stores/profile/npcMintStore.ts; features/onboarding/screens/ClaimUsernameScreen.tsx; shared/ui/composed/QRCode.tsx -->
+<!-- code: ../colada/src/parse.ts; ../colada/src/detectors.ts; ../colada/src/machine/createMachine.ts; ../colada/src/operations/defaultOperations.ts; features/send/lib/sovranPaymentConfig.ts; shared/lib/cashu/manager.ts; shared/lib/cashu/npc.ts; shared/stores/profile/npcMintStore.ts; features/onboarding/screens/ClaimUsernameScreen.tsx; shared/ui/composed/QRCode.tsx -->
 
 - [x] **Cashu ecash** — proofs, tokens, payment requests via [`@cashu/cashu-ts`](https://github.com/cashubtc/cashu-ts)
   - [x] **P2PK receive** — receive tokens whose proofs carry a NUT-10 well-known secret of kind `P2PK` (NUT-11) locked to your pubkey; unlocked automatically with the active profile's key
   - [x] **Cashu payment requests** — request-driven flow with amount, memo, and accepted mints
   - [x] **Animated UR QR codes** — multi-frame UR sequences via `@gandlaf21/bc-ur` for oversized payloads
 - [x] **Coco wallet engine** — `@cashu/coco-core` + `@cashu/coco-expo-sqlite` + `@cashu/coco-react` for proof storage, swaps, and reactive state
-- [x] **`coco-payment-ux`** — our own send/receive/mint-select state-machine library that sits on top of Coco
+- [x] **`colada`** — our own send/receive/mint-select state-machine library that sits on top of Coco
 - [x] **Lightning**
   - [x] **BOLT-11** — invoice decoding via `@gandlaf21/bolt11-decode`, pay-to-invoice through mint melt quotes
   - [x] **Lightning address (LUD-16)** — pay any `name@domain.com` static internet identifier
   - [x] **LNURL-pay (LUD-06)** — `payRequest` flow over bech32 `lnurl1...` or `lightning:` URIs
 - [x] **BIP-321** — the new `bitcoin:` URI scheme (supersedes BIP-21) for onchain + Lightning, extended in practice with a `cashu` parameter so a single URI can advertise all three rails; fallback rail UI when the chosen rail fails (the onchain rail is parsed and ranked but not yet sendable)
 - [x] **Ecash send** — token-based Cashu sends through online recipient flows and offline handoff paths
-  - [x] **Online ecash send** — `coco-payment-ux` drives amount, mint, recipient, and payment-request flows with mint checks before execution
+  - [x] **Online ecash send** — `colada` drives amount, mint, recipient, and payment-request flows with mint checks before execution
   - [x] **Offline token handoff** — Coco can compose the token with no network once spendable proofs are selected
   - [x] **Share targets** — QR, system share, NFC, BLE mesh
   - [x] **Copy as text** — raw `cashuB...` token
@@ -117,7 +117,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
   - [x] **NIP-17 Private Direct Messages** — `kind 14` rumors sealed and gift-wrapped per NIP-59 (`kind 1059`), encrypted with NIP-44 v2
 - [x] **Relays & search**
   - [x] **NDK Mobile** — relay management via [`@nostr-dev-kit/ndk-mobile`](https://github.com/nostr-dev-kit/ndk-mobile)
-  - [x] **Primal cache relay** — `cache.primal.net` for fast feed loading and profile lookups
+  - [x] **Nostr app-view** — Sovran-owned feed, profile, metrics, thread cache, and GraphQL endpoint for fast app views. The default deployment is Nagg, but Colada receives only the GraphQL URL.
   - [x] **Vertex** — [Vertex](https://vertexlab.io) trust-ranked Nostr search and follower-graph reputation scores
   - [x] **Vertex credibility on rows** — reputation + followers shown inline on contact search and payment-recipient confirmations
 - [x] **`nostr-tools`** — low-level signing, encoding, NIP utilities
@@ -137,7 +137,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 <!-- code: features/ai/screens/AiChatScreen.tsx; features/ai/hooks/useAiSend.ts; features/ai/components/AiHeaderTitle.tsx; features/ai/components/ModelChip.tsx; features/ai/lib/format.ts; shared/lib/routstr/api.ts; shared/lib/routstr/topUp.ts; shared/stores/profile/routstrStore.ts; shared/stores/runtime/routstrTopUpStore.ts -->
 
 - [x] **Routstr integration** — [Routstr](https://routstr.com) is a decentralized reverse proxy that fronts OpenAI-compatible LLM providers and bills per request in Cashu; Sovran uses your wallet as the funding source so there's no separate billing account
-- [x] **Cashu-token top-up** — `coco-payment-ux` mints a Cashu token from your wallet and deposits it as Routstr balance; subsequent calls are paid out of that balance
+- [x] **Cashu-token top-up** — `colada` mints a Cashu token from your wallet and deposits it as Routstr balance; subsequent calls are paid out of that balance
 - [x] **Model picker** — switch between models in chat
 - [x] **Streaming responses** — token-by-token rendering
 - [x] **AI chat as a tab** — first-class tab, not a settings page
@@ -186,7 +186,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Scanning & input
 
-<!-- code: features/camera/screens/CameraScreen/CameraScreen.tsx; features/camera/screens/CameraScreen/CameraLayout.tsx; features/camera/hooks/useHandleCameraPermission.ts; features/camera/screens/StandaloneCameraScreen.tsx; coco-payment-ux/src/parse.ts; coco-payment-ux/src/normalize.ts; coco-payment-ux/src/detectors.ts; coco-payment-ux/src/machine/createMachine.ts; features/send/lib/sovranPaymentConfig.ts -->
+<!-- code: features/camera/screens/CameraScreen/CameraScreen.tsx; features/camera/screens/CameraScreen/CameraLayout.tsx; features/camera/hooks/useHandleCameraPermission.ts; features/camera/screens/StandaloneCameraScreen.tsx; ../colada/src/parse.ts; ../colada/src/normalize.ts; ../colada/src/detectors.ts; ../colada/src/machine/createMachine.ts; features/send/lib/sovranPaymentConfig.ts -->
 
 - [x] **Unified parser** — one parser handles paste / scan / NFC / deeplink and ranks results so the most useful option surfaces first
 - [x] **Recognized payloads**
@@ -207,7 +207,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Deeplinks & URL schemes
 
-<!-- code: app.json; app.config.js; app/_layout.tsx; coco-payment-ux/src/react/CocoPaymentUXProvider.tsx; coco-payment-ux/src/normalize.ts; coco-payment-ux/src/parse.ts; coco-payment-ux/src/intent.ts; shared/lib/nav/routeSchemas.ts -->
+<!-- code: app.json; app.config.js; app/_layout.tsx; ../colada/src/react/ColadaProvider.tsx; ../colada/src/normalize.ts; ../colada/src/parse.ts; ../colada/src/intent.ts; shared/lib/nav/routeSchemas.ts -->
 
 - [x] **Custom schemes** — `bitcoin:`, `lightning:`, `lnurl:`, `cashu:`, `nostr:`, `web+nostr:`
 - [x] **Sovran scheme** — `sovran://` for in-app routes
@@ -258,15 +258,15 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **Transaction location stamps** — optional geolocation captured at the moment a transaction finalizes
   - [x] **Privacy-gated reveal** — locations stay hidden behind a placeholder and only render after explicit user reveal
   - [x] **Grayscale map** — rendered via `expo-maps` with a desaturation overlay so location is glanceable but not flashy
-  - [x] **Per-flow capture** — visible on receive-token, mint-quote, melt-quote, and send-token detail screens
+  - [x] **Per-flow capture** — visible on receive-token, Lightning/onchain receive, Lightning send, and send-token detail screens
   - [x] **Opt-out** — setting can be disabled globally; when off, nothing is captured or stored
 - [x] **Transaction status indicators** — single `LoadingIndicator` block handles loading / success / error / reverted across the app
 
 ### Send & receive
 
-<!-- code: features/send/providers/CocoPaymentUX.tsx; features/send/lib/sovranPaymentConfig.ts; features/send/lib/createSovranScreenActionsBridge.ts; features/send/screens/AmountFlowScreen.tsx; features/send/screens/AmountSelector.tsx; features/send/screens/MeltQuoteScreen.tsx; features/send/screens/PaymentRequestScreen.tsx; features/send/screens/SendTokenScreen.tsx; features/receive/screens/ReceiveScreen.tsx; features/receive/screens/MintQuoteScreen.tsx; features/receive/screens/ReceiveTokenScreen.tsx; coco-payment-ux/src/machine/transitions.ts; coco-payment-ux/src/screen-actions/availability.ts -->
+<!-- code: features/send/providers/Colada.tsx; features/send/lib/sovranPaymentConfig.ts; features/send/lib/createSovranScreenActionsBridge.ts; features/send/screens/AmountFlowScreen.tsx; features/send/screens/AmountSelector.tsx; features/send/screens/LightningSendScreen.tsx; features/send/screens/OnchainSendScreen.tsx; features/send/screens/PaymentRequestScreen.tsx; features/send/screens/SendTokenScreen.tsx; features/receive/screens/ReceiveScreen.tsx; features/receive/screens/LightningReceiveScreen.tsx; features/receive/screens/OnchainReceiveScreen.tsx; features/receive/screens/ReceiveTokenScreen.tsx; ../colada/src/machine/transitions.ts; ../colada/src/screen-actions/availability.ts -->
 
-- [x] **Send flow state machine** — `coco-payment-ux` machine drives amount → mint → recipient → execute
+- [x] **Send flow state machine** — `colada` machine drives amount → mint → recipient → execute
 - [x] **Recipient identity enrichment** — NIP-05 + Nostr profile resolved before you confirm
 - [x] **Mint revalidation** — mint health revalidated on amount entry
 - [x] **Token detail share screen** — copy (text or emoji), share, NFC side-by-side
@@ -354,14 +354,14 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Not yet shipped
 
-<!-- code: coco-payment-ux/src/screen-actions/availability.ts; coco-payment-ux/src/screen-actions/defaultHandlers.ts; coco-payment-ux/src/intent.ts; coco-payment-ux/src/parse.ts; app.json; eas.json; modules/bitchat-module/src/BitChatModule.ts; features/map/screens/MapScreen.tsx -->
+<!-- code: ../colada/src/screen-actions/availability.ts; ../colada/src/screen-actions/defaultHandlers.ts; ../colada/src/intent.ts; ../colada/src/parse.ts; app.json; eas.json; modules/bitchat-module/src/BitChatModule.ts; features/map/screens/MapScreen.tsx -->
 
 - [ ] **On-chain send/receive rail** — the parser recognizes addresses and BIP-321 onchain hints, but `availability.ts` marks the rail "Coming soon" and the send handler logs `onchainNotSupported`. No mint-quote-driven on-chain receive yet.
 - [ ] **Production Android release** — Android app config, EAS scripts, JS fallbacks, and many Android-specific UI branches exist, but iOS remains the shipping target and some native features are iOS-only.
 
 ## Technical shape
 
-<!-- code: package.json; bun.lock; tsconfig.json; eslint.config.js; jest.config.js; patches/; app/; features/; shared/; modules/; targets/widget/; coco-payment-ux/; __rules__/; AGENTS.md; CLAUDE.md -->
+<!-- code: package.json; bun.lock; tsconfig.json; eslint.config.js; jest.config.js; patches/; app/; features/; shared/; modules/; targets/widget/; ../colada/; __rules__/; AGENTS.md; CLAUDE.md -->
 
 ### Stack
 
@@ -384,12 +384,12 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Repository map
 
-<!-- code: app/; features/; shared/; coco-payment-ux/; modules/; targets/widget/; patches/; __rules__/; AGENTS.md -->
+<!-- code: app/; features/; shared/; ../colada/; modules/; targets/widget/; patches/; __rules__/; AGENTS.md -->
 
 - `app/` — Expo Router routes and route-group stacks.
 - `features/` — domain modules for wallet, send, receive, mint, transactions, feed, contacts, AI, map, split bill, settings, BitChat, Whitenoise, theme, and onboarding.
 - `shared/` — cross-cutting UI primitives, providers, stores, Cashu/Nostr/NFC/Routstr helpers, theme and persistence infrastructure.
-- `coco-payment-ux/` — local package for the payment parser, state machine, guards, screen actions, LNURL/NIP-05 resolution, and tests.
+- `../colada/` — sibling package for the payment parser, state machine, guards, screen actions, LNURL/NIP-05 resolution, and tests.
 - `modules/` — local native modules: BitChat and Liquid Glass text.
 - `targets/widget/` — iOS widget target managed by `@bacons/apple-targets`.
 - `patches/` — patch-package patches for upstream dependencies consumed by the app.

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useManager, usePaginatedHistory } from '@cashu/coco-react';
+import { useColadaSubscriptions } from '@sovranbitcoin/colada/react';
+import { MeltQuoteState } from '@cashu/cashu-ts';
 import type {
   HistoryEntry,
   MeltHistoryEntry,
@@ -11,25 +13,26 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { log } from '@/shared/lib/logger';
 
-function opStateToQuoteState(opState: MeltOperationState): 'PAID' | 'PENDING' | 'UNPAID' {
-  if (opState === 'finalized') return 'PAID';
-  if (opState === 'pending' || opState === 'executing') return 'PENDING';
-  return 'UNPAID';
+function opStateToHistoryState(opState: MeltOperationState): MeltHistoryEntry['state'] {
+  if (opState === 'finalized') return MeltQuoteState.PAID;
+  if (opState === 'pending' || opState === 'executing') return MeltQuoteState.PENDING;
+  return MeltQuoteState.UNPAID;
 }
 
 // MeltOperation is a discriminated union by state — only some variants carry
 // `quoteId` and `amount`. Read both as optional and bail out if missing.
 function meltOpToHistoryEntry(op: MeltOperation): MeltHistoryEntry | null {
-  const opAny = op as { quoteId?: string; amount?: number };
+  const opAny = op as Pick<MeltHistoryEntry, 'quoteId' | 'amount'>;
   if (!opAny.quoteId || opAny.amount == null) return null;
   return {
     id: op.id,
     type: 'melt',
+    operationId: op.id,
     createdAt: op.createdAt,
     mintUrl: op.mintUrl,
     unit: 'sat',
     quoteId: opAny.quoteId,
-    state: opStateToQuoteState(op.state),
+    state: opStateToHistoryState(op.state),
     amount: opAny.amount,
   };
 }
@@ -50,6 +53,7 @@ function meltOpToHistoryEntry(op: MeltOperation): MeltHistoryEntry | null {
 export function useHistoryWithMelts(pageSize = 100) {
   const paginatedResult = usePaginatedHistory(pageSize);
   const manager = useManager();
+  const bus = useColadaSubscriptions();
   const mockMode = useSettingsStore((s) => s.mockMode);
   const mockHistory = useMockDataStore((s) => s.mockHistory);
   const [meltEntries, setMeltEntries] = useState<MeltHistoryEntry[]>([]);
@@ -94,29 +98,20 @@ export function useHistoryWithMelts(pageSize = 100) {
     void fetchMeltOps();
   }, [fetchMeltOps]);
 
-  // Re-fetch when melt-op events fire so the list stays in sync
+  // Re-fetch when melt operation events reach Colada's bus so the list stays in sync.
   useEffect(() => {
     const handler = () => {
       void fetchMeltOps();
     };
-    const unsubs = [
-      manager.on('melt-op:prepared', handler),
-      manager.on('melt-op:finalized', handler),
-      manager.on('melt-op:pending', handler),
-      manager.on('melt-op:rolled-back', handler),
-    ];
-    return () => {
-      unsubs.forEach((u) => u());
-    };
-  }, [manager, fetchMeltOps]);
+    return bus.subscribe({ type: 'melt.updated' }, handler);
+  }, [bus, fetchMeltOps]);
 
   // Re-fetch history when any transaction state changes (pending → confirmed, etc.)
   useEffect(() => {
-    const unsub = manager.on('history:updated', () => {
+    return bus.subscribe({ type: 'history.updated' }, () => {
       void paginatedResult.refresh();
     });
-    return unsub;
-  }, [manager, paginatedResult.refresh]);
+  }, [bus, paginatedResult.refresh]);
 
   // Merge melt operations into history, deduplicating by quoteId.
   // Stabilise: only return a new array ref if entries actually changed.

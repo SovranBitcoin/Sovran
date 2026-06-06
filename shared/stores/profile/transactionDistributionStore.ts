@@ -24,7 +24,7 @@
  * never engaged, and the inferred 'displayed' clobbered the real action.
  *
  * Both `useTransactionSource` (Transaction.tsx) and
- * `screenActionsBridge.getSourceLabel` (CocoPaymentUX.tsx) compute the
+ * `screenActionsBridge.getSourceLabel` (Colada.tsx) compute the
  * read key with the same convention.
  *
  * Lifecycle:
@@ -33,7 +33,7 @@
  *    inference cannot overwrite it. This makes the inference a safe
  *    fallback rather than a clobber.
  *  - The 'displayed' fallback is written by a global subscription to coco's
- *    `mint-op:quote-state-changed` event in `CocoPaymentUX.tsx` when a quote
+ *    `mint-op:quote-state-changed` event in `Colada.tsx` when a quote
  *    transitions to PAID/ISSUED and no source has been recorded yet.
  */
 

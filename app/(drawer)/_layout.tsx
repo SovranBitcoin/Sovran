@@ -7,7 +7,7 @@ import {
 import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { router, useSegments } from 'expo-router';
 import { DrawerContentComponentProps, useDrawerStatus } from '@react-navigation/drawer';
-import { getCornerRadiusSync } from 'expo-screen-corner-radius';
+import { getScreenCornerRadius } from '@/shared/lib/screenCornerRadius';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -25,6 +25,7 @@ type MenuRoute =
   | '/(drawer)/(tabs)/feed'
   | '/(drawer)/(tabs)/index'
   | '/(drawer)/(tabs)/contacts'
+  | '/(drawer)/(tabs)/notifications'
   | '/(drawer)/(tabs)/ai'
   | '/(settings-flow)';
 
@@ -59,6 +60,12 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'Contacts',
     route: '/(drawer)/(tabs)/contacts',
     activeSegments: ['(drawer)', '(tabs)', 'contacts'],
+  },
+  {
+    icon: { default: 'mdi:bell-outline', selected: 'mdi:bell' },
+    label: 'Notifications',
+    route: '/(drawer)/(tabs)/notifications',
+    activeSegments: ['(drawer)', '(tabs)', 'notifications'],
   },
   {
     icon: { default: 'mdi:robot-outline', selected: 'mdi:robot' },
@@ -205,7 +212,7 @@ export default function DrawerLayout() {
   // Match the device's hardware screen corner radius so the scene's rounded
   // TL/BL hug the physical display curve. Falls back to a token-driven radius
   // when null (Android <12, or devices without rounded displays).
-  const deviceRadius = getCornerRadiusSync() ?? radius['2xl'];
+  const deviceRadius = getScreenCornerRadius(radius['2xl']);
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: surface }]}>
       <Drawer

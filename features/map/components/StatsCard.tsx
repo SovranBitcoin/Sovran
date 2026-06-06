@@ -2,7 +2,7 @@ import { memo } from 'react';
 import {
   Host,
   Button as SwiftUIButton,
-  ContextMenu,
+  Menu,
   HStack as SwiftUIHStack,
   VStack as SwiftUIVStack,
   Image as SwiftUIImage,
@@ -10,8 +10,10 @@ import {
 } from '@expo/ui/swift-ui';
 import { font, foregroundStyle, frame, glassEffect, padding } from '@expo/ui/swift-ui/modifiers';
 import { ActionSheetIOS, Platform, StyleSheet, Text } from 'react-native';
+import opacity from 'hex-color-opacity';
+import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { zIndex } from '@/shared/styles/tokens';
+import { alpha, radius, shadow, spacing, zIndex } from '@/shared/styles/tokens';
 import { useCapabilities } from '@/shared/ui/capability';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { MERCHANT_CATEGORIES, type MerchantCategoryId } from '@/shared/lib/map/categories';
@@ -49,7 +51,11 @@ export const StatsCard = memo(function StatsCard({
   onCategoryChange,
   cardWidth,
 }: StatsCardProps) {
-  const foreground = useThemeColor('foreground');
+  const [foreground, surfaceSecondary, muted] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'muted',
+  ] as const);
   const { liquidGlass } = useCapabilities();
 
   const visibleText = loading ? '...' : `${visibleCount.toLocaleString()} visible`;
@@ -81,23 +87,37 @@ export const StatsCard = memo(function StatsCard({
             styles.fallbackCard,
             {
               width: cardWidth,
-              borderColor: `${foreground}1F`,
+              // Match the map's CircleActionButton (flat variant): same
+              // surface-secondary fill + muted border, so the bottom card isn't
+              // darker than the floating locate/zoom buttons.
+              backgroundColor: surfaceSecondary,
+              borderColor: opacity(muted, 0.3),
             },
           ]}>
-          <Text style={[styles.fallbackIcon, { color: BITCOIN_ACCENT }]}>B</Text>
+          <Icon name="mdi:bitcoin" size={26} color={BITCOIN_ACCENT} />
           <View style={styles.fallbackText}>
-            <Text style={[styles.fallbackTitle, { color: foreground }]}>{visibleText}</Text>
-            <Text style={[styles.fallbackSubtitle, { color: foreground }]} numberOfLines={1}>
+            <Text style={[styles.fallbackTitle, { color: foreground }]} numberOfLines={1}>
+              {visibleText}
+            </Text>
+            <Text
+              style={[styles.fallbackSubtitle, { color: opacity(foreground, alpha.strong) }]}
+              numberOfLines={1}>
               {totalText}
             </Text>
           </View>
-          <Text style={[styles.fallbackChevron, { color: foreground }]}>v</Text>
+          <Icon name="mdi:chevron-down" size={20} color={opacity(foreground, alpha.muted)} />
         </Pressable>
       </View>
     );
   }
 
+  // `Menu` (not `ContextMenu`) so the glass capsule opens the category filter on
+  // a single TAP. `ContextMenu` is hardcoded to long-press, which is why the
+  // dropdown "did nothing" when tapped. Omitting `onPrimaryAction` means the tap
+  // opens the menu (matching the proven FiatCurrencyPill.liquid pattern). The
+  // glass effect + frame live on the Menu; the label is the trigger content.
   const glassCardModifiers = [
+    frame({ width: cardWidth, height: 64, alignment: 'center' }),
     glassEffect({
       shape: 'capsule' as const,
       glass: { variant: 'regular' as const, interactive: true },
@@ -106,53 +126,43 @@ export const StatsCard = memo(function StatsCard({
 
   return (
     <View style={styles.statsContainer}>
-      <Host style={{ zIndex: zIndex.sticky, height: 60, width: cardWidth }} matchContents>
-        <ContextMenu>
-          <ContextMenu.Items>
-            {CATEGORY_FILTERS.map((cat) => (
-              <SwiftUIButton
-                key={cat}
-                label={`${categoryLabel(cat)}${cat === category ? ' ✓' : ''}`}
-                onPress={() => onCategoryChange(cat)}
-              />
-            ))}
-          </ContextMenu.Items>
-          <ContextMenu.Trigger>
-            <SwiftUIHStack>
-              <SwiftUIButton
-                modifiers={[
-                  frame({ width: cardWidth, height: 60, alignment: 'center' }),
-                  ...glassCardModifiers,
-                ]}>
-                <SwiftUIHStack
-                  alignment="center"
-                  spacing={12}
-                  modifiers={[
-                    frame({ maxWidth: Infinity, height: 60, alignment: 'leading' }),
-                    padding({ horizontal: 16 }),
-                  ]}>
-                  <SwiftUIImage
-                    systemName="bitcoinsign.circle.fill"
-                    size={24}
-                    color={BITCOIN_ACCENT}
-                  />
-                  <SwiftUIVStack alignment="leading" spacing={2}>
-                    <SwiftUIText
-                      modifiers={[font({ size: 18, weight: 'bold' }), foregroundStyle(foreground)]}>
-                      {visibleText}
-                    </SwiftUIText>
-                    <SwiftUIHStack alignment="center" spacing={4}>
-                      <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(foreground)]}>
-                        {totalText}
-                      </SwiftUIText>
-                      <SwiftUIImage systemName="chevron.down" size={10} color={foreground} />
-                    </SwiftUIHStack>
-                  </SwiftUIVStack>
-                </SwiftUIHStack>
-              </SwiftUIButton>
+      <Host style={{ zIndex: zIndex.sticky, height: 64, width: cardWidth }} matchContents>
+        <Menu
+          modifiers={glassCardModifiers}
+          label={
+            <SwiftUIHStack
+              alignment="center"
+              spacing={12}
+              modifiers={[
+                frame({ maxWidth: Infinity, height: 64, alignment: 'leading' }),
+                padding({ horizontal: 18 }),
+              ]}>
+              <SwiftUIImage systemName="bitcoinsign.circle.fill" size={24} color={BITCOIN_ACCENT} />
+              {/* VStack takes the remaining width so the chevron sits at the
+                  far right edge instead of crammed against the subtitle. */}
+              <SwiftUIVStack
+                alignment="leading"
+                spacing={2}
+                modifiers={[frame({ maxWidth: Infinity, alignment: 'leading' })]}>
+                <SwiftUIText
+                  modifiers={[font({ size: 18, weight: 'bold' }), foregroundStyle(foreground)]}>
+                  {visibleText}
+                </SwiftUIText>
+                <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(foreground)]}>
+                  {totalText}
+                </SwiftUIText>
+              </SwiftUIVStack>
+              <SwiftUIImage systemName="chevron.down" size={14} color={foreground} />
             </SwiftUIHStack>
-          </ContextMenu.Trigger>
-        </ContextMenu>
+          }>
+          {CATEGORY_FILTERS.map((cat) => (
+            <SwiftUIButton
+              key={cat}
+              label={`${categoryLabel(cat)}${cat === category ? ' ✓' : ''}`}
+              onPress={() => onCategoryChange(cat)}
+            />
+          ))}
+        </Menu>
       </Host>
     </View>
   );
@@ -167,17 +177,15 @@ const styles = StyleSheet.create({
   },
   fallbackCard: {
     minHeight: 60,
-    borderRadius: 30,
-    borderWidth: 1,
-    backgroundColor: 'rgba(20, 20, 20, 0.72)',
-    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  fallbackIcon: {
-    fontSize: 20,
-    fontWeight: '800',
+    gap: spacing.md,
+    shadowColor: 'black',
+    ...shadow.md,
   },
   fallbackText: {
     flex: 1,
@@ -189,10 +197,6 @@ const styles = StyleSheet.create({
   },
   fallbackSubtitle: {
     fontSize: 12,
-    opacity: 0.8,
-  },
-  fallbackChevron: {
-    fontSize: 12,
-    opacity: 0.75,
+    marginTop: 1,
   },
 });

@@ -8,13 +8,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { FadeIn, Easing } from 'react-native-reanimated';
-import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
+import { LegendList, type LegendListRenderItemProps } from '@legendapp/list/react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import Icon from 'assets/icons';
 
 import { type FeedEvent, type NoteMetrics, DEFAULT_METRICS } from './nostr/feedTypes';
@@ -26,9 +28,11 @@ import {
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 
 import { useThread, type ThreadItem } from '@/features/feed/hooks/useThread';
+import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log } from '@/shared/lib/logger';
+import { actionMenuPopup } from '@/shared/lib/popup';
 import {
   DEFAULT_REPLY_SKELETON_COUNT,
   MAX_REPLY_SKELETON_COUNT,
@@ -40,6 +44,44 @@ interface ThreadViewProps {
 }
 
 const REPLY_MEASUREMENT_CANDIDATE_LIMIT = 12;
+
+const REPLY_SORT_OPTIONS: {
+  id: ThreadReplySort;
+  label: string;
+  description: string;
+  icon: string;
+}[] = [
+  {
+    id: 'relevant',
+    label: 'Relevant',
+    description: 'Best overall signal from likes, follows, replies, reposts, and zaps.',
+    icon: 'mdi:trending-up',
+  },
+  {
+    id: 'new',
+    label: 'New',
+    description: 'Latest replies first.',
+    icon: 'mdi:clock-outline',
+  },
+  {
+    id: 'likes',
+    label: 'Likes',
+    description: 'Replies with the most likes.',
+    icon: 'iconamoon:heart-fill',
+  },
+  {
+    id: 'zaps',
+    label: 'Zaps',
+    description: 'Replies with the highest zap total.',
+    icon: 'mdi:lightning-bolt',
+  },
+  {
+    id: 'reposts',
+    label: 'Reposts',
+    description: 'Replies with the most reposts.',
+    icon: 'garden:arrow-retweet-fill-16',
+  },
+];
 
 const TRANSITION_REPLY_FADE_IN = FadeIn.duration(SKELETON_EXIT_DURATION_MS).easing(
   Easing.out(Easing.cubic)
@@ -55,7 +97,16 @@ type ThreadTransitionItem = {
   skeletonIndex: number;
 };
 
-type ThreadListItem = ThreadItem | ThreadSkeletonItem | ThreadTransitionItem;
+type ThreadReplySortTabsItem = {
+  type: 'reply-sort-tabs';
+  id: 'reply-sort-tabs';
+};
+
+type ThreadListItem =
+  | ThreadItem
+  | ThreadSkeletonItem
+  | ThreadTransitionItem
+  | ThreadReplySortTabsItem;
 
 function threadKeyExtractor(item: ThreadListItem): string {
   switch (item.type) {
@@ -66,6 +117,8 @@ function threadKeyExtractor(item: ThreadListItem): string {
     case 'reply':
     case 'transition-reply':
       return `r_${item.event.id}`;
+    case 'reply-sort-tabs':
+      return item.id;
     case 'target-skeleton':
     case 'reply-skeleton':
       return item.id;
@@ -97,11 +150,86 @@ function getRenderedReplyCount(items: ThreadItem[]): number {
   return items.reduce((count, item) => count + (item.type === 'reply' ? 1 : 0), 0);
 }
 
+function withReplySortTabs(items: ThreadListItem[]): ThreadListItem[] {
+  if (items.some((item) => item.type === 'reply-sort-tabs')) return items;
+  const targetIndex = items.findIndex((item) => item.type === 'target');
+  if (targetIndex === -1) return items;
+  return [
+    ...items.slice(0, targetIndex + 1),
+    { type: 'reply-sort-tabs', id: 'reply-sort-tabs' },
+    ...items.slice(targetIndex + 1),
+  ];
+}
+
+function ReplySortPicker({
+  selected,
+  onSelect,
+  foreground,
+  surfaceTertiary,
+}: {
+  selected: ThreadReplySort;
+  onSelect: (sort: ThreadReplySort) => void;
+  foreground: string;
+  surfaceTertiary: string;
+}) {
+  const activeBg = useMemo(() => opacity(surfaceTertiary, 0.5), [surfaceTertiary]);
+  const pressedBg = useMemo(() => opacity(surfaceTertiary, 0.65), [surfaceTertiary]);
+  const selectedOption =
+    REPLY_SORT_OPTIONS.find((option) => option.id === selected) ?? REPLY_SORT_OPTIONS[0];
+
+  const openSortMenu = useCallback(() => {
+    actionMenuPopup({
+      title: 'Replies',
+      buttons: REPLY_SORT_OPTIONS.map((option) => ({
+        text: option.label,
+        description: option.description,
+        icon: option.icon,
+        variant: selected === option.id ? 'primary' : undefined,
+        testID: `thread-reply-sort-${option.id}`,
+        onPress: (close) => {
+          close();
+          if (selected !== option.id) onSelect(option.id);
+        },
+      })),
+    });
+  }, [onSelect, selected]);
+
+  return (
+    <View style={styles.replySortContainer}>
+      <View style={styles.replySortContent}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: true }}
+          accessibilityLabel={`Reply sort: ${selectedOption.label}`}
+          activeOpacity={1}
+          haptics
+          onPress={openSortMenu}
+          style={({ pressed }) => [
+            styles.replySortButton,
+            { backgroundColor: pressed ? pressedBg : activeBg },
+          ]}>
+          <View style={styles.replySortInner}>
+            <Text
+              size={14}
+              medium
+              numberOfLines={1}
+              style={[styles.replySortLabel, { color: opacity(foreground, 0.95) }]}>
+              {selectedOption.label}
+            </Text>
+            <Icon name="mdi:chevron-down" size={16} color={opacity(foreground, 0.95)} />
+          </View>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function ThreadViewInner({ eventId }: ThreadViewProps) {
-  const [foreground, background, defaultColor] = useThemeColor([
+  const [foreground, background, defaultColor, surfaceTertiary] = useThemeColor([
     'foreground',
     'background',
     'default',
+    'surface-tertiary',
   ] as const);
   const headerHeight = useHeaderHeight();
   const imageOverlay = useImageOverlay();
@@ -111,11 +239,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     hiddenReplyCount,
     isLoading,
     isFetching,
+    isLoadingMoreReplies,
+    hasMoreReplies,
+    replySort,
+    setReplySort,
     error,
     dataVersion,
     profilesRef,
     metricsRef,
     quotedEventsRef,
+    loadMoreReplies,
   } = useThread(eventId);
 
   const skeletonHeightsRef = useRef<Map<number, number>>(new Map());
@@ -141,7 +274,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     setMeasuredOrder(null);
     setMeasuredVersion(0);
     setTransitionPhase('idle');
-  }, [eventId]);
+  }, [eventId, replySort]);
 
   useEffect(() => {
     return () => {
@@ -162,6 +295,17 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     () => items.filter((it): it is Extract<ThreadItem, { type: 'reply' }> => it.type === 'reply'),
     [items]
   );
+
+  useEffect(() => {
+    if (!measuredOrder) return;
+    const nextEvents = replyEvents.map((item) => item.event);
+    const nextIds = new Set(nextEvents.map((event) => event.id));
+    const kept = measuredOrder.filter((event) => nextIds.has(event.id));
+    const keptIds = new Set(kept.map((event) => event.id));
+    const appended = nextEvents.filter((event) => !keptIds.has(event.id));
+    if (kept.length === measuredOrder.length && appended.length === 0) return;
+    setMeasuredOrder([...kept, ...appended]);
+  }, [measuredOrder, replyEvents]);
 
   const measurementSlotCount = useMemo(
     () => Math.min(MAX_REPLY_SKELETON_COUNT, replyEvents.length),
@@ -198,19 +342,19 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     if (measuredOrder) {
       const nonReplyItems = items.filter((it) => it.type !== 'reply');
       if (transitionPhase === 'exiting') {
-        return [
+        return withReplySortTabs([
           ...nonReplyItems,
           ...measuredOrder.map<ThreadListItem>((event, index) => ({
             type: 'transition-reply' as const,
             event,
             skeletonIndex: index,
           })),
-        ];
+        ]);
       }
-      return [
+      return withReplySortTabs([
         ...nonReplyItems,
         ...measuredOrder.map<ThreadItem>((event) => ({ type: 'reply', event })),
-      ];
+      ]);
     }
 
     if (isMeasuring) {
@@ -220,13 +364,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         targetReplyCount == null
           ? Math.min(MAX_REPLY_SKELETON_COUNT, replyEvents.length)
           : Math.min(MAX_REPLY_SKELETON_COUNT, Math.max(replyEvents.length, targetReplyCount));
-      return [...nonReplyItems, ...createReplySkeletonItems(skeletonCount)];
+      return withReplySortTabs([...nonReplyItems, ...createReplySkeletonItems(skeletonCount)]);
     }
 
-    if (!isFetching) return items;
+    if (!isFetching) return withReplySortTabs(items);
 
     const targetReplyCount = getTargetReplyCount(items, metricsRef);
-    if (targetReplyCount === 0) return items;
+    if (targetReplyCount === 0) return withReplySortTabs(items);
 
     const pendingReplyCount =
       targetReplyCount == null
@@ -234,9 +378,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         : Math.max(0, targetReplyCount - getRenderedReplyCount(items));
     const skeletonCount = Math.min(MAX_REPLY_SKELETON_COUNT, pendingReplyCount);
 
-    if (skeletonCount === 0) return items;
+    if (skeletonCount === 0) return withReplySortTabs(items);
 
-    return [...items, ...createReplySkeletonItems(skeletonCount)];
+    return withReplySortTabs([...items, ...createReplySkeletonItems(skeletonCount)]);
   }, [
     isFetching,
     isLoading,
@@ -350,6 +494,17 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         );
       }
 
+      if (item.type === 'reply-sort-tabs') {
+        return (
+          <ReplySortPicker
+            selected={replySort}
+            onSelect={setReplySort}
+            foreground={foreground}
+            surfaceTertiary={surfaceTertiary}
+          />
+        );
+      }
+
       if (item.type === 'transition-reply') {
         const metrics = getDisplayMetrics(item.event.id);
         const engagement = getEngagementState(item.event.id);
@@ -420,6 +575,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       hasParents,
       profilesRef,
       quotedEventsRef,
+      replySort,
+      setReplySort,
+      foreground,
+      surfaceTertiary,
       toggleLike,
       toggleRepost,
       getThreadContext,
@@ -430,6 +589,14 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     () => replyEvents.slice(0, measurementCandidateCount).map((it) => it.event),
     [measurementCandidateCount, replyEvents]
   );
+
+  const handleEndReached = useCallback(() => {
+    // Don't start reply pagination while the initial fetch or the skeleton
+    // measurement pass is running — the footer spinner would otherwise overlay
+    // the measurement tree / exit shimmer (duplicate spinners).
+    if (isFetching || isMeasuring) return;
+    void loadMoreReplies();
+  }, [loadMoreReplies, isFetching, isMeasuring]);
 
   if (error && items.length === 0) {
     return (
@@ -461,10 +628,21 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
             estimatedItemSize={200}
             drawDistance={500}
             renderItem={renderItem}
-            extraData={`${dataVersion}:${engagementRevision}:${isFetching ? 1 : 0}`}
+            extraData={[
+              dataVersion,
+              engagementRevision,
+              isFetching ? 1 : 0,
+              isLoadingMoreReplies ? 1 : 0,
+              hasMoreReplies ? 1 : 0,
+              replySort,
+            ].join(':')}
             recycleItems
             ListFooterComponent={
-              hiddenReplyCount > 0 && !isFetching ? (
+              isLoadingMoreReplies && !isMeasuring ? (
+                <View style={styles.hiddenReplyFooter}>
+                  <Spinner size={18} color={opacity(foreground, 0.45)} />
+                </View>
+              ) : hiddenReplyCount > 0 && !isFetching && !hasMoreReplies ? (
                 <View style={styles.hiddenReplyFooter}>
                   <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
                     {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
@@ -473,6 +651,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 </View>
               ) : null
             }
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.4}
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
             showsVerticalScrollIndicator={false}
@@ -549,5 +729,30 @@ const styles = StyleSheet.create({
   },
   transitionStack: {
     position: 'relative',
+  },
+  replySortContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 6,
+    paddingBottom: 10,
+  },
+  replySortContent: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replySortButton: {
+    borderRadius: 999,
+  },
+  replySortInner: {
+    minHeight: 34,
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  replySortLabel: {
+    lineHeight: 18,
   },
 });

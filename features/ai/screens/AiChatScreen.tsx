@@ -4,7 +4,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { PatternBackground } from '@/shared/ui/composed/PatternBackground';

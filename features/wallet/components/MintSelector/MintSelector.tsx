@@ -2,6 +2,7 @@ import React from 'react';
 
 import BalancePill from '@/shared/ui/composed/BalancePill';
 import { Log } from '@/shared/lib/logger';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { useMintSelector, type MintSelectorProps } from './useMintSelector';
 
 /**
@@ -22,8 +23,14 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
         balance={shared.balance}
         unit={shared.unit}
         isLoading={shared.isLoading}
-        iconUrl={shared.mintIconUrl}
-        iconFallbackName={shared.mintName}
+        iconNode={
+          <MintIcon
+            iconUrl={shared.mintIconUrl}
+            name={shared.mintName}
+            size={32}
+            isLoading={shared.isLoading}
+          />
+        }
         loadingTitlePlaceholder="Mint Name"
         onPress={shared.onRequestMintList}
         width={shared.dimensions.buttonWidth}

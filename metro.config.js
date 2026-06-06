@@ -5,12 +5,12 @@ const { withUniwindConfig } = require('uniwind/metro');
 
 const config = getDefaultConfig(__dirname);
 
-// `@sovranbitcoin/schemas` lives as a sibling repo and is wired in via
-// `file:../sovran-schemas`. Metro needs the linked target in `watchFolders`
-// so transform/resolve can walk its source files; otherwise the `node_modules`
-// symlink resolves but the target falls outside Metro's project roots.
-// `extraNodeModules` pins the schemas package's peer-deps (zod, neverthrow)
-// to the app's own copies so we don't ship two realms of ZodObject.
+// `@sovranbitcoin/schemas`, Colada, and the local P2PK helper
+// live as sibling repos wired in via `file:../...`. Metro needs linked targets
+// in `watchFolders` so transform/resolve can walk their built files; otherwise
+// the `node_modules` symlink can resolve outside Metro's project roots.
+// `extraNodeModules` pins shared package names and schemas peer-deps (zod,
+// neverthrow) to the app's own copies so we don't ship duplicate realms.
 //
 // On EAS / CI builds the sibling source isn't checked out — the npm package
 // is installed from node_modules directly. Adding a non-existent watchFolder
@@ -19,15 +19,77 @@ const config = getDefaultConfig(__dirname);
 // Only add the watchFolder when the directory actually exists locally.
 const sovranSchemasPath = path.resolve(__dirname, '..', 'sovran-schemas');
 const appNodeModules = path.resolve(__dirname, 'node_modules');
-if (fs.existsSync(sovranSchemasPath)) {
-  config.watchFolders = [...(config.watchFolders ?? []), sovranSchemasPath];
-}
+const appCocoPackages = {
+  '@cashu/coco-core': path.resolve(appNodeModules, '@cashu', 'coco-core'),
+  '@cashu/coco-expo-sqlite': path.resolve(appNodeModules, '@cashu', 'coco-expo-sqlite'),
+  '@cashu/coco-react': path.resolve(appNodeModules, '@cashu', 'coco-react'),
+};
+const localColadaPath = path.resolve(__dirname, '..', 'colada');
+const localColadaEntryPath = path.join(localColadaPath, 'src', 'index.ts');
+const localColadaReactEntryPath = path.join(localColadaPath, 'src', 'react', 'index.ts');
+const localColadaOperationsEntryPath = path.join(localColadaPath, 'src', 'operations', 'index.ts');
+const localNaggTsPath = path.resolve(__dirname, '..', 'nagg-ts');
+const localNaggTsEntryPath = path.join(localNaggTsPath, 'src', 'index.ts');
+const localNaggTsMapEntryPath = path.join(localNaggTsPath, 'src', 'map', 'index.ts');
+const localNaggTsRecipesEntryPath = path.join(localNaggTsPath, 'src', 'recipes', 'index.ts');
+const localNaggTsSchemasEntryPath = path.join(localNaggTsPath, 'src', 'schemas.ts');
+const localP2PKImportPluginPath = path.resolve(__dirname, '..', 'coco-p2pk-plugin-helper');
+const localP2PKImportPluginEntryPath = path.join(localP2PKImportPluginPath, 'src', 'index.ts');
+// Pin React singleton entry points for sibling packages, but let `react-native`
+// continue through Uniwind's resolver so className/css interop stays installed.
+const appReactEntryPaths = Object.fromEntries(
+  [
+    ['react', path.join(appNodeModules, 'react', 'index.js')],
+    ['react/jsx-runtime', path.join(appNodeModules, 'react', 'jsx-runtime.js')],
+    ['react/jsx-dev-runtime', path.join(appNodeModules, 'react', 'jsx-dev-runtime.js')],
+    ['react/compiler-runtime', path.join(appNodeModules, 'react', 'compiler-runtime.js')],
+  ].filter(([, filePath]) => fs.existsSync(filePath))
+);
+const existingSiblingPackagePaths = [
+  sovranSchemasPath,
+  localColadaPath,
+  localNaggTsPath,
+  localP2PKImportPluginPath,
+].filter(fs.existsSync);
+const localPackageEntryPaths = {
+  ...(fs.existsSync(localColadaEntryPath) ? { colada: localColadaEntryPath } : {}),
+  ...(fs.existsSync(localColadaReactEntryPath)
+    ? { 'colada/react': localColadaReactEntryPath }
+    : {}),
+  ...(fs.existsSync(localColadaOperationsEntryPath)
+    ? { 'colada/operations': localColadaOperationsEntryPath }
+    : {}),
+  ...(fs.existsSync(localNaggTsEntryPath) ? { 'nagg-ts': localNaggTsEntryPath } : {}),
+  ...(fs.existsSync(localNaggTsMapEntryPath) ? { 'nagg-ts/map': localNaggTsMapEntryPath } : {}),
+  ...(fs.existsSync(localNaggTsRecipesEntryPath)
+    ? { 'nagg-ts/recipes': localNaggTsRecipesEntryPath }
+    : {}),
+  ...(fs.existsSync(localNaggTsSchemasEntryPath)
+    ? { 'nagg-ts/schemas': localNaggTsSchemasEntryPath }
+    : {}),
+  ...(fs.existsSync(localP2PKImportPluginEntryPath)
+    ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginEntryPath }
+    : {}),
+};
+
+config.watchFolders = Array.from(
+  new Set([...(config.watchFolders ?? []), ...existingSiblingPackagePaths])
+);
 config.resolver = {
   ...config.resolver,
   unstable_enableSymlinks: true,
   nodeModulesPaths: [...(config.resolver?.nodeModulesPaths ?? []), appNodeModules],
   extraNodeModules: {
     ...(config.resolver?.extraNodeModules ?? {}),
+    react: path.resolve(appNodeModules, 'react'),
+    'react-native': path.resolve(appNodeModules, 'react-native'),
+    ...appCocoPackages,
+    ...(fs.existsSync(localColadaPath) ? { colada: localColadaPath } : {}),
+    ...(fs.existsSync(localNaggTsPath) ? { 'nagg-ts': localNaggTsPath } : {}),
+    ...(fs.existsSync(localP2PKImportPluginPath)
+      ? { 'coco-cashu-plugin-p2pk-import': localP2PKImportPluginPath }
+      : {}),
+    ...(fs.existsSync(sovranSchemasPath) ? { '@sovranbitcoin/schemas': sovranSchemasPath } : {}),
     zod: path.resolve(appNodeModules, 'zod'),
     neverthrow: path.resolve(appNodeModules, 'neverthrow'),
   },
@@ -147,6 +209,36 @@ uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: cashuTsEsmPath,
+    };
+  }
+  // Force the shared, type-bearing libs to the app's single copy. The
+  // `@sovranbitcoin/*` registry packages each ship a nested `zod`/`neverthrow`
+  // under their own `node_modules`, which Metro would otherwise bundle as
+  // separate realms — breaking cross-package `instanceof ZodError` / Result
+  // identity. Resolving these from the app root collapses them to one copy
+  // (mirrors the tsconfig `paths` pinning so bundle and type-check agree).
+  if (
+    moduleName === 'zod' ||
+    moduleName.startsWith('zod/') ||
+    moduleName === 'neverthrow' ||
+    moduleName.startsWith('neverthrow/')
+  ) {
+    return context.resolveRequest(
+      { ...context, originModulePath: path.join(__dirname, 'index.js') },
+      moduleName,
+      platform
+    );
+  }
+  if (appReactEntryPaths[moduleName]) {
+    return {
+      type: 'sourceFile',
+      filePath: appReactEntryPaths[moduleName],
+    };
+  }
+  if (localPackageEntryPaths[moduleName]) {
+    return {
+      type: 'sourceFile',
+      filePath: localPackageEntryPaths[moduleName],
     };
   }
   // Chain to Uniwind's resolver to preserve CSS interop styling

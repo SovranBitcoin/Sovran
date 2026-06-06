@@ -9,7 +9,8 @@
 import React, { useEffect } from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
-import { useScreenActions } from 'coco-payment-ux/react';
+import { isReceiveTokenRedeemed } from '@sovranbitcoin/colada';
+import { useScreenActions } from '@sovranbitcoin/colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
@@ -32,13 +33,9 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface ReceiveTokenScreenProps {
   receiveHistoryEntry?: ReceiveHistoryEntry | string;
-  onNavigateBack: () => void;
 }
 
-export function ReceiveTokenScreen({
-  receiveHistoryEntry,
-  onNavigateBack,
-}: ReceiveTokenScreenProps) {
+export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenProps) {
   useLifecycleLogger('ReceiveTokenScreen');
   const { entry, error, actions, source, mintUrl } = useScreenActions(
     'receiveToken',
@@ -51,7 +48,7 @@ export function ReceiveTokenScreen({
     if (error) paymentLog.warn('receive.token.error', { error });
   }, [error]);
 
-  const isRedeemed = entry?.state === 'finalized';
+  const isRedeemed = isReceiveTokenRedeemed(entry);
 
   useEffect(() => {
     if (!entry) return;
@@ -63,7 +60,14 @@ export function ReceiveTokenScreen({
   }, [entry, isRedeemed]);
 
   if (error) {
-    return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
+    return (
+      <ScreenErrorState
+        message={error}
+        onGoBack={() => {
+          void actions.back.execute();
+        }}
+      />
+    );
   }
 
   if (!entry) {
@@ -79,14 +83,14 @@ export function ReceiveTokenScreen({
             text: 'Close',
             icon: 'ri:close-circle-line',
             variant: 'secondary',
-            onPress: async () => onNavigateBack(),
+            onPress: async () => actions.back.execute(),
             condition: isRedeemed,
           },
           {
             testID: 'receive-token-cancel',
             text: 'Cancel',
             variant: 'secondary',
-            onPress: async () => onNavigateBack(),
+            onPress: async () => actions.back.execute(),
             condition: !isRedeemed,
           },
           {

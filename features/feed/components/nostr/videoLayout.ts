@@ -96,7 +96,14 @@ export function buildVideoOverlayLayout(
   };
 } | null {
   const item = feedItems[feedIndex];
-  const event = item?.type === 'note' ? item.event : item?.originalEvent;
+  const candidates =
+    item?.type === 'note'
+      ? [item.rootEvent, item.event, ...(item.replyPreviewEvents ?? [])]
+      : [item?.rootEvent, item?.originalEvent];
+  const event = candidates.find(
+    (candidate): candidate is FeedEvent =>
+      !!candidate && getVideoUrlsFromContent(candidate.content).length > 0
+  );
   if (!event) return null;
   const segments = parseContent(event.content);
   const blockSegments = segments.filter(
@@ -157,8 +164,13 @@ export function buildVideoOverlayLayout(
 export function computeFeedIndicesWithVideo(feedItems: FeedItem[]): number[] {
   const out: number[] = [];
   feedItems.forEach((item, i) => {
-    const ev = item.type === 'note' ? item.event : item.originalEvent;
-    if (ev && getVideoUrlsFromContent(ev.content).length > 0) out.push(i);
+    const events =
+      item.type === 'note'
+        ? [item.rootEvent, item.event, ...(item.replyPreviewEvents ?? [])]
+        : [item.rootEvent, item.originalEvent];
+    if (events.some((event) => event && getVideoUrlsFromContent(event.content).length > 0)) {
+      out.push(i);
+    }
   });
   return out;
 }

@@ -16,12 +16,12 @@ import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
-const LIST_OPTIONS = { title: 'Select Mint' };
-const ADD_OPTIONS = { title: 'Add Mints' };
-const INFO_OPTIONS = { title: 'Mint Details' };
+const LIST_OPTIONS = { title: 'Select mint' };
+const ADD_OPTIONS = { title: 'Add mints' };
+const INFO_OPTIONS = { title: 'Mint details' };
 const REVIEWS_OPTIONS = { title: 'Reviews' };
 const DISTRIBUTION_OPTIONS = { title: 'Balance split' };
-const REBALANCE_PLAN_OPTIONS = { title: 'Rebalance Plan' };
+const REBALANCE_PLAN_OPTIONS = { title: 'Rebalance plan' };
 const USER_MESSAGES_OPTIONS = { headerShown: false };
 
 export default function MintFlowLayout() {

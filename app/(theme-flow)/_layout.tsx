@@ -11,7 +11,7 @@ import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
-const PREVIEW_OPTIONS = { title: 'Theme Preview' };
+const PREVIEW_OPTIONS = { title: 'Theme preview' };
 const BACKGROUND_OPTIONS = { title: 'Background' };
 const GALLERY_OPTIONS = { title: 'Gallery' };
 

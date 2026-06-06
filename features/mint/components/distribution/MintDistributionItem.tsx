@@ -3,11 +3,11 @@ import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import Icon from 'assets/icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DistributionSlider } from './DistributionSlider';
@@ -210,9 +210,8 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
 
         <HStack align="center" justify="space-between" className="mb-3">
           <HStack align="center" gap={12} className="mr-3 flex-1">
-            <Avatar
-              state={mintInfo?.icon_url ? 'image' : 'fallback'}
-              picture={mintInfo?.icon_url}
+            <MintIcon
+              iconUrl={mintInfo?.icon_url}
               size={40}
               name={displayName}
               alt={`${displayName} icon`}

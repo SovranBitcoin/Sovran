@@ -97,7 +97,7 @@ interface LogProps {
   /**
    * Optional testID for the screen container. When omitted and `name`
    * ends with `Screen`, a `screen-<kebab>` testID is auto-derived (e.g.
-   * `MintQuoteScreen` → `screen-mint-quote`). The testID is rendered as
+   * `LightningReceiveScreen` → `screen-lightning-receive`). The testID is rendered as
    * a hidden 1×1 transparent <Text> element in the AX tree so log-doctor
    * can target it via `wait for screen #screen-mint-quote` etc. without
    * any layout impact.

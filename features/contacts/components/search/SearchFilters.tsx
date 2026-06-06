@@ -18,12 +18,17 @@ type SearchFiltersProps = {
    * list to only pills that have matches for the current query.
    */
   filters?: readonly ContactsFilter[];
+  /**
+   * Extra pills rendered inline at the end of the same scrollable row.
+   */
+  trailing?: React.ReactElement | null;
 };
 
 export const SearchFilters = ({
   activeFilter,
   onFilterChange,
   filters = BASE_FILTERS,
+  trailing = null,
 }: SearchFiltersProps) => {
   const flatListRef = useRef<FlatList<ContactsFilter>>(null);
 
@@ -47,6 +52,7 @@ export const SearchFilters = ({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          ListFooterComponent={trailing}
         />
       </View>
     </Log>

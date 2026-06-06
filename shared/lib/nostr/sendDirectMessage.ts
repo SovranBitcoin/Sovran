@@ -7,8 +7,8 @@
  * rejects once every relay rejects, or with a `TimeoutError` if no relay
  * accepts within `timeoutMs`.
  *
- * Real-world relay availability is poor: relay.damus.io, nos.lol, and
- * relay.primal.net all regularly stall on publish under load. nostr-tools'
+ * Real-world relay availability is poor: public relays regularly stall on
+ * publish under load. nostr-tools'
  * per-relay promises may never settle when the socket stalls (no heartbeat),
  * and `Promise.any` only rejects when every relay rejects, so a fully-stalled
  * relay set leaves the caller's await hanging until TCP eventually fails. We
@@ -18,7 +18,7 @@
 
 import { nip19, SimplePool } from 'nostr-tools';
 
-import { withTimeout } from 'coco-payment-ux';
+import { withTimeout } from '@sovranbitcoin/colada';
 
 import { nostrLog } from '@/shared/lib/logger';
 
@@ -30,7 +30,7 @@ const FALLBACK_PAYMENT_RELAYS = [
   'wss://relay.damus.io',
   'wss://relay.8333.space/',
   'wss://nos.lol',
-  'wss://relay.primal.net',
+  'wss://relay.nostr.band',
 ];
 
 /** How long to wait for the first relay OK before failing the publish. */

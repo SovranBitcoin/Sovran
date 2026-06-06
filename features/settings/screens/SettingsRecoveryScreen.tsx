@@ -7,7 +7,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Switch, Button, Card } from 'heroui-native';
 import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -16,6 +16,7 @@ import { useNavigation, router } from 'expo-router';
 import { Mint } from '@cashu/coco-core';
 import { useBalanceContext } from '@cashu/coco-react';
 import { deleteMintOperation } from '@/shared/lib/cashu/managerInternals';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { LoadingIndicator } from '@/shared/blocks/status';
@@ -283,7 +284,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         const balances = await manager.wallet.balances
           .byMint()
           .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
-        const mintBalance = balances[mintUrl]?.total ?? 0;
+        const mintBalance = amountToNumber(balances[mintUrl]?.total);
         const fundsFound = mintBalance > 0;
         const mintMs = Math.round((performance.now() - mintT0) * 100) / 100;
 
@@ -424,12 +425,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             const displayName = getMintDisplayName(mint, mint.mintUrl);
             return (
               <HStack key={mint.mintUrl} spacing={12} className="items-center">
-                <Avatar
-                  state={mint.mintInfo?.icon_url ? 'image' : 'fallback'}
-                  picture={mint.mintInfo?.icon_url}
-                  name={displayName}
-                  size={36}
-                />
+                <MintIcon iconUrl={mint.mintInfo?.icon_url} name={displayName} size={36} />
                 <Text size={14} bold numberOfLines={1} style={{ color: foreground, flex: 1 }}>
                   {displayName}
                 </Text>
@@ -672,12 +668,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
                     const displayName = getMintDisplayName(mint, result.mint);
                     return (
                       <HStack key={index} spacing={12} className="items-center">
-                        <Avatar
-                          state={mint?.mintInfo?.icon_url ? 'image' : 'fallback'}
-                          picture={mint?.mintInfo?.icon_url}
-                          name={displayName}
-                          size={36}
-                        />
+                        <MintIcon iconUrl={mint?.mintInfo?.icon_url} name={displayName} size={36} />
                         <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
                           <Text size={14} bold numberOfLines={1} style={{ color: foreground }}>
                             {displayName}
@@ -771,12 +762,7 @@ const MintRecoveryRow: React.FC<{
 
   return (
     <HStack spacing={12} className="items-center">
-      <Avatar
-        state={mint?.mintInfo?.icon_url ? 'image' : 'fallback'}
-        picture={mint?.mintInfo?.icon_url}
-        name={displayName}
-        size={36}
-      />
+      <MintIcon iconUrl={mint?.mintInfo?.icon_url} name={displayName} size={36} />
       <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
         <Text
           size={14}

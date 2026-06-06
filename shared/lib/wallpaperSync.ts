@@ -6,6 +6,10 @@ import {
 import { fetchWallpaperCatalog } from '@/shared/lib/apiClient';
 import { PUBLIC_KEYS } from '@/shared/lib/constants';
 
+function isLikelyHttpUrl(url: string | undefined | null): url is string {
+  return typeof url === 'string' && /^https?:\/\/\S+/i.test(url.trim());
+}
+
 /**
  * Refresh the wallpaper catalog from the API. `signal` aborts the fetch
  * if the caller goes away before the catalog lands.
@@ -45,6 +49,33 @@ export async function refreshCatalog(signal?: AbortSignal): Promise<boolean> {
 
   const droppedAlbums = albums.length - filteredAlbums.length;
   const droppedWallpapers = wallpapers.length - filteredWallpapers.length;
+  const keptAlbumSlugs = new Set(filteredAlbums.map((a) => a.slug));
+  const orphanAlbumSlugs = Array.from(
+    new Set(
+      filteredWallpapers
+        .map((w) => w.albumSlug)
+        .filter((slug) => slug && !keptAlbumSlugs.has(slug))
+    )
+  );
+
+  log.info('wallpaper.sync.catalog_loaded', {
+    receivedWallpapers: wallpapers.length,
+    receivedAlbums: albums.length,
+    keptWallpapers: filteredWallpapers.length,
+    keptAlbums: filteredAlbums.length,
+    droppedWallpapers,
+    droppedAlbums,
+    orphanAlbumSlugs,
+    missingThumbUrls: filteredWallpapers.filter((w) => !isLikelyHttpUrl(w.thumbUrl)).length,
+    missingBlossomUrls: filteredWallpapers.filter((w) => !isLikelyHttpUrl(w.blossomUrl)).length,
+    sampleWallpapers: filteredWallpapers.slice(0, 8).map((w) => ({
+      themeName: w.themeName,
+      albumSlug: w.albumSlug,
+      hasThumbUrl: isLikelyHttpUrl(w.thumbUrl),
+      hasBlossomUrl: isLikelyHttpUrl(w.blossomUrl),
+    })),
+  });
+
   if (droppedAlbums > 0 || droppedWallpapers > 0) {
     // Surface which authors got dropped so a mismatch is debuggable from the
     // log stream — listing distinct pubkeys (truncated) + display names.

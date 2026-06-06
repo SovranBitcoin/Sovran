@@ -2,11 +2,13 @@
  * Pure event handler for the split-bill payment reconciler. Extracted so
  * the branching can be exercised by a unit test without React, NDK, or
  * coco mocks. The hook in `useSplitBillOrchestrator.ts` calls this on
- * each `manager.on('history:updated', …)` event.
+ * each Colada `history.updated` bus event.
  *
  * Returns the action taken so callers (and tests) can assert on the
  * outcome; the live hook just discards the value.
  */
+
+import { isMintQuotePaymentObserved } from '@sovranbitcoin/colada';
 
 interface ReconcilerStore {
   quoteIdToSplitBill: Record<string, { groupId: string; participantId: string }>;
@@ -31,10 +33,7 @@ export function reconcileSplitBillHistoryUpdate(
   if (!quoteId) return 'ignored';
   const ref = store.quoteIdToSplitBill[quoteId];
   if (!ref) return 'ignored';
-  // Coco's MintQuoteState is 'UNPAID' | 'PAID' | 'ISSUED' — but mints
-  // may surface 'EXPIRED' via legacy or upstream paths the type does
-  // not enumerate yet. Read as string so both branches stay reachable.
-  if (entry.state === 'PAID' || entry.state === 'ISSUED') {
+  if (isMintQuotePaymentObserved(entry)) {
     store.markPaymentPaidByQuoteId(quoteId);
     return 'paid';
   }

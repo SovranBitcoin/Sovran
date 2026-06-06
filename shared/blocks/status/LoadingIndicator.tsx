@@ -23,6 +23,7 @@ import Animated, {
   useFrameCallback,
   useSharedValue,
   withDelay,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Mask, Path, Rect } from 'react-native-svg';
@@ -34,6 +35,16 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export type Phase = 'idle' | 'loading' | 'done';
 export type Result = 'success' | 'error' | 'reverted';
+
+export interface ConfirmationProgress {
+  currentConfirmations: number | null;
+  requiredConfirmations: number;
+}
+
+export interface SegmentedProgress {
+  completedSegments: number | null;
+  segmentCount: number;
+}
 
 export interface LoadingIndicatorProps {
   phase?: Phase;
@@ -58,6 +69,13 @@ export interface LoadingIndicatorProps {
    *  replay the draw-from-scratch animation). Set true for static
    *  success/error decorations that should animate on entry. */
   playOnMount?: boolean;
+  /** Generic segmented progress. Each visible segment represents one step;
+   *  completed segments animate to success, and a fully completed ring
+   *  resolves through the success animation. */
+  segmentedProgress?: SegmentedProgress;
+  /** Dynamic segmented progress for onchain confirmation counts. Kept as a
+   *  domain-named convenience over `segmentedProgress`. */
+  confirmationProgress?: ConfirmationProgress;
 }
 
 // Geometry tuned so the disc fills ~76% of the size box (matches the
@@ -67,10 +85,33 @@ export interface LoadingIndicatorProps {
 const RING_R = 38;
 const CIRC = 2 * Math.PI * RING_R;
 const RING_STROKE = 3.5;
+// Segment arc thickness scales inversely with the segment count: a handful
+// of onchain-confirmation segments render thick and chunky, while a dense
+// 24-segment ring stays legible. See `segmentStroke()`.
+const SEGMENT_STROKE_MIN = 4.5;
+const SEGMENT_STROKE_MAX = 8.5;
+const SEGMENT_RESULT_DISC_R = RING_R + SEGMENT_STROKE_MAX / 2;
+
+function segmentStroke(segmentCount: number): number {
+  return Math.max(SEGMENT_STROKE_MIN, Math.min(SEGMENT_STROKE_MAX, 54 / segmentCount));
+}
 const ICON_STROKE = 6.5;
+const DEFAULT_SEGMENT_COUNT = 6;
+const MAX_SEGMENT_COUNT = 24;
+const SEGMENT_ANIM_MS = 340;
+const SEGMENT_STAGGER_MS = 55;
+const SEGMENT_PULSE_MS = 180;
+
+// Idle ring reads as a handful of discrete arc segments (echoing the
+// segmented confirmation ring) rather than a fine dotted hairline. Six
+// evenly spaced dashes around the circumference — `dash + gap` divides
+// CIRC exactly, so the seams land symmetrically and don't drift.
+const IDLE_SEGMENT_COUNT = 6;
+const IDLE_SEGMENT_GAP = 13;
+const IDLE_SEGMENT_DASH = CIRC / IDLE_SEGMENT_COUNT - IDLE_SEGMENT_GAP;
 
 const DASH: Record<Phase, [number, number]> = {
-  idle: [5, 9],
+  idle: [IDLE_SEGMENT_DASH, IDLE_SEGMENT_GAP],
   loading: [70, CIRC - 70],
   done: [CIRC, 0],
 };
@@ -109,6 +150,157 @@ const D_ICON_OUT = 250;
 const T_FILL = 350;
 const T_ICON = 550;
 
+export interface NormalizedSegmentedProgress {
+  segmentCount: number;
+  completedSegments: number;
+}
+
+interface NormalizedConfirmationProgress extends NormalizedSegmentedProgress {
+  currentConfirmations: number;
+  requiredConfirmations: number;
+}
+
+export function normalizeSegmentedProgress(
+  progress: SegmentedProgress | null | undefined
+): NormalizedSegmentedProgress | null {
+  if (!progress) return null;
+
+  const total = Number.isSafeInteger(progress.segmentCount)
+    ? progress.segmentCount
+    : DEFAULT_SEGMENT_COUNT;
+  const segmentTotal = total > 0 ? total : DEFAULT_SEGMENT_COUNT;
+  const rawCompleted =
+    progress.completedSegments == null ? 0 : Math.floor(progress.completedSegments);
+  const sourceCompletedSegments = Number.isFinite(rawCompleted)
+    ? Math.max(0, Math.min(rawCompleted, segmentTotal))
+    : 0;
+  const segmentCount = Math.min(segmentTotal, MAX_SEGMENT_COUNT);
+  const completedSegments =
+    segmentTotal <= MAX_SEGMENT_COUNT
+      ? sourceCompletedSegments
+      : Math.round((sourceCompletedSegments / segmentTotal) * segmentCount);
+
+  return {
+    segmentCount,
+    completedSegments: Math.max(0, Math.min(completedSegments, segmentCount)),
+  };
+}
+
+export function normalizeConfirmationProgress(
+  progress: ConfirmationProgress | null | undefined
+): NormalizedConfirmationProgress | null {
+  if (!progress) return null;
+
+  const required = Number.isSafeInteger(progress.requiredConfirmations)
+    ? progress.requiredConfirmations
+    : DEFAULT_SEGMENT_COUNT;
+  const requiredConfirmations = required > 0 ? required : DEFAULT_SEGMENT_COUNT;
+  const rawCurrent =
+    progress.currentConfirmations == null ? 0 : Math.floor(progress.currentConfirmations);
+  const currentConfirmations = Number.isFinite(rawCurrent)
+    ? Math.max(0, Math.min(rawCurrent, requiredConfirmations))
+    : 0;
+  const normalized = normalizeSegmentedProgress({
+    completedSegments: currentConfirmations,
+    segmentCount: requiredConfirmations,
+  });
+
+  if (!normalized) return null;
+
+  return {
+    currentConfirmations,
+    requiredConfirmations,
+    segmentCount: normalized.segmentCount,
+    completedSegments: normalized.completedSegments,
+  };
+}
+
+interface ConfirmationSegmentProps {
+  index: number;
+  segmentCount: number;
+  completed: boolean;
+  pendingColor: string;
+  successColor: string;
+  delayMs: number;
+}
+
+function ConfirmationSegment({
+  index,
+  segmentCount,
+  completed,
+  pendingColor,
+  successColor,
+  delayMs,
+}: ConfirmationSegmentProps): React.ReactElement {
+  const progress = useSharedValue(completed ? 1 : 0);
+  const pulse = useSharedValue(0);
+  const hasMountedRef = React.useRef(false);
+  const step = CIRC / segmentCount;
+  const stroke = segmentStroke(segmentCount);
+  // Widen the gap with the stroke so round line caps don't close the seams
+  // between thick segments and blur the ring into one continuous arc.
+  const gap = segmentCount === 1 ? 0 : Math.min(step * 0.5, Math.max(stroke + 4, step * 0.22));
+  const dash = Math.max(1, step - gap);
+
+  useEffect(() => {
+    const isFirstCompletedRender = !hasMountedRef.current && completed;
+    const segmentDelay = delayMs + (isFirstCompletedRender ? index * SEGMENT_STAGGER_MS : 0);
+    hasMountedRef.current = true;
+
+    progress.set(
+      withDelay(
+        segmentDelay,
+        withTiming(completed ? 1 : 0, {
+          duration: SEGMENT_ANIM_MS,
+          easing: Easing.out(Easing.cubic),
+        })
+      )
+    );
+
+    if (completed) {
+      pulse.set(
+        withDelay(
+          segmentDelay,
+          withSequence(
+            withTiming(1, { duration: SEGMENT_PULSE_MS, easing: Easing.out(Easing.cubic) }),
+            withTiming(0, { duration: SEGMENT_PULSE_MS, easing: Easing.inOut(Easing.ease) })
+          )
+        )
+      );
+    } else {
+      pulse.set(
+        withTiming(0, {
+          duration: SEGMENT_PULSE_MS,
+          easing: Easing.inOut(Easing.ease),
+        })
+      );
+    }
+  }, [completed, delayMs, index, progress, pulse]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    opacity: 0.45 + progress.get() * 0.55,
+    stroke: interpolateColor(progress.get(), [0, 1], [pendingColor, successColor]),
+    // Grow from a thinner pending arc to the full thickness as it fills, with
+    // a brief pulse-thicken at the moment of completion.
+    strokeWidth: stroke * (0.72 + progress.get() * 0.28) + pulse.get() * 1.6,
+  }));
+
+  return (
+    <AnimatedCircle
+      testID={`loading-indicator-confirmation-segment-${index}`}
+      cx={50}
+      cy={50}
+      r={RING_R}
+      fill="none"
+      strokeLinecap="round"
+      strokeDasharray={[dash, CIRC - dash]}
+      strokeDashoffset={-index * step}
+      transform="rotate(-90 50 50)"
+      animatedProps={animatedProps}
+    />
+  );
+}
+
 export function LoadingIndicator({
   phase = 'idle',
   result = 'success',
@@ -119,6 +311,8 @@ export function LoadingIndicator({
   revertedColor,
   transitionDelayMs = 0,
   playOnMount = false,
+  segmentedProgress,
+  confirmationProgress,
 }: LoadingIndicatorProps): React.ReactElement {
   const [themeFg, themeSuccess, themeDanger, themeWarning] = useThemeColor([
     'foreground',
@@ -130,7 +324,36 @@ export function LoadingIndicator({
   const okColor = successColor ?? themeSuccess;
   const errColor = errorColor ?? themeDanger;
   const revColor = revertedColor ?? themeWarning;
-  const resultColor = result === 'error' ? errColor : result === 'reverted' ? revColor : okColor;
+  const segmentCompleted = segmentedProgress?.completedSegments ?? null;
+  const segmentCount = segmentedProgress?.segmentCount ?? null;
+  const confirmationCurrent = confirmationProgress?.currentConfirmations ?? null;
+  const confirmationRequired = confirmationProgress?.requiredConfirmations ?? null;
+  const normalizedSegmentedProgress = React.useMemo(() => {
+    if (segmentCount != null) {
+      return normalizeSegmentedProgress({
+        completedSegments: segmentCompleted,
+        segmentCount,
+      });
+    }
+
+    return confirmationRequired == null
+      ? null
+      : normalizeConfirmationProgress({
+          currentConfirmations: confirmationCurrent,
+          requiredConfirmations: confirmationRequired,
+        });
+  }, [confirmationCurrent, confirmationRequired, segmentCompleted, segmentCount]);
+  const segmentedComplete =
+    normalizedSegmentedProgress != null &&
+    normalizedSegmentedProgress.completedSegments >= normalizedSegmentedProgress.segmentCount;
+  const isSegmentedMode = normalizedSegmentedProgress != null;
+  const renderSegmentedSegments = normalizedSegmentedProgress != null;
+  const effectivePhase = segmentedComplete ? 'done' : phase;
+  const effectiveResult = segmentedComplete ? 'success' : result;
+  const shouldShowResult = segmentedComplete || (!isSegmentedMode && effectivePhase === 'done');
+  const resultDelayMs = segmentedComplete ? SEGMENT_ANIM_MS : 0;
+  const resultColor =
+    effectiveResult === 'error' ? errColor : effectiveResult === 'reverted' ? revColor : okColor;
 
   // Mount in terminal state when phase='done': skip the ring/fill/icon
   // choreography and render the resolved frame immediately. Matches
@@ -138,8 +361,10 @@ export function LoadingIndicator({
   // when re-rendering rows with an already-resolved status. Static
   // success/error decorations that want the draw-in on mount opt out
   // via `playOnMount`.
-  const startedDone = React.useRef(phase === 'done' && !playOnMount).current;
-  const startedResult = React.useRef(result).current;
+  const startedDone = React.useRef(
+    effectivePhase === 'done' && !playOnMount && !segmentedComplete
+  ).current;
+  const startedResult = React.useRef(effectiveResult).current;
   const startedSuccess = startedDone && startedResult === 'success';
   const startedError = startedDone && startedResult === 'error';
   const startedReverted = startedDone && startedResult === 'reverted';
@@ -165,10 +390,14 @@ export function LoadingIndicator({
   // burn CPU on a no-op every frame.
   useFrameCallback(() => {
     'worklet';
-    if (speed.value === 0 && targetSpeed.value === 0) return;
-    speed.value += (targetSpeed.value - speed.value) * 0.06;
-    if (Math.abs(speed.value) < 0.001) speed.value = 0;
-    rotation.value = (rotation.value + speed.value) % 360;
+    const currentSpeed = speed.get();
+    const nextTargetSpeed = targetSpeed.get();
+    if (currentSpeed === 0 && nextTargetSpeed === 0) return;
+
+    const nextSpeed = currentSpeed + (nextTargetSpeed - currentSpeed) * 0.06;
+    const settledSpeed = Math.abs(nextSpeed) < 0.001 ? 0 : nextSpeed;
+    speed.set(settledSpeed);
+    rotation.set((rotation.get() + settledSpeed) % 360);
   });
 
   useEffect(() => {
@@ -178,61 +407,76 @@ export function LoadingIndicator({
       config: { duration: number; easing: EasingFunction | EasingFunctionFactory }
     ) => (d > 0 ? withDelay(d, withTiming(target, config)) : withTiming(target, config));
 
-    const [a, b] = DASH[phase];
-    dashA.value = t(a, { duration: D_RING, easing: E_RING });
-    dashB.value = t(b, { duration: D_RING, easing: E_RING });
-    ringOpac.value = t(RING_OPAC[phase], { duration: D_OPAC, easing: E_DEF });
+    const [a, b] = DASH[effectivePhase];
+    dashA.set(t(a, { duration: D_RING, easing: E_RING }));
+    dashB.set(t(b, { duration: D_RING, easing: E_RING }));
+    ringOpac.set(t(RING_OPAC[effectivePhase], { duration: D_OPAC, easing: E_DEF }));
+
+    const nextSpeed = isSegmentedMode ? 0 : SPEED[effectivePhase];
 
     let speedTimer: ReturnType<typeof setTimeout> | null = null;
     if (d > 0) {
       speedTimer = setTimeout(() => {
-        targetSpeed.value = SPEED[phase];
+        targetSpeed.set(nextSpeed);
       }, d);
     } else {
-      targetSpeed.value = SPEED[phase];
+      targetSpeed.set(nextSpeed);
     }
 
-    if (phase === 'done') {
-      colorProgress.value = withDelay(
-        d + T_FILL,
-        withTiming(1, { duration: D_FILL_IN, easing: E_FILL_OPAC })
+    if (shouldShowResult) {
+      colorProgress.set(
+        withDelay(
+          d + resultDelayMs + T_FILL,
+          withTiming(1, { duration: D_FILL_IN, easing: E_FILL_OPAC })
+        )
       );
-      fillOpac.value = withDelay(
-        d + T_FILL,
-        withTiming(1, { duration: D_FILL_IN, easing: E_FILL_OPAC })
+      fillOpac.set(
+        withDelay(
+          d + resultDelayMs + T_FILL,
+          withTiming(1, { duration: D_FILL_IN, easing: E_FILL_OPAC })
+        )
       );
-      fillScale.value = withDelay(
-        d + T_FILL,
-        withTiming(1, { duration: D_FILL_SCALE, easing: E_FILL_SCALE })
+      fillScale.set(
+        withDelay(
+          d + resultDelayMs + T_FILL,
+          withTiming(1, { duration: D_FILL_SCALE, easing: E_FILL_SCALE })
+        )
       );
 
       const drawIn = () =>
-        withDelay(d + T_ICON, withTiming(0, { duration: D_ICON_IN, easing: E_ICON }));
+        withDelay(
+          d + resultDelayMs + T_ICON,
+          withTiming(0, { duration: D_ICON_IN, easing: E_ICON })
+        );
       const undraw = (len: number) => t(len, { duration: D_ICON_OUT, easing: E_DEF });
 
-      checkOff.value = result === 'success' ? drawIn() : undraw(ICON.check.len);
-      xOff.value = result === 'error' ? drawIn() : undraw(ICON.xA.len);
-      revertOff.value = result === 'reverted' ? drawIn() : undraw(ICON.revert.len);
+      checkOff.set(effectiveResult === 'success' ? drawIn() : undraw(ICON.check.len));
+      xOff.set(effectiveResult === 'error' ? drawIn() : undraw(ICON.xA.len));
+      revertOff.set(effectiveResult === 'reverted' ? drawIn() : undraw(ICON.revert.len));
     } else {
-      colorProgress.value = t(0, { duration: D_FILL_OUT, easing: E_DEF });
-      fillOpac.value = t(0, { duration: D_FILL_OUT, easing: E_DEF });
-      fillScale.value = t(0.78, { duration: D_FILL_OUT, easing: E_DEF });
-      checkOff.value = t(ICON.check.len, { duration: D_ICON_OUT, easing: E_DEF });
-      xOff.value = t(ICON.xA.len, { duration: D_ICON_OUT, easing: E_DEF });
-      revertOff.value = t(ICON.revert.len, { duration: D_ICON_OUT, easing: E_DEF });
+      colorProgress.set(t(0, { duration: D_FILL_OUT, easing: E_DEF }));
+      fillOpac.set(t(0, { duration: D_FILL_OUT, easing: E_DEF }));
+      fillScale.set(t(0.78, { duration: D_FILL_OUT, easing: E_DEF }));
+      checkOff.set(t(ICON.check.len, { duration: D_ICON_OUT, easing: E_DEF }));
+      xOff.set(t(ICON.xA.len, { duration: D_ICON_OUT, easing: E_DEF }));
+      revertOff.set(t(ICON.revert.len, { duration: D_ICON_OUT, easing: E_DEF }));
     }
 
     return () => {
       if (speedTimer != null) clearTimeout(speedTimer);
     };
   }, [
-    phase,
-    result,
+    effectivePhase,
+    effectiveResult,
     transitionDelayMs,
     dashA,
     dashB,
     ringOpac,
     targetSpeed,
+    isSegmentedMode,
+    shouldShowResult,
+    resultDelayMs,
+    normalizedSegmentedProgress,
     colorProgress,
     fillOpac,
     fillScale,
@@ -242,9 +486,9 @@ export function LoadingIndicator({
   ]);
 
   const ringStrokeAP = useAnimatedProps(() => ({
-    strokeDasharray: [dashA.value, dashB.value],
-    opacity: ringOpac.value,
-    stroke: interpolateColor(colorProgress.value, [0, 1], [ringColor, resultColor]),
+    strokeDasharray: [dashA.get(), dashB.get()],
+    opacity: ringOpac.get(),
+    stroke: interpolateColor(colorProgress.get(), [0, 1], [ringColor, resultColor]),
   }));
 
   // Rotation and scale are applied via Animated.View transform styles
@@ -252,21 +496,22 @@ export function LoadingIndicator({
   // drive `<G rotation={…} />` or `<G scale={…} />` from Reanimated shared
   // values on the UI thread.
   const ringWrapStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
+    transform: [{ rotate: `${rotation.get()}deg` }],
   }));
 
   const fillWrapStyle = useAnimatedStyle(() => ({
-    opacity: fillOpac.value,
-    transform: [{ scale: fillScale.value }],
+    opacity: fillOpac.get(),
+    transform: [{ scale: fillScale.get() }],
   }));
 
   const fillCircleAP = useAnimatedProps(() => ({
-    fill: interpolateColor(colorProgress.value, [0, 1], [ringColor, resultColor]),
+    fill: interpolateColor(colorProgress.get(), [0, 1], [ringColor, resultColor]),
   }));
 
-  const checkAP = useAnimatedProps(() => ({ strokeDashoffset: checkOff.value }));
-  const xAP = useAnimatedProps(() => ({ strokeDashoffset: xOff.value }));
-  const revertAP = useAnimatedProps(() => ({ strokeDashoffset: revertOff.value }));
+  const checkAP = useAnimatedProps(() => ({ strokeDashoffset: checkOff.get() }));
+  const xAP = useAnimatedProps(() => ({ strokeDashoffset: xOff.get() }));
+  const revertAP = useAnimatedProps(() => ({ strokeDashoffset: revertOff.get() }));
+  const resultDiscRadius = isSegmentedMode ? SEGMENT_RESULT_DISC_R : RING_R;
 
   return (
     <View style={{ width: size, height: size }}>
@@ -320,7 +565,7 @@ export function LoadingIndicator({
           <AnimatedCircle
             cx={50}
             cy={50}
-            r={RING_R}
+            r={resultDiscRadius}
             mask="url(#iconMask)"
             animatedProps={fillCircleAP}
           />
@@ -330,15 +575,31 @@ export function LoadingIndicator({
       {/* Ring outline. Rotates via outer Animated.View. */}
       <Animated.View style={[StyleSheet.absoluteFill, ringWrapStyle]}>
         <Svg width={size} height={size} viewBox="0 0 100 100">
-          <AnimatedCircle
-            cx={50}
-            cy={50}
-            r={RING_R}
-            fill="none"
-            strokeWidth={RING_STROKE}
-            strokeLinecap="round"
-            animatedProps={ringStrokeAP}
-          />
+          {renderSegmentedSegments ? (
+            normalizedSegmentedProgress ? (
+              Array.from({ length: normalizedSegmentedProgress.segmentCount }, (_, index) => (
+                <ConfirmationSegment
+                  key={index}
+                  index={index}
+                  segmentCount={normalizedSegmentedProgress.segmentCount}
+                  completed={index < normalizedSegmentedProgress.completedSegments}
+                  pendingColor={ringColor}
+                  successColor={okColor}
+                  delayMs={transitionDelayMs}
+                />
+              ))
+            ) : null
+          ) : (
+            <AnimatedCircle
+              cx={50}
+              cy={50}
+              r={RING_R}
+              fill="none"
+              strokeWidth={RING_STROKE}
+              strokeLinecap="round"
+              animatedProps={ringStrokeAP}
+            />
+          )}
         </Svg>
       </Animated.View>
     </View>

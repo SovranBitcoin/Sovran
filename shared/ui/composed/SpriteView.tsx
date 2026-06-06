@@ -17,6 +17,38 @@ interface AnimatedSpriteBackgroundProps {
   themeName?: string;
 }
 
+function describeImageSource(source: unknown): Record<string, unknown> {
+  if (typeof source === 'number') {
+    return { sourceKind: 'bundled-require', assetId: source };
+  }
+  if (source && typeof source === 'object') {
+    const record = source as Record<string, unknown>;
+    const uri = typeof record.uri === 'string' ? record.uri : undefined;
+    if (uri) {
+      return {
+        sourceKind: uri.startsWith('file://')
+          ? 'file-uri'
+          : uri.startsWith('http://') || uri.startsWith('https://')
+            ? 'remote-uri'
+            : 'uri',
+        uri,
+      };
+    }
+    return { sourceKind: 'object', sourceKeys: Object.keys(record) };
+  }
+  return { sourceKind: typeof source };
+}
+
+function describeImageLoadError(event: unknown): string {
+  if (event && typeof event === 'object') {
+    const directError = (event as { error?: unknown }).error;
+    if (typeof directError === 'string') return directError;
+    const nativeEvent = (event as { nativeEvent?: { error?: unknown } }).nativeEvent;
+    if (typeof nativeEvent?.error === 'string') return nativeEvent.error;
+  }
+  return String(event ?? 'unknown');
+}
+
 const AnimatedSpriteBackground = ({
   backgroundColor,
   themeName,
@@ -50,6 +82,28 @@ const AnimatedSpriteBackground = ({
   const activeTheme = themeName ?? ctxTheme.currentTheme;
   const backgroundImageSource = backgroundImageThemes[activeTheme];
 
+  useEffect(() => {
+    if (!backgroundImageSource) {
+      const registeredThemes = Object.keys(backgroundImageThemes);
+      log.warn('bg.sprite.image_missing', {
+        theme: activeTheme,
+        requestedTheme: themeName ?? null,
+        currentTheme: ctxTheme.currentTheme,
+        backgroundColor,
+        registeredImageThemeCount: registeredThemes.length,
+        registeredImageThemeSamples: registeredThemes.slice(0, 12),
+      });
+      return;
+    }
+
+    log.info('bg.sprite.image_source', {
+      theme: activeTheme,
+      requestedTheme: themeName ?? null,
+      currentTheme: ctxTheme.currentTheme,
+      ...describeImageSource(backgroundImageSource),
+    });
+  }, [activeTheme, backgroundColor, backgroundImageSource, ctxTheme.currentTheme, themeName]);
+
   if (!backgroundImageSource) {
     log.debug('bg.sprite.render', { theme: activeTheme, hasImage: false });
     return (
@@ -73,6 +127,19 @@ const AnimatedSpriteBackground = ({
         <Image
           source={backgroundImageSource}
           style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.18 }] }]}
+          onLoad={() => {
+            log.info('bg.sprite.image_loaded', {
+              theme: activeTheme,
+              ...describeImageSource(backgroundImageSource),
+            });
+          }}
+          onError={(event) => {
+            log.warn('bg.sprite.image_load_failed', {
+              theme: activeTheme,
+              error: describeImageLoadError(event),
+              ...describeImageSource(backgroundImageSource),
+            });
+          }}
         />
       </Animated.View>
     </Log>

@@ -50,6 +50,45 @@ describe('redactStorageDump', () => {
     expect((out.d as string[])[0]).toBe('<REDACTED:lightning-invoice>');
   });
 
+  it('redacts nsec strings embedded anywhere in a dump', () => {
+    const nsec = 'nsec1' + 'a'.repeat(58);
+    const out = redactStorageDump({
+      'legacy-nostr-store': {
+        raw: nsec,
+        note: `imported ${nsec}`,
+      },
+    });
+    const legacy = out['legacy-nostr-store'] as { raw: string; note: string };
+    expect(legacy.raw).toBe('<REDACTED:nsec>');
+    expect(legacy.note).toBe('imported <REDACTED:nsec>');
+  });
+
+  it('redacts mnemonic and private-key fields by key name', () => {
+    const out = redactStorageDump({
+      'legacy-wallet-store': {
+        mnemonic:
+          'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
+        cashuMnemonic:
+          'legal winner thank year wave sausage worth useful legal winner thank yellow',
+        keys: {
+          privateKeyHex: 'f'.repeat(64),
+          secretKey: 'e'.repeat(64),
+          publicKeyHex: 'a'.repeat(64),
+        },
+      },
+    });
+    const legacy = out['legacy-wallet-store'] as {
+      mnemonic: string;
+      cashuMnemonic: string;
+      keys: { privateKeyHex: string; secretKey: string; publicKeyHex: string };
+    };
+    expect(legacy.mnemonic).toBe('<REDACTED:secret>');
+    expect(legacy.cashuMnemonic).toBe('<REDACTED:secret>');
+    expect(legacy.keys.privateKeyHex).toBe('<REDACTED:private-key>');
+    expect(legacy.keys.secretKey).toBe('<REDACTED:private-key>');
+    expect(legacy.keys.publicKeyHex).toBe('a'.repeat(64));
+  });
+
   it('preserves non-sensitive primitive values unchanged', () => {
     const out = redactStorageDump({
       'settings-store': { theme: 'dark', count: 42, enabled: true, deleted: null },

@@ -1,9 +1,9 @@
 /**
- * @fileoverview Transactions-flow meltQuote route — re-entry from the
+ * @fileoverview Transactions-flow legacy meltQuote route — re-entry from the
  * transactions list. The route body and zod schema live on
- * `MeltQuoteRoute`. Mint-pill callbacks stay undefined here: this route
- * renders the entry read-only. `Stack.Screen` title comes from
- * `(transactions-flow)/_layout.tsx`.
+ * `MeltQuoteRoute`, which dispatches to the rail-specific send screen.
+ * Mint-pill callbacks stay undefined here: this route renders the entry
+ * read-only.
  */
 
 import { MeltQuoteRoute } from '@/features/send';

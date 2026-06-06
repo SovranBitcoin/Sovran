@@ -3,7 +3,7 @@
  *
  * General mint management modal — not driven by a payment flow.
  * Builds MintListItem[] from live data (useMints + useBalanceContext) plus
- * the bulk catalog from `getMintCatalog`, the same source coco-payment-ux
+ * the bulk catalog from `getMintCatalog`, the same source colada
  * uses for Send / Receive Select Mint.
  *
  * Validates the deep-link `continueParams` (JSON-encoded) and the
@@ -17,12 +17,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { z } from 'zod';
 
 import { useBalanceContext, useMints } from '@cashu/coco-react';
-import type { MintAvailability } from 'coco-payment-ux';
+import type { MintAvailability } from '@sovranbitcoin/colada';
 
 import { MintListScreen } from '@/features/mint';
 import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';
 import { buildMintListItems } from '@/features/send';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { cashuLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
@@ -65,7 +66,7 @@ function MintListRoute() {
     () =>
       trustedMints.map((m) => ({
         mintUrl: m.mintUrl,
-        balance: mintBalances[m.mintUrl]?.total ?? 0,
+        balance: amountToNumber(mintBalances[m.mintUrl]?.total),
         status: 'available' as const,
         reason: null,
         isPreferred: false,
@@ -73,7 +74,7 @@ function MintListRoute() {
     [trustedMints, mintBalances]
   );
 
-  // One bulk fetch — same source coco-payment-ux uses for Select Mint, so
+  // One bulk fetch — same source colada uses for Select Mint, so
   // the audit / score pills render identically across both surfaces.
   const mintUrls = useMemo(() => trustedMints.map((m) => m.mintUrl), [trustedMints]);
   const catalog = useMintCatalog(mintUrls);

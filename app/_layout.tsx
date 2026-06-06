@@ -45,7 +45,7 @@ import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
 import { WhitenoiseProvider } from '@/features/whitenoise/WhitenoiseProvider';
 import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
-import { SovranPaymentUXProvider } from '@/features/send/providers/CocoPaymentUX';
+import { SovranColadaProvider } from '@/features/send/providers/Colada';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
@@ -112,7 +112,7 @@ const PROFILE_SWITCH_SPLASH_BOX_SIZE =
 // InitializationProvider is first so the splash screen renders immediately
 // while PersistGate waits for Redux rehydration (avoids blank screen gap).
 // OfflineStatusProvider lives here (not inside RootLayoutContent) so the
-// downstream SovranPaymentUXProvider — which consumes useOfflineStatus() to
+// downstream SovranColadaProvider — which consumes useOfflineStatus() to
 // drive the machine's offline send branch — actually sees real network state
 // instead of the default { isOffline: false }. The visual <OfflineShell>
 // stays inside RootLayoutContent and reads the same context.
@@ -147,14 +147,12 @@ function AccountScopedProviders({
         [WhitenoiseProvider, { accountIndex }],
         CocoProvider,
         WalletContextProvider,
-        SovranPaymentUXProvider,
+        SovranColadaProvider,
         ActionSheetProvider,
         PricelistProvider,
-        // Starts the bitchat BLE mesh once per account scope so peers
-        // populate app-wide (Split Bill picker, future "who's nearby?"
-        // surfaces) without needing a chat screen open to keep the mesh
-        // running. Mounted after keys/NDK so the advertised nickname is
-        // derived from the active profile.
+        // Mounts BitChat DM listeners once per account scope without
+        // starting BLE on app launch. BLE discovery announces to nearby
+        // bitchat clients, so explicit peer-list/chat surfaces own startup.
         BitchatBLEProvider,
         AppGate,
       ]),

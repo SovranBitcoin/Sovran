@@ -3,6 +3,7 @@ import { type LayoutChangeEvent, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import Icon from '@/assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -37,6 +38,7 @@ import {
   TARGET_SKELETON_VARIANT,
   type ReplySkeletonMatch,
 } from '@/features/feed/lib/threadReplySkeletons';
+import { THREAD_CONNECTOR_LINE_STYLE } from './threadConnectorStyle';
 
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
 
@@ -54,6 +56,8 @@ interface PostCardProps {
 
   showLineAbove?: boolean;
   showLineBelow?: boolean;
+  showFooterBorder?: boolean;
+  fullBleedFooterBorder?: boolean;
 
   index?: number;
   skipAnimation?: boolean;
@@ -66,6 +70,7 @@ interface PostCardProps {
   onCommentPress?: () => void;
   onRepostPress?: () => void;
   onLikePress?: () => void;
+  onMorePress?: () => void;
   reposted?: boolean;
   liked?: boolean;
   repostPending?: boolean;
@@ -101,6 +106,8 @@ export const PostCard = React.memo(function PostCard({
   variant,
   showLineAbove = false,
   showLineBelow = false,
+  showFooterBorder = true,
+  fullBleedFooterBorder = false,
   index = 0,
   skipAnimation = true,
   feedIndex,
@@ -109,6 +116,7 @@ export const PostCard = React.memo(function PostCard({
   onCommentPress,
   onRepostPress,
   onLikePress,
+  onMorePress,
   reposted = false,
   liked = false,
   repostPending = false,
@@ -168,6 +176,7 @@ export const PostCard = React.memo(function PostCard({
       profiles: ctx?.profiles ?? new Map(),
       metrics: ctx?.metrics ?? new Map(),
       quotedEvents: ctx?.quotedEvents ?? new Map(),
+      replyPreviewEventIds: ctx?.replyPreviewEventIds,
     });
     router.push({
       pathname: '/(user-flow)/thread',
@@ -201,6 +210,10 @@ export const PostCard = React.memo(function PostCard({
     if (suppressThreadTapRef.current) return;
     navigateToThread();
   }, [navigateToThread]);
+
+  const handleMorePress = useCallback(() => {
+    onMorePress?.();
+  }, [onMorePress]);
 
   const tapGesture = useMemo(
     () =>
@@ -278,6 +291,7 @@ export const PostCard = React.memo(function PostCard({
               quotedEvents={quotedEvents}
               profiles={profiles}
               getMetrics={getMetrics}
+              event={event}
               onVideoTap={onVideoTap}
               onQuotedPressIn={handleNestedPressIn}
               onQuotedPressOut={handleNestedPressOut}
@@ -316,13 +330,20 @@ export const PostCard = React.memo(function PostCard({
 
   // ── Gutter layout (feed, repost-original, thread-reply) ──
   const hasConnectingBars = showLineAbove || showLineBelow;
+  const showMetricsBorder = showFooterBorder && (isThread ? !hasConnectingBars : true);
   const lineColor = defaultColor;
 
   const gutterContent = (
     <View style={pcStyles.gutterRow}>
       <View style={pcStyles.gutterCol}>
         {showLineAbove ? (
-          <View style={[pcStyles.lineAbove, { backgroundColor: lineColor }]} />
+          <View
+            style={[
+              pcStyles.lineAbove,
+              THREAD_CONNECTOR_LINE_STYLE,
+              { borderLeftColor: lineColor },
+            ]}
+          />
         ) : null}
         <Pressable
           onPressIn={handleNestedPressIn}
@@ -337,34 +358,54 @@ export const PostCard = React.memo(function PostCard({
           />
         </Pressable>
         {showLineBelow ? (
-          <View style={[pcStyles.lineBelow, { backgroundColor: lineColor }]} />
+          <View
+            style={[
+              pcStyles.lineBelow,
+              THREAD_CONNECTOR_LINE_STYLE,
+              { borderLeftColor: lineColor },
+            ]}
+          />
         ) : null}
       </View>
 
       <View style={sharedStyles.flex1}>
         <HStack align="center" gap={6} style={sharedStyles.mb4}>
-          <Pressable
-            onPressIn={handleNestedPressIn}
-            onPressOut={handleNestedPressOut}
-            onPress={navigateToProfile}>
-            <Text
-              bold
-              size={14}
-              style={textPrimary}
-              numberOfLines={isThread ? 1 : undefined}
-              fallback={nameFallback}>
-              {displayName}
-            </Text>
-          </Pressable>
-          {shortTime ? (
-            <>
-              <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
-                {'•'}
+          <HStack align="center" gap={6} style={pcStyles.headerTextRow}>
+            <Pressable
+              onPressIn={handleNestedPressIn}
+              onPressOut={handleNestedPressOut}
+              onPress={navigateToProfile}>
+              <Text
+                bold
+                size={14}
+                style={textPrimary}
+                numberOfLines={isThread ? 1 : undefined}
+                fallback={nameFallback}>
+                {displayName}
               </Text>
-              <Text size={13} style={textMuted}>
-                {shortTime}
-              </Text>
-            </>
+            </Pressable>
+            {shortTime ? (
+              <>
+                <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
+                  {'•'}
+                </Text>
+                <Text size={13} style={textMuted}>
+                  {shortTime}
+                </Text>
+              </>
+            ) : null}
+          </HStack>
+          {onMorePress ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="More post actions"
+              onPressIn={handleNestedPressIn}
+              onPressOut={handleNestedPressOut}
+              onPress={handleMorePress}
+              haptics
+              style={pcStyles.moreButton}>
+              <Icon name="tabler:dots" size={18} color={opacity(foreground, 0.5)} />
+            </Pressable>
           ) : null}
         </HStack>
 
@@ -400,12 +441,20 @@ export const PostCard = React.memo(function PostCard({
 
         <Spacer size={8} />
 
-        <View style={pcStyles.inlineMetricsWrap}>
+        <View
+          style={[
+            fullBleedFooterBorder
+              ? pcStyles.inlineMetricsWrapFullBleed
+              : pcStyles.inlineMetricsWrap,
+            fullBleedFooterBorder && showMetricsBorder && pcStyles.inlineMetricsWrapFullBleedBorder,
+            fullBleedFooterBorder &&
+              showMetricsBorder && { borderBottomColor: opacity(foreground, 0.1) },
+          ]}>
           <MetricsFooter
             metrics={metrics}
             borderColor={foreground}
             compact={isThread}
-            showBorder={isThread ? !hasConnectingBars : true}
+            showBorder={!fullBleedFooterBorder && showMetricsBorder}
             onCommentPress={isThread ? (onCommentPress ?? navigateToThread) : undefined}
             onRepostPress={onRepostPress}
             onLikePress={onLikePress}
@@ -646,11 +695,34 @@ const pcStyles = StyleSheet.create({
   dotSeparator: {
     marginRight: 4,
   },
+  headerTextRow: {
+    flex: 1,
+    minWidth: 0,
+  },
+  moreButton: {
+    width: 30,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -4,
+    marginRight: -6,
+    borderRadius: 14,
+  },
   inlineMetricsWrap: {
     marginLeft: -(AVATAR_SIZE + 12),
     marginRight: -16,
     paddingLeft: AVATAR_SIZE + 12,
     paddingRight: 16,
+  },
+  inlineMetricsWrapFullBleed: {
+    marginLeft: -(AVATAR_SIZE + 12 + 16),
+    marginRight: -16,
+    paddingLeft: AVATAR_SIZE + 12 + 16,
+    paddingRight: 16,
+  },
+  inlineMetricsWrapFullBleedBorder: {
+    borderBottomWidth: 1,
+    paddingBottom: 10,
   },
   noteTextLine: {
     lineHeight: 22,
@@ -658,14 +730,11 @@ const pcStyles = StyleSheet.create({
   lineAbove: {
     position: 'absolute',
     top: 0,
-    width: 2,
+    left: AVATAR_SIZE / 2 - 1,
     height: AVATAR_SIZE / 2,
-    borderRadius: 1,
   },
   lineBelow: {
-    width: 2,
     flex: 1,
     marginTop: 6,
-    borderRadius: 1,
   },
 });

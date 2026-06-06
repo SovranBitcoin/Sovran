@@ -41,6 +41,13 @@ export interface LocationTier {
 
 // --- BLE bridge payloads ---
 
+export interface BitchatBLEIdentityMaterial {
+  version: 'sovran-bitchat-ble-v1';
+  nostrPubkey: string;
+  noisePrivateKeyHex: string;
+  signingPrivateKeyHex: string;
+}
+
 export interface BLEPeer {
   peerID: string;
   nickname: string;

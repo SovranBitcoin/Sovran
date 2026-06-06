@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { HistoryEntry } from '@cashu/coco-core';
-import { useManager } from '@cashu/coco-react';
+import { useColadaSubscriptions } from '@sovranbitcoin/colada/react';
 import { log } from '@/shared/lib/logger';
 
 type UseHistoryEntryResult<T extends HistoryEntry> = {
@@ -10,13 +10,18 @@ type UseHistoryEntryResult<T extends HistoryEntry> = {
   error: string | null;
 };
 
+function getStringField(entry: unknown, key: string): string | undefined {
+  const value = (entry as Record<string, unknown> | null | undefined)?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 /**
  * Hook to manage a single history entry with real-time updates.
  *
  * Handles:
  * - Parsing string input (JSON) to HistoryEntry
  * - Maintaining current entry state
- * - Subscribing to `history:updated` events for real-time sync
+ * - Subscribing to Colada's bus for real-time sync
  * - Syncing state when initialEntry prop changes
  *
  * @example
@@ -32,7 +37,7 @@ type UseHistoryEntryResult<T extends HistoryEntry> = {
 export function useHistoryEntry<T extends HistoryEntry>(
   initialEntry: T | string | undefined
 ): UseHistoryEntryResult<T> {
-  const manager = useManager();
+  const bus = useColadaSubscriptions();
 
   // Parse initialEntry - handles both string (from route params) and object
   const { parsed, parseError } = useMemo(() => {
@@ -74,24 +79,55 @@ export function useHistoryEntry<T extends HistoryEntry>(
     }
   }, [parsed]);
 
-  // Subscribe to history:updated events to keep entry in sync
+  // Subscribe through Colada's bus so detail screens share one update model
+  // instead of attaching their own Coco manager watchers.
   useEffect(() => {
     if (!parsed?.id) return;
 
-    const handleHistoryUpdated = ({ entry }: { mintUrl: string; entry: HistoryEntry }) => {
-      // Match by id and type for type safety
-      if (entry.id === parsed.id && entry.type === parsed.type) {
-        log.debug('tx.history_entry.updated', { id: entry.id, type: entry.type });
-        setCurrentEntry(entry as T);
+    const matchesParsedEntry = (entry: Record<string, unknown>): boolean => {
+      if (entry.id === parsed.id && entry.type === parsed.type) return true;
+      const parsedQuoteId = getStringField(parsed, 'quoteId');
+      if (parsedQuoteId && entry.quoteId === parsedQuoteId) {
+        return true;
       }
+      if (
+        typeof parsed.operationId === 'string' &&
+        parsed.operationId.length > 0 &&
+        entry.operationId === parsed.operationId
+      ) {
+        return true;
+      }
+      return false;
     };
 
-    const unsubscribe = manager.on('history:updated', handleHistoryUpdated);
+    const unHistory = bus.subscribe(
+      { type: 'history.updated', historyType: parsed.type, entryId: parsed.id },
+      (event) => {
+        log.debug('tx.history_entry.updated', { id: event.entryId, type: event.historyType });
+        setCurrentEntry(event.entry as unknown as T);
+      }
+    );
+
+    const operationType =
+      parsed.type === 'melt' ? 'melt.updated' : parsed.type === 'mint' ? 'mint.updated' : null;
+    const unOperation = operationType
+      ? bus.subscribe({ type: operationType }, (event) => {
+          if (!matchesParsedEntry(event.entry as Record<string, unknown>)) return;
+          log.debug('tx.history_entry.operation_updated', {
+            id: parsed.id,
+            type: parsed.type,
+            operationId: event.operationId,
+            quoteId: event.quoteId,
+          });
+          setCurrentEntry((current) => Object.assign({}, current ?? parsed, event.entry) as T);
+        })
+      : undefined;
 
     return () => {
-      unsubscribe();
+      unHistory();
+      unOperation?.();
     };
-  }, [parsed?.id, parsed?.type, manager]);
+  }, [parsed, bus]);
 
   return {
     entry: currentEntry,

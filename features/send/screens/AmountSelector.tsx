@@ -1,14 +1,21 @@
 /**
  * Machine-driven adapter over the shared AmountEntryView primitive.
- * Unpacks coco-payment-ux's amountEntry screen state into the primitive's
+ * Unpacks colada's amountEntry screen state into the primitive's
  * typed contract and wires the bound actions through.
  */
 
 import { useCallback, useMemo } from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import {
+  PixelRatio,
+  type StyleProp,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
-import type { ActionVariant, RecipientProfile, ScreenActionName } from 'coco-payment-ux';
-import type { BoundAction, QuickSendSuggestion } from 'coco-payment-ux/react';
+import type { ActionVariant, RecipientProfile, ScreenActionName } from '@sovranbitcoin/colada';
+import type { BoundAction, QuickSendSuggestion } from '@sovranbitcoin/colada/react';
 
 import { MintSelector } from '@/features/wallet';
 import type { ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
@@ -22,6 +29,8 @@ import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore'
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
 type AmountEntryActions = Record<ScreenActionName['amountEntry'], BoundAction>;
+
+const EMPTY_QUICK_SEND_SUGGESTIONS: QuickSendSuggestion[] = [];
 
 function readAmountEntryFields(entry: Record<string, unknown>) {
   const rawInput = typeof entry.rawInput === 'string' ? entry.rawInput : '';
@@ -56,7 +65,7 @@ interface AmountSelectorProps {
    * by a recipient avatar + "Pay <name>") and should render as a 50/50
    * bottom-bar pill alongside Next. The wallet flips this on once the
    * payment machine has resolved a Nostr identity for the melt target
-   * (see `coco-payment-ux`'s `resolveRecipientPubkey` / `resolveRecipientProfile`
+   * (see `colada`'s `resolveRecipientPubkey` / `resolveRecipientProfile`
    * operations).
    */
   showMintBottomButton?: boolean;
@@ -67,18 +76,20 @@ interface AmountSelectorProps {
   /**
    * Resolved Nostr recipient identity for the current melt target. When
    * present, forwarded to `actions.next.execute(...)` as part of the params
-   * so coco-payment-ux's default `next` handler can pass it into the
-   * machine via `enterAmount`. Lets MeltQuoteScreen render the "Pay <name>"
+   * so colada's default `next` handler can pass it into the
+   * machine via `enterAmount`. Lets LightningSendScreen render the "Pay <name>"
    * header on first paint instead of paying a second NIP-05 round-trip.
    */
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
+  /** Hide variant menu when the caller owns delivery after ecash creation. */
+  suppressNextVariants?: boolean;
 }
 
 export function AmountSelector({
   entry,
   actions,
-  suggestions = [],
+  suggestions = EMPTY_QUICK_SEND_SUGGESTIONS,
   transactionType,
   machineBusy = false,
   showMintBottomButton = false,
@@ -86,6 +97,7 @@ export function AmountSelector({
   onRequestMintList,
   recipientPubkey,
   recipientProfile,
+  suppressNextVariants = false,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
 
@@ -121,7 +133,7 @@ export function AmountSelector({
   }, [actions.toggle, inputMode]);
 
   // Pack recipient identity into the execute params on every `next` call.
-  // Spread by the action manager into `ctx`, then read by coco-payment-ux's
+  // Spread by the action manager into `ctx`, then read by colada's
   // default `next` handler — undefined values are ignored downstream, so
   // safe to always include.
   const nextExecuteParams = useMemo(
@@ -147,11 +159,12 @@ export function AmountSelector({
     await actions.next.execute(nextExecuteParams);
   }, [actions.next, numericValue, inputMode, unit, transactionType, nextExecuteParams]);
 
-  // Map the coco-payment-ux availability variants (ecash/lightning/onchain on
+  // Map the colada availability variants (ecash/lightning/onchain on
   // send-money flows) into ActionMenuButton's variant shape. Each variant
   // invokes `actions.next.execute({ variantId })`, which routes through the
   // screen-action handler to the machine.
   const nextVariants = useMemo<ActionMenuVariant[] | undefined>(() => {
+    if (suppressNextVariants) return undefined;
     const raw = actions.next.variants as ActionVariant[] | undefined;
     if (!raw || raw.length === 0) return undefined;
     return raw.map((v) => ({
@@ -174,7 +187,7 @@ export function AmountSelector({
         await actions.next.execute({ variantId: v.id, ...nextExecuteParams });
       },
     }));
-  }, [actions.next, nextExecuteParams]);
+  }, [actions.next, nextExecuteParams, suppressNextVariants]);
 
   // The AI-credit top-up flow lands on this screen via a hand-rolled
   // navigation (`useRoutstrTopUpStore.start()` → `/(send-flow)/amount`),
@@ -219,6 +232,7 @@ export function AmountSelector({
 
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
+  const nextNoticeText = nextDisabled ? actions.next.reason : undefined;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
 
   // When the recipient header is in play, surface the mint as a 50/50
@@ -237,11 +251,27 @@ export function AmountSelector({
   //     visible padding inside the SwiftUI liquid-glass button instead
   //     of crowding the avatar + label + chevron row at 48 px.
   const { width: windowWidth } = useWindowDimensions();
-  const mintBottomPillWidth = Math.max(0, windowWidth / 2 - 8);
+  const mintBottomSlotWidth = useMemo(
+    () => PixelRatio.roundToNearestPixel(windowWidth / 2),
+    [windowWidth]
+  );
+  const mintBottomPillWidth = useMemo(
+    () => Math.max(0, mintBottomSlotWidth - 8),
+    [mintBottomSlotWidth]
+  );
+  const mintBottomPillWrapperStyle = useMemo<StyleProp<ViewStyle>>(() => {
+    return [
+      styles.mintBottomPillWrapper,
+      {
+        width: mintBottomPillWidth,
+        height: 48,
+      },
+    ];
+  }, [mintBottomPillWidth]);
   const leadingBottomButton = useMemo(() => {
     if (!showMintBottomButton || !onRequestMintList) return undefined;
     return (
-      <View style={{ margin: 4, marginBottom: 8 }}>
+      <View style={mintBottomPillWrapperStyle}>
         <MintSelector
           selectedMintUrl={mintUrl}
           onRequestMintList={onRequestMintList}
@@ -251,10 +281,16 @@ export function AmountSelector({
         />
       </View>
     );
-  }, [showMintBottomButton, onRequestMintList, mintUrl, mintBottomPillWidth]);
+  }, [
+    showMintBottomButton,
+    onRequestMintList,
+    mintUrl,
+    mintBottomPillWidth,
+    mintBottomPillWrapperStyle,
+  ]);
 
   return (
-    <Log name="AmountSelector" style={{ flex: 1 }}>
+    <Log name="AmountSelector" style={styles.amountSelectorRoot}>
       <AmountEntryView
         rawInput={rawInput}
         numericValue={numericValue}
@@ -265,6 +301,7 @@ export function AmountSelector({
         onNext={handleNext}
         nextLoading={nextLoading}
         nextDisabled={nextDisabled}
+        noticeText={nextNoticeText}
         nextTestID="amount-next"
         fiatSymbol={fiatSymbol}
         secondaryDisplay={secondaryDisplay}
@@ -279,3 +316,13 @@ export function AmountSelector({
     </Log>
   );
 }
+
+const styles = StyleSheet.create({
+  amountSelectorRoot: {
+    flex: 1,
+  },
+  mintBottomPillWrapper: {
+    margin: 4,
+    marginBottom: 8,
+  },
+});

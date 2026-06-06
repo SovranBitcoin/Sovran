@@ -7,6 +7,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 import type { NoteMetrics } from './feedTypes';
 import { formatCount, formatSats } from './feedFormat';
 import { sharedStyles } from './feedStyles';
@@ -81,6 +82,32 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   const iconSize = compact ? 13 : 16;
   const textSize = compact ? 11 : 13;
 
+  // The repost button opens a menu offering a plain repost or a quote. Quote is
+  // disabled/greyed-out for now.
+  const handleRepostPress = React.useCallback(() => {
+    if (!onRepostPress) return;
+    actionMenuPopup({
+      title: 'Repost',
+      buttons: [
+        {
+          text: reposted ? 'Undo repost' : 'Repost',
+          icon: 'garden:arrow-retweet-fill-16',
+          onPress: (close) => {
+            close();
+            onRepostPress();
+          },
+        },
+        {
+          text: 'Quote',
+          icon: 'mdi:format-quote-close',
+          disabled: true,
+          reason: 'Coming soon',
+          onPress: (close) => close(),
+        },
+      ],
+    });
+  }, [onRepostPress, reposted]);
+
   return (
     <View
       style={[
@@ -103,7 +130,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           </HStack>
         </Pressable>
         <Pressable
-          onPress={onRepostPress}
+          onPress={handleRepostPress}
           disabled={!onRepostPress || repostPending}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}

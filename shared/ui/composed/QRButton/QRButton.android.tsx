@@ -2,9 +2,6 @@ import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  measure,
-  runOnJS,
-  runOnUI,
   useAnimatedRef,
   useAnimatedStyle,
   useSharedValue,
@@ -64,25 +61,10 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   const visibilityStyle = useAnimatedStyle(() => ({ opacity: visibility.value }));
 
   const publishAnchor = useCallback(() => {
-    // Worklet path — UI-thread, syncs with frame.
-    runOnUI(() => {
-      'worklet';
-      const m = measure(animatedRef);
-      if (m === null || !m.width || !m.height) return;
-      runOnJS(setQRButtonAnchor)({
-        x: m.pageX,
-        y: m.pageY,
-        width: m.width,
-        height: m.height,
-        borderRadius,
-      });
-      runOnJS(initLog)(
-        'QRButtonAnchor',
-        `measure(UI) — pageX=${m.pageX} pageY=${m.pageY} width=${m.width} height=${m.height}`
-      );
-    })();
-    // JS-thread fallback for the Fabric quirk where measure() returns null.
-    // Same coord space; the store dedupes redundant publishes.
+    // Android's UI-thread measurement can report pageX/pageY in a different
+    // space than the root view during boot on devices with variable system
+    // nav bars. The splash morph consumes window coordinates, so keep this
+    // path on measureInWindow only.
     const node = animatedRef.current as unknown as {
       measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
     } | null;

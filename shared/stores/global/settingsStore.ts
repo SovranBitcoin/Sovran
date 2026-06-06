@@ -4,6 +4,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import {
+  AVATAR_FALLBACK_VARIANTS,
+  DEFAULT_AVATAR_FALLBACK_VARIANT,
+  type AvatarFallbackVariant,
+} from '@/shared/lib/avatarFallback';
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -60,6 +65,7 @@ interface SettingsState {
   quickAccessP2PK: boolean;
   regenerateP2PKOnReceive: boolean;
   sendLocationEnabled: boolean;
+  avatarFallbackVariant: AvatarFallbackVariant;
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
   middlemanRouting: MiddlemanRoutingSettings;
@@ -108,6 +114,7 @@ const PersistedSettings = z.object({
   quickAccessP2PK: z.boolean().default(false),
   regenerateP2PKOnReceive: z.boolean().default(true),
   sendLocationEnabled: z.boolean().default(false),
+  avatarFallbackVariant: z.enum(AVATAR_FALLBACK_VARIANTS).default(DEFAULT_AVATAR_FALLBACK_VARIANT),
   minTransferThreshold: z.number().int().nonnegative().default(5),
   middlemanRouting: PersistedMiddlemanRouting.default({
     maxHops: 2,
@@ -136,6 +143,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   quickAccessP2PK: false,
   regenerateP2PKOnReceive: true,
   sendLocationEnabled: false,
+  avatarFallbackVariant: DEFAULT_AVATAR_FALLBACK_VARIANT,
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
 };
@@ -190,6 +198,10 @@ interface SettingsActions {
   // Send location stamping
   setSendLocationEnabled: (enabled: boolean) => void;
   getSendLocationEnabled: () => boolean;
+
+  // Avatar fallback variation
+  setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => void;
+  getAvatarFallbackVariant: () => AvatarFallbackVariant;
 
   // Rebalancing
   setMinTransferThreshold: (sats: number) => void;
@@ -312,6 +324,13 @@ export const useSettingsStore = create<SettingsStore>()(
         },
         getSendLocationEnabled: () => get().sendLocationEnabled,
 
+        // Avatar fallback
+        setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => {
+          storeLog.info('store.settings.set_avatar_fallback_variant', { variant });
+          set({ avatarFallbackVariant: variant });
+        },
+        getAvatarFallbackVariant: () => get().avatarFallbackVariant,
+
         // Rebalancing
         setMinTransferThreshold: (sats: number) => {
           storeLog.info('store.settings.set_min_transfer_threshold', { sats });
@@ -349,6 +368,7 @@ export const useSettingsStore = create<SettingsStore>()(
           quickAccessP2PK: state.quickAccessP2PK,
           regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
           sendLocationEnabled: state.sendLocationEnabled,
+          avatarFallbackVariant: state.avatarFallbackVariant,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
         }),

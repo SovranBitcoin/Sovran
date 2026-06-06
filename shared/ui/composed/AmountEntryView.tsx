@@ -4,16 +4,16 @@
  *
  * Consumed by the send/receive flow's AmountSelector adapter (machine-driven)
  * and by the Split-Bill step-1 screen (local-state). Keep it framework-neutral:
- * no coco-payment-ux imports, no feature imports that would create cycles.
+ * no colada imports, no feature imports that would create cycles.
  */
 
 import { useMemo } from 'react';
-import { ScrollView, Text as RNText, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text as RNText, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 
-import type { QuickSendSuggestion } from 'coco-payment-ux/react';
+import type { QuickSendSuggestion } from '@sovranbitcoin/colada/react';
 
 import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import { AMOUNT_FONT_FAMILY, AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -117,6 +117,7 @@ interface AmountEntryViewProps {
   nextText?: string;
   nextTestID?: string;
   nextIcon?: string;
+  noticeText?: string | null;
 
   /** Fiat currency symbol (e.g. '$'). Required when inputMode === 'fiat'. */
   fiatSymbol?: string | null;
@@ -173,7 +174,8 @@ export function AmountEntryView({
   nextDisabled = false,
   nextText = 'Next',
   nextTestID = 'amount-next',
-  nextIcon = 'lucide:arrow-right',
+  nextIcon,
+  noticeText = null,
   fiatSymbol = null,
   secondaryDisplay = null,
   onToggleMode,
@@ -312,11 +314,16 @@ export function AmountEntryView({
             {secondaryDisplay && (
               <CurrencySwapperPill inputMode={inputMode} onPress={onToggleMode} />
             )}
+            {noticeText != null && noticeText.length > 0 ? (
+              <Text size={13} weight="bold" style={[styles.noticeText, { color: danger }]}>
+                {noticeText}
+              </Text>
+            ) : null}
           </VStack>
         </View>
       </View>
 
-      <BottomButtons style={{ position: 'relative' }} paddingBottom={0}>
+      <BottomButtons style={styles.bottomButtons} paddingBottom={0}>
         {suggestionsRow}
         <CustomKeyboard
           loading={nextLoading}
@@ -340,9 +347,9 @@ export function AmountEntryView({
             // When `leadingBottomButton` is set (recipient-header flow),
             // extras are suppressed and the row becomes [leading 50%] +
             // [ActionMenuButton 50%].
-            <HStack align="center" gap={0} style={{ flex: 1 }}>
+            <HStack align="center" gap={0} style={styles.bottomRow}>
               {leadingBottomButton ? (
-                <View style={{ flex: 1, alignItems: 'center' }}>{leadingBottomButton}</View>
+                <View style={styles.bottomSlotCentered}>{leadingBottomButton}</View>
               ) : null}
               <ActionMenuButton
                 label={nextText}
@@ -364,7 +371,7 @@ export function AmountEntryView({
                 menuTitle="Select option"
               />
               {!leadingBottomButton && extraButtons && extraButtons.length > 0 ? (
-                <View style={{ flex: 1 }}>
+                <View style={styles.bottomSlot}>
                   <Button
                     testID={extraButtons[0].testID}
                     text={extraButtons[0].text}
@@ -399,9 +406,9 @@ export function AmountEntryView({
             // caller-supplied leading node (e.g. MintSelector pill) can
             // render its own image-backed chrome without this primitive
             // needing to model mint internals.
-            <HStack align="center" gap={0} style={{ flex: 1 }}>
-              <View style={{ flex: 1, alignItems: 'center' }}>{leadingBottomButton}</View>
-              <View style={{ flex: 1 }}>
+            <HStack align="center" gap={0} style={styles.bottomRow}>
+              <View style={styles.bottomSlotCentered}>{leadingBottomButton}</View>
+              <View style={styles.bottomSlot}>
                 <Button
                   testID={nextTestID}
                   text={nextText}
@@ -438,3 +445,23 @@ export function AmountEntryView({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  bottomButtons: {
+    position: 'relative',
+  },
+  bottomRow: {
+    flex: 1,
+  },
+  bottomSlot: {
+    flex: 1,
+  },
+  bottomSlotCentered: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  noticeText: {
+    maxWidth: 280,
+    textAlign: 'center',
+  },
+});

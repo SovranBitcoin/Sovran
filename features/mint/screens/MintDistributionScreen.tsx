@@ -21,6 +21,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { Card } from '@/shared/ui/composed/Card';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import {
   EMPTY_DISTRIBUTION,
   useMintDistributionStore,
@@ -188,7 +189,7 @@ export function MintDistributionScreen() {
   const balanceTotals = useMemo(() => {
     const map: Record<string, number> = {};
     mintUrls.forEach((url) => {
-      map[url] = liveBalances[url]?.total || 0;
+      map[url] = amountToNumber(liveBalances[url]?.total);
     });
     return map;
   }, [mintUrls, liveBalances]);
@@ -346,7 +347,7 @@ export function MintDistributionScreen() {
                 key={mint.mintUrl}
                 mintUrl={mint.mintUrl}
                 mintInfo={mintInfoMap[mint.mintUrl]}
-                balance={liveBalances[mint.mintUrl]?.total || 0}
+                balance={amountToNumber(liveBalances[mint.mintUrl]?.total)}
                 unit={selectedCurrency.toLowerCase()}
                 distributionBp={distribution[mint.mintUrl] || 0}
                 onDistributionChange={handleDistributionChange}

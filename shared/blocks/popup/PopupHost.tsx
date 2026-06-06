@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Log } from '@/shared/lib/logger';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import {
+  Keyboard,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { BottomSheetFooter } from '@gorhom/bottom-sheet';
 import { BottomSheet, Button, useToast } from 'heroui-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,6 +47,7 @@ import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
+import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
@@ -317,6 +325,17 @@ const CUSTOM_SHEET_CONTENT: Record<
     canPop: boolean;
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
+  'send-memo': SendMemoContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
 };
 
 function SheetContent({
@@ -377,7 +396,7 @@ function SheetContent({
       customNavDirection === 'forward' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220);
     return (
       <Animated.View
-        key={`${activeCustomPage.sheetId}-${canPopCustomPage ? 'stacked' : 'root'}`}
+        key={`${activeCustomPage.sheetId}-${canPopCustomPage ? 'stacked' : 'root'}-${openCycle}`}
         style={isContentHeight ? undefined : { flex: 1 }}
         entering={entering}
         exiting={exiting}>
@@ -464,6 +483,7 @@ function SheetActionButton({ button, variant, feedbackVariant, close }: SheetAct
 
 function SheetPopup() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const current = usePopupStore((s) => s.current);
   const isOpen = usePopupStore((s) => s.isOpen);
   const destroyed = usePopupStore((s) => s.destroyed);
@@ -508,6 +528,7 @@ function SheetPopup() {
   const [customFooterConfig, setCustomFooterConfig] = useState<CustomSheetFooterConfig | null>(
     null
   );
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const pushCustomPage = useCallback(
     <K extends keyof ActionSheetPayloads>(sheetId: K, pagePayload: ActionSheetPayloads[K]) => {
@@ -542,6 +563,12 @@ function SheetPopup() {
     setCustomNavDirection('forward');
     setCustomFooterConfig(null);
   }, [isOpen, current]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsKeyboardVisible(false);
+    }
+  }, [isOpen]);
 
   const customRootSheetId =
     customStack[0]?.sheetId ?? (isCustom && payload ? payload.sheetId : undefined);
@@ -586,10 +613,41 @@ function SheetPopup() {
     [hasLiveStatus, overlayColor, successMutedColor]
   );
 
+  useEffect(() => {
+    const willShow = Keyboard.addListener('keyboardWillShow', () => setIsKeyboardVisible(true));
+    const didShow = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+    const willHide = Keyboard.addListener('keyboardWillHide', () => setIsKeyboardVisible(false));
+    const didHide = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+
+    return () => {
+      willShow.remove();
+      didShow.remove();
+      willHide.remove();
+      didHide.remove();
+    };
+  }, []);
+
   const customSnapPoints = useMemo(
     () => (layoutConfig?.mode === 'snapPoints' ? [...layoutConfig.snapPoints] : undefined),
     [layoutConfig]
   );
+  const customMaxDynamicContentSize = useMemo(
+    () =>
+      isCustom && layoutConfig?.mode === 'contentHeight'
+        ? Math.max(0, windowHeight - insets.top)
+        : undefined,
+    [insets.top, isCustom, layoutConfig?.mode, windowHeight]
+  );
+
+  const customContentContainerClassName = useMemo(() => {
+    if (!isCustom) return undefined;
+    if (layoutConfig?.mode === 'snapPoints') return 'h-full px-0 pt-0 pb-0';
+    // When the memo input is focused, gorhom already lifts the sheet above the
+    // keyboard. Drop the inherited safe bottom padding so `Skip` doesn't float
+    // with an extra empty band beneath it.
+    if (customRootSheetId === 'send-memo' && isKeyboardVisible) return 'px-3 pb-0';
+    return 'px-3';
+  }, [customRootSheetId, isCustom, isKeyboardVisible, layoutConfig?.mode]);
 
   useEffect(() => {
     const standard = !isCustom ? (current as StandardSheetPayload) : null;
@@ -605,7 +663,10 @@ function SheetPopup() {
   }, [current, isOpen, isCustom]);
 
   const handleOpenChange = (open: boolean) => {
-    if (!open && isOpen) close();
+    if (!open && isOpen) {
+      Keyboard.dismiss();
+      close();
+    }
   };
 
   const renderCustomFooter = useCallback(
@@ -651,9 +712,10 @@ function SheetPopup() {
 
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
-      <BottomSheet.Portal>
+      <BottomSheet.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
         <BottomSheet.Overlay
           isCloseOnPress={standardPayload?.dismissable ?? true}
+          onPress={() => Keyboard.dismiss()}
           style={{ backgroundColor: `rgba(0,0,0,${alpha.strong})` }}
         />
         <BottomSheet.Content
@@ -662,7 +724,14 @@ function SheetPopup() {
           bottomInset={isCustom ? undefined : insets.bottom}
           snapPoints={isCustom ? customSnapPoints : undefined}
           enableDynamicSizing={isCustom ? layoutConfig?.mode === 'contentHeight' : undefined}
+          maxDynamicContentSize={customMaxDynamicContentSize}
           enableOverDrag={isCustom ? false : undefined}
+          // Same keyboard recipe as ActionMenuHost's input forms. Gorhom's
+          // interactive mode lifts the sheet by keyboard height; restore
+          // settles it back after the input blurs.
+          keyboardBehavior="interactive"
+          keyboardBlurBehavior="restore"
+          android_keyboardInputMode="adjustResize"
           footerComponent={
             isCustom && layoutConfig?.mode !== 'contentHeight' ? renderCustomFooter : undefined
           }
@@ -712,21 +781,13 @@ function SheetPopup() {
             // custom sheets render with 8px more horizontal padding per
             // side than visually-identical menu-lane sheets like "Select
             // option".
-            isCustom
-              ? layoutConfig?.mode === 'snapPoints'
-                ? 'h-full px-0 pt-0 pb-0'
-                : 'px-3'
-              : undefined
+            customContentContainerClassName
           }
-          // Patched flag (see patches/heroui-native+1.0.2.patch): swap
-          // heroui's `BottomSheetView` wrapper for a plain RN `View` so
-          // the nested gorhom-registered scrollable inside the custom
-          // sheet's content (e.g. the `BottomSheetScrollView` that
-          // `SectionAnchorList`'s `LegendList` uses via
-          // `renderScrollComponent`) stays the active scrollable. Without
-          // this, heroui's wrapper claims registration as a `VIEW`-type
-          // scrollable on mount and pan gestures dismiss the sheet
-          // instead of scrolling the list.
+          // Patched flag (see patches/heroui-native+1.0.2.patch): snap-point
+          // custom sheets use a plain RN `View` so their nested
+          // gorhom-registered scrollables stay active. Content-height sheets
+          // must keep `BottomSheetView`; it is the wrapper that reports
+          // dynamic content height back to gorhom.
           contentContainerProps={
             isCustom && layoutConfig?.mode === 'snapPoints'
               ? ({ useDirectView: true } as never)

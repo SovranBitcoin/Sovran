@@ -2,7 +2,7 @@
  * Local-state amount entry with sat/fiat toggle.
  *
  * For screens that need the same sat/fiat input UX as the send/receive flow
- * but without the coco-payment-ux payment machine (no mint, no proofs, no
+ * but without the colada payment machine (no mint, no proofs, no
  * paste/scan/next-machine-action). Reuses `createAmountActionManager` for
  * the conversion math, toggle behaviour, secondary-display formatting, and
  * keyboard-unit computation, so numeric behaviour stays byte-identical to
@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import { createAmountActionManager } from 'coco-payment-ux';
+import { createAmountActionManager } from '@sovranbitcoin/colada';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';

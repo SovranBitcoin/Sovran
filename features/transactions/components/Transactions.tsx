@@ -19,6 +19,7 @@ import { SwapTransactionRow } from '@/features/transactions/components/SwapTrans
 import { SplitBillTransactionRow } from '@/features/transactions/components/SplitBillTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
@@ -26,10 +27,16 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
-import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
+import {
+  isCancellablePendingEcash,
+  isPendingTransaction,
+  matchesTransactionFilters,
+  type TransactionDirection,
+  type TransactionPaymentType,
+} from '@sovranbitcoin/colada';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { duration, spacing, zIndex } from '@/shared/styles/tokens';
+import { spacing, zIndex } from '@/shared/styles/tokens';
 import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import {
   useSwapTransactionsStore,
@@ -84,8 +91,8 @@ interface Props {
   history: HistoryEntry[];
   isFetching?: boolean; // Loading state for fetching transactions
   // Filtering options
-  filter?: 'all' | 'incoming' | 'outgoing';
-  type?: 'all' | 'lightning' | 'ecash';
+  filter?: TransactionDirection;
+  type?: TransactionPaymentType;
   mintUrlFilter?: string;
   at?: 'all' | 'at';
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
@@ -180,29 +187,20 @@ export const Transactions = React.memo(
           if (quoteId && quoteIdToSplitBill[quoteId]) return false;
         }
 
-        if (
-          filter === 'incoming' &&
-          historyEntry.type !== 'mint' &&
-          historyEntry.type !== 'receive'
-        )
+        if (!matchesTransactionFilters(historyEntry, { paymentType: type, direction: filter })) {
           return false;
-        if (filter === 'outgoing' && historyEntry.type !== 'send' && historyEntry.type !== 'melt')
-          return false;
-        if (type === 'lightning' && historyEntry.type !== 'mint' && historyEntry.type !== 'melt')
-          return false;
-        if (type === 'ecash' && historyEntry.type !== 'send' && historyEntry.type !== 'receive')
-          return false;
+        }
 
         // Filter out expired transactions if hideExpired is true
         if (hideExpired) {
           const isExpired =
             historyEntry.type === 'mint' &&
-            historyEntry.state === 'UNPAID' &&
-            mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+            String(historyEntry.state) === 'UNPAID' &&
+            mintHistoryEntryExpired(historyEntry);
           if (isExpired) return false;
 
           // Filter out unpaid melt quotes
-          if (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') {
+          if (historyEntry.type === 'melt' && String(historyEntry.state) === 'UNPAID') {
             return false;
           }
         }
@@ -298,17 +296,13 @@ export const Transactions = React.memo(
           const isCollapsingGhost =
             historyEntry.type === 'send' &&
             collapsing.has((historyEntry as SendHistoryEntry).operationId);
-          const isPending =
-            (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
-            (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') ||
-            isCancellablePendingEcash(historyEntry) ||
-            isCollapsingGhost;
+          const isPending = isPendingTransaction(historyEntry, { isCollapsingGhost });
 
           // Check if it's an expired mint transaction
           const isExpired =
             historyEntry.type === 'mint' &&
-            historyEntry.state === 'UNPAID' &&
-            mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+            String(historyEntry.state) === 'UNPAID' &&
+            mintHistoryEntryExpired(historyEntry);
 
           if (isExpired) return 'expired';
           return isPending ? 'pending' : 'confirmed';
@@ -430,10 +424,19 @@ export const Transactions = React.memo(
       [onTransactionPress, onCancelPendingEcash]
     );
 
-    const getEstimatedItemSize = useCallback(
-      (section: Section) => HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16,
-      []
-    );
+    const getFixedItemSize = useCallback((section: Section): number | undefined => {
+      // Pure transaction sections are uniform-height, so we can hand LegendList
+      // an exact fixed size (fast path, no measurement). Sections containing
+      // swap or split-bill rows have content-dependent heights — trusting the
+      // 69px-per-row constant there mis-sized them and caused overlap, gaps,
+      // and scroll jumps. Returning `undefined` tells LegendList to measure
+      // those sections instead.
+      const hasVariableRow = section.data.some(
+        (item) => item.kind === 'swap' || item.kind === 'split-bill'
+      );
+      if (hasVariableRow) return undefined;
+      return HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16;
+    }, []);
 
     const renderSection = useCallback(
       ({ item: section }: { item: Section }) => (
@@ -497,17 +500,7 @@ export const Transactions = React.memo(
               minHeight: screenHeight / 2,
             }}>
             <Spacer size={24} />
-            <Icon
-              name="ant-design:loading-outlined"
-              size={32}
-              color={opacity(foreground, 0.33)}
-              spin={{
-                duration: duration.spin,
-                outputRange: ['0deg', '360deg'],
-                delay: 0,
-                easing: 'linear',
-              }}
-            />
+            <Spinner size={32} color={opacity(foreground, 0.33)} />
             <Text heavy size={16} style={{ color: opacity(foreground, 0.66) }}>
               Loading Transactions...
             </Text>
@@ -625,8 +618,9 @@ export const Transactions = React.memo(
           key={listKey}
           style={{ flex: 1 }}
           data={sectionsToDisplay}
-          keyExtractor={(section) => section.index!}
-          getEstimatedItemSize={getEstimatedItemSize}
+          keyExtractor={(section) => section.index ?? section.title}
+          getFixedItemSize={getFixedItemSize}
+          estimatedItemSize={HEADER_HEIGHT + ITEM_HEIGHT + 16}
           maintainVisibleContentPosition
           // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
           // triggers a fresh LinearTransition on every measured-position

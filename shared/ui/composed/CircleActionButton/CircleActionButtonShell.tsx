@@ -32,10 +32,12 @@ export function CircleActionButtonShell({
   accessibilityLabel,
   accessibilityHint,
   onPress,
+  onPressIn,
+  onPressOut,
   children,
 }: CircleActionButtonShellProps): React.ReactElement {
   const [foreground] = useThemeColor(['foreground'] as const);
-  const interactive = !disabled && !!onPress;
+  const interactive = !disabled && !!(onPress || onPressIn || onPressOut);
   const a11yLabel = accessibilityLabel ?? label;
 
   return (

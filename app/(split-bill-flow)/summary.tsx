@@ -11,7 +11,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet } from 'react-native';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 import { z } from 'zod';
 
 import { useGuardedRouter as useRouter } from '@/shared/hooks/useGuardedRouter';

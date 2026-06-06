@@ -89,7 +89,7 @@ node codereview/analyze-structure/index.mjs --llm
 
 # 4. Subtree only.
 node codereview/analyze-structure/index.mjs features/payments --llm
-node codereview/analyze-structure/index.mjs coco-payment-ux --llm
+node codereview/analyze-structure/index.mjs ../colada --llm
 
 # 5. Single dimension — disable everything else for max signal-to-noise.
 node codereview/analyze-structure/index.mjs --llm \

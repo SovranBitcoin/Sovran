@@ -18,7 +18,6 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import {
@@ -27,6 +26,7 @@ import {
   TransferStepChain,
   TransferErrorBanner,
 } from '@/shared/blocks/transfer';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import Icon from 'assets/icons';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
@@ -160,9 +160,8 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         align="center"
                         gap={3}
                         className={`min-w-0 shrink ${!isActiveNode ? 'opacity-40' : ''}`}>
-                        <Avatar
-                          state={info?.icon_url ? 'image' : 'fallback'}
-                          picture={info?.icon_url}
+                        <MintIcon
+                          iconUrl={info?.icon_url}
                           size={20}
                           name={name}
                           alt={`${name} icon`}

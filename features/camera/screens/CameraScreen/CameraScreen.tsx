@@ -17,7 +17,7 @@ import {
 import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 
 import Icon from 'assets/icons';
-import { usePaymentFlowMachine } from 'coco-payment-ux/react';
+import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useHandleCameraPermission } from '../../hooks/useHandleCameraPermission';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';

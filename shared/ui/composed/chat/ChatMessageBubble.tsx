@@ -7,6 +7,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { formatRelative } from '@/shared/lib/date';
 import { CashuTokenBubble } from './CashuTokenBubble';
 import type { ChatBubbleMessage } from './types';
@@ -156,19 +157,21 @@ export function ChatMessageBubble({
                 {formatRelative(message.timestamp, 'chat-bubble')}
               </Text>
               {message.isOwn && message.deliveryStatus ? (
-                <Icon
-                  name={
-                    message.deliveryStatus === 'sending'
-                      ? 'ant-design:loading-outlined'
-                      : message.deliveryStatus === 'failed'
+                message.deliveryStatus === 'sending' ? (
+                  <Spinner size={12} color={shade500} />
+                ) : (
+                  <Icon
+                    name={
+                      message.deliveryStatus === 'failed'
                         ? 'mdi:alert-circle-outline'
                         : message.deliveryStatus === 'delivered'
                           ? 'mdi:check-all'
                           : 'simple-line-icons:check'
-                  }
-                  size={12}
-                  color={message.deliveryStatus === 'failed' ? danger : shade500}
-                />
+                    }
+                    size={12}
+                    color={message.deliveryStatus === 'failed' ? danger : shade500}
+                  />
+                )
               ) : null}
             </HStack>
           ) : null}

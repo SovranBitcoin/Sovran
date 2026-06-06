@@ -10,6 +10,10 @@ const COPY_CONFIGS = {
     title: 'Payment Request Copied',
     text: 'Payment request has been copied to your clipboard.',
   },
+  lightningInvoice: {
+    title: 'Lightning Invoice Copied',
+    text: 'Lightning invoice has been copied to your clipboard.',
+  },
   address: {
     title: 'Address Copied',
     text: 'Address has been copied to your clipboard.',

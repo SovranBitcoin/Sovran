@@ -11,6 +11,7 @@
 import React from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
+import { decodeUrlOrAddress, isLightningInvoiceBolt11 } from '@sovranbitcoin/colada';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -57,6 +58,16 @@ export function submitProofSuggestion(
   void machine.chooseProofs(amount);
 }
 
+export function shouldShowProofSelectorMintChange(
+  payload: Pick<ActionSheetPayloads['proof-selector'], 'meltTarget' | 'paymentRequest'>
+): boolean {
+  const meltTarget = payload.meltTarget?.trim();
+  if (!meltTarget || payload.paymentRequest) return true;
+  const isLightningTarget =
+    isLightningInvoiceBolt11(meltTarget) || decodeUrlOrAddress(meltTarget) != null;
+  return !isLightningTarget;
+}
+
 function SuggestionRow({ text, icon, display, onPress }: SuggestionRowProps) {
   return (
     <Menu.Item onPress={onPress}>
@@ -95,6 +106,7 @@ interface ProofSelectorContentProps extends CustomSheetSharedProps {
 
 export function ProofSelectorContent({ payload, close }: ProofSelectorContentProps) {
   const { suggestions, unit, machine } = payload;
+  const showChangeMint = shouldShowProofSelectorMintChange(payload);
 
   return (
     <View>
@@ -124,21 +136,25 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
             }}
           />
         ) : null}
-        <View className="bg-foreground/10 mx-3 my-1 h-px" />
-        <Menu.Item
-          onPress={() => {
-            void machine.requestMintSelector();
-            close();
-          }}>
-          <HStack align="center" gap={10} style={{ flex: 1 }}>
-            <Icon name="mdi:swap-horizontal" size={20} />
-            <View style={{ flex: 1 }}>
-              <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
-                Change mint
-              </Menu.ItemTitle>
-            </View>
-          </HStack>
-        </Menu.Item>
+        {showChangeMint ? (
+          <>
+            <View className="bg-foreground/10 mx-3 my-1 h-px" />
+            <Menu.Item
+              onPress={() => {
+                void machine.requestMintSelector();
+                close();
+              }}>
+              <HStack align="center" gap={10} style={{ flex: 1 }}>
+                <Icon name="mdi:swap-horizontal" size={20} />
+                <View style={{ flex: 1 }}>
+                  <Menu.ItemTitle className="flex-none" numberOfLines={1} style={{ flex: 0 }}>
+                    Change mint
+                  </Menu.ItemTitle>
+                </View>
+              </HStack>
+            </Menu.Item>
+          </>
+        ) : null}
       </Menu>
     </View>
   );

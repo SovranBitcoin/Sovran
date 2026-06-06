@@ -81,7 +81,7 @@ const decodedTokens: {
 
 for (const tokenStr of tokenStrings) {
   try {
-    const token = getDecodedToken(tokenStr);
+    const token = getDecodedToken(tokenStr, []);
     decodedTokens.push({ token, raw: tokenStr });
     console.log(`\nDecoded token for mint: ${token.mint}`);
     console.log(`  proofs: ${token.proofs.length}`);

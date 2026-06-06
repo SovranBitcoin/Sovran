@@ -11,23 +11,19 @@
  * @see {@link https://github.com/bitcoinvault/coco-cashu-core} Coco Cashu Core
  */
 
-import {
-  getDecodedToken,
-  type HistoryEntry,
-  type Manager,
-  type ReceiveHistoryEntry,
-  type SendHistoryEntry,
-} from '@cashu/coco-core';
+import { type Manager, type ReceiveHistoryEntry } from '@cashu/coco-core';
+import { getTokenMetadata } from '@cashu/cashu-ts';
 
 import { log } from '../logger';
 import { mintLocalId } from '../id';
+import { amountToNumber } from './amount';
 
 /**
  * Validates if a string is a valid ecash token by attempting to decode it
  *
  * @description Checks if the provided string can be successfully decoded as an ecash token
  *
- * **Process:** getDecodedToken() → return success/failure
+ * **Process:** getTokenMetadata() → return success/failure
  * **Effects:** None (pure validation function)
  *
  * @param {string} token - The token string to validate
@@ -42,7 +38,7 @@ import { mintLocalId } from '../id';
  */
 export function isValidEcashToken(token: string): boolean {
   try {
-    getDecodedToken(token);
+    getTokenMetadata(token);
     log.debug('cashu.utils.validate_ecash_token', { valid: true, tokenLen: token.length });
     return true;
   } catch {
@@ -56,25 +52,15 @@ export function isValidEcashToken(token: string): boolean {
 // ============================================================================
 
 /**
- * Sums the amounts of all proofs in an array.
- * Eliminates repeated `.reduce((sum, p) => sum + p.amount, 0)` across the codebase.
- */
-function sumProofAmounts(proofs: readonly { amount: number }[]): number {
-  let total = 0;
-  for (const p of proofs) total += p.amount;
-  return total;
-}
-
-/**
  * Extracts the amount in sats from an ecash token.
  */
 export function getEcashTokenAmount(token: string): number | undefined {
   try {
-    const decoded = getDecodedToken(token);
-    const amount = sumProofAmounts(decoded.proofs);
+    const decoded = getTokenMetadata(token);
+    const amount = amountToNumber(decoded.amount);
     log.debug('cashu.utils.get_ecash_token_amount', {
       amount,
-      proofCount: decoded.proofs.length,
+      proofCount: decoded.incompleteProofs.length,
       mint: decoded.mint,
     });
     return amount;
@@ -114,30 +100,34 @@ function extractP2PKPubkey(proofs: readonly { secret: string }[]): string | null
 export function buildReceiveHistoryEntry(
   rawToken: string,
   unitOverride?: string
-): ReceiveHistoryEntry {
+): ReceiveHistoryEntry & { source: 'legacy'; legacyHistoryId: string; updatedAt: number } {
   log.info('cashu.utils.build_receive_history_entry', { tokenLen: rawToken.length, unitOverride });
-  const decodedToken = getDecodedToken(rawToken);
-  const p2pkPubkey = extractP2PKPubkey(decodedToken.proofs);
-  const amount = sumProofAmounts(decodedToken.proofs);
+  const decodedToken = getTokenMetadata(rawToken);
+  const p2pkPubkey = extractP2PKPubkey(decodedToken.incompleteProofs);
+  const amount = amountToNumber(decodedToken.amount);
   log.debug('cashu.utils.build_receive_history_entry.decoded', {
-    amount,
-    proofCount: decodedToken.proofs.length,
+    amount: String(amount),
+    proofCount: decodedToken.incompleteProofs.length,
     mint: decodedToken.mint,
     hasP2pk: !!p2pkPubkey,
   });
+  const now = Date.now();
+  const id = mintLocalId('receive');
   return {
-    id: mintLocalId('receive'),
+    id,
     type: 'receive',
-    amount: sumProofAmounts(decodedToken.proofs),
+    source: 'legacy',
+    legacyHistoryId: id,
+    amount,
     unit: unitOverride ?? decodedToken.unit ?? 'sat',
     mintUrl: decodedToken.mint,
-    createdAt: Date.now(),
+    createdAt: now,
+    updatedAt: now,
     metadata: {
       rawToken,
       ...(p2pkPubkey ? { p2pkPubkey } : {}),
     },
     state: 'prepared',
-    token: decodedToken,
   };
 }
 
@@ -146,22 +136,8 @@ export function buildReceiveHistoryEntry(
 // ============================================================================
 
 /**
- * Send-operation states that can be rolled back. `prepared` operations need
- * `cancel`; `pending`/`executing` need `reclaim` (see `attemptRollback`).
- */
-const CANCELLABLE_SEND_STATES = new Set(['pending', 'prepared']);
-
-/**
- * Type guard: a history entry that can be cancelled by the user via swipe
- * or the bulk-sweep button on Transactions.
- */
-export function isCancellablePendingEcash(entry: HistoryEntry): entry is SendHistoryEntry {
-  return entry.type === 'send' && CANCELLABLE_SEND_STATES.has((entry as SendHistoryEntry).state);
-}
-
-/**
  * State-aware rollback. Mirrors `attemptRollback` from
- * `coco-payment-ux/src/operations/defaultOperations.ts` so the in-app sweep
+ * `colada/src/operations/defaultOperations.ts` so the in-app sweep
  * surface (Transactions) and the offline-payment-rollback path agree on
  * which RPC to call: `cancel` for `prepared`, `reclaim` for `pending`/
  * `executing`. Returns `true` on success, `false` otherwise (errors logged).

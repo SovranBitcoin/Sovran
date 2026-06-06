@@ -1,14 +1,20 @@
 import React from 'react';
 import { Text as RNText, View } from 'react-native';
+import { MeltQuoteState } from '@cashu/cashu-ts';
+import { createPaymentCopyGroups, type PaymentCopyResolver } from '@sovranbitcoin/colada';
 
 import { popupLog } from '../logger';
 import { formatAmount } from '@/shared/lib/currency';
+import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import {
+  getMeltDetailPathname,
+  getMintDetailPathname,
+} from '@/shared/lib/nav/transactionDetailRoutes';
 import { useToastSurface } from './useToastSurface';
 import { fmt, isAmountSegment, type PopupTextSegment } from './format';
 import { StatusToast, type StatusToastStatus } from './StatusToast';
@@ -43,53 +49,57 @@ function ToastAmountText({ amount, unit, color }: { amount: number; unit: string
   );
 }
 
-const CASES = {
-  receive: {
-    message: TOAST_COPY.receive.message,
-    submessagePending: TOAST_COPY.receive.processing,
-    submessageConfirmed: (amount: number, unit: string) =>
-      fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
-    submessageFailed: TOAST_COPY.receive.failed,
-    history: { type: 'mint' as const, idField: 'quoteId' as const },
-    route: { pathname: '/mintQuote' as const, paramKey: 'mintHistoryEntry' },
-  },
-  send: {
-    message: TOAST_COPY.send.message,
-    submessagePending: TOAST_COPY.send.processing,
-    submessageConfirmed: (amount: number, unit: string) =>
-      fmt`${TOAST_COPY.send.confirmed} ${{ amount, unit }}`,
-    submessageFailed: TOAST_COPY.send.failed,
-    history: { type: 'send' as const, idField: 'operationId' as const },
-    route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
-  },
-  'payment-request': {
-    message: TOAST_COPY['payment-request'].message,
-    submessagePending: TOAST_COPY['payment-request'].processing,
-    submessageDelivered: TOAST_COPY['payment-request'].delivered,
-    submessageConfirmed: TOAST_COPY['payment-request'].confirmed,
-    submessageFailed: TOAST_COPY['payment-request'].failed,
-    history: { type: 'send' as const, idField: 'operationId' as const },
-    route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
-  },
-  melt: {
-    message: TOAST_COPY.melt.message,
-    submessagePending: TOAST_COPY.melt.processing,
-    submessageConfirmed: (amount: number, unit: string) =>
-      fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
-    submessageFailed: TOAST_COPY.melt.failed,
-    history: { type: 'melt' as const, idField: 'quoteId' as const },
-    route: { pathname: '/meltQuote' as const, paramKey: 'meltHistoryEntry' },
-  },
-  'receive-ecash': {
-    message: TOAST_COPY['receive-ecash'].message,
-    submessagePending: TOAST_COPY['receive-ecash'].processing,
-    submessageConfirmed: (amount: number, unit: string) =>
-      fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
-    submessageFailed: TOAST_COPY['receive-ecash'].failed,
-    history: { type: 'receive' as const, idField: 'id' as const },
-    route: { pathname: '/receiveToken' as const, paramKey: 'receiveHistoryEntry' },
-  },
-} as const;
+function createPaymentStatusToastCases(paymentCopy: PaymentCopyResolver) {
+  const { TOAST_COPY } = createPaymentCopyGroups(paymentCopy);
+
+  return {
+    receive: {
+      message: TOAST_COPY.receive.message,
+      submessagePending: TOAST_COPY.receive.processing,
+      submessageConfirmed: (amount: number, unit: string) =>
+        fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
+      submessageFailed: TOAST_COPY.receive.failed,
+      history: { type: 'mint' as const, idField: 'quoteId' as const },
+      route: { pathname: '/lightningReceive' as const, paramKey: 'mintHistoryEntry' },
+    },
+    send: {
+      message: TOAST_COPY.send.message,
+      submessagePending: TOAST_COPY.send.processing,
+      submessageConfirmed: (amount: number, unit: string) =>
+        fmt`${TOAST_COPY.send.confirmed} ${{ amount, unit }}`,
+      submessageFailed: TOAST_COPY.send.failed,
+      history: { type: 'send' as const, idField: 'operationId' as const },
+      route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
+    },
+    'payment-request': {
+      message: TOAST_COPY['payment-request'].message,
+      submessagePending: TOAST_COPY['payment-request'].processing,
+      submessageDelivered: TOAST_COPY['payment-request'].delivered,
+      submessageConfirmed: TOAST_COPY['payment-request'].confirmed,
+      submessageFailed: TOAST_COPY['payment-request'].failed,
+      history: { type: 'send' as const, idField: 'operationId' as const },
+      route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
+    },
+    melt: {
+      message: TOAST_COPY.melt.message,
+      submessagePending: TOAST_COPY.melt.processing,
+      submessageConfirmed: (amount: number, unit: string) =>
+        fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
+      submessageFailed: TOAST_COPY.melt.failed,
+      history: { type: 'melt' as const, idField: 'quoteId' as const },
+      route: { pathname: '/lightningSend' as const, paramKey: 'meltHistoryEntry' },
+    },
+    'receive-ecash': {
+      message: TOAST_COPY['receive-ecash'].message,
+      submessagePending: TOAST_COPY['receive-ecash'].processing,
+      submessageConfirmed: (amount: number, unit: string) =>
+        fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
+      submessageFailed: TOAST_COPY['receive-ecash'].failed,
+      history: { type: 'receive' as const, idField: 'id' as const },
+      route: { pathname: '/receiveToken' as const, paramKey: 'receiveHistoryEntry' },
+    },
+  } as const;
+}
 
 type PaymentStatusToastProps = {
   variant: PaymentStatusToastVariant;
@@ -117,7 +127,9 @@ export function PaymentStatusToast({
   ...toastProps
 }: PaymentStatusToastProps) {
   const hide = toastProps.hide as (ids?: string | string[] | 'all') => void;
-  const config = CASES[variant];
+  const paymentCopy = usePaymentCopyResolver();
+  const cases = React.useMemo(() => createPaymentStatusToastCases(paymentCopy), [paymentCopy]);
+  const config = cases[variant];
   const active = usePaymentStatusStore((s) => s.active);
   const isDelivered = active?.id === paymentId && active?.state === 'delivered';
   const isConfirmed = active?.id === paymentId && active?.state === 'confirmed';
@@ -178,6 +190,7 @@ export function PaymentStatusToast({
       );
       // v3 melts are not in history; construct MeltHistoryEntry from operationId
       if (!entry && variant === 'melt' && effectiveOperationId) {
+        const now = Date.now();
         entry = {
           type: 'melt',
           id: effectiveOperationId,
@@ -185,15 +198,27 @@ export function PaymentStatusToast({
           mintUrl,
           amount,
           unit,
-          state: 'PAID',
-          createdAt: Date.now(),
+          state: MeltQuoteState.PAID,
+          createdAt: now,
         } as const;
       }
       if (entry) {
-        guardedRouter.navigate({
-          pathname: config.route.pathname,
-          params: { [config.route.paramKey]: JSON.stringify(entry) },
-        });
+        if (entry.type === 'mint') {
+          guardedRouter.navigate({
+            pathname: getMintDetailPathname(entry),
+            params: { mintHistoryEntry: JSON.stringify(entry) },
+          });
+        } else if (entry.type === 'melt') {
+          guardedRouter.navigate({
+            pathname: getMeltDetailPathname(entry),
+            params: { meltHistoryEntry: JSON.stringify(entry) },
+          });
+        } else {
+          guardedRouter.navigate({
+            pathname: config.route.pathname,
+            params: { [config.route.paramKey]: JSON.stringify(entry) },
+          });
+        }
       }
     } catch (e) {
       popupLog.warn('popup.open_transaction_failed', { error: e });

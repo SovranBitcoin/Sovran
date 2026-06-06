@@ -9,23 +9,22 @@
     "scripts/*.{js,ts}"
   ],
   "project": ["**/*.{ts,tsx,js,jsx}"],
-  "ignore": [
-    ".agents/**",
-    ".monicon/**",
-    "modules/**",
-    "targets/**",
-    "coco-payment-ux/docs/references/**"
-  ],
+  "ignore": [".agents/**", ".monicon/**", "modules/**", "targets/**"],
   "ignoreDependencies": [
     "^@iconify-json/",
     "buffer",
     "process",
     "@expo/metro-config",
+    "expo-screen-corner-radius",
+    "@sovranbitcoin/schemas",
     "cashu-kym",
+    "coco-cashu-plugin-p2pk-import",
+    "colada",
     "@monicon/metro",
     "metro-minify-terser",
     "number-flow-react-native",
-    "nutpatch"
+    "nutpatch",
+    "patch-package"
   ],
   "ignoreBinaries": ["claude", "eas", "maestro", "tsx"],
   "ignoreIssues": {
@@ -53,6 +52,6 @@
     "shared/ui/composed/QRButton/**": ["files", "types"],
     "shared/ui/primitives/SelectableCheck/index.tsx": ["types"],
     "shared/lib/popup/**": ["exports"],
-    "coco-payment-ux/**": ["files", "exports", "types", "dependencies", "unlisted"]
+    "coco-cashu-plugin-p2pk-import/**": ["files", "exports", "types", "unlisted"]
   }
 }

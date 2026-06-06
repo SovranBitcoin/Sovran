@@ -1,7 +1,4 @@
-import {
-  getSendTokenReachabilityWarning,
-  shouldShowMintOfflineWarning,
-} from '@/features/send/lib/sendTokenWarning';
+import { getSendTokenReachabilityWarning, shouldShowMintOfflineWarning } from '@sovranbitcoin/colada';
 
 describe('send token mint offline warning', () => {
   it('shows while a mint-unreachable offline token is still pending', () => {

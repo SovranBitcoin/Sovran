@@ -18,7 +18,7 @@ import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
 const USER_MESSAGES_OPTIONS = { headerShown: false };
-const SHARE_OPTIONS = { title: 'Share Profile' };
+const SHARE_OPTIONS = { title: 'Share profile' };
 const THREAD_OPTIONS = { title: 'Thread' };
 const GEOHASH_CHAT_OPTIONS = { headerShown: false };
 const BITCHAT_NETWORK_OPTIONS = { headerShown: false };

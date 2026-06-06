@@ -153,6 +153,63 @@ describe('logger redaction safety (audit 56.json F-001 / F-008 / F-012)', () => 
     expect(params.len).toBe(nsec.length);
   });
 
+  it('redacts nsec values even below the default long-string threshold', () => {
+    const captured: { event: string; params?: Record<string, unknown> }[] = [];
+    const log = createLogger({
+      level: 'debug',
+      async: false,
+      transports: [(e) => captured.push({ event: e.event, params: e.params })],
+      pretty: false,
+      dedupWindowMs: 0,
+    });
+    const nsec = 'nsec1' + 'a'.repeat(58);
+    log.warn('keys.import', { value: nsec });
+    const dump = JSON.stringify(captured);
+    expect(dump).not.toContain(nsec);
+    expect(captured[0].params!.value).toEqual({ _kind: 'nsec', len: nsec.length });
+  });
+
+  it('redacts private-key-shaped fields regardless of value length', () => {
+    const { log, captured } = captureLog();
+    const privateKeyHex = 'f'.repeat(64);
+    log.warn('keys.cache', {
+      publicKeyHex: 'a'.repeat(64),
+      privateKeyHex,
+      nested: { secretKey: privateKeyHex },
+    });
+    const dump = JSON.stringify(captured);
+    expect(dump).not.toContain(privateKeyHex);
+    expect(captured[0].params!.publicKeyHex).toEqual({
+      _kind: 'base64',
+      len: 64,
+      preview: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…',
+    });
+    expect(captured[0].params!.privateKeyHex).toEqual({ _kind: 'private_key', len: 64 });
+    expect((captured[0].params!.nested as { secretKey: unknown }).secretKey).toEqual({
+      _kind: 'private_key',
+      len: 64,
+    });
+  });
+
+  it('redacts nsec substrings inside Error messages and stacks', () => {
+    const captured: { error?: { message: string; stack: string[] } }[] = [];
+    const log = createLogger({
+      level: 'debug',
+      async: false,
+      transports: [(e) => captured.push({ error: e.error })],
+      pretty: false,
+      dedupWindowMs: 0,
+    });
+    const nsec = 'nsec1' + 'a'.repeat(58);
+    const err = new Error(`failed for ${nsec}`);
+    err.stack = `Error: failed for ${nsec}\n at importNsec`;
+    log.warn('keys.import_failed', { err });
+    const dump = JSON.stringify(captured);
+    expect(dump).not.toContain(nsec);
+    expect(captured[0].error?.message).toBe('failed for <REDACTED:nsec>');
+    expect(captured[0].error?.stack[0]).toBe('Error: failed for <REDACTED:nsec>');
+  });
+
   it('summarizeString does not preview cashu_token bytes (F-001)', () => {
     const { log, captured } = captureLog();
     const token = 'cashuA' + 'B'.repeat(80);

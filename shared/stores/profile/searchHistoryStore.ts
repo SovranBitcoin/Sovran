@@ -34,6 +34,12 @@ interface SearchHistoryState {
    * @param context The context to get searches for (defaults to 'default')
    */
   getRecentSearches: (context?: string) => SearchHistoryEntry[];
+
+  /**
+   * Clear all recent searches for a context (defaults to 'default').
+   * @param context The context to clear (defaults to 'default')
+   */
+  clearSearchHistory: (context?: string) => void;
 }
 
 const PersistedSearchEntry = z.looseObject({
@@ -88,6 +94,16 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
       getRecentSearches: (context: string = 'default') => {
         const state = get();
         return state.recentSearches[context] || [];
+      },
+
+      clearSearchHistory: (context: string = 'default') => {
+        storeLog.debug('store.search_history.clear', { context });
+        set((state) => {
+          if (!state.recentSearches[context]?.length) return state;
+          const next = { ...state.recentSearches };
+          delete next[context];
+          return { recentSearches: next };
+        });
       },
     }),
     persistConfig({

@@ -23,7 +23,7 @@ import type { BLEPeer } from 'bitchat-module';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
-import { useRecentContacts } from '@/features/payments/hooks/useRecentContacts';
+import { useNip17RecentContacts } from '@/features/payments/hooks/useNip17RecentContacts';
 import { useContactSearch } from '@/features/payments/hooks/useContactSearch';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
@@ -66,9 +66,9 @@ export interface PickerCandidate {
    */
   isActive?: boolean;
   /**
-   * Optional Nostr reputation score (0-100) from `/nostr/search`. The
-   * server computes this from the DVM's pagerank output on every search
-   * response, so it's always present for search-sourced candidates;
+   * Optional Nostr reputation score (0-100) from Nagg profile search. The
+   * server returns cached Vertex reputation when available and falls back to
+   * the query-specific search score for search-sourced candidates;
    * DM-sourced (Recent) rows don't carry it. Surfaced in the row's
    * accent slot when available.
    */
@@ -82,7 +82,7 @@ export interface PickerCandidate {
   followerCount?: number;
   /**
    * Optional following count — paired with `followerCount`, same cache-only
-   * sourcing from `/nostr/search`'s enrichment of cached `/profile` records.
+   * sourcing from Nagg profile search's cached `/profile` records.
    * Surfaced as a second stat pill when present.
    */
   followingCount?: number;
@@ -95,7 +95,7 @@ export interface PickerCandidate {
    */
   nip05?: string;
   /**
-   * Server-side NIP-05 verification flag from `/nostr/search`. Drives the
+   * Server-side NIP-05 verification flag from Nagg profile search. Drives the
    * blue-vs-dim color of the NIP-05 pill in `ContactRow` — without it the
    * pill renders gray as if unverified even when the server knew better.
    */
@@ -129,7 +129,7 @@ interface ProfileMetadata {
   nip05Valid?: boolean;
 }
 
-/** Reputation / social-proof stats the `/nostr/search` endpoint includes
+/** Reputation / social-proof stats Nagg profile search includes
  *  alongside each result (when the server can populate them cheaply). All
  *  fields are independently optional. `score` is always present for
  *  search-sourced candidates; `followers` / `follows` flow through only
@@ -138,6 +138,10 @@ interface SearchHitStats {
   score?: number;
   followers?: number;
   follows?: number;
+}
+
+function optionalNumber(value: number | null | undefined): number | undefined {
+  return typeof value === 'number' ? value : undefined;
 }
 
 function bleCandidate(peer: BLEPeer): PickerCandidate {
@@ -158,7 +162,7 @@ function bleCandidate(peer: BLEPeer): PickerCandidate {
  *  picture / nip05). It's populated by the subscription in the hook below
  *  — `useRecentContacts` itself only returns pubkeys. `stats` carries any
  *  session-cached reputation data we've seen for this pubkey (typically
- *  from a prior `/nostr/search` hit), so a Recent row can render the
+ *  from a prior profile-search hit), so a Recent row can render the
  *  same shield/followers pills as a freshly-searched result. */
 function nostrCandidate(
   pubkey: string,
@@ -210,7 +214,7 @@ function selfCandidate(profile: ProfileEntry, isActive: boolean): PickerCandidat
 }
 
 /**
- * Build a candidate from a Nostr profile-search REST hit. Collapsed into
+ * Build a candidate from a Nostr profile-search hit. Collapsed into
  * the `nostr` source/channel so ids unify with the Recent section — the
  * moment the user selects a search hit we want it to live alongside
  * real DM-derived contacts in the main picker (same id lets selection
@@ -306,7 +310,7 @@ export function useSplitBillParticipantPicker(
   const { keys: realNostrKeys } = useNostrKeysContext();
   const nostrKeys = enabled ? realNostrKeys : null;
   const { peers: blePeers } = useBLEPeers();
-  const { displayContacts } = useRecentContacts(nostrKeys);
+  const { displayContacts } = useNip17RecentContacts(nostrKeys);
   const [searchQuery, setSearchQuery] = useState('');
   // Disabled mode: pass an empty query so `useContactSearch`'s length
   // guard short-circuits before debounce or the API call.
@@ -355,10 +359,10 @@ export function useSplitBillParticipantPicker(
   }, [displayContacts, selfPubkeys, promotedPubkeys]);
 
   // --- Subscribe to kind-0 metadata for recent contacts + `search` results.
-  //     `useContactSearch` already returns profiles inline via the REST
-  //     search API — but those profiles can be stale / partial, so layering
+  //     `useContactSearch` already returns profiles inline via Nagg GraphQL
+  //     profile search — but those profiles can be stale / partial, so layering
   //     a relay subscription on top lets freshly-updated metadata overwrite
-  //     the REST snapshot as it arrives. The filter is capped at 100
+  //     the GraphQL snapshot as it arrives. The filter is capped at 100
   //     authors to keep the subscription small; realistic split bills
   //     pick from <20 contacts.
   // Ref-stable author list. Without this, tapping a Recent row mutates
@@ -436,7 +440,7 @@ export function useSplitBillParticipantPicker(
     return map;
   }, [profileEvents]);
 
-  // Fallback profile index drawn from REST `/nostr/search` hits. When the
+  // Fallback profile index drawn from Nagg profile-search hits. When the
   // user taps a search result, the hit's pubkey gets promoted to the
   // Recent section. If the relay subscription hasn't yet surfaced a kind-0
   // for that pubkey, `profilesByPubkey.get(pk)` returns undefined and the
@@ -460,7 +464,7 @@ export function useSplitBillParticipantPicker(
   }, [displayResults]);
 
   // Resolve a profile preferring fresh relay metadata, falling back to the
-  // REST search snapshot. Callers treat the result as a stable input for
+  // GraphQL search snapshot. Callers treat the result as a stable input for
   // candidate memoization below.
   const resolveProfile = useCallback(
     (pubkey: string): ProfileMetadata | undefined =>
@@ -468,7 +472,7 @@ export function useSplitBillParticipantPicker(
     [profilesByPubkey, searchProfilesByPubkey]
   );
 
-  // Session-scoped reputation cache. `/nostr/search` responses inline
+  // Session-scoped reputation cache. Nagg profile search responses inline
   // `score` / `followers` / `follows` when the server has a cached
   // `/profile` for that pubkey — free data the DVM already paid for. We
   // accumulate every hit seen during the picker session so a contact the
@@ -486,9 +490,9 @@ export function useSplitBillParticipantPicker(
       for (const r of displayResults) {
         if (!r?.pubkey || r.pubkey.startsWith('placeholder-')) continue;
         const fresh: SearchHitStats = {
-          score: r.profile?.score,
-          followers: r.profile?.followers,
-          follows: r.profile?.follows,
+          score: optionalNumber(r.profile?.score),
+          followers: optionalNumber(r.profile?.followers),
+          follows: optionalNumber(r.profile?.follows),
         };
         if (
           fresh.score === undefined &&
@@ -645,15 +649,15 @@ export function useSplitBillParticipantPicker(
       // results list so the row's check stays visible as the user toggles.
       .filter((r) => !originalRecentPubkeys.has(r.pubkey) && !selfPubkeys.has(r.pubkey))
       .map((r) => {
-        // Prefer fresh relay metadata over REST snapshot when both exist.
+        // Prefer fresh relay metadata over the GraphQL snapshot when both exist.
         const relayProfile = profilesByPubkey.get(r.pubkey);
-        // Reputation stats come from the REST hit. `/nostr/search` inlines
+        // Reputation stats come from the GraphQL hit. Nagg profile search inlines
         // `followers` / `follows` / `score` / `created_at` from the server's
         // cached `/profile` records (cache-only — the server never fetches
         // per search hit), so each field flows through as an optional.
-        const score = r.profile?.score;
-        const followers = r.profile?.followers;
-        const follows = r.profile?.follows;
+        const score = optionalNumber(r.profile?.score);
+        const followers = optionalNumber(r.profile?.followers);
+        const follows = optionalNumber(r.profile?.follows);
         seen.add(r.pubkey);
         const cached = cache.get(r.pubkey);
         if (

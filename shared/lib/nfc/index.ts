@@ -1,7 +1,7 @@
 /**
- * NFC module: adapter for coco-payment-ux POS flows and standalone token write.
+ * NFC module: adapter for colada POS flows and standalone token write.
  *
- * - createNfcAdapter(): NfcIOAdapter for coco-payment-ux machine
+ * - createNfcAdapter(): NfcIOAdapter for colada machine
  * - writeTokenToNFC(): write token to tag (e.g. P2P sharing); throws NfcError
  * - NfcError: typed errors with .code for UI handling
  */

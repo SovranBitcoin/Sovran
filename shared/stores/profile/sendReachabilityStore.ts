@@ -6,11 +6,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
-export type SendReachabilityStatus =
-  | 'checking'
-  | 'device-offline'
-  | 'mint-unreachable'
-  | 'mint-reachable';
+type SendReachabilityStatus = 'checking' | 'device-offline' | 'mint-unreachable' | 'mint-reachable';
 
 interface SendReachabilityEntry {
   status: SendReachabilityStatus;

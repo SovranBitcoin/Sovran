@@ -59,7 +59,9 @@ function startJSThreadMonitor(intervalMs = 200, thresholdMs = 100): () => void {
 // no way to pause the heartbeat (audit 56 F-016).
 let _heartbeatStop: (() => void) | null = null;
 let _heartbeatBootstrap: ReturnType<typeof setTimeout> | null = null;
-if (SHOW_LOGS) {
+const IS_JEST_RUNTIME = typeof process !== 'undefined' && process.env.JEST_WORKER_ID !== undefined;
+
+if (SHOW_LOGS && !IS_JEST_RUNTIME) {
   _heartbeatBootstrap = setTimeout(() => {
     _heartbeatStop = startJSThreadMonitor();
   }, 1000);

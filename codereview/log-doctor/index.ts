@@ -30,8 +30,9 @@
  *   renders      Re-render analysis (counts, why-did-update hints)
  *   screens      Screen navigation flow, content snapshots, and durations
  *   startup      Initialization waterfall, stage timing, gate sequence
- *   coco         Coco wallet module breakdown, issues, mint requests
+ *   coco         Coco/Colada wallet module breakdown, issues, mint requests
  *   network      Network request/response pairs with latency
+ *   feed         Feed/thread GraphQL, page mapping, and reply seed/render flow
  *   full         Full entries but deduplicated and trimmed
  *   diff         Compare latest session against previous to isolate failure-specific entries
  *   flows        Reconstruct cross-async traces using flowId in ctx
@@ -1081,12 +1082,23 @@ function modeStartup(entries: LogEntry[], _opts: Options): string {
 
 // ─── Mode: coco ─────────────────────────────────────────────────────────────
 
+function isCocoDiagnosticEvent(e: LogEntry): boolean {
+  return e.event.startsWith('coco.') || e.event.startsWith('colada.');
+}
+
+function cocoModuleName(event: string): string {
+  const parts = event.split('.');
+  if (parts[0] === '@sovranbitcoin/colada') return `${parts[0]}.${parts[1] ?? 'unknown'}`;
+  return parts[1] ?? 'unknown';
+}
+
 function modeCoco(entries: LogEntry[], opts: Options): string {
-  // Coco events come from CocoLogger: event starts with "coco."
-  const cocoEntries = entries.filter((e) => e.event.startsWith('coco.'));
+  // Coco events come from CocoLogger; Colada emits wallet-boundary diagnostics
+  // under "colada." so this mode can trace a user action across both layers.
+  const cocoEntries = entries.filter(isCocoDiagnosticEvent);
 
   if (cocoEntries.length === 0)
-    return 'No coco events found. Ensure CocoLogger is wired into Manager (replaces ConsoleLogger).';
+    return 'No coco/colada events found. Ensure CocoLogger and Colada logger are wired into the app logger.';
 
   const lines: string[] = [];
 
@@ -1096,16 +1108,15 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
     { debug: number; info: number; warn: number; error: number }
   >();
   for (const e of cocoEntries) {
-    // event format: coco.<module>.<event_key>
-    const parts = e.event.split('.');
-    const module = parts[1] ?? 'unknown';
+    // event format: coco.<module>.<event_key> or colada.<module>.<event_key>
+    const module = cocoModuleName(e.event);
     const counts = moduleCounts.get(module) ?? { debug: 0, info: 0, warn: 0, error: 0 };
     const level = e.level as keyof typeof counts;
     if (level in counts) counts[level]++;
     moduleCounts.set(module, counts);
   }
 
-  lines.push('COCO MODULE BREAKDOWN:');
+  lines.push('COCO/COLADA MODULE BREAKDOWN:');
   lines.push('');
   const sortedModules = [...moduleCounts.entries()].sort((a, b) => {
     const aTotal = a[1].debug + a[1].info + a[1].warn + a[1].error;
@@ -1124,7 +1135,7 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
   // ── Section 2: Warnings and errors with context ──
   const issues = cocoEntries.filter((e) => e.level === 'warn' || e.level === 'error');
   if (issues.length > 0) {
-    lines.push(`COCO ISSUES (${issues.length} warnings/errors):`);
+    lines.push(`COCO/COLADA ISSUES (${issues.length} warnings/errors):`);
     lines.push('');
     // Deduplicate by message
     const byMsg = new Map<
@@ -1147,7 +1158,28 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
     lines.push('');
   }
 
-  // ── Section 3: Mint request summary ──
+  // ── Section 3: Amount boundary diagnostics ──
+  const amountEvents = cocoEntries.filter(
+    (e) =>
+      e.event.includes('amount') ||
+      e.params?.rawAmount != null ||
+      e.params?.satAmount != null ||
+      e.params?.effectiveSatAmount != null
+  );
+  if (amountEvents.length > 0) {
+    lines.push(`AMOUNT DIAGNOSTICS (${amountEvents.length} events):`);
+    lines.push('');
+    const notable = amountEvents
+      .filter((e) => e.level !== 'debug' || e.event.includes('boundary'))
+      .slice(-25);
+    for (const e of notable) {
+      const t = e._t ? `[${Math.round(e._t)}ms] ` : '';
+      lines.push(`  ${t}${levelIcon(e.level)} ${e.event} ${shortParams(e.params, 8)}`);
+    }
+    lines.push('');
+  }
+
+  // ── Section 4: Mint request summary ──
   const mintRequests = cocoEntries.filter((e) => {
     const msg = (e.params?.msg as string) ?? '';
     return msg.includes('Mint request') || msg.includes('Mint response');
@@ -1172,10 +1204,10 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
     lines.push('');
   }
 
-  // ── Section 4: Timeline of key coco events (non-debug) ──
+  // ── Section 5: Timeline of key coco/colada events (non-debug) ──
   const keyEvents = cocoEntries.filter((e) => e.level !== 'debug');
   if (keyEvents.length > 0) {
-    lines.push('COCO KEY EVENTS (info/warn/error):');
+    lines.push('COCO/COLADA KEY EVENTS (info/warn/error):');
     lines.push('');
     const { page, footer } = paginate(keyEvents, opts);
     let prevT: number | null = null;
@@ -1184,7 +1216,8 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
       const delta = prevT !== null ? t - prevT : 0;
       prevT = t;
       const msg = (e.params?.msg as string) ?? '';
-      const shortMsg = msg.length > 60 ? msg.slice(0, 57) + '...' : msg;
+      const params = msg || shortParams(e.params);
+      const shortMsg = params.length > 60 ? params.slice(0, 57) + '...' : params;
       lines.push(
         `${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(40).slice(0, 40)} ${shortMsg}`
       );
@@ -1218,6 +1251,107 @@ function modeNetwork(entries: LogEntry[], opts: Options): string {
     lines.push(`${t} ${levelIcon(e.level)} ${e.event}  ${shortParams(e.params)}`);
   }
 
+  lines.push(footer);
+  return lines.join('\n');
+}
+
+function modeFeed(entries: LogEntry[], opts: Options): string {
+  const feedEntries = entries.filter(
+    (e) =>
+      e.event.startsWith('feed.') ||
+      e.event.startsWith('thread.') ||
+      e.event.startsWith('nagg.graphql.') ||
+      e.event === 'api.fetch' ||
+      e.event.startsWith('api.fetch_') ||
+      e.event === 'api.parse_failed'
+  );
+
+  if (feedEntries.length === 0) return 'No feed/thread entries found.';
+
+  const lines: string[] = [];
+  const warnings = feedEntries.filter((e) => e.level === 'warn').length;
+  const errors = feedEntries.filter((e) => e.level === 'error' || e.level === 'fatal').length;
+  const gqlEntries = feedEntries.filter((e) => e.event.startsWith('nagg.graphql.'));
+  const feedPages = feedEntries.filter((e) => e.event === 'feed.nagg.page.done');
+  const threadResults = feedEntries.filter(
+    (e) => e.event === 'thread.nagg.graphql.result' || e.event === 'thread.load.done'
+  );
+  const threadSeeds = feedEntries.filter((e) => e.event.startsWith('thread.seed.'));
+
+  lines.push('FEED/THREAD LOG:');
+  lines.push(
+    `  entries=${feedEntries.length} warnings=${warnings} errors=${errors} graphql=${gqlEntries.length} feedPages=${feedPages.length} threadResults=${threadResults.length}`
+  );
+  lines.push('');
+
+  if (gqlEntries.length > 0) {
+    const opCounts = new Map<string, number>();
+    for (const e of gqlEntries) {
+      const op = String(e.params?.operationName ?? '?');
+      const suffix = e.event.replace('nagg.graphql.request.', '').replace('nagg.graphql.', '');
+      const key = `${op}:${suffix}`;
+      opCounts.set(key, (opCounts.get(key) ?? 0) + 1);
+    }
+    lines.push('GRAPHQL OPS:');
+    for (const [key, count] of Array.from(opCounts.entries()).slice(0, 16)) {
+      lines.push(`  ${key} x${count}`);
+    }
+    lines.push('');
+  }
+
+  if (feedPages.length > 0) {
+    lines.push('FEED PAGES:');
+    for (const e of feedPages.slice(-12)) {
+      const p = e.params ?? {};
+      const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+      lines.push(
+        `${t} ${p.source ?? '?'} items=${p.items ?? '?'} previews=${p.replyPreviews ?? '?'} ` +
+          `profiles=${p.profiles ?? '?'} missingProfiles=${p.missingProfiles ?? '?'} ` +
+          `offset=${p.offset ?? '?'} duration=${p.durationMs ?? '?'}ms`
+      );
+    }
+    lines.push('');
+  }
+
+  if (threadSeeds.length > 0 || threadResults.length > 0) {
+    lines.push('THREADS:');
+    for (const e of [...threadSeeds.slice(-6), ...threadResults.slice(-12)]) {
+      const p = e.params ?? {};
+      const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+      lines.push(
+        `${t} ${e.event} event=${p.eventId ?? '?'} sort=${p.replySort ?? p.sort ?? '?'} ` +
+          `nodes=${p.replyNodeCount ?? '?'} rendered=${p.renderedReplies ?? p.replies ?? '?'} ` +
+          `hidden=${p.hiddenReplies ?? '?'} expected=${p.expectedReplies ?? p.targetReplyCount ?? '?'} ` +
+          `hasMore=${p.hasMoreReplies ?? '?'} duration=${p.durationMs ?? '?'}ms`
+      );
+    }
+    lines.push('');
+  }
+
+  const problemEntries = feedEntries.filter(
+    (e) =>
+      e.level === 'warn' ||
+      e.level === 'error' ||
+      e.level === 'fatal' ||
+      e.event.endsWith('.error') ||
+      e.event.endsWith('.graphql_error') ||
+      e.event.endsWith('.aborted')
+  );
+  if (problemEntries.length > 0) {
+    lines.push('PROBLEMS:');
+    for (const e of problemEntries.slice(-16)) {
+      const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+      lines.push(`${t} ${levelIcon(e.level)} ${e.event} ${shortParams(e.params)}`);
+    }
+    lines.push('');
+  }
+
+  const { page, footer } = paginate(feedEntries, opts);
+  lines.push('TIMELINE:');
+  for (const e of page) {
+    const t = e._t ? `[${Math.round(e._t)}ms]` : '';
+    lines.push(`${t} ${levelIcon(e.level)} ${e.event} ${shortParams(e.params)}`);
+  }
   lines.push(footer);
   return lines.join('\n');
 }
@@ -1849,6 +1983,15 @@ function modeCrypto(entries: LogEntry[], opts: Options): string {
 function modeOps(entries: LogEntry[], opts: Options): string {
   // Operation phase tracking for mint/melt/send/receive flows
   const opPatterns = [
+    { prefix: 'colada.operations.', name: 'Colada Operations' },
+    { prefix: 'colada.amount.', name: 'Colada Amount' },
+    { prefix: 'colada.amount_actions.', name: 'Colada Amount Actions' },
+    { prefix: 'colada.amount_boundary.', name: 'Colada Amount Boundary' },
+    { prefix: 'colada.bolt11.', name: 'Colada Bolt11' },
+    { prefix: 'colada.lnurl.', name: 'Colada LNURL' },
+    { prefix: 'colada.flow.', name: 'Colada Flow' },
+    { prefix: 'colada.screen.', name: 'Colada Screen' },
+    { prefix: 'colada.sovran.', name: 'Sovran Colada Boundary' },
     { prefix: 'coco.mint.', name: 'Mint' },
     { prefix: 'coco.melt.', name: 'Melt' },
     { prefix: 'coco.send.', name: 'Send' },
@@ -2048,6 +2191,7 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
     { name: 'startup', fn: modeStartup },
     { name: 'coco', fn: modeCoco },
     { name: 'network', fn: modeNetwork },
+    { name: 'feed', fn: modeFeed },
     { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
     { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
     { name: 'full (yaml)', fn: (e, o) => modeFull(e, { ...o, format: 'yaml' }) },
@@ -2640,7 +2784,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget, phone'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, flows, ws, gc, budget, phone'
     );
     process.exit(1);
   }
@@ -2696,6 +2840,9 @@ async function main() {
     case 'network':
       output = modeNetwork(entries, opts);
       break;
+    case 'feed':
+      output = modeFeed(entries, opts);
+      break;
     case 'full':
       output = modeFull(entries, opts);
       break;
@@ -2723,7 +2870,7 @@ async function main() {
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget, crypto, ops, perf, phone'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, flows, ws, gc, budget, crypto, ops, perf, phone'
       );
       process.exit(1);
   }

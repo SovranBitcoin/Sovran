@@ -1,6 +1,11 @@
 import { Manager, type Plugin } from '@cashu/coco-core';
+import { createCashuSeedGetter, deriveStandardCashuSeed } from '@sovranbitcoin/colada';
 import { CocoCoreLogger } from './cocoLogger';
-import { ExpoSqliteRepositories } from '@cashu/coco-expo-sqlite';
+import {
+  ExpoSqliteRepositories,
+  type ExpoSqliteRepositoriesOptions,
+} from '@cashu/coco-expo-sqlite';
+import { createSovranCocoRepositories } from './cocoRepositories';
 import * as SQLite from 'expo-sqlite';
 import {
   retrieveMnemonic,
@@ -17,15 +22,15 @@ import {
 } from './npc';
 import {
   deriveNostrKeys,
-  deriveCashuWalletSeed,
-  deriveCashuWalletSeedFromRoot,
-  deriveCashuWalletSeedForImported,
+  deriveCashuMnemonic,
+  deriveCashuMnemonicForImported,
 } from '@/shared/lib/nostr/keyDerivation';
 import { getInflightProofs, restoreProofsToReady } from './managerInternals';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase } from '../logger';
+import { createP2PKImportPlugin } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
@@ -65,6 +70,7 @@ export class CocoManager {
   private static cashuMnemonic: string | null = null;
   private static signerKey: Uint8Array | null = null;
   private static npcPlugin: NPCPlugin | null = null;
+  private static npcPluginRegistered = false;
   /** Stored reference to seed getter for pre-warming during background init */
   private static seedGetter: (() => Promise<Uint8Array>) | null = null;
   /** Current account index — controls which DB file and NPC signer to use */
@@ -77,6 +83,7 @@ export class CocoManager {
     this.signerKey = null;
     this.cashuMnemonic = null;
     this.npcPlugin = null;
+    this.npcPluginRegistered = false;
     this.seedGetter = null;
     this.isImportedProfile = false;
   }
@@ -109,7 +116,7 @@ export class CocoManager {
    * Called from CocoProvider with the key already derived by NostrKeysProvider.
    */
   static setSignerKey(sk: Uint8Array): void {
-    this.signerKey = sk;
+    this.signerKey = new Uint8Array(sk);
   }
 
   /**
@@ -142,98 +149,65 @@ export class CocoManager {
     const initStart = performance.now();
     const doInitialize = async (): Promise<Manager> => {
       try {
+        const p2pkImportSecretKey = this.signerKey ? new Uint8Array(this.signerKey) : null;
+
         // 1. SQLite database (async to avoid blocking JS thread during profile switch)
         const dbName = this.getDbName();
         const db = await initPhase(`CocoManager.openDB[${dbName}]`, () =>
           SQLite.openDatabaseAsync(dbName)
         );
         this.db = db;
-        const repositories = new ExpoSqliteRepositories({ database: db });
+        const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
+        const repositories = createSovranCocoRepositories(new ExpoSqliteRepositories({ database }));
         await initPhase('CocoManager.reposInit', () => repositories.init());
 
         // 2. Seed getter (lazy — no crypto work until first call, cached after)
         // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
         const accountIndex = this.accountIndex;
         const isImported = this.isImportedProfile;
-        let cachedSeed: Uint8Array | null = null;
-        const seedGetter = async (): Promise<Uint8Array> => {
-          if (cachedSeed) return cachedSeed;
-
-          // Fast path: check SecureStore for a previously derived seed
-          const mnemonicForHash = this.cashuMnemonic ?? (await retrieveMnemonic());
-          const mHash = mnemonicForHash ? hashMnemonic(mnemonicForHash) : null;
-          if (mHash) {
-            const cached = await retrieveCashuSeed(accountIndex);
-            if (cached && cached.mnemonicHash === mHash) {
-              initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
-              cachedSeed = cached.seed;
-              return cached.seed;
+        const cashuMnemonic = this.cashuMnemonic;
+        const seedGetter = createCashuSeedGetter({
+          getMnemonic: async () => cashuMnemonic ?? (await retrieveMnemonic()),
+          deriveSeed: (mnemonic) => {
+            if (cashuMnemonic) {
+              return deriveStandardCashuSeed(mnemonic);
             }
-          }
 
-          // Slow path: derive via PBKDF2
-          let seed: Uint8Array;
-          if (this.cashuMnemonic) {
-            seed = deriveCashuWalletSeed(this.cashuMnemonic);
-          } else {
-            const mnemonic = mnemonicForHash ?? (await retrieveMnemonic());
-            if (!mnemonic) throw new Error('No mnemonic found in secure storage');
-            if (isImported) {
-              seed = deriveCashuWalletSeedForImported(mnemonic, accountIndex);
-            } else {
-              seed = deriveCashuWalletSeedFromRoot(mnemonic, accountIndex);
-            }
-          }
-          cachedSeed = seed;
-
-          // Persist for next cold start (fire-and-forget)
-          if (mHash) {
-            storeCashuSeed(accountIndex, seed, mHash).catch((e) =>
-              cashuLog.warn('cashu.manager.seed_cache_store_failed', { error: e })
-            );
-          }
-
-          return seed;
-        };
+            const cashuChildMnemonic = isImported
+              ? deriveCashuMnemonicForImported(mnemonic, accountIndex)
+              : deriveCashuMnemonic(mnemonic, accountIndex);
+            return deriveStandardCashuSeed(cashuChildMnemonic);
+          },
+          cache: {
+            load: async ({ mnemonic }) => {
+              const mnemonicHash = hashMnemonic(mnemonic);
+              const cached = await retrieveCashuSeed(accountIndex);
+              if (cached && cached.mnemonicHash === mnemonicHash) {
+                initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
+                return cached.seed;
+              }
+              return null;
+            },
+            store: (seed, { mnemonic }) => {
+              const mnemonicHash = hashMnemonic(mnemonic);
+              storeCashuSeed(accountIndex, seed, mnemonicHash).catch((e) =>
+                cashuLog.warn('cashu.manager.seed_cache_store_failed', { error: e })
+              );
+            },
+          },
+        });
 
         this.seedGetter = seedGetter;
 
-        // 3. NPC plugin (constructor only — no network call)
-        // The Plugin type comes from @cashu/coco-core; NPCPlugin implements
-        // the same shape via coco-cashu-plugin-npc's bundled (older) coco
-        // types, so we bridge with a single nominal cast at the seam — far
-        // narrower than a per-callsite `any`.
-        const plugins: Plugin[] = [];
-        const nsecSigner = await initPhase('CocoManager.getSigner', () =>
-          this.getCurrentProfileSigner()
-        );
-        initLog('CocoManager', `signer created: ${!!nsecSigner}`);
-
-        if (nsecSigner) {
-          // NpcSigner is `(t: EventTemplate) => Promise<SignedEvent>` from
-          // npubcash-sdk; the underlying NsecSigner.signEvent is the same
-          // shape via nostr-tools, so we re-type the param at the boundary.
-          const signerFunction: NpcSigner = (eventTemplate) =>
-            nsecSigner.signEvent(eventTemplate as EventTemplate);
-
-          // Resolve the active profile's pubkey so the sync cursor is
-          // pubkey-keyed (not accountIndex-keyed); guards against index
-          // recycling when the highest-numbered profile is deleted.
-          const { useProfileStore } = await import('@/shared/stores/global/profileStore');
-          const activePubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
-
-          if (!activePubkey) {
-            cashuLog.warn('cashu.manager.npc_skip_no_pubkey');
-          } else {
-            this.npcPlugin = new NPCPlugin(NPC_BASE_URL, signerFunction, {
-              syncIntervalMs: NPC_SYNC_INTERVAL_MS,
-              useWebsocket: true,
-              sinceStore: new AsyncStorageSinceStore(getNpcSinceStoreKey(activePubkey)),
-            });
-            plugins.push(this.npcPlugin as unknown as Plugin);
-            initLog('CocoManager', 'NPC plugin created');
-          }
-        }
+        // 3. Core plugins. The P2PK import uses only the active profile signer
+        // snapshot captured for this manager initialization. Do not read global
+        // env/config or stored profile nsecs here, otherwise one profile's nsec
+        // can be imported into another profile's Coco database.
+        const plugins: Plugin[] = [
+          createP2PKImportPlugin({
+            getSecretKeys: () => (p2pkImportSecretKey ? [new Uint8Array(p2pkImportSecretKey)] : []),
+          }),
+        ];
 
         // 4. Create Manager
         initLog('CocoManager', 'creating Manager instance...');
@@ -244,6 +218,7 @@ export class CocoManager {
           undefined,
           plugins
         );
+        await initPhase('CocoManager.initCorePlugins', () => this.instance!.initPlugins());
         initLog('CocoManager', 'Manager created');
         cashuLog.info('cashu.manager.initialized', {
           duration_ms: Math.round((performance.now() - initStart) * 100) / 100,
@@ -318,7 +293,6 @@ export class CocoManager {
    */
   static async enableNpcSyncAndProcessor(): Promise<void> {
     const manager = this.instance;
-    const npcPlugin = this.npcPlugin;
     if (!manager) {
       throw new Error('Manager not initialized. Call initialize() first.');
     }
@@ -327,8 +301,18 @@ export class CocoManager {
     cashuLog.info('cashu.manager.npc_sync_and_processor.start');
 
     try {
+      let npcPlugin: NPCPlugin | null = null;
       try {
         initLog('CocoManager', 'initializing plugins...');
+        npcPlugin = await this.getOrCreateNpcPlugin();
+        if (npcPlugin && !this.npcPluginRegistered) {
+          // The Plugin type comes from @cashu/coco-core; NPCPlugin implements
+          // the same shape via coco-cashu-plugin-npc's bundled (older) coco
+          // types, so we bridge with a single nominal cast at the seam — far
+          // narrower than a per-callsite `any`.
+          manager.use(npcPlugin as unknown as Plugin);
+          this.npcPluginRegistered = true;
+        }
         await manager.initPlugins();
         initLog('CocoManager', 'plugins initialized');
       } catch (error) {
@@ -540,6 +524,42 @@ export class CocoManager {
     } finally {
       this.pendingCleanup = null;
     }
+  }
+
+  private static async getOrCreateNpcPlugin(): Promise<NPCPlugin | null> {
+    if (this.npcPlugin) return this.npcPlugin;
+
+    const nsecSigner = await initPhase('CocoManager.getSigner', () =>
+      this.getCurrentProfileSigner()
+    );
+    initLog('CocoManager', `signer created: ${!!nsecSigner}`);
+
+    if (!nsecSigner) return null;
+
+    // NpcSigner is `(t: EventTemplate) => Promise<SignedEvent>` from
+    // npubcash-sdk; the underlying NsecSigner.signEvent is the same shape
+    // via nostr-tools, so we re-type the param at the boundary.
+    const signerFunction: NpcSigner = (eventTemplate) =>
+      nsecSigner.signEvent(eventTemplate as EventTemplate);
+
+    // Resolve the active profile's pubkey so the sync cursor is pubkey-keyed
+    // (not accountIndex-keyed); guards against index recycling when the
+    // highest-numbered profile is deleted.
+    const { useProfileStore } = await import('@/shared/stores/global/profileStore');
+    const activePubkey = useProfileStore.getState().getActiveProfile()?.pubkey;
+
+    if (!activePubkey) {
+      cashuLog.warn('cashu.manager.npc_skip_no_pubkey');
+      return null;
+    }
+
+    this.npcPlugin = new NPCPlugin(NPC_BASE_URL, signerFunction, {
+      syncIntervalMs: NPC_SYNC_INTERVAL_MS,
+      useWebsocket: true,
+      sinceStore: new AsyncStorageSinceStore(getNpcSinceStoreKey(activePubkey)),
+    });
+    initLog('CocoManager', 'NPC plugin created');
+    return this.npcPlugin;
   }
 
   /**

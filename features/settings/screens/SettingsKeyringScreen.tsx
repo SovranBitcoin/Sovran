@@ -19,9 +19,8 @@ import { Section } from '@/shared/ui/composed/Section';
 import type { Keypair } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { nip19 } from 'nostr-tools';
-import { hexToBytes } from '@noble/hashes/utils.js';
-import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
+import { getPublicKey, nip19 } from 'nostr-tools';
+import { parseP2PKSecretInput } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import QRCode from 'react-native-qrcode-svg';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
@@ -34,6 +33,7 @@ import {
   Switch as HeroSwitch,
 } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
 /**
  * CurrentKeyItem - Featured display for the active/most recent key
@@ -213,10 +213,12 @@ export const SettingsKeyringScreen: React.FC = () => {
   useLifecycleLogger('SettingsKeyringScreen');
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
   const manager = useManager();
+  const { keys: nostrKeys, isReady: nostrKeysReady } = useNostrKeysContext();
 
   const [keypairs, setKeypairs] = useState<Keypair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImportingCurrentNsec, setIsImportingCurrentNsec] = useState(false);
 
   // Quick access setting from settings store
   const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
@@ -268,39 +270,23 @@ export const SettingsKeyringScreen: React.FC = () => {
   });
 
   /**
-   * Try to import a key with multiple strategies without manipulating the input
+   * Try to import a key with multiple strategies without manipulating the input.
    */
   const tryImportKey = async (input: string): Promise<boolean> => {
     if (!manager) return false;
 
-    // Strategy 1: Try as nsec
-    if (input.startsWith('nsec1')) {
-      try {
-        const decoded = nip19.decode(input);
-        if (decoded.type === 'nsec') {
-          await manager.keyring.addKeyPair(decoded.data as Uint8Array);
-          return true;
-        }
-      } catch (error) {
-        log.warn('settings.keyring.import.nsec_decode_failed', {
-          error: (error as Error)?.message,
-        });
-      }
+    const parsed = parseP2PKSecretInput(input);
+    if (!parsed.success) {
+      log.warn('settings.keyring.import.invalid_input', { error: parsed.error });
+      return false;
     }
 
-    // Strategy 2: Try as raw 64-char hex (32-byte private key)
-    if (isNostrPubkeyHex(input)) {
-      try {
-        await manager.keyring.addKeyPair(hexToBytes(input));
-        return true;
-      } catch (error) {
-        log.warn('settings.keyring.import.hex_decode_failed', {
-          error: (error as Error)?.message,
-        });
-      }
-    }
-
-    return false;
+    const keypair = await manager.keyring.addKeyPair(parsed.secretKey);
+    log.info('settings.keyring.import.key_imported', {
+      publicKeyHex: keypair.publicKeyHex,
+      source: parsed.source,
+    });
+    return true;
   };
 
   /**
@@ -368,10 +354,62 @@ export const SettingsKeyringScreen: React.FC = () => {
       })
   );
 
+  /**
+   * Adds the active Sovran/Nostr identity key to Coco's P2PK keyring. Coco
+   * stores P2PK public keys as SEC1-compressed strings with the Nostr x-only
+   * key prefixed by `02`, matching KeyRingService.getPublicKeyHex().
+   */
+  const handleImportCurrentNsec = useSingleFlight(async () => {
+    if (!manager) {
+      staticPopup('wallet-still-loading');
+      return;
+    }
+
+    if (!nostrKeys?.privateKey) {
+      staticPopup('key-import-failed', {
+        text: 'Current Nostr key is not ready yet.',
+      });
+      return;
+    }
+
+    try {
+      setIsImportingCurrentNsec(true);
+      const publicKeyHex = `02${getPublicKey(nostrKeys.privateKey)}`;
+      const existingKeypairs = await manager.keyring.getAllKeyPairs();
+
+      if (existingKeypairs.some((keypair) => keypair.publicKeyHex === publicKeyHex)) {
+        setKeypairs(existingKeypairs);
+        staticPopup('key-imported', {
+          text: 'Your active Nostr key is already available for P2PK-locked ecash.',
+        });
+        return;
+      }
+
+      const keypair = await manager.keyring.addKeyPair(nostrKeys.privateKey);
+      log.info('settings.keyring.import_current_nsec.key_imported', {
+        publicKeyHex: keypair.publicKeyHex,
+      });
+      staticPopup('key-imported', {
+        text: 'Your active Nostr key can now receive P2PK-locked ecash.',
+      });
+      await loadKeypairs();
+    } catch (error) {
+      log.error('settings.keyring.import_current_nsec_failed', { error });
+      staticPopup('key-import-failed', {
+        text: 'Failed to add your current Nostr key.',
+      });
+    } finally {
+      setIsImportingCurrentNsec(false);
+    }
+  });
+
   const handleCopyKey = async (publicKey: string) => {
     await Clipboard.setStringAsync(publicKey);
     copyPopup('publicKey');
   };
+
+  const canImportCurrentNsec = !!manager && nostrKeysReady && !!nostrKeys?.privateKey;
+  const isKeyringActionPending = isGenerating || isImportingCurrentNsec;
 
   return (
     <Screen name="SettingsKeyringScreen">
@@ -383,11 +421,14 @@ export const SettingsKeyringScreen: React.FC = () => {
               <Pressable
                 onPress={handleImportNsec}
                 style={{ padding: 8 }}
-                disabled={isGenerating}
+                disabled={isKeyringActionPending}
                 testID="keyring-import-trigger">
                 <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
               </Pressable>
-              <Pressable onPress={handleGenerateKey} style={{ padding: 8 }} disabled={isGenerating}>
+              <Pressable
+                onPress={handleGenerateKey}
+                style={{ padding: 8 }}
+                disabled={isKeyringActionPending}>
                 {isGenerating ? (
                   <LoadingIndicator size={22} phase="loading" color={foreground} />
                 ) : (
@@ -429,6 +470,30 @@ export const SettingsKeyringScreen: React.FC = () => {
                 isSelected={regenerateP2PKOnReceive ?? true}
                 onSelectedChange={setRegenerateP2PKOnReceive}
               />
+            </ListGroup.ItemSuffix>
+          </ListGroup.Item>
+          <Separator className="mx-4" />
+          <ListGroup.Item>
+            <ListGroup.ItemContent>
+              <ListGroup.ItemTitle>Use Current Nostr Key</ListGroup.ItemTitle>
+              <ListGroup.ItemDescription>
+                Add your active nsec as a P2PK receive key
+              </ListGroup.ItemDescription>
+            </ListGroup.ItemContent>
+            <ListGroup.ItemSuffix>
+              <Button
+                variant="secondary"
+                size="sm"
+                isDisabled={!canImportCurrentNsec || isImportingCurrentNsec}
+                onPress={handleImportCurrentNsec}
+                testID="keyring-import-current-nsec">
+                {isImportingCurrentNsec ? (
+                  <LoadingIndicator size={16} phase="loading" color={foreground} />
+                ) : (
+                  <Icon name="mdi:key-chain" size={16} color={foreground} />
+                )}
+                <Button.Label>Add</Button.Label>
+              </Button>
             </ListGroup.ItemSuffix>
           </ListGroup.Item>
         </ListGroup>

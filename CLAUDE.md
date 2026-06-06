@@ -4,7 +4,7 @@ Checkout that groups the Sovran product repos with local copies of Cashu librari
 
 ## Product
 
-- **sovran-app** — Expo/React Native wallet: Cashu ecash, Lightning, Nostr identity, NFC, and related UX (includes `coco-payment-ux`).
+- **sovran-app** — Expo/React Native wallet: Cashu ecash, Lightning, Nostr identity, NFC, and related UX (includes `colada`).
 - **api.sovran.money** — Backend API (Bun, Hono): Cashu, Nostr, Supabase, and eSIM-related routes consumed by the app and admin.
 - **sovran.money** — Public marketing site (Vite with SSR/prerender).
 - **sovran-admin-panel** — Internal Vite/React dashboard for eSIM catalog, orders, and reconciliation.

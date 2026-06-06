@@ -1,14 +1,14 @@
 /**
- * @fileoverview Sovran payment flow config — single source for coco-payment-ux glue
+ * @fileoverview Sovran payment flow config — single source for colada glue
  *
- * Factory functions that inject Sovran-specific behavior into coco-payment-ux:
+ * Factory functions that inject Sovran-specific behavior into colada:
  * - createSovranNotifications: error/notification popups + state updates
  * - createSovranHandlers: step handlers (navigation, popups, dismiss)
- * - createSovranScreenActionHandlers: post-terminal actions (NFC, emoji picker)
+ * - createSovranScreenActionHandlers: post-terminal actions (NFC, emoji token picker)
  * - createSovranScanSources: scan input sources (clipboard, gallery, NFC)
  *
  * Operations (executeSend, executeMelt, buildMintListItems, etc.) are now built-in
- * via createCocoPaymentUX in the library.
+ * via createColada in the library.
  */
 
 import { Share } from 'react-native';
@@ -19,16 +19,17 @@ import { router } from 'expo-router';
 import { paymentLog } from '@/shared/lib/logger';
 import { mintLocalId } from '@/shared/lib/id';
 
-import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
+import { getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
 import type {
   HistoryEntry,
   Manager,
-  SendHistoryEntry,
   MeltHistoryEntry,
+  SendHistoryEntry,
   MintHistoryEntry,
-  ReceiveHistoryEntry,
 } from '@cashu/coco-core';
 import {
+  isSendTokenCancelled,
+  isSendTokenComplete,
   withTimeout,
   type MachineOperations,
   type NotificationHandlerMap,
@@ -38,9 +39,16 @@ import {
   type ScreenActionHandlerMap,
   type StepHandlerMap,
   type NfcIOAdapter,
-} from 'coco-payment-ux';
+} from '@sovranbitcoin/colada';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
+import { getMintQuotePaymentValue, getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
+import {
+  getP2PKImportExtension,
+  resolvePrimaryReceiveP2PKPublicKey,
+} from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
 import { writeTokenToNFC, NfcError, isUserCancelError } from '@/shared/lib/nfc';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
@@ -55,12 +63,18 @@ import {
   paymentOptionsPopup,
   paymentStatusPopup,
   proofSelectorPopup,
+  sendMemoPopup,
   staticPopup,
   paramPopup,
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
+import { sendBLEPublicMessage } from '@/features/bitchat/lib/blePrivateDelivery';
+import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
+import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
+import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
+import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { getNpcAddress } from '@/shared/lib/cashu/npc';
@@ -75,11 +89,11 @@ import { useTransactionDistributionStore } from '@/shared/stores/profile/transac
 // =============================================================================
 
 /**
- * Sovran-side override for coco-payment-ux's default `executeReceive`.
+ * Sovran-side override for colada's default `executeReceive`.
  *
  * Why this exists:
  *
- * coco-payment-ux's default `executeReceive` (defaultOperations.ts:502) calls
+ * colada's default `executeReceive` (defaultOperations.ts:502) calls
  * `mgr.wallet.receive(token)`, then tries to find the resulting persisted
  * history entry by matching `metadata.rawToken === tokenString || h.token ===
  * tokenString`. When the lookup fails (race against coco's history write, or
@@ -132,8 +146,8 @@ export function createSovranExecuteReceive(
     // `regenerateP2PKOnReceive` enabled.
     let hadP2PKProofs = false;
     try {
-      const decoded = getDecodedToken(tokenString);
-      hadP2PKProofs = decoded.proofs.some((p) => {
+      const metadata = getTokenMetadata(tokenString);
+      hadP2PKProofs = metadata.incompleteProofs.some((p) => {
         try {
           const parsed = JSON.parse(p.secret);
           return Array.isArray(parsed) && parsed[0] === 'P2PK';
@@ -196,19 +210,26 @@ export function createSovranExecuteReceive(
       polledMs: MAX_ATTEMPTS * DELAY_MS,
     });
     let tokenAmount = 0;
+    let tokenUnit = 'sat';
     try {
-      const decoded = getDecodedToken(tokenString);
-      tokenAmount = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
+      const metadata = getTokenMetadata(tokenString);
+      tokenAmount = amountToNumber(metadata.amount);
+      tokenUnit = metadata.unit ?? 'sat';
     } catch {
       /* ignore */
     }
+    const now = Date.now();
     const fallbackEntry = {
       id: mintLocalId('redeemed'),
       type: 'receive' as const,
-      createdAt: Date.now(),
+      source: 'legacy' as const,
+      legacyHistoryId: mintLocalId('redeemed'),
+      createdAt: now,
+      updatedAt: now,
       mintUrl,
-      unit: 'sat',
+      unit: tokenUnit,
       amount: tokenAmount,
+      state: 'finalized',
       metadata: { rawToken: tokenString },
     };
     return {
@@ -225,9 +246,9 @@ export function createSovranExecuteReceive(
 const MINT_QUOTE_PREPARE_TIMEOUT_MS = 10_000;
 
 /**
- * Sovran-side override for coco-payment-ux's default `executeMintQuote`.
+ * Sovran-side override for colada's default `executeMintQuote`.
  *
- * coco-payment-ux's default (defaultOperations.ts:275) calls
+ * colada's default (defaultOperations.ts:275) calls
  * `mgr.ops.mint.prepare(...)` and constructs the history entry directly from
  * the returned operation, using `mintOp.id` as the entry id. The comment at
  * defaultOperations.ts:291 acknowledges the race: it builds from the
@@ -243,16 +264,20 @@ const MINT_QUOTE_PREPARE_TIMEOUT_MS = 10_000;
  * history for the persisted row by `quoteId` (deterministic — no race) and
  * fall back to set-difference. Use coco's persisted row as authoritative for
  * the id, while preserving `paymentRequest` from the operation result so
- * the MintQuoteScreen still has a lightning invoice to display.
+ * the LightningReceiveScreen still has a lightning invoice to display.
  */
 export function createSovranExecuteMintQuote(
   getManager: () => Manager | null
 ): NonNullable<MachineOperations['executeMintQuote']> {
-  return async (mintUrl, amount, _unit) => {
+  return async (mintUrl, amount, _unit, method = 'bolt11') => {
     const manager = getManager();
     if (!manager) {
       paymentLog.error('payment.execute_mint_quote.no_manager');
       throw new Error('Wallet manager is not available');
+    }
+
+    if (method === 'onchain') {
+      throw new Error('Onchain mint quotes are not supported by @cashu/coco-core 1.0.1');
     }
 
     // Snapshot existing mint ids for this mint URL so we can detect the
@@ -272,7 +297,7 @@ export function createSovranExecuteMintQuote(
 
     paymentLog.info('payment.execute_mint_quote.start', { mintUrl, amount });
     const mintOp = await withTimeout(
-      manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' }),
+      prepareBolt11MintQuote(manager, mintUrl, amount, _unit),
       MINT_QUOTE_PREPARE_TIMEOUT_MS,
       'executeMintQuote.prepare'
     );
@@ -286,11 +311,12 @@ export function createSovranExecuteMintQuote(
     const constructedEntry: MintHistoryEntry = {
       id: mintOp.id,
       type: 'mint',
+      operationId: mintOp.id,
       createdAt: mintOp.createdAt,
       mintUrl: mintOp.mintUrl,
       unit: mintOp.unit,
       quoteId: mintOp.quoteId,
-      state: 'UNPAID',
+      state: mintOp.lastObservedRemoteState ?? 'UNPAID',
       amount: mintOp.amount,
       paymentRequest: mintOp.request,
       metadata: { operationId: mintOp.id },
@@ -373,6 +399,9 @@ export function createSovranNotifications(
     },
     UNSUPPORTED_INPUT: ({ code: _code, message, data: _data }) => {
       staticPopup('unsupported-input', { text: message });
+    },
+    UNSUPPORTED_PAYMENT_METHOD: ({ code: _code, message, data: _data }) => {
+      staticPopup('unsupported-payment-method', { text: message });
     },
     ALL_OPTIONS_DISABLED: ({ code: _code, message: _message, data: _data }) => {
       staticPopup('all-options-disabled');
@@ -517,9 +546,9 @@ export function createSovranNotifications(
     // ── Screen action notifications ─────────────────────────────────
 
     onSendStatusChecked: ({ operationId: _operationId, state, redeemed }) => {
-      if (redeemed || state === 'finalized') {
+      if (redeemed || isSendTokenComplete({ state })) {
         staticPopup('token-redeemed-by-recipient');
-      } else if (state === 'rolled_back') {
+      } else if (isSendTokenCancelled({ state })) {
         staticPopup('transaction-already-cancelled');
       } else if (state === 'not_found') {
         staticPopup('operation-not-found');
@@ -643,6 +672,10 @@ export function createSovranNotifications(
       if (hadP2PKProofs && useSettingsStore.getState().regenerateP2PKOnReceive) {
         const mgr = config?.getManager?.();
         if (mgr) {
+          if ((getP2PKImportExtension(mgr)?.getPublicKeys() ?? []).length > 0) {
+            return;
+          }
+
           try {
             await mgr.keyring.generateKeyPair();
             const keypair = await mgr.keyring.getLatestKeyPair();
@@ -729,6 +762,75 @@ interface CreateSovranHandlersConfig {
   onOptionDismiss?: () => void;
   getManager: () => Manager | null;
   getNpub?: () => string | undefined;
+  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null;
+}
+
+function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string | null {
+  try {
+    const parsed = JSON.parse(historyEntry) as {
+      token?: Parameters<typeof getEncodedToken>[0];
+      tokenString?: unknown;
+      metadata?: { rawToken?: unknown };
+    };
+    if (typeof parsed.tokenString === 'string' && parsed.tokenString.length > 0) {
+      return parsed.tokenString;
+    }
+    if (typeof parsed.metadata?.rawToken === 'string' && parsed.metadata.rawToken.length > 0) {
+      return parsed.metadata.rawToken;
+    }
+    if (parsed.token) {
+      return getEncodedToken(parsed.token);
+    }
+  } catch (err) {
+    paymentLog.warn('near_pay.token.extract_failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  return null;
+}
+
+async function deliverNearPayIfActive(
+  historyEntry: string,
+  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null
+): Promise<void> {
+  const active = useNearPaySessionStore.getState().active;
+  if (!active) return;
+
+  try {
+    const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
+    if (!encodedToken) throw new Error('Created send entry did not contain an ecash token');
+
+    const profileScope = getBitchatProfileScope();
+    const identityMaterial = getBitchatIdentityMaterial?.() ?? null;
+    const nickname = getBitchatNickname() || 'sovran';
+    // Deliver the whole token as a SINGLE public BLE message. The private Noise
+    // DM path caps content at 255 bytes (one-byte TLV length), so a multi-KB
+    // token would be split into many messages that unmodified bitchat receivers
+    // cannot reassemble. The public path transparently fragments/reassembles
+    // into one message and stock bitchat renders the `cashu…` token as a single
+    // redeemable chip. See sendBLEPublicMessage for the full rationale/trade-off.
+    const result = await sendBLEPublicMessage({
+      content: encodedToken,
+      nickname,
+      profileScope,
+      identityMaterial,
+    });
+
+    paymentLog.info('near_pay.delivery.sent', {
+      peerID: active.recipient.peerID,
+      tokenBytes: encodedToken.length,
+      hasDirectLink: active.recipient.hasDirectLink,
+      startupMs: Math.round(result.startupMs * 100) / 100,
+      sendMs: Math.round(result.sendMs * 100) / 100,
+    });
+  } catch (err) {
+    paymentLog.error('near_pay.delivery.failed', {
+      peerID: active.recipient.peerID,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    useNearPaySessionStore.getState().complete();
+  }
 }
 
 export function createSovranHandlers({
@@ -736,6 +838,7 @@ export function createSovranHandlers({
   onOptionDismiss,
   getManager,
   getNpub,
+  getBitchatIdentityMaterial,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   paymentLog.debug('payment.handlers.created');
 
@@ -760,7 +863,7 @@ export function createSovranHandlers({
       if (topUpState.active) {
         try {
           const entry = JSON.parse(historyEntry);
-          const encodedToken = getEncodedTokenV4(entry.token);
+          const encodedToken = getEncodedToken(entry.token);
           const result = await executeRoutstrTopUp(encodedToken);
 
           if (result.success) {
@@ -805,6 +908,8 @@ export function createSovranHandlers({
           });
         }
       }
+
+      await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',
@@ -865,16 +970,25 @@ export function createSovranHandlers({
       // `MeltHistoryEntry.metadata` is typed `Record<string, string>` upstream
       // in `@cashu/coco-core`, so the resolved profile is flattened into
       // individual string keys instead of stored as a nested object.
-      // `MeltQuoteScreen` re-assembles them on read.
-      const entry: MeltHistoryEntry = {
-        id: mintLocalId('melt-preview'),
+      // `LightningSendScreen` re-assembles them on read.
+      const id = mintLocalId('melt-preview');
+      const now = Date.now();
+      const entry: MeltHistoryEntry & {
+        source: 'legacy';
+        legacyHistoryId: string;
+        updatedAt: number;
+      } = {
+        id,
         type: 'melt',
-        createdAt: Date.now(),
+        source: 'legacy',
+        legacyHistoryId: id,
+        createdAt: now,
+        updatedAt: now,
         mintUrl,
         unit: unit ?? 'sat',
         quoteId: '',
         state: 'UNPAID',
-        amount,
+        amount: amountToNumber(amount),
         metadata: {
           phase: 'preview',
           meltTarget,
@@ -891,14 +1005,23 @@ export function createSovranHandlers({
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
       nav({
-        pathname: '/(send-flow)/meltQuote',
+        pathname: '/(send-flow)/lightningSend',
         params: { meltHistoryEntry: JSON.stringify(entry) },
       });
     },
 
     mintQuoteCreated: ({ historyEntry, unit }) => {
+      let pathname: '/(receive-flow)/lightningReceive' | '/(receive-flow)/onchainReceive' =
+        '/(receive-flow)/lightningReceive';
+      try {
+        pathname = getOnchainMintAddress(JSON.parse(historyEntry) as HistoryEntry)
+          ? '/(receive-flow)/onchainReceive'
+          : '/(receive-flow)/lightningReceive';
+      } catch {
+        pathname = '/(receive-flow)/lightningReceive';
+      }
       router.replace({
-        pathname: '/(receive-flow)/mintQuote',
+        pathname,
         params: { mintHistoryEntry: historyEntry, unit },
       });
     },
@@ -932,7 +1055,7 @@ export function createSovranHandlers({
       router.navigate(buildModalProfileHref({ npub }));
     },
 
-    navigateToReceive: async ({ unit }) => {
+    navigateToReceive: async ({ unit, methodContext }) => {
       const t0 = performance.now();
       const npub = getNpub?.();
       const selectedMintUrl = useNpcMintStore.getState().getActiveMintUrl();
@@ -941,8 +1064,7 @@ export function createSovranHandlers({
       const currentMgr = getManager();
       if (currentMgr) {
         try {
-          const keypair = await currentMgr.keyring.getLatestKeyPair();
-          p2pkKey = keypair?.publicKeyHex ?? undefined;
+          p2pkKey = await resolvePrimaryReceiveP2PKPublicKey(currentMgr);
         } catch {
           /* ignore */
         }
@@ -956,6 +1078,7 @@ export function createSovranHandlers({
         npcAddress: npub ? getNpcAddress(undefined, npub) : undefined,
         p2pkKey,
         selectedMintUrl,
+        ...(methodContext ? { methodContext } : {}),
         unit,
       };
       router.navigate({
@@ -973,6 +1096,7 @@ export function createSovranHandlers({
         selectedMintUrl: preselectedMintUrl ?? '',
         ...(constraints.paymentRequest ? { paymentRequest: constraints.paymentRequest } : {}),
         ...(constraints.meltTarget ? { meltTarget: constraints.meltTarget } : {}),
+        ...(constraints.methodContext ? { methodContext: constraints.methodContext } : {}),
         // Snapshot the machine-resolved recipient identity onto the entry so
         // the amount screen renders "Pay <name>" + avatar on first paint
         // when the resolver beat the navigation. AmountFlowScreen also
@@ -982,6 +1106,14 @@ export function createSovranHandlers({
         ...(constraints.recipientProfile ? { recipientProfile: constraints.recipientProfile } : {}),
       };
       const params = { amountEntry: JSON.stringify(entry) };
+      const nearPaySessionStore = useNearPaySessionStore.getState();
+      if (constraints.destination === 'sendEcash' && nearPaySessionStore.active) {
+        nearPaySessionStore.setAmountEntry(params.amountEntry);
+        paymentLog.info('navigate.enterAmount.near_pay_inline', {
+          duration_ms: performance.now() - t0,
+        });
+        return;
+      }
       router.navigate(
         constraints.destination === 'mintQuote'
           ? { pathname: '/(receive-flow)/amount', params }
@@ -998,6 +1130,9 @@ export function createSovranHandlers({
       paymentRequest: _paymentRequest,
       meltTarget: _meltTarget,
       destination,
+      mintQuoteMethod,
+      meltQuoteMethod,
+      methodRequirement,
       mintListItems,
       scope,
     }) => {
@@ -1005,6 +1140,9 @@ export function createSovranHandlers({
         items: mintListItems ?? [],
         scope: scope ?? 'selected',
         destination,
+        ...(mintQuoteMethod ? { mintQuoteMethod } : {}),
+        ...(meltQuoteMethod ? { meltQuoteMethod } : {}),
+        ...(methodRequirement ? { methodRequirement } : {}),
         unit,
       };
 
@@ -1026,6 +1164,10 @@ export function createSovranHandlers({
 
     chooseProofs: (stepData) => {
       proofSelectorPopup({ ...stepData, machine });
+    },
+
+    enterSendMemo: (stepData) => {
+      sendMemoPopup({ ...stepData, machine });
     },
 
     dismiss: () => {
@@ -1064,17 +1206,9 @@ function mintQuoteCtx(ctx: ScreenActionContext): Ctx<MintHistoryEntry> {
   return ctx as Ctx<MintHistoryEntry>;
 }
 
-function receiveTokenCtx(ctx: ScreenActionContext): Ctx<ReceiveHistoryEntry> {
-  return ctx as Ctx<ReceiveHistoryEntry>;
-}
-
-function meltQuoteCtx(ctx: ScreenActionContext): Ctx<MeltHistoryEntry> {
-  return ctx as Ctx<MeltHistoryEntry>;
-}
-
 /**
  * App-specific screen action overrides. Only actions that require platform
- * primitives not available in coco-payment-ux (NFC writer, emoji picker).
+ * primitives not available in colada (NFC writer, emoji picker).
  * All other actions are handled by the built-in default handlers.
  */
 export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
@@ -1089,7 +1223,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         }
 
         try {
-          await writeTokenToNFC(getEncodedTokenV4(entry.token));
+          await writeTokenToNFC(getEncodedToken(entry.token));
           paymentLog.info('payment.screen_action.nfc.success');
           nfcEcashSharedPopup();
           return;
@@ -1134,8 +1268,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       /**
        * Route text vs emoji copy on the sendToken screen. Split-menu UI
        * (`ActionMenuButton`) calls `actions.copy.execute({ variantId })` with
-       * `'text'` or `'emoji'`. An omitted `variantId` (legacy callers) falls
-       * through to the text path, preserving prior behavior.
+       * `'text'` or `'emoji'`. An omitted `variantId` uses the text path.
        */
       copy: async (rawCtx) => {
         const { entry } = sendCtx(rawCtx);
@@ -1145,12 +1278,12 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         // narrow it directly without a cast.
         const variantId = typeof rawCtx.variantId === 'string' ? rawCtx.variantId : 'text';
         if (variantId === 'emoji') {
-          emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
+          emojiPickerPopup({ token: getEncodedToken(entry.token) });
           return;
         }
         // Default — text clipboard copy.
         try {
-          await Clipboard.setStringAsync(getEncodedTokenV4(entry.token));
+          await Clipboard.setStringAsync(getEncodedToken(entry.token));
           copyPopup('token');
           paymentLog.info('payment.send_token.copy.text.success', { entryId: entry.id });
         } catch (e) {
@@ -1158,15 +1291,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
             error: e instanceof Error ? e.message : String(e),
           });
         }
-      },
-      /**
-       * @deprecated — reach this via `copy({ variantId: 'emoji' })` now. The
-       * action name is retained for a release so any extant callers still work.
-       */
-      copyAsEmoji: async (rawCtx) => {
-        const { entry } = sendCtx(rawCtx);
-        if (!entry.token) return;
-        emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
       },
     },
 
@@ -1176,7 +1300,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
     // method for the resulting transaction. The other wallet's payment
     // method is unknowable, but we can capture which channel WE used to
     // share the lightning invoice. The 'displayed' fallback is written by
-    // a global subscription in CocoPaymentUX.tsx when the quote transitions
+    // a global subscription in Colada.tsx when the quote transitions
     // to PAID/ISSUED without any explicit copy/share action.
     //
     // The distribution store is keyed by `quoteId` (NOT historyEntry.id)
@@ -1193,23 +1317,23 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
     mintQuote: {
       copy: async (rawCtx) => {
         const { entry } = mintQuoteCtx(rawCtx);
-        const paymentRequest = entry.paymentRequest;
+        const paymentValue = getMintQuotePaymentValue(entry);
         const quoteId = entry.quoteId;
-        if (!paymentRequest || !quoteId) {
+        if (!paymentValue || !quoteId) {
           paymentLog.warn('payment.mint_quote.copy.no_payment_request', {
-            hasPaymentRequest: !!paymentRequest,
+            hasPaymentRequest: !!paymentValue,
             hasQuoteId: !!quoteId,
           });
           return;
         }
         try {
-          await Clipboard.setStringAsync(paymentRequest);
+          await Clipboard.setStringAsync(paymentValue);
           useTransactionDistributionStore.getState().setDistribution(quoteId, 'copy');
           paymentLog.info('payment.mint_quote.copy.success', {
             quoteId,
             entryId: entry.id,
           });
-          copyPopup('paymentRequest');
+          copyPopup(getOnchainMintAddress(entry) ? 'address' : 'lightningInvoice');
         } catch (e) {
           paymentLog.error('payment.mint_quote.copy.failed', {
             error: e instanceof Error ? e.message : String(e),
@@ -1219,20 +1343,20 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
       share: async (rawCtx) => {
         const { entry } = mintQuoteCtx(rawCtx);
-        const paymentRequest = entry.paymentRequest;
+        const paymentValue = getMintQuotePaymentValue(entry);
         const quoteId = entry.quoteId;
-        if (!paymentRequest || !quoteId) {
+        if (!paymentValue || !quoteId) {
           paymentLog.warn('payment.mint_quote.share.no_payment_request', {
-            hasPaymentRequest: !!paymentRequest,
+            hasPaymentRequest: !!paymentValue,
             hasQuoteId: !!quoteId,
           });
           return;
         }
         try {
           // Read the share result so we can detect AirDrop on iOS. The
-          // built-in coco-payment-ux platform.share at CocoPaymentUX.tsx
-          // discards the result, so we can't piggyback on it.
-          const result = await Share.share({ message: paymentRequest });
+          // provider share adapter intentionally returns void, so this
+          // action override owns the result inspection.
+          const result = await Share.share({ message: paymentValue });
           if (result.action !== Share.sharedAction) {
             paymentLog.debug('payment.mint_quote.share.dismissed', { quoteId });
             return;

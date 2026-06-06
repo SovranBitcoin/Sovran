@@ -4,7 +4,7 @@ import {
   type MintAvailability,
   type MintCatalogEntry,
   type MintListItem,
-} from 'coco-payment-ux';
+} from '@sovranbitcoin/colada';
 
 import { getMintDisplayName } from '@/shared/lib/url';
 
@@ -13,7 +13,7 @@ import { getMintDisplayName } from '@/shared/lib/url';
  * and a pre-fetched catalog (audit / KYM / operator profile data, keyed by
  * mint URL).
  *
- * The Mint Manager owns this path; `coco-payment-ux` has its own equivalent
+ * The Mint Manager owns this path; `colada` has its own equivalent
  * for Send / Receive Select Mint that pulls the same catalog via the
  * `fetchMintCatalog` callback. Both surfaces consume identical fields, so the
  * audit / score pills render the same regardless of entry point.

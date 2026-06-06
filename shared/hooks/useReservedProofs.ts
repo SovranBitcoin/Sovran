@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
 import type { CoreProof } from '@cashu/coco-core';
 import { getReservedProofs } from '@/shared/lib/cashu/managerInternals';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { walletLog } from '@/shared/lib/logger';
@@ -26,7 +27,7 @@ export function useReservedProofs(): ReservedProofsResult {
       try {
         const proofs = await getReservedProofs(managerRef.current);
         if (cancelled) return;
-        const total = proofs.reduce((sum, proof) => sum + proof.amount, 0);
+        const total = proofs.reduce((sum, proof) => sum + amountToNumber(proof.amount), 0);
         walletLog.info('reservedProofs.loaded', { count: proofs.length, total });
         setReservedTotal(total);
         setReservedProofs(proofs);

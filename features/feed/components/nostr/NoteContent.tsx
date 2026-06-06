@@ -18,11 +18,11 @@ import { openExternalUrl } from '@/shared/lib/url';
 import { staticPopup } from '@/shared/lib/popup';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
-import { usePaymentFlowMachine } from 'coco-payment-ux/react';
+import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ContentSegment, FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
-import { parseContent, prettifyUrl, tryNpubEncode } from './feedParse';
+import { collectQuoteTagIds, parseContent, prettifyUrl, tryNpubEncode } from './feedParse';
 import { formatRelative } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
 
@@ -569,6 +569,15 @@ export const NoteContent = React.memo(function NoteContent({
 
   const hasInline = inlineSegments.length > 0;
   const hasBlocks = blockSegments.length > 0;
+  const taggedQuoteIds = useMemo(() => {
+    if (!overlayEvent) return [];
+    const inlineQuoteIds = new Set(
+      blockSegments
+        .filter((seg) => seg.kind === 'nevent' || seg.kind === 'note')
+        .map((seg) => (seg.kind === 'nevent' || seg.kind === 'note' ? seg.eventId : ''))
+    );
+    return collectQuoteTagIds(overlayEvent).filter((id) => !inlineQuoteIds.has(id));
+  }, [blockSegments, overlayEvent]);
 
   const activeSegments = expanded ? inlineSegments : displaySegments;
 
@@ -738,6 +747,16 @@ export const NoteContent = React.memo(function NoteContent({
             }
           });
         })()}
+      {taggedQuoteIds.map((id) => (
+        <QuotedPostCard
+          key={`q${id}`}
+          event={quotedEvents.get(id)}
+          profiles={profiles}
+          getMetrics={getMetrics}
+          onPressIn={onQuotedPressIn}
+          onPressOut={onQuotedPressOut}
+        />
+      ))}
     </VStack>
   );
 });

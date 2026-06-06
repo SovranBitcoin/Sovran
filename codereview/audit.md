@@ -40,7 +40,7 @@ CWD is `sovran-app/`. All paths below are relative to it unless noted.
   Uniwind (Tailwind v4 for RN), Zustand v5 + AsyncStorage persist, legacy
   Redux + redux-persist (migrating), `@cashu/coco-*`, `@nostr-dev-kit/ndk-mobile`,
   Reanimated v4, Gesture Handler v2, neverthrow, zod v4, Jest.
-- `coco-payment-ux/` (file: dep at `sovran-app/coco-payment-ux/`) —
+- `../colada/` (file: dependency imported as `colada`) —
   first-party, UI-agnostic payment-flow engine. Inspired by state machines,
   *not* a finished one. Hunt: ad-hoc payment flows in sovran-app that
   bypass it; sovran-specific leaks across its public API (sovran components,
@@ -121,7 +121,7 @@ bun run codereview/analyze-structure/index.mjs --llm | sed -n '/^Overall:/,/^# R
 # Full LLM summary (~5K tokens). Add a path to scope.
 bun run codereview/analyze-structure/index.mjs --llm                       # whole sovran-app
 bun run codereview/analyze-structure/index.mjs features/payments --llm     # subtree
-bun run codereview/analyze-structure/index.mjs coco-payment-ux --llm       # payment-flow package
+bun run codereview/analyze-structure/index.mjs ../colada --llm    # payment-flow package
 
 # Top of summary only (~2K tokens) — score + headline counts + top hotspots.
 bun run codereview/analyze-structure/index.mjs --llm | head -180
@@ -139,11 +139,11 @@ bun run codereview/lookalikes/index.mjs --by-value '#FF0000'
 # Focus mode — full reports filtered to pairs involving one file.
 bun run codereview/lookalikes/index.mjs --focus shared/theme.ts
 
-# Find files inside coco-payment-ux that import from sovran-app/* (leak hunt)
-grep -RnE "from ['\"](@/|features/|shared/|navigation/|app/)" coco-payment-ux/src 2>/dev/null
+# Find files inside colada that import from sovran-app/* (leak hunt)
+grep -RnE "from ['\"](@/|features/|shared/|navigation/|app/)" ../colada/src 2>/dev/null
 
-# Find sovran-app payment paths that bypass coco-payment-ux (bypass hunt)
-grep -RlE "useCocoPayment|CocoPaymentUX|paymentMachine|coco-payment-ux" features shared 2>/dev/null
+# Find sovran-app payment paths that bypass colada (bypass hunt)
+grep -RlE "useColada|Colada|paymentMachine|colada" features shared 2>/dev/null
 grep -RlE "useMeltQuote|useMintQuote|useSwap|payInvoice|sendCashu|claimCashu" features shared 2>/dev/null
 
 # Skill index (frontmatter description for every installed skill)
@@ -225,10 +225,10 @@ which structural signal motivated it (e.g. "Module Design 49/100, top
 complexity hotspot lives here, lookalikes shows 6 color collisions").
 
 Two named patterns are **always in scope** regardless of slice choice:
-- "coco payment flow bypasses `coco-payment-ux/`" — grep `features shared`
+- "coco payment flow bypasses `../colada/`" — grep `features shared`
   for ad-hoc Cashu/Lightning flows that don't route through the package.
-- "`coco-payment-ux/` leaks `sovran-app/`-specific assumptions" — grep
-  `coco-payment-ux/src` for imports of sovran components, nav primitives,
+- "`../colada/` leaks `sovran-app/`-specific assumptions" — grep
+  `../colada/src` for imports of sovran components, nav primitives,
   theme tokens, or data shapes.
 
 ### Pass 3 — Investigate
@@ -300,7 +300,7 @@ Compact reference; consult the cited skills and protocol files for full rules.
    `z.email`/`z.url`/`z.uuid`. Every string `.max()`; every array `.max()`.
    Hot paths use `safeParse`. ZodError → neverthrow Result via
    `{ type: "zod", issues: error.issues }`. Schemas live in
-   `../sovran-schemas`; duplicates in sovran-app or coco-payment-ux are
+   `../sovran-schemas`; duplicates in sovran-app or colada are
    findings unless app-only is justified. `@hono/zod-validator` server-side.
    Skills: `zod-4`, `zod`.
 7. **Performance, races, concurrency** — TOCTOU on proof state, RMW in
@@ -508,8 +508,8 @@ classify):
 9. Matt Pocock process skills loaded are listed in `audit.process_skills_consulted`.
 10. If `log.txt` absent, dependent findings are `UNVERIFIED`; if present,
     grounded lines are quoted in the markdown report.
-11. The two named cross-cutting patterns ("bypasses `coco-payment-ux/`",
+11. The two named cross-cutting patterns ("bypasses `../colada/`",
     "leaks sovran-app assumptions") were searched even when ENTRY is
     elsewhere.
-12. Schemas in sovran-app or coco-payment-ux duplicating
+12. Schemas in sovran-app or colada duplicating
     `../sovran-schemas` are flagged.

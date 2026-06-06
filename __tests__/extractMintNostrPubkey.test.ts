@@ -32,6 +32,10 @@ describe('extractMintNostrPubkey', () => {
     expect(extractMintNostrPubkey(withNostrContact(NPUB))).toBe(HEX_LOWER);
   });
 
+  it('accepts case-insensitive nostr contact methods', () => {
+    expect(extractMintNostrPubkey({ contact: [{ method: 'NOSTR', info: NPUB }] })).toBe(HEX_LOWER);
+  });
+
   it('trims surrounding whitespace before parsing', () => {
     expect(extractMintNostrPubkey(withNostrContact(`  ${HEX_LOWER}  `))).toBe(HEX_LOWER);
     expect(extractMintNostrPubkey(withNostrContact(`\n${NPUB}\n`))).toBe(HEX_LOWER);

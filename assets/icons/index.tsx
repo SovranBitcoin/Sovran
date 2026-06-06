@@ -1,67 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import Svg, { Circle, Defs, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { Monicon } from '@monicon/native';
 
-import { Animated, StyleProp, ViewStyle } from 'react-native';
-import { Easing } from 'react-native-reanimated';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 
 type IconProps = {
   name: string;
   color?: string;
   size?: number;
-  spin?: {
-    duration: Animated.TimingAnimationConfig['duration'];
-    outputRange: number[] | string[];
-    delay: Animated.TimingAnimationConfig['delay'];
-    easing?: 'easeOut' | 'linear';
-  };
   style?: any;
   className?: string;
 };
 
-function Icon({ name, color, size = 24, spin, style = {}, className }: IconProps) {
+function Icon({ name, color, size = 24, style = {}, className }: IconProps) {
   const foreground = useThemeColor('foreground');
-  const spinValue = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (spin?.outputRange) {
-      const spinAnimation = Animated.sequence([
-        Animated.timing(spinValue, {
-          toValue: 1,
-          duration: spin?.duration, // Rotate 120 degrees in 1 second
-          easing: spin?.easing === 'linear' ? Easing.linear : Easing.elastic(1),
-          useNativeDriver: true,
-        }),
-        Animated.delay(spin?.delay || 0), // 4 second delay
-      ]);
-
-      Animated.loop(spinAnimation).start();
-    }
-  }, [spin, spinValue]);
-
-  const spinAnimation = spin?.outputRange
-    ? spinValue.interpolate({
-        inputRange: [0, 1],
-        outputRange: spin?.outputRange, // Rotate 120 degrees
-      })
-    : '0deg';
-
-  if (spin?.outputRange) {
-    return (
-      <Animated.View
-        style={{
-          transform: [{ rotate: spinAnimation }],
-          ...style,
-        }}
-        className={className}>
-        <Monicon name={name} size={size} color={color || foreground} />
-      </Animated.View>
-    );
-  }
 
   return (
     <View style={style} className={className}>
@@ -81,6 +37,15 @@ export const icons: string[] = [
   'circle-flags:us',
   'circle-flags:eu',
   'circle-flags:gb',
+  // Post action menus (repost / ignore) — referenced from actionMenuPopup
+  // string literals the scanner can't follow.
+  'mdi:format-quote-close',
+  'mdi:eye-off-outline',
+  'mdi:account-cancel-outline',
+  'mdi:account-multiple',
+  // Empty-state showcase variants — passed dynamically through EmptyState.
+  'mdi:receipt-text-outline',
+  'mdi:bluetooth-off',
   'hugeicons:blockchain-01',
   'fluent:apps-16-filled',
   'ri:openai-fill', // Using robot as OpenAI icon
@@ -200,6 +165,9 @@ export const icons: string[] = [
   'ph:coins',
   'mingcute:home-4-fill',
   'mingcute:home-4-line',
+  'mdi:bell',
+  'mdi:bell-off-outline',
+  'mdi:bell-outline',
 
   // Explore page icons
   'mdi:chevron-left',
@@ -209,6 +177,7 @@ export const icons: string[] = [
   'mdi:calendar',
   'mdi:account-group',
   'mdi:arrow-right',
+  'mdi:trending-up',
   'mdi:gamepad-variant',
   'mdi:food',
   'mdi:airplane',
@@ -297,7 +266,6 @@ export const icons: string[] = [
   'mdi:arrow-collapse-down',
   'mdi:arrow-collapse-up',
   'mdi:arrow-up',
-  'mdi:bank',
   'mdi:chart-pie',
   'mdi:check-decagram',
   'mdi:database-search',
@@ -305,6 +273,7 @@ export const icons: string[] = [
   'mdi:lightning-bolt',
   'mdi:magnify',
   'mdi:map-marker-radius',
+  'mdi:message-outline',
   'mdi:message-reply',
   'mdi:message-text',
   'mdi:open-in-new',
@@ -313,6 +282,7 @@ export const icons: string[] = [
   'mdi:refresh',
   'mdi:send',
   'mdi:broadcast',
+  'mingcute:bank-fill',
   'mdi:shield',
   'mdi:shield-check',
   'mdi:shield-refresh',

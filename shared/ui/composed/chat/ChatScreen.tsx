@@ -13,7 +13,7 @@ import {
   useReanimatedKeyboardAnimation,
 } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
-import { LegendList } from '@legendapp/list';
+import { LegendList } from '@legendapp/list/react-native';
 
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -89,6 +89,13 @@ interface ChatScreenProps {
   counterpartyAvatar?: React.ReactNode | null;
   historyExtras?: (last: ChatBubbleMessage | undefined) => Record<string, unknown>;
   kbStateExtras?: () => Record<string, unknown>;
+  /**
+   * Fired when the user scrolls to the START (top) of the history — used to
+   * load older messages (server-paginated threads). `maintainVisibleContentPosition`
+   * already keeps the viewport anchored when older bubbles prepend.
+   */
+  onStartReached?: () => void;
+  onStartReachedThreshold?: number;
 }
 
 /** Hint for LegendList's virtualization math. Real bubble heights are
@@ -97,7 +104,7 @@ interface ChatScreenProps {
 const ESTIMATED_BUBBLE_HEIGHT = 80;
 
 /**
- * Shared chat surface backed by `@legendapp/list`. Used by BitChat, Nostr
+ * Shared chat surface backed by `@legendapp/list/react-native`. Used by BitChat, Nostr
  * DM, WhiteNoise, geohash — every DM-like chat surface. Architecture mirrors
  * `AiChatScreen` (which uses LegendList directly): forward-ordered data,
  * `alignItemsAtEnd` for the chat-style bottom dock, `maintainScrollAtEnd`
@@ -142,6 +149,8 @@ export function ChatScreen({
   counterpartyAvatar,
   historyExtras,
   kbStateExtras,
+  onStartReached,
+  onStartReachedThreshold,
 }: ChatScreenProps) {
   const headerHeight = useHeaderHeight();
   const safeAreaInsets = useSafeAreaInsets();
@@ -378,6 +387,8 @@ export function ChatScreen({
                 maintainScrollAtEnd
                 maintainScrollAtEndThreshold={0.1}
                 maintainVisibleContentPosition
+                onStartReached={onStartReached}
+                onStartReachedThreshold={onStartReachedThreshold}
                 recycleItems
                 contentContainerStyle={listContentContainerStyle}
               />

@@ -4,6 +4,7 @@
 
 import {
   getProofSuggestionDisplay,
+  shouldShowProofSelectorMintChange,
   submitProofSuggestion,
 } from '@/shared/lib/popup/popups/proofSelectorSheet';
 
@@ -11,6 +12,11 @@ jest.mock('react-native', () => ({ View: 'View' }));
 jest.mock('heroui-native', () => ({
   BottomSheet: { Title: 'BottomSheet.Title' },
   Menu: Object.assign('Menu', { Item: 'Menu.Item', ItemTitle: 'Menu.ItemTitle' }),
+}));
+jest.mock('@sovranbitcoin/colada', () => ({
+  decodeUrlOrAddress: (value: string) =>
+    value.includes('@') || value.toLowerCase().startsWith('lnurlp://') ? 'https://lnurl' : null,
+  isLightningInvoiceBolt11: (value: string) => value.toLowerCase().startsWith('lnbc'),
 }));
 jest.mock('assets/icons', () => 'Icon', { virtual: true });
 jest.mock('@/shared/ui/composed/AmountFormatter', () => ({ AmountFormatter: 'AmountFormatter' }));
@@ -50,5 +56,38 @@ describe('proof selector suggestion display', () => {
     submitProofSuggestion(machine as never, 20);
 
     expect(machine.chooseProofs).toHaveBeenCalledWith(20);
+  });
+
+  it('hides mint change for lightning melt amount fallback', () => {
+    expect(
+      shouldShowProofSelectorMintChange({
+        meltTarget: 'lnbc1...',
+        paymentRequest: undefined,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps mint change for ecash/payment-request fallbacks', () => {
+    expect(
+      shouldShowProofSelectorMintChange({
+        meltTarget: undefined,
+        paymentRequest: undefined,
+      })
+    ).toBe(true);
+    expect(
+      shouldShowProofSelectorMintChange({
+        meltTarget: undefined,
+        paymentRequest: 'creq1...',
+      })
+    ).toBe(true);
+  });
+
+  it('keeps mint change for non-lightning melt fallbacks', () => {
+    expect(
+      shouldShowProofSelectorMintChange({
+        meltTarget: 'bitcoin:bc1qexample',
+        paymentRequest: undefined,
+      })
+    ).toBe(true);
   });
 });

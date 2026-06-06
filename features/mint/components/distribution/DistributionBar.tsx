@@ -3,11 +3,11 @@ import { StyleSheet, View, LayoutChangeEvent } from 'react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { getContrastColors, FALLBACK_COLORS, useDominantColor } from '@/shared/lib/colorExtraction';
 import { Log } from '@/shared/lib/logger';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 
 const MIN_PERCENTAGE_FOR_AVATAR = 12;
 const AVATAR_SIZE = 20;
@@ -119,9 +119,8 @@ const AnimatedSegment: React.FC<SegmentProps> = ({
         />
         {showAvatar && (
           <View className="items-center justify-center">
-            <Avatar
-              state={mintIcon ? 'image' : 'fallback'}
-              picture={mintIcon}
+            <MintIcon
+              iconUrl={mintIcon}
               size={AVATAR_SIZE}
               name={mintName}
               alt={`${mintName} icon`}

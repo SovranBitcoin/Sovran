@@ -1,26 +1,19 @@
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-import type {
-  MintHistoryEntry,
-  MeltHistoryEntry,
-  SendHistoryEntry,
-  ReceiveHistoryEntry,
-} from '@cashu/coco-core';
+import type { HistoryEntry } from '@cashu/coco-core';
 
-import {
-  buildTimeline,
-  getCardLabel,
-  getStatusColorType,
-  getStatusHeader,
-} from '@/features/transactions/components/detail/buildTimeline';
+import { buildTimeline, getCardLabel, getStatusColorType, getStatusHeader } from '@sovranbitcoin/colada';
 
 const baseFields = {
   id: 'h1',
+  source: 'legacy' as const,
+  legacyHistoryId: 'h1',
   createdAt: 1_700_000_000_000,
+  updatedAt: 1_700_000_000_000,
   mintUrl: 'https://mint.example',
   unit: 'sat',
 };
 
-function mintEntry(overrides: Partial<MintHistoryEntry> = {}): MintHistoryEntry {
+function mintEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     type: 'mint',
@@ -29,10 +22,29 @@ function mintEntry(overrides: Partial<MintHistoryEntry> = {}): MintHistoryEntry 
     state: MintQuoteState.UNPAID,
     amount: 100,
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
-function meltEntry(overrides: Partial<MeltHistoryEntry> = {}): MeltHistoryEntry {
+function operationMintEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
+  return {
+    ...baseFields,
+    id: 'mint:op1',
+    source: 'operation',
+    type: 'mint',
+    operationId: 'op1',
+    paymentRequest: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
+    quoteId: 'q1',
+    state: 'pending',
+    amount: 100,
+    metadata: {
+      method: 'onchain',
+      onchainAddress: 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080',
+    },
+    ...overrides,
+  } as unknown as HistoryEntry;
+}
+
+function meltEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     type: 'melt',
@@ -40,10 +52,10 @@ function meltEntry(overrides: Partial<MeltHistoryEntry> = {}): MeltHistoryEntry 
     state: MeltQuoteState.UNPAID,
     amount: 100,
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
-function sendEntry(overrides: Partial<SendHistoryEntry> = {}): SendHistoryEntry {
+function sendEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     type: 'send',
@@ -51,17 +63,17 @@ function sendEntry(overrides: Partial<SendHistoryEntry> = {}): SendHistoryEntry 
     state: 'prepared',
     amount: 100,
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
-function receiveEntry(overrides: Partial<ReceiveHistoryEntry> = {}): ReceiveHistoryEntry {
+function receiveEntry(overrides: Record<string, unknown> = {}): HistoryEntry {
   return {
     ...baseFields,
     type: 'receive',
     state: 'finalized',
     amount: 100,
     ...overrides,
-  };
+  } as unknown as HistoryEntry;
 }
 
 const NOW = 2_000_000_000_000;
@@ -96,6 +108,84 @@ describe('buildTimeline (audit 61.json F-006)', () => {
       });
       expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
       expect(t[2].info).toContain('250');
+    });
+
+    it('operation-backed pending onchain mint waits for address payment', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'pending' }),
+        currentTime: NOW,
+      });
+      expect(t).toHaveLength(3);
+      expect(t[0]).toMatchObject({
+        state: MintQuoteState.UNPAID,
+        stepType: 'next-pending',
+        info: 'Pay the address to receive funds',
+      });
+      expect(t[1].stepType).toBe('future-small');
+      expect(t[2].stepType).toBe('future-small');
+    });
+
+    it('operation-backed pending onchain mint shows compact confirmation progress', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'pending' }),
+        currentTime: NOW,
+        onchainConfirmationProgress: {
+          hasPayment: true,
+          hasUnconfirmedPayment: false,
+          receivedSats: 100,
+          currentConfirmations: 1,
+          requiredConfirmations: 6,
+          isSatisfied: false,
+        },
+      });
+
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
+      expect(t[1]).toMatchObject({
+        state: MintQuoteState.PAID,
+        displayLabel: 'Payment received',
+        info: '1/6 confirmations',
+      });
+    });
+
+    it('operation-backed executing mint maps to payment received', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'executing' }),
+        currentTime: NOW,
+        onchainConfirmationProgress: {
+          hasPayment: true,
+          hasUnconfirmedPayment: false,
+          receivedSats: 100,
+          currentConfirmations: 6,
+          requiredConfirmations: 6,
+          isSatisfied: true,
+        },
+      });
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'current', 'future-small']);
+      expect(t[1].state).toBe(MintQuoteState.PAID);
+      expect(t[1].info).toBe('6/6 confirmations');
+    });
+
+    it('operation-backed finalized mint maps to issued success', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'finalized', amount: 321 }),
+        currentTime: NOW,
+      });
+      expect(t.map((s) => s.stepType)).toEqual(['complete', 'complete', 'success']);
+      expect(t[2].info).toContain('321');
+    });
+
+    it('operation-backed failed mint shows a terminal failure', () => {
+      const t = buildTimeline({
+        historyEntry: operationMintEntry({ state: 'failed', error: 'Quote expired' }),
+        currentTime: NOW,
+      });
+      expect(t).toHaveLength(2);
+      expect(t[1]).toMatchObject({
+        state: 'failed',
+        displayLabel: 'Failed',
+        stepType: 'expired',
+        info: 'Quote expired',
+      });
     });
   });
 
@@ -264,6 +354,30 @@ describe('getCardLabel (audit 61.json F-009)', () => {
         { state: 's', displayLabel: '', stepType: 'success' },
       ])
     ).toBe('Receive • Complete');
+  });
+
+  it('operation-backed mint labels use normalized operation state', () => {
+    expect(
+      getCardLabel(operationMintEntry({ state: 'finalized' }), [
+        { state: 's', displayLabel: '', stepType: 'success' },
+      ])
+    ).toBe('Receive • Complete');
+    expect(
+      getCardLabel(operationMintEntry({ state: 'executing' }), [
+        { state: 's', displayLabel: '', stepType: 'current' },
+      ])
+    ).toBe('Receive • In Progress');
+    expect(
+      getCardLabel(operationMintEntry({ state: 'pending' }), [
+        { state: 's', displayLabel: '', stepType: 'next-pending' },
+      ])
+    ).toBe('Receive • Awaiting Payment');
+    expect(
+      getCardLabel(operationMintEntry({ state: 'pending' }), [
+        { state: MintQuoteState.UNPAID, displayLabel: '', stepType: 'complete' },
+        { state: MintQuoteState.PAID, displayLabel: '', stepType: 'next-pending' },
+      ])
+    ).toBe('Receive • In Progress');
   });
 
   it('payment-request-mode send labels as "Payment • …"', () => {

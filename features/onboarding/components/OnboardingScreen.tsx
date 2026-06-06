@@ -57,7 +57,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     {
       bgColor: orange300,
       duration: 3000,
-      title: 'Bitcoin That Feels Like Cash',
+      title: 'Bitcoin that feels like cash',
       description:
         'Send and receive instantly with near-zero fees. Ecash bearer tokens live on your device \u2014 like digital cash.',
       icon: 'mdi:bitcoin',
@@ -81,7 +81,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     {
       bgColor: shade300,
       duration: 3000,
-      title: 'Stay Private, Stay Sovereign',
+      title: 'Stay private, stay sovereign',
       description:
         'You\u2019re all set. Start sending and receiving bitcoin instantly. Welcome to freedom.',
       icon: 'mdi:shield-check',

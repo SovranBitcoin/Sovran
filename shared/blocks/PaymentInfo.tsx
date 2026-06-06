@@ -25,8 +25,8 @@ const ANIMATE_THRESHOLD = 500;
  * camelCase → kebab-case for testID generation. Keeps the AX testIDs
  * uniform with the kebab-case `<screen>-<action>` convention used
  * across the app, so log-doctor's selector parser (which only accepts
- * [a-z0-9-]) can target them. `paymentRequest` → `payment-request`,
- * `token` stays `token`.
+ * [a-z0-9-]) can target them. `paymentRequest` -> `payment-request`,
+ * `lightningInvoice` -> `lightning-invoice`, `token` stays `token`.
  */
 function kebabCase(s: string): string {
   return s

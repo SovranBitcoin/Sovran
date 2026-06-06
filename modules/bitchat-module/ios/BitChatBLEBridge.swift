@@ -1,6 +1,7 @@
 import Foundation
 import ExpoModulesCore
 import CoreBluetooth
+import CryptoKit
 
 /// Bridges BitChat's BLEService to the Expo module event system.
 /// Manages the lifecycle of the BLE mesh transport and forwards
@@ -12,6 +13,8 @@ import CoreBluetooth
 enum BitChatBridgeError: Error, LocalizedError {
     case notStarted
     case invalidPeerID
+    case invalidIdentityMaterial(String)
+    case identityKeySaveFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -19,7 +22,39 @@ enum BitChatBridgeError: Error, LocalizedError {
             return "BLE mesh is not started. Call startBLE() first."
         case .invalidPeerID:
             return "Invalid peer ID (expected 16-char hex)."
+        case .invalidIdentityMaterial(let reason):
+            return "Invalid BitChat identity material: \(reason)."
+        case .identityKeySaveFailed(let keyName):
+            return "Failed to persist BitChat \(keyName) identity key."
         }
+    }
+}
+
+private struct BitchatBLEIdentityMaterial {
+    let noisePrivateKey: Data
+    let signingPrivateKey: Data
+    let peerID: String
+    let identityID: String
+
+    init(noisePrivateKeyHex: String, signingPrivateKeyHex: String) throws {
+        guard let noiseData = Data(hexString: noisePrivateKeyHex), noiseData.count == 32 else {
+            throw BitChatBridgeError.invalidIdentityMaterial("noise key must be 32-byte hex")
+        }
+        guard let signingData = Data(hexString: signingPrivateKeyHex), signingData.count == 32 else {
+            throw BitChatBridgeError.invalidIdentityMaterial("signing key must be 32-byte hex")
+        }
+        guard let noiseKey = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: noiseData) else {
+            throw BitChatBridgeError.invalidIdentityMaterial("noise key is not a valid Curve25519 key")
+        }
+        guard let signingKey = try? Curve25519.Signing.PrivateKey(rawRepresentation: signingData) else {
+            throw BitChatBridgeError.invalidIdentityMaterial("signing key is not a valid Ed25519 key")
+        }
+
+        self.noisePrivateKey = noiseData
+        self.signingPrivateKey = signingData
+        let peerID = PeerID(publicKey: noiseKey.publicKey.rawRepresentation).id
+        self.peerID = peerID
+        self.identityID = "\(peerID):\(signingKey.publicKey.rawRepresentation.hexEncodedString())"
     }
 }
 
@@ -42,6 +77,8 @@ final class BitChatBLEBridge: NSObject {
     private var module: BitChatModule?
     private var isRunning = false
     private var activeProfileScope: String?
+    private var activeIdentityID: String?
+    private var activeNickname: String?
     private var lastCBState: CBManagerState = .unknown
 
     /// In-memory mirror of the persisted DM-peer summaries. Mutated only on the
@@ -138,20 +175,65 @@ final class BitChatBLEBridge: NSObject {
         self.module = module
     }
 
-    func start(nickname: String, profileScope: String) {
+    private func installIdentityKey(
+        _ keyData: Data,
+        forKey key: String,
+        in keychain: ProfileScopedBitchatKeychain
+    ) throws {
+        if case .success(let existing) = keychain.getIdentityKeyWithResult(forKey: key), existing == keyData {
+            return
+        }
+
+        switch keychain.saveIdentityKeyWithResult(keyData, forKey: key) {
+        case .success:
+            return
+        default:
+            throw BitChatBridgeError.identityKeySaveFailed(key)
+        }
+    }
+
+    private func installDeterministicIdentity(
+        _ identityMaterial: BitchatBLEIdentityMaterial,
+        in keychain: ProfileScopedBitchatKeychain
+    ) throws {
+        try installIdentityKey(identityMaterial.noisePrivateKey, forKey: "noiseStaticKey", in: keychain)
+        try installIdentityKey(
+            identityMaterial.signingPrivateKey,
+            forKey: "ed25519SigningKey",
+            in: keychain
+        )
+    }
+
+    func start(
+        nickname: String,
+        profileScope: String,
+        noisePrivateKeyHex: String,
+        signingPrivateKeyHex: String
+    ) throws {
+        let identityMaterial = try BitchatBLEIdentityMaterial(
+            noisePrivateKeyHex: noisePrivateKeyHex,
+            signingPrivateKeyHex: signingPrivateKeyHex
+        )
         let scope = BitchatProfileScope.storageSuffix(for: profileScope)
-        if isRunning, activeProfileScope == scope {
-            bleService?.setNickname(nickname)
+        if isRunning, activeProfileScope == scope, activeIdentityID == identityMaterial.identityID {
+            if activeNickname != nickname {
+                bleService?.setNickname(nickname)
+                activeNickname = nickname
+            }
             return
         }
         if isRunning {
             stop()
         }
-        isRunning = true
-        activeProfileScope = scope
-        loadDmSummaries(for: scope)
 
         let keychain = ProfileScopedBitchatKeychain(profileScope: profileScope)
+        try installDeterministicIdentity(identityMaterial, in: keychain)
+
+        isRunning = true
+        activeProfileScope = scope
+        activeIdentityID = identityMaterial.identityID
+        activeNickname = nickname
+        loadDmSummaries(for: scope)
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
@@ -171,6 +253,8 @@ final class BitChatBLEBridge: NSObject {
         bleService = nil
         isRunning = false
         activeProfileScope = nil
+        activeIdentityID = nil
+        activeNickname = nil
         dmSummaries = [:]
     }
 

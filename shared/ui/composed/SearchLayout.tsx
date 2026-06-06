@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useMemo } from 'react';
+import { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
@@ -17,9 +17,13 @@ type SearchContextValue = {
   isSearching: boolean;
   searchQuery: string;
   clearKey: number;
+  /** Text the search input remounts with — pairs with `clearKey` to seed it. */
+  seedText: string;
   onSearchChange: (query: string) => void;
   onOpenSearch: () => void;
   onCloseSearch: () => void;
+  /** Programmatically run a query (e.g. tapping a recent-search chip). */
+  setQuery: (query: string) => void;
 };
 
 const SearchContext = createContext<SearchContextValue | null>(null);
@@ -33,7 +37,7 @@ export const useSearchContext = () => {
 // --- Header components (read state from context, identity-stable) ---
 
 function SearchBarTitle({ placeholder }: { placeholder: string }) {
-  const { clearKey, onSearchChange } = useSearchContext();
+  const { clearKey, seedText, onSearchChange } = useSearchContext();
   const { width } = useWindowDimensions();
   const searchBarWidth = getHeaderTitleWidthFromWidth(width);
 
@@ -41,6 +45,7 @@ function SearchBarTitle({ placeholder }: { placeholder: string }) {
     <GlassSearchBar
       width={searchBarWidth}
       clearKey={clearKey}
+      seedText={seedText}
       onChangeText={onSearchChange}
       placeholder={placeholder}
       keyboardType="web-search"
@@ -70,9 +75,26 @@ function SearchHeaderRight() {
 type SearchLayoutProps = {
   title: string;
   placeholder: string;
+  /**
+   * Custom header title shown when NOT searching (the Wallet passes its
+   * `MintSelector`). When searching, the `GlassSearchBar` always takes over.
+   * Omitted → React Navigation renders the native `title` string.
+   */
+  renderIdleTitle?: () => ReactNode;
+  /**
+   * Transparent header + content, for a tab that paints its own background
+   * (the Wallet's wallpaper). Default `false` keeps the opaque `surface`
+   * behavior used by Feed/Contacts.
+   */
+  transparent?: boolean;
 };
 
-export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
+export function SearchLayout({
+  title,
+  placeholder,
+  renderIdleTitle,
+  transparent = false,
+}: SearchLayoutProps) {
   const [iconColor, surface] = useThemeColor(['foreground', 'surface'] as const);
   const navigation = useNavigation();
   const search = useHeaderSearch();
@@ -100,16 +122,34 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
         headerRight,
         options: {
           title,
-          headerStyle: { backgroundColor: surface },
           // Without this, the native bar inherits the locked dark
           // `userInterfaceStyle` and renders the title white — invisible on
           // the light theme's `surface` background.
           headerTitleStyle: { color: iconColor },
           headerTintColor: iconColor,
-          ...(search.isSearching ? { headerTitle: searchBarTitle } : {}),
+          ...(transparent
+            ? { headerTransparent: true, headerStyle: { backgroundColor: 'transparent' } }
+            : { headerStyle: { backgroundColor: surface } }),
+          // GlassSearchBar wins while searching; otherwise an optional custom
+          // idle title (Wallet's MintSelector), else the native `title`.
+          ...(search.isSearching
+            ? { headerTitle: searchBarTitle }
+            : renderIdleTitle
+              ? { headerTitle: renderIdleTitle }
+              : {}),
         },
       }),
-    [iconColor, headerLeft, headerRight, surface, title, search.isSearching, searchBarTitle]
+    [
+      iconColor,
+      headerLeft,
+      headerRight,
+      surface,
+      title,
+      search.isSearching,
+      searchBarTitle,
+      renderIdleTitle,
+      transparent,
+    ]
   );
 
   const contextValue: SearchContextValue = useMemo(
@@ -117,23 +157,30 @@ export function SearchLayout({ title, placeholder }: SearchLayoutProps) {
       isSearching: search.isSearching,
       searchQuery: search.searchQuery,
       clearKey: search.clearKey,
+      seedText: search.seedText,
       onSearchChange: search.onSearchChange,
       onOpenSearch: search.onOpenSearch,
       onCloseSearch: search.onCloseSearch,
+      setQuery: search.setQuery,
     }),
     [
       search.isSearching,
       search.searchQuery,
       search.clearKey,
+      search.seedText,
       search.onSearchChange,
       search.onOpenSearch,
       search.onCloseSearch,
+      search.setQuery,
     ]
   );
 
   return (
     <SearchContext.Provider value={contextValue}>
-      <Stack screenOptions={{ contentStyle: { backgroundColor: surface } }}>
+      <Stack
+        screenOptions={{
+          contentStyle: { backgroundColor: transparent ? 'transparent' : surface },
+        }}>
         <Stack.Screen name="index" options={screenOptions} />
       </Stack>
     </SearchContext.Provider>

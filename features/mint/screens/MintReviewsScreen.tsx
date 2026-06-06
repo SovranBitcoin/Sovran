@@ -2,8 +2,10 @@ import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { FlatList } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { z } from 'zod';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -11,8 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { reviewMint } from '@/shared/lib/apiClient';
-import type { MintRecommendation } from '@sovranbitcoin/schemas';
+import { reviewMint, type MintRecommendation } from '@/shared/lib/apiClient';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useIdentityName } from '@/shared/hooks/useIdentityName';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
@@ -72,18 +73,35 @@ const ReviewItem = React.memo(function ReviewItem({
   // Reviewer names: prefer Nostr metadata (cached in the shared SWR
   // store, populated by other surfaces), fall back to the deterministic
   // word pair so reviews never render anonymous-looking hex.
-  const { displayName } = useIdentityName(review.pubkey);
+  const { displayName: fallbackDisplayName } = useIdentityName(review.pubkey);
+  const displayName = review.displayName ?? review.name ?? fallbackDisplayName;
+  const reviewerPicture = review.picture ?? review.image;
 
   const formattedDate = review.created_at
     ? formatDate(review.created_at * 1000, 'short-date')
     : null;
+  const handleAvatarPress = useCallback(() => {
+    router.push(buildModalProfileHref({ pubkey: review.pubkey }));
+  }, [review.pubkey]);
 
   return (
     <View className="py-4">
       <HStack align="flex-start" gap={12}>
-        <View className="shrink-0">
-          <Avatar state="fallback" seed={review.pubkey} name={displayName} size={40} />
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${displayName} profile`}
+          activeOpacity={0.75}
+          className="shrink-0"
+          haptics
+          onPress={handleAvatarPress}>
+          <Avatar
+            state={reviewerPicture ? 'image' : 'fallback'}
+            picture={reviewerPicture}
+            seed={review.pubkey}
+            name={displayName}
+            size={40}
+          />
+        </Pressable>
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <View

@@ -5,11 +5,13 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { formatAmount } from '@/shared/lib/currency';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import type { HistoryEntry } from '@cashu/coco-core';
+import { isSettledReceiveHistoryEntry, isSettledSpendHistoryEntry } from '@sovranbitcoin/colada';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
 import { Log } from '@/shared/lib/logger';
@@ -103,10 +105,7 @@ const MODE_CONFIG: Record<
   spent: {
     title: 'Spent this month',
     filter: (entry) => {
-      if (entry.type !== 'send' && entry.type !== 'melt') return false;
-      if (entry.type === 'send' && entry.state !== 'finalized') return false;
-      if (entry.type === 'melt' && entry.state !== 'PAID') return false;
-      return true;
+      return isSettledSpendHistoryEntry(entry);
     },
     mockBase: 3_200,
     mockPattern: [0.3, 0.1, 0.8, 1.4, 0.5, 1.1, 2.0, 0.7, 1.5],
@@ -114,9 +113,7 @@ const MODE_CONFIG: Record<
   received: {
     title: 'Received this month',
     filter: (entry) => {
-      if (entry.type !== 'mint' && entry.type !== 'receive') return false;
-      if (entry.type === 'mint' && entry.state !== 'PAID') return false;
-      return true;
+      return isSettledReceiveHistoryEntry(entry);
     },
     mockBase: 5_400,
     mockPattern: [1.2, 0.4, 0.9, 0.2, 1.8, 0.6, 1.3, 0.8, 0.5],
@@ -202,7 +199,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
       for (const entry of matching) {
         const day = new Date(entry.createdAt).getDate();
-        dailyAmounts[day - 1] += entry.amount;
+        dailyAmounts[day - 1] += amountToNumber(entry.amount);
       }
     }
 

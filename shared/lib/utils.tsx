@@ -15,8 +15,10 @@ import { decode } from '@gandlaf21/bolt11-decode';
 import _ from 'lodash';
 import { twMerge } from 'tailwind-merge';
 
-import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import type { HistoryEntry } from '@cashu/coco-core';
 import { log } from './logger';
+
+type AnyMintHistoryEntry = Extract<HistoryEntry, { type: 'mint' }>;
 
 /** Outgoing = ecash send or Lightning melt */
 export function isOutgoingTransaction(entry: Pick<HistoryEntry, 'type'>): boolean {
@@ -41,7 +43,7 @@ export function isOutgoingTransaction(entry: Pick<HistoryEntry, 'type'>): boolea
  *   // Handle expired entry - remove from UI or show warning
  * }
  */
-export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean {
+export function mintHistoryEntryExpired(historyEntry: AnyMintHistoryEntry): boolean {
   try {
     if (!historyEntry.paymentRequest) {
       return false;
@@ -65,7 +67,9 @@ export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean
  * @param historyEntry - The mint history entry containing the payment request
  * @returns Formatted string like "expires in 14m 32s" or null if no expiry or already expired
  */
-export function getMintHistoryEntryTimeUntilExpiry(historyEntry: MintHistoryEntry): string | null {
+export function getMintHistoryEntryTimeUntilExpiry(
+  historyEntry: AnyMintHistoryEntry
+): string | null {
   try {
     if (!historyEntry.paymentRequest) {
       return null;

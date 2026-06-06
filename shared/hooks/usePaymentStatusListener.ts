@@ -14,6 +14,7 @@ import { useManagerContext } from '@cashu/coco-react';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { paymentLog } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
@@ -52,13 +53,16 @@ export function usePaymentStatusListener(): void {
 
     const offStateChanged = manager.on(
       'mint-op:quote-state-changed',
-      ({ mintUrl, quoteId, state, operation }) => {
+      ({ mintUrl, quoteId, state: remoteState, operation }) => {
+        if (operation.state === 'init') return;
+
         paymentLog.debug('hook.payment_status.mint_quote_state_changed', {
           quoteId,
-          state,
+          state: remoteState ?? null,
+          method: operation.method,
           mintUrl,
         });
-        if (state !== 'PAID') return;
+        if (remoteState !== 'PAID') return;
 
         // Suppress per-leg toasts while a swap is running — the unified
         // SwapStatusToast owns the user-facing surface for the duration.
@@ -71,10 +75,7 @@ export function usePaymentStatusListener(): void {
           return;
         }
 
-        // The event payload's MintOperation already carries amount/unit
-        // (MintIntentData on every state). The previous getPaginatedHistory
-        // scan blocked coco's sequential EventBus on every PAID transition.
-        const amount = operation.amount;
+        const amount = amountToNumber(operation.amount);
         const unit = operation.unit;
 
         const existingActive = usePaymentStatusStore.getState().active;
@@ -124,9 +125,9 @@ export function usePaymentStatusListener(): void {
         quoteId,
         lastObservedRemoteState: state,
         lastObservedRemoteStateAt,
-        amount,
         unit,
       } = operation;
+      const amount = amountToNumber(operation.amount);
       paymentLog.debug('hook.payment_status.mint_quote_added', { quoteId, state, mintUrl });
       if (state !== 'PAID') return;
 
@@ -206,7 +207,7 @@ export function usePaymentStatusListener(): void {
         !active ||
         active.variant !== 'receive-ecash' ||
         active.mintUrl !== mintUrl ||
-        active.amount !== entry.amount ||
+        active.amount !== amountToNumber(entry.amount) ||
         active.receiveEntryId ||
         !entry.id
       ) {
@@ -214,7 +215,7 @@ export function usePaymentStatusListener(): void {
       }
       paymentLog.info('hook.payment_status.receive_entry_linked', {
         mintUrl,
-        amount: entry.amount,
+        amount: amountToNumber(entry.amount),
         entryId: entry.id,
       });
       store.setConfirmed(active.id, { receiveEntryId: entry.id });
@@ -223,7 +224,7 @@ export function usePaymentStatusListener(): void {
     const offReceiveCreated = manager.on('receive-op:finalized', ({ mintUrl, operation }) => {
       paymentLog.info('hook.payment_status.receive_created', {
         mintUrl,
-        amount: operation.amount,
+        amount: amountToNumber(operation.amount),
         operationId: operation.id,
       });
       // Transition the toast to 'confirmed' even if history:updated
@@ -233,14 +234,14 @@ export function usePaymentStatusListener(): void {
       if (
         active?.variant === 'receive-ecash' &&
         active.mintUrl === mintUrl &&
-        active.amount === operation.amount
+        active.amount === amountToNumber(operation.amount)
       ) {
         store.setConfirmed(active.id);
       }
     });
 
     const offSendFinalized = manager.on('send:finalized', ({ mintUrl, operationId, operation }) => {
-      const amount = operation.amount;
+      const amount = amountToNumber(operation.amount);
       const unit = 'sat';
       paymentLog.info('hook.payment_status.send_finalized', { operationId, mintUrl, amount });
       if (isSwapStatusActive()) {
@@ -295,7 +296,7 @@ export function usePaymentStatusListener(): void {
           operationId,
           mintUrl,
           quoteId: operation.quoteId,
-          amount: operation.amount,
+          amount: amountToNumber(operation.amount),
         });
         if (isSwapStatusActive()) {
           paymentLog.info('hook.payment_status.suppressed_for_swap', {
@@ -318,7 +319,7 @@ export function usePaymentStatusListener(): void {
           store.setConfirmed(store.active!.id, { operationId });
         } else {
           // Background melt (no active toast) — show new confirmed toast
-          const amount = operation.amount;
+          const amount = amountToNumber(operation.amount);
           const unit = 'sat';
           store.setActive({
             variant: 'melt',

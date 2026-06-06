@@ -20,8 +20,8 @@ import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { Log } from '@/shared/lib/logger';
@@ -80,12 +80,7 @@ export const TransferEntryRow = React.memo(
       <HStack spacing={12} flex={1}>
         {/* Avatar with small arrow overlay */}
         <View style={styles.avatarWrapper}>
-          <Avatar
-            state={mintIconUrl ? 'image' : 'fallback'}
-            picture={mintIconUrl}
-            size={36}
-            name={mintName}
-          />
+          <MintIcon iconUrl={mintIconUrl} size={36} name={mintName} />
           <View style={[styles.arrowBadge, { backgroundColor: surfaceSecondary }]}>
             <Icon
               name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}

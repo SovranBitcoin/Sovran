@@ -1,3 +1,4 @@
+import { toSafeSatAmount } from '@/shared/lib/cashu/amount';
 import type { TransferStep } from '@/features/mint/components/rebalance';
 import type { StepState } from '@/features/mint/components/rebalance/groupSteps';
 
@@ -249,21 +250,22 @@ export function computeInitialTransferAmount({
   feeHeadroom: number;
 }): TransferAmountDecision {
   const minRequired = minTransferThreshold + feeHeadroom;
-  if (sourceBalance < minRequired) {
+  const requestedSatAmount = toSafeSatAmount(requestedAmount) ?? 0;
+  if (sourceBalance < minRequired || requestedSatAmount < minTransferThreshold) {
     return { status: 'skip', minRequired };
   }
 
-  if (requestedAmount + feeHeadroom > sourceBalance) {
+  if (requestedSatAmount + feeHeadroom > sourceBalance) {
     return {
       status: 'capped',
-      amount: sourceBalance - feeHeadroom,
+      amount: toSafeSatAmount(sourceBalance - feeHeadroom) ?? 0,
       capped: true,
     };
   }
 
   return {
     status: 'ready',
-    amount: requestedAmount,
+    amount: requestedSatAmount,
     capped: false,
   };
 }

@@ -19,6 +19,9 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { AVATAR_FALLBACK_VARIANT_LABELS } from '@/shared/lib/avatarFallback';
+import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
+import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -131,6 +134,8 @@ export const SettingsScreen = () => {
   const setWhitenoiseEnabled = useSettingsStore((state) => state.setWhitenoiseEnabled);
   const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
+  const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
+  const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -173,13 +178,25 @@ export const SettingsScreen = () => {
         </Section>
         <Section title="Preferences">
           <ListGroup variant="secondary">
-            <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap Routing" />
+            <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap routing" />
+            <Separator className="mx-4" />
+            <SettingsListLinkItem
+              href="/(settings-flow)/avatar"
+              title="Avatar fallback"
+              description={AVATAR_FALLBACK_VARIANT_LABELS[avatarFallbackVariant]}
+            />
+            <Separator className="mx-4" />
+            <SettingsListLinkItem
+              href="/(settings-flow)/notification-policy"
+              title="Notifications"
+              description={notificationPolicyLabel(notificationPolicy)}
+            />
           </ListGroup>
         </Section>
         <Section title="App Information">
           <ListGroup variant="secondary">
             <SettingsListActionItem
-              title="View Source on GitHub"
+              title="View source on GitHub"
               onPress={() => {
                 void openExternalUrl('https://github.com/SovranBitcoin/Sovran');
               }}
@@ -199,7 +216,7 @@ export const SettingsScreen = () => {
             <Separator className="mx-4" />
             <SettingsListLinkItem
               href="/(settings-flow)/recovery"
-              title="Recover Wallet"
+              title="Recover wallet"
               description="Restore ecash from all mints using your seed"
             />
           </ListGroup>
@@ -235,18 +252,18 @@ export const SettingsScreen = () => {
         {devMode ? (
           <Section title="Developer">
             <ListGroup variant="secondary">
-              <SettingsListActionItem title="Export Database" onPress={handleExportDatabase} />
+              <SettingsListActionItem title="Export database" onPress={handleExportDatabase} />
               <Separator className="mx-4" />
               <Separator className="mx-4" />
               <SettingsListLinkItem
                 href="/(settings-flow)/storage"
-                title="Storage Inventory"
+                title="Storage inventory"
                 description="View persisted storage keys and coco database files"
               />
               <Separator className="mx-4" />
               <SettingsListLinkItem
                 href="/(settings-flow)/design-system"
-                title="Design System"
+                title="Design system"
                 description="Preview shared UI components"
               />
               <Separator className="mx-4" />
@@ -363,7 +380,7 @@ export const SettingsScreen = () => {
 
         <Section title="Danger Zone" isDanger>
           <ListGroup variant="secondary">
-            <SettingsListLinkItem href="/(settings-flow)/delete" title="Delete Account" isDanger />
+            <SettingsListLinkItem href="/(settings-flow)/delete" title="Delete account" isDanger />
           </ListGroup>
         </Section>
 

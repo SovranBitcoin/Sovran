@@ -61,7 +61,7 @@ const HEX_RE = /^[0-9a-f]+$/i;
 // Use this at any trust boundary that takes a `pubkey` string from
 // untrusted input (relay payloads, deep-link params, feed-spec JSON) —
 // `value.length === 64` alone passes UTF-8 mojibake and arbitrary
-// 64-char strings into NDK/Primal filters (audit 26#F-005).
+// 64-char strings into NDK/Nostr filters (audit 26#F-005).
 export function isNostrPubkeyHex(value: unknown): value is string {
   return typeof value === 'string' && value.length === 64 && HEX_RE.test(value);
 }

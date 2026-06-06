@@ -1,67 +1,99 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { FlatList, View, StyleSheet } from 'react-native';
+import React, { useState, useCallback, useMemo } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { ScreenContainer } from '@/features/contacts/components/ScreenContainer';
-import FilterItem from '@/features/contacts/components/search/SearchFilterItem';
-import { HomeFeed, PRIMAL_FEED_SPECS } from '@/features/feed/components/HomeFeed';
-import { Text } from '@/shared/ui/primitives/Text';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
-import Icon from '@/assets/icons';
+import {
+  HomeFeed,
+  FEED_FILTER_FOR_YOU,
+  FEED_FILTER_FOLLOWING_POPULAR,
+  FEED_FILTER_FOLLOWING_RECENT,
+} from '@/features/feed/components/HomeFeed';
+import { UnifiedSearch } from '@/shared/ui/composed/search/UnifiedSearch';
+import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
 import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
-import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
+import { actionMenuPopup } from '@/shared/lib/popup';
 
 const SEARCH_FILTERS_HEIGHT = 56;
-const SEARCH_FILTERS = ['People'] as const;
+const FEED_TAB_FOR_YOU = 'for-you';
+const FEED_TAB_FOLLOWING = 'following';
+
+type FeedTabId = typeof FEED_TAB_FOR_YOU | typeof FEED_TAB_FOLLOWING;
+type FollowingMode = 'Popular' | 'Recent';
+
+const FEED_TABS: { id: FeedTabId; label: string; opensMenu?: boolean }[] = [
+  { id: FEED_TAB_FOR_YOU, label: 'For You' },
+  { id: FEED_TAB_FOLLOWING, label: 'Following', opensMenu: true },
+];
 
 type FeedFiltersProps = {
-  isSearching: boolean;
-  onFilterChange?: (filter: string) => void;
+  activeTab: FeedTabId;
+  followingMode: FollowingMode;
+  onSelectForYou: () => void;
+  onSelectFollowingMode: (mode: FollowingMode) => void;
 };
 
-function FeedFilters({ isSearching, onFilterChange }: FeedFiltersProps) {
-  const feedFilters = useMemo(() => {
-    const primalNames = PRIMAL_FEED_SPECS.map((s) => s.name);
-    return [...primalNames];
-  }, []);
+function FeedFilters({
+  activeTab,
+  followingMode,
+  onSelectForYou,
+  onSelectFollowingMode,
+}: FeedFiltersProps) {
+  const openFollowingMenu = useCallback(() => {
+    actionMenuPopup({
+      title: 'Following',
+      buttons: [
+        {
+          text: 'Popular',
+          description: 'Top followed posts and replies by recent like activity.',
+          icon: 'iconamoon:heart-fill',
+          variant: followingMode === 'Popular' ? 'primary' : undefined,
+          testID: 'feed-following-popular',
+          onPress: (close) => {
+            close();
+            onSelectFollowingMode('Popular');
+          },
+        },
+        {
+          text: 'Recent',
+          description: 'Latest posts and replies from people you follow.',
+          icon: 'mdi:clock-outline',
+          variant: followingMode === 'Recent' ? 'primary' : undefined,
+          testID: 'feed-following-recent',
+          onPress: (close) => {
+            close();
+            onSelectFollowingMode('Recent');
+          },
+        },
+      ],
+    });
+  }, [followingMode, onSelectFollowingMode]);
 
-  const filters = isSearching ? (SEARCH_FILTERS as unknown as string[]) : feedFilters;
-  const [activeFilterItem, setActiveFilterItem] = useState<string>(filters[0]);
-  const flatListRef = useRef<FlatList<string>>(null);
-
-  useEffect(() => {
-    const defaultFilter = filters[0];
-    setActiveFilterItem(defaultFilter);
-    onFilterChange?.(defaultFilter);
-  }, [isSearching]);
-
-  const handleFilterChange = (filter: string) => {
-    feedLog.info('feed.filter.change', { filter, isSearching });
-    setActiveFilterItem(filter);
-    onFilterChange?.(filter);
-  };
+  const handleTabPress = useCallback(
+    (tab: FeedTabId) => {
+      if (tab === FEED_TAB_FOR_YOU) {
+        onSelectForYou();
+        return;
+      }
+      openFollowingMenu();
+    },
+    [onSelectForYou, openFollowingMenu]
+  );
 
   return (
     <Log name="FeedFilters">
       <View style={filtersInnerStyles.container}>
-        <FlatList
-          ref={flatListRef}
-          data={filters}
-          keyExtractor={(item) => item}
-          renderItem={({ item, index }) => (
-            <FilterItem
-              item={item}
-              index={index}
-              flatListRef={flatListRef}
-              activeFilterItem={activeFilterItem}
-              setActiveFilterItem={handleFilterChange}
+        <View style={filtersInnerStyles.content}>
+          {FEED_TABS.map((tab) => (
+            <FeedTabButton
+              key={tab.id}
+              label={tab.label}
+              active={activeTab === tab.id}
+              showChevron={tab.opensMenu}
+              onPress={() => handleTabPress(tab.id)}
             />
-          )}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={filtersInnerStyles.content}
-          keyboardShouldPersistTaps="handled"
-        />
+          ))}
+        </View>
       </View>
     </Log>
   );
@@ -73,32 +105,50 @@ const filtersInnerStyles = StyleSheet.create({
     marginHorizontal: -20,
   },
   content: {
+    flexDirection: 'row',
     gap: 4,
     paddingHorizontal: 20,
     alignItems: 'center',
+    height: SEARCH_FILTERS_HEIGHT,
   },
 });
 
 export function FeedScreen() {
   useLifecycleLogger('FeedScreen', feedLog);
 
-  const { isSearching, searchQuery } = useSearchContext();
-  const [activeFilter, setActiveFilter] = useState('Trending');
-  const [foreground, surface, separator, muted] = useThemeColor([
-    'foreground',
-    'surface',
-    'separator-secondary',
-    'muted',
-  ] as const);
+  const { isSearching } = useSearchContext();
+  const [activeTab, setActiveTab] = useState<FeedTabId>(FEED_TAB_FOR_YOU);
+  const [followingMode, setFollowingMode] = useState<FollowingMode>('Popular');
+  const [surface, separator] = useThemeColor(['surface', 'separator-secondary'] as const);
 
-  const handleFilterChange = useCallback((filter: string) => {
-    feedLog.info('feed.filter.change', { filter });
-    setActiveFilter(filter);
+  const activeFilter = useMemo(() => {
+    if (activeTab === FEED_TAB_FOR_YOU) return FEED_FILTER_FOR_YOU;
+    return followingMode === 'Popular'
+      ? FEED_FILTER_FOLLOWING_POPULAR
+      : FEED_FILTER_FOLLOWING_RECENT;
+  }, [activeTab, followingMode]);
+  const handleSelectForYou = useCallback(() => {
+    feedLog.info('feed.filter.change', { filter: FEED_FILTER_FOR_YOU });
+    setActiveTab(FEED_TAB_FOR_YOU);
   }, []);
 
-  const hasSearchQuery = searchQuery.trim().length > 0;
-  const showSearchResults = isSearching && hasSearchQuery;
-  const showSearchPrompt = isSearching && !hasSearchQuery;
+  const handleSelectFollowingMode = useCallback((mode: FollowingMode) => {
+    const filter =
+      mode === 'Popular' ? FEED_FILTER_FOLLOWING_POPULAR : FEED_FILTER_FOLLOWING_RECENT;
+    feedLog.info('feed.filter.change', { filter, mode });
+    setFollowingMode(mode);
+    setActiveTab(FEED_TAB_FOLLOWING);
+  }, []);
+
+  // While searching, UnifiedSearch owns the whole surface (its own scope-tab
+  // row + body); the For You/Following filter row is only for the idle feed.
+  if (isSearching) {
+    return (
+      <Log name="FeedScreen" style={[styles.root, { backgroundColor: surface }]}>
+        <UnifiedSearch recentContext="feed" />
+      </Log>
+    );
+  }
 
   return (
     <Log name="FeedScreen" style={[styles.root, { backgroundColor: surface }]}>
@@ -112,32 +162,16 @@ export function FeedScreen() {
             borderBottomColor: separator,
           },
         ]}>
-        <FeedFilters isSearching={isSearching} onFilterChange={handleFilterChange} />
+        <FeedFilters
+          activeTab={activeTab}
+          followingMode={followingMode}
+          onSelectForYou={handleSelectForYou}
+          onSelectFollowingMode={handleSelectFollowingMode}
+        />
       </View>
 
       <ScreenContainer>
-        {showSearchResults ? (
-          <SearchResultsList searchQuery={searchQuery} />
-        ) : showSearchPrompt ? (
-          <VStack spacing={24} align="center" className="mt-3 px-4" style={styles.flex1}>
-            <VStack
-              justify="center"
-              align="center"
-              className="bg-surface-secondary h-20 w-20 rounded-full">
-              <Icon name="mingcute:search-3-line" size={40} color={muted} />
-            </VStack>
-            <VStack spacing={12}>
-              <Text className="text-center" color={foreground} bold size={20}>
-                Search for someone by name
-              </Text>
-              <Text className="text-center" color={muted} size={16}>
-                Enter a name, NIP-05, or npub to find people
-              </Text>
-            </VStack>
-          </VStack>
-        ) : (
-          <HomeFeed activeFilter={activeFilter} />
-        )}
+        <HomeFeed activeFilter={activeFilter} />
       </ScreenContainer>
     </Log>
   );
@@ -149,8 +183,5 @@ const styles = StyleSheet.create({
   },
   filtersRow: {
     height: SEARCH_FILTERS_HEIGHT,
-  },
-  flex1: {
-    flex: 1,
   },
 });

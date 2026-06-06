@@ -19,8 +19,8 @@
  *      DB). Returns NUT-06 info directly from the mint, so we still get the
  *      operator pubkey and can resolve their Nostr profile.
  *
- *   3. **Reviews endpoint** (`/cashu/mint/reviews`) — independent of audit,
- *      runs in parallel for every mint. Provides KYM score + review count.
+ *   3. **Nostr GraphQL mint reviews** — independent of audit, runs in
+ *      parallel for every mint. Provides KYM score + review count.
  *
  * Side effects: populates the audit / KYM / mint-profile Zustand stores
  * along the way so the trust-review screen and other surfaces that read
@@ -28,7 +28,7 @@
  */
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-import type { MintCatalogEntry } from 'coco-payment-ux';
+import type { MintCatalogEntry } from '@sovranbitcoin/colada';
 
 import { transformAuditData } from '@/features/mint/lib/auditInfo';
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
@@ -83,7 +83,9 @@ function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unkn
 
   if (profile) {
     entry.contactFollowers = profile.followers;
-    entry.contactReputation = Math.round(profile.reputation);
+    if (typeof profile.reputation === 'number') {
+      entry.contactReputation = Math.round(profile.reputation);
+    }
   }
 
   return { entry, info };
@@ -93,7 +95,7 @@ async function resolveNostrProfile(
   mintUrl: string,
   pubkey: string,
   signal?: AbortSignal
-): Promise<{ followers: number; reputation: number } | undefined> {
+): Promise<{ followers: number; reputation: number | null } | undefined> {
   const profileStore = useMintProfileStore.getState();
   const cached = profileStore.getCached(mintUrl);
   if (cached && !profileStore.isStale(mintUrl)) {
@@ -111,7 +113,7 @@ async function resolveNostrProfile(
 /**
  * Fetcher signature exposed by the wallet. The Manager-bound `getMintInfo`
  * is passed in so this module stays standalone (callable from React hooks
- * and from coco-payment-ux's machine-driven code path).
+ * and from colada's machine-driven code path).
  */
 type MintInfoLookup = (mintUrl: string) => Promise<GetInfoResponse | null>;
 
@@ -170,7 +172,9 @@ async function fetchEntry(
     const profile = await resolveNostrProfile(mintUrl, pubkey, signal);
     if (profile) {
       entry.contactFollowers = profile.followers;
-      entry.contactReputation = Math.round(profile.reputation);
+      if (typeof profile.reputation === 'number') {
+        entry.contactReputation = Math.round(profile.reputation);
+      }
     }
   }
 

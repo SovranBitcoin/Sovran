@@ -13,7 +13,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
-import { defaultDetectors, type AnnotatedOption } from 'coco-payment-ux';
+import { defaultDetectors, type AnnotatedOption } from '@sovranbitcoin/colada';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -32,12 +32,14 @@ const LIGHTNING_KINDS: readonly OptionKind[] = ['lightningInvoice', 'lightningAd
 function getMethodLabel(kind: OptionKind): string {
   if (CASHU_KINDS.includes(kind)) return 'Cashu';
   if (LIGHTNING_KINDS.includes(kind)) return 'Lightning';
+  if (kind === 'onchainAddress') return 'Onchain';
   return kind;
 }
 
 function getMethodIcon(kind: OptionKind): string {
   if (CASHU_KINDS.includes(kind)) return 'majesticons:coins';
   if (LIGHTNING_KINDS.includes(kind)) return 'mdi:lightning-bolt';
+  if (kind === 'onchainAddress') return 'hugeicons:blockchain-01';
   return 'ph:contactless-payment-fill';
 }
 

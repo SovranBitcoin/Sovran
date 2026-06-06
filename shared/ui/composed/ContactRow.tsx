@@ -20,7 +20,7 @@
 
 import React, { ReactNode } from 'react';
 import opacity from 'hex-color-opacity';
-import type { MintListItem } from 'coco-payment-ux';
+import type { MintListItem } from '@sovranbitcoin/colada';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -32,6 +32,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ListRow, type ListRowAvatar, type ListRowIconCircle } from '@/shared/ui/composed/ListRow';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import {
   RowStatsAccent,
   STAT_ICONS,
@@ -54,14 +55,15 @@ interface NostrProfileLike {
   display_name?: string;
   displayName?: string;
   picture?: string;
+  image?: string;
   nip05?: string;
   nip05Valid?: boolean;
   about?: string;
   lud16?: string;
-  /** Pagerank reputation (0–100). Present on REST-search profiles; sparse elsewhere. */
-  score?: number;
-  followers?: number;
-  follows?: number;
+  /** Vertex reputation (0-100). Present on Nagg profile-search profiles; sparse elsewhere. */
+  score?: number | null;
+  followers?: number | null;
+  follows?: number | null;
 }
 
 interface NostrIdentity {
@@ -108,6 +110,7 @@ interface BleIdentity {
   kind: 'ble';
   peerID: string;
   nickname?: string;
+  picture?: string;
   /** Omit these fields when the caller supplies its own `subtitle` / `trailing`. */
   /** Cached announce-time reachability (true if announce arrived directly or
    *  we had a direct link at announce time). Use `hasDirectLink` for truthful
@@ -161,13 +164,17 @@ export function nostrIdentity(
   profile?: NostrProfileLike,
   opts?: { isLoadingProfile?: boolean; verified?: boolean }
 ): NostrIdentity {
+  const score = typeof profile?.score === 'number' ? profile.score : undefined;
+  const followerCount = typeof profile?.followers === 'number' ? profile.followers : undefined;
+  const followingCount = typeof profile?.follows === 'number' ? profile.follows : undefined;
+
   return {
     kind: 'nostr',
     pubkey,
     profile,
-    score: profile?.score,
-    followerCount: profile?.followers,
-    followingCount: profile?.follows,
+    score,
+    followerCount,
+    followingCount,
     isLoadingProfile: opts?.isLoadingProfile,
     verified: opts?.verified,
   };
@@ -229,6 +236,7 @@ export function mintIdentity(
 export function bleIdentity(peer: {
   peerID: string;
   nickname?: string;
+  picture?: string;
   isConnected?: boolean;
   hasDirectLink?: boolean;
   lastSeen?: number;
@@ -279,6 +287,9 @@ interface ContactRowProps {
   identity: Identity | Identity[];
 
   title?: string;
+  /** Rendered inline at the end of the title row, right-aligned next to the
+   *  name (e.g. a relative last-message timestamp on the conversation list). */
+  titleTrailing?: ReactNode;
   /** `null` suppresses the subtitle entirely (pairs with `hideMetadata` for
    *  replies-mode: show the last message, hide the stat pills). */
   subtitle?: string | ReactNode | null;
@@ -391,7 +402,9 @@ function derivePicture(ids: Identity[]): string | undefined {
   return (
     find(ids, 'mint')?.iconUrl ??
     find(ids, 'nostr')?.profile?.picture ??
-    find(ids, 'self')?.avatarUrl
+    find(ids, 'nostr')?.profile?.image ??
+    find(ids, 'self')?.avatarUrl ??
+    find(ids, 'ble')?.picture
   );
 }
 
@@ -598,6 +611,7 @@ function buildStats(
 export function ContactRow({
   identity,
   title: titleOverride,
+  titleTrailing,
   subtitle: subtitleOverride,
   hideMetadata = false,
   showNip05 = true,
@@ -649,7 +663,11 @@ export function ContactRow({
   let avatarProp: ListRowAvatar | undefined;
   let iconCircleProp: ListRowIconCircle | undefined;
 
-  if (nostr?.verified) {
+  if (mint) {
+    leadingNode = (
+      <MintIcon iconUrl={mint.iconUrl} name={name} size={AVATAR_SIZE} isLoading={resolvedLoading} />
+    );
+  } else if (nostr?.verified) {
     // Routes through `leading` so Avatar's `status` prop survives — ListRow's
     // `avatar` slot doesn't expose it.
     leadingNode = (
@@ -662,10 +680,8 @@ export function ContactRow({
         size={AVATAR_SIZE}
       />
     );
-  } else if (mint || nostr || self || picture) {
+  } else if (nostr || self || ble || picture) {
     avatarProp = { picture, seed, name, size: AVATAR_SIZE, state: avatarState };
-  } else if (ble) {
-    iconCircleProp = { icon: 'mdi:bluetooth', color: BLUETOOTH_ACCENT };
   } else if (geohash) {
     const isBleTier = geohash.transport === 'ble';
     iconCircleProp = {
@@ -680,8 +696,15 @@ export function ContactRow({
   const titleFallback = deriveTitleFallback(identities);
   const isCurrentSelf = !!self?.isActive;
 
-  const titleNode: string | ReactNode | undefined =
-    isCurrentSelf && titleBase ? (
+  // While loading, keep the title a plain string so ListRow renders the title
+  // *skeleton* (a node title bypasses the placeholder, which would otherwise
+  // leak the deterministic word-pair name as a fake "loaded" name). The CURRENT
+  // badge / titleTrailing decorations only make sense once real data is in.
+  let titleNode: string | ReactNode | undefined = titleBase;
+  if (resolvedLoading) {
+    titleNode = titleBase;
+  } else if (isCurrentSelf && titleBase) {
+    titleNode = (
       <HStack align="center" spacing={8}>
         <Text size={16} bold numberOfLines={1} color={foreground}>
           {titleBase}
@@ -698,9 +721,19 @@ export function ContactRow({
           </Text>
         </View>
       </HStack>
-    ) : (
-      titleBase
     );
+  } else if (titleTrailing != null && titleBase) {
+    // Name on the left (ellipsizes), titleTrailing (e.g. relative date) pinned
+    // to the right edge of the title column.
+    titleNode = (
+      <HStack align="center" style={{ justifyContent: 'space-between', gap: 8 }}>
+        <Text size={16} bold numberOfLines={1} color={foreground} style={{ flexShrink: 1 }}>
+          {titleBase}
+        </Text>
+        {titleTrailing}
+      </HStack>
+    );
+  }
 
   // ---- Subtitle ---------------------------------------------------------
 
@@ -829,6 +862,7 @@ export function ContactRow({
       loading={resolvedLoading}
       disabled={disabled}
       padding={padding}
+      accessibilityLabel={typeof titleBase === 'string' ? titleBase : undefined}
       testID={testID}
     />
   );

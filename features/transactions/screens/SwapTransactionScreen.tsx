@@ -2,7 +2,7 @@
  * @fileoverview Swap Transaction Detail Screen
  *
  * Displays a grouped swap run composed of multiple steps.
- * Layout follows the same pattern as MeltQuote / MintQuote / SendToken screens:
+ * Layout follows the same pattern as Lightning send / receive / SendToken screens:
  *   1. Header with total amount + swap icon
  *   2. Leg cards
  *   3. Section with metadata (Status, Steps, Fees, Date)
@@ -14,6 +14,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
+import { MeltQuoteState } from '@cashu/cashu-ts';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -30,14 +31,19 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
+import {
+  getMeltDetailPathname,
+  getMintDetailPathname,
+} from '@/shared/lib/nav/transactionDetailRoutes';
 import {
   useSwapTransactionsStore,
   type SwapLeg,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
 import { DetailsList } from '@/shared/ui/composed/DetailsList';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import {
   TransferEntryRow,
   TransferSeparator,
@@ -113,20 +119,21 @@ function buildSwapEntryRowProps(
   mintName: string
 ) {
   const isSend = historyEntry.type === 'melt';
+  const numericAmount = amountToNumber(historyEntry.amount);
   const fiatAmount = formatAmount(
-    { amount: Math.abs(historyEntry.amount), unit: historyEntry.unit },
+    { amount: Math.abs(numericAmount), unit: historyEntry.unit },
     { displayAs: 'usd' }
   );
 
   const handlePress = () => {
     if (historyEntry.type === 'mint') {
       router.navigate({
-        pathname: '/mintQuote',
+        pathname: getMintDetailPathname(historyEntry),
         params: { mintHistoryEntry: JSON.stringify(historyEntry) },
       });
     } else {
       router.navigate({
-        pathname: '/meltQuote',
+        pathname: getMeltDetailPathname(historyEntry),
         params: { meltHistoryEntry: JSON.stringify(historyEntry) },
       });
     }
@@ -136,7 +143,7 @@ function buildSwapEntryRowProps(
     type: (isSend ? 'send' : 'receive') as 'send' | 'receive',
     mintIconUrl,
     mintName,
-    amount: historyEntry.amount,
+    amount: numericAmount,
     unit: historyEntry.unit,
     subtitle: historyEntry.createdAt
       ? formatDate(historyEntry.createdAt, 'short-date-time')
@@ -173,12 +180,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
       {/* Row 1: [mint a] → [mint b] — equal width */}
       <HStack spacing={8} align="center">
         <HStack spacing={8} align="center" flex={1}>
-          <Avatar
-            state={srcInfo?.icon_url ? 'image' : 'fallback'}
-            picture={srcInfo?.icon_url}
-            size={28}
-            name={srcName}
-          />
+          <MintIcon iconUrl={srcInfo?.icon_url} size={28} name={srcName} />
           <UntranslatedText
             bold
             size={13}
@@ -192,12 +194,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <Icon name="mdi:arrow-right" size={10} color="#fff" />
         </View>
         <HStack spacing={8} align="center" flex={1}>
-          <Avatar
-            state={dstInfo?.icon_url ? 'image' : 'fallback'}
-            picture={dstInfo?.icon_url}
-            size={28}
-            name={dstName}
-          />
+          <MintIcon iconUrl={dstInfo?.icon_url} size={28} name={dstName} />
           <UntranslatedText
             bold
             size={13}
@@ -344,10 +341,10 @@ export function SwapTransactionScreen({ groupId }: Props) {
           : undefined;
 
         if (mintEntry) {
-          received += Math.abs(mintEntry.amount);
+          received += Math.abs(amountToNumber(mintEntry.amount));
           hasMintHistory = true;
         }
-        if (meltEntry) sent += Math.abs(meltEntry.amount);
+        if (meltEntry) sent += Math.abs(amountToNumber(meltEntry.amount));
         else if (leg.amount > 0) sent += leg.amount; // fallback for synthetic melts
       }
     }
@@ -467,12 +464,16 @@ export function SwapTransactionScreen({ groupId }: Props) {
                         (leg.meltQuoteId
                           ? {
                               id: leg.meltOperationId ?? leg.id,
+                              operationId: leg.meltOperationId ?? leg.id,
                               createdAt: group.createdAt,
                               mintUrl: leg.fromMintUrl,
                               unit: group.unit,
                               type: 'melt' as const,
                               quoteId: leg.meltQuoteId,
-                              state: leg.localStatus === 'done' ? 'PAID' : 'UNPAID',
+                              state:
+                                leg.localStatus === 'done'
+                                  ? MeltQuoteState.PAID
+                                  : MeltQuoteState.UNPAID,
                               amount: leg.amount,
                             }
                           : undefined);

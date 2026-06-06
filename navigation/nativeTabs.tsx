@@ -20,6 +20,7 @@ type HeaderIconName = string;
 const ANDROID_HEADER_ICON_MAP: Partial<Record<HeaderIconName, string>> = {
   'line.3.horizontal': 'mdi:menu',
   'wave.3.right': 'lucide:nfc',
+  magnifyingglass: 'mingcute:search-3-line',
   xmark: 'material-symbols:close-rounded',
 };
 

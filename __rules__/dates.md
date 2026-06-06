@@ -43,7 +43,7 @@ So an American user sees `Mar 16, 2026, 3:42 PM`, a British user sees `16 Mar 20
 - ❌ `date.toLocaleTimeString(...)` / `date.toLocaleDateString(...)` / `date.toLocaleString(...)` in feature code. They re-allocate an `Intl` formatter per render and won't honor the resolution rules above.
 - ❌ `new Intl.DateTimeFormat(...)` inline. The cache in `date.ts` is shared across the app — extend it instead.
 - ❌ Hand-rolled "X minutes ago" math. Use `formatRelative(x, 'verbose')` or `formatRelative(x, 'compact')`.
-- ❌ Importing or extending `coco-payment-ux/FormattedTimestamp` for new sovran-app code. That class belongs to coco-ux.
+- ❌ Importing or extending `colada/FormattedTimestamp` for new sovran-app code. That class belongs to coco-ux.
 - ❌ Adding a new `style` value because none of the existing ones quite fit. First check whether your screen really needs a different presentation, or whether it should just adopt one of the existing styles. **Constraining the style set is the entire point.** Only add when the new presentation is genuinely shared by ≥2 surfaces.
 
 ## When you do need a new style

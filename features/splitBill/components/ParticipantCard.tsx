@@ -14,9 +14,9 @@
  * generous padding. The deck's outer ScrollView absorbs the tallest card's
  * rendered height.
  *
- * Footer: a tappable "View" pill that navigates to `/mintQuote` for the
- * underlying coco `MintHistoryEntry` — the same destination `Transaction`
- * rows on the wallet home point to.
+ * Footer: a tappable "View" pill that navigates to the receive detail route
+ * for the underlying coco `MintHistoryEntry` — the same destination
+ * `Transaction` rows on the wallet home point to.
  *
  * State treatments:
  *   - `paymentState === 'paid'`    → QR dims to 0.4 and a ✓ chip overlays.
@@ -33,6 +33,7 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { getContrastColors, useDominantColor } from '@/shared/lib/colorExtraction';
 import { AnimatedQRCode } from '@/shared/ui/composed/QRCode';
@@ -43,7 +44,6 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
-import { duration } from '@/shared/styles/tokens';
 import type {
   SplitBillGroup,
   SplitBillParticipant,
@@ -120,17 +120,7 @@ export function ParticipantCard({
     </View>
   ) : (
     <View style={styles.qrPlaceholder}>
-      <Icon
-        name="ant-design:loading-outlined"
-        size={28}
-        color="rgba(255,255,255,0.75)"
-        spin={{
-          duration: duration.spin,
-          outputRange: ['0deg', '360deg'],
-          delay: 0,
-          easing: 'linear',
-        }}
-      />
+      <Spinner size={28} color="rgba(255,255,255,0.75)" />
       <Text size={12} style={{ color: 'rgba(255,255,255,0.75)', marginTop: 8 }}>
         Generating invoice…
       </Text>
@@ -235,9 +225,9 @@ export function ParticipantCard({
             ) : null}
           </View>
 
-          {/* View button — links to `/mintQuote`, same destination a
-              Transaction row on the wallet home points to. Text-only; a
-              trailing arrow glyph felt cluttered next to the QR. */}
+          {/* View button — links to the same destination a Transaction row
+              on the wallet home points to. Text-only; a trailing arrow glyph
+              felt cluttered next to the QR. */}
           <Pressable
             onPress={canView ? () => onView(participant.id) : undefined}
             disabled={!canView}

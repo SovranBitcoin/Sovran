@@ -38,9 +38,9 @@ the exception. Skill and research files are inputs, not edit targets;
 audit files are inputs too. The `completion_status` annotation in Phase 6
 is local-only — not committed.
 
-## 1a. Mission for `coco-payment-ux/`
+## 1a. Mission for `../colada/`
 
-`coco-payment-ux/` is the **first-party, UI-agnostic engine for complex
+`../colada/` is the **first-party, UI-agnostic engine for complex
 coco payment flows** — the single home for every multi-step payment
 interaction (state transitions, side effects, async coordination, error
 recovery, retries). Consumers define their UI; the package wires it
@@ -48,8 +48,8 @@ together. `sovran-app/` is the **first** consumer, not the only one —
 the design payoff is that other projects can drop in their own UI layer
 and inherit our payment flows for free.
 
-Do **not** confuse `coco-payment-ux/` with the external `coco/` library.
-The external `coco/` is read-only reference; `coco-payment-ux/` is ours
+Do **not** confuse `../colada/` with the external `coco/` library.
+The external `coco/` is read-only reference; `../colada/` is ours
 and fully editable.
 
 The package is loosely inspired by state machines but is not a finished
@@ -58,15 +58,15 @@ or missing transitions. Two cross-cutting patterns are first-class slice
 targets and **always in scope**, even when the slice is named elsewhere:
 
 - **Bypass:** an ad-hoc coco payment flow that lives in `sovran-app/` and
-  doesn't route through `coco-payment-ux/`. Default verdict: bug. Either
+  doesn't route through `../colada/`. Default verdict: bug. Either
   migrate the flow into the package, or, if the package isn't ready, flag
   the gap as follow-up — never entrench the bypass.
-- **Leak:** `coco-payment-ux/` imports a sovran component, sovran nav
+- **Leak:** `../colada/` imports a sovran component, sovran nav
   primitive, sovran theme token, or sovran-only data shape across its
   public API. Default verdict: bug. Either abstract the dependency to a
   consumer-supplied prop/adapter or flag the leak as follow-up.
 
-Inside `coco-payment-ux/`, prefer names that are UI-agnostic over names
+Inside `../colada/`, prefer names that are UI-agnostic over names
 borrowed from `sovran-app/`'s component vocabulary. Rename drift inside
 the package is a target, not a constraint — the package being ours
 means it's editable.
@@ -89,7 +89,7 @@ from "fix the audit findings" alone.
    don't preserve the bug just because it's the current behavior.
    Optimistic-update flows are a recurring offender: verify they actually
    roll back on failure, dedupe correctly, and reconcile against the
-   server-truth event before declaring "done". Inside `coco-payment-ux/`,
+   server-truth event before declaring "done". Inside `../colada/`,
    bypass is intent-vs-behavior failure on the consumer side; sovran-leak
    is the same on the package side. Both are bugs to fix, not shapes to
    preserve.
@@ -102,7 +102,7 @@ from "fix the audit findings" alone.
 4. **Ubiquitous language.** Names in our code match the vocabulary of
    `coco/`, `cashu-ts/`, the protocol specs (`nuts/`, `nips/`, `luds/`),
    and `../sovran-schemas/`. Parallel terms invented in-house are rename
-   targets. This applies inside `coco-payment-ux/` too — don't let the
+   targets. This applies inside `../colada/` too — don't let the
    package name imply the code is third-party.
 5. **Consolidate look-alikes.** When two components, helpers, or hooks
    differ only for historical vibe-coded reasons or in ways the user
@@ -189,15 +189,15 @@ update_audit() {
 jq -r '.findings[] | "\(input_filename|gsub(".*/"; ""))\t\(.id)\t\(.completion_status // "untagged")"' __audits__/*.json | awk -F'\t' '$3 != "complete" && $3 != "partial" && $3 != "stale" && $3 != "deferred" && $3 != "untagged" {print}'
 
 # 4.8  Compact structural-health (the score we want to drive to 100).
-#      Run for BOTH packages — sovran-app and coco-payment-ux — so the
+#      Run for BOTH packages — sovran-app and ../colada — so the
 #      slice can be picked from whichever has the lower-scoring dimensions.
 bun run codereview/analyze-structure/index.mjs --llm | head -180                  # sovran-app
-bun run codereview/analyze-structure/index.mjs coco-payment-ux --llm | head -180  # coco-payment-ux
+bun run codereview/analyze-structure/index.mjs ../colada --llm | head -180  # colada
 
 # 4.9  Lowest-scoring sub-dimensions (these are highest-leverage fixes).
 #      Score block alone is ~300 tokens — pull this first to pick a slice.
 bun run codereview/analyze-structure/index.mjs --llm | sed -n '/^Overall:/,/^# Repo/p'
-bun run codereview/analyze-structure/index.mjs coco-payment-ux --llm | sed -n '/^Overall:/,/^# Repo/p'
+bun run codereview/analyze-structure/index.mjs ../colada --llm | sed -n '/^Overall:/,/^# Repo/p'
 
 # 4.9a Lookalikes — duplicate names / values / colors / near-matches.
 #      Run after picking a candidate slice; collisions in that subtree
@@ -212,11 +212,11 @@ for d in .agents/skills/*/; do n=$(basename "$d"); desc=$(awk -F': ' '/^descript
 TOPIC="zustand persist"; grep -rli "$TOPIC" .agents/skills/*/SKILL.md
 
 # 4.11 Bypass / leak hunts (cross-cutting patterns from audit.md §5)
-grep -RnE "from ['\"](@/|features/|shared/|navigation/|app/)" coco-payment-ux/src 2>/dev/null
+grep -RnE "from ['\"](@/|features/|shared/|navigation/|app/)" ../colada/src 2>/dev/null
 grep -RlE "useMeltQuote|useMintQuote|useSwap|payInvoice|sendCashu|claimCashu" features shared 2>/dev/null
 
-# 4.12 Schema duplication: same z.* pattern in sovran-app/coco-payment-ux that should live in ../sovran-schemas
-grep -RnE "z\\.(strictObject|object|discriminatedUnion)\\(" features shared coco-payment-ux/src 2>/dev/null | head -40
+# 4.12 Schema duplication: same z.* pattern in sovran-app/ and ../colada that should live in ../sovran-schemas
+grep -RnE "z\\.(strictObject|object|discriminatedUnion)\\(" features shared ../colada/src 2>/dev/null | head -40
 ls ../sovran-schemas/src 2>/dev/null
 
 # 4.12a Log-doctor — when a slice fixes dynamic behaviour (perf, race, leak).
@@ -273,7 +273,7 @@ to weeks old. Some findings are stale (already fixed). Many similar
 issues elsewhere were never cited because the auditor wasn't looking at
 those files. For every finding that survives Phase 3 re-verification,
 **name the underlying pattern in one sentence and grep the whole repo
-for its footprint** — both `sovran-app/` and `coco-payment-ux/`. The
+for its footprint** — both `sovran-app/` and `../colada/`. The
 slice fixes the pattern, not just the call sites the auditor happened
 to cite.
 
@@ -287,15 +287,15 @@ findings (untagged / partial / deferred). Group by:
   issue (e.g. five `useShallow` misses → one selector-hygiene slice)
 - **structural-health bucket** — findings that move the same
   `analyze-structure` sub-dimension toward 100, in either
-  `sovran-app/` or `coco-payment-ux/`
+  `sovran-app/` or `../colada/`
 - **lookalikes cluster** — findings whose files appear in
   `lookalikes` name-collision, value-collision, or color-near-match
   reports. These are pure consolidation slices — the auditor often
   doesn't cite the duplicates that surround a finding, but folding
   them into the same slice closes the audit *and* shrinks the repo.
-- **partial findings with unfinished `coco-payment-ux/` side** — a
+- **partial findings with unfinished `../colada/` side** — a
   finding marked `partial` because one half landed in `sovran-app/`
-  and the `coco-payment-ux/` half wasn't done. These are high-leverage
+  and the `../colada/` half wasn't done. These are high-leverage
   and explicitly in-scope; check the audit's `completion_note` for
   what's left.
 
@@ -337,16 +337,16 @@ A slice is a related cluster that:
   inconsistency consolidated, most follow-up unblocked, OR the lowest
   score in `analyze-structure --llm` for either package.
 - **Prefers patterns that close out partial findings** where the audit's
-  `completion_note` flags an unfinished `coco-payment-ux/` side, a
+  `completion_note` flags an unfinished `../colada/` side, a
   remaining call site, or a follow-up the previous slice deferred. These
   give measurable closure for the same slice budget.
 
-If the cluster spans the `sovran-app/` ↔ `coco-payment-ux/` seam, follow it
+If the cluster spans the `sovran-app/` ↔ `../colada/` seam, follow it
 across the boundary — those bypass / leak patterns from §1a are
 first-class slice targets, not specialty cases.
 
 If the highest-leverage slice would require building out missing machinery
-in `coco-payment-ux/`, prefer flagging the gap as follow-up over
+in `../colada/`, prefer flagging the gap as follow-up over
 half-finishing the package mid-slice.
 
 Announce the chosen slice and the specific finding IDs in one paragraph
@@ -420,7 +420,7 @@ Write a short brief inline (markdown). Structure:
 ## Risks
 - Persist shape? <yes + version bump + migrator | no>
 - Test gaps? <listed>
-- Coco-payment-ux scope creep? <listed>
+- Colada scope creep? <listed>
 
 ## Acceptance gates
 - type-check clean on touched files
@@ -473,7 +473,7 @@ Apply §1b principles in passing:
 - **Ubiquitous language.** Rename in-house parallel terms to match the
   vocabulary of the dependency they wrap (`coco/`, `cashu-ts/`,
   `nuts/`, `nips/`, `luds/`, `../sovran-schemas/`). Inside
-  `coco-payment-ux/`, rename sovran-borrowed names to UI-agnostic
+  `../colada/`, rename sovran-borrowed names to UI-agnostic
   vocabulary.
 
 Stop and ask the user when:
@@ -621,7 +621,7 @@ SHA: <feature-sha>.
    the directory is gitignored and annotations stay local. Any audit file
    in the commit blocks the slice (unstage, amend).
 10. The two named cross-cutting patterns from §1a ("bypasses
-    `coco-payment-ux/`", "leaks sovran-app assumptions") were searched
+    `../colada/`", "leaks sovran-app assumptions") were searched
     via §4.11 even if the slice is named elsewhere; if hits exist, the
     plan says whether they were folded in or deferred and why.
 10a. The §1b principles were applied: any in-passing intent-vs-behavior

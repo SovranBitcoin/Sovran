@@ -12,6 +12,7 @@ import { useBalanceContext, useMints } from '@cashu/coco-react';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
+import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog } from '@/shared/lib/logger';
 
 export function useAppBalance(): number {
@@ -39,7 +40,7 @@ export function useAppBalance(): number {
     () =>
       mockMode
         ? mockBalance
-        : stableMintUrls.reduce((sum, url) => sum + (liveBalances[url]?.total || 0), 0),
+        : stableMintUrls.reduce((sum, url) => sum + amountToNumber(liveBalances[url]?.total), 0),
     [mockMode, mockBalance, liveBalances, stableMintUrls]
   );
 

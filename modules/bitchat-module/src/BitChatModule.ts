@@ -7,13 +7,19 @@ import type {
   BLEPeer,
   BLEPeerEvent,
   BLEPrivateMessageEvent,
+  BitchatBLEIdentityMaterial,
   NostrMessageEvent,
   NostrPrivateMessageEvent,
 } from './types';
 
 interface BitChatNativeModule {
   // BLE
-  startBLE(nickname: string, profileScope: string): Promise<void>;
+  startBLE(
+    nickname: string,
+    profileScope: string,
+    noisePrivateKeyHex: string,
+    signingPrivateKeyHex: string
+  ): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
   startBLEPrivateChat(peerID: string): Promise<void>;
   resetBLEPrivateChat(peerID: string): Promise<void>;
@@ -60,8 +66,46 @@ function unavailable(): Promise<never> {
 
 // --- BLE Mesh ---
 
-export function startBLE(nickname: string, profileScope: string): Promise<void> {
-  return NativeModule ? NativeModule.startBLE(nickname, profileScope) : unavailable();
+const KEY_HEX_RE = /^[0-9a-f]{64}$/;
+
+function validateBLEIdentityMaterial(
+  identityMaterial: BitchatBLEIdentityMaterial | null | undefined
+): void {
+  if (!identityMaterial) {
+    throw new Error('BitChat identity material unavailable');
+  }
+  if (identityMaterial.version !== 'sovran-bitchat-ble-v1') {
+    throw new Error('BitChat identity material has an unsupported version');
+  }
+  if (!KEY_HEX_RE.test(identityMaterial.nostrPubkey)) {
+    throw new Error('BitChat Nostr identity material is invalid');
+  }
+  if (!KEY_HEX_RE.test(identityMaterial.noisePrivateKeyHex)) {
+    throw new Error('BitChat noise identity material is invalid');
+  }
+  if (!KEY_HEX_RE.test(identityMaterial.signingPrivateKeyHex)) {
+    throw new Error('BitChat signing identity material is invalid');
+  }
+}
+
+export function startBLE(
+  nickname: string,
+  profileScope: string,
+  identityMaterial: BitchatBLEIdentityMaterial
+): Promise<void> {
+  try {
+    validateBLEIdentityMaterial(identityMaterial);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+  return NativeModule
+    ? NativeModule.startBLE(
+        nickname,
+        profileScope,
+        identityMaterial.noisePrivateKeyHex,
+        identityMaterial.signingPrivateKeyHex
+      )
+    : unavailable();
 }
 
 export function sendBLEMessage(content: string): Promise<void> {

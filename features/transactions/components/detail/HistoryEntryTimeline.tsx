@@ -2,13 +2,22 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { MintQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
+import {
+  buildTimeline,
+  getCardLabel,
+  getStatusColorType,
+  getStatusHeader,
+  type ChainOnchainConfirmationProgress as OnchainConfirmationProgress,
+  type TimelineItem,
+  type TimelineStepType,
+} from '@sovranbitcoin/colada';
 import Animated, {
   Easing,
   FadeInDown,
-  useAnimatedStyle,
   useSharedValue,
   withDelay,
   withTiming,
+  useAnimatedProps,
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -32,17 +41,10 @@ import {
   mintHistoryEntryExpired,
   getMintHistoryEntryTimeUntilExpiry,
 } from '@/shared/lib/utils';
+import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { Log } from '@/shared/lib/logger';
-
-import {
-  buildTimeline,
-  getCardLabel,
-  getStatusHeader,
-  getStatusColorType,
-  type TimelineItem,
-  type TimelineStepType,
-} from './buildTimeline';
 
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
@@ -51,12 +53,15 @@ interface HistoryEntryTimelineProps {
   tokenCreated?: boolean;
   /** For NUT-18 payment requests - indicates Nostr DM was sent */
   nostrSent?: boolean;
+  /** For onchain mint quotes - network confirmations observed for the funding tx. */
+  onchainConfirmationProgress?: OnchainConfirmationProgress | null;
 }
 
 const LINE_WIDTH = 3;
 const LINE_HEIGHT = 50;
 const LINE_ANIM_MS = 400;
 const LINE_TIMING = { duration: LINE_ANIM_MS, easing: Easing.out(Easing.cubic) };
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 type TimelineLineType = 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient';
 
@@ -79,6 +84,7 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
 }: AnimatedTimelineLineProps) {
   const isComplete = lineType === 'complete';
   const fillHeight = useSharedValue(isComplete ? 1 : 0);
+  const gradientId = React.useId().replace(/:/g, '');
 
   useEffect(() => {
     const target = lineType === 'complete' ? 1 : 0;
@@ -88,16 +94,20 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
         : withTiming(target, LINE_TIMING);
   }, [lineType, delayMs, fillHeight]);
 
-  const fillStyle = useAnimatedStyle(() => ({
-    height: `${fillHeight.value * 100}%`,
+  const fillProps = useAnimatedProps(() => ({
+    height: fillHeight.value * LINE_HEIGHT,
   }));
 
   if (lineType === 'expired-gradient' || lineType === 'rolled-back-gradient') {
     const endColor = lineType === 'expired-gradient' ? dangerColor : warningColor;
     return (
-      <Svg width={LINE_WIDTH} height={LINE_HEIGHT} style={{ marginVertical: 4 }}>
+      <Svg
+        testID="history-entry-timeline-line"
+        width={LINE_WIDTH}
+        height={LINE_HEIGHT}
+        style={styles.timelineLine}>
         <Defs>
-          <LinearGradient id={`gradient-${lineType}`} x1="0" y1="0" x2="0" y2="1">
+          <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={successColor} />
             <Stop offset="100%" stopColor={endColor} />
           </LinearGradient>
@@ -109,33 +119,37 @@ const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
           height={LINE_HEIGHT}
           rx={LINE_WIDTH / 2}
           ry={LINE_WIDTH / 2}
-          fill={`url(#gradient-${lineType})`}
+          fill={`url(#${gradientId})`}
         />
       </Svg>
     );
   }
 
   return (
-    <View
-      style={{
-        width: LINE_WIDTH,
-        height: LINE_HEIGHT,
-        backgroundColor: mutedColor,
-        borderRadius: LINE_WIDTH / 2,
-        marginVertical: 4,
-        overflow: 'hidden',
-      }}>
-      <Animated.View
-        style={[
-          {
-            width: LINE_WIDTH,
-            backgroundColor: successColor,
-            borderRadius: LINE_WIDTH / 2,
-          },
-          fillStyle,
-        ]}
+    <Svg
+      testID="history-entry-timeline-line"
+      width={LINE_WIDTH}
+      height={LINE_HEIGHT}
+      style={styles.timelineLine}>
+      <Rect
+        x={0}
+        y={0}
+        width={LINE_WIDTH}
+        height={LINE_HEIGHT}
+        rx={LINE_WIDTH / 2}
+        ry={LINE_WIDTH / 2}
+        fill={mutedColor}
       />
-    </View>
+      <AnimatedRect
+        x={0}
+        y={0}
+        width={LINE_WIDTH}
+        rx={LINE_WIDTH / 2}
+        ry={LINE_WIDTH / 2}
+        fill={successColor}
+        animatedProps={fillProps}
+      />
+    </Svg>
   );
 });
 
@@ -148,6 +162,7 @@ export function HistoryEntryTimeline({
   meltQuote,
   tokenCreated,
   nostrSent,
+  onchainConfirmationProgress,
 }: HistoryEntryTimelineProps) {
   const [foreground, mutedColor, successColor, dangerColor, warningColor] = useThemeColor([
     'foreground',
@@ -157,17 +172,19 @@ export function HistoryEntryTimeline({
     'warning',
   ] as const);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const paymentCopy = usePaymentCopyResolver();
 
   const foreground66 = opacity(foreground, 0.66);
   const foreground50 = opacity(foreground, 0.5);
 
   const meltExpiry = meltQuote?.expiry;
   const mintState = historyEntry.type === 'mint' ? historyEntry.state : null;
+  const isOnchainMint = historyEntry.type === 'mint' && !!getOnchainMintAddress(historyEntry);
 
   useEffect(() => {
     const shouldUpdate =
       (historyEntry.type === 'melt' && meltExpiry) ||
-      (historyEntry.type === 'mint' && mintState === MintQuoteState.UNPAID);
+      (historyEntry.type === 'mint' && !isOnchainMint && mintState === MintQuoteState.UNPAID);
 
     if (shouldUpdate) {
       const interval = setInterval(() => {
@@ -176,14 +193,31 @@ export function HistoryEntryTimeline({
 
       return () => clearInterval(interval);
     }
-  }, [historyEntry.type, meltExpiry, mintState]);
+  }, [historyEntry.type, isOnchainMint, meltExpiry, mintState]);
 
   const timeline = useMemo(
-    () => buildTimeline({ historyEntry, meltQuote, currentTime, tokenCreated, nostrSent }),
-    [historyEntry, meltQuote, currentTime, tokenCreated, nostrSent]
+    () =>
+      buildTimeline({
+        historyEntry,
+        meltQuote,
+        currentTime,
+        tokenCreated,
+        nostrSent,
+        onchainConfirmationProgress,
+        paymentCopy,
+      }),
+    [
+      historyEntry,
+      meltQuote,
+      currentTime,
+      tokenCreated,
+      nostrSent,
+      onchainConfirmationProgress,
+      paymentCopy,
+    ]
   );
 
-  const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent);
+  const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent, paymentCopy);
   const statusHeader = getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
 
@@ -195,7 +229,8 @@ export function HistoryEntryTimeline({
 
     if (
       historyEntry.type === 'mint' &&
-      historyEntry.state === MintQuoteState.UNPAID &&
+      !isOnchainMint &&
+      String(historyEntry.state) === MintQuoteState.UNPAID &&
       !mintHistoryEntryExpired(historyEntry)
     ) {
       const expiryInfo = getMintHistoryEntryTimeUntilExpiry(historyEntry);
@@ -284,6 +319,13 @@ export function HistoryEntryTimeline({
             const lineType = nextItem ? getLineType(item, nextItem) : null;
             const isFutureState =
               item.stepType === 'next-pending' || item.stepType === 'future-small';
+            const confirmationProgress =
+              isOnchainMint && item.state === MintQuoteState.PAID && onchainConfirmationProgress
+                ? {
+                    currentConfirmations: onchainConfirmationProgress.currentConfirmations,
+                    requiredConfirmations: onchainConfirmationProgress.requiredConfirmations,
+                  }
+                : undefined;
 
             const dotDelay = index * 300;
             const lineDelay = dotDelay + 150;
@@ -300,6 +342,7 @@ export function HistoryEntryTimeline({
                       successColor={successColor}
                       errorColor={dangerColor}
                       revertedColor={warningColor}
+                      confirmationProgress={confirmationProgress}
                       {...mapCheckpointStatusToIndicator(
                         timelineStepTypeToCheckpointStatus(item.stepType)
                       )}
@@ -363,5 +406,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  timelineLine: {
+    marginVertical: 4,
   },
 });

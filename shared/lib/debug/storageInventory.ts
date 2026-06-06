@@ -180,6 +180,7 @@ export async function getFullAsyncStorageDump(): Promise<Record<string, unknown>
 
 const REDACTED_GEOLOCATION_KEY_PATTERN = /^transaction-location-store(:|$)/;
 
+const NSEC_PATTERN = /\bnsec1[023456789acdefghjklmnpqrstuvwxyz]{58}\b/g;
 const CASHU_TOKEN_PATTERN = /\bcashu[AB][A-Za-z0-9_-]{20,}/g;
 const LIGHTNING_INVOICE_PATTERN = /\bln(bc|tb|bcrt|sb)[0-9]{1,12}[a-z0-9]{20,}/gi;
 
@@ -195,6 +196,11 @@ const LIGHTNING_INVOICE_PATTERN = /\bln(bc|tb|bcrt|sb)[0-9]{1,12}[a-z0-9]{20,}/g
  * lightning invoices (`lnbc…` / `lntb…` / `lnbcrt…` / `lnsb…`) are
  * recursively replaced inside any string value, since they leak
  * spendable funds or in-flight payment metadata if shared verbatim.
+ *
+ * Wallet secrets: legacy stores or future debugging mistakes may include
+ * `nsec`, mnemonic, seed, or private-key fields. Those are redacted by key
+ * name before recursive traversal, so a stored JSON blob cannot leak identity
+ * or wallet recovery material through the support dump path.
  *
  * Pure: callers are free to dump the redacted shape to Share.share,
  * console, or a support channel.
@@ -217,7 +223,7 @@ function redactValue(value: unknown): unknown {
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = redactValue(v);
+      out[k] = isSensitiveStorageField(k) ? redactSensitiveStorageValue(v, k) : redactValue(v);
     }
     return out;
   }
@@ -226,6 +232,55 @@ function redactValue(value: unknown): unknown {
 
 function redactString(s: string): string {
   return s
+    .replace(NSEC_PATTERN, '<REDACTED:nsec>')
     .replace(CASHU_TOKEN_PATTERN, '<REDACTED:cashu-token>')
     .replace(LIGHTNING_INVOICE_PATTERN, '<REDACTED:lightning-invoice>');
+}
+
+function normalizeFieldName(name: string): string {
+  return name.replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
+function sensitiveStorageKind(fieldName: string): string | null {
+  const normalized = normalizeFieldName(fieldName);
+  if (
+    normalized === 'secret' ||
+    normalized === 'nsec' ||
+    normalized.endsWith('nsec') ||
+    normalized === 'privkey' ||
+    normalized.endsWith('privatekey') ||
+    normalized.endsWith('privatekeyhex') ||
+    normalized.endsWith('secretkey') ||
+    normalized.endsWith('signerkey') ||
+    normalized.endsWith('xpriv')
+  ) {
+    return 'private-key';
+  }
+  if (
+    normalized === 'mnemonic' ||
+    normalized.endsWith('mnemonic') ||
+    normalized === 'seed' ||
+    normalized.endsWith('seed') ||
+    normalized.endsWith('seedhex') ||
+    normalized.endsWith('passphrase') ||
+    normalized.endsWith('password')
+  ) {
+    return 'secret';
+  }
+  return null;
+}
+
+function isSensitiveStorageField(fieldName: string): boolean {
+  return sensitiveStorageKind(fieldName) !== null;
+}
+
+function redactSensitiveStorageValue(value: unknown, fieldName: string): string {
+  const kind = sensitiveStorageKind(fieldName) ?? 'secret';
+  if (typeof value === 'string') {
+    const redacted = redactString(value);
+    if (redacted !== value && redacted.startsWith('<REDACTED:')) {
+      return redacted;
+    }
+  }
+  return `<REDACTED:${kind}>`;
 }

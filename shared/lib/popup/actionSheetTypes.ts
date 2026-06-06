@@ -1,4 +1,4 @@
-import type { AnnotatedOption, PaymentMachine, StepDataMap } from 'coco-payment-ux';
+import type { AnnotatedOption, PaymentMachine, StepDataMap } from '@sovranbitcoin/colada';
 
 export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }
@@ -22,6 +22,10 @@ type PaymentFallbackPayload = PaymentOptionsPayload & {
 };
 
 type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
+  machine: PaymentMachine;
+};
+
+type SendMemoPayload = StepDataMap['enterSendMemo'] & {
   machine: PaymentMachine;
 };
 
@@ -80,6 +84,12 @@ type BaseActionSheetPayloads = {
    * as `payment-options`.
    */
   'proof-selector': ProofSelectorPayload;
+  /**
+   * Optional memo before creating an ecash token. This is reached from the
+   * send-flow amount route, which is itself an iOS route modal, so it needs
+   * the same FullWindowOverlay-backed lane as the other send-flow sheets.
+   */
+  'send-memo': SendMemoPayload;
 };
 
 /** Payload types for custom action sheets. */

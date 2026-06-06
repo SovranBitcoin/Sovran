@@ -3,16 +3,20 @@
  *
  * Pure display component — receives a pre-built MintListItem[] and renders it.
  * All data fetching (balances, KYM scores, audit data, availability) is done
- * before navigation via machine operations in CocoPaymentUX.tsx.
+ * before navigation via machine operations in Colada.tsx.
  *
  * The only local state is the selected currency tab.
  */
 
 import React, { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
-import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
+import {
+  LegendList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from '@legendapp/list/react-native';
 
-import type { MintListItem } from 'coco-payment-ux';
+import type { MintListItem } from '@sovranbitcoin/colada';
 
 import Icon from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';

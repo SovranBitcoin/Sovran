@@ -5,7 +5,7 @@
  *
  * @description
  * **Comprehensive button component with advanced visual effects and multiple modes**
- * - Multiple variants (primary, secondary, dangerous)
+ * - Multiple variants (primary, secondary, dangerous, underline)
  * - Ripple effect animations with customizable configuration
  * - Blur effects for enhanced visual appeal
  * - Icon-only, text-only, and combined modes
@@ -15,7 +15,7 @@
  * **Features:**
  * - Ripple effect animations with position tracking
  * - Blur effects with customizable intensity and tint
- * - Three button variants with theme-aware colors
+ * - Button variants with theme-aware colors
  * - Loading states with animated spinners
  * - Icon and text content support
  * - Accessibility and testing support
@@ -57,7 +57,7 @@
  * @see {@link ./Text}
  */
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   StyleProp,
   ViewStyle,
@@ -65,14 +65,15 @@ import {
   LayoutChangeEvent,
   GestureResponderEvent,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import Icon from 'assets/icons';
 import { Pressable, type HapticConfig } from './Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 
 // Buttons sit close to the bottom-bar gradient and the home indicator, where
 // off-by-a-few-pixel taps are common. An 8pt slop on every side is small
@@ -217,13 +218,14 @@ const useRipple = ({ enabled, config }: UseRippleOptions) => {
 /**
  * Button variant types
  *
- * @typedef {'primary' | 'secondary' | 'dangerous'} ButtonVariant
+ * @typedef {'primary' | 'secondary' | 'dangerous' | 'underline'} ButtonVariant
  * @description
  * - 'primary': Light background with dark text (high contrast)
  * - 'secondary': Dark background with light text (medium contrast)
  * - 'dangerous': Red background with light text (warning/danger actions)
+ * - 'underline': Text action with no background and an underline
  */
-type ButtonVariant = 'primary' | 'secondary' | 'dangerous';
+type ButtonVariant = 'primary' | 'secondary' | 'dangerous' | 'underline';
 
 /**
  * Button size variant.
@@ -380,6 +382,17 @@ export const Button = ({
   accessibilityHint,
 }: ButtonProps) => {
   const sz = SIZES[size];
+  const stableContentRef = useRef<{ text?: string | React.ReactNode; icon?: React.ReactNode }>({
+    text,
+    icon,
+  });
+  useEffect(() => {
+    if (!loading) {
+      stableContentRef.current = { text, icon };
+    }
+  }, [icon, loading, text]);
+  const layoutText = loading ? stableContentRef.current.text : text;
+  const layoutIcon = loading ? stableContentRef.current.icon : icon;
   // Derive a sensible default label from `text` when it's a string so the
   // common case ("primary CTA with visible copy") needs no extra prop.
   // Icon-only and ReactNode-text callers must supply `accessibilityLabel`
@@ -415,7 +428,7 @@ export const Button = ({
   const blurConfig = typeof blur === 'object' ? blur : {};
   const { intensity = 75, tint = 'dark' } = blurConfig;
 
-  const shouldUseBlur = blur !== false;
+  const shouldUseBlur = variant === 'underline' ? false : blur !== false;
 
   /**
    * Gets button styles based on variant and effect configuration
@@ -473,6 +486,13 @@ export const Button = ({
     }
 
     switch (variant) {
+      case 'underline':
+        return {
+          ...base,
+          backgroundColor: 'transparent',
+          borderWidth: 0,
+          overflow: 'visible' as const,
+        };
       case 'primary':
         return {
           ...base,
@@ -523,8 +543,9 @@ export const Button = ({
         return background;
       case 'secondary':
       case 'dangerous':
+      case 'underline':
       default:
-        return foreground;
+        return variant === 'underline' ? foregroundSecondary : foreground;
     }
   };
 
@@ -549,18 +570,27 @@ export const Button = ({
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
         {/* Content rendering - string text or React node */}
-        {typeof text === 'string' ? (
+        {typeof layoutText === 'string' ? (
           <Text
             size={16}
             bold
             style={{
               color: getTextColor(),
+              opacity: loading ? 0 : 1,
+              ...(variant === 'underline'
+                ? { textDecorationLine: 'underline' as const }
+                : undefined),
             }}>
-            {text}
+            {layoutText}
           </Text>
         ) : (
-          text || icon
+          <View style={loading ? styles.hiddenContent : undefined}>{layoutText ?? layoutIcon}</View>
         )}
+        {loading ? (
+          <View pointerEvents="none" style={styles.loadingOverlay}>
+            <Spinner size={16} />
+          </View>
+        ) : null}
       </Pressable>
     );
   }
@@ -568,7 +598,7 @@ export const Button = ({
   // Icon-only: a fixed square. Override the outer paddings to 0 because the
   // dimension *is* the visual size — extra padding would push the icon off-
   // center and grow the hit area beyond what's drawn.
-  if (!text && icon) {
+  if (!layoutText && layoutIcon) {
     return (
       <Pressable
         testID={testID}
@@ -597,20 +627,7 @@ export const Button = ({
           {/* Ripple effect overlay */}
           {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
           {/* Loading spinner or icon content */}
-          {loading ? (
-            <Icon
-              name="ant-design:loading-outlined"
-              size={16}
-              spin={{
-                delay: 0,
-                duration: 1000,
-                outputRange: ['0deg', '360deg'],
-                easing: 'linear',
-              }}
-            />
-          ) : (
-            icon
-          )}
+          {loading ? <Spinner size={16} /> : layoutIcon}
         </View>
       </Pressable>
     );
@@ -639,41 +656,49 @@ export const Button = ({
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
         <HStack
+          collapsable={false}
           align="center"
           justify="center"
-          spacing={text && icon && !loading ? sz.iconTextSpacing : 0}>
-          {loading ? (
-            <Icon
-              name="ant-design:loading-outlined"
-              size={16}
-              spin={{
-                delay: 0,
-                duration: 1000,
-                outputRange: ['0deg', '360deg'],
-                easing: 'linear',
-              }}
-            />
-          ) : (
-            <>
-              {icon}
-              {text != null &&
-                (typeof text === 'string' ? (
-                  <Text
-                    style={{
-                      color: getTextColor(),
-                      fontFamily: 'OxygenBold',
-                      textAlign: 'center',
-                    }}
-                    size={sz.fontSize}>
-                    {text}
-                  </Text>
-                ) : (
-                  text
-                ))}
-            </>
-          )}
+          spacing={layoutText && layoutIcon ? sz.iconTextSpacing : 0}
+          style={loading ? styles.hiddenContent : undefined}>
+          <>
+            {layoutIcon}
+            {layoutText != null &&
+              (typeof layoutText === 'string' ? (
+                <Text
+                  style={{
+                    color: getTextColor(),
+                    fontFamily: 'OxygenBold',
+                    textAlign: 'center',
+                    ...(variant === 'underline'
+                      ? { textDecorationLine: 'underline' as const }
+                      : undefined),
+                  }}
+                  size={sz.fontSize}>
+                  {layoutText}
+                </Text>
+              ) : (
+                layoutText
+              ))}
+          </>
         </HStack>
+        {loading ? (
+          <View pointerEvents="none" style={styles.loadingOverlay}>
+            <Spinner size={16} />
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
 };
+
+const styles = StyleSheet.create({
+  hiddenContent: {
+    opacity: 0,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

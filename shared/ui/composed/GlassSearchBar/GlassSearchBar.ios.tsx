@@ -15,6 +15,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   keyboardType = 'web-search',
   autoFocus,
   debounceMs,
+  seedText = '',
 }: GlassSearchBarProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -60,7 +61,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
       <View style={{ alignItems: 'center', ...(width != null ? { width } : { flex: 1 }) }}>
         <TextInput
           key={clearKey}
-          defaultValue=""
+          defaultValue={seedText}
           placeholder={placeholder}
           placeholderTextColor={opacity(foreground, 0.33)}
           onChangeText={handleTextChange}

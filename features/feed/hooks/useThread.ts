@@ -1,158 +1,268 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { InteractionManager, useWindowDimensions } from 'react-native';
-import { Metadata, ShortTextNote } from 'nostr-tools/kinds';
 
-import {
-  collectReferencedIds,
-  normalizeFeedEvent,
-  parseJson,
-  parseNoteMetrics,
-  parseProfileFromRaw,
-} from '@/features/feed/components/nostr/feedParse';
-import {
-  createPrimalRelayClient,
-  PRIMAL_CACHE_RELAY_URL,
-  PRIMAL_KIND_MENTIONS,
-  PRIMAL_KIND_NOTE_STATS,
-} from '@/features/feed/components/nostr/primalRelay';
 import type {
   FeedEvent,
   NoteMetrics,
   ProfileInfo,
-  RawPrimalEvent,
 } from '@/features/feed/components/nostr/feedTypes';
-import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
+import type {
+  ThreadReplySort,
+  ThreadResult,
+  ThreadSeedBuckets,
+} from '@/features/feed/data/feedClient';
+import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import { consumeThreadSeed } from '@/features/feed/lib/threadSeedCache';
 import {
-  charsPerLineForWidth,
-  DEFAULT_REPLY_SKELETON_COUNT,
-  MAX_REPLY_SKELETON_COUNT,
-  type ReplySkeletonMatch,
-  sortRepliesForSkeletons,
-} from '@/features/feed/lib/threadReplySkeletons';
+  bucketsFromThreadResult,
+  buildThreadItemsFromResult,
+  buildThreadItemsFromSeed,
+  orderedReplyIdsForThreadResult,
+  type BuiltThreadItems,
+  type ThreadItem,
+} from '@/features/feed/lib/threadItems';
+import { charsPerLineForWidth } from '@/features/feed/lib/threadReplySkeletons';
 import { feedLog } from '@/shared/lib/logger';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
-export type ThreadItem =
-  | { type: 'parent'; event: FeedEvent }
-  | { type: 'target'; event: FeedEvent }
-  | { type: 'reply'; event: FeedEvent; skeletonMatch?: ReplySkeletonMatch };
-
-let threadRequestCounter = 0;
-
-function nextRequestPrefix(): string {
-  threadRequestCounter = (threadRequestCounter + 1) >>> 0;
-  return `${Date.now().toString(36)}_${threadRequestCounter.toString(36)}`;
-}
-
-type MergeBuckets = {
-  allEvents: Map<string, FeedEvent>;
-  profiles: Map<string, ProfileInfo>;
-  metrics: Map<string, NoteMetrics>;
-  embeddedMentions: Map<string, FeedEvent>;
-};
-
-type MergeOptions = {
-  /** When true, only set events not already present in `allEvents`. */
-  skipExistingEvents?: boolean;
-  /** When true, route quoted events into the quoted-events map regardless of kind. */
-  includeAsQuoted?: Map<string, FeedEvent>;
-};
-
-function mergeRawEvents(
-  rawEvents: RawPrimalEvent[],
-  buckets: MergeBuckets,
-  opts: MergeOptions = {}
-): { foundNewNote: boolean } {
-  let foundNewNote = false;
-  for (const raw of rawEvents) {
-    if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-      const parsed = parseJson<Record<string, unknown>>(raw.content);
-      const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-      if (eid && parsed) buckets.metrics.set(eid, parseNoteMetrics(parsed));
-      continue;
-    }
-    if (raw.kind === PRIMAL_KIND_MENTIONS) {
-      const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
-      if (!mentionEvent) continue;
-      buckets.embeddedMentions.set(mentionEvent.id, mentionEvent);
-      buckets.allEvents.set(mentionEvent.id, mentionEvent);
-      continue;
-    }
-    if (raw.kind === Metadata) {
-      const result = parseProfileFromRaw(raw);
-      if (result) buckets.profiles.set(result[0], result[1]);
-      continue;
-    }
-    const ev = normalizeFeedEvent(raw);
-    if (!ev) continue;
-    if (opts.includeAsQuoted) {
-      opts.includeAsQuoted.set(ev.id, ev);
-      continue;
-    }
-    if (ev.kind !== ShortTextNote) continue;
-    if (opts.skipExistingEvents && buckets.allEvents.has(ev.id)) continue;
-    buckets.allEvents.set(ev.id, ev);
-    foundNewNote = true;
-  }
-  return { foundNewNote };
-}
+export type { ThreadItem } from '@/features/feed/lib/threadItems';
 
 type UseThreadResult = {
   items: ThreadItem[];
   hiddenReplyCount: number;
   isLoading: boolean;
   isFetching: boolean;
+  isLoadingMoreReplies: boolean;
+  hasMoreReplies: boolean;
+  replySort: ThreadReplySort;
+  setReplySort: (sort: ThreadReplySort) => void;
   error: string | null;
   dataVersion: number;
   profilesRef: React.MutableRefObject<Map<string, ProfileInfo>>;
   metricsRef: React.MutableRefObject<Map<string, NoteMetrics>>;
   quotedEventsRef: React.MutableRefObject<Map<string, FeedEvent>>;
+  loadMoreReplies: () => Promise<void>;
 };
 
+const THREAD_REPLY_PAGE_SIZE = 10;
 const EMPTY_PROFILES: Map<string, ProfileInfo> = new Map();
 const EMPTY_METRICS: Map<string, NoteMetrics> = new Map();
 const EMPTY_QUOTED: Map<string, FeedEvent> = new Map();
 
 export function useThread(eventId: string): UseThreadResult {
+  const { keys: nostrKeys } = useNostrKeysContext();
+  const viewerPubkey = nostrKeys?.pubkey;
   const [items, setItems] = useState<ThreadItem[]>([]);
   const [hiddenReplyCount, setHiddenReplyCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
+  const [isLoadingMoreReplies, setIsLoadingMoreReplies] = useState(false);
+  const [hasMoreReplies, setHasMoreReplies] = useState(false);
+  const [replySort, setReplySort] = useState<ThreadReplySort>('relevant');
   const [error, setError] = useState<string | null>(null);
   const [dataVersion, setDataVersion] = useState(0);
 
   const profilesRef = useRef<Map<string, ProfileInfo>>(EMPTY_PROFILES);
   const metricsRef = useRef<Map<string, NoteMetrics>>(EMPTY_METRICS);
   const quotedEventsRef = useRef<Map<string, FeedEvent>>(EMPTY_QUOTED);
+  const threadSeedRef = useRef<ThreadSeedBuckets | null>(null);
+  const replyOrderRef = useRef<string[]>([]);
+  const replyOffsetRef = useRef(0);
+  const hasMoreRepliesRef = useRef(false);
+  const isInitialFetchingRef = useRef(false);
+  const isLoadingMoreRepliesRef = useRef(false);
+  const currentEventIdRef = useRef<string | null>(null);
+  const requestGenerationRef = useRef(0);
+  const loadMoreAbortControllerRef = useRef<AbortController | null>(null);
 
   const { width: viewportWidth } = useWindowDimensions();
   const charsPerLineRef = useRef(charsPerLineForWidth(viewportWidth));
   charsPerLineRef.current = charsPerLineForWidth(viewportWidth);
 
+  const applyThreadResult = useCallback(
+    (result: ThreadResult, source: 'initial' | 'more'): BuiltThreadItems | null => {
+      const orderedReplyIds = orderedReplyIdsForThreadResult(result, source, replyOrderRef.current);
+      const built = buildThreadItemsFromResult(
+        eventId,
+        result,
+        charsPerLineRef.current,
+        orderedReplyIds
+      );
+      if (!built) return null;
+
+      replyOrderRef.current = built.items
+        .filter((item): item is Extract<ThreadItem, { type: 'reply' }> => item.type === 'reply')
+        .map((item) => item.event.id);
+      threadSeedRef.current = bucketsFromThreadResult(result);
+      profilesRef.current = result.profiles;
+      metricsRef.current = result.metrics;
+      quotedEventsRef.current = result.quotedEvents;
+
+      const nextHasMore =
+        result.hasMoreReplies && (built.expectedReplies === 0 || built.hiddenReplyCount > 0);
+      hasMoreRepliesRef.current = nextHasMore;
+      setHasMoreReplies(nextHasMore);
+      setItems(built.items);
+      setHiddenReplyCount(built.hiddenReplyCount);
+      setDataVersion((v) => v + 1);
+
+      feedLog.info(source === 'initial' ? 'thread.load.done' : 'thread.replies.load_more.done', {
+        eventId,
+        parents: result.thread.parents.length,
+        replies: built.receivedReplies,
+        profiles: result.profiles.size,
+        hiddenReplies: built.hiddenReplyCount,
+        hasMoreReplies: nextHasMore,
+        replyOffset: replyOffsetRef.current,
+        replySort,
+      });
+
+      feedLog.info('thread.reply_skeleton.sort', {
+        eventId,
+        expectedReplies: built.expectedReplies,
+        receivedReplies: built.receivedReplies,
+        skeletonMatchCount: built.skeletonMatchCount,
+        originalOrder: result.thread.replies.slice(0, 10).map((event, originalIndex) => ({
+          originalIndex,
+          eventId: event.id,
+          contentLength: event.content.length,
+        })),
+        sortedOrder: built.sortedMatches.slice(0, 10),
+        visibleMatches: built.sortedMatches.filter((match) => match.skeletonIndex !== null),
+      });
+
+      return built;
+    },
+    [eventId, replySort]
+  );
+
+  const loadMoreReplies = useCallback(async () => {
+    if (
+      !eventId ||
+      isInitialFetchingRef.current ||
+      isLoadingMoreRepliesRef.current ||
+      !hasMoreRepliesRef.current ||
+      !threadSeedRef.current
+    ) {
+      return;
+    }
+
+    const generation = requestGenerationRef.current;
+    const offset = replyOffsetRef.current;
+    const seed = threadSeedRef.current;
+    const controller = new AbortController();
+    loadMoreAbortControllerRef.current?.abort();
+    loadMoreAbortControllerRef.current = controller;
+    isLoadingMoreRepliesRef.current = true;
+    setIsLoadingMoreReplies(true);
+
+    const client = getFeedClient();
+
+    feedLog.info('thread.replies.load_more.start', {
+      eventId,
+      limit: THREAD_REPLY_PAGE_SIZE,
+      offset,
+      replySort,
+    });
+
+    try {
+      const result = await client.getThread({
+        eventId,
+        limit: THREAD_REPLY_PAGE_SIZE,
+        offset,
+        sort: replySort,
+        viewerPubkey,
+        seed,
+        signal: controller.signal,
+      });
+      if (generation !== requestGenerationRef.current) return;
+
+      replyOffsetRef.current += result.loadedReplyCount;
+      if (result.loadedReplyCount === 0) {
+        hasMoreRepliesRef.current = false;
+        setHasMoreReplies(false);
+        return;
+      }
+
+      if (!applyThreadResult(result, 'more')) {
+        hasMoreRepliesRef.current = false;
+        setHasMoreReplies(false);
+      }
+    } catch (err) {
+      if (generation === requestGenerationRef.current) {
+        feedLog.error('thread.replies.load_more.error', {
+          eventId,
+          replySort,
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+      }
+    } finally {
+      if (loadMoreAbortControllerRef.current === controller) {
+        loadMoreAbortControllerRef.current = null;
+      }
+      client.dispose?.();
+      if (generation === requestGenerationRef.current) {
+        isLoadingMoreRepliesRef.current = false;
+        setIsLoadingMoreReplies(false);
+      }
+    }
+  }, [applyThreadResult, eventId, replySort, viewerPubkey]);
+
   useEffect(() => {
     if (!eventId) return;
 
     let cancelled = false;
+    const preservedSeed = threadSeedRef.current;
+    const eventChanged = currentEventIdRef.current !== eventId;
+    currentEventIdRef.current = eventId;
+    const generation = requestGenerationRef.current + 1;
+    requestGenerationRef.current = generation;
+    const controller = new AbortController();
+    loadMoreAbortControllerRef.current?.abort();
+    loadMoreAbortControllerRef.current = null;
+    isInitialFetchingRef.current = true;
+    isLoadingMoreRepliesRef.current = false;
+    replyOffsetRef.current = 0;
+    replyOrderRef.current = [];
+    threadSeedRef.current = null;
+    hasMoreRepliesRef.current = false;
     setError(null);
     setIsFetching(true);
+    setIsLoadingMoreReplies(false);
+    setHasMoreReplies(false);
 
-    const seed = consumeThreadSeed(eventId);
+    const seed = eventChanged
+      ? consumeThreadSeed(eventId)
+      : (preservedSeed ?? consumeThreadSeed(eventId));
     if (seed) {
-      const seeded = buildThreadStructure(eventId, seed.allEvents);
-      if (seeded.target) {
-        const seededItems: ThreadItem[] = [
-          ...seeded.parents.map<ThreadItem>((event) => ({ type: 'parent', event })),
-          { type: 'target', event: seeded.target },
-        ];
+      threadSeedRef.current = seed;
+      const seeded = buildThreadItemsFromSeed(eventId, seed, charsPerLineRef.current);
+      if (seeded) {
+        replyOrderRef.current = seeded.items
+          .filter((item): item is Extract<ThreadItem, { type: 'reply' }> => item.type === 'reply')
+          .map((item) => item.event.id);
         profilesRef.current = seed.profiles;
         metricsRef.current = seed.metrics;
         quotedEventsRef.current = seed.quotedEvents;
-        setItems(seededItems);
-        setHiddenReplyCount(0);
+        setItems(seeded.items);
+        setHiddenReplyCount(seeded.hiddenReplyCount);
         setDataVersion((v) => v + 1);
         setIsLoading(false);
+        feedLog.info('thread.seed.applied', {
+          eventId,
+          seedEvents: seed.allEvents.size,
+          seedReplyPreviewIds: seed.replyPreviewEventIds?.map((id) => id.slice(0, 10)) ?? [],
+          renderedReplies: seeded.receivedReplies,
+          hiddenReplies: seeded.hiddenReplyCount,
+          expectedReplies: seeded.expectedReplies,
+        });
       } else {
         setIsLoading(true);
+        feedLog.warn('thread.seed.unusable', {
+          eventId,
+          seedEvents: seed.allEvents.size,
+          seedReplyPreviewIds: seed.replyPreviewEventIds?.map((id) => id.slice(0, 10)) ?? [],
+        });
       }
     } else {
       setItems([]);
@@ -160,154 +270,43 @@ export function useThread(eventId: string): UseThreadResult {
       setIsLoading(true);
     }
 
-    feedLog.info('thread.load.start', { eventId, seeded: !!seed });
+    feedLog.info('thread.load.start', {
+      eventId,
+      seeded: !!seed,
+      replySort,
+      viewerPubkey: !!viewerPubkey,
+    });
 
     const fetchThread = async () => {
-      const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
+      const client = getFeedClient();
 
       try {
-        const prefix = nextRequestPrefix();
-
-        const buckets: MergeBuckets = {
-          allEvents: seed ? new Map(seed.allEvents) : new Map<string, FeedEvent>(),
-          profiles: seed ? new Map(seed.profiles) : new Map<string, ProfileInfo>(),
-          metrics: seed ? new Map(seed.metrics) : new Map<string, NoteMetrics>(),
-          embeddedMentions: seed ? new Map(seed.quotedEvents) : new Map<string, FeedEvent>(),
-        };
-
-        const phase1Raw = await client.request(`${prefix}_thread`, {
-          cache: ['thread_view', { event_id: eventId, limit: 200 }],
+        const result = await client.getThread({
+          eventId,
+          limit: THREAD_REPLY_PAGE_SIZE,
+          offset: 0,
+          sort: replySort,
+          viewerPubkey,
+          seed,
+          signal: controller.signal,
         });
-        if (cancelled) return;
-        mergeRawEvents(phase1Raw, buckets);
+        if (cancelled || generation !== requestGenerationRef.current) return;
+        replyOffsetRef.current = result.loadedReplyCount;
 
-        const initial = buildThreadStructure(eventId, buckets.allEvents);
-        if (!initial.target) {
+        if (!applyThreadResult(result, 'initial')) {
           setError('Post not found');
           setIsLoading(false);
           setIsFetching(false);
           return;
         }
 
-        const suppExpected = buckets.metrics.get(eventId)?.replyCount ?? 0;
-        const shouldFetchSupplementary =
-          initial.replies.length === 0 || suppExpected > initial.replies.length;
-        let thread = initial;
-        if (shouldFetchSupplementary && !cancelled) {
-          try {
-            const suppRaw = await client.request(`${prefix}_supp`, {
-              cache: ['event_replies', { event_id: eventId, limit: 50 }],
-            });
-            if (!cancelled) {
-              const { foundNewNote } = mergeRawEvents(suppRaw, buckets, {
-                skipExistingEvents: true,
-              });
-              if (foundNewNote) {
-                const rebuilt = buildThreadStructure(eventId, buckets.allEvents);
-                if (rebuilt.target) thread = rebuilt;
-              }
-            }
-          } catch (err) {
-            feedLog.warn('thread.supp_fetch_failed', {
-              eventId,
-              error: err instanceof Error ? err : new Error(String(err)),
-            });
-          }
-        }
-
-        if (cancelled) return;
-
-        const contentSources = [thread.target!, ...thread.parents, ...thread.replies];
-        const { eventIds: referencedEventIds, pubkeys: inlineMentionPubkeys } =
-          collectReferencedIds(contentSources);
-        const quotedEvents = new Map<string, FeedEvent>(buckets.embeddedMentions);
-        const missingQuotedIds = referencedEventIds.filter((id) => !quotedEvents.has(id));
-
-        if (missingQuotedIds.length > 0) {
-          const quotedRaw = await client.request(`${prefix}_quoted`, {
-            cache: ['events', { event_ids: missingQuotedIds }],
-          });
-          if (!cancelled) {
-            mergeRawEvents(quotedRaw, buckets, { includeAsQuoted: quotedEvents });
-          }
-        }
-
-        const neededPubkeys = new Set(inlineMentionPubkeys);
-        for (const ev of contentSources) neededPubkeys.add(ev.pubkey);
-        for (const ev of quotedEvents.values()) neededPubkeys.add(ev.pubkey);
-        const missingProfilePubkeys = Array.from(neededPubkeys).filter(
-          (pk) => !buckets.profiles.has(pk)
-        );
-
-        if (missingProfilePubkeys.length > 0) {
-          const profileRaw = await client.request(`${prefix}_profiles`, {
-            cache: ['user_infos', { pubkeys: missingProfilePubkeys }],
-          });
-          if (!cancelled) mergeRawEvents(profileRaw, buckets);
-        }
-
-        if (cancelled) return;
-
-        const target = thread.target!;
-        const targetMetrics = buckets.metrics.get(eventId);
-        const expectedReplies = targetMetrics?.replyCount ?? 0;
-        const skeletonMatchCount = Math.min(
-          MAX_REPLY_SKELETON_COUNT,
-          targetMetrics?.replyCount ?? DEFAULT_REPLY_SKELETON_COUNT
-        );
-        const sortedReplies = sortRepliesForSkeletons(
-          thread.replies,
-          skeletonMatchCount,
-          charsPerLineRef.current
-        );
-        const replies = sortedReplies.replies;
-        const nextItems: ThreadItem[] = [
-          ...thread.parents.map<ThreadItem>((event) => ({ type: 'parent', event })),
-          { type: 'target', event: target },
-          ...replies.map<ThreadItem>((event, index) => ({
-            type: 'reply',
-            event,
-            skeletonMatch: sortedReplies.matches[index],
-          })),
-        ];
-
-        const hidden = Math.max(0, expectedReplies - replies.length);
-
-        feedLog.info('thread.load.done', {
-          eventId,
-          parents: thread.parents.length,
-          replies: thread.replies.length,
-          profiles: buckets.profiles.size,
-          hiddenReplies: hidden,
-        });
-
-        feedLog.info('thread.reply_skeleton.sort', {
-          eventId,
-          expectedReplies,
-          receivedReplies: thread.replies.length,
-          skeletonMatchCount,
-          originalOrder: thread.replies.slice(0, 10).map((event, originalIndex) => ({
-            originalIndex,
-            eventId: event.id,
-            contentLength: event.content.length,
-          })),
-          sortedOrder: sortedReplies.matches.slice(0, 10),
-          visibleMatches: sortedReplies.matches.filter((match) => match.skeletonIndex !== null),
-        });
-
-        profilesRef.current = buckets.profiles;
-        metricsRef.current = buckets.metrics;
-        quotedEventsRef.current = quotedEvents;
-
-        setItems(nextItems);
-        setHiddenReplyCount(hidden);
-        setDataVersion((v) => v + 1);
         setIsLoading(false);
         setIsFetching(false);
       } catch (err) {
-        if (!cancelled) {
+        if (!cancelled && generation === requestGenerationRef.current) {
           feedLog.error('thread.load.error', {
             eventId,
+            replySort,
             error: err instanceof Error ? err : new Error(String(err)),
           });
           if (!seed) {
@@ -317,7 +316,10 @@ export function useThread(eventId: string): UseThreadResult {
           setIsFetching(false);
         }
       } finally {
-        client.close();
+        client.dispose?.();
+        if (!cancelled && generation === requestGenerationRef.current) {
+          isInitialFetchingRef.current = false;
+        }
       }
     };
 
@@ -327,19 +329,30 @@ export function useThread(eventId: string): UseThreadResult {
 
     return () => {
       cancelled = true;
+      if (requestGenerationRef.current === generation) requestGenerationRef.current += 1;
+      controller.abort();
+      loadMoreAbortControllerRef.current?.abort();
+      loadMoreAbortControllerRef.current = null;
+      isInitialFetchingRef.current = false;
+      isLoadingMoreRepliesRef.current = false;
       task.cancel();
     };
-  }, [eventId]);
+  }, [applyThreadResult, eventId, replySort, viewerPubkey]);
 
   return {
     items,
     hiddenReplyCount,
     isLoading,
     isFetching,
+    isLoadingMoreReplies,
+    hasMoreReplies,
+    replySort,
+    setReplySort,
     error,
     dataVersion,
     profilesRef,
     metricsRef,
     quotedEventsRef,
+    loadMoreReplies,
   };
 }

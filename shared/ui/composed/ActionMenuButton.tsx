@@ -20,11 +20,11 @@
  *
  * Disabled variants remain visible in the menu with their `reason` rendered as a
  * `Menu.ItemDescription`, matching the pattern used by availability.ts in
- * coco-payment-ux.
+ * colada.
  */
 
 import React, { useCallback, useRef } from 'react';
-import { StyleProp, ViewStyle } from 'react-native';
+import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 
 import { Button } from '@/shared/ui/primitives/Button';
@@ -32,6 +32,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon from 'assets/icons';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { log } from '@/shared/lib/logger';
 
 export interface ActionMenuVariant {
   /** Stable id — e.g. 'text' | 'emoji' | 'ecash' | 'lightning' | 'offlineEcash' | 'onchain'. */
@@ -132,8 +133,16 @@ export function ActionMenuButton({
 
   const handlePrimaryPress = useCallback(async () => {
     if (!defaultVariant || primaryDisabled) return;
-    await defaultVariant.onPress();
-  }, [defaultVariant, primaryDisabled]);
+    try {
+      await defaultVariant.onPress();
+    } catch (error) {
+      log.error('ui.action_menu.primary_action_failed', {
+        testID,
+        variantId: defaultVariant.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [defaultVariant, primaryDisabled, testID]);
 
   const primaryIconNode = icon ? <Icon name={icon} size={18} /> : undefined;
 
@@ -246,7 +255,7 @@ function renderMenuPortal(
         } as const);
 
   return (
-    <Menu.Portal>
+    <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
       <MenuScrim />
       <Menu.Content {...contentProps}>
         {title ? (
@@ -261,7 +270,18 @@ function renderMenuPortal(
             isDisabled={v.isDisabled}
             variant={v.isDestructive ? 'danger' : 'default'}
             onPress={() => {
-              void v.onPress();
+              if (v.isDisabled) return;
+              void (async () => {
+                try {
+                  await v.onPress();
+                } catch (error) {
+                  log.error('ui.action_menu.menu_action_failed', {
+                    testID: v.testID ?? (rootTestID ? `${rootTestID}-menu-${v.id}` : undefined),
+                    variantId: v.id,
+                    error: error instanceof Error ? error.message : String(error),
+                  });
+                }
+              })();
             }}>
             <HStack align="center" gap={10} style={{ flex: 1 }}>
               {v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}

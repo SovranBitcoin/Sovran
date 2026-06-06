@@ -8,7 +8,7 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 interface CachedMintProfile {
   followers: number;
-  reputation: number;
+  reputation: number | null;
   timestamp: number;
 }
 
@@ -18,7 +18,7 @@ interface MintProfileState {
 
 interface MintProfileActions {
   getCached: (mintUrl: string) => CachedMintProfile | undefined;
-  setCached: (mintUrl: string, followers: number, reputation: number) => void;
+  setCached: (mintUrl: string, followers: number, reputation: number | null) => void;
   isStale: (mintUrl: string, maxAgeMinutes?: number) => boolean;
 }
 
@@ -30,7 +30,7 @@ const PersistedMintProfileStore = z.object({
       z.string().max(2048),
       z.looseObject({
         followers: z.number().int().nonnegative(),
-        reputation: z.number(),
+        reputation: z.number().nullable(),
         timestamp: z.number().int().nonnegative(),
       })
     )
@@ -47,7 +47,7 @@ export const useMintProfileStore = create<MintProfileStore>()(
           return get().cache[normalizeMintUrlKey(mintUrl)];
         },
 
-        setCached: (mintUrl: string, followers: number, reputation: number) => {
+        setCached: (mintUrl: string, followers: number, reputation: number | null) => {
           const normalized = normalizeMintUrlKey(mintUrl);
           storeLog.debug('store.mint_profile.set_cached', {
             mintUrl: normalized,

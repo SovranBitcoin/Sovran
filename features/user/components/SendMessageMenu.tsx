@@ -41,13 +41,30 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
     const list: ActionMenuVariant[] = [
       {
         id: 'nostr',
-        label: 'Nostr DM',
+        label: 'Nostr DM (NIP-17)',
         description: 'Encrypted (NIP-17 gift wrap)',
         icon: 'mdi:message-text',
         testID: 'send-message-menu-nostr',
         onPress: () => {
-          nostrLog.info('user.profile.send_message', { pubkey, transport: 'nostr' });
+          nostrLog.info('user.profile.send_message', { pubkey, transport: 'nip17' });
           router.navigate(buildProfileHref('userMessages', { pubkey }, profileFlowGroup) as never);
+        },
+      },
+      {
+        id: 'nip04',
+        label: 'Legacy DM (NIP-04)',
+        description: 'Encrypted (NIP-04) — compatible with older clients',
+        icon: 'mdi:message-outline',
+        testID: 'send-message-menu-nip04',
+        onPress: () => {
+          nostrLog.info('user.profile.send_message', { pubkey, transport: 'nip04' });
+          router.navigate(
+            buildProfileHref(
+              'userMessages',
+              { pubkey, protocol: 'nip04' },
+              profileFlowGroup
+            ) as never
+          );
         },
       },
     ];

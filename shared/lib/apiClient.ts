@@ -1,22 +1,37 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
-import { combineSignals, isAbortError, timeoutSignal, type RequestControls } from 'coco-payment-ux';
-import { ok, err, Result } from 'neverthrow';
+import {
+  combineSignals,
+  createNostrGraphqlMintEnrichment,
+  isAbortError,
+  timeoutSignal,
+  type MintReviewRecommendation,
+  type MintReviewsSummary,
+  type RequestControls,
+} from '@sovranbitcoin/colada';
+import {
+  createNaggClient,
+  NaggProfileSearchDataSchema,
+  type NaggProfileSearchResult,
+} from '@sovranbitcoin/nagg-ts';
+import { PROFILE_SEARCH_QUERY, profileSearchInput } from '@sovranbitcoin/nagg-ts/recipes';
+import { ok, err, Result, ResultAsync } from 'neverthrow';
 import { z } from 'zod';
 import { apiLog } from './logger';
 import {
   AuditMintResponse as AuditMintResponseStrict,
   CatalogResponse,
   LatestVersionResponse,
-  MintReviewsResponse,
   MintSearchResponse,
-  NostrProfileFull,
+  NostrProfileFull as NostrProfileFullStrict,
   SearchUsersResponse,
+  TopFollower as TopFollowerStrict,
   loggableIssues,
   parseWith,
-  type MintRecommendation,
+  type MintRecommendation as SchemaMintRecommendation,
   type MintSearchResult,
   type ParseError,
 } from '@sovranbitcoin/schemas';
+import { backendConfig } from '@/shared/config/backend';
 
 // Local relaxation: the auditor returns `info` in several shapes depending
 // on the upstream mint state — sometimes a NUT-06 object, sometimes null,
@@ -31,26 +46,70 @@ const AuditMintResponse = AuditMintResponseStrict.extend({
 });
 type AuditMintResponseType = z.infer<typeof AuditMintResponse>;
 
-const BASE_URL = 'https://api.sovran.money/api';
+// Local compatibility while the shared package release catches up to the
+// live `/nostr/profile` wire shape. Vertex can return `null` when pagerank,
+// created_at, or node count are not computable; rejecting the whole profile
+// would drop otherwise useful follower/name/picture data.
+const NullableVertexMetric = z.number().nullable();
+const TopFollower = TopFollowerStrict.extend({
+  score: NullableVertexMetric.optional(),
+});
+const NostrProfileFull = NostrProfileFullStrict.extend({
+  score: NullableVertexMetric,
+  created_at: z.number().int().nullable(),
+  nodes: z.number().int().nonnegative().nullable().optional(),
+  topFollowers: z.array(TopFollower).max(500),
+});
+type NostrProfileFullType = z.infer<typeof NostrProfileFull>;
+export type MintRecommendation = SchemaMintRecommendation &
+  Partial<Pick<MintReviewRecommendation, 'name' | 'displayName' | 'picture' | 'image'>>;
+type MintReviewsResponseType = {
+  mintUrl: string;
+  score: number | null;
+  recommendations: MintRecommendation[];
+  lastUpdated: number | null;
+  fromCache: boolean;
+};
+type SearchUsersResponseType = z.infer<typeof SearchUsersResponse>;
+
+const API_BASE_URL = backendConfig.apiBaseUrl;
+const SCORE_API_BASE_URL = backendConfig.scoreApiBaseUrl;
 
 /**
  * Default per-request budget. React Native's `fetch` has no native timeout;
  * a request that never settles wedges the screen's loading state until the
  * OS reaps the socket — minutes on cellular. Every helper enforces this
  * unless the caller passes a tighter signal. The wallet endpoints sit
- * behind sovran.money so use a tighter budget than coco-payment-ux's
+ * behind sovran.money so use a tighter budget than colada's
  * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
  */
 const DEFAULT_TIMEOUT_MS = 10_000;
+const mintReviewsEnrichment = createNostrGraphqlMintEnrichment({
+  endpoint: backendConfig.nostrGraphqlEndpoint,
+  timeoutMs: DEFAULT_TIMEOUT_MS,
+});
+const nostrGraphqlClient = createNaggClient({
+  endpoint: backendConfig.nostrGraphqlEndpoint,
+  // Expose nagg's REST app-view (/v1/nostr/*) alongside GraphQL. `transport`
+  // defaults to 'graphql', so behavior is unchanged until a query opts in with
+  // `transport: 'appview'` + an `appView` binding (see nagg-ts NaggAppViewBinding).
+  appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
+  defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
+});
 
 // Re-export schema-derived types for callers that previously imported them
 // from this module.
-export type { AuditMintResponseType as AuditMintResponse, MintRecommendation, MintSearchResult };
-export type { NostrProfileFull, NostrSearchResult } from '@sovranbitcoin/schemas';
+export type {
+  AuditMintResponseType as AuditMintResponse,
+  MintReviewsResponseType as MintReviewsResponse,
+  MintSearchResult,
+  NostrProfileFullType as NostrProfileFull,
+};
+export type { NostrSearchResult } from '@sovranbitcoin/schemas';
 
-// Re-export coco-payment-ux's cancellable-fetch primitives so existing
+// Re-export colada's cancellable-fetch primitives so existing
 // `@/shared/lib/apiClient` consumers don't have to learn the new import
-// path. `coco-payment-ux/safeFetch` is the canonical implementation.
+// path. `colada/safeFetch` is the canonical implementation.
 export { isAbortError };
 
 type FetchOrParseError = Error | ParseError;
@@ -62,6 +121,33 @@ function toError(e: FetchOrParseError): Error {
     return new Error(`${(e as ParseError).where}: ${issues} schema issue(s)`);
   }
   return new Error('unknown error');
+}
+
+function toUnknownError(e: unknown): Error {
+  return e instanceof Error ? e : new Error(typeof e === 'string' ? e : 'Unknown error');
+}
+
+function normalizeMintReviewsSummary(
+  mintUrl: string,
+  summary: MintReviewsSummary | undefined
+): MintReviewsResponseType {
+  return {
+    mintUrl: summary?.mintUrl ?? mintUrl,
+    score: summary?.score ?? null,
+    recommendations: (summary?.recommendations ?? []).map((review) => ({
+      score: review.score,
+      comment: review.comment,
+      pubkey: review.pubkey,
+      eventId: review.eventId,
+      created_at: review.created_at,
+      ...(review.name ? { name: review.name } : {}),
+      ...(review.displayName ? { displayName: review.displayName } : {}),
+      ...(review.picture ? { picture: review.picture } : {}),
+      ...(review.image ? { image: review.image } : {}),
+    })),
+    lastUpdated: summary?.lastUpdated ?? null,
+    fromCache: summary?.fromCache ?? true,
+  };
 }
 
 /**
@@ -152,11 +238,10 @@ export async function fetchStatus(
 }
 
 /**
- * Logger-safe URL projection. Query strings carry user-entered PII for
- * `nostr/search` (names, NIP-05 addresses) and arbitrary mint URLs for
- * `cashu/mint/*`; the ring buffer can be exported via `dumpForLLM`, so we
- * never let the raw query reach a log line. Host + path is enough to
- * disambiguate routes during triage.
+ * Logger-safe URL projection. Query strings can carry user-entered PII for
+ * profile search and arbitrary mint URLs for `cashu/mint/*`; the ring buffer
+ * can be exported via `dumpForLLM`, so we never let the raw query reach a log
+ * line. Host + path is enough to disambiguate routes during triage.
  */
 function describeRoute(url: string): { host: string; path: string } {
   try {
@@ -171,9 +256,8 @@ function describeRoute(url: string): { host: string; path: string } {
 // Parsers — hoisted to module scope to avoid Zod v4 JIT cost on each call.
 // ---------------------------------------------------------------------------
 
-const parseSearchUsers = parseWith(SearchUsersResponse, 'nostr/search');
+const parseSearchUsers = parseWith(SearchUsersResponse, 'graphql.profileSearch');
 const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
-const parseMintReviews = parseWith(MintReviewsResponse, 'cashu/mint/reviews');
 const parseMintSearch = parseWith(MintSearchResponse, 'cashu/mints/search');
 const parseNostrProfile = parseWith(NostrProfileFull, 'nostr/profile');
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
@@ -206,11 +290,43 @@ const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
   return ok(input as GetInfoResponse);
 };
 
+function profileSearchCreatedAtSeconds(value: NaggProfileSearchResult['createdAt']) {
+  if (value == null) return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? Math.floor(value) : undefined;
+  const ms = value instanceof Date ? value.getTime() : Date.parse(value);
+  if (!Number.isFinite(ms)) return undefined;
+  return Math.floor(ms / 1000);
+}
+
+function mapProfileSearchResult(row: NaggProfileSearchResult) {
+  const createdAt = profileSearchCreatedAtSeconds(row.createdAt);
+  return {
+    pubkey: row.pubkey,
+    npub: row.npub,
+    ...(typeof row.rank === 'number' ? { rank: row.rank } : {}),
+    ...(typeof row.score === 'number' || row.score === null ? { score: row.score } : {}),
+    ...(row.name ? { name: row.name } : {}),
+    ...(row.displayName ? { displayName: row.displayName } : {}),
+    ...(row.picture ? { picture: row.picture } : {}),
+    ...(row.image ? { image: row.image } : {}),
+    ...(row.banner ? { banner: row.banner } : {}),
+    ...(row.about ? { about: row.about } : {}),
+    ...(row.nip05 ? { nip05: row.nip05 } : {}),
+    ...(typeof row.nip05Valid === 'boolean' ? { nip05Valid: row.nip05Valid } : {}),
+    ...(row.website ? { website: row.website } : {}),
+    ...(row.lud16 ? { lud16: row.lud16 } : {}),
+    ...(row.lud06 ? { lud06: row.lud06 } : {}),
+    ...(typeof row.followers === 'number' ? { followers: row.followers } : {}),
+    ...(typeof row.follows === 'number' ? { follows: row.follows } : {}),
+    ...(createdAt !== undefined ? { created_at: createdAt } : {}),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API client functions
 // ---------------------------------------------------------------------------
 
-export const searchUsers = ({
+export const searchUsers = async ({
   query,
   limit = 10,
   signal,
@@ -218,34 +334,88 @@ export const searchUsers = ({
   query: string;
   limit?: number;
   signal?: AbortSignal;
-}) => {
-  const params = new URLSearchParams({ query, limit: String(limit) });
-  return fetchJson(
-    `${BASE_URL}/nostr/search?${params}`,
-    parseSearchUsers,
-    'nostr/search',
-    undefined,
-    { signal }
-  );
+}): Promise<Result<SearchUsersResponseType, Error>> => {
+  const startedAt = Date.now();
+  const route = describeRoute(backendConfig.nostrGraphqlEndpoint);
+  const logFields = {
+    ...route,
+    operationName: 'ProfileSearch',
+    queryLength: query.trim().length,
+    limit,
+  };
+
+  apiLog.info('api.profile_search.start', logFields);
+  const result = await nostrGraphqlClient.query({
+    query: PROFILE_SEARCH_QUERY,
+    operationName: 'ProfileSearch',
+    variables: { input: profileSearchInput({ query, limit }) },
+    dataSchema: NaggProfileSearchDataSchema,
+    signal,
+  });
+
+  if (result.isErr()) {
+    apiLog.warn('api.profile_search.failed', {
+      ...logFields,
+      durationMs: Date.now() - startedAt,
+      errorType: result.error.type,
+      message: result.error.message,
+    });
+    return err(new Error(result.error.message));
+  }
+
+  const raw = {
+    query: result.value.profileSearch.query,
+    limit: result.value.profileSearch.limit,
+    sort: result.value.profileSearch.sort,
+    fromCache: result.value.profileSearch.fromCache,
+    results: result.value.profileSearch.nodes.map(mapProfileSearchResult),
+  };
+
+  const parsed = parseSearchUsers(raw);
+  if (parsed.isErr()) {
+    apiLog.warn('api.parse_failed', {
+      where: 'graphql.profileSearch',
+      issues: loggableIssues(parsed.error),
+    });
+    apiLog.warn('api.profile_search.failed', {
+      ...logFields,
+      durationMs: Date.now() - startedAt,
+      errorType: 'parse',
+    });
+    return err(toError(parsed.error));
+  }
+
+  apiLog.info('api.profile_search.done', {
+    ...logFields,
+    durationMs: Date.now() - startedAt,
+    resultCount: parsed.value.results.length,
+    fromCache: parsed.value.fromCache,
+  });
+  return ok(parsed.value);
 };
 
 export const auditMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
   fetchJson(
-    `${BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
+    `${API_BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
     parseAuditMint,
     'cashu/mint/audit',
     undefined,
     { signal }
   );
 
-export const reviewMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
-  fetchJson(
-    `${BASE_URL}/cashu/mint/reviews?mintUrl=${encodeURIComponent(mintUrl)}`,
-    parseMintReviews,
-    'cashu/mint/reviews',
-    undefined,
-    { signal }
-  );
+export const reviewMint = async ({
+  mintUrl,
+  signal,
+}: {
+  mintUrl: string;
+  signal?: AbortSignal;
+}): Promise<Result<MintReviewsResponseType, Error>> => {
+  const result = await ResultAsync.fromThrowable<[], MintReviewsSummary | undefined, Error>(
+    () => mintReviewsEnrichment.fetchMintReviews(mintUrl, { signal }),
+    toUnknownError
+  )();
+  return result.map((summary) => normalizeMintReviewsSummary(mintUrl, summary));
+};
 
 export const searchMints = ({
   query,
@@ -262,7 +432,7 @@ export const searchMints = ({
   signal?: AbortSignal;
 }) =>
   fetchJson(
-    `${BASE_URL}/cashu/mints/search?${new URLSearchParams({
+    `${API_BASE_URL}/cashu/mints/search?${new URLSearchParams({
       ...(query && { q: query }),
       ...(currency && currency !== 'ALL' && { currency }),
       ...(limit && { limit: String(limit) }),
@@ -282,7 +452,7 @@ export const getLatestVersion = ({
   signal?: AbortSignal;
 }) =>
   fetchJson(
-    `${BASE_URL}/app/latest-version`,
+    `${API_BASE_URL}/app/latest-version`,
     parseLatestVersion,
     'app/latest-version',
     {
@@ -295,7 +465,7 @@ export const getLatestVersion = ({
 
 export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}) =>
   fetchJson(
-    `${BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
+    `${SCORE_API_BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
     parseNostrProfile,
     'nostr/profile',
     undefined,
@@ -310,7 +480,7 @@ export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}
  */
 export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
   fetchJson(
-    `${BASE_URL}/wallpapers/catalog`,
+    `${API_BASE_URL}/wallpapers/catalog`,
     parseCatalog,
     'wallpapers/catalog',
     undefined,

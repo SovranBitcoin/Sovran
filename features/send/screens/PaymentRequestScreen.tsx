@@ -12,8 +12,8 @@
 import React from 'react';
 
 import type { SendHistoryEntry } from '@cashu/coco-core';
-import { isPaymentRequestPreview } from 'coco-payment-ux';
-import { useScreenActions } from 'coco-payment-ux/react';
+import { isPaymentRequestPreview } from '@sovranbitcoin/colada';
+import { useScreenActions } from '@sovranbitcoin/colada/react';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatAmount } from '@/shared/lib/currency';
@@ -73,13 +73,22 @@ export function PaymentRequestScreen({
     nostrSent,
   });
 
-  const anyLoading = actions.confirm.loading || actions.cancel.loading;
+  const anyLoading = actions.confirm.loading || actions.cancel.loading || actions.back.loading;
 
   const bottomButtons = (
     <BottomButtons>
       <HStack justify="center" align="center">
         <ButtonHandler
           buttons={[
+            {
+              testID: 'payment-request-close',
+              text: 'Close',
+              icon: 'ri:close-circle-line',
+              variant: 'secondary',
+              onPress: () => actions.back.execute(),
+              condition: !isPreview && actions.back.available,
+              disabled: anyLoading,
+            },
             {
               testID: 'payment-request-confirm',
               text: actions.confirm.loading ? 'Sending...' : 'Confirm',
@@ -94,10 +103,7 @@ export function PaymentRequestScreen({
               text: actions.cancel.loading ? 'Cancelling...' : 'Cancel',
               icon: actions.cancel.loading ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',
-              onPress: async () => {
-                await actions.cancel.execute();
-                onCancel();
-              },
+              onPress: onCancel,
               condition: actions.cancel.available,
               disabled: anyLoading,
             },

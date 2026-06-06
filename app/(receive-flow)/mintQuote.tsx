@@ -1,16 +1,16 @@
 /**
- * @fileoverview Receive-flow mintQuote route — final screen of an
- * active Lightning receive. The route body and zod schema live on
+ * @fileoverview Receive-flow legacy mintQuote route dispatcher. The route body and zod schema live on
  * `MintQuoteRoute`; this wrapper threads the mint-pill callbacks through
  * the active payment machine so the user can swap mints mid-flow.
- * `Stack.Screen` title comes from `(receive-flow)/_layout.tsx`.
+ * `MintQuoteRoute` dispatches to the rail-specific receive screen from the
+ * serialized entry.
  */
 
 import React, { useCallback } from 'react';
 import { z } from 'zod';
 
 import { MintQuoteRoute } from '@/features/receive';
-import { usePaymentFlowMachine } from 'coco-payment-ux/react';
+import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
