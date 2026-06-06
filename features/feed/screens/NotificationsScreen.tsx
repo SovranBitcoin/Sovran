@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -50,7 +50,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 // hits the server. ALL/MENTIONS are the server-backed tabs.
 type NotificationTab = FeedNotificationTab | 'APP';
 
-const NOTIFICATION_TABS: Array<{ id: NotificationTab; label: string }> = [
+const NOTIFICATION_TABS: { id: NotificationTab; label: string }[] = [
   { id: 'ALL', label: 'All' },
   { id: 'MENTIONS', label: 'Mentions' },
   { id: 'APP', label: 'App' },
@@ -124,6 +124,11 @@ export function NotificationsScreen() {
     paginationUntilRef.current = page?.paginationUntil ?? 0;
     hasMoreRef.current =
       !!page && page.paginationUntil > 0 && page.notifications.length >= NOTIFICATIONS_PAGE_SIZE;
+    feedLog.info('feed.notifications.ui.applied', {
+      notifications: page?.notifications.length ?? 0,
+      hasPage: !!page,
+      paginationUntil: page?.paginationUntil ?? 0,
+    });
     setResult(page);
   }, []);
 
@@ -355,6 +360,18 @@ export function NotificationsScreen() {
     }
     return buildNotificationListItems(notifications);
   }, [notifications, activeTab, seedCreatedAt, termsDate]);
+
+  // Render boundary for notifications: result rows → rendered list items, and
+  // whether the screen is empty. Cross-check with feed.notifications.fetch.done
+  // (data layer) to localize an empty notifications screen.
+  useEffect(() => {
+    feedLog.info('feed.notifications.ui.render', {
+      tab: activeTab,
+      notifications: notifications.length,
+      items: notificationItems.length,
+      empty: notificationItems.length === 0,
+    });
+  }, [notifications.length, notificationItems.length, activeTab]);
 
   return (
     <Screen name="NotificationsScreen" scroll="custom" bgColor={surface}>

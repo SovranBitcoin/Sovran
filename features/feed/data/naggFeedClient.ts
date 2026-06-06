@@ -834,6 +834,7 @@ async function runNaggQuery<TSchema extends z.ZodType>(
     ...endpointLogFields(),
   };
 
+  logBackendConfigOnce();
   apiLog.info('nagg.graphql.request.start', requestFields);
 
   const client = createNaggClient({
@@ -868,6 +869,24 @@ async function runNaggQuery<TSchema extends z.ZodType>(
         ...requestFields,
         durationMs,
       });
+    } else if (error.type === 'schema') {
+      // The canonical shape failed `dataSchema.safeParse` — this is the prime
+      // suspect for an EMPTY feed/notifications: the request succeeded but the
+      // client rejected the payload, so nothing reaches the UI. Log the exact
+      // failing field(s) so we can see which part of the live data the schema
+      // rejected.
+      apiLog.error('nagg.graphql.request.schema_error', {
+        ...requestFields,
+        durationMs,
+        issueCount: error.issues?.length ?? 0,
+        issues: (error.issues ?? []).slice(0, 10).map((issue) => ({
+          path: Array.isArray(issue.path)
+            ? issue.path.join('.')
+            : String((issue as { path?: unknown }).path ?? ''),
+          code: issue.code,
+          message: issue.message,
+        })),
+      });
     } else {
       const thrown = errorFromNaggError(error);
       const params = {
@@ -888,8 +907,41 @@ async function runNaggQuery<TSchema extends z.ZodType>(
     ...requestFields,
     durationMs,
     dataKeys: dataKeysOf(result.value),
+    resultCount: countCanonical(result.value),
   });
   return result.value;
+}
+
+// Logs the resolved backend config once per session: the endpoint + which
+// transport each view uses (GraphQL vs REST app-view). If feeds are empty
+// because a flag is unexpectedly enabling the REST path, this surfaces it.
+let loggedBackendConfig = false;
+function logBackendConfigOnce(): void {
+  if (loggedBackendConfig) return;
+  loggedBackendConfig = true;
+  apiLog.info('nagg.backend.config', {
+    graphqlEndpoint: backendConfig.nostrGraphqlEndpoint,
+    appViewBaseUrl: backendConfig.nostrAppViewBaseUrl,
+    feedAppView: backendConfig.nostrFeedAppView,
+    notificationsAppView: backendConfig.nostrNotificationsAppView,
+    dmAppView: backendConfig.nostrDmAppView,
+  });
+}
+
+// Counts the rows in a parsed canonical payload (feed items / notification nodes
+// / thread events) for log diagnostics — distinguishes "request returned data"
+// from "request returned an empty page".
+function countCanonical(value: unknown): number {
+  if (!value || typeof value !== 'object') return 0;
+  const v = value as {
+    items?: unknown[];
+    notifications?: { nodes?: unknown[] };
+    events?: unknown[];
+  };
+  if (Array.isArray(v.items)) return v.items.length;
+  if (v.notifications && Array.isArray(v.notifications.nodes)) return v.notifications.nodes.length;
+  if (Array.isArray(v.events)) return v.events.length;
+  return 0;
 }
 
 /**
@@ -1379,9 +1431,24 @@ type NaggFeedPageOf = NaggFeedPage<FeedEvent, ProfileInfo>;
  * connection into the canonical {@link NaggFeedPage}. Offset/until pagination is
  * the page's min `created_at` (set by `graphqlNodesToNaggPage`).
  */
+// Logs the GraphQL distiller's node→item conversion. A large drop (many nodes
+// in, few/zero items out) means the distiller is discarding the response — a key
+// EMPTY-feed signal, distinct from "no nodes returned" or "schema rejected".
+function logDistill(distiller: string, nodesIn: number, itemsOut: number): void {
+  feedLog.info('feed.nagg.distill', {
+    distiller,
+    nodesIn,
+    itemsOut,
+    dropped: nodesIn - itemsOut,
+  });
+}
+
 function eventsFeedToPage(data: unknown): NaggFeedPageOf {
   const feed = data as GraphqlFeedData;
-  return graphqlNodesToNaggPage(feed.events?.nodes ?? []) as NaggFeedPageOf;
+  const nodes = feed.events?.nodes ?? [];
+  const page = graphqlNodesToNaggPage(nodes) as NaggFeedPageOf;
+  logDistill('events', nodes.length, page.items.length);
+  return page;
 }
 
 /**
@@ -1396,13 +1463,17 @@ function rankedFeedToPage(data: unknown): NaggFeedPageOf {
   if (feed.rankedEvents) {
     const nodes = feed.rankedEvents.nodes ?? [];
     const page = graphqlNodesToNaggPage(nodes) as NaggFeedPageOf;
+    logDistill('ranked', nodes.length, page.items.length);
     return {
       ...page,
       paginationUntil: nodes.length > 0 ? 1 : 0,
       paginationOffset: nodes.length,
     };
   }
-  return graphqlNodesToNaggPage(feed.events?.nodes ?? []) as NaggFeedPageOf;
+  const nodes = feed.events?.nodes ?? [];
+  const page = graphqlNodesToNaggPage(nodes) as NaggFeedPageOf;
+  logDistill('ranked-events-fallback', nodes.length, page.items.length);
+  return page;
 }
 
 /**
@@ -1412,13 +1483,16 @@ function rankedFeedToPage(data: unknown): NaggFeedPageOf {
  */
 function followingRepliesToPage(data: unknown): NaggFeedPageOf {
   const feed = data as GraphqlFeedData;
-  return graphqlNodesToNaggPage(feed.events?.nodes ?? [], {
+  const nodes = feed.events?.nodes ?? [];
+  const page = graphqlNodesToNaggPage(nodes, {
     parentForNode: (node) =>
       node.rootContext?.nodes?.[0] ??
       node.parentReplyRefs?.nodes?.[0] ??
       node.parentRootRefs?.nodes?.[0] ??
       node.eventRefs?.nodes?.[0],
   }) as NaggFeedPageOf;
+  logDistill('following-replies', nodes.length, page.items.length);
+  return page;
 }
 
 /**
@@ -1676,6 +1750,7 @@ function notificationsToPage(data: unknown): NaggNotificationsPage {
       ...target,
     });
   }
+  logDistill('notifications', sourceNodes.length, nodes.length);
   return {
     notifications: {
       nodes,
@@ -2093,7 +2168,19 @@ export function createNaggFeedClient(): FeedClient {
         signal,
         timeoutMs,
       });
-      return notificationsResultFromPage(page);
+      const result = notificationsResultFromPage(page);
+      feedLog.info('feed.notifications.fetch.done', {
+        transport: backendConfig.nostrNotificationsAppView ? 'appview' : 'graphql',
+        tab,
+        policy,
+        replyScope,
+        pageNodes: page.notifications.nodes.length,
+        results: result.notifications.length,
+        metrics: result.metricsMap.size,
+        profiles: result.profilesMap.size,
+        paginationUntil: result.paginationUntil,
+      });
+      return result;
     },
 
     async getThread({

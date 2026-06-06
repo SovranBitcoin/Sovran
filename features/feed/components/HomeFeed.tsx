@@ -22,7 +22,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { log, Log } from '@/shared/lib/logger';
+import { log, Log, feedLog } from '@/shared/lib/logger';
 import {
   LegendList,
   type LegendListRenderItemProps,
@@ -261,6 +261,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     async (specIndex: number, isRefresh = false) => {
       const spec = feedSpecs[specIndex]?.spec;
       if (!spec) return;
+      feedLog.info('feed.ui.load', {
+        spec: feedSpecs[specIndex]?.name,
+        specIndex,
+        isRefresh,
+        hasViewer: !!userPubkey,
+      });
       const cacheKey = feedPageKey(spec, userPubkey);
 
       // Applies a page-0 result to state + pagination refs. Used both for the
@@ -343,6 +349,12 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
 
         if (!isActiveLoad(requestId)) return;
 
+        feedLog.info('feed.ui.fetch.applied', {
+          spec: feedSpecs[specIndex]?.name,
+          items: phase1.orderedFeedItems.length,
+          paginationUntil: phase1.paginationUntil,
+          isRefresh,
+        });
         applyPhase1(phase1);
         feedPageCache.setEntry(cacheKey, phase1, { viewerKey: userPubkey || '' });
         feedPageCache.markTouched(cacheKey);
@@ -718,6 +730,20 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   useEffect(() => {
     feedRowsRef.current = feedRows;
   }, [feedRows]);
+
+  // Render boundary: how many feed items became rendered rows, and whether the
+  // screen is currently showing the empty state. `feedItems > 0 && rows === 0`
+  // means a render-stage drop; `empty: true` with items 0 after load means the
+  // data layer returned nothing (cross-check feed.nagg.* logs above).
+  useEffect(() => {
+    feedLog.info('feed.ui.render', {
+      spec: feedSpecs[activeSpecIndex]?.name,
+      feedItems: feedItems.length,
+      rows: feedRows.length,
+      isLoading,
+      empty: !isLoading && feedRows.length === 0,
+    });
+  }, [feedItems.length, feedRows.length, isLoading, activeSpecIndex, feedSpecs]);
 
   const renderFeedItem = useCallback(
     ({ item: row, index }: LegendListRenderItemProps<FeedRow, string | undefined>) => {
