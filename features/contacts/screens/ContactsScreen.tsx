@@ -212,6 +212,7 @@ export const ContactsScreen = () => {
             dmEvent: null,
             nip17Content: undefined,
             timestamp: 0,
+            protocol: 'whitenoise' as const,
           }))
         : [],
     [whitenoiseEnabled, whitenoiseDmEntries]
@@ -311,6 +312,14 @@ export const ContactsScreen = () => {
         lastMessage
           ? formatRelative(item.timestamp * 1000, 'compact')
           : undefined;
+      // Label non-default DM protocols so a NIP-04 / White Noise conversation is
+      // distinguishable from the default NIP-17 in the now-mixed list.
+      const protocolLabel =
+        item.type === 'contact' && item.protocol === 'nip04'
+          ? 'NIP-04'
+          : item.type === 'contact' && item.protocol === 'whitenoise'
+            ? 'White Noise'
+            : undefined;
       // Don't drive the avatar's loading skeleton off "profile is missing":
       // for strangers (Marmot DM accept, Requests pill) kind-0 may simply not
       // be on our relay set, so missing IS the steady state.
@@ -343,8 +352,10 @@ export const ContactsScreen = () => {
           subtitle={lastMessage}
           hideMetadata={!!lastMessage}
           titleTrailing={
-            lastMessageAt ? (
-              <Text style={{ fontSize: 12, color: muted }}>{lastMessageAt}</Text>
+            protocolLabel || lastMessageAt ? (
+              <Text style={{ fontSize: 12, color: muted }}>
+                {[protocolLabel, lastMessageAt].filter(Boolean).join(' · ')}
+              </Text>
             ) : undefined
           }
           onPress={() => navigateToProfile(item.pubkey, mintUrl)}

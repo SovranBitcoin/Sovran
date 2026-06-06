@@ -7,13 +7,13 @@ import {
   type MintReviewRecommendation,
   type MintReviewsSummary,
   type RequestControls,
-} from 'colada';
+} from '@sovranbitcoin/colada';
 import {
   createNaggClient,
   NaggProfileSearchDataSchema,
   type NaggProfileSearchResult,
-} from 'nagg-ts';
-import { PROFILE_SEARCH_QUERY, profileSearchInput } from 'nagg-ts/recipes';
+} from '@sovranbitcoin/nagg-ts';
+import { PROFILE_SEARCH_QUERY, profileSearchInput } from '@sovranbitcoin/nagg-ts/recipes';
 import { ok, err, Result, ResultAsync } from 'neverthrow';
 import { z } from 'zod';
 import { apiLog } from './logger';

@@ -35,7 +35,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
 import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
-import { isReservedSendHistoryEntry } from 'colada';
+import { isReservedSendHistoryEntry } from '@sovranbitcoin/colada';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
 import { amountToNumber } from '@/shared/lib/cashu/amount';

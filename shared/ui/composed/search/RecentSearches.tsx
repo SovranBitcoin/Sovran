@@ -28,6 +28,10 @@ const DEFAULT_PROMPT: EmptySearchPrompt = {
   subtitle: 'Enter a name, NIP-05, npub, mint, or place to get started',
 };
 
+// Recent queries are still collected (see UnifiedSearch's addQuery effect) but
+// not surfaced as chips for now. Flip to true to re-enable the section.
+const SHOW_RECENT_SEARCH_CHIPS = false;
+
 export function RecentSearches({
   surface,
   onPickQuery,
@@ -47,7 +51,7 @@ export function RecentSearches({
       keyboardShouldPersistTaps="always"
       keyboardDismissMode="on-drag"
       showsVerticalScrollIndicator={false}>
-      {queries.length > 0 ? (
+      {SHOW_RECENT_SEARCH_CHIPS && queries.length > 0 ? (
         <View style={styles.section}>
           <HStack align="center" justify="space-between" style={styles.sectionTitle}>
             <Text bold size={15} color={foreground}>

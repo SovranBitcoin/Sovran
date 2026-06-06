@@ -4,7 +4,7 @@ import { StyleSheet } from 'react-native';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
-import { getHistoryEntryRefreshLabel } from 'colada';
+import { getHistoryEntryRefreshLabel } from '@sovranbitcoin/colada';
 
 import type { HistoryEntry } from '@cashu/coco-core';
 

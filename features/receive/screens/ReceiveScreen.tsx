@@ -12,10 +12,10 @@ import React, { memo, useEffect, useState } from 'react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
-import { useScreenActions, type UseScreenActionsResult } from 'colada/react';
+import { useScreenActions, type UseScreenActionsResult } from '@sovranbitcoin/colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
-import type { FormattedString } from 'colada';
+import type { FormattedString } from '@sovranbitcoin/colada';
 import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';

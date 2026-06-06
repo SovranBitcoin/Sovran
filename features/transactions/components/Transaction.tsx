@@ -16,7 +16,7 @@ import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
 import TransactionIcon from '@/features/transactions/components/TransactionIcon';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { isCancellablePendingEcash, isSendTokenCancelled } from 'colada';
+import { isCancellablePendingEcash, isSendTokenCancelled } from '@sovranbitcoin/colada';
 import {
   COLLAPSE_DURATION_MS,
   useIsCollapsing,

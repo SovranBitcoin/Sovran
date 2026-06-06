@@ -12,14 +12,14 @@ import {
   type NaggEventConnection,
   NaggDmConversationDataSchema,
   NaggDmEnvelopesDataSchema,
-} from 'nagg-ts';
+} from '@sovranbitcoin/nagg-ts';
 import {
   DM_CONVERSATION_QUERY,
   DM_ENVELOPES_QUERY,
   dmConversationInput,
   dmEnvelopesAppView,
   dmEnvelopesInput,
-} from 'nagg-ts/recipes';
+} from '@sovranbitcoin/nagg-ts/recipes';
 import { backendConfig } from '@/shared/config/backend';
 import { paymentLog } from '@/shared/lib/logger';
 

@@ -211,6 +211,24 @@ uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
       filePath: cashuTsEsmPath,
     };
   }
+  // Force the shared, type-bearing libs to the app's single copy. The
+  // `@sovranbitcoin/*` registry packages each ship a nested `zod`/`neverthrow`
+  // under their own `node_modules`, which Metro would otherwise bundle as
+  // separate realms — breaking cross-package `instanceof ZodError` / Result
+  // identity. Resolving these from the app root collapses them to one copy
+  // (mirrors the tsconfig `paths` pinning so bundle and type-check agree).
+  if (
+    moduleName === 'zod' ||
+    moduleName.startsWith('zod/') ||
+    moduleName === 'neverthrow' ||
+    moduleName.startsWith('neverthrow/')
+  ) {
+    return context.resolveRequest(
+      { ...context, originModulePath: path.join(__dirname, 'index.js') },
+      moduleName,
+      platform
+    );
+  }
   if (appReactEntryPaths[moduleName]) {
     return {
       type: 'sourceFile',

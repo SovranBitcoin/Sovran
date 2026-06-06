@@ -16,7 +16,7 @@ import {
   type NativeSyntheticEvent,
 } from '@legendapp/list/react-native';
 
-import type { MintListItem } from 'colada';
+import type { MintListItem } from '@sovranbitcoin/colada';
 
 import Icon from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';

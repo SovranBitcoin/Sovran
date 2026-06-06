@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 
-import type { MintAvailability } from 'colada';
+import type { MintAvailability } from '@sovranbitcoin/colada';
 
 import { useBalanceContext } from '@cashu/coco-react';
 

@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
-import type { MintCatalogEntry } from 'colada';
+import type { MintCatalogEntry } from '@sovranbitcoin/colada';
 
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';

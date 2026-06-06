@@ -39,7 +39,7 @@ import {
   type ScreenActionHandlerMap,
   type StepHandlerMap,
   type NfcIOAdapter,
-} from 'colada';
+} from '@sovranbitcoin/colada';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
@@ -48,7 +48,7 @@ import { getMintQuotePaymentValue, getOnchainMintAddress } from '@/shared/lib/ca
 import {
   getP2PKImportExtension,
   resolvePrimaryReceiveP2PKPublicKey,
-} from 'coco-cashu-plugin-p2pk-import';
+} from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
 import { writeTokenToNFC, NfcError, isUserCancelError } from '@/shared/lib/nfc';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';

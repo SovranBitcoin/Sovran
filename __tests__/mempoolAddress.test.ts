@@ -1,4 +1,4 @@
-import { summarizeMempoolAddress, type MempoolAddressStats } from 'colada';
+import { summarizeMempoolAddress, type MempoolAddressStats } from '@sovranbitcoin/colada';
 import {
   getCachedMempoolAddressStats,
   useMempoolAddressCache,

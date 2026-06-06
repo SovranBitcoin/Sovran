@@ -17,7 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { z } from 'zod';
 
 import { useBalanceContext, useMints } from '@cashu/coco-react';
-import type { MintAvailability } from 'colada';
+import type { MintAvailability } from '@sovranbitcoin/colada';
 
 import { MintListScreen } from '@/features/mint';
 import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';

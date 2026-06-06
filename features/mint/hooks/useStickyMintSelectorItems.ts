@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { MintListItem } from 'colada';
+import type { MintListItem } from '@sovranbitcoin/colada';
 
 function hasItems(items: MintListItem[] | null | undefined): items is MintListItem[] {
   return Array.isArray(items) && items.length > 0;

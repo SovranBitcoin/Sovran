@@ -1,4 +1,4 @@
-import type { AnnotatedOption, PaymentMachine, StepDataMap } from 'colada';
+import type { AnnotatedOption, PaymentMachine, StepDataMap } from '@sovranbitcoin/colada';
 
 export type ProfileSwitcherAction =
   | { type: 'switch'; accountIndex: number }

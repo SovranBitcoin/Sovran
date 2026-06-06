@@ -9,13 +9,13 @@ import type {
   MintReviewInfo,
   ScreenActionsBridge,
   ScreenType,
-} from 'colada';
+} from '@sovranbitcoin/colada';
 import {
   isMintQuotePaymentObserved,
   meltOperationToScreenActionEntry,
   mergeEntryUpdate as defaultMerge,
   shouldApplyEntryUpdate as defaultShouldApply,
-} from 'colada';
+} from '@sovranbitcoin/colada';
 
 import { paymentLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';

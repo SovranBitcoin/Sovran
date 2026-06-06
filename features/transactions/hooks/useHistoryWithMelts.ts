@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useManager, usePaginatedHistory } from '@cashu/coco-react';
-import { useColadaSubscriptions } from 'colada/react';
+import { useColadaSubscriptions } from '@sovranbitcoin/colada/react';
 import { MeltQuoteState } from '@cashu/cashu-ts';
 import type {
   HistoryEntry,

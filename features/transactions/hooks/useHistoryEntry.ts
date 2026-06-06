@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { HistoryEntry } from '@cashu/coco-core';
-import { useColadaSubscriptions } from 'colada/react';
+import { useColadaSubscriptions } from '@sovranbitcoin/colada/react';
 import { log } from '@/shared/lib/logger';
 
 type UseHistoryEntryResult<T extends HistoryEntry> = {

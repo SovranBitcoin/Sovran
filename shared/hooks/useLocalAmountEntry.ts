@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import { createAmountActionManager } from 'colada';
+import { createAmountActionManager } from '@sovranbitcoin/colada';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';

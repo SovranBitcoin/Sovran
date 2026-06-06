@@ -25,7 +25,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useManager } from '@cashu/coco-react';
-import { useColadaSubscriptions } from 'colada/react';
+import { useColadaSubscriptions } from '@sovranbitcoin/colada/react';
 import NDK, { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { startBLE } from 'bitchat-module';
 

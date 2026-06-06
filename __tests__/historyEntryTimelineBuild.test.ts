@@ -1,7 +1,7 @@
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import type { HistoryEntry } from '@cashu/coco-core';
 
-import { buildTimeline, getCardLabel, getStatusColorType, getStatusHeader } from 'colada';
+import { buildTimeline, getCardLabel, getStatusColorType, getStatusHeader } from '@sovranbitcoin/colada';
 
 const baseFields = {
   id: 'h1',

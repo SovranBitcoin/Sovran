@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { apiLog } from '../logger';
 import { buildAbortSignal, isAbortError } from '../apiClient';
-import { type RequestControls } from 'colada';
+import { type RequestControls } from '@sovranbitcoin/colada';
 
 const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
 

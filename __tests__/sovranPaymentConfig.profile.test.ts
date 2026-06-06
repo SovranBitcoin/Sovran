@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import type { PaymentMachine } from 'colada';
+import type { PaymentMachine } from '@sovranbitcoin/colada';
 import type { Manager } from '@cashu/coco-core';
 import {
   createSovranHandlers,
@@ -18,7 +18,7 @@ const mockNearPayComplete = jest.fn();
 const mockNearPaySetAmountEntry = jest.fn();
 let mockNearPayActive: unknown = null;
 
-jest.mock('colada', () => ({
+jest.mock('@sovranbitcoin/colada', () => ({
   withTimeout: jest.fn((promise: Promise<unknown>) => promise),
 }));
 

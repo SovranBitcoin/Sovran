@@ -6,17 +6,22 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
+import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { paymentLog } from '@/shared/lib/logger';
 import { fetchDmEnvelopes, type DmEnvelopePage } from '../data/dmEnvelopeClient';
-import { decryptDmEnvelopes } from '../data/dmDecryptPipeline';
+import { decryptDmEnvelopes, type DmProtocol } from '../data/dmDecryptPipeline';
 import { CURSOR_SLACK_SECONDS, pageOldestWrapTs } from '../data/dmPagination';
+
+/** Fetched DM kinds: NIP-04 (kind 4) + NIP-17 gift wraps (kind 1059). */
+const DM_KINDS = [4, 1059];
 
 export interface DmConversation {
   counterparty: string;
   lastMessagePreview: string;
   /** unix seconds */
   lastMessageAt: number;
-  protocol: 'nip17';
+  /** Protocol of the most recent message with this counterparty. */
+  protocol: DmProtocol;
 }
 
 const PAGE_LIMIT = 100;
@@ -53,6 +58,9 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
       }
       const decrypted = decryptDmEnvelopes(page.envelopes, viewer, privateKey);
       for (const dm of decrypted) {
+        // One conversation per counterparty across protocols; the most recent
+        // message wins (and sets the displayed protocol). Per-protocol threads
+        // are opened from the profile's send-message picker.
         const existing = bucketRef.current.get(dm.counterparty);
         if (!existing || dm.createdAt > existing.lastMessageAt) {
           bucketRef.current.set(dm.counterparty, {
@@ -86,10 +94,13 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
     setError(null);
     setLoading(true);
     void (async () => {
-      await giftWrapCache.cache.hydrate(viewerPubkey);
+      await Promise.all([
+        giftWrapCache.cache.hydrate(viewerPubkey),
+        nip04Cache.hydrate(viewerPubkey),
+      ]);
       const page = await fetchDmEnvelopes({
         viewer: viewerPubkey,
-        kinds: [1059],
+        kinds: DM_KINDS,
         limit: PAGE_LIMIT,
         refresh: refreshKey > 0,
         signal: controller.signal,
@@ -125,7 +136,7 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
       const until = oldestWrapTsRef.current + CURSOR_SLACK_SECONDS;
       const page = await fetchDmEnvelopes({
         viewer: viewerPubkey,
-        kinds: [1059],
+        kinds: DM_KINDS,
         until,
         limit: PAGE_LIMIT,
       });

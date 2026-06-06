@@ -13,7 +13,7 @@ jest.mock('heroui-native', () => ({
   BottomSheet: { Title: 'BottomSheet.Title' },
   Menu: Object.assign('Menu', { Item: 'Menu.Item', ItemTitle: 'Menu.ItemTitle' }),
 }));
-jest.mock('colada', () => ({
+jest.mock('@sovranbitcoin/colada', () => ({
   decodeUrlOrAddress: (value: string) =>
     value.includes('@') || value.toLowerCase().startsWith('lnurlp://') ? 'https://lnurl' : null,
   isLightningInvoiceBolt11: (value: string) => value.toLowerCase().startsWith('lnbc'),

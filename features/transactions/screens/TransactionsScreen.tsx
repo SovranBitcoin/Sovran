@@ -38,7 +38,7 @@ import {
   matchesTransactionFilters,
   type TransactionDirection,
   type TransactionPaymentType,
-} from 'colada';
+} from '@sovranbitcoin/colada';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 

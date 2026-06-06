@@ -20,7 +20,7 @@ import React, {
 } from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
-import { deriveMintMethodCapabilityMapFromTrustedMints, type WalletContext } from 'colada';
+import { deriveMintMethodCapabilityMapFromTrustedMints, type WalletContext } from '@sovranbitcoin/colada';
 import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 

@@ -13,7 +13,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { BottomSheet, Menu } from 'heroui-native';
-import { defaultDetectors, type AnnotatedOption } from 'colada';
+import { defaultDetectors, type AnnotatedOption } from '@sovranbitcoin/colada';
 
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';

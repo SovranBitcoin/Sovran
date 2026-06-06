@@ -4,7 +4,7 @@
 
 import { LightningSendRoute } from '@/features/send';
 import { useCallback } from 'react';
-import { usePaymentFlowMachine } from 'colada/react';
+import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { cashuLog } from '@/shared/lib/logger';
 

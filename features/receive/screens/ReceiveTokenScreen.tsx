@@ -9,8 +9,8 @@
 import React, { useEffect } from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
-import { isReceiveTokenRedeemed } from 'colada';
-import { useScreenActions } from 'colada/react';
+import { isReceiveTokenRedeemed } from '@sovranbitcoin/colada';
+import { useScreenActions } from '@sovranbitcoin/colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,

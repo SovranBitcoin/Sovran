@@ -9,8 +9,8 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Stack } from 'expo-router';
 
-import { useExecutionState, useScreenActions, usePaymentFlowMachine } from 'colada/react';
-import { fetchNip05Pubkey, type RecipientProfile } from 'colada';
+import { useExecutionState, useScreenActions, usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { fetchNip05Pubkey, type RecipientProfile } from '@sovranbitcoin/colada';
 
 import { MintSelector } from '@/features/wallet';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';

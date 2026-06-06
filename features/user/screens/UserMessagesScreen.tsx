@@ -16,6 +16,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { staticPopup } from '@/shared/lib/popup';
 import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { buildGiftWrappedDMPair } from '@/shared/lib/nostr/nip17';
+import { buildNip04DM } from '@/shared/lib/nostr/nip04';
+import type { DmProtocol } from '@/features/payments/data/dmDecryptPipeline';
 
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -38,7 +40,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { Screen } from '@/shared/ui/composed/Screen';
-import { usePaymentFlowMachine } from 'colada/react';
+import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 const SURFACE = 'nostr-dm' as const;
@@ -56,6 +58,8 @@ interface DmMessage {
 
 interface UserMessagesScreenProps {
   pubkey: string;
+  /** Which Nostr DM protocol this thread uses. Threads are per-protocol. */
+  protocol?: DmProtocol;
   /** Optional callback for back navigation - if not provided, uses router.back() */
   onBack?: () => void;
 }
@@ -68,7 +72,11 @@ type SendMoneyPaymentMachine = {
   }) => Promise<void>;
 };
 
-export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) {
+export function UserMessagesScreen({
+  pubkey,
+  protocol = 'nip17',
+  onBack,
+}: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
 
   const [shade400, background] = useThemeColor(['shade-400', 'background'] as const);
@@ -97,7 +105,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
     loadMore,
     refresh,
     error: threadError,
-  } = useDmThread(isMockThread ? '' : pubkey, nostrKeys?.pubkey, nostrKeys?.privateKey);
+  } = useDmThread(isMockThread ? '' : pubkey, nostrKeys?.pubkey, nostrKeys?.privateKey, protocol);
 
   // Local messages = optimistic sent echoes (real threads) OR the seeded mock
   // thread. Echoes are keyed on the self-copy wrap id so they dedup against the
@@ -230,6 +238,62 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       }
 
       const timestamp = Math.floor(Date.now() / 1000);
+
+      // NIP-04 (legacy): a single signed kind-4 event authored by us and
+      // addressed to the recipient via a `p` tag. No gift wrap / self-copy —
+      // nagg re-fetches our sent copy via the `authors` filter, so the echo
+      // dedups on its event id.
+      if (protocol === 'nip04') {
+        let nip04EchoId: string | undefined;
+        try {
+          const dm = buildNip04DM({
+            content: text,
+            senderPrivateKey: myPrivateKey,
+            recipientPublicKey: pubkey,
+          });
+          nip04EchoId = dm.id;
+          setLocalMessages((prev) => [
+            ...prev,
+            {
+              id: dm.id,
+              content: text,
+              isOwn: true,
+              isSending: true,
+              created_at: timestamp,
+              pubkey: myPubkey,
+            },
+          ]);
+
+          const event = new NDKEvent(ndk);
+          event.kind = dm.kind;
+          event.content = dm.content;
+          event.tags = dm.tags;
+          event.created_at = dm.created_at;
+          event.pubkey = dm.pubkey;
+          event.id = dm.id;
+          event.sig = dm.sig;
+          await event.publish();
+
+          log.info('dm.send.complete', {
+            eventId: dm.id,
+            protocol: 'nip04',
+            total_ms: Math.round(performance.now() - dmStart),
+          });
+          setLocalMessages((prev) =>
+            prev.map((msg) => (msg.id === nip04EchoId ? { ...msg, isSending: false } : msg))
+          );
+        } catch (error) {
+          log.error('dm.send.failed', {
+            error,
+            protocol: 'nip04',
+            total_ms: Math.round(performance.now() - dmStart),
+          });
+          setLocalMessages((prev) => prev.filter((msg) => msg.id !== nip04EchoId));
+          staticPopup('send-message-failed');
+        }
+        return;
+      }
+
       let echoId: string | undefined;
       try {
         // Build NIP-17 gift-wrapped DM pair: one for the recipient, one self-copy.
@@ -299,7 +363,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         staticPopup('send-message-failed');
       }
     },
-    [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey, isMockThread]
+    [ndk, nostrKeys?.privateKey, nostrKeys?.pubkey, pubkey, isMockThread, protocol]
   );
 
   const handleSendMoney = useCallback(() => {

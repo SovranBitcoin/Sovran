@@ -33,7 +33,7 @@ import {
   matchesTransactionFilters,
   type TransactionDirection,
   type TransactionPaymentType,
-} from 'colada';
+} from '@sovranbitcoin/colada';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { spacing, zIndex } from '@/shared/styles/tokens';

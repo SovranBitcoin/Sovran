@@ -4,7 +4,7 @@ import {
   NaggUnknownDataSchema,
   type NaggCapability,
   type NaggError,
-} from 'nagg-ts';
+} from '@sovranbitcoin/nagg-ts';
 import {
   authoredReplyChainInput,
   followingRecentEventsInput,
@@ -20,7 +20,7 @@ import {
   type EventQueryInput,
   type RankedEventsInput,
   type ReferenceRankInput,
-} from 'nagg-ts/recipes';
+} from '@sovranbitcoin/nagg-ts/recipes';
 import {
   graphqlNodesToNaggPage,
   metricsFromGraphqlNode,
@@ -28,7 +28,7 @@ import {
   profileFromMetadataEvent,
   type NaggGraphqlConnection as GraphqlConnection,
   type NaggGraphqlEventNode as GraphqlEventNode,
-} from 'nagg-ts/map';
+} from '@sovranbitcoin/nagg-ts/map';
 import { backendConfig } from '@/shared/config/backend';
 import { apiLog, feedLog, redactError } from '@/shared/lib/logger';
 import {

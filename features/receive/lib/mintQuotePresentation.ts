@@ -3,7 +3,7 @@ import {
   getOnchainConfirmationProgress,
   type MempoolAddressSummary,
   type ChainOnchainConfirmationProgress as OnchainConfirmationProgress,
-} from 'colada';
+} from '@sovranbitcoin/colada';
 
 import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 

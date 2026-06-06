@@ -1,5 +1,5 @@
 import React from 'react';
-import { isSendTokenCancelled } from 'colada';
+import { isSendTokenCancelled } from '@sovranbitcoin/colada';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { Spinner } from '@/shared/ui/primitives/Spinner';

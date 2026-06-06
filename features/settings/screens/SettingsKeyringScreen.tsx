@@ -20,7 +20,7 @@ import type { Keypair } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { getPublicKey, nip19 } from 'nostr-tools';
-import { parseP2PKSecretInput } from 'coco-cashu-plugin-p2pk-import';
+import { parseP2PKSecretInput } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import QRCode from 'react-native-qrcode-svg';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';

@@ -6,7 +6,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
-import type { TransactionDirection, TransactionPaymentType } from 'colada';
+import type { TransactionDirection, TransactionPaymentType } from '@sovranbitcoin/colada';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 

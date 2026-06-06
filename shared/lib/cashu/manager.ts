@@ -1,5 +1,5 @@
 import { Manager, type Plugin } from '@cashu/coco-core';
-import { createCashuSeedGetter, deriveStandardCashuSeed } from 'colada';
+import { createCashuSeedGetter, deriveStandardCashuSeed } from '@sovranbitcoin/colada';
 import { CocoCoreLogger } from './cocoLogger';
 import {
   ExpoSqliteRepositories,
@@ -30,7 +30,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase } from '../logger';
-import { createP2PKImportPlugin } from 'coco-cashu-plugin-p2pk-import';
+import { createP2PKImportPlugin } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;

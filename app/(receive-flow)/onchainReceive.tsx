@@ -5,7 +5,7 @@
 import { useCallback } from 'react';
 
 import { OnchainReceiveRoute } from '@/features/receive';
-import { usePaymentFlowMachine } from 'colada/react';
+import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { z } from 'zod';

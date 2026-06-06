@@ -21,7 +21,17 @@
       "@/config/*": ["./config/*"],
       "@/redux/*": ["./redux/*"],
       "@/themes": ["./themes"],
-      "~/*": ["src/*"]
+      "~/*": ["src/*"],
+      // The @sovranbitcoin/* registry packages each carry a nested copy of
+      // these shared, type-bearing libs. Pin every `zod`/`neverthrow` import
+      // (including those inside the packages' own source) to the app's single
+      // copy so TypeScript sees one identity — otherwise cross-package types
+      // (ZodType, Result) are treated as incompatible. Mirrors the Metro
+      // resolver pinning so type-check and runtime agree on one realm.
+      "zod": ["./node_modules/zod"],
+      "zod/*": ["./node_modules/zod/*"],
+      "neverthrow": ["./node_modules/neverthrow"],
+      "neverthrow/*": ["./node_modules/neverthrow/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],

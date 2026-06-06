@@ -1088,7 +1088,7 @@ function isCocoDiagnosticEvent(e: LogEntry): boolean {
 
 function cocoModuleName(event: string): string {
   const parts = event.split('.');
-  if (parts[0] === 'colada') return `${parts[0]}.${parts[1] ?? 'unknown'}`;
+  if (parts[0] === '@sovranbitcoin/colada') return `${parts[0]}.${parts[1] ?? 'unknown'}`;
   return parts[1] ?? 'unknown';
 }
 

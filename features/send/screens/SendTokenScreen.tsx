@@ -11,13 +11,13 @@ import { Platform, StyleSheet } from 'react-native';
 
 import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
-import { useScreenActions } from 'colada/react';
+import { useScreenActions } from '@sovranbitcoin/colada/react';
 import {
   getSendTokenReachabilityWarning,
   isSendTokenCancelled,
   isSendTokenComplete,
   type ActionVariant,
-} from 'colada';
+} from '@sovranbitcoin/colada';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,

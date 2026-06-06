@@ -17,8 +17,8 @@ import { useWindowDimensions, View } from 'react-native';
 import { Stack } from 'expo-router';
 
 import type { MeltHistoryEntry } from '@cashu/coco-core';
-import { isMeltQuotePaid, isMeltQuoteReadyToPay } from 'colada';
-import { useScreenActions } from 'colada/react';
+import { isMeltQuotePaid, isMeltQuoteReadyToPay } from '@sovranbitcoin/colada';
+import { useScreenActions } from '@sovranbitcoin/colada/react';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {

@@ -8,9 +8,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
+import { nip04Cache } from '@/shared/lib/nostr/nip04Cache';
 import { paymentLog } from '@/shared/lib/logger';
 import { fetchDmConversation, type DmEnvelopePage } from '../data/dmEnvelopeClient';
-import { decryptDmEnvelopes, type DecryptedDm } from '../data/dmDecryptPipeline';
+import { decryptDmEnvelopes, type DecryptedDm, type DmProtocol } from '../data/dmDecryptPipeline';
 import { CURSOR_SLACK_SECONDS, pageOldestWrapTs } from '../data/dmPagination';
 
 const PAGE_LIMIT = 50;
@@ -27,7 +28,8 @@ export interface DmThreadMessage {
 export function useDmThread(
   counterparty: string,
   viewerPubkey?: string,
-  viewerPrivateKey?: Uint8Array
+  viewerPrivateKey?: Uint8Array,
+  protocol: DmProtocol = 'nip17'
 ) {
   const [messages, setMessages] = useState<DmThreadMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,7 +64,9 @@ export function useDmThread(
 
   const ingestMessages = useCallback(
     (decrypted: DecryptedDm[]) => {
-      const relevant = decrypted.filter((dm) => dm.counterparty === counterparty);
+      const relevant = decrypted.filter(
+        (dm) => dm.counterparty === counterparty && dm.protocol === protocol
+      );
       const fresh = relevant.filter((dm) => !seenMsgIdsRef.current.has(dm.id));
       if (fresh.length === 0) return;
       fresh.forEach((dm) => seenMsgIdsRef.current.add(dm.id));
@@ -81,7 +85,7 @@ export function useDmThread(
         return merged;
       });
     },
-    [counterparty]
+    [counterparty, protocol]
   );
 
   useEffect(() => {
@@ -98,11 +102,13 @@ export function useDmThread(
     setError(null);
     setLoading(true);
     void (async () => {
-      await giftWrapCache.cache.hydrate(viewerPubkey);
+      await (protocol === 'nip04'
+        ? nip04Cache.hydrate(viewerPubkey)
+        : giftWrapCache.cache.hydrate(viewerPubkey));
       const page = await fetchDmConversation({
         viewer: viewerPubkey,
         counterparty,
-        kinds: [1059],
+        kinds: protocol === 'nip04' ? [4] : [1059],
         limit: PAGE_LIMIT,
         refresh: refreshKey > 0,
         signal: controller.signal,
@@ -122,7 +128,15 @@ export function useDmThread(
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [counterparty, viewerPubkey, viewerPrivateKey, refreshKey, trackEnvelopes, ingestMessages]);
+  }, [
+    counterparty,
+    protocol,
+    viewerPubkey,
+    viewerPrivateKey,
+    refreshKey,
+    trackEnvelopes,
+    ingestMessages,
+  ]);
 
   const loadMore = useCallback(async () => {
     if (
@@ -140,7 +154,7 @@ export function useDmThread(
       const page = await fetchDmConversation({
         viewer: viewerPubkey,
         counterparty,
-        kinds: [1059],
+        kinds: protocol === 'nip04' ? [4] : [1059],
         until,
         limit: PAGE_LIMIT,
       });
@@ -155,7 +169,15 @@ export function useDmThread(
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [hasMore, viewerPubkey, viewerPrivateKey, counterparty, trackEnvelopes, ingestMessages]);
+  }, [
+    hasMore,
+    viewerPubkey,
+    viewerPrivateKey,
+    counterparty,
+    protocol,
+    trackEnvelopes,
+    ingestMessages,
+  ]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 

@@ -14,8 +14,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import type { ActionVariant, RecipientProfile, ScreenActionName } from 'colada';
-import type { BoundAction, QuickSendSuggestion } from 'colada/react';
+import type { ActionVariant, RecipientProfile, ScreenActionName } from '@sovranbitcoin/colada';
+import type { BoundAction, QuickSendSuggestion } from '@sovranbitcoin/colada/react';
 
 import { MintSelector } from '@/features/wallet';
 import type { ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';

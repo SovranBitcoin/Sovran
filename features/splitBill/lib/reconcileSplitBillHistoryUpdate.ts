@@ -8,7 +8,7 @@
  * outcome; the live hook just discards the value.
  */
 
-import { isMintQuotePaymentObserved } from 'colada';
+import { isMintQuotePaymentObserved } from '@sovranbitcoin/colada';
 
 interface ReconcilerStore {
   quoteIdToSplitBill: Record<string, { groupId: string; participantId: string }>;

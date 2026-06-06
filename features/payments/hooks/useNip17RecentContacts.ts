@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { getMockContacts, MOCK_ALLOWED_PUBKEYS_HEX } from '@/shared/stores/runtime/mockDataStore';
+import type { DmProtocol } from '../data/dmDecryptPipeline';
 import { useDmConversations } from './useDmConversations';
 
 const DEFAULT_CONTACTS = [{ pubkey: PUBLIC_KEYS.SUPPORT, label: 'Sovran' }] as const;
@@ -28,6 +29,8 @@ export interface RecentContact {
   pubkey: string;
   timestamp: number;
   isDefault?: boolean;
+  /** Which protocol this conversation is on. Absent rows default to NIP-17. */
+  protocol?: DmProtocol | 'whitenoise';
 }
 
 export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
@@ -45,6 +48,7 @@ export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
       dmEvent: { content: c.lastMessagePreview },
       nip17Content: c.lastMessagePreview,
       timestamp: c.lastMessageAt,
+      protocol: c.protocol,
     }));
 
     const existing = new Set(recent.map((c) => c.pubkey));

@@ -20,13 +20,13 @@ import { useManager } from '@cashu/coco-react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 
-import type { MachineOperations, NavigationCallbacks, RecipientProfile } from 'colada';
-import { createColada, createMempoolSpaceChainAdapter, withTimeout } from 'colada';
+import type { MachineOperations, NavigationCallbacks, RecipientProfile } from '@sovranbitcoin/colada';
+import { createColada, createMempoolSpaceChainAdapter, withTimeout } from '@sovranbitcoin/colada';
 import {
   ColadaProvider as ColadaProviderBase,
   type ColadaProviderProps,
   type DeepLinkConfig,
-} from 'colada/react';
+} from '@sovranbitcoin/colada/react';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { parseRawMetadata } from '@/shared/hooks/useNostrProfileMetadata';

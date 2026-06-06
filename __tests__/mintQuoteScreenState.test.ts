@@ -1,6 +1,6 @@
 import type { HistoryEntry } from '@cashu/coco-core';
-import { isMintQuotePaymentObserved } from 'colada';
-import type { MempoolAddressSummary } from 'colada';
+import { isMintQuotePaymentObserved } from '@sovranbitcoin/colada';
+import type { MempoolAddressSummary } from '@sovranbitcoin/colada';
 
 import {
   getMintQuoteRouteTitle,
