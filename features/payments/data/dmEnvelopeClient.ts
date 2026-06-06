@@ -90,7 +90,9 @@ export async function fetchDmEnvelopes(args: {
     variables: { input: dmEnvelopesInput(recipeInput) },
     dataSchema: NaggDmEnvelopesDataSchema,
     // Dedicated REST app-view for the contacts/DM list when enabled; otherwise
-    // the GraphQL resolver. Both normalize to the same connection shape.
+    // the GraphQL resolver. Both transports parse the same `{ dmEnvelopes: {
+    // nodes, pageInfo } }` connection via `NaggDmEnvelopesDataSchema` — no
+    // per-transport normalize layer (the REST body is already canonical).
     transport: backendConfig.nostrDmAppView ? 'appview' : 'graphql',
     appView: dmEnvelopesAppView(recipeInput),
     refresh: args.refresh,

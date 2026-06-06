@@ -1,20 +1,29 @@
 import {
   createNaggClient,
   NAGG_CAPABILITIES,
-  NaggUnknownDataSchema,
+  NaggFeedPageSchema,
+  NaggThreadSchema,
+  NaggNotificationsPageSchema,
+  type NaggAppViewBinding,
   type NaggCapability,
   type NaggError,
+  type NaggNotificationsPage,
+  type NaggThread,
 } from '@sovranbitcoin/nagg-ts';
 import {
   authoredReplyChainInput,
   followingRecentEventsInput,
   followingRepliesEventsInput,
   followingPopularRankedEventsInput,
+  followsFeedAppView,
   forYouRankedEventsInput,
-  mergeRelevantReplyNodes as mergeNaggRelevantReplyNodes,
+  notificationsAppView,
   notificationsInput,
+  rankedFeedAppView,
   recentNotesEventsInput,
+  threadAppView,
   threadReplyRankInput as buildThreadReplyRankInput,
+  userFeedAppView,
   withEventExclusions,
   withRankedTargetExclusions,
   type EventQueryInput,
@@ -26,15 +35,14 @@ import {
   metricsFromGraphqlNode,
   normalizeGraphqlEvent,
   profileFromMetadataEvent,
+  type NaggFeedPage,
   type NaggGraphqlConnection as GraphqlConnection,
   type NaggGraphqlEventNode as GraphqlEventNode,
 } from '@sovranbitcoin/nagg-ts/map';
+import type { z } from 'zod';
 import { backendConfig } from '@/shared/config/backend';
 import { apiLog, feedLog, redactError } from '@/shared/lib/logger';
-import {
-  buildThreadStructure,
-  type ThreadStructure,
-} from '@/features/feed/lib/buildThreadStructure';
+import { buildThreadStructure } from '@/features/feed/lib/buildThreadStructure';
 import { mapNaggFeedPage } from './mapNaggFeedPage';
 import type {
   FeedClient,
@@ -319,22 +327,6 @@ query NaggGraphqlFollowingReplies($input: EventQueryInput!) {
       ${BASE_EVENT_SELECTION}
       ${AUTHOR_METADATA_SELECTION}
       ${ROOT_CONTEXT_SELECTION}
-      ${QUOTED_CONTENT_SELECTION}
-      ${METRIC_SELECTION}
-    }
-    pageInfo { endCursor hasNextPage }
-  }
-}
-`;
-
-const FOLLOWING_POPULAR_QUERY = `
-query NaggGraphqlFollowingPopular($input: RankedEventsInput!) {
-  rankedEvents(input: $input) {
-    nodes {
-      ${BASE_EVENT_SELECTION}
-      ${AUTHOR_METADATA_SELECTION}
-      ${ROOT_CONTEXT_SELECTION}
-      ${EVENT_REFS_SELECTION}
       ${QUOTED_CONTENT_SELECTION}
       ${METRIC_SELECTION}
     }
@@ -793,45 +785,75 @@ function summarizeGraphqlVariables(variables: Record<string, unknown>): Record<s
   return summary;
 }
 
-function graphqlDataKeys(value: unknown): string[] {
+function dataKeysOf(value: unknown): string[] {
   const record = objectRecord(value);
   return record ? Object.keys(record).slice(0, 8) : [];
 }
 
-async function postGraphql<T>(
+/**
+ * One transport-agnostic request per view. The caller supplies the canonical
+ * `dataSchema` plus the GraphQL distiller (`graphqlToData`) and the REST app-view
+ * `appView` binding; `transport` (derived from a feature flag) selects the URL.
+ *
+ * - `transport: 'graphql'` → POST the GraphQL endpoint, distil `data` with
+ *   `graphqlToData`, then `dataSchema.safeParse`.
+ * - `transport: 'appview'` (with a binding) → GET/POST the REST route; the body
+ *   is already canonical, so `dataSchema.safeParse` runs with no distill step.
+ *
+ * Both branches return the SAME parsed canonical type — there is no
+ * per-transport fork at the call site, only a different URL.
+ */
+type NaggQueryOptions<TSchema extends z.ZodType> = {
+  dataSchema: TSchema;
+  graphqlToData?: (data: unknown) => unknown;
+  appView?: NaggAppViewBinding;
+  transport?: 'graphql' | 'appview';
+  signal?: AbortSignal;
+  timeoutMs?: number;
+};
+
+async function runNaggQuery<TSchema extends z.ZodType>(
   query: string,
   variables: Record<string, unknown>,
   refresh: boolean | undefined,
-  controls: { signal?: AbortSignal; timeoutMs?: number } = {}
-): Promise<T> {
-  const operationName = graphqlOperationName(query);
+  options: NaggQueryOptions<TSchema>
+): Promise<z.infer<TSchema>> {
+  const operationName = options.appView?.operationName ?? graphqlOperationName(query);
+  // App-view only when explicitly selected AND a binding exists; otherwise the
+  // nagg client falls through to GraphQL (so the switch degrades per-query).
+  const transport = options.transport === 'appview' && options.appView ? 'appview' : 'graphql';
   const startedAt = Date.now();
   const requestFields = {
     operationName,
     refresh: !!refresh,
-    timeoutMs: controls.timeoutMs,
+    timeoutMs: options.timeoutMs,
+    transport,
     variables: summarizeGraphqlVariables(variables),
     ...endpointLogFields(),
   };
-  let failureLogged = false;
 
   apiLog.info('nagg.graphql.request.start', requestFields);
 
-  const client = createNaggClient({ endpoint: graphqlEndpoint() });
+  const client = createNaggClient({
+    endpoint: graphqlEndpoint(),
+    appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
+  });
   const result = await client.query({
     query,
     variables,
     operationName,
-    dataSchema: NaggUnknownDataSchema,
+    dataSchema: options.dataSchema,
+    graphqlToData: options.graphqlToData,
+    transport,
+    appView: options.appView,
     refresh,
-    signal: controls.signal,
-    timeoutMs: controls.timeoutMs,
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
   });
   const durationMs = Date.now() - startedAt;
 
   if (result.isErr()) {
     const error = result.error;
-    failureLogged = true;
     if (error.type === 'graphql') {
       apiLog.error('nagg.graphql.request.graphql_error', {
         ...requestFields,
@@ -860,30 +882,45 @@ async function postGraphql<T>(
     throw errorFromNaggError(error);
   }
 
-  const data = result.value as T;
-  try {
-    const durationMs = Date.now() - startedAt;
-    apiLog.info('nagg.graphql.request.done', {
-      ...requestFields,
-      durationMs,
-      dataKeys: graphqlDataKeys(data),
-    });
-    return data;
-  } catch (error) {
-    if (!failureLogged) {
-      const params = {
-        ...requestFields,
-        durationMs: Date.now() - startedAt,
-        error: redactError(error),
-      };
-      if (redactError(error).message === 'Aborted') {
-        apiLog.warn('nagg.graphql.request.aborted', params);
-      } else {
-        apiLog.error('nagg.graphql.request.error', params);
-      }
-    }
-    throw error;
+  apiLog.info('nagg.graphql.request.done', {
+    ...requestFields,
+    durationMs,
+    dataKeys: dataKeysOf(result.value),
+  });
+  return result.value;
+}
+
+/**
+ * The feed seam: resolve a query to a parsed {@link NaggFeedPage} regardless of
+ * transport. GraphQL distils its node tree with `graphqlToData`; the app-view
+ * returns the canonical page directly. Both end at `NaggFeedPageSchema` and feed
+ * straight into `mapNaggFeedPage`.
+ */
+function fetchNaggFeedPage(
+  query: string,
+  variables: Record<string, unknown>,
+  refresh: boolean | undefined,
+  options: {
+    graphqlToData: (data: unknown) => unknown;
+    appView?: NaggAppViewBinding;
+    transport?: 'graphql' | 'appview';
+    signal?: AbortSignal;
+    timeoutMs?: number;
   }
+): Promise<NaggFeedPage<FeedEvent, ProfileInfo>> {
+  return runNaggQuery(query, variables, refresh, {
+    dataSchema: NaggFeedPageSchema,
+    graphqlToData: options.graphqlToData,
+    appView: options.appView,
+    transport: options.transport,
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
+  }) as Promise<NaggFeedPage<FeedEvent, ProfileInfo>>;
+}
+
+/** The flag-derived transport for feed/thread views. */
+function feedTransport(): 'graphql' | 'appview' {
+  return backendConfig.nostrFeedAppView ? 'appview' : 'graphql';
 }
 
 function errorFromNaggError(error: NaggError): Error {
@@ -897,97 +934,122 @@ function errorFromNaggError(error: NaggError): Error {
 
 const unsupportedGraphqlCapabilities = new Set<NaggCapability>();
 
-async function postGraphqlWithCapabilityFallback<T>({
+/**
+ * A `runNaggQuery` invocation that can stand in for the primary or a fallback.
+ * Fallbacks are always GraphQL-only (no app-view binding), so they re-derive the
+ * canonical shape from the lighter GraphQL query via the same `graphqlToData`.
+ */
+type NaggQueryAttempt = {
+  query: string;
+  variables: Record<string, unknown>;
+  appView?: NaggAppViewBinding;
+  transport?: 'graphql' | 'appview';
+};
+
+async function postGraphqlWithCapabilityFallback<TSchema extends z.ZodType>({
   capability,
-  query,
-  variables,
-  fallbackQuery,
-  fallbackVariables,
+  primary,
+  fallback,
   refresh,
   controls,
   isCapabilityError,
 }: {
   capability: NaggCapability;
-  query: string;
-  variables: Record<string, unknown>;
-  fallbackQuery: string;
-  fallbackVariables: Record<string, unknown>;
+  primary: NaggQueryAttempt;
+  fallback: NaggQueryAttempt;
   refresh: boolean | undefined;
-  controls?: { signal?: AbortSignal; timeoutMs?: number };
+  controls: { dataSchema: TSchema; graphqlToData: (data: unknown) => unknown } & {
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  };
   isCapabilityError: (error: unknown) => boolean;
-}): Promise<T> {
+}): Promise<z.infer<TSchema>> {
+  const run = (attempt: NaggQueryAttempt): Promise<z.infer<TSchema>> =>
+    runNaggQuery(attempt.query, attempt.variables, refresh, {
+      dataSchema: controls.dataSchema,
+      graphqlToData: controls.graphqlToData,
+      appView: attempt.appView,
+      transport: attempt.transport,
+      signal: controls.signal,
+      timeoutMs: controls.timeoutMs,
+    });
+
   if (unsupportedGraphqlCapabilities.has(capability)) {
     apiLog.warn('nagg.graphql.capability_fallback', {
       capability,
-      operationName: graphqlOperationName(query),
-      fallbackOperationName: graphqlOperationName(fallbackQuery),
+      operationName: graphqlOperationName(primary.query),
+      fallbackOperationName: graphqlOperationName(fallback.query),
       reason: 'cached_unsupported_capability',
     });
-    return postGraphql<T>(fallbackQuery, fallbackVariables, refresh, controls);
+    return run(fallback);
   }
 
   try {
-    return await postGraphql<T>(query, variables, refresh, controls);
+    return await run(primary);
   } catch (error) {
     if (!isCapabilityError(error)) throw error;
     unsupportedGraphqlCapabilities.add(capability);
     apiLog.warn('nagg.graphql.capability_fallback', {
       capability,
-      operationName: graphqlOperationName(query),
-      fallbackOperationName: graphqlOperationName(fallbackQuery),
+      operationName: graphqlOperationName(primary.query),
+      fallbackOperationName: graphqlOperationName(fallback.query),
       reason: redactError(error),
     });
-    return postGraphql<T>(fallbackQuery, fallbackVariables, refresh, controls);
+    return run(fallback);
   }
 }
 
-async function postGraphqlWithAuthorReplyFallback<T>(
-  query: string,
-  variables: Record<string, unknown>,
-  fallbackQuery: string,
-  fallbackVariables: Record<string, unknown>,
+async function postGraphqlWithAuthorReplyFallback<TSchema extends z.ZodType>(
+  primary: NaggQueryAttempt,
+  fallback: NaggQueryAttempt,
   refresh: boolean | undefined,
-  controls: { signal?: AbortSignal; timeoutMs?: number } = {}
-): Promise<T> {
+  controls: { dataSchema: TSchema; graphqlToData: (data: unknown) => unknown } & {
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  }
+): Promise<z.infer<TSchema>> {
   return postGraphqlWithCapabilityFallback({
     capability: NAGG_CAPABILITIES.AUTHORED_REPLY_CHAIN,
-    query,
-    variables,
-    fallbackQuery,
-    fallbackVariables,
+    primary,
+    fallback,
     refresh,
     controls,
     isCapabilityError: isAuthorReplyCapabilityError,
   });
 }
 
-async function postGraphqlWithAuthorReplyAndTimeoutFallback<T>(
-  query: string,
-  variables: Record<string, unknown>,
-  authorReplyFallbackQuery: string,
-  authorReplyFallbackVariables: Record<string, unknown>,
-  timeoutFallbackQuery: string,
-  timeoutFallbackVariables: Record<string, unknown>,
+async function postGraphqlWithAuthorReplyAndTimeoutFallback<TSchema extends z.ZodType>(
+  primary: NaggQueryAttempt,
+  authorReplyFallback: NaggQueryAttempt,
+  timeoutFallback: NaggQueryAttempt,
   refresh: boolean | undefined,
-  controls: { signal?: AbortSignal; timeoutMs?: number } = {}
-): Promise<T> {
+  controls: { dataSchema: TSchema; graphqlToData: (data: unknown) => unknown } & {
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  }
+): Promise<z.infer<TSchema>> {
   try {
-    return await postGraphqlWithAuthorReplyFallback<T>(
-      query,
-      variables,
-      authorReplyFallbackQuery,
-      authorReplyFallbackVariables,
+    return await postGraphqlWithAuthorReplyFallback(
+      primary,
+      authorReplyFallback,
       refresh,
       controls
     );
   } catch (error) {
     if (controls.signal?.aborted || !isGraphqlTimeoutError(error)) throw error;
     apiLog.warn('nagg.graphql.timeout_fallback', {
-      operationName: graphqlOperationName(query),
-      fallbackOperationName: graphqlOperationName(timeoutFallbackQuery),
+      operationName: graphqlOperationName(primary.query),
+      fallbackOperationName: graphqlOperationName(timeoutFallback.query),
       reason: redactError(error),
     });
-    return postGraphql<T>(timeoutFallbackQuery, timeoutFallbackVariables, refresh, controls);
+    return runNaggQuery(timeoutFallback.query, timeoutFallback.variables, refresh, {
+      dataSchema: controls.dataSchema,
+      graphqlToData: controls.graphqlToData,
+      appView: timeoutFallback.appView,
+      transport: timeoutFallback.transport,
+      signal: controls.signal,
+      timeoutMs: controls.timeoutMs,
+    });
   }
 }
 
@@ -1090,70 +1152,6 @@ function threadRankCandidateLimit(limit: number, offset: number): number {
   return Math.max(100, offset + limit + RELEVANT_AUTHOR_REPLY_LIMIT + 1);
 }
 
-function childAuthorReplyNodes(node: GraphqlEventNode | undefined): GraphqlEventNode[] {
-  return node?.childAuthorReplies?.nodes ?? [];
-}
-
-function childFollowedReplyNodes(node: GraphqlEventNode | undefined): GraphqlEventNode[] {
-  return node?.childFollowedReply?.nodes ?? [];
-}
-
-function replyGraphEventFromNode(node: GraphqlEventNode | null | undefined) {
-  const event = normalizeGraphqlEvent(node);
-  if (!event) return undefined;
-  return {
-    id: event.id,
-    pubkey: event.pubkey,
-    tags: event.tags,
-    createdAt: event.created_at,
-  };
-}
-
-function mergeRelevantReplyNodes({
-  sourceNode,
-  authorNodes = [],
-  followedNodes = [],
-  rankedNodes = [],
-  allNodes = [],
-  offset = 0,
-  limit,
-}: {
-  sourceNode?: GraphqlEventNode | null;
-  authorNodes?: GraphqlEventNode[];
-  followedNodes?: GraphqlEventNode[];
-  rankedNodes?: GraphqlEventNode[];
-  allNodes?: GraphqlEventNode[];
-  offset?: number;
-  limit?: number;
-}): {
-  nodes: GraphqlEventNode[];
-  pageNodes: GraphqlEventNode[];
-  pageEventIds: string[];
-  hasMore: boolean;
-} {
-  const merged = mergeNaggRelevantReplyNodes({
-    sourceNode,
-    authorNodes,
-    followedNodes,
-    rankedNodes,
-    allNodes,
-    offset,
-    limit,
-    toEvent: replyGraphEventFromNode,
-    childAuthorNodesFor: childAuthorReplyNodes,
-    childFollowedNodesFor: childFollowedReplyNodes,
-  });
-  const pageEnd = limit == null ? merged.nodes.length : offset + limit;
-  return {
-    nodes: merged.nodes,
-    pageNodes: merged.pageNodes,
-    pageEventIds: merged.pageNodes
-      .map((node) => normalizeGraphqlEvent(node)?.id)
-      .filter((id): id is string => !!id),
-    hasMore: merged.nodes.length > pageEnd,
-  };
-}
-
 function threadReplyRankInput(
   sort: ThreadReplySort,
   viewerPubkey?: string
@@ -1253,37 +1251,86 @@ function feedQueryOptionsFromPreferences(filters: FeedPreferenceFilters): FeedQu
   };
 }
 
-function mapGraphqlFeed(nodes: GraphqlEventNode[], options: FeedQueryOptions = {}) {
-  return mapNaggFeedPage(graphqlNodesToNaggPage(nodes), options);
+type NaggFeedPageOf = NaggFeedPage<FeedEvent, ProfileInfo>;
+
+/**
+ * The `events`-feed distiller (`graphqlToData`): distils the GraphQL `events`
+ * connection into the canonical {@link NaggFeedPage}. Offset/until pagination is
+ * the page's min `created_at` (set by `graphqlNodesToNaggPage`).
+ */
+function eventsFeedToPage(data: unknown): NaggFeedPageOf {
+  const feed = data as GraphqlFeedData;
+  return graphqlNodesToNaggPage(feed.events?.nodes ?? []) as NaggFeedPageOf;
 }
 
-function mapRankedGraphqlFeed(nodes: GraphqlEventNode[], options: FeedQueryOptions = {}) {
-  const result = mapGraphqlFeed(nodes, options);
-  return {
-    ...result,
-    paginationUntil: nodes.length > 0 ? 1 : 0,
-    paginationOffset: nodes.length,
-  };
-}
-
-function mapRankedOrEventGraphqlFeed(
-  data: GraphqlFeedData,
-  options: FeedQueryOptions = {}
-): FeedParseResult {
-  if (data.rankedEvents) {
-    return mapRankedGraphqlFeed(data.rankedEvents.nodes ?? [], options);
+/**
+ * The ranked-feed distiller (`graphqlToData`): distils `rankedEvents` (or the
+ * timeout-fallback `events`) into a {@link NaggFeedPage}. Ranked results paginate
+ * by offset, so when the response is ranked we stamp the ranked sentinel
+ * (`paginationUntil: 1`, `paginationOffset` = node count) the way the legacy
+ * `mapRankedGraphqlFeed` did; the events fallback keeps min-`created_at` paging.
+ */
+function rankedFeedToPage(data: unknown): NaggFeedPageOf {
+  const feed = data as GraphqlFeedData;
+  if (feed.rankedEvents) {
+    const nodes = feed.rankedEvents.nodes ?? [];
+    const page = graphqlNodesToNaggPage(nodes) as NaggFeedPageOf;
+    return {
+      ...page,
+      paginationUntil: nodes.length > 0 ? 1 : 0,
+      paginationOffset: nodes.length,
+    };
   }
-  return mapGraphqlFeed(data.events?.nodes ?? [], options);
+  return graphqlNodesToNaggPage(feed.events?.nodes ?? []) as NaggFeedPageOf;
 }
 
-function mapFollowingRepliesGraphqlFeed(nodes: GraphqlEventNode[], options: FeedQueryOptions = {}) {
-  const page = graphqlNodesToNaggPage(nodes, {
+/**
+ * The following-replies distiller (`graphqlToData`): resolves each reply's parent
+ * context from the rich reference selections before distilling, so reply rows
+ * render with their root/parent attached.
+ */
+function followingRepliesToPage(data: unknown): NaggFeedPageOf {
+  const feed = data as GraphqlFeedData;
+  return graphqlNodesToNaggPage(feed.events?.nodes ?? [], {
     parentForNode: (node) =>
       node.rootContext?.nodes?.[0] ??
       node.parentReplyRefs?.nodes?.[0] ??
       node.parentRootRefs?.nodes?.[0] ??
       node.eventRefs?.nodes?.[0],
-  });
+  }) as NaggFeedPageOf;
+}
+
+/**
+ * The profile-enrichment distiller (`graphqlToData`): the profile query returns
+ * raw kind-0 metadata events, so distil them straight into the page's `profiles`
+ * map (the rest of the page is empty — only the side map is consumed).
+ */
+function profileEventsToPage(data: unknown): NaggFeedPageOf {
+  const feed = data as GraphqlFeedData;
+  const profiles: NaggFeedPageOf['profiles'] = {};
+  for (const node of feed.events?.nodes ?? []) {
+    const profile = profileFromMetadataEvent(node);
+    if (profile) profiles[node.pubkey] = profile;
+  }
+  return {
+    items: [],
+    metrics: {},
+    profiles,
+    quoted: {},
+    paginationUntil: 0,
+    paginationOffset: 0,
+  };
+}
+
+/**
+ * Map a {@link NaggFeedPage} (from either transport) through the shared mapper.
+ * Pagination fields ride on the page itself, so ranked and events feeds paginate
+ * exactly as they did before — there is no transport-specific post-processing.
+ */
+function mapNaggFeedPageResult(
+  page: NaggFeedPageOf,
+  options: FeedQueryOptions = {}
+): FeedParseResult {
   return mapNaggFeedPage(page, options);
 }
 
@@ -1315,39 +1362,6 @@ function logFeedPageResult(
     paginationOffset: result.paginationOffset,
   });
   return result;
-}
-
-function graphqlNodeKindCounts(nodes: GraphqlEventNode[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const node of nodes) {
-    const kind = typeof node.kind === 'number' ? String(node.kind) : 'unknown';
-    counts[kind] = (counts[kind] ?? 0) + 1;
-  }
-  return counts;
-}
-
-function includeSelectedReplyNodesInThread(
-  thread: ThreadStructure,
-  replyNodes: readonly GraphqlEventNode[]
-): ThreadStructure {
-  if (!thread.target || replyNodes.length === 0) return thread;
-  const existingIds = new Set([
-    thread.target.id,
-    ...thread.parents.map((event) => event.id),
-    ...thread.replies.map((event) => event.id),
-  ]);
-  const selectedReplies: FeedEvent[] = [];
-  for (const node of replyNodes) {
-    const event = normalizeGraphqlEvent(node);
-    if (!event || existingIds.has(event.id)) continue;
-    existingIds.add(event.id);
-    selectedReplies.push(event);
-  }
-  if (selectedReplies.length === 0) return thread;
-  return {
-    ...thread,
-    replies: [...thread.replies, ...selectedReplies],
-  };
 }
 
 function collectHydrationFromGraphqlNodes(nodes: GraphqlEventNode[]): {
@@ -1477,6 +1491,171 @@ function addThreadNode(
   for (const childNode of node.childFollowedReply?.nodes ?? []) addThreadNode(childNode, buckets);
 }
 
+/**
+ * The notifications distiller (`graphqlToData`): distils the GraphQL
+ * `notifications` connection into the canonical {@link NaggNotificationsPage}.
+ * Each node carries its `{ event, reason, actorVertexScore }` plus the resolved
+ * `targetEvent`/`targetEventId` (the schema passes these through), and the feed
+ * hydration (`metrics`/`profiles`/`quoted`) rides alongside as page side maps —
+ * exactly the shape nagg's REST `/nostr/notifications` route emits.
+ */
+function notificationsToPage(data: unknown): NaggNotificationsPage {
+  const feed = data as GraphqlNotificationsData;
+  const sourceNodes = feed.notifications?.nodes ?? [];
+  const eventNodes = sourceNodes
+    .map((node) => node.event)
+    .filter((event): event is GraphqlEventNode => !!event);
+  const hydration = collectHydrationFromGraphqlNodes(eventNodes);
+  const nodes: NaggNotificationsPage['notifications']['nodes'] = [];
+  for (const node of sourceNodes) {
+    const event = normalizeGraphqlEvent(node.event);
+    if (!event) continue;
+    const reason = node.reason || 'mention';
+    const target = notificationTargetFromGraphqlNode(node.event, reason);
+    nodes.push({
+      event,
+      reason,
+      actorVertexScore:
+        typeof node.actorVertexScore === 'number' && Number.isFinite(node.actorVertexScore)
+          ? node.actorVertexScore
+          : 0,
+      ...target,
+    });
+  }
+  return {
+    notifications: {
+      nodes,
+      pageInfo: {
+        endCursor: feed.notifications?.pageInfo?.endCursor ?? undefined,
+        hasNextPage: feed.notifications?.pageInfo?.hasNextPage ?? false,
+      },
+    },
+    metrics: Object.fromEntries(hydration.metrics),
+    profiles: Object.fromEntries(hydration.profiles) as NaggNotificationsPage['profiles'],
+    quoted: Object.fromEntries(hydration.quotedEvents) as NaggNotificationsPage['quoted'],
+  };
+}
+
+/**
+ * Build a {@link FeedNotificationsResult} from the parsed canonical
+ * {@link NaggNotificationsPage}, identically for both transports: order notifs
+ * newest-first, derive the next-page `until` cursor, and lift the hydration side
+ * maps into the result Maps.
+ */
+function notificationsResultFromPage(page: NaggNotificationsPage): FeedNotificationsResult {
+  const notifications = page.notifications.nodes
+    .map((node) => {
+      const enriched = node as NaggNotificationsPage['notifications']['nodes'][number] & {
+        targetEvent?: FeedEvent;
+        targetEventId?: string;
+      };
+      return {
+        event: node.event as FeedEvent,
+        ...(enriched.targetEvent ? { targetEvent: enriched.targetEvent } : {}),
+        ...(enriched.targetEventId ? { targetEventId: enriched.targetEventId } : {}),
+        reason: node.reason,
+        actorVertexScore: node.actorVertexScore,
+      };
+    })
+    .sort(compareNotificationsNewestFirst);
+  return {
+    notifications,
+    metricsMap: new Map(Object.entries(page.metrics)) as Map<string, NoteMetrics>,
+    profilesMap: new Map(Object.entries(page.profiles)) as Map<string, ProfileInfo>,
+    quotedEventsMap: new Map(Object.entries(page.quoted)) as Map<string, FeedEvent>,
+    paginationUntil:
+      notifications.length > 0
+        ? Math.min(...notifications.map((notification) => notification.event.created_at))
+        : 0,
+  };
+}
+
+/**
+ * The thread distiller (`graphqlToData`): walks the GraphQL thread node tree
+ * (root + parent refs + every reply variant the query selects) into the canonical
+ * {@link NaggThread} flat shape (`root` + descendant `events` + hydration side
+ * maps) — exactly what nagg's REST `/nostr/thread` route emits. Reply structure
+ * and order are derived downstream by a single `buildThreadStructure`.
+ */
+function threadToCanonical(data: unknown): NaggThread {
+  const thread = data as GraphqlThreadData;
+  const buckets = {
+    allEvents: new Map<string, FeedEvent>(),
+    profiles: new Map<string, ProfileInfo>(),
+    metrics: new Map<string, NoteMetrics>(),
+    quotedEvents: new Map<string, FeedEvent>(),
+  };
+  const eventNode = thread.event ?? undefined;
+  addThreadNode(eventNode, buckets);
+  for (const parent of eventNode?.parentRefs?.nodes ?? []) addThreadNode(parent, buckets);
+  for (const reply of eventNode?.authorReplies?.nodes ?? []) addThreadNode(reply, buckets);
+  for (const reply of eventNode?.followedReply?.nodes ?? []) addThreadNode(reply, buckets);
+  for (const reply of eventNode?.replies?.nodes ?? []) addThreadNode(reply, buckets);
+  for (const reply of eventNode?.allReplies?.nodes ?? []) addThreadNode(reply, buckets);
+
+  const root = normalizeGraphqlEvent(eventNode);
+  const events = Array.from(buckets.allEvents.values()).filter((event) => event.id !== root?.id);
+  return {
+    // The schema requires a `root`; an empty/invalid event id surfaces as a
+    // miss downstream (buildThreadStructure returns an empty thread).
+    root: (root ?? {
+      id: '',
+      kind: 1,
+      pubkey: '',
+      content: '',
+      tags: [],
+      created_at: 0,
+    }) as NaggThread['root'],
+    events: events as NaggThread['events'],
+    metrics: Object.fromEntries(buckets.metrics),
+    profiles: Object.fromEntries(buckets.profiles) as NaggThread['profiles'],
+    quoted: Object.fromEntries(buckets.quotedEvents) as NaggThread['quoted'],
+  };
+}
+
+/**
+ * Build a {@link ThreadResult} from the parsed canonical {@link NaggThread},
+ * identically for both transports: seed the buckets, run one
+ * {@link buildThreadStructure} to derive parents/replies (time-ordered), and page
+ * over the resulting replies.
+ */
+function threadResultFromCanonical(
+  eventId: string,
+  limit: number,
+  thread: NaggThread,
+  seed: ThreadRequest['seed']
+): ThreadResult {
+  const buckets = {
+    allEvents: seed ? new Map(seed.allEvents) : new Map<string, FeedEvent>(),
+    profiles: seed ? new Map(seed.profiles) : new Map<string, ProfileInfo>(),
+    metrics: seed ? new Map(seed.metrics) : new Map<string, NoteMetrics>(),
+    quotedEvents: seed ? new Map(seed.quotedEvents) : new Map<string, FeedEvent>(),
+  };
+  const allEvents = [thread.root, ...thread.events].filter(
+    (event): event is NaggThread['root'] => !!event && !!event.id
+  );
+  for (const event of allEvents) buckets.allEvents.set(event.id, event as FeedEvent);
+  for (const [id, metrics] of Object.entries(thread.metrics)) buckets.metrics.set(id, metrics);
+  for (const [pubkey, profile] of Object.entries(thread.profiles)) {
+    buckets.profiles.set(pubkey, profile);
+  }
+  for (const [id, quote] of Object.entries(thread.quoted)) {
+    buckets.quotedEvents.set(id, quote as FeedEvent);
+  }
+
+  const structure = buildThreadStructure(eventId, buckets.allEvents);
+  const replyPageEventIds = structure.replies.slice(0, limit).map((event) => event.id);
+  const hasMoreReplies = structure.replies.length > limit;
+  return {
+    ...buckets,
+    thread: structure,
+    replyPageEventIds,
+    replyPageSize: limit,
+    loadedReplyCount: replyPageEventIds.length,
+    hasMoreReplies,
+  };
+}
+
 export function createNaggFeedClient(): FeedClient {
   return {
     async getFeed({
@@ -1528,22 +1707,32 @@ export function createNaggFeedClient(): FeedClient {
           ...viewerVariables,
           authorChain: authoredReplyChainInput(),
         };
-        const data = userPubkey
-          ? await postGraphqlWithAuthorReplyAndTimeoutFallback<GraphqlFeedData>(
-              RANKED_FEED_WITH_VIEWER_QUERY,
-              variables,
-              RANKED_FEED_WITH_VIEWER_LEGACY_QUERY,
-              viewerVariables,
-              FEED_QUERY,
-              { input: timeoutFallbackInput },
+        const transport = feedTransport();
+        const rankedControls = {
+          dataSchema: NaggFeedPageSchema,
+          graphqlToData: rankedFeedToPage,
+          signal,
+          timeoutMs,
+        };
+        const page = userPubkey
+          ? await postGraphqlWithAuthorReplyAndTimeoutFallback(
+              {
+                query: RANKED_FEED_WITH_VIEWER_QUERY,
+                variables,
+                appView: rankedFeedAppView(input),
+                transport,
+              },
+              { query: RANKED_FEED_WITH_VIEWER_LEGACY_QUERY, variables: viewerVariables },
+              { query: FEED_QUERY, variables: { input: timeoutFallbackInput } },
               refresh,
-              { signal, timeoutMs }
+              rankedControls
             )
-          : await postGraphql<GraphqlFeedData>(RANKED_FEED_QUERY, { input }, refresh, {
-              signal,
-              timeoutMs,
+          : await runNaggQuery(RANKED_FEED_QUERY, { input }, refresh, {
+              ...rankedControls,
+              appView: rankedFeedAppView(input),
+              transport,
             });
-        return logResult('for-you', mapRankedOrEventGraphqlFeed(data, feedOptions));
+        return logResult('for-you', mapNaggFeedPageResult(page as NaggFeedPageOf, feedOptions));
       }
       if (isFollowingRepliesSpec(parsedSpec)) {
         if (!userPubkey) return logResult('following-replies-no-viewer', emptyFeedParseResult());
@@ -1556,16 +1745,14 @@ export function createNaggFeedClient(): FeedClient {
           }) as EventQueryInput,
           preferenceFilters
         );
-        const data = await postGraphql<GraphqlFeedData>(
-          FOLLOWING_REPLIES_QUERY,
-          { input },
-          refresh,
-          { signal, timeoutMs }
-        );
-        return logResult(
-          'following-replies',
-          mapFollowingRepliesGraphqlFeed(data.events?.nodes ?? [], feedOptions)
-        );
+        const page = await fetchNaggFeedPage(FOLLOWING_REPLIES_QUERY, { input }, refresh, {
+          graphqlToData: followingRepliesToPage,
+          appView: followsFeedAppView({ pubkeys: [userPubkey], until, limit, offset }),
+          transport: feedTransport(),
+          signal,
+          timeoutMs,
+        });
+        return logResult('following-replies', mapNaggFeedPageResult(page, feedOptions));
       }
       if (isFollowingPopularSpec(parsedSpec)) {
         if (!userPubkey) return logResult('following-popular-no-viewer', emptyFeedParseResult());
@@ -1594,17 +1781,27 @@ export function createNaggFeedClient(): FeedClient {
           ...viewerVariables,
           authorChain: authoredReplyChainInput(),
         };
-        const data = await postGraphqlWithAuthorReplyAndTimeoutFallback<GraphqlFeedData>(
-          FOLLOWING_POPULAR_WITH_VIEWER_QUERY,
-          variables,
-          FOLLOWING_POPULAR_WITH_VIEWER_LEGACY_QUERY,
-          viewerVariables,
-          FEED_QUERY,
-          { input: timeoutFallbackInput },
+        const page = await postGraphqlWithAuthorReplyAndTimeoutFallback(
+          {
+            query: FOLLOWING_POPULAR_WITH_VIEWER_QUERY,
+            variables,
+            appView: rankedFeedAppView(input),
+            transport: feedTransport(),
+          },
+          { query: FOLLOWING_POPULAR_WITH_VIEWER_LEGACY_QUERY, variables: viewerVariables },
+          { query: FEED_QUERY, variables: { input: timeoutFallbackInput } },
           refresh,
-          { signal, timeoutMs }
+          {
+            dataSchema: NaggFeedPageSchema,
+            graphqlToData: rankedFeedToPage,
+            signal,
+            timeoutMs,
+          }
         );
-        return logResult('following-popular', mapRankedOrEventGraphqlFeed(data, feedOptions));
+        return logResult(
+          'following-popular',
+          mapNaggFeedPageResult(page as NaggFeedPageOf, feedOptions)
+        );
       }
       if (isFollowingRecentSpec(parsedSpec)) {
         if (!userPubkey) return logResult('following-recent-no-viewer', emptyFeedParseResult());
@@ -1617,21 +1814,28 @@ export function createNaggFeedClient(): FeedClient {
           }) as EventQueryInput,
           preferenceFilters
         );
-        const data = await postGraphql<GraphqlFeedData>(FEED_QUERY, { input }, refresh, {
+        const page = await fetchNaggFeedPage(FEED_QUERY, { input }, refresh, {
+          graphqlToData: eventsFeedToPage,
+          appView: followsFeedAppView({ pubkeys: [userPubkey], until, limit, offset }),
+          transport: feedTransport(),
           signal,
           timeoutMs,
         });
-        return logResult('following-recent', mapGraphqlFeed(data.events?.nodes ?? [], feedOptions));
+        return logResult('following-recent', mapNaggFeedPageResult(page, feedOptions));
       }
       const input = withPreferenceEventFilters(
         feedInputFromSpec({ spec: hydratedSpec, limit, until, offset }),
         preferenceFilters
       );
-      const data = await postGraphql<GraphqlFeedData>(FEED_QUERY, { input }, refresh, {
+      const genericPubkeys = pubkeysFromSpec(parsedSpec);
+      const page = await fetchNaggFeedPage(FEED_QUERY, { input }, refresh, {
+        graphqlToData: eventsFeedToPage,
+        appView: followsFeedAppView({ pubkeys: genericPubkeys, until, limit, offset }),
+        transport: feedTransport(),
         signal,
         timeoutMs,
       });
-      return logResult('generic', mapGraphqlFeed(data.events?.nodes ?? [], feedOptions));
+      return logResult('generic', mapNaggFeedPageResult(page, feedOptions));
     },
 
     async getUserFeed({
@@ -1645,7 +1849,7 @@ export function createNaggFeedClient(): FeedClient {
       signal,
       timeoutMs,
     }: UserFeedPageRequest) {
-      const data = await postGraphql<GraphqlFeedData>(
+      const page = await fetchNaggFeedPage(
         FEED_QUERY,
         {
           input: {
@@ -1657,9 +1861,15 @@ export function createNaggFeedClient(): FeedClient {
           },
         },
         refresh,
-        { signal, timeoutMs }
+        {
+          graphqlToData: eventsFeedToPage,
+          appView: userFeedAppView({ pubkey, until, limit, offset }),
+          transport: feedTransport(),
+          signal,
+          timeoutMs,
+        }
       );
-      return mapGraphqlFeed(data.events?.nodes ?? [], {
+      return mapNaggFeedPage(page, {
         includeNote: (event) => event.pubkey === pubkey && isRootNote(event),
         includeRepost: (event) => event.pubkey === pubkey,
         extraProfile: authorName
@@ -1678,10 +1888,13 @@ export function createNaggFeedClient(): FeedClient {
       timeoutMs,
     }: PostsByPubkeysRequest) {
       if (pubkeys.length === 0) {
-        return mapGraphqlFeed([], { includeNote: () => false, includeRepost: () => false });
+        return mapNaggFeedPage(graphqlNodesToNaggPage([]) as NaggFeedPageOf, {
+          includeNote: () => false,
+          includeRepost: () => false,
+        });
       }
       const pubkeySet = new Set(pubkeys);
-      const data = await postGraphql<GraphqlFeedData>(
+      const page = await fetchNaggFeedPage(
         FEED_QUERY,
         {
           input: {
@@ -1693,9 +1906,15 @@ export function createNaggFeedClient(): FeedClient {
           },
         },
         refresh,
-        { signal, timeoutMs }
+        {
+          graphqlToData: eventsFeedToPage,
+          appView: followsFeedAppView({ pubkeys, until, limit, offset }),
+          transport: feedTransport(),
+          signal,
+          timeoutMs,
+        }
       );
-      return mapGraphqlFeed(data.events?.nodes ?? [], {
+      return mapNaggFeedPage(page, {
         includeNote: (event) => pubkeySet.has(event.pubkey) && isRootNote(event),
         includeRepost: (event) => pubkeySet.has(event.pubkey),
       });
@@ -1712,18 +1931,22 @@ export function createNaggFeedClient(): FeedClient {
 
       if (missingQuotedIds.length > 0) {
         tasks.push(
-          postGraphql<GraphqlFeedData>(
+          runNaggQuery(
             ENRICH_EVENTS_QUERY,
             { input: { ids: missingQuotedIds, limit: missingQuotedIds.length } },
             refresh,
-            { signal, timeoutMs }
-          ).then((data) => collectHydrationFromGraphqlNodes(data.events?.nodes ?? []))
+            { dataSchema: NaggFeedPageSchema, graphqlToData: eventsFeedToPage, signal, timeoutMs }
+          ).then((page) => ({
+            metrics: new Map(Object.entries(page.metrics)) as Map<string, NoteMetrics>,
+            profiles: new Map(Object.entries(page.profiles)) as Map<string, ProfileInfo>,
+            quotedEvents: new Map(Object.entries(page.quoted)) as Map<string, FeedEvent>,
+          }))
         );
       }
 
       if (missingProfilePubkeys.length > 0) {
         tasks.push(
-          postGraphql<GraphqlFeedData>(
+          runNaggQuery(
             PROFILE_EVENTS_QUERY,
             {
               input: {
@@ -1733,15 +1956,15 @@ export function createNaggFeedClient(): FeedClient {
               },
             },
             refresh,
-            { signal, timeoutMs }
-          ).then((data) => {
-            const profiles = new Map<string, ProfileInfo>();
-            for (const node of data.events?.nodes ?? []) {
-              const profile = profileFromMetadataEvent(node);
-              if (profile) profiles.set(node.pubkey, profile);
+            {
+              dataSchema: NaggFeedPageSchema,
+              graphqlToData: profileEventsToPage,
+              signal,
+              timeoutMs,
             }
-            return { profiles };
-          })
+          ).then((page) => ({
+            profiles: new Map(Object.entries(page.profiles)) as Map<string, ProfileInfo>,
+          }))
         );
       }
 
@@ -1786,45 +2009,23 @@ export function createNaggFeedClient(): FeedClient {
         until,
         limit,
       });
-      const data = await postGraphql<GraphqlNotificationsData>(
-        NOTIFICATIONS_QUERY,
-        { input },
-        refresh,
-        { signal, timeoutMs }
-      );
-      const nodes = data.notifications?.nodes ?? [];
-      const eventNodes = nodes
-        .map((node) => node.event)
-        .filter((event): event is GraphqlEventNode => !!event);
-      const hydration = collectHydrationFromGraphqlNodes(eventNodes);
-      const notifications = nodes
-        .map((node) => {
-          const event = normalizeGraphqlEvent(node.event);
-          if (!event) return undefined;
-          const reason = node.reason || 'mention';
-          const target = notificationTargetFromGraphqlNode(node.event, reason);
-          return {
-            event,
-            ...target,
-            reason,
-            actorVertexScore:
-              typeof node.actorVertexScore === 'number' && Number.isFinite(node.actorVertexScore)
-                ? node.actorVertexScore
-                : 0,
-          };
-        })
-        .filter((notification): notification is NonNullable<typeof notification> => !!notification)
-        .sort(compareNotificationsNewestFirst);
-      return {
-        notifications,
-        metricsMap: hydration.metrics,
-        profilesMap: hydration.profiles,
-        quotedEventsMap: hydration.quotedEvents,
-        paginationUntil:
-          notifications.length > 0
-            ? Math.min(...notifications.map((notification) => notification.event.created_at))
-            : 0,
-      };
+      const page = await runNaggQuery(NOTIFICATIONS_QUERY, { input }, refresh, {
+        dataSchema: NaggNotificationsPageSchema,
+        graphqlToData: notificationsToPage,
+        appView: notificationsAppView({
+          viewer: viewerPubkey,
+          tab,
+          policy,
+          replyScope,
+          since,
+          until,
+          limit,
+        }),
+        transport: backendConfig.nostrNotificationsAppView ? 'appview' : 'graphql',
+        signal,
+        timeoutMs,
+      });
+      return notificationsResultFromPage(page);
     },
 
     async getThread({
@@ -1875,98 +2076,49 @@ export function createNaggFeedClient(): FeedClient {
               rank,
             }
           : variables;
-      const data = isRelevantSort
-        ? await postGraphqlWithAuthorReplyFallback<GraphqlThreadData>(
-            query,
-            variables,
-            THREAD_RANKED_QUERY,
-            fallbackVariables,
+      const transport = feedTransport();
+      const threadControls = {
+        dataSchema: NaggThreadSchema,
+        graphqlToData: threadToCanonical,
+        signal,
+        timeoutMs,
+      };
+      const appView = threadAppView({ id: eventId, limit });
+      const canonical = isRelevantSort
+        ? await postGraphqlWithAuthorReplyFallback(
+            { query, variables, appView, transport },
+            { query: THREAD_RANKED_QUERY, variables: fallbackVariables },
             false,
-            { signal, timeoutMs }
+            threadControls
           )
-        : await postGraphql<GraphqlThreadData>(query, variables, false, {
-            signal,
-            timeoutMs,
+        : await runNaggQuery(query, variables, false, {
+            ...threadControls,
+            appView,
+            transport,
           });
 
-      const rankedReplyNodes = data.event?.replies?.nodes ?? [];
-      const allReplyNodes = data.event?.allReplies?.nodes ?? [];
-      const supportsSourceAuthorReplies = isRelevantSort && !!data.event?.authorReplies;
-      const relevantReplies = supportsSourceAuthorReplies
-        ? mergeRelevantReplyNodes({
-            sourceNode: data.event,
-            authorNodes: data.event?.authorReplies?.nodes,
-            followedNodes: data.event?.followedReply?.nodes,
-            rankedNodes: rankedReplyNodes,
-            allNodes: allReplyNodes,
-            offset,
-            limit,
-          })
-        : null;
-      const replyNodes = relevantReplies?.pageNodes ?? rankedReplyNodes;
-      const replyPageEventIds =
-        relevantReplies?.pageEventIds ??
-        replyNodes
-          .map((node) => normalizeGraphqlEvent(node)?.id)
-          .filter((id): id is string => !!id);
-      const buckets = {
-        allEvents: seed ? new Map(seed.allEvents) : new Map<string, FeedEvent>(),
-        profiles: seed ? new Map(seed.profiles) : new Map<string, ProfileInfo>(),
-        metrics: seed ? new Map(seed.metrics) : new Map<string, NoteMetrics>(),
-        quotedEvents: seed ? new Map(seed.quotedEvents) : new Map<string, FeedEvent>(),
-      };
-      addThreadNode(data.event ?? undefined, buckets);
-      for (const parent of data.event?.parentRefs?.nodes ?? []) addThreadNode(parent, buckets);
-      if (supportsSourceAuthorReplies) {
-        for (const reply of data.event?.authorReplies?.nodes ?? []) addThreadNode(reply, buckets);
-        for (const reply of data.event?.followedReply?.nodes ?? []) addThreadNode(reply, buckets);
-        for (const reply of rankedReplyNodes) addThreadNode(reply, buckets);
-        for (const reply of allReplyNodes) addThreadNode(reply, buckets);
-      } else {
-        for (const reply of replyNodes) addThreadNode(reply, buckets);
-      }
+      const result = threadResultFromCanonical(eventId, limit, canonical, seed);
 
-      const thread = includeSelectedReplyNodesInThread(
-        buildThreadStructure(eventId, buckets.allEvents),
-        replyNodes
-      );
-      const hasMoreReplies = relevantReplies
-        ? relevantReplies.hasMore || allReplyNodes.length >= candidateLimit
-        : replyNodes.length >= limit;
-      const targetMetrics = buckets.metrics.get(eventId);
-
-      feedLog.info('thread.nagg.graphql.result', {
+      feedLog.info('thread.nagg.result', {
         eventId,
         sort,
         limit,
         offset,
         candidateLimit,
         rankedLimit,
+        transport: transport === 'appview' && appView ? 'appview' : 'graphql',
         query: graphqlOperationName(query),
         durationMs: Date.now() - startedAt,
         seedEvents: seed?.allEvents.size ?? 0,
-        allEvents: buckets.allEvents.size,
-        replyNodeCount: replyNodes.length,
-        rankedReplyNodeCount: rankedReplyNodes.length,
-        allReplyNodeCount: allReplyNodes.length,
-        authorReplyNodeCount: data.event?.authorReplies?.nodes?.length ?? 0,
-        followedReplyNodeCount: data.event?.followedReply?.nodes?.length ?? 0,
-        supportsSourceAuthorReplies,
-        replyPageEventIds: replyPageEventIds.map(shortId),
-        replyNodeKinds: graphqlNodeKindCounts(replyNodes),
-        renderedReplies: thread.replies.length,
-        targetReplyCount: targetMetrics?.replyCount ?? null,
-        hasMoreReplies,
+        allEvents: result.allEvents.size,
+        replyPageEventIds: result.replyPageEventIds.map(shortId),
+        renderedReplies: result.thread.replies.length,
+        targetReplyCount: result.metrics.get(eventId)?.replyCount ?? null,
+        loadedReplyCount: result.loadedReplyCount,
+        hasMoreReplies: result.hasMoreReplies,
       });
 
-      return {
-        ...buckets,
-        thread,
-        replyPageEventIds,
-        replyPageSize: limit,
-        loadedReplyCount: replyPageEventIds.length,
-        hasMoreReplies,
-      };
+      return result;
     },
   };
 }
