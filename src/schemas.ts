@@ -128,17 +128,17 @@ export const NaggServiceInfoSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// App-view feed-page canonical shape
+// Canonical feed-page / thread / notifications shapes — ONE parser per view,
+// both transports.
 //
-// The REST app-view feed/ranked/thread routes return a server-shaped
-// `FeedResponse`/thread payload that already carries the same data the
-// `graphqlNodesToNaggPage` mapper distils a rich GraphQL feed query down to:
-// a list of feed items plus side maps of metrics, profiles and quoted events
-// keyed by id/pubkey. These schemas describe that canonical `NaggFeedPage`
-// shape (see `src/map/feed.ts`) so the app-view bindings' `normalize` output is
-// schema-validated by the same transport path the GraphQL connection schemas
-// use. (The rich GraphQL node-with-aggregates selection lives in the consumer;
-// the canonical post-mapping shape is what both transports converge on.)
+// nagg's REST app-view emits these shapes directly (a server-shaped
+// `FeedResponse`/`ThreadResponse`/`NotificationsResponse`), and the GraphQL
+// branch distils its rich node tree to the same shape via `graphqlToData`
+// (`graphqlNodesToNaggPage`, see `src/map/graphql.ts`) BEFORE the parse. So each
+// `Nagg*Schema` below is the single `dataSchema` both transports converge on:
+// `Schema.safeParse(<nagg REST body>)` and `Schema.safeParse(<distilled GraphQL
+// data>)` succeed and produce deep-equal canonical objects. There is no
+// per-transport normalize layer.
 // ---------------------------------------------------------------------------
 
 // A feed event uses second-resolution `created_at` (matching `NaggFeedEvent`),

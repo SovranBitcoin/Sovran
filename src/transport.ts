@@ -37,8 +37,13 @@ export interface NaggResponseLogEvent extends NaggRequestLogEvent {
 /**
  * Which transport serves a request:
  * - `graphql`  → POST the generic GraphQL `/graphql` endpoint (recipes/semantics client-side).
- * - `appview`  → GET/POST nagg's server-shaped REST app-view (`/nostr/*`), normalized
- *                back into the same shape the GraphQL `dataSchema` validates.
+ * - `appview`  → GET/POST nagg's server-shaped REST app-view (`/nostr/*`), which now emits
+ *                the SAME canonical shape the GraphQL `dataSchema` validates.
+ *
+ * Both transports converge on a single `dataSchema.safeParse(canonical)`: the REST body IS
+ * the canonical shape, and the GraphQL `data` is distilled to it by the request's optional
+ * {@link NaggGraphqlRequest.graphqlToData} before the same parse — so there is one parser per
+ * view, not a per-transport normalize layer.
  *
  * `appview` only applies to a request that carries an {@link NaggAppViewBinding} and to a
  * client configured with an {@link NaggAppViewConfig}; otherwise the GraphQL path is used,
@@ -71,9 +76,10 @@ export interface NaggClientConfig {
 }
 
 /**
- * Declares how a single query is served by the REST app-view. `normalize` maps the raw
- * REST JSON into the SAME shape the request's `dataSchema` validates, so callers get an
- * identical, schema-checked result regardless of which transport ran.
+ * Declares how a single query is served by the REST app-view. The REST body IS the
+ * canonical shape the request's `dataSchema` validates (nagg's app-view emits it directly),
+ * so there is no per-transport normalize step — the raw body is parsed by the same schema
+ * the GraphQL path uses, giving callers an identical, schema-checked result either way.
  */
 export interface NaggAppViewBinding {
   /** Route relative to the app-view base, e.g. `/nostr/feed`. The `/v1` prefix is applied by the client. */
@@ -82,8 +88,6 @@ export interface NaggAppViewBinding {
   searchParams?: NaggSearchParams;
   /** POST body; ignored for GET. */
   body?: unknown;
-  /** Map the raw REST JSON into the canonical shape that `dataSchema` parses. */
-  normalize: (restJson: unknown) => unknown;
   /** Optional label for logging; defaults to the request's `operationName`. */
   operationName?: string;
 }
@@ -114,6 +118,14 @@ export interface NaggGraphqlRequest<TSchema extends z.ZodType> extends RequestCo
    * AND the client has an `appView` base configured; otherwise the GraphQL path runs.
    */
   appView?: NaggAppViewBinding;
+  /**
+   * Distils the raw GraphQL `data` into the canonical shape `dataSchema` validates, applied
+   * in the GraphQL branch BEFORE the parse. This moves the rich node-tree distillation (e.g.
+   * `graphqlNodesToNaggPage`) behind the transport seam, so both transports end at the same
+   * `dataSchema.safeParse(canonical)`. Omit for queries whose GraphQL `data` already matches
+   * the schema (e.g. DM envelopes).
+   */
+  graphqlToData?: (data: unknown) => unknown;
 }
 
 export interface NaggClient {
@@ -206,7 +218,7 @@ function postGraphql<TSchema extends z.ZodType>(
       return errAsync(error);
     }
     return ResultAsync.fromPromise(response.json() as Promise<unknown>, toNaggNetworkError)
-      .andThen((raw) => parseGraphqlData(raw, request.dataSchema))
+      .andThen((raw) => parseGraphqlData(raw, request.dataSchema, request.graphqlToData))
       .map((data) => {
         logEnd(config, endpoint, operationName, variables, refresh, startedAt, true, response.status);
         return data;
@@ -247,7 +259,8 @@ function fetchGraphql<TSchema extends z.ZodType>(
 
 export function parseGraphqlData<TSchema extends z.ZodType>(
   raw: unknown,
-  dataSchema: TSchema
+  dataSchema: TSchema,
+  graphqlToData?: (data: unknown) => unknown
 ): Result<z.infer<TSchema>, NaggError> {
   const envelope = NaggGraphqlEnvelopeSchema.safeParse(raw);
   if (!envelope.success) {
@@ -268,7 +281,10 @@ export function parseGraphqlData<TSchema extends z.ZodType>(
   if (envelope.data.data === undefined) {
     return err({ type: 'missing_data', message: 'GraphQL response did not include data' });
   }
-  const data = dataSchema.safeParse(envelope.data.data);
+  // Distil the rich GraphQL node tree into the canonical shape BEFORE the parse, so this
+  // branch ends at the same `dataSchema.safeParse(canonical)` the REST branch reaches.
+  const canonical = graphqlToData ? graphqlToData(envelope.data.data) : envelope.data.data;
+  const data = dataSchema.safeParse(canonical);
   if (!data.success) {
     return err({
       type: 'schema',
@@ -397,7 +413,9 @@ function fetchAppViewQuery<TSchema extends z.ZodType>(
     signal: request.signal,
     timeoutMs: request.timeoutMs,
     operationName,
-  }).andThen((raw) => parseRestData(binding.normalize(raw), request.dataSchema));
+    // The REST body IS the canonical shape — parse it with the same schema the GraphQL
+    // branch parses, no per-transport normalize.
+  }).andThen((raw) => parseRestData(raw, request.dataSchema));
 }
 
 function fetchAppViewRest<TSchema extends z.ZodType>(

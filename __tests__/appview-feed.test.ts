@@ -8,6 +8,7 @@ import {
   threadAppView,
   userFeedAppView,
 } from '../src/recipes';
+import { graphqlNodesToNaggPage } from '../src/map';
 import {
   NaggFeedPageSchema,
   NaggNoteStatsSchema,
@@ -34,7 +35,7 @@ function restEvent(id: string, overrides: Record<string, unknown> = {}) {
   };
 }
 
-// A representative FeedResponse payload mixing a note (with root) and a repost.
+// A representative nagg REST FeedResponse body mixing a note (with root) and a repost.
 const feedResponse = {
   items: [
     {
@@ -63,8 +64,13 @@ const feedResponse = {
   paginationOffset: 2,
 };
 
+// ---------------------------------------------------------------------------
+// Bindings reduce to { path, method, params|body, operationName } — no normalize.
+// The canonical Nagg*Schema parses the raw nagg REST body directly.
+// ---------------------------------------------------------------------------
+
 describe('rankedFeedAppView', () => {
-  test('POSTs the ranked input as a JSON body and normalizes to the feed page', () => {
+  test('POSTs the ranked input as a JSON body; no normalize on the binding', () => {
     const input = forYouRankedEventsInput({ viewerPubkey: PUBKEY, limit: 20 });
     const binding = rankedFeedAppView(input);
 
@@ -72,16 +78,12 @@ describe('rankedFeedAppView', () => {
     expect(binding.method).toBe('POST');
     expect(binding.searchParams).toBeUndefined();
     expect(binding.body).toBe(input);
+    expect('normalize' in binding).toBe(false);
 
-    const normalized = binding.normalize(feedResponse);
-    expect(NaggFeedPageSchema.safeParse(normalized).success).toBe(true);
-
-    const page = normalized as ReturnType<typeof binding.normalize> & {
-      items: Array<Record<string, unknown>>;
-      metrics: Record<string, unknown>;
-      paginationUntil: number;
-      paginationOffset: number;
-    };
+    // The raw REST body parses directly through the canonical feed-page schema.
+    const parsed = NaggFeedPageSchema.safeParse(feedResponse);
+    expect(parsed.success).toBe(true);
+    const page = parsed.data!;
     expect(page.items).toHaveLength(2);
     expect(page.items[0]).toMatchObject({ type: 'note' });
     expect(page.items[1]).toMatchObject({ type: 'repost' });
@@ -97,7 +99,7 @@ describe('rankedFeedAppView', () => {
 });
 
 describe('followsFeedAppView', () => {
-  test('GETs /nostr/feed with an authors CSV and normalizes to the feed page', () => {
+  test('GETs /nostr/feed with an authors CSV; no normalize', () => {
     const binding = followsFeedAppView({
       pubkeys: [PUBKEY, ROOT_ID],
       until: 1_700_000_000,
@@ -113,9 +115,8 @@ describe('followsFeedAppView', () => {
       limit: 25,
       offset: 5,
     });
-
-    const normalized = binding.normalize(feedResponse);
-    expect(NaggFeedPageSchema.safeParse(normalized).success).toBe(true);
+    expect('normalize' in binding).toBe(false);
+    expect(NaggFeedPageSchema.safeParse(feedResponse).success).toBe(true);
   });
 
   test('omits the pubkeys param when no authors are provided', () => {
@@ -123,12 +124,11 @@ describe('followsFeedAppView', () => {
     expect(binding.searchParams).toEqual({ limit: 30 });
   });
 
-  test('normalizes the canonical note item shape (created_at, tags, root)', () => {
-    const binding = followsFeedAppView({ pubkeys: [PUBKEY] });
-    const page = binding.normalize(feedResponse) as {
-      items: Array<{ type: string; event?: Record<string, unknown>; rootEvent?: Record<string, unknown> }>;
-    };
+  test('the canonical schema accepts the nagg REST note item (created_at, tags, root)', () => {
+    const page = NaggFeedPageSchema.parse(feedResponse);
     const note = page.items[0];
+    expect(note.type).toBe('note');
+    if (note.type !== 'note') throw new Error('expected a note item');
     expect(note.event).toEqual({
       id: NOTE_ID,
       kind: 1,
@@ -142,7 +142,7 @@ describe('followsFeedAppView', () => {
 });
 
 describe('userFeedAppView', () => {
-  test('GETs /nostr/feed/user and normalizes to the feed page', () => {
+  test('GETs /nostr/feed/user; no normalize', () => {
     const binding = userFeedAppView({ pubkey: PUBKEY, until: 1_700_000_000, limit: 40 });
 
     expect(binding.path).toBe('/nostr/feed/user');
@@ -152,8 +152,8 @@ describe('userFeedAppView', () => {
       until: 1_700_000_000,
       limit: 40,
     });
-
-    expect(NaggFeedPageSchema.safeParse(binding.normalize(feedResponse)).success).toBe(true);
+    expect('normalize' in binding).toBe(false);
+    expect(NaggFeedPageSchema.safeParse(feedResponse).success).toBe(true);
   });
 
   test('defaults limit to 50 and omits pubkey when absent', () => {
@@ -162,12 +162,13 @@ describe('userFeedAppView', () => {
 });
 
 describe('threadAppView', () => {
-  test('GETs /nostr/thread and normalizes to the canonical thread shape', () => {
+  test('GETs /nostr/thread; the canonical schema parses the raw REST body', () => {
     const binding = threadAppView({ id: ROOT_ID, limit: 500 });
 
     expect(binding.path).toBe('/nostr/thread');
     expect(binding.method).toBe('GET');
     expect(binding.searchParams).toEqual({ id: ROOT_ID, limit: 500 });
+    expect('normalize' in binding).toBe(false);
 
     const threadResponse = {
       root: restEvent(ROOT_ID, { content: 'root', tags: [] }),
@@ -177,14 +178,9 @@ describe('threadAppView', () => {
       quoted: {},
     };
 
-    const normalized = binding.normalize(threadResponse);
-    expect(NaggThreadSchema.safeParse(normalized).success).toBe(true);
-
-    const thread = normalized as {
-      root: { id: string };
-      events: Array<{ id: string }>;
-      metrics: Record<string, unknown>;
-    };
+    const parsed = NaggThreadSchema.safeParse(threadResponse);
+    expect(parsed.success).toBe(true);
+    const thread = parsed.data!;
     expect(thread.root.id).toBe(ROOT_ID);
     expect(thread.events.map((event) => event.id)).toEqual([NOTE_ID, REPOST_ID]);
     expect(thread.metrics[ROOT_ID]).toMatchObject({ likeCount: 9, replyCount: 4 });
@@ -192,7 +188,7 @@ describe('threadAppView', () => {
 });
 
 describe('notificationsAppView', () => {
-  test('GETs /nostr/notifications with defaulted params and builds the connection', () => {
+  test('GETs /nostr/notifications with defaulted params; the schema parses the connection', () => {
     const binding = notificationsAppView({ viewer: PUBKEY });
 
     expect(binding.path).toBe('/nostr/notifications');
@@ -204,47 +200,38 @@ describe('notificationsAppView', () => {
       replyScope: 'THREAD',
       limit: 50,
     });
+    expect('normalize' in binding).toBe(false);
 
+    // nagg now emits the server-side connection { nodes, pageInfo } directly.
     const notificationsResponse = {
-      notifications: [
-        { event: restEvent(NOTE_ID), reason: 'mention', actorVertexScore: 0.75 },
-        { event: restEvent(REPOST_ID, { kind: 7 }), reason: 'reaction', actorVertexScore: 0.1 },
-      ],
+      notifications: {
+        nodes: [
+          { event: restEvent(NOTE_ID), reason: 'mention', actorVertexScore: 0.75 },
+          { event: restEvent(REPOST_ID, { kind: 7 }), reason: 'reaction', actorVertexScore: 0.1 },
+        ],
+        pageInfo: { hasNextPage: false, endCursor: '2026-01-01T00:00:00Z|' + NOTE_ID },
+      },
       metrics: { [NOTE_ID]: { likeCount: 1, repostCount: 0, replyCount: 0, satsZapped: 0 } },
       profiles: { [PUBKEY]: { name: 'carol' } },
       quoted: {},
-      paginationUntil: 1_699_990_000,
     };
 
-    const normalized = binding.normalize(notificationsResponse);
-    expect(NaggNotificationsPageSchema.safeParse(normalized).success).toBe(true);
-
-    const page = normalized as {
-      notifications: {
-        nodes: Array<{ event: { id: string }; reason: string; actorVertexScore: number }>;
-        pageInfo: { hasNextPage: boolean; endCursor: number | null };
-      };
-    };
+    const parsed = NaggNotificationsPageSchema.safeParse(notificationsResponse);
+    expect(parsed.success).toBe(true);
+    const page = parsed.data!;
     expect(page.notifications.nodes).toHaveLength(2);
     expect(page.notifications.nodes[0]).toMatchObject({ reason: 'mention', actorVertexScore: 0.75 });
-    expect(page.notifications.pageInfo.endCursor).toBe(1_699_990_000);
-    // 2 nodes < limit 50 → no next page.
-    expect(page.notifications.pageInfo.hasNextPage).toBe(false);
+    expect(page.notifications.pageInfo?.hasNextPage).toBe(false);
   });
 
-  test('flags hasNextPage when the page fills to the limit', () => {
-    const binding = notificationsAppView({ viewer: PUBKEY, limit: 2 });
-    const page = binding.normalize({
-      notifications: [
-        { event: restEvent(NOTE_ID), reason: 'mention', actorVertexScore: 0 },
-        { event: restEvent(REPOST_ID), reason: 'reply', actorVertexScore: 0 },
-      ],
+  test('accepts a null endCursor (empty page)', () => {
+    const parsed = NaggNotificationsPageSchema.safeParse({
+      notifications: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
       metrics: {},
       profiles: {},
       quoted: {},
-      paginationUntil: 1_699_990_000,
-    }) as { notifications: { pageInfo: { hasNextPage: boolean } } };
-    expect(page.notifications.pageInfo.hasNextPage).toBe(true);
+    });
+    expect(parsed.success).toBe(true);
   });
 
   test('preserves a custom tab, policy, reply scope, and bounds', () => {
@@ -270,30 +257,137 @@ describe('notificationsAppView', () => {
 });
 
 describe('noteStatsAppView', () => {
-  test('POSTs the id list and normalizes the stats map keyed by event id', () => {
+  test('POSTs the id list; the schema parses the stats map keyed by event id', () => {
     const binding = noteStatsAppView([NOTE_ID, REPOST_ID, '']);
 
     expect(binding.path).toBe('/nostr/notes/stats');
     expect(binding.method).toBe('POST');
     // Empty ids are dropped.
     expect(binding.body).toEqual({ ids: [NOTE_ID, REPOST_ID] });
+    expect('normalize' in binding).toBe(false);
 
-    const normalized = binding.normalize({
+    const parsed = NaggNoteStatsSchema.safeParse({
       [NOTE_ID]: { likeCount: 5, repostCount: 2, replyCount: 1, satsZapped: 21 },
       [REPOST_ID]: { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 },
     });
-    expect(NaggNoteStatsSchema.safeParse(normalized).success).toBe(true);
-
-    const stats = normalized as Record<string, Record<string, number>>;
-    expect(stats[NOTE_ID]).toEqual({
+    expect(parsed.success).toBe(true);
+    expect(parsed.data![NOTE_ID]).toEqual({
       likeCount: 5,
       repostCount: 2,
       replyCount: 1,
       satsZapped: 21,
     });
-    // Missing fields default to 0.
-    expect(binding.normalize({ [NOTE_ID]: {} })).toEqual({
-      [NOTE_ID]: { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 },
-    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-fixture: one parser, both transports.
+//
+// For each feed-family view, a representative nagg REST body fixture AND a
+// representative GraphQL `data` fixture (run through `graphqlNodesToNaggPage`,
+// the GraphQL→canonical distiller wired as `graphqlToData`) are fed through the
+// SAME Nagg*Schema. Both must parse AND produce deep-equal canonical objects.
+// ---------------------------------------------------------------------------
+
+describe('one parser, both transports (cross-fixture)', () => {
+  test('feed: REST body and distilled GraphQL data parse equal through NaggFeedPageSchema', () => {
+    // GraphQL node selection: a note with a resolved root + per-node aggregates +
+    // author metadata. graphqlNodesToNaggPage distils this to the canonical page.
+    const graphqlNodes = [
+      {
+        id: NOTE_ID,
+        kind: 1,
+        pubkey: PUBKEY,
+        content: 'hello',
+        tags: [['e', ROOT_ID, '', 'root']],
+        createdAt: 1_700_000_000,
+        rootContext: {
+          nodes: [
+            {
+              id: ROOT_ID,
+              kind: 1,
+              pubkey: PUBKEY,
+              content: 'root',
+              tags: [],
+              createdAt: 1_699_900_000,
+              likes: { rows: [{ metrics: { pubkeys: 0 } }] },
+              reposts: { rows: [{ metrics: { pubkeys: 0 } }] },
+              replyStats: { rows: [{ metrics: { events: 0 } }] },
+              zaps: { rows: [{ metrics: { amountSats: 0 } }] },
+            },
+          ],
+        },
+        authorMetadata: [
+          {
+            id: 'profile-alice',
+            kind: 0,
+            pubkey: PUBKEY,
+            content: JSON.stringify({ name: 'alice', picture: 'https://example/pic.png' }),
+            tags: [],
+            createdAt: 1_699_000_000,
+          },
+        ],
+        likes: { rows: [{ metrics: { pubkeys: 3 } }] },
+        reposts: { rows: [{ metrics: { pubkeys: 1 } }] },
+        replyStats: { rows: [{ metrics: { events: 2 } }] },
+        zaps: { rows: [{ metrics: { amountSats: 100 } }] },
+      },
+    ];
+
+    // graphqlNodesToNaggPage is the graphqlToData distiller for the feed family.
+    const distilled = graphqlNodesToNaggPage(graphqlNodes);
+
+    // The REST body that nagg emits for the equivalent feed (one note + root),
+    // shaped to converge byte-for-byte on the same canonical page.
+    const restBody = {
+      items: [
+        {
+          type: 'note',
+          event: restEvent(NOTE_ID),
+          rootEvent: restEvent(ROOT_ID, { content: 'root', tags: [], created_at: 1_699_900_000 }),
+          rootEventId: ROOT_ID,
+        },
+      ],
+      metrics: {
+        [NOTE_ID]: { likeCount: 3, repostCount: 1, replyCount: 2, satsZapped: 100 },
+        [ROOT_ID]: { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 },
+      },
+      profiles: {
+        [PUBKEY]: { name: 'alice', picture: 'https://example/pic.png' },
+      },
+      quoted: {},
+      paginationUntil: 1_700_000_000,
+      paginationOffset: 1,
+    };
+
+    const fromGraphql = NaggFeedPageSchema.safeParse(distilled);
+    const fromRest = NaggFeedPageSchema.safeParse(restBody);
+
+    expect(fromGraphql.success).toBe(true);
+    expect(fromRest.success).toBe(true);
+    // Same parser, same canonical object regardless of transport.
+    expect(fromRest.data).toEqual(fromGraphql.data);
+  });
+
+  test('notifications: REST body and the GraphQL connection parse through NaggNotificationsPageSchema', () => {
+    // The GraphQL notifications resolver already returns the connection shape
+    // ({ notifications: { nodes, pageInfo }, metrics, profiles, quoted }); the REST
+    // app-view now emits the identical shape, so the same schema parses both.
+    const canonical = {
+      notifications: {
+        nodes: [{ event: restEvent(NOTE_ID), reason: 'mention', actorVertexScore: 0.5 }],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+      metrics: { [NOTE_ID]: { likeCount: 0, repostCount: 0, replyCount: 0, satsZapped: 0 } },
+      profiles: { [PUBKEY]: { name: 'alice' } },
+      quoted: {},
+    };
+
+    const fromGraphql = NaggNotificationsPageSchema.safeParse(canonical);
+    const fromRest = NaggNotificationsPageSchema.safeParse(structuredClone(canonical));
+
+    expect(fromGraphql.success).toBe(true);
+    expect(fromRest.success).toBe(true);
+    expect(fromRest.data).toEqual(fromGraphql.data);
   });
 });
