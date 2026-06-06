@@ -1085,6 +1085,11 @@ module.exports = {
     "width": 16,
     "height": 16
   },
+  "mdi:message-outline": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2m0 14H5.2L4 17.2V4h16z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
   "mdi:message-reply": {
     "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M22 4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14l4 4z\"/></svg>",
     "width": 16,

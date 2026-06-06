@@ -273,6 +273,7 @@ export const icons: string[] = [
   'mdi:lightning-bolt',
   'mdi:magnify',
   'mdi:map-marker-radius',
+  'mdi:message-outline',
   'mdi:message-reply',
   'mdi:message-text',
   'mdi:open-in-new',
