@@ -15,6 +15,7 @@
 
 import { create } from 'zustand';
 import { nip19 } from 'nostr-tools';
+import { storeLog } from '@/shared/lib/logger';
 import { useScanHistoryStore, type ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useSwapTransactionsStore,
@@ -503,6 +504,43 @@ function removeNostrMetadata() {
       }
       return { byPubkey: next };
     });
+  });
+}
+
+function purgeFixtureMetadataNow() {
+  useNostrMetadataCache.setState((state) => {
+    let removed = 0;
+    const next = { ...state.byPubkey };
+    for (const pubkey of Object.keys(MOCK_DM.metadataByPubkey)) {
+      if (pubkey in next) {
+        delete next[pubkey];
+        removed += 1;
+      }
+    }
+    if (removed === 0) return state;
+    // Deliberately NOT wrapped in withSkippedPersistWrites: unlike the
+    // in-memory inject/remove, this must PERSIST the deletion so leaked fixture
+    // identities (Bob/Alice/…) that were written to AsyncStorage in a previous
+    // build never rehydrate again.
+    storeLog.info('mock.fixture_metadata_purged', { removed });
+    return { byPubkey: next };
+  });
+}
+
+/**
+ * Permanently drop any persisted mock fixture metadata (Bob/Alice/…) from the
+ * Nostr metadata cache. Called at launch when mock mode is off so demo
+ * identities can never leak through real surfaces. Idempotent and a no-op when
+ * nothing leaked. Waits for the cache to hydrate so it sees the persisted blob.
+ */
+export function purgeFixtureMetadata() {
+  if (useNostrMetadataCache.persist.hasHydrated()) {
+    purgeFixtureMetadataNow();
+    return;
+  }
+  const unsub = useNostrMetadataCache.persist.onFinishHydration(() => {
+    purgeFixtureMetadataNow();
+    unsub?.();
   });
 }
 
