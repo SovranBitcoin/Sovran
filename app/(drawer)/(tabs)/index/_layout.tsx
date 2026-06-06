@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { MintSelector } from '@/features/wallet';
+import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { SearchLayout } from '@/shared/ui/composed/SearchLayout';
 
@@ -12,6 +13,7 @@ export default function HomeLayout() {
   const machine = usePaymentFlowMachine({ walletContext });
 
   const handleRequestMintList = useCallback(() => {
+    clearPaymentContext('wallet.mint_selector');
     void machine.requestMintSelector({ reset: true });
   }, [machine]);
 

@@ -28,7 +28,7 @@ import { useHandleCameraPermission } from '@/features/camera';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
-import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
+import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -100,6 +100,7 @@ export function WalletScreen() {
 
   const handleReceive = useCallback(() => {
     walletLog.info('wallet.action.receive', { unit: ACCOUNT.unit });
+    clearPaymentContext('wallet.receive');
     void machine.startReceive({ reset: true });
   }, [machine]);
 
@@ -110,6 +111,7 @@ export function WalletScreen() {
       walletLog.info('wallet.action.scan_qr_denied');
       return;
     }
+    clearPaymentContext('wallet.scan_qr');
     router.navigate({
       pathname: '/camera',
       params: { to: 'sendToken', unit: ACCOUNT.unit },
@@ -118,7 +120,7 @@ export function WalletScreen() {
 
   const handleSend = useCallback(async () => {
     walletLog.info('wallet.action.send', { unit: ACCOUNT.unit });
-    useNearPaySessionStore.getState().clear();
+    clearPaymentContext('wallet.send');
     await machine.startSendEcash({ reset: true });
   }, [machine]);
 
@@ -129,12 +131,13 @@ export function WalletScreen() {
 
   const handleNearPay = useCallback(() => {
     walletLog.info('wallet.near_pay.tap', { unit: ACCOUNT.unit });
-    useNearPaySessionStore.getState().clear();
+    clearPaymentContext('wallet.near_pay');
     router.push('/(send-flow)/nearPay');
   }, []);
 
   const handleNfc = useCallback(() => {
     walletLog.info('wallet.action.nfc', { unit: ACCOUNT.unit });
+    clearPaymentContext('wallet.nfc');
     void machine.scan?.(undefined, { source: 'nfc' });
   }, [machine]);
 
