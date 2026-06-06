@@ -69,7 +69,12 @@ export function parseBackendConfig(env: BackendEnvInput = readBackendEnv()): Bac
     scoreApiBaseUrl: parsed.data.EXPO_PUBLIC_SCORE_API_BASE_URL ?? nostrAppViewBaseUrl,
     nostrGraphqlEndpoint:
       parsed.data.EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT ?? `${nostrAppViewBaseUrl}/graphql`,
-    nostrDmAppView: parsed.data.EXPO_PUBLIC_NOSTR_DM_APPVIEW === 'true',
+    // Default ON: the contacts/DM list uses nagg's purpose-built, paginated
+    // REST app-view endpoint (optimized for that page) rather than the generic
+    // GraphQL query. Set EXPO_PUBLIC_NOSTR_DM_APPVIEW=false to fall back to
+    // GraphQL. nagg returns the same encrypted envelopes either way (it never
+    // decrypts), and both transports default to NIP-04 + NIP-17 kinds.
+    nostrDmAppView: parsed.data.EXPO_PUBLIC_NOSTR_DM_APPVIEW !== 'false',
   };
 }
 

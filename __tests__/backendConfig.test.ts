@@ -7,7 +7,7 @@ describe('backend config', () => {
       apiBaseUrl: 'https://api.sovran.money/api',
       scoreApiBaseUrl: 'https://nagg.up.railway.app',
       nostrGraphqlEndpoint: 'https://nagg.up.railway.app/graphql',
-      nostrDmAppView: false,
+      nostrDmAppView: true,
     });
   });
 
@@ -24,16 +24,16 @@ describe('backend config', () => {
       apiBaseUrl: 'https://api.example.test/api',
       scoreApiBaseUrl: 'http://localhost:8080',
       nostrGraphqlEndpoint: 'http://localhost:8081/graphql',
-      nostrDmAppView: false,
+      nostrDmAppView: true,
     });
   });
 
-  it('enables the DM app-view transport only when explicitly set to "true"', () => {
+  it('defaults the DM app-view transport ON, opting out only on "false"', () => {
     expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_DM_APPVIEW: 'true' }).nostrDmAppView).toBe(true);
     expect(parseBackendConfig({ EXPO_PUBLIC_NOSTR_DM_APPVIEW: 'false' }).nostrDmAppView).toBe(
       false
     );
-    expect(parseBackendConfig({}).nostrDmAppView).toBe(false);
+    expect(parseBackendConfig({}).nostrDmAppView).toBe(true);
   });
 
   it('keeps the legacy Nagg base URL env as an app-view fallback', () => {
