@@ -9,7 +9,11 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Stack } from 'expo-router';
 
-import { useExecutionState, useScreenActions, usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import {
+  useExecutionState,
+  useScreenActions,
+  usePaymentFlowMachine,
+} from '@sovranbitcoin/colada/react';
 import { fetchNip05Pubkey, type RecipientProfile } from '@sovranbitcoin/colada';
 
 import { MintSelector } from '@/features/wallet';
@@ -22,6 +26,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
+import { useAmountDraftStore } from '@/shared/stores/runtime/amountDraftStore';
 
 import { RecipientHeader } from '../components/RecipientHeader';
 
@@ -57,8 +62,33 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   const { isExecuting } = useExecutionState(machine);
 
   const handleRequestMintList = useCallback(() => {
+    // Preserve the entered amount across the mint-selector round trip. colada
+    // commits the typed amount to the machine only on `next`; opening the mint
+    // selector tears down the amount session and re-enters a FRESH amount step
+    // after a mint change, which would blank the keypad. Stash the live draft
+    // here (the single chokepoint every flow's mint pill routes through) and
+    // restore it on re-entry via the effect below.
+    const rawInput = typeof entry?.rawInput === 'string' ? entry.rawInput : '';
+    const inputMode = entry?.inputMode === 'fiat' ? 'fiat' : 'sat';
+    const scope = typeof entry?.destination === 'string' ? entry.destination : '';
+    if (rawInput && rawInput !== '0') {
+      useAmountDraftStore.getState().stash({ rawInput, inputMode, scope });
+    }
     void machine.requestMintSelector();
-  }, [machine]);
+  }, [machine, entry]);
+
+  // Restore the stashed amount when we return to a fresh amount step after a
+  // mint change. `take` only returns the draft when the destination matches, so
+  // an unrelated flow can't pick it up; we re-apply via the same `setInput`
+  // action the keypad uses and only when the keypad is currently empty.
+  useEffect(() => {
+    const scope = typeof entry?.destination === 'string' ? entry.destination : '';
+    const draft = useAmountDraftStore.getState().take(scope);
+    if (!draft) return;
+    const currentRaw = typeof entry?.rawInput === 'string' ? entry.rawInput : '';
+    if (currentRaw && currentRaw !== '0') return;
+    void actions.setInput.execute({ input: draft.rawInput, mode: draft.inputMode });
+  }, [mintUrl, entry?.destination, entry?.rawInput, actions.setInput]);
 
   const canSendOffline = typeof entry?.canSendOffline === 'boolean' ? entry.canSendOffline : null;
 

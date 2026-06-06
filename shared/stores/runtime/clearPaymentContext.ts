@@ -1,4 +1,5 @@
 import { storeLog } from '@/shared/lib/logger';
+import { useAmountDraftStore } from './amountDraftStore';
 import { useNearPaySessionStore } from './nearPayStore';
 import { useRoutstrTopUpStore } from './routstrTopUpStore';
 
@@ -27,4 +28,7 @@ export function clearPaymentContext(reason: string): void {
   }
   useRoutstrTopUpStore.getState().reset();
   useNearPaySessionStore.getState().clear();
+  // A fresh flow must never restore an amount stashed during a previous,
+  // abandoned mint-selector round trip.
+  useAmountDraftStore.getState().clear();
 }
