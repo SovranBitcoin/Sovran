@@ -23,6 +23,7 @@ const ENV_KEYS = [
   'EXPO_PUBLIC_API_BASE_URL',
   'EXPO_PUBLIC_SCORE_API_BASE_URL',
   'EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT',
+  'EXPO_PUBLIC_NOSTR_FEED_APPVIEW',
 ] as const;
 
 const originalFetchDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'fetch');
@@ -2085,6 +2086,185 @@ describe('createNaggFeedClient', () => {
     expect(repostsCall.variables.rank).toMatchObject({
       references: { kinds: [6, 16], limit: 500 },
       metric: { name: 'reposts', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
+    });
+  });
+});
+
+describe('createNaggFeedClient with the REST app-view transport enabled', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    mockFetch.mockReset();
+    Object.defineProperty(globalThis, 'fetch', {
+      configurable: true,
+      writable: true,
+      value: mockFetch as unknown as typeof fetch,
+    });
+    for (const key of ENV_KEYS) delete process.env[key];
+    process.env.EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL = 'http://nagg.test/';
+    process.env.EXPO_PUBLIC_NOSTR_FEED_APPVIEW = 'true';
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      const value = originalEnv[key as (typeof ENV_KEYS)[number]];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  afterAll(() => {
+    if (originalFetchDescriptor) {
+      Object.defineProperty(globalThis, 'fetch', originalFetchDescriptor);
+      return;
+    }
+    Reflect.deleteProperty(globalThis, 'fetch');
+  });
+
+  it('fetches the For You ranked feed over the REST app-view', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        items: [{ type: 'note', event: { ...root } }],
+        metrics: { root: { likeCount: 7, repostCount: 0, replyCount: 0, satsZapped: 0 } },
+        profiles: { alice: { name: 'Alice' } },
+        quoted: {},
+        paginationUntil: 100,
+        paginationOffset: 1,
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getFeed({
+      spec: JSON.stringify({ id: 'for-you', kind: 'notes', hours: 24 }),
+      userPubkey: 'viewer',
+      limit: 12,
+    });
+
+    const requestUrl = new URL(String(mockFetch.mock.calls[0][0]));
+    expect(`${requestUrl.origin}${requestUrl.pathname}`).toBe(
+      'http://nagg.test/v1/nostr/feed/ranked'
+    );
+    expect(mockFetch.mock.calls[0][1].method).toBe('POST');
+    expect(result.orderedFeedItems).toHaveLength(1);
+    expect(result.orderedFeedItems[0]).toMatchObject({
+      type: 'note',
+      event: expect.objectContaining({ id: 'root' }),
+    });
+    expect(result.metricsMap.get('root')?.likeCount).toBe(7);
+    expect(result.profilesMap.get('alice')).toEqual({ name: 'Alice' });
+    // Ranked feeds keep the offset-based pagination sentinel on both transports.
+    expect(result.paginationUntil).toBe(1);
+    expect(result.paginationOffset).toBe(1);
+  });
+
+  it('fetches a user feed over the REST app-view', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        items: [{ type: 'note', event: { ...root, pubkey: 'alice' } }],
+        metrics: {},
+        profiles: { alice: { name: 'Alice' } },
+        quoted: {},
+        paginationUntil: 100,
+        paginationOffset: 1,
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getUserFeed({
+      pubkey: 'alice',
+      authorName: 'Alice',
+    });
+
+    const requestUrl = new URL(String(mockFetch.mock.calls[0][0]));
+    expect(`${requestUrl.origin}${requestUrl.pathname}`).toBe(
+      'http://nagg.test/v1/nostr/feed/user'
+    );
+    expect(requestUrl.searchParams.get('pubkey')).toBe('alice');
+    expect(result.orderedFeedItems).toHaveLength(1);
+    expect(result.orderedFeedItems[0]).toMatchObject({
+      type: 'note',
+      event: expect.objectContaining({ id: 'root', pubkey: 'alice' }),
+    });
+  });
+
+  it('builds a thread result from the REST app-view payload', async () => {
+    const reply = {
+      id: 'reply',
+      kind: 1,
+      pubkey: 'bob',
+      content: 'reply',
+      tags: [['e', 'root', '', 'reply']],
+      created_at: 101,
+    };
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        root: { ...root },
+        events: [{ ...root }, reply],
+        metrics: { root: { likeCount: 0, repostCount: 0, replyCount: 1, satsZapped: 0 } },
+        profiles: { bob: { name: 'Bob' } },
+        quoted: {},
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getThread({ eventId: 'root' });
+
+    const requestUrl = new URL(String(mockFetch.mock.calls[0][0]));
+    expect(`${requestUrl.origin}${requestUrl.pathname}`).toBe('http://nagg.test/v1/nostr/thread');
+    expect(requestUrl.searchParams.get('id')).toBe('root');
+    expect(result.thread.target?.id).toBe('root');
+    expect(result.thread.replies.map((event) => event.id)).toEqual(['reply']);
+    expect(result.replyPageEventIds).toEqual(['reply']);
+    expect(result.metrics.get('root')?.replyCount).toBe(1);
+    expect(result.profiles.get('bob')).toEqual({ name: 'Bob' });
+    expect(result.hasMoreReplies).toBe(false);
+  });
+
+  it('keeps notifications on GraphQL even with the feed app-view enabled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        data: {
+          notifications: {
+            nodes: [{ reason: 'mention', actorVertexScore: 1, event: rootGql }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      }),
+    });
+
+    const { createNaggFeedClient } = jest.requireActual<
+      typeof import('@/features/feed/data/naggFeedClient')
+    >('@/features/feed/data/naggFeedClient');
+
+    const result = await createNaggFeedClient().getNotifications({
+      viewerPubkey: 'viewer'.padEnd(64, '0'),
+      limit: 12,
+    });
+
+    const requestUrl = new URL(String(mockFetch.mock.calls[0][0]));
+    expect(requestUrl.pathname).toBe('/graphql');
+    expect(result.notifications[0]).toMatchObject({
+      event: expect.objectContaining({ id: 'root' }),
     });
   });
 });

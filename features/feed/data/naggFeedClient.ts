@@ -2,6 +2,7 @@ import {
   createNaggClient,
   NAGG_CAPABILITIES,
   NaggUnknownDataSchema,
+  type NaggAppViewBinding,
   type NaggCapability,
   type NaggError,
 } from '@sovranbitcoin/nagg-ts';
@@ -10,11 +11,15 @@ import {
   followingRecentEventsInput,
   followingRepliesEventsInput,
   followingPopularRankedEventsInput,
+  followsFeedAppView,
   forYouRankedEventsInput,
   mergeRelevantReplyNodes as mergeNaggRelevantReplyNodes,
   notificationsInput,
+  rankedFeedAppView,
   recentNotesEventsInput,
+  threadAppView,
   threadReplyRankInput as buildThreadReplyRankInput,
+  userFeedAppView,
   withEventExclusions,
   withRankedTargetExclusions,
   type EventQueryInput,
@@ -26,6 +31,7 @@ import {
   metricsFromGraphqlNode,
   normalizeGraphqlEvent,
   profileFromMetadataEvent,
+  type NaggFeedPage,
   type NaggGraphqlConnection as GraphqlConnection,
   type NaggGraphqlEventNode as GraphqlEventNode,
 } from '@sovranbitcoin/nagg-ts/map';
@@ -798,18 +804,33 @@ function graphqlDataKeys(value: unknown): string[] {
   return record ? Object.keys(record).slice(0, 8) : [];
 }
 
+/**
+ * Optional REST app-view binding to ride alongside a GraphQL query. When
+ * {@link backendConfig.nostrFeedAppView} is on AND a binding is provided, the
+ * request is served by nagg's REST app-view (the binding `normalize` returns the
+ * SAME canonical shape the GraphQL `data` field carries); otherwise the GraphQL
+ * path runs. Mirrors `dmEnvelopeClient`'s per-query transport switch.
+ */
+type AppViewControls = {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  appView?: NaggAppViewBinding;
+};
+
 async function postGraphql<T>(
   query: string,
   variables: Record<string, unknown>,
   refresh: boolean | undefined,
-  controls: { signal?: AbortSignal; timeoutMs?: number } = {}
+  controls: AppViewControls = {}
 ): Promise<T> {
   const operationName = graphqlOperationName(query);
+  const useAppView = backendConfig.nostrFeedAppView && !!controls.appView;
   const startedAt = Date.now();
   const requestFields = {
     operationName,
     refresh: !!refresh,
     timeoutMs: controls.timeoutMs,
+    transport: useAppView ? 'appview' : 'graphql',
     variables: summarizeGraphqlVariables(variables),
     ...endpointLogFields(),
   };
@@ -817,7 +838,10 @@ async function postGraphql<T>(
 
   apiLog.info('nagg.graphql.request.start', requestFields);
 
-  const client = createNaggClient({ endpoint: graphqlEndpoint() });
+  const client = createNaggClient({
+    endpoint: graphqlEndpoint(),
+    appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
+  });
   const result = await client.query({
     query,
     variables,
@@ -826,6 +850,8 @@ async function postGraphql<T>(
     refresh,
     signal: controls.signal,
     timeoutMs: controls.timeoutMs,
+    transport: useAppView ? 'appview' : 'graphql',
+    appView: controls.appView,
   });
   const durationMs = Date.now() - startedAt;
 
@@ -1253,6 +1279,35 @@ function feedQueryOptionsFromPreferences(filters: FeedPreferenceFilters): FeedQu
   };
 }
 
+/**
+ * Resolve a query to the canonical {@link NaggFeedPage} regardless of transport.
+ * When the feed app-view flag is on AND a binding is supplied, nagg-ts serves the
+ * REST route and the binding's `normalize` already returns a `NaggFeedPage` — so
+ * we return it as-is. Otherwise we run the GraphQL query and distill its raw
+ * nodes with `graphqlToPage` (defaults to `graphqlNodesToNaggPage`). Downstream
+ * `mapNaggFeedPage` mapping is identical for both paths.
+ */
+async function fetchNaggFeedPage(
+  query: string,
+  variables: Record<string, unknown>,
+  refresh: boolean | undefined,
+  controls: AppViewControls,
+  graphqlToPage: (data: GraphqlFeedData) => NaggFeedPage<FeedEvent, ProfileInfo>
+): Promise<NaggFeedPage<FeedEvent, ProfileInfo>> {
+  if (backendConfig.nostrFeedAppView && controls.appView) {
+    return postGraphql<NaggFeedPage<FeedEvent, ProfileInfo>>(query, variables, refresh, controls);
+  }
+  const data = await postGraphql<GraphqlFeedData>(query, variables, refresh, {
+    signal: controls.signal,
+    timeoutMs: controls.timeoutMs,
+  });
+  return graphqlToPage(data);
+}
+
+function pageFromEventNodes(data: GraphqlFeedData): NaggFeedPage<FeedEvent, ProfileInfo> {
+  return graphqlNodesToNaggPage(data.events?.nodes ?? []) as NaggFeedPage<FeedEvent, ProfileInfo>;
+}
+
 function mapGraphqlFeed(nodes: GraphqlEventNode[], options: FeedQueryOptions = {}) {
   return mapNaggFeedPage(graphqlNodesToNaggPage(nodes), options);
 }
@@ -1263,6 +1318,25 @@ function mapRankedGraphqlFeed(nodes: GraphqlEventNode[], options: FeedQueryOptio
     ...result,
     paginationUntil: nodes.length > 0 ? 1 : 0,
     paginationOffset: nodes.length,
+  };
+}
+
+/**
+ * Map a {@link NaggFeedPage} (from either transport) the same way
+ * {@link mapRankedGraphqlFeed} maps GraphQL nodes: offset-based pagination
+ * driven by the page's item count (the `paginationUntil: 1` sentinel), so ranked
+ * REST results paginate identically to the GraphQL ranked path.
+ */
+function mapRankedNaggFeedPage(
+  page: NaggFeedPage<FeedEvent, ProfileInfo>,
+  options: FeedQueryOptions = {}
+): FeedParseResult {
+  const result = mapNaggFeedPage(page, options);
+  const itemCount = page.items.length;
+  return {
+    ...result,
+    paginationUntil: itemCount > 0 ? 1 : 0,
+    paginationOffset: itemCount,
   };
 }
 
@@ -1477,6 +1551,59 @@ function addThreadNode(
   for (const childNode of node.childFollowedReply?.nodes ?? []) addThreadNode(childNode, buckets);
 }
 
+/** Canonical thread shape produced by `threadAppView(...).normalize`. */
+type NaggThreadAppViewResult = {
+  root: FeedEvent;
+  events: FeedEvent[];
+  metrics: Record<string, NoteMetrics>;
+  profiles: Record<string, ProfileInfo>;
+  quoted: Record<string, FeedEvent>;
+};
+
+/**
+ * Build a {@link ThreadResult} from the REST thread payload. The flat `events`
+ * list (root + descendants) seeds the same buckets the GraphQL path fills, then
+ * `buildThreadStructure` derives parents/replies identically. Reply paging is
+ * derived from the resulting structure (the REST endpoint returns an already
+ * server-ranked event list rather than the GraphQL relevant/author-chain
+ * preview metadata, so we page over the flattened replies).
+ */
+function threadResultFromAppView(
+  eventId: string,
+  limit: number,
+  result: NaggThreadAppViewResult,
+  seed: ThreadRequest['seed']
+): ThreadResult {
+  const buckets = {
+    allEvents: seed ? new Map(seed.allEvents) : new Map<string, FeedEvent>(),
+    profiles: seed ? new Map(seed.profiles) : new Map<string, ProfileInfo>(),
+    metrics: seed ? new Map(seed.metrics) : new Map<string, NoteMetrics>(),
+    quotedEvents: seed ? new Map(seed.quotedEvents) : new Map<string, FeedEvent>(),
+  };
+  const allEventNodes = [result.root, ...result.events].filter(
+    (event): event is FeedEvent => !!event && !!event.id
+  );
+  for (const event of allEventNodes) buckets.allEvents.set(event.id, event);
+  for (const [id, metrics] of Object.entries(result.metrics)) buckets.metrics.set(id, metrics);
+  for (const [pubkey, profile] of Object.entries(result.profiles)) {
+    buckets.profiles.set(pubkey, profile);
+  }
+  for (const [id, quote] of Object.entries(result.quoted)) buckets.quotedEvents.set(id, quote);
+
+  const thread = buildThreadStructure(eventId, buckets.allEvents);
+  const replyPageEventIds = thread.replies.slice(0, limit).map((event) => event.id);
+  const hasMoreReplies = thread.replies.length > limit;
+
+  return {
+    ...buckets,
+    thread,
+    replyPageEventIds,
+    replyPageSize: limit,
+    loadedReplyCount: replyPageEventIds.length,
+    hasMoreReplies,
+  };
+}
+
 export function createNaggFeedClient(): FeedClient {
   return {
     async getFeed({
@@ -1516,6 +1643,17 @@ export function createNaggFeedClient(): FeedClient {
           }),
           preferenceFilters
         );
+        if (backendConfig.nostrFeedAppView) {
+          // REST ranked feed: a single normalized `NaggFeedPage` (no GraphQL
+          // capability/timeout fallback chain), mapped via the same ranked path.
+          const page = await postGraphql<NaggFeedPage<FeedEvent, ProfileInfo>>(
+            RANKED_FEED_QUERY,
+            { input },
+            refresh,
+            { signal, timeoutMs, appView: rankedFeedAppView(input) }
+          );
+          return logResult('for-you', mapRankedNaggFeedPage(page, feedOptions));
+        }
         const timeoutFallbackInput = withPreferenceEventFilters(
           recentInputFromSpec({ parsed: parsedSpec, limit, offset }),
           preferenceFilters
@@ -1578,6 +1716,15 @@ export function createNaggFeedClient(): FeedClient {
           }),
           preferenceFilters
         );
+        if (backendConfig.nostrFeedAppView) {
+          const page = await postGraphql<NaggFeedPage<FeedEvent, ProfileInfo>>(
+            FOLLOWING_POPULAR_QUERY,
+            { input },
+            refresh,
+            { signal, timeoutMs, appView: rankedFeedAppView(input) }
+          );
+          return logResult('following-popular', mapRankedNaggFeedPage(page, feedOptions));
+        }
         const timeoutFallbackInput = withPreferenceEventFilters(
           followingRecentEventsInput({
             viewerPubkey: userPubkey,
@@ -1645,7 +1792,7 @@ export function createNaggFeedClient(): FeedClient {
       signal,
       timeoutMs,
     }: UserFeedPageRequest) {
-      const data = await postGraphql<GraphqlFeedData>(
+      const page = await fetchNaggFeedPage(
         FEED_QUERY,
         {
           input: {
@@ -1657,9 +1804,10 @@ export function createNaggFeedClient(): FeedClient {
           },
         },
         refresh,
-        { signal, timeoutMs }
+        { signal, timeoutMs, appView: userFeedAppView({ pubkey, until, limit, offset }) },
+        pageFromEventNodes
       );
-      return mapGraphqlFeed(data.events?.nodes ?? [], {
+      return mapNaggFeedPage(page, {
         includeNote: (event) => event.pubkey === pubkey && isRootNote(event),
         includeRepost: (event) => event.pubkey === pubkey,
         extraProfile: authorName
@@ -1681,7 +1829,7 @@ export function createNaggFeedClient(): FeedClient {
         return mapGraphqlFeed([], { includeNote: () => false, includeRepost: () => false });
       }
       const pubkeySet = new Set(pubkeys);
-      const data = await postGraphql<GraphqlFeedData>(
+      const page = await fetchNaggFeedPage(
         FEED_QUERY,
         {
           input: {
@@ -1693,9 +1841,10 @@ export function createNaggFeedClient(): FeedClient {
           },
         },
         refresh,
-        { signal, timeoutMs }
+        { signal, timeoutMs, appView: followsFeedAppView({ pubkeys, until, limit, offset }) },
+        pageFromEventNodes
       );
-      return mapGraphqlFeed(data.events?.nodes ?? [], {
+      return mapNaggFeedPage(page, {
         includeNote: (event) => pubkeySet.has(event.pubkey) && isRootNote(event),
         includeRepost: (event) => pubkeySet.has(event.pubkey),
       });
@@ -1838,6 +1987,30 @@ export function createNaggFeedClient(): FeedClient {
       timeoutMs,
     }: ThreadRequest): Promise<ThreadResult> {
       const startedAt = Date.now();
+      if (backendConfig.nostrFeedAppView) {
+        // REST thread: a single normalized `{ root, events, ... }` payload built
+        // into the same `ThreadResult` buckets as the GraphQL path.
+        const result = await postGraphql<NaggThreadAppViewResult>(
+          THREAD_NEW_QUERY,
+          { id: eventId, limit, offset },
+          false,
+          { signal, timeoutMs, appView: threadAppView({ id: eventId, limit }) }
+        );
+        const threadResult = threadResultFromAppView(eventId, limit, result, seed);
+        feedLog.info('thread.nagg.appview.result', {
+          eventId,
+          sort,
+          limit,
+          offset,
+          durationMs: Date.now() - startedAt,
+          seedEvents: seed?.allEvents.size ?? 0,
+          allEvents: threadResult.allEvents.size,
+          renderedReplies: threadResult.thread.replies.length,
+          loadedReplyCount: threadResult.loadedReplyCount,
+          hasMoreReplies: threadResult.hasMoreReplies,
+        });
+        return threadResult;
+      }
       const rank = threadReplyRankInput(sort, viewerPubkey);
       const isRelevantSort = sort === 'relevant' && !!rank;
       const candidateLimit = threadRankCandidateLimit(limit, offset);
