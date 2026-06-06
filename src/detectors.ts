@@ -13,6 +13,7 @@ import { decodePaymentRequest, getTokenMetadata } from '@cashu/cashu-ts';
 import { decode } from '@gandlaf21/bolt11-decode';
 import { nip19 } from 'nostr-tools';
 
+import { amountToNumberOrUndefined } from './amount';
 import type { Detectors, PaymentRequestInfo, PaymentRequestTransport } from './types';
 
 const tryDecode = <T>(fn: () => T): T | null => {
@@ -44,7 +45,7 @@ const getPaymentRequestInfo = (v: string): PaymentRequestInfo | null => {
   }));
   return {
     mints: decoded.mints ?? [],
-    amount: decoded.amount?.toNumber(),
+    amount: amountToNumberOrUndefined(decoded.amount),
     unit: decoded.unit ?? 'sat',
     transports,
   };

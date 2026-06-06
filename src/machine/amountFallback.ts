@@ -16,7 +16,10 @@ interface FallbackMint {
   proofAmounts: number[];
 }
 
-export function buildProofSuggestions(proofAmounts: number[], amount: number): {
+export function buildProofSuggestions(
+  proofAmounts: number[],
+  amount: number
+): {
   exactMatch: boolean;
   suggestions: Suggestions;
   hasSuggestion: boolean;
@@ -38,7 +41,10 @@ export function buildProofSuggestions(proofAmounts: number[], amount: number): {
   };
 }
 
-export function buildBalanceSuggestions(balance: number, amount: number): {
+export function buildBalanceSuggestions(
+  balance: number,
+  amount: number
+): {
   suggestions: Suggestions;
   hasSuggestion: boolean;
 } {
@@ -99,7 +105,10 @@ export function buildChooseAmountFallback(args: {
   if (args.destination === 'paymentRequest' || args.destination === 'mintQuote') return null;
   if (args.destination === 'meltQuote' && args.ctx.offline) return null;
 
-  const fallbackMint = pickFallbackMint(args.walletCtx, args.ctx, args.preferredMintUrl);
+  const fallbackMint =
+    args.destination === 'meltQuote'
+      ? pickHighestBalanceFallbackMint(args.walletCtx, args.ctx)
+      : pickFallbackMint(args.walletCtx, args.ctx, args.preferredMintUrl);
   if (!fallbackMint) return null;
 
   if (args.destination === 'sendEcash' && args.ctx.offline) {
@@ -149,8 +158,29 @@ function pickFallbackMint(
     if (preferred) return preferred;
   }
 
-  return walletCtx.trustedMintUrls
-    .map((mintUrl) => toFallbackMint(mintUrl))
-    .filter((mint): mint is FallbackMint => mint != null)
-    .sort((a, b) => b.balance - a.balance)[0] ?? null;
+  return (
+    walletCtx.trustedMintUrls
+      .map((mintUrl) => toFallbackMint(mintUrl))
+      .filter((mint): mint is FallbackMint => mint != null)
+      .sort((a, b) => b.balance - a.balance)[0] ?? null
+  );
+}
+
+function pickHighestBalanceFallbackMint(
+  walletCtx: WalletContext,
+  ctx: FlowContext
+): FallbackMint | null {
+  const allowed = ctx.supportedMintUrls?.length ? new Set(ctx.supportedMintUrls) : null;
+
+  return (
+    walletCtx.trustedMintUrls
+      .filter((mintUrl) => !allowed || allowed.has(mintUrl))
+      .map((mintUrl) => ({
+        mintUrl,
+        balance: walletCtx.mintBalances[mintUrl] ?? 0,
+        proofAmounts: walletCtx.proofAmounts[mintUrl] ?? [],
+      }))
+      .filter((mint) => mint.balance > 0)
+      .sort((a, b) => b.balance - a.balance)[0] ?? null
+  );
 }

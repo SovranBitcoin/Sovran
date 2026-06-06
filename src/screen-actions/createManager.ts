@@ -229,15 +229,15 @@ export function createScreenActionManager<S extends ScreenType>(
 // ---------------------------------------------------------------------------
 
 const ACTION_NAMES: Record<ScreenType, string[]> = {
-  sendToken: ['copy', 'share', 'nfc', 'copyAsEmoji', 'checkStatus', 'cancel'],
-  receiveToken: ['redeem'],
-  mintQuote: ['copy', 'share'],
-  meltQuote: ['pay', 'cancel'],
-  paymentRequest: ['confirm', 'cancel'],
-  receive: ['copy', 'share', 'paste', 'fixedAmount', 'scanQr', 'changeNpcMint'],
-  mintInfo: ['trust', 'copy', 'share'],
-  amountEntry: ['setInput', 'toggle', 'next', 'paste', 'scanQr'],
-  mintSelector: ['select', 'getInfo', 'addMint'],
+  sendToken: ['copy', 'share', 'nfc', 'checkStatus', 'cancel', 'back'],
+  receiveToken: ['redeem', 'back'],
+  mintQuote: ['copy', 'share', 'back'],
+  meltQuote: ['pay', 'cancel', 'back'],
+  paymentRequest: ['confirm', 'cancel', 'back'],
+  receive: ['copy', 'share', 'paste', 'fixedAmount', 'scanQr', 'changeNpcMint', 'back'],
+  mintInfo: ['trust', 'copy', 'share', 'back'],
+  amountEntry: ['setInput', 'toggle', 'next', 'paste', 'scanQr', 'cancel', 'back'],
+  mintSelector: ['select', 'getInfo', 'addMint', 'cancel', 'back'],
 };
 
 function getActionNames(screenType: ScreenType): string[] {

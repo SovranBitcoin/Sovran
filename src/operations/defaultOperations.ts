@@ -10,25 +10,34 @@
 //   linkTransaction       — needs app-specific scan history store
 //   Mint catalog data     — bulk fetch (audit / KYM / operator profile),
 //                           injected via fetchMintCatalog
-//   Mint review detail    — per-mint enrichment for the trust review screen,
-//                           injected via enrichMintReviewInfo
+//   Mint review detail    — local per-mint trust metrics injected via
+//                           enrichMintReviewInfo; Nostr profile/review event
+//                           enrichment can default to generic GraphQL via
+//                           createColada({ nostrGraphqlEndpoint })
 // ---------------------------------------------------------------------------
 
-import { getEncodedToken, getTokenMetadata, type AmountLike, type Token } from '@cashu/cashu-ts';
+import { getTokenMetadata } from '@cashu/cashu-ts';
 import type {
   Manager,
   Mint,
-  MintHistoryEntry,
   ReceiveHistoryEntry,
   SendHistoryEntry,
 } from '@cashu/coco-core';
+import { getEncodedToken } from '@cashu/coco-core';
+import { nip19 } from 'nostr-tools';
 import type { MachineOperations, StepDataMap } from '../machine/types';
-import type { MintCatalogEntry, MintListItem, MintReviewInfo } from '../types';
+import type {
+  MintCatalogEntry,
+  MintContactProfileResolver,
+  MintListItem,
+  MintReviewInfo,
+  MintReviewsFetcher,
+} from '../types';
 import { defaultDetectors } from '../detectors';
 import { errField, logger } from '../logger';
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
 import { resolveRecipientPubkey } from '../recipient';
-import { amountToNumber, toCashuAmount } from '../amount';
+import { amountToNumber, type AmountLike } from '../amount';
 import {
   buildMethodAwareMintCandidates,
   deriveMintMethodCapabilityMapFromTrustedMints,
@@ -39,6 +48,7 @@ import { parseHistoryEntryOnce } from './historyEntry';
 // not export it as a named type, so we infer it from the manager API to
 // stay aligned with whatever shape mgr.mint.getMintInfo actually returns.
 type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
+type CoreToken = NonNullable<SendHistoryEntry['token']>;
 
 function hasMintInfo(value: MintInfo | undefined): value is MintInfo {
   return (
@@ -46,6 +56,40 @@ function hasMintInfo(value: MintInfo | undefined): value is MintInfo {
     value !== null &&
     Object.keys(value as Record<string, unknown>).length > 0
   );
+}
+
+function normalizeNostrPubkey(input: string): string | undefined {
+  const value = input.trim().replace(/^nostr:/i, '');
+  if (/^[0-9a-f]{64}$/i.test(value)) {
+    return value.toLowerCase();
+  }
+  try {
+    const decoded = nip19.decode(value);
+    if (decoded.type === 'npub') {
+      return decoded.data;
+    }
+    if (decoded.type === 'nprofile') {
+      return decoded.data.pubkey;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function extractMintNostrContactPubkey(mintInfo: MintInfo | undefined): string | undefined {
+  const contacts = (mintInfo as { contact?: unknown } | undefined)?.contact;
+  if (!Array.isArray(contacts)) return undefined;
+  for (const contact of contacts) {
+    if (typeof contact !== 'object' || contact === null) continue;
+    const method = (contact as { method?: unknown }).method;
+    const info = (contact as { info?: unknown }).info;
+    if (typeof method !== 'string' || typeof info !== 'string') continue;
+    if (method.trim().toLowerCase() !== 'nostr') continue;
+    const pubkey = normalizeNostrPubkey(info);
+    if (pubkey) return pubkey;
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -65,27 +109,15 @@ async function findSendHistoryEntryByOperationId(
   return entry ? JSON.stringify(entry) : null;
 }
 
-async function findMintHistoryEntry(
-  mgr: Manager,
-  operationId: string,
-  quoteId: string
-): Promise<MintHistoryEntry | null> {
-  const history = await mgr.history.getPaginatedHistory(0, 50);
-  return (
-    history.find(
-      (h): h is MintHistoryEntry =>
-        h.type === 'mint' &&
-        (h.operationId === operationId ||
-          h.metadata?.operationId === operationId ||
-          h.quoteId === quoteId)
-    ) ?? null
-  );
-}
-
 function mapMeltOperationState(state: string): string {
   if (state === 'finalized') return 'PAID';
   if (state === 'pending' || state === 'executing') return 'PENDING';
   return 'UNPAID';
+}
+
+function requireSatUnit(unit: string | undefined): 'sat' {
+  if (unit == null || unit === 'sat') return 'sat';
+  throw new Error(`Unsupported unit ${unit}; only sat is supported`);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,51 +135,38 @@ interface SendOperationLike {
   amount: AmountLike;
 }
 
-function buildSyntheticSendEntry(operation: SendOperationLike, token: Token): SendHistoryEntry {
+function buildSyntheticSendEntry(operation: SendOperationLike, token: CoreToken): SendHistoryEntry {
   return {
     id: operation.id,
     type: 'send',
-    source: 'operation',
     createdAt: operation.createdAt,
-    updatedAt: operation.updatedAt ?? Date.now(),
     mintUrl: operation.mintUrl,
     unit: 'sat',
     state: 'pending',
-    amount: toCashuAmount(operation.amount),
+    amount: amountToNumber(operation.amount),
     operationId: operation.id,
     token,
     metadata: { operationId: operation.id },
   };
 }
 
-function withOnchainMintMetadata(
-  entry: MintHistoryEntry,
-  quote: {
-    request: string;
-    quoteData: { amountPaid: { toString(): string }; amountIssued: { toString(): string } };
-  },
-  requestedAmount: number
-): MintHistoryEntry {
-  return {
-    ...entry,
-    metadata: {
-      ...(entry.metadata ?? {}),
-      method: 'onchain',
-      onchainAddress: quote.request,
-      requestedAmount: String(requestedAmount),
-      amountPaid: quote.quoteData.amountPaid.toString(),
-      amountIssued: quote.quoteData.amountIssued.toString(),
-    },
-  };
+function normalizeMemo(memo: string | undefined): string | undefined {
+  const trimmed = memo?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
-function ensureSendEntryToken(historyEntry: string, token: Token): string {
+function applyTokenMemo(token: CoreToken, memo: string | undefined): CoreToken {
+  const normalized = normalizeMemo(memo);
+  return normalized ? { ...token, memo: normalized } : token;
+}
+
+function ensureSendEntryToken(historyEntry: string, token: CoreToken): string {
   // The DB row may not have the token yet due to a race between execute
   // resolving and HistoryService persisting; inject it before returning so
   // the caller never sees a tokenless send entry.
   const parsed = parseHistoryEntryOnce(historyEntry);
   if (!parsed || parsed.type !== 'send') return historyEntry;
-  if (parsed.token) return historyEntry;
+  if (parsed.token) return JSON.stringify({ ...parsed, token: { ...parsed.token, ...token } });
   return JSON.stringify({ ...parsed, token });
 }
 
@@ -270,6 +289,10 @@ export interface DefaultOperationsConfig {
    * needed the same audit data earlier in the session).
    */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
+  /** Resolve a NUT-06 Nostr contact pubkey into display metadata. */
+  resolveMintContactProfile?: MintContactProfileResolver;
+  /** Fetch aggregated review rows for the trust-review screen. */
+  fetchMintReviews?: MintReviewsFetcher;
   /**
    * Dev-only: when true, executePaymentRequest simulates a delivery failure
    * to test rollback. Ignored unless NODE_ENV !== 'production' so a hostile
@@ -328,7 +351,7 @@ export function createDefaultOperations(
   };
 
   return {
-    executeSend: async (mintUrl, amount) => {
+    executeSend: async (mintUrl, amount, memo) => {
       const mgr = requireManager();
       // send.execute is atomic — there is no rollback to exercise — so the
       // mock-fail gate runs before prepare to leave no reservation behind.
@@ -339,6 +362,7 @@ export function createDefaultOperations(
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
       logger.info('operations.executeSend.execute', { operationId: prepared.id });
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      const tokenWithMemo = applyTokenMemo(token, memo);
       logger.info('operations.executeSend.complete', {
         operationId: operation.id,
         state: operation.state,
@@ -348,14 +372,14 @@ export function createDefaultOperations(
       // constructing from the operation result to avoid a race.
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
       if (historyEntry) {
-        return { historyEntry: ensureSendEntryToken(historyEntry, token) };
+        return { historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo) };
       }
 
       logger.warn('operations.executeSend.historyMissing', { operationId: operation.id });
-      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, token)) };
+      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, tokenWithMemo)) };
     },
 
-    executeOfflineSend: async (mintUrl, amount) => {
+    executeOfflineSend: async (mintUrl, amount, memo) => {
       const mgr = requireManager();
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
 
@@ -370,84 +394,30 @@ export function createDefaultOperations(
       }
 
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      const tokenWithMemo = applyTokenMemo(token, memo);
 
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
       if (historyEntry) {
-        return { historyEntry: ensureSendEntryToken(historyEntry, token) };
+        return { historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo) };
       }
 
       logger.warn('operations.executeOfflineSend.historyMissing', { operationId: operation.id });
-      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, token)) };
+      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, tokenWithMemo)) };
     },
 
     executeMintQuote: async (mintUrl, amount, _unit, method = 'bolt11') => {
       const mgr = requireManager();
       logger.info('operations.executeMintQuote.prepare', { mintUrl, amount, method });
       if (method === 'onchain') {
-        const quote = await mgr.quotes.mint.create({
-          mintUrl,
-          method: 'onchain',
-          unit: _unit ?? 'sat',
-        });
-        if (quote.method !== 'onchain') {
-          throw new Error(`Mint returned ${quote.method} quote for onchain request`);
-        }
-        logger.info('operations.executeMintQuote.onchain.created', {
-          quoteId: quote.quoteId,
-          addressPreview: quote.request.slice(0, 12) + '…',
-        });
-
-        const mintOp = await mgr.ops.mint.prepare({
-          mintUrl,
-          method: 'onchain',
-          quoteId: quote.quoteId,
-          amount,
-          unit: _unit ?? 'sat',
-          methodData: {},
-        });
-        logger.info('operations.executeMintQuote.onchain.prepared', {
-          operationId: mintOp.id,
-          quoteId: mintOp.quoteId,
-        });
-
-        const persisted = await findMintHistoryEntry(mgr, mintOp.id, mintOp.quoteId);
-        if (persisted) {
-          return {
-            historyEntry: JSON.stringify(withOnchainMintMetadata(persisted, quote, amount)),
-          };
-        }
-
-        const entry: MintHistoryEntry = {
-          id: `mint:${mintOp.id}`,
-          type: 'mint',
-          source: 'operation',
-          operationId: mintOp.id,
-          createdAt: mintOp.createdAt,
-          updatedAt: mintOp.updatedAt,
-          mintUrl: mintOp.mintUrl,
-          unit: mintOp.unit,
-          quoteId: mintOp.quoteId,
-          state: 'pending',
-          amount: mintOp.amount,
-          paymentRequest: mintOp.request,
-          metadata: { operationId: mintOp.id },
-        };
-        return {
-          historyEntry: JSON.stringify(withOnchainMintMetadata(entry, quote, amount)),
-        };
+        throw new Error('Onchain mint quotes are not supported by @cashu/coco-core 1.0.1');
       }
 
-      const quote = await mgr.quotes.mint.create({
+      const mintOp = await mgr.ops.mint.prepare({
         mintUrl,
         amount,
         method: 'bolt11',
-        unit: _unit ?? 'sat',
-      });
-      const mintOp = await mgr.ops.mint.prepare({
-        mintUrl,
-        method: 'bolt11',
-        quoteId: quote.quoteId,
-        unit: _unit ?? 'sat',
+        unit: requireSatUnit(_unit),
+        methodData: {},
       });
       logger.info('operations.executeMintQuote.created', {
         operationId: mintOp.id,
@@ -459,15 +429,12 @@ export function createDefaultOperations(
       const entry = {
         id: mintOp.id,
         type: 'mint' as const,
-        source: 'operation' as const,
         operationId: mintOp.id,
         createdAt: mintOp.createdAt,
-        updatedAt: mintOp.updatedAt,
         mintUrl: mintOp.mintUrl,
         unit: mintOp.unit,
         quoteId: mintOp.quoteId,
-        state: 'pending' as const,
-        remoteState: quote.state,
+        state: mintOp.lastObservedRemoteState ?? ('UNPAID' as const),
         amount: mintOp.amount,
         paymentRequest: mintOp.request,
         metadata: { operationId: mintOp.id },
@@ -734,7 +701,7 @@ export function createDefaultOperations(
       try {
         const metadata = getTokenMetadata(tokenString);
         hadP2PK = hasP2PKProofs(metadata.incompleteProofs);
-        tokenAmount = metadata.amount.toNumber();
+        tokenAmount = amountToNumber(metadata.amount);
       } catch (e) {
         logger.warn('operations.executeReceive.p2pkDetectionFailed', { error: errField(e) });
       }
@@ -767,6 +734,7 @@ export function createDefaultOperations(
 
     executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
+      requireSatUnit(_unit);
       logger.info('operations.executeMelt.start', {
         mintUrl,
         amount,
@@ -779,17 +747,10 @@ export function createDefaultOperations(
             timeoutMs: config.lightningTimeoutMs,
           });
 
-      const quote = await mgr.quotes.melt.create({
-        mintUrl,
-        method: 'bolt11',
-        methodData: { invoice: bolt11 },
-        unit: 'sat',
-      });
       const operation = await mgr.ops.melt.prepare({
         mintUrl,
         method: 'bolt11',
-        quoteId: quote.quoteId,
-        unit: 'sat',
+        methodData: { invoice: bolt11 },
       });
       logger.info('operations.executeMelt.execute', { operationId: operation.id });
       // prepare() reserves proofs at the mint. If execute() throws — mint
@@ -872,6 +833,47 @@ export function createDefaultOperations(
         if (item.auditState !== undefined) rowCatalog.auditState = item.auditState;
       }
 
+      const contactPubkey = extractMintNostrContactPubkey(mintInfo);
+      const [contactProfile, reviews] = await Promise.all([
+        contactPubkey && config.resolveMintContactProfile
+          ? config.resolveMintContactProfile(contactPubkey, mintUrl).catch((e) => {
+              logger.warn('operations.buildMintReviewInfo.contactProfile.failed', {
+                mintUrl,
+                pubkey: contactPubkey,
+                error: errField(e),
+              });
+              return undefined;
+            })
+          : Promise.resolve(undefined),
+        config.fetchMintReviews
+          ? config.fetchMintReviews(mintUrl).catch((e) => {
+              logger.warn('operations.buildMintReviewInfo.reviews.failed', {
+                mintUrl,
+                error: errField(e),
+              });
+              return undefined;
+            })
+          : Promise.resolve(undefined),
+      ]);
+
+      const asyncEnrichment: Partial<MintReviewInfo> = {};
+      if (contactProfile) {
+        asyncEnrichment.contactProfile = contactProfile;
+        if (typeof contactProfile.followers === 'number') {
+          asyncEnrichment.contactFollowers = contactProfile.followers;
+        }
+        if (typeof contactProfile.score === 'number') {
+          asyncEnrichment.contactReputation = Math.round(contactProfile.score);
+        }
+      }
+      if (reviews) {
+        asyncEnrichment.reviews = reviews;
+        asyncEnrichment.reviewCount = reviews.recommendations.length;
+        if (typeof reviews.score === 'number') {
+          asyncEnrichment.kymScore = reviews.score;
+        }
+      }
+
       const result: MintReviewInfo = {
         mintUrl,
         displayName: mintInfo?.name ?? item?.displayName ?? mintUrl,
@@ -887,6 +889,7 @@ export function createDefaultOperations(
         isTrusted,
         ...enrichment,
         ...rowCatalog,
+        ...asyncEnrichment,
       };
 
       // Detail metrics (avgTimeMs, swap counts, totals) only exist in the
@@ -1057,12 +1060,10 @@ function buildSyntheticPaymentRequestEntry(
   return {
     id: operationId,
     type: 'send',
-    source: 'operation',
     createdAt: now,
-    updatedAt: now,
     mintUrl,
     unit: 'sat',
-    amount: toCashuAmount(amount),
+    amount,
     operationId,
     state: 'pending',
   };

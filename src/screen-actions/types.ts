@@ -4,6 +4,7 @@
 
 import type { FormattedString } from '../formatting/FormattedString';
 import type { FormattedTimestamp } from '../formatting/FormattedTimestamp';
+import type { ColadaSubscriptionBus } from '../subscriptions';
 import type { PaymentRequestInfo } from '../types';
 
 /**
@@ -37,17 +38,31 @@ export type ScreenType =
  * Screens use this to get type-safe action names; the wallet implements handlers for each.
  */
 export type ScreenActionName = {
-  sendToken: 'copy' | 'share' | 'nfc' | 'copyAsEmoji' | 'checkStatus' | 'cancel';
-  receiveToken: 'redeem';
-  mintQuote: 'copy' | 'share';
-  meltQuote: 'pay' | 'cancel';
-  paymentRequest: 'confirm' | 'cancel';
-  receive: 'copy' | 'share' | 'paste' | 'fixedAmount' | 'scanQr' | 'changeNpcMint';
-  mintInfo: 'trust' | 'copy' | 'share';
+  sendToken: 'copy' | 'share' | 'nfc' | 'checkStatus' | 'cancel' | 'back';
+  receiveToken: 'redeem' | 'back';
+  mintQuote: 'copy' | 'share' | 'back';
+  meltQuote: 'pay' | 'cancel' | 'back';
+  paymentRequest: 'confirm' | 'cancel' | 'back';
+  receive:
+    | 'copy'
+    | 'share'
+    | 'paste'
+    | 'fixedAmount'
+    | 'scanQr'
+    | 'changeNpcMint'
+    | 'back';
+  mintInfo: 'trust' | 'copy' | 'share' | 'back';
   /** Flow amount screen — keyboard + submit; `setInput`/`toggle` are handled inside the manager. */
-  amountEntry: 'setInput' | 'toggle' | 'next' | 'paste' | 'scanQr';
+  amountEntry:
+    | 'setInput'
+    | 'toggle'
+    | 'next'
+    | 'paste'
+    | 'scanQr'
+    | 'cancel'
+    | 'back';
   /** Mint selector screen — select a mint, inspect details, or add new mints. */
-  mintSelector: 'select' | 'getInfo' | 'addMint';
+  mintSelector: 'select' | 'getInfo' | 'addMint' | 'cancel' | 'back';
 };
 
 /**
@@ -83,8 +98,7 @@ export interface ActionAvailability {
   reason?: string;
   /**
    * Optional alternate forms of this action. When present, the UI can surface a
-   * split-button menu and pass `{ variantId }` to `execute`. Back-compat: if
-   * omitted, existing screens behave identically.
+   * split-button menu and pass `{ variantId }` to `execute`.
    */
   variants?: ActionVariant[];
 }
@@ -108,7 +122,9 @@ export interface ScreenActionContext<E = unknown> {
 
 type MaybeAsync = void | Promise<void>;
 
-export type ActionHandler<E = unknown> = (ctx: ScreenActionContext<E>) => MaybeAsync;
+export type ActionHandler<E = unknown> = (
+  ctx: ScreenActionContext<E>,
+) => MaybeAsync;
 
 /**
  * Wallet provides one handler per action per screen.
@@ -126,7 +142,10 @@ export type ScreenActionHandlerMap = {
 
 export interface ScreenActionManager<S extends ScreenType> {
   /** Execute a named action. Sets loading, calls the handler, clears loading. */
-  execute: (action: ScreenActionName[S], params?: Record<string, unknown>) => Promise<void>;
+  execute: (
+    action: ScreenActionName[S],
+    params?: Record<string, unknown>,
+  ) => Promise<void>;
   /** Current entry (updated via setEntry). */
   getEntry: () => Record<string, unknown> | null;
   /** Push a new entry (e.g. from history:updated). Recomputes availability. */
@@ -135,4 +154,43 @@ export interface ScreenActionManager<S extends ScreenType> {
   inspect: () => Record<ScreenActionName[S], ActionState>;
   /** Subscribe to state changes. Returns unsubscribe function. */
   subscribe: (listener: () => void) => () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Screen Action Session — framework-agnostic page update interface
+// ---------------------------------------------------------------------------
+
+export interface ScreenActionsBridge {
+  /** Merged into action context after core runtime context. */
+  getExtraContext?: () => Record<string, unknown>;
+  /**
+   * Bind app-owned stores/native sources to Colada's subscription bus once
+   * for the provider lifetime.
+   */
+  bindSubscriptionBus?: (bus: ColadaSubscriptionBus) => () => void;
+  /**
+   * Subscribe this screen to Colada bus events and map those events into
+   * entry updates for the screen-action manager. Return unsubscribe.
+   */
+  subscribeEntryUpdates?: (
+    screenType: ScreenType,
+    callback: (entry: Record<string, unknown>) => void,
+    bus: ColadaSubscriptionBus,
+  ) => () => void;
+  shouldApplyEntryUpdate?: (
+    currentEntry: Record<string, unknown> | null,
+    updatedEntry: Record<string, unknown>,
+  ) => boolean;
+  mergeEntryUpdate?: (
+    currentEntry: Record<string, unknown> | null,
+    updatedEntry: Record<string, unknown>,
+  ) => Record<string, unknown>;
+  /** When omitted, Colada's built-in screen-action decoration is used. */
+  decorateEntry?: (
+    entry: Record<string, unknown> | null,
+    ctx: { language: string },
+  ) => Record<string, unknown> | null;
+  getLocale?: () => string;
+  /** Scan / NFC provenance label for the current entry. */
+  getSourceLabel?: (entry: Record<string, unknown> | null) => string | null;
 }

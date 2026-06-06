@@ -5,6 +5,7 @@
 import type { ActionAvailability, ScreenActionName, ScreenType } from './types';
 import {
   evaluateMintMethodAmountAvailability,
+  isMethodImplemented,
   methodContextHasSupportingMint,
   type MintMethodAmountAvailability,
 } from '../mint-capabilities';
@@ -71,14 +72,14 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
         {
           id: 'text',
           label: 'as Text',
-          description: 'Copy the token string',
+          description: 'Copy the token as plain text',
           icon: 'lets-icons:copy',
           available: canAct,
         },
         {
           id: 'emoji',
           label: 'as Emoji',
-          description: 'Copy as an emoji-packed string',
+          description: 'Copy the token as emoji',
           icon: 'fluent:emoji-24-filled',
           available: canAct,
         },
@@ -86,28 +87,34 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
     },
     share: { available: canAct },
     nfc: { available: canAct },
-    // Deprecated — surfaced via `copy.variants[emoji]` instead. Retained so
-    // the wallet's existing handler (emojiPickerPopup) can still be invoked
-    // under the hood when the variant fires. Remove in Phase 5.
-    copyAsEmoji: { available: canAct },
     checkStatus: {
       available: canAct && state === 'pending',
     },
     cancel: {
       available: canAct && operationId != null,
-      ...(!operationId && canAct ? { reason: 'Legacy entry — cannot cancel' } : {}),
+      ...(!operationId && canAct ? { reason: 'Missing operation ID — cannot cancel' } : {}),
     },
+    back: { available: true },
   };
 }
 
 function receiveTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<'receiveToken'> {
-  const token = entry.token;
+  const metadata = entry.metadata;
+  const rawToken =
+    typeof metadata === 'object' && metadata !== null
+      ? (metadata as Record<string, unknown>).rawToken
+      : undefined;
+  // Entries built by buildReceiveHistoryEntry carry the token in
+  // metadata.rawToken rather than entry.token, so accept either.
+  const hasToken =
+    entry.token != null || (typeof rawToken === 'string' && rawToken.length > 0);
   const id = entry.id as string | undefined;
   const isScanPlaceholder = id?.startsWith('receive-') ?? false;
   const isRedeemed = !isScanPlaceholder;
 
   return {
-    redeem: { available: !isRedeemed && token != null },
+    redeem: { available: !isRedeemed && hasToken },
+    back: { available: true },
   };
 }
 
@@ -118,6 +125,7 @@ function mintQuoteAvailability(entry: Record<string, unknown>): AvailabilityMap<
   return {
     copy: { available: !isPaid },
     share: { available: !isPaid },
+    back: { available: true },
   };
 }
 
@@ -131,6 +139,7 @@ function meltQuoteAvailability(entry: Record<string, unknown>): AvailabilityMap<
   return {
     pay: { available: !isPaid && !isPending && state === 'UNPAID' },
     cancel: { available: !isPreview && (state === 'UNPAID' || isPending) },
+    back: { available: true },
   };
 }
 
@@ -146,6 +155,7 @@ function paymentRequestAvailability(
   return {
     confirm: { available: isPreview },
     cancel: { available: !isDelivered },
+    back: { available: true },
   };
 }
 
@@ -156,6 +166,7 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   const isMeltQuote = destination === 'meltQuote';
   const isMintQuote = destination === 'mintQuote';
   const isPaymentRequest = destination === 'paymentRequest';
+  const isSendSideAmountEntry = isSendEcash || isMeltQuote;
   const meltTarget = typeof entry.meltTarget === 'string' ? entry.meltTarget : '';
   const hasMeltTarget = meltTarget.length > 0;
   const hasFiatToggle =
@@ -307,8 +318,10 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   // ── onchain ────────────────────────────────────────────────────────
   // Coco currently supports reusable onchain mint quotes only. Only surface
   // onchain when at least one trusted mint advertises the relevant NUT method.
-  const showOnchainReceive = isMintQuote && receiveOnchainSupported;
-  const showOnchainSend = !isMintQuote && sendOnchainSupported;
+  const receiveOnchainImplemented = isMethodImplemented(receiveOnchainRequirement);
+  const sendOnchainImplemented = isMethodImplemented(sendOnchainRequirement);
+  const showOnchainReceive = isMintQuote && receiveOnchainImplemented && receiveOnchainSupported;
+  const showOnchainSend = !isMintQuote && sendOnchainImplemented && sendOnchainSupported;
   const onchainAvailable = showOnchainReceive ? nextCanFire && receiveOnchainCompatible : false;
   const onchainDescription = showOnchainReceive
     ? 'Create an onchain receive address'
@@ -382,8 +395,10 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
         : {}),
       variants: nextVariants,
     },
-    paste: { available: isSendEcash },
-    scanQr: { available: isSendEcash },
+    paste: { available: isSendSideAmountEntry },
+    scanQr: { available: isSendSideAmountEntry },
+    cancel: { available: true },
+    back: { available: true },
   };
 }
 
@@ -394,6 +409,7 @@ function mintInfoAvailability(entry: Record<string, unknown>): AvailabilityMap<'
     trust: { available: !isTrusted },
     copy: { available: hasMintUrl },
     share: { available: hasMintUrl },
+    back: { available: true },
   };
 }
 
@@ -406,6 +422,8 @@ function mintSelectorAvailability(entry: Record<string, unknown>): AvailabilityM
     select: { available: hasItems },
     getInfo: { available: isManagement },
     addMint: { available: isManagement },
+    cancel: { available: true },
+    back: { available: true },
   };
 }
 
@@ -433,6 +451,7 @@ function receiveAvailability(entry: Record<string, unknown>): AvailabilityMap<'r
     },
     scanQr: { available: hubLoaded },
     changeNpcMint: { available: hubLoaded && hasNpc && unit === 'sat' },
+    back: { available: true },
   };
 }
 

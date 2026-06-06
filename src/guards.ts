@@ -9,7 +9,6 @@
 import type {
   ResolvedIntent,
   WalletContext,
-  Detectors,
   GuardResult,
   WalletCapability,
   CapabilityCheckResult,
@@ -36,8 +35,7 @@ export function isValidSatAmount(n: unknown): n is number {
 
 export function validateIntent(
   intent: ResolvedIntent,
-  ctx: WalletContext,
-  detectors?: Detectors
+  ctx: WalletContext
 ): GuardResult[] {
   const results: GuardResult[] = [];
 

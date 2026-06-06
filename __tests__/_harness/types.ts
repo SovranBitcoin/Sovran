@@ -54,6 +54,8 @@ export interface TestMachineConfig {
   locale?: string;
   /** NFC adapter for NFC-related tests. */
   nfcAdapter?: NfcIOAdapter;
+  /** Enables the optional ecash token memo step. Defaults to false. */
+  enableEcashSendMemo?: boolean;
 }
 
 /**
@@ -154,6 +156,8 @@ export type FlowAction =
   | { type: 'changeMint'; mintUrl: string; persist?: boolean; scope?: 'npc' | 'selected' }
   /** User selects a proof composition amount. */
   | { type: 'chooseProofs'; amount: number }
+  /** User submits or skips the optional ecash token memo. */
+  | { type: 'submitSendMemo'; memo?: string }
   /** User taps the mint selector button. */
   | { type: 'requestMintSelector'; scope?: 'npc' | 'selected' }
   /** User taps the "Send" button. */
@@ -230,6 +234,8 @@ export interface FlowScenario {
   wallet?: Partial<WalletContext>;
   /** Whether to run in offline mode. */
   offline?: boolean;
+  /** Enables the optional ecash token memo step. */
+  enableEcashSendMemo?: boolean;
   /** The sequence of user actions to execute. */
   steps: FlowAction[];
   /** The expected final state after all steps. */

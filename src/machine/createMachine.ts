@@ -2,8 +2,19 @@ import { defaultDetectors } from '../detectors';
 import { isMintOfflineError } from '../errors';
 import { t } from '../formatting/locales';
 import { errField, logger } from '../logger';
-import { parseHistoryEntryOnce } from '../operations/historyEntry';
-import { buildChooseProofsData, buildProofSuggestions } from './amountFallback';
+import { buildProofSuggestions } from './amountFallback';
+import {
+  runConfirmMeltEffect,
+  runConfirmPaymentRequestEffect,
+  runConfirmSendEffect,
+  runMintListEnrichmentEffect,
+  runMintReviewInfoEffect,
+  runMintQuoteEffect,
+  runNfcWriteBackEffect,
+  runRecipientProfileEffect,
+  runRecipientPubkeyEffect,
+  runTrustMintEffect,
+} from './effects';
 import { transition } from './transitions';
 import type { MintListItem, PaymentOption } from '../types';
 import type {
@@ -88,10 +99,14 @@ function deriveExecutionState(
       };
 
     case 'chooseProofs':
+    case 'enterSendMemo':
       return {
         status: 'needsInput',
-        code: 'PROOF_SELECTION_REQUIRED',
-        message: t('PROOF_SELECTION_REQUIRED', locale),
+        code: step === 'chooseProofs' ? 'PROOF_SELECTION_REQUIRED' : 'SEND_MEMO_REQUIRED',
+        message:
+          step === 'chooseProofs'
+            ? t('PROOF_SELECTION_REQUIRED', locale)
+            : t('SEND_MEMO_REQUIRED', locale),
         isExecutable: false,
         isExecuting: false,
         step,
@@ -151,6 +166,7 @@ const INPUT_STEPS = new Set<FlowStep>([
   'chooseOption',
   'chooseFallbackOption',
   'chooseProofs',
+  'enterSendMemo',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -164,6 +180,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     getContext,
     getUnit,
     getOffline,
+    enableEcashSendMemo = false,
     getLocale,
     unit: configUnit = 'sat',
     operations,
@@ -325,27 +342,38 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       !flowCtx.recipientPubkey &&
       operations?.resolveRecipientPubkey
     ) {
+      const resolveRecipientPubkey = operations.resolveRecipientPubkey;
+      const recipientGeneration = flowGeneration;
       logger.info('machine.recipient.stage1.start', {
         targetPreview: target.slice(0, 30),
       });
       void (async () => {
-        try {
-          const pk = await operations!.resolveRecipientPubkey!(target);
-          logger.info('machine.recipient.stage1.resolved', { hasPk: !!pk });
-          if (!pk) return;
+        const effect = await runRecipientPubkeyEffect({
+          target,
+          operation: resolveRecipientPubkey,
+          isStale: (op) => isStaleGeneration(recipientGeneration, op),
+        });
+
+        if (effect.isOk()) {
+          logger.info('machine.recipient.stage1.resolved', {
+            hasPk: effect.value.kind === 'resolved',
+          });
+          if (effect.value.kind !== 'resolved') return;
           if (flowCtx.meltTarget !== target) return; // stale guard
           if (flowCtx.recipientPubkey) return; // already set
           // Replace flowCtx so useSyncExternalStore subscribers see a fresh
           // reference. Mutating in place keeps the same closure-bound ref
           // and the snapshot diff is a no-op.
-          flowCtx = { ...flowCtx, recipientPubkey: pk };
+          flowCtx = { ...flowCtx, recipientPubkey: effect.value.pubkey };
           mirrorRecipientOntoStepData();
           notify();
           // Chain into stage 2 immediately so the profile resolves without
           // waiting for the next transition.
           maybeResolveRecipient(target, undefined);
-        } catch (err) {
-          logger.warn('machine.recipient.resolvePubkey.threw', { error: errField(err) });
+        } else {
+          logger.warn('machine.recipient.resolvePubkey.threw', {
+            error: errField(effect.error.cause),
+          });
         }
       })();
     }
@@ -358,24 +386,36 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       !flowCtx.recipientProfile &&
       operations?.resolveRecipientProfile
     ) {
+      const resolveRecipientProfile = operations.resolveRecipientProfile;
+      const recipientGeneration = flowGeneration;
       logger.info('machine.recipient.stage2.start', {
         pubkeyPreview: pubkey.slice(0, 8),
       });
       void (async () => {
-        try {
-          const profile = await operations!.resolveRecipientProfile!(pubkey);
+        const effect = await runRecipientProfileEffect({
+          pubkey,
+          operation: resolveRecipientProfile,
+          isStale: (op) => isStaleGeneration(recipientGeneration, op),
+        });
+
+        if (effect.isOk()) {
           logger.info('machine.recipient.stage2.resolved', {
-            hasProfile: !!profile,
-            displayName: profile?.displayName ?? null,
+            hasProfile: effect.value.kind === 'resolved',
+            displayName:
+              effect.value.kind === 'resolved'
+                ? effect.value.profile.displayName
+                : null,
           });
-          if (!profile) return;
+          if (effect.value.kind !== 'resolved') return;
           if (flowCtx.recipientPubkey !== pubkey) return; // stale guard
           if (flowCtx.recipientProfile) return;
-          flowCtx = { ...flowCtx, recipientProfile: profile };
+          flowCtx = { ...flowCtx, recipientProfile: effect.value.profile };
           mirrorRecipientOntoStepData();
           notify();
-        } catch (err) {
-          logger.warn('machine.recipient.resolveProfile.threw', { error: errField(err) });
+        } else {
+          logger.warn('machine.recipient.resolveProfile.threw', {
+            error: errField(effect.error.cause),
+          });
         }
       })();
     }
@@ -465,25 +505,31 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   function startMintListEnrichment(
     data: StepDataMap['selectMint'],
     generation: number
-  ): void {
-    if (!operations?.buildMintListItems) return;
+  ): Promise<void> | null {
+    if (!operations?.buildMintListItems) return null;
 
-    void (async () => {
-      try {
-        const items = await operations.buildMintListItems(data);
-        if (isStaleGeneration(generation, 'buildMintListItems')) return;
+    const task = (async () => {
+      const effect = await runMintListEnrichmentEffect({
+        data,
+        operation: operations.buildMintListItems,
+        isStale: (op) => isStaleGeneration(generation, op),
+      });
+
+      if (effect.isOk()) {
+        if (effect.value.kind === 'stale') return;
         if (step !== 'selectMint') return;
         const current = stepData as StepDataMap['selectMint'];
         setStep('selectMint', {
           ...current,
-          mintListItems: items,
+          mintListItems: effect.value.items,
           mintListItemsStatus: 'ready',
         });
         notify();
-      } catch (err) {
-        if (isStaleGeneration(generation, 'buildMintListItems.catch')) return;
+      } else {
         if (step !== 'selectMint') return;
-        logger.warn('machine.selectMint.enrichment.failed', { error: errField(err) });
+        logger.warn('machine.selectMint.enrichment.failed', {
+          error: errField(effect.error.cause),
+        });
         const current = stepData as StepDataMap['selectMint'];
         setStep('selectMint', {
           ...current,
@@ -493,6 +539,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         notify();
       }
     })();
+
+    void task;
+    return task;
   }
 
   const send = async (event: import('./types').FlowEvent): Promise<void> => {
@@ -555,48 +604,37 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         unit: data.unit,
       });
 
-      try {
-        const result = await operations.executeMelt(data.mintUrl, data.meltTarget, data.amount, data.unit);
-        if (isStaleGeneration(sendGeneration, 'executeMelt')) return;
+      const effect = await runConfirmMeltEffect({
+        data,
+        operation: operations.executeMelt,
+        context: flowCtx,
+        isStale: (op) => isStaleGeneration(sendGeneration, op),
+      });
+
+      if (effect.isOk()) {
+        if (effect.value.kind === 'stale') return;
         logger.info('machine.melt.success', { mintUrl: data.mintUrl });
 
-        const parsed = parseHistoryEntryOnce(result.historyEntry);
-        if (operations.linkTransaction && parsed?.id) {
-          operations.linkTransaction(data.meltTarget, parsed.id);
+        for (const link of effect.value.links) {
+          if (link.type === 'linkTransaction') {
+            operations.linkTransaction?.(link.input, link.transactionId);
+          }
         }
 
-        void notifications?.onPaymentConfirmed?.({
-          variant: 'melt',
-          mintUrl: data.mintUrl,
-          amount: data.amount,
-          unit: data.unit,
-          historyEntry: result.historyEntry,
-        });
-
-        if (parsed?.id) {
-          void notifications?.onTransactionCreated?.({
-            transactionId: parsed.id,
-            type: 'melt',
-            mintUrl: data.mintUrl,
-            amount: data.amount,
-            unit: data.unit,
-            rawInput: flowCtx.rawInput,
-            source: flowCtx.source,
-          });
-          void notifications?.onMeltQuoteCreated?.({
-            mintUrl: data.mintUrl,
-            operationId: parsed.id,
-            amount: data.amount,
-            unit: data.unit,
-            meltTarget: data.meltTarget,
-          });
+        for (const notification of effect.value.notifications) {
+          if (notification.type === 'onPaymentConfirmed') {
+            void notifications?.onPaymentConfirmed?.(notification.data);
+          } else if (notification.type === 'onTransactionCreated') {
+            void notifications?.onTransactionCreated?.(notification.data);
+          } else if (notification.type === 'onMeltQuoteCreated') {
+            void notifications?.onMeltQuoteCreated?.(notification.data);
+          }
         }
 
-        setStep('navigateToMeltPreview', { ...data, historyEntry: result.historyEntry });
-      } catch (err) {
-        if (isStaleGeneration(sendGeneration, 'executeMelt.catch')) return;
-        logger.warn('machine.melt.failed', { error: errField(err) });
-        routeOperationFailure(err, 'melt', data.meltTarget, data);
+        setStep(effect.value.step, effect.value.data);
+      } else {
+        logger.warn('machine.melt.failed', { error: errField(effect.error.cause) });
+        routeOperationFailure(effect.error.cause, 'melt', data.meltTarget, data);
       }
 
       if (isStaleGeneration(sendGeneration, 'executeMelt.finalize')) return;
@@ -647,20 +685,26 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         unit: data.unit,
       });
 
-      try {
-        const result = await operations.executePaymentRequest(data.mintUrl, data.paymentRequest, data.amount, data.unit);
-        if (isStaleGeneration(sendGeneration, 'executePaymentRequest')) return;
+      const effect = await runConfirmPaymentRequestEffect({
+        data,
+        operation: operations.executePaymentRequest,
+        context: flowCtx,
+        isStale: (op) => isStaleGeneration(sendGeneration, op),
+      });
 
-        if (result.rolledBack) {
+      if (effect.isOk()) {
+        if (effect.value.kind === 'stale') return;
+
+        if (effect.value.kind === 'rolledBack') {
           // Delivery failed but ecash was reclaimed — route through standard
           // failure path so BIP321 multi-option flows show the fallback selector.
           logger.warn('machine.paymentRequest.rolledBack', {
             mintUrl: data.mintUrl,
-            errorMessage: result.errorMessage,
+            errorMessage: effect.value.errorMessage,
           });
           settle(true);
           routeOperationFailure(
-            new Error(result.errorMessage ?? 'Delivery failed'),
+            effect.value.cause,
             'paymentRequest',
             data.paymentRequest,
             data,
@@ -671,38 +715,33 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           logger.info('machine.paymentRequest.success', { mintUrl: data.mintUrl });
           settle(false);
 
-          const parsed = parseHistoryEntryOnce(result.historyEntry);
-          if (operations.linkTransaction && parsed?.id) {
-            operations.linkTransaction(data.paymentRequest, parsed.id);
+          for (const link of effect.value.links) {
+            if (link.type === 'linkTransaction') {
+              operations.linkTransaction?.(link.input, link.transactionId);
+            }
           }
 
-          void notifications?.onPaymentConfirmed?.({
-            variant: 'paymentRequest',
-            mintUrl: data.mintUrl,
-            amount: data.amount,
-            unit: data.unit,
-            historyEntry: result.historyEntry,
-          });
-
-          if (parsed?.id) {
-            void notifications?.onTransactionCreated?.({
-              transactionId: parsed.id,
-              type: 'send',
-              mintUrl: data.mintUrl,
-              amount: data.amount,
-              unit: data.unit,
-              rawInput: flowCtx.rawInput,
-              source: flowCtx.source,
-            });
+          for (const notification of effect.value.notifications) {
+            if (notification.type === 'onPaymentConfirmed') {
+              void notifications?.onPaymentConfirmed?.(notification.data);
+            } else if (notification.type === 'onTransactionCreated') {
+              void notifications?.onTransactionCreated?.(notification.data);
+            }
           }
 
-          setStep('navigateToPaymentRequest', { ...data, historyEntry: result.historyEntry });
+          setStep(effect.value.step, effect.value.data);
         }
-      } catch (err) {
-        if (isStaleGeneration(sendGeneration, 'executePaymentRequest.catch')) return;
-        logger.warn('machine.paymentRequest.failed', { error: errField(err) });
+      } else {
+        logger.warn('machine.paymentRequest.failed', {
+          error: errField(effect.error.cause),
+        });
         settle(false);
-        routeOperationFailure(err, 'paymentRequest', data.paymentRequest, data);
+        routeOperationFailure(
+          effect.error.cause,
+          'paymentRequest',
+          data.paymentRequest,
+          data,
+        );
       }
 
       if (isStaleGeneration(sendGeneration, 'executePaymentRequest.finalize')) return;
@@ -728,6 +767,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     // Wrap the main transition path so sendLocked is always released,
     // even if transition() or an operation throws unexpectedly.
     try {
+    let postDispatchTask: Promise<void> | null = null;
     const walletCtx = getContext();
     const unit = getUnit?.() ?? configUnit;
 
@@ -760,7 +800,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     // post-transition resolver only fires when something actually changed.
     const prevMeltTarget = flowCtx.meltTarget;
     const prevRecipientPubkey = flowCtx.recipientPubkey;
-    const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit, offline);
+    const result = transition(
+      step,
+      flowCtx,
+      eventForTransition,
+      detectors,
+      walletCtx,
+      unit,
+      offline,
+      enableEcashSendMemo
+    );
 
     flowCtx = result.context;
     setStep(result.step, result.data);
@@ -842,7 +891,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           if (best) {
             const walletCtxInner = getContext();
             const unitInner = getUnit?.() ?? configUnit;
-            const r = transition(step, flowCtx, { type: 'OPTION_CHOSEN', option: best.option }, detectors, walletCtxInner, unitInner, offline);
+            const r = transition(
+              step,
+              flowCtx,
+              { type: 'OPTION_CHOSEN', option: best.option },
+              detectors,
+              walletCtxInner,
+              unitInner,
+              offline,
+              enableEcashSendMemo
+            );
             flowCtx = r.context;
             flowCtx.source = 'nfc';
             setStep(r.step, r.data);
@@ -857,7 +915,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             void notifications?.onNfcPaymentProgress?.({ phase: 'selecting' });
             const walletCtxInner = getContext();
             const unitInner = getUnit?.() ?? configUnit;
-            const r = transition(step, flowCtx, { type: 'MINT_SELECTED', mintUrl: best.mintUrl }, detectors, walletCtxInner, unitInner, offline);
+            const r = transition(
+              step,
+              flowCtx,
+              { type: 'MINT_SELECTED', mintUrl: best.mintUrl },
+              detectors,
+              walletCtxInner,
+              unitInner,
+              offline,
+              enableEcashSendMemo
+            );
             flowCtx = r.context;
             flowCtx.source = 'nfc';
             setStep(r.step, r.data);
@@ -879,66 +946,44 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           handlerExecuting = true;
           notify();
 
-          void notifications?.onNfcPaymentProgress?.({ phase: 'creating' });
+          const effect = await runNfcWriteBackEffect({
+            data,
+            executeNfcSend: operations.executeNfcSend,
+            rollbackSend: operations.rollbackSend,
+            nfcAdapter,
+            context: flowCtx,
+            onProgress: (progress) => {
+              void notifications?.onNfcPaymentProgress?.(progress);
+            },
+            isStale: (op) => isStaleGeneration(sendGeneration, op),
+          });
 
-          let nfcSendResult: { token: string; historyEntry: string; operationId: string } | null = null;
-          try {
-            nfcSendResult = await operations.executeNfcSend(data.mintUrl, data.amount);
-            if (isStaleGeneration(sendGeneration, 'executeNfcSend')) return;
+          if (effect.isOk()) {
+            if (effect.value.kind === 'stale') return;
 
-            void notifications?.onNfcPaymentProgress?.({ phase: 'writing' });
-            await nfcAdapter.writeToken(nfcSendResult.token);
-            if (isStaleGeneration(sendGeneration, 'nfc.writeToken')) return;
-            await nfcAdapter.releaseSession();
-            if (isStaleGeneration(sendGeneration, 'nfc.releaseSession')) return;
-
-            const parsed = parseHistoryEntryOnce(nfcSendResult.historyEntry);
-            // Link transaction for scan history provenance
-            if (operations.linkTransaction && flowCtx.rawInput && parsed?.id) {
-              operations.linkTransaction(flowCtx.rawInput, parsed.id);
+            for (const link of effect.value.links) {
+              if (link.type === 'linkTransaction') {
+                operations.linkTransaction?.(link.input, link.transactionId);
+              }
             }
 
-            void notifications?.onPaymentConfirmed?.({
-              variant: 'send',
-              mintUrl: data.mintUrl,
-              amount: data.amount,
-              unit: data.unit,
-              historyEntry: nfcSendResult.historyEntry,
-            });
-
-            if (parsed?.id) {
-              void notifications?.onTransactionCreated?.({
-                transactionId: parsed.id,
-                type: 'send',
-                mintUrl: data.mintUrl,
-                amount: data.amount,
-                unit: data.unit,
-                rawInput: flowCtx.rawInput,
-                source: 'nfc',
-              });
+            for (const notification of effect.value.notifications) {
+              if (notification.type === 'onPaymentConfirmed') {
+                void notifications?.onPaymentConfirmed?.(notification.data);
+              } else if (notification.type === 'onTransactionCreated') {
+                void notifications?.onTransactionCreated?.(notification.data);
+              }
             }
 
-            setStep('sendComplete', {
-              historyEntry: nfcSendResult.historyEntry,
-              recipientPubkey: flowCtx.recipientPubkey,
-              recipientProfile: flowCtx.recipientProfile,
-            });
-          } catch (err) {
-            if (isStaleGeneration(sendGeneration, 'executeNfcSend.catch')) return;
-            // Write-back or send failed — rollback if token was created
-            let rolledBack = false;
-            if (nfcSendResult && operations.rollbackSend) {
-              try {
-                await operations.rollbackSend(nfcSendResult.operationId);
-                rolledBack = true;
-              } catch { /* rollback best-effort */ }
+            setStep(effect.value.step, effect.value.data);
+          } else {
+            for (const notification of effect.error.notifications) {
+              if (notification.type === 'onNfcWriteFailed') {
+                void notifications?.onNfcWriteFailed?.(notification.data);
+              }
             }
-            await nfcAdapter.releaseSession();
 
-            const message = err instanceof Error ? err.message : 'NFC write failed';
-            void notifications?.onNfcWriteFailed?.({ message, rolledBack });
-
-            setStep('error', { code: 'NFC_WRITE_FAILED', message });
+            setStep('error', effect.error.data);
           }
 
           handlerExecuting = false;
@@ -963,8 +1008,6 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         const localProofs = buildProofSuggestions(proofAmounts, data.amount);
         const hasExactLocalProofs = proofAmounts.length > 0 && localProofs.exactMatch;
         const shouldCreateLocalTokenFirst = hasExactLocalProofs && !!operations.executeOfflineSend;
-        const appOffline = (getOffline?.() ?? false) || flowCtx.offline === true;
-        const forceLocalSend = appOffline || flowCtx.localProofSend === true;
         logger.info('machine.confirmSend.start', {
           mintUrl: data.mintUrl,
           amount: data.amount,
@@ -973,140 +1016,50 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         });
         handlerExecuting = true;
         notify();
-        try {
-          if (shouldCreateLocalTokenFirst) {
-            const result = await operations.executeOfflineSend!(data.mintUrl, data.amount);
-            if (isStaleGeneration(sendGeneration, 'executeOfflineSend.localFirst')) return;
-            logger.info('machine.send.localFirst.success');
-            setStep('sendComplete', {
-              historyEntry: result.historyEntry,
-              createdOffline: true,
-              mintWasOffline: flowCtx.mintUnreachableConfirmed ? true : undefined,
-              recipientPubkey: flowCtx.recipientPubkey,
-              recipientProfile: flowCtx.recipientProfile,
-            });
+        const effect = await runConfirmSendEffect({
+          data,
+          operations,
+          context: flowCtx,
+          proofAmounts,
+          getOffline: () => getOffline?.() ?? false,
+          getLocale: () => getLocale?.() ?? 'en',
+          isStale: (op) => isStaleGeneration(sendGeneration, op),
+        });
 
-            const parsed = parseHistoryEntryOnce(result.historyEntry);
-            if (parsed?.id) {
-              void notifications?.onTransactionCreated?.({
-                transactionId: parsed.id,
-                type: 'send',
-                mintUrl: data.mintUrl,
-                amount: data.amount,
-                unit: flowCtx.unit,
-                rawInput: flowCtx.rawInput,
-                source: flowCtx.source,
-              });
-            }
-          } else if (forceLocalSend && operations.executeOfflineSend) {
-            const error = new Error(t('MINT_UNREACHABLE', getLocale?.() ?? 'en'));
-            error.name = 'MintFetchError';
-            throw error;
-          } else {
-            const result = await operations.executeSend(data.mintUrl, data.amount);
-            if (isStaleGeneration(sendGeneration, 'executeSend')) return;
-            logger.info('machine.send.success');
-            setStep('sendComplete', {
-              historyEntry: result.historyEntry,
-              recipientPubkey: flowCtx.recipientPubkey,
-              recipientProfile: flowCtx.recipientProfile,
-            });
-
-            const parsed = parseHistoryEntryOnce(result.historyEntry);
-            if (parsed?.id) {
-              void notifications?.onTransactionCreated?.({
-                transactionId: parsed.id,
-                type: 'send',
-                mintUrl: data.mintUrl,
-                amount: data.amount,
-                unit: flowCtx.unit,
-                rawInput: flowCtx.rawInput,
-                source: flowCtx.source,
-              });
-            }
+        if (effect.isOk()) {
+          if (effect.value.context) {
+            flowCtx = { ...flowCtx, ...effect.value.context };
           }
-        } catch (err) {
-          if (isStaleGeneration(sendGeneration, 'executeSend.catch')) return;
-          let handled = false;
-          const mintUnreachableConfirmed =
-            isMintOfflineError(err) && !forceLocalSend && !shouldCreateLocalTokenFirst;
-          if (mintUnreachableConfirmed && !flowCtx.mintUnreachableConfirmed) {
-            flowCtx = { ...flowCtx, mintUnreachableConfirmed: true };
-          }
+          if (effect.value.kind === 'stale') return;
 
-          // Phase 1: If mint is offline and exact proofs exist, auto offline send
-          if (
-            isMintOfflineError(err) &&
-            operations.executeOfflineSend &&
-            proofAmounts.length > 0
-          ) {
-            logger.info('machine.send.offlineFallback.attempt', { mintUrl: data.mintUrl });
-            const built = buildProofSuggestions(proofAmounts, data.amount);
-            if (built.exactMatch) {
-              try {
-                const result = await operations.executeOfflineSend(data.mintUrl, data.amount);
-                if (isStaleGeneration(sendGeneration, 'executeOfflineSend')) return;
-                logger.info('machine.send.offlineFallback.success');
-                setStep('sendComplete', {
-                  historyEntry: result.historyEntry,
-                  createdOffline: true,
-                  mintWasOffline:
-                    mintUnreachableConfirmed || flowCtx.mintUnreachableConfirmed
-                      ? true
-                      : undefined,
-                  recipientPubkey: flowCtx.recipientPubkey,
-                  recipientProfile: flowCtx.recipientProfile,
-                });
+          if (effect.value.kind === 'completed') {
+            if (effect.value.path === 'localFirst') {
+              logger.info('machine.send.localFirst.success');
+            } else if (effect.value.path === 'offlineFallback') {
+              logger.info('machine.send.offlineFallback.success');
+            } else {
+              logger.info('machine.send.success');
+            }
+            setStep(effect.value.step, effect.value.data);
 
-                const parsed = parseHistoryEntryOnce(result.historyEntry);
-                if (parsed?.id) {
-                  void notifications?.onTransactionCreated?.({
-                    transactionId: parsed.id,
-                    type: 'send',
-                    mintUrl: data.mintUrl,
-                    amount: data.amount,
-                    unit: flowCtx.unit,
-                    rawInput: flowCtx.rawInput,
-                    source: flowCtx.source,
-                  });
-                }
-
-                handled = true;
-              } catch (e) {
-                if (isStaleGeneration(sendGeneration, 'executeOfflineSend.catch')) return;
-                logger.warn('machine.send.offlineFallback.failed', { error: errField(e) });
+            for (const notification of effect.value.notifications) {
+              if (notification.type === 'onTransactionCreated') {
+                void notifications?.onTransactionCreated?.(notification.data);
               }
             }
+          } else {
+            setStep(effect.value.step, effect.value.data);
           }
-
-          // Phase 2: Proof selector fallback (existing behavior)
-          if (!handled && proofAmounts.length > 0) {
-            const built = buildProofSuggestions(proofAmounts, data.amount);
-            if (!built.exactMatch && built.hasSuggestion) {
-              const chooseProofsData = buildChooseProofsData({
-                mintUrl: data.mintUrl,
-                amount: data.amount,
-                unit: flowCtx.unit,
-                proofAmounts,
-                suggestions: built.suggestions,
-                ctx: flowCtx,
-              });
-              setStep('chooseProofs', chooseProofsData);
-              handled = true;
-            }
+        } else {
+          if (effect.error.context) {
+            flowCtx = { ...flowCtx, ...effect.error.context };
           }
-
-          // Phase 3: Error
-          if (!handled) {
-            const mintUnreachable = isMintOfflineError(err);
-            setStep('error', {
-              code: 'SEND_FAILED',
-              message: mintUnreachable
-                ? t('MINT_UNREACHABLE', getLocale?.() ?? 'en')
-                : err instanceof Error ? err.message : t('SEND_FAILED', getLocale?.() ?? 'en'),
-              ...(mintUnreachable ? { data: { mintUnreachable: true } } : {}),
+          if (effect.error.fallbackFailure) {
+            logger.warn('machine.send.offlineFallback.failed', {
+              error: errField(effect.error.fallbackFailure),
             });
           }
+          setStep('error', effect.error.data);
         }
         handlerExecuting = false;
         notify();
@@ -1119,45 +1072,30 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         });
         handlerExecuting = true;
         notify();
-        try {
-          if (getOffline?.() ?? false) {
-            const error = new Error(t('MINT_UNREACHABLE', getLocale?.() ?? 'en'));
-            error.name = 'MintFetchError';
-            throw error;
-          }
-          const result = await operations.executeMintQuote(
-            data.mintUrl,
-            data.amount,
-            data.unit,
-            data.method
-          );
-          if (isStaleGeneration(sendGeneration, 'executeMintQuote')) return;
-          logger.info('machine.createMintQuote.success');
-          setStep('mintQuoteCreated', { historyEntry: result.historyEntry, unit: data.unit });
+        const effect = await runMintQuoteEffect({
+          data,
+          operations,
+          context: flowCtx,
+          getOffline: () => getOffline?.() ?? false,
+          getLocale: () => getLocale?.() ?? 'en',
+          isStale: (op) => isStaleGeneration(sendGeneration, op),
+        });
 
-          const parsed = parseHistoryEntryOnce(result.historyEntry);
-          if (parsed?.id) {
-            void notifications?.onTransactionCreated?.({
-              transactionId: parsed.id,
-              type: 'mint',
-              mintUrl: data.mintUrl,
-              amount: data.amount,
-              unit: data.unit,
-              rawInput: flowCtx.rawInput,
-              source: flowCtx.source,
-            });
+        if (effect.isOk()) {
+          if (effect.value.kind === 'stale') return;
+          logger.info('machine.createMintQuote.success');
+          setStep(effect.value.step, effect.value.data);
+
+          for (const notification of effect.value.notifications) {
+            if (notification.type === 'onTransactionCreated') {
+              void notifications?.onTransactionCreated?.(notification.data);
+            }
           }
-        } catch (err) {
-          if (isStaleGeneration(sendGeneration, 'executeMintQuote.catch')) return;
-          logger.warn('machine.createMintQuote.failed', { error: errField(err) });
-          const mintUnreachable = isMintOfflineError(err);
-          setStep('error', {
-            code: 'MINT_QUOTE_FAILED',
-            message: mintUnreachable
-              ? t('MINT_UNREACHABLE', getLocale?.() ?? 'en')
-              : err instanceof Error ? err.message : t('MINT_QUOTE_FAILED', getLocale?.() ?? 'en'),
-            ...(mintUnreachable ? { data: { mintUnreachable: true } } : {}),
+        } else {
+          logger.warn('machine.createMintQuote.failed', {
+            error: errField(effect.error.cause),
           });
+          setStep('error', effect.error.data);
         }
         handlerExecuting = false;
         notify();
@@ -1169,7 +1107,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             mintListItems: buildFallbackMintListItems(data),
             mintListItemsStatus: 'loading',
           });
-          startMintListEnrichment(data, sendGeneration);
+          postDispatchTask = startMintListEnrichment(data, sendGeneration);
           notify();
         }
       }
@@ -1185,27 +1123,26 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         reviewStep === 'reviewMint'
           ? (stepData as StepDataMap['reviewMint'])
           : (stepData as StepDataMap['openMint']);
-      const mintUrl =
-        reviewStep === 'reviewMint'
-          ? (reviewData as StepDataMap['reviewMint']).mintUrl
-          : (reviewData as StepDataMap['openMint']).url;
       handlerExecuting = true;
       notify();
-      try {
-        const info = await operations.buildMintReviewInfo(mintUrl);
-        if (isStaleGeneration(sendGeneration, 'buildMintReviewInfo')) return;
-        if (reviewStep === 'reviewMint') {
-          setStep('reviewMint', { ...(reviewData as StepDataMap['reviewMint']), mintInfo: info });
+
+      const effect = await runMintReviewInfoEffect({
+        step: reviewStep,
+        data: reviewData,
+        operation: operations.buildMintReviewInfo,
+        getLocale: () => getLocale?.() ?? 'en',
+        isStale: (op) => isStaleGeneration(sendGeneration, op),
+      });
+
+      if (effect.isOk()) {
+        if (effect.value.kind === 'stale') return;
+        if (effect.value.step === 'reviewMint') {
+          setStep('reviewMint', effect.value.data);
         } else {
-          setStep('openMint', { ...(reviewData as StepDataMap['openMint']), mintInfo: info });
+          setStep('openMint', effect.value.data);
         }
-      } catch (err) {
-        if (isStaleGeneration(sendGeneration, 'buildMintReviewInfo.catch')) return;
-        setStep('error', {
-          code: 'UNSUPPORTED_INPUT',
-          message:
-            err instanceof Error ? err.message : t('LOAD_MINTS_FAILED', getLocale?.() ?? 'en'),
-        });
+      } else {
+        setStep('error', effect.error.data);
       }
       handlerExecuting = false;
       notify();
@@ -1216,16 +1153,18 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     if (reviewMintData && operations?.trustMint && step === 'receiveToken') {
       handlerExecuting = true;
       notify();
-      try {
-        await operations.trustMint(reviewMintData.mintUrl);
-        if (isStaleGeneration(sendGeneration, 'trustMint')) return;
-      } catch (err) {
-        if (isStaleGeneration(sendGeneration, 'trustMint.catch')) return;
-        setStep('error', {
-          code: 'UNSUPPORTED_INPUT',
-          message:
-            err instanceof Error ? err.message : t('TRUST_MINT_FAILED', getLocale?.() ?? 'en'),
-        });
+
+      const effect = await runTrustMintEffect({
+        data: reviewMintData,
+        operation: operations.trustMint,
+        getLocale: () => getLocale?.() ?? 'en',
+        isStale: (op) => isStaleGeneration(sendGeneration, op),
+      });
+
+      if (effect.isOk()) {
+        if (effect.value.kind === 'stale') return;
+      } else {
+        setStep('error', effect.error.data);
       }
       handlerExecuting = false;
       notify();
@@ -1249,6 +1188,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     try {
       await dispatchHandler(step, stepData);
       if (isStaleGeneration(sendGeneration, 'dispatchHandler')) return;
+      if (postDispatchTask) {
+        // Preserve the existing selectMint timing: handlers receive fallback
+        // rows first, then immediately-settled enrichment can land before the
+        // machine action promise resolves.
+        await Promise.race([
+          postDispatchTask,
+          new Promise<void>((resolve) => setTimeout(resolve, 0)),
+        ]);
+        if (isStaleGeneration(sendGeneration, 'dispatchHandler.postTask')) return;
+      }
     } finally {
       if (isStaleGeneration(sendGeneration, 'dispatchHandler.finally')) return;
       if (trackExecuting) {
@@ -1409,6 +1358,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   const chooseProofs = (amount: number) => send({ type: 'PROOFS_CHOSEN', amount });
 
+  const submitSendMemo = (memo?: string) => send({ type: 'SEND_MEMO_SUBMITTED', memo });
+
   const startSendEcash = (opts?: {
     reset?: boolean;
     meltTarget?: string;
@@ -1467,6 +1418,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     enterAmount,
     chooseOption,
     chooseProofs,
+    submitSendMemo,
     changeMint,
     requestMintSelector,
     startSendEcash,

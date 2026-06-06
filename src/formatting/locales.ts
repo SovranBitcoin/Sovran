@@ -38,6 +38,7 @@ const en: TranslationMap = {
   NO_AMOUNT: 'Amount is required to continue',
   MINT_SELECTION_REQUIRED: 'Mint selection is required to continue',
   PROOF_SELECTION_REQUIRED: 'Proof selection is required to continue',
+  SEND_MEMO_REQUIRED: 'Memo input is required to continue',
 
   // Blocked / error messages
   NO_VALID_MINT: 'No valid mint available',
@@ -74,6 +75,7 @@ const ar: TranslationMap = {
   NO_AMOUNT: 'يجب إدخال المبلغ للمتابعة',
   MINT_SELECTION_REQUIRED: 'يجب اختيار المنت للمتابعة',
   PROOF_SELECTION_REQUIRED: 'يجب اختيار الإثبات للمتابعة',
+  SEND_MEMO_REQUIRED: 'يجب إدخال المذكرة أو تخطيها للمتابعة',
 
   NO_VALID_MINT: 'لا يوجد منت صالح',
   ALL_OPTIONS_DISABLED: 'جميع خيارات الدفع معطلة',
@@ -108,6 +110,7 @@ const de: TranslationMap = {
   NO_AMOUNT: 'Betrag muss eingegeben werden',
   MINT_SELECTION_REQUIRED: 'Mint muss ausgewählt werden',
   PROOF_SELECTION_REQUIRED: 'Proof muss ausgewählt werden',
+  SEND_MEMO_REQUIRED: 'Memo muss eingegeben oder übersprungen werden',
 
   NO_VALID_MINT: 'Kein gültiger Mint verfügbar',
   ALL_OPTIONS_DISABLED: 'Alle Zahlungsoptionen sind deaktiviert',

@@ -172,8 +172,20 @@ describe('manual entry — startSendEcash', () => {
         recipientPubkey,
       },
     });
-    expect((lastHandler.data as { candidates: unknown[] }).candidates).toEqual([
-      { mintUrl: MINT1, balance: 5000 },
+    expect((lastHandler.data as { candidates: unknown[] }).candidates).toMatchObject([
+      { mintUrl: MINT1, balance: 5000, status: 'available', reason: null },
+      {
+        mintUrl: MINT2,
+        balance: 100,
+        status: 'disabled',
+        reason: { code: 'INSUFFICIENT_BALANCE' },
+      },
+      {
+        mintUrl: MINT3,
+        balance: 0,
+        status: 'disabled',
+        reason: { code: 'INSUFFICIENT_BALANCE' },
+      },
     ]);
 
     await tm.machine.changeMint(MINT1);
@@ -209,6 +221,7 @@ describe('manual entry — startSendEcash', () => {
       wallet: {
         trustedMintUrls: [MINT1, MINT2, MINT3],
         mintBalances: { [MINT1]: 5000, [MINT2]: 4000, [MINT3]: 100 },
+        mintMethodCapabilities: WALLETS.multiMintUnbalanced.mintMethodCapabilities,
         preferredMintUrl: MINT3,
         proofAmounts: {
           [MINT1]: [1024, 2048, 512, 256],
@@ -253,9 +266,15 @@ describe('manual entry — startSendEcash', () => {
         recipientProfile,
       },
     });
-    expect((lastHandler.data as { candidates: unknown[] }).candidates).toEqual([
-      { mintUrl: MINT1, balance: 5000 },
-      { mintUrl: MINT2, balance: 4000 },
+    expect((lastHandler.data as { candidates: unknown[] }).candidates).toMatchObject([
+      { mintUrl: MINT1, balance: 5000, status: 'available', reason: null },
+      { mintUrl: MINT2, balance: 4000, status: 'available', reason: null },
+      {
+        mintUrl: MINT3,
+        balance: 100,
+        status: 'disabled',
+        reason: { code: 'INSUFFICIENT_BALANCE' },
+      },
     ]);
   });
 });

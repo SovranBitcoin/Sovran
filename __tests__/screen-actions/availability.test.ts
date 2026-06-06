@@ -21,6 +21,90 @@ import {
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
 import { MINT1, MINT2 } from '../_harness/fixtures';
 
+describe('screen action availability — back', () => {
+  const screens = [
+    'sendToken',
+    'receiveToken',
+    'mintQuote',
+    'meltQuote',
+    'paymentRequest',
+    'receive',
+    'mintInfo',
+    'amountEntry',
+    'mintSelector',
+  ] as const;
+
+  it.each(screens)('%s always exposes back as available', (screen) => {
+    const actions = getAvailableActions(screen, {});
+
+    expect(actions.back.available).toBe(true);
+  });
+});
+
+describe('sendTokenAvailability — copy variants', () => {
+  it('surfaces emoji copy as a copy variant, not a sibling action', () => {
+    const actions = getAvailableActions('sendToken', {
+      token: { token: [] },
+      state: 'pending',
+      operationId: 'op-1',
+    });
+
+    expect(actions.copy.variants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'text', available: true }),
+        expect.objectContaining({ id: 'emoji', available: true }),
+      ])
+    );
+    expect('copyAsEmoji' in actions).toBe(false);
+  });
+});
+
+describe('receiveTokenAvailability — redeem', () => {
+  it('redeem is available for a scanned/pasted entry carrying metadata.rawToken', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'receive-1700000000-1',
+      type: 'receive',
+      amount: 21,
+      metadata: { rawToken: 'cashuBexampletoken' },
+    });
+
+    expect(actions.redeem.available).toBe(true);
+  });
+
+  it('redeem is available when the decoded token is on entry.token', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'receive-1700000000-2',
+      type: 'receive',
+      amount: 21,
+      token: { mint: 'https://mint1.example.com', proofs: [] },
+    });
+
+    expect(actions.redeem.available).toBe(true);
+  });
+
+  it('redeem is unavailable for a placeholder entry with no token at all', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'receive-1700000000-3',
+      type: 'receive',
+      amount: 21,
+      metadata: {},
+    });
+
+    expect(actions.redeem.available).toBe(false);
+  });
+
+  it('redeem is unavailable for a finalized (already redeemed) entry', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'op-finalized-123',
+      type: 'receive',
+      amount: 21,
+      metadata: { rawToken: 'cashuBexampletoken' },
+    });
+
+    expect(actions.redeem.available).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // paymentRequest — Confirm availability
 // ---------------------------------------------------------------------------
@@ -218,6 +302,50 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     expect(actions.next.available).toBe(true);
   });
 
+  it('always exposes cancel as available', () => {
+    const actions = getAvailableActions('amountEntry', {
+      destination: 'sendEcash',
+      effectiveSatAmount: 0,
+    });
+
+    expect(actions.cancel.available).toBe(true);
+  });
+
+  it('exposes paste and scan on send-side amount entries only', () => {
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'sendEcash',
+      }).paste.available
+    ).toBe(true);
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'sendEcash',
+      }).scanQr.available
+    ).toBe(true);
+
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'meltQuote',
+      }).paste.available
+    ).toBe(true);
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'meltQuote',
+      }).scanQr.available
+    ).toBe(true);
+
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'mintQuote',
+      }).paste.available
+    ).toBe(false);
+    expect(
+      getAvailableActions('amountEntry', {
+        destination: 'mintQuote',
+      }).scanQr.available
+    ).toBe(false);
+  });
+
   it('hides onchain receive when no trusted mint advertises NUT-04 onchain', () => {
     const entry = {
       destination: 'mintQuote',
@@ -240,7 +368,7 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     expect(actions.next.variants?.some((variant) => variant.id === 'onchain')).toBe(false);
   });
 
-  it('shows onchain receive only when a trusted mint advertises NUT-04 onchain', () => {
+  it('hides onchain receive even when a trusted mint advertises NUT-04 onchain', () => {
     const entry = {
       destination: 'mintQuote',
       effectiveSatAmount: 100,
@@ -262,9 +390,8 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     };
 
     const actions = getAvailableActions('amountEntry', entry);
-    const onchain = actions.next.variants?.find((variant) => variant.id === 'onchain');
 
-    expect(onchain).toMatchObject({ available: true });
+    expect(actions.next.variants?.some((variant) => variant.id === 'onchain')).toBe(false);
   });
 
   it('disables Lightning receive when no trusted mint advertises NUT-04 bolt11', () => {
@@ -361,7 +488,7 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     expect(lightning).toMatchObject({ available: true });
   });
 
-  it('ignores NUT-04 min amount for onchain receive availability', () => {
+  it('hides onchain receive regardless of advertised NUT-04 min amount', () => {
     const entry = {
       destination: 'mintQuote',
       selectedMintUrl: MINT1,
@@ -384,12 +511,11 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
     };
 
     const actions = getAvailableActions('amountEntry', entry);
-    const onchain = actions.next.variants?.find((variant) => variant.id === 'onchain');
 
-    expect(onchain).toMatchObject({ available: true });
+    expect(actions.next.variants?.some((variant) => variant.id === 'onchain')).toBe(false);
   });
 
-  it('keeps Lightning and onchain receive available despite advertised NUT-04 minimums', () => {
+  it('keeps Lightning receive available and hides unsupported onchain receive', () => {
     const entry = {
       destination: 'mintQuote',
       selectedMintUrl: MINT1,
@@ -422,7 +548,7 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
 
     expect(actions.next.available).toBe(true);
     expect(lightning).toMatchObject({ available: true });
-    expect(onchain).toMatchObject({ available: true });
+    expect(onchain).toBeUndefined();
   });
 
   it('disables Lightning send when no trusted mint advertises NUT-05 bolt11', () => {
@@ -451,5 +577,16 @@ describe('amountEntryAvailability — next gate (sat-rounded fiat input)', () =>
       reason: 'No trusted mint can pay over Lightning',
     });
     expect(actions.next.available).toBe(false);
+  });
+});
+
+describe('mintSelectorAvailability', () => {
+  it('always exposes cancel as available', () => {
+    const actions = getAvailableActions('mintSelector', {
+      items: [],
+      destination: 'sendEcash',
+    });
+
+    expect(actions.cancel.available).toBe(true);
   });
 });

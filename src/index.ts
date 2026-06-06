@@ -16,9 +16,167 @@ export {
 // Re-export Manager type so consumers don't need to import coco-cashu-core
 export type { Manager } from '@cashu/coco-core';
 
+// Wallet seed helpers
+export {
+  CashuSeedError,
+  createCashuSeedGetter,
+  deriveStandardCashuSeed,
+  generateCashuMnemonic,
+  isValidCashuMnemonic,
+  normalizeCashuMnemonic,
+  tryDeriveStandardCashuSeed,
+} from './wallet-seed';
+export type {
+  CashuSeedCache,
+  CashuSeedCacheContext,
+  CashuSeedErrorCode,
+  CashuSeedResult,
+  CreateCashuSeedGetterConfig,
+  DeriveStandardCashuSeedOptions,
+  GenerateCashuMnemonicOptions,
+} from './wallet-seed';
+
 // Logger seam — consumers inject a structured logger via the `logger` option
 // on `createColada`; tests and standalone consumers get a no-op default.
 export { setLogger, type CocoLogger } from './logger';
+
+// Copy / i18n
+export {
+  DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
+  createMempoolSpaceChainAdapter,
+  defaultChainAdapter,
+  fetchMempoolAddressStats,
+  getOnchainConfirmationInfo,
+  getOnchainConfirmationProgress,
+  MempoolAddressStatsSchema,
+  summarizeMempoolAddress,
+} from './chain';
+export type {
+  MempoolAddressSummary,
+  MempoolAddressStats,
+  MempoolSpaceChainAdapterOptions,
+  OnchainConfirmationProgress as ChainOnchainConfirmationProgress,
+} from './chain';
+
+export {
+  createPaymentCopyGroups,
+  createPaymentCopyResolver,
+  getPaymentCopy,
+  MELT_COPY,
+  MINT_COPY,
+  PAYMENT_REQUEST_COPY,
+  paymentCopyDefaults,
+  RECEIVE_COPY,
+  registerPaymentCopyLocale,
+  resolvePaymentCopy,
+  SEND_COPY,
+  TOAST_COPY,
+} from './copy';
+export type {
+  PaymentCopyCatalog,
+  PaymentCopyError,
+  PaymentCopyKey,
+  PaymentCopyOptions,
+  PaymentCopyResolver,
+  PaymentCopyResult,
+  PaymentCopyVariables,
+} from './copy';
+
+// History / payment-state timeline
+export {
+  buildTimeline,
+  getCardLabel,
+  getHistoryEntryRefreshLabel,
+  getSendTokenReachabilityWarning,
+  getHistoryEntryOnchainMintAddress,
+  getStatusColorType,
+  getStatusHeader,
+  isCancellablePendingEcash,
+  isMeltQuotePaid,
+  isMeltQuoteReadyToPay,
+  isMintQuotePaymentObserved,
+  isOnchainHistoryEntry,
+  isPendingTransaction,
+  isReceiveTokenRedeemed,
+  isReservedSendHistoryEntry,
+  isSendTokenCancelled,
+  isSendTokenComplete,
+  isSettledReceiveHistoryEntry,
+  isSettledSpendHistoryEntry,
+  matchesTransactionDirection,
+  matchesTransactionFilters,
+  matchesTransactionPaymentType,
+  shouldShowMintOfflineWarning,
+} from './history';
+export type {
+  BuildTimelineInput,
+  OnchainConfirmationProgress,
+  SendTokenReachabilityStatus,
+  SendTokenReachabilityWarningOptions,
+  SendTokenWarningCopy,
+  TimelineItem,
+  TimelineStepType,
+  TransactionDirection,
+  TransactionPaymentType,
+} from './history';
+
+// Adapter contracts
+export type {
+  BleAdapter,
+  CameraAdapter,
+  ChainAddressCounter,
+  ChainAddressFundingTx,
+  ChainAddressStats,
+  ChainAddressSummary,
+  ChainAdapter,
+  ChainFeeEstimate,
+  ChainNetwork,
+  ChainTransactionStatus,
+  ClipboardAdapter,
+  ClockAdapter,
+  ColadaAdapters,
+  HapticsAdapter,
+  ImagePickerAdapter,
+  JsonPrimitive,
+  JsonRecord,
+  JsonValue,
+  LoggerAdapter,
+  NfcAdapter,
+  NostrAdapter,
+  NotificationsAdapter,
+  QrDecoderAdapter,
+  QrEncoderAdapter,
+  RandomAdapter,
+  SecureStorageAdapter,
+  ShareAdapter,
+  StorageAdapter,
+} from './adapters';
+
+// Subscription bus
+export {
+  createSubscriptionBus,
+  matchesSubscriptionFilter,
+} from './subscriptions';
+export type {
+  ColadaSubscriptionBus,
+  ColadaSubscriptionEvent,
+  HistoryEntryType,
+  HistoryUpdatedEvent,
+  MeltUpdatedEvent,
+  MintInfoEnrichmentChangedEvent,
+  MintInfoFetchedEvent,
+  MintSelectorItemAddedEvent,
+  MintUpdatedEvent,
+  ReceiveNpcMintChangedEvent,
+  ReceiveP2pkKeyChangedEvent,
+  ScreenActionsChangedEvent,
+  ScreenActionsChangedReason,
+  SubscriptionEventForFilter,
+  SubscriptionEventForType,
+  SubscriptionEventType,
+  SubscriptionFilter,
+  SubscriptionListener,
+} from './subscriptions';
 
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
@@ -34,7 +192,11 @@ export {
 export { resolveIntent } from './intent';
 export { defaultDetectors } from './detectors';
 export { annotateOptions } from './annotate';
-export { selectMint, selectMintForMelt, type MintSelectionConfig } from './mint-selection';
+export {
+  selectMint,
+  selectMintForMelt,
+  type MintSelectionConfig,
+} from './mint-selection';
 export {
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
@@ -58,8 +220,6 @@ export {
   isValidSatAmount,
   MAX_SAT_AMOUNT,
 } from './guards';
-export { getNfcFallback, getAllFallbacks } from './nfc-fallback';
-
 // Normalization
 export {
   sanitizeInput,
@@ -125,6 +285,7 @@ export type {
 
 // Screen actions (post-terminal screen action system)
 export {
+  createScreenActionSession,
   createScreenActionManager,
   getAvailableActions,
   isPaymentRequestPreview,
@@ -139,14 +300,20 @@ export type {
   ActionHandler,
   ActionState,
   ActionVariant,
+  CreateScreenActionSessionConfig,
   DecoratedEntryFields,
   DefaultScreenActionHandlersConfig,
   MeltOperationLike,
   NavigationCallbacks,
+  ScreenActionEntrySeed,
+  ScreenActionEntryUpdateSubscriber,
   ScreenActionContext,
   ScreenActionHandlerMap,
   ScreenActionManager,
   ScreenActionName,
+  ScreenActionsBridge,
+  ScreenActionSession,
+  ScreenActionSessionSnapshot,
   ScreenType,
 } from './screen-actions';
 
@@ -185,6 +352,12 @@ export {
   type RequestControls,
 } from './safeFetch';
 
+export { createNostrGraphqlMintEnrichment } from './nostr-graphql';
+export type {
+  NostrGraphqlMintEnrichment,
+  NostrGraphqlMintEnrichmentConfig,
+} from './nostr-graphql';
+
 // Domain types
 export type {
   Detectors,
@@ -210,9 +383,14 @@ export type {
   AmountEntryConstraints,
   MintListItem,
   MintCatalogEntry,
+  MintContactProfile,
+  MintContactProfileResolver,
   MintSelectionResult,
   MintCandidate,
   MintReviewInfo,
+  MintReviewRecommendation,
+  MintReviewsFetcher,
+  MintReviewsSummary,
   GuardResult,
   WalletCapability,
   CapabilityCheckResult,

@@ -5,7 +5,7 @@
 // with built-in operations, WalletContext tracking, and the PaymentMachine.
 //
 // This is the primary entry point for integrating colada. The wallet
-// provides a Manager (from coco-cashu-core) and optional platform primitives;
+// provides a Manager (from coco-cashu-core) and app-owned enrichment callbacks;
 // the instance does everything else.
 // ---------------------------------------------------------------------------
 
@@ -21,9 +21,16 @@ import type {
   StepHandlerMap,
   URDecoderLike,
 } from '../machine/types';
-import type { MintCatalogEntry, MintReviewInfo, WalletContext } from '../types';
+import type {
+  MintCatalogEntry,
+  MintContactProfileResolver,
+  MintReviewInfo,
+  MintReviewsFetcher,
+  WalletContext,
+} from '../types';
 import { createDefaultOperations } from '../operations/defaultOperations';
 import { createWalletContextTracker, type WalletContextTracker } from './walletContextTracker';
+import { createNostrGraphqlMintEnrichment } from '../nostr-graphql';
 
 // NUT-06 mint info as returned by coco's `Manager`. Re-derived here (rather than
 // imported from cashu-ts) so the type tracks whatever shape `mgr.mint.getMintInfo`
@@ -37,14 +44,6 @@ type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
 export interface ColadaConfig {
   manager: Manager;
 
-  platform?: {
-    clipboard?: { write: (text: string) => Promise<void> };
-    share?: (content: { message: string; url?: string }) => Promise<void>;
-    nfc?: NfcIOAdapter;
-    scanSources?: ScanSources;
-    createURDecoder?: () => URDecoderLike;
-  };
-
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
 
   unit?: string;
@@ -52,6 +51,7 @@ export interface ColadaConfig {
   getLocale?: () => string;
   getBtcPrice?: () => number;
   getDisplayCurrency?: () => { code: string; symbol: string } | null;
+  enableEcashSendMemo?: boolean;
 
   getPreferredMintUrl?: () => string | undefined;
 
@@ -69,6 +69,16 @@ export interface ColadaConfig {
   fetchMintInfo?: (mintUrl: string) => Promise<MintInfo | null>;
   /** Per-mint enrichment for the trust-review screen. Read from local caches. */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
+  /**
+   * Optional generic Nostr GraphQL endpoint. When set, Colada can resolve mint
+   * contact profiles and mint reviews from indexed Nostr events without
+   * knowing which backend serves the GraphQL schema.
+   */
+  nostrGraphqlEndpoint?: string;
+  /** Resolve a mint operator Nostr pubkey from NUT-06 contact metadata. */
+  resolveMintContactProfile?: MintContactProfileResolver;
+  /** Fetch aggregated Nostr reviews for a mint. */
+  fetchMintReviews?: MintReviewsFetcher;
 
   /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
@@ -113,11 +123,7 @@ export interface ColadaInstance {
 export function createColada(config: ColadaConfig): ColadaInstance {
   const {
     manager,
-    platform,
     sendNostrDM,
-    unit = 'sat',
-    getOffline,
-    getLocale,
     enrichMintReviewInfo,
   } = config;
 
@@ -127,6 +133,10 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     getPreferredMintUrl: config.getPreferredMintUrl,
   });
 
+  const graphqlEnrichment = config.nostrGraphqlEndpoint
+    ? createNostrGraphqlMintEnrichment({ endpoint: config.nostrGraphqlEndpoint })
+    : null;
+
   const operations = createDefaultOperations({
     getManager: () => manager,
     getProofAmounts: () => tracker.getContext().proofAmounts,
@@ -135,6 +145,9 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
     fetchMintInfo: config.fetchMintInfo,
+    resolveMintContactProfile:
+      config.resolveMintContactProfile ?? graphqlEnrichment?.resolveMintContactProfile,
+    fetchMintReviews: config.fetchMintReviews ?? graphqlEnrichment?.fetchMintReviews,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
     shouldMockFailMelt: config.shouldMockFailMelt,
     shouldMockFailSend: config.shouldMockFailSend,
@@ -184,6 +197,7 @@ export function createMachineFromInstance(config: CreateMachineFromInstanceConfi
     getLocale: getLocale ?? (() => 'en'),
     unit,
     operations: instance.operations as MachineOperations,
+    enableEcashSendMemo: instance.config.enableEcashSendMemo,
     notifications,
     createURDecoder,
     scanSources,

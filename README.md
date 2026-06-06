@@ -1,355 +1,340 @@
 # Colada
 
-> **Target API:** This document describes how we **want** the package to be used. Concrete export names, prop shapes, and provider wiring may differ until the implementation matches—treat this as the north star, not a changelog.
+Colada is the payment-flow layer for Coco-based wallets. It owns payment
+sequencing, payment-state copy, screen-action availability, subscription events,
+chain helpers, and adapter-shaped side effects. Wallet apps own presentation,
+routing, storage, native modules, and product-specific enrichment.
 
-## Problem this package solves
+The package has two public entry points:
 
-Colada is the reusable payment-flow layer for Coco-based wallets.
+- `colada` for framework-agnostic machine, adapters, copy, history, chain,
+  subscription, screen-action session, and capability helpers.
+- `colada/react` for `ColadaProvider`, `usePaymentFlowMachine`,
+  `useScreenActions`, `useExecutionState`, and `useColadaSubscriptions`.
 
-Coco gives wallets a headless engine for mints, proofs, quotes, operations, storage, and events. Wallet apps still need to answer a separate UX question: given a pasted string, scanned QR code, deep link, amount entry, mint state, offline state, and available payment methods, what flow should the user enter next, what should be guarded, and which actions should be available on each terminal screen?
+## What Colada Owns
 
-Colada solves that middle layer. It provides a framework-agnostic payment machine plus React bindings that parse payment inputs, classify rails, resolve intent, apply wallet/mint capability guards, run Coco operations, and expose consistent screen actions such as copy, share, redeem, pay, cancel, scan, paste, and mint selection.
+- Flow sequencing: pasted, scanned, and deep-linked inputs are parsed, annotated,
+  guarded, and routed by the payment machine.
+- Payment-state copy: user-visible payment labels, timeline copy, status copy,
+  action labels, and toast strings resolve through the copy catalog.
+- Side-effect channels: operations and notifications are named channels; apps
+  provide implementations, but Colada decides when they are fired.
+- Update model: a typed subscription bus publishes history, melt, mint, receive,
+  mint-info, mint-selector, and screen-action events.
+- Chain helpers: the default chain adapter talks to mempool.space and exposes
+  fee, address summary, transaction status, broadcast, and confirmation helpers.
+- Native seams: clipboard, share, camera, image picker, haptics, notifications,
+  Nostr, BLE, NFC, chain, storage, secure storage, QR encode/decode, clock,
+  random, and logger integrations are adapter interfaces.
 
-The package is not a UI kit and not a wallet database. Apps still own routing, presentation, persistence, platform APIs, notifications, and product-specific enrichment. The point is to keep payment sequencing and availability rules in one importable module instead of duplicating them across every screen.
+## What Apps Own
 
-Most Cashu wallets implement payment UX as app-specific screens, stores, and dialogs. Colada extracts that logic into a reusable module with `createColada` and `ColadaProvider`, with app concerns injected at the boundary.
+- Routes, screens, navigation components, and layout.
+- Persistent stores, profile state, selected mint state, and app settings.
+- Platform implementations for every adapter.
+- Wallet operations that touch Coco, native modules, APIs, or private state.
+- App-specific seed derivation paths and secret storage policy.
+- Optional copy overrides and screen-entry enrichment.
 
-## What this package is
+Colada should not import Expo, Nitro, React Native native modules, Nostr relay
+pools, storage clients, or chain libraries directly. Those dependencies stay in
+the app behind JSON-shaped adapter contracts.
 
-**Flow machine** — Parses payment-related input, advances through steps (amount, mint selection, scan pipeline, send/receive orchestration), and delegates **navigation and side effects** through **step handlers**. Optional **operations** let the wallet run async work (e.g. execute send, create mint quote) inside the machine’s transitions so screens stay thin.
+## Minimal React Setup
 
-**Screen actions** — A separate layer for **post-terminal** screens: typed actions bound to a **history entry** (copy, pay, redeem, cancel, etc.) with **availability** and **loading** per action. This is intentionally separate from the flow machine so detail screens do not reimplement business logic.
-
-## Desired root provider: `ColadaProvider`
-
-The package should ship a **single, generic** root component named **`ColadaProvider`** (this is the name used throughout this doc). Apps mount it **once** with **flat props**—no nested `config` object, no bespoke wrapper that wires dozens of refs.
-
-**Design goals (agreed):**
-
-1. **Flat API (prop 1.A)** — `handlers`, `operations`, `notifications`, `actions`, platform sources, and persistence callbacks are **top-level props**, not `config={{ ... }}`.
-2. **Simple app code** — The app should not juggle `pubkeyRef`, `managerRef`, `walletContextRef`, and a manual `createHandlers(machine, refs)` factory. The provider (and implementation inside Colada) owns **internal wiring**; the app passes **plain functions or objects** and optional **persistence** callbacks. Whatever minimizes ref soup at the call site wins.
-3. **Mint / NPC persistence** — Persistence lives in the **app** (stores, SecureStore, API). The provider exposes **named callbacks** the machine invokes when the user’s choice should be saved, e.g. **`savePreferredMint(mintUrl)`** and **`saveNpcMint(mintUrl)`** (exact names TBD). Colada does not store mints; it only notifies the app to persist.
-4. **One tree** — This same provider registers everything **`useScreenActions`** needs (manager, payment machine, sources) via context. Most screens use **two arguments**; the **amount entry** screen passes a third options object with **`amountConfig`** (see [Amount entry](#amount-entry-screen-amountentry)).
-5. **Defaults + overrides** — The package ships **sensible defaults** (e.g. clipboard + gallery scan behavior, optional UR decoder hook-up) where it can; apps **override** props when they need custom behavior.
-
-### Flat props (target)
-
-| Prop                          | Role                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`handlers`**                | Step handlers the machine invokes—navigation entry points for the payment flow (e.g. open amount screen, navigate to token detail, dismiss). Shape TBD: ideally a plain map; implementation may use context to supply `machine` without a factory at the app.                                                                                          |
-| **`operations`**              | Async wallet operations the machine runs for certain steps when provided (e.g. confirm send, create mint quote). When set, some paths are handled internally and handlers only see **result** steps.                                                                                                                                                   |
-| **`notifications`**           | Informational feedback from the machine (errors, validation). Non-blocking; if a key has no handler, it is ignored.                                                                                                                                                                                                                                    |
-| **`actions`**                 | Handler implementations for **predefined** (and optionally **custom**) per-screen actions—see [Predefined actions](#predefined-actions-and-optional-custom-ones). `useScreenActions` resolves them by `screenType`.                                                                                                                                    |
-| **`screenActionsBridge`**     | Optional wallet-only wiring for **`useScreenActions`**: extra action context (`getExtraContext`), history / melt subscriptions (`onEntryUpdate`), entry merge rules, **`decorateEntry`**, **`getLocale`**, scan provenance (**`getSourceLabel`**), and **`subscribeGlobalScreenActions`** for reactive labels. See `src/react/screenActionsBridge.ts`. |
-| **`savePreferredMint`**       | Called when the flow should persist the user’s **selected send/receive mint** (app writes to its store).                                                                                                                                                                                                                                               |
-| **`saveNpcMint`**             | Called when the flow should persist the **NPC / Lightning-address mint** only (app writes + optional server sync).                                                                                                                                                                                                                                     |
-| **`onNpcMintSync`**           | Optional: run when provider mounts if the app needs to sync NPC mint from server (wallet-specific).                                                                                                                                                                                                                                                    |
-| **`clipboardSource`**         | Returns clipboard text for paste / scan-from-clipboard flows.                                                                                                                                                                                                                                                                                          |
-| **`shareSource`**             | Platform share primitive (e.g. React Native `Share`). Merged into action context for **`share`** actions.                                                                                                                                                                                                                                              |
-| **`cameraPermissionsSource`** | Requests or checks camera permission for QR flows.                                                                                                                                                                                                                                                                                                     |
-| **`imagePickerSource`**       | Opens gallery / image picker for QR-from-image flows.                                                                                                                                                                                                                                                                                                  |
-
-Optional overrides (names illustrative): **`createURDecoder`**, **`scanSources`** — omitted when defaults suffice.
-
-Screens should not import Expo clipboard, camera, or image-picker for these flows unless overriding—the provider injects them at the boundary.
-
-**Implementation status:** Colada ships **`ColadaProvider`** with **grouped props** — top-level `handlers` and `children`, plus four typed config groups: **`engine`** (`instance`, `operations`, `detectors`), **`callbacks`** (`notifications`, `actions`, `screenActionsBridge`), **`runtime`** (`getOffline`, `getBtcPrice`, `getDisplayCurrency`, `getLocale`, `translations`), and **`platform`** (`writeClipboard`, `shareContent`, `nfcAdapter`, `createURDecoder`, `scanSources`, `deepLinks`, `navigation`).
-
-### Naming & legacy exports
-
-- The **only** root provider name in the public API is **`ColadaProvider`**.
-
-### Wallet context and `usePaymentFlowMachine` (recommended)
-
-**Recommendation:** Keep building **`WalletContext`** in the app (selected mint, trusted mint URLs, proof amounts, etc.) and pass it into **`usePaymentFlowMachine({ walletContext, unit })`** on each flow screen.
-
-**Why not push all of that into the root provider?** Balance and proofs are **profile- and route-scoped**; the app already has stores and overrides (e.g. mint select for a specific flow). Duplicating that graph inside Colada would recreate your state layer. The provider should own **machine + injected services + screen-action context**, not clone **Zustand / profile** state.
-
-**Summary:** **`ColadaProvider`** once at the root; **`usePaymentFlowMachine`** still receives **`walletContext`** from the screen’s hooks—thin, explicit, testable.
-
-### Handlers, operations, and notifications (how they fit together)
-
-**Principle:** The **machine** owns sequencing, guards, and which step comes next. **Handlers** should be thin—mostly “given this step payload, navigate or show UI”—not duplicate wallet rules. **Operations** are the async **wallet I/O** the machine calls when it needs a real effect (send, mint quote, build mint list). **Notifications** are **optional** UX hooks keyed by situation (often error codes); if the wallet does not register a handler for that key, the machine **continues silently** (no throw, no blocking).
-
-Example story (target behavior): the user starts a send flow. The machine checks prerequisites (e.g. balance) **before** or **instead of** blindly navigating. If there is no spendable balance, the machine dispatches e.g. `NO_BALANCE` to **notifications**. If `notifications.NO_BALANCE` is set, the wallet shows a toast; if it is omitted, nothing is shown and the flow stops or redirects according to machine rules—without putting that branching inside a step handler.
-
-#### Example: a good **step handler** (navigation only)
-
-Handlers receive **fully prepared** step data from the machine. They should not re-derive business rules the machine already resolved.
-
-```ts
-// enterAmount — open the amount screen with constraints the machine computed
-enterAmount: ({ unit, preselectedMintUrl, constraints }) => {
-  router.push({
-    pathname: '/amount',
-    params: {
-      unit,
-      selectedMintUrl: preselectedMintUrl ?? '',
-      destination: constraints.destination,
-    },
-  });
-};
-
-// sendComplete — machine finished a send; navigate to the token detail screen
-sendComplete: ({ historyEntry }) => {
-  router.push({ pathname: '/sendToken', params: { sendHistoryEntry: historyEntry } });
-};
-```
-
-No balance checks here—the machine decided that `enterAmount` or `sendComplete` is the right step.
-
-#### Example: a good **operation** (async wallet work)
-
-Operations return **facts** the machine needs for the next transition (e.g. serialized history entry for navigation). They should not navigate; the machine calls **handlers** for that after success or error routing.
-
-```ts
-const operations = {
-  executeSend: async (mintUrl, amount) => {
-    const result = await manager.send.prepareAndExecute(mintUrl, amount);
-    return { historyEntry: JSON.stringify(result.historyEntry) };
-  },
-
-  executeMintQuote: async (mintUrl, amount, unit) => {
-    const quote = await manager.mint.createQuote(mintUrl, amount, unit);
-    return { historyEntry: JSON.stringify(quote.historyEntry) };
-  },
-
-  buildMintListItems: async (selectMintStepData) => {
-    return buildRowsFromWalletState(selectMintStepData);
-  },
-};
-```
-
-#### Example: a good **notification** (optional, fire-and-forget)
-
-Notifications map **machine-identified situations** to **presentation**. Unregistered keys are no-ops.
-
-```ts
-const notifications = {
-  // ErrorCode keys — machine lands on error step or emits before navigation
-  NO_BALANCE: ({ message }) => {
-    toast.info(message ?? 'No balance available');
-  },
-  INSUFFICIENT_BALANCE: ({ message }) => {
-    toast.warning(message ?? 'Not enough funds');
-  },
-
-  // Scan pipeline — optional UX when clipboard / gallery yields nothing
-  onScanEmpty: (source) => {
-    toast.info(`Nothing to paste (${source})`);
-  },
-  onScanError: (source, err) => {
-    console.warn(source, err);
-  },
-};
-```
-
-Together: **handlers** move the user between routes; **operations** talk to **coco-cashu** (or your wallet); **notifications** are the thin UI layer for edge cases the machine detects. The **machine** is what links them so screens and handlers stay dumb.
-
-## Terminal screens: `useScreenActions`
-
-For screens that show a **single history entry** and a small set of buttons (send token, receive token, melt quote, mint quote, receive hub, etc.), the **canonical** API is **two arguments** — no per-screen “context” objects. The **amount** flow screen is the exception: **`amountEntry`** plus **`{ amountConfig }`** (see below).
+This is the smallest useful shape. Real apps usually add operations,
+notifications, screen actions, adapters, deep links, and a
+`screenActionsBridge`.
 
 ```tsx
-const { entry, error, actions, source } = useScreenActions('sendToken', sendHistoryEntry);
-```
+import React from 'react';
+import { ColadaProvider, usePaymentFlowMachine } from 'colada/react';
+import type { StepHandlerMap, WalletContext } from 'colada';
 
-Same shape **everywhere** (`'receiveToken'`, `'meltQuote'`, `'receive'`, …). The hook should export almost everything the screen needs from that call site; optional wallet-specific fields (e.g. `source` for scan provenance, decorated timestamps) are extra return keys, not extra parameters.
-
-| Argument         | Meaning                                                                                   |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| **`screenType`** | Which predefined action set and availability rules apply (`src/screen-actions/types.ts`). |
-| **`entryParam`** | JSON string from the router **or** a parsed history entry object.                         |
-
-**Returns (target):**
-
-| Field         | Role                                                                                                                                       |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`entry`**   | Current entry (optionally decorated by the wallet — formatted strings, timestamps, etc.).                                                  |
-| **`error`**   | Parse/missing-entry error for early exit UI.                                                                                               |
-| **`actions`** | Bound map: each name has `available`, `loading`, `execute(params?)`.                                                                       |
-| **`source`**  | Optional scan provenance label when the wallet’s **`screenActionsBridge.getSourceLabel`** is set; always **`null`** for **`amountEntry`**. |
-
-Wallet apps may add more return fields (e.g. **`source`**, labels). The **call site** is **two arguments** for history-driven screens; **`amountEntry`** adds a **third** `{ amountConfig }` (see [Amount entry](#amount-entry-screen-amountentry)).
-
-**Where the rest comes from:** Handlers come from the provider **`actions`** prop. **`paymentMachine`** is always injected by the hook from context. Other extras (**`manager`**, Nostr **`sendDirectMessage`**, **`requestCameraPermission`**, history + melt **`onEntryUpdate`**, **`decorateEntry`**, **`source`**) come from the optional **`screenActionsBridge`** prop on **`ColadaProvider`**, so apps do not wrap **`useScreenActions`** in a second hook.
-
-Each action is still a **bound** object:
-
-- `available` — Whether the action should be offered.
-- `loading` — Whether an async execute is in flight.
-- `execute(params?)` — Run the handler; use small params only when the **UI** varies behavior (e.g. `{ source: 'npc' \| 'p2pk' }` for copy). Platform **sources** belong on the provider and in **`getExtraContext`**, not in `useScreenActions(...)`.
-
-**Note:** The hook return value **`actions`** (bound `execute` / `available` / `loading`) is **not** the same as the provider prop **`actions`** (the handler map you register once).
-
-**Implementation note:** The app wrapper may pass a **third** argument only for **`screenType: 'amountEntry'`** (`amountConfig`). All other screen types stay at two arguments.
-
-Screens stay declarative: gate on `error` / missing `entry`, then wire `ButtonHandler` (or similar) with `condition: actions.foo.available` and `loading: actions.foo.loading`.
-
-### Predefined actions (and optional custom ones)
-
-**Predefined** means: for each **`ScreenType`**, Colada declares a **fixed set of action names** that cover the usual terminal/detail flows. Availability rules live in one place (`getAvailableActions`); the wallet only implements **handlers** for those names—no per-page reinvention of “can I pay yet?”.
-
-| Screen type      | Predefined actions (target set)                                |
-| ---------------- | -------------------------------------------------------------- |
-| `sendToken`      | `copy`, `share`, `nfc`, `copyAsEmoji`, `checkStatus`, `cancel` |
-| `receiveToken`   | `redeem`                                                       |
-| `mintQuote`      | `copy`, `share`                                                |
-| `meltQuote`      | `pay`, `cancel`                                                |
-| `paymentRequest` | `confirm`, `cancel`                                            |
-| `receive` (hub)  | `copy`, `paste`, `fixedAmount`, `scanQr`, `changeNpcMint`      |
-| `amountEntry`    | `setInput`, `toggle`, `next`, `paste`, `scanQr`                |
-
-Authoritative source: `src/screen-actions/types.ts` (`ScreenActionName`).
-
-### Amount entry screen (`amountEntry`)
-
-The flow **amount** route (send/receive) uses the same **screen-actions** pattern as terminal screens: **`useScreenActions('amountEntry', entrySeed, { amountConfig })`**.
-
-- **`entrySeed`** — Stable fields merged into the live entry: `destination`, `unit`, `selectedMintUrl`, optional `paymentRequest` / `meltTarget`, and (for availability) `fiatCurrency` + `btcPrice` when fiat toggle applies. Re-create or memoize when mint or route params change so the manager’s base entry stays in sync.
-- **`amountConfig`** — **`CreateAmountActionManagerConfig`**: getters (`getMintUrl`, `getProofAmounts`, `getBtcPrice`, …) so sat/fiat input, offline sendability, and keyboard state stay in **`createAmountActionManager`** while **`setInput`** / **`toggle`** run **synchronously** (no per-key loading). **`next`** / **`paste`** / **`scanQr`** are wallet handlers with **`loading`**.
-- **`setInput` / `toggle`** — Invoked as `actions.setInput.execute({ input })` and `actions.toggle.execute()`; no separate `useAmountActions` hook.
-- **Machine validation** — On **`AMOUNT_ENTERED`**, if **`amount > 0`** and **`mintUrl`** is empty/whitespace, the machine calls **`notifications.onMissingMintForAmount`** (optional) so the wallet can toast instead of guarding only in the route. **`offline`** on the event is merged from **`getOffline?.()`** on **`CreateMachineConfig`** when omitted, so routes do not need to pass **`offline`** into **`enterAmount`**.
-- **Sovran** — Implement **`screenActionsBridge`** once in **`features/send/providers/Colada.tsx`** (same extras as before: manager, history/melt subscriptions, formatted entry, scan **`source`**). Pass **`amountConfig`** as the third argument only for **`amountEntry`**.
-
-**Wallet wiring:** You register implementations once (e.g. `createSovranScreenActionHandlers()`), keyed by screen type and action name, and pass them as the provider **`actions`** prop. Each handler receives **`ScreenActionContext`** (`entry`, `manager`, plus merged **sources** and extras—`shareSource`, `paymentMachine`, etc.).
-
-```ts
-// Pseudocode — pass as <ColadaProvider callbacks={{ actions: walletActions }} shareSource={...} />
-const walletActions = {
-  sendToken: {
-    copy: async (ctx) => {
-      /* Clipboard + toast */
+function createHandlers(): StepHandlerMap {
+  return {
+    enterAmount: ({ unit, constraints }) => {
+      router.push({ pathname: '/amount', params: { unit, destination: constraints.destination } });
     },
-    share: async (ctx) => {
-      // Use provider-injected share primitive — do not import Share in every screen
-      await ctx.shareSource?.({ message: ctx.entry.tokenString, title: 'Ecash' });
+    selectMint: ({ amount, destination }) => {
+      router.push({ pathname: '/mint-select', params: { amount, destination } });
     },
-    cancel: async (ctx) => {
-      /* Cancel operation */
+    sendComplete: ({ historyEntry }) => {
+      router.push({ pathname: '/send-token', params: { historyEntry } });
     },
-    // …
-  },
-  meltQuote: {
-    pay: async (ctx) => {
-      /* prepareMelt / executeMelt */
+    mintQuoteCreated: ({ historyEntry }) => {
+      router.push({ pathname: '/mint-quote', params: { historyEntry } });
     },
-    cancel: async (ctx) => {
-      /* router.back or melt cancel */
+    error: ({ message }) => {
+      toast.show(message);
     },
-  },
-  receive: {
-    copy: async (ctx) => {
-      /* npc vs p2pk via execute() params from UI */
-    },
-    paste: async (ctx) => {
-      await ctx.paymentMachine?.scan?.();
-    },
-    // …
-  },
-};
-```
+  };
+}
 
-**Custom / extended actions (target):** Standard pages use only the predefined matrix. For one-off product screens, the wallet should be able to register **additional** action names (e.g. `exportToken`, `openInExplorer`) without breaking the core types—e.g. by merging a **`ScreenActionHandlerMap` extension** at the app layer or by a future extension map merged into the provider **`actions`** prop. The rule: **defaults cover the necessary cases**; **extensions are convenience**, implemented beside the same `useScreenActions` pattern (`execute` / `available` / `loading`) so pages stay consistent.
-
-Until that extension is implemented, prefer **flow machine** steps or **navigation** for rare one-offs, and keep terminal screens on the predefined list above.
-
-## Machine vs screen actions
-
-| Use                                                   | When                                                                                                          |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Machine** (`usePaymentFlowMachine` + step handlers) | Multi-step flows: scan → parse → options → amount → mint → confirm → navigate to terminal screen.             |
-| **`useScreenActions`**                                | One screen, one entry, discrete user actions (copy, pay, redeem, cancel) with centralized availability rules. |
-
-Avoid ad-hoc hooks per screen; compose **screen actions** + **mint info** (or other read-only data) at the screen boundary.
-
-## Flow screens: `isExecuting` with `useExecutionState`
-
-For any screen that uses **`usePaymentFlowMachine`**, subscribe to execution state with **`useExecutionState`** (from `colada/react`). It wraps the machine’s `subscribe` / `inspect` API with `useSyncExternalStore` so UI stays in sync.
-
-```tsx
-import { useExecutionState, usePaymentFlowMachine } from 'colada/react';
-
-const machine = usePaymentFlowMachine({ walletContext, unit });
-const { isExecuting } = useExecutionState(machine);
-```
-
-**`isExecuting`** is the flag you use for **global** loading while the machine is doing work: spinners on amount/mint routes, disabling rows in mint lists, blocking double-taps while navigation or async **operations** run.
-
-**When it is `true` (typical):**
-
-- The machine is awaiting an **async step handler** (e.g. router navigation) for a step that is **not** treated as pure “user typing” input.
-- **`operations`** are in flight (`executeSend`, `executeMintQuote`, `buildMintListItems`) — the machine sets executing for the duration.
-
-**When it stays `false` during handler work:** Steps like **`enterAmount`**, **`selectMint`**, **`chooseOption`**, and **`chooseProofs`** are **input** steps — the machine does **not** flip the global executing flag while their handlers run, so you do not get a full-screen spinner while the user is entering an amount or picking options (per `INPUT_STEPS` in the implementation).
-
-**What else is on the snapshot:** `useExecutionState` returns the full **`ExecutionState`** (`status`, `code`, `step`, `isExecutable`, `message`, `isExecuting`, …). Use `isExecuting` for loading chrome; use `status` / `message` if you need to reflect blocked or needs-input states in the same component.
-
-**Not the same as screen actions:** Terminal/detail screens driven by **`useScreenActions`** use **`actions.<name>.loading`** per button (copy, pay, etc.). Use **`isExecuting`** only for **flow-machine** screens and shared UI (popups, sheets) that hold a **`machine`** reference.
-
-## Minimal pseudocode
-
-**App root**
-
-```tsx
-<ColadaProvider
-  handlers={walletStepHandlers}
-  engine={{
-    operations: walletOperations,
-  }}
-  callbacks={{
-    notifications: walletNotifications,
-    actions: walletActions,
-  }}
-  savePreferredMint={(mintUrl) => mintStore.setSelectedMint(pubkey, mintUrl)}
-  saveNpcMint={async (mintUrl) => {
-    await npcMintStore.updateServerMint(mintUrl, privateKey);
-  }}
-  onNpcMintSync={async () => npcMintStore.syncFromServer(manager)}
-  clipboardSource={() => Clipboard.getStringAsync()}
-  shareSource={(payload) => Share.share(payload)}
-  cameraPermissionsSource={() => Camera.requestCameraPermissionsAsync()}
-  imagePickerSource={() => ImagePicker.launchImageLibraryAsync(/* … */)}>
-  <App />
-</ColadaProvider>
-```
-
-**Terminal screen**
-
-```tsx
-function SendTokenScreen({ sendHistoryEntry }) {
-  const { entry, error, actions } = useScreenActions('sendToken', sendHistoryEntry);
-
-  if (error) return <ErrorState message={error} />;
-  if (!entry) return <LoadingState />;
-
+export function AppRoot() {
   return (
-    <>
-      <HistoryDetails entry={entry} />
-      <ButtonHandler
-        buttons={[
-          {
-            text: 'Copy',
-            onPress: () => actions.copy.execute(),
-            condition: actions.copy.available,
-          },
-          // …
-        ]}
-      />
-    </>
+    <ColadaProvider
+      handlers={() => createHandlers()}
+      operations={walletOperations}
+      notifications={walletNotifications}
+      actions={walletScreenActions}
+      clipboardAdapter={clipboardAdapter}
+      shareAdapter={shareAdapter}
+      imagePickerAdapter={imagePickerAdapter}
+      chainAdapter={chainAdapter}
+      navigation={{ goBack: () => router.back(), scanQr: openScanner }}
+    >
+      <App />
+    </ColadaProvider>
   );
+}
+
+export function SendEntryScreen({ walletContext }: { walletContext: WalletContext }) {
+  const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+
+  return <Button title="Paste or scan" onPress={() => machine.scan(undefined, { source: 'paste' })} />;
 }
 ```
 
-## Related implementation files
+## Provider API
 
-For aligning code with this guide:
+`ColadaProvider` is mounted once with flat props. There is no grouped
+`engine`, `callbacks`, `runtime`, or `platform` prop in the shipped React API.
 
-- `src/react/ColadaProvider.tsx` — root provider (flat props); nested-config API removed
-- `src/react/useExecutionState.ts` — subscribe to `ExecutionState` (`isExecuting`, …)
-- `src/react/useScreenActions.ts` — **`useScreenActions(screenType, entryParam)`**; reads handlers + optional **`screenActionsBridge`** from context; **`useScreenActionsWithConfig`** for advanced/tests
-- `src/react/screenActionsBridge.ts` — **`ScreenActionsBridge`** type for wallet injection
-- `src/machine/createMachine.ts` — `createPaymentMachine`
-- `src/screen-actions/*` — action manager, availability, types
+Important props:
 
-In **Sovran**, **`features/send/providers/Colada.tsx`** composes **`ColadaProvider`** with handlers, operations, persistence, **`actions`**, and **`screenActionsBridge`** (manager, Nostr DM helper, camera permission, history/melt subscriptions, entry decoration, scan provenance). Screens import **`useScreenActions`** from **`colada/react`** only—no app-level wrapper hook. The amount flow passes a **third** argument **`{ amountConfig }`** for **`amountEntry`**.
+| Prop | Purpose |
+| --- | --- |
+| `handlers` | Factory called with the `PaymentMachine`; returns `StepHandlerMap` navigation handlers. |
+| `instance` | Optional `createColada()` instance for framework-agnostic operation/context reuse. |
+| `operations` | Wallet I/O the machine can run internally, such as send, receive, melt, mint quote, mint review, status checks, rollback, Nostr DM, and recipient profile lookup. |
+| `notifications` | Optional named callbacks for UX and lifecycle events. Missing handlers are no-ops. |
+| `actions` | Wallet overrides for predefined `useScreenActions` actions. Defaults cover navigation, operations, copy, and share where possible. |
+| `screenActionsBridge` | App-owned bridge for extra action context, subscription binding, entry merge rules, decoration, locale, and source labels. |
+| `getOffline`, `getBtcPrice`, `getDisplayCurrency`, `getLocale` | Runtime getters read through refs so long-lived handlers see fresh values. |
+| `translations`, `paymentCopyOverrides` | Copy/i18n extensions for payment-state text. |
+| `clipboardAdapter`, `shareAdapter`, `cameraAdapter`, `imagePickerAdapter`, `hapticsAdapter`, `notificationsAdapter`, `nostrAdapter`, `bleAdapter`, `nfcAdapter`, `chainAdapter`, `storageAdapter`, `secureStorageAdapter`, `qrEncoderAdapter`, `qrDecoderAdapter`, `clockAdapter`, `randomAdapter`, `loggerAdapter` | JSON-shaped native/platform seams. |
+| `scanSources` | Optional explicit scan-source map. When omitted, clipboard and image-picker adapters derive default sources. |
+| `deepLinks` | Reactive deep-link input and scheme filtering. Accepted Cashu links are scanned by the machine. |
+| `navigation` | Default screen-action navigation callbacks such as `goBack`, `scanQr`, `mintInfo`, and `addMint`. |
+
+Flat provider props win over values carried by `instance`.
+
+## Nostr GraphQL Enrichment
+
+Colada stays backend-agnostic for Nostr-indexed mint data. Pass
+`nostrGraphqlEndpoint` to `createColada()` when the wallet has an indexer that
+serves the generic Nostr GraphQL schema:
+
+```ts
+const instance = createColada({
+  manager,
+  nostrGraphqlEndpoint: 'https://nostr-index.example.com/graphql',
+});
+```
+
+With that URL, Colada's default operations can resolve mint operator kind-0
+profiles and mint review events through `events(input:)` and
+`pubkeyEvents(kinds: [0])`. Wallets can still override the behavior by passing
+`resolveMintContactProfile` or `fetchMintReviews` directly.
+
+## Cashu Seed Helpers
+
+Colada exports wallet seed helpers for Coco `seedGetter` setup:
+
+- `generateCashuMnemonic()` creates a standard 12-word BIP-39 mnemonic.
+- `deriveStandardCashuSeed(mnemonic)` returns the standard 64-byte BIP-39 seed.
+- `createCashuSeedGetter({ getMnemonic })` returns a lazy Coco-compatible
+  `() => Promise<Uint8Array>`.
+
+Use the default path when a wallet stores a Cashu mnemonic directly:
+
+```ts
+const seedGetter = createCashuSeedGetter({
+  getMnemonic: () => loadCashuMnemonic(),
+});
+```
+
+Apps with frozen custom derivation can keep that derivation app-owned by
+passing `deriveSeed`. The callback receives a normalized, validated BIP-39
+mnemonic and must return the 64-byte seed Coco expects.
+
+```ts
+const seedGetter = createCashuSeedGetter({
+  getMnemonic: () => loadRootMnemonic(),
+  deriveSeed: (rootMnemonic) => deriveSeedForProfile(rootMnemonic, accountIndex),
+});
+```
+
+Optional `cache.load` and `cache.store` hooks let apps keep expensive PBKDF2 or
+custom derivation out of the hot path without moving secret storage into Colada.
+
+## Flow Machine
+
+`usePaymentFlowMachine({ walletContext, unit })` binds the current screen's
+wallet context to the provider-owned machine and returns a stable
+`PaymentMachine`.
+
+Use the machine for multi-step flows:
+
+- scan/paste/deep link
+- choose payment option
+- enter amount
+- select mint
+- choose proofs
+- confirm send
+- create mint quote
+- open mint review
+- navigate to receive
+- dismiss/error handling
+
+Handlers should only move the user to the screen described by the step payload.
+They should not redo balance, mint, payment-method, offline, or parser logic
+that the machine has already resolved.
+
+Operations should perform wallet I/O and return facts to the machine. They
+should not navigate.
+
+Notifications should present or record side effects. Missing notification
+handlers must be treated as intentional no-ops.
+
+## Screen Actions
+
+`useScreenActions(screenType, entryParam)` is for terminal/detail screens that
+already have one entry. It returns:
+
+- `entry`: parsed and optionally decorated entry
+- `error`: entry parsing or missing-entry error
+- `actions`: bound action objects with `available`, `loading`, `reason`,
+  optional `variants`, and `execute(params?)`
+- `mintUrl`: raw mint URL when present
+- `source`: scan provenance label when the bridge provides one
+- `suggestions`: amount suggestions for `amountEntry`
+
+`amountEntry` may pass a third argument with `{ amountConfig }`. When omitted,
+the provider derives the amount config from wallet context and runtime getters.
+
+Current screen-action contract:
+
+| Screen type | Actions |
+| --- | --- |
+| `sendToken` | `copy`, `share`, `nfc`, `checkStatus`, `cancel`, `back` |
+| `receiveToken` | `redeem`, `back` |
+| `mintQuote` | `copy`, `share`, `back` |
+| `meltQuote` | `pay`, `cancel`, `back` |
+| `paymentRequest` | `confirm`, `cancel`, `back` |
+| `receive` | `copy`, `share`, `paste`, `fixedAmount`, `scanQr`, `changeNpcMint`, `back` |
+| `mintInfo` | `trust`, `copy`, `share`, `back` |
+| `amountEntry` | `setInput`, `toggle`, `next`, `paste`, `scanQr`, `cancel`, `back` |
+| `mintSelector` | `select`, `getInfo`, `addMint`, `cancel`, `back` |
+
+`back` is always part of the action surface so dead-end screens have a
+non-destructive exit. `cancel` remains available only on screens where it has a
+distinct operation or flow meaning.
+
+Emoji token copy is a `sendToken.copy` variant with `variantId: 'emoji'`.
+There is no sibling emoji-copy runtime action.
+
+Frameworks that are not React should use `createScreenActionSession()`. A
+session owns entry parsing, subscription-driven entry updates, merge/decorate
+rules, source refreshes, action inspection, action execution, and disposal. It
+exposes `inspect()`, `subscribe()`, `execute(action, params?)`, `setEntry()`,
+`setEntrySeed()`, and `dispose()`. React's `useScreenActions()` is only an
+adapter around that session via `useSyncExternalStore`.
+
+`screenActionsBridge` remains app-owned. It can publish from stores/native
+sources into Colada's bus and provide entry update mapping, merge rules,
+decoration, locale, source labels, and extra action context without depending on
+React.
+
+## Copy And Localization
+
+Use `createPaymentCopyResolver`, `resolvePaymentCopy`, `getPaymentCopy`,
+`registerPaymentCopyLocale`, and `paymentCopyOverrides` for payment-state text.
+
+Apps may override individual copy keys, but default payment copy belongs in
+Colada. New payment states should declare copy keys beside the state/action
+logic instead of adding app-screen strings.
+
+## Subscription Bus
+
+`createSubscriptionBus()` exposes:
+
+- `subscribe(filter, listener)`
+- `subscribeAll(listener)`
+- `publish(event)`
+
+React consumers can use `useColadaSubscriptions()`.
+
+Events are JSON-shaped and typed by `ColadaSubscriptionEvent`, including
+`history.updated`, `melt.updated`, `mint.updated`, receive mint/key changes,
+mint-info enrichment/fetch events, mint-selector additions, and
+`screenActions.changed`.
+
+Screens should subscribe through the bus or through `screenActionsBridge`.
+They should not each invent custom polling hooks for payment detail updates.
+
+## Chain Helpers
+
+The default chain implementation is `defaultChainAdapter`, backed by
+`createMempoolSpaceChainAdapter()`.
+
+Framework-agnostic helpers include:
+
+- `fetchMempoolAddressStats`
+- `summarizeMempoolAddress`
+- `getOnchainConfirmationProgress`
+- `getOnchainConfirmationInfo`
+- `MempoolAddressStatsSchema`
+
+The `ChainAdapter` contract covers fees, address transactions, address summary,
+transaction status, broadcast, and optional address subscriptions. Apps can
+replace mempool.space with Esplora, Electrum, or a local node by implementing
+the same adapter shape.
+
+## Mint Method Capabilities
+
+Mint payment-method support is explicit. Colada derives support from NUT-04
+and NUT-05 method-unit metadata via:
+
+- `deriveMintMethodSupportFromInfo`
+- `deriveMintMethodCapabilityMapFromTrustedMints`
+- `getMintMethodCapability`
+- `evaluateMintMethodAmountAvailability`
+
+Missing method-unit metadata is treated as unsupported for that mint, method,
+and unit. There is no implicit `bolt11`/`sat` compatibility fallback for a
+mint that did not advertise the method.
+
+If a payment method is not implemented by Colada, its variant stays disabled
+with a concrete reason instead of pretending the path can execute.
+
+## File Map
+
+- `src/adapters/`: JSON-shaped native/platform contracts.
+- `src/react/ColadaProvider.tsx`: provider, context, flat prop API, deep-link
+  processing, scan-source derivation, and React hooks.
+- `src/machine/`: framework-agnostic payment machine, flow modules, transition
+  helpers, and operation/notification types.
+- `src/screen-actions/`: action contracts, availability rules, default
+  handlers, and entry decoration/merge helpers.
+- `src/copy/`: payment copy catalog, locale registration, and resolver.
+- `src/subscriptions/`: typed event bus.
+- `src/chain/`: mempool.space adapter and onchain confirmation helpers.
+- `src/history/`: payment-state predicates, timelines, labels, and warnings.
+- `src/mint-capabilities.ts`: method-unit capability derivation and guards.
+- `src/amount-actions/`: amount-entry state, fiat/sat conversion, suggestions,
+  and offline proof composition support.
+
+## Working Rules
+
+- Prefer root imports from `colada` for framework-agnostic helpers and
+  `colada/react` for React hooks.
+- Keep app screens declarative: render the step or entry Colada hands back.
+- Put native/platform dependencies behind adapters.
+- Put app-specific entry enrichment in `screenActionsBridge`.
+- Add payment-state strings to the copy catalog, not to app screens.
+- Add subscription updates to the typed bus, not per-screen watchers.
+- Do not keep dual API shapes or retired sibling actions for previous app code;
+  update the one consumer and delete the retired path.

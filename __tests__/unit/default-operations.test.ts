@@ -14,7 +14,6 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { Amount } from '@cashu/cashu-ts';
 import type { Manager } from '@cashu/coco-core';
 import { createDefaultOperations } from '../../src/operations/defaultOperations';
 
@@ -25,6 +24,7 @@ const MINT1 = 'https://mint1.example.com';
 interface MockManagerOverrides {
   history?: Record<string, unknown>;
   wallet?: Record<string, unknown>;
+  mint?: Record<string, unknown>;
   ops?: {
     send?: Record<string, unknown>;
     mint?: Record<string, unknown>;
@@ -59,6 +59,8 @@ function createMockManager(overrides: MockManagerOverrides = {}) {
     mint: {
       addMint: vi.fn(),
       isTrustedMint: vi.fn().mockResolvedValue(true),
+      getMintInfo: vi.fn().mockResolvedValue({ name: 'Mock Mint' }),
+      ...overrides?.mint,
     },
     ops: {
       send: {
@@ -245,59 +247,103 @@ describe('executePaymentRequest — inband fallback', () => {
   });
 });
 
-describe('executeMintQuote — onchain', () => {
-  it('prepares a durable mint operation for reusable onchain receive quotes', async () => {
-    const address = 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080';
-    const quote = {
-      method: 'onchain',
-      quoteId: 'onchain-q-1',
-      request: address,
-      mintUrl: MINT1,
-      unit: 'sat',
-      createdAt: 1,
-      updatedAt: 2,
-      quoteData: {
-        amountPaid: Amount.from(0),
-        amountIssued: Amount.from(0),
-      },
-    };
-    const mintOp = {
-      id: 'op-onchain-1',
-      state: 'pending',
-      createdAt: 3,
-      updatedAt: 4,
-      mintUrl: MINT1,
-      unit: 'sat',
-      quoteId: quote.quoteId,
-      amount: Amount.from(123),
-      request: address,
-    };
-    const persistedEntry = {
-      id: `mint:${mintOp.id}`,
-      type: 'mint',
-      source: 'operation',
-      operationId: mintOp.id,
-      createdAt: mintOp.createdAt,
-      updatedAt: mintOp.updatedAt,
-      mintUrl: MINT1,
-      unit: 'sat',
-      quoteId: quote.quoteId,
-      state: 'pending',
-      amount: mintOp.amount,
-      paymentRequest: address,
-    };
+describe('buildMintReviewInfo — social enrichment', () => {
+  it('merges mint contact profile and aggregated reviews from callbacks', async () => {
+    const contactPubkey = 'a'.repeat(64);
     const mockManager = createMockManager({
-      history: {
-        getPaginatedHistory: vi.fn().mockResolvedValue([persistedEntry]),
+      mint: {
+        getMintInfo: vi.fn().mockResolvedValue({
+          name: 'Mint One',
+          icon_url: 'https://mint.example.com/icon.png',
+          contact: [{ method: 'nostr', info: contactPubkey }],
+        }),
       },
-      quotes: {
-        mint: {
-          create: vi.fn().mockResolvedValue(quote),
+      wallet: {
+        balances: {
+          byMint: vi.fn().mockResolvedValue({ [MINT1]: { total: 12 } }),
         },
       },
+    });
+    const resolveMintContactProfile = vi.fn().mockResolvedValue({
+      pubkey: contactPubkey,
+      displayName: 'Mint Operator',
+      picture: 'https://example.com/operator.png',
+      followers: 42,
+      score: 91.4,
+    });
+    const fetchMintReviews = vi.fn().mockResolvedValue({
+      mintUrl: MINT1,
+      score: 4.5,
+      recommendations: [
+        {
+          score: 5,
+          comment: 'fast',
+          pubkey: 'b'.repeat(64),
+          eventId: 'c'.repeat(64),
+          created_at: 1_710_000_000,
+          displayName: 'Reviewer',
+          picture: 'https://example.com/reviewer.png',
+        },
+      ],
+      lastUpdated: 1_710_000_000,
+      fromCache: true,
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      resolveMintContactProfile,
+      fetchMintReviews,
+    });
+
+    const info = await ops.buildMintReviewInfo!(MINT1);
+
+    expect(resolveMintContactProfile).toHaveBeenCalledWith(contactPubkey, MINT1);
+    expect(fetchMintReviews).toHaveBeenCalledWith(MINT1);
+    expect(info.contactProfile?.displayName).toBe('Mint Operator');
+    expect(info.contactFollowers).toBe(42);
+    expect(info.contactReputation).toBe(91);
+    expect(info.reviews?.recommendations[0]?.displayName).toBe('Reviewer');
+    expect(info.kymScore).toBe(4.5);
+    expect(info.reviewCount).toBe(1);
+  });
+
+  it('still returns mint info when enrichment callbacks fail', async () => {
+    const contactPubkey = 'a'.repeat(64);
+    const mockManager = createMockManager({
+      mint: {
+        getMintInfo: vi.fn().mockResolvedValue({
+          name: 'Mint One',
+          contact: [{ method: 'nostr', info: contactPubkey }],
+        }),
+      },
+      wallet: {
+        balances: {
+          byMint: vi.fn().mockResolvedValue({ [MINT1]: { total: 0 } }),
+        },
+      },
+    });
+
+    const ops = createDefaultOperations({
+      getManager: () => mockManager as unknown as Manager,
+      resolveMintContactProfile: vi.fn().mockRejectedValue(new Error('profile offline')),
+      fetchMintReviews: vi.fn().mockRejectedValue(new Error('reviews offline')),
+    });
+
+    const info = await ops.buildMintReviewInfo!(MINT1);
+
+    expect(info.mintUrl).toBe(MINT1);
+    expect(info.displayName).toBe('Mint One');
+    expect(info.contactProfile).toBeUndefined();
+    expect(info.reviews).toBeUndefined();
+  });
+});
+
+describe('executeMintQuote — onchain', () => {
+  it('reports onchain mint quotes as unsupported by the published Coco default manager', async () => {
+    const mockManager = createMockManager({
       ops: {
         mint: {
-          prepare: vi.fn().mockResolvedValue(mintOp),
+          prepare: vi.fn(),
         },
       },
     });
@@ -306,34 +352,10 @@ describe('executeMintQuote — onchain', () => {
       getManager: () => mockManager as unknown as Manager,
     });
 
-    const result = await ops.executeMintQuote!(MINT1, 123, 'sat', 'onchain');
-    const entry = JSON.parse(result.historyEntry);
+    await expect(ops.executeMintQuote!(MINT1, 123, 'sat', 'onchain')).rejects.toThrow(
+      'Onchain mint quotes are not supported by @cashu/coco-core 1.0.1'
+    );
 
-    expect(mockManager.quotes.mint.create).toHaveBeenCalledWith({
-      mintUrl: MINT1,
-      method: 'onchain',
-      unit: 'sat',
-    });
-    expect(mockManager.ops.mint.prepare).toHaveBeenCalledWith({
-      mintUrl: MINT1,
-      method: 'onchain',
-      quoteId: quote.quoteId,
-      amount: 123,
-      unit: 'sat',
-      methodData: {},
-    });
-    expect(entry).toMatchObject({
-      id: `mint:${mintOp.id}`,
-      type: 'mint',
-      source: 'operation',
-      operationId: mintOp.id,
-      quoteId: quote.quoteId,
-      paymentRequest: address,
-      metadata: {
-        method: 'onchain',
-        onchainAddress: address,
-        requestedAmount: '123',
-      },
-    });
+    expect(mockManager.ops.mint.prepare).not.toHaveBeenCalled();
   });
 });

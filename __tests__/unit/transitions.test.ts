@@ -421,7 +421,7 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
     expect(result.step).toBe('selectMint');
   });
 
-  it('keeps onchain receive intent and hides incompatible mints when reopening the mint selector', () => {
+  it('keeps onchain receive intent and disables all mints when reopening the mint selector', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 1000, [MINT2]: 0 },
@@ -450,7 +450,10 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
     expect(result.data).toMatchObject({
       mintQuoteMethod: 'onchain',
       methodRequirement: { operation: 'mint', method: 'onchain', unit: 'sat' },
-      candidates: [{ mintUrl: MINT2, status: 'available' }],
+      candidates: [
+        { mintUrl: MINT1, status: 'disabled' },
+        { mintUrl: MINT2, status: 'disabled' },
+      ],
     });
   });
 });
@@ -582,7 +585,7 @@ describe('transition — AMOUNT_ENTERED', () => {
     expect(result.context.meltTarget).toBe('user@example.com');
   });
 
-  it('opens a method-aware mint selector when onchain receive is selected on an incompatible mint', () => {
+  it('returns an error when onchain receive is selected on the default Coco manager', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 1000, [MINT2]: 0 },
@@ -626,16 +629,14 @@ describe('transition — AMOUNT_ENTERED', () => {
       wallet
     );
 
-    expect(result.step).toBe('selectMint');
+    expect(result.step).toBe('error');
     expect(result.data).toMatchObject({
-      destination: 'mintQuote',
-      mintQuoteMethod: 'onchain',
-      methodRequirement: { operation: 'mint', method: 'onchain', unit: 'sat' },
-      candidates: [{ mintUrl: MINT2, status: 'available' }],
+      code: 'NO_VALID_MINT',
+      message: 'onchain receive is not supported yet',
     });
   });
 
-  it('keeps the selected onchain receive mint despite advertised minimums', () => {
+  it('returns an error for onchain receive despite advertised minimums', () => {
     const wallet: WalletContext = {
       trustedMintUrls: [MINT1, MINT2],
       mintBalances: { [MINT1]: 0, [MINT2]: 0 },
@@ -679,12 +680,10 @@ describe('transition — AMOUNT_ENTERED', () => {
       wallet
     );
 
-    expect(result.step).toBe('createMintQuote');
+    expect(result.step).toBe('error');
     expect(result.data).toMatchObject({
-      mintUrl: MINT1,
-      amount: 500,
-      unit: 'sat',
-      method: 'onchain',
+      code: 'NO_VALID_MINT',
+      message: 'onchain receive is not supported yet',
     });
   });
 

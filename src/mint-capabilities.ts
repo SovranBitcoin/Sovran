@@ -66,14 +66,6 @@ function readCapability(
 
   const methods = settings?.methods;
   if (!Array.isArray(methods)) {
-    if (method === 'bolt11' && normalizedUnit === DEFAULT_UNIT) {
-      return {
-        ...base,
-        supported: true,
-        legacySatAllowed: true,
-        reason: `NUT-${nut} method-unit metadata is missing; allowing legacy sat flow`,
-      };
-    }
     return {
       ...base,
       supported: false,
@@ -125,18 +117,8 @@ export function deriveMintMethodCapabilityMapFromTrustedMints(
   );
 }
 
-function legacyCapability(requirement: MintMethodRequirement): MintMethodUnitCapability {
+function missingCapability(requirement: MintMethodRequirement): MintMethodUnitCapability {
   const unit = normalizeUnit(requirement.unit);
-  if (requirement.method === 'bolt11' && unit === DEFAULT_UNIT) {
-    return {
-      supported: true,
-      disabled: false,
-      method: requirement.method,
-      unit,
-      legacySatAllowed: true,
-      reason: `NUT method-unit metadata is missing; allowing legacy sat flow`,
-    };
-  }
   return {
     supported: false,
     disabled: false,
@@ -153,11 +135,11 @@ export function getMintMethodCapability(
 ): MintMethodUnitCapability {
   const support =
     ctx.mintMethodCapabilities?.[mintUrl]?.[requirement.operation]?.[requirement.method];
-  return support ?? legacyCapability(requirement);
+  return support ?? missingCapability(requirement);
 }
 
 export function isMethodImplemented(requirement: MintMethodRequirement): boolean {
-  if (requirement.operation === 'melt' && requirement.method === 'onchain') return false;
+  if (requirement.method === 'onchain') return false;
   return true;
 }
 

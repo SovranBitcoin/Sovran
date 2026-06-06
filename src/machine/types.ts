@@ -22,6 +22,7 @@ export type FlowStep =
   | 'enterAmount'
   | 'selectMint'
   | 'chooseProofs'
+  | 'enterSendMemo'
   | 'receiveToken'
   | 'confirmSend'
   | 'sendComplete'
@@ -131,8 +132,14 @@ export interface StepDataMap {
       roundUp: { amount: number } | null;
     };
   };
+  enterSendMemo: {
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    memo?: string;
+  };
   receiveToken: { token: string };
-  confirmSend: { mintUrl: string; amount: number };
+  confirmSend: { mintUrl: string; amount: number; memo?: string };
   sendComplete: {
     historyEntry: string;
     /** True when the token was created from local proofs without contacting the mint first. */
@@ -241,6 +248,17 @@ export interface FlowContext {
    */
   localProofSend?: boolean;
   /**
+   * Optional Cashu token memo. The cashu-ts Token type names this field
+   * `memo`; it is encoded into the token metadata when present.
+   */
+  memo?: string;
+  /**
+   * True once the optional send memo prompt has been answered or skipped.
+   * Needed because a skipped memo leaves `memo` undefined but must not prompt
+   * again before token creation.
+   */
+  sendMemoHandled?: boolean;
+  /**
    * True when an online app path reached the mint and got a mint-unreachable
    * failure. This is distinct from the whole wallet being offline.
    */
@@ -299,7 +317,8 @@ export type ExecutionState =
         | 'MINT_SELECTION_REQUIRED'
         | 'OPTION_SELECTION_REQUIRED'
         | 'FALLBACK_OPTION_REQUIRED'
-        | 'PROOF_SELECTION_REQUIRED';
+        | 'PROOF_SELECTION_REQUIRED'
+        | 'SEND_MEMO_REQUIRED';
       message: string;
       isExecutable: false;
       isExecuting: boolean;
@@ -369,6 +388,7 @@ export type FlowEvent =
       scope?: 'npc' | 'selected';
     }
   | { type: 'PROOFS_CHOSEN'; amount: number }
+  | { type: 'SEND_MEMO_SUBMITTED'; memo?: string }
   | { type: 'REQUEST_MINT_SELECTOR'; scope?: 'npc' | 'selected' }
   | {
       type: 'START_SEND_ECASH';
@@ -660,18 +680,23 @@ export type NotificationHandlerMap = {
  * createMintQuote, selectMint). When provided, the machine handles
  * success/failure routing and only dispatches external handlers for the
  * resulting navigation/UI step.
- *
- * Backward compatible: when omitted, external handlers receive the raw
- * action step data (old behavior).
  */
 export interface MachineOperations {
-  executeSend: (mintUrl: string, amount: number) => Promise<{ historyEntry: string }>;
+  executeSend: (
+    mintUrl: string,
+    amount: number,
+    memo?: string
+  ) => Promise<{ historyEntry: string }>;
   /**
    * Execute a send using only local proofs (no mint contact).
    * Used as an automatic fallback when the mint is offline but exact-match
    * proofs exist. Returns the same shape as executeSend.
    */
-  executeOfflineSend?: (mintUrl: string, amount: number) => Promise<{ historyEntry: string }>;
+  executeOfflineSend?: (
+    mintUrl: string,
+    amount: number,
+    memo?: string
+  ) => Promise<{ historyEntry: string }>;
   executeMintQuote: (
     mintUrl: string,
     amount: number,
@@ -908,6 +933,12 @@ export interface CreateMachineConfig {
    */
   getOffline?: () => boolean;
   /**
+   * When true, ecash sends pause after amount/mint selection and ask the
+   * consumer UI for an optional Cashu token memo before token creation.
+   * Defaults to false for backwards compatibility.
+   */
+  enableEcashSendMemo?: boolean;
+  /**
    * Returns the current locale for localized reason messages.
    * Defaults to 'en'.
    */
@@ -948,6 +979,8 @@ export interface PaymentMachine {
   chooseOption: (option: PaymentOption) => Promise<void>;
   /** User selected round-down or round-up amount from offline proof suggestions. */
   chooseProofs: (amount: number) => Promise<void>;
+  /** Submit or skip the optional ecash token memo prompt. */
+  submitSendMemo: (memo?: string) => Promise<void>;
   /** Select a mint. Without `destination`, continues the current flow with the new mint. */
   changeMint: (
     mintUrl: string,

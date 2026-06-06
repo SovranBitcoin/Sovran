@@ -136,13 +136,22 @@ export function createMockOperations(
 
   return {
     // executeSend: creates an ecash token and returns a history entry
-    executeSend: wrap('executeSend', async (_mintUrl, _amount) => ({
-      historyEntry: stubHistoryEntry({ type: 'send' }),
+    executeSend: wrap('executeSend', async (mintUrl, _amount, memo) => ({
+      historyEntry: stubHistoryEntry({
+        type: 'send',
+        mintUrl,
+        token: { mint: mintUrl, proofs: [], unit: 'sat', ...(memo ? { memo } : {}) },
+      }),
     })),
 
     // executeOfflineSend: creates an ecash token from exact local proofs.
-    executeOfflineSend: wrap('executeOfflineSend', async (_mintUrl, _amount) => ({
-      historyEntry: stubHistoryEntry({ type: 'send', offline: true }),
+    executeOfflineSend: wrap('executeOfflineSend', async (mintUrl, _amount, memo) => ({
+      historyEntry: stubHistoryEntry({
+        type: 'send',
+        mintUrl,
+        offline: true,
+        token: { mint: mintUrl, proofs: [], unit: 'sat', ...(memo ? { memo } : {}) },
+      }),
     })),
 
     // executeMintQuote: creates a Lightning invoice via the mint

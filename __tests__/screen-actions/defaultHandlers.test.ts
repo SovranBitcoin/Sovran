@@ -138,6 +138,29 @@ function createManager(
 // built-in copy/share targets
 // ---------------------------------------------------------------------------
 
+describe('back default handlers', () => {
+  const screens: ScreenType[] = [
+    'sendToken',
+    'receiveToken',
+    'mintQuote',
+    'meltQuote',
+    'paymentRequest',
+    'receive',
+    'mintInfo',
+    'amountEntry',
+    'mintSelector',
+  ];
+
+  it.each(screens)('%s delegates to navigation.goBack', async (screenType) => {
+    const { handlers, navigation } = createMockConfig();
+    const { mgr } = createManager(screenType, handlers, {});
+
+    await mgr.execute('back');
+
+    expect(navigation.goBack).toHaveBeenCalled();
+  });
+});
+
 describe('built-in copy/share targets', () => {
   it('labels mint quote clipboard copies as Lightning invoices', async () => {
     const writeClipboard = vi.fn(async () => {});
@@ -432,6 +455,23 @@ describe('receiveToken default handlers', () => {
       expect(ops.executeReceive).toHaveBeenCalled();
       expect(notifications.find((n) => n.event === 'onReceiveProcessing')).toBeTruthy();
       expect(notifications.find((n) => n.event === 'onReceiveConfirmed')).toBeTruthy();
+    });
+
+    it('redeems an entry whose token is only in metadata.rawToken (scan/paste)', async () => {
+      const { handlers, ops } = createMockConfig();
+      const rawToken = 'cashuBexampletoken';
+      const { mgr } = createManager('receiveToken', handlers, {
+        id: 'receive-preview-2',
+        type: 'receive',
+        mintUrl: MINT1,
+        amount: 1,
+        unit: 'sat',
+        metadata: { rawToken },
+      });
+
+      await mgr.execute('redeem');
+
+      expect(ops.executeReceive).toHaveBeenCalledWith(rawToken, MINT1, 1);
     });
 
     it('notification sequence: onReceiveProcessing → onReceiveConfirmed → onTransactionCreated', async () => {
@@ -831,6 +871,16 @@ describe('mintSelector default handlers', () => {
       expect(navigation.addMint).toHaveBeenCalled();
     });
   });
+
+  describe('cancel', () => {
+    it('calls navigation.goBack', async () => {
+      const { handlers, navigation } = createMockConfig();
+      const { mgr } = createManager('mintSelector', handlers, {});
+
+      await mgr.execute('cancel');
+      expect(navigation.goBack).toHaveBeenCalled();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -838,6 +888,18 @@ describe('mintSelector default handlers', () => {
 // ---------------------------------------------------------------------------
 
 describe('amountEntry default handlers', () => {
+  describe('cancel', () => {
+    it('calls navigation.goBack', async () => {
+      const { handlers, navigation } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        destination: 'sendEcash',
+      });
+
+      await mgr.execute('cancel');
+      expect(navigation.goBack).toHaveBeenCalled();
+    });
+  });
+
   describe('next', () => {
     it('delegates to machine.enterAmount', async () => {
       const { handlers, machine } = createMockConfig();
@@ -981,7 +1043,7 @@ describe('amountEntry default handlers', () => {
       });
     });
 
-    it('enters onchain receive even when the selected mint advertises a higher minimum', async () => {
+    it('does not enter unsupported onchain receive from the default next handler', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
         effectiveSatAmount: 500,
@@ -1011,16 +1073,10 @@ describe('amountEntry default handlers', () => {
 
       await mgr.execute('next', { variantId: 'onchain' });
 
-      expect(machine.enterAmount).toHaveBeenCalledWith(500, MINT1, {
-        destination: 'mintQuote',
-        mintQuoteMethod: 'onchain',
-        meltTarget: undefined,
-        recipientPubkey: undefined,
-        amountEntryDisplay: expect.any(Object),
-      });
+      expect(machine.enterAmount).not.toHaveBeenCalled();
     });
 
-    it('enters onchain receive when a trusted alternate satisfies the amount', async () => {
+    it('does not enter unsupported onchain receive even when an alternate advertises it', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
         effectiveSatAmount: 500,
@@ -1058,13 +1114,7 @@ describe('amountEntry default handlers', () => {
 
       await mgr.execute('next', { variantId: 'onchain' });
 
-      expect(machine.enterAmount).toHaveBeenCalledWith(500, MINT1, {
-        destination: 'mintQuote',
-        mintQuoteMethod: 'onchain',
-        meltTarget: undefined,
-        recipientPubkey: undefined,
-        amountEntryDisplay: expect.any(Object),
-      });
+      expect(machine.enterAmount).not.toHaveBeenCalled();
     });
 
     it('does nothing when effectiveSatAmount is 0', async () => {
@@ -1102,7 +1152,17 @@ describe('amountEntry default handlers', () => {
       expect(machine.scan).toHaveBeenCalled();
     });
 
-    it('does nothing for non-sendEcash destinations', async () => {
+    it('delegates to machine.scan for meltQuote', async () => {
+      const { handlers, machine } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        destination: 'meltQuote',
+      });
+
+      await mgr.execute('paste');
+      expect(machine.scan).toHaveBeenCalled();
+    });
+
+    it('does nothing for receive destinations', async () => {
       const { handlers, machine } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
         destination: 'mintQuote',
@@ -1125,7 +1185,18 @@ describe('amountEntry default handlers', () => {
       expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'amount' });
     });
 
-    it('does nothing for non-sendEcash destinations', async () => {
+    it('calls navigation.scanQr for meltQuote', async () => {
+      const { handlers, navigation } = createMockConfig();
+      const { mgr } = createManager('amountEntry', handlers, {
+        destination: 'meltQuote',
+        unit: 'sat',
+      });
+
+      await mgr.execute('scanQr');
+      expect(navigation.scanQr).toHaveBeenCalledWith({ unit: 'sat', context: 'amount' });
+    });
+
+    it('does nothing for receive destinations', async () => {
       const { handlers, navigation } = createMockConfig();
       const { mgr } = createManager('amountEntry', handlers, {
         destination: 'mintQuote',

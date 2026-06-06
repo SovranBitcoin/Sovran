@@ -184,6 +184,69 @@ describe('ecash send — table-driven scenarios', () => {
   });
 });
 
+describe('ecash send — optional memo flow', () => {
+  it('pauses before token creation and passes the trimmed memo to executeSend when enabled', async () => {
+    const tm = createTestMachine({
+      wallet: WALLETS.noExactProofs,
+      enableEcashSendMemo: true,
+    });
+
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+
+    tm.assertStep('enterSendMemo');
+    expect(tm.operationCalls.some((call) => call.name === 'executeSend')).toBe(false);
+
+    await tm.machine.submitSendMemo('  lunch  ');
+
+    tm.assertStep('sendComplete');
+    const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
+    expect(sendCall?.args).toEqual([MINT1, 100, 'lunch']);
+    const entry = JSON.parse(
+      (sendCall?.result as { historyEntry: string }).historyEntry
+    ) as { token?: { memo?: string } };
+    expect(entry.token?.memo).toBe('lunch');
+    tm.assertContext({ memo: 'lunch', sendMemoHandled: true });
+  });
+
+  it('treats a blank memo as skipped', async () => {
+    const tm = createTestMachine({
+      wallet: WALLETS.noExactProofs,
+      enableEcashSendMemo: true,
+    });
+
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+    await tm.machine.submitSendMemo('   ');
+
+    tm.assertStep('sendComplete');
+    const sendCall = tm.operationCalls.find((call) => call.name === 'executeSend');
+    expect(sendCall?.args).toEqual([MINT1, 100]);
+    tm.assertContext({ sendMemoHandled: true });
+    expect(tm.machine.getContext().memo).toBeUndefined();
+  });
+
+  it('asks for a memo after offline proof fallback selection before creating the token', async () => {
+    const tm = createTestMachine({
+      wallet: WALLETS.noExactProofs,
+      offline: true,
+      enableEcashSendMemo: true,
+    });
+
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+    tm.assertStep('chooseProofs');
+
+    await tm.machine.chooseProofs(96);
+    tm.assertStep('enterSendMemo');
+
+    await tm.machine.submitSendMemo('offline handoff');
+    tm.assertStep('sendComplete');
+    const offlineCall = tm.operationCalls.find((call) => call.name === 'executeOfflineSend');
+    expect(offlineCall?.args).toEqual([MINT1, 96, 'offline handoff']);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Proof selection flow
 // ---------------------------------------------------------------------------
