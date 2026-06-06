@@ -1,4 +1,4 @@
-import { createNaggClient, NaggUnknownDataSchema, type NaggError } from 'nagg-ts';
+import { createNaggClient, NaggUnknownDataSchema, type NaggError } from '@sovranbitcoin/nagg-ts';
 import { z } from 'zod';
 import type { RequestControls } from './safeFetch';
 import type { MintContactProfile, MintReviewRecommendation, MintReviewsSummary } from './types';
