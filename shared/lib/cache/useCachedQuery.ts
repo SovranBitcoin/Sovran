@@ -23,7 +23,10 @@ export interface UseCachedQueryArgs<TData> {
   /** Viewer pubkey stored on the entry (`''` for host-scoped). */
   viewerKey: string;
   /** Performs the network fetch. `refresh` true bypasses the server cache. */
-  fetcher: (args: { refresh: boolean; signal: AbortSignal }) => Promise<{ data: TData; cursor?: string }>;
+  fetcher: (args: {
+    refresh: boolean;
+    signal: AbortSignal;
+  }) => Promise<{ data: TData; cursor?: string }>;
   /** Optional schema; a parse failure treats the cached entry as a miss. */
   dataSchema?: z.ZodType<unknown>;
   enabled?: boolean;
@@ -38,7 +41,9 @@ export interface UseCachedQueryResult<TData> {
   refresh: () => void;
 }
 
-export function useCachedQuery<TData>(args: UseCachedQueryArgs<TData>): UseCachedQueryResult<TData> {
+export function useCachedQuery<TData>(
+  args: UseCachedQueryArgs<TData>
+): UseCachedQueryResult<TData> {
   const { store, key, viewerKey, fetcher, dataSchema, enabled = true } = args;
 
   const entry = store.use((s) => (key ? s.byKey[key] : undefined));
@@ -64,7 +69,12 @@ export function useCachedQuery<TData>(args: UseCachedQueryArgs<TData>): UseCache
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        await store.run(key, () => fetcher({ refresh, signal: controller.signal }), viewerKey, refresh);
+        await store.run(
+          key,
+          () => fetcher({ refresh, signal: controller.signal }),
+          viewerKey,
+          refresh
+        );
         if (!controller.signal.aborted) {
           setStatus('success');
           setError(null);

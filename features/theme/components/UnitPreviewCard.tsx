@@ -93,15 +93,16 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
         ? { uri: remoteThumb }
         : null;
   const hasImageSource = !!imageSource;
-  const sourceKind = useDownloadedUri || hasDownloaded
-    ? 'downloaded-file'
-    : useBundledImage
-      ? 'bundled-require'
-      : remoteThumb
-        ? 'remote-thumb'
-        : hasPalette
-          ? 'palette-gradient'
-          : 'solid-fallback';
+  const sourceKind =
+    useDownloadedUri || hasDownloaded
+      ? 'downloaded-file'
+      : useBundledImage
+        ? 'bundled-require'
+        : remoteThumb
+          ? 'remote-thumb'
+          : hasPalette
+            ? 'palette-gradient'
+            : 'solid-fallback';
 
   useEffect(() => {
     if (rawThumbUrl?.trim() && !remoteThumb) {

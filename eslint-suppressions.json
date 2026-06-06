@@ -1,4 +1,9 @@
 {
+  "__tests__/naggFeedClient.test.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
   "app/(drawer)/(tabs)/_layout.tsx": {
     "no-restricted-syntax": {
       "count": 4
@@ -17,9 +22,6 @@
   "assets/icons/index.tsx": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
-    },
-    "no-restricted-imports": {
-      "count": 1
     }
   },
   "config/modalScreens.ts": {
@@ -27,9 +29,19 @@
       "count": 1
     }
   },
+  "features/ai/components/AiMessageBubble.tsx": {
+    "unused-imports/no-unused-imports": {
+      "count": 1
+    }
+  },
   "features/ai/hooks/useAiSend.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 6
+    }
+  },
+  "features/contacts/components/SearchPostsList.tsx": {
+    "react/display-name": {
+      "count": 1
     }
   },
   "features/feed/components/nostr/MetricsFooter.tsx": {
@@ -70,6 +82,11 @@
       "count": 3
     }
   },
+  "features/feed/screens/NotificationsScreen.tsx": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
   "features/map/screens/MapScreen.tsx": {
     "no-restricted-syntax": {
       "count": 1
@@ -106,11 +123,6 @@
     }
   },
   "features/onboarding/components/types.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
-  "features/payments/lib/decryptNip04Events.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
