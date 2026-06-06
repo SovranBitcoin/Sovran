@@ -1,0 +1,55 @@
+---
+description: Invariants that keep profile switching crash-safe and leak-free. Read before changing the profile orchestrator, CocoManager teardown, app restart, or any pubkey-scoped cache.
+globs:
+  - shared/lib/profile/profileSessionOrchestrator.ts
+  - shared/lib/profile/appRestart.ts
+  - shared/lib/cashu/manager.ts
+  - shared/lib/cache/createPubkeyScopedCache.ts
+alwaysApply: false
+---
+
+# Profile switch teardown
+
+Switching profiles is **restart-based**, not in-process. Verified crash-safe and
+leak-free as of 2026-06; keep it that way.
+
+## How a switch works
+
+`switchToExistingProfile` (`profileSessionOrchestrator.ts`):
+1. Refuses to start unless `CocoManager.isReadyForCleanup()` (no pending
+   init/cleanup, no background run) — a busy manager blocks the switch with a
+   "wallet still loading" popup rather than racing teardown.
+2. `await CocoManager.cleanup()` — disables watchers, `dispose()`s, and
+   **closes the SQLite connection** (`db.closeAsync()`), then clears the
+   instance + sensitive runtime state.
+3. `switchProfile(index)` → `flushProfileStoreToDisk()` → `restartApp()`.
+
+`restartApp` (`appRestart.ts`): production `RNRestart.restart()` (full native
+restart), dev `DevSettings.reload()` (JS reload), `Updates.reloadAsync()`
+fallback.
+
+## Why it's safe — do not "fix" these with redundant code
+
+- **No DB lock.** Production fully restarts the process (the OS releases SQLite).
+  The dev JS-reload keeps the native process alive, which is exactly why
+  `cleanup()` MUST close the DB before restart — it does. Keep that close in
+  place and awaited.
+- **No cross-profile data leak.** `nip04Cache` / `giftWrapCache` are scoped by
+  the **viewer** pubkey (`get(viewerPubkey, …)`), so profile B reads its own
+  scope; profile A's on-disk blobs stay under A's pubkey and are never read by B.
+  The JS teardown on restart resets the in-memory `scopes` map. This is why
+  `createPubkeyScopedCache.evictFromMemory` is intentionally NOT wired into the
+  switch today (see its TODO) — adding it now is dead code.
+- **`nostrMetadataCache` is global/host-scoped on purpose.** kind-0 metadata is
+  public and identical for every viewer, so sharing it across profiles is
+  correct, not a leak. (Mock fixture identities are the one exception — purged by
+  `purgeFixtureMetadata` when mock mode is off; see the mock store.)
+
+## Rules
+
+- Never make profile switch in-process without first wiring `clear()` /
+  `evictFromMemory` on every pubkey-scoped cache (the restart is what makes
+  skipping that safe today).
+- Keep `cleanup()`'s SQLite close awaited and before `restartApp()`.
+- Don't add cache-clearing on switch "to be safe" — it's redundant with the
+  restart and the per-viewer scoping. Add it only when in-process switching lands.
