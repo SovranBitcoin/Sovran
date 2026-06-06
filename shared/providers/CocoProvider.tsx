@@ -35,8 +35,16 @@ async function initializeDefaultMints(manager: Manager): Promise<void> {
   try {
     log.info('coco.init_default_mints');
 
-    const defaultMints = ['https://mint.sovran.money', 'https://mint.minibits.cash/Bitcoin'];
-    const defaultSelectedMint = 'https://mint.minibits.cash/Bitcoin';
+    // Default mint set installed on first run. Mirrors numo's curated list
+    // (minibits + chorus + cubabitcoin) plus our own mint.sovran.money, but
+    // deliberately excludes coinos. Sovran's own mint is the default selection.
+    const defaultMints = [
+      'https://mint.sovran.money',
+      'https://mint.minibits.cash/Bitcoin',
+      'https://mint.chorus.community',
+      'https://mint.cubabitcoin.org',
+    ];
+    const defaultSelectedMint = 'https://mint.sovran.money';
 
     for (const mintUrl of defaultMints) {
       try {

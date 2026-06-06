@@ -33,6 +33,17 @@ module.exports = ({ config }) => {
   // shared/lib/nostr/secureStorage.ts:getDebugMnemonicOverride.
   const debugMnemonic = buildProfile === 'development' ? process.env.DEBUG_MNEMONIC : undefined;
 
+  // Shared giveaway P2PK key. UNLIKE debugMnemonic this is injected for ALL
+  // build profiles: giveaway ecash is P2PK-locked to this key's public key and
+  // every shipped install must be able to redeem it. Sourced from the
+  // non-`EXPO_PUBLIC_` var so Expo never inlines it anywhere except this explicit
+  // `extra` entry; the wallet reads it via Constants.expoConfig.extra in
+  // shared/lib/cashu/manager.ts. SECURITY: a key embedded in the bundle is
+  // extractable by anyone who reverses a build — only use low-value, rotatable
+  // giveaway keys. Generate one with `node scripts/gen-giveaway-key.mjs`.
+  // See .cursor/rules/secure-storage-key-derivation.mdc.
+  const giveawayP2pkSecret = process.env.GIVEAWAY_P2PK_SECRET || undefined;
+
   // Spread the static config from app.json and override only what's needed
   return {
     ...config,
@@ -40,6 +51,7 @@ module.exports = ({ config }) => {
     extra: {
       ...config.extra,
       ...(debugMnemonic ? { debugMnemonic } : {}),
+      ...(giveawayP2pkSecret ? { giveawayP2pkSecret } : {}),
     },
     plugins: [...(config.plugins || []), 'expo-maps'],
     ios: {

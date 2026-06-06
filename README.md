@@ -117,7 +117,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
   - [x] **NIP-17 Private Direct Messages** — `kind 14` rumors sealed and gift-wrapped per NIP-59 (`kind 1059`), encrypted with NIP-44 v2
 - [x] **Relays & search**
   - [x] **NDK Mobile** — relay management via [`@nostr-dev-kit/ndk-mobile`](https://github.com/nostr-dev-kit/ndk-mobile)
-  - [x] **Nostr app-view** — Sovran-owned feed, profile, metrics, thread cache, and GraphQL endpoint for fast app views. The default deployment is Nagg, but Colada receives only the GraphQL URL.
+  - [x] **Nostr app-view** — Sovran-owned feed, profile, metrics, thread, notification, and DM-envelope queries served for fast app views. The default deployment is Nagg (self-hostable); the app queries it through the [`@sovranbitcoin/nagg-ts`](https://github.com/SovranBitcoin/nagg-ts) GraphQL client, with optimized REST app-view endpoints used where available (e.g. DM envelopes). nagg is zero-knowledge for DMs — it relays encrypted envelopes and never decrypts.
   - [x] **Vertex** — [Vertex](https://vertexlab.io) trust-ranked Nostr search and follower-graph reputation scores
   - [x] **Vertex credibility on rows** — reputation + followers shown inline on contact search and payment-recipient confirmations
 - [x] **`nostr-tools`** — low-level signing, encoding, NIP utilities
@@ -131,6 +131,11 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
   - [x] **Reposts (NIP-18, `kind 6`)** — share a `kind 1` text note to your own followers
   - [x] **Link parsing** — hyperlinks rendered with preview affordances
   - [x] **Image grid layout** — multi-image posts with adaptive grid
+  - [x] **Ignore post / person** — mute a note or author from the thread view; the feed reactively hides ignored content
+- [x] **Notifications & follows**
+  - [x] **Notifications tab** — likes, reposts, replies, mentions, and zaps with All / Mentions / App filters and a policy menu
+  - [x] **Follows & followers** — browse a profile's follow graph and open any entry
+- [x] **Unified cross-surface search** — one search box on Wallet, Contacts, and Feed with scope tabs (All / Contacts / Feed / Posts), aggregated results, and recents on an empty query
 
 ### AI
 
@@ -153,6 +158,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - [x] **Group chats over BLE** — multi-peer chats on the mesh
 - [x] **Geohash chat rooms** — public location-bound chat rooms keyed by geohash precision
 - [x] **Split-bill over BLE** — settle splits across nearby peers without any server in the path
+- [x] **Nut Drop (ecash over BLE)** — pay a nearby BitChat peer in Cashu ecash from a honeycomb peer picker. The token is broadcast as a single **public** mesh message so any unmodified nearby receiver can reassemble the full token; the amount screen warns that anyone nearby can claim it. A private mesh-DM path is gated on longer mesh-DM payloads.
 - [x] **BLE peer discovery in contacts** — nearby mesh peers appear in the contact list with mesh identity
 - [x] **Delivery acks** — delivered / failed delivery state on DMs
 - [x] **Profile-scoped BLE identity** — BLE peer identity is scoped to the active Sovran profile
@@ -233,6 +239,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 - [x] **Wallpaper-driven theming** — theme tints are derived from the user's chosen wallpaper via `react-native-image-colors`
 - [x] **Nostr wallpaper sharing** — wallpapers are published and discovered through Nostr; download-then-apply so themes never flip before the asset is ready
+- [x] **Hardened wallpaper pipeline** — remote thumbnail validation, per-URI palette fallback, and catalog/sprite/theme diagnostics with render-count + image-decode perf logs; the wallpaper background is memoized and skips the motion sensor on solid-colour themes
 - [x] **Light & dark theme** — full light theme parity across chrome and content
 - [x] **Liquid Glass** — `liquid-glass-text` native module for iOS 26 glassmorphism text
 - [x] **Capability variants** — Liquid Glass / blur / mesh gradient gracefully fall back on older OS versions
@@ -468,4 +475,4 @@ Sovran is licensed under the **Mozilla Public License 2.0**. See [`LICENSE`](./L
 
 ---
 
-Last reviewed: 2026-05-16. Capability claims cross-checked against `../bips`, `../cashu-ts`, `../coco`, `../nips`, `../nuts`, `../luds`, and Routstr sibling repos on this date.
+Last reviewed: 2026-06-06. Capability claims cross-checked against `../bips`, `../cashu-ts`, `../coco`, `../nips`, `../nuts`, `../luds`, and Routstr sibling repos on this date.

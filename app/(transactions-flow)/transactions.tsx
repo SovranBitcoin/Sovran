@@ -12,7 +12,8 @@
 
 import React, { useCallback } from 'react';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
 import { HistoryEntry, ReceiveHistoryEntry } from '@cashu/coco-core';

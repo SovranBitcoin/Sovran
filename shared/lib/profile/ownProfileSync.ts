@@ -17,7 +17,8 @@ export async function syncOwnProfiles(signal?: AbortSignal): Promise<void> {
   const profiles = useProfileStore.getState().profiles;
   if (profiles.length === 0) return;
 
-  const metadataEntries: Record<string, { displayName?: string; name?: string; picture?: string }> = {};
+  const metadataEntries: Record<string, { displayName?: string; name?: string; picture?: string }> =
+    {};
   let synced = 0;
 
   await Promise.all(

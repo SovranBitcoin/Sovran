@@ -10,7 +10,8 @@
 
 import React, { useCallback, useEffect } from 'react';
 import { Platform, ScrollView, useWindowDimensions } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import opacity from 'hex-color-opacity';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';

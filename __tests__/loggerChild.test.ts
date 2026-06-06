@@ -179,16 +179,27 @@ describe('logger redaction safety (audit 56.json F-001 / F-008 / F-012)', () => 
     });
     const dump = JSON.stringify(captured);
     expect(dump).not.toContain(privateKeyHex);
-    expect(captured[0].params!.publicKeyHex).toEqual({
-      _kind: 'base64',
-      len: 64,
-      preview: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…',
-    });
+    // A 64-char hex value is the 32-byte secp256k1 length; a public key and a
+    // private key are indistinguishable by value, so neither is ever previewed.
+    expect(captured[0].params!.publicKeyHex).toEqual({ _kind: 'hex32', len: 64 });
     expect(captured[0].params!.privateKeyHex).toEqual({ _kind: 'private_key', len: 64 });
     expect((captured[0].params!.nested as { secretKey: unknown }).secretKey).toEqual({
       _kind: 'private_key',
       len: 64,
     });
+  });
+
+  it('redacts a bare 64-hex private key in a non-sensitive field (no preview leak)', () => {
+    // Regression: a 32-byte private key logged under a generic field name was
+    // classified as base64/hex and previewed (first 32 chars = 128 bits of the
+    // key). It must now be a no-preview `hex32` secret.
+    const { log, captured } = captureLog();
+    const privKeyHex = '0123456789abcdef'.repeat(4); // 64 hex chars
+    log.warn('p2pk.import', { value: privKeyHex });
+    const dump = JSON.stringify(captured);
+    expect(dump).not.toContain(privKeyHex);
+    expect(dump).not.toContain(privKeyHex.slice(0, 32));
+    expect(captured[0].params!.value).toEqual({ _kind: 'hex32', len: 64 });
   });
 
   it('redacts nsec substrings inside Error messages and stacks', () => {

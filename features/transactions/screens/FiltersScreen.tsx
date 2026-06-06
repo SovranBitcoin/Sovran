@@ -5,7 +5,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useMints } from '@cashu/coco-react';
 import { z } from 'zod';

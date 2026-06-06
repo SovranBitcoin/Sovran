@@ -351,6 +351,25 @@ export const useSettingsStore = create<SettingsStore>()(
         name: 'settings-store',
         storage: AsyncStorage,
         schema: PersistedSettings,
+        // v1 -> v2: force every mock flag off. Mock mode (and its fixture
+        // identities Bob/Alice) must never persist into a shipped/updated
+        // install — it was leaking through after the toggle was disabled. This
+        // guarantees every existing install lands with mock OFF on the next
+        // launch, regardless of how it was turned on; afterHydrate then purges
+        // any fixture metadata that already leaked into the cache.
+        version: 2,
+        migrate: (state) => {
+          const persisted = (state ?? {}) as z.infer<typeof PersistedSettings>;
+          return {
+            ...persisted,
+            mockMode: false,
+            mockOffline: false,
+            mockFailSend: false,
+            mockFailMelt: false,
+            mockFailPaymentRequest: false,
+            mockNoGlass: false,
+          };
+        },
         partialize: (state) => ({
           language: state.language,
           displayBtc: state.displayBtc,
@@ -379,6 +398,13 @@ export const useSettingsStore = create<SettingsStore>()(
               useMockDataStore: { getState: () => { activate: () => void } };
             };
             useMockDataStore.getState().activate();
+          } else {
+            // Mock is off — scrub any fixture identities that leaked into the
+            // persisted Nostr metadata cache in a previous build.
+            const { purgeFixtureMetadata } = require('../runtime/mockDataStore') as {
+              purgeFixtureMetadata: () => void;
+            };
+            purgeFixtureMetadata();
           }
         },
       })

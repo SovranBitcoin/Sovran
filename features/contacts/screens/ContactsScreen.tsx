@@ -112,7 +112,7 @@ export const ContactsScreen = () => {
     displayContacts,
     contactPubkeys,
     conversations: dmConversations,
-    loading: contactsLoading,
+    hasLoadedOnce: contactsHasLoadedOnce,
     hasMore: hasMoreContacts,
     loadMore: loadMoreContacts,
   } = useNip17RecentContacts(nostrKeys);
@@ -124,14 +124,18 @@ export const ContactsScreen = () => {
   );
 
   // Single loading gate for the idle contacts list: show one centered spinner
-  // until the first DM-conversation + mint-info load settles, instead of the
-  // staggered per-source layout shifting. After the first settle the list owns
-  // its own pull-to-refresh; we never flash the spinner again.
+  // until the first DM-conversation fetch genuinely settles AND mint-info has
+  // loaded, instead of the staggered per-source layout shifting. We gate on the
+  // hook's `hasLoadedOnce` (not `!loading`) because `loading` starts false and
+  // only flips true once the fetch effect runs — gating on `!loading` hid the
+  // spinner on the first render and flashed cached mint rows before contacts
+  // arrived. After the first settle the list owns its own pull-to-refresh; we
+  // never flash the spinner again.
   const [contactsLoadedOnce, setContactsLoadedOnce] = useState(false);
   useEffect(() => {
-    if (!contactsLoading) setContactsLoadedOnce(true);
-  }, [contactsLoading]);
-  const showContactsSpinner = !contactsLoadedOnce && (contactsLoading || mintInfoLoading);
+    if (contactsHasLoadedOnce && !mintInfoLoading) setContactsLoadedOnce(true);
+  }, [contactsHasLoadedOnce, mintInfoLoading]);
+  const showContactsSpinner = !contactsLoadedOnce;
 
   // Pending White Noise (Marmot MLS) DM invites — surfaced as the 'Requests'
   // pill on the idle Contacts tab. The InviteReader (mounted by

@@ -12,7 +12,8 @@
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
-import { Stack, router, Link } from 'expo-router';
+import { Stack, Link } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useFocusEffect } from '@react-navigation/native';
 import { z } from 'zod';
 

@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
 import { PaymentRequestScreen } from '@/features/send';

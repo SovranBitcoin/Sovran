@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { wnLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';

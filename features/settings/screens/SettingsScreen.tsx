@@ -4,7 +4,8 @@ import { openExternalUrl } from '@/shared/lib/url';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
-import { router, type Href } from 'expo-router';
+import { type Href } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';

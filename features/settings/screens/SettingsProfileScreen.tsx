@@ -37,6 +37,7 @@ export const SettingsProfileScreen = () => {
   const { keys: nostrKeys, cashuMnemonic, isLoading: nostrKeysLoading } = useNostrKeysContext();
   const cashuMnemonicLoading = nostrKeysLoading;
   const mutedColor = useThemeColor('muted');
+  const dangerColor = useThemeColor('danger');
   const [visibleFields, setVisibleFields] = useState({
     mnemonic: false,
     nsec: false,
@@ -133,6 +134,30 @@ export const SettingsProfileScreen = () => {
         <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
           Profile Details
         </Text>
+
+        <Card
+          variant="secondary"
+          className="mb-4"
+          style={{
+            borderWidth: 1,
+            borderColor: dangerColor,
+            backgroundColor: opacity(dangerColor, 0.08),
+          }}>
+          <Card.Body className="flex-row items-start gap-3 py-4">
+            <Icon name="mdi:shield" size={20} color={dangerColor} />
+            <View className="flex-1">
+              <Text bold size={14} style={{ color: dangerColor }}>
+                Sovran will never ask for these
+              </Text>
+              <Text size={13} className="mt-1">
+                Your recovery phrase, nsec, and private keys are the keys to your money and
+                identity. Never share them with anyone — not even Sovran support. Anyone who asks
+                for them is trying to steal from you.
+              </Text>
+            </View>
+          </Card.Body>
+        </Card>
+
         <Card variant="secondary" className="mb-4">
           <Card.Body className="items-center py-5">
             <Avatar

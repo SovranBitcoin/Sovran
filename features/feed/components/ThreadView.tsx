@@ -28,6 +28,7 @@ import {
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 
 import { useThread, type ThreadItem } from '@/features/feed/hooks/useThread';
+import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import type { ThreadReplySort } from '@/features/feed/data/feedClient';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -250,6 +251,14 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     quotedEventsRef,
     loadMoreReplies,
   } = useThread(eventId);
+
+  // The Ignore post / Ignore person menu lives only here in the thread view,
+  // not in the feed list. profilesRef is stable, so getProfileName is too.
+  const getProfileName = useCallback(
+    (pubkey: string) => profilesRef.current.get(pubkey)?.name,
+    [profilesRef]
+  );
+  const openPostActions = usePostActions({ getProfileName });
 
   const skeletonHeightsRef = useRef<Map<number, number>>(new Map());
   const replyHeightsRef = useRef<Map<string, number>>(new Map());
@@ -528,6 +537,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
                 repostPendingDirection={engagement.repostPendingDirection}
                 onLikePress={() => toggleLike(item.event)}
                 onRepostPress={() => toggleRepost(item.event)}
+                onMorePress={() => openPostActions(item.event)}
                 getThreadContext={getThreadContext}
               />
             </Animated.View>
@@ -563,11 +573,13 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           skeletonMatch={item.type === 'reply' ? item.skeletonMatch : undefined}
           onLikePress={() => toggleLike(item.event)}
           onRepostPress={() => toggleRepost(item.event)}
+          onMorePress={() => openPostActions(item.event)}
           getThreadContext={getThreadContext}
         />
       );
     },
     [
+      openPostActions,
       getDisplayMetrics,
       getEngagementState,
       getMetrics,

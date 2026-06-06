@@ -5,7 +5,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
 import Icon from 'assets/icons';

@@ -33,7 +33,6 @@ import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
 import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
-import { actionMenuPopup } from '@/shared/lib/popup';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
 
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feedTypes';
@@ -96,38 +95,6 @@ const FEED_THREAD_CONNECTOR_TOP =
   FEED_CARD_VERTICAL_PADDING + FEED_AVATAR_SIZE + FEED_THREAD_CONNECTOR_AVATAR_GAP;
 const FEED_REPOST_HEADER_HEIGHT = 27;
 const FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y = FEED_REPOST_HEADER_HEIGHT + FEED_AVATAR_CENTER_Y;
-
-type IgnoreTarget = {
-  eventId?: string;
-  pubkey?: string;
-};
-
-function feedItemEvents(item: FeedItem): FeedEvent[] {
-  const events: FeedEvent[] = [];
-  if (item.type === 'note') {
-    events.push(item.event);
-    if (item.rootEvent) events.push(item.rootEvent);
-    events.push(...(item.replyPreviewEvents ?? []));
-    return events;
-  }
-
-  events.push(item.repostEvent);
-  if (item.originalEvent) events.push(item.originalEvent);
-  if (item.rootEvent) events.push(item.rootEvent);
-  for (const reposter of item.reposters ?? []) events.push(reposter.event);
-  return events;
-}
-
-function feedItemMatchesIgnoreTarget(item: FeedItem, target: IgnoreTarget): boolean {
-  const eventId = target.eventId?.toLowerCase();
-  const pubkey = target.pubkey?.toLowerCase();
-  if (!eventId && !pubkey) return false;
-  return feedItemEvents(item).some(
-    (event) =>
-      (eventId ? event.id.toLowerCase() === eventId : false) ||
-      (pubkey ? event.pubkey.toLowerCase() === pubkey : false)
-  );
-}
 
 // ============================================================================
 // Empty / Error States
@@ -199,8 +166,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const imageOverlay = useImageOverlay();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;
-  const ignoreEvent = useFeedIgnoreStore((state) => state.ignoreEvent);
-  const ignorePubkey = useFeedIgnoreStore((state) => state.ignorePubkey);
   const ignoredPubkeysKey = useFeedIgnoreStore((state) => state.ignoredPubkeys.join('\u0000'));
   const ignoredEventIdsKey = useFeedIgnoreStore((state) => state.ignoredEventIds.join('\u0000'));
   const [, startTransition] = useTransition();
@@ -682,44 +647,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
     [feedIndicesWithVideo, buildLayoutForVideoIndex]
   );
 
-  const removeIgnoredItems = useCallback((target: IgnoreTarget) => {
-    setFeedItems((prev) => prev.filter((item) => !feedItemMatchesIgnoreTarget(item, target)));
-  }, []);
-
-  const openPostActions = useCallback(
-    (event: FeedEvent) => {
-      const profile = profilesRef.current.get(event.pubkey);
-      const fallback = tryNpubEncode(event.pubkey).slice(0, 12) + '…';
-      actionMenuPopup({
-        title: 'Post',
-        buttons: [
-          {
-            text: 'Ignore post',
-            icon: 'mdi:eye-off-outline',
-            testID: 'feed-ignore-post',
-            onPress: (close) => {
-              close();
-              ignoreEvent(event.id);
-              removeIgnoredItems({ eventId: event.id });
-            },
-          },
-          {
-            text: 'Ignore person',
-            description: profile?.name ?? fallback,
-            icon: 'mdi:account-cancel-outline',
-            testID: 'feed-ignore-person',
-            onPress: (close) => {
-              close();
-              ignorePubkey(event.pubkey);
-              removeIgnoredItems({ pubkey: event.pubkey });
-            },
-          },
-        ],
-      });
-    },
-    [ignoreEvent, ignorePubkey, profilesRef, removeIgnoredItems]
-  );
-
   // ── Render ──
 
   const getThreadContext = useCallback(
@@ -823,7 +750,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPendingDirection={engagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
-                  onMorePress={() => openPostActions(item.event)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
                   showFooterBorder={false}
@@ -856,7 +782,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                         repostPendingDirection={replyEngagement.repostPendingDirection}
                         onLikePress={() => toggleLikeRef.current(replyEvent)}
                         onRepostPress={() => toggleRepostRef.current(replyEvent)}
-                        onMorePress={() => openPostActions(replyEvent)}
                         getThreadContext={() => getThreadContextRef.current()}
                         showFooterBorder={isLastReply}
                         fullBleedFooterBorder
@@ -893,7 +818,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPendingDirection={rootEngagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(rootEvent)}
                   onRepostPress={() => toggleRepostRef.current(rootEvent)}
-                  onMorePress={() => openPostActions(rootEvent)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current()}
                   showFooterBorder={false}
@@ -919,7 +843,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   repostPendingDirection={engagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
-                  onMorePress={() => openPostActions(item.event)}
                   getThreadContext={() => getThreadContextRef.current()}
                   fullBleedFooterBorder
                 />
@@ -946,7 +869,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             repostPendingDirection={engagement.repostPendingDirection}
             onLikePress={() => toggleLikeRef.current(item.event)}
             onRepostPress={() => toggleRepostRef.current(item.event)}
-            onMorePress={() => openPostActions(item.event)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
             fullBleedFooterBorder
@@ -983,7 +905,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 repostPendingDirection={rootEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(rootEvent)}
                 onRepostPress={() => toggleRepostRef.current(rootEvent)}
-                onMorePress={() => openPostActions(rootEvent)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 showFooterBorder={false}
@@ -1012,7 +933,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 repostPendingDirection={repostEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(originalEvent)}
                 onRepostPress={() => toggleRepostRef.current(originalEvent)}
-                onMorePress={() => openPostActions(originalEvent)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
                 fullBleedFooterBorder
@@ -1043,7 +963,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           repostPendingDirection={repostEngagement.repostPendingDirection}
           onLikePress={originalEvent ? () => toggleLikeRef.current(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepostRef.current(originalEvent) : undefined}
-          onMorePress={originalEvent ? () => openPostActions(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
           getThreadContext={() => getThreadContextRef.current()}
           fullBleedFooterBorder
@@ -1058,7 +977,6 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       toggleLikeRef,
       toggleRepostRef,
       getThreadContextRef,
-      openPostActions,
     ]
   );
 

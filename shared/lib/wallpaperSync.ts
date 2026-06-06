@@ -52,9 +52,7 @@ export async function refreshCatalog(signal?: AbortSignal): Promise<boolean> {
   const keptAlbumSlugs = new Set(filteredAlbums.map((a) => a.slug));
   const orphanAlbumSlugs = Array.from(
     new Set(
-      filteredWallpapers
-        .map((w) => w.albumSlug)
-        .filter((slug) => slug && !keptAlbumSlugs.has(slug))
+      filteredWallpapers.map((w) => w.albumSlug).filter((slug) => slug && !keptAlbumSlugs.has(slug))
     )
   );
 

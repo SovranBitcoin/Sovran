@@ -84,6 +84,11 @@ interface AmountSelectorProps {
   recipientProfile?: RecipientProfile;
   /** Hide variant menu when the caller owns delivery after ecash creation. */
   suppressNextVariants?: boolean;
+  /**
+   * Nut-Drop context: surfaces a persistent warning that the ecash is sent over
+   * the public BLE mesh (anyone nearby can claim it).
+   */
+  isNutDrop?: boolean;
 }
 
 export function AmountSelector({
@@ -98,6 +103,7 @@ export function AmountSelector({
   recipientPubkey,
   recipientProfile,
   suppressNextVariants = false,
+  isNutDrop = false,
 }: AmountSelectorProps) {
   useLifecycleLogger('AmountSelector', walletLog);
 
@@ -233,6 +239,9 @@ export function AmountSelector({
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
   const nextNoticeText = nextDisabled ? actions.next.reason : undefined;
+  const warningText = isNutDrop
+    ? 'Sent over public mesh chat — anyone nearby can claim it. Private mesh DMs are coming when longer messages are supported.'
+    : undefined;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
 
   // When the recipient header is in play, surface the mint as a 50/50
@@ -302,6 +311,7 @@ export function AmountSelector({
         nextLoading={nextLoading}
         nextDisabled={nextDisabled}
         noticeText={nextNoticeText}
+        warningText={warningText}
         nextTestID="amount-next"
         fiatSymbol={fiatSymbol}
         secondaryDisplay={secondaryDisplay}

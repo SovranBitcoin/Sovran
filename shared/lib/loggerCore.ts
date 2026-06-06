@@ -231,6 +231,14 @@ const SECRET_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] =
   { name: 'nsec', test: (s) => /^nsec1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s) },
   { name: 'cashu_token', test: (s) => s.startsWith('cashuA') || s.startsWith('cashuB') },
   { name: 'lightning_invoice', test: (s) => /^ln(bc|tb|tbs)[0-9a-z]{50,}/i.test(s) },
+  // A bare 32-byte hex string is the secp256k1 private-key length. A private
+  // key and a public key / event id are indistinguishable by value (both are
+  // 64 hex chars), so we cannot safely preview *any* of them: a 32-char preview
+  // would leak half a private key. Classify all 64-char hex as a secret and
+  // emit only `{ _kind, len }` (no preview). Deliberately log npubs (which keep
+  // their preview) when you need a readable identity in logs. Runs before the
+  // base64/hex long-string patterns, which would otherwise preview it.
+  { name: 'hex32', test: (s) => /^(0x)?[0-9a-fA-F]{64}$/.test(s) },
 ];
 
 const EMBEDDED_SECRET_PATTERNS: { replacement: string; pattern: RegExp }[] = [
@@ -346,7 +354,12 @@ function compactSensitiveField(value: unknown, fieldName: string | undefined): u
   if (!kind) return undefined;
   if (typeof value === 'string') {
     const c = classifyString(value);
-    return { _kind: c.kind === 'secret' ? c.name : kind, len: value.length };
+    // Prefer a specifically branded secret type (nsec/cashu_token/jwt/pem/…)
+    // over the field-derived kind. The generic 32-byte-hex secret (`hex32`) is
+    // *less* specific than a named field like `privateKeyHex`, so keep the
+    // field's kind in that case.
+    const useValueName = c.kind === 'secret' && c.name !== 'hex32';
+    return { _kind: useValueName ? c.name : kind, len: value.length };
   }
   if (value instanceof Uint8Array || (typeof Buffer !== 'undefined' && Buffer.isBuffer(value))) {
     return { _kind: kind, bytes: (value as Uint8Array).byteLength };

@@ -118,6 +118,12 @@ interface AmountEntryViewProps {
   nextTestID?: string;
   nextIcon?: string;
   noticeText?: string | null;
+  /**
+   * Persistent, warning-tinted notice under the amount (e.g. the Nut-Drop
+   * "sent over public mesh, anyone can claim" disclaimer). Distinct from the
+   * danger-tinted, condition-driven `noticeText`.
+   */
+  warningText?: string | null;
 
   /** Fiat currency symbol (e.g. '$'). Required when inputMode === 'fiat'. */
   fiatSymbol?: string | null;
@@ -176,6 +182,7 @@ export function AmountEntryView({
   nextTestID = 'amount-next',
   nextIcon,
   noticeText = null,
+  warningText = null,
   fiatSymbol = null,
   secondaryDisplay = null,
   onToggleMode,
@@ -186,11 +193,12 @@ export function AmountEntryView({
   leadingBottomButton,
   transactionType = 'neutral',
 }: AmountEntryViewProps) {
-  const [foreground, background, danger, success] = useThemeColor([
+  const [foreground, background, danger, success, warning] = useThemeColor([
     'foreground',
     'background',
     'danger',
     'success',
+    'warning',
   ] as const);
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
@@ -317,6 +325,11 @@ export function AmountEntryView({
             {noticeText != null && noticeText.length > 0 ? (
               <Text size={13} weight="bold" style={[styles.noticeText, { color: danger }]}>
                 {noticeText}
+              </Text>
+            ) : null}
+            {warningText != null && warningText.length > 0 ? (
+              <Text size={12} weight="medium" style={[styles.warningText, { color: warning }]}>
+                {warningText}
               </Text>
             ) : null}
           </VStack>
@@ -463,5 +476,10 @@ const styles = StyleSheet.create({
   noticeText: {
     maxWidth: 280,
     textAlign: 'center',
+  },
+  warningText: {
+    maxWidth: 300,
+    textAlign: 'center',
+    marginTop: 6,
   },
 });

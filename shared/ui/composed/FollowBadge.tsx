@@ -32,7 +32,11 @@ export function FollowBadge({ pubkey, relationship }: FollowBadgeProps) {
   const [success, accent] = useThemeColor(['success', 'accent'] as const);
 
   const resolved: FollowRelationship =
-    relationship && relationship !== 'none' ? relationship : isFollowingLocal ? 'following' : 'none';
+    relationship && relationship !== 'none'
+      ? relationship
+      : isFollowingLocal
+        ? 'following'
+        : 'none';
 
   if (resolved === 'none') return null;
 

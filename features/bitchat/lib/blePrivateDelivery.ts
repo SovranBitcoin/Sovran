@@ -1,4 +1,9 @@
-import { sendBLEMessage, sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
+import {
+  sendBLEMessage,
+  sendBLEPrivateMessage,
+  startBLE,
+  startBLEPrivateChat,
+} from 'bitchat-module';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
 import { mintLocalId } from '@/shared/lib/id';

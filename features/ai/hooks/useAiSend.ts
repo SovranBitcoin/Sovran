@@ -3,7 +3,7 @@ import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { sendMessage, checkBalance } from '@/shared/lib/routstr/api';
 import { isAbortError } from '@/shared/lib/apiClient';
 import { pickFinalizeMessage } from '../lib/finalize';

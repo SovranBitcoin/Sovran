@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { UnreadInvite } from '@internet-privacy/marmot-ts';
 import { useWhitenoise } from '../WhitenoiseContext';

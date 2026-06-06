@@ -15,7 +15,7 @@ import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { paymentLog } from '@/shared/lib/logger';
 import { mintLocalId } from '@/shared/lib/id';
 

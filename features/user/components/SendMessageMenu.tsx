@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
 import { useWhitenoiseSetup } from '@/features/whitenoise/hooks/useWhitenoiseSetup';

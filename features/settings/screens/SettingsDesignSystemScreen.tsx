@@ -1,7 +1,8 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
 
-import { router, type Href } from 'expo-router';
+import { type Href } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { ListGroup, PressableFeedback, Separator } from 'heroui-native';
 
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
