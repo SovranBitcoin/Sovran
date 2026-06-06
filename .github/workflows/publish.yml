@@ -32,11 +32,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            "https://npm.pkg.github.com/@sovranbitcoin/colada/${{ steps.ver.outputs.version }}")
-          if [ "$STATUS" = "200" ]; then
-            echo "::notice::v${{ steps.ver.outputs.version }} already on the registry; nothing to do."
+          VER="${{ steps.ver.outputs.version }}"
+          PUBLISHED=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            "https://npm.pkg.github.com/@sovranbitcoin/colada" \
+            | jq -r --arg v "$VER" '.versions[$v].version // empty')
+          if [ "$PUBLISHED" = "$VER" ]; then
+            echo "::notice::v$VER already on the registry; nothing to do."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
