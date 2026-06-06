@@ -4,13 +4,18 @@ jest.mock('bitchat-module', () => ({
   startBLE: jest.fn(),
   startBLEPrivateChat: jest.fn(),
   sendBLEPrivateMessage: jest.fn(),
+  sendBLEMessage: jest.fn(),
 }));
 
 jest.mock('@/shared/lib/id', () => ({
   mintLocalId: jest.fn((prefix: string) => `${prefix}-id`),
 }));
 
-import { chunkUtf8, sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
+import {
+  chunkUtf8,
+  sendBLEPrivateMessageChunks,
+  sendBLEPublicMessage,
+} from '@/features/bitchat/lib/blePrivateDelivery';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
 function byteLength(text: string): number {
@@ -136,5 +141,61 @@ describe('BitChat BLE private delivery', () => {
     ).rejects.toThrow('BitChat identity material unavailable');
 
     expect(startBLE).not.toHaveBeenCalled();
+  });
+});
+
+describe('BitChat BLE public message delivery', () => {
+  it('sends the whole token as a single public message after starting BLE', async () => {
+    const startBLE = jest
+      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .mockResolvedValue(undefined);
+    const sendBLEMessage = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+    // A multi-KB token that would have been split into many private DM chunks.
+    const token = `cashuB${'A'.repeat(4000)}`;
+
+    const result = await sendBLEPublicMessage({
+      content: token,
+      nickname: 'sender',
+      profileScope: 'profile-a',
+      identityMaterial: IDENTITY_MATERIAL,
+      deps: { startBLE, sendBLEMessage, now: () => 0 },
+    });
+
+    expect(startBLE).toHaveBeenCalledWith('sender', 'profile-a', IDENTITY_MATERIAL);
+    expect(sendBLEMessage).toHaveBeenCalledTimes(1);
+    expect(sendBLEMessage).toHaveBeenCalledWith(token);
+    expect(result).toEqual({ startupMs: 0, sendMs: 0 });
+  });
+
+  it('fails safely before native calls when profile scope is missing', async () => {
+    const sendBLEMessage = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+
+    await expect(
+      sendBLEPublicMessage({
+        content: 'cashuA...',
+        nickname: 'sender',
+        profileScope: '',
+        identityMaterial: IDENTITY_MATERIAL,
+        deps: { sendBLEMessage },
+      })
+    ).rejects.toThrow('BitChat profile scope unavailable');
+
+    expect(sendBLEMessage).not.toHaveBeenCalled();
+  });
+
+  it('fails safely before native calls when identity material is missing', async () => {
+    const sendBLEMessage = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+
+    await expect(
+      sendBLEPublicMessage({
+        content: 'cashuA...',
+        nickname: 'sender',
+        profileScope: 'profile-a',
+        identityMaterial: null,
+        deps: { sendBLEMessage },
+      })
+    ).rejects.toThrow('BitChat identity material unavailable');
+
+    expect(sendBLEMessage).not.toHaveBeenCalled();
   });
 });

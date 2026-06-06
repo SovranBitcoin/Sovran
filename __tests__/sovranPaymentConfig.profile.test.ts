@@ -10,7 +10,7 @@ import {
 } from '@/features/send/lib/sovranPaymentConfig';
 import { sendMemoPopup } from '@/shared/lib/popup';
 import { getEncodedToken } from '@cashu/cashu-ts';
-import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
+import { sendBLEPublicMessage } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 const mockNavigate = jest.fn();
@@ -37,7 +37,7 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
 jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedToken: jest.fn() }));
 jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
-  sendBLEPrivateMessageChunks: jest.fn(),
+  sendBLEPublicMessage: jest.fn(),
 }));
 jest.mock('@/features/bitchat/hooks/useBitchatNickname', () => ({
   getBitchatNickname: jest.fn(() => 'Self Sender'),
@@ -128,7 +128,7 @@ describe('createSovranHandlers profile routing', () => {
     mockNearPaySetAmountEntry.mockReset();
     mockNearPayActive = null;
     (getEncodedToken as jest.Mock).mockReset();
-    (sendBLEPrivateMessageChunks as jest.Mock).mockReset();
+    (sendBLEPublicMessage as jest.Mock).mockReset();
     (sendMemoPopup as jest.Mock).mockReset();
   });
 
@@ -254,11 +254,8 @@ describe('createSovranHandlers profile routing', () => {
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-near-pay-token');
-    (sendBLEPrivateMessageChunks as jest.Mock).mockResolvedValue({
-      chunks: 2,
-      messageIds: ['m-1', 'm-2'],
+    (sendBLEPublicMessage as jest.Mock).mockResolvedValue({
       startupMs: 1,
-      handshakeMs: 2,
       sendMs: 3,
     });
     // @ts-expect-error sendComplete only reads no machine methods.
@@ -280,13 +277,11 @@ describe('createSovranHandlers profile routing', () => {
       mintWasOffline: false,
     });
 
-    expect(sendBLEPrivateMessageChunks).toHaveBeenCalledWith(
+    expect(sendBLEPublicMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        peerID: 'peer-123',
         content: 'cashuA-near-pay-token',
         nickname: 'Self Sender',
         profileScope: 'profile-scope',
-        messageIdPrefix: 'near-pay',
       })
     );
     expect(mockNearPayComplete).toHaveBeenCalledTimes(1);

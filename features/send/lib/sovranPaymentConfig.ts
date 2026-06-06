@@ -69,7 +69,7 @@ import {
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
-import { sendBLEPrivateMessageChunks } from '@/features/bitchat/lib/blePrivateDelivery';
+import { sendBLEPublicMessage } from '@/features/bitchat/lib/blePrivateDelivery';
 import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
@@ -803,22 +803,25 @@ async function deliverNearPayIfActive(
     const profileScope = getBitchatProfileScope();
     const identityMaterial = getBitchatIdentityMaterial?.() ?? null;
     const nickname = getBitchatNickname() || 'sovran';
-    const result = await sendBLEPrivateMessageChunks({
-      peerID: active.recipient.peerID,
+    // Deliver the whole token as a SINGLE public BLE message. The private Noise
+    // DM path caps content at 255 bytes (one-byte TLV length), so a multi-KB
+    // token would be split into many messages that unmodified bitchat receivers
+    // cannot reassemble. The public path transparently fragments/reassembles
+    // into one message and stock bitchat renders the `cashu…` token as a single
+    // redeemable chip. See sendBLEPublicMessage for the full rationale/trade-off.
+    const result = await sendBLEPublicMessage({
       content: encodedToken,
       nickname,
       profileScope,
       identityMaterial,
-      messageIdPrefix: 'near-pay',
     });
 
     paymentLog.info('near_pay.delivery.sent', {
       peerID: active.recipient.peerID,
-      chunks: result.chunks,
+      tokenBytes: encodedToken.length,
       hasDirectLink: active.recipient.hasDirectLink,
       startupMs: Math.round(result.startupMs * 100) / 100,
       sendMs: Math.round(result.sendMs * 100) / 100,
-      handshakeError: result.handshakeError ?? null,
     });
   } catch (err) {
     paymentLog.error('near_pay.delivery.failed', {

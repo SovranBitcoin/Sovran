@@ -1,4 +1,4 @@
-import { sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
+import { sendBLEMessage, sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
 import { mintLocalId } from '@/shared/lib/id';
@@ -127,4 +127,73 @@ export async function sendBLEPrivateMessageChunks({
     sendMs: now() - sendAt,
     ...(handshakeError ? { handshakeError } : {}),
   };
+}
+
+interface SendBLEPublicMessageDeps {
+  startBLE?: typeof startBLE;
+  sendBLEMessage?: typeof sendBLEMessage;
+  now?: () => number;
+}
+
+interface SendBLEPublicMessageOptions {
+  content: string;
+  nickname: string;
+  profileScope: string;
+  identityMaterial: BitchatBLEIdentityMaterial | null | undefined;
+  deps?: SendBLEPublicMessageDeps;
+}
+
+interface SendBLEPublicMessageResult {
+  startupMs: number;
+  sendMs: number;
+}
+
+/**
+ * Send `content` as a SINGLE public BLE mesh message and let the transport
+ * handle fragmentation/reassembly.
+ *
+ * Why public + one message instead of a private Noise DM:
+ * bitchat's private-message wire format (`PrivateMessagePacket`) carries the
+ * text in a TLV with a ONE-byte length prefix, so content is hard-capped at
+ * 255 UTF-8 bytes — `encode()` returns nil and drops anything larger. That is
+ * why a multi-KB ecash token previously had to be split into many separate
+ * Noise DMs (`sendBLEPrivateMessageChunks`), which unmodified bitchat receivers
+ * cannot reassemble — they surface as many disjoint messages, none of which is
+ * a complete token.
+ *
+ * The public `.message` path instead carries up to 60_000 bytes (2-byte length
+ * field), is transparently BLE-fragmented on send and reassembled into exactly
+ * ONE message on receive, and stock bitchat already detects `cashu…` tokens and
+ * renders them as a single tappable, redeemable chip. So the whole token lands
+ * as one unit on an unmodified receiver with no receiver-side changes.
+ *
+ * Trade-off: a public message is broadcast across the mesh (signed but NOT
+ * Noise-encrypted), so the bearer token is readable by any peer in BLE/relay
+ * range. This is inherent — stock bitchat only renders Cashu tokens on the
+ * public path — and matches the "drop" semantics of NearPay/Nut Drop.
+ */
+export async function sendBLEPublicMessage({
+  content,
+  nickname,
+  profileScope,
+  identityMaterial,
+  deps,
+}: SendBLEPublicMessageOptions): Promise<SendBLEPublicMessageResult> {
+  if (!profileScope) throw new Error('BitChat profile scope unavailable');
+  if (!identityMaterial) throw new Error('BitChat identity material unavailable');
+
+  const startBLEFn = deps?.startBLE ?? startBLE;
+  const sendMessageFn = deps?.sendBLEMessage ?? sendBLEMessage;
+  const now = deps?.now ?? (() => performance.now());
+
+  const effectiveNickname = nickname || 'sovran';
+
+  const startupAt = now();
+  await startBLEFn(effectiveNickname, profileScope, identityMaterial);
+  const startupMs = now() - startupAt;
+
+  const sendAt = now();
+  await sendMessageFn(content);
+
+  return { startupMs, sendMs: now() - sendAt };
 }
