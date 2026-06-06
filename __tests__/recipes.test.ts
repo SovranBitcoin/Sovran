@@ -2,8 +2,6 @@ import { describe, expect, test } from "vitest";
 import {
   authoredReplyChainInput,
   dmEnvelopesAppView,
-  derivedTopicExcludeFilter,
-  expandHideList,
   followedPubkeySource,
   followingPopularRankedEventsInput,
   followingRecentEventsInput,
@@ -19,9 +17,6 @@ import {
   recentNotesEventsInput,
   shuffleInput,
   threadReplyRankInput,
-  trendingClusterFeedInput,
-  trendingClusterRankedEventsInput,
-  trendingInput,
   withEventExclusions,
   withRankedTargetExclusions,
 } from "../src/recipes";
@@ -252,63 +247,6 @@ describe("rank recipes", () => {
         excludePubkeys: ["e".repeat(64)],
       },
     });
-  });
-});
-
-describe("topic recipes", () => {
-  test("expands hidden topics through descendants and builds a derived exclude filter", () => {
-    const expanded = expandHideList(
-      [
-        { value: "crypto" },
-        { value: "crypto.bitcoin", parent: "crypto" },
-        { value: "crypto.lightning", parent: "crypto.bitcoin" },
-        { value: "art" },
-      ],
-      ["crypto"],
-    );
-
-    expect(expanded).toEqual(["crypto", "crypto.bitcoin", "crypto.lightning"]);
-    expect(derivedTopicExcludeFilter(expanded)).toEqual({
-      key: "topic",
-      dataset: "DERIVED_TAGS",
-      excludeValues: ["crypto", "crypto.bitcoin", "crypto.lightning"],
-    });
-  });
-});
-
-describe("trending recipes", () => {
-  test("builds trending query input and cluster feed drill-down input", () => {
-    expect(
-      trendingInput({ window: "H8", category: "crypto", limit: 5 }),
-    ).toEqual({
-      window: "H8",
-      category: "crypto",
-      limit: 5,
-    });
-    expect(
-      trendingClusterFeedInput({
-        clusterId: "cluster-1",
-        limit: 12,
-        shuffle: { seed: "topic", counter: 1 },
-      }),
-    ).toEqual({
-      kinds: [1, 1111],
-      tags: [{ key: "cluster", value: "cluster-1", dataset: "DERIVED_TAGS" }],
-      limit: 12,
-      shuffle: { seed: "topic", counter: 1 },
-    });
-    const ranked = trendingClusterRankedEventsInput({
-      clusterId: "cluster-1",
-      limit: 12,
-      shuffle: { seed: "rank-topic", counter: 2 },
-    });
-    expect(ranked.target.tags?.[0]).toEqual({
-      key: "cluster",
-      value: "cluster-1",
-      dataset: "DERIVED_TAGS",
-    });
-    expect(ranked.terms?.some((term) => term.pubkeyScore)).toBe(true);
-    expect(ranked.shuffle).toEqual({ seed: "rank-topic", counter: 2 });
   });
 });
 

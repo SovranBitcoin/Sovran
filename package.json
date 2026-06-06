@@ -1,6 +1,6 @@
 {
   "name": "@sovranbitcoin/nagg-ts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Typed, UI-agnostic client helpers for generic Nagg GraphQL and app-view APIs.",
   "license": "MIT",
   "packageManager": "bun@1.3.5",
