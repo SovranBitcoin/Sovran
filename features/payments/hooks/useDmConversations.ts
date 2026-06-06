@@ -29,6 +29,12 @@ const PAGE_LIMIT = 100;
 export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uint8Array) {
   const [conversations, setConversations] = useState<DmConversation[]>([]);
   const [loading, setLoading] = useState(false);
+  // `loading` starts false and only flips true once the fetch effect runs, so a
+  // consumer that gates a first-load spinner on `!loading` would hide it on the
+  // very first render (before the fetch starts) and flash partial data. This
+  // latches true only after the first real fetch settles, so the contacts list
+  // can wait for genuine results instead of rendering early.
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -116,7 +122,10 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
         setError(err);
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setHasLoadedOnce(true);
+        }
       });
     return () => controller.abort();
   }, [viewerPubkey, viewerPrivateKey, refreshKey, ingest]);
@@ -153,5 +162,5 @@ export function useDmConversations(viewerPubkey?: string, viewerPrivateKey?: Uin
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-  return { conversations, loading, hasMore, loadMore, refresh, error };
+  return { conversations, loading, hasLoadedOnce, hasMore, loadMore, refresh, error };
 }

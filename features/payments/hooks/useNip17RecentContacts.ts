@@ -35,10 +35,8 @@ export interface RecentContact {
 
 export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
   const mockMode = useSettingsStore((s) => s.mockMode);
-  const { conversations, loading, hasMore, loadMore, refresh, error } = useDmConversations(
-    nostrKeys?.pubkey,
-    nostrKeys?.privateKey
-  );
+  const { conversations, loading, hasLoadedOnce, hasMore, loadMore, refresh, error } =
+    useDmConversations(nostrKeys?.pubkey, nostrKeys?.privateKey);
 
   const displayContacts = useMemo<RecentContact[]>(() => {
     const recent: RecentContact[] = conversations.map((c) => ({
@@ -92,6 +90,7 @@ export function useNip17RecentContacts(nostrKeys: NostrKeys | null) {
     contactPubkeys,
     conversations,
     loading,
+    hasLoadedOnce,
     hasMore,
     loadMore,
     refresh,
