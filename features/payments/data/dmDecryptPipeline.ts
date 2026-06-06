@@ -34,10 +34,20 @@ function pTagValue(tags: string[][]): string | undefined {
 
 function envelopeCreatedAt(envelope: DmEnvelope): number {
   const raw = envelope.createdAt;
-  if (typeof raw === 'number') return raw;
-  if (raw instanceof Date) return Math.round(raw.getTime() / 1000);
+  if (raw instanceof Date) return Math.floor(raw.getTime() / 1000);
+  // nagg returns `createdAt` as a number OR a string (numeric or ISO-8601);
+  // normalize all of them to unix seconds. A numeric value above the
+  // milliseconds threshold is downscaled. The previous `Number(raw)` path
+  // produced NaN -> 0 (epoch / 1970) for ISO-string timestamps, which is why
+  // NIP-04 message dates rendered as 1970 (NIP-17 is unaffected — it uses the
+  // decrypted inner rumor's numeric `created_at`).
+  if (typeof raw === 'number') {
+    return raw > 1_000_000_000_000 ? Math.floor(raw / 1000) : raw;
+  }
   const n = Number(raw);
-  return Number.isFinite(n) ? n : 0;
+  if (Number.isFinite(n)) return n > 1_000_000_000_000 ? Math.floor(n / 1000) : n;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
 }
 
 /**

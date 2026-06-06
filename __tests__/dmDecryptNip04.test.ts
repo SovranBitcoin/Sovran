@@ -111,4 +111,26 @@ describe('decryptDmEnvelopes — NIP-04 (kind 4)', () => {
     };
     expect(decryptDmEnvelopes([env], viewerPk, viewerSk)).toHaveLength(0);
   });
+
+  it('parses an ISO-8601 string createdAt to unix seconds (regression: 1970)', () => {
+    // nagg may return `createdAt` as an ISO-8601 string; the old Number(raw)
+    // path produced NaN -> 0 (1970). It must resolve to the real send time.
+    const env: DmEnvelope = {
+      ...receivedDm('legacy timestamp'),
+      createdAt: new Date(1_700_000_000 * 1000).toISOString(),
+    };
+    const out = decryptDmEnvelopes([env], viewerPk, viewerSk);
+    expect(out).toHaveLength(1);
+    expect(out[0].createdAt).toBe(1_700_000_000);
+  });
+
+  it('downscales a millisecond numeric createdAt to seconds', () => {
+    const env: DmEnvelope = {
+      ...receivedDm('millis timestamp'),
+      createdAt: 1_700_000_000_000,
+    };
+    const out = decryptDmEnvelopes([env], viewerPk, viewerSk);
+    expect(out).toHaveLength(1);
+    expect(out[0].createdAt).toBe(1_700_000_000);
+  });
 });
