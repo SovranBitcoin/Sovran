@@ -49,13 +49,32 @@ function describeImageLoadError(event: unknown): string {
   return String(event ?? 'unknown');
 }
 
-const AnimatedSpriteBackground = ({
+const AnimatedSpriteBackground = React.memo(function AnimatedSpriteBackground({
   backgroundColor,
   themeName,
-}: AnimatedSpriteBackgroundProps) => {
+}: AnimatedSpriteBackgroundProps) {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
+  const ctxTheme = useTheme();
+  const activeTheme = themeName ?? ctxTheme.currentTheme;
+  const backgroundImageSource = backgroundImageThemes[activeTheme];
+  const hasImage = !!backgroundImageSource;
+
+  // Perf counters: how often this (notoriously re-render-prone) background
+  // re-renders, and how long the wallpaper takes to decode. Surfaced so a
+  // custom-wallpaper perf regression is visible in `bg.sprite.*` logs.
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  const loadStartRef = useRef(0);
   useEffect(() => {
+    loadStartRef.current = Date.now();
+  }, [backgroundImageSource]);
+
+  // Parallax motion — only subscribe when an image is actually shown. A
+  // solid-colour theme has no visible parallax, so streaming the device-motion
+  // sensor at 50ms (a real CPU cost on every screen) would be pure waste.
+  useEffect(() => {
+    if (!hasImage) return;
     DeviceMotion.setUpdateInterval(50);
     log.debug('bg.sprite.motion.start', { intervalMs: 50 });
     const subscription = DeviceMotion.addListener(({ rotation }) => {
@@ -76,11 +95,7 @@ const AnimatedSpriteBackground = ({
       log.debug('bg.sprite.motion.stop');
       subscription.remove();
     };
-  }, [motion]);
-
-  const ctxTheme = useTheme();
-  const activeTheme = themeName ?? ctxTheme.currentTheme;
-  const backgroundImageSource = backgroundImageThemes[activeTheme];
+  }, [motion, hasImage]);
 
   useEffect(() => {
     if (!backgroundImageSource) {
@@ -105,7 +120,11 @@ const AnimatedSpriteBackground = ({
   }, [activeTheme, backgroundColor, backgroundImageSource, ctxTheme.currentTheme, themeName]);
 
   if (!backgroundImageSource) {
-    log.debug('bg.sprite.render', { theme: activeTheme, hasImage: false });
+    log.debug('bg.sprite.render', {
+      theme: activeTheme,
+      hasImage: false,
+      renderCount: renderCountRef.current,
+    });
     return (
       <Log name="SpriteView">
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>
@@ -113,7 +132,11 @@ const AnimatedSpriteBackground = ({
     );
   }
 
-  log.debug('bg.sprite.render', { theme: activeTheme, hasImage: true });
+  log.debug('bg.sprite.render', {
+    theme: activeTheme,
+    hasImage: true,
+    renderCount: renderCountRef.current,
+  });
 
   return (
     <Log name="SpriteView">
@@ -130,6 +153,8 @@ const AnimatedSpriteBackground = ({
           onLoad={() => {
             log.info('bg.sprite.image_loaded', {
               theme: activeTheme,
+              decodeMs: loadStartRef.current ? Date.now() - loadStartRef.current : null,
+              renderCount: renderCountRef.current,
               ...describeImageSource(backgroundImageSource),
             });
           }}
@@ -144,6 +169,6 @@ const AnimatedSpriteBackground = ({
       </Animated.View>
     </Log>
   );
-};
+});
 
 export default AnimatedSpriteBackground;
