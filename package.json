@@ -1,5 +1,5 @@
 {
-  "name": "nagg-ts",
+  "name": "@sovranbitcoin/nagg-ts",
   "version": "0.1.0",
   "description": "Typed, UI-agnostic client helpers for generic Nagg GraphQL and app-view APIs.",
   "license": "MIT",
@@ -9,12 +9,21 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./map": "./src/map/index.ts",
     "./schemas": "./src/schemas.ts",
     "./recipes": "./src/recipes/index.ts"
   },
   "files": [
     "src"
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SovranBitcoin/nagg-ts.git"
+  },
   "dependencies": {
     "neverthrow": "^8.2.0"
   },
@@ -36,6 +45,10 @@
   "scripts": {
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "bun run type-check && bun run test",
+    "bump:patch": "bun pm version patch --no-git-tag-version",
+    "bump:minor": "bun pm version minor --no-git-tag-version",
+    "bump:major": "bun pm version major --no-git-tag-version"
   }
 }
