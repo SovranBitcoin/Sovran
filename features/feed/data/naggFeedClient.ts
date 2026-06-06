@@ -820,10 +820,20 @@ async function runNaggQuery<TSchema extends z.ZodType>(
   refresh: boolean | undefined,
   options: NaggQueryOptions<TSchema>
 ): Promise<z.infer<TSchema>> {
-  const operationName = options.appView?.operationName ?? graphqlOperationName(query);
   // App-view only when explicitly selected AND a binding exists; otherwise the
   // nagg client falls through to GraphQL (so the switch degrades per-query).
   const transport = options.transport === 'appview' && options.appView ? 'appview' : 'graphql';
+  // The GraphQL request's operationName MUST match the query document's operation
+  // (e.g. `NaggGraphqlRankedFeed`). The app-view binding's label ('RankedFeed',
+  // 'Notifications', …) is a REST identifier, NOT a GraphQL operation name —
+  // sending it on the GraphQL path makes nagg reject the request with
+  // "Unknown operation named RankedFeed", which silently empties the feed. So
+  // only use the binding label on the app-view path; on GraphQL, always derive
+  // the operation name from the query document.
+  const operationName =
+    transport === 'appview'
+      ? (options.appView?.operationName ?? graphqlOperationName(query))
+      : graphqlOperationName(query);
   const startedAt = Date.now();
   const requestFields = {
     operationName,
