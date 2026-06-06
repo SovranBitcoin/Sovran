@@ -1,4 +1,5 @@
 export * from './feed';
+export * from './appview-feed';
 export * from './rank';
 export * from './reply-graph';
 export * from './thread';

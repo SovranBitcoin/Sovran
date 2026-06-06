@@ -127,6 +127,122 @@ export const NaggServiceInfoSchema = z.object({
   appViews: z.array(AppViewCapabilitySchema),
 });
 
+// ---------------------------------------------------------------------------
+// App-view feed-page canonical shape
+//
+// The REST app-view feed/ranked/thread routes return a server-shaped
+// `FeedResponse`/thread payload that already carries the same data the
+// `graphqlNodesToNaggPage` mapper distils a rich GraphQL feed query down to:
+// a list of feed items plus side maps of metrics, profiles and quoted events
+// keyed by id/pubkey. These schemas describe that canonical `NaggFeedPage`
+// shape (see `src/map/feed.ts`) so the app-view bindings' `normalize` output is
+// schema-validated by the same transport path the GraphQL connection schemas
+// use. (The rich GraphQL node-with-aggregates selection lives in the consumer;
+// the canonical post-mapping shape is what both transports converge on.)
+// ---------------------------------------------------------------------------
+
+// A feed event uses second-resolution `created_at` (matching `NaggFeedEvent`),
+// not the GraphQL `createdAt` ISO/ms timestamp — the REST payload emits the raw
+// nostr event shape.
+export const NaggFeedEventSchema = z
+  .object({
+    id: z.string(),
+    kind: z.number().int(),
+    pubkey: z.string(),
+    content: z.string(),
+    tags: z.array(z.array(z.string())),
+    created_at: z.number(),
+  })
+  .passthrough();
+
+export const NaggNoteMetricsSchema = z.object({
+  likeCount: z.number(),
+  repostCount: z.number(),
+  replyCount: z.number(),
+  satsZapped: z.number(),
+});
+
+export const NaggProfileInfoSchema = z
+  .object({
+    name: z.string(),
+    picture: z.string().optional(),
+  })
+  .passthrough();
+
+export const NaggReposterInfoSchema = z.object({
+  pubkey: z.string(),
+  event: NaggFeedEventSchema,
+});
+
+export const NaggFeedItemSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('note'),
+    event: NaggFeedEventSchema,
+    rootEvent: NaggFeedEventSchema.nullable().optional(),
+    rootEventId: z.string().optional(),
+    replyPreviewEvents: z.array(NaggFeedEventSchema).optional(),
+  }),
+  z.object({
+    type: z.literal('repost'),
+    repostEvent: NaggFeedEventSchema,
+    originalEvent: NaggFeedEventSchema.nullable().optional(),
+    originalEventId: z.string().optional(),
+    rootEvent: NaggFeedEventSchema.nullable().optional(),
+    rootEventId: z.string().optional(),
+    reposters: z.array(NaggReposterInfoSchema).optional(),
+  }),
+]);
+
+export const NaggFeedPageSchema = z.object({
+  items: z.array(NaggFeedItemSchema),
+  metrics: z.record(z.string(), NaggNoteMetricsSchema),
+  profiles: z.record(z.string(), NaggProfileInfoSchema),
+  quoted: z.record(z.string(), NaggFeedEventSchema),
+  paginationUntil: z.number(),
+  paginationOffset: z.number(),
+});
+
+// Thread: the root event plus its ordered descendant events, sharing the same
+// metrics/profiles/quoted hydration the feed uses.
+export const NaggThreadSchema = z.object({
+  root: NaggFeedEventSchema,
+  events: z.array(NaggFeedEventSchema),
+  metrics: z.record(z.string(), NaggNoteMetricsSchema),
+  profiles: z.record(z.string(), NaggProfileInfoSchema),
+  quoted: z.record(z.string(), NaggFeedEventSchema),
+});
+
+// Notifications canonical connection. The nodes carry the feed-event payload
+// plus the ranking metadata (reason, actorVertexScore) the GraphQL
+// notifications resolver exposes; metrics/profiles/quoted ride alongside as
+// page-level hydration side maps (the REST app-view supplies them, and the
+// GraphQL query embeds the equivalent per node).
+export const NaggNotificationNodeSchema = z
+  .object({
+    event: NaggFeedEventSchema,
+    reason: z.string(),
+    actorVertexScore: z.number(),
+  })
+  .passthrough();
+
+export const NaggNotificationsPageSchema = z.object({
+  notifications: z.object({
+    nodes: z.array(NaggNotificationNodeSchema),
+    pageInfo: z
+      .object({
+        endCursor: z.unknown().optional(),
+        hasNextPage: z.boolean().optional(),
+      })
+      .optional(),
+  }),
+  metrics: z.record(z.string(), NaggNoteMetricsSchema),
+  profiles: z.record(z.string(), NaggProfileInfoSchema),
+  quoted: z.record(z.string(), NaggFeedEventSchema),
+});
+
+// Note stats: per-id aggregate metrics, keyed by event id.
+export const NaggNoteStatsSchema = z.record(z.string(), NaggNoteMetricsSchema);
+
 // DM envelope data (zero-knowledge — raw encrypted events for client decrypt).
 export const NaggDmEnvelopesDataSchema = z.object({
   dmEnvelopes: NaggEventConnectionSchema,
@@ -211,3 +327,12 @@ export type NaggWhitenoiseEventsData = z.infer<typeof NaggWhitenoiseEventsDataSc
 export type NaggPostsRecentData = z.infer<typeof NaggPostsRecentDataSchema>;
 export type NaggPostsPopularData = z.infer<typeof NaggPostsPopularDataSchema>;
 export type NaggWallpaperCatalogData = z.infer<typeof NaggWallpaperCatalogDataSchema>;
+export type NaggFeedEventShape = z.infer<typeof NaggFeedEventSchema>;
+export type NaggNoteMetricsShape = z.infer<typeof NaggNoteMetricsSchema>;
+export type NaggProfileInfoShape = z.infer<typeof NaggProfileInfoSchema>;
+export type NaggFeedItemShape = z.infer<typeof NaggFeedItemSchema>;
+export type NaggFeedPage = z.infer<typeof NaggFeedPageSchema>;
+export type NaggThread = z.infer<typeof NaggThreadSchema>;
+export type NaggNotificationNode = z.infer<typeof NaggNotificationNodeSchema>;
+export type NaggNotificationsPage = z.infer<typeof NaggNotificationsPageSchema>;
+export type NaggNoteStats = z.infer<typeof NaggNoteStatsSchema>;
