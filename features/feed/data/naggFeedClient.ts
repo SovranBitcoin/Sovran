@@ -2154,7 +2154,7 @@ export function createNaggFeedClient(): FeedClient {
       timeoutMs,
     }: FeedNotificationsRequest): Promise<FeedNotificationsResult> {
       const input = notificationsInput({
-        viewer: viewerPubkey,
+        pubkey: viewerPubkey,
         tab,
         policy,
         replyScope,
@@ -2166,7 +2166,7 @@ export function createNaggFeedClient(): FeedClient {
         dataSchema: NaggNotificationsPageSchema,
         graphqlToData: notificationsToPage,
         appView: notificationsAppView({
-          viewer: viewerPubkey,
+          pubkey: viewerPubkey,
           tab,
           policy,
           replyScope,
