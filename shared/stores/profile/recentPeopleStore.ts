@@ -10,7 +10,7 @@ export const MAX_RECENT_PEOPLE = 20;
 
 const HEX_PUBKEY_RE = /^[0-9a-f]{64}$/;
 
-export interface RecentPersonEntry {
+interface RecentPersonEntry {
   pubkey: string;
   firstOpenedAt: number;
   lastOpenedAt: number;

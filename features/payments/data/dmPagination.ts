@@ -10,7 +10,7 @@ import type { DmEnvelope, DmEnvelopePage } from './dmEnvelopeClient';
 export const CURSOR_SLACK_SECONDS = 2 * 24 * 60 * 60;
 
 /** Normalize an envelope `createdAt` (ISO string | unix seconds | ms | Date) to unix seconds. */
-export function envelopeUnixSeconds(createdAt: DmEnvelope['createdAt']): number {
+function envelopeUnixSeconds(createdAt: DmEnvelope['createdAt']): number {
   if (typeof createdAt === 'number') {
     return createdAt > 1e12 ? Math.floor(createdAt / 1000) : Math.floor(createdAt);
   }

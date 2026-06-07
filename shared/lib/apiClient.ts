@@ -101,7 +101,6 @@ const nostrGraphqlClient = createNaggClient({
 // from this module.
 export type {
   AuditMintResponseType as AuditMintResponse,
-  MintReviewsResponseType as MintReviewsResponse,
   MintSearchResult,
   NostrProfileFullType as NostrProfileFull,
 };

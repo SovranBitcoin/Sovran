@@ -44,7 +44,7 @@ const GUARDED_METHODS = new Set([
 ]);
 
 /** A complete `router` plus `raw` (the unwrapped router, for the rare case guarding is undesirable). */
-export type GuardedRouter = typeof router & { raw: typeof router };
+type GuardedRouter = typeof router & { raw: typeof router };
 
 function createGuardedRouter(target: typeof router): GuardedRouter {
   return new Proxy(target as object, {

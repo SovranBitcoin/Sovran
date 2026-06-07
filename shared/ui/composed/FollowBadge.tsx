@@ -19,9 +19,9 @@ import {
   useNostrSocialStore,
 } from '@/shared/stores/profile/nostrSocialStore';
 
-export type FollowRelationship = 'following' | 'follows_you' | 'mutual' | 'none';
+type FollowRelationship = 'following' | 'follows_you' | 'mutual' | 'none';
 
-export interface FollowBadgeProps {
+interface FollowBadgeProps {
   pubkey: string;
   /** Server-provided relationship; when omitted/none, falls back to local follow state. */
   relationship?: FollowRelationship;

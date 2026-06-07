@@ -14,8 +14,6 @@ import { FlatList, StyleSheet } from 'react-native';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
 import type { SearchScopeId } from './scopes';
 
-export type { SearchScopeId } from './scopes';
-
 type SearchScopeTabsProps = {
   /** Visible scopes, in order. The caller filters out empty ones. */
   scopes: readonly SearchScopeId[];

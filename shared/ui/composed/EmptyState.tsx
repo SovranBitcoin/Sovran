@@ -17,7 +17,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 const EMPTY_STATE_ICON_SIZE = 40;
 
-export interface EmptyStateProps {
+interface EmptyStateProps {
   /** Iconify glyph name, e.g. `'mdi:message-text'`. */
   icon: string;
   title: string;

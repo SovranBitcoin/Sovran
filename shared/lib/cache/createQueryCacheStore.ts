@@ -21,7 +21,7 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { currentCacheEpoch } from './cacheSession';
 import type { QueryCacheEntry } from './queryCacheTypes';
 
-export interface QueryCacheStoreOptions {
+interface QueryCacheStoreOptions {
   /** Kebab-case AsyncStorage key, e.g. `'feed-cache'`. */
   name: string;
   /** Snake_case log slug; defaults to `name` with dashes replaced. */
@@ -48,7 +48,7 @@ interface QueryCacheState<TData> {
   clear: () => void;
 }
 
-export interface QueryCacheStore<TData> {
+interface QueryCacheStore<TData> {
   /** Zustand hook — subscribe to `s.byKey[key]` for reactive reads. */
   use: UseBoundStore<StoreApi<QueryCacheState<TData>>>;
   getEntry: (key: string) => QueryCacheEntry<TData> | undefined;

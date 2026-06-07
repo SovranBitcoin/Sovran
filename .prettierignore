@@ -9,3 +9,4 @@ node_modules/**
 expo-env.d.ts
 uniwind-types.d.ts
 vendor/**
+eslint-suppressions.json

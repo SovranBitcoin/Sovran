@@ -532,6 +532,10 @@ function purgeFixtureMetadataNow() {
  * Nostr metadata cache. Called at launch when mock mode is off so demo
  * identities can never leak through real surfaces. Idempotent and a no-op when
  * nothing leaked. Waits for the cache to hydrate so it sees the persisted blob.
+ *
+ * @public Consumed via a dynamic `require()` in settingsStore's mock-off
+ * migration path (deliberately lazy to avoid eagerly loading this store), which
+ * knip can't see statically.
  */
 export function purgeFixtureMetadata() {
   if (useNostrMetadataCache.persist.hasHydrated()) {

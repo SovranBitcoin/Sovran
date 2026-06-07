@@ -16,7 +16,7 @@ import { CURSOR_SLACK_SECONDS, pageOldestWrapTs } from '../data/dmPagination';
 
 const PAGE_LIMIT = 50;
 
-export interface DmThreadMessage {
+interface DmThreadMessage {
   id: string;
   content: string;
   senderPubkey: string;

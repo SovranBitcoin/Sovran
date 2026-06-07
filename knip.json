@@ -9,17 +9,14 @@
     "scripts/*.{js,ts}"
   ],
   "project": ["**/*.{ts,tsx,js,jsx}"],
-  "ignore": [".agents/**", ".monicon/**", "modules/**", "targets/**"],
+  "ignore": [".monicon/**", "modules/**", "targets/**"],
   "ignoreDependencies": [
     "^@iconify-json/",
     "buffer",
     "process",
     "@expo/metro-config",
     "expo-screen-corner-radius",
-    "@sovranbitcoin/schemas",
     "cashu-kym",
-    "coco-cashu-plugin-p2pk-import",
-    "colada",
     "@monicon/metro",
     "metro-minify-terser",
     "number-flow-react-native",

@@ -6,7 +6,7 @@
  */
 import { createQueryCacheStore } from '@/shared/lib/cache/createQueryCacheStore';
 
-export interface OwnProfileStats {
+interface OwnProfileStats {
   followers: number;
   follows: number;
 }
