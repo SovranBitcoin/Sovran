@@ -674,6 +674,7 @@ function NotificationGroupRow({
               result={result}
               foreground={foreground}
               muted={muted}
+              contained
             />
           </View>
         ) : null}
