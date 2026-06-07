@@ -1836,6 +1836,7 @@ function notificationsResultFromPage(page: NaggNotificationsPage): FeedNotificat
       notifications.length > 0
         ? Math.min(...notifications.map((notification) => notification.event.created_at))
         : 0,
+    hasNextPage: page.notifications.pageInfo?.hasNextPage ?? false,
   };
 }
 

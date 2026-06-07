@@ -101,6 +101,9 @@ export type FeedNotificationsResult = {
   metricsMap: Map<string, NoteMetrics>;
   quotedEventsMap: Map<string, FeedEvent>;
   paginationUntil: number;
+  /** Server's hasNextPage — grouping collapses item counts below the page size,
+   *  so the count alone can't decide whether to keep paging. */
+  hasNextPage: boolean;
 };
 
 export type ThreadSeedBuckets = {

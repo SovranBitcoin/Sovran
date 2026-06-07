@@ -122,8 +122,7 @@ export function NotificationsScreen() {
 
   const applyFirstPage = useCallback((page: FeedNotificationsResult | null) => {
     paginationUntilRef.current = page?.paginationUntil ?? 0;
-    hasMoreRef.current =
-      !!page && page.paginationUntil > 0 && page.notifications.length >= NOTIFICATIONS_PAGE_SIZE;
+    hasMoreRef.current = !!page && page.paginationUntil > 0 && page.hasNextPage;
     feedLog.info('feed.notifications.ui.applied', {
       notifications: page?.notifications.length ?? 0,
       hasPage: !!page,
@@ -244,13 +243,12 @@ export function NotificationsScreen() {
       });
       if (!page || controller.signal.aborted || sequence !== loadSequenceRef.current) return;
 
-      if (page.notifications.length === 0 || page.paginationUntil <= 0) {
+      if (page.notifications.length === 0 || page.paginationUntil <= 0 || !page.hasNextPage) {
         hasMoreRef.current = false;
-        return;
+      } else {
+        hasMoreRef.current = true;
       }
-
-      paginationUntilRef.current = page.paginationUntil;
-      hasMoreRef.current = page.notifications.length >= NOTIFICATIONS_PAGE_SIZE;
+      if (page.paginationUntil > 0) paginationUntilRef.current = page.paginationUntil;
       setResult((previous) => mergeNotificationsResult(previous, page));
     } catch (error) {
       if (controller.signal.aborted || sequence !== loadSequenceRef.current) return;

@@ -7,7 +7,22 @@ export function emptyNotificationsResult(): FeedNotificationsResult {
     metricsMap: new Map(),
     quotedEventsMap: new Map(),
     paginationUntil: 0,
+    hasNextPage: false,
   };
+}
+
+// Identity used to dedupe across pages. Grouped nodes (follow/repost/reaction/
+// zap) collapse a whole post/relationship, so two pages can carry the same group
+// with different representative events — dedupe those by reason+target, and
+// everything else by event id.
+function notificationDedupeKey(notification: FeedNotification): string {
+  if (notification.type === 'group') {
+    const target = notification.targetEventId ?? notification.targetEvent?.id ?? 'profile';
+    return notification.reason === 'follow'
+      ? 'group:follow'
+      : `group:${notification.reason}:${target}`;
+  }
+  return `single:${notification.event.id}`;
 }
 
 export function filterNotificationsResult(
@@ -26,11 +41,12 @@ export function mergeNotificationsResult(
 ): FeedNotificationsResult {
   if (!previous) return next;
 
-  const seen = new Set(previous.notifications.map((notification) => notification.event.id));
+  const seen = new Set(previous.notifications.map(notificationDedupeKey));
   const notifications = [...previous.notifications];
   for (const notification of next.notifications) {
-    if (seen.has(notification.event.id)) continue;
-    seen.add(notification.event.id);
+    const key = notificationDedupeKey(notification);
+    if (seen.has(key)) continue;
+    seen.add(key);
     notifications.push(notification);
   }
 
@@ -40,6 +56,7 @@ export function mergeNotificationsResult(
     metricsMap: mergeMaps(previous.metricsMap, next.metricsMap),
     quotedEventsMap: mergeMaps(previous.quotedEventsMap, next.quotedEventsMap),
     paginationUntil: next.paginationUntil || previous.paginationUntil,
+    hasNextPage: next.hasNextPage,
   };
 }
 

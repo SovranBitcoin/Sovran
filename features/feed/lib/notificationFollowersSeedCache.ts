@@ -32,5 +32,6 @@ export function takeNotificationFollowersSeed(seedId: string | undefined): FeedN
     metricsMap: new Map(base.metricsMap),
     quotedEventsMap: new Map(base.quotedEventsMap),
     paginationUntil: oldestSeedTimestamp || base.paginationUntil,
+    hasNextPage: base.hasNextPage ?? true,
   };
 }

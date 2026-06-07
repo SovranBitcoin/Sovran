@@ -25,6 +25,7 @@ const result = (
 ): FeedNotificationsResult => ({
   notifications,
   paginationUntil,
+  hasNextPage: paginationUntil > 0,
   profilesMap: new Map(notifications.map((item) => [item.event.pubkey, { name: item.event.id }])),
   metricsMap: new Map(),
   quotedEventsMap: new Map(),
