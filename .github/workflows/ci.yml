@@ -27,14 +27,23 @@ jobs:
           bun-version-file: ${{ env.APP_DIR }}/package.json
 
       # The gates run entirely against published packages — @cashu/coco-* from
-      # npm, @sovranbitcoin/* from GitHub Packages — resolved by the lockfile.
-      # SOVRAN_CI_TOKEN carries cross-repo GitHub Packages read; GITHUB_TOKEN is
-      # the fallback. (No coco/colada/schemas source checkout: nothing links it.)
-      - name: Install dependencies
+      # npm, @sovranbitcoin/* from GitHub Packages. SOVRAN_CI_TOKEN carries
+      # cross-repo GitHub Packages read; GITHUB_TOKEN is the fallback. (No
+      # coco/colada/schemas source checkout: nothing links it.)
+      #
+      # `deps:sovran-latest` re-resolves the @sovranbitcoin/* packages to their
+      # newest published versions before install, so CI always validates against
+      # the latest colada/nagg-ts/schemas without a manual bump. This is a
+      # deliberate trade of lockfile determinism for always-on compatibility
+      # signal: a breaking publish can red CI with no code change here — that is
+      # the early warning, by design.
+      - name: Install dependencies (latest Sovran packages)
         working-directory: ${{ env.APP_DIR }}
         env:
           GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
-        run: bun install --frozen-lockfile
+        run: |
+          bun run deps:sovran-latest
+          bun install
 
       - name: Lint
         working-directory: ${{ env.APP_DIR }}
@@ -84,11 +93,13 @@ jobs:
         with:
           bun-version-file: ${{ env.APP_DIR }}/package.json
 
-      - name: Install dependencies
+      - name: Install dependencies (latest Sovran packages)
         working-directory: ${{ env.APP_DIR }}
         env:
           GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
-        run: bun install --frozen-lockfile
+        run: |
+          bun run deps:sovran-latest
+          bun install
 
       - name: Run analyze-structure
         working-directory: ${{ env.APP_DIR }}
