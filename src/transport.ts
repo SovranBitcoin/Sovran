@@ -321,8 +321,11 @@ function appViewUrl(
     }
   }
   if (refresh) {
+    // `refresh=1` tells nagg to revalidate; the no-store fetch + Cache-Control:
+    // no-cache headers already defeat any intermediate HTTP cache, so we do NOT
+    // add a volatile `_refresh` timestamp — it would make every refresh a unique
+    // cache key on nagg and defeat the shared response cache.
     url.searchParams.set('refresh', '1');
-    url.searchParams.set('_refresh', String(Date.now()));
   }
   return url.toString();
 }
@@ -475,8 +478,11 @@ function logAppViewEnd(
 
 function refreshUrl(endpoint: string, refresh: boolean): string {
   if (!refresh) return endpoint;
+  // Only `refresh=1` — no volatile `_refresh` timestamp. The GraphQL cache key is
+  // the POST body, so a per-request timestamp adds nothing but noise here, and on
+  // the REST path it would bust nagg's shared response cache key on every refresh.
   const separator = endpoint.includes('?') ? '&' : '?';
-  return `${endpoint}${separator}refresh=1&_refresh=${Date.now()}`;
+  return `${endpoint}${separator}refresh=1`;
 }
 
 function logEnd(
