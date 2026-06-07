@@ -1,5 +1,5 @@
 export type NotificationTab = "ALL" | "MENTIONS";
-export type NotificationPolicy = "RELAXED" | "MODERATE" | "STRICT";
+export type NotificationPolicy = "RELAXED" | "MODERATE" | "STRICT" | "FOLLOWS";
 export type NotificationReplyScope = "DIRECT" | "THREAD";
 
 export type NotificationsInput = {
@@ -30,10 +30,14 @@ export function notificationsInput(
   };
 }
 
+// Vertex-score thresholds per policy. FOLLOWS gates on the follow graph rather
+// than scores (the server filters actors to the viewer's follow set), so its
+// thresholds are 0 — it never relies on a score cutoff.
 export const NOTIFICATION_POLICY_THRESHOLDS = {
   RELAXED: { actor: 0, viewer: 0 },
   MODERATE: { actor: 20, viewer: 60 },
   STRICT: { actor: 50, viewer: 80 },
+  FOLLOWS: { actor: 0, viewer: 0 },
 } as const satisfies Record<
   NotificationPolicy,
   { actor: number; viewer: number }

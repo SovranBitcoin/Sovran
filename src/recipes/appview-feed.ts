@@ -128,7 +128,7 @@ export function threadAppView(options: ThreadAppViewOptions): NaggAppViewBinding
 export type NotificationsAppViewInput = {
   pubkey: string;
   tab?: 'ALL' | 'MENTIONS';
-  policy?: 'RELAXED' | 'MODERATE' | 'STRICT';
+  policy?: 'RELAXED' | 'MODERATE' | 'STRICT' | 'FOLLOWS';
   replyScope?: 'DIRECT' | 'THREAD';
   since?: number;
   until?: number;
