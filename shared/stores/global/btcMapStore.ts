@@ -122,10 +122,10 @@ let inflightPlacesFetch: Promise<BtcMapPlace[]> | null = null;
 let storeEpoch = 0;
 
 // Persisted-shape schema. Envelope-only validation on `placesCache.data` —
-// per-item parse against `BtcMapPlace` is a 2–3s JS-thread block on a 40k
-// array (audit __audits__/44.json F-001), and a corrupt cache is recoverable
-// via refetch, so the cost-benefit favours the envelope check. The fetch
-// path still parses each item before writing to the store.
+// per-item parse against `BtcMapPlace` is a 2-3s JS-thread block on a 40k
+// array, and a corrupt cache is recoverable via refetch, so the cost-benefit
+// favours the envelope check. The fetch path still parses each item before
+// writing to the store.
 const PersistedPlacesCache = z
   .object({
     data: z.array(z.unknown()).max(200_000),

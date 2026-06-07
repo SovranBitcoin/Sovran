@@ -23,12 +23,9 @@
 // helper and migrate callers to the official accessor. Until then, this file
 // is the only sanctioned place to reach past the `private` boundary.
 //
-// Refs:
-//   - sovran-app/__audits__/24.json#F-003 (pending-mint-op cleanup cast)
-//   - sovran-app/__audits__/36.json#F-008 (8 TS2341 errors on Manager)
-//   - sovran-app/__audits__/09.json#F-002 (private reach-ins in manager.ts /
-//     migration.ts / useReservedProofs)
-//
+// Historical trigger: repeated TS2341/private-reach-in failures across mint-op
+// cleanup, migration, and reserved-proof paths. Keep future reach-ins here.
+// See `../.agents/skills/sovran-architecture-workflow`.
 
 import type { CoreProof, Manager, MeltOperation, MeltOperationState } from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';

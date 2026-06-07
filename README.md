@@ -368,7 +368,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ## Technical shape
 
-<!-- code: package.json; bun.lock; tsconfig.json; eslint.config.js; jest.config.js; patches/; app/; features/; shared/; modules/; targets/widget/; ../colada/; __rules__/; AGENTS.md; CLAUDE.md -->
+<!-- code: package.json; bun.lock; tsconfig.json; eslint.config.js; jest.config.js; patches/; app/; features/; shared/; modules/; targets/widget/; ../colada/; ../.agents/skills/; AGENTS.md; CLAUDE.md -->
 
 ### Stack
 
@@ -391,7 +391,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 
 ### Repository map
 
-<!-- code: app/; features/; shared/; ../colada/; modules/; targets/widget/; patches/; __rules__/; AGENTS.md -->
+<!-- code: app/; features/; shared/; ../colada/; modules/; targets/widget/; patches/; ../.agents/skills/; AGENTS.md -->
 
 - `app/` — Expo Router routes and route-group stacks.
 - `features/` — domain modules for wallet, send, receive, mint, transactions, feed, contacts, AI, map, split bill, settings, BitChat, Whitenoise, theme, and onboarding.
@@ -400,7 +400,7 @@ _Reference — every capability Sovran ships today, organized by concern. Each i
 - `modules/` — local native modules: BitChat and Liquid Glass text.
 - `targets/widget/` — iOS widget target managed by `@bacons/apple-targets`.
 - `patches/` — patch-package patches for upstream dependencies consumed by the app.
-- `__rules__/` and `AGENTS.md` — contributor/agent rules that govern architecture, UI, storage, security, and commit workflow.
+- `../.agents/skills/` and `AGENTS.md` — contributor/agent skills that govern architecture, UI, storage, security, and commit workflow.
 
 ## Platforms
 
@@ -458,13 +458,13 @@ bun run android              # build and launch on Android when configured
 
 ## Contributing
 
-<!-- code: CLAUDE.md; AGENTS.md; __rules__/; codereview/audit.md; codereview/fix.md; codereview/analyze-structure/index.mjs -->
+<!-- code: CLAUDE.md; AGENTS.md; ../.agents/skills/; codereview/audit.md; codereview/fix.md; codereview/analyze-structure/index.mjs -->
 
 Sovran lives inside a workspace checkout of related repos (see [`CLAUDE.md`](./CLAUDE.md) for the layout). Before opening a PR:
 
 - Read [`CLAUDE.md`](./CLAUDE.md) for workspace conventions (where to edit, which sibling repos are read-only, patch-package rules).
-- Read [`AGENTS.md`](./AGENTS.md) for the per-feature contributor rules.
-- Read the rule files under [`__rules__/`](./__rules__) before writing UI: capability variants, responsive scaling, caching, dates, icons, design tokens, colors, status indicators, flow screens, buttons, thread skeletons.
+- Read [`AGENTS.md`](./AGENTS.md) for the repo-local skill router.
+- Load the relevant skills under [`../.agents/skills`](../.agents/skills) before writing code; Sovran-owned skills cover workspace ops, architecture, UI, data/runtime, security, payment-flow guards, compatibility, docs, and PR quality.
 - Run `bun run lint && bun run type-check && bun run test` before committing.
 
 ## License

@@ -4,8 +4,8 @@ Tooling and prompts for code-quality review.
 
 ```
 codereview/
-├── audit.md             # read-only review prompt — produces __audits__/NN.json
-├── fix.md               # write-capable counterpart — turns audits into PR-sized diffs
+├── audit.md             # read-only review prompt, inline markdown report
+├── fix.md               # write-capable live-code cleanup prompt
 ├── analyze-structure/   # repo-wide structural metrics + lookalikes subcommand
 │   ├── index.mjs              # CLI dispatch + structural reports
 │   ├── lookalikes-mode.mjs    # `lookalikes` subcommand entry
@@ -22,7 +22,7 @@ codereview/
     └── args.mjs         # getNumericArg, getStringArg
 ```
 
-`npm run audit`, `npm run fix`, `npm run analyze-structure`, and
+`bun run audit`, `bun run fix`, `bun run analyze-structure`, and
 `npm run log-doctor` invoke these by their canonical paths. There are no
 `scripts/` shims — paths in audit.md / fix.md / commands below match
 exactly what gets run.

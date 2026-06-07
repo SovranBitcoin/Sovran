@@ -142,10 +142,10 @@ const INITIAL_STATE: NostrSocialState = {
   optimisticRepostsByEventId: {},
 };
 
-// Bounded schemas — `nostrSocialStore` persists up to three optimistic maps
-// that grow unbounded if the user hammers reactions/follows offline (audit
-// __audits__/16.json F-003). The .max() caps below stop a runaway blob from
-// hanging rehydrate; if the limits are hit the merge falls back to defaults.
+// Bounded schemas - `nostrSocialStore` persists up to three optimistic maps
+// that grow unbounded if the user hammers reactions/follows offline. The .max()
+// caps below stop a runaway blob from hanging rehydrate; if the limits are hit
+// the merge falls back to defaults.
 const PersistedReactionState = z.looseObject({
   reactionEventId: z.string().max(128).optional(),
   updatedAt: z.number().int().nonnegative(),
