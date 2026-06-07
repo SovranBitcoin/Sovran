@@ -252,8 +252,8 @@ describe("rank recipes", () => {
 
 describe("notification recipes", () => {
   test("builds strict all notifications input by default", () => {
-    expect(notificationsInput({ viewer: "a".repeat(64) })).toEqual({
-      viewer: "a".repeat(64),
+    expect(notificationsInput({ pubkey: "a".repeat(64) })).toEqual({
+      pubkey: "a".repeat(64),
       tab: "ALL",
       policy: "STRICT",
       replyScope: "THREAD",
@@ -264,7 +264,7 @@ describe("notification recipes", () => {
   test("preserves mentions tab, relaxed policy, reply scope, and bounds", () => {
     expect(
       notificationsInput({
-        viewer: "b".repeat(64),
+        pubkey: "b".repeat(64),
         tab: "MENTIONS",
         policy: "RELAXED",
         replyScope: "DIRECT",
@@ -273,7 +273,7 @@ describe("notification recipes", () => {
         limit: 10,
       }),
     ).toEqual({
-      viewer: "b".repeat(64),
+      pubkey: "b".repeat(64),
       tab: "MENTIONS",
       policy: "RELAXED",
       replyScope: "DIRECT",

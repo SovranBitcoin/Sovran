@@ -3,7 +3,8 @@ export type NotificationPolicy = "RELAXED" | "MODERATE" | "STRICT";
 export type NotificationReplyScope = "DIRECT" | "THREAD";
 
 export type NotificationsInput = {
-  viewer: string;
+  /** The account whose notifications to load. */
+  pubkey: string;
   tab?: NotificationTab;
   policy?: NotificationPolicy;
   replyScope?: NotificationReplyScope;
@@ -15,11 +16,11 @@ export type NotificationsInput = {
 export function notificationsInput(
   options: NotificationsInput,
 ): Required<
-  Pick<NotificationsInput, "viewer" | "tab" | "policy" | "replyScope" | "limit">
+  Pick<NotificationsInput, "pubkey" | "tab" | "policy" | "replyScope" | "limit">
 > &
   Pick<NotificationsInput, "since" | "until"> {
   return {
-    viewer: options.viewer,
+    pubkey: options.pubkey,
     tab: options.tab ?? "ALL",
     policy: options.policy ?? "STRICT",
     replyScope: options.replyScope ?? "THREAD",

@@ -8,6 +8,12 @@ export type RankedEventsInput = {
   metric?: MetricInput;
   terms?: WeightedRankTermInput[];
   candidatePubkeyBoosts?: Array<ReturnType<typeof viewerFollowBoost>>;
+  /**
+   * The requesting account, carried on every ranked request so future
+   * viewer-personalized ranking needs no client/schema change. Optional and
+   * currently advisory server-side.
+   */
+  pubkey?: string;
   shuffle?: ShuffleInput;
   limit?: number;
   offset?: number;
@@ -132,6 +138,7 @@ export function forYouRankedEventsInput(options: {
     metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
     terms: [...engagementRankTerms(), vertexAuthorScoreTerm(0.3), recencyTerm(1.1)],
     candidatePubkeyBoosts: options.viewerPubkey ? [viewerFollowBoost(options.viewerPubkey, 5)] : undefined,
+    ...(options.viewerPubkey ? { pubkey: options.viewerPubkey } : {}),
     shuffle: options.shuffle,
     limit: options.limit ?? 30,
     offset: options.offset ?? 0,
@@ -213,6 +220,7 @@ export function followingPopularRankedEventsInput(options: {
     },
     metric: { name: 'actors', op: 'COUNT_DISTINCT', distinctField: 'PUBKEY' },
     terms: [...engagementRankTerms(), vertexAuthorScoreTerm(0.25), recencyTerm(0.9)],
+    pubkey: options.viewerPubkey,
     shuffle: options.shuffle,
     limit: options.limit ?? 30,
     offset: options.offset ?? 0,

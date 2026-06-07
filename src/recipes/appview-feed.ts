@@ -126,7 +126,7 @@ export function threadAppView(options: ThreadAppViewOptions): NaggAppViewBinding
 // ---------------------------------------------------------------------------
 
 export type NotificationsAppViewInput = {
-  viewer: string;
+  pubkey: string;
   tab?: 'ALL' | 'MENTIONS';
   policy?: 'RELAXED' | 'MODERATE' | 'STRICT';
   replyScope?: 'DIRECT' | 'THREAD';
@@ -149,7 +149,7 @@ export function notificationsAppView(input: NotificationsAppViewInput): NaggAppV
     method: 'GET',
     operationName: 'Notifications',
     searchParams: {
-      viewer: input.viewer,
+      pubkey: input.pubkey,
       tab: input.tab ?? 'ALL',
       policy: input.policy ?? 'STRICT',
       replyScope: input.replyScope ?? 'THREAD',

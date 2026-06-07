@@ -189,12 +189,12 @@ describe('threadAppView', () => {
 
 describe('notificationsAppView', () => {
   test('GETs /nostr/notifications with defaulted params; the schema parses the connection', () => {
-    const binding = notificationsAppView({ viewer: PUBKEY });
+    const binding = notificationsAppView({ pubkey: PUBKEY });
 
     expect(binding.path).toBe('/nostr/notifications');
     expect(binding.method).toBe('GET');
     expect(binding.searchParams).toEqual({
-      viewer: PUBKEY,
+      pubkey: PUBKEY,
       tab: 'ALL',
       policy: 'STRICT',
       replyScope: 'THREAD',
@@ -236,7 +236,7 @@ describe('notificationsAppView', () => {
 
   test('preserves a custom tab, policy, reply scope, and bounds', () => {
     const binding = notificationsAppView({
-      viewer: PUBKEY,
+      pubkey: PUBKEY,
       tab: 'MENTIONS',
       policy: 'RELAXED',
       replyScope: 'DIRECT',
@@ -245,7 +245,7 @@ describe('notificationsAppView', () => {
       limit: 10,
     });
     expect(binding.searchParams).toEqual({
-      viewer: PUBKEY,
+      pubkey: PUBKEY,
       tab: 'MENTIONS',
       policy: 'RELAXED',
       replyScope: 'DIRECT',
