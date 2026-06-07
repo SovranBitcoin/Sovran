@@ -129,6 +129,9 @@ export function NotificationFollowersScreen() {
             limit: FOLLOW_PAGE_SIZE,
             until: cursor,
             refresh: refresh && pageIndex === 0,
+            // The detail screen needs the full ungrouped follow list, not the
+            // collapsed group the All tab renders.
+            grouped: false,
             signal,
           });
           if (signal.aborted) return null;

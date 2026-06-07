@@ -70,6 +70,16 @@ export type FeedNotificationsRequest = RequestControls & {
   until?: number;
   limit?: number;
   refresh?: boolean;
+  /** Group follow/repost/reaction/zap server-side (default true). Set false for the raw list. */
+  grouped?: boolean;
+};
+
+/** One sampled participant of a grouped notification (for the avatar cluster). */
+export type FeedNotificationActor = {
+  pubkey: string;
+  eventId: string;
+  createdAt: number;
+  actorVertexScore?: number;
 };
 
 export type FeedNotification = {
@@ -78,6 +88,11 @@ export type FeedNotification = {
   targetEventId?: string;
   reason: string;
   actorVertexScore: number;
+  /** Server grouping metadata: present (with type 'group') when many notifications collapsed. */
+  type?: 'single' | 'group';
+  total?: number;
+  totalCapped?: boolean;
+  sampleActors?: FeedNotificationActor[];
 };
 
 export type FeedNotificationsResult = {

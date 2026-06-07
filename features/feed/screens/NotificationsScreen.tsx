@@ -642,8 +642,11 @@ function NotificationGroupRow({
 }) {
   const tone = notificationTone(item.reason);
   const names = item.notifications.map((notification) => notificationName(notification, result));
-  const title = groupedNotificationTitle(names, item.notifications.length, item.reason);
-  const previewEvent = item.reason === 'repost' ? item.notifications[0]?.targetEvent : undefined;
+  const title = groupedNotificationTitle(names, item.total, item.reason, item.totalCapped);
+  const previewEvent =
+    item.reason === 'repost' || item.reason === 'reaction' || item.reason === 'zap'
+      ? item.notifications[0]?.targetEvent
+      : undefined;
   const timestamp = notificationGroupTimestamp(item.notifications);
 
   return (
@@ -950,16 +953,26 @@ function notificationTitle(name: string, reason: string, hasTargetEvent = false)
   }
 }
 
+const GROUP_ACTIONS: Record<'follow' | 'repost' | 'reaction' | 'zap', string> = {
+  follow: 'followed you',
+  repost: 'reposted your post',
+  reaction: 'liked your post',
+  zap: 'zapped your post',
+};
+
 function groupedNotificationTitle(
   names: readonly string[],
   count: number,
-  reason: 'follow' | 'repost'
+  reason: 'follow' | 'repost' | 'reaction' | 'zap',
+  totalCapped = false
 ): string {
-  const action = reason === 'follow' ? 'followed you' : 'reposted your post';
+  const action = GROUP_ACTIONS[reason];
   if (count <= 0) return action;
   if (count === 1) return `${names[0]} ${action}`;
   if (count === 2) return `${names[0]} and ${names[1]} ${action}`;
-  return `${names[0]}, ${names[1]} and ${count - 2} others ${action}`;
+  const others = count - 2;
+  const moreLabel = totalCapped ? `${others}+ others` : `${others} others`;
+  return `${names[0]}, ${names[1]} and ${moreLabel} ${action}`;
 }
 
 function notificationIcon(reason: string): string {

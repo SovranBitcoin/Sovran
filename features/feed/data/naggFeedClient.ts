@@ -52,6 +52,7 @@ import type {
   FeedEnrichmentUpdates,
   FeedParseResult,
   FeedPageRequest,
+  FeedNotification,
   FeedNotificationsRequest,
   FeedNotificationsResult,
   ThreadRequest,
@@ -1785,8 +1786,12 @@ function notificationsResultFromPage(page: NaggNotificationsPage): FeedNotificat
   const notifications = page.notifications.nodes
     .map((node) => {
       const enriched = node as NaggNotificationsPage['notifications']['nodes'][number] & {
+        type?: 'single' | 'group';
         targetEvent?: FeedEvent;
         targetEventId?: string;
+        total?: number;
+        totalCapped?: boolean;
+        sampleActors?: FeedNotification['sampleActors'];
       };
       return {
         event: node.event as FeedEvent,
@@ -1794,6 +1799,10 @@ function notificationsResultFromPage(page: NaggNotificationsPage): FeedNotificat
         ...(enriched.targetEventId ? { targetEventId: enriched.targetEventId } : {}),
         reason: node.reason,
         actorVertexScore: node.actorVertexScore,
+        ...(enriched.type ? { type: enriched.type } : {}),
+        ...(typeof enriched.total === 'number' ? { total: enriched.total } : {}),
+        ...(enriched.totalCapped ? { totalCapped: enriched.totalCapped } : {}),
+        ...(enriched.sampleActors ? { sampleActors: enriched.sampleActors } : {}),
       };
     })
     .sort(compareNotificationsNewestFirst);
@@ -2150,6 +2159,7 @@ export function createNaggFeedClient(): FeedClient {
       until,
       limit = 50,
       refresh,
+      grouped = true,
       signal,
       timeoutMs,
     }: FeedNotificationsRequest): Promise<FeedNotificationsResult> {
@@ -2173,6 +2183,7 @@ export function createNaggFeedClient(): FeedClient {
           since,
           until,
           limit,
+          grouped,
         }),
         transport: backendConfig.nostrNotificationsAppView ? 'appview' : 'graphql',
         signal,
