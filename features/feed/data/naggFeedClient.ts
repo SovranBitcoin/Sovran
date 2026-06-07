@@ -821,50 +821,71 @@ async function runNaggQuery<TSchema extends z.ZodType>(
   refresh: boolean | undefined,
   options: NaggQueryOptions<TSchema>
 ): Promise<z.infer<TSchema>> {
-  // App-view only when explicitly selected AND a binding exists; otherwise the
-  // nagg client falls through to GraphQL (so the switch degrades per-query).
-  const transport = options.transport === 'appview' && options.appView ? 'appview' : 'graphql';
-  // The GraphQL request's operationName MUST match the query document's operation
-  // (e.g. `NaggGraphqlRankedFeed`). The app-view binding's label ('RankedFeed',
-  // 'Notifications', …) is a REST identifier, NOT a GraphQL operation name —
-  // sending it on the GraphQL path makes nagg reject the request with
-  // "Unknown operation named RankedFeed", which silently empties the feed. So
-  // only use the binding label on the app-view path; on GraphQL, always derive
-  // the operation name from the query document.
-  const operationName =
-    transport === 'appview'
-      ? (options.appView?.operationName ?? graphqlOperationName(query))
-      : graphqlOperationName(query);
-  const startedAt = Date.now();
-  const requestFields = {
-    operationName,
-    refresh: !!refresh,
-    timeoutMs: options.timeoutMs,
-    transport,
-    variables: summarizeGraphqlVariables(variables),
-    ...endpointLogFields(),
-  };
+  // Prefer the REST app-view whenever a binding exists and a base URL is
+  // configured — it is the optimized, product-shaped path (e.g. grouped
+  // notifications). GraphQL is the fallback: used when there's no app-view
+  // binding/base, or when the app-view attempt errors or comes back empty. The
+  // optional per-call `transport: 'graphql'` still forces GraphQL outright.
+  const appViewBase = backendConfig.nostrAppViewBaseUrl?.trim();
+  const canAppView =
+    !!options.appView && !!appViewBase && options.transport !== 'graphql';
+  const preferred: 'appview' | 'graphql' = canAppView ? 'appview' : 'graphql';
 
   logBackendConfigOnce();
-  apiLog.info('nagg.graphql.request.start', requestFields);
 
   const client = createNaggClient({
     endpoint: graphqlEndpoint(),
     appView: { baseUrl: backendConfig.nostrAppViewBaseUrl, version: 'v1' },
   });
-  const result = await client.query({
-    query,
-    variables,
-    operationName,
-    dataSchema: options.dataSchema,
-    graphqlToData: options.graphqlToData,
-    transport,
-    appView: options.appView,
-    refresh,
-    signal: options.signal,
-    timeoutMs: options.timeoutMs,
-  });
-  const durationMs = Date.now() - startedAt;
+
+  const attempt = async (transport: 'appview' | 'graphql') => {
+    // The GraphQL request's operationName MUST match the query document's
+    // operation. The app-view binding's label ('RankedFeed', 'Notifications', …)
+    // is a REST identifier, NOT a GraphQL operation name, so only use it on the
+    // app-view path; on GraphQL always derive it from the query document.
+    const operationName =
+      transport === 'appview'
+        ? (options.appView?.operationName ?? graphqlOperationName(query))
+        : graphqlOperationName(query);
+    const requestFields = {
+      operationName,
+      refresh: !!refresh,
+      timeoutMs: options.timeoutMs,
+      transport,
+      variables: summarizeGraphqlVariables(variables),
+      ...endpointLogFields(),
+    };
+    apiLog.info('nagg.graphql.request.start', requestFields);
+    const startedAt = Date.now();
+    const result = await client.query({
+      query,
+      variables,
+      operationName,
+      dataSchema: options.dataSchema,
+      graphqlToData: options.graphqlToData,
+      transport,
+      appView: options.appView,
+      refresh,
+      signal: options.signal,
+      timeoutMs: options.timeoutMs,
+    });
+    return { result, requestFields, durationMs: Date.now() - startedAt };
+  };
+
+  let outcome = await attempt(preferred);
+  if (
+    preferred === 'appview' &&
+    (outcome.result.isErr() || countCanonical(outcome.result.value) === 0)
+  ) {
+    apiLog.warn('nagg.appview.fallback_to_graphql', {
+      ...outcome.requestFields,
+      durationMs: outcome.durationMs,
+      reason: outcome.result.isErr() ? outcome.result.error.type : 'empty',
+    });
+    outcome = await attempt('graphql');
+  }
+
+  const { result, requestFields, durationMs } = outcome;
 
   if (result.isErr()) {
     const error = result.error;
@@ -2185,13 +2206,16 @@ export function createNaggFeedClient(): FeedClient {
           limit,
           grouped,
         }),
-        transport: backendConfig.nostrNotificationsAppView ? 'appview' : 'graphql',
+        // Always prefer the app-view (it serves the grouped, optimized
+        // notifications); runNaggQuery falls back to GraphQL if the app-view is
+        // unavailable, errors, or returns nothing.
+        transport: 'appview',
         signal,
         timeoutMs,
       });
       const result = notificationsResultFromPage(page);
       feedLog.info('feed.notifications.fetch.done', {
-        transport: backendConfig.nostrNotificationsAppView ? 'appview' : 'graphql',
+        transport: 'appview',
         tab,
         policy,
         replyScope,
