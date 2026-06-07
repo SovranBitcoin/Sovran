@@ -24,6 +24,7 @@
       "autoIncrement": true
     },
     "production": {
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_NOSTR_APPVIEW_BASE_URL": "https://nagg.up.railway.app",
         "EXPO_PUBLIC_NOSTR_GRAPHQL_ENDPOINT": "https://nagg.up.railway.app/graphql"
