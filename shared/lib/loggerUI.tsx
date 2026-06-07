@@ -13,7 +13,7 @@
 
 import { createContext, useContext, useEffect, useRef } from 'react';
 import React, { type ReactNode } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { log, type Logger } from './loggerCore';
 
@@ -147,6 +147,11 @@ export function Log({
   const prevContent = useRef<string[]>([]);
 
   useEffect(() => {
+    // Skip the recursive element-tree walk entirely when debug logging won't be
+    // emitted (always in production, where this effect otherwise ran on every
+    // render of every screen). Dynamic so dev / log-doctor builds still capture
+    // `ui.screen` events after a runtime setLevel('debug').
+    if (!screenLogger.isLevelEnabled('debug')) return;
     try {
       const content = extractVisibleContent(children);
       const contentKey = content.join('|');
@@ -175,7 +180,6 @@ export function Log({
   // default `flex: 1` style makes the wrapper fill its parent; an explicit
   // `style` prop overrides it.
   if (resolvedTestID) {
-    const { View } = require('react-native');
     return React.createElement(
       UIPathContext.Provider,
       { value: path },
@@ -192,7 +196,6 @@ export function Log({
   }
 
   if (style) {
-    const { View } = require('react-native');
     return React.createElement(
       UIPathContext.Provider,
       { value: path },

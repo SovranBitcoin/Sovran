@@ -5,6 +5,7 @@
  * (receive-flow, send-flow, mint-flow, transactions-flow) to ensure consistency.
  */
 
+import { memo } from 'react';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { ParamListBase, NavigationProp } from '@react-navigation/native';
 import { router } from 'expo-router';
@@ -20,23 +21,27 @@ interface FlowColors {
  * Shared header button component for flow layouts.
  * Shows close button on first screen, back button on subsequent screens.
  */
-const FlowHeaderButton = ({
+// Memoized so re-rendering the navigation header (which happens on any root
+// re-render) doesn't re-parse the SVG icon unless isFirstScreen/foreground change.
+const FlowHeaderButton = memo(function FlowHeaderButton({
   isFirstScreen,
   foreground,
 }: {
   isFirstScreen: boolean;
   foreground: string;
-}) => (
-  <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-    <Icon
-      name={
-        isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
-      }
-      size={24}
-      color={foreground}
-    />
-  </Pressable>
-);
+}) {
+  return (
+    <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
+      <Icon
+        name={
+          isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
+        }
+        size={24}
+        color={foreground}
+      />
+    </Pressable>
+  );
+});
 
 /**
  * Get the base screen options for flow layouts (used inside modal stacks).

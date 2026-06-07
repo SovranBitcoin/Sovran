@@ -249,81 +249,101 @@ function ProfileMetadataSync() {
   return null;
 }
 
+// Stable, memoized modal close button. Defined at module scope (not inside
+// RootLayoutContent) so its component identity never changes between renders —
+// otherwise React Navigation tears down and remounts the header's left button
+// (re-parsing its SVG icon) on every root re-render.
+const CloseButton = React.memo(function CloseButton({ foreground }: { foreground: string }) {
+  return (
+    <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
+      <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
+    </Pressable>
+  );
+});
+
 // Inner component that can access theme context
 function RootLayoutContent() {
   const { currentTheme } = useTheme();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
 
-  // Close button component for modal presentations
-  const CloseButton = () => (
-    <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-    </Pressable>
+  // Screen options builder. Memoized so unrelated root re-renders don't rebuild
+  // every modal screen's options object on each render.
+  const getScreenOptions = useCallback(
+    (screen: ModalConfig) => {
+      // Base header styling options from shared config
+      const backgroundColor = nostrKeys?.pubkey ? background : 'transparent';
+      const baseHeaderOptions = getBaseModalHeaderOptions(foreground, backgroundColor);
+
+      // Check if this is a modal/formSheet presentation
+      const isModalPresentation =
+        screen.options?.presentation === 'modal' || screen.options?.presentation === 'formSheet';
+
+      // If headerShown is explicitly false, the nested layout handles headers
+      // Don't add any header-related options
+      if (screen.options?.headerShown === false) {
+        return {
+          ...screen.options,
+          // Ensure no header-related options leak through
+          headerBackButtonDisplayMode: 'minimal' as const,
+        };
+      }
+
+      // If the screen has explicit options, merge with base options
+      if (screen.options) {
+        // If headerTransparent is true, use transparent background to avoid opaque header
+        const headerStyleOverride = screen.options.headerTransparent
+          ? {
+              headerStyle: { backgroundColor: 'transparent' },
+              headerLargeStyle: { backgroundColor: 'transparent' },
+            }
+          : {};
+
+        return {
+          ...baseHeaderOptions,
+          ...screen.options,
+          headerShown: true,
+          ...headerStyleOverride,
+          ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
+          // Add close button for modal presentations (only when header is shown)
+          ...(isModalPresentation
+            ? { headerLeft: () => <CloseButton foreground={foreground} /> }
+            : {}),
+        };
+      }
+
+      // Default options for screens with titles (non-modal screens)
+      if (screen.title !== undefined) {
+        return {
+          ...baseHeaderOptions,
+          headerShown: true,
+          headerTitle: screen.title,
+          headerBlurEffect: 'regular' as const,
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
+          headerLargeStyle: { backgroundColor: 'transparent' },
+          headerBackTitle: 'Back',
+        };
+      }
+
+      // Default: no special options
+      return {};
+    },
+    [foreground, background, nostrKeys?.pubkey]
   );
-
-  // Screen options builder
-  const getScreenOptions = (screen: ModalConfig) => {
-    // Base header styling options from shared config
-    const backgroundColor = nostrKeys?.pubkey ? background : 'transparent';
-    const baseHeaderOptions = getBaseModalHeaderOptions(foreground, backgroundColor);
-
-    // Check if this is a modal/formSheet presentation
-    const isModalPresentation =
-      screen.options?.presentation === 'modal' || screen.options?.presentation === 'formSheet';
-
-    // If headerShown is explicitly false, the nested layout handles headers
-    // Don't add any header-related options
-    if (screen.options?.headerShown === false) {
-      return {
-        ...screen.options,
-        // Ensure no header-related options leak through
-        headerBackButtonDisplayMode: 'minimal' as const,
-      };
-    }
-
-    // If the screen has explicit options, merge with base options
-    if (screen.options) {
-      // If headerTransparent is true, use transparent background to avoid opaque header
-      const headerStyleOverride = screen.options.headerTransparent
-        ? {
-            headerStyle: { backgroundColor: 'transparent' },
-            headerLargeStyle: { backgroundColor: 'transparent' },
-          }
-        : {};
-
-      return {
-        ...baseHeaderOptions,
-        ...screen.options,
-        headerShown: true,
-        ...headerStyleOverride,
-        ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
-        // Add close button for modal presentations (only when header is shown)
-        ...(isModalPresentation ? { headerLeft: CloseButton } : {}),
-      };
-    }
-
-    // Default options for screens with titles (non-modal screens)
-    if (screen.title !== undefined) {
-      return {
-        ...baseHeaderOptions,
-        headerShown: true,
-        headerTitle: screen.title,
-        headerBlurEffect: 'regular' as const,
-        headerTransparent: true,
-        headerStyle: { backgroundColor: 'transparent' },
-        headerLargeStyle: { backgroundColor: 'transparent' },
-        headerBackTitle: 'Back',
-      };
-    }
-
-    // Default: no special options
-    return {};
-  };
 
   // For iOS 26+ with Liquid Glass, use transparent background to enable glass effects
   const { liquidGlass } = useCapabilities();
   const contentBackgroundColor = liquidGlass ? 'transparent' : background;
+
+  // Memoize the modal screen list so it isn't rebuilt on every root re-render.
+  const modalScreenElements = useMemo(
+    () =>
+      MODAL_SCREENS.map((screen) => (
+        <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
+      )),
+    [getScreenOptions]
+  );
 
   return (
     <NavigationThemeProvider value={DarkTheme}>
@@ -339,10 +359,17 @@ function RootLayoutContent() {
       />
       <OfflineShell>
         <Stack
+          // NOTE: keyed on the theme so a theme/wallpaper change re-applies
+          // contentStyle/header colors. This remounts the navigator on theme
+          // switch (not on the modal-open hot path). Removing it needs on-device
+          // verification that native-stack re-applies colors to already-mounted
+          // screens — left in place until that's confirmed (see perf plan §4).
           key={currentTheme}
           screenOptions={{
             headerShown: false,
             gestureEnabled: true,
+            // Stop the covered drawer/tab tree from re-rendering under a modal.
+            freezeOnBlur: true,
             contentStyle: {
               backgroundColor: contentBackgroundColor,
             },
@@ -351,9 +378,7 @@ function RootLayoutContent() {
           <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
 
           {/* All modal screens configured from MODAL_SCREENS */}
-          {MODAL_SCREENS.map((screen) => (
-            <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
-          ))}
+          {modalScreenElements}
         </Stack>
       </OfflineShell>
     </NavigationThemeProvider>

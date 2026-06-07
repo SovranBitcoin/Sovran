@@ -722,7 +722,10 @@ export function MintAddScreen() {
       scroll="custom"
       onHeaderHeightChange={setTotalHeaderHeight}
       footer={bottomButtons}
-      bgColor={surface}>
+      bgColor={surface}
+      // Renders an autoFocus mint-URL input; mount synchronously so the
+      // keyboard opens without racing the modal slide-in.
+      deferContent={false}>
       <Stack.Screen options={screenOptions} />
       <Spacer size={16} />
       {!showContent ? (
