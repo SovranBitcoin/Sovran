@@ -10,7 +10,7 @@ const eslintPluginPrettierRecommended = require('eslint-plugin-prettier/recommen
 // matter far more than this single non-blocking `warn`). Re-enable
 // unconditionally once the plugin supports zod 4, or migrate the rule to
 // eslint-plugin-react-hooks v6 (`react-hooks/react-compiler`).
-// Tracked in __research__/architecture-review-2026-06.md.
+// Revisit when the plugin can load under the repo-wide zod v4 override.
 let reactCompilerPlugin = null;
 try {
   reactCompilerPlugin = require('eslint-plugin-react-compiler');
@@ -336,7 +336,8 @@ module.exports = defineConfig([
         },
         // `borderWidth: 0.5` (and the directional variants) rounds DOWN
         // to 0 on DPR=1 devices — the border vanishes. Documented in
-        // `__rules__/responsive-scaling.md`. Use `StyleSheet.hairlineWidth`
+        // `../.agents/skills/sovran-ui-patterns/references/responsive-scaling.md`.
+        // Use `StyleSheet.hairlineWidth`
         // (== `1 / PixelRatio.get()`, guaranteed to render as exactly
         // one physical pixel on every density). 1pt is also fine if the
         // design wants something visibly thicker than a hairline.
@@ -344,11 +345,12 @@ module.exports = defineConfig([
           selector:
             "Property[key.name=/^border(Top|Bottom|Left|Right|Start|End)?Width$/][value.type='Literal'][value.value=0.5]",
           message:
-            '`borderWidth: 0.5` rounds to 0 on DPR=1 devices and the border disappears. Use `StyleSheet.hairlineWidth` (1 physical pixel on every density) or a literal `1`. See __rules__/responsive-scaling.md.',
+            '`borderWidth: 0.5` rounds to 0 on DPR=1 devices and the border disappears. Use `StyleSheet.hairlineWidth` (1 physical pixel on every density) or a literal `1`. See ../.agents/skills/sovran-ui-patterns/references/responsive-scaling.md.',
         },
         // `Date#toLocaleDateString` / `Date#toLocaleTimeString` bypass the
         // canonical date pipeline in `shared/lib/date.ts` (rule:
-        // `__rules__/dates.md`). The shared `formatDate(input, style)` and
+        // `../.agents/skills/sovran-data-runtime/references/dates.md`). The shared
+        // `formatDate(input, style)` and
         // `formatRelative(input, style)` resolve locale automatically
         // (in-app language override → device locale → `'en'`) and lock the
         // style names so screens stay consistent. Bare `.toLocale*String`
@@ -359,7 +361,7 @@ module.exports = defineConfig([
         {
           selector: 'MemberExpression[property.name=/^toLocale(Date|Time)String$/]',
           message:
-            "Use `formatDate(input, style)` from '@/shared/lib/date' (or `formatRelative` for relative timestamps). The shared helpers resolve locale automatically and lock the style vocabulary. See __rules__/dates.md for the catalog of styles.",
+            "Use `formatDate(input, style)` from '@/shared/lib/date' (or `formatRelative` for relative timestamps). The shared helpers resolve locale automatically and lock the style vocabulary. See ../.agents/skills/sovran-data-runtime/references/dates.md for the catalog of styles.",
         },
       ],
     },
@@ -374,8 +376,8 @@ module.exports = defineConfig([
     },
   },
   // Two known callers legitimately need a frozen snapshot rather than a
-  // rotation-reactive value. Both are tracked as deferred follow-ups in
-  // __audits__/ — when they land, drop these exemptions.
+  // rotation-reactive value. If either surface moves to live layout
+  // measurement, drop the matching exemption.
   //   - app/_layout.tsx: splash overlay measurements are taken once at app
   //     launch (before any rotation could matter) and used to morph into a
   //     QR-button anchor. Subscribing to dimension changes here would

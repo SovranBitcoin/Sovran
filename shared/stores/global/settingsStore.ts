@@ -81,7 +81,7 @@ const DEFAULT_MIDDLEMAN_ROUTING: MiddlemanRoutingSettings = {
 
 // Persisted-shape schema (defensive rehydrate validation). All fields are
 // optional + carry a default so adding a new field doesn't drop the user's
-// existing settings on first launch (audit __audits__/06.json F-007).
+// existing settings on first launch.
 const PersistedTermsAccepted = z
   .object({
     termsAccepted: z.boolean(),
