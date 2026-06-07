@@ -8,10 +8,6 @@ on:
 
 env:
   APP_DIR: sovran-app
-  COCO_DIR: coco
-  COCO_REF: feat/onchain
-  COLADA_DIR: colada
-  SCHEMAS_DIR: sovran-schemas
 
 jobs:
   code-quality:
@@ -25,44 +21,19 @@ jobs:
         with:
           path: ${{ env.APP_DIR }}
 
-      - name: Checkout Coco onchain PR
-        uses: actions/checkout@v4
-        with:
-          repository: cashubtc/coco
-          ref: ${{ env.COCO_REF }}
-          path: ${{ env.COCO_DIR }}
-
-      - name: Checkout Sovran schemas
-        uses: actions/checkout@v4
-        with:
-          repository: SovranBitcoin/sovran-schemas
-          ref: main
-          path: ${{ env.SCHEMAS_DIR }}
-          token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
-
-      - name: Checkout Colada
-        uses: actions/checkout@v4
-        with:
-          repository: Kelbie/colada
-          ref: main
-          path: ${{ env.COLADA_DIR }}
-          token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: ${{ env.APP_DIR }}/package.json
 
-      - name: Build Coco packages
-        working-directory: ${{ env.COCO_DIR }}
-        run: |
-          bun install --no-save
-          bun run build
-
+      # The gates run entirely against published packages — @cashu/coco-* from
+      # npm, @sovranbitcoin/* from GitHub Packages — resolved by the lockfile.
+      # SOVRAN_CI_TOKEN carries cross-repo GitHub Packages read; GITHUB_TOKEN is
+      # the fallback. (No coco/colada/schemas source checkout: nothing links it.)
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
         run: bun install --frozen-lockfile
 
       - name: Lint
@@ -108,44 +79,15 @@ jobs:
           fetch-depth: 0
           path: ${{ env.APP_DIR }}
 
-      - name: Checkout Coco onchain PR
-        uses: actions/checkout@v4
-        with:
-          repository: cashubtc/coco
-          ref: ${{ env.COCO_REF }}
-          path: ${{ env.COCO_DIR }}
-
-      - name: Checkout Sovran schemas
-        uses: actions/checkout@v4
-        with:
-          repository: SovranBitcoin/sovran-schemas
-          ref: main
-          path: ${{ env.SCHEMAS_DIR }}
-          token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
-
-      - name: Checkout Colada
-        uses: actions/checkout@v4
-        with:
-          repository: Kelbie/colada
-          ref: main
-          path: ${{ env.COLADA_DIR }}
-          token: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: ${{ env.APP_DIR }}/package.json
 
-      - name: Build Coco packages
-        working-directory: ${{ env.COCO_DIR }}
-        run: |
-          bun install --no-save
-          bun run build
-
       - name: Install dependencies
         working-directory: ${{ env.APP_DIR }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SOVRAN_CI_TOKEN || secrets.GITHUB_TOKEN }}
         run: bun install --frozen-lockfile
 
       - name: Run analyze-structure
