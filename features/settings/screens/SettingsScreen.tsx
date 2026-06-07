@@ -46,6 +46,7 @@ const ProfileButton = () => {
                 picture={picture}
                 name={displayName}
                 size={40}
+                fallbackVariant="beam"
               />
             </ListGroup.ItemPrefix>
             <ListGroup.ItemContent>

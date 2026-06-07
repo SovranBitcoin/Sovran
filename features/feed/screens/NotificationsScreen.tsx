@@ -169,7 +169,11 @@ export function NotificationsScreen() {
       }
       setErrorMessage(null);
 
-      void fetchNotificationsPage({ signal, refresh: true })
+      // Only an explicit pull-to-refresh forces nagg to revalidate. An initial
+      // focus reads the shared response cache (which auto-revalidates a stale
+      // entry in the background), so opening the screen no longer pays the full
+      // recompute cost on every mount.
+      void fetchNotificationsPage({ signal, refresh: mode === 'refresh' })
         .then((page) => {
           if (signal.aborted || sequence !== loadSequenceRef.current) return;
           applyFirstPage(page);

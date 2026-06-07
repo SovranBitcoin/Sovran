@@ -199,7 +199,10 @@ export function NotificationFollowersScreen() {
       }
       setErrorMessage(null);
 
-      void fetchFollowPages({ signal, refresh: true })
+      // Only an explicit pull-to-refresh forces nagg to revalidate; an initial
+      // focus reads the shared response cache (stale entries revalidate in the
+      // background), so opening the screen avoids a full recompute each mount.
+      void fetchFollowPages({ signal, refresh: mode === 'refresh' })
         .then((page) => {
           if (signal.aborted || sequence !== loadSequenceRef.current) return;
           applyFirstPage(page);

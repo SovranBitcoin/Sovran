@@ -68,9 +68,9 @@ describe('settings avatar fallback variant', () => {
     });
   });
 
-  it('defaults to beam on fresh installs', () => {
-    expect(useSettingsStore.getState().avatarFallbackVariant).toBe('beam');
-    expect(useSettingsStore.getState().getAvatarFallbackVariant()).toBe('beam');
+  it('defaults to the flat person glyph on fresh installs', () => {
+    expect(useSettingsStore.getState().avatarFallbackVariant).toBe('flat');
+    expect(useSettingsStore.getState().getAvatarFallbackVariant()).toBe('flat');
   });
 
   it('stores allowed variants through the settings action', () => {
@@ -88,11 +88,22 @@ describe('settings avatar fallback variant', () => {
     expect(useSettingsStore.getState().avatarFallbackVariant).toBe('glass');
   });
 
+  it('migrates installs still on the legacy beam default to the new flat default', async () => {
+    // `beam` was the old global default; the migration rides those installs onto
+    // `flat` so dense surfaces go quiet, while explicit pixel/glass picks above
+    // are preserved.
+    await setPersistedSettings({ avatarFallbackVariant: 'beam' });
+
+    await useSettingsStore.persist.rehydrate();
+
+    expect(useSettingsStore.getState().avatarFallbackVariant).toBe('flat');
+  });
+
   it('rejects an invalid persisted variant and keeps the default', async () => {
     await setPersistedSettings({ avatarFallbackVariant: 'ring' });
 
     await useSettingsStore.persist.rehydrate();
 
-    expect(useSettingsStore.getState().avatarFallbackVariant).toBe('beam');
+    expect(useSettingsStore.getState().avatarFallbackVariant).toBe('flat');
   });
 });

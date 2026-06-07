@@ -357,7 +357,7 @@ export const useSettingsStore = create<SettingsStore>()(
         // guarantees every existing install lands with mock OFF on the next
         // launch, regardless of how it was turned on; afterHydrate then purges
         // any fixture metadata that already leaked into the cache.
-        version: 2,
+        version: 3,
         migrate: (state) => {
           const persisted = (state ?? {}) as z.infer<typeof PersistedSettings>;
           return {
@@ -368,6 +368,12 @@ export const useSettingsStore = create<SettingsStore>()(
             mockFailMelt: false,
             mockFailPaymentRequest: false,
             mockNoGlass: false,
+            // v2 -> v3: the avatar fallback default moved from the cute `beam`
+            // face to the neutral `flat` person glyph (so dense surfaces stay
+            // quiet). Installs still carrying the old default ride the new one;
+            // explicit `pixel`/`glass`/`flat` choices are preserved.
+            avatarFallbackVariant:
+              persisted.avatarFallbackVariant === 'beam' ? 'flat' : persisted.avatarFallbackVariant,
           };
         },
         partialize: (state) => ({

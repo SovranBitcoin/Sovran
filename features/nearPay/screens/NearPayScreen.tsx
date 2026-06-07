@@ -571,6 +571,7 @@ const PeerNode = React.memo(function PeerNode({
             name={target.peer.name}
             seed={target.peer.peerID}
             alt={`${target.peer.name} avatar`}
+            fallbackVariant="beam"
           />
         </View>
         <Animated.View pointerEvents="none" style={peerAvatarNameLabelStyle}>
@@ -694,6 +695,7 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
           name={recipient.name}
           seed={recipient.peerID}
           alt={`${recipient.name} avatar`}
+          fallbackVariant="beam"
         />
       </View>
       <Text size={15} weight="bold" numberOfLines={1} style={titleStyle}>
@@ -1808,6 +1810,7 @@ export function NearPayScreen() {
                       name={sharedAvatarPeer.name}
                       seed={sharedAvatarPeer.peerID}
                       alt={`${sharedAvatarPeer.name} avatar`}
+                      fallbackVariant="beam"
                     />
                   </View>
                 </Animated.View>

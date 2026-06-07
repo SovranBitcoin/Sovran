@@ -1,16 +1,26 @@
-export const AVATAR_FALLBACK_VARIANTS = ['beam', 'pixel', 'glass'] as const;
+export const AVATAR_FALLBACK_VARIANTS = ['beam', 'pixel', 'glass', 'flat'] as const;
 
 export type AvatarFallbackVariant = (typeof AVATAR_FALLBACK_VARIANTS)[number];
 
-export const DEFAULT_AVATAR_FALLBACK_VARIANT: AvatarFallbackVariant = 'beam';
+// Boring, neutral person glyph on a muted background — mirrors `MintIcon`'s
+// missing-icon fallback. This is the global default so dense surfaces (feeds,
+// DM lists, conversations, notifications, contact/search lists) stay quiet;
+// personal/expressive surfaces force the cute `beam` instead.
+export const DEFAULT_AVATAR_FALLBACK_VARIANT: AvatarFallbackVariant = 'flat';
 
 export const WHITE_FACE_AVATAR_FALLBACK_VARIANT = 'beam' satisfies AvatarFallbackVariant;
 export const GLASS_AVATAR_FALLBACK_VARIANT = 'glass' satisfies AvatarFallbackVariant;
+export const FLAT_AVATAR_FALLBACK_VARIANT = 'flat' satisfies AvatarFallbackVariant;
+
+// Person glyph for the flat fallback. Kept in the `mingcute` family so it reads
+// as a sibling to the mint fallback (`mingcute:bank-fill`).
+export const FLAT_AVATAR_FALLBACK_ICON = 'mingcute:user-3-fill';
 
 export const AVATAR_FALLBACK_VARIANT_LABELS: Record<AvatarFallbackVariant, string> = {
   beam: 'Beam',
   pixel: 'Pixels',
   glass: 'Glass',
+  flat: 'Flat',
 };
 
 // Stronger static design-system colors used by every fallback variation. Beam

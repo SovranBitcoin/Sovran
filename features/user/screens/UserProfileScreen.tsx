@@ -343,6 +343,7 @@ function BannerWithAvatarComponent({
   bannerUrl,
   pictureUrl,
   pubkey,
+  isOwnProfile,
   displayName,
   nip05,
   isLoading,
@@ -356,6 +357,7 @@ function BannerWithAvatarComponent({
   bannerUrl?: string;
   pictureUrl?: string;
   pubkey: string;
+  isOwnProfile: boolean;
   displayName: string;
   nip05?: string;
   isLoading: boolean;
@@ -440,6 +442,7 @@ function BannerWithAvatarComponent({
         seed={pubkey}
         size={AVATAR_SIZE}
         name={displayName}
+        fallbackVariant={isOwnProfile ? 'beam' : undefined}
       />
     </View>
   );
@@ -1007,6 +1010,7 @@ export function UserProfileScreen() {
                 bannerUrl={cachedProfile?.banner}
                 pictureUrl={cachedProfile?.picture}
                 pubkey={pubkey}
+                isOwnProfile={isOwnProfile}
                 displayName={displayName}
                 nip05={cachedProfile?.nip05}
                 isLoading={isMetadataLoading}
