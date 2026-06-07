@@ -9,6 +9,8 @@ import Icon from 'assets/icons';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import {
   AVATAR_FALLBACK_COLOR_TOKENS,
+  FLAT_AVATAR_FALLBACK_ICON,
+  FLAT_AVATAR_FALLBACK_VARIANT,
   GLASS_AVATAR_FALLBACK_VARIANT,
   WHITE_FACE_AVATAR_FALLBACK_VARIANT,
   getAvatarFallbackColorsForVariant,
@@ -71,6 +73,30 @@ function GradientFallbackContent({
   );
 }
 
+function FlatFallbackContent({ borderRadius, size }: { borderRadius: number; size: number }) {
+  // Mirror `MintIcon`'s missing-icon fallback: a single glyph in the background
+  // color, centered on the muted surface color.
+  const [muted, background] = useThemeColor(['muted', 'background'] as const);
+  const iconSize = Math.round(size * 0.72);
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFillObject,
+        {
+          borderRadius,
+          overflow: 'hidden',
+          backgroundColor: muted,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+      ]}>
+      <Icon name={FLAT_AVATAR_FALLBACK_ICON} size={iconSize} color={background} />
+    </View>
+  );
+}
+
 function AvatarFallbackContent({
   fallbackSeed,
   borderRadius,
@@ -90,6 +116,10 @@ function AvatarFallbackContent({
     colors: fallbackColors,
     seed: fallbackSeed,
   });
+
+  if (fallbackVariant === FLAT_AVATAR_FALLBACK_VARIANT) {
+    return <FlatFallbackContent borderRadius={borderRadius} size={size} />;
+  }
 
   if (fallbackVariant === GLASS_AVATAR_FALLBACK_VARIANT) {
     return <GradientFallbackContent fallbackSeed={fallbackSeed} borderRadius={borderRadius} />;

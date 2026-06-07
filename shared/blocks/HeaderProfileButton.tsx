@@ -68,6 +68,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
           picture={picture}
           name={displayName}
           size={AVATAR_SIZE}
+          fallbackVariant="beam"
         />
       </Pressable>
     </Animated.View>

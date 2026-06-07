@@ -170,6 +170,7 @@ function ProfileSwitcherButtons({
                 overrideName: profile.cachedDisplayName,
               })}
               size={30}
+              fallbackVariant="beam"
             />
           </Pressable>
         ))}
@@ -241,6 +242,7 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
             picture={picture}
             name={displayName}
             size={56}
+            fallbackVariant="beam"
           />
         </Pressable>
         <ProfileSwitcherButtons executeProfileAction={executeProfileAction} openSheet={openSheet} />

@@ -120,12 +120,13 @@ describe('avatar fallback rendering', () => {
     expect(sanitizeAvatarFallbackSeed('')).toBe('avatar');
   });
 
-  it('only exposes glass, beam, and pixels as fallback options', () => {
-    expect(AVATAR_FALLBACK_VARIANTS).toEqual(['beam', 'pixel', 'glass']);
+  it('exposes beam, pixels, glass, and flat as fallback options', () => {
+    expect(AVATAR_FALLBACK_VARIANTS).toEqual(['beam', 'pixel', 'glass', 'flat']);
     expect(AVATAR_FALLBACK_VARIANT_LABELS).toEqual({
       beam: 'Beam',
       pixel: 'Pixels',
       glass: 'Glass',
+      flat: 'Flat',
     });
   });
 
@@ -273,6 +274,38 @@ describe('avatar fallback rendering', () => {
 
     expect(primaryGradient.props.colors).toHaveLength(3);
     expect(overlayGradient.props.colors).toHaveLength(3);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('renders the flat variation as a person glyph in the background color', () => {
+    let renderer: TestRenderer.ReactTestRenderer;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        <Avatar
+          state="fallback"
+          seed="npub flat/#?"
+          alt="Flat avatar seed"
+          size={40}
+          fallbackVariant="flat"
+        />
+      );
+    });
+
+    // No generative content — flat is a single static glyph like the mint icon.
+    expect(renderer!.root.findAllByProps({ testID: 'boring-avatar' })).toHaveLength(0);
+    expect(renderer!.root.findAllByProps({ testID: 'white-face-beam-head' })).toHaveLength(0);
+    expect(renderer!.root.findAllByProps({ testID: 'avatar-glass-gradient-primary' })).toHaveLength(
+      0
+    );
+
+    const personIcon = renderer!.root.findByProps({ testID: 'icon-mingcute:user-3-fill' });
+    expect(personIcon.props.color).toBe('theme-background');
+    // 72% of the avatar size, matching the mint fallback ratio.
+    expect(personIcon.props.size).toBe(29);
 
     act(() => {
       renderer.unmount();

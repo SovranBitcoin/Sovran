@@ -357,7 +357,13 @@ export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBott
   return (
     <Log name="ImageOverlayBottomPanelReply">
       <Pressable onPress={onReplyPress} style={styles.replyRow}>
-        <Avatar state="fallback" seed={currentUserPubkey ?? ''} size={28} name="" />
+        <Avatar
+          state="fallback"
+          seed={currentUserPubkey ?? ''}
+          size={28}
+          name=""
+          fallbackVariant="beam"
+        />
         <View style={styles.replyInputWrap}>
           <Text size={14} style={{ color: PANEL_TEXT_MUTED }}>
             Post your reply
