@@ -15,7 +15,7 @@ export function emptyNotificationsResult(): FeedNotificationsResult {
 // zap) collapse a whole post/relationship, so two pages can carry the same group
 // with different representative events — dedupe those by reason+target, and
 // everything else by event id.
-function notificationDedupeKey(notification: FeedNotification): string {
+export function notificationDedupeKey(notification: FeedNotification): string {
   if (notification.type === 'group') {
     const target = notification.targetEventId ?? notification.targetEvent?.id ?? 'profile';
     return notification.reason === 'follow'

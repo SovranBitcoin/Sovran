@@ -21,7 +21,10 @@ import {
   notificationReplyScopeLabel,
 } from '@/features/feed/lib/notificationCopy';
 import { seedNotificationFollowers } from '@/features/feed/lib/notificationFollowersSeedCache';
-import { mergeNotificationsResult } from '@/features/feed/lib/notificationResults';
+import {
+  mergeNotificationsResult,
+  notificationDedupeKey,
+} from '@/features/feed/lib/notificationResults';
 import {
   buildNotificationListItems,
   type NotificationListItem,
@@ -80,6 +83,10 @@ export function NotificationsScreen() {
   const loadingMoreRef = useRef(false);
   const hasMoreRef = useRef(false);
   const paginationUntilRef = useRef(0);
+  // Group identities already shown, so load-more can stop when a page brings
+  // nothing new — more reliable than the server's (conservative) hasNextPage,
+  // which under-reports once grouping collapses a page below the page size.
+  const seenKeysRef = useRef<Set<string>>(new Set());
   const tabBarPadding = useTabBarBottomPadding();
   const [foreground, surface, separator, muted, surfaceTertiary] = useThemeColor([
     'foreground',
@@ -122,7 +129,10 @@ export function NotificationsScreen() {
 
   const applyFirstPage = useCallback((page: FeedNotificationsResult | null) => {
     paginationUntilRef.current = page?.paginationUntil ?? 0;
-    hasMoreRef.current = !!page && page.paginationUntil > 0 && page.hasNextPage;
+    seenKeysRef.current = new Set((page?.notifications ?? []).map(notificationDedupeKey));
+    // Optimistic: as long as there's a cursor, try to page. load-more stops as
+    // soon as a fetch brings no genuinely-new items.
+    hasMoreRef.current = !!page && page.paginationUntil > 0;
     feedLog.info('feed.notifications.ui.applied', {
       notifications: page?.notifications.length ?? 0,
       hasPage: !!page,
@@ -243,13 +253,18 @@ export function NotificationsScreen() {
       });
       if (!page || controller.signal.aborted || sequence !== loadSequenceRef.current) return;
 
-      if (page.notifications.length === 0 || page.paginationUntil <= 0 || !page.hasNextPage) {
-        hasMoreRef.current = false;
-      } else {
-        hasMoreRef.current = true;
+      const newKeys = page.notifications
+        .map(notificationDedupeKey)
+        .filter((key) => !seenKeysRef.current.has(key));
+      const advanced = page.paginationUntil > 0 && page.paginationUntil < cursor;
+      // Stop only when a page adds nothing new or the cursor can't advance —
+      // grouping makes the raw item count an unreliable "has more" signal.
+      hasMoreRef.current = newKeys.length > 0 && advanced;
+      if (advanced) paginationUntilRef.current = page.paginationUntil;
+      if (newKeys.length > 0) {
+        newKeys.forEach((key) => seenKeysRef.current.add(key));
+        setResult((previous) => mergeNotificationsResult(previous, page));
       }
-      if (page.paginationUntil > 0) paginationUntilRef.current = page.paginationUntil;
-      setResult((previous) => mergeNotificationsResult(previous, page));
     } catch (error) {
       if (controller.signal.aborted || sequence !== loadSequenceRef.current) return;
       const message = error instanceof Error ? error.message : String(error);
@@ -265,6 +280,7 @@ export function NotificationsScreen() {
       if (tab === activeTab) return;
       paginationUntilRef.current = 0;
       hasMoreRef.current = false;
+      seenKeysRef.current = new Set();
       setResult(null);
       setErrorMessage(null);
       setIsLoadingMore(false);
