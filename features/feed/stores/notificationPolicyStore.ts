@@ -27,7 +27,7 @@ type NotificationPolicyActions = {
 type NotificationPolicyStore = NotificationPolicyState & NotificationPolicyActions;
 
 const PersistedNotificationPolicyStore = z.object({
-  policy: z.enum(['RELAXED', 'MODERATE', 'STRICT']).default(DEFAULT_NOTIFICATION_POLICY),
+  policy: z.enum(['RELAXED', 'MODERATE', 'STRICT', 'FOLLOWS']).default(DEFAULT_NOTIFICATION_POLICY),
   replyScope: z.enum(['DIRECT', 'THREAD']).default(DEFAULT_NOTIFICATION_REPLY_SCOPE),
 });
 

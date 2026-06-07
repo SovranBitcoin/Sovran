@@ -57,7 +57,7 @@ export type FeedEnrichmentRequest = RequestControls & {
   refresh?: boolean;
 };
 
-export type FeedNotificationPolicy = 'RELAXED' | 'MODERATE' | 'STRICT';
+export type FeedNotificationPolicy = 'RELAXED' | 'MODERATE' | 'STRICT' | 'FOLLOWS';
 export type FeedNotificationReplyScope = 'DIRECT' | 'THREAD';
 export type FeedNotificationTab = 'ALL' | 'MENTIONS';
 

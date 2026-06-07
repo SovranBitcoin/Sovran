@@ -32,6 +32,8 @@ export function notificationPolicyLabel(policy: FeedNotificationPolicy): string 
       return 'Moderate';
     case 'STRICT':
       return 'Strict';
+    case 'FOLLOWS':
+      return 'Follows';
   }
 }
 

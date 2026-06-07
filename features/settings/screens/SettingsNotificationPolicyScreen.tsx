@@ -10,9 +10,15 @@ import { Section } from '@/shared/ui/composed/Section';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { SelectableCheck } from '@/shared/ui/primitives/SelectableCheck';
 
-const NOTIFICATION_POLICIES: readonly FeedNotificationPolicy[] = ['STRICT', 'MODERATE', 'RELAXED'];
+const NOTIFICATION_POLICIES: readonly FeedNotificationPolicy[] = [
+  'FOLLOWS',
+  'STRICT',
+  'MODERATE',
+  'RELAXED',
+];
 
 const POLICY_DESCRIPTIONS: Record<FeedNotificationPolicy, string> = {
+  FOLLOWS: 'Only notifications from people you follow.',
   STRICT: 'Prefer high-signal notifications from trusted parts of the network.',
   MODERATE: 'Balance relevance with a broader notification surface.',
   RELAXED: 'Show the widest set of notification events.',
