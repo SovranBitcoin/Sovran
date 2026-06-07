@@ -133,6 +133,11 @@ export type NotificationsAppViewInput = {
   since?: number;
   until?: number;
   limit?: number;
+  /**
+   * Group follow/repost/reaction/zap items server-side (default true). Pass
+   * false to read the raw ungrouped list (the followers-detail screen does).
+   */
+  grouped?: boolean;
 };
 
 /**
@@ -156,6 +161,7 @@ export function notificationsAppView(input: NotificationsAppViewInput): NaggAppV
       ...(input.since ? { since: input.since } : {}),
       ...(input.until ? { until: input.until } : {}),
       limit: input.limit ?? 50,
+      ...(input.grouped === false ? { grouped: 'false' } : {}),
     },
   };
 }

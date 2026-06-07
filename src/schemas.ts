@@ -212,16 +212,41 @@ export const NaggThreadSchema = z.object({
   quoted: z.record(z.string(), NaggFeedEventSchema),
 });
 
+// One actor in a grouped notification (a follower / reposter / reactor /
+// zapper), carried as a sample so the UI can render an avatar cluster without
+// the full member list.
+export const NaggNotificationActorSchema = z
+  .object({
+    pubkey: z.string(),
+    eventId: z.string(),
+    createdAt: z.number(),
+    actorVertexScore: z.number().optional(),
+  })
+  .passthrough();
+
 // Notifications canonical connection. The nodes carry the feed-event payload
 // plus the ranking metadata (reason, actorVertexScore) the GraphQL
 // notifications resolver exposes; metrics/profiles/quoted ride alongside as
 // page-level hydration side maps (the REST app-view supplies them, and the
 // GraphQL query embeds the equivalent per node).
+//
+// The REST app-view additionally groups follow/repost/reaction/zap items: a
+// node with `type: "group"` represents many collapsed notifications, carrying a
+// `total`, up to three `sampleActors`, and (for repost/reaction/zap) the
+// `targetEvent`. reply/quote/mention stay `type: "single"`. The GraphQL path
+// omits these fields (it is per-event), so they are all optional.
+// targetEvent / targetEventId ride through `.passthrough()` (the GraphQL mapper
+// injects them from references; the REST app-view emits them inline) and are
+// read by consumers via a cast, so they stay off the explicit shape.
 export const NaggNotificationNodeSchema = z
   .object({
+    type: z.enum(["single", "group"]).optional(),
     event: NaggFeedEventSchema,
     reason: z.string(),
     actorVertexScore: z.number(),
+    total: z.number().optional(),
+    totalCapped: z.boolean().optional(),
+    sampleActors: z.array(NaggNotificationActorSchema).optional(),
   })
   .passthrough();
 
@@ -333,6 +358,7 @@ export type NaggProfileInfoShape = z.infer<typeof NaggProfileInfoSchema>;
 export type NaggFeedItemShape = z.infer<typeof NaggFeedItemSchema>;
 export type NaggFeedPage = z.infer<typeof NaggFeedPageSchema>;
 export type NaggThread = z.infer<typeof NaggThreadSchema>;
+export type NaggNotificationActor = z.infer<typeof NaggNotificationActorSchema>;
 export type NaggNotificationNode = z.infer<typeof NaggNotificationNodeSchema>;
 export type NaggNotificationsPage = z.infer<typeof NaggNotificationsPageSchema>;
 export type NaggNoteStats = z.infer<typeof NaggNoteStatsSchema>;
