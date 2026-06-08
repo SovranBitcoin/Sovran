@@ -32,6 +32,7 @@ import type { NativeStackNavigationOptions } from '@react-navigation/native-stac
 
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useDeferredMount } from '@/shared/hooks/useDeferredMount';
 import { ModalLayoutWrapper } from './ModalLayoutWrapper';
 import { ScreenBackgroundContext, ScreenFooterContext } from './ScreenFooterContext';
 
@@ -70,6 +71,15 @@ interface ScreenProps {
   onHeaderHeightChange?: (height: number) => void;
   scrollIndicatorInsets?: { top?: number; right?: number; bottom?: number; left?: number };
   /**
+   * Defer mounting the content subtree until just after the first commit so the
+   * native-stack present/slide can start on a cheap frame (themed background
+   * only), then fill in the content. Default `true`. Set `false` for screens
+   * that must render synchronously on mount — e.g. ones that auto-focus a text
+   * input or measure a child immediately (the input/child would otherwise not
+   * exist when the focus/measure fires). See `useDeferredMount`.
+   */
+  deferContent?: boolean;
+  /**
    * Apply safe-area top/bottom padding to the content frame. Only meaningful
    * with `scroll="custom"` or `scroll="none"` — when a ScrollView is used it
    * handles the insets itself via `contentInsetAdjustmentBehavior="automatic"`.
@@ -107,6 +117,7 @@ export function Screen({
   onHeaderHeightChange,
   scrollIndicatorInsets,
   safeArea = false,
+  deferContent = true,
 }: ScreenProps) {
   const [measuredFooterHeight, setMeasuredFooterHeight] = useState(0);
   // Track what we last committed to state so we can ignore onLayout callbacks
@@ -127,6 +138,12 @@ export function Screen({
     () => ({ setFooterHeight: updateFooterHeight }),
     [updateFooterHeight]
   );
+
+  // Defer the content subtree so the modal present starts on a cheap frame.
+  // The Log boundary + ModalLayoutWrapper background stay mounted immediately,
+  // so the modal shows its themed background (no white flash) and log-doctor's
+  // screen testID appears right away; only `children`/`footer` wait one tick.
+  const contentReady = useDeferredMount(deferContent);
 
   const insets = useSafeAreaInsets();
   // Match ModalLayoutWrapper: read header height directly so this is safe to
@@ -176,8 +193,8 @@ export function Screen({
             onHeaderHeightChange={onHeaderHeightChange}
             scrollIndicatorInsets={scrollIndicatorInsets}
             bgColor={bgColor}
-            bottomContent={footer}>
-            {framedChildren}
+            bottomContent={contentReady ? footer : undefined}>
+            {contentReady ? framedChildren : null}
           </ModalLayoutWrapper>
         </ScreenFooterContext.Provider>
       </ScreenBackgroundContext.Provider>

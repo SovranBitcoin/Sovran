@@ -5,7 +5,15 @@
  */
 
 import React, { ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { NativeScrollEvent, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  NativeScrollEvent,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
@@ -38,6 +46,50 @@ const DebugRow = ({
     </Text>
   </View>
 );
+
+/**
+ * Owns the Reanimated shared value + scroll handler for the animated-scroll
+ * mode. Split out of ModalLayoutWrapper so those hooks only run when a screen
+ * actually opts into animated scroll — keeping the per-mount cost off the
+ * common (non-animated) modal path. Shared-value access stays inside the
+ * worklet (never read/written during render), so it's React Compiler safe.
+ */
+function AnimatedScrollContainer({
+  externalScrollY,
+  contentContainerStyle,
+  scrollIndicatorInsets,
+  showHeaderSpacer,
+  totalHeaderHeight,
+  children,
+}: {
+  externalScrollY?: SharedValue<number>;
+  contentContainerStyle: StyleProp<ViewStyle>;
+  scrollIndicatorInsets?: { top?: number; right?: number; bottom?: number; left?: number };
+  showHeaderSpacer: boolean;
+  totalHeaderHeight: number;
+  children: ReactNode;
+}) {
+  const internalScrollY = useSharedValue(0);
+  const scrollY = externalScrollY ?? internalScrollY;
+
+  const animatedScrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = Math.max(0, event.contentOffset.y);
+    },
+  });
+
+  return (
+    <Animated.ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={contentContainerStyle}
+      onScroll={animatedScrollHandler}
+      scrollEventThrottle={16}
+      scrollIndicatorInsets={scrollIndicatorInsets}>
+      {showHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
+      {children}
+    </Animated.ScrollView>
+  );
+}
 
 interface ModalLayoutWrapperProps {
   children: ReactNode;
@@ -113,14 +165,9 @@ export function ModalLayoutWrapper({
 
   const [adjustedInsets, setAdjustedInsets] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
 
-  const internalScrollY = useSharedValue(0);
-  const scrollY = externalScrollY ?? internalScrollY;
-
-  const animatedScrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = Math.max(0, event.contentOffset.y);
-    },
-  });
+  // The animated-scroll shared value + handler live in AnimatedScrollContainer
+  // below, so every non-animated modal (the common case) doesn't pay the
+  // per-mount Reanimated worklet/shared-value registration.
 
   const handleScroll = useCallback((event: { nativeEvent: NativeScrollEvent }) => {
     const { contentInset } = event.nativeEvent;
@@ -199,15 +246,14 @@ export function ModalLayoutWrapper({
         {useCustomScrollView ? (
           <View style={{ flex: 1 }}>{children}</View>
         ) : useAnimatedScroll ? (
-          <Animated.ScrollView
-            style={{ flex: 1 }}
+          <AnimatedScrollContainer
+            externalScrollY={externalScrollY}
             contentContainerStyle={scrollContentStyle}
-            onScroll={animatedScrollHandler}
-            scrollEventThrottle={16}
-            scrollIndicatorInsets={scrollIndicatorInsets}>
-            {!disableHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
+            scrollIndicatorInsets={scrollIndicatorInsets}
+            showHeaderSpacer={!disableHeaderSpacer}
+            totalHeaderHeight={totalHeaderHeight}>
             {children}
-          </Animated.ScrollView>
+          </AnimatedScrollContainer>
         ) : (
           <ScrollView
             className="flex-1"

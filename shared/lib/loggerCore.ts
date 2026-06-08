@@ -118,6 +118,13 @@ export interface Logger {
   fatal(event: string, params?: Record<string, unknown>): void;
   child(context: Record<string, unknown>): Logger;
   setLevel(level: LogLevel): void;
+  /**
+   * Cheap predicate for whether `level` would currently be emitted. Mirrors the
+   * short-circuit at the top of `emit` (SHOW_LOGS + enabled + severity), so hot
+   * callers can skip building expensive params — e.g. the `<Log>` UI wrapper's
+   * recursive tree walk — when logging is disabled. Dynamic: respects setLevel.
+   */
+  isLevelEnabled(level: LogLevel): boolean;
   /** Get the ring buffer contents (useful for crash reports or LLM context dumps) */
   getRecentLogs(): LogEntry[];
   /** Clear the ring buffer */
@@ -744,6 +751,8 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
     setLevel: (newLevel) => {
       core.minSeverity = LEVEL_SEVERITY[newLevel];
     },
+    isLevelEnabled: (queryLevel) =>
+      SHOW_LOGS && core.enabled && LEVEL_SEVERITY[queryLevel] >= core.minSeverity,
     getRecentLogs: () => core.buffer.getAll(),
     clearRecentLogs: () => core.buffer.clear(),
     dumpForLLM: (dumpOpts?: DumpOptions) => {
