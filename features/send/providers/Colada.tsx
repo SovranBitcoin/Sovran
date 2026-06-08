@@ -157,7 +157,11 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           await sendDirectMessageToRelays({ senderPrivateKey: pk, nprofile, message });
         },
         getOffline,
-        enableEcashSendMemo: true,
+        // Disabled while the send-memo UI is WIP. With memos on, a proof-selector
+        // round-up/round-down routes PROOFS_CHOSEN -> enterSendMemo, whose sheet is
+        // then clobbered by the proof-selector's close() and the send is stranded.
+        // Off => PROOFS_CHOSEN goes straight to confirmSend, so round-up just sends.
+        enableEcashSendMemo: false,
         getLocale: () => useSettingsStore.getState().language || 'en',
         getBtcPrice,
         getDisplayCurrency,
