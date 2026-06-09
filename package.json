@@ -50,8 +50,8 @@
     "ios": "expo run:ios",
     "screenshots": "node scripts/resize-screenshots.js",
     "test": "jest",
-    "release:freedomstore": "FREEDOMSTORE_TARGET=freedomstore/freedomstore bash scripts/create-freedomstore-pr.sh",
-    "release:freedomstore:test": "bash scripts/create-freedomstore-pr.sh",
+    "test:release": "bun test scripts/lib/__tests__",
+    "release:ios": "node scripts/release-ios.mjs",
     "probe:nagg": "bun features/feed/data/__scripts__/probeNagg.ts"
   },
   "dependencies": {

@@ -80,7 +80,7 @@ function runWorker() {
     // The first npub chars come from x-only bytes, i.e. b[1..4] here.
     const b = pt.toBytes(true);
     // Decode just enough 5-bit groups (up to 6) and compare, short-circuiting.
-    if ((b[1] >>> 3) === t0) {
+    if (b[1] >>> 3 === t0) {
       if (len === 1) return found();
       if ((((b[1] & 7) << 2) | (b[2] >>> 6)) === t1) {
         if (len === 2) return found();
@@ -115,9 +115,10 @@ function runWorker() {
 if (isMainThread) {
   const argv = process.argv.slice(2);
   const tIdx = argv.indexOf('--threads');
-  const threads =
-    tIdx >= 0 ? Number(argv[tIdx + 1]) : Math.max(1, os.cpus().length - 1);
-  const prefix = (argv.find((a) => !a.startsWith('--') && a !== String(threads)) || 's0vran').toLowerCase();
+  const threads = tIdx >= 0 ? Number(argv[tIdx + 1]) : Math.max(1, os.cpus().length - 1);
+  const prefix = (
+    argv.find((a) => !a.startsWith('--') && a !== String(threads)) || 's0vran'
+  ).toLowerCase();
 
   let target;
   try {
