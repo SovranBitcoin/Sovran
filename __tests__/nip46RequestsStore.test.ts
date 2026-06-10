@@ -36,7 +36,6 @@ function makeRequest(overrides: Partial<Nip46PendingRequest> = {}): Nip46Pending
     id: `rpc-${seq}`,
     eventId: `${seq}`.padStart(64, '0'),
     clientPubkey: APP_A,
-    connectionKnown: true,
     method: 'sign_event',
     kind: 1,
     paramsPreview: { type: 'none' },
@@ -234,16 +233,25 @@ describe('session grants', () => {
 });
 
 describe('throttled apps', () => {
-  it('sets and clears UI flags', () => {
+  it('records cooldownUntil and clears with null', () => {
     const store = useNip46RequestsStore.getState();
-    store.setAppThrottled(APP_A, true);
-    expect(useNip46RequestsStore.getState().throttledApps).toEqual({ [APP_A]: true });
+    store.setAppThrottled(APP_A, 5_000);
+    expect(useNip46RequestsStore.getState().throttledApps).toEqual({ [APP_A]: 5_000 });
 
-    store.setAppThrottled(APP_A, false);
+    store.setAppThrottled(APP_A, null);
     expect(useNip46RequestsStore.getState().throttledApps).toEqual({});
 
     // Clearing an absent flag is a no-op.
-    store.setAppThrottled(APP_B, false);
+    store.setAppThrottled(APP_B, null);
     expect(useNip46RequestsStore.getState().throttledApps).toEqual({});
+  });
+
+  it('clear() drops throttle flags alongside the queue', () => {
+    const store = useNip46RequestsStore.getState();
+    store.setAppThrottled(APP_A, 5_000);
+    store.enqueue(makeRequest());
+    store.clear();
+    expect(useNip46RequestsStore.getState().throttledApps).toEqual({});
+    expect(useNip46RequestsStore.getState().pending).toEqual([]);
   });
 });

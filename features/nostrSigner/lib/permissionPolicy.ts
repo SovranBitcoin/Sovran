@@ -7,15 +7,16 @@
  * persisted grant; only a runtime session grant (peer≠self decrypt) can.
  */
 
-import { Result } from 'neverthrow';
 import { z } from 'zod';
 
+import { safeJsonParse } from '@/features/nostrSigner/lib/json';
 import {
   MAX_EVENT_KIND,
   NIP46_ERRORS,
   NIP46_RPC_KIND,
   type ConnectionMode,
   type ConnectionStatus,
+  type EncryptionGrantKey,
   type GrantKey,
   type GrantVerdict,
   type Nip46ErrorString,
@@ -37,15 +38,10 @@ export interface ClassifyInput {
   userPubkey?: string;
 }
 
-export interface Classification {
+interface Classification {
   class: SensitivityClass;
   isSelfDecrypt: boolean;
 }
-
-const safeJsonParse = Result.fromThrowable(
-  (raw: string) => JSON.parse(raw) as unknown,
-  () => 'invalid_json' as const
-);
 
 // Classification only needs tags; never reuse this for signing-path validation.
 const DeletionTagsSchema = z.looseObject({
@@ -113,6 +109,23 @@ export function classifyRequest(input: ClassifyInput): Classification {
     case 'sign_event':
       return { class: classifySignKind(kind, params), isSelfDecrypt: false };
   }
+}
+
+const SIGN_EVENT_GRANT_KEY_PREFIX = 'sign_event:';
+
+/**
+ * Inverse of `grantKeyFor`: split a stored grant key back into method + kind.
+ * The single decoder for the `sign_event:<kind>` shape — classification,
+ * catalog display, and the editor all consume this instead of re-slicing.
+ */
+export function parseGrantKey(grantKey: GrantKey): { method: Nip46Method; kind?: number } {
+  if (grantKey.startsWith(SIGN_EVENT_GRANT_KEY_PREFIX)) {
+    return {
+      method: 'sign_event',
+      kind: Number(grantKey.slice(SIGN_EVENT_GRANT_KEY_PREFIX.length)),
+    };
+  }
+  return { method: grantKey as EncryptionGrantKey };
 }
 
 /** Persistent grant key for a request, or null for auto-class methods (never grantable). */

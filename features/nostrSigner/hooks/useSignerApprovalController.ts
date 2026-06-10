@@ -36,10 +36,10 @@ import { popup, showActionSheet } from '@/shared/lib/popup';
 import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/popupStore';
 
 /** Settle delay between a sheet closing and the approval sheet opening. */
-export const APPROVAL_OPEN_DELAY_MS = 500;
+const APPROVAL_OPEN_DELAY_MS = 500;
 
 /** "Quiet 2s" — the auto-signed notice must never demand attention. */
-export const AUTO_SIGNED_TOAST_MS = 2000;
+const AUTO_SIGNED_TOAST_MS = 2000;
 
 // ── Pure decision helpers (unit-tested) ─────────────────────────
 
@@ -64,7 +64,7 @@ export function pruneDeferredIds(
   return next;
 }
 
-export type SignerSheetCloseOutcome = 'none' | 'defer-silent' | 'defer-toast';
+type SignerSheetCloseOutcome = 'none' | 'defer-silent' | 'defer-toast';
 
 /** What a signer-approval close means for the remaining queue. */
 export function signerSheetCloseOutcome(
@@ -121,9 +121,19 @@ export function useSignerApprovalController(): void {
   }, [isOpen, pending]);
 
   // ── Auto-signed toast (Always Allow grants) ───────────────────
+  // The activity store is persisted (AsyncStorage) and rehydrates async. Seed
+  // the baseline only AFTER hydration: otherwise persist's merge setState fires
+  // the subscriber with the PREVIOUS session's newest entry, which can spuriously
+  // toast "Auto-signed" on a cold start when nothing was signed.
   useEffect(() => {
-    let lastSeenEntryId = useNip46ActivityStore.getState().entries[0]?.id ?? null;
+    let hydrated = false;
+    let lastSeenEntryId: string | null = null;
+    const seed = (): void => {
+      lastSeenEntryId = useNip46ActivityStore.getState().entries[0]?.id ?? null;
+      hydrated = true;
+    };
     const unsubscribe = useNip46ActivityStore.subscribe((state) => {
+      if (!hydrated) return; // ignore the rehydration setState (and any pre-hydration write)
       const newest = state.entries[0];
       if (newest === undefined || newest.id === lastSeenEntryId) return;
       lastSeenEntryId = newest.id;
@@ -136,6 +146,11 @@ export function useSignerApprovalController(): void {
       const copy = autoSignedToastCopy(appDisplayName(connection), headline);
       popup({ message: copy.label, text: copy.description, duration: AUTO_SIGNED_TOAST_MS });
     });
-    return unsubscribe;
+    const unsubHydrate = useNip46ActivityStore.persist.onFinishHydration(seed);
+    if (useNip46ActivityStore.persist.hasHydrated()) seed();
+    return () => {
+      unsubHydrate();
+      unsubscribe();
+    };
   }, []);
 }

@@ -53,12 +53,10 @@ import type { NDKAuthPolicy, NDKFilter, NDKKind, NDKSubscription } from '@nostr-
 import { err, errAsync, ok, Result, ResultAsync } from 'neverthrow';
 
 import { CREATED_AT_SKEW_SEC, NIP46_RPC_KIND } from '@/features/nostrSigner/lib/nip46Types';
-import { nostrLog, redactError } from '@/shared/lib/logger';
+import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
 
 /** Per-relay publish timeout; sendResponse resolves on the FIRST relay OK. */
 export const PUBLISH_TIMEOUT_MS = 5_000;
-
-type RedactedCause = { name: string; message: string };
 
 /**
  * Envelope encryption scheme. Structurally identical to the connections
@@ -70,16 +68,16 @@ export type Nip46Encryption = 'nip44' | 'nip04';
 export type Nip46TransportError =
   | { type: 'not-started' }
   | { type: 'no-relays' }
-  | { type: 'transport-failed'; cause: RedactedCause }
-  | { type: 'encrypt-failed'; cause: RedactedCause }
-  | { type: 'decrypt-failed'; cause: RedactedCause }
-  | { type: 'sign-failed'; cause: RedactedCause }
-  | { type: 'publish-failed'; cause: RedactedCause };
+  | { type: 'transport-failed'; cause: RedactedError }
+  | { type: 'encrypt-failed'; cause: RedactedError }
+  | { type: 'decrypt-failed'; cause: RedactedError }
+  | { type: 'sign-failed'; cause: RedactedError }
+  | { type: 'publish-failed'; cause: RedactedError };
 
 const NOT_STARTED: Nip46TransportError = { type: 'not-started' };
 const NO_RELAYS: Nip46TransportError = { type: 'no-relays' };
 
-export interface Nip46TransportStartParams {
+interface Nip46TransportStartParams {
   /**
    * The user's signing key. A raw Uint8Array is wrapped into an
    * NDKPrivateKeySigner; either way it lives only in transport state.
@@ -95,22 +93,17 @@ export interface Nip46TransportStartParams {
   onEvent: (event: NDKEvent) => void;
 }
 
-export interface Nip46SendResponseParams {
+interface Nip46SendResponseParams {
   toPubkey: string;
   /** Already-serialised RPC response JSON. Encrypted here, never logged. */
   payloadJson: string;
   encryption: Nip46Encryption;
 }
 
-export interface Nip46DecryptedEnvelope {
+interface Nip46DecryptedEnvelope {
   plaintext: string;
   /** Scheme that actually decrypted — the ENGINE decides whether to re-pin. */
   used: Nip46Encryption;
-}
-
-export interface Nip46RelayState {
-  url: string;
-  connected: boolean;
 }
 
 const safeNormalizeRelayUrl = Result.fromThrowable(
@@ -197,16 +190,6 @@ export class Nip46Transport {
     return this.lastEventReceivedAtMs;
   }
 
-  /** Connection state of every relay in the dedicated pool, for UI. */
-  relayStates(): Nip46RelayState[] {
-    const ndk = this.ndk;
-    if (!ndk) return [];
-    return [...ndk.pool.relays.values()].map((relay) => ({
-      url: relay.url,
-      connected: relay.connected,
-    }));
-  }
-
   /**
    * Builds the dedicated NDK + "nip46" pool, dials the relay union, and
    * subscribes {kinds:[24133], #p:[userPubkey], since}. Idempotent: a second
@@ -279,11 +262,11 @@ export class Nip46Transport {
   }
 
   /**
-   * AppState-foreground path: redials any dropped sockets (no-op on live
-   * ones) and restarts the subscription at the caller-supplied since
-   * (typically min(lastEventReceivedAt, now − 300s), computed by the engine).
+   * AppState-foreground path: redials any dropped sockets (no-op on live ones)
+   * and restarts the subscription at its own overlap-safe since
+   * (min(lastEventReceivedAt, now − 300s)) — the same window `rebuild` uses.
    */
-  reconnect(sinceEpochSec: number): Result<void, Nip46TransportError> {
+  reconnect(): Result<void, Nip46TransportError> {
     const ndk = this.ndk;
     if (!ndk) return err(NOT_STARTED);
 
@@ -296,7 +279,7 @@ export class Nip46Transport {
           });
         });
       }
-      this.subscribeCurrent(sinceEpochSec);
+      this.subscribeCurrent(this.overlapSafeSinceSec());
       nostrLog.info('nostr.signer.transport_reconnected');
     }, transportFailure('nostr.signer.transport_reconnect_failed'))();
   }

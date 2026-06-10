@@ -148,7 +148,7 @@ function AccountScopedProviders({
         // NIP-46 signer service — stays cold (no sockets) until the user has
         // ≥1 connected app or an in-flight pairing. Must sit directly after
         // NostrNDKProvider: it gates on its isInitialized flag.
-        [NostrSignerProvider, { accountIndex }],
+        NostrSignerProvider,
         [WhitenoiseProvider, { accountIndex }],
         CocoProvider,
         WalletContextProvider,

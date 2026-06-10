@@ -22,6 +22,8 @@ export const CREATED_AT_SKEW_SEC = 300;
 // Activity log retention
 export const ACTIVITY_CAP = 500;
 export const ACTIVITY_MAX_AGE_DAYS = 30;
+/** Max length of the engine-curated activity summary (normal-class sign_event). */
+export const SUMMARY_MAX_LENGTH = 80;
 
 // Pairing & connection limits
 export const MAX_CONNECTED_APPS = 64;

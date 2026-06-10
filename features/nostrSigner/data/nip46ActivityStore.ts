@@ -7,8 +7,10 @@
  *
  * Redaction contract: entries structurally cannot carry request params,
  * plaintexts, ciphertexts, or full event JSON — only the engine-supplied
- * `summary` (≤120 chars, normal-class sign_event only) and the signed
- * event id ever land here.
+ * `summary` (the engine truncates to SUMMARY_MAX_LENGTH = 80, normal-class
+ * sign_event only) and the signed event id ever land here. The store applies
+ * its own MAX_SUMMARY_LENGTH = 120 ceiling purely as a persistence-boundary
+ * sanity bound on whatever it is handed.
  */
 
 import { create } from 'zustand';
@@ -65,7 +67,7 @@ const PersistedActivityStore = z.object({
   entries: z.array(PersistedActivityEntry).max(ACTIVITY_CAP).default([]),
 });
 
-export type LogActivityInput = Omit<Nip46ActivityEntry, 'id' | 'at'> & { at?: number };
+type LogActivityInput = Omit<Nip46ActivityEntry, 'id' | 'at'> & { at?: number };
 
 interface Nip46ActivityState {
   entries: Nip46ActivityEntry[];

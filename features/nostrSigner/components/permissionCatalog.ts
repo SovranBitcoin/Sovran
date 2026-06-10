@@ -25,6 +25,7 @@ import type { ActivityVerdict, GrantKey, Nip46Method } from '@/features/nostrSig
 import {
   classifyRequest,
   grantKeyFor,
+  parseGrantKey,
   type SensitivityClass,
 } from '@/features/nostrSigner/lib/permissionPolicy';
 
@@ -365,17 +366,9 @@ export function permissionEntryFor(lookup: PermissionLookup): PermissionCatalogE
   };
 }
 
-const SIGN_EVENT_GRANT_KEY_PREFIX = 'sign_event:';
-
 /** Presentation for a stored grant key (app permission editor rows). */
 export function permissionEntryForGrantKey(grantKey: GrantKey): PermissionCatalogEntry {
-  if (grantKey.startsWith(SIGN_EVENT_GRANT_KEY_PREFIX)) {
-    return permissionEntryFor({
-      method: 'sign_event',
-      kind: Number(grantKey.slice(SIGN_EVENT_GRANT_KEY_PREFIX.length)),
-    });
-  }
-  return permissionEntryFor({ method: grantKey as Exclude<GrantKey, `sign_event:${number}`> });
+  return permissionEntryFor(parseGrantKey(grantKey));
 }
 
 /**
@@ -394,7 +387,7 @@ export function alwaysAllowEligible(lookup: PermissionLookup): boolean {
 
 // ── Tier banners (plan copy, verbatim) ──────────────────────────
 
-export interface TierBanner {
+interface TierBanner {
   tone: 'warning' | 'danger';
   segments: CopySegment[];
 }
@@ -447,7 +440,7 @@ export function encryptedPayloadLabel(ciphertextLength: number): string {
 
 // ── Activity verdict display ────────────────────────────────────
 
-export interface ActivityVerdictDisplay {
+interface ActivityVerdictDisplay {
   label: string;
   /** Registered monicon glyph. */
   icon: string;
@@ -516,7 +509,7 @@ export function queueStripLabel(position: number, total: number): string {
 
 // ── Toast/notice copy builders ──────────────────────────────────
 
-export interface ToastCopy {
+interface ToastCopy {
   label: string;
   description: string;
 }

@@ -38,8 +38,6 @@ export interface Nip46PendingRequest {
   /** Kind-24133 envelope event id — globally unique dedupe key. */
   eventId: string;
   clientPubkey: string;
-  /** False for pairing prompts from not-yet-connected clients. */
-  connectionKnown: boolean;
   method: Nip46Method;
   kind?: number;
   paramsPreview: Nip46ParamsPreview;
@@ -47,14 +45,14 @@ export interface Nip46PendingRequest {
   expiresAt: number;
 }
 
-export type EnqueueRejection = 'duplicate' | 'per_app_cap' | 'global_cap';
+type EnqueueRejection = 'duplicate' | 'per_app_cap' | 'global_cap';
 
 /** Session grants exist only for decrypt methods — never for signing. */
 export type SessionGrantKey = 'nip04_decrypt' | 'nip44_decrypt';
 
-export type SessionGrantError = 'self_decrypt_forbidden' | 'not_session_grantable';
+type SessionGrantError = 'self_decrypt_forbidden' | 'not_session_grantable';
 
-export interface Nip46SessionGrant {
+interface Nip46SessionGrant {
   clientPubkey: string;
   grantKey: SessionGrantKey;
   expiresAt: number;
@@ -63,13 +61,18 @@ export interface Nip46SessionGrant {
 const SESSION_GRANTABLE_KEYS: readonly string[] = ['nip04_decrypt', 'nip44_decrypt'];
 
 /** Toast handoff for the UI layer (Layer 3 consumes + clears). */
-export type Nip46PairingNotice = 'expired';
+type Nip46PairingNotice = 'expired';
 
 interface Nip46RequestsState {
   pending: Nip46PendingRequest[];
   sessionGrants: Nip46SessionGrant[];
-  /** Apps in rate-limit cooldown — UI flag only; the engine owns the timing. */
-  throttledApps: Record<string, true>;
+  /**
+   * Apps in rate-limit cooldown → the cooldown's `cooldownUntil` (epoch ms).
+   * UI derives the banner from `cooldownUntil > now`, so a quiet app's flag
+   * lapses with the cooldown even without further inbound traffic. Absent ⇒
+   * never throttled.
+   */
+  throttledApps: Record<string, number>;
   /**
    * UI-requested hot flag: signer surfaces (share screen, connect sheet) set
    * this so the service hook starts the engine even with zero connections.
@@ -104,6 +107,7 @@ interface Nip46RequestsActions {
   promote: (id: string) => void;
   /** Remove and return every request past its TTL so the engine can respond + log. */
   expireDue: (nowMs: number) => Nip46PendingRequest[];
+  /** Drops the pending queue AND the throttle flags (engine stop owns both). */
   clear: () => void;
   /**
    * 1h opt-in auto-approve for critical peer≠self decrypts. The guard forces
@@ -120,7 +124,8 @@ interface Nip46RequestsActions {
   /** Revoke one grant, or all of an app's grants when `grantKey` is omitted. */
   revokeSessionGrant: (clientPubkey: string, grantKey?: SessionGrantKey) => void;
   pruneSessionGrants: (nowMs?: number) => void;
-  setAppThrottled: (clientPubkey: string, throttled: boolean) => void;
+  /** Record an app's cooldown end (epoch ms), or clear the flag with `null`. */
+  setAppThrottled: (clientPubkey: string, cooldownUntil: number | null) => void;
   setServiceHotRequested: (hot: boolean) => void;
   setResumedPairing: (parsed: ParsedNostrConnectUri | null) => void;
   setPairingNotice: (notice: Nip46PairingNotice | null) => void;
@@ -183,7 +188,7 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>()((set, get) => 
   },
 
   clear: () => {
-    set({ pending: [] });
+    set({ pending: [], throttledApps: {} });
   },
 
   grantSession: (clientPubkey, grantKey, guard, nowMs = Date.now()) => {
@@ -225,14 +230,15 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>()((set, get) => 
     });
   },
 
-  setAppThrottled: (clientPubkey, throttled) => {
+  setAppThrottled: (clientPubkey, cooldownUntil) => {
     set((state) => {
-      if (throttled === (state.throttledApps[clientPubkey] === true)) return state;
+      const current = state.throttledApps[clientPubkey] ?? null;
+      if (cooldownUntil === current) return state;
       const throttledApps = { ...state.throttledApps };
-      if (throttled) {
-        throttledApps[clientPubkey] = true;
-      } else {
+      if (cooldownUntil === null) {
         delete throttledApps[clientPubkey];
+      } else {
+        throttledApps[clientPubkey] = cooldownUntil;
       }
       return { throttledApps };
     });

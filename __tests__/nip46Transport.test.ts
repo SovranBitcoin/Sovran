@@ -532,11 +532,13 @@ describe('rebuild', () => {
 });
 
 describe('reconnect', () => {
-  it('redials every relay and restarts the subscription at the supplied since', () => {
+  it('redials every relay and restarts the subscription at its own overlap-safe since', () => {
+    const nowMs = 1_700_100_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(nowMs);
     const { transport, onEvent, ndk } = startTransport();
     const oldSubscription = ndk.subscriptions[0];
 
-    const result = transport.reconnect(SINCE + 500);
+    const result = transport.reconnect();
 
     expect(result.isOk()).toBe(true);
     for (const relay of ndk.pool.relays.values()) {
@@ -544,7 +546,7 @@ describe('reconnect', () => {
     }
     expect(oldSubscription.stop).toHaveBeenCalledTimes(1);
     const newSubscription = ndk.subscriptions[1];
-    expect(newSubscription.filters.since).toBe(SINCE + 500);
+    expect(newSubscription.filters.since).toBe(Math.floor(nowMs / 1000) - CREATED_AT_SKEW_SEC);
 
     oldSubscription.emit('event', { id: 'late' });
     expect(onEvent).not.toHaveBeenCalled();
@@ -552,9 +554,22 @@ describe('reconnect', () => {
     expect(onEvent).toHaveBeenCalledTimes(1);
   });
 
+  it('never re-subscribes later than the last received event', () => {
+    const eventAtMs = 1_700_100_000_000;
+    const laterMs = eventAtMs + 3_600_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(eventAtMs);
+    const { transport, ndk } = startTransport();
+    ndk.subscriptions[0].emit('event', { id: 'evt' });
+
+    nowSpy.mockReturnValue(laterMs);
+    expect(transport.reconnect().isOk()).toBe(true);
+
+    expect(ndk.subscriptions[1].filters.since).toBe(Math.floor(eventAtMs / 1000));
+  });
+
   it('errs not-started before start', () => {
     const transport = new Nip46Transport();
-    expect(transport.reconnect(SINCE)._unsafeUnwrapErr()).toEqual({ type: 'not-started' });
+    expect(transport.reconnect()._unsafeUnwrapErr()).toEqual({ type: 'not-started' });
   });
 });
 
@@ -572,7 +587,6 @@ describe('stop', () => {
     }
     expect(ndk.pool.relays.size).toBe(0);
     expect(transport.isStarted).toBe(false);
-    expect(transport.relayStates()).toEqual([]);
 
     // Late events after stop are dropped by the generation guard.
     subscription.emit('event', { id: 'late' });
@@ -593,22 +607,5 @@ describe('stop', () => {
     });
     expect(restart.isOk()).toBe(true);
     expect(mocked.__mock.instances.ndks).toHaveLength(2);
-  });
-});
-
-describe('relayStates', () => {
-  it('reports per-relay url and connection flag from the dedicated pool', () => {
-    const { transport, ndk } = startTransport();
-    const relays = [...ndk.pool.relays.values()];
-    relays[0].connected = false;
-
-    expect(transport.relayStates()).toEqual([
-      { url: 'wss://relay.damus.io/', connected: false },
-      { url: 'wss://nos.lol/', connected: true },
-    ]);
-  });
-
-  it('is empty before start', () => {
-    expect(new Nip46Transport().relayStates()).toEqual([]);
   });
 });

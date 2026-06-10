@@ -10,15 +10,17 @@
  *   → created_at skew (±CREATED_AT_SKEW_SEC)
  *   → sender lookup → stranger with no outstanding bunker secret and no
  *     awaited nostrconnect pairing? drop (DoS guard — never leak liveness)
- *   → SIGNATURE VERIFY — earlier than the plan's nominal slot, deliberately:
- *     a forged envelope spoofing a paired app's pubkey must not consume that
- *     app's rate budget (spoofed-sender rate-limit DoS) nor trigger decrypt
- *     work. It still sits after the connection/secret gates so unsolicited
- *     traffic dies on cheap map lookups before any schnorr math. Verification
- *     is NDKEvent.verifySignature(true) — synchronous on the dedicated
- *     transport NDK (no asyncSigVerification), and a no-op re-read when the
- *     relay layer already verified.
- *   → rateLimiter.take → decrypt (per-peer pin, fallback; re-pin on mismatch)
+ *   → SIGNATURE VERIFY — a cheap schnorr pre-filter, after the connection/
+ *     secret gates so unsolicited traffic dies on map lookups first.
+ *     NDKEvent.verifySignature(true) is synchronous on the dedicated transport
+ *     NDK; it is NOT trusted as the anti-spoofing gate, because NDK caches
+ *     verify verdicts process-globally by event id, so a forged envelope can
+ *     replay a recently-cached id and pass.
+ *   → decrypt (per-peer pin, fallback; re-pin on mismatch)
+ *   → rateLimiter.take — AFTER decrypt, deliberately: the ECDH decrypt is the
+ *     real sender authentication, so a forged envelope spoofing a paired app's
+ *     pubkey (it cannot be decrypted) never consumes that app's rate budget
+ *     (spoofed-sender rate-limit DoS guard).
  *   → RpcRequest zod parse → connect handshake | permissionPolicy.evaluate
  *   → allow: execute + respond + log · deny: respond error + log · ask:
  *     enqueue (TTL) + resolver context in module scope + verdict callbacks.
@@ -56,6 +58,7 @@ import {
   hasOutstanding as hasOutstandingBunkerSecret,
   type BunkerSecretsError,
 } from '@/features/nostrSigner/lib/bunkerSecrets';
+import { safeJsonParse } from '@/features/nostrSigner/lib/json';
 import {
   extractSignedEventId,
   isExecutableMethod,
@@ -71,6 +74,7 @@ import {
   NIP46_ERRORS,
   REQUEST_TTL_MS,
   RpcRequestSchema,
+  SUMMARY_MAX_LENGTH,
   UnsignedEventSchema,
   type ActivityVerdict,
   type GrantKey,
@@ -90,9 +94,8 @@ import { nostrLog, redactError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 import { relays as defaultSignerRelays } from '@/shared/ndk';
 
-export const DEDUPE_LRU_SIZE = 512;
+const DEDUPE_LRU_SIZE = 512;
 export const EXPIRY_SWEEP_INTERVAL_MS = 10_000;
-const SUMMARY_MAX_LENGTH = 80;
 
 // ── Public types ────────────────────────────────────────────────
 
@@ -107,8 +110,6 @@ export interface Nip46EngineStartConfig {
   signer: NDKPrivateKeySigner | Uint8Array;
   /** Hex pubkey of the active profile (= remote-signer pubkey, Amber model). */
   userPubkey: string;
-  /** Active profile's derivation index — carried for pairing intents. */
-  accountIndex: number;
 }
 
 export type Nip46DecisionAction = 'approve_once' | 'always' | 'deny_once' | 'always_deny' | 'block';
@@ -126,12 +127,20 @@ export interface CompleteNostrconnectPairingInput {
   parsed: ParsedNostrConnectUri;
   /** Perm toggles the user accepted — persisted as always-grants (origin 'pairing'). */
   acceptedGrantKeys: readonly GrantKey[];
+  /**
+   * Every eligible (toggleable) grant key the review sheet presented. On a
+   * re-pair, presented keys the user left UNCHECKED have their standing
+   * 'always' grant cleared back to ask — so the "Update Permissions" downgrade
+   * the sheet promised actually takes effect. Omitted ⇒ no reconcile (the
+   * additive merge stands). 'deny' grants are never touched (the sheet has no
+   * deny affordance; that lives in the per-app editor).
+   */
+  presentedGrantKeys?: readonly GrantKey[];
 }
 
 /** Structural subset of Nip46Transport the engine drives — injectable in tests. */
 export interface Nip46EngineTransport {
   readonly isStarted: boolean;
-  readonly lastEventReceivedAt: number | null;
   start(params: {
     signer: NDKPrivateKeySigner | Uint8Array;
     userPubkey: string;
@@ -140,7 +149,8 @@ export interface Nip46EngineTransport {
     onEvent: (event: NDKEvent) => void;
   }): Result<void, Nip46TransportError>;
   rebuild(relayUrls: readonly string[]): Result<void, Nip46TransportError>;
-  reconnect(sinceEpochSec: number): Result<void, Nip46TransportError>;
+  /** Redial + re-subscribe at the transport's own overlap-safe since. */
+  reconnect(): Result<void, Nip46TransportError>;
   stop(): Result<void, Nip46TransportError>;
   decryptEnvelope(
     senderPubkey: string,
@@ -171,11 +181,6 @@ export type OnUserVerdictNeeded = (request: Nip46PendingRequest) => void;
 
 const NOT_STARTED: Nip46EngineError = { type: 'not-started' };
 
-const safeJsonParse = Result.fromThrowable(
-  (raw: string) => JSON.parse(raw) as unknown,
-  () => 'invalid_json' as const
-);
-
 /** Insertion-ordered LRU membership set (Map keeps recency via delete+set). */
 class LruSet {
   private readonly entries = new Map<string, true>();
@@ -197,7 +202,6 @@ class LruSet {
 
 interface EngineState {
   userPubkey: string;
-  accountIndex: number;
   signer: NDKPrivateKeySigner;
 }
 
@@ -379,6 +383,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       userPubkey: engine.userPubkey,
       request,
     });
+    if (state !== engine) return; // engine stopped/restarted mid-execution — never sign/respond
     if (outcome.isErr()) {
       void respond(
         clientPubkey,
@@ -457,6 +462,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       return;
     }
     const consumed = await deps.consumeSecret(engine.userPubkey, secret);
+    if (state !== engine) return; // stopped/restarted during the consume await
     if (consumed.isErr()) {
       // Storage failure — consumption state unknown, so NEVER ack (a replayable
       // secret behind a successful pairing is worse than one lost re-scan).
@@ -572,28 +578,34 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     // or their pubkey is an awaited nostrconnect pairing.
     if (!connection && !awaited) {
       const outstanding = await deps.hasOutstandingSecret(engine.userPubkey);
+      if (state !== engine) return; // stopped/restarted during the await
       if (outstanding.isErr() || !outstanding.value) {
         nostrLog.debug('nostr.signer.engine_stranger_drop');
         return;
       }
     }
 
-    // 5. Signature verify — see file header for why this precedes rate/decrypt.
+    // 5. Signature verify — a cheap pre-filter (see file header); NDK caches
+    // verify verdicts by id, so this is not the anti-spoofing gate — decrypt is.
     if (event.verifySignature(true) !== true) {
       nostrLog.warn('nostr.signer.engine_invalid_signature_drop');
       return;
     }
 
-    // 6. Rate limit (verdict applied post-parse so the response carries the rpc id).
-    const rate = deps.rateLimiter.take(sender);
-    requests().setAppThrottled(sender, rate.throttled);
-
-    // 7. Decrypt (pin first, fallback second); re-pin when the peer switched.
+    // 6. Decrypt (pin first, fallback second); re-pin when the peer switched.
     const pinned: Nip46Encryption = connection?.encryption ?? 'nip44';
     const envelope = await deps.transport.decryptEnvelope(sender, event.content, pinned);
     if (envelope.isErr()) return; // transport already logged; silent per plan
+    if (state !== engine) return; // stopped/restarted during the decrypt await
     const { plaintext, used } = envelope.value;
     if (connection && used !== pinned) connections().setEncryption(sender, used);
+
+    // 7. Rate limit — AFTER a successful decrypt (the ECDH decrypt authenticates
+    // the sender), so a forged envelope spoofing a paired app's pubkey can never
+    // burn that app's budget. Verdict applied post-parse so the response carries
+    // the rpc id.
+    const rate = deps.rateLimiter.take(sender);
+    requests().setAppThrottled(sender, rate.throttled ? (rate.cooldownUntil ?? null) : null);
 
     // 8. RPC parse.
     const json = safeJsonParse(plaintext);
@@ -707,7 +719,6 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       id: request.id,
       eventId,
       clientPubkey: sender,
-      connectionKnown: true,
       method: request.method,
       ...(kind !== undefined && { kind }),
       paramsPreview: preview,
@@ -726,6 +737,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       connections().touchUsage(sender, { denied: true });
       return;
     }
+    const askSummary = summaryFor(decision, unsigned);
     pendingContexts.set(request.id, {
       request,
       clientPubkey: sender,
@@ -733,9 +745,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       grantKey: decision.grantKey ?? null,
       isSelfDecrypt: decision.isSelfDecrypt === true,
       encryption: used,
-      ...(decision.class === 'normal' && unsigned !== null
-        ? { summary: unsigned.content.slice(0, SUMMARY_MAX_LENGTH) }
-        : {}),
+      ...(askSummary !== undefined && { summary: askSummary }),
     });
     ensureSweep();
     notifyVerdictNeeded(pending);
@@ -797,7 +807,6 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       config.signer instanceof Uint8Array ? new NDKPrivateKeySigner(config.signer) : config.signer;
     const engine: EngineState = {
       userPubkey: config.userPubkey.toLowerCase(),
-      accountIndex: config.accountIndex,
       signer,
     };
     // State is live before the transport dials so even a synchronously
@@ -841,11 +850,9 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
 
   function reconnect(): Result<void, Nip46EngineError> {
     if (!state || !deps.transport.isStarted) return ok(undefined);
-    const skewedNowSec = Math.floor(deps.now() / 1000) - CREATED_AT_SKEW_SEC;
-    const lastEventMs = deps.transport.lastEventReceivedAt;
-    const sinceEpochSec =
-      lastEventMs === null ? skewedNowSec : Math.min(skewedNowSec, Math.floor(lastEventMs / 1000));
-    const reconnected = deps.transport.reconnect(sinceEpochSec);
+    // The transport computes the overlap-safe since itself (it owns
+    // lastEventReceivedAt); the engine's dedupe LRU absorbs the redelivery.
+    const reconnected = deps.transport.reconnect();
     if (reconnected.isErr()) return err({ type: 'transport', cause: reconnected.error });
     return ok(undefined);
   }
@@ -884,6 +891,22 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       grants,
     });
     if (upserted.isErr()) return errAsync({ type: 'upsert-failed', cause: upserted.error });
+
+    // Re-pair reconcile: a presented toggle the user UNCHECKED must downgrade a
+    // standing 'always' grant back to ask (upsertApp merges additively, so it
+    // can't do this itself). Scoped to presented keys and only to 'always' so
+    // grants configured in the per-app editor (incl. 'deny') stay untouched.
+    if (input.presentedGrantKeys !== undefined) {
+      const accepted = new Set(input.acceptedGrantKeys);
+      for (const grantKey of input.presentedGrantKeys) {
+        if (accepted.has(grantKey)) continue;
+        if (connections().apps[clientPubkey]?.grants[grantKey]?.verdict !== 'always') continue;
+        const cleared = connections().setGrant(clientPubkey, grantKey, null);
+        if (cleared.isErr()) {
+          nostrLog.warn('nostr.signer.engine_grant_clear_failed', { cause: cleared.error });
+        }
+      }
+    }
 
     awaitedPairings.delete(clientPubkey);
     const rebuilt = rebuildRelays();

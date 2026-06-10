@@ -12,6 +12,7 @@ import {
   DENY_ERROR_BY_REASON,
   evaluate,
   grantKeyFor,
+  parseGrantKey,
   type ClassifyInput,
   type EvaluateInput,
   type PolicyConnection,
@@ -170,6 +171,22 @@ describe('grantKeyFor', () => {
     expect(grantKeyFor('sign_event')).toBeNull();
     expect(grantKeyFor('sign_event', 65536)).toBeNull();
     expect(grantKeyFor('sign_event', -1)).toBeNull();
+  });
+});
+
+describe('parseGrantKey', () => {
+  it('is the inverse of grantKeyFor for sign_event kinds', () => {
+    expect(parseGrantKey('sign_event:1')).toEqual({ method: 'sign_event', kind: 1 });
+    expect(parseGrantKey('sign_event:1111')).toEqual({ method: 'sign_event', kind: 1111 });
+    expect(parseGrantKey(grantKeyFor('sign_event', 17375) as GrantKey)).toEqual({
+      method: 'sign_event',
+      kind: 17375,
+    });
+  });
+
+  it('returns the bare method (no kind) for encryption keys', () => {
+    expect(parseGrantKey('nip44_decrypt')).toEqual({ method: 'nip44_decrypt' });
+    expect(parseGrantKey('nip04_encrypt')).toEqual({ method: 'nip04_encrypt' });
   });
 });
 

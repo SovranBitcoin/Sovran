@@ -4,11 +4,12 @@
  * DetailsList for one activity entry: App / Action / Method / Kind / Result /
  * Time / Event ID (truncated + copyable).
  *
- * No raw-event block: activity entries store only the signed event id —
- * never full event JSON (redaction contract in nip46ActivityStore) — so the
- * plan's monospace raw-event view is not reconstructable here. Encrypt and
- * decrypt entries instead carry the line "Encrypted content is never stored
- * or displayed."
+ * No raw-event block: activity entries persist only the engine-curated content
+ * summary (≤80 chars, normal-class sign_event) and the signed event id — never
+ * full event JSON (redaction contract in nip46ActivityStore) — so the plan's
+ * monospace raw-event view is not reconstructable here. The stored summary is
+ * shown as a Content row when present. Encrypt and decrypt entries instead
+ * carry the line "Encrypted content is never stored or displayed."
  *
  * Route params: `id` — the activity entry id.
  */
@@ -130,6 +131,7 @@ export function SignerActivityDetailScreen(): React.ReactElement {
     ...(entry.method === 'sign_event' && entry.kind !== undefined
       ? [{ title: 'Kind', value: `${entry.kind} — ${catalogEntry.permissionEditorLabel}` }]
       : []),
+    ...(entry.summary !== undefined ? [{ title: 'Content', value: entry.summary }] : []),
     { title: 'Result', value: resultLabelFor(entry.verdict) },
     { title: 'Time', value: formatDate(entry.at, 'short-date-time') },
     ...(entry.eventId !== undefined

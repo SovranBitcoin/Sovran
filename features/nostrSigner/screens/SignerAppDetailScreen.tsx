@@ -27,15 +27,14 @@ import {
   PressableFeedback,
   Switch as HeroSwitch,
 } from 'heroui-native';
-import { Result } from 'neverthrow';
 
 import Icon from 'assets/icons';
+import { safeHostname, shortPubkey } from '@/features/nostrSigner/components/display';
 import {
   alwaysAllowEligible,
   appDisplayName,
   permissionEntryForGrantKey,
   type PermissionEditorGroup,
-  type PermissionLookup,
 } from '@/features/nostrSigner/components/permissionCatalog';
 import {
   useNip46ConnectionsStore,
@@ -43,6 +42,7 @@ import {
 } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import type { GrantKey } from '@/features/nostrSigner/lib/nip46Types';
+import { parseGrantKey } from '@/features/nostrSigner/lib/permissionPolicy';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatDate, formatRelative } from '@/shared/lib/date';
 import { nostrLog } from '@/shared/lib/logger';
@@ -60,6 +60,8 @@ const IDENTITY_AVATAR_SIZE = 64;
 
 const THROTTLED_BANNER = 'This app is sending unusual amounts of requests';
 const WALLET_GROUP_CAPTION = 'Wallet events always require your approval.';
+const LOCKED_GROUP_CAPTION =
+  'Some of these always require your approval and can never be set to Allow.';
 const PERMISSIONS_FOOTER =
   'Allow signs without asking. Block denies without asking. Everything is logged in Activity.';
 const STRICT_MODE_TITLE = 'Ask Every Time';
@@ -105,18 +107,6 @@ const TRI_STATE_OPTIONS: readonly { state: TriState; label: string }[] = [
   { state: 'block', label: 'Block' },
 ];
 
-const SIGN_EVENT_GRANT_KEY_PREFIX = 'sign_event:';
-
-function lookupForGrantKey(grantKey: GrantKey): PermissionLookup {
-  if (grantKey.startsWith(SIGN_EVENT_GRANT_KEY_PREFIX)) {
-    return {
-      method: 'sign_event',
-      kind: Number(grantKey.slice(SIGN_EVENT_GRANT_KEY_PREFIX.length)),
-    };
-  }
-  return { method: grantKey as Exclude<GrantKey, `sign_event:${number}`> };
-}
-
 function triStateFor(app: Nip46Connection, grantKey: GrantKey): TriState {
   const verdict = app.grants[grantKey]?.verdict;
   if (verdict === 'always') return 'allow';
@@ -124,13 +114,11 @@ function triStateFor(app: Nip46Connection, grantKey: GrantKey): TriState {
   return 'ask';
 }
 
-const safeHostname = Result.fromThrowable(
-  (url: string) => new URL(url).hostname,
-  () => 'invalid_url' as const
-);
-
-function shortPubkey(pubkey: string): string {
-  return `${pubkey.slice(0, 8)}…${pubkey.slice(-4)}`;
+/** Append the kind/method so two rows sharing a catalog label stay distinguishable. */
+function disambiguatedLabel(grantKey: GrantKey, baseLabel: string): string {
+  const { method, kind } = parseGrantKey(grantKey);
+  if (method === 'sign_event' && kind !== undefined) return `${baseLabel} (kind ${kind})`;
+  return `${baseLabel} (${method})`;
 }
 
 function statsLine(app: Nip46Connection): string {
@@ -214,8 +202,10 @@ export function SignerAppDetailScreen(): React.ReactElement {
   const renameApp = useNip46ConnectionsStore((s) => s.renameApp);
   const disconnectApp = useNip46ConnectionsStore((s) => s.disconnectApp);
   const revokeSessionGrant = useNip46RequestsStore((s) => s.revokeSessionGrant);
+  // Derive from cooldownUntil so the banner lapses with the cooldown even if
+  // the app went quiet (the engine only writes the flag on inbound traffic).
   const throttled = useNip46RequestsStore((s) =>
-    clientPubkey === undefined ? false : s.throttledApps[clientPubkey] === true
+    clientPubkey === undefined ? false : (s.throttledApps[clientPubkey] ?? 0) > Date.now()
   );
 
   const [foreground, muted, warning, warningSoftFg] = useThemeColor([
@@ -235,16 +225,39 @@ export function SignerAppDetailScreen(): React.ReactElement {
       .sort();
     keys.push(...extras);
 
-    const rows = keys.map((grantKey) => ({
+    const base = keys.map((grantKey) => ({
       grantKey,
       entry: permissionEntryForGrantKey(grantKey),
-      allowEligible: alwaysAllowEligible(lookupForGrantKey(grantKey)),
+      allowEligible: alwaysAllowEligible(parseGrantKey(grantKey)),
     }));
-    return GROUP_ORDER.map(({ group, label }) => ({
-      group,
-      label,
-      rows: rows.filter((row) => row.entry.permissionEditorGroup === group),
-    })).filter(({ rows: groupRows }) => groupRows.length > 0);
+    // The catalog maps sibling kinds to one editor label (e.g. kinds 1 and 1111
+    // both → "Publish posts"), so a unioned grant key can collide with a base
+    // row. Qualify the label with its kind/method whenever it is shared, so no
+    // two rows render identically.
+    const labelCounts = new Map<string, number>();
+    for (const row of base) {
+      labelCounts.set(
+        row.entry.permissionEditorLabel,
+        (labelCounts.get(row.entry.permissionEditorLabel) ?? 0) + 1
+      );
+    }
+    const rows = base.map((row) => ({
+      ...row,
+      displayLabel:
+        (labelCounts.get(row.entry.permissionEditorLabel) ?? 0) > 1
+          ? disambiguatedLabel(row.grantKey, row.entry.permissionEditorLabel)
+          : row.entry.permissionEditorLabel,
+    }));
+    return GROUP_ORDER.map(({ group, label }) => {
+      const groupRows = rows.filter((row) => row.entry.permissionEditorGroup === group);
+      return {
+        group,
+        label,
+        rows: groupRows,
+        // Any locked (Allow-disabled) row needs an explanation, not just Wallet.
+        hasLockedRow: groupRows.some((row) => !row.allowEligible),
+      };
+    }).filter(({ rows: groupRows }) => groupRows.length > 0);
   }, [app?.grants]);
 
   const onSelectTriState = useCallback(
@@ -400,7 +413,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         {/* Permissions */}
         <Section title="Permissions">
           <VStack spacing={8}>
-            {groupedRows.map(({ group, label, rows }) => (
+            {groupedRows.map(({ group, label, rows, hasLockedRow }) => (
               <View key={group}>
                 <Text
                   className="text-foreground/50 mb-1 ml-3 mt-1 uppercase tracking-wide"
@@ -409,11 +422,11 @@ export function SignerAppDetailScreen(): React.ReactElement {
                   {label}
                 </Text>
                 <View className="bg-surface-secondary rounded-lg px-3 py-1">
-                  {rows.map(({ grantKey, entry, allowEligible }) => (
+                  {rows.map(({ grantKey, displayLabel, allowEligible }) => (
                     <HStack key={grantKey} gap={12} style={{ paddingVertical: 8 }}>
                       <View style={{ flex: 1 }}>
                         <Text size={14} color={foreground} numberOfLines={2}>
-                          {entry.permissionEditorLabel}
+                          {displayLabel}
                         </Text>
                       </View>
                       <TriStateChips
@@ -424,9 +437,9 @@ export function SignerAppDetailScreen(): React.ReactElement {
                     </HStack>
                   ))}
                 </View>
-                {group === 'wallet' ? (
+                {hasLockedRow ? (
                   <Text className="ml-3 mt-1" size={12} color={muted}>
-                    {WALLET_GROUP_CAPTION}
+                    {group === 'wallet' ? WALLET_GROUP_CAPTION : LOCKED_GROUP_CAPTION}
                   </Text>
                 ) : null}
               </View>

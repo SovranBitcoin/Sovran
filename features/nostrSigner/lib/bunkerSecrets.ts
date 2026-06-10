@@ -25,8 +25,9 @@ import { errAsync, okAsync, Result, ResultAsync } from 'neverthrow';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 
+import { safeJsonParse } from '@/features/nostrSigner/lib/json';
 import { BUNKER_SECRET_TTL_MS } from '@/features/nostrSigner/lib/nip46Types';
-import { nostrLog, redactError } from '@/shared/lib/logger';
+import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
 const STORAGE_KEY_PREFIX = 'nip46_bunker_secrets_';
@@ -35,23 +36,21 @@ const MAX_OUTSTANDING_SECRETS = 8;
 const SECRET_BYTES = 16;
 const SECRET_HEX_RE = /^[0-9a-f]{32}$/;
 
-export const BunkerSecretEntrySchema = z.strictObject({
+const BunkerSecretEntrySchema = z.strictObject({
   /** @SECRET one-time pairing bearer credential — never log or surface in errors */
   secret: z.string().regex(SECRET_HEX_RE),
   createdAt: z.int().min(0),
   expiresAt: z.int().min(0),
 });
-export type BunkerSecretEntry = z.infer<typeof BunkerSecretEntrySchema>;
+type BunkerSecretEntry = z.infer<typeof BunkerSecretEntrySchema>;
 
 const BunkerSecretsBlobSchema = z.array(BunkerSecretEntrySchema);
 
-type RedactedCause = { name: string; message: string };
-
 export type BunkerSecretsError =
   | { type: 'invalid-pubkey' }
-  | { type: 'csprng-failed'; cause: RedactedCause }
-  | { type: 'storage-read-failed'; cause: RedactedCause }
-  | { type: 'storage-write-failed'; cause: RedactedCause };
+  | { type: 'csprng-failed'; cause: RedactedError }
+  | { type: 'storage-read-failed'; cause: RedactedError }
+  | { type: 'storage-write-failed'; cause: RedactedError };
 
 const INVALID_PUBKEY: BunkerSecretsError = { type: 'invalid-pubkey' };
 
@@ -106,11 +105,6 @@ const deleteItem = (key: string): ResultAsync<void, BunkerSecretsError> =>
     nostrLog.error('nostr.signer.secrets_delete_failed', { error: cause });
     return { type: 'storage-write-failed', cause } as const;
   });
-
-const safeJsonParse = Result.fromThrowable(
-  (raw: string) => JSON.parse(raw) as unknown,
-  () => 'invalid_json' as const
-);
 
 const generateSecret = Result.fromThrowable(
   () => {

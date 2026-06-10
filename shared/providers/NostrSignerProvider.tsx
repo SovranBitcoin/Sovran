@@ -8,8 +8,6 @@ import { useInitMount } from '@/shared/lib/logger';
 
 interface NostrSignerProviderProps {
   children: ReactNode;
-  /** Active profile's derivation index — forwarded to engine.start. */
-  accountIndex?: number;
 }
 
 /**
@@ -21,9 +19,9 @@ interface NostrSignerProviderProps {
  * UI-requested hot flag, the hooks gate every side effect — the engine never
  * starts and no sockets open.
  */
-export function NostrSignerProvider({ children, accountIndex = 0 }: NostrSignerProviderProps) {
+export function NostrSignerProvider({ children }: NostrSignerProviderProps) {
   useInitMount('NostrSignerProvider');
-  useNostrSignerService(accountIndex);
+  useNostrSignerService();
   useResumePendingPairing();
   useSignerApprovalController();
   useConnectSheetOpener();

@@ -25,11 +25,10 @@ import {
   MAX_CONNECTED_APPS,
   type ConnectionMode,
   type ConnectionStatus,
-  type EncryptionGrantKey,
   type GrantKey,
   type GrantVerdict,
 } from '@/features/nostrSigner/lib/nip46Types';
-import { classifyRequest, type ClassifyInput } from '@/features/nostrSigner/lib/permissionPolicy';
+import { classifyRequest, parseGrantKey } from '@/features/nostrSigner/lib/permissionPolicy';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
@@ -45,18 +44,6 @@ const MAX_IMAGE_URL_LENGTH = 1024;
 
 const RELAY_URL_RE = /^wss:\/\/\S+$/;
 
-const SIGN_EVENT_GRANT_KEY_PREFIX = 'sign_event:';
-
-function classifyInputForGrantKey(grantKey: GrantKey): ClassifyInput {
-  if (grantKey.startsWith(SIGN_EVENT_GRANT_KEY_PREFIX)) {
-    return {
-      method: 'sign_event',
-      kind: Number(grantKey.slice(SIGN_EVENT_GRANT_KEY_PREFIX.length)),
-    };
-  }
-  return { method: grantKey as EncryptionGrantKey };
-}
-
 /**
  * Whether a grant key classifies critical and therefore can never hold
  * 'always'. Classification runs without request params, so kind 5 (deletion)
@@ -64,12 +51,12 @@ function classifyInputForGrantKey(grantKey: GrantKey): ClassifyInput {
  * even though a single harmless-scope deletion prompt can still be approved.
  */
 export function isCriticalGrantKey(grantKey: GrantKey): boolean {
-  return classifyRequest(classifyInputForGrantKey(grantKey)).class === 'critical';
+  return classifyRequest(parseGrantKey(grantKey)).class === 'critical';
 }
 
 export type ConnectionOrigin = 'bunker' | 'nostrconnect';
 export type ConnectionEncryption = 'nip44' | 'nip04';
-export type GrantOrigin = 'pairing' | 'prompt';
+type GrantOrigin = 'pairing' | 'prompt';
 
 export interface Nip46Grant {
   verdict: GrantVerdict;
@@ -160,7 +147,7 @@ export interface UpsertAppInput {
   grants?: Partial<Record<GrantKey, Nip46Grant>>;
 }
 
-export interface UpdateMetadataInput {
+interface UpdateMetadataInput {
   name?: string;
   url?: string;
   image?: string;
@@ -168,7 +155,7 @@ export interface UpdateMetadataInput {
 }
 
 export type UpsertAppError = 'invalid_pubkey' | 'invalid_relays' | 'app_limit_reached';
-export type SetGrantError = 'unknown_app' | 'invalid_grant_key' | 'critical_always_forbidden';
+type SetGrantError = 'unknown_app' | 'invalid_grant_key' | 'critical_always_forbidden';
 
 interface Nip46ConnectionsState {
   apps: Record<string, Nip46Connection>;

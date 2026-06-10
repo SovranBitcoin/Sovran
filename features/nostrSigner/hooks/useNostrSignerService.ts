@@ -68,7 +68,7 @@ function hasActiveApp(apps: Record<string, Nip46Connection>): boolean {
   return Object.values(apps).some((app) => app.status === 'active');
 }
 
-export function useNostrSignerService(accountIndex: number): void {
+export function useNostrSignerService(): void {
   const { isInitialized: ndkInitialized } = useNostrNDKContext();
   const { keys } = useNostrKeysContext();
   const connectionsHydrated = useNip46ConnectionsHydrated();
@@ -89,7 +89,6 @@ export function useNostrSignerService(accountIndex: number): void {
     const started = nip46Engine.start({
       signer: keys.privateKey,
       userPubkey: keys.pubkey,
-      accountIndex,
     });
     if (started.isErr()) {
       // Error types only — engine errors carry pre-redacted causes, but the
@@ -103,7 +102,7 @@ export function useNostrSignerService(accountIndex: number): void {
         nostrLog.warn('nostr.signer.service_stop_failed', { error: stopped.error.type });
       }
     };
-  }, [shouldRun, keys, accountIndex]);
+  }, [shouldRun, keys]);
 
   // ── Relay-set tracking (UI-driven disconnect/block while running) ──
   // Pairing paths rebuild inside the engine already; this catches connection

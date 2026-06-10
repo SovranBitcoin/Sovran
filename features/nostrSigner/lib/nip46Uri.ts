@@ -19,8 +19,8 @@ import {
 } from '@/features/nostrSigner/lib/nip46Types';
 import { grantKeyFor } from '@/features/nostrSigner/lib/permissionPolicy';
 
-export const MAX_URI_RELAYS = 5;
-export const MAX_PERMS_ENTRIES = 32;
+const MAX_URI_RELAYS = 5;
+const MAX_PERMS_ENTRIES = 32;
 const MAX_SECRET_LENGTH = 64;
 const MAX_NAME_LENGTH = 120;
 const MAX_URL_LENGTH = 2048;
@@ -72,20 +72,18 @@ export interface ParsedNostrConnectUri {
   image?: string;
   /** Grantable perm tokens decoded from the `perms` CSV. */
   perms: PermToken[];
-  /** Raw CSV entries rejected as unknown/ungrantable — the connect sheet can mention them. */
-  droppedPerms: string[];
 }
 
-export interface ParsedBunkerUri {
+interface ParsedBunkerUri {
   type: 'bunker';
   signerPubkey: string;
   relays: string[];
   secret?: string;
 }
 
-export type ParsedNip46Uri = ParsedNostrConnectUri | ParsedBunkerUri;
+type ParsedNip46Uri = ParsedNostrConnectUri | ParsedBunkerUri;
 
-export interface BuildBunkerUriInput {
+interface BuildBunkerUriInput {
   signerPubkey: string;
   relays: string[];
   secret: string;
@@ -106,7 +104,7 @@ const decodeComponent = Result.fromThrowable(
   (): Nip46UriError => ({ type: 'bad_encoding' })
 );
 
-export type QueryPair = readonly [key: string, value: string];
+type QueryPair = readonly [key: string, value: string];
 
 /**
  * Manual query-string parser. Splits on '&' and the first '=' per segment;
@@ -210,11 +208,10 @@ export function parseNostrconnectUri(raw: string): Result<ParsedNostrConnectUri,
         });
         if (!fields.success) return err<never, Nip46UriError>(invalidField(fields.error));
         return parsePermsCsv(singles.perms ?? '').map(
-          ({ tokens, dropped }): ParsedNostrConnectUri => ({
+          ({ tokens }): ParsedNostrConnectUri => ({
             type: 'nostrconnect',
             ...fields.data,
             perms: tokens,
-            droppedPerms: dropped,
           })
         );
       });
@@ -246,7 +243,7 @@ export function parseNip46Uri(raw: string): Result<ParsedNip46Uri, Nip46UriError
   );
 }
 
-export interface ParsedPermsCsv {
+interface ParsedPermsCsv {
   tokens: PermToken[];
   dropped: string[];
 }
@@ -308,3 +305,27 @@ export function buildPermsCsv(tokens: readonly PermToken[]): string {
     .map((token) => (token.kind === undefined ? token.method : `${token.method}:${token.kind}`))
     .join(',');
 }
+
+/**
+ * Re-encode a parsed nostrconnect URI to its wire form (the connect sheet's
+ * payload contract). Inverse of `parseNostrconnectUri` for everything the sheet
+ * consumes — only the grantable `perms` survive a parse, so ungrantable entries
+ * never round-trip. Lives beside the parser/`buildBunkerUri` so the URI codec
+ * stays in one layer.
+ */
+export const encodeNostrconnectUri = Result.fromThrowable(
+  (parsed: ParsedNostrConnectUri): string => {
+    const params = [
+      ...parsed.relays.map((relay) => `relay=${encodeURIComponent(relay)}`),
+      `secret=${encodeURIComponent(parsed.secret)}`,
+    ];
+    if (parsed.perms.length > 0) {
+      params.push(`perms=${encodeURIComponent(buildPermsCsv(parsed.perms))}`);
+    }
+    if (parsed.name !== undefined) params.push(`name=${encodeURIComponent(parsed.name)}`);
+    if (parsed.url !== undefined) params.push(`url=${encodeURIComponent(parsed.url)}`);
+    if (parsed.image !== undefined) params.push(`image=${encodeURIComponent(parsed.image)}`);
+    return `nostrconnect://${parsed.clientPubkey}?${params.join('&')}`;
+  },
+  () => 'encode_failed' as const
+);

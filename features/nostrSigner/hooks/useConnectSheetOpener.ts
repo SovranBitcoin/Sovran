@@ -18,40 +18,16 @@
  */
 
 import { useEffect } from 'react';
-import { Result } from 'neverthrow';
 
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
-import { buildPermsCsv, type ParsedNostrConnectUri } from '@/features/nostrSigner/lib/nip46Uri';
+import { encodeNostrconnectUri } from '@/features/nostrSigner/lib/nip46Uri';
 import { nostrLog } from '@/shared/lib/logger';
 import { popup, showActionSheet } from '@/shared/lib/popup';
 
-export const PAIRING_EXPIRED_TOAST = {
+const PAIRING_EXPIRED_TOAST = {
   label: 'Connection expired',
   description: 'Scan the QR code again to connect.',
 } as const;
-
-/**
- * Re-encode a parsed nostrconnect URI to its wire form (the connect sheet's
- * payload contract). Inverse of `parseNostrconnectUri` for everything the
- * sheet consumes; `droppedPerms` are intentionally not round-tripped — they
- * were rejected as ungrantable at parse time.
- */
-export const encodeNostrconnectUri = Result.fromThrowable(
-  (parsed: ParsedNostrConnectUri): string => {
-    const params = [
-      ...parsed.relays.map((relay) => `relay=${encodeURIComponent(relay)}`),
-      `secret=${encodeURIComponent(parsed.secret)}`,
-    ];
-    if (parsed.perms.length > 0) {
-      params.push(`perms=${encodeURIComponent(buildPermsCsv(parsed.perms))}`);
-    }
-    if (parsed.name !== undefined) params.push(`name=${encodeURIComponent(parsed.name)}`);
-    if (parsed.url !== undefined) params.push(`url=${encodeURIComponent(parsed.url)}`);
-    if (parsed.image !== undefined) params.push(`image=${encodeURIComponent(parsed.image)}`);
-    return `nostrconnect://${parsed.clientPubkey}?${params.join('&')}`;
-  },
-  () => 'encode_failed' as const
-);
 
 export function useConnectSheetOpener(): void {
   const resumedPairing = useNip46RequestsStore((s) => s.resumedPairing);

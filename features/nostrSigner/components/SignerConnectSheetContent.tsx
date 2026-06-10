@@ -32,6 +32,11 @@ import { nip19 } from 'nostr-tools';
 
 import Icon from 'assets/icons';
 import {
+  SegmentedText,
+  safeHostname,
+  shortPubkey,
+} from '@/features/nostrSigner/components/display';
+import {
   alwaysAllowEligible,
   appDisplayName,
   permissionEntryFor,
@@ -123,11 +128,6 @@ function restartWarningSegments(appName: string): CopySegment[] {
 
 // ── Shared helpers ──────────────────────────────────────────────
 
-const safeHostname = Result.fromThrowable(
-  (url: string) => new URL(url).hostname,
-  () => 'invalid_url' as const
-);
-
 const safeNpubEncode = Result.fromThrowable(
   (pubkeyHex: string) => nip19.npubEncode(pubkeyHex),
   () => 'invalid_pubkey' as const
@@ -140,26 +140,6 @@ function truncatedNpubFor(pubkeyHex: string): string {
   return truncateMiddle(npub, NPUB_TRUNCATE_CHARS);
 }
 
-function SegmentedText({
-  segments,
-  size,
-  color,
-}: {
-  segments: CopySegment[];
-  size: number;
-  color?: string;
-}) {
-  return (
-    <Text size={size} {...(color !== undefined && { color })} style={{ lineHeight: size * 1.45 }}>
-      {segments.map((segment, index) => (
-        <Text key={index} size={size} bold={segment.bold} {...(color !== undefined && { color })}>
-          {segment.text}
-        </Text>
-      ))}
-    </Text>
-  );
-}
-
 /**
  * Sheet-scoped resource release. Both the root page and the pushed picker
  * page unmount on a page swap, so each unmount first checks whether the
@@ -169,11 +149,18 @@ function SegmentedText({
  */
 function releaseIfSheetClosed(parsed: ParsedNostrConnectUri): void {
   const popupState = usePopupStore.getState();
-  const sheetStillUp =
-    popupState.isOpen &&
-    isCustomSheetPayload(popupState.current) &&
-    popupState.current.sheetId === 'signer-connect';
-  if (sheetStillUp) return;
+  const current = popupState.current;
+  if (popupState.isOpen && isCustomSheetPayload(current) && current.sheetId === 'signer-connect') {
+    // Only a same-pairing page swap (root ⇄ profile-picker) keeps everything.
+    // A second nostrconnect URI that REPLACED this sheet's payload is a
+    // different pairing, so `parsed` must still be released even though a
+    // signer-connect sheet is technically up.
+    const currentUri = (current.payload as ActionSheetPayloads['signer-connect']).uri;
+    const currentParsed = parseNostrconnectUri(currentUri);
+    if (currentParsed.isOk() && checkedCacheKey(currentParsed.value) === checkedCacheKey(parsed)) {
+      return;
+    }
+  }
   useNip46RequestsStore.getState().setServiceHotRequested(false);
   checkedStateCache.delete(checkedCacheKey(parsed));
   const cancelled = nip46Engine.cancelNostrconnectPairing(parsed.clientPubkey);
@@ -376,10 +363,16 @@ function ConnectReview({
     useCallback(async () => {
       setFailure(null);
       setIsConnecting(true);
-      const acceptedGrantKeys = permRows
-        .filter((row) => row.eligible && checked[row.grantKey] === true)
+      const eligibleRows = permRows.filter((row) => row.eligible);
+      const acceptedGrantKeys = eligibleRows
+        .filter((row) => checked[row.grantKey] === true)
         .map((row) => row.grantKey);
-      const outcome = await completePairingWhenHot({ parsed, acceptedGrantKeys });
+      const presentedGrantKeys = eligibleRows.map((row) => row.grantKey);
+      const outcome = await completePairingWhenHot({
+        parsed,
+        acceptedGrantKeys,
+        presentedGrantKeys,
+      });
       setIsConnecting(false);
       if (outcome.isErr()) {
         nostrLog.warn('nostr.signer.connect_sheet_pairing_failed', {
@@ -440,7 +433,7 @@ function ConnectReview({
             {appName}
           </Text>
           <Text size={12} color={muted} numberOfLines={1}>
-            {appDomain ?? truncateMiddle(parsed.clientPubkey, 8)}
+            {appDomain ?? shortPubkey(parsed.clientPubkey)}
           </Text>
         </VStack>
       </HStack>

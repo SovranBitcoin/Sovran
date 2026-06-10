@@ -12,6 +12,7 @@ import type { PermToken } from '@/features/nostrSigner/lib/nip46Types';
 import {
   buildBunkerUri,
   buildPermsCsv,
+  encodeNostrconnectUri,
   parseBunkerUri,
   parseNip46Uri,
   parseNostrconnectUri,
@@ -95,7 +96,6 @@ describe('parseNostrconnectUri', () => {
       url: 'https://primal.net',
       image: 'https://primal.net/icon.png',
       perms: [{ method: 'sign_event', kind: 1 }, { method: 'nip44_encrypt' }],
-      droppedPerms: [],
     });
   });
 
@@ -105,7 +105,6 @@ describe('parseNostrconnectUri', () => {
     expect(parsed.url).toBeUndefined();
     expect(parsed.image).toBeUndefined();
     expect(parsed.perms).toEqual([]);
-    expect(parsed.droppedPerms).toEqual([]);
   });
 
   it('lowercases an uppercase hex pubkey', () => {
@@ -493,7 +492,7 @@ describe('perms CSV codec', () => {
     expect(parsePermsCsv(csv)._unsafeUnwrap()).toEqual({ tokens, dropped: [] });
   });
 
-  it('reports dropped perms through parseNostrconnectUri', () => {
+  it('keeps only grantable perms through parseNostrconnectUri, dropping the rest', () => {
     const parsed = parseNostrconnectUri(
       nostrconnectUri([
         ...BASE_PARAMS,
@@ -501,6 +500,26 @@ describe('perms CSV codec', () => {
       ])
     )._unsafeUnwrap();
     expect(parsed.perms).toEqual([{ method: 'sign_event', kind: 1 }]);
-    expect(parsed.droppedPerms).toEqual(['ping', 'bogus', 'sign_event:99999']);
+  });
+});
+
+describe('encodeNostrconnectUri', () => {
+  it('re-encodes a parsed URI so it parses back to the same grantable contract', () => {
+    const original = nostrconnectUri([
+      ...BASE_PARAMS,
+      `name=${encodeURIComponent('Primal')}`,
+      `perms=${encodeURIComponent('sign_event:1,nip44_encrypt')}`,
+    ]);
+    const parsed = parseNostrconnectUri(original)._unsafeUnwrap();
+
+    const encoded = encodeNostrconnectUri(parsed)._unsafeUnwrap();
+    expect(encoded.startsWith(`nostrconnect://${CLIENT_PUBKEY}?`)).toBe(true);
+
+    const reparsed = parseNostrconnectUri(encoded)._unsafeUnwrap();
+    expect(reparsed.clientPubkey).toBe(parsed.clientPubkey);
+    expect(reparsed.secret).toBe(parsed.secret);
+    expect(reparsed.relays).toEqual(parsed.relays);
+    expect(reparsed.name).toBe(parsed.name);
+    expect(reparsed.perms).toEqual(parsed.perms);
   });
 });

@@ -12,8 +12,10 @@
  * (they no longer need a secret), which is exactly the confirm copy's claim.
  *
  * The bunker URI embeds the bearer secret: render + clipboard only, never
- * logged. Relay rows read the static default relay set — the transport's live
- * per-relay state is intentionally not part of the feature's public surface.
+ * logged. Relay rows list the default signer relay set the QR advertises; they
+ * deliberately assert no live connection state, since the dedicated signer pool
+ * may not have dialed yet (or may be offline) at the moment the QR is shown — a
+ * green "Connected" badge there would be misleading exactly when it matters.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -37,7 +39,6 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
-import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -50,7 +51,6 @@ const QR_SIZE = 220;
 const SCREEN_TITLE = 'Share My Signer';
 const COPY_LINK_LABEL = 'Copy Link';
 const RELAYS_SECTION_TITLE = 'Relays';
-const RELAY_CONNECTED_LABEL = 'Connected';
 const SECRET_SECTION_TITLE = 'Secret';
 const SECRET_BODY =
   'This link contains a one-time secret. It can connect one app and expires after 10 minutes.';
@@ -202,7 +202,6 @@ export function ShareSignerScreen(): React.ReactElement {
               <ListRow
                 iconCircle={{ icon: 'mdi:broadcast', color: muted, size: 40 }}
                 title={relay.replace(/^wss:\/\//, '')}
-                trailing={<Badge variant="success">{RELAY_CONNECTED_LABEL}</Badge>}
                 accessibilityLabel={relay}
               />
             </React.Fragment>

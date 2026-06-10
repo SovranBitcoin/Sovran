@@ -28,8 +28,10 @@
 
 import { errAsync, okAsync, ResultAsync } from 'neverthrow';
 
-import { encodeNostrconnectUri } from '@/features/nostrSigner/hooks/useConnectSheetOpener';
-import type { ParsedNostrConnectUri } from '@/features/nostrSigner/lib/nip46Uri';
+import {
+  encodeNostrconnectUri,
+  type ParsedNostrConnectUri,
+} from '@/features/nostrSigner/lib/nip46Uri';
 import {
   clearPairingIntent,
   setPairingIntent,
@@ -49,7 +51,7 @@ export const PAIRING_SAVE_FAILED_TOAST = {
   description: 'Try again.',
 } as const;
 
-export interface SwitchAndConnectTarget {
+interface SwitchAndConnectTarget {
   /** Derivation/account index `switchToExistingProfile` switches to. */
   accountIndex: number;
   /**
@@ -61,7 +63,7 @@ export interface SwitchAndConnectTarget {
   pubkey: string;
 }
 
-export type SwitchProfileAndPairError =
+type SwitchProfileAndPairError =
   | { type: 'encode-failed' }
   | { type: 'intent-not-saved'; cause: PairingIntentError['type'] }
   | { type: 'switch-failed' };

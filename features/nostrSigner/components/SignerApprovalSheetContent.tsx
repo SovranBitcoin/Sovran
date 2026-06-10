@@ -21,11 +21,15 @@ import { Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { BottomSheet, Button as HerouiButton } from 'heroui-native';
-import { Result } from 'neverthrow';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import Animated, { SlideInRight } from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
+import {
+  SegmentedText,
+  safeHostname,
+  shortPubkey,
+} from '@/features/nostrSigner/components/display';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import {
   useNip46RequestsStore,
@@ -50,7 +54,6 @@ import {
   SLIDE_TO_APPROVE_LABEL,
   tierBannerFor,
   VIEW_ALL_LABEL,
-  type CopySegment,
 } from '@/features/nostrSigner/components/permissionCatalog';
 import { suppressSignerDeferToastOnce } from '@/features/nostrSigner/hooks/signerApprovalCoordination';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
@@ -82,15 +85,6 @@ interface SignerApprovalContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['signer-approval'];
 }
 
-const safeHostname = Result.fromThrowable(
-  (url: string) => new URL(url).hostname,
-  () => 'invalid_url' as const
-);
-
-function shortPubkey(pubkey: string): string {
-  return `${pubkey.slice(0, 8)}…${pubkey.slice(-4)}`;
-}
-
 /** Relay/url tag value for kind 22242/27235 login bodies. Bounded by catalog. */
 function loginTargetFor(event: UnsignedEvent): string | undefined {
   for (const tag of event.tags) {
@@ -99,26 +93,6 @@ function loginTargetFor(event: UnsignedEvent): string | undefined {
     }
   }
   return undefined;
-}
-
-function SegmentedText({
-  segments,
-  size,
-  color,
-}: {
-  segments: CopySegment[];
-  size: number;
-  color?: string;
-}) {
-  return (
-    <Text size={size} {...(color !== undefined && { color })} style={{ lineHeight: size * 1.45 }}>
-      {segments.map((segment, index) => (
-        <Text key={index} size={size} bold={segment.bold} {...(color !== undefined && { color })}>
-          {segment.text}
-        </Text>
-      ))}
-    </Text>
-  );
 }
 
 function EventPreviewCard({ event }: { event: UnsignedEvent }) {

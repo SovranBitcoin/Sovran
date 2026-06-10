@@ -11,11 +11,12 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { errAsync, okAsync, Result, ResultAsync } from 'neverthrow';
+import { errAsync, okAsync, ResultAsync } from 'neverthrow';
 import { z } from 'zod';
 
+import { safeJsonParse } from '@/features/nostrSigner/lib/json';
 import { PAIRING_INTENT_TTL_MS } from '@/features/nostrSigner/lib/nip46Types';
-import { nostrLog, redactError } from '@/shared/lib/logger';
+import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
 export const PAIRING_INTENT_STORAGE_KEY = 'nip46-pending-pairing';
@@ -24,7 +25,7 @@ const MAX_URI_LENGTH = 4096;
 
 const PubkeyHexSchema = z.custom<string>(isNostrPubkeyHex, 'expected 64 hex chars');
 
-export const PairingIntentSchema = z.strictObject({
+const PairingIntentSchema = z.strictObject({
   /** @SECRET full nostrconnect:// URI — carries the pairing secret; never log */
   uri: z.string().min(1).max(MAX_URI_LENGTH),
   targetPubkey: PubkeyHexSchema,
@@ -34,13 +35,11 @@ export const PairingIntentSchema = z.strictObject({
 });
 export type PairingIntent = z.infer<typeof PairingIntentSchema>;
 
-type RedactedCause = { name: string; message: string };
-
 export type PairingIntentError =
   | { type: 'invalid-pubkey' }
   | { type: 'invalid-intent' }
-  | { type: 'storage-read-failed'; cause: RedactedCause }
-  | { type: 'storage-write-failed'; cause: RedactedCause };
+  | { type: 'storage-read-failed'; cause: RedactedError }
+  | { type: 'storage-write-failed'; cause: RedactedError };
 
 export type TakePairingIntentOutcome =
   | { status: 'taken'; intent: PairingIntent }
@@ -74,11 +73,6 @@ const removeItem = (): ResultAsync<void, PairingIntentError> =>
     nostrLog.error('nostr.signer.pairing_intent_clear_failed', { error: cause });
     return { type: 'storage-write-failed', cause } as const;
   });
-
-const safeJsonParse = Result.fromThrowable(
-  (raw: string) => JSON.parse(raw) as unknown,
-  () => 'invalid_json' as const
-);
 
 /** Persists a pending pairing intent before the restart-based profile switch. */
 export function setPairingIntent(

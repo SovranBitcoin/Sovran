@@ -27,24 +27,23 @@ import { NDKUser } from '@nostr-dev-kit/ndk-mobile';
 import type { NDKPrivateKeySigner, NostrEvent } from '@nostr-dev-kit/ndk-mobile';
 import { err, errAsync, ok, okAsync, Result, ResultAsync } from 'neverthrow';
 
+import { safeJsonParse } from '@/features/nostrSigner/lib/json';
 import {
   UnsignedEventSchema,
   type Nip46Method,
   type RpcRequest,
   type UnsignedEvent,
 } from '@/features/nostrSigner/lib/nip46Types';
-import { nostrLog, redactError } from '@/shared/lib/logger';
+import { nostrLog, redactError, type RedactedError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
-type RedactedCause = { name: string; message: string };
-
-export type Nip46MethodHandlerError =
+type Nip46MethodHandlerError =
   | { type: 'malformed-params' }
-  | { type: 'execution-failed'; cause: RedactedCause };
+  | { type: 'execution-failed'; cause: RedactedError };
 
 const MALFORMED: Nip46MethodHandlerError = { type: 'malformed-params' };
 
-export interface Nip46MethodHandlerInput {
+interface Nip46MethodHandlerInput {
   /** The user's signing key — passed through, never retained. */
   signer: NDKPrivateKeySigner;
   /** Hex pubkey of the active profile (= the remote-signer pubkey). */
@@ -53,7 +52,7 @@ export interface Nip46MethodHandlerInput {
 }
 
 /** Resolves to the RPC `result` string for the response payload. */
-export type Nip46MethodHandler = (
+type Nip46MethodHandler = (
   input: Nip46MethodHandlerInput
 ) => ResultAsync<string, Nip46MethodHandlerError>;
 
@@ -63,11 +62,6 @@ export type Nip46ExecutableMethod = Exclude<Nip46Method, 'connect'>;
 export function isExecutableMethod(method: Nip46Method): method is Nip46ExecutableMethod {
   return method !== 'connect';
 }
-
-const safeJsonParse = Result.fromThrowable(
-  (raw: string) => JSON.parse(raw) as unknown,
-  () => 'invalid_json' as const
-);
 
 const executionFailure =
   (logEvent: string) =>

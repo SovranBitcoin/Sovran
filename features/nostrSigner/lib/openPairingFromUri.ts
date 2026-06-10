@@ -41,9 +41,9 @@ export const PAIRING_ERROR_BUNKER =
 
 // ── Dispatch ────────────────────────────────────────────────────
 
-export type OpenPairingFromUriError = { type: 'invalid-uri' } | { type: 'bunker-unsupported' };
+type OpenPairingFromUriError = { type: 'invalid-uri' } | { type: 'bunker-unsupported' };
 
-export interface OpenPairingFromUriOptions {
+interface OpenPairingFromUriOptions {
   /**
    * Runs after validation succeeds, immediately before the connect sheet
    * opens — e.g. the hub's paste menu closes itself here so the dismissal

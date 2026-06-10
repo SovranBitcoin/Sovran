@@ -238,9 +238,7 @@ function makeEngine(deps: Partial<Nip46EngineDeps> = {}, autoStart = true): Engi
   });
   createdEngines.push(engine);
   if (autoStart) {
-    expect(engine.start({ signer: fakeSigner, userPubkey: USER, accountIndex: 0 }).isOk()).toBe(
-      true
-    );
+    expect(engine.start({ signer: fakeSigner, userPubkey: USER }).isOk()).toBe(true);
   }
   return {
     engine,
@@ -283,7 +281,6 @@ function nostrconnectUri(overrides: Partial<ParsedNostrConnectUri> = {}): Parsed
     secret: 'client-secret-token',
     name: 'Primal',
     perms: [],
-    droppedPerms: [],
     ...overrides,
   };
 }
@@ -378,7 +375,7 @@ describe('pipeline auto verdicts', () => {
 
     expect(parsedResponse(sent[0]!)).toEqual({ id: request.id, error: NIP46_ERRORS.rateLimited });
     expect(activityEntries()).toMatchObject([{ verdict: 'auto_denied_rate_limited' }]);
-    expect(useNip46RequestsStore.getState().throttledApps[APP]).toBe(true);
+    expect(useNip46RequestsStore.getState().throttledApps[APP]).toBe(now + 1); // cooldownUntil
   });
 
   it('answers "malformed request" for an unparseable sign_event payload', async () => {
@@ -471,6 +468,22 @@ describe('pipeline gates', () => {
     expect(rateLimiter.take).not.toHaveBeenCalled();
     expect(transport.decryptEnvelope).not.toHaveBeenCalled();
     expect(sent).toHaveLength(0);
+  });
+
+  it('a spoofed envelope that fails to decrypt never burns the victim app rate budget', async () => {
+    // Forged envelope claims a paired app's pubkey and replays a cached id so
+    // verifySignature passes, but the ECDH decrypt fails — the rate limiter
+    // (and the victim app's budget) must never be touched.
+    pairApp();
+    const { emit, sent, rateLimiter, overrides } = makeEngine();
+    overrides.failDecrypt = true;
+
+    emit(makeEvent(rpc('get_public_key')));
+    await flush();
+
+    expect(rateLimiter.take).not.toHaveBeenCalled();
+    expect(sent).toHaveLength(0);
+    expect(useNip46RequestsStore.getState().throttledApps[APP]).toBeUndefined();
   });
 
   it('rejects events outside the created_at skew window', async () => {
@@ -672,6 +685,47 @@ describe('nostrconnect pairing', () => {
     expect(activityEntries()).toMatchObject([{ method: 'connect', verdict: 'approved_pairing' }]);
   });
 
+  it('re-pair downgrades an unchecked presented grant from always back to ask', async () => {
+    // App already paired with sign_event:1 'always' and an editor-set deny on
+    // sign_event:6. The user re-pairs and UNCHECKS sign_event:1 (both keys are
+    // presented). The always grant must be cleared; the deny must survive.
+    pairApp(APP_B);
+    expect(
+      useNip46ConnectionsStore.getState().setGrant(APP_B, 'sign_event:1', 'always').isOk()
+    ).toBe(true);
+    expect(useNip46ConnectionsStore.getState().setGrant(APP_B, 'sign_event:6', 'deny').isOk()).toBe(
+      true
+    );
+    const { engine } = makeEngine();
+    const parsed = nostrconnectUri();
+    engine.startNostrconnectPairing(parsed);
+
+    const result = await engine.completeNostrconnectPairing({
+      parsed,
+      acceptedGrantKeys: [],
+      presentedGrantKeys: ['sign_event:1', 'sign_event:6'],
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(connectionFor(APP_B)?.grants['sign_event:1']).toBeUndefined(); // downgraded to ask
+    expect(connectionFor(APP_B)?.grants['sign_event:6']).toMatchObject({ verdict: 'deny' }); // untouched
+  });
+
+  it('re-pair leaves grants intact when presentedGrantKeys is omitted', async () => {
+    pairApp(APP_B);
+    expect(
+      useNip46ConnectionsStore.getState().setGrant(APP_B, 'sign_event:1', 'always').isOk()
+    ).toBe(true);
+    const { engine } = makeEngine();
+    const parsed = nostrconnectUri();
+    engine.startNostrconnectPairing(parsed);
+
+    const result = await engine.completeNostrconnectPairing({ parsed, acceptedGrantKeys: [] });
+
+    expect(result.isOk()).toBe(true);
+    expect(connectionFor(APP_B)?.grants['sign_event:1']).toMatchObject({ verdict: 'always' });
+  });
+
   it('cancelNostrconnectPairing closes the stranger window again', async () => {
     const { engine, emit, transport } = makeEngine();
     engine.startNostrconnectPairing(nostrconnectUri());
@@ -783,6 +837,17 @@ describe('resolveRequest', () => {
 
     const again = await engine.resolveRequest(requestId, { action: 'approve_once' });
     expect(again._unsafeUnwrapErr()).toEqual({ type: 'unknown-request' });
+  });
+
+  it('truncates the ask→approve activity summary to SUMMARY_MAX_LENGTH (80)', async () => {
+    const { engine, requestId } = await makeAsk(
+      'sign_event',
+      signEventParams({ content: 'x'.repeat(200) })
+    );
+
+    expect((await engine.resolveRequest(requestId, { action: 'approve_once' })).isOk()).toBe(true);
+
+    expect(activityEntries()[0]!.summary).toHaveLength(80);
   });
 
   it('always persists an always grant and future requests auto-approve', async () => {
@@ -1025,9 +1090,7 @@ describe('lifecycle', () => {
     );
     expect(params.sinceEpochSec).toBe(nowSec() - 300);
 
-    expect(engine.start({ signer: fakeSigner, userPubkey: USER, accountIndex: 0 }).isOk()).toBe(
-      true
-    );
+    expect(engine.start({ signer: fakeSigner, userPubkey: USER }).isOk()).toBe(true);
     expect(transport.start).toHaveBeenCalledTimes(1);
   });
 
@@ -1043,12 +1106,39 @@ describe('lifecycle', () => {
     expect(resolved._unsafeUnwrapErr()).toEqual({ type: 'not-started' });
   });
 
-  it('reconnect re-subscribes no later than the last received event', () => {
+  it('stop during an in-flight decrypt never enqueues, responds, or signs', async () => {
+    pairApp();
+    const harness = makeEngine();
+    let resolveDecrypt: ((value: { plaintext: string; used: Nip46Encryption }) => void) | undefined;
+    const deferredDecrypt = ResultAsync.fromPromise(
+      new Promise<{ plaintext: string; used: Nip46Encryption }>((resolve) => {
+        resolveDecrypt = resolve;
+      }),
+      () => ({ type: 'decrypt-failed' as const, cause: { name: 'E', message: 'x' } })
+    );
+    harness.transport.decryptEnvelope.mockImplementationOnce((() => deferredDecrypt) as never);
+
+    const request = rpc('sign_event', signEventParams());
+    harness.emit(makeEvent(request));
+    await flush();
+    expect(useNip46RequestsStore.getState().pending).toHaveLength(0); // decrypt still in flight
+
+    expect(harness.engine.stop().isOk()).toBe(true);
+    resolveDecrypt!({ plaintext: JSON.stringify(request), used: 'nip44' });
+    await flush();
+
+    // The continuation re-checks the engine epoch after the await and bails.
+    expect(useNip46RequestsStore.getState().pending).toHaveLength(0);
+    expect(harness.sent).toHaveLength(0);
+    expect(harness.rateLimiter.take).not.toHaveBeenCalled();
+  });
+
+  it('reconnect delegates to the transport (which owns the overlap-safe since)', () => {
     const { engine, transport } = makeEngine();
-    transport.lastEventReceivedAt = now - 600_000; // 10 min ago
 
     expect(engine.reconnect().isOk()).toBe(true);
 
-    expect(transport.reconnect).toHaveBeenCalledWith(Math.floor((now - 600_000) / 1000));
+    expect(transport.reconnect).toHaveBeenCalledTimes(1);
+    expect(transport.reconnect).toHaveBeenCalledWith();
   });
 });

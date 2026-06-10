@@ -149,7 +149,6 @@ async function renderProvider(): Promise<TestRenderer.ReactTestRenderer> {
   let renderer!: TestRenderer.ReactTestRenderer;
   await act(async () => {
     const providerProps: React.ComponentProps<typeof NostrSignerProvider> = {
-      accountIndex: ACCOUNT_INDEX,
       children: null,
     };
     renderer = TestRenderer.create(React.createElement(NostrSignerProvider, providerProps));
@@ -234,12 +233,11 @@ describe('useNostrSignerService start/stop', () => {
     expect(engine.start).toHaveBeenCalledWith({
       signer: mockKeysContext.keys?.privateKey,
       userPubkey: USER,
-      accountIndex: ACCOUNT_INDEX,
     });
 
     // Unrelated store churn must not re-start.
     await act(async () => {
-      useNip46RequestsStore.getState().setAppThrottled(APP, true);
+      useNip46RequestsStore.getState().setAppThrottled(APP, Date.now() + 60_000);
       await flush();
     });
     expect(engine.start).toHaveBeenCalledTimes(1);
