@@ -26,7 +26,7 @@ import type { ParsedNostrConnectUri } from '@/features/nostrSigner/lib/nip46Uri'
 
 import { safeHostname } from './boundedDisplay';
 
-export type PreviousConnectionMatch =
+type PreviousConnectionMatch =
   | { kind: 'none' }
   | { kind: 'active'; connection: Nip46Connection }
   | { kind: 'blocked'; connection: Nip46Connection };

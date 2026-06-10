@@ -100,7 +100,7 @@ export interface SummarizeRequestInput {
   preview: Nip46ParamsPreview;
 }
 
-export interface SummarizeRequestContext {
+interface SummarizeRequestContext {
   /**
    * The user's CURRENT follow set, for the kind-3 diff. Callers must only
    * pass this when the baseline belongs to the signing identity (the sheet

@@ -75,9 +75,7 @@ export interface PermissionLookup {
 
 // ── Untrusted-display bounds ────────────────────────────────────
 // boundDisplay lives in lib/boundedDisplay so the headless summary layer can
-// share the same choke point; re-exported here for existing importers.
-
-export { boundDisplay, UNNAMED_APP_LABEL };
+// share the same choke point — import it from there, not from this catalog.
 
 function boundedAppName(ctx: PermissionCopyContext): string {
   const trimmed = ctx.appName.trim();
@@ -290,7 +288,7 @@ const METHOD_ROWS: Record<Exclude<Nip46Method, 'sign_event'>, CatalogRow> = {
   // activity rows (connect) and catalog completeness (ping is never logged).
   connect: {
     headline: 'Connect App',
-    body: ' connected to your signer.',
+    body: ' connected to Remote Login.',
     alwaysVerbPhrase: 'connect',
     icon: 'lucide:link',
     permissionEditorLabel: 'Connect',
@@ -575,8 +573,8 @@ export function requestsWaitingToastCopy(pendingCount: number): ToastCopy {
     label: 'Requests waiting',
     description:
       pendingCount === 1
-        ? '1 request is in your queue. Open Signer to review.'
-        : `${pendingCount} requests are in your queue. Open Signer to review.`,
+        ? '1 request is in your queue. Open Remote Login to review.'
+        : `${pendingCount} requests are in your queue. Open Remote Login to review.`,
   };
 }
 

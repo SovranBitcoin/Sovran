@@ -185,6 +185,24 @@ describe('tampered blob rejection at merge', () => {
       'deny'
     );
   });
+
+  // Corrupt persisted grants (bitrot, downgrade, hand-edit) must fail closed
+  // at the schema gate — rejected wholesale, never a crash or a partial load.
+  it.each([
+    ['unknown verdict enum', { verdict: 'maybe', origin: 'prompt', createdAt: 1, useCount: 0 }],
+    ['missing verdict field', { origin: 'prompt', createdAt: 1, useCount: 0 }],
+    ['negative createdAt', { verdict: 'deny', origin: 'prompt', createdAt: -5, useCount: 0 }],
+    ['unknown origin', { verdict: 'deny', origin: 'telepathy', createdAt: 1, useCount: 0 }],
+  ])('rejects a grant with %s without crashing rehydrate', async (_label, corruptGrant) => {
+    const client = pk(8);
+    const tampered = persistedConnection(client);
+    tampered.grants = { 'sign_event:1': corruptGrant as never };
+    writeBlob({ [client]: tampered });
+
+    await expect(useNip46ConnectionsStore.persist.rehydrate()).resolves.not.toThrow();
+
+    expect(useNip46ConnectionsStore.getState().apps).toEqual({});
+  });
 });
 
 describe('setGrant critical ceiling', () => {
@@ -386,9 +404,11 @@ describe('per-peer decrypt grants', () => {
   });
 
   it('refuses a grant asserting peerIsSelf', () => {
+    // Deliberately illegal at the type level — pins the runtime guard.
+    const hostileAttestation = { peerIsSelf: true };
     const result = useNip46ConnectionsStore
       .getState()
-      .setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: true } as never);
+      .setPeerDecryptGrant(client, peerX, 'nip44_decrypt', hostileAttestation as never);
     expect(result._unsafeUnwrapErr()).toBe('self_decrypt_forbidden');
   });
 

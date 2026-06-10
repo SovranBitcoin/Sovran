@@ -15,7 +15,6 @@ import {
   alwaysAllowEligible,
   appDisplayName,
   autoSignedToastCopy,
-  boundDisplay,
   encryptedPayloadLabel,
   expiredNoticeCopy,
   permissionEntryFor,
@@ -24,10 +23,10 @@ import {
   queueStripLabel,
   requestsWaitingToastCopy,
   tierBannerFor,
-  UNNAMED_APP_LABEL,
   type CopySegment,
   type PermissionLookup,
 } from '@/features/nostrSigner/components/permissionCatalog';
+import { boundDisplay, UNNAMED_APP_LABEL } from '@/features/nostrSigner/lib/boundedDisplay';
 import {
   ActivityVerdictSchema,
   Nip46MethodSchema,
@@ -348,10 +347,10 @@ describe('labels, toasts, and bounds', () => {
   it('requests-waiting toast copy', () => {
     expect(requestsWaitingToastCopy(3)).toEqual({
       label: 'Requests waiting',
-      description: '3 requests are in your queue. Open Signer to review.',
+      description: '3 requests are in your queue. Open Remote Login to review.',
     });
     expect(requestsWaitingToastCopy(1).description).toBe(
-      '1 request is in your queue. Open Signer to review.'
+      '1 request is in your queue. Open Remote Login to review.'
     );
   });
 

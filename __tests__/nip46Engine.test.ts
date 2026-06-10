@@ -990,6 +990,26 @@ describe('resolveRequest', () => {
     expect(again._unsafeUnwrapErr()).toEqual({ type: 'unknown-request' });
   });
 
+  it('CONCURRENT verdicts on one request: first wins, second gets unknown-request', async () => {
+    const { engine, sent, requestId } = await makeAsk();
+
+    // The context handover is synchronous read-check-delete, so even two
+    // verdicts racing through Promise.all must produce exactly one execution
+    // (one wire response, one activity row) — this pins that invariant.
+    const [first, second] = await Promise.all([
+      engine.resolveRequest(requestId, { action: 'approve_once' }),
+      engine.resolveRequest(requestId, { action: 'approve_once' }),
+    ]);
+
+    const outcomes = [first.isOk(), second.isOk()].sort();
+    expect(outcomes).toEqual([false, true]);
+    expect([first, second].find((r) => r.isErr())!._unsafeUnwrapErr()).toEqual({
+      type: 'unknown-request',
+    });
+    expect(sent).toHaveLength(1);
+    expect(activityEntries()).toHaveLength(1);
+  });
+
   it('truncates the ask→approve activity summary to SUMMARY_MAX_LENGTH (80)', async () => {
     const { engine, requestId } = await makeAsk(
       'sign_event',
@@ -1348,9 +1368,6 @@ describe('session approvals', () => {
     await engine.resolveRequest(requestId, { action: 'approve_session' });
     expect(useNip46RequestsStore.getState().sessionAllows.length).toBeGreaterThan(0);
 
-    const second = rpc('sign_event', signEventParams({ kind: 7 }));
-    // kind 7 is in a different bundle — still session-pending? It auto-asks;
-    // resolve directly via a fresh ask.
     const harness = await makeAsk('sign_event', signEventParams({ kind: 5 }), undefined);
     await harness.engine.resolveRequest(harness.requestId, { action: 'block' });
 

@@ -19,18 +19,30 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { ScrollView } from 'react-native';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
-import { safeHostname, shortPubkey } from '@/features/nostrSigner/components/display';
+import { shortPubkey } from '@/features/nostrSigner/components/display';
+import { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import {
   alwaysAllowEligible,
   appDisplayName,
   permissionEntryForGrantKey,
   type PermissionEditorGroup,
 } from '@/features/nostrSigner/components/permissionCatalog';
+import { PermissionGestureDemo } from '@/features/nostrSigner/components/PermissionGestureDemo';
 import {
   PermissionSwitchRow,
   triStateFor,
@@ -56,7 +68,8 @@ import { nostrLog } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 import { actionMenuPopup, popup } from '@/shared/lib/popup';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { Screen } from '@/shared/ui/composed/Screen';
+import { ListRow } from '@/shared/ui/composed/ListRow';
+import { Screen, useScreenOptions } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -66,16 +79,48 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 const IDENTITY_AVATAR_SIZE = 64;
 
+// ── Scroll-linked header handoff ────────────────────────────────
+// One FLIP POINT, not overlapping scroll bands: crossing it retargets a
+// single timed progress value (content fades fully out over the first half,
+// the header twin fades in over the second half — never both visible, and
+// parking the scroll anywhere settles on exactly one). withTiming retargets
+// from the current value on interruption, so spamming across the threshold
+// just reverses mid-fade; the two thresholds add hysteresis so resting right
+// on the boundary can't jitter.
+// The content avatar sits at y 16 (pt-4) with height 64, so its bottom slides
+// under the header bar at offset 80 — flip just before that, when the picture
+// is almost gone, and flip back once most of it has re-emerged.
+const FLIP_SHOW_HEADER_Y = 76; // scrolling down past this → header identity
+const FLIP_SHOW_CONTENT_Y = 56; // scrolling back above this → content identity
+const FLIP_FADE_MS = 200;
+const CONTENT_FADE_PHASE = [0, 0.5];
+const HEADER_FADE_PHASE = [0.5, 1];
+const SCROLL_H_PADDING = { paddingHorizontal: 16 } as const;
+const CONTENT_IDENTITY_STYLE = { alignItems: 'center' } as const;
+const HEADER_IDENTITY_ROW_STYLE = { flexDirection: 'row', alignItems: 'center', gap: 8 } as const;
+const HEADER_NAME_STYLE = { maxWidth: 190 } as const;
+
+const CENTER_ROW_STYLE = { alignItems: 'center' } as const;
+const FLEX_ONE_STYLE = { flex: 1 } as const;
+const PEER_ROW_STYLE = { flex: 1, alignItems: 'center' } as const;
+const CONFIRM_BODY_TEXT_STYLE = { lineHeight: 20 } as const;
+const FINE_GRAINED_ROW_STYLE = { alignItems: 'center', alignSelf: 'flex-end' } as const;
+// The adjacent permission rows (ListGroup.Item, p-4) inset 16 — match them
+// so the groups align on this screen.
+const MANAGE_ROW_INSET = 16;
+
 const THROTTLED_BANNER = 'This app is sending unusual amounts of requests';
 const WALLET_GROUP_CAPTION = 'Wallet events always require your approval.';
 const LOCKED_GROUP_CAPTION =
   'Some of these always require your approval and can never be set to Allow.';
-const PERMISSIONS_FOOTER =
-  'Tap a permission to toggle Allow. Long-press for Ask / Allow / Block. Everything is logged in Activity.';
 const STRICT_MODE_TITLE = 'Ask Every Time';
 const STRICT_MODE_DESCRIPTION = 'Ignore saved permissions and ask for every request.';
 const FINE_GRAINED_LABEL = 'Advanced';
+const RENAME_APP_SUBTITLE = 'Change the name shown for this app';
+const VIEW_ACTIVITY_SUBTITLE = 'See every request this app has made';
 const RESTORE_DEFAULTS_LABEL = 'Restore Defaults';
+const RESTORE_DEFAULTS_SUBTITLE = 'Allow common social actions again — everything else asks';
+const DISCONNECT_SUBTITLE = 'Sign this app out and revoke its permissions';
 const RESTORE_DEFAULTS_BODY =
   'Common social actions are allowed again — the same defaults as when you first connect. Everything else asks. Decrypt access for people is not affected.';
 const EVERYONE_TITLE = 'Everyone';
@@ -112,7 +157,7 @@ function PeerAccessIdentity({ pubkey, sublabel }: { pubkey: string; sublabel: st
   const person = useNostrPersonDisplay(pubkey);
   const name = person.name ?? shortPubkey(pubkey);
   return (
-    <HStack gap={12} style={{ flex: 1, alignItems: 'center' }}>
+    <HStack gap={12} style={PEER_ROW_STYLE}>
       <Avatar
         state={person.picture ? 'image' : 'fallback'}
         picture={person.picture}
@@ -121,7 +166,7 @@ function PeerAccessIdentity({ pubkey, sublabel }: { pubkey: string; sublabel: st
         size={32}
         alt={name}
       />
-      <View style={{ flex: 1 }}>
+      <View style={FLEX_ONE_STYLE}>
         <Text size={14} color={foreground} numberOfLines={1}>
           {name}
         </Text>
@@ -133,41 +178,53 @@ function PeerAccessIdentity({ pubkey, sublabel }: { pubkey: string; sublabel: st
   );
 }
 
+/**
+ * Header twin of the content identity — fades/rises in as the content
+ * version scrolls under the transparent header, then stays for the rest of
+ * the scroll. Lives in the navigation header's React tree, but reanimated
+ * drives the style from the screen's scroll position on the UI thread.
+ */
+function AppHeaderIdentity({
+  progress,
+  name,
+  image,
+  seed,
+}: {
+  /** Flip progress 0→1 (content shown → header shown). */
+  progress: SharedValue<number>;
+  name: string;
+  image?: string;
+  seed: string;
+}) {
+  const [foreground] = useThemeColor(['foreground'] as const);
+  const fadeStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, HEADER_FADE_PHASE, [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateY: interpolate(progress.value, HEADER_FADE_PHASE, [6, 0], Extrapolation.CLAMP) },
+    ],
+  }));
+  const composed = useMemo(() => [HEADER_IDENTITY_ROW_STYLE, fadeStyle], [fadeStyle]);
+  return (
+    <Animated.View style={composed}>
+      <Avatar
+        state={image ? 'image' : 'fallback'}
+        picture={image}
+        seed={seed}
+        fallbackVariant="beam"
+        size={28}
+        alt={name}
+      />
+      <Text size={16} bold color={foreground} numberOfLines={1} style={HEADER_NAME_STYLE}>
+        {name}
+      </Text>
+    </Animated.View>
+  );
+}
+
 function statsLine(app: Nip46Connection): string {
   const requests = app.requestCount === 1 ? '1 request' : `${app.requestCount} requests`;
   if (app.lastUsedAt === undefined) return requests;
   return `${requests} · Last used ${formatRelative(app.lastUsedAt, 'compact')}`;
-}
-
-// ── Row pieces ──────────────────────────────────────────────────
-
-function LinkRow({
-  title,
-  isDanger,
-  onPress,
-}: {
-  title: string;
-  isDanger?: boolean;
-  onPress: () => void;
-}) {
-  const [danger, muted] = useThemeColor(['danger', 'muted'] as const);
-  return (
-    <PressableFeedback animation={false} onPress={onPress}>
-      <PressableFeedback.Scale>
-        <ListGroup.Item disabled>
-          <ListGroup.ItemContent>
-            <ListGroup.ItemTitle>
-              {isDanger ? <Text style={{ color: danger }}>{title}</Text> : title}
-            </ListGroup.ItemTitle>
-          </ListGroup.ItemContent>
-          <ListGroup.ItemSuffix>
-            <Icon name="mdi:chevron-right" size={18} color={muted} />
-          </ListGroup.ItemSuffix>
-        </ListGroup.Item>
-      </PressableFeedback.Scale>
-      <PressableFeedback.Ripple />
-    </PressableFeedback>
-  );
 }
 
 // ── Screen ──────────────────────────────────────────────────────
@@ -196,15 +253,69 @@ export function SignerAppDetailScreen(): React.ReactElement {
     clientPubkey === undefined ? false : (s.throttledApps[clientPubkey] ?? 0) > Date.now()
   );
 
-  const [foreground, muted, warning, warningSoftFg] = useThemeColor([
+  const [foreground, muted, warning, warningSoftFg, danger] = useThemeColor([
     'foreground',
     'muted',
     'warning',
     'warning-soft-foreground',
+    'danger',
   ] as const);
 
   const appName = appDisplayName(app);
   const appDomain = app?.url !== undefined ? safeHostname(app.url).unwrapOr(null) : null;
+
+  // Content scrolls UNDER the transparent blur header (thread-page style):
+  // the scroll view spans the full screen and the CONTENT is padded by the
+  // header height instead of framing the whole screen below it.
+  const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
+  const scrollContentStyle = useMemo(
+    () => ({ paddingTop: headerHeight, paddingBottom: 32 + insets.bottom }),
+    [headerHeight, insets.bottom]
+  );
+  const indicatorInsets = useMemo(() => ({ top: headerHeight }), [headerHeight]);
+
+  // ── Scroll-linked identity handoff (content ↔ header) ────────
+  const flipProgress = useSharedValue(0);
+  const flipped = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    const y = event.contentOffset.y;
+    // One retarget per crossing (not per frame); hysteresis between the two
+    // thresholds keeps boundary noise from re-triggering.
+    if (flipped.value === 0 && y > FLIP_SHOW_HEADER_Y) {
+      flipped.value = 1;
+      flipProgress.value = withTiming(1, { duration: FLIP_FADE_MS });
+    } else if (flipped.value === 1 && y < FLIP_SHOW_CONTENT_Y) {
+      flipped.value = 0;
+      flipProgress.value = withTiming(0, { duration: FLIP_FADE_MS });
+    }
+  });
+  const contentIdentityFade = useAnimatedStyle(() => ({
+    opacity: interpolate(flipProgress.value, CONTENT_FADE_PHASE, [1, 0], Extrapolation.CLAMP),
+  }));
+  const contentIdentityComposed = useMemo(
+    () => [CONTENT_IDENTITY_STYLE, contentIdentityFade],
+    [contentIdentityFade]
+  );
+  const appImage = app?.image;
+  useScreenOptions(
+    () =>
+      clientPubkey === undefined || app === undefined
+        ? { headerTitle: undefined, title: '' }
+        : {
+            headerTitle: () => (
+              <AppHeaderIdentity
+                progress={flipProgress}
+                name={appName}
+                {...(appImage !== undefined && { image: appImage })}
+                seed={clientPubkey}
+              />
+            ),
+          },
+    // flipProgress is a stable shared-value ref; app presence tracked via appImage/appName.
+    [appName, appImage, clientPubkey, app === undefined]
+  );
+  const dangerTextStyle = useMemo(() => ({ color: danger }), [danger]);
 
   // Top-level groups: capability bundles (one human concept per row) plus
   // the locked per-key rows (deletion / decrypt / wallet). Per-action
@@ -275,6 +386,10 @@ export function SignerAppDetailScreen(): React.ReactElement {
   const everyoneAllowed =
     decryptAccessRows.length > 0 &&
     decryptAccessRows.every((row) => app?.peerDecryptGrants[row.peer] !== undefined);
+  const everyoneA11yValue = useMemo(
+    () => ({ text: everyoneAllowed ? 'Always' : 'Ask' }),
+    [everyoneAllowed]
+  );
 
   const onToggleEveryone = useCallback(() => {
     if (clientPubkey === undefined) return;
@@ -363,6 +478,15 @@ export function SignerAppDetailScreen(): React.ReactElement {
     });
   }, [clientPubkey, app, setGrant]);
 
+  const strictModeOn = app?.mode === 'strict';
+  // The whole row toggles (same affordance as the permission rows below) —
+  // the switch itself is a pure visual inside a pointerEvents="none" wrapper.
+  const onPressStrictRow = useCallback(() => {
+    if (clientPubkey === undefined) return;
+    setMode(clientPubkey, strictModeOn ? 'standard' : 'strict');
+  }, [clientPubkey, setMode, strictModeOn]);
+  const strictA11yState = useMemo(() => ({ checked: strictModeOn }), [strictModeOn]);
+
   const onSelectTriState = useCallback(
     (grantKey: GrantKey, state: TriState) => {
       if (clientPubkey === undefined) return;
@@ -441,7 +565,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
       title: 'Disconnect App',
       header: (
         <View className="px-2 pb-2">
-          <Text size={14} style={{ lineHeight: 20 }}>
+          <Text size={14} style={CONFIRM_BODY_TEXT_STYLE}>
             <Text size={14} bold>
               {nameAtConfirm}
             </Text>
@@ -467,7 +591,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
         { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
       ],
     });
-  }, [appName, clientPubkey, disconnectApp, revokeSessionGrant]);
+  }, [appName, clientPubkey, disconnectApp, revokeSessionGrant, revokeSessionAllows]);
 
   // Unknown pubkey, or the app was just disconnected — transient empty frame.
   if (clientPubkey === undefined || app === undefined) {
@@ -479,23 +603,30 @@ export function SignerAppDetailScreen(): React.ReactElement {
   }
 
   return (
-    <Screen name="SignerAppDetailScreen" scroll="custom" safeArea>
-      <ScrollView className="px-4" contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* Identity card */}
+    <Screen name="SignerAppDetailScreen" scroll="custom">
+      <Animated.ScrollView
+        style={SCROLL_H_PADDING}
+        contentContainerStyle={scrollContentStyle}
+        scrollIndicatorInsets={indicatorInsets}
+        onScroll={onScroll}
+        scrollEventThrottle={16}>
+        {/* Identity card — logo + name fade out as their header twins fade in */}
         <VStack align="center" spacing={4} className="pb-2 pt-4">
-          <Avatar
-            state={app.image ? 'image' : 'fallback'}
-            picture={app.image}
-            seed={app.clientPubkey}
-            fallbackVariant="beam"
-            size={IDENTITY_AVATAR_SIZE}
-            alt={appName}
-          />
-          <View className="pt-2">
-            <Text size={20} bold color={foreground} numberOfLines={1}>
-              {appName}
-            </Text>
-          </View>
+          <Animated.View style={contentIdentityComposed}>
+            <Avatar
+              state={app.image ? 'image' : 'fallback'}
+              picture={app.image}
+              seed={app.clientPubkey}
+              fallbackVariant="beam"
+              size={IDENTITY_AVATAR_SIZE}
+              alt={appName}
+            />
+            <View className="pt-2">
+              <Text size={20} bold color={foreground} numberOfLines={1}>
+                {appName}
+              </Text>
+            </View>
+          </Animated.View>
           <Text size={13} color={muted} numberOfLines={1}>
             {appDomain ?? shortPubkey(app.clientPubkey)}
           </Text>
@@ -513,9 +644,9 @@ export function SignerAppDetailScreen(): React.ReactElement {
         {/* Throttle flag */}
         {throttled ? (
           <View className="bg-warning-soft mt-2 rounded-2xl p-3">
-            <HStack spacing={8} style={{ alignItems: 'center' }}>
+            <HStack spacing={8} style={CENTER_ROW_STYLE}>
               <Icon name="mdi:alert-circle-outline" size={18} color={warning} />
-              <View style={{ flex: 1 }}>
+              <View style={FLEX_ONE_STYLE}>
                 <Text size={13} color={warningSoftFg}>
                   {THROTTLED_BANNER}
                 </Text>
@@ -524,23 +655,36 @@ export function SignerAppDetailScreen(): React.ReactElement {
           </View>
         ) : null}
 
-        {/* Strict mode */}
+        {/* Gesture demo — teaches tap / long-press on the permission rows below */}
+        <View className="pt-4">
+          <PermissionGestureDemo />
+        </View>
+
+        {/* Strict mode — the whole row toggles, like the permission rows */}
         <View className="pt-4">
           <ListGroup variant="secondary">
-            <ListGroup.Item>
-              <ListGroup.ItemContent>
-                <ListGroup.ItemTitle>{STRICT_MODE_TITLE}</ListGroup.ItemTitle>
-                <ListGroup.ItemDescription>{STRICT_MODE_DESCRIPTION}</ListGroup.ItemDescription>
-              </ListGroup.ItemContent>
-              <ListGroup.ItemSuffix>
-                <HeroSwitch
-                  isSelected={app.mode === 'strict'}
-                  onSelectedChange={(selected) =>
-                    setMode(clientPubkey, selected ? 'strict' : 'standard')
-                  }
-                />
-              </ListGroup.ItemSuffix>
-            </ListGroup.Item>
+            <PressableFeedback
+              animation={false}
+              onPress={onPressStrictRow}
+              accessibilityRole="switch"
+              accessibilityLabel={STRICT_MODE_TITLE}
+              accessibilityState={strictA11yState}
+              accessibilityHint={STRICT_MODE_DESCRIPTION}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>{STRICT_MODE_TITLE}</ListGroup.ItemTitle>
+                    <ListGroup.ItemDescription>{STRICT_MODE_DESCRIPTION}</ListGroup.ItemDescription>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <View pointerEvents="none">
+                      <HeroSwitch isSelected={strictModeOn} />
+                    </View>
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
           </ListGroup>
         </View>
 
@@ -588,7 +732,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
                         onPress={onToggleEveryone}
                         accessibilityRole="button"
                         accessibilityLabel={EVERYONE_TITLE}
-                        accessibilityValue={{ text: everyoneAllowed ? 'Always' : 'Ask' }}>
+                        accessibilityValue={everyoneA11yValue}>
                         <PressableFeedback.Scale>
                           <ListGroup.Item disabled>
                             <ListGroup.ItemContent>
@@ -651,10 +795,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
                   accessibilityRole="button"
                   accessibilityLabel={FINE_GRAINED_LABEL}
                   onPress={() => openFineGrained(group)}>
-                  <HStack
-                    gap={4}
-                    className="mr-1 mt-1"
-                    style={{ alignItems: 'center', alignSelf: 'flex-end' }}>
+                  <HStack gap={4} className="mr-1 mt-1" style={FINE_GRAINED_ROW_STYLE}>
                     <Text size={12} bold color={muted}>
                       {FINE_GRAINED_LABEL}
                     </Text>
@@ -663,26 +804,54 @@ export function SignerAppDetailScreen(): React.ReactElement {
                 </Pressable>
               </View>
             ))}
-            <Text className="ml-3" size={12} color={muted} style={{ lineHeight: 17 }}>
-              {PERMISSIONS_FOOTER}
-            </Text>
           </VStack>
         </View>
 
         {/* Manage rows */}
-        <ListGroup variant="secondary">
-          <LinkRow title="Rename App" onPress={openRename} />
-          <LinkRow title="View Activity" onPress={openActivity} />
-          <LinkRow title={RESTORE_DEFAULTS_LABEL} onPress={confirmRestoreDefaults} />
-        </ListGroup>
+        <View className="pt-4">
+          <ListGroup variant="secondary">
+            <ListRow
+              paddingHorizontal={MANAGE_ROW_INSET}
+              title="Rename App"
+              subtitle={RENAME_APP_SUBTITLE}
+              trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
+              onPress={openRename}
+            />
+            <ListRow
+              paddingHorizontal={MANAGE_ROW_INSET}
+              title="View Activity"
+              subtitle={VIEW_ACTIVITY_SUBTITLE}
+              trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
+              onPress={openActivity}
+            />
+            <ListRow
+              paddingHorizontal={MANAGE_ROW_INSET}
+              title={RESTORE_DEFAULTS_LABEL}
+              subtitle={RESTORE_DEFAULTS_SUBTITLE}
+              trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
+              onPress={confirmRestoreDefaults}
+            />
+          </ListGroup>
+        </View>
 
         {/* Danger zone */}
         <Section title="Danger Zone" isDanger>
           <ListGroup variant="secondary">
-            <LinkRow title="Disconnect App" isDanger onPress={confirmDisconnect} />
+            <ListRow
+              paddingHorizontal={MANAGE_ROW_INSET}
+              title={
+                <Text size={16} bold style={dangerTextStyle}>
+                  Disconnect App
+                </Text>
+              }
+              subtitle={DISCONNECT_SUBTITLE}
+              accessibilityLabel="Disconnect App"
+              trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
+              onPress={confirmDisconnect}
+            />
           </ListGroup>
         </Section>
-      </ScrollView>
+      </Animated.ScrollView>
     </Screen>
   );
 }

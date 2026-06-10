@@ -2,19 +2,13 @@
  * @fileoverview Signer per-app permission editor route
  *
  * Requires `clientPubkey` (64-hex) — pushed by the hub's connected-apps
- * list. Validated at the route boundary per AUDIT.md dim-5. The header
- * title is the connected app's display name (length-bounded by
- * `appDisplayName`; falls back to "Unnamed app").
+ * list. Validated at the route boundary per AUDIT.md dim-5. The header is
+ * owned by the SCREEN (scroll-linked identity crossfade via
+ * `useScreenOptions`); the layout's empty title covers the first frame.
  */
 
-import { useMemo } from 'react';
-import { Stack } from 'expo-router';
 import { z } from 'zod';
-import {
-  appDisplayName,
-  SignerAppDetailScreen,
-  useNip46ConnectionsStore,
-} from '@/features/nostrSigner';
+import { SignerAppDetailScreen } from '@/features/nostrSigner';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
@@ -23,18 +17,8 @@ const ParamsSchema = z.object({
 
 export default function SignerAppDetailRoute() {
   const params = useRouteParams(ParamsSchema, { where: 'signer-flow.app' });
-  const clientPubkey = params?.clientPubkey;
-  const app = useNip46ConnectionsStore((s) =>
-    clientPubkey === undefined ? undefined : s.apps[clientPubkey]
-  );
-  const screenOptions = useMemo(() => ({ title: appDisplayName(app) }), [app]);
 
   if (!params) return null;
 
-  return (
-    <>
-      <Stack.Screen options={screenOptions} />
-      <SignerAppDetailScreen />
-    </>
-  );
+  return <SignerAppDetailScreen />;
 }

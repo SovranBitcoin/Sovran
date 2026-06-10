@@ -53,6 +53,25 @@ export interface PairingIntentInput {
   targetAccountIndex: number;
 }
 
+// ── Serialised RMW queue (same pattern as bunkerSecrets) ────────
+// take = read → validate → clear; without serialisation two concurrent
+// callers (e.g. a double-fired boot effect) could both read the same
+// secret-bearing intent before either clear lands — single-take must hold
+// within a session as well as across crash-and-reboot.
+
+let rmwQueue: Promise<unknown> = Promise.resolve();
+
+function queued<T>(
+  task: () => ResultAsync<T, PairingIntentError>
+): ResultAsync<T, PairingIntentError> {
+  const run = rmwQueue.then(() => task());
+  rmwQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return new ResultAsync(run);
+}
+
 const getItem = (): ResultAsync<string | null, PairingIntentError> =>
   ResultAsync.fromPromise(AsyncStorage.getItem(PAIRING_INTENT_STORAGE_KEY), (error) => {
     const cause = redactError(error);
@@ -91,7 +110,7 @@ export function setPairingIntent(
     });
     return errAsync({ type: 'invalid-intent' });
   }
-  return setItem(JSON.stringify(parsed.data));
+  return queued(() => setItem(JSON.stringify(parsed.data)));
 }
 
 /**
@@ -111,24 +130,26 @@ export function takePairingIntent(
   nowMs: number = Date.now()
 ): ResultAsync<TakePairingIntentOutcome, PairingIntentError> {
   if (!isNostrPubkeyHex(activePubkey)) return errAsync({ type: 'invalid-pubkey' });
-  return getItem().andThen((raw): ResultAsync<TakePairingIntentOutcome, PairingIntentError> => {
-    if (raw === null) return okAsync({ status: 'none' });
-    const parsed = safeJsonParse(raw).map((value) => PairingIntentSchema.safeParse(value));
-    if (parsed.isErr() || !parsed.value.success) {
-      nostrLog.warn('nostr.signer.pairing_intent_corrupt');
-      return removeItem().map(() => ({ status: 'none' }) as const);
-    }
-    const intent = parsed.value.data;
-    if (nowMs >= intent.expiresAt) {
-      return removeItem().map(() => ({ status: 'expired' }) as const);
-    }
-    if (intent.targetPubkey.toLowerCase() !== activePubkey.toLowerCase()) {
-      return removeItem().map(() => ({ status: 'mismatch' }) as const);
-    }
-    return removeItem().map(() => ({ status: 'taken', intent }) as const);
-  });
+  return queued(() =>
+    getItem().andThen((raw): ResultAsync<TakePairingIntentOutcome, PairingIntentError> => {
+      if (raw === null) return okAsync({ status: 'none' });
+      const parsed = safeJsonParse(raw).map((value) => PairingIntentSchema.safeParse(value));
+      if (parsed.isErr() || !parsed.value.success) {
+        nostrLog.warn('nostr.signer.pairing_intent_corrupt');
+        return removeItem().map(() => ({ status: 'none' }) as const);
+      }
+      const intent = parsed.value.data;
+      if (nowMs >= intent.expiresAt) {
+        return removeItem().map(() => ({ status: 'expired' }) as const);
+      }
+      if (intent.targetPubkey.toLowerCase() !== activePubkey.toLowerCase()) {
+        return removeItem().map(() => ({ status: 'mismatch' }) as const);
+      }
+      return removeItem().map(() => ({ status: 'taken', intent }) as const);
+    })
+  );
 }
 
 export function clearPairingIntent(): ResultAsync<void, PairingIntentError> {
-  return removeItem();
+  return queued(() => removeItem());
 }

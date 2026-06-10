@@ -29,13 +29,13 @@ import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import {
   appDisplayName,
-  boundDisplay,
   encryptedPayloadLabel,
   permissionEntryFor,
   permissionTierFor,
   type PermissionLookup,
   type PermissionTier,
 } from '@/features/nostrSigner/components/permissionCatalog';
+import { boundDisplay } from '@/features/nostrSigner/lib/boundedDisplay';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import {
   useNip46RequestsStore,

@@ -18,6 +18,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { LegendList } from '@legendapp/list/react-native';
+import { useHeaderHeight } from '@react-navigation/elements';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button as HerouiButton } from 'heroui-native';
 
@@ -160,6 +162,15 @@ export function SignerActivityScreen(): React.ReactElement {
     [entries, filter, appFilterKeys]
   );
 
+  // Content scrolls UNDER the transparent blur header (thread-page style).
+  const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
+  const listContentStyle = useMemo(
+    () => ({ paddingTop: headerHeight, paddingBottom: insets.bottom }),
+    [headerHeight, insets.bottom]
+  );
+  const indicatorInsets = useMemo(() => ({ top: headerHeight }), [headerHeight]);
+
   const openDetail = useCallback((entryId: string) => {
     router.push(`/(signer-flow)/activity-detail?id=${encodeURIComponent(entryId)}` as never);
   }, []);
@@ -234,7 +245,7 @@ export function SignerActivityScreen(): React.ReactElement {
   );
 
   return (
-    <Screen name="SignerActivityScreen" scroll="custom" safeArea>
+    <Screen name="SignerActivityScreen" scroll="custom">
       {/* Legend List: the activity log holds up to ACTIVITY_CAP entries —
           recycled fixed-height rows keep scrolling cheap. Rows are stateless
           (ListRow + derived props), so recycling is safe. */}
@@ -246,6 +257,8 @@ export function SignerActivityScreen(): React.ReactElement {
         estimatedItemSize={ESTIMATED_ROW_HEIGHT}
         estimatedHeaderSize={CHIP_HEADER_HEIGHT}
         drawDistance={400}
+        contentContainerStyle={listContentStyle}
+        scrollIndicatorInsets={indicatorInsets}
         ListHeaderComponent={chips}
         ListEmptyComponent={
           <EmptyState icon="lucide:activity" title={EMPTY_TITLE} subtitle={EMPTY_SUBTITLE} />

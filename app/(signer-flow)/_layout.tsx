@@ -6,9 +6,15 @@
  * (`slideFromRight('(signer-flow)')` in config/modalScreens.ts); screens
  * within push horizontally with close/back header.
  *
- * Titles: static ones live here; the per-app permission editor (`app`) gets
- * its dynamic app-name title from the route file, and `share` sets its own
- * title via `useScreenOptions` inside ShareSignerScreen.
+ * Titles: static ones live here; the per-app permission editor (`app`) owns
+ * its header inside the screen (scroll-linked identity crossfade), and
+ * `share` sets its own title via `useScreenOptions` inside ShareSignerScreen.
+ *
+ * Headers are transparent; on iOS 26 the system scroll-edge glass frosts
+ * them automatically once content scrolls underneath (the thread-page look —
+ * deliberately NO `headerBlurEffect`, which would overlap the system effect
+ * per the react-native-screens docs). Screens make content underlap by
+ * padding scroll content with `useHeaderHeight()` instead of `safeArea`.
  */
 
 import { useMemo } from 'react';

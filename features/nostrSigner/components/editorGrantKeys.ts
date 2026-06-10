@@ -36,6 +36,12 @@ export const BASE_EDITOR_GRANT_KEYS: readonly GrantKey[] = [
   'nip44_encrypt',
   'nip04_decrypt',
   'nip44_decrypt',
-  // wallet
+  // wallet — every kind the catalog maps to the wallet row, so a denied
+  // grant on any of them lands on a stable row instead of minting one.
   'sign_event:17375',
+  'sign_event:7375',
+  'sign_event:7374',
+  'sign_event:7376',
+  'sign_event:9321',
+  'sign_event:10019',
 ];

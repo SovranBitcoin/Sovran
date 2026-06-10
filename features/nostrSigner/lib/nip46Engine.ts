@@ -80,7 +80,6 @@ import {
   SUMMARY_MAX_LENGTH,
   UnsignedEventSchema,
   type ActivityVerdict,
-  type DecryptMethod,
   type GrantKey,
   type Nip46Method,
   type RpcRequest,
@@ -95,8 +94,13 @@ import {
 } from '@/features/nostrSigner/lib/permissionPolicy';
 import { createRateLimiter, type Nip46RateLimiter } from '@/features/nostrSigner/lib/rateLimiter';
 import { findPreviousConnection } from '@/features/nostrSigner/lib/connectionMatch';
-import { bundleForGrantKey } from '@/features/nostrSigner/lib/permissionBundles';
 import { summarizeRequest } from '@/features/nostrSigner/lib/requestSummary';
+import {
+  resolveVerdict,
+  type Nip46RequestDecision,
+  type PendingRequestContext,
+  type VerdictResolverSeam,
+} from '@/features/nostrSigner/lib/verdictResolver';
 import { nostrLog, redactError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 import { relays as defaultSignerRelays } from '@/shared/ndk';
@@ -118,24 +122,6 @@ export interface Nip46EngineStartConfig {
   signer: NDKPrivateKeySigner | Uint8Array;
   /** Hex pubkey of the active profile (= remote-signer pubkey, Amber model). */
   userPubkey: string;
-}
-
-/**
- * 'approve_session' grants for the SESSION (until engine stop/app restart):
- * peer≠self decrypts get a peer-scoped session grant; everything else gets a
- * session allow over the request's whole bundle — wallet sign kinds included
- * (runtime-only, so the persisted critical ceiling is untouched).
- */
-export type Nip46DecisionAction =
-  | 'approve_once'
-  | 'approve_session'
-  | 'always'
-  | 'deny_once'
-  | 'always_deny'
-  | 'block';
-
-export interface Nip46RequestDecision {
-  action: Nip46DecisionAction;
 }
 
 export interface CompleteNostrconnectPairingInput {
@@ -228,20 +214,6 @@ interface EngineState {
   signer: NDKPrivateKeySigner;
 }
 
-/** Everything needed to execute/respond when the user (or sweep) resolves an ask. */
-interface PendingRequestContext {
-  request: RpcRequest;
-  clientPubkey: string;
-  kind?: number;
-  grantKey: GrantKey | null;
-  isSelfDecrypt: boolean;
-  encryption: Nip46Encryption;
-  /** Pre-truncated content snippet — present only for normal-class sign_event. */
-  summary?: string;
-  /** Structured summary computed at request time, for the activity row. */
-  summaryV2?: Nip46ActivitySummaryV2;
-}
-
 interface ParsedSignParams {
   unsigned: UnsignedEvent | null;
   kind: number | undefined;
@@ -280,6 +252,14 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
   };
 
   let state: EngineState | null = null;
+  /**
+   * Bumped on every start AND stop (mirrors the transport's pattern). Async
+   * work captures it on entry and re-checks at each await boundary — object
+   * identity on `state` can't express "check again later without re-reading",
+   * and a missed re-read after a future await insertion fails silently.
+   */
+  let generation = 0;
+  const isStale = (capturedGeneration: number): boolean => generation !== capturedGeneration;
   /** Spans transport rebuilds on purpose — absorbs the deliberate since-overlap. */
   const dedupe = new LruSet(DEDUPE_LRU_SIZE);
   const awaitedPairings = new Map<string, ParsedNostrConnectUri>();
@@ -406,13 +386,14 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     consumedPeerGrantPubkey?: string;
   }): Promise<void> {
     const { engine, clientPubkey, request, kind, encryption } = args;
+    const capturedGeneration = generation;
     if (!isExecutableMethod(request.method)) return; // connect never reaches here
     const outcome = await methodHandlers[request.method]({
       signer: engine.signer,
       userPubkey: engine.userPubkey,
       request,
     });
-    if (state !== engine) return; // engine stopped/restarted mid-execution — never sign/respond
+    if (isStale(capturedGeneration)) return; // stopped/restarted mid-execution — never respond
     if (outcome.isErr()) {
       void respond(
         clientPubkey,
@@ -462,6 +443,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     rateAllowed: boolean;
   }): Promise<void> {
     const { engine, clientPubkey, request, connection, encryption } = args;
+    const capturedGeneration = generation;
 
     if (connection) {
       if (connection.status === 'blocked') {
@@ -494,7 +476,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       return;
     }
     const consumed = await deps.consumeSecret(engine.userPubkey, secret);
-    if (state !== engine) return; // stopped/restarted during the consume await
+    if (isStale(capturedGeneration)) return; // stopped/restarted during the consume await
     if (consumed.isErr()) {
       // Storage failure — consumption state unknown, so NEVER ack (a replayable
       // secret behind a successful pairing is worse than one lost re-scan).
@@ -522,6 +504,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       return;
     }
     await respond(clientPubkey, { id: request.id, result: 'ack' }, encryption);
+    if (isStale(capturedGeneration)) return; // stopped/restarted during the ack await
     logActivity({ clientPubkey, method: 'connect', verdict: 'approved_pairing' });
     const rebuilt = rebuildRelays();
     if (rebuilt.isErr()) {
@@ -581,6 +564,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
   async function processEvent(event: NDKEvent): Promise<void> {
     const engine = state;
     if (!engine) return;
+    const capturedGeneration = generation;
     const nowMs = deps.now();
 
     // 1. Envelope dedupe — marked immediately so replays cost one map lookup.
@@ -610,7 +594,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     // or their pubkey is an awaited nostrconnect pairing.
     if (!connection && !awaited) {
       const outstanding = await deps.hasOutstandingSecret(engine.userPubkey);
-      if (state !== engine) return; // stopped/restarted during the await
+      if (isStale(capturedGeneration)) return; // stopped/restarted during the await
       if (outstanding.isErr() || !outstanding.value) {
         nostrLog.debug('nostr.signer.engine_stranger_drop');
         return;
@@ -628,7 +612,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     const pinned: Nip46Encryption = connection?.encryption ?? 'nip44';
     const envelope = await deps.transport.decryptEnvelope(sender, event.content, pinned);
     if (envelope.isErr()) return; // transport already logged; silent per plan
-    if (state !== engine) return; // stopped/restarted during the decrypt await
+    if (isStale(capturedGeneration)) return; // stopped/restarted during the decrypt await
     const { plaintext, used } = envelope.value;
     if (connection && used !== pinned) connections().setEncryption(sender, used);
 
@@ -880,6 +864,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     };
     // State is live before the transport dials so even a synchronously
     // delivered event finds the engine ready; rolled back on start failure.
+    generation += 1;
     state = engine;
     const sinceEpochSec = Math.floor(deps.now() / 1000) - CREATED_AT_SKEW_SEC;
     const started = deps.transport.start({
@@ -899,6 +884,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
 
   function stop(): Result<void, Nip46EngineError> {
     if (!state) return ok(undefined);
+    generation += 1; // strands every in-flight await at its next staleness check
     stopSweep();
     pendingContexts.clear();
     awaitedPairings.clear();
@@ -1031,198 +1017,45 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
   }
 
   // ── Deferred verdict resolution (called by the approval UI) ────
+  // The decision→grants/response/activity mapping lives in verdictResolver;
+  // the engine hands it this narrow seam over its module state.
+
+  const resolverSeam: VerdictResolverSeam = {
+    takeContext: (requestId) => {
+      const context = pendingContexts.get(requestId);
+      pendingContexts.delete(requestId);
+      return context;
+    },
+    deleteContext: (requestId) => {
+      pendingContexts.delete(requestId);
+    },
+    stopSweepIfIdle: () => {
+      if (requests().pending.length === 0) stopSweep();
+    },
+    respond,
+    logActivity,
+    executeApproved: (context, encryption) => {
+      const engine = state;
+      if (!engine) return Promise.resolve(); // stopped between verdict and execution
+      return executeAndRespond({
+        engine,
+        clientPubkey: context.clientPubkey,
+        request: context.request,
+        ...(context.kind !== undefined && { kind: context.kind }),
+        encryption,
+        approveVerdict: 'approved_once',
+        ...(context.summary !== undefined && { summary: context.summary }),
+        ...(context.summaryV2 !== undefined && { summaryV2: context.summaryV2 }),
+      });
+    },
+  };
 
   function resolveRequest(
     requestId: string,
     decision: Nip46RequestDecision
   ): ResultAsync<void, Nip46EngineError> {
-    const engine = state;
-    if (!engine) return errAsync(NOT_STARTED);
-    const context = pendingContexts.get(requestId);
-    if (!context) return errAsync({ type: 'unknown-request' });
-    pendingContexts.delete(requestId);
-    requests().remove(requestId);
-    if (requests().pending.length === 0) stopSweep();
-
-    const { clientPubkey, request } = context;
-    const connection = connections().apps[clientPubkey] ?? null;
-    const encryption = connection?.encryption ?? context.encryption;
-
-    const finish = (work: Promise<void>): ResultAsync<void, Nip46EngineError> =>
-      ResultAsync.fromPromise(work, (error): Nip46EngineError => {
-        nostrLog.error('nostr.signer.engine_resolve_failed', { error: redactError(error) });
-        return { type: 'unknown-request' };
-      });
-
-    const denyOnce = (): Promise<void> => {
-      // Respond only while the snapshot taken at resolve time is an active
-      // pairing: a vanished record is unpaired and a since-blocked one is the
-      // silent tier. The 'block' action relies on the snapshot semantics —
-      // `connection` was read BEFORE blockApp() flipped the store, so the
-      // prompted request still gets its documented final "Not authorized"
-      // while everything the app sends afterwards is silent.
-      if (connection !== null && connection.status === 'active') {
-        void respond(
-          clientPubkey,
-          { id: request.id, error: NIP46_ERRORS.notAuthorized },
-          encryption
-        );
-      }
-      logActivity({
-        clientPubkey,
-        method: request.method,
-        ...(context.kind !== undefined && { kind: context.kind }),
-        verdict: 'denied_once',
-        ...(context.summaryV2 !== undefined && { summaryV2: context.summaryV2 }),
-      });
-      connections().touchUsage(clientPubkey, { denied: true });
-      return Promise.resolve();
-    };
-
-    switch (decision.action) {
-      case 'deny_once':
-        return finish(denyOnce());
-
-      case 'always_deny': {
-        if (context.grantKey !== null) {
-          const written = connections().setGrant(clientPubkey, context.grantKey, 'deny');
-          if (written.isErr()) {
-            nostrLog.warn('nostr.signer.engine_grant_write_failed', { cause: written.error });
-          }
-        }
-        return finish(denyOnce());
-      }
-
-      case 'block': {
-        connections().blockApp(clientPubkey);
-        // Session state must not survive a later unblock.
-        requests().revokeSessionGrant(clientPubkey);
-        requests().revokeSessionAllows(clientPubkey);
-        // The prompted request gets a final answer; everything else the app
-        // queued is flushed silently (blocked tier = activity rows only).
-        for (const other of requests().pending.filter((p) => p.clientPubkey === clientPubkey)) {
-          pendingContexts.delete(other.id);
-          requests().remove(other.id);
-          logActivity({
-            clientPubkey,
-            method: other.method,
-            ...(other.kind !== undefined && { kind: other.kind }),
-            verdict: 'auto_denied_blocked',
-          });
-        }
-        if (requests().pending.length === 0) stopSweep();
-        return finish(denyOnce());
-      }
-
-      case 'approve_once':
-      case 'approve_session':
-      case 'always': {
-        // A connection that vanished or got blocked mid-prompt must not sign.
-        if (connection === null) {
-          // Disconnected mid-prompt: the pubkey is unpaired now, so no wire
-          // response (the client times out, exactly as if the signer left).
-          nostrLog.debug('nostr.signer.engine_resolve_disconnected_drop');
-          return finish(Promise.resolve());
-        }
-        if (connection.status === 'blocked') {
-          // Blocked tier: silent activity row, no response.
-          logActivity({
-            clientPubkey,
-            method: request.method,
-            ...(context.kind !== undefined && { kind: context.kind }),
-            verdict: 'auto_denied_blocked',
-          });
-          return finish(Promise.resolve());
-        }
-        if (decision.action === 'always') {
-          const isDecrypt =
-            request.method === 'nip04_decrypt' || request.method === 'nip44_decrypt';
-          if (isDecrypt && !context.isSelfDecrypt) {
-            // Peer-scoped persistent grant (the blanket decrypt grant key is
-            // critical and unrepresentable as 'always').
-            const peerPubkey = request.params[0]?.toLowerCase();
-            if (peerPubkey !== undefined) {
-              const written = connections().setPeerDecryptGrant(
-                clientPubkey,
-                peerPubkey,
-                request.method as DecryptMethod,
-                { peerIsSelf: false }
-              );
-              if (written.isErr()) {
-                nostrLog.warn('nostr.signer.engine_peer_grant_rejected', { cause: written.error });
-              }
-            }
-          } else if (!isDecrypt && context.grantKey !== null) {
-            // Always grants the whole human concept — every key in the
-            // request's bundle ("send private messages" covers encrypt AND
-            // DM-sign). Bundles exclude critical keys by construction, and
-            // each setGrant independently re-enforces the ceiling anyway.
-            const grantKeys = bundleForGrantKey(context.grantKey)?.grantKeys ?? [context.grantKey];
-            for (const grantKey of grantKeys) {
-              const written = connections().setGrant(clientPubkey, grantKey, 'always');
-              if (written.isErr()) {
-                nostrLog.warn('nostr.signer.engine_grant_write_failed', {
-                  grantKey,
-                  cause: written.error,
-                });
-              }
-            }
-          }
-        }
-        if (decision.action === 'approve_session') {
-          const isDecrypt =
-            request.method === 'nip04_decrypt' || request.method === 'nip44_decrypt';
-          if (isDecrypt && context.isSelfDecrypt) {
-            // Unreachable from the sheet (self-decrypt offers Approve only);
-            // the store's peerIsSelf guard is the hard backstop. Fall through
-            // to approve-once semantics.
-            nostrLog.warn('nostr.signer.engine_session_self_decrypt_fallback');
-          } else if (isDecrypt) {
-            // Peer-scoped session: covers this conversation until the engine
-            // stops. The decrypt peer is params[0] (classification-time read).
-            const peerPubkey = request.params[0]?.toLowerCase();
-            if (peerPubkey !== undefined) {
-              const granted = requests().grantSession(
-                clientPubkey,
-                request.method as DecryptMethod,
-                peerPubkey,
-                { peerIsSelf: false }
-              );
-              if (granted.isErr()) {
-                nostrLog.warn('nostr.signer.engine_session_grant_rejected', {
-                  cause: granted.error,
-                });
-              }
-            }
-          } else if (context.grantKey !== null) {
-            // Session mirrors Always's bundle semantics; wallet keys are
-            // unbundled singletons and ARE session-allowable (runtime-only).
-            const grantKeys = bundleForGrantKey(context.grantKey)?.grantKeys ?? [context.grantKey];
-            for (const grantKey of grantKeys) {
-              const granted = requests().grantSessionAllow(clientPubkey, grantKey);
-              if (granted.isErr()) {
-                nostrLog.warn('nostr.signer.engine_session_allow_rejected', {
-                  grantKey,
-                  cause: granted.error,
-                });
-              }
-            }
-          }
-        }
-        return finish(
-          executeAndRespond({
-            engine,
-            clientPubkey,
-            request,
-            ...(context.kind !== undefined && { kind: context.kind }),
-            encryption,
-            approveVerdict: 'approved_once',
-            ...(context.summary !== undefined && { summary: context.summary }),
-            ...(context.summaryV2 !== undefined && { summaryV2: context.summaryV2 }),
-          })
-        );
-      }
-    }
+    if (!state) return errAsync(NOT_STARTED);
+    return resolveVerdict(resolverSeam, requestId, decision);
   }
 
   function onUserVerdictNeeded(callback: OnUserVerdictNeeded): () => void {

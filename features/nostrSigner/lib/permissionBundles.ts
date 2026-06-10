@@ -103,7 +103,7 @@ export function bundleForGrantKey(grantKey: GrantKey): PermissionBundle | null {
   return BUNDLE_BY_GRANT_KEY.get(grantKey) ?? null;
 }
 
-export type BundleTriState = 'ask' | 'allow' | 'block' | 'mixed';
+type BundleTriState = 'ask' | 'allow' | 'block' | 'mixed';
 
 /**
  * Derived editor state for a bundle: uniform member verdicts map directly;

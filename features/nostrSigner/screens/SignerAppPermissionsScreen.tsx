@@ -19,12 +19,14 @@ import { useLocalSearchParams } from 'expo-router';
 import { z } from 'zod';
 
 import {
-  buildPermissionKeyRows,
   PermissionSwitchRow,
   triStateFor,
-  type PermissionKeyRowModel,
   type TriState,
 } from '@/features/nostrSigner/components/PermissionKeyRows';
+import {
+  buildPermissionKeyRows,
+  type PermissionKeyRowModel,
+} from '@/features/nostrSigner/components/permissionRowModel';
 import { BASE_EDITOR_GRANT_KEYS } from '@/features/nostrSigner/components/editorGrantKeys';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import type { GrantKey } from '@/features/nostrSigner/lib/nip46Types';

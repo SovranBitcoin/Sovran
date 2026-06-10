@@ -24,6 +24,13 @@ const FONTS = {
   'MonaSans-Bold': require('assets/fonts/MonaSans/MonaSans-Bold.ttf'),
   'MonaSans-ExtraBold': require('assets/fonts/MonaSans/MonaSans-ExtraBold.ttf'),
   'MonaSans-Black': require('assets/fonts/MonaSans/MonaSans-Black.ttf'),
+  // SUBSET font (6 KB, 31 glyphs) — only the letters of the signer gesture
+  // demo's beat words ("Tap!", "Tap again!", "Hold…", "Block!"). Any other
+  // text in this family renders tofu/fallback. To add glyphs, regenerate:
+  //   python3 -m fontTools.subset LuckiestGuy-Regular.ttf \
+  //     --text="<all needed chars>" --output-file=LuckiestGuy-Subset.ttf
+  // (Luckiest Guy by Astigmatic, Apache 2.0, via google/fonts.)
+  'LuckiestGuy-Subset': require('assets/fonts/LuckiestGuy/LuckiestGuy-Subset.ttf'),
 };
 
 export function useFonts() {

@@ -22,7 +22,7 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 
 import type { Nip46PendingRequest } from '@/features/nostrSigner/data/nip46RequestsStore';
-import type { Nip46DecisionAction } from '@/features/nostrSigner/lib/nip46Engine';
+import type { Nip46DecisionAction } from '@/features/nostrSigner/lib/verdictResolver';
 
 function stableHash(input: string): string {
   return bytesToHex(sha256(utf8ToBytes(input)));

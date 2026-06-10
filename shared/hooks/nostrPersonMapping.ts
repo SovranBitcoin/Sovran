@@ -17,7 +17,7 @@ interface NaggProfileFields {
   about?: string;
 }
 
-export interface PersonMetadataPartial {
+interface PersonMetadataPartial {
   displayName?: string;
   name?: string;
   picture?: string;

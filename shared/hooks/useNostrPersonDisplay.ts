@@ -23,7 +23,7 @@ import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache
 /** Pubkeys already looked up (in flight, succeeded, or failed) this session. */
 const attempted = new Set<string>();
 
-export interface NostrPersonDisplay {
+interface NostrPersonDisplay {
   /** displayName ?? name, trimmed; undefined when unknown (caller falls back to shortPubkey). */
   name: string | undefined;
   picture: string | undefined;

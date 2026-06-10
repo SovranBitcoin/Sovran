@@ -26,6 +26,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import {
   BottomSheet,
   Button as HerouiButton,
@@ -38,11 +40,8 @@ import { Result } from 'neverthrow';
 import { nip19 } from 'nostr-tools';
 
 import Icon from 'assets/icons';
-import {
-  SegmentedText,
-  safeHostname,
-  shortPubkey,
-} from '@/features/nostrSigner/components/display';
+import { SegmentedText, shortPubkey } from '@/features/nostrSigner/components/display';
+import { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import {
   alwaysAllowEligible,
   appDisplayName,
@@ -124,6 +123,15 @@ const SAVE_FAILED_MESSAGE =
 const PICKER_TITLE = 'Sign In As';
 const RESTART_WARNING_TITLE = 'Switching profiles restarts Sovran.';
 const SWITCH_AND_CONNECT_LABEL = 'Switch & Connect';
+
+const CENTER_SELF_STYLE = { alignSelf: 'center' } as const;
+const FLEX_ONE_STYLE = { flex: 1 } as const;
+const SUMMARY_TEXT_STYLE = { lineHeight: 20 } as const;
+const CAPTION_TEXT_STYLE = { lineHeight: 17 } as const;
+const INELIGIBLE_ROW_STYLE = { opacity: 0.55 } as const;
+const EXPAND_PRESSABLE_STYLE = { padding: 4 } as const;
+const PRESET_ROW_STYLE = { paddingLeft: 12 } as const;
+const PROFILE_ROW_STYLE = { paddingVertical: 8 } as const;
 
 function cautionSegments(connectionOrigin: string): CopySegment[] {
   return [
@@ -273,12 +281,13 @@ function ReviewSwitchRow({
   selected: boolean;
   onToggle: () => void;
 }) {
+  const switchA11yState = useMemo(() => ({ checked: selected }), [selected]);
   return (
     <PressableFeedback
       animation={false}
       onPress={onToggle}
       accessibilityRole="switch"
-      accessibilityState={{ checked: selected }}
+      accessibilityState={switchA11yState}
       accessibilityLabel={label}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
@@ -374,8 +383,14 @@ interface CachedSheetState {
 
 const checkedStateCache = new Map<string, CachedSheetState>();
 
+/**
+ * Per-attempt key: clientPubkey alone can't tell two pairing attempts from
+ * the same client apart, but the raw secret must not sit in observable map
+ * keys — a one-way fingerprint keeps attempts distinct without retaining it.
+ */
 function checkedCacheKey(parsed: ParsedNostrConnectUri): string {
-  return `${parsed.clientPubkey}:${parsed.secret}`;
+  const secretFingerprint = bytesToHex(sha256(utf8ToBytes(parsed.secret))).slice(0, 16);
+  return `${parsed.clientPubkey}:${secretFingerprint}`;
 }
 
 // ── Engine completion (waits out the service-hook cold start) ───
@@ -445,7 +460,7 @@ function InvalidLinkBody({ close }: { close: () => void }): React.ReactElement {
       </BottomSheet.Title>
       <HStack spacing={10} align="center">
         <Icon name="mdi:alert-circle-outline" size={22} color={danger} />
-        <View style={{ flex: 1 }}>
+        <View style={FLEX_ONE_STYLE}>
           <Text size={14} color={foreground}>
             {INVALID_LINK_MESSAGE}
           </Text>
@@ -458,7 +473,7 @@ function InvalidLinkBody({ close }: { close: () => void }): React.ReactElement {
         haptics
         accessibilityLabel={CANCEL_BUTTON_LABEL}
         onPress={close}
-        style={{ alignSelf: 'center' }}
+        style={CENTER_SELF_STYLE}
       />
     </VStack>
   );
@@ -536,6 +551,9 @@ function ConnectReview({
   const [isConnecting, setIsConnecting] = useState(false);
   const [failure, setFailure] = useState<ConnectFailure | null>(null);
 
+  const reviewToggleA11yState = useMemo(() => ({ expanded: reviewExpanded }), [reviewExpanded]);
+  const togglePresetExpanded = useCallback(() => setPresetExpanded((value) => !value), []);
+
   const toggleReview = useCallback(() => {
     setReviewExpanded((value) => !value);
     setReviewPresented(true);
@@ -612,6 +630,7 @@ function ConnectReview({
   );
 
   const presetAllChecked = presetRows.every((row) => checked[row.grantKey] === true);
+  const presetA11yState = useMemo(() => ({ checked: presetAllChecked }), [presetAllChecked]);
   const togglePresetAll = useCallback(() => {
     setChecked((current) => {
       const allOn = presetRows.every((row) => current[row.grantKey] === true);
@@ -740,7 +759,7 @@ function ConnectReview({
           size={44}
           alt={appName}
         />
-        <VStack spacing={2} style={{ flex: 1 }}>
+        <VStack spacing={2} style={FLEX_ONE_STYLE}>
           <Text size={16} bold color={foreground} numberOfLines={1}>
             {appName}
           </Text>
@@ -765,7 +784,7 @@ function ConnectReview({
             size={40}
             alt={profileDisplayName}
           />
-          <VStack spacing={2} style={{ flex: 1 }}>
+          <VStack spacing={2} style={FLEX_ONE_STYLE}>
             <Text size={15} bold color={foreground} numberOfLines={1}>
               {profileDisplayName}
             </Text>
@@ -790,7 +809,7 @@ function ConnectReview({
         <View className="bg-danger-soft rounded-2xl p-3">
           <HStack spacing={8} align="center">
             <Icon name="mdi:alert-circle" size={18} color={danger} />
-            <View style={{ flex: 1 }}>
+            <View style={FLEX_ONE_STYLE}>
               <SegmentedText
                 segments={blockedNoticeSegments(appName)}
                 size={13}
@@ -804,7 +823,7 @@ function ConnectReview({
       {/* Reconnect: minimal restore summary + opt-in review checklist */}
       {variant === 'reconnect' && previousConnection !== undefined ? (
         <VStack spacing={10}>
-          <Text size={14} color={foreground} style={{ lineHeight: 20 }}>
+          <Text size={14} color={foreground} style={SUMMARY_TEXT_STYLE}>
             {RECONNECT_SUMMARY}
           </Text>
           <Text size={12} color={muted}>
@@ -816,7 +835,7 @@ function ConnectReview({
           <Pressable
             haptics
             accessibilityRole="button"
-            accessibilityState={{ expanded: reviewExpanded }}
+            accessibilityState={reviewToggleA11yState}
             accessibilityLabel={REVIEW_PERMISSIONS_LABEL}
             onPress={toggleReview}>
             <HStack spacing={4} align="center">
@@ -862,7 +881,7 @@ function ConnectReview({
             </ListGroup>
           ) : null}
           {reviewExpanded ? (
-            <Text size={12} color={muted} style={{ lineHeight: 17 }}>
+            <Text size={12} color={muted} style={CAPTION_TEXT_STYLE}>
               {UNCHECKED_CAPTION}
             </Text>
           ) : null}
@@ -890,7 +909,7 @@ function ConnectReview({
               <HStack
                 spacing={10}
                 align="center"
-                style={!row.eligible ? { opacity: 0.55 } : undefined}>
+                style={!row.eligible ? INELIGIBLE_ROW_STYLE : undefined}>
                 <SelectableCheck
                   selected={checked[row.grantKey] === true}
                   disabled={!row.eligible}
@@ -898,7 +917,7 @@ function ConnectReview({
                   variant={row.warning ? 'warning' : 'default'}
                 />
                 <Icon name={row.entry.icon} size={18} color={row.warning ? warning : muted} />
-                <View style={{ flex: 1 }}>
+                <View style={FLEX_ONE_STYLE}>
                   <Text size={14} color={foreground} numberOfLines={1}>
                     {row.entry.permissionEditorLabel}
                   </Text>
@@ -912,7 +931,7 @@ function ConnectReview({
             </Pressable>
           ))}
           {hasStrippedRows ? (
-            <Text size={12} color={muted} style={{ lineHeight: 17 }}>
+            <Text size={12} color={muted} style={CAPTION_TEXT_STYLE}>
               {STRIPPED_PERMS_NOTICE}
             </Text>
           ) : null}
@@ -925,12 +944,12 @@ function ConnectReview({
           <Pressable
             haptics
             accessibilityRole="checkbox"
-            accessibilityState={{ checked: presetAllChecked }}
+            accessibilityState={presetA11yState}
             accessibilityLabel={PRESET_TITLE}
             onPress={togglePresetAll}>
             <HStack spacing={10} align="center">
               <SelectableCheck selected={presetAllChecked} style="square" />
-              <View style={{ flex: 1 }}>
+              <View style={FLEX_ONE_STYLE}>
                 <Text size={14} bold color={foreground}>
                   {PRESET_TITLE}
                 </Text>
@@ -942,8 +961,8 @@ function ConnectReview({
                 haptics
                 accessibilityRole="button"
                 accessibilityLabel={presetExpanded ? 'Collapse list' : 'Expand list'}
-                onPress={() => setPresetExpanded((value) => !value)}
-                style={{ padding: 4 }}>
+                onPress={togglePresetExpanded}
+                style={EXPAND_PRESSABLE_STYLE}>
                 <Icon
                   name={presetExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
                   size={20}
@@ -961,7 +980,7 @@ function ConnectReview({
                   accessibilityState={{ checked: checked[row.grantKey] === true }}
                   accessibilityLabel={row.entry.permissionEditorLabel}
                   onPress={() => toggleRow(row)}
-                  style={{ paddingLeft: 12 }}>
+                  style={PRESET_ROW_STYLE}>
                   <HStack spacing={10} align="center">
                     <SelectableCheck
                       selected={checked[row.grantKey] === true}
@@ -969,7 +988,7 @@ function ConnectReview({
                       variant={row.warning ? 'warning' : 'default'}
                     />
                     <Icon name={row.entry.icon} size={18} color={row.warning ? warning : muted} />
-                    <View style={{ flex: 1 }}>
+                    <View style={FLEX_ONE_STYLE}>
                       <Text size={14} color={foreground} numberOfLines={1}>
                         {row.entry.permissionEditorLabel}
                       </Text>
@@ -982,7 +1001,7 @@ function ConnectReview({
       ) : null}
 
       {variant !== 'reconnect' && (permRows.length > 0 || presetRows.length > 0) ? (
-        <Text size={12} color={muted} style={{ lineHeight: 17 }}>
+        <Text size={12} color={muted} style={CAPTION_TEXT_STYLE}>
           {UNCHECKED_CAPTION}
         </Text>
       ) : null}
@@ -992,7 +1011,7 @@ function ConnectReview({
         <View className="bg-danger-soft rounded-2xl p-3">
           <HStack spacing={8} align="center">
             <Icon name="mdi:alert-circle" size={18} color={danger} />
-            <View style={{ flex: 1 }}>
+            <View style={FLEX_ONE_STYLE}>
               <Text size={13} color={dangerSoftFg}>
                 {failureMessageFor(failure)}
               </Text>
@@ -1059,6 +1078,10 @@ export function SignerProfilePickerContent({
     }, [activeIndex, close, parsed, profiles, selectedIndex])
   );
 
+  const onSwitchAndConnect = useCallback(() => {
+    void switchAndConnect();
+  }, [switchAndConnect]);
+
   const showRestartWarning = selectedIndex !== activeIndex;
 
   return (
@@ -1082,7 +1105,7 @@ export function SignerProfilePickerContent({
               accessibilityState={{ selected: isSelected }}
               accessibilityLabel={displayName}
               onPress={() => selectProfile(profile)}>
-              <HStack spacing={12} align="center" style={{ paddingVertical: 8 }}>
+              <HStack spacing={12} align="center" style={PROFILE_ROW_STYLE}>
                 <Avatar
                   state={profile.cachedPicture ? 'image' : 'fallback'}
                   picture={profile.cachedPicture}
@@ -1091,7 +1114,7 @@ export function SignerProfilePickerContent({
                   size={40}
                   alt={displayName}
                 />
-                <VStack spacing={2} style={{ flex: 1 }}>
+                <VStack spacing={2} style={FLEX_ONE_STYLE}>
                   <Text size={15} bold color={foreground} numberOfLines={1}>
                     {displayName}
                   </Text>
@@ -1120,10 +1143,7 @@ export function SignerProfilePickerContent({
               />
             </VStack>
           </View>
-          <HerouiButton
-            variant="primary"
-            className="bg-foreground"
-            onPress={() => void switchAndConnect()}>
+          <HerouiButton variant="primary" className="bg-foreground" onPress={onSwitchAndConnect}>
             <HerouiButton.Label className="text-background">
               {SWITCH_AND_CONNECT_LABEL}
             </HerouiButton.Label>

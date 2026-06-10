@@ -9,12 +9,8 @@
  * `bun run knip` stays green.
  */
 
-// ── Stores (drawer badge, settings entry, app-detail screen) ────
-export { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
+// ── Stores (drawer badge, settings entry) ───────────────────────
 export { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
-
-// ── Catalog (app-detail header copy) ────────────────────────────
-export { appDisplayName } from '@/features/nostrSigner/components/permissionCatalog';
 
 // ── Screens (signer-flow routes) ────────────────────────────────
 export { ShareSignerScreen } from '@/features/nostrSigner/screens/ShareSignerScreen';

@@ -5,7 +5,7 @@
  * reaction/repost/reply targets (fetched via useReferencedEventPreview, with
  * skeleton/unavailable states so the sheet stays answerable), the follow-list
  * diff, the decrypt conversation peer, app-data operations, and zap requests.
- * `RawEventDetails` keeps the expandable raw JSON available under every
+ * `ExpandableEventJson` keeps the expandable raw JSON available under every
  * sign_event card — human copy never replaces raw inspection.
  *
  * Every rendered string derived from request params or fetched content is
@@ -46,6 +46,20 @@ const MONOSPACE_FONT = Platform.select({ ios: 'Courier New', default: 'monospace
 const SHOW_DETAILS_LABEL = 'Details';
 const HIDE_DETAILS_LABEL = 'Hide details';
 
+const CENTER_ROW_STYLE = { alignItems: 'center' } as const;
+const BASELINE_ROW_STYLE = { alignItems: 'baseline' } as const;
+const FLEX_ONE_STYLE = { flex: 1 } as const;
+const PREVIEW_CARD_STYLE = { gap: 8 } as const;
+const OWN_TEXT_CARD_STYLE = { gap: 4 } as const;
+const FOLLOW_DIFF_CARD_STYLE = { gap: 10 } as const;
+const PREFIX_BADGE_STYLE = { minWidth: 18 } as const;
+const NAME_SHRINK_STYLE = { flexShrink: 1 } as const;
+const PEER_NAME_BLOCK_STYLE = { flex: 1, gap: 2 } as const;
+const SKELETON_AVATAR_STYLE = { width: 28, height: 28, borderRadius: 14 } as const;
+const SKELETON_NAME_STYLE = { width: 120, height: 14 } as const;
+const SKELETON_LINE_FULL_STYLE = { width: '100%', height: 12 } as const;
+const SKELETON_LINE_SHORT_STYLE = { width: '70%', height: 12 } as const;
+
 function boundedName(name: string | undefined, pubkey: string): string {
   const trimmed = name?.trim();
   return trimmed ? boundDisplay(trimmed, NAME_MAX_CHARS) : shortPubkey(pubkey);
@@ -76,9 +90,9 @@ function PeerIdentityRow({
   const picture = pictureOverride ?? person.picture;
 
   return (
-    <HStack spacing={8} style={{ alignItems: 'center' }}>
+    <HStack spacing={8} style={CENTER_ROW_STYLE}>
       {prefix !== undefined ? (
-        <Text size={13} bold color={prefixColor ?? foreground} style={{ minWidth: 18 }}>
+        <Text size={13} bold color={prefixColor ?? foreground} style={PREFIX_BADGE_STYLE}>
           {prefix}
         </Text>
       ) : null}
@@ -90,7 +104,7 @@ function PeerIdentityRow({
         size={size}
         alt={name}
       />
-      <Text size={14} bold color={foreground} numberOfLines={1} style={{ flexShrink: 1 }}>
+      <Text size={14} bold color={foreground} numberOfLines={1} style={NAME_SHRINK_STYLE}>
         {name}
       </Text>
     </HStack>
@@ -114,7 +128,7 @@ export function ReferencedNoteCard({
 
   if (embedded !== undefined) {
     return (
-      <View className="bg-surface rounded-2xl p-3" style={{ gap: 8 }}>
+      <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
         <PeerIdentityRow pubkey={embedded.pubkey} />
         <Text size={14} numberOfLines={3} color={foreground}>
           {embedded.text}
@@ -127,13 +141,13 @@ export function ReferencedNoteCard({
 
   if (fetched.status === 'loading' || fetched.status === 'idle') {
     return (
-      <View className="bg-surface rounded-2xl p-3" style={{ gap: 8 }}>
-        <HStack spacing={8} style={{ alignItems: 'center' }}>
-          <Skeleton style={{ width: 28, height: 28, borderRadius: 14 }} />
-          <Skeleton style={{ width: 120, height: 14 }} />
+      <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
+        <HStack spacing={8} style={CENTER_ROW_STYLE}>
+          <Skeleton style={SKELETON_AVATAR_STYLE} />
+          <Skeleton style={SKELETON_NAME_STYLE} />
         </HStack>
-        <Skeleton style={{ width: '100%', height: 12 }} />
-        <Skeleton style={{ width: '70%', height: 12 }} />
+        <Skeleton style={SKELETON_LINE_FULL_STYLE} />
+        <Skeleton style={SKELETON_LINE_SHORT_STYLE} />
       </View>
     );
   }
@@ -149,7 +163,7 @@ export function ReferencedNoteCard({
   }
 
   return (
-    <View className="bg-surface rounded-2xl p-3" style={{ gap: 8 }}>
+    <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
       <PeerIdentityRow
         pubkey={fetched.event.pubkey}
         nameOverride={fetched.author?.name}
@@ -167,7 +181,7 @@ export function OwnTextBlock({ label, text }: { label: string; text: string }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   if (text.length === 0) return null;
   return (
-    <View className="bg-surface rounded-2xl p-3" style={{ gap: 4 }}>
+    <View className="bg-surface rounded-2xl p-3" style={OWN_TEXT_CARD_STYLE}>
       <Text size={12} bold color={muted}>
         {label}
       </Text>
@@ -202,9 +216,9 @@ export function FollowDiffCard({
   if (detail.baseline === 'unavailable') {
     return (
       <View className="bg-surface rounded-2xl p-3">
-        <HStack spacing={8} style={{ alignItems: 'center' }}>
+        <HStack spacing={8} style={CENTER_ROW_STYLE}>
           <Icon name="mdi:alert-circle-outline" size={16} color={warning} />
-          <View style={{ flex: 1 }}>
+          <View style={FLEX_ONE_STYLE}>
             <Text size={13} color={muted}>
               {`Replaces your entire follow list with ${detail.total} accounts.`}
             </Text>
@@ -219,7 +233,7 @@ export function FollowDiffCard({
     Math.max(0, detail.removedCount - FOLLOW_ROW_CAP);
 
   return (
-    <View className="bg-surface rounded-2xl p-3" style={{ gap: 10 }}>
+    <View className="bg-surface rounded-2xl p-3" style={FOLLOW_DIFF_CARD_STYLE}>
       {detail.added.slice(0, FOLLOW_ROW_CAP).map((pubkey) => (
         <PeerIdentityRow key={`add-${pubkey}`} pubkey={pubkey} prefix="+" prefixColor={success} />
       ))}
@@ -252,7 +266,7 @@ export function DecryptPeerCard({
   const name = boundedName(person.name, peerPubkey);
   return (
     <View className="bg-surface rounded-2xl p-3">
-      <HStack spacing={10} style={{ alignItems: 'center' }}>
+      <HStack spacing={10} style={CENTER_ROW_STYLE}>
         <Avatar
           state={person.picture ? 'image' : 'fallback'}
           picture={person.picture}
@@ -261,12 +275,12 @@ export function DecryptPeerCard({
           size={36}
           alt={name}
         />
-        <View style={{ flex: 1, gap: 2 }}>
+        <View style={PEER_NAME_BLOCK_STYLE}>
           <Text size={15} bold color={foreground} numberOfLines={1}>
             {name}
           </Text>
           {ciphertextLength !== undefined ? (
-            <HStack spacing={4} style={{ alignItems: 'center' }}>
+            <HStack spacing={4} style={CENTER_ROW_STYLE}>
               <Icon name="mdi:shield" size={12} color={muted} />
               <Text size={12} color={muted}>
                 {encryptedPayloadLabel(ciphertextLength)}
@@ -288,9 +302,9 @@ export function AppDataCard({ operationLine }: { operationLine: string }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   return (
     <View className="bg-surface rounded-2xl p-3">
-      <HStack spacing={8} style={{ alignItems: 'center' }}>
+      <HStack spacing={8} style={CENTER_ROW_STYLE}>
         <Icon name="fluent:apps-16-filled" size={16} color={muted} />
-        <View style={{ flex: 1 }}>
+        <View style={FLEX_ONE_STYLE}>
           <Text size={14} color={foreground}>
             {operationLine}
           </Text>
@@ -310,8 +324,8 @@ export function ZapRequestCard({
 }) {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   return (
-    <View className="bg-surface rounded-2xl p-3" style={{ gap: 8 }}>
-      <HStack spacing={8} style={{ alignItems: 'baseline' }}>
+    <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
+      <HStack spacing={8} style={BASELINE_ROW_STYLE}>
         <Text size={20} bold color={foreground}>
           {amountSats !== undefined ? `${amountSats} sats` : 'Unspecified amount'}
         </Text>
@@ -324,11 +338,25 @@ export function ZapRequestCard({
   );
 }
 
+const EXPANDED_BLOCK_STYLE = { gap: 6 } as const;
+const JSON_SCROLL_STYLE = { maxHeight: FULL_EVENT_MAX_HEIGHT } as const;
+const JSON_TEXT_STYLE = { fontFamily: MONOSPACE_FONT } as const;
+
 /**
- * Expandable raw event JSON + copy button. Rendered under every sign_event
- * card so the human summary never hides what is actually being signed.
+ * Expandable raw event JSON + copy button — the one JSON inspector for every
+ * sign_event surface, so the human summary never hides what is actually
+ * being signed. Labels are configurable per surface ("Details" under summary
+ * cards, "Show full event" on the bare preview card).
  */
-export function RawEventDetails({ event }: { event: UnsignedEvent }) {
+export function ExpandableEventJson({
+  event,
+  showLabel = SHOW_DETAILS_LABEL,
+  hideLabel = HIDE_DETAILS_LABEL,
+}: {
+  event: UnsignedEvent;
+  showLabel?: string;
+  hideLabel?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const fullJson = useMemo(() => JSON.stringify(event, null, 2), [event]);
@@ -337,6 +365,7 @@ export function RawEventDetails({ event }: { event: UnsignedEvent }) {
     [fullJson]
   );
 
+  const toggle = useCallback(() => setExpanded((value) => !value), []);
   const copyJson = useCallback(() => {
     void Clipboard.setStringAsync(fullJson);
     popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
@@ -347,22 +376,22 @@ export function RawEventDetails({ event }: { event: UnsignedEvent }) {
       <Pressable
         haptics
         accessibilityRole="button"
-        accessibilityLabel={expanded ? HIDE_DETAILS_LABEL : SHOW_DETAILS_LABEL}
-        onPress={() => setExpanded((value) => !value)}>
-        <HStack spacing={4} style={{ alignItems: 'center' }}>
+        accessibilityLabel={expanded ? hideLabel : showLabel}
+        onPress={toggle}>
+        <HStack spacing={4} style={CENTER_ROW_STYLE}>
           <Text size={13} bold color={muted}>
-            {expanded ? HIDE_DETAILS_LABEL : SHOW_DETAILS_LABEL}
+            {expanded ? hideLabel : showLabel}
           </Text>
           <Icon name={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'} size={16} color={muted} />
         </HStack>
       </Pressable>
       {expanded ? (
-        <View style={{ gap: 6 }}>
+        <View style={EXPANDED_BLOCK_STYLE}>
           <GestureScrollView
             nestedScrollEnabled
-            style={{ maxHeight: FULL_EVENT_MAX_HEIGHT }}
+            style={JSON_SCROLL_STYLE}
             showsVerticalScrollIndicator>
-            <Text size={12} color={foreground} style={{ fontFamily: MONOSPACE_FONT }}>
+            <Text size={12} color={foreground} style={JSON_TEXT_STYLE}>
               {displayJson}
             </Text>
           </GestureScrollView>

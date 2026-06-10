@@ -13,10 +13,6 @@ import React from 'react';
 import type { CopySegment } from '@/features/nostrSigner/components/permissionCatalog';
 import { Text } from '@/shared/ui/primitives/Text';
 
-// Hostname parsing lives in lib/boundedDisplay so headless lib modules
-// (connectionMatch) share the same parser; re-exported for existing importers.
-export { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
-
 /** First-8 … last-4 pubkey fallback for the app-identity subtitle. */
 export function shortPubkey(pubkey: string): string {
   return `${pubkey.slice(0, 8)}…${pubkey.slice(-4)}`;

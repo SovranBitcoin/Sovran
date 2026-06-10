@@ -163,6 +163,20 @@ describe('takePairingIntent', () => {
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr()).toEqual({ type: 'invalid-pubkey' });
   });
+
+  it('hands the intent to exactly one of two CONCURRENT takes (RMW queue)', async () => {
+    await setPairingIntent(INPUT, T0);
+
+    // Without serialisation both reads land before either clear, and both
+    // resolve 'taken' — the secret-bearing URI would be handed out twice.
+    const [first, second] = await Promise.all([
+      takePairingIntent(TARGET_PUBKEY, T0 + 1_000),
+      takePairingIntent(TARGET_PUBKEY, T0 + 1_000),
+    ]);
+    const statuses = [first._unsafeUnwrap().status, second._unsafeUnwrap().status].sort();
+    expect(statuses).toEqual(['none', 'taken']);
+    expect(mocked.__backing.has(PAIRING_INTENT_STORAGE_KEY)).toBe(false);
+  });
 });
 
 describe('clearPairingIntent', () => {

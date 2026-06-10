@@ -23,7 +23,7 @@ import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata'
 import { nostrLog, redactError } from '@/shared/lib/logger';
 import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
-export interface ReferencedEventPreview {
+interface ReferencedEventPreview {
   status: 'idle' | 'loading' | 'ready' | 'unavailable';
   event?: FeedEvent;
   author?: { name?: string; picture?: string };

@@ -25,19 +25,13 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { BottomSheet, Button as HerouiButton } from 'heroui-native';
-import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import Animated, { SlideInRight } from 'react-native-reanimated';
 
 import Icon from 'assets/icons';
-import {
-  SegmentedText,
-  safeHostname,
-  shortPubkey,
-} from '@/features/nostrSigner/components/display';
+import { SegmentedText, shortPubkey } from '@/features/nostrSigner/components/display';
+import { boundDisplay, safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import {
   useNip46RequestsStore,
@@ -50,14 +44,14 @@ import {
   verdictIdsForGroup,
   type Nip46RequestGroup,
 } from '@/features/nostrSigner/lib/requestGrouping';
-import { nip46Engine, type Nip46DecisionAction } from '@/features/nostrSigner/lib/nip46Engine';
+import { nip46Engine } from '@/features/nostrSigner/lib/nip46Engine';
+import type { Nip46DecisionAction } from '@/features/nostrSigner/lib/verdictResolver';
 import type { UnsignedEvent } from '@/features/nostrSigner/lib/nip46Types';
 import {
   allHandledToastCopy,
   alwaysAllowEligible,
   APPROVAL_BUTTON_LABELS,
   appDisplayName,
-  boundDisplay,
   blockAppConfirmTitle,
   BLOCK_APP_LABEL,
   expiredNoticeCopy,
@@ -74,7 +68,7 @@ import {
   DecryptPeerCard,
   FollowDiffCard,
   OwnTextBlock,
-  RawEventDetails,
+  ExpandableEventJson,
   ReferencedNoteCard,
   ZapRequestCard,
 } from '@/features/nostrSigner/components/SummaryPreviewCards';
@@ -100,11 +94,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 const CONTENT_PREVIEW_MAX_CHARS = 300;
-const FULL_EVENT_DISPLAY_MAX_CHARS = 16_384;
-const FULL_EVENT_MAX_HEIGHT = 240;
 const EXPIRED_NOTICE_MS = 1500;
 const ADVANCE_ANIMATION_MS = 220;
-const MONOSPACE_FONT = Platform.select({ ios: 'Courier New', default: 'monospace' });
 
 /** Stable fallback so memo deps don't churn while the sheet is closing. */
 const NONE_PREVIEW = { type: 'none' } as const;
@@ -146,63 +137,33 @@ function loginTargetFor(event: UnsignedEvent): string | undefined {
   return undefined;
 }
 
+const PREVIEW_CARD_STYLE = { gap: 8 } as const;
+const CENTER_ROW_STYLE = { alignItems: 'center' } as const;
+const FLEX_ONE_STYLE = { flex: 1 } as const;
+const QUEUE_STRIP_ROW_STYLE = { alignItems: 'center', justifyContent: 'space-between' } as const;
+const VIEW_ALL_PRESSABLE_STYLE = { padding: 4 } as const;
+const UNDERLINE_TEXT_STYLE = { textDecorationLine: 'underline' } as const;
+
+/** Bounded content preview + the shared JSON inspector, in a card. */
 function EventPreviewCard({ event }: { event: UnsignedEvent }) {
-  const [expanded, setExpanded] = useState(false);
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const [foreground] = useThemeColor(['foreground'] as const);
   const contentPreview = useMemo(
     () => boundDisplay(event.content.trim(), CONTENT_PREVIEW_MAX_CHARS),
     [event.content]
   );
-  const fullJson = useMemo(() => JSON.stringify(event, null, 2), [event]);
-  const displayJson = useMemo(
-    () => boundDisplay(fullJson, FULL_EVENT_DISPLAY_MAX_CHARS),
-    [fullJson]
-  );
-
-  const copyJson = useCallback(() => {
-    void Clipboard.setStringAsync(fullJson);
-    popup({ message: 'Copied', type: 'success', variant: 'toast', duration: 1500 });
-  }, [fullJson]);
 
   return (
-    <View className="bg-surface rounded-2xl p-3" style={{ gap: 8 }}>
+    <View className="bg-surface rounded-2xl p-3" style={PREVIEW_CARD_STYLE}>
       {contentPreview.length > 0 ? (
         <Text size={14} numberOfLines={3} color={foreground}>
           {contentPreview}
         </Text>
       ) : null}
-      <Pressable
-        haptics
-        accessibilityRole="button"
-        accessibilityLabel={expanded ? HIDE_FULL_EVENT_LABEL : SHOW_FULL_EVENT_LABEL}
-        onPress={() => setExpanded((value) => !value)}>
-        <HStack spacing={4} style={{ alignItems: 'center' }}>
-          <Text size={13} bold color={muted}>
-            {expanded ? HIDE_FULL_EVENT_LABEL : SHOW_FULL_EVENT_LABEL}
-          </Text>
-          <Icon name={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'} size={16} color={muted} />
-        </HStack>
-      </Pressable>
-      {expanded ? (
-        <View style={{ gap: 6 }}>
-          <GestureScrollView
-            nestedScrollEnabled
-            style={{ maxHeight: FULL_EVENT_MAX_HEIGHT }}
-            showsVerticalScrollIndicator>
-            <Text size={12} color={foreground} style={{ fontFamily: MONOSPACE_FONT }}>
-              {displayJson}
-            </Text>
-          </GestureScrollView>
-          <HerouiButton
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            onPress={copyJson}
-            accessibilityLabel="Copy full event">
-            <Icon name="lets-icons:copy" size={18} color={muted} />
-          </HerouiButton>
-        </View>
-      ) : null}
+      <ExpandableEventJson
+        event={event}
+        showLabel={SHOW_FULL_EVENT_LABEL}
+        hideLabel={HIDE_FULL_EVENT_LABEL}
+      />
     </View>
   );
 }
@@ -452,6 +413,16 @@ export function SignerApprovalSheetContent({
     });
   }, [appName, submitVerdict]);
 
+  const approvePrimary = useCallback(() => {
+    void submitVerdict(isSelfDecrypt ? 'approve_once' : 'approve_session');
+  }, [isSelfDecrypt, submitVerdict]);
+  const approveAlways = useCallback(() => {
+    void submitVerdict('always');
+  }, [submitVerdict]);
+  const denyOnce = useCallback(() => {
+    void submitVerdict('deny_once');
+  }, [submitVerdict]);
+
   // Counts DECISIONS (consolidated groups), not raw spam requests.
   const totalInBatch = advanceCount + groups.length;
   const position = Math.min(advanceCount + 1, totalInBatch);
@@ -461,9 +432,9 @@ export function SignerApprovalSheetContent({
   if (expiredNotice !== null) {
     return (
       <View className="px-1 pb-4 pt-1">
-        <HStack spacing={10} style={{ alignItems: 'center' }}>
+        <HStack spacing={10} style={CENTER_ROW_STYLE}>
           <Icon name="mdi:clock-alert-outline" size={22} color={warning} />
-          <View style={{ flex: 1 }}>
+          <View style={FLEX_ONE_STYLE}>
             <Text size={14} color={foreground}>
               {expiredNotice}
             </Text>
@@ -484,7 +455,7 @@ export function SignerApprovalSheetContent({
       entering={hasAdvancedRef.current ? SlideInRight.duration(ADVANCE_ANIMATION_MS) : undefined}>
       <VStack spacing={14} className="px-1 pb-2 pt-1">
         {totalInBatch > 1 ? (
-          <HStack style={{ alignItems: 'center', justifyContent: 'space-between' }}>
+          <HStack style={QUEUE_STRIP_ROW_STYLE}>
             <Text size={12} bold color={muted}>
               {queueStripLabel(position, totalInBatch)}
             </Text>
@@ -493,8 +464,8 @@ export function SignerApprovalSheetContent({
               accessibilityRole="button"
               accessibilityLabel={VIEW_ALL_LABEL}
               onPress={viewAll}
-              style={{ padding: 4 }}>
-              <Text size={12} bold color={muted} style={{ textDecorationLine: 'underline' }}>
+              style={VIEW_ALL_PRESSABLE_STYLE}>
+              <Text size={12} bold color={muted} style={UNDERLINE_TEXT_STYLE}>
                 {VIEW_ALL_LABEL}
               </Text>
             </Pressable>
@@ -502,7 +473,7 @@ export function SignerApprovalSheetContent({
         ) : null}
 
         {/* App identity */}
-        <HStack spacing={12} style={{ alignItems: 'center' }}>
+        <HStack spacing={12} style={CENTER_ROW_STYLE}>
           <Avatar
             state={connection?.image ? 'image' : 'fallback'}
             picture={connection?.image}
@@ -511,7 +482,7 @@ export function SignerApprovalSheetContent({
             size={44}
             alt={appName}
           />
-          <VStack spacing={2} style={{ flex: 1 }}>
+          <VStack spacing={2} style={FLEX_ONE_STYLE}>
             <Text size={16} bold color={foreground} numberOfLines={1}>
               {appName}
             </Text>
@@ -556,7 +527,7 @@ export function SignerApprovalSheetContent({
         {detail?.type === 'zap_request' ? (
           <ZapRequestCard amountSats={detail.amountSats} recipientPubkey={detail.recipientPubkey} />
         ) : null}
-        {signEvent !== null && usesSummaryCard ? <RawEventDetails event={signEvent} /> : null}
+        {signEvent !== null && usesSummaryCard ? <ExpandableEventJson event={signEvent} /> : null}
         {signEvent !== null && !usesSummaryCard ? <EventPreviewCard event={signEvent} /> : null}
         {preview.type === 'encrypt' ? (
           <View className="bg-surface rounded-2xl p-3">
@@ -580,13 +551,13 @@ export function SignerApprovalSheetContent({
                 ? 'bg-danger-soft rounded-2xl p-3'
                 : 'bg-warning-soft rounded-2xl p-3'
             }>
-            <HStack spacing={8} style={{ alignItems: 'center' }}>
+            <HStack spacing={8} style={CENTER_ROW_STYLE}>
               <Icon
                 name={banner.tone === 'danger' ? 'mdi:alert-circle' : 'mdi:alert-circle-outline'}
                 size={18}
                 color={banner.tone === 'danger' ? danger : warning}
               />
-              <View style={{ flex: 1 }}>
+              <View style={FLEX_ONE_STYLE}>
                 <SegmentedText
                   segments={banner.segments}
                   size={13}
@@ -609,13 +580,13 @@ export function SignerApprovalSheetContent({
                   ? 'bg-danger-soft rounded-2xl p-3'
                   : 'bg-warning-soft rounded-2xl p-3'
               }>
-              <HStack spacing={8} style={{ alignItems: 'center' }}>
+              <HStack spacing={8} style={CENTER_ROW_STYLE}>
                 <Icon
                   name="mdi:alert-circle"
                   size={18}
                   color={riskBanner.tone === 'danger' ? danger : warning}
                 />
-                <View style={{ flex: 1 }}>
+                <View style={FLEX_ONE_STYLE}>
                   <Text
                     size={13}
                     color={riskBanner.tone === 'danger' ? dangerSoftFg : warningSoftFg}>
@@ -631,10 +602,7 @@ export function SignerApprovalSheetContent({
             escalating severity. Self-decrypt keeps maximum friction:
             Approve (once) / Deny / Block only. */}
         <VStack spacing={10}>
-          <HerouiButton
-            variant="primary"
-            className="bg-foreground"
-            onPress={() => void submitVerdict(isSelfDecrypt ? 'approve_once' : 'approve_session')}>
+          <HerouiButton variant="primary" className="bg-foreground" onPress={approvePrimary}>
             <HerouiButton.Label className="text-background">
               {isSelfDecrypt
                 ? APPROVAL_BUTTON_LABELS.approveOnce
@@ -642,11 +610,11 @@ export function SignerApprovalSheetContent({
             </HerouiButton.Label>
           </HerouiButton>
           {offerAlways ? (
-            <HerouiButton variant="tertiary" onPress={() => void submitVerdict('always')}>
+            <HerouiButton variant="tertiary" onPress={approveAlways}>
               <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.alwaysAllow}</HerouiButton.Label>
             </HerouiButton>
           ) : null}
-          <HerouiButton variant="danger-soft" onPress={() => void submitVerdict('deny_once')}>
+          <HerouiButton variant="danger-soft" onPress={denyOnce}>
             <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.deny}</HerouiButton.Label>
           </HerouiButton>
           <HerouiButton

@@ -51,7 +51,7 @@ export interface ListRowIconCircle {
 }
 
 /** Plain leading icon — no circle chrome, settings-row style. */
-export interface ListRowIcon {
+interface ListRowIcon {
   name: string;
   /** Defaults to the foreground theme color. */
   color?: string;
@@ -111,6 +111,14 @@ interface ListRowProps {
   /** Default: `paddingHorizontal: 20, paddingVertical: 12`. Compact: pv 8. */
   padding?: 'default' | 'compact';
 
+  /**
+   * Horizontal inset of the row content. Defaults to the app-wide 20; pass 16
+   * when the row sits beside heroui `ListGroup.Item` siblings (p-4 = 16) so
+   * adjacent groups align. NOTE: the `style` prop lands on the OUTER wrapper —
+   * padding there stacks on top of this inset instead of replacing it.
+   */
+  paddingHorizontal?: number;
+
   style?: StyleProp<ViewStyle>;
 
   /** VoiceOver/TalkBack label for the row. Defaults to `title` when `title`
@@ -149,6 +157,7 @@ export function ListRow({
   subtitleFallback,
   testID,
   padding = 'default',
+  paddingHorizontal = 20,
   style,
   accessibilityLabel,
   accessibilityHint,
@@ -248,13 +257,15 @@ export function ListRow({
   const accentBelow = accentPosition === 'below' && accent != null;
   const leadingWidth =
     avatar?.size ?? iconCircle?.size ?? (leading != null ? DEFAULT_AVATAR_SIZE : 0);
-  const accentInsetLeft = leadingEl ? 20 + leadingWidth + ROW_GAP : 20;
+  const accentInsetLeft = leadingEl
+    ? paddingHorizontal + leadingWidth + ROW_GAP
+    : paddingHorizontal;
 
   const mainRow = (
     <HStack
       align="center"
       style={{
-        paddingHorizontal: 20,
+        paddingHorizontal,
         paddingTop: paddingVertical,
         paddingBottom: accentBelow ? 0 : paddingVertical,
         gap: ROW_GAP,
@@ -275,7 +286,7 @@ export function ListRow({
       <View
         style={{
           paddingLeft: accentInsetLeft,
-          paddingRight: 20,
+          paddingRight: paddingHorizontal,
           paddingTop: 4,
           paddingBottom: paddingVertical,
         }}>

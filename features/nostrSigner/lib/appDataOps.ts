@@ -27,7 +27,7 @@
 import { boundDisplay, MAX_CONTEXT_LABEL_DISPLAY } from './boundedDisplay';
 import { safeJsonParse } from './json';
 
-export interface AppDataOperation {
+interface AppDataOperation {
   /** Sheet headline override, e.g. "Load App Settings". */
   headline: string;
   /**
@@ -70,7 +70,7 @@ const WORD_REWRITES: Record<string, string> = {
 const MAX_OPERATION_WORDS = 8;
 const WALLET_RISK_RE = /nwc|wallet/i;
 
-function riskFor(...sources: Array<string | undefined>): { risk?: 'wallet_credential' } {
+function riskFor(...sources: (string | undefined)[]): { risk?: 'wallet_credential' } {
   return sources.some((source) => source !== undefined && WALLET_RISK_RE.test(source))
     ? { risk: 'wallet_credential' }
     : {};
