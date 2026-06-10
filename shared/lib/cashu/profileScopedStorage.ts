@@ -135,6 +135,8 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'bitchat-dm-messages-store',
   'feed-ignore-store',
   'notification-policy-store',
+  'nip46-connections-store',
+  'nip46-activity-store',
   // Generic query caches (createQueryCacheStore). Profile-scoped because their
   // entries are keyed by the viewer pubkey.
   'feed-cache',
