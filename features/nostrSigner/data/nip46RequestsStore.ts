@@ -23,6 +23,7 @@ import {
   type Nip46Method,
   type UnsignedEvent,
 } from '@/features/nostrSigner/lib/nip46Types';
+import type { ParsedNostrConnectUri } from '@/features/nostrSigner/lib/nip46Uri';
 import { storeLog } from '@/shared/lib/logger';
 
 export type Nip46ParamsPreview =
@@ -61,11 +62,30 @@ export interface Nip46SessionGrant {
 
 const SESSION_GRANTABLE_KEYS: readonly string[] = ['nip04_decrypt', 'nip44_decrypt'];
 
+/** Toast handoff for the UI layer (Layer 3 consumes + clears). */
+export type Nip46PairingNotice = 'expired';
+
 interface Nip46RequestsState {
   pending: Nip46PendingRequest[];
   sessionGrants: Nip46SessionGrant[];
   /** Apps in rate-limit cooldown — UI flag only; the engine owns the timing. */
   throttledApps: Record<string, true>;
+  /**
+   * UI-requested hot flag: signer surfaces (share screen, connect sheet) set
+   * this so the service hook starts the engine even with zero connections.
+   * The hook clears nothing here — the surface that set it owns resetting it.
+   */
+  serviceHotRequested: boolean;
+  /**
+   * Boot handoff from useResumePendingPairing: a pairing intent that survived
+   * a profile-switch restart, parsed and already registered with the engine
+   * via startNostrconnectPairing. Layer 3 watches this to open the connect
+   * sheet, then clears it. Carries the pairing secret — runtime-only by
+   * construction (this store never persists) and never logged.
+   */
+  resumedPairing: ParsedNostrConnectUri | null;
+  /** Set when a pairing intent died (expired/mismatched) — UI shows a toast. */
+  pairingNotice: Nip46PairingNotice | null;
 }
 
 interface Nip46RequestsActions {
@@ -94,6 +114,9 @@ interface Nip46RequestsActions {
   revokeSessionGrant: (clientPubkey: string, grantKey?: SessionGrantKey) => void;
   pruneSessionGrants: (nowMs?: number) => void;
   setAppThrottled: (clientPubkey: string, throttled: boolean) => void;
+  setServiceHotRequested: (hot: boolean) => void;
+  setResumedPairing: (parsed: ParsedNostrConnectUri | null) => void;
+  setPairingNotice: (notice: Nip46PairingNotice | null) => void;
 }
 
 type Nip46RequestsStore = Nip46RequestsState & Nip46RequestsActions;
@@ -102,6 +125,9 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>()((set, get) => 
   pending: [],
   sessionGrants: [],
   throttledApps: {},
+  serviceHotRequested: false,
+  resumedPairing: null,
+  pairingNotice: null,
 
   enqueue: (request) => {
     const { pending } = get();
@@ -191,5 +217,18 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>()((set, get) => 
       }
       return { throttledApps };
     });
+  },
+
+  setServiceHotRequested: (hot) => {
+    set((state) => (state.serviceHotRequested === hot ? state : { serviceHotRequested: hot }));
+  },
+
+  setResumedPairing: (parsed) => {
+    // The parsed URI embeds the pairing secret — never log it.
+    set({ resumedPairing: parsed });
+  },
+
+  setPairingNotice: (notice) => {
+    set({ pairingNotice: notice });
   },
 }));
