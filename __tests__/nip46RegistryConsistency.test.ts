@@ -19,7 +19,11 @@ import {
   permissionTierFor,
   requestsWaitingToastCopy,
 } from '@/features/nostrSigner/components/permissionCatalog';
-import { buildPermissionKeyRows } from '@/features/nostrSigner/components/permissionRowModel';
+import {
+  buildPermissionKeyRows,
+  bundleSessionStatus,
+  sessionStatusFor,
+} from '@/features/nostrSigner/components/permissionRowModel';
 import { isCriticalGrantKey } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { PAIRING_PRESET_GRANT_KEYS } from '@/features/nostrSigner/lib/pairingPreset';
 import { PERMISSION_BUNDLES } from '@/features/nostrSigner/lib/permissionBundles';
@@ -93,5 +97,43 @@ describe('permission registry consistency', () => {
         headline: expect.stringMatching(/signer/i),
       });
     }
+  });
+});
+
+describe('sessionStatusFor / bundleSessionStatus', () => {
+  const PEER_A = 'a'.repeat(64);
+  const PEER_B = 'b'.repeat(64);
+
+  it('labels peer-scoped decrypt session grants with a people count', () => {
+    const grants = [
+      { grantKey: 'nip44_decrypt' as const, peerPubkey: PEER_A },
+      { grantKey: 'nip44_decrypt' as const, peerPubkey: PEER_B },
+      { grantKey: 'nip04_decrypt' as const, peerPubkey: PEER_A },
+    ];
+    expect(sessionStatusFor('nip44_decrypt', grants, [])).toBe('Allowed this session · 2 people');
+    expect(sessionStatusFor('nip04_decrypt', grants, [])).toBe('Allowed this session · 1 person');
+  });
+
+  it('labels session allows without a count and stays quiet otherwise', () => {
+    const allows = [{ grantKey: 'sign_event:1' as const }];
+    expect(sessionStatusFor('sign_event:1', [], allows)).toBe('Allowed this session');
+    expect(sessionStatusFor('sign_event:7', [], allows)).toBeUndefined();
+    expect(sessionStatusFor('nip44_decrypt', [], allows)).toBeUndefined();
+  });
+
+  it('counts a duplicate peer once', () => {
+    const grants = [
+      { grantKey: 'nip44_decrypt' as const, peerPubkey: PEER_A },
+      { grantKey: 'nip44_decrypt' as const, peerPubkey: PEER_A },
+    ];
+    expect(sessionStatusFor('nip44_decrypt', grants, [])).toBe('Allowed this session · 1 person');
+  });
+
+  it('labels a bundle only when EVERY member key is session-allowed', () => {
+    const bundle = PERMISSION_BUNDLES[0]!;
+    const all = bundle.grantKeys.map((grantKey) => ({ grantKey }));
+    expect(bundleSessionStatus(bundle.grantKeys, all)).toBe('Allowed this session');
+    expect(bundleSessionStatus(bundle.grantKeys, all.slice(1))).toBeUndefined();
+    expect(bundleSessionStatus([], all)).toBeUndefined();
   });
 });

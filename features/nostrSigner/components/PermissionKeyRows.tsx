@@ -61,6 +61,7 @@ export function PermissionSwitchRow({
   subtitle,
   state,
   allowEligible,
+  sessionStatus,
   onChange,
 }: {
   label: string;
@@ -68,6 +69,13 @@ export function PermissionSwitchRow({
   subtitle?: string;
   state: PermissionRowState;
   allowEligible: boolean;
+  /**
+   * Live session-state line ("Allowed this session") — replaces the persisted
+   * status while the row's persisted state is 'ask', so the label never
+   * contradicts behavior mid-session. Persisted deny/allow win in evaluate(),
+   * so other states keep their own labels.
+   */
+  sessionStatus?: string | undefined;
   onChange: (next: TriState) => void;
 }) {
   const [danger, muted] = useThemeColor(['danger', 'muted'] as const);
@@ -128,7 +136,10 @@ export function PermissionSwitchRow({
     onChange(state === 'allow' ? 'ask' : 'allow');
   }, [state, allowEligible, onChange, openMenu]);
 
-  const status = stateLabel(state, allowEligible);
+  const status =
+    state === 'ask' && sessionStatus !== undefined
+      ? sessionStatus
+      : stateLabel(state, allowEligible);
   const description = subtitle !== undefined ? `${status} · ${subtitle}` : status;
 
   return (

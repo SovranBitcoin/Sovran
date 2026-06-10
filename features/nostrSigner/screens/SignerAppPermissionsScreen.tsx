@@ -25,10 +25,12 @@ import {
 } from '@/features/nostrSigner/components/PermissionKeyRows';
 import {
   buildPermissionKeyRows,
+  sessionStatusFor,
   type PermissionKeyRowModel,
 } from '@/features/nostrSigner/components/permissionRowModel';
 import { BASE_EDITOR_GRANT_KEYS } from '@/features/nostrSigner/components/editorGrantKeys';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
+import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import type { GrantKey } from '@/features/nostrSigner/lib/nip46Types';
 import {
   bundleForGrantKey,
@@ -75,6 +77,28 @@ export function SignerAppPermissionsScreen(): React.ReactElement {
   );
   const setGrant = useNip46ConnectionsStore((s) => s.setGrant);
   const muted = useThemeColor('muted');
+
+  // Live session state, so a row never reads "Always asks" while a session
+  // grant/allow is quietly auto-approving it (until restart). Strict mode
+  // suppresses these labels — evaluate() asks before session checks there,
+  // so the persisted labels are the truthful ones.
+  const strictModeOn = app?.mode === 'strict';
+  const sessionGrants = useNip46RequestsStore((s) => s.sessionGrants);
+  const sessionAllows = useNip46RequestsStore((s) => s.sessionAllows);
+  const appSessionGrants = useMemo(
+    () =>
+      clientPubkey === undefined
+        ? []
+        : sessionGrants.filter((grant) => grant.clientPubkey === clientPubkey),
+    [sessionGrants, clientPubkey]
+  );
+  const appSessionAllows = useMemo(
+    () =>
+      clientPubkey === undefined
+        ? []
+        : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey),
+    [sessionAllows, clientPubkey]
+  );
 
   // One section per bundle the group contains, then "Other" for unbundled
   // rows (locked keys, odd-kind extras). filter preserves row order.
@@ -140,6 +164,11 @@ export function SignerAppPermissionsScreen(): React.ReactElement {
                     {...(row.subtitle !== undefined && { subtitle: row.subtitle })}
                     state={triStateFor(app, row.grantKey)}
                     allowEligible={row.allowEligible}
+                    sessionStatus={
+                      strictModeOn
+                        ? undefined
+                        : sessionStatusFor(row.grantKey, appSessionGrants, appSessionAllows)
+                    }
                     onChange={(state) => onChange(row.grantKey, state)}
                   />
                 </React.Fragment>

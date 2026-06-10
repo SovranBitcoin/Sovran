@@ -34,8 +34,10 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 const ALLOW_TITLE = 'Allow decrypting messages';
 const ALLOW_DESCRIPTION = 'Decrypt without asking, for this person only.';
-const TEMPORARY_TITLE = 'Temporary access';
-const TEMPORARY_DESCRIPTION = 'This session — until Sovran restarts';
+// Session access folds into the main row so the OFF switch can't read as
+// "no access" while a session grant is quietly approving decrypts.
+const SUFFIX_ROW_STYLE = { alignItems: 'center' } as const;
+const SESSION_DESCRIPTION = 'Allowed this session — turn on to keep access after Sovran restarts.';
 const REVOKE_TITLE = 'Revoke Access';
 const REVOKED_TOAST = 'Access revoked';
 
@@ -70,6 +72,8 @@ export function SignerAppPersonScreen(): React.ReactElement {
   );
 
   const hasPersistentGrant = peer !== undefined && app?.peerDecryptGrants[peer] !== undefined;
+  const allowDescription =
+    !hasPersistentGrant && hasSessionAccess ? SESSION_DESCRIPTION : ALLOW_DESCRIPTION;
 
   const onToggleAllow = useCallback(
     (selected: boolean) => {
@@ -136,23 +140,19 @@ export function SignerAppPersonScreen(): React.ReactElement {
           <ListGroup.Item>
             <ListGroup.ItemContent>
               <ListGroup.ItemTitle>{ALLOW_TITLE}</ListGroup.ItemTitle>
-              <ListGroup.ItemDescription>{ALLOW_DESCRIPTION}</ListGroup.ItemDescription>
+              <ListGroup.ItemDescription>{allowDescription}</ListGroup.ItemDescription>
             </ListGroup.ItemContent>
             <ListGroup.ItemSuffix>
-              <HeroSwitch isSelected={hasPersistentGrant} onSelectedChange={onToggleAllow} />
+              {/* ItemSuffix is a bare (column) View — the HStack keeps the
+                  session clock and the switch on one line. */}
+              <HStack gap={8} style={SUFFIX_ROW_STYLE}>
+                {!hasPersistentGrant && hasSessionAccess ? (
+                  <Icon name="mdi:clock-outline" size={18} color={muted} />
+                ) : null}
+                <HeroSwitch isSelected={hasPersistentGrant} onSelectedChange={onToggleAllow} />
+              </HStack>
             </ListGroup.ItemSuffix>
           </ListGroup.Item>
-          {hasSessionAccess ? (
-            <ListGroup.Item>
-              <ListGroup.ItemContent>
-                <ListGroup.ItemTitle>{TEMPORARY_TITLE}</ListGroup.ItemTitle>
-                <ListGroup.ItemDescription>{TEMPORARY_DESCRIPTION}</ListGroup.ItemDescription>
-              </ListGroup.ItemContent>
-              <ListGroup.ItemSuffix>
-                <Icon name="mdi:clock-outline" size={18} color={muted} />
-              </ListGroup.ItemSuffix>
-            </ListGroup.Item>
-          ) : null}
         </ListGroup>
 
         {/* Danger zone */}

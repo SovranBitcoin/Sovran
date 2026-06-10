@@ -61,7 +61,7 @@ type SessionAllowError = 'decrypt_key_forbidden' | 'invalid_grant_key';
  * covers another. Peer is the lowercase hex from the decrypt request params.
  * Lives for the SESSION — until the engine stops (`clear()`).
  */
-interface Nip46SessionGrant {
+export interface Nip46SessionGrant {
   clientPubkey: string;
   grantKey: SessionGrantKey;
   peerPubkey: string;
@@ -73,7 +73,7 @@ interface Nip46SessionGrant {
  * untouched and a restart always re-prompts). Decrypt keys are forbidden
  * here; the peer-scoped `sessionGrants` path owns those.
  */
-interface Nip46SessionAllow {
+export interface Nip46SessionAllow {
   clientPubkey: string;
   grantKey: GrantKey;
 }

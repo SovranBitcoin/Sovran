@@ -18,7 +18,7 @@
  * Route params: `clientPubkey` — the connected app's pubkey (64-hex).
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -48,6 +48,10 @@ import {
   triStateFor,
   type TriState,
 } from '@/features/nostrSigner/components/PermissionKeyRows';
+import {
+  bundleSessionStatus,
+  sessionStatusFor,
+} from '@/features/nostrSigner/components/permissionRowModel';
 import {
   bundleTriState,
   PERMISSION_BUNDLES,
@@ -110,6 +114,15 @@ const FINE_GRAINED_ROW_STYLE = { alignItems: 'center', alignSelf: 'flex-end' } a
 const MANAGE_ROW_INSET = 16;
 
 const THROTTLED_BANNER = 'This app is sending unusual amounts of requests';
+// Second banner line: the cooldown is the reason no approval prompts appear,
+// so say so and show when asking resumes.
+const THROTTLE_TICK_MS = 15_000;
+
+/** "in about 4 minutes" / "in under a minute" — cooldowns are minute-scale. */
+function throttleResumeLabel(msLeft: number): string {
+  const minutes = Math.ceil(msLeft / 60_000);
+  return minutes <= 1 ? 'in under a minute' : `in about ${minutes} minutes`;
+}
 const WALLET_GROUP_CAPTION = 'Wallet events always require your approval.';
 const LOCKED_GROUP_CAPTION =
   'Some of these always require your approval and can never be set to Allow.';
@@ -128,7 +141,7 @@ const DISCONNECT_SUBTITLE = 'Sign this app out and revoke its permissions';
 const RESTORE_DEFAULTS_BODY =
   'Common social actions are allowed again — the same defaults as when you first connect. Everything else asks. Decrypt access for people is not affected.';
 const EVERYONE_TITLE = 'Everyone';
-const EVERYONE_DESCRIPTION = 'Master setting · applies to all people below';
+const EVERYONE_DESCRIPTION = 'Decrypt with all people below, without asking';
 const SESSION_ACCESS_LABEL = 'This session';
 const DECRYPT_ACCESS_CAPTION =
   'People this app may decrypt your conversations with, without asking. Revoking prompts again on the next message.';
@@ -251,11 +264,25 @@ export function SignerAppDetailScreen(): React.ReactElement {
   const setPeerDecryptGrant = useNip46ConnectionsStore((s) => s.setPeerDecryptGrant);
   const revokeSessionGrant = useNip46RequestsStore((s) => s.revokeSessionGrant);
   const revokeSessionAllows = useNip46RequestsStore((s) => s.revokeSessionAllows);
-  // Derive from cooldownUntil so the banner lapses with the cooldown even if
-  // the app went quiet (the engine only writes the flag on inbound traffic).
-  const throttled = useNip46RequestsStore((s) =>
-    clientPubkey === undefined ? false : (s.throttledApps[clientPubkey] ?? 0) > Date.now()
+  // Cooldown end (epoch ms). The engine only writes the flag during an
+  // active rate-limit cooldown, so `> now` is the banner condition.
+  const throttledUntil = useNip46RequestsStore((s) =>
+    clientPubkey === undefined ? 0 : (s.throttledApps[clientPubkey] ?? 0)
   );
+  // Ticking clock while the cooldown runs: keeps the countdown fresh and
+  // lapses the banner on time even if the app went quiet (the engine writes
+  // the flag only on inbound traffic).
+  const [throttleNow, setThrottleNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (throttledUntil <= Date.now()) return undefined;
+    setThrottleNow(Date.now());
+    const id = setInterval(() => {
+      setThrottleNow(Date.now());
+      if (throttledUntil <= Date.now()) clearInterval(id);
+    }, THROTTLE_TICK_MS);
+    return () => clearInterval(id);
+  }, [throttledUntil]);
+  const throttled = throttledUntil > throttleNow;
 
   const [foreground, muted, warning, warningSoftFg, danger] = useThemeColor([
     'foreground',
@@ -347,6 +374,18 @@ export function SignerAppDetailScreen(): React.ReactElement {
         : sessionGrants.filter((g) => g.clientPubkey === clientPubkey),
     [sessionGrants, clientPubkey]
   );
+  // Session labels are suppressed in strict mode: evaluate() returns 'ask'
+  // BEFORE consulting session state there (same reason the approval sheet
+  // hides session affordances on strict apps), so the persisted labels are
+  // the truthful ones.
+  const sessionAllows = useNip46RequestsStore((s) => s.sessionAllows);
+  const appSessionAllows = useMemo(
+    () =>
+      clientPubkey === undefined
+        ? []
+        : sessionAllows.filter((allow) => allow.clientPubkey === clientPubkey),
+    [sessionAllows, clientPubkey]
+  );
 
   const decryptAccessRows = useMemo(() => {
     const rows = new Map<string, { peer: string; sublabel: string; session: boolean }>();
@@ -399,9 +438,22 @@ export function SignerAppDetailScreen(): React.ReactElement {
     if (clientPubkey === undefined) return;
     const peers = decryptAccessRows.map((row) => row.peer);
     const count = peers.length;
+    const peopleLabel = count === 1 ? 'this person' : `all ${count} people`;
     if (everyoneAllowed) {
       actionMenuPopup({
-        title: `Revoke for all ${count} people?`,
+        title: `Revoke for ${peopleLabel}?`,
+        header: (
+          <View className="px-2 pb-2">
+            <Text size={14} style={CONFIRM_BODY_TEXT_STYLE}>
+              <Text size={14} bold>
+                {appName}
+              </Text>
+              {` will ask before decrypting with ${
+                count === 1 ? 'this person' : 'any of these people'
+              }. Access granted for this session ends too. No other permissions change.`}
+            </Text>
+          </View>
+        ),
         buttons: [
           {
             text: 'Revoke for everyone',
@@ -419,8 +471,29 @@ export function SignerAppDetailScreen(): React.ReactElement {
       });
       return;
     }
+    // Escalation is the part worth spelling out: turning Everyone on makes
+    // session-only people permanent.
+    const sessionOnly = decryptAccessRows.filter(
+      (row) => row.session && app?.peerDecryptGrants[row.peer] === undefined
+    ).length;
+    const escalationNote =
+      sessionOnly === 0
+        ? ''
+        : sessionOnly === 1
+          ? ' 1 person with access for this session becomes permanent.'
+          : ` ${sessionOnly} people with access for this session become permanent.`;
     actionMenuPopup({
-      title: `Allow for all ${count} people?`,
+      title: `Allow for ${peopleLabel}?`,
+      header: (
+        <View className="px-2 pb-2">
+          <Text size={14} style={CONFIRM_BODY_TEXT_STYLE}>
+            <Text size={14} bold>
+              {appName}
+            </Text>
+            {` will decrypt messages with ${peopleLabel} without asking — permanently, until you revoke it.${escalationNote} No other permissions change.`}
+          </Text>
+        </View>
+      ),
       buttons: [
         {
           text: 'Allow for everyone',
@@ -447,6 +520,8 @@ export function SignerAppDetailScreen(): React.ReactElement {
     clientPubkey,
     decryptAccessRows,
     everyoneAllowed,
+    appName,
+    app?.peerDecryptGrants,
     setPeerDecryptGrant,
     revokePeerDecryptGrant,
     revokeSessionGrant,
@@ -681,8 +756,13 @@ export function SignerAppDetailScreen(): React.ReactElement {
             <HStack spacing={8} style={CENTER_ROW_STYLE}>
               <Icon name="mdi:alert-circle-outline" size={18} color={warning} />
               <View style={FLEX_ONE_STYLE}>
-                <Text size={13} color={warningSoftFg}>
+                <Text size={13} bold color={warningSoftFg}>
                   {THROTTLED_BANNER}
+                </Text>
+                <Text size={12} color={warningSoftFg}>
+                  {`Requests are being declined automatically — asking resumes ${throttleResumeLabel(
+                    throttledUntil - throttleNow
+                  )}.`}
                 </Text>
               </View>
             </HStack>
@@ -742,6 +822,11 @@ export function SignerAppDetailScreen(): React.ReactElement {
                         label={bundle.label}
                         state={bundleTriState((grantKey) => app.grants[grantKey]?.verdict, bundle)}
                         allowEligible
+                        sessionStatus={
+                          strictModeOn
+                            ? undefined
+                            : bundleSessionStatus(bundle.grantKeys, appSessionAllows)
+                        }
                         onChange={(next) => onSelectBundleState(bundle, next)}
                       />
                     </React.Fragment>
@@ -753,6 +838,11 @@ export function SignerAppDetailScreen(): React.ReactElement {
                         label={rowLabel}
                         state={triStateFor(app, grantKey)}
                         allowEligible={allowEligible}
+                        sessionStatus={
+                          strictModeOn
+                            ? undefined
+                            : sessionStatusFor(grantKey, appSessionGrants, appSessionAllows)
+                        }
                         onChange={(state) => onSelectTriState(grantKey, state)}
                       />
                     </React.Fragment>

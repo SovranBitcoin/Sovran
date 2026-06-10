@@ -11,6 +11,10 @@ import {
   type PermissionEditorGroup,
 } from '@/features/nostrSigner/components/permissionCatalog';
 import type { Nip46Connection } from '@/features/nostrSigner/data/nip46ConnectionsStore';
+import type {
+  Nip46SessionAllow,
+  Nip46SessionGrant,
+} from '@/features/nostrSigner/data/nip46RequestsStore';
 import type { GrantKey } from '@/features/nostrSigner/lib/nip46Types';
 import { parseGrantKey } from '@/features/nostrSigner/lib/permissionPolicy';
 
@@ -58,6 +62,44 @@ function grantKeySubtitle(grantKey: GrantKey): string {
     return note !== undefined ? `${note} · kind ${kind}` : `Event kind ${kind}`;
   }
   return METHOD_NOTES[method] ?? method;
+}
+
+/**
+ * Live session-state status line for a permission row, or undefined when no
+ * session access covers `grantKey`. Decrypt keys are allowed per PERSON
+ * (peer-scoped session grants), so their label carries the people count;
+ * every other key is a plain session allow. evaluate() lets a persisted
+ * 'deny' win over session state, so callers must only show this on rows
+ * whose persisted state is 'ask'.
+ */
+export function sessionStatusFor(
+  grantKey: GrantKey,
+  appSessionGrants: readonly Pick<Nip46SessionGrant, 'grantKey' | 'peerPubkey'>[],
+  appSessionAllows: readonly Pick<Nip46SessionAllow, 'grantKey'>[]
+): string | undefined {
+  const peers = new Set(
+    appSessionGrants.filter((grant) => grant.grantKey === grantKey).map((g) => g.peerPubkey)
+  );
+  if (peers.size > 0) {
+    return `Allowed this session · ${peers.size} ${peers.size === 1 ? 'person' : 'people'}`;
+  }
+  if (appSessionAllows.some((allow) => allow.grantKey === grantKey)) return 'Allowed this session';
+  return undefined;
+}
+
+/**
+ * Bundle-level session status: 'approve_session' mints allows over the
+ * request's whole bundle, so "every key allowed" is the natural (and
+ * non-overstating) condition. Partial coverage stays unlabeled — the
+ * per-key Advanced rows carry the detail.
+ */
+export function bundleSessionStatus(
+  bundleKeys: readonly GrantKey[],
+  appSessionAllows: readonly Pick<Nip46SessionAllow, 'grantKey'>[]
+): string | undefined {
+  if (bundleKeys.length === 0) return undefined;
+  const allowed = new Set(appSessionAllows.map((allow) => allow.grantKey));
+  return bundleKeys.every((key) => allowed.has(key)) ? 'Allowed this session' : undefined;
 }
 
 export interface PermissionKeyRowModel {
