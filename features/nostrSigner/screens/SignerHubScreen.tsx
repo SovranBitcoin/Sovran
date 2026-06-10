@@ -1,0 +1,257 @@
+/**
+ * @fileoverview Signer hub — pending queue entry, connected apps, connect
+ * actions, and the activity link
+ *
+ * Sections (plan "Routes → index"):
+ *   Pending        — only when the runtime queue is non-empty; one prominent
+ *                    row into the requests page.
+ *   Connected Apps — one row per paired app → app-detail permission editor;
+ *                    empty state invites the first QR scan.
+ *   Connect        — Scan QR (camera with the signer-pair action), Paste
+ *                    Connection Link (actionMenuPopup input → parseNip46Uri →
+ *                    engine pairing + connect sheet), Share My Signer.
+ *   History        — Activity log link.
+ *
+ * The plan's passive "Connections for other profiles are paused…" banner is
+ * intentionally absent: the connections store is profile-scoped storage, so
+ * the active profile structurally cannot read whether OTHER profiles have
+ * connections. Detecting it would require cross-profile storage reads, which
+ * the per-pubkey scoping forbids — documented as not applicable for v1.
+ *
+ * App names come from connection metadata (client-supplied = untrusted);
+ * everything renders through the catalog's bounded helpers and is never
+ * logged.
+ */
+
+import React, { useCallback, useMemo } from 'react';
+
+import Icon from 'assets/icons';
+import { appDisplayName } from '@/features/nostrSigner/components/permissionCatalog';
+import {
+  useNip46ConnectionsStore,
+  type Nip46Connection,
+} from '@/features/nostrSigner/data/nip46ConnectionsStore';
+import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
+import { nip46Engine } from '@/features/nostrSigner/lib/nip46Engine';
+import { parseNip46Uri } from '@/features/nostrSigner/lib/nip46Uri';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { formatRelative } from '@/shared/lib/date';
+import { nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { actionMenuPopup, showActionSheet } from '@/shared/lib/popup';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { ListRow } from '@/shared/ui/composed/ListRow';
+import { Screen } from '@/shared/ui/composed/Screen';
+import { Section } from '@/shared/ui/composed/Section';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
+
+// ── Copy (plan verbatim; templates interpolated) ────────────────
+
+const PENDING_ROW_SUBTITLE = 'Tap to review';
+
+const APPS_EMPTY_TITLE = 'No apps connected';
+const APPS_EMPTY_SUBTITLE =
+  'Scan a QR code from any Nostr app to sign in with your Sovran identity.';
+
+const SCAN_QR_LABEL = 'Scan QR Code';
+const PASTE_LINK_LABEL = 'Paste Connection Link';
+const SHARE_SIGNER_LABEL = 'Share My Signer';
+
+const PASTE_PROMPT_BODY = 'Paste the connection link from the app you want to sign in to.';
+const PASTE_ERROR_INVALID = "That doesn't look like a Nostr connection link.";
+/**
+ * bunker:// is what WE mint for clients — pasting one here is the wrong
+ * direction, so v1 treats it as unsupported with an explanatory error
+ * (the plan has no copy for this case; new string, documented).
+ */
+const PASTE_ERROR_BUNKER =
+  "That's a bunker link — it belongs in the app you're signing in to. Paste that app's nostrconnect link here instead.";
+const PASTE_CONNECT_LABEL = 'Connect';
+
+const ACTIVITY_ROW_TITLE = 'Activity';
+const ACTIVITY_ROW_SUBTITLE = 'Signatures, approvals and denials';
+
+function pendingRowTitle(count: number): string {
+  return count === 1 ? '1 request waiting' : `${count} requests waiting`;
+}
+
+/** "Last used 2h ago · N allowed" (plan template; "Never used" pre-first-use). */
+function connectionSubtitle(connection: Nip46Connection): string {
+  const lastUsed =
+    connection.lastUsedAt === undefined
+      ? 'Never used'
+      : `Last used ${formatRelative(connection.lastUsedAt, 'compact')}`;
+  const allowedCount = Object.values(connection.grants).filter(
+    (grant) => grant?.verdict === 'always'
+  ).length;
+  return `${lastUsed} · ${allowedCount} allowed`;
+}
+
+// ── Screen ──────────────────────────────────────────────────────
+
+export function SignerHubScreen(): React.ReactElement {
+  useLifecycleLogger('SignerHubScreen');
+  const pendingCount = useNip46RequestsStore((s) => s.pending.length);
+  const apps = useNip46ConnectionsStore((s) => s.apps);
+  const [foreground, warning] = useThemeColor(['foreground', 'warning'] as const);
+
+  const connections = useMemo(
+    () =>
+      Object.values(apps).sort(
+        (a, b) => (b.lastUsedAt ?? b.pairedAt) - (a.lastUsedAt ?? a.pairedAt)
+      ),
+    [apps]
+  );
+
+  // ── Navigation ────────────────────────────────────────────────
+
+  const openRequests = useCallback(() => {
+    router.push('/(signer-flow)/requests' as never);
+  }, []);
+
+  const openAppDetail = useCallback((clientPubkey: string) => {
+    // Hex pubkey — URL-safe by construction, no encoding needed.
+    router.push(`/(signer-flow)/app?clientPubkey=${clientPubkey}` as never);
+  }, []);
+
+  const openScan = useCallback(() => {
+    // Route action lands with Layer 4's camera intercept; linked now per plan.
+    router.navigate({ pathname: '/camera', params: { action: 'signer-pair' } });
+  }, []);
+
+  const openShare = useCallback(() => {
+    router.push('/(signer-flow)/share' as never);
+  }, []);
+
+  const openActivity = useCallback(() => {
+    router.push('/(signer-flow)/activity' as never);
+  }, []);
+
+  // ── Paste Connection Link ─────────────────────────────────────
+
+  const openPasteLink = useCallback(() => {
+    actionMenuPopup({
+      title: PASTE_LINK_LABEL,
+      inputs: [
+        {
+          id: 'uri',
+          placeholder: 'nostrconnect://…',
+          description: PASTE_PROMPT_BODY,
+          autoCapitalize: 'none',
+          autoCorrect: false,
+        },
+      ],
+      primaryAction: {
+        text: PASTE_CONNECT_LABEL,
+        isDisabled: (values) => !values.uri || values.uri.trim().length === 0,
+        onPress: (values, { setError, close }) => {
+          const raw = (values.uri ?? '').trim();
+          // The URI embeds the pairing secret — never log it.
+          const parsed = parseNip46Uri(raw);
+          if (parsed.isErr()) {
+            setError(PASTE_ERROR_INVALID);
+            return;
+          }
+          if (parsed.value.type === 'bunker') {
+            setError(PASTE_ERROR_BUNKER);
+            return;
+          }
+          // Engine may be cold (zero connections): request hot FIRST so the
+          // service hook starts it; the pairing registers either way and a
+          // cold start picks the pairing relays up via relayUnion. The
+          // connect sheet (Layer 4) owns clearing the hot flag.
+          useNip46RequestsStore.getState().setServiceHotRequested(true);
+          const started = nip46Engine.startNostrconnectPairing(parsed.value);
+          if (started.isErr() && started.error.type !== 'not-started') {
+            nostrLog.warn('nostr.signer.hub_pairing_start_failed', {
+              error: started.error.type,
+            });
+          }
+          close();
+          showActionSheet('signer-connect', { uri: raw });
+        },
+      },
+    });
+  }, []);
+
+  // ── Render ────────────────────────────────────────────────────
+
+  return (
+    <Screen name="SignerHubScreen">
+      {pendingCount > 0 ? (
+        <Section title="Pending">
+          <ListRow
+            iconCircle={{ icon: 'mdi:bell', color: warning }}
+            title={pendingRowTitle(pendingCount)}
+            subtitle={PENDING_ROW_SUBTITLE}
+            trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
+            onPress={openRequests}
+            testID="signer-hub-pending-row"
+          />
+        </Section>
+      ) : null}
+
+      <Section title="Connected Apps">
+        {connections.length === 0 ? (
+          <EmptyState
+            icon="mdi:qrcode-scan"
+            title={APPS_EMPTY_TITLE}
+            subtitle={APPS_EMPTY_SUBTITLE}
+          />
+        ) : (
+          connections.map((connection) => (
+            <ListRow
+              key={connection.clientPubkey}
+              leading={
+                <Avatar
+                  state={connection.image ? 'image' : 'fallback'}
+                  picture={connection.image}
+                  seed={connection.clientPubkey}
+                  fallbackVariant="beam"
+                  size={44}
+                  alt={appDisplayName(connection)}
+                />
+              }
+              title={appDisplayName(connection)}
+              subtitle={connectionSubtitle(connection)}
+              trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
+              onPress={() => openAppDetail(connection.clientPubkey)}
+            />
+          ))
+        )}
+      </Section>
+
+      <Section title="Connect">
+        <ListRow
+          iconCircle={{ icon: 'mdi:qrcode-scan', color: foreground }}
+          title={SCAN_QR_LABEL}
+          onPress={openScan}
+          testID="signer-hub-scan-row"
+        />
+        <ListRow
+          iconCircle={{ icon: 'lucide:clipboard-paste', color: foreground }}
+          title={PASTE_LINK_LABEL}
+          onPress={openPasteLink}
+          testID="signer-hub-paste-row"
+        />
+        <ListRow
+          iconCircle={{ icon: 'mdi:share-variant', color: foreground }}
+          title={SHARE_SIGNER_LABEL}
+          onPress={openShare}
+          testID="signer-hub-share-row"
+        />
+      </Section>
+
+      <Section title="History">
+        <ListRow
+          iconCircle={{ icon: 'lucide:activity', color: foreground }}
+          title={ACTIVITY_ROW_TITLE}
+          subtitle={ACTIVITY_ROW_SUBTITLE}
+          trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
+          onPress={openActivity}
+          testID="signer-hub-activity-row"
+        />
+      </Section>
+    </Screen>
+  );
+}

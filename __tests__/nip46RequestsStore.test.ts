@@ -128,6 +128,30 @@ describe('pending queue', () => {
     store.clear();
     expect(useNip46RequestsStore.getState().pending).toEqual([]);
   });
+
+  it('promote moves a request to the head and preserves the rest of the order', () => {
+    const store = useNip46RequestsStore.getState();
+    const first = makeRequest();
+    const second = makeRequest({ clientPubkey: APP_B });
+    const third = makeRequest({ clientPubkey: APP_C });
+    store.enqueue(first);
+    store.enqueue(second);
+    store.enqueue(third);
+
+    store.promote(third.id);
+    expect(useNip46RequestsStore.getState().pending.map((p) => p.id)).toEqual([
+      third.id,
+      first.id,
+      second.id,
+    ]);
+
+    // Promoting the head and promoting an unknown id are both no-ops.
+    const stable = useNip46RequestsStore.getState().pending;
+    store.promote(third.id);
+    expect(useNip46RequestsStore.getState().pending).toBe(stable);
+    store.promote('missing');
+    expect(useNip46RequestsStore.getState().pending).toBe(stable);
+  });
 });
 
 describe('session grants', () => {

@@ -48,6 +48,11 @@ import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
+import { SignerApprovalSheetContent } from '@/features/nostrSigner/components/SignerApprovalSheetContent';
+import {
+  SignerConnectSheetContent,
+  SignerProfilePickerContent,
+} from '@/features/nostrSigner/components/SignerConnectSheetContent';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
@@ -326,6 +331,39 @@ const CUSTOM_SHEET_CONTENT: Record<
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
   'send-memo': SendMemoContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'signer-approval': SignerApprovalSheetContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'signer-connect': SignerConnectSheetContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'signer-profile-picker': SignerProfilePickerContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(

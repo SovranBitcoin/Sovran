@@ -58,6 +58,57 @@ export {
 } from '@/features/nostrSigner/hooks/useNostrSignerService';
 export { useResumePendingPairing } from '@/features/nostrSigner/hooks/useResumePendingPairing';
 
+// ── Approval UX (catalog is the single copy/icon/tier source) ───
+export {
+  ACTIVITY_VERDICT_DISPLAY,
+  allHandledToastCopy,
+  alwaysAllowEligible,
+  alwaysScopeFootnote,
+  APPROVAL_BUTTON_LABELS,
+  appDisplayName,
+  autoSignedToastCopy,
+  boundDisplay,
+  encryptedPayloadLabel,
+  expiredNoticeCopy,
+  permissionEntryFor,
+  permissionEntryForGrantKey,
+  permissionTierFor,
+  queueStripLabel,
+  requestsWaitingToastCopy,
+  SESSION_GRANT_CHECKBOX_LABEL,
+  tierBannerFor,
+  UNNAMED_APP_LABEL,
+} from '@/features/nostrSigner/components/permissionCatalog';
+export type {
+  ActivityVerdictDisplay,
+  CopySegment,
+  PermissionCatalogEntry,
+  PermissionCopyContext,
+  PermissionEditorGroup,
+  PermissionLookup,
+  PermissionTier,
+  TierBanner,
+  ToastCopy,
+} from '@/features/nostrSigner/components/permissionCatalog';
+export { SignerApprovalSheetContent } from '@/features/nostrSigner/components/SignerApprovalSheetContent';
+export {
+  onSwitchAndConnect,
+  SignerConnectSheetContent,
+  SignerProfilePickerContent,
+} from '@/features/nostrSigner/components/SignerConnectSheetContent';
+export type { SwitchAndConnectTarget } from '@/features/nostrSigner/components/SignerConnectSheetContent';
+export { useSignerApprovalController } from '@/features/nostrSigner/hooks/useSignerApprovalController';
+export {
+  encodeNostrconnectUri,
+  useConnectSheetOpener,
+} from '@/features/nostrSigner/hooks/useConnectSheetOpener';
+export { ShareSignerScreen } from '@/features/nostrSigner/screens/ShareSignerScreen';
+export { SignerActivityDetailScreen } from '@/features/nostrSigner/screens/SignerActivityDetailScreen';
+export { SignerActivityScreen } from '@/features/nostrSigner/screens/SignerActivityScreen';
+export { SignerAppDetailScreen } from '@/features/nostrSigner/screens/SignerAppDetailScreen';
+export { SignerHubScreen } from '@/features/nostrSigner/screens/SignerHubScreen';
+export { SignerRequestsScreen } from '@/features/nostrSigner/screens/SignerRequestsScreen';
+
 // ── Pairing URIs (scan/paste/share) ─────────────────────────────
 export {
   buildBunkerUri,

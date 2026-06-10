@@ -1,7 +1,9 @@
 import React, { type ReactNode } from 'react';
 
+import { useConnectSheetOpener } from '@/features/nostrSigner/hooks/useConnectSheetOpener';
 import { useNostrSignerService } from '@/features/nostrSigner/hooks/useNostrSignerService';
 import { useResumePendingPairing } from '@/features/nostrSigner/hooks/useResumePendingPairing';
+import { useSignerApprovalController } from '@/features/nostrSigner/hooks/useSignerApprovalController';
 import { useInitMount } from '@/shared/lib/logger';
 
 interface NostrSignerProviderProps {
@@ -23,5 +25,7 @@ export function NostrSignerProvider({ children, accountIndex = 0 }: NostrSignerP
   useInitMount('NostrSignerProvider');
   useNostrSignerService(accountIndex);
   useResumePendingPairing();
+  useSignerApprovalController();
+  useConnectSheetOpener();
   return <>{children}</>;
 }

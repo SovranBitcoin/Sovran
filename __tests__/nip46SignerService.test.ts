@@ -67,6 +67,14 @@ jest.mock('@/shared/lib/logger', () => ({
   }),
 }));
 
+// NostrSignerProvider also mounts the approval controller (Layer 3), whose
+// popup surface reaches heroui-native at import time — mock it like
+// sendMemoSheet.test.ts does. The controller's behavior has its own suite.
+jest.mock('@/shared/lib/popup', () => ({
+  popup: jest.fn(),
+  showActionSheet: jest.fn(),
+}));
+
 jest.mock('@/shared/lib/cashu/profileScopedStorage', () => {
   const map = new Map<string, string>();
   return {
@@ -99,6 +107,7 @@ import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46Conne
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import { nip46Engine } from '@/features/nostrSigner/lib/nip46Engine';
 import { takePairingIntent } from '@/features/nostrSigner/lib/pairingIntentStorage';
+import { popup, showActionSheet } from '@/shared/lib/popup';
 import { NostrSignerProvider } from '@/shared/providers/NostrSignerProvider';
 
 // React processes renders/unmounts via deferred microtasks unless the act
@@ -127,6 +136,8 @@ const engine = nip46Engine as typeof nip46Engine & {
   startNostrconnectPairing: jest.Mock;
 };
 const takeIntent = takePairingIntent as jest.Mock;
+const popupMock = popup as jest.Mock;
+const showActionSheetMock = showActionSheet as jest.Mock;
 
 let appStateHandler: ((next: AppStateStatus) => void) | null = null;
 
@@ -314,10 +325,12 @@ describe('useResumePendingPairing', () => {
     expect(engine.startNostrconnectPairing).toHaveBeenCalledWith(
       expect.objectContaining({ clientPubkey: CLIENT, secret: 's3cret', relays: [RELAY] })
     );
-    expect(useNip46RequestsStore.getState().resumedPairing).toMatchObject({
-      clientPubkey: CLIENT,
-    });
-    // The handoff is a hot condition — the service must have warmed the engine.
+    // Layer 3's connect-sheet opener consumes the handoff in the same mount:
+    // hot flag raised, field cleared, sheet opened with the re-encoded URI.
+    expect(useNip46RequestsStore.getState().resumedPairing).toBeNull();
+    expect(useNip46RequestsStore.getState().serviceHotRequested).toBe(true);
+    expect(showActionSheetMock).toHaveBeenCalledWith('signer-connect', { uri });
+    // The handoff flipped the service hot — the engine must have warmed.
     expect(engine.start).toHaveBeenCalledTimes(1);
     await unmountInAct(renderer);
   });
@@ -325,7 +338,11 @@ describe('useResumePendingPairing', () => {
   it('surfaces an expired intent as a toast notice and stays cold', async () => {
     takeIntent.mockReturnValue(okAsync({ status: 'expired' }));
     const renderer = await renderProvider();
-    expect(useNip46RequestsStore.getState().pairingNotice).toBe('expired');
+    // Layer 3's opener consumes the notice: toast shown, field cleared.
+    expect(useNip46RequestsStore.getState().pairingNotice).toBeNull();
+    expect(popupMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Connection expired' })
+    );
     expect(engine.startNostrconnectPairing).not.toHaveBeenCalled();
     expect(engine.start).not.toHaveBeenCalled();
     await unmountInAct(renderer);

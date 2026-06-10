@@ -95,6 +95,13 @@ interface Nip46RequestsActions {
    */
   enqueue: (request: Nip46PendingRequest) => Result<void, EnqueueRejection>;
   remove: (id: string) => void;
+  /**
+   * Move a pending request to the queue head. The approval sheet always
+   * renders the head, so this is how the requests page seeds the prompt at a
+   * specific row ("review this one") without a second queue representation.
+   * Engine resolution/expiry are id/TTL-based — order is presentation-only.
+   */
+  promote: (id: string) => void;
   /** Remove and return every request past its TTL so the engine can respond + log. */
   expireDue: (nowMs: number) => Nip46PendingRequest[];
   clear: () => void;
@@ -151,6 +158,18 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>()((set, get) => 
     set((state) => {
       const pending = state.pending.filter((p) => p.id !== id);
       return pending.length === state.pending.length ? state : { pending };
+    });
+  },
+
+  promote: (id) => {
+    set((state) => {
+      const index = state.pending.findIndex((p) => p.id === id);
+      if (index <= 0) return state;
+      const target = state.pending[index];
+      if (target === undefined) return state;
+      return {
+        pending: [target, ...state.pending.slice(0, index), ...state.pending.slice(index + 1)],
+      };
     });
   },
 

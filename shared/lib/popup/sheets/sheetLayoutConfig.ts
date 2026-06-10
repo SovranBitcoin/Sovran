@@ -12,4 +12,12 @@ export const SHEET_LAYOUT_CONFIG: Record<CustomSheetId, SheetLayoutConfig> = {
   'payment-fallback': { mode: 'contentHeight' },
   'proof-selector': { mode: 'contentHeight' },
   'send-memo': { mode: 'contentHeight' },
+  // Signer sheets auto-fit: the approval prompt is identity + copy + preview
+  // + buttons, and the connect sheet is a perm checklist — both well under a
+  // screen, and dynamic sizing keeps the wallet-tier slide footer snug.
+  'signer-approval': { mode: 'contentHeight' },
+  'signer-connect': { mode: 'contentHeight' },
+  // Only ever pushed inside the signer-connect sheet, so the root's layout
+  // governs at runtime; the entry exists because the registry is total.
+  'signer-profile-picker': { mode: 'contentHeight' },
 };
