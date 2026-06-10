@@ -187,7 +187,7 @@ export function SignerActivityScreen(): React.ReactElement {
         <ListRow
           padding="compact"
           iconCircle={{ icon: display.icon, color: toneColors[display.tone], size: 40 }}
-          title={item.summaryV2?.headline ?? entry.headline}
+          title={item.summary?.headline ?? entry.headline}
           subtitle={`${appName} · ${formatRelative(item.at, 'chat-bubble')}`}
           accent={
             display.accentLine !== undefined ? (

@@ -236,6 +236,18 @@ const GLOVE_BASE = {
   width: GLOVE_W,
   height: GLOVE_H,
 } as const;
+/** Hand + its shadow live on an explicitly zIndexed layer: document order
+ *  alone is not enough — the SVG overlays (hold ring's animatedProps circle,
+ *  menu icons) can composite above later siblings, putting stray strokes on
+ *  top of the hand. */
+const HAND_LAYER_STYLE = {
+  position: 'absolute',
+  left: 0,
+  top: 0,
+  width: SCENE_W,
+  height: SCENE_H,
+  zIndex: 10,
+} as const;
 const CAPTION_STYLE = { textAlign: 'center' } as const;
 const INVISIBLE_STYLE = { opacity: 0 } as const;
 /** Beat words: flush with the mock row's left edge, vertically centered in
@@ -594,11 +606,13 @@ export function PermissionGestureDemo(): React.ReactElement {
             </Text>
           </Animated.View>
 
-          {/* Hand layer LAST — glove and its shadow stack above the menu */}
-          <Animated.View style={shadowComposed} />
-          <Animated.View style={gloveComposed}>
-            <GloveHand fg={foreground} />
-          </Animated.View>
+          {/* Hand layer LAST and zIndexed — nothing may draw over the hand */}
+          <View style={HAND_LAYER_STYLE}>
+            <Animated.View style={shadowComposed} />
+            <Animated.View style={gloveComposed}>
+              <GloveHand fg={foreground} />
+            </Animated.View>
+          </View>
         </View>
       </View>
       {reducedMotion ? (

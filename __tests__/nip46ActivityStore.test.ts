@@ -102,15 +102,19 @@ describe('logActivity', () => {
     expect(entries[entries.length - 1].at).toBe(1);
   });
 
-  it('truncates summaries to 120 chars', () => {
+  it('truncates content previews and summary lines at the persistence bound', () => {
     useNip46ActivityStore.getState().logActivity({
       clientPubkey: CLIENT,
       method: 'sign_event',
       kind: 1,
       verdict: 'auto_approved_grant',
-      summary: 'x'.repeat(300),
+      summary: { headline: 'h'.repeat(100), line: 'l'.repeat(300) },
+      contentPreview: 'x'.repeat(300),
     });
-    expect(useNip46ActivityStore.getState().entries[0].summary).toHaveLength(120);
+    const entry0 = useNip46ActivityStore.getState().entries[0];
+    expect(entry0.contentPreview).toHaveLength(120);
+    expect(entry0.summary?.line).toHaveLength(120);
+    expect(entry0.summary?.headline).toHaveLength(64);
   });
 });
 
@@ -121,7 +125,8 @@ describe('persistence', () => {
       method: 'sign_event',
       kind: 1,
       verdict: 'approved_once',
-      summary: 'hello nostr',
+      summary: { headline: 'Publish a Post', line: 'Published a post' },
+      contentPreview: 'hello nostr',
       eventId: 'b'.repeat(64),
     });
     await flushPersistWrites();
@@ -145,8 +150,8 @@ describe('persistence', () => {
     expect(useNip46ActivityStore.getState().entries).toEqual([]);
   });
 
-  it('rejects a blob smuggling an over-long summary', async () => {
-    writeBlob([entry({ summary: 'x'.repeat(200) })]);
+  it('rejects a blob smuggling an over-long content preview', async () => {
+    writeBlob([entry({ contentPreview: 'x'.repeat(200) })]);
     await useNip46ActivityStore.persist.rehydrate();
     expect(useNip46ActivityStore.getState().entries).toEqual([]);
   });

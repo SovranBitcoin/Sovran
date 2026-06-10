@@ -7,13 +7,13 @@
  *
  * Redaction contract: entries structurally cannot carry request params,
  * plaintexts, ciphertexts, or full event JSON — only the engine-supplied
- * `summary`/`summaryV2` (curated, bounded display copy) and the signed event
- * id ever land here. The store applies its own MAX_SUMMARY_LENGTH = 120
+ * `summary`/`contentPreview` (curated, bounded display copy) and the signed
+ * event id ever land here. The store applies its own MAX_SUMMARY_LENGTH = 120
  * ceiling purely as a persistence-boundary sanity bound on whatever it is
  * handed.
  *
- * `summaryV2.refPubkey` (the decrypt conversation peer, for the detail
- * screen's "who" rendering) is deliberate new metadata-at-rest: local-only,
+ * `summary.refPubkey` (the decrypt conversation peer, for the detail
+ * screen's "who" rendering) is deliberate metadata-at-rest: local-only,
  * profile-scoped, never logged.
  */
 
@@ -41,7 +41,7 @@ const MAX_SUMMARY_LENGTH = 120;
 const ACTIVITY_MAX_AGE_MS = ACTIVITY_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
 /** Structured human-readable summary, computed by the engine at log time. */
-export interface Nip46ActivitySummaryV2 {
+export interface Nip46ActivitySummary {
   /** Headline override ("Liked a post" headline form, ≤64 chars). */
   headline?: string;
   /** Plain activity line ("Loaded its app settings", ≤120 chars). */
@@ -58,10 +58,11 @@ export interface Nip46ActivityEntry {
   method: Nip46Method;
   kind?: number;
   verdict: ActivityVerdict;
-  /** Engine-curated display snippet — never raw params. */
-  summary?: string;
-  /** Structured summary (newer entries); legacy entries render via `summary`. */
-  summaryV2?: Nip46ActivitySummaryV2;
+  /** Structured summary — the primary display copy. */
+  summary?: Nip46ActivitySummary;
+  /** Engine-curated raw-content snippet (never raw params) — the detail
+   *  screen's fallback line for kinds `summarizeRequest` has no copy for. */
+  contentPreview?: string;
   /** Signed event id, for normal-class sign_event detail views. */
   eventId?: string;
   at: number;
@@ -70,7 +71,7 @@ export interface Nip46ActivityEntry {
 // `isNostrPubkeyHex` is a generic 64-hex-char gate — event ids share the shape.
 const Hex64Schema = z.custom<string>(isNostrPubkeyHex, 'invalid 64-hex id');
 
-const PersistedSummaryV2 = z.looseObject({
+const PersistedSummary = z.looseObject({
   headline: z.string().max(64).optional(),
   line: z.string().max(MAX_SUMMARY_LENGTH).optional(),
   refEventId: Hex64Schema.optional(),
@@ -83,9 +84,8 @@ const PersistedActivityEntry = z.looseObject({
   method: Nip46MethodSchema,
   kind: EventKindSchema.optional(),
   verdict: ActivityVerdictSchema,
-  summary: z.string().max(MAX_SUMMARY_LENGTH).optional(),
-  // Optional + additive: legacy entries without it hydrate unchanged.
-  summaryV2: PersistedSummaryV2.optional(),
+  summary: PersistedSummary.optional(),
+  contentPreview: z.string().max(MAX_SUMMARY_LENGTH).optional(),
   eventId: Hex64Schema.optional(),
   at: z.int().min(0),
 });
@@ -102,6 +102,8 @@ interface Nip46ActivityState {
 
 interface Nip46ActivityActions {
   logActivity: (input: LogActivityInput) => void;
+  /** Wipes the log — the hub's Reset Remote Login. */
+  clearAll: () => void;
 }
 
 type Nip46ActivityStore = Nip46ActivityState & Nip46ActivityActions;
@@ -117,27 +119,31 @@ export const useNip46ActivityStore = create<Nip46ActivityStore>()(
       entries: [],
 
       logActivity: (input) => {
-        const { at, summary, summaryV2, ...rest } = input;
+        const { at, summary, contentPreview, ...rest } = input;
         const entry: Nip46ActivityEntry = {
           ...rest,
-          ...(summary !== undefined && { summary: summary.slice(0, MAX_SUMMARY_LENGTH) }),
-          ...(summaryV2 !== undefined && {
-            summaryV2: {
-              ...(summaryV2.headline !== undefined && {
-                headline: summaryV2.headline.slice(0, 64),
+          ...(summary !== undefined && {
+            summary: {
+              ...(summary.headline !== undefined && {
+                headline: summary.headline.slice(0, 64),
               }),
-              ...(summaryV2.line !== undefined && {
-                line: summaryV2.line.slice(0, MAX_SUMMARY_LENGTH),
+              ...(summary.line !== undefined && {
+                line: summary.line.slice(0, MAX_SUMMARY_LENGTH),
               }),
-              ...(summaryV2.refEventId !== undefined && { refEventId: summaryV2.refEventId }),
-              ...(summaryV2.refPubkey !== undefined && { refPubkey: summaryV2.refPubkey }),
+              ...(summary.refEventId !== undefined && { refEventId: summary.refEventId }),
+              ...(summary.refPubkey !== undefined && { refPubkey: summary.refPubkey }),
             },
+          }),
+          ...(contentPreview !== undefined && {
+            contentPreview: contentPreview.slice(0, MAX_SUMMARY_LENGTH),
           }),
           id: mintLocalId('nip46'),
           at: at ?? Date.now(),
         };
         set((state) => ({ entries: [entry, ...state.entries].slice(0, ACTIVITY_CAP) }));
       },
+
+      clearAll: () => set({ entries: [] }),
     }),
     persistConfig({
       name: 'nip46-activity-store',

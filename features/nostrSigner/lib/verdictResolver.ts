@@ -21,7 +21,7 @@
 
 import { errAsync, ResultAsync } from 'neverthrow';
 
-import type { Nip46ActivitySummaryV2 } from '@/features/nostrSigner/data/nip46ActivityStore';
+import type { Nip46ActivitySummary } from '@/features/nostrSigner/data/nip46ActivityStore';
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import type {
@@ -66,10 +66,10 @@ export interface PendingRequestContext {
   grantKey: GrantKey | null;
   isSelfDecrypt: boolean;
   encryption: Nip46Encryption;
-  /** Pre-truncated content snippet — present only for normal-class sign_event. */
-  summary?: string;
   /** Structured summary computed at request time, for the activity row. */
-  summaryV2?: Nip46ActivitySummaryV2;
+  summary?: Nip46ActivitySummary;
+  /** Pre-truncated content snippet — present only for normal-class sign_event. */
+  contentPreview?: string;
 }
 
 type VerdictResolveError = { type: 'unknown-request' };
@@ -92,8 +92,8 @@ export interface VerdictResolverSeam {
     method: Nip46Method;
     kind?: number;
     verdict: ActivityVerdict;
-    summary?: string;
-    summaryV2?: Nip46ActivitySummaryV2;
+    summary?: Nip46ActivitySummary;
+    contentPreview?: string;
   }): void;
   /** Runs the approved request through the engine's executor + responder. */
   executeApproved(context: PendingRequestContext, encryption: Nip46Encryption): Promise<void>;
@@ -141,7 +141,7 @@ export function resolveVerdict(
       method: request.method,
       ...(context.kind !== undefined && { kind: context.kind }),
       verdict: 'denied_once',
-      ...(context.summaryV2 !== undefined && { summaryV2: context.summaryV2 }),
+      ...(context.summary !== undefined && { summary: context.summary }),
     });
     connections().touchUsage(clientPubkey, { denied: true });
     return Promise.resolve();

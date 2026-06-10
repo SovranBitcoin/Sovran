@@ -115,6 +115,10 @@ const LOCKED_GROUP_CAPTION =
   'Some of these always require your approval and can never be set to Allow.';
 const STRICT_MODE_TITLE = 'Ask Every Time';
 const STRICT_MODE_DESCRIPTION = 'Ignore saved permissions and ask for every request.';
+// Long-press menu (mirrors the permission rows' gesture) — only two modes.
+const STANDARD_MODE_MENU_LABEL = 'Use Saved Permissions';
+const STANDARD_MODE_MENU_DESCRIPTION = 'Apply your saved Allow, Ask, and Block choices';
+const STRICT_ROW_HINT = 'Double tap to toggle. Long press for more options.';
 const FINE_GRAINED_LABEL = 'Advanced';
 const RENAME_APP_SUBTITLE = 'Change the name shown for this app';
 const VIEW_ACTIVITY_SUBTITLE = 'See every request this app has made';
@@ -486,6 +490,36 @@ export function SignerAppDetailScreen(): React.ReactElement {
     setMode(clientPubkey, strictModeOn ? 'standard' : 'strict');
   }, [clientPubkey, setMode, strictModeOn]);
   const strictA11yState = useMemo(() => ({ checked: strictModeOn }), [strictModeOn]);
+  const openStrictMenu = useCallback(() => {
+    if (clientPubkey === undefined) return;
+    const checkSuffix = <Icon name="mdi:check" size={18} color={muted} />;
+    actionMenuPopup({
+      title: STRICT_MODE_TITLE,
+      buttons: [
+        {
+          text: STANDARD_MODE_MENU_LABEL,
+          icon: 'mdi:check-circle',
+          description: STANDARD_MODE_MENU_DESCRIPTION,
+          ...(!strictModeOn && { suffix: checkSuffix }),
+          onPress: (close) => {
+            close();
+            setMode(clientPubkey, 'standard');
+          },
+        },
+        {
+          text: STRICT_MODE_TITLE,
+          icon: 'mdi:help-circle',
+          description: STRICT_MODE_DESCRIPTION,
+          ...(strictModeOn && { suffix: checkSuffix }),
+          variant: 'secondary',
+          onPress: (close) => {
+            close();
+            setMode(clientPubkey, 'strict');
+          },
+        },
+      ],
+    });
+  }, [clientPubkey, muted, setMode, strictModeOn]);
 
   const onSelectTriState = useCallback(
     (grantKey: GrantKey, state: TriState) => {
@@ -666,10 +700,11 @@ export function SignerAppDetailScreen(): React.ReactElement {
             <PressableFeedback
               animation={false}
               onPress={onPressStrictRow}
+              onLongPress={openStrictMenu}
               accessibilityRole="switch"
               accessibilityLabel={STRICT_MODE_TITLE}
               accessibilityState={strictA11yState}
-              accessibilityHint={STRICT_MODE_DESCRIPTION}>
+              accessibilityHint={STRICT_ROW_HINT}>
               <PressableFeedback.Scale>
                 <ListGroup.Item disabled>
                   <ListGroup.ItemContent>

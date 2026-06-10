@@ -14,11 +14,14 @@
  *                                persistent per-person grant)
  *   self-decrypt               → Approve (once) / Deny — NIP-60 wallet
  *                                payloads keep maximum friction
+ *   strict-mode app            → Approve (once) / Deny, mirroring the "Ask
+ *                                Every Time" setting — evaluate() ignores
+ *                                session/always/peer grants under strict,
+ *                                so those affordances must not exist here
  * plus a "Block this app" link (confirmed) under every prompt. "Session" =
  * until the engine stops (profile switch / app restart). Decrypt requests
  * never preview content — only the conversation peer and an "Encrypted
- * payload · N chars" line. Note: on strict-mode apps a session/always grant
- * is minted but evaluate() ignores it (strict wins) — same as before.
+ * payload · N chars" line.
  *
  * Display strings derived from request params are untrusted: previews are
  * length-bounded before render and never logged.
@@ -390,11 +393,18 @@ export function SignerApprovalSheetContent({
     head !== null
       ? { method: head.method, ...(head.kind !== undefined && { kind: head.kind }) }
       : null;
+  // "Ask Every Time" mode: evaluate() prompts everything before grant checks,
+  // so persistent/session affordances would mint grants that can't apply —
+  // the sheet must mirror what the settings say is possible.
+  const strictMode = connection?.mode === 'strict';
   // Peer decrypts offer a PEER-scoped Always (setPeerDecryptGrant); blanket
-  // wallet/critical keys and self-decrypt never offer Always.
-  const offerAlways = isPeerDecrypt
-    ? peerLabel !== undefined
-    : lookupForAlways !== null && tier !== 'wallet' && alwaysAllowEligible(lookupForAlways);
+  // wallet/critical keys and self-decrypt never offer Always
+  // (alwaysAllowEligible covers the wallet tier).
+  const offerAlways =
+    !strictMode &&
+    (isPeerDecrypt
+      ? peerLabel !== undefined
+      : lookupForAlways !== null && alwaysAllowEligible(lookupForAlways));
 
   const confirmBlock = useCallback(() => {
     actionMenuPopup({
@@ -413,9 +423,12 @@ export function SignerApprovalSheetContent({
     });
   }, [appName, submitVerdict]);
 
+  // Strict mode approves once, like self-decrypt — a session grant would be
+  // inert under strict and the label would overpromise.
+  const approveOnceOnly = isSelfDecrypt || strictMode;
   const approvePrimary = useCallback(() => {
-    void submitVerdict(isSelfDecrypt ? 'approve_once' : 'approve_session');
-  }, [isSelfDecrypt, submitVerdict]);
+    void submitVerdict(approveOnceOnly ? 'approve_once' : 'approve_session');
+  }, [approveOnceOnly, submitVerdict]);
   const approveAlways = useCallback(() => {
     void submitVerdict('always');
   }, [submitVerdict]);
@@ -604,7 +617,7 @@ export function SignerApprovalSheetContent({
         <VStack spacing={10}>
           <HerouiButton variant="primary" className="bg-foreground" onPress={approvePrimary}>
             <HerouiButton.Label className="text-background">
-              {isSelfDecrypt
+              {approveOnceOnly
                 ? APPROVAL_BUTTON_LABELS.approveOnce
                 : APPROVAL_BUTTON_LABELS.allowSession}
             </HerouiButton.Label>

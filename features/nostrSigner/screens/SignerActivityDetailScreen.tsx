@@ -160,7 +160,7 @@ export function SignerActivityDetailScreen(): React.ReactElement {
   }
 
   const appName = appDisplayName(connection);
-  const summaryLine = entry.summaryV2?.line ?? entry.summary;
+  const summaryLine = entry.summary?.line ?? entry.contentPreview;
 
   return (
     <Screen name="SignerActivityDetailScreen">
@@ -188,7 +188,7 @@ export function SignerActivityDetailScreen(): React.ReactElement {
         {/* What happened */}
         <View className="mt-3">
           <ListGroup variant="secondary">
-            <DetailRow label="Action" value={entry.summaryV2?.headline ?? catalogEntry.headline} />
+            <DetailRow label="Action" value={entry.summary?.headline ?? catalogEntry.headline} />
             {summaryLine !== undefined ? (
               <>
                 <Separator className="mx-4" />
@@ -203,15 +203,15 @@ export function SignerActivityDetailScreen(): React.ReactElement {
         </View>
 
         {/* Referenced-note preview (reaction/repost/reply target) */}
-        {entry.summaryV2?.refEventId !== undefined ? (
+        {entry.summary?.refEventId !== undefined ? (
           <View className="pt-3">
-            <ReferencedNoteCard eventId={entry.summaryV2.refEventId} />
+            <ReferencedNoteCard eventId={entry.summary.refEventId} />
           </View>
         ) : null}
         {/* Decrypt conversation peer */}
-        {entry.summaryV2?.refPubkey !== undefined ? (
+        {entry.summary?.refPubkey !== undefined ? (
           <View className="pt-3">
-            <DecryptPeerCard peerPubkey={entry.summaryV2.refPubkey} />
+            <DecryptPeerCard peerPubkey={entry.summary.refPubkey} />
           </View>
         ) : null}
         {isEncryptionMethod(entry.method) ? (

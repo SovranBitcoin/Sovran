@@ -33,6 +33,7 @@ import {
   type Nip46Connection,
 } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
+import { clearAllSignerData } from '@/features/nostrSigner/lib/clearSignerData';
 import {
   openPairingFromUri,
   PAIRING_ERROR_BUNKER,
@@ -42,12 +43,15 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelative } from '@/shared/lib/date';
 import { useLifecycleLogger } from '@/shared/lib/logger';
-import { actionMenuPopup } from '@/shared/lib/popup';
+import { actionMenuPopup, popup } from '@/shared/lib/popup';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Section } from '@/shared/ui/composed/Section';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Text } from '@/shared/ui/primitives/Text';
+import { View } from '@/shared/ui/primitives/View/View';
 
 // ── Copy (plan verbatim; templates interpolated) ────────────────
 
@@ -69,6 +73,14 @@ const PASTE_CONNECT_LABEL = 'Connect';
 
 const ACTIVITY_ROW_TITLE = 'Activity';
 const ACTIVITY_ROW_SUBTITLE = 'Signatures, approvals and denials';
+
+const RESET_SIGNER_LABEL = 'Reset Remote Login';
+const RESET_SIGNER_SUBTITLE = 'Disconnect every app and clear all permissions and history';
+const RESET_CONFIRM_BODY =
+  'Every connected app will be signed out, and all permissions, pending requests, and history will be cleared. Apps can reconnect anytime.';
+const RESET_SUCCESS_MESSAGE = 'Remote Login reset';
+const RESET_FAILURE_MESSAGE = 'Some signer data could not be cleared';
+const RESET_BODY_TEXT_STYLE = { lineHeight: 20 } as const;
 
 function pendingRowTitle(count: number): string {
   return count === 1 ? '1 request waiting' : `${count} requests waiting`;
@@ -92,7 +104,14 @@ export function SignerHubScreen(): React.ReactElement {
   useLifecycleLogger('SignerHubScreen');
   const pendingCount = useNip46RequestsStore((s) => s.pending.length);
   const apps = useNip46ConnectionsStore((s) => s.apps);
-  const [foreground, warning] = useThemeColor(['foreground', 'warning'] as const);
+  const { keys } = useNostrKeysContext();
+  const [foreground, warning, danger, muted] = useThemeColor([
+    'foreground',
+    'warning',
+    'danger',
+    'muted',
+  ] as const);
+  const dangerTextStyle = useMemo(() => ({ color: danger }), [danger]);
 
   const connections = useMemo(
     () =>
@@ -160,6 +179,36 @@ export function SignerHubScreen(): React.ReactElement {
       },
     });
   }, []);
+
+  // ── Reset Remote Login ────────────────────────────────────────
+
+  const confirmReset = useCallback(() => {
+    const activePubkey = keys?.pubkey;
+    actionMenuPopup({
+      title: RESET_SIGNER_LABEL,
+      header: (
+        <View className="px-2 pb-2">
+          <Text size={14} style={RESET_BODY_TEXT_STYLE}>
+            {RESET_CONFIRM_BODY}
+          </Text>
+        </View>
+      ),
+      buttons: [
+        {
+          text: 'Reset',
+          variant: 'dangerous',
+          onPress: (close) => {
+            close();
+            void clearAllSignerData(activePubkey).match(
+              () => popup({ message: RESET_SUCCESS_MESSAGE, type: 'success' }),
+              () => popup({ message: RESET_FAILURE_MESSAGE, type: 'error' })
+            );
+          },
+        },
+        { text: 'Cancel', variant: 'secondary', onPress: (close) => close() },
+      ],
+    });
+  }, [keys?.pubkey]);
 
   // ── Render ────────────────────────────────────────────────────
 
@@ -251,6 +300,23 @@ export function SignerHubScreen(): React.ReactElement {
             trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
             onPress={openActivity}
             testID="signer-hub-activity-row"
+          />
+        </ListGroup>
+      </Section>
+
+      <Section title="Danger Zone" isDanger>
+        <ListGroup variant="secondary">
+          <ListRow
+            title={
+              <Text size={16} bold style={dangerTextStyle}>
+                {RESET_SIGNER_LABEL}
+              </Text>
+            }
+            subtitle={RESET_SIGNER_SUBTITLE}
+            accessibilityLabel={RESET_SIGNER_LABEL}
+            trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
+            onPress={confirmReset}
+            testID="signer-hub-reset-row"
           />
         </ListGroup>
       </Section>

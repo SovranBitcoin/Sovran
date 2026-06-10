@@ -144,11 +144,10 @@ const PersistedConnection = z.looseObject({
   requestCount: z.int().min(0),
   deniedCount: z.int().min(0),
   grants: z.record(GrantKeySchema, PersistedGrant),
-  // `.default({})` keeps pre-v2 blobs parseable (the v2 migrator is the belt,
-  // this is the braces — a rejected blob here would wipe every pairing).
+  // `.default({})`/`.default([])` keep a blob missing these fields parseable —
+  // a rejected blob falls back to in-memory defaults (createMergeWithSchema)
+  // and would wipe every pairing, so default-fill rather than reject.
   peerDecryptGrants: z.record(HexPubkeySchema, PersistedPeerDecryptGrant).default({}),
-  // Pre-v3 blobs: same default-fill discipline; the migrator also clamps a
-  // malformed chain so this field cannot become a new blob-wipe vector.
   previousClientPubkeys: z.array(HexPubkeySchema).max(MAX_PREVIOUS_CLIENT_PUBKEYS).default([]),
 });
 
@@ -280,6 +279,8 @@ interface Nip46ConnectionsActions {
   unblockApp: (clientPubkey: string) => void;
   /** Deletes the record entirely (Block keeps it with status 'blocked'). */
   disconnectApp: (clientPubkey: string) => void;
+  /** Deletes EVERY record — the hub's Reset Remote Login. */
+  clearAll: () => void;
   renameApp: (clientPubkey: string, name: string) => void;
   /** Re-pair metadata refresh — only call after user approval (blocks rename-phishing). */
   updateMetadataAfterApproval: (clientPubkey: string, meta: UpdateMetadataInput) => void;
@@ -612,6 +613,11 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
           });
         },
 
+        clearAll: () => {
+          storeLog.info('store.nip46_connections.clear_all');
+          set({ apps: {} });
+        },
+
         renameApp: (clientPubkey, name) => {
           patchApp(clientPubkey, (app) => {
             const sanitized = sanitizeName(name);
@@ -644,25 +650,6 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
       name: 'nip46-connections-store',
       storage: profileStorage,
       schema: PersistedConnectionsStore,
-      version: 3,
-      // v1 → v2: connections gained `peerDecryptGrants`; v2 → v3:
-      // `previousClientPubkeys`. The schema defaults already fill both at
-      // merge; this migrator is the belt so a future schema tightening can't
-      // strand old blobs. It also CLAMPS a malformed chain (non-hex entries
-      // dropped, most recent 8 kept) instead of letting the schema reject the
-      // whole blob — a rejected blob wipes every pairing.
-      migrate: (state) => {
-        const persisted = state as {
-          apps?: Record<string, { peerDecryptGrants?: unknown; previousClientPubkeys?: unknown }>;
-        };
-        for (const app of Object.values(persisted?.apps ?? {})) {
-          if (app.peerDecryptGrants === undefined) app.peerDecryptGrants = {};
-          app.previousClientPubkeys = Array.isArray(app.previousClientPubkeys)
-            ? app.previousClientPubkeys.filter(isNostrPubkeyHex).slice(-MAX_PREVIOUS_CLIENT_PUBKEYS)
-            : [];
-        }
-        return persisted as { apps: Record<string, Nip46Connection> };
-      },
       partialize: (state) => ({ apps: state.apps }),
     })
   )

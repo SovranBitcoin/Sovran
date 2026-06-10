@@ -340,7 +340,7 @@ describe('pipeline auto verdicts', () => {
         method: 'sign_event',
         kind: 1,
         verdict: 'auto_approved_grant',
-        summary: 'hello from a client app',
+        contentPreview: 'hello from a client app',
         eventId: signed.id,
       },
     ]);
@@ -981,7 +981,7 @@ describe('resolveRequest', () => {
         verdict: 'approved_once',
         method: 'sign_event',
         kind: 1,
-        summary: 'hello from a client app',
+        contentPreview: 'hello from a client app',
       },
     ]);
     expect(connectionFor(APP)?.grants['sign_event:1']).toBeUndefined(); // once ≠ always
@@ -1010,7 +1010,7 @@ describe('resolveRequest', () => {
     expect(activityEntries()).toHaveLength(1);
   });
 
-  it('truncates the ask→approve activity summary to SUMMARY_MAX_LENGTH (80)', async () => {
+  it('truncates the ask→approve content preview to SUMMARY_MAX_LENGTH (80)', async () => {
     const { engine, requestId } = await makeAsk(
       'sign_event',
       signEventParams({ content: 'x'.repeat(200) })
@@ -1018,7 +1018,7 @@ describe('resolveRequest', () => {
 
     expect((await engine.resolveRequest(requestId, { action: 'approve_once' })).isOk()).toBe(true);
 
-    expect(activityEntries()[0]!.summary).toHaveLength(80);
+    expect(activityEntries()[0]!.contentPreview).toHaveLength(80);
   });
 
   it('always persists an always grant and future requests auto-approve', async () => {
@@ -1204,7 +1204,7 @@ describe('resolveRequest', () => {
   });
 });
 
-describe('structured activity summaries (summaryV2)', () => {
+describe('structured activity summaries', () => {
   it('approve path logs a human-readable headline/line for a kind-7 like', async () => {
     const target = '2'.repeat(64);
     const { engine, requestId } = await makeAsk(
@@ -1216,7 +1216,7 @@ describe('structured activity summaries (summaryV2)', () => {
 
     expect(activityEntries()[0]).toMatchObject({
       verdict: 'approved_once',
-      summaryV2: { headline: 'Like a Post', line: 'Liked a post', refEventId: target },
+      summary: { headline: 'Like a Post', line: 'Liked a post', refEventId: target },
     });
   });
 
@@ -1230,7 +1230,7 @@ describe('structured activity summaries (summaryV2)', () => {
 
     expect(activityEntries()[0]).toMatchObject({
       verdict: 'denied_once',
-      summaryV2: { headline: 'Load App Settings' },
+      summary: { headline: 'Load App Settings' },
     });
   });
 
@@ -1240,7 +1240,7 @@ describe('structured activity summaries (summaryV2)', () => {
     await engine.resolveRequest(requestId, { action: 'approve_once' });
 
     const entry = activityEntries()[0] as unknown as Record<string, unknown>;
-    expect(entry).toMatchObject({ summaryV2: { refPubkey: PEER } });
+    expect(entry).toMatchObject({ summary: { refPubkey: PEER } });
     expect(JSON.stringify(entry)).not.toContain('ct-secret-material');
   });
 });

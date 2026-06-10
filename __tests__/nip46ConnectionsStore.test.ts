@@ -79,7 +79,7 @@ function persistedConnection(clientPubkey: string): Nip46Connection {
   };
 }
 
-function writeBlob(apps: Record<string, Nip46Connection>, version = 3): void {
+function writeBlob(apps: Record<string, Nip46Connection>, version = 1): void {
   storageMap.set(STORAGE_KEY, JSON.stringify({ state: { apps }, version }));
 }
 
@@ -477,15 +477,15 @@ describe('per-peer decrypt grants', () => {
   });
 });
 
-describe('v1 → v2 migration', () => {
-  it('hydrates a real v1 blob (no peerDecryptGrants) without wiping pairings', async () => {
+describe('partial persisted blobs (schema default-fill)', () => {
+  it('hydrates a blob missing peerDecryptGrants without wiping pairings', async () => {
     const client = pk(30);
-    const v1Connection = persistedConnection(client) as unknown as Record<string, unknown>;
-    delete v1Connection.peerDecryptGrants;
-    v1Connection.grants = {
+    const partial = persistedConnection(client) as unknown as Record<string, unknown>;
+    delete partial.peerDecryptGrants;
+    partial.grants = {
       'sign_event:1': { verdict: 'always', origin: 'pairing', createdAt: 1, useCount: 3 },
     };
-    writeBlob({ [client]: v1Connection as unknown as Nip46Connection }, 1);
+    writeBlob({ [client]: partial as unknown as Nip46Connection });
 
     await useNip46ConnectionsStore.persist.rehydrate();
 
@@ -495,14 +495,14 @@ describe('v1 → v2 migration', () => {
     expect(app.grants['sign_event:1']?.verdict).toBe('always');
   });
 
-  it('still rejects a v1 blob with a tampered critical-always grant', async () => {
+  it('still rejects a partial blob with a tampered critical-always grant', async () => {
     const client = pk(31);
     const tampered = persistedConnection(client) as unknown as Record<string, unknown>;
     delete tampered.peerDecryptGrants;
     tampered.grants = {
       nip44_decrypt: { verdict: 'always', origin: 'prompt', createdAt: 1, useCount: 0 },
     };
-    writeBlob({ [client]: tampered as unknown as Nip46Connection }, 1);
+    writeBlob({ [client]: tampered as unknown as Nip46Connection });
 
     await useNip46ConnectionsStore.persist.rehydrate();
 
@@ -683,15 +683,15 @@ describe('adoptConnection', () => {
   });
 });
 
-describe('v2 → v3 migration', () => {
-  it('hydrates a real v2 blob (no previousClientPubkeys) without wiping pairings', async () => {
+describe('previousClientPubkeys blob hygiene', () => {
+  it('hydrates a blob missing previousClientPubkeys without wiping pairings', async () => {
     const client = pk(60);
-    const v2Connection = persistedConnection(client) as unknown as Record<string, unknown>;
-    delete v2Connection.previousClientPubkeys;
-    v2Connection.grants = {
+    const partial = persistedConnection(client) as unknown as Record<string, unknown>;
+    delete partial.previousClientPubkeys;
+    partial.grants = {
       'sign_event:1': { verdict: 'always', origin: 'pairing', createdAt: 1, useCount: 3 },
     };
-    writeBlob({ [client]: v2Connection as unknown as Nip46Connection }, 2);
+    writeBlob({ [client]: partial as unknown as Nip46Connection });
 
     await useNip46ConnectionsStore.persist.rehydrate();
 
@@ -701,22 +701,14 @@ describe('v2 → v3 migration', () => {
     expect(app.grants['sign_event:1']?.verdict).toBe('always');
   });
 
-  it('clamps a malformed chain instead of wiping the blob', async () => {
+  it('rejects a malformed chain at merge — the uniform tampered-blob policy', async () => {
     const client = pk(61);
     const tampered = persistedConnection(client) as unknown as Record<string, unknown>;
-    tampered.previousClientPubkeys = [
-      'not-hex',
-      ...Array.from({ length: 10 }, (_, i) =>
-        `${(70 + i).toString(16)}`.padStart(2, '0').repeat(32)
-      ),
-    ];
-    writeBlob({ [client]: tampered as unknown as Nip46Connection }, 2);
+    tampered.previousClientPubkeys = ['not-hex'];
+    writeBlob({ [client]: tampered as unknown as Nip46Connection });
 
     await useNip46ConnectionsStore.persist.rehydrate();
 
-    const app = useNip46ConnectionsStore.getState().apps[client];
-    expect(app).toBeDefined();
-    expect(app.previousClientPubkeys).toHaveLength(8);
-    expect(app.previousClientPubkeys).not.toContain('not-hex');
+    expect(useNip46ConnectionsStore.getState().apps).toEqual({});
   });
 });

@@ -43,7 +43,7 @@ import { err, errAsync, ok, Result, ResultAsync } from 'neverthrow';
 
 import {
   useNip46ActivityStore,
-  type Nip46ActivitySummaryV2,
+  type Nip46ActivitySummary,
 } from '@/features/nostrSigner/data/nip46ActivityStore';
 import {
   useNip46ConnectionsStore,
@@ -301,8 +301,8 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     method: Nip46Method;
     kind?: number;
     verdict: ActivityVerdict;
-    summary?: string;
-    summaryV2?: Nip46ActivitySummaryV2;
+    summary?: Nip46ActivitySummary;
+    contentPreview?: string;
     eventId?: string;
   }): void {
     if (input.method === 'ping') return;
@@ -380,8 +380,8 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       | 'auto_approved_session'
       | 'auto_approved_peer_grant'
       | 'auto_approved_method';
-    summary?: string;
-    summaryV2?: Nip46ActivitySummaryV2;
+    summary?: Nip46ActivitySummary;
+    contentPreview?: string;
     consumedGrantKey?: GrantKey;
     consumedPeerGrantPubkey?: string;
   }): Promise<void> {
@@ -410,7 +410,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       return;
     }
     void respond(clientPubkey, { id: request.id, result: outcome.value }, encryption);
-    const isNormalSign = args.summary !== undefined;
+    const isNormalSign = args.contentPreview !== undefined;
     const eventId =
       request.method === 'sign_event' && isNormalSign
         ? extractSignedEventId(outcome.value)
@@ -421,7 +421,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       ...(kind !== undefined && { kind }),
       verdict: args.approveVerdict,
       ...(args.summary !== undefined && { summary: args.summary }),
-      ...(args.summaryV2 !== undefined && { summaryV2: args.summaryV2 }),
+      ...(args.contentPreview !== undefined && { contentPreview: args.contentPreview }),
       ...(eventId !== undefined && { eventId }),
     });
     connections().touchUsage(clientPubkey, {
@@ -717,8 +717,8 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
     }
 
     if (decision.verdict === 'allow') {
-      const summary = summaryFor(decision, unsigned);
-      const summaryV2 = summaryV2For(request.method, kind, preview);
+      const contentPreview = contentPreviewFor(decision, unsigned);
+      const summary = summaryFor(request.method, kind, preview);
       await executeAndRespond({
         engine,
         clientPubkey: sender,
@@ -727,7 +727,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
         encryption: used,
         approveVerdict: decision.logVerdict,
         ...(summary !== undefined && { summary }),
-        ...(summaryV2 !== undefined && { summaryV2 }),
+        ...(contentPreview !== undefined && { contentPreview }),
         ...(decision.reason === 'grant_always' &&
           decision.grantKey !== undefined && { consumedGrantKey: decision.grantKey }),
         ...(decision.reason === 'peer_grant_always' &&
@@ -759,8 +759,8 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       connections().touchUsage(sender, { denied: true });
       return;
     }
-    const askSummary = summaryFor(decision, unsigned);
-    const askSummaryV2 = summaryV2For(request.method, kind, preview);
+    const askContentPreview = contentPreviewFor(decision, unsigned);
+    const askSummary = summaryFor(request.method, kind, preview);
     pendingContexts.set(request.id, {
       request,
       clientPubkey: sender,
@@ -769,13 +769,13 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
       isSelfDecrypt: decision.isSelfDecrypt === true,
       encryption: used,
       ...(askSummary !== undefined && { summary: askSummary }),
-      ...(askSummaryV2 !== undefined && { summaryV2: askSummaryV2 }),
+      ...(askContentPreview !== undefined && { contentPreview: askContentPreview }),
     });
     ensureSweep();
     notifyVerdictNeeded(pending);
   }
 
-  function summaryFor(
+  function contentPreviewFor(
     decision: PolicyDecision,
     unsigned: UnsignedEvent | null
   ): string | undefined {
@@ -788,11 +788,11 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
    * time (the params are gone by render time). No follow baseline here — the
    * kind-3 count-only fallback is the right activity copy regardless.
    */
-  function summaryV2For(
+  function summaryFor(
     method: Nip46Method,
     kind: number | undefined,
     preview: Nip46ParamsPreview
-  ): Nip46ActivitySummaryV2 | undefined {
+  ): Nip46ActivitySummary | undefined {
     const summary = summarizeRequest({ method, ...(kind !== undefined && { kind }), preview });
     const refEventId = summary.referenced.noteIds[0];
     const refPubkey = preview.type === 'decrypt' ? preview.peerPubkey : undefined;
@@ -1045,7 +1045,7 @@ export function createNip46Engine(overrides: Partial<Nip46EngineDeps> = {}): Nip
         encryption,
         approveVerdict: 'approved_once',
         ...(context.summary !== undefined && { summary: context.summary }),
-        ...(context.summaryV2 !== undefined && { summaryV2: context.summaryV2 }),
+        ...(context.contentPreview !== undefined && { contentPreview: context.contentPreview }),
       });
     },
   };
