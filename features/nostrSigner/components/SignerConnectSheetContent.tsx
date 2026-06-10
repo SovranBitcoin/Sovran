@@ -19,8 +19,10 @@
  * the service-hot flag, and the checkbox cache are released only when the
  * SHEET itself is gone — both pages share `releaseIfSheetClosed`.
  *
- * The "Switch & Connect" path stops at `onSwitchAndConnect` — the exported
- * Layer-4 seam (pairing intent persistence + profile-switch restart).
+ * The "Switch & Connect" path delegates to `switchProfileAndPair` (lib) —
+ * pairing intent persisted (awaited) → sheet closed → restart-based profile
+ * switch. On an abort (intent not saved / switch refused) the seam shows the
+ * retry toast; the sheet only closes once the intent write is durable.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -49,6 +51,7 @@ import {
   type ParsedNostrConnectUri,
 } from '@/features/nostrSigner/lib/nip46Uri';
 import { grantKeyFor } from '@/features/nostrSigner/lib/permissionPolicy';
+import { switchProfileAndPair } from '@/features/nostrSigner/lib/switchProfileAndPair';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -116,35 +119,6 @@ function restartWarningSegments(appName: string): CopySegment[] {
     { text: appName, bold: true },
     { text: ' will continue automatically after the restart.' },
   ];
-}
-
-// ── Layer-4 seam: profile switch + pairing intent ───────────────
-
-export interface SwitchAndConnectTarget {
-  accountIndex: number;
-  pubkey: string;
-}
-
-/**
- * Seam the profile picker fires when the user confirms "Switch & Connect" for
- * a non-active profile. Fire-and-forget from the UI's perspective — the real
- * implementation restarts the app, so nothing here can be awaited usefully.
- *
- * TODO(Layer 4 — nostrconnect + profile switch): replace this stub body with
- * `setPairingIntent({ uri, targetPubkey: target.pubkey, targetAccountIndex:
- * target.accountIndex })` (lib/pairingIntentStorage) followed by
- * `switchToExistingProfile` (shared/lib/profile/profileSessionOrchestrator →
- * restartApp()); `useResumePendingPairing` already handles the post-restart
- * resume. Until wired, the tap logs (no URI — it embeds the secret) and drops.
- */
-export function onSwitchAndConnect(
-  parsed: ParsedNostrConnectUri,
-  target: SwitchAndConnectTarget
-): void {
-  void parsed;
-  nostrLog.warn('nostr.signer.switch_and_connect_unwired', {
-    targetAccountIndex: target.accountIndex,
-  });
 }
 
 // ── Shared helpers ──────────────────────────────────────────────
@@ -640,8 +614,14 @@ export function SignerProfilePickerContent({
     useCallback(async () => {
       const target = profiles.find((profile) => profile.accountIndex === selectedIndex);
       if (target === undefined || target.accountIndex === activeIndex) return;
-      onSwitchAndConnect(parsed, { accountIndex: target.accountIndex, pubkey: target.pubkey });
-      close();
+      // The seam orders the teardown: intent persisted (awaited) → sheet
+      // closed → restart-based switch. On an abort it shows the retry toast
+      // and the sheet stays open for another attempt.
+      await switchProfileAndPair(
+        parsed,
+        { accountIndex: target.accountIndex, pubkey: target.pubkey },
+        close
+      );
     }, [activeIndex, close, parsed, profiles, selectedIndex])
   );
 

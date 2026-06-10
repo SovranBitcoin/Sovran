@@ -8,8 +8,8 @@
  *   Connected Apps — one row per paired app → app-detail permission editor;
  *                    empty state invites the first QR scan.
  *   Connect        — Scan QR (camera with the signer-pair action), Paste
- *                    Connection Link (actionMenuPopup input → parseNip46Uri →
- *                    engine pairing + connect sheet), Share My Signer.
+ *                    Connection Link (actionMenuPopup input → shared
+ *                    openPairingFromUri dispatch), Share My Signer.
  *   History        — Activity log link.
  *
  * The plan's passive "Connections for other profiles are paused…" banner is
@@ -32,13 +32,16 @@ import {
   type Nip46Connection,
 } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
-import { nip46Engine } from '@/features/nostrSigner/lib/nip46Engine';
-import { parseNip46Uri } from '@/features/nostrSigner/lib/nip46Uri';
+import {
+  openPairingFromUri,
+  PAIRING_ERROR_BUNKER,
+  PAIRING_ERROR_INVALID_LINK,
+} from '@/features/nostrSigner/lib/openPairingFromUri';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelative } from '@/shared/lib/date';
-import { nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
-import { actionMenuPopup, showActionSheet } from '@/shared/lib/popup';
+import { useLifecycleLogger } from '@/shared/lib/logger';
+import { actionMenuPopup } from '@/shared/lib/popup';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import { Screen } from '@/shared/ui/composed/Screen';
@@ -58,14 +61,6 @@ const PASTE_LINK_LABEL = 'Paste Connection Link';
 const SHARE_SIGNER_LABEL = 'Share My Signer';
 
 const PASTE_PROMPT_BODY = 'Paste the connection link from the app you want to sign in to.';
-const PASTE_ERROR_INVALID = "That doesn't look like a Nostr connection link.";
-/**
- * bunker:// is what WE mint for clients — pasting one here is the wrong
- * direction, so v1 treats it as unsupported with an explanatory error
- * (the plan has no copy for this case; new string, documented).
- */
-const PASTE_ERROR_BUNKER =
-  "That's a bunker link — it belongs in the app you're signing in to. Paste that app's nostrconnect link here instead.";
 const PASTE_CONNECT_LABEL = 'Connect';
 
 const ACTIVITY_ROW_TITLE = 'Activity';
@@ -115,7 +110,7 @@ export function SignerHubScreen(): React.ReactElement {
   }, []);
 
   const openScan = useCallback(() => {
-    // Route action lands with Layer 4's camera intercept; linked now per plan.
+    // signer-pair mode: the standalone camera only accepts NIP-46 URIs.
     router.navigate({ pathname: '/camera', params: { action: 'signer-pair' } });
   }, []);
 
@@ -146,29 +141,17 @@ export function SignerHubScreen(): React.ReactElement {
         isDisabled: (values) => !values.uri || values.uri.trim().length === 0,
         onPress: (values, { setError, close }) => {
           const raw = (values.uri ?? '').trim();
-          // The URI embeds the pairing secret — never log it.
-          const parsed = parseNip46Uri(raw);
-          if (parsed.isErr()) {
-            setError(PASTE_ERROR_INVALID);
-            return;
+          // The URI embeds the pairing secret — never log it. Shared Layer-4
+          // dispatch: validate → hot flag → engine pairing → close the menu
+          // (beforeOpen) → connect sheet.
+          const opened = openPairingFromUri(raw, { beforeOpen: close });
+          if (opened.isErr()) {
+            setError(
+              opened.error.type === 'bunker-unsupported'
+                ? PAIRING_ERROR_BUNKER
+                : PAIRING_ERROR_INVALID_LINK
+            );
           }
-          if (parsed.value.type === 'bunker') {
-            setError(PASTE_ERROR_BUNKER);
-            return;
-          }
-          // Engine may be cold (zero connections): request hot FIRST so the
-          // service hook starts it; the pairing registers either way and a
-          // cold start picks the pairing relays up via relayUnion. The
-          // connect sheet (Layer 4) owns clearing the hot flag.
-          useNip46RequestsStore.getState().setServiceHotRequested(true);
-          const started = nip46Engine.startNostrconnectPairing(parsed.value);
-          if (started.isErr() && started.error.type !== 'not-started') {
-            nostrLog.warn('nostr.signer.hub_pairing_start_failed', {
-              error: started.error.type,
-            });
-          }
-          close();
-          showActionSheet('signer-connect', { uri: raw });
         },
       },
     });

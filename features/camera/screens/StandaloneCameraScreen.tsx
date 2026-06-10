@@ -18,7 +18,12 @@ import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = cameraRouteParamsSchema.extend({
-  action: z.enum(['nfc-pay']).optional(),
+  /**
+   * `nfc-pay` auto-starts an NFC payment scan; `signer-pair` (the signer
+   * hub's "Scan QR Code" / `/camera?action=signer-pair` link) restricts the
+   * scanner to NIP-46 pairing URIs — no payment fallback.
+   */
+  action: z.enum(['nfc-pay', 'signer-pair']).optional(),
 });
 
 export function StandaloneCameraScreen() {
@@ -27,6 +32,7 @@ export function StandaloneCameraScreen() {
   useLifecycleLogger('StandaloneCameraShell');
   const params = useRouteParams(ParamsSchema, { where: 'camera.standalone' });
   const action = params?.action;
+  const isSignerPair = action === 'signer-pair';
   const foreground = useThemeColor('foreground');
   const { machine } = useColadaContext();
 
@@ -51,7 +57,7 @@ export function StandaloneCameraScreen() {
       <>
         <Stack.Screen
           options={{
-            title: 'Scan QR',
+            title: isSignerPair ? 'Connect App' : 'Scan QR',
             headerTransparent: true,
             headerStyle: { backgroundColor: 'transparent' },
             headerTintColor: foreground,
@@ -71,7 +77,7 @@ export function StandaloneCameraScreen() {
             ),
           }}
         />
-        <CameraScreen />
+        <CameraScreen signerPairOnly={isSignerPair} />
       </>
     </Log>
   );

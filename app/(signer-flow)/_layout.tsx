@@ -23,6 +23,7 @@ const ACTIVITY_DETAIL_OPTIONS = { title: 'Request Details' };
 // Dynamic app-name title is set by app/(signer-flow)/app.tsx via <Stack.Screen>.
 const APP_OPTIONS = { title: '' };
 const SHARE_OPTIONS = { title: 'Share My Signer' };
+const CONNECT_OPTIONS = { title: 'Connect App' };
 
 export default function SignerFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
@@ -39,6 +40,7 @@ export default function SignerFlowLayout() {
       <Stack.Screen name="activity-detail" options={ACTIVITY_DETAIL_OPTIONS} />
       <Stack.Screen name="app" options={APP_OPTIONS} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />
+      <Stack.Screen name="connect" options={CONNECT_OPTIONS} />
     </Stack>
   );
 }

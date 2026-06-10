@@ -92,11 +92,9 @@ export type {
 } from '@/features/nostrSigner/components/permissionCatalog';
 export { SignerApprovalSheetContent } from '@/features/nostrSigner/components/SignerApprovalSheetContent';
 export {
-  onSwitchAndConnect,
   SignerConnectSheetContent,
   SignerProfilePickerContent,
 } from '@/features/nostrSigner/components/SignerConnectSheetContent';
-export type { SwitchAndConnectTarget } from '@/features/nostrSigner/components/SignerConnectSheetContent';
 export { useSignerApprovalController } from '@/features/nostrSigner/hooks/useSignerApprovalController';
 export {
   encodeNostrconnectUri,
@@ -108,6 +106,16 @@ export { SignerActivityScreen } from '@/features/nostrSigner/screens/SignerActiv
 export { SignerAppDetailScreen } from '@/features/nostrSigner/screens/SignerAppDetailScreen';
 export { SignerHubScreen } from '@/features/nostrSigner/screens/SignerHubScreen';
 export { SignerRequestsScreen } from '@/features/nostrSigner/screens/SignerRequestsScreen';
+
+// ── Pairing entry dispatch (camera scan / paste / deep link) ────
+export {
+  openPairingFromUri,
+  PAIRING_ERROR_BUNKER,
+  PAIRING_ERROR_INVALID_LINK,
+  PAIRING_ERROR_INVALID_QR,
+  PAIRING_ERROR_TITLE,
+} from '@/features/nostrSigner/lib/openPairingFromUri';
+export type { OpenPairingFromUriError } from '@/features/nostrSigner/lib/openPairingFromUri';
 
 // ── Pairing URIs (scan/paste/share) ─────────────────────────────
 export {
@@ -148,6 +156,14 @@ export type {
   PairingIntentError,
   PairingIntentInput,
 } from '@/features/nostrSigner/lib/pairingIntentStorage';
+export {
+  PAIRING_SAVE_FAILED_TOAST,
+  switchProfileAndPair,
+} from '@/features/nostrSigner/lib/switchProfileAndPair';
+export type {
+  SwitchAndConnectTarget,
+  SwitchProfileAndPairError,
+} from '@/features/nostrSigner/lib/switchProfileAndPair';
 
 // ── Policy (sensitivity tiers for sheet copy/badges) ────────────
 export { classifyRequest, grantKeyFor } from '@/features/nostrSigner/lib/permissionPolicy';
