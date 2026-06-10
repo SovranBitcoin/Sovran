@@ -8,9 +8,11 @@
 
 import {
   ACTIVITY_VERDICT_DISPLAY,
+  APPROVAL_BUTTON_LABELS,
+  BLOCK_APP_LABEL,
+  blockAppConfirmTitle,
   allHandledToastCopy,
   alwaysAllowEligible,
-  alwaysScopeFootnote,
   appDisplayName,
   autoSignedToastCopy,
   boundDisplay,
@@ -57,7 +59,9 @@ describe('catalog completeness', () => {
     expect(entry.alwaysVerbPhrase.length).toBeGreaterThan(0);
     expect(entry.icon).toMatch(/^[a-z0-9-]+:[a-z0-9:-]+$/);
     expect(entry.permissionEditorLabel.length).toBeGreaterThan(0);
-    expect(['basic', 'content', 'account', 'wallet']).toContain(entry.permissionEditorGroup);
+    expect(['public', 'account', 'signin', 'private', 'wallet']).toContain(
+      entry.permissionEditorGroup
+    );
   });
 
   it.each(REPRESENTATIVE_KINDS)('sign_event kind %i yields a complete entry', (kind) => {
@@ -94,10 +98,30 @@ describe('copy table (plan, verbatim)', () => {
     );
   });
 
-  it.each([6, 16])('sign kind %i (repost)', (kind) => {
-    const entry = permissionEntryFor({ method: 'sign_event', kind });
+  it('sign kind 6 (repost of a text note)', () => {
+    const entry = permissionEntryFor({ method: 'sign_event', kind: 6 });
     expect(entry.headline).toBe('Repost a Note');
-    expect(bodyText({ method: 'sign_event', kind })).toBe('Primal wants to repost a note as you.');
+    expect(bodyText({ method: 'sign_event', kind: 6 })).toBe(
+      'Primal wants to repost a note as you.'
+    );
+  });
+
+  it('sign kind 16 (generic repost — non-note content, NIP-18)', () => {
+    const entry = permissionEntryFor({ method: 'sign_event', kind: 16 });
+    expect(entry.headline).toBe('Repost Content');
+    expect(entry.permissionEditorLabel).toBe('Repost other content');
+    expect(bodyText({ method: 'sign_event', kind: 16 })).toBe(
+      'Primal wants to repost content (articles, media) as you.'
+    );
+  });
+
+  it('sign kind 1111 (comment under non-note content, NIP-22)', () => {
+    const entry = permissionEntryFor({ method: 'sign_event', kind: 1111 });
+    expect(entry.headline).toBe('Publish a Comment');
+    expect(entry.permissionEditorLabel).toBe('Comment on other content');
+    expect(bodyText({ method: 'sign_event', kind: 1111 })).toBe(
+      'Primal wants to comment on content as you.'
+    );
   });
 
   it('sign kind 7 (react)', () => {
@@ -171,10 +195,11 @@ describe('copy table (plan, verbatim)', () => {
 
   it('sign unknown kind', () => {
     const entry = permissionEntryFor({ method: 'sign_event', kind: 31337 });
-    expect(entry.headline).toBe('Sign Event (kind 31337)');
+    expect(entry.headline).toBe('Unrecognized Action');
     expect(bodyText({ method: 'sign_event', kind: 31337 })).toBe(
-      "Primal wants to sign an event type Sovran doesn't recognize. Review the raw event before allowing."
+      "Primal wants to do something Sovran doesn't recognize. Review the details before allowing."
     );
+    expect(entry.permissionEditorLabel).toBe('Unrecognized action');
   });
 
   it.each(['nip04_encrypt', 'nip44_encrypt'] as const)('%s interpolates the peer', (method) => {
@@ -188,9 +213,7 @@ describe('copy table (plan, verbatim)', () => {
   it.each(['nip04_decrypt', 'nip44_decrypt'] as const)('%s', (method) => {
     const entry = permissionEntryFor({ method });
     expect(entry.headline).toBe('Decrypt Your Data');
-    expect(bodyText({ method })).toBe(
-      'Primal wants to read encrypted data sent to you. Allowing reveals private content to this app.'
-    );
+    expect(bodyText({ method })).toBe('Primal wants to read messages sent to you.');
   });
 
   it('bolds exactly the app name segment', () => {
@@ -311,12 +334,6 @@ describe('banners and footnote (plan, verbatim)', () => {
       "Unrecognized event type. If you didn't expect this, deny it."
     );
   });
-
-  it('always-scope footnote', () => {
-    expect(joined(alwaysScopeFootnote(APP, 'sign posts'))).toBe(
-      'Always Allow lets Primal sign posts without asking. Change anytime in Connected Apps.'
-    );
-  });
 });
 
 describe('labels, toasts, and bounds', () => {
@@ -382,7 +399,58 @@ describe('labels, toasts, and bounds', () => {
   it('grant-key lookup matches the request lookup', () => {
     expect(permissionEntryForGrantKey('sign_event:1').headline).toBe('Publish a Post');
     expect(permissionEntryForGrantKey('sign_event:17375').tier).toBe('wallet');
-    expect(permissionEntryForGrantKey('nip44_decrypt').permissionEditorGroup).toBe('wallet');
-    expect(permissionEntryForGrantKey('sign_event:31337').headline).toBe('Sign Event (kind 31337)');
+    expect(permissionEntryForGrantKey('nip44_decrypt').permissionEditorGroup).toBe('private');
+    expect(permissionEntryForGrantKey('sign_event:31337').headline).toBe('Unrecognized Action');
+  });
+});
+
+describe('risk-based editor groups', () => {
+  it.each([
+    [1, 'public'],
+    [6, 'public'],
+    [7, 'public'],
+    [30023, 'public'],
+    [9734, 'public'],
+    [23456, 'public'], // unknown kinds read as publishable events
+    [0, 'account'],
+    [3, 'account'],
+    [5, 'account'],
+    [10002, 'account'],
+    [30078, 'account'],
+    [22242, 'signin'],
+    [27235, 'signin'],
+    [4, 'private'],
+    [14, 'private'],
+    [1059, 'private'],
+    [17375, 'wallet'],
+  ] as const)('sign_event kind %i groups under %s', (kind, group) => {
+    expect(permissionEntryFor({ method: 'sign_event', kind }).permissionEditorGroup).toBe(group);
+  });
+
+  it.each([
+    ['nip44_encrypt', 'private'],
+    ['nip04_encrypt', 'private'],
+    ['nip44_decrypt', 'private'],
+    ['nip04_decrypt', 'private'],
+    ['get_public_key', 'signin'],
+  ] as const)('method %s groups under %s', (method, group) => {
+    expect(permissionEntryFor({ method }).permissionEditorGroup).toBe(group);
+  });
+});
+
+describe('session copy', () => {
+  it('button labels + block copy', () => {
+    expect(APPROVAL_BUTTON_LABELS.allowSession).toBe('Allow This Session');
+    expect(APPROVAL_BUTTON_LABELS.approveOnce).toBe('Approve');
+    expect(BLOCK_APP_LABEL).toBe('Block this app');
+    expect(blockAppConfirmTitle('Primal')).toBe(
+      "Block Primal? It won't be able to send requests until you unblock it in Connected Apps."
+    );
+  });
+
+  it('auto_approved_session accent reads "for this session"', () => {
+    expect(ACTIVITY_VERDICT_DISPLAY.auto_approved_session.accentLine).toBe(
+      'Auto-approved — for this session'
+    );
   });
 });

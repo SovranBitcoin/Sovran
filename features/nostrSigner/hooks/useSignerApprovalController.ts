@@ -32,6 +32,7 @@ import { useNip46ActivityStore } from '@/features/nostrSigner/data/nip46Activity
 import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
 import { consumeSignerDeferToastSuppression } from '@/features/nostrSigner/hooks/signerApprovalCoordination';
+import { consolidatePending } from '@/features/nostrSigner/lib/requestGrouping';
 import { popup, showActionSheet } from '@/shared/lib/popup';
 import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/popupStore';
 
@@ -99,7 +100,9 @@ export function useSignerApprovalController(): void {
     if (outcome === 'none') return;
     for (const request of live) deferredIdsRef.current.add(request.id);
     if (outcome === 'defer-toast') {
-      const copy = requestsWaitingToastCopy(live.length);
+      // Count DECISIONS (consolidated groups) — matches what the approval
+      // sheet and requests screen will actually show.
+      const copy = requestsWaitingToastCopy(consolidatePending(live).length);
       popup({ message: copy.label, text: copy.description });
     }
   }, [signerSheetOpen]);

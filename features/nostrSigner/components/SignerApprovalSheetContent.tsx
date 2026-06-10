@@ -6,11 +6,19 @@
  * go straight to `nip46Engine.resolveRequest`; the engine removes the request
  * from the store, which is what advances the head here — no local queue copy.
  *
- * Tier → affordances (permissionCatalog is the single source):
- *   standard/protected/unknown → Allow Once / (Always Allow) / Deny
- *   wallet                     → SlideToConfirm + Deny, NEVER Always Allow
- * Decrypt requests never preview content — only "Encrypted payload · N
- * chars" — and peer≠self decrypts add the opt-in 1h session-grant checkbox.
+ * Affordances (permissionCatalog is the single copy source):
+ *   standard/protected/unknown → Allow This Session / (Always Allow) / Deny
+ *   wallet                     → Allow This Session / Deny (Always never —
+ *                                session allows are runtime-only by design)
+ *   peer≠self decrypt          → same buttons, PEER-scoped (session grant /
+ *                                persistent per-person grant)
+ *   self-decrypt               → Approve (once) / Deny — NIP-60 wallet
+ *                                payloads keep maximum friction
+ * plus a "Block this app" link (confirmed) under every prompt. "Session" =
+ * until the engine stops (profile switch / app restart). Decrypt requests
+ * never preview content — only the conversation peer and an "Encrypted
+ * payload · N chars" line. Note: on strict-mode apps a session/always grant
+ * is minted but evaluate() ignores it (strict wins) — same as before.
  *
  * Display strings derived from request params are untrusted: previews are
  * length-bounded before render and never logged.
@@ -35,37 +43,57 @@ import {
   useNip46RequestsStore,
   type Nip46PendingRequest,
 } from '@/features/nostrSigner/data/nip46RequestsStore';
+import { connectionForClient } from '@/features/nostrSigner/lib/connectionMatch';
+import {
+  consolidatePending,
+  groupDeparted,
+  verdictIdsForGroup,
+  type Nip46RequestGroup,
+} from '@/features/nostrSigner/lib/requestGrouping';
 import { nip46Engine, type Nip46DecisionAction } from '@/features/nostrSigner/lib/nip46Engine';
 import type { UnsignedEvent } from '@/features/nostrSigner/lib/nip46Types';
 import {
   allHandledToastCopy,
   alwaysAllowEligible,
-  alwaysScopeFootnote,
   APPROVAL_BUTTON_LABELS,
   appDisplayName,
   boundDisplay,
-  encryptedPayloadLabel,
+  blockAppConfirmTitle,
+  BLOCK_APP_LABEL,
   expiredNoticeCopy,
   HIDE_FULL_EVENT_LABEL,
   permissionEntryFor,
   queueStripLabel,
-  SESSION_GRANT_CHECKBOX_LABEL,
   SHOW_FULL_EVENT_LABEL,
-  SLIDE_TO_APPROVE_LABEL,
+  peerDecryptBanner,
   tierBannerFor,
   VIEW_ALL_LABEL,
 } from '@/features/nostrSigner/components/permissionCatalog';
+import {
+  AppDataCard,
+  DecryptPeerCard,
+  FollowDiffCard,
+  OwnTextBlock,
+  RawEventDetails,
+  ReferencedNoteCard,
+  ZapRequestCard,
+} from '@/features/nostrSigner/components/SummaryPreviewCards';
+import {
+  summarizeRequest,
+  type RequestSummary,
+  type SummaryRisk,
+} from '@/features/nostrSigner/lib/requestSummary';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
+import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { suppressSignerDeferToastOnce } from '@/features/nostrSigner/hooks/signerApprovalCoordination';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nostrLog } from '@/shared/lib/logger';
-import { popup, type ActionSheetPayloads } from '@/shared/lib/popup';
+import { actionMenuPopup, popup, type ActionSheetPayloads } from '@/shared/lib/popup';
 import type { CustomSheetSharedProps } from '@/shared/lib/popup/sheets/types';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { SlideToConfirm } from '@/shared/ui/composed/SlideToConfirm';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { SelectableCheck } from '@/shared/ui/primitives/SelectableCheck';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -80,6 +108,29 @@ const MONOSPACE_FONT = Platform.select({ ios: 'Courier New', default: 'monospace
 
 /** Stable fallback so memo deps don't churn while the sheet is closing. */
 const NONE_PREVIEW = { type: 'none' } as const;
+
+/** Summary detail variants that render a dedicated preview card. */
+const SUMMARY_CARD_DETAIL_TYPES: ReadonlySet<string> = new Set([
+  'react',
+  'repost',
+  'reply',
+  'quote',
+  'follow_diff',
+  'app_data',
+  'zap_request',
+]);
+
+/** Risk-flag banner copy (rendered in addition to the tier banner). */
+const RISK_BANNERS: Partial<Record<SummaryRisk, { tone: 'danger' | 'warning'; text: string }>> = {
+  never_sign_anomaly: {
+    tone: 'danger',
+    text: 'This event type should never be signed by your key. Deny unless you know exactly why.',
+  },
+  wallet_credential: {
+    tone: 'danger',
+    text: 'This data can include wallet connection secrets. Only approve if you set up a wallet in this app.',
+  },
+};
 
 interface SignerApprovalContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['signer-approval'];
@@ -170,44 +221,57 @@ export function SignerApprovalSheetContent({
     'danger-soft-foreground',
   ] as const);
 
-  const head: Nip46PendingRequest | null = pending.length > 0 ? pending[0] : null;
+  // Consolidated view: one DECISION per group of identical spam requests.
+  const groups = useMemo(() => consolidatePending(pending), [pending]);
+  const headGroup: Nip46RequestGroup | null = groups.length > 0 ? groups[0] : null;
+  const head: Nip46PendingRequest | null = headGroup?.requests[0] ?? null;
+  const headGroupKey = headGroup?.key ?? null;
   const connection = useNip46ConnectionsStore((s) =>
-    head ? s.apps[head.clientPubkey] : undefined
+    head ? connectionForClient(s.apps, head.clientPubkey) : undefined
   );
 
   const [expiredNotice, setExpiredNotice] = useState<string | null>(null);
-  const [sessionGrantChecked, setSessionGrantChecked] = useState(false);
   const [advanceCount, setAdvanceCount] = useState(0);
 
   const resolvedIdsRef = useRef<Set<string>>(new Set());
   const tallyRef = useRef({ allowed: 0, denied: 0 });
   const hasAdvancedRef = useRef(false);
   const closingRef = useRef(false);
-  const prevHeadRef = useRef<Nip46PendingRequest | null>(head);
+  const prevGroupRef = useRef<{ key: string; ids: string[]; clientPubkey: string } | null>(
+    headGroup === null
+      ? null
+      : {
+          key: headGroup.key,
+          ids: headGroup.requests.map((request) => request.id),
+          clientPubkey: headGroup.requests[0].clientPubkey,
+        }
+  );
 
-  // Session-grant opt-in is per-request; never carry a tick across requests.
-  const headId = head?.id ?? null;
+  // Group departures: a group we resolved just advances; a group that
+  // vanished with NONE of its ids resolved expired under us (engine sweep) —
+  // show the 1.5s notice. A head request expiring while identical siblings
+  // remain keeps the same group key: no advance, no flash.
   useEffect(() => {
-    setSessionGrantChecked(false);
-  }, [headId]);
-
-  // Head departures: a head we resolved just advances; a head that vanished
-  // without our verdict expired under us (engine sweep) — show the 1.5s
-  // notice before revealing the next request.
-  useEffect(() => {
-    const prev = prevHeadRef.current;
-    prevHeadRef.current = head;
-    if (prev === null || (head !== null && head.id === prev.id)) return undefined;
+    const prev = prevGroupRef.current;
+    prevGroupRef.current =
+      headGroup === null
+        ? null
+        : {
+            key: headGroup.key,
+            ids: headGroup.requests.map((request) => request.id),
+            clientPubkey: headGroup.requests[0].clientPubkey,
+          };
+    if (prev === null || (headGroup !== null && headGroup.key === prev.key)) return undefined;
     hasAdvancedRef.current = true;
     setAdvanceCount((count) => count + 1);
-    if (resolvedIdsRef.current.has(prev.id)) return undefined;
+    if (groupDeparted(prev.ids, resolvedIdsRef.current) === 'resolved') return undefined;
     const expiredAppName = appDisplayName(
-      useNip46ConnectionsStore.getState().apps[prev.clientPubkey]
+      connectionForClient(useNip46ConnectionsStore.getState().apps, prev.clientPubkey)
     );
     setExpiredNotice(expiredNoticeCopy(expiredAppName));
     const timer = setTimeout(() => setExpiredNotice(null), EXPIRED_NOTICE_MS);
     return () => clearTimeout(timer);
-  }, [head]);
+  }, [headGroup]);
 
   const finish = useCallback(() => {
     if (closingRef.current) return;
@@ -227,23 +291,44 @@ export function SignerApprovalSheetContent({
 
   const submitVerdict = useSingleFlight(
     useCallback(
-      async (action: Nip46DecisionAction, sessionGrant: boolean) => {
-        if (head === null) return;
-        resolvedIdsRef.current.add(head.id);
-        if (action === 'deny_once') {
-          tallyRef.current.denied += 1;
+      async (action: Nip46DecisionAction) => {
+        if (headGroup === null) return;
+        // Snapshot ids + mark resolved + tally BEFORE the first await, so the
+        // departure effect (which fires as the store updates mid-loop) reads
+        // a fully-resolved group and never flashes the expired notice.
+        const ids = verdictIdsForGroup(action, headGroup);
+        if (action === 'block') {
+          // The engine flushes EVERY pending request from this app — mark
+          // them all resolved so no sibling group flashes "expired".
+          const appPubkey = headGroup.requests[0]!.clientPubkey;
+          const flushed = useNip46RequestsStore
+            .getState()
+            .pending.filter((request) => request.clientPubkey === appPubkey);
+          for (const request of flushed) resolvedIdsRef.current.add(request.id);
+          tallyRef.current.denied += flushed.length;
         } else {
-          tallyRef.current.allowed += 1;
+          for (const request of headGroup.requests) resolvedIdsRef.current.add(request.id);
+          if (action === 'deny_once') {
+            tallyRef.current.denied += headGroup.requests.length;
+          } else {
+            tallyRef.current.allowed += headGroup.requests.length;
+          }
         }
-        const resolved = await nip46Engine.resolveRequest(head.id, {
-          action,
-          ...(sessionGrant && { sessionGrant: true }),
-        });
-        if (resolved.isErr()) {
-          nostrLog.warn('nostr.signer.approval_resolve_failed', { error: resolved.error.type });
+        for (const id of ids) {
+          const resolved = await nip46Engine.resolveRequest(id, { action });
+          if (resolved.isErr()) {
+            if (resolved.error.type === 'unknown-request') {
+              // A member expired (sweep) or was flushed (block) mid-loop.
+              nostrLog.debug('nostr.signer.approval_resolve_raced');
+            } else {
+              nostrLog.warn('nostr.signer.approval_resolve_failed', {
+                error: resolved.error.type,
+              });
+            }
+          }
         }
       },
-      [head]
+      [headGroup]
     )
   );
 
@@ -267,36 +352,108 @@ export function SignerApprovalSheetContent({
     });
   }, [head, signEvent]);
 
+  // Kind-3 diff baseline — only when the cached follow list belongs to the
+  // signing identity (the store is active-profile-scoped; a kind 3 carrying a
+  // foreign pubkey must fall back to the count-only presentation).
+  const followingPubkeys = useNostrSocialStore((s) => s.followingPubkeys);
+  const contactsUpdatedAt = useNostrSocialStore((s) => s.contactsUpdatedAt);
+  const currentFollows = useMemo(() => {
+    if (head?.kind !== 3 || contactsUpdatedAt <= 0 || keys === null) return undefined;
+    const eventPubkey = (signEvent as { pubkey?: unknown } | null)?.pubkey;
+    if (typeof eventPubkey === 'string' && eventPubkey.toLowerCase() !== keys.pubkey.toLowerCase())
+      return undefined;
+    return new Set(Object.keys(followingPubkeys));
+  }, [head?.kind, contactsUpdatedAt, keys, signEvent, followingPubkeys]);
+
+  const summary: RequestSummary | null = useMemo(() => {
+    if (head === null) return null;
+    return summarizeRequest(
+      {
+        method: head.method,
+        ...(head.kind !== undefined && { kind: head.kind }),
+        preview,
+      },
+      {
+        ...(currentFollows !== undefined && { currentFollows }),
+        ...(keys !== null && { selfPubkey: keys.pubkey }),
+      }
+    );
+  }, [head, preview, currentFollows, keys]);
+
+  const detail = summary?.detail;
+  // Detail variants with a dedicated card; everything else keeps the classic
+  // content-preview card (which embeds its own expandable JSON).
+  const usesSummaryCard = detail !== undefined && SUMMARY_CARD_DETAIL_TYPES.has(detail.type);
+
   const appName = appDisplayName(connection);
   const appDomain =
     connection?.url !== undefined ? safeHostname(connection.url).unwrapOr(null) : null;
+
+  // Decrypt/encrypt peer label: resolved display name, shortPubkey fallback.
+  const peerPubkey =
+    preview.type === 'decrypt' || preview.type === 'encrypt' ? preview.peerPubkey : undefined;
+  const { metadata: peerMetadata } = useNostrProfileMetadata(peerPubkey);
+  const peerLabel =
+    peerPubkey !== undefined
+      ? peerMetadata?.displayName?.trim() || peerMetadata?.name?.trim() || shortPubkey(peerPubkey)
+      : undefined;
+
   const bodyContext = useMemo(() => {
     if (head === null) return { appName };
     return {
       appName,
-      ...(preview.type === 'encrypt' && { peerLabel: shortPubkey(preview.peerPubkey) }),
+      ...(peerLabel !== undefined && { peerLabel: boundDisplay(peerLabel, 48) }),
       ...(signEvent !== null &&
         (head.kind === 22242 || head.kind === 27235) && {
           relayLabel: loginTargetFor(signEvent),
         }),
     };
-  }, [appName, head, preview, signEvent]);
-
-  const tier = entry?.tier ?? 'standard';
-  const banner = entry !== null ? tierBannerFor(tier, appName) : null;
-  const lookupForAlways =
-    head !== null
-      ? { method: head.method, ...(head.kind !== undefined && { kind: head.kind }) }
-      : null;
-  const offerAlways =
-    lookupForAlways !== null && tier !== 'wallet' && alwaysAllowEligible(lookupForAlways);
+  }, [appName, head, peerLabel, signEvent]);
 
   const isPeerDecrypt =
     preview.type === 'decrypt' &&
     keys !== null &&
     preview.peerPubkey.toLowerCase() !== keys.pubkey.toLowerCase();
+  const isSelfDecrypt = preview.type === 'decrypt' && !isPeerDecrypt;
 
-  const totalInBatch = advanceCount + pending.length;
+  const tier = entry?.tier ?? 'standard';
+  // Peer decrypts get accurate conversation-privacy copy — the wallet-tier
+  // banner ("touches your wallet") is for self-decrypts (NIP-60 payloads).
+  const banner =
+    entry === null
+      ? null
+      : isPeerDecrypt
+        ? peerDecryptBanner(appName)
+        : tierBannerFor(tier, appName);
+  const lookupForAlways =
+    head !== null
+      ? { method: head.method, ...(head.kind !== undefined && { kind: head.kind }) }
+      : null;
+  // Peer decrypts offer a PEER-scoped Always (setPeerDecryptGrant); blanket
+  // wallet/critical keys and self-decrypt never offer Always.
+  const offerAlways = isPeerDecrypt
+    ? peerLabel !== undefined
+    : lookupForAlways !== null && tier !== 'wallet' && alwaysAllowEligible(lookupForAlways);
+
+  const confirmBlock = useCallback(() => {
+    actionMenuPopup({
+      title: blockAppConfirmTitle(appName),
+      buttons: [
+        {
+          text: 'Block',
+          variant: 'dangerous',
+          onPress: (menuClose) => {
+            menuClose();
+            void submitVerdict('block');
+          },
+        },
+        { text: 'Cancel', variant: 'secondary', onPress: (menuClose) => menuClose() },
+      ],
+    });
+  }, [appName, submitVerdict]);
+
+  // Counts DECISIONS (consolidated groups), not raw spam requests.
+  const totalInBatch = advanceCount + groups.length;
   const position = Math.min(advanceCount + 1, totalInBatch);
 
   // ── Render ────────────────────────────────────────────────────
@@ -323,7 +480,7 @@ export function SignerApprovalSheetContent({
 
   return (
     <Animated.View
-      key={head.id}
+      key={headGroupKey ?? head.id}
       entering={hasAdvancedRef.current ? SlideInRight.duration(ADVANCE_ANIMATION_MS) : undefined}>
       <VStack spacing={14} className="px-1 pb-2 pt-1">
         {totalInBatch > 1 ? (
@@ -362,19 +519,45 @@ export function SignerApprovalSheetContent({
               {appDomain ?? shortPubkey(head.clientPubkey)}
             </Text>
           </VStack>
-          <Icon name={entry.icon} size={22} color={muted} />
         </HStack>
 
-        {/* Headline + body */}
+        {/* Headline + body — summary overrides; catalog is the total fallback */}
         <VStack spacing={6}>
           <BottomSheet.Title className="text-foreground text-lg font-bold">
-            {entry.headline}
+            {summary?.headline ?? entry.headline}
           </BottomSheet.Title>
-          <SegmentedText segments={entry.body(bodyContext)} size={14} color={foreground} />
+          <SegmentedText
+            segments={(summary?.body ?? entry.body)(bodyContext)}
+            size={14}
+            color={foreground}
+          />
         </VStack>
 
-        {/* Preview card — decrypt NEVER previews content */}
-        {preview.type === 'sign_event' ? <EventPreviewCard event={preview.event} /> : null}
+        {/* Preview card per summary detail — decrypt NEVER previews content.
+            sign_event details keep the raw JSON reachable via Details. */}
+        {detail?.type === 'react' ? <ReferencedNoteCard eventId={detail.targetEventId} /> : null}
+        {detail?.type === 'repost' ? (
+          <ReferencedNoteCard eventId={detail.targetEventId} embedded={detail.embedded} />
+        ) : null}
+        {detail?.type === 'reply' ? (
+          <>
+            <ReferencedNoteCard eventId={detail.parentEventId} />
+            <OwnTextBlock label="Your reply" text={detail.text} />
+          </>
+        ) : null}
+        {detail?.type === 'quote' ? (
+          <>
+            <ReferencedNoteCard eventId={detail.quotedEventId} />
+            <OwnTextBlock label="Your post" text={detail.text} />
+          </>
+        ) : null}
+        {detail?.type === 'follow_diff' ? <FollowDiffCard detail={detail} /> : null}
+        {detail?.type === 'app_data' ? <AppDataCard operationLine={detail.operationLine} /> : null}
+        {detail?.type === 'zap_request' ? (
+          <ZapRequestCard amountSats={detail.amountSats} recipientPubkey={detail.recipientPubkey} />
+        ) : null}
+        {signEvent !== null && usesSummaryCard ? <RawEventDetails event={signEvent} /> : null}
+        {signEvent !== null && !usesSummaryCard ? <EventPreviewCard event={signEvent} /> : null}
         {preview.type === 'encrypt' ? (
           <View className="bg-surface rounded-2xl p-3">
             <Text size={14} numberOfLines={3} color={foreground}>
@@ -383,14 +566,10 @@ export function SignerApprovalSheetContent({
           </View>
         ) : null}
         {preview.type === 'decrypt' ? (
-          <View className="bg-surface rounded-2xl p-3">
-            <HStack spacing={8} style={{ alignItems: 'center' }}>
-              <Icon name="mdi:shield" size={16} color={muted} />
-              <Text size={13} color={muted}>
-                {encryptedPayloadLabel(preview.ciphertextLength)}
-              </Text>
-            </HStack>
-          </View>
+          <DecryptPeerCard
+            peerPubkey={preview.peerPubkey}
+            ciphertextLength={preview.ciphertextLength}
+          />
         ) : null}
 
         {/* Tier banner */}
@@ -418,76 +597,65 @@ export function SignerApprovalSheetContent({
           </View>
         ) : null}
 
-        {/* 1h session grant — peer≠self decrypt only */}
-        {isPeerDecrypt ? (
-          <Pressable
-            haptics
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: sessionGrantChecked }}
-            accessibilityLabel={SESSION_GRANT_CHECKBOX_LABEL}
-            onPress={() => setSessionGrantChecked((value) => !value)}>
-            <HStack spacing={10} style={{ alignItems: 'center' }}>
-              <SelectableCheck selected={sessionGrantChecked} />
-              <View style={{ flex: 1 }}>
-                <Text size={13} color={foreground}>
-                  {SESSION_GRANT_CHECKBOX_LABEL}
-                </Text>
-              </View>
-            </HStack>
-          </Pressable>
-        ) : null}
+        {/* Risk-flag banners (summary-derived, on top of the tier banner) */}
+        {(summary?.riskFlags ?? []).map((flag) => {
+          const riskBanner = RISK_BANNERS[flag];
+          if (riskBanner === undefined) return null;
+          return (
+            <View
+              key={flag}
+              className={
+                riskBanner.tone === 'danger'
+                  ? 'bg-danger-soft rounded-2xl p-3'
+                  : 'bg-warning-soft rounded-2xl p-3'
+              }>
+              <HStack spacing={8} style={{ alignItems: 'center' }}>
+                <Icon
+                  name="mdi:alert-circle"
+                  size={18}
+                  color={riskBanner.tone === 'danger' ? danger : warning}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    size={13}
+                    color={riskBanner.tone === 'danger' ? dangerSoftFg : warningSoftFg}>
+                    {riskBanner.text}
+                  </Text>
+                </View>
+              </HStack>
+            </View>
+          );
+        })}
 
-        {/* Always-scope footnote */}
-        {offerAlways ? (
-          <SegmentedText
-            segments={alwaysScopeFootnote(appName, entry.alwaysVerbPhrase)}
-            size={12}
-            color={muted}
-          />
-        ) : null}
-
-        {/* Actions */}
-        {tier === 'wallet' ? (
-          <VStack spacing={10} style={{ alignItems: 'center' }}>
-            <SlideToConfirm
-              onConfirm={() => void submitVerdict('approve_once', sessionGrantChecked)}
-              iconName="mdi:check"
-              label={SLIDE_TO_APPROVE_LABEL}
-              trackColor={danger}
-              thumbColor={foreground}
-              textColor={foreground}
-              iconColor={danger}
-            />
-            <HerouiButton variant="ghost" onPress={() => void submitVerdict('deny_once', false)}>
-              <HerouiButton.Label className="text-danger underline">
-                {APPROVAL_BUTTON_LABELS.deny}
-              </HerouiButton.Label>
+        {/* Actions: Session / (Always) / Deny / Block — one button stack with
+            escalating severity. Self-decrypt keeps maximum friction:
+            Approve (once) / Deny / Block only. */}
+        <VStack spacing={10}>
+          <HerouiButton
+            variant="primary"
+            className="bg-foreground"
+            onPress={() => void submitVerdict(isSelfDecrypt ? 'approve_once' : 'approve_session')}>
+            <HerouiButton.Label className="text-background">
+              {isSelfDecrypt
+                ? APPROVAL_BUTTON_LABELS.approveOnce
+                : APPROVAL_BUTTON_LABELS.allowSession}
+            </HerouiButton.Label>
+          </HerouiButton>
+          {offerAlways ? (
+            <HerouiButton variant="tertiary" onPress={() => void submitVerdict('always')}>
+              <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.alwaysAllow}</HerouiButton.Label>
             </HerouiButton>
-          </VStack>
-        ) : (
-          <VStack spacing={10}>
-            <HerouiButton
-              variant="primary"
-              className="bg-foreground"
-              onPress={() => void submitVerdict('approve_once', sessionGrantChecked)}>
-              <HerouiButton.Label className="text-background">
-                {APPROVAL_BUTTON_LABELS.allowOnce}
-              </HerouiButton.Label>
-            </HerouiButton>
-            {offerAlways ? (
-              <HerouiButton
-                variant="tertiary"
-                onPress={() => void submitVerdict('always', sessionGrantChecked)}>
-                <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.alwaysAllow}</HerouiButton.Label>
-              </HerouiButton>
-            ) : null}
-            <HerouiButton variant="ghost" onPress={() => void submitVerdict('deny_once', false)}>
-              <HerouiButton.Label className="text-danger underline">
-                {APPROVAL_BUTTON_LABELS.deny}
-              </HerouiButton.Label>
-            </HerouiButton>
-          </VStack>
-        )}
+          ) : null}
+          <HerouiButton variant="danger-soft" onPress={() => void submitVerdict('deny_once')}>
+            <HerouiButton.Label>{APPROVAL_BUTTON_LABELS.deny}</HerouiButton.Label>
+          </HerouiButton>
+          <HerouiButton
+            variant="danger"
+            accessibilityLabel={BLOCK_APP_LABEL}
+            onPress={confirmBlock}>
+            <HerouiButton.Label>{BLOCK_APP_LABEL}</HerouiButton.Label>
+          </HerouiButton>
+        </VStack>
       </VStack>
     </Animated.View>
   );

@@ -21,6 +21,8 @@ export { ShareSignerScreen } from '@/features/nostrSigner/screens/ShareSignerScr
 export { SignerActivityDetailScreen } from '@/features/nostrSigner/screens/SignerActivityDetailScreen';
 export { SignerActivityScreen } from '@/features/nostrSigner/screens/SignerActivityScreen';
 export { SignerAppDetailScreen } from '@/features/nostrSigner/screens/SignerAppDetailScreen';
+export { SignerAppPermissionsScreen } from '@/features/nostrSigner/screens/SignerAppPermissionsScreen';
+export { SignerAppPersonScreen } from '@/features/nostrSigner/screens/SignerAppPersonScreen';
 export { SignerHubScreen } from '@/features/nostrSigner/screens/SignerHubScreen';
 export { SignerRequestsScreen } from '@/features/nostrSigner/screens/SignerRequestsScreen';
 

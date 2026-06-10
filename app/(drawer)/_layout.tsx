@@ -87,7 +87,7 @@ const MENU_ITEMS: MenuItem[] = [
   },
   {
     icon: { default: 'mdi:key-variant', selected: 'mdi:key-variant' },
-    label: 'Signer',
+    label: 'Remote Login',
     route: '/(signer-flow)',
     activeSegments: ['(signer-flow)'],
     useBadgeCount: useSignerPendingCount,

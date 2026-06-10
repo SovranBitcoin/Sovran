@@ -31,4 +31,13 @@ export type CustomSheetSharedProps = {
 
 export type SheetLayoutConfig =
   | { mode: 'snapPoints'; snapPoints: readonly string[] }
-  | { mode: 'contentHeight' };
+  | {
+      mode: 'contentHeight';
+      /**
+       * Render the content in gorhom's BottomSheetScrollView (patched heroui
+       * `useScrollableContainer` flag): the sheet still auto-fits short
+       * content, but scrolls instead of clipping once expandable sections
+       * push it past maxDynamicContentSize.
+       */
+      scrollable?: boolean;
+    };

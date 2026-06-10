@@ -23,8 +23,11 @@ import {
   GrantVerdictSchema,
   isGrantKey,
   MAX_CONNECTED_APPS,
+  MAX_PEER_DECRYPT_GRANTS_PER_APP,
+  MAX_PREVIOUS_CLIENT_PUBKEYS,
   type ConnectionMode,
   type ConnectionStatus,
+  type DecryptMethod,
   type GrantKey,
   type GrantVerdict,
 } from '@/features/nostrSigner/lib/nip46Types';
@@ -66,6 +69,19 @@ export interface Nip46Grant {
   useCount: number;
 }
 
+/**
+ * A standing decrypt grant scoped to ONE conversation partner. Lives outside
+ * `grants` deliberately: grant keys are a closed codec the permission editor
+ * enumerates, and the critical-always ceiling on `grants` must keep rejecting
+ * blanket decrypt grants byte-for-byte (see the schema refine below).
+ */
+export interface PeerDecryptGrant {
+  methods: DecryptMethod[];
+  createdAt: number;
+  lastUsedAt?: number;
+  useCount: number;
+}
+
 export interface Nip46Connection {
   clientPubkey: string;
   name?: string;
@@ -82,6 +98,15 @@ export interface Nip46Connection {
   requestCount: number;
   deniedCount: number;
   grants: Partial<Record<GrantKey, Nip46Grant>>;
+  /** Keyed by lowercase peer pubkey hex. Never holds the user's own pubkey. */
+  peerDecryptGrants: Record<string, PeerDecryptGrant>;
+  /**
+   * Client keys this record REPLACED via adoption (ephemeral-key clients
+   * re-pairing). Attribution metadata only — activity history resolves
+   * through it (`connectionForClient`); it never grants anything. Capped at
+   * MAX_PREVIOUS_CLIENT_PUBKEYS, most recent kept.
+   */
+  previousClientPubkeys: string[];
 }
 
 // 64-char hex pubkey — the trust-boundary predicate used across the app.
@@ -92,6 +117,13 @@ const RelayUrlSchema = z.string().max(MAX_RELAY_URL_LENGTH).regex(RELAY_URL_RE);
 const PersistedGrant = z.looseObject({
   verdict: GrantVerdictSchema,
   origin: z.enum(['pairing', 'prompt']),
+  createdAt: z.int().min(0),
+  lastUsedAt: z.int().min(0).optional(),
+  useCount: z.int().min(0),
+});
+
+const PersistedPeerDecryptGrant = z.looseObject({
+  methods: z.array(z.enum(['nip04_decrypt', 'nip44_decrypt'])).min(1),
   createdAt: z.int().min(0),
   lastUsedAt: z.int().min(0).optional(),
   useCount: z.int().min(0),
@@ -112,6 +144,12 @@ const PersistedConnection = z.looseObject({
   requestCount: z.int().min(0),
   deniedCount: z.int().min(0),
   grants: z.record(GrantKeySchema, PersistedGrant),
+  // `.default({})` keeps pre-v2 blobs parseable (the v2 migrator is the belt,
+  // this is the braces — a rejected blob here would wipe every pairing).
+  peerDecryptGrants: z.record(HexPubkeySchema, PersistedPeerDecryptGrant).default({}),
+  // Pre-v3 blobs: same default-fill discipline; the migrator also clamps a
+  // malformed chain so this field cannot become a new blob-wipe vector.
+  previousClientPubkeys: z.array(HexPubkeySchema).max(MAX_PREVIOUS_CLIENT_PUBKEYS).default([]),
 });
 
 const PersistedConnectionsStore = z
@@ -124,6 +162,15 @@ const PersistedConnectionsStore = z
     'app key does not match clientPubkey'
   )
   .refine(
+    // The critical ceiling forbids a BLANKET decrypt-always because ciphertext
+    // is opaque — a blanket grant covers every conversation, present and
+    // future. `peerDecryptGrants` is the deliberate, scoped exception: it only
+    // exposes the one conversation the user already chose to expose by
+    // approving a decrypt with that exact peer, and self-peer (NIP-60 wallet
+    // payloads) is excluded twice — evaluate() asks on isSelfDecrypt BEFORE
+    // consulting peer grants, and every write path requires the
+    // `{ peerIsSelf: false }` guard. This refine therefore stays byte-for-byte
+    // for `grants` and never inspects `peerDecryptGrants`.
     (data) =>
       Object.values(data.apps).every((app) =>
         Object.entries(app.grants).every(
@@ -132,6 +179,13 @@ const PersistedConnectionsStore = z
         )
       ),
     'critical grant key holds an always verdict'
+  )
+  .refine(
+    (data) =>
+      Object.values(data.apps).every(
+        (app) => Object.keys(app.peerDecryptGrants).length <= MAX_PEER_DECRYPT_GRANTS_PER_APP
+      ),
+    'too many peer decrypt grants'
   );
 
 export interface UpsertAppInput {
@@ -156,6 +210,17 @@ interface UpdateMetadataInput {
 
 export type UpsertAppError = 'invalid_pubkey' | 'invalid_relays' | 'app_limit_reached';
 type SetGrantError = 'unknown_app' | 'invalid_grant_key' | 'critical_always_forbidden';
+type SetPeerDecryptGrantError =
+  | 'unknown_app'
+  | 'self_decrypt_forbidden'
+  | 'invalid_peer'
+  | 'peer_grant_limit';
+
+export type AdoptConnectionError =
+  | UpsertAppError
+  | 'unknown_previous'
+  | 'same_pubkey'
+  | 'target_exists';
 
 interface Nip46ConnectionsState {
   apps: Record<string, Nip46Connection>;
@@ -164,6 +229,20 @@ interface Nip46ConnectionsState {
 interface Nip46ConnectionsActions {
   /** Create or update a connection. New apps are rejected once the cap is hit. */
   upsertApp: (input: UpsertAppInput) => Result<void, UpsertAppError>;
+  /**
+   * Replace a previous connection with a re-pairing client's new record in
+   * ONE atomic set. `inheritGrants: true` (active previous) carries grants,
+   * peer decrypt grants, mode, pairedAt, counters, and lastUsedAt;
+   * `false` (blocked previous — deliberate fresh start) carries only the
+   * `previousClientPubkeys` attribution chain. The old record is deleted.
+   * Callers must have user confirmation; the ENGINE re-validates the match
+   * before calling this (claimed identity is attacker-controllable).
+   */
+  adoptConnection: (
+    previousClientPubkey: string,
+    input: UpsertAppInput,
+    opts: { inheritGrants: boolean }
+  ) => Result<void, AdoptConnectionError>;
   /** Set a standing verdict, or clear back to ask with `null`. Enforces the critical ceiling. */
   setGrant: (
     clientPubkey: string,
@@ -172,8 +251,31 @@ interface Nip46ConnectionsActions {
   ) => Result<void, SetGrantError>;
   setMode: (clientPubkey: string, mode: ConnectionMode) => void;
   setEncryption: (clientPubkey: string, encryption: ConnectionEncryption) => void;
-  /** Bump usage counters; pass `grantKey` when an auto-approval consumed a grant. */
-  touchUsage: (clientPubkey: string, opts?: { denied?: boolean; grantKey?: GrantKey }) => void;
+  /**
+   * Persistent "Always" decrypt grant for one (app, peer, method). Same
+   * compile-time `{ peerIsSelf: false }` guard pattern as the session grant —
+   * a self-decrypt grant is unrepresentable through this API.
+   */
+  setPeerDecryptGrant: (
+    clientPubkey: string,
+    peerPubkey: string,
+    method: DecryptMethod,
+    guard: { peerIsSelf: false }
+  ) => Result<void, SetPeerDecryptGrantError>;
+  /** Drop one method, or the whole peer entry when `method` is omitted. */
+  revokePeerDecryptGrant: (
+    clientPubkey: string,
+    peerPubkey: string,
+    method?: DecryptMethod
+  ) => void;
+  /**
+   * Bump usage counters; pass `grantKey` when an auto-approval consumed a
+   * standing grant, or `peerGrant` when it consumed a per-peer decrypt grant.
+   */
+  touchUsage: (
+    clientPubkey: string,
+    opts?: { denied?: boolean; grantKey?: GrantKey; peerGrantPubkey?: string }
+  ) => void;
   blockApp: (clientPubkey: string) => void;
   unblockApp: (clientPubkey: string) => void;
   /** Deletes the record entirely (Block keeps it with status 'blocked'). */
@@ -270,6 +372,8 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
             requestCount: 0,
             deniedCount: 0,
             grants: {},
+            peerDecryptGrants: {},
+            previousClientPubkeys: [],
           };
           const next: Nip46Connection = {
             ...base,
@@ -288,6 +392,89 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
             isNew: !existing,
           });
           set({ apps: { ...apps, [input.clientPubkey]: next } });
+          return ok(undefined);
+        },
+
+        adoptConnection: (previousClientPubkey, input, opts) => {
+          if (!isNostrPubkeyHex(input.clientPubkey)) return err('invalid_pubkey');
+          const relays = sanitizeRelays(input.relays);
+          if (relays === null) return err('invalid_relays');
+          const newKey = input.clientPubkey.toLowerCase();
+          const previousKey = previousClientPubkey.toLowerCase();
+          if (newKey === previousKey) return err('same_pubkey');
+
+          const { apps } = get();
+          const previous = apps[previousKey];
+          if (previous === undefined) return err('unknown_previous');
+          if (apps[newKey] !== undefined) return err('target_exists');
+          // Net count is unchanged (delete + insert) — count post-deletion so
+          // adoption always succeeds at the app cap.
+          if (Object.keys(apps).length - 1 >= MAX_CONNECTED_APPS) {
+            storeLog.warn('store.nip46_connections.app_limit_reached');
+            return err('app_limit_reached');
+          }
+
+          const now = Date.now();
+          const name = sanitizeName(input.name);
+          const url = sanitizeUrl(input.url, MAX_URL_LENGTH);
+          const image = sanitizeUrl(input.image, MAX_IMAGE_URL_LENGTH);
+          // Attribution chain: carry the old record's own chain, append the
+          // old key, drop collisions with the new key, keep the most recent.
+          const chain = [...previous.previousClientPubkeys, previous.clientPubkey]
+            .map((key) => key.toLowerCase())
+            .filter((key, index, all) => key !== newKey && all.indexOf(key) === index)
+            .slice(-MAX_PREVIOUS_CLIENT_PUBKEYS);
+
+          const carried = opts.inheritGrants
+            ? {
+                // sanitizeGrants as belt — carried grants already conform to
+                // the critical-always ceiling by construction.
+                grants: sanitizeGrants(previous.grants),
+                peerDecryptGrants: previous.peerDecryptGrants,
+                mode: previous.mode,
+                pairedAt: previous.pairedAt,
+                requestCount: previous.requestCount,
+                deniedCount: previous.deniedCount,
+                ...(previous.lastUsedAt !== undefined && { lastUsedAt: previous.lastUsedAt }),
+              }
+            : {
+                grants: {},
+                peerDecryptGrants: {},
+                mode: input.mode ?? ('standard' as const),
+                pairedAt: now,
+                requestCount: 0,
+                deniedCount: 0,
+              };
+
+          const next: Nip46Connection = {
+            clientPubkey: newKey,
+            relays,
+            origin: input.origin,
+            status: 'active',
+            // The new client re-pins its own envelope scheme from its first
+            // inbound request — never carry the old client's pin.
+            encryption: input.encryption ?? 'nip44',
+            ...carried,
+            // Pairing-time grants (accepted checklist keys) merge on top of
+            // anything carried — same additive semantics as upsertApp.
+            grants: { ...carried.grants, ...sanitizeGrants(input.grants ?? {}) },
+            ...(name !== undefined && { name }),
+            ...(url !== undefined && { url }),
+            ...(image !== undefined && { image }),
+            ...(input.mode !== undefined && { mode: input.mode }),
+            previousClientPubkeys: chain,
+          };
+
+          storeLog.info('store.nip46_connections.adopt', {
+            inheritGrants: opts.inheritGrants,
+            chainLength: chain.length,
+          });
+          set((state) => {
+            const nextApps = { ...state.apps };
+            delete nextApps[previousKey];
+            nextApps[newKey] = next;
+            return { apps: nextApps };
+          });
           return ok(undefined);
         },
 
@@ -311,6 +498,60 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
           return ok(undefined);
         },
 
+        setPeerDecryptGrant: (clientPubkey, peerPubkey, method, guard) => {
+          // Runtime re-check of the compile-time contract — a cast must not be
+          // able to mint a self-decrypt grant.
+          if (guard.peerIsSelf !== false) return err('self_decrypt_forbidden');
+          if (!isNostrPubkeyHex(peerPubkey)) return err('invalid_peer');
+          const app = get().apps[clientPubkey];
+          if (!app) return err('unknown_app');
+          const peer = peerPubkey.toLowerCase();
+          const existing = app.peerDecryptGrants[peer];
+          if (
+            existing === undefined &&
+            Object.keys(app.peerDecryptGrants).length >= MAX_PEER_DECRYPT_GRANTS_PER_APP
+          ) {
+            storeLog.warn('store.nip46_connections.peer_grant_limit');
+            return err('peer_grant_limit');
+          }
+          storeLog.info('store.nip46_connections.peer_decrypt_grant', { method });
+          patchApp(clientPubkey, (current) => ({
+            ...current,
+            peerDecryptGrants: {
+              ...current.peerDecryptGrants,
+              [peer]: existing
+                ? {
+                    ...existing,
+                    methods: existing.methods.includes(method)
+                      ? existing.methods
+                      : [...existing.methods, method],
+                  }
+                : { methods: [method], createdAt: Date.now(), useCount: 0 },
+            },
+          }));
+          return ok(undefined);
+        },
+
+        revokePeerDecryptGrant: (clientPubkey, peerPubkey, method) => {
+          const peer = peerPubkey.toLowerCase();
+          storeLog.info('store.nip46_connections.peer_decrypt_revoke', {
+            scope: method ?? 'all',
+          });
+          patchApp(clientPubkey, (app) => {
+            const existing = app.peerDecryptGrants[peer];
+            if (!existing) return app;
+            const peerDecryptGrants = { ...app.peerDecryptGrants };
+            const remaining =
+              method === undefined ? [] : existing.methods.filter((m) => m !== method);
+            if (remaining.length === 0) {
+              delete peerDecryptGrants[peer];
+            } else {
+              peerDecryptGrants[peer] = { ...existing, methods: remaining };
+            }
+            return { ...app, peerDecryptGrants };
+          });
+        },
+
         setMode: (clientPubkey, mode) => {
           patchApp(clientPubkey, (app) => ({ ...app, mode }));
         },
@@ -331,9 +572,19 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
                 [grantKey]: { ...grant, lastUsedAt: now, useCount: grant.useCount + 1 },
               };
             }
+            let peerDecryptGrants = app.peerDecryptGrants;
+            const peer = opts?.peerGrantPubkey?.toLowerCase();
+            const peerGrant = peer !== undefined ? peerDecryptGrants[peer] : undefined;
+            if (peer !== undefined && peerGrant !== undefined) {
+              peerDecryptGrants = {
+                ...peerDecryptGrants,
+                [peer]: { ...peerGrant, lastUsedAt: now, useCount: peerGrant.useCount + 1 },
+              };
+            }
             return {
               ...app,
               grants,
+              peerDecryptGrants,
               lastUsedAt: now,
               requestCount: app.requestCount + 1,
               deniedCount: opts?.denied ? app.deniedCount + 1 : app.deniedCount,
@@ -393,7 +644,25 @@ export const useNip46ConnectionsStore = create<Nip46ConnectionsStore>()(
       name: 'nip46-connections-store',
       storage: profileStorage,
       schema: PersistedConnectionsStore,
-      version: 1,
+      version: 3,
+      // v1 → v2: connections gained `peerDecryptGrants`; v2 → v3:
+      // `previousClientPubkeys`. The schema defaults already fill both at
+      // merge; this migrator is the belt so a future schema tightening can't
+      // strand old blobs. It also CLAMPS a malformed chain (non-hex entries
+      // dropped, most recent 8 kept) instead of letting the schema reject the
+      // whole blob — a rejected blob wipes every pairing.
+      migrate: (state) => {
+        const persisted = state as {
+          apps?: Record<string, { peerDecryptGrants?: unknown; previousClientPubkeys?: unknown }>;
+        };
+        for (const app of Object.values(persisted?.apps ?? {})) {
+          if (app.peerDecryptGrants === undefined) app.peerDecryptGrants = {};
+          app.previousClientPubkeys = Array.isArray(app.previousClientPubkeys)
+            ? app.previousClientPubkeys.filter(isNostrPubkeyHex).slice(-MAX_PREVIOUS_CLIENT_PUBKEYS)
+            : [];
+        }
+        return persisted as { apps: Record<string, Nip46Connection> };
+      },
       partialize: (state) => ({ apps: state.apps }),
     })
   )

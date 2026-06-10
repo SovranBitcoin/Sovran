@@ -18,15 +18,13 @@ import {
   type Nip46PendingRequest,
   type SessionGrantKey,
 } from '@/features/nostrSigner/data/nip46RequestsStore';
-import {
-  MAX_PENDING_GLOBAL,
-  MAX_PENDING_PER_APP,
-  SESSION_GRANT_TTL_MS,
-} from '@/features/nostrSigner/lib/nip46Types';
+import { MAX_PENDING_GLOBAL, MAX_PENDING_PER_APP } from '@/features/nostrSigner/lib/nip46Types';
 
 const APP_A = 'a'.repeat(64);
 const APP_B = 'b'.repeat(64);
 const APP_C = 'c'.repeat(64);
+const PEER_X = 'e'.repeat(64);
+const PEER_Y = 'f'.repeat(64);
 
 let seq = 0;
 
@@ -46,7 +44,12 @@ function makeRequest(overrides: Partial<Nip46PendingRequest> = {}): Nip46Pending
 }
 
 beforeEach(() => {
-  useNip46RequestsStore.setState({ pending: [], sessionGrants: [], throttledApps: {} });
+  useNip46RequestsStore.setState({
+    pending: [],
+    sessionGrants: [],
+    sessionAllows: [],
+    throttledApps: {},
+  });
 });
 
 describe('pending queue', () => {
@@ -154,34 +157,36 @@ describe('pending queue', () => {
 });
 
 describe('session grants', () => {
-  const NOW = 1_000_000;
+  function grant(app: string, key: 'nip04_decrypt' | 'nip44_decrypt', peer: string) {
+    return useNip46RequestsStore.getState().grantSession(app, key, peer, { peerIsSelf: false });
+  }
 
-  it('grants for 1 hour and expires at the TTL boundary', () => {
+  it('grants for the session — no expiry', () => {
     const store = useNip46RequestsStore.getState();
-    expect(store.grantSession(APP_A, 'nip44_decrypt', { peerIsSelf: false }, NOW).isOk()).toBe(
-      true
-    );
-
-    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', NOW)).toBe(true);
-    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', NOW + SESSION_GRANT_TTL_MS - 1)).toBe(
-      true
-    );
-    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', NOW + SESSION_GRANT_TTL_MS)).toBe(false);
+    expect(grant(APP_A, 'nip44_decrypt', PEER_X).isOk()).toBe(true);
+    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', PEER_X)).toBe(true);
   });
 
-  it('scopes grants to app and key', () => {
+  it('scopes grants to app, key, AND peer', () => {
     const store = useNip46RequestsStore.getState();
-    store.grantSession(APP_A, 'nip44_decrypt', { peerIsSelf: false }, NOW);
-    expect(store.hasSessionGrant(APP_B, 'nip44_decrypt', NOW)).toBe(false);
-    expect(store.hasSessionGrant(APP_A, 'nip04_decrypt', NOW)).toBe(false);
-    expect(store.hasSessionGrant(APP_A, 'sign_event:17375', NOW)).toBe(false);
+    grant(APP_A, 'nip44_decrypt', PEER_X);
+    expect(store.hasSessionGrant(APP_B, 'nip44_decrypt', PEER_X)).toBe(false);
+    expect(store.hasSessionGrant(APP_A, 'nip04_decrypt', PEER_X)).toBe(false);
+    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', PEER_Y)).toBe(false);
+    expect(store.hasSessionGrant(APP_A, 'sign_event:17375', PEER_X)).toBe(false);
+  });
+
+  it('matches peers case-insensitively (lowercased at write and lookup)', () => {
+    const store = useNip46RequestsStore.getState();
+    grant(APP_A, 'nip44_decrypt', PEER_X.toUpperCase());
+    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', PEER_X)).toBe(true);
   });
 
   it('refuses a grant asserting peerIsSelf — wallet payload decrypts always prompt', () => {
     const selfGuard = { peerIsSelf: true };
     const result = useNip46RequestsStore
       .getState()
-      .grantSession(APP_A, 'nip44_decrypt', selfGuard as never, NOW);
+      .grantSession(APP_A, 'nip44_decrypt', PEER_X, selfGuard as never);
     expect(result._unsafeUnwrapErr()).toBe('self_decrypt_forbidden');
     expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
   });
@@ -189,69 +194,118 @@ describe('session grants', () => {
   it('refuses non-decrypt keys smuggled past the type system', () => {
     const result = useNip46RequestsStore
       .getState()
-      .grantSession(APP_A, 'sign_event:17375' as SessionGrantKey, { peerIsSelf: false }, NOW);
+      .grantSession(APP_A, 'sign_event:17375' as SessionGrantKey, PEER_X, { peerIsSelf: false });
     expect(result._unsafeUnwrapErr()).toBe('not_session_grantable');
     expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
   });
 
-  it('re-granting refreshes the expiry instead of duplicating', () => {
-    const store = useNip46RequestsStore.getState();
-    store.grantSession(APP_A, 'nip44_decrypt', { peerIsSelf: false }, NOW);
-    store.grantSession(APP_A, 'nip44_decrypt', { peerIsSelf: false }, NOW + 1_000);
+  it('refuses a malformed peer pubkey', () => {
+    const result = useNip46RequestsStore
+      .getState()
+      .grantSession(APP_A, 'nip44_decrypt', 'not-hex', { peerIsSelf: false });
+    expect(result._unsafeUnwrapErr()).toBe('invalid_peer');
+    expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
+  });
 
-    const grants = useNip46RequestsStore.getState().sessionGrants;
-    expect(grants).toHaveLength(1);
-    expect(grants[0].expiresAt).toBe(NOW + 1_000 + SESSION_GRANT_TTL_MS);
+  it('re-granting the same (app, key, peer) stays a single entry', () => {
+    grant(APP_A, 'nip44_decrypt', PEER_X);
+    grant(APP_A, 'nip44_decrypt', PEER_X);
+    expect(useNip46RequestsStore.getState().sessionGrants).toHaveLength(1);
+  });
+
+  it('keeps separate entries per peer', () => {
+    grant(APP_A, 'nip44_decrypt', PEER_X);
+    grant(APP_A, 'nip44_decrypt', PEER_Y);
+    expect(useNip46RequestsStore.getState().sessionGrants).toHaveLength(2);
   });
 
   it('revokes one key or all keys for an app', () => {
     const store = useNip46RequestsStore.getState();
-    store.grantSession(APP_A, 'nip44_decrypt', { peerIsSelf: false }, NOW);
-    store.grantSession(APP_A, 'nip04_decrypt', { peerIsSelf: false }, NOW);
-    store.grantSession(APP_B, 'nip44_decrypt', { peerIsSelf: false }, NOW);
+    grant(APP_A, 'nip44_decrypt', PEER_X);
+    grant(APP_A, 'nip04_decrypt', PEER_X);
+    grant(APP_B, 'nip44_decrypt', PEER_X);
 
     store.revokeSessionGrant(APP_A, 'nip44_decrypt');
-    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', NOW)).toBe(false);
-    expect(store.hasSessionGrant(APP_A, 'nip04_decrypt', NOW)).toBe(true);
+    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', PEER_X)).toBe(false);
+    expect(store.hasSessionGrant(APP_A, 'nip04_decrypt', PEER_X)).toBe(true);
 
     store.revokeSessionGrant(APP_A);
     expect(useNip46RequestsStore.getState().sessionGrants).toEqual([
       expect.objectContaining({ clientPubkey: APP_B }),
     ]);
   });
+});
 
-  it('prunes expired grants', () => {
+describe('session allows', () => {
+  it('accepts non-decrypt keys — wallet sign kinds included (runtime-only by design)', () => {
     const store = useNip46RequestsStore.getState();
-    store.grantSession(APP_A, 'nip44_decrypt', { peerIsSelf: false }, NOW);
-    store.grantSession(APP_B, 'nip44_decrypt', { peerIsSelf: false }, NOW + SESSION_GRANT_TTL_MS);
+    expect(store.grantSessionAllow(APP_A, 'sign_event:1').isOk()).toBe(true);
+    expect(store.grantSessionAllow(APP_A, 'sign_event:17375').isOk()).toBe(true);
+    expect(store.hasSessionAllow(APP_A, 'sign_event:1')).toBe(true);
+    expect(store.hasSessionAllow(APP_A, 'sign_event:17375')).toBe(true);
+  });
 
-    store.pruneSessionGrants(NOW + SESSION_GRANT_TTL_MS);
-    expect(useNip46RequestsStore.getState().sessionGrants).toEqual([
-      expect.objectContaining({ clientPubkey: APP_B }),
-    ]);
+  it('rejects decrypt keys — peer-scoped session grants own those', () => {
+    const store = useNip46RequestsStore.getState();
+    expect(store.grantSessionAllow(APP_A, 'nip44_decrypt')._unsafeUnwrapErr()).toBe(
+      'decrypt_key_forbidden'
+    );
+    expect(store.grantSessionAllow(APP_A, 'nip04_decrypt')._unsafeUnwrapErr()).toBe(
+      'decrypt_key_forbidden'
+    );
+    expect(useNip46RequestsStore.getState().sessionAllows).toEqual([]);
+  });
+
+  it('is idempotent — consolidated groups resolve N times with one decision', () => {
+    const store = useNip46RequestsStore.getState();
+    store.grantSessionAllow(APP_A, 'sign_event:1');
+    store.grantSessionAllow(APP_A, 'sign_event:1');
+    expect(useNip46RequestsStore.getState().sessionAllows).toHaveLength(1);
+  });
+
+  it('scopes per app and revokes per app', () => {
+    const store = useNip46RequestsStore.getState();
+    store.grantSessionAllow(APP_A, 'sign_event:1');
+    store.grantSessionAllow(APP_B, 'sign_event:1');
+    expect(store.hasSessionAllow(APP_B, 'sign_event:1')).toBe(true);
+
+    store.revokeSessionAllows(APP_A);
+    expect(store.hasSessionAllow(APP_A, 'sign_event:1')).toBe(false);
+    expect(store.hasSessionAllow(APP_B, 'sign_event:1')).toBe(true);
+  });
+
+  it('clear() drops pending, throttle flags, AND all session state', () => {
+    const store = useNip46RequestsStore.getState();
+    store.enqueue(makeRequest());
+    store.setAppThrottled(APP_A, 9_999_999);
+    store.grantSessionAllow(APP_A, 'sign_event:1');
+    store.grantSession(APP_A, 'nip44_decrypt', PEER_X, { peerIsSelf: false });
+
+    store.clear();
+
+    const state = useNip46RequestsStore.getState();
+    expect(state.pending).toEqual([]);
+    expect(state.throttledApps).toEqual({});
+    expect(state.sessionGrants).toEqual([]);
+    expect(state.sessionAllows).toEqual([]);
   });
 });
 
-describe('throttled apps', () => {
-  it('records cooldownUntil and clears with null', () => {
+describe('revoke by peer', () => {
+  it("removes one peer's grants under both methods, leaving others untouched", () => {
     const store = useNip46RequestsStore.getState();
-    store.setAppThrottled(APP_A, 5_000);
-    expect(useNip46RequestsStore.getState().throttledApps).toEqual({ [APP_A]: 5_000 });
+    store.grantSession(APP_A, 'nip44_decrypt', PEER_X, { peerIsSelf: false });
+    store.grantSession(APP_A, 'nip04_decrypt', PEER_X, { peerIsSelf: false });
+    store.grantSession(APP_A, 'nip44_decrypt', PEER_Y, { peerIsSelf: false });
+    store.grantSession(APP_B, 'nip44_decrypt', PEER_X, { peerIsSelf: false });
 
-    store.setAppThrottled(APP_A, null);
-    expect(useNip46RequestsStore.getState().throttledApps).toEqual({});
+    store.revokeSessionGrant(APP_A, undefined, PEER_X.toUpperCase());
 
-    // Clearing an absent flag is a no-op.
-    store.setAppThrottled(APP_B, null);
-    expect(useNip46RequestsStore.getState().throttledApps).toEqual({});
-  });
-
-  it('clear() drops throttle flags alongside the queue', () => {
-    const store = useNip46RequestsStore.getState();
-    store.setAppThrottled(APP_A, 5_000);
-    store.enqueue(makeRequest());
-    store.clear();
-    expect(useNip46RequestsStore.getState().throttledApps).toEqual({});
-    expect(useNip46RequestsStore.getState().pending).toEqual([]);
+    const grants = useNip46RequestsStore.getState().sessionGrants;
+    expect(grants).toHaveLength(2);
+    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', PEER_Y)).toBe(true);
+    expect(store.hasSessionGrant(APP_B, 'nip44_decrypt', PEER_X)).toBe(true);
+    expect(store.hasSessionGrant(APP_A, 'nip44_decrypt', PEER_X)).toBe(false);
+    expect(store.hasSessionGrant(APP_A, 'nip04_decrypt', PEER_X)).toBe(false);
   });
 });

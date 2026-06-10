@@ -30,6 +30,7 @@ function run(request: ClassifyInput, overrides: Partial<EvaluateInput> = {}) {
     connection: makeConnection(),
     request,
     hasSessionGrant: () => false,
+    hasSessionAllow: () => false,
     rateLimit: { allowed: true },
     ...overrides,
   });
@@ -44,7 +45,7 @@ describe('classifyRequest', () => {
     expect(classifyRequest({ method }).class).toBe('auto');
   });
 
-  it.each([1, 6, 16, 7, 1111])('classifies sign_event kind %i as normal', (kind) => {
+  it.each([1, 6, 16, 7, 1111, 30023])('classifies sign_event kind %i as normal', (kind) => {
     expect(classifyRequest({ method: 'sign_event', kind }).class).toBe('normal');
   });
 
@@ -426,14 +427,24 @@ describe('session grants', () => {
     userPubkey: USER_PUBKEY,
   };
 
-  it('allows a peer≠self decrypt holding a session grant', () => {
-    const decision = run(peerDecrypt, { hasSessionGrant: (key) => key === 'nip44_decrypt' });
+  it('allows a peer≠self decrypt holding a session grant for THAT peer', () => {
+    const decision = run(peerDecrypt, {
+      hasSessionGrant: (key, peer) => key === 'nip44_decrypt' && peer === PEER_PUBKEY,
+    });
     expect(decision).toMatchObject({
       verdict: 'allow',
       reason: 'session_grant',
       logVerdict: 'auto_approved_session',
       class: 'critical',
+      peerPubkey: PEER_PUBKEY,
     });
+  });
+
+  it('asks when the session grant belongs to a different peer', () => {
+    const decision = run(peerDecrypt, {
+      hasSessionGrant: (key, peer) => key === 'nip44_decrypt' && peer === 'c'.repeat(64),
+    });
+    expect(decision).toMatchObject({ verdict: 'ask' });
   });
 
   it('still prompts for decrypt-to-self despite a session grant', () => {
@@ -464,5 +475,141 @@ describe('session grants', () => {
       hasSessionGrant: () => true,
     });
     expect(decision).toMatchObject({ verdict: 'deny', reason: 'grant_deny' });
+  });
+});
+
+describe('per-peer persistent decrypt grants', () => {
+  const peerDecrypt: ClassifyInput = {
+    method: 'nip44_decrypt',
+    params: [PEER_PUBKEY, 'cipher'],
+    userPubkey: USER_PUBKEY,
+  };
+
+  function withPeerGrant(methods: string[], peer: string = PEER_PUBKEY): PolicyConnection {
+    return makeConnection({ peerDecryptGrants: { [peer]: { methods } } });
+  }
+
+  it('allows a decrypt holding a matching (peer, method) grant', () => {
+    const decision = run(peerDecrypt, { connection: withPeerGrant(['nip44_decrypt']) });
+    expect(decision).toMatchObject({
+      verdict: 'allow',
+      reason: 'peer_grant_always',
+      logVerdict: 'auto_approved_peer_grant',
+      class: 'critical',
+      peerPubkey: PEER_PUBKEY,
+    });
+  });
+
+  it('asks when the grant covers a different peer', () => {
+    const decision = run(peerDecrypt, {
+      connection: withPeerGrant(['nip44_decrypt'], 'c'.repeat(64)),
+    });
+    expect(decision).toMatchObject({ verdict: 'ask' });
+  });
+
+  it('asks when the grant covers a different decrypt method', () => {
+    const decision = run(peerDecrypt, { connection: withPeerGrant(['nip04_decrypt']) });
+    expect(decision).toMatchObject({ verdict: 'ask' });
+  });
+
+  it('matches uppercase request params against a lowercase grant key', () => {
+    const decision = run(
+      { ...peerDecrypt, params: [PEER_PUBKEY.toUpperCase(), 'cipher'] },
+      { connection: withPeerGrant(['nip44_decrypt']) }
+    );
+    expect(decision).toMatchObject({ verdict: 'allow', reason: 'peer_grant_always' });
+  });
+
+  it('still prompts for decrypt-to-self even with a poisoned matching entry', () => {
+    const decision = run(
+      { method: 'nip44_decrypt', params: [USER_PUBKEY, 'cipher'], userPubkey: USER_PUBKEY },
+      { connection: withPeerGrant(['nip44_decrypt'], USER_PUBKEY) }
+    );
+    expect(decision).toMatchObject({ verdict: 'ask', reason: 'self_decrypt', isSelfDecrypt: true });
+  });
+
+  it('ignores peer grants in strict mode', () => {
+    const decision = run(peerDecrypt, {
+      connection: makeConnection({
+        mode: 'strict',
+        peerDecryptGrants: { [PEER_PUBKEY]: { methods: ['nip44_decrypt'] } },
+      }),
+    });
+    expect(decision).toMatchObject({ verdict: 'ask', reason: 'strict_mode' });
+  });
+
+  it('honors a blanket deny grant over a peer grant', () => {
+    const decision = run(peerDecrypt, {
+      connection: makeConnection({
+        grants: { nip44_decrypt: { verdict: 'deny' } },
+        peerDecryptGrants: { [PEER_PUBKEY]: { methods: ['nip44_decrypt'] } },
+      }),
+    });
+    expect(decision).toMatchObject({ verdict: 'deny', reason: 'grant_deny' });
+  });
+
+  it('a tampered blanket decrypt-always still asks (critical ceiling intact)', () => {
+    const decision = run(peerDecrypt, {
+      connection: makeConnection({ grants: { nip44_decrypt: { verdict: 'always' } } }),
+    });
+    expect(decision).toMatchObject({ verdict: 'ask', reason: 'critical_class' });
+  });
+
+  it('never applies peer grants to signing requests', () => {
+    const decision = run(
+      { method: 'sign_event', kind: 1, params: [PEER_PUBKEY], userPubkey: USER_PUBKEY },
+      { connection: withPeerGrant(['nip44_decrypt']) }
+    );
+    expect(decision).toMatchObject({ verdict: 'ask' });
+  });
+});
+
+describe('session allows', () => {
+  it('allows a sign request holding a session allow', () => {
+    const decision = run(
+      { method: 'sign_event', kind: 1 },
+      { hasSessionAllow: (grantKey) => grantKey === 'sign_event:1' }
+    );
+    expect(decision).toMatchObject({
+      verdict: 'allow',
+      reason: 'session_allow',
+      logVerdict: 'auto_approved_session',
+    });
+  });
+
+  it('allows a CRITICAL wallet sign kind via session allow — runtime-only bypass of the persisted ceiling', () => {
+    const decision = run({ method: 'sign_event', kind: 17375 }, { hasSessionAllow: () => true });
+    expect(decision).toMatchObject({
+      verdict: 'allow',
+      reason: 'session_allow',
+      logVerdict: 'auto_approved_session',
+    });
+  });
+
+  it('ignores session allows in strict mode', () => {
+    const decision = run(
+      { method: 'sign_event', kind: 1 },
+      { connection: makeConnection({ mode: 'strict' }), hasSessionAllow: () => true }
+    );
+    expect(decision).toMatchObject({ verdict: 'ask', reason: 'strict_mode' });
+  });
+
+  it('honors a deny grant before any session allow', () => {
+    const decision = run(
+      { method: 'sign_event', kind: 1 },
+      {
+        connection: makeConnection({ grants: { 'sign_event:1': { verdict: 'deny' } } }),
+        hasSessionAllow: () => true,
+      }
+    );
+    expect(decision).toMatchObject({ verdict: 'deny', reason: 'grant_deny' });
+  });
+
+  it('never applies session allows to a self-decrypt', () => {
+    const decision = run(
+      { method: 'nip44_decrypt', params: [USER_PUBKEY, 'ct'], userPubkey: USER_PUBKEY },
+      { hasSessionAllow: () => true }
+    );
+    expect(decision).toMatchObject({ verdict: 'ask', reason: 'self_decrypt' });
   });
 });

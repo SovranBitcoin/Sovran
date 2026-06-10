@@ -74,11 +74,13 @@ function persistedConnection(clientPubkey: string): Nip46Connection {
     requestCount: 0,
     deniedCount: 0,
     grants: {},
+    peerDecryptGrants: {},
+    previousClientPubkeys: [],
   };
 }
 
-function writeBlob(apps: Record<string, Nip46Connection>): void {
-  storageMap.set(STORAGE_KEY, JSON.stringify({ state: { apps }, version: 1 }));
+function writeBlob(apps: Record<string, Nip46Connection>, version = 3): void {
+  storageMap.set(STORAGE_KEY, JSON.stringify({ state: { apps }, version }));
 }
 
 async function flushPersistWrites(): Promise<void> {
@@ -337,5 +339,364 @@ describe('app lifecycle actions', () => {
     expect(app.name).toBe('Primal');
     expect(app.url).toBe('https://primal.net');
     expect(app.relays).toEqual(['wss://relay.primal.net']);
+  });
+});
+
+describe('per-peer decrypt grants', () => {
+  const client = pk(20);
+  const peerX = 'e'.repeat(64);
+  const peerY = 'f'.repeat(64);
+
+  beforeEach(() => {
+    expect(useNip46ConnectionsStore.getState().upsertApp(baseInput(client)).isOk()).toBe(true);
+  });
+
+  it('sets, merges methods, and revokes per peer', () => {
+    const store = useNip46ConnectionsStore.getState();
+    expect(
+      store.setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: false }).isOk()
+    ).toBe(true);
+    expect(
+      store.setPeerDecryptGrant(client, peerX, 'nip04_decrypt', { peerIsSelf: false }).isOk()
+    ).toBe(true);
+    // Re-granting the same method is idempotent.
+    expect(
+      store.setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: false }).isOk()
+    ).toBe(true);
+
+    const grant = useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX];
+    expect(grant.methods).toEqual(['nip44_decrypt', 'nip04_decrypt']);
+
+    store.revokePeerDecryptGrant(client, peerX, 'nip44_decrypt');
+    expect(
+      useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX].methods
+    ).toEqual(['nip04_decrypt']);
+
+    store.revokePeerDecryptGrant(client, peerX);
+    expect(
+      useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX]
+    ).toBeUndefined();
+  });
+
+  it('lowercases the peer key on write', () => {
+    useNip46ConnectionsStore
+      .getState()
+      .setPeerDecryptGrant(client, peerX.toUpperCase(), 'nip44_decrypt', { peerIsSelf: false });
+    expect(useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX]).toBeDefined();
+  });
+
+  it('refuses a grant asserting peerIsSelf', () => {
+    const result = useNip46ConnectionsStore
+      .getState()
+      .setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: true } as never);
+    expect(result._unsafeUnwrapErr()).toBe('self_decrypt_forbidden');
+  });
+
+  it('refuses malformed peers and unknown apps', () => {
+    const store = useNip46ConnectionsStore.getState();
+    expect(
+      store
+        .setPeerDecryptGrant(client, 'not-hex', 'nip44_decrypt', { peerIsSelf: false })
+        ._unsafeUnwrapErr()
+    ).toBe('invalid_peer');
+    expect(
+      store
+        .setPeerDecryptGrant(pk(21), peerX, 'nip44_decrypt', { peerIsSelf: false })
+        ._unsafeUnwrapErr()
+    ).toBe('unknown_app');
+  });
+
+  it('rejects new peers past the per-app cap but still updates existing ones', () => {
+    const store = useNip46ConnectionsStore.getState();
+    for (let i = 0; i < 50; i++) {
+      const peer = i.toString(16).padStart(2, '0').repeat(32);
+      expect(
+        store.setPeerDecryptGrant(client, peer, 'nip44_decrypt', { peerIsSelf: false }).isOk()
+      ).toBe(true);
+    }
+    const overflowPeer = 'ab'.repeat(32);
+    expect(
+      store
+        .setPeerDecryptGrant(client, overflowPeer, 'nip44_decrypt', { peerIsSelf: false })
+        ._unsafeUnwrapErr()
+    ).toBe('peer_grant_limit');
+    // Adding a second method to an existing peer is still allowed at the cap.
+    const existingPeer = '00'.repeat(32);
+    expect(
+      store.setPeerDecryptGrant(client, existingPeer, 'nip04_decrypt', { peerIsSelf: false }).isOk()
+    ).toBe(true);
+  });
+
+  it('touchUsage attributes consumption to the peer grant', () => {
+    const store = useNip46ConnectionsStore.getState();
+    store.setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: false });
+    store.touchUsage(client, { peerGrantPubkey: peerX });
+
+    const grant = useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX];
+    expect(grant.useCount).toBe(1);
+    expect(grant.lastUsedAt).toBeDefined();
+    expect(
+      useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerY]
+    ).toBeUndefined();
+  });
+
+  it('persists peer grants through the round-trip', async () => {
+    const store = useNip46ConnectionsStore.getState();
+    store.setPeerDecryptGrant(client, peerX, 'nip44_decrypt', { peerIsSelf: false });
+    await flushPersistWrites();
+
+    const blob = storageMap.get(STORAGE_KEY);
+    useNip46ConnectionsStore.setState({ apps: {} });
+    await flushPersistWrites();
+    storageMap.set(STORAGE_KEY, blob!);
+    await useNip46ConnectionsStore.persist.rehydrate();
+
+    expect(
+      useNip46ConnectionsStore.getState().apps[client].peerDecryptGrants[peerX].methods
+    ).toEqual(['nip44_decrypt']);
+  });
+});
+
+describe('v1 → v2 migration', () => {
+  it('hydrates a real v1 blob (no peerDecryptGrants) without wiping pairings', async () => {
+    const client = pk(30);
+    const v1Connection = persistedConnection(client) as unknown as Record<string, unknown>;
+    delete v1Connection.peerDecryptGrants;
+    v1Connection.grants = {
+      'sign_event:1': { verdict: 'always', origin: 'pairing', createdAt: 1, useCount: 3 },
+    };
+    writeBlob({ [client]: v1Connection as unknown as Nip46Connection }, 1);
+
+    await useNip46ConnectionsStore.persist.rehydrate();
+
+    const app = useNip46ConnectionsStore.getState().apps[client];
+    expect(app).toBeDefined();
+    expect(app.peerDecryptGrants).toEqual({});
+    expect(app.grants['sign_event:1']?.verdict).toBe('always');
+  });
+
+  it('still rejects a v1 blob with a tampered critical-always grant', async () => {
+    const client = pk(31);
+    const tampered = persistedConnection(client) as unknown as Record<string, unknown>;
+    delete tampered.peerDecryptGrants;
+    tampered.grants = {
+      nip44_decrypt: { verdict: 'always', origin: 'prompt', createdAt: 1, useCount: 0 },
+    };
+    writeBlob({ [client]: tampered as unknown as Nip46Connection }, 1);
+
+    await useNip46ConnectionsStore.persist.rehydrate();
+
+    expect(useNip46ConnectionsStore.getState().apps).toEqual({});
+  });
+});
+
+describe('adoptConnection', () => {
+  const OLD = pk(40);
+  const NEW = pk(41);
+  const peerX = 'e'.repeat(64);
+
+  function seedPrevious(overrides: Partial<Parameters<typeof baseInput>[1]> = {}) {
+    const store = useNip46ConnectionsStore.getState();
+    expect(
+      store
+        .upsertApp(baseInput(OLD, { name: 'Primal', url: 'https://primal.net', ...overrides }))
+        .isOk()
+    ).toBe(true);
+    store.setGrant(OLD, 'sign_event:1', 'always');
+    store.setGrant(OLD, 'sign_event:7', 'deny');
+    store.setPeerDecryptGrant(OLD, peerX, 'nip44_decrypt', { peerIsSelf: false });
+    store.setMode(OLD, 'strict');
+    store.touchUsage(OLD);
+  }
+
+  it('inheritGrants: true carries config and deletes the old record atomically', () => {
+    seedPrevious();
+    const before = useNip46ConnectionsStore.getState().apps[OLD];
+
+    const result = useNip46ConnectionsStore
+      .getState()
+      .adoptConnection(OLD, baseInput(NEW, { name: 'PrimalWeb', url: 'https://primal.net' }), {
+        inheritGrants: true,
+      });
+    expect(result.isOk()).toBe(true);
+
+    const apps = useNip46ConnectionsStore.getState().apps;
+    expect(apps[OLD]).toBeUndefined();
+    const adopted = apps[NEW];
+    expect(adopted).toMatchObject({
+      clientPubkey: NEW,
+      name: 'PrimalWeb',
+      status: 'active',
+      mode: 'strict',
+      encryption: 'nip44',
+      pairedAt: before.pairedAt,
+      requestCount: before.requestCount,
+      deniedCount: before.deniedCount,
+      previousClientPubkeys: [OLD],
+    });
+    expect(adopted.grants['sign_event:1']?.verdict).toBe('always');
+    expect(adopted.grants['sign_event:7']?.verdict).toBe('deny');
+    expect(adopted.peerDecryptGrants[peerX]?.methods).toEqual(['nip44_decrypt']);
+    expect(adopted.lastUsedAt).toBe(before.lastUsedAt);
+  });
+
+  it('inheritGrants: false carries only the attribution chain (blocked fresh start)', () => {
+    seedPrevious();
+    useNip46ConnectionsStore.getState().blockApp(OLD);
+
+    const result = useNip46ConnectionsStore
+      .getState()
+      .adoptConnection(OLD, baseInput(NEW), { inheritGrants: false });
+    expect(result.isOk()).toBe(true);
+
+    const adopted = useNip46ConnectionsStore.getState().apps[NEW];
+    expect(adopted.grants).toEqual({});
+    expect(adopted.peerDecryptGrants).toEqual({});
+    expect(adopted.mode).toBe('standard');
+    expect(adopted.status).toBe('active');
+    expect(adopted.requestCount).toBe(0);
+    expect(adopted.previousClientPubkeys).toEqual([OLD]);
+    expect(useNip46ConnectionsStore.getState().apps[OLD]).toBeUndefined();
+  });
+
+  it('merges pairing-time grants on top of carried grants', () => {
+    seedPrevious();
+    const result = useNip46ConnectionsStore.getState().adoptConnection(
+      OLD,
+      baseInput(NEW, {
+        grants: {
+          'sign_event:6': { verdict: 'always', origin: 'pairing', createdAt: 1, useCount: 0 },
+        },
+      }),
+      { inheritGrants: true }
+    );
+    expect(result.isOk()).toBe(true);
+    const adopted = useNip46ConnectionsStore.getState().apps[NEW];
+    expect(adopted.grants['sign_event:1']?.verdict).toBe('always');
+    expect(adopted.grants['sign_event:6']?.verdict).toBe('always');
+  });
+
+  it('extends and caps the chain, dropping new-key collisions', () => {
+    const store = useNip46ConnectionsStore.getState();
+    expect(store.upsertApp(baseInput(OLD)).isOk()).toBe(true);
+    const longChain = Array.from({ length: 9 }, (_, i) =>
+      `${(50 + i).toString(16)}`.padStart(2, '0').repeat(32)
+    );
+    useNip46ConnectionsStore.setState((state) => ({
+      apps: {
+        ...state.apps,
+        [OLD]: { ...state.apps[OLD], previousClientPubkeys: [...longChain, NEW] },
+      },
+    }));
+
+    expect(
+      useNip46ConnectionsStore
+        .getState()
+        .adoptConnection(OLD, baseInput(NEW), { inheritGrants: true })
+        .isOk()
+    ).toBe(true);
+    const chain = useNip46ConnectionsStore.getState().apps[NEW].previousClientPubkeys;
+    expect(chain).toHaveLength(8);
+    expect(chain[chain.length - 1]).toBe(OLD); // most recent kept
+    expect(chain).not.toContain(NEW); // collision with live key dropped
+  });
+
+  it('rejects self-adopt, unknown previous, and existing target', () => {
+    const store = useNip46ConnectionsStore.getState();
+    expect(store.upsertApp(baseInput(OLD)).isOk()).toBe(true);
+    expect(store.upsertApp(baseInput(NEW)).isOk()).toBe(true);
+
+    expect(
+      store.adoptConnection(OLD, baseInput(OLD), { inheritGrants: true })._unsafeUnwrapErr()
+    ).toBe('same_pubkey');
+    expect(
+      store.adoptConnection(pk(42), baseInput(pk(43)), { inheritGrants: true })._unsafeUnwrapErr()
+    ).toBe('unknown_previous');
+    expect(
+      store.adoptConnection(OLD, baseInput(NEW), { inheritGrants: true })._unsafeUnwrapErr()
+    ).toBe('target_exists');
+  });
+
+  it('succeeds at the connected-app cap (net count unchanged)', () => {
+    const store = useNip46ConnectionsStore.getState();
+    for (let i = 0; i < 64; i++) {
+      expect(store.upsertApp(baseInput(pk(100 + i))).isOk()).toBe(true);
+    }
+    expect(
+      useNip46ConnectionsStore
+        .getState()
+        .adoptConnection(pk(100), baseInput(pk(200)), { inheritGrants: true })
+        .isOk()
+    ).toBe(true);
+    expect(Object.keys(useNip46ConnectionsStore.getState().apps)).toHaveLength(64);
+  });
+
+  it('still drops critical-always entries arriving via input grants', () => {
+    seedPrevious();
+    const result = useNip46ConnectionsStore.getState().adoptConnection(
+      OLD,
+      baseInput(NEW, {
+        grants: {
+          nip44_decrypt: { verdict: 'always', origin: 'pairing', createdAt: 1, useCount: 0 },
+        },
+      }),
+      { inheritGrants: true }
+    );
+    expect(result.isOk()).toBe(true);
+    expect(useNip46ConnectionsStore.getState().apps[NEW].grants.nip44_decrypt).toBeUndefined();
+  });
+
+  it('persists the chain through the round-trip', async () => {
+    seedPrevious();
+    useNip46ConnectionsStore
+      .getState()
+      .adoptConnection(OLD, baseInput(NEW), { inheritGrants: true });
+    await flushPersistWrites();
+
+    const blob = storageMap.get(STORAGE_KEY);
+    useNip46ConnectionsStore.setState({ apps: {} });
+    await flushPersistWrites();
+    storageMap.set(STORAGE_KEY, blob!);
+    await useNip46ConnectionsStore.persist.rehydrate();
+
+    expect(useNip46ConnectionsStore.getState().apps[NEW].previousClientPubkeys).toEqual([OLD]);
+  });
+});
+
+describe('v2 → v3 migration', () => {
+  it('hydrates a real v2 blob (no previousClientPubkeys) without wiping pairings', async () => {
+    const client = pk(60);
+    const v2Connection = persistedConnection(client) as unknown as Record<string, unknown>;
+    delete v2Connection.previousClientPubkeys;
+    v2Connection.grants = {
+      'sign_event:1': { verdict: 'always', origin: 'pairing', createdAt: 1, useCount: 3 },
+    };
+    writeBlob({ [client]: v2Connection as unknown as Nip46Connection }, 2);
+
+    await useNip46ConnectionsStore.persist.rehydrate();
+
+    const app = useNip46ConnectionsStore.getState().apps[client];
+    expect(app).toBeDefined();
+    expect(app.previousClientPubkeys).toEqual([]);
+    expect(app.grants['sign_event:1']?.verdict).toBe('always');
+  });
+
+  it('clamps a malformed chain instead of wiping the blob', async () => {
+    const client = pk(61);
+    const tampered = persistedConnection(client) as unknown as Record<string, unknown>;
+    tampered.previousClientPubkeys = [
+      'not-hex',
+      ...Array.from({ length: 10 }, (_, i) =>
+        `${(70 + i).toString(16)}`.padStart(2, '0').repeat(32)
+      ),
+    ];
+    writeBlob({ [client]: tampered as unknown as Nip46Connection }, 2);
+
+    await useNip46ConnectionsStore.persist.rehydrate();
+
+    const app = useNip46ConnectionsStore.getState().apps[client];
+    expect(app).toBeDefined();
+    expect(app.previousClientPubkeys).toHaveLength(8);
+    expect(app.previousClientPubkeys).not.toContain('not-hex');
   });
 });

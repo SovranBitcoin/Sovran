@@ -41,7 +41,10 @@ import {
   useNip46RequestsStore,
   type Nip46PendingRequest,
 } from '@/features/nostrSigner/data/nip46RequestsStore';
+import { connectionForClient } from '@/features/nostrSigner/lib/connectionMatch';
+import { consolidatePending } from '@/features/nostrSigner/lib/requestGrouping';
 import { nip46Engine } from '@/features/nostrSigner/lib/nip46Engine';
+import { summarizeRequest } from '@/features/nostrSigner/lib/requestSummary';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -95,6 +98,16 @@ function lookupFor(request: Nip46PendingRequest): PermissionLookup {
 
 /** Bounded one-line preview; decrypt NEVER previews content. */
 function previewSubtitleFor(request: Nip46PendingRequest): string | undefined {
+  // Human-readable summary line first ("Liked a post", "Load its app
+  // settings from your account"); raw-ish previews where no summary exists.
+  const summary = summarizeRequest({
+    method: request.method,
+    ...(request.kind !== undefined && { kind: request.kind }),
+    preview: request.paramsPreview,
+  });
+  if (summary.activityLine.length > 0) {
+    return boundDisplay(summary.activityLine, SUBTITLE_PREVIEW_MAX_CHARS);
+  }
   const preview = request.paramsPreview;
   switch (preview.type) {
     case 'sign_event': {
@@ -253,7 +266,7 @@ export function SignerRequestsScreen(): React.ReactElement {
   return (
     <Screen name="SignerRequestsScreen">
       {groups.map((group) => {
-        const appName = appDisplayName(apps[group.clientPubkey]);
+        const appName = appDisplayName(connectionForClient(apps, group.clientPubkey));
         const count = group.requests.length;
         const allowAllEnabled = group.requests.every(
           (request) => permissionTierFor(lookupFor(request)) === 'standard'
@@ -294,13 +307,17 @@ export function SignerRequestsScreen(): React.ReactElement {
                 ) : null}
               </View>
 
-              {group.requests.map((request) => {
+              {consolidatePending(group.requests).map((rowGroup) => {
+                const request = rowGroup.requests[0]!;
                 const entry = permissionEntryFor(lookupFor(request));
-                const remainingMs = request.expiresAt - now;
+                // Earliest member drives the countdown; the label can jump UP
+                // when that member expires out (pre-filtered above) — fine.
+                const remainingMs =
+                  Math.min(...rowGroup.requests.map((member) => member.expiresAt)) - now;
                 const urgent = remainingMs < COUNTDOWN_WARNING_MS;
                 return (
                   <Animated.View
-                    key={request.id}
+                    key={rowGroup.key}
                     exiting={FadeOut.duration(ROW_EXIT_MS)}
                     layout={LinearTransition.duration(ROW_EXIT_MS)}>
                     <ListRow

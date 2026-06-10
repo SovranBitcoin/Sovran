@@ -26,7 +26,14 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BottomSheet, Button as HerouiButton } from 'heroui-native';
+import {
+  BottomSheet,
+  Button as HerouiButton,
+  ListGroup,
+  PressableFeedback,
+  Separator,
+  Switch as HeroSwitch,
+} from 'heroui-native';
 import { Result } from 'neverthrow';
 import { nip19 } from 'nostr-tools';
 
@@ -43,19 +50,25 @@ import {
   type CopySegment,
   type PermissionCatalogEntry,
 } from '@/features/nostrSigner/components/permissionCatalog';
-import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
+import {
+  useNip46ConnectionsStore,
+  type Nip46Connection,
+} from '@/features/nostrSigner/data/nip46ConnectionsStore';
 import { useNip46RequestsStore } from '@/features/nostrSigner/data/nip46RequestsStore';
+import { findPreviousConnection } from '@/features/nostrSigner/lib/connectionMatch';
 import {
   nip46Engine,
   type Nip46EngineError,
   type CompleteNostrconnectPairingInput,
 } from '@/features/nostrSigner/lib/nip46Engine';
-import type { GrantKey } from '@/features/nostrSigner/lib/nip46Types';
+import { isGrantKey, type GrantKey } from '@/features/nostrSigner/lib/nip46Types';
+import { PERMISSION_BUNDLES } from '@/features/nostrSigner/lib/permissionBundles';
 import {
   parseNostrconnectUri,
   type ParsedNostrConnectUri,
 } from '@/features/nostrSigner/lib/nip46Uri';
-import { grantKeyFor } from '@/features/nostrSigner/lib/permissionPolicy';
+import { presetGrantKeysExcluding } from '@/features/nostrSigner/lib/pairingPreset';
+import { grantKeyFor, parseGrantKey } from '@/features/nostrSigner/lib/permissionPolicy';
 import { switchProfileAndPair } from '@/features/nostrSigner/lib/switchProfileAndPair';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -80,11 +93,22 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 const CONNECT_TITLE = 'Connect App';
 const UPDATE_PERMISSIONS_LABEL = 'Update Permissions';
+const RECONNECT_TITLE = 'Reconnect App';
+const RECONNECT_BUTTON_LABEL = 'Reconnect';
+const RECONNECT_SUMMARY =
+  "You've connected this app before — your saved permissions will be restored.";
+const REVIEW_PERMISSIONS_LABEL = 'Review permissions';
+const ADOPT_CHANGED_MESSAGE =
+  'This connection changed while you were reviewing it. Please try again.';
 const SIGNING_IN_AS_LABEL = 'Signing in as';
 const CHANGE_LABEL = 'Change';
 const REQUESTING_LABEL = 'This app is requesting:';
+const PRESET_TITLE = 'Allow common social actions';
+const PRESET_DESCRIPTION =
+  'Posts, reactions, reposts, follows, settings — never wallet or decrypts.';
 const ALWAYS_ASKS_LABEL = 'Always asks';
 const UNCHECKED_CAPTION = 'Unchecked permissions will ask you each time instead.';
+const MIXED_REVIEW_CAPTION = 'Custom · tap to allow all';
 const STRIPPED_PERMS_NOTICE =
   "These permissions can never be granted in advance — you'll be asked each time.";
 const CONNECT_BUTTON_LABEL = 'Connect';
@@ -116,6 +140,21 @@ function connectedToastCopy(appName: string): { label: string; description: stri
     label: `Connected to ${appName}`,
     description: "You're signed in. Manage permissions in Connected Apps.",
   };
+}
+
+/** "5 saved permissions · 2 decrypt contacts" (decrypt segment omitted at 0). */
+function reconnectCountsLine(grantCount: number, decryptContactCount: number): string {
+  const grants = `${grantCount} saved permission${grantCount === 1 ? '' : 's'}`;
+  if (decryptContactCount === 0) return grants;
+  return `${grants} · ${decryptContactCount} decrypt contact${decryptContactCount === 1 ? '' : 's'}`;
+}
+
+function blockedNoticeSegments(appName: string): CopySegment[] {
+  return [
+    { text: 'You blocked ' },
+    { text: appName, bold: true },
+    { text: ' before. Connecting again starts fresh.' },
+  ];
 }
 
 function restartWarningSegments(appName: string): CopySegment[] {
@@ -200,9 +239,100 @@ function permRowsFor(parsed: ParsedNostrConnectUri): PermRow[] {
   return rows;
 }
 
+/**
+ * "Common social actions" rows: the curated bundle minus anything the URI
+ * already requested (URI rows keep their own presentation and defaults).
+ * Every bundle key is always-allow-eligible by construction; the filter is
+ * defense in depth against future bundle edits.
+ */
+function presetRowsFor(uriRows: readonly PermRow[]): PermRow[] {
+  const covered = new Set<string>(uriRows.map((row) => row.grantKey));
+  return presetGrantKeysExcluding(covered)
+    .map((grantKey) => {
+      const lookup = parseGrantKey(grantKey);
+      const entry = permissionEntryFor(lookup);
+      return {
+        grantKey,
+        entry,
+        eligible: alwaysAllowEligible(lookup),
+        warning: entry.tier === 'protected' || entry.tier === 'unknown',
+      };
+    })
+    .filter((row) => row.eligible);
+}
+
+/** Switch row for the Reconnect review list — editor look, sheet-local. */
+function ReviewSwitchRow({
+  label,
+  description,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  description?: string;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <PressableFeedback
+      animation={false}
+      onPress={onToggle}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={label}>
+      <PressableFeedback.Scale>
+        <ListGroup.Item disabled>
+          <ListGroup.ItemContent>
+            <ListGroup.ItemTitle>{label}</ListGroup.ItemTitle>
+            {description !== undefined ? (
+              <ListGroup.ItemDescription>{description}</ListGroup.ItemDescription>
+            ) : null}
+          </ListGroup.ItemContent>
+          <ListGroup.ItemSuffix>
+            {/* Visual only — the row owns the press (the switch's own
+                Pressable would swallow it). */}
+            <View pointerEvents="none">
+              <HeroSwitch isSelected={selected} />
+            </View>
+          </ListGroup.ItemSuffix>
+        </ListGroup.Item>
+      </PressableFeedback.Scale>
+      <PressableFeedback.Ripple />
+    </PressableFeedback>
+  );
+}
+
+/**
+ * Reconnect-variant checklist: the URI's eligible rows plus rows synthesized
+ * from the PREVIOUS record's always-grants — so everything being restored is
+ * reviewable. Deny grants get no row (the sheet has no deny affordance; they
+ * carry via adoption and stay editable in the per-app editor).
+ */
+function reconnectRowsFor(uriRows: readonly PermRow[], previous: Nip46Connection): PermRow[] {
+  const eligibleUriRows = uriRows.filter((row) => row.eligible);
+  const covered = new Set<string>(eligibleUriRows.map((row) => row.grantKey));
+  const extra: PermRow[] = [];
+  for (const [grantKey, grant] of Object.entries(previous.grants)) {
+    if (!grant || grant.verdict !== 'always') continue;
+    if (covered.has(grantKey)) continue;
+    if (!isGrantKey(grantKey)) continue;
+    const lookup = parseGrantKey(grantKey);
+    if (!alwaysAllowEligible(lookup)) continue;
+    const entry = permissionEntryFor(lookup);
+    extra.push({
+      grantKey,
+      entry,
+      eligible: true,
+      warning: entry.tier === 'protected' || entry.tier === 'unknown',
+    });
+  }
+  return [...eligibleUriRows, ...extra];
+}
+
 function defaultCheckedFor(
   rows: readonly PermRow[],
-  existingGrants: Partial<Record<GrantKey, { verdict: string }>> | undefined
+  existingGrants: Partial<Record<GrantKey, { verdict: string }>> | undefined,
+  presetRows: readonly PermRow[] = []
 ): Record<string, boolean> {
   const checked: Record<string, boolean> = {};
   for (const row of rows) {
@@ -217,6 +347,15 @@ function defaultCheckedFor(
     // Security design resolution: sensitive perms default UNCHECKED.
     checked[row.grantKey] = row.entry.tier === 'standard';
   }
+  // Preset rows default ON for a FIRST pairing — that is the bundle's whole
+  // point; sensitive-tier items (0, 3, 9734, encrypt) are deliberately
+  // pre-checked inside an explicitly labeled, individually-uncheckable
+  // bundle. On a re-pair, defaults mirror the standing grants so "Update
+  // Permissions" never silently re-grants something the user removed.
+  for (const row of presetRows) {
+    checked[row.grantKey] =
+      existingGrants === undefined ? true : existingGrants[row.grantKey]?.verdict === 'always';
+  }
   return checked;
 }
 
@@ -224,8 +363,16 @@ function defaultCheckedFor(
  * Survives the root-page unmount caused by pushing the profile-picker page
  * (PopupHost renders only the top custom page). Keyed per pairing attempt;
  * dropped by `releaseIfSheetClosed` when the sheet actually closes.
+ * `reviewPresented` is STICKY: once the Reconnect variant's checklist has
+ * been opened, the rows count as presented for the whole attempt — collapsing
+ * again must not retract edits the user made while it was open.
  */
-const checkedStateCache = new Map<string, Record<string, boolean>>();
+interface CachedSheetState {
+  checked: Record<string, boolean>;
+  reviewPresented: boolean;
+}
+
+const checkedStateCache = new Map<string, CachedSheetState>();
 
 function checkedCacheKey(parsed: ParsedNostrConnectUri): string {
   return `${parsed.clientPubkey}:${parsed.secret}`;
@@ -255,10 +402,24 @@ async function completePairingWhenHot(
   return outcome;
 }
 
-type ConnectFailure = 'relays' | 'save';
+type ConnectFailure = 'relays' | 'save' | 'changed';
 
 function failureFor(error: Nip46EngineError): ConnectFailure {
+  if (error.type === 'adopt-failed') {
+    return error.cause === 'inherit_mismatch' ? 'changed' : 'save';
+  }
   return error.type === 'upsert-failed' ? 'save' : 'relays';
+}
+
+function failureMessageFor(failure: ConnectFailure): string {
+  switch (failure) {
+    case 'relays':
+      return RELAY_UNREACHABLE_MESSAGE;
+    case 'save':
+      return SAVE_FAILED_MESSAGE;
+    case 'changed':
+      return ADOPT_CHANGED_MESSAGE;
+  }
 }
 
 // ── Root sheet body ─────────────────────────────────────────────
@@ -307,6 +468,7 @@ function ConnectReview({
   parsed,
   close,
   pushCustomPage,
+  setFooterConfig,
 }: SignerConnectContentProps & { parsed: ParsedNostrConnectUri }): React.ReactElement {
   const [foreground, muted, warning, danger, dangerSoftFg] = useThemeColor([
     'foreground',
@@ -316,22 +478,72 @@ function ConnectReview({
     'danger-soft-foreground',
   ] as const);
   const { keys } = useNostrKeysContext();
-  const connection = useNip46ConnectionsStore((s) => s.apps[parsed.clientPubkey]);
+  // Whole map: the reconnect matcher scans all connections, not one key.
+  const apps = useNip46ConnectionsStore((s) => s.apps);
+  const connection = apps[parsed.clientPubkey];
   const activeProfile = useProfileStore((s) =>
     s.profiles.find((profile) => profile.accountIndex === s.activeAccountIndex)
   );
 
   const isUpdate = connection !== undefined;
+  // Same app, NEW ephemeral client key? (Exact-pubkey update takes precedence;
+  // the matcher is only a UX offer — the engine re-validates it at completion.)
+  const match = useMemo(
+    () => (isUpdate ? ({ kind: 'none' } as const) : findPreviousConnection(apps, parsed)),
+    [apps, isUpdate, parsed]
+  );
+  const variant: 'update' | 'reconnect' | 'blocked-fresh' | 'fresh' = isUpdate
+    ? 'update'
+    : match.kind === 'active'
+      ? 'reconnect'
+      : match.kind === 'blocked'
+        ? 'blocked-fresh'
+        : 'fresh';
+  const previousConnection = match.kind === 'none' ? undefined : match.connection;
+
   const appName = appDisplayName({ ...(parsed.name !== undefined && { name: parsed.name }) });
   const appDomain = parsed.url !== undefined ? safeHostname(parsed.url).unwrapOr(null) : null;
 
   const permRows = useMemo(() => permRowsFor(parsed), [parsed]);
-  const cacheKey = checkedCacheKey(parsed);
-  const [checked, setChecked] = useState<Record<string, boolean>>(
-    () => checkedStateCache.get(cacheKey) ?? defaultCheckedFor(permRows, connection?.grants)
+  // Reconnect hides the preset (the previous config replaces preset defaults).
+  const presetRows = useMemo(
+    () => (variant === 'reconnect' ? [] : presetRowsFor(permRows)),
+    [variant, permRows]
   );
+  const reviewRows = useMemo(
+    () =>
+      variant === 'reconnect' && previousConnection !== undefined
+        ? reconnectRowsFor(permRows, previousConnection)
+        : permRows,
+    [variant, previousConnection, permRows]
+  );
+  const cacheKey = checkedCacheKey(parsed);
+  const [checked, setChecked] = useState<Record<string, boolean>>(() => {
+    const cached = checkedStateCache.get(cacheKey);
+    if (cached !== undefined) return cached.checked;
+    if (variant === 'reconnect' && previousConnection !== undefined) {
+      return defaultCheckedFor(reviewRows, previousConnection.grants);
+    }
+    // Blocked previous → deliberate fresh start: nothing pre-checked from it.
+    return defaultCheckedFor(permRows, connection?.grants, presetRows);
+  });
+  const [presetExpanded, setPresetExpanded] = useState(false);
+  // Sticky for the attempt: once true, the reconnect rows count as presented.
+  const [reviewPresented, setReviewPresented] = useState<boolean>(
+    () => checkedStateCache.get(cacheKey)?.reviewPresented ?? false
+  );
+  const [reviewExpanded, setReviewExpanded] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [failure, setFailure] = useState<ConnectFailure | null>(null);
+
+  const toggleReview = useCallback(() => {
+    setReviewExpanded((value) => !value);
+    setReviewPresented(true);
+    setChecked((current) => {
+      checkedStateCache.set(cacheKey, { checked: current, reviewPresented: true });
+      return current;
+    });
+  }, [cacheKey]);
 
   // Hot + awaited pairing for the life of the SHEET. Registration is
   // idempotent, so the resumed-pairing path (already registered at boot) and
@@ -347,23 +559,84 @@ function ConnectReview({
     return () => releaseIfSheetClosed(parsed);
   }, [parsed]);
 
-  const toggleRow = useCallback(
-    (row: PermRow) => {
-      if (!row.eligible) return;
-      setChecked((current) => {
-        const next = { ...current, [row.grantKey]: !current[row.grantKey] };
-        checkedStateCache.set(cacheKey, next);
-        return next;
+  const cacheChecked = useCallback(
+    (next: Record<string, boolean>) => {
+      const cached = checkedStateCache.get(cacheKey);
+      checkedStateCache.set(cacheKey, {
+        checked: next,
+        reviewPresented: cached?.reviewPresented ?? false,
       });
     },
     [cacheKey]
   );
 
+  const toggleRow = useCallback(
+    (row: PermRow) => {
+      if (!row.eligible) return;
+      setChecked((current) => {
+        const next = { ...current, [row.grantKey]: !current[row.grantKey] };
+        cacheChecked(next);
+        return next;
+      });
+    },
+    [cacheChecked]
+  );
+
+  // Review list speaks the editor's bundle vocabulary: one switch per
+  // capability bundle (toggling covers every member key in the review set),
+  // plus individual rows for unbundled keys.
+  const reviewGroups = useMemo(() => {
+    const byKey = new Map(reviewRows.map((row) => [row.grantKey, row]));
+    const bundles = PERMISSION_BUNDLES.map((bundle) => ({
+      bundle,
+      rows: bundle.grantKeys
+        .map((grantKey) => byKey.get(grantKey))
+        .filter((row): row is PermRow => row !== undefined),
+    })).filter(({ rows }) => rows.length > 0);
+    const bundled = new Set(bundles.flatMap(({ rows }) => rows.map((row) => row.grantKey)));
+    const others = reviewRows.filter((row) => !bundled.has(row.grantKey));
+    return { bundles, others };
+  }, [reviewRows]);
+
+  const toggleReviewBundle = useCallback(
+    (rows: readonly PermRow[]) => {
+      setChecked((current) => {
+        const allOn = rows.every((row) => current[row.grantKey] === true);
+        const next = { ...current };
+        for (const row of rows) next[row.grantKey] = !allOn;
+        cacheChecked(next);
+        return next;
+      });
+    },
+    [cacheChecked]
+  );
+
+  const presetAllChecked = presetRows.every((row) => checked[row.grantKey] === true);
+  const togglePresetAll = useCallback(() => {
+    setChecked((current) => {
+      const allOn = presetRows.every((row) => current[row.grantKey] === true);
+      const next = { ...current };
+      for (const row of presetRows) next[row.grantKey] = !allOn;
+      cacheChecked(next);
+      return next;
+    });
+  }, [cacheChecked, presetRows]);
+
   const connect = useSingleFlight(
     useCallback(async () => {
       setFailure(null);
       setIsConnecting(true);
-      const eligibleRows = permRows.filter((row) => row.eligible);
+      // Reconnect: grants arrive via ADOPTION, so a never-opened checklist
+      // presents/accepts nothing (nothing can downgrade). Once the user has
+      // opened "Review permissions" (sticky), the reviewed rows are the
+      // contract — unchecking an inherited grant downgrades it post-adoption.
+      // Other variants: URI rows + preset rows, one accepted/presented union.
+      const eligibleRows =
+        variant === 'reconnect'
+          ? reviewPresented
+            ? reviewRows
+            : []
+          : [...permRows.filter((row) => row.eligible), ...presetRows];
       const acceptedGrantKeys = eligibleRows
         .filter((row) => checked[row.grantKey] === true)
         .map((row) => row.grantKey);
@@ -372,6 +645,9 @@ function ConnectReview({
         parsed,
         acceptedGrantKeys,
         presentedGrantKeys,
+        ...(previousConnection !== undefined && {
+          replacesClientPubkey: previousConnection.clientPubkey,
+        }),
       });
       setIsConnecting(false);
       if (outcome.isErr()) {
@@ -385,7 +661,19 @@ function ConnectReview({
       const toast = connectedToastCopy(appName);
       popup({ message: toast.label, text: toast.description, type: 'success' });
       close();
-    }, [appName, cacheKey, checked, close, parsed, permRows])
+    }, [
+      appName,
+      cacheKey,
+      checked,
+      close,
+      parsed,
+      permRows,
+      presetRows,
+      previousConnection,
+      reviewPresented,
+      reviewRows,
+      variant,
+    ])
   );
 
   const openProfilePicker = useCallback(() => {
@@ -408,14 +696,38 @@ function ConnectReview({
     ? CONNECTING_BUTTON_LABEL
     : failure !== null
       ? TRY_AGAIN_BUTTON_LABEL
-      : isUpdate
+      : variant === 'update'
         ? UPDATE_PERMISSIONS_LABEL
-        : CONNECT_BUTTON_LABEL;
+        : variant === 'reconnect'
+          ? RECONNECT_BUTTON_LABEL
+          : CONNECT_BUTTON_LABEL;
+
+  // Connect/Cancel live in PopupHost's pinned footer (the sheet body
+  // scrolls; the actions must not scroll away with it). Cleared on unmount
+  // so the pushed profile-picker page gets a footer-free sheet.
+  useEffect(() => {
+    setFooterConfig({
+      buttons: [
+        {
+          label: primaryLabel,
+          onPress: () => void connect(),
+          variant: 'primary',
+          isDisabled: isConnecting,
+        },
+        { label: CANCEL_BUTTON_LABEL, onPress: close, variant: 'tertiary' },
+      ],
+    });
+    return () => setFooterConfig(null);
+  }, [setFooterConfig, primaryLabel, isConnecting, connect, close]);
 
   return (
     <VStack spacing={14} className="px-1 pb-2 pt-1">
       <BottomSheet.Title className="text-foreground text-lg font-bold">
-        {isUpdate ? UPDATE_PERMISSIONS_LABEL : CONNECT_TITLE}
+        {variant === 'update'
+          ? UPDATE_PERMISSIONS_LABEL
+          : variant === 'reconnect'
+            ? RECONNECT_TITLE
+            : CONNECT_TITLE}
       </BottomSheet.Title>
 
       {/* App identity (app-supplied metadata — bounded, untrusted) */}
@@ -473,8 +785,92 @@ function ConnectReview({
         </HStack>
       </VStack>
 
-      {/* Requested permissions */}
-      {permRows.length > 0 ? (
+      {/* Blocked-before notice (metadata match on a blocked record) */}
+      {variant === 'blocked-fresh' ? (
+        <View className="bg-danger-soft rounded-2xl p-3">
+          <HStack spacing={8} align="center">
+            <Icon name="mdi:alert-circle" size={18} color={danger} />
+            <View style={{ flex: 1 }}>
+              <SegmentedText
+                segments={blockedNoticeSegments(appName)}
+                size={13}
+                color={dangerSoftFg}
+              />
+            </View>
+          </HStack>
+        </View>
+      ) : null}
+
+      {/* Reconnect: minimal restore summary + opt-in review checklist */}
+      {variant === 'reconnect' && previousConnection !== undefined ? (
+        <VStack spacing={10}>
+          <Text size={14} color={foreground} style={{ lineHeight: 20 }}>
+            {RECONNECT_SUMMARY}
+          </Text>
+          <Text size={12} color={muted}>
+            {reconnectCountsLine(
+              Object.keys(previousConnection.grants).length,
+              Object.keys(previousConnection.peerDecryptGrants).length
+            )}
+          </Text>
+          <Pressable
+            haptics
+            accessibilityRole="button"
+            accessibilityState={{ expanded: reviewExpanded }}
+            accessibilityLabel={REVIEW_PERMISSIONS_LABEL}
+            onPress={toggleReview}>
+            <HStack spacing={4} align="center">
+              <Text size={13} bold color={muted}>
+                {REVIEW_PERMISSIONS_LABEL}
+              </Text>
+              <Icon
+                name={reviewExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                size={16}
+                color={muted}
+              />
+            </HStack>
+          </Pressable>
+          {reviewExpanded ? (
+            <ListGroup variant="secondary">
+              {reviewGroups.bundles.map(({ bundle, rows }, index) => {
+                const allOn = rows.every((row) => checked[row.grantKey] === true);
+                const anyOn = rows.some((row) => checked[row.grantKey] === true);
+                return (
+                  <React.Fragment key={bundle.id}>
+                    {index > 0 ? <Separator className="mx-4" /> : null}
+                    <ReviewSwitchRow
+                      label={bundle.label}
+                      description={anyOn && !allOn ? MIXED_REVIEW_CAPTION : undefined}
+                      selected={allOn}
+                      onToggle={() => toggleReviewBundle(rows)}
+                    />
+                  </React.Fragment>
+                );
+              })}
+              {reviewGroups.others.map((row, index) => (
+                <React.Fragment key={row.grantKey}>
+                  {reviewGroups.bundles.length > 0 || index > 0 ? (
+                    <Separator className="mx-4" />
+                  ) : null}
+                  <ReviewSwitchRow
+                    label={row.entry.permissionEditorLabel}
+                    selected={checked[row.grantKey] === true}
+                    onToggle={() => toggleRow(row)}
+                  />
+                </React.Fragment>
+              ))}
+            </ListGroup>
+          ) : null}
+          {reviewExpanded ? (
+            <Text size={12} color={muted} style={{ lineHeight: 17 }}>
+              {UNCHECKED_CAPTION}
+            </Text>
+          ) : null}
+        </VStack>
+      ) : null}
+
+      {/* Requested permissions (hidden on Reconnect — the review list owns it) */}
+      {variant !== 'reconnect' && permRows.length > 0 ? (
         <VStack spacing={10}>
           <Text size={12} bold color={muted}>
             {REQUESTING_LABEL}
@@ -520,45 +916,90 @@ function ConnectReview({
               {STRIPPED_PERMS_NOTICE}
             </Text>
           ) : null}
-          <Text size={12} color={muted} style={{ lineHeight: 17 }}>
-            {UNCHECKED_CAPTION}
-          </Text>
         </VStack>
       ) : null}
 
-      {/* Inline failure state (relay unreachable / save failed) */}
+      {/* Common social actions preset (bundle minus URI-covered keys) */}
+      {presetRows.length > 0 ? (
+        <VStack spacing={10}>
+          <Pressable
+            haptics
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: presetAllChecked }}
+            accessibilityLabel={PRESET_TITLE}
+            onPress={togglePresetAll}>
+            <HStack spacing={10} align="center">
+              <SelectableCheck selected={presetAllChecked} style="square" />
+              <View style={{ flex: 1 }}>
+                <Text size={14} bold color={foreground}>
+                  {PRESET_TITLE}
+                </Text>
+                <Text size={12} color={muted}>
+                  {PRESET_DESCRIPTION}
+                </Text>
+              </View>
+              <Pressable
+                haptics
+                accessibilityRole="button"
+                accessibilityLabel={presetExpanded ? 'Collapse list' : 'Expand list'}
+                onPress={() => setPresetExpanded((value) => !value)}
+                style={{ padding: 4 }}>
+                <Icon
+                  name={presetExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                  size={20}
+                  color={muted}
+                />
+              </Pressable>
+            </HStack>
+          </Pressable>
+          {presetExpanded
+            ? presetRows.map((row) => (
+                <Pressable
+                  key={row.grantKey}
+                  haptics
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: checked[row.grantKey] === true }}
+                  accessibilityLabel={row.entry.permissionEditorLabel}
+                  onPress={() => toggleRow(row)}
+                  style={{ paddingLeft: 12 }}>
+                  <HStack spacing={10} align="center">
+                    <SelectableCheck
+                      selected={checked[row.grantKey] === true}
+                      style="square"
+                      variant={row.warning ? 'warning' : 'default'}
+                    />
+                    <Icon name={row.entry.icon} size={18} color={row.warning ? warning : muted} />
+                    <View style={{ flex: 1 }}>
+                      <Text size={14} color={foreground} numberOfLines={1}>
+                        {row.entry.permissionEditorLabel}
+                      </Text>
+                    </View>
+                  </HStack>
+                </Pressable>
+              ))
+            : null}
+        </VStack>
+      ) : null}
+
+      {variant !== 'reconnect' && (permRows.length > 0 || presetRows.length > 0) ? (
+        <Text size={12} color={muted} style={{ lineHeight: 17 }}>
+          {UNCHECKED_CAPTION}
+        </Text>
+      ) : null}
+
+      {/* Inline failure state (relay unreachable / save failed / changed) */}
       {failure !== null ? (
         <View className="bg-danger-soft rounded-2xl p-3">
           <HStack spacing={8} align="center">
             <Icon name="mdi:alert-circle" size={18} color={danger} />
             <View style={{ flex: 1 }}>
               <Text size={13} color={dangerSoftFg}>
-                {failure === 'relays' ? RELAY_UNREACHABLE_MESSAGE : SAVE_FAILED_MESSAGE}
+                {failureMessageFor(failure)}
               </Text>
             </View>
           </HStack>
         </View>
       ) : null}
-
-      {/* Footer */}
-      <VStack spacing={10}>
-        <HerouiButton
-          variant="primary"
-          className="bg-foreground"
-          isDisabled={isConnecting}
-          onPress={() => void connect()}>
-          <HerouiButton.Label className="text-background">{primaryLabel}</HerouiButton.Label>
-        </HerouiButton>
-        <Button
-          text={CANCEL_BUTTON_LABEL}
-          variant="underline"
-          size="compact"
-          haptics
-          accessibilityLabel={CANCEL_BUTTON_LABEL}
-          onPress={close}
-          style={{ alignSelf: 'center' }}
-        />
-      </VStack>
     </VStack>
   );
 }

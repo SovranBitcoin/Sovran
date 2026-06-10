@@ -25,7 +25,8 @@ import {
 
 export type SensitivityClass = 'auto' | 'normal' | 'sensitive' | 'critical' | 'forbidden';
 
-const NORMAL_SIGN_KINDS = new Set([1, 6, 16, 7, 1111]);
+// 30023 (long-form articles) is public content — same risk class as kind 1.
+const NORMAL_SIGN_KINDS = new Set([1, 6, 16, 7, 1111, 30023]);
 const SENSITIVE_SIGN_KINDS = new Set([0, 3, 10002, 22242, 27235, 4, 13, 14, 1059, 9734, 30078]);
 // NIP-60/61 wallet kinds — signing these can move or expose ecash.
 const CRITICAL_SIGN_KINDS = new Set([17375, 7375, 7374, 7376, 9321, 10019]);
@@ -152,18 +153,27 @@ export interface PolicyConnection {
   status: ConnectionStatus;
   mode: ConnectionMode;
   grants: Partial<Record<GrantKey, { verdict: GrantVerdict }>>;
+  /** Per-peer decrypt grants, keyed by lowercase peer pubkey hex. */
+  peerDecryptGrants?: Record<string, { methods: readonly string[] }>;
 }
 
 export interface EvaluateInput {
   /** null = sender is not a connected app (engine should have dropped it; defense in depth). */
   connection: PolicyConnection | null;
   request: ClassifyInput;
-  /** Runtime session-grant lookup (1h opt-in for critical peer≠self decrypts). */
-  hasSessionGrant: (grantKey: GrantKey) => boolean;
+  /** Runtime session-grant lookup (peer-scoped opt-in for peer≠self decrypts). */
+  hasSessionGrant: (grantKey: GrantKey, peerPubkey: string) => boolean;
+  /** Runtime session-allow lookup (non-decrypt keys; wallet sign kinds included). */
+  hasSessionAllow: (grantKey: GrantKey) => boolean;
   rateLimit: { allowed: boolean };
 }
 
-export type PolicyAllowReason = 'auto_method' | 'grant_always' | 'session_grant';
+export type PolicyAllowReason =
+  | 'auto_method'
+  | 'grant_always'
+  | 'session_grant'
+  | 'session_allow'
+  | 'peer_grant_always';
 export type PolicyDenyReason =
   | 'not_connected'
   | 'blocked'
@@ -177,6 +187,8 @@ interface PolicyDecisionBase {
   class: SensitivityClass;
   grantKey?: GrantKey;
   isSelfDecrypt?: boolean;
+  /** Decrypt peer (lowercase hex) — set when a per-peer grant fired. */
+  peerPubkey?: string;
 }
 
 export type PolicyDecision = PolicyDecisionBase &
@@ -184,7 +196,11 @@ export type PolicyDecision = PolicyDecisionBase &
     | {
         verdict: 'allow';
         reason: PolicyAllowReason;
-        logVerdict: 'auto_approved_method' | 'auto_approved_grant' | 'auto_approved_session';
+        logVerdict:
+          | 'auto_approved_method'
+          | 'auto_approved_grant'
+          | 'auto_approved_session'
+          | 'auto_approved_peer_grant';
       }
     | {
         verdict: 'deny';
@@ -218,7 +234,7 @@ export const DENY_ERROR_BY_REASON: Record<PolicyDenyReason, Nip46ErrorString> = 
  * except auto; persisted 'always' never allows the critical class.
  */
 export function evaluate(input: EvaluateInput): PolicyDecision {
-  const { connection, request, hasSessionGrant, rateLimit } = input;
+  const { connection, request, hasSessionGrant, hasSessionAllow, rateLimit } = input;
   const { class: sensitivity, isSelfDecrypt } = classifyRequest(request);
   const common = { class: sensitivity, ...(isSelfDecrypt && { isSelfDecrypt: true }) };
 
@@ -272,15 +288,44 @@ export function evaluate(input: EvaluateInput): PolicyDecision {
     return { verdict: 'ask', reason: 'strict_mode', logVerdict: 'prompt', ...withKey };
   }
   if (isSelfDecrypt) {
+    // BEFORE any peer-grant honoring: even a tampered peerDecryptGrants entry
+    // keyed on the user's own pubkey can never auto-approve a self-decrypt.
     return { verdict: 'ask', reason: 'self_decrypt', logVerdict: 'prompt', ...withKey };
   }
-  // Session grants exist only for peer≠self decrypts; a stray entry for any
-  // other key must not silently approve a critical sign.
+  // Per-peer grants exist only for peer≠self decrypts; a stray entry for any
+  // other key must not silently approve a critical sign. Both lookups are
+  // peer-scoped — a grant for one conversation never covers another.
   const sessionEligible = request.method === 'nip04_decrypt' || request.method === 'nip44_decrypt';
-  if (sessionEligible && hasSessionGrant(grantKey)) {
+  const decryptPeer = sessionEligible ? request.params?.[0]?.toLowerCase() : undefined;
+  if (sessionEligible && decryptPeer !== undefined) {
+    const withPeer = { ...withKey, peerPubkey: decryptPeer };
+    if (hasSessionGrant(grantKey, decryptPeer)) {
+      return {
+        verdict: 'allow',
+        reason: 'session_grant',
+        logVerdict: 'auto_approved_session',
+        ...withPeer,
+      };
+    }
+    const peerGrant = connection.peerDecryptGrants?.[decryptPeer];
+    if (peerGrant !== undefined && peerGrant.methods.includes(request.method)) {
+      return {
+        verdict: 'allow',
+        reason: 'peer_grant_always',
+        logVerdict: 'auto_approved_peer_grant',
+        ...withPeer,
+      };
+    }
+  }
+  // Session allows (runtime-only, non-decrypt keys) sit ABOVE the persisted
+  // critical ceiling on purpose: wallet sign kinds may be session-allowed —
+  // a restart always re-prompts — while a PERSISTED always on critical stays
+  // unrepresentable. Deny grants, strict mode, and self-decrypt already won
+  // above this line.
+  if (hasSessionAllow(grantKey)) {
     return {
       verdict: 'allow',
-      reason: 'session_grant',
+      reason: 'session_allow',
       logVerdict: 'auto_approved_session',
       ...withKey,
     };
@@ -288,7 +333,8 @@ export function evaluate(input: EvaluateInput): PolicyDecision {
   if (persisted === 'always') {
     if (sensitivity === 'critical') {
       // Unreachable through store actions (schema refine blocks critical
-      // 'always'); a tampered blob still cannot silently sign.
+      // 'always'); a tampered blob still cannot silently sign. Critical is
+      // never allowed by a PERSISTED grant — only runtime session state.
       return { verdict: 'ask', reason: 'critical_class', logVerdict: 'prompt', ...withKey };
     }
     return {

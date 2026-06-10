@@ -1,10 +1,12 @@
 /**
  * @fileoverview NIP-46 Requests Store (runtime-only)
  *
- * Never persisted: the pending approval queue, opt-in session grants, and
- * per-app throttle flags all die with the JS context. Promise resolvers for
- * deferred verdicts live in the engine's module scope, not here — store state
- * must stay serializable-shaped even though it never serializes.
+ * Never persisted: the pending approval queue, opt-in SESSION grants (valid
+ * until the engine stops — profile switch or app restart; `clear()` wipes
+ * them), and per-app throttle flags all die with the JS context. Promise
+ * resolvers for deferred verdicts live in the engine's module scope, not
+ * here — store state must stay serializable-shaped even though it never
+ * serializes.
  *
  * `paramsPreview` carries only SAFE display payloads: the parsed unsigned
  * event for sign_event, the client-supplied plaintext for encrypt, and for
@@ -16,14 +18,15 @@ import { err, ok, type Result } from 'neverthrow';
 import { create } from 'zustand';
 
 import {
+  isGrantKey,
   MAX_PENDING_GLOBAL,
   MAX_PENDING_PER_APP,
-  SESSION_GRANT_TTL_MS,
   type GrantKey,
   type Nip46Method,
   type UnsignedEvent,
 } from '@/features/nostrSigner/lib/nip46Types';
 import type { ParsedNostrConnectUri } from '@/features/nostrSigner/lib/nip46Uri';
+import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 import { storeLog } from '@/shared/lib/logger';
 
 export type Nip46ParamsPreview =
@@ -50,12 +53,29 @@ type EnqueueRejection = 'duplicate' | 'per_app_cap' | 'global_cap';
 /** Session grants exist only for decrypt methods — never for signing. */
 export type SessionGrantKey = 'nip04_decrypt' | 'nip44_decrypt';
 
-type SessionGrantError = 'self_decrypt_forbidden' | 'not_session_grantable';
+type SessionGrantError = 'self_decrypt_forbidden' | 'not_session_grantable' | 'invalid_peer';
+type SessionAllowError = 'decrypt_key_forbidden' | 'invalid_grant_key';
 
+/**
+ * Scoped per (app, method, PEER): a grant for one conversation partner never
+ * covers another. Peer is the lowercase hex from the decrypt request params.
+ * Lives for the SESSION — until the engine stops (`clear()`).
+ */
 interface Nip46SessionGrant {
   clientPubkey: string;
   grantKey: SessionGrantKey;
-  expiresAt: number;
+  peerPubkey: string;
+}
+
+/**
+ * Session-scoped allow for any NON-decrypt grant key — including wallet sign
+ * kinds (deliberate: runtime-only, so the persisted critical ceiling is
+ * untouched and a restart always re-prompts). Decrypt keys are forbidden
+ * here; the peer-scoped `sessionGrants` path owns those.
+ */
+interface Nip46SessionAllow {
+  clientPubkey: string;
+  grantKey: GrantKey;
 }
 
 const SESSION_GRANTABLE_KEYS: readonly string[] = ['nip04_decrypt', 'nip44_decrypt'];
@@ -66,6 +86,7 @@ type Nip46PairingNotice = 'expired';
 interface Nip46RequestsState {
   pending: Nip46PendingRequest[];
   sessionGrants: Nip46SessionGrant[];
+  sessionAllows: Nip46SessionAllow[];
   /**
    * Apps in rate-limit cooldown → the cooldown's `cooldownUntil` (epoch ms).
    * UI derives the banner from `cooldownUntil > now`, so a quiet app's flag
@@ -107,23 +128,42 @@ interface Nip46RequestsActions {
   promote: (id: string) => void;
   /** Remove and return every request past its TTL so the engine can respond + log. */
   expireDue: (nowMs: number) => Nip46PendingRequest[];
-  /** Drops the pending queue AND the throttle flags (engine stop owns both). */
+  /**
+   * Drops the pending queue, throttle flags, AND all session state (peer
+   * decrypt sessions + session allows). Engine stop is the only caller —
+   * "this session" ends exactly when the engine does.
+   */
   clear: () => void;
   /**
-   * 1h opt-in auto-approve for critical peer≠self decrypts. The guard forces
-   * the caller to assert the peer is not the user — decrypt-to-self (NIP-60
-   * wallet payloads) must always prompt.
+   * Session-scoped opt-in auto-approve for critical peer≠self decrypts,
+   * scoped to ONE conversation partner; lives until the engine stops. The
+   * guard forces the caller to assert the peer is not the user —
+   * decrypt-to-self (NIP-60 wallet payloads) must always prompt.
    */
   grantSession: (
     clientPubkey: string,
     grantKey: SessionGrantKey,
-    guard: { peerIsSelf: false },
-    nowMs?: number
+    peerPubkey: string,
+    guard: { peerIsSelf: false }
   ) => Result<void, SessionGrantError>;
-  hasSessionGrant: (clientPubkey: string, grantKey: GrantKey, nowMs?: number) => boolean;
-  /** Revoke one grant, or all of an app's grants when `grantKey` is omitted. */
-  revokeSessionGrant: (clientPubkey: string, grantKey?: SessionGrantKey) => void;
-  pruneSessionGrants: (nowMs?: number) => void;
+  hasSessionGrant: (clientPubkey: string, grantKey: GrantKey, peerPubkey: string) => boolean;
+  /**
+   * Revoke session grants for an app — all of them, one method's, or (via
+   * `peerPubkey`) one conversation partner's across both methods.
+   */
+  revokeSessionGrant: (
+    clientPubkey: string,
+    grantKey?: SessionGrantKey,
+    peerPubkey?: string
+  ) => void;
+  /**
+   * Session-scoped allow for a non-decrypt grant key (wallet sign kinds
+   * included — runtime-only by design). Idempotent: consolidated approval
+   * groups resolve N requests with the same decision.
+   */
+  grantSessionAllow: (clientPubkey: string, grantKey: GrantKey) => Result<void, SessionAllowError>;
+  hasSessionAllow: (clientPubkey: string, grantKey: GrantKey) => boolean;
+  revokeSessionAllows: (clientPubkey: string) => void;
   /** Record an app's cooldown end (epoch ms), or clear the flag with `null`. */
   setAppThrottled: (clientPubkey: string, cooldownUntil: number | null) => void;
   setServiceHotRequested: (hot: boolean) => void;
@@ -136,6 +176,7 @@ type Nip46RequestsStore = Nip46RequestsState & Nip46RequestsActions;
 export const useNip46RequestsStore = create<Nip46RequestsStore>()((set, get) => ({
   pending: [],
   sessionGrants: [],
+  sessionAllows: [],
   throttledApps: {},
   serviceHotRequested: false,
   resumedPairing: null,
@@ -188,45 +229,70 @@ export const useNip46RequestsStore = create<Nip46RequestsStore>()((set, get) => 
   },
 
   clear: () => {
-    set({ pending: [], throttledApps: {} });
+    set({ pending: [], throttledApps: {}, sessionGrants: [], sessionAllows: [] });
   },
 
-  grantSession: (clientPubkey, grantKey, guard, nowMs = Date.now()) => {
+  grantSession: (clientPubkey, grantKey, peerPubkey, guard) => {
     // Runtime re-checks of the compile-time contracts — a JS caller (or a
-    // cast) must not be able to mint a self-decrypt or signing session grant.
+    // cast) must not be able to mint a self-decrypt or signing session grant
+    // or an unscoped peer.
     if (guard.peerIsSelf !== false) return err('self_decrypt_forbidden');
     if (!SESSION_GRANTABLE_KEYS.includes(grantKey)) return err('not_session_grantable');
+    if (!isNostrPubkeyHex(peerPubkey)) return err('invalid_peer');
+    const peer = peerPubkey.toLowerCase();
     storeLog.info('store.nip46_requests.session_grant', { grantKey });
     set((state) => ({
       sessionGrants: [
         ...state.sessionGrants.filter(
-          (g) => !(g.clientPubkey === clientPubkey && g.grantKey === grantKey)
+          (g) =>
+            !(g.clientPubkey === clientPubkey && g.grantKey === grantKey && g.peerPubkey === peer)
         ),
-        { clientPubkey, grantKey, expiresAt: nowMs + SESSION_GRANT_TTL_MS },
+        { clientPubkey, grantKey, peerPubkey: peer },
       ],
     }));
     return ok(undefined);
   },
 
-  hasSessionGrant: (clientPubkey, grantKey, nowMs = Date.now()) => {
+  hasSessionGrant: (clientPubkey, grantKey, peerPubkey) => {
+    const peer = peerPubkey.toLowerCase();
     return get().sessionGrants.some(
-      (g) => g.clientPubkey === clientPubkey && g.grantKey === grantKey && g.expiresAt > nowMs
+      (g) => g.clientPubkey === clientPubkey && g.grantKey === grantKey && g.peerPubkey === peer
     );
   },
 
-  revokeSessionGrant: (clientPubkey, grantKey) => {
+  revokeSessionGrant: (clientPubkey, grantKey, peerPubkey) => {
+    const peer = peerPubkey?.toLowerCase();
     set((state) => ({
       sessionGrants: state.sessionGrants.filter(
         (g) =>
-          g.clientPubkey !== clientPubkey || (grantKey !== undefined && g.grantKey !== grantKey)
+          g.clientPubkey !== clientPubkey ||
+          (grantKey !== undefined && g.grantKey !== grantKey) ||
+          (peer !== undefined && g.peerPubkey !== peer)
       ),
     }));
   },
 
-  pruneSessionGrants: (nowMs = Date.now()) => {
+  grantSessionAllow: (clientPubkey, grantKey) => {
+    // Decrypt access is peer-scoped by design — a blanket decrypt session
+    // would cover every conversation; the peer path owns those.
+    if (SESSION_GRANTABLE_KEYS.includes(grantKey)) return err('decrypt_key_forbidden');
+    if (!isGrantKey(grantKey)) return err('invalid_grant_key');
+    const { sessionAllows } = get();
+    if (sessionAllows.some((a) => a.clientPubkey === clientPubkey && a.grantKey === grantKey)) {
+      return ok(undefined);
+    }
+    storeLog.info('store.nip46_requests.session_allow', { grantKey });
+    set({ sessionAllows: [...sessionAllows, { clientPubkey, grantKey }] });
+    return ok(undefined);
+  },
+
+  hasSessionAllow: (clientPubkey, grantKey) =>
+    get().sessionAllows.some((a) => a.clientPubkey === clientPubkey && a.grantKey === grantKey),
+
+  revokeSessionAllows: (clientPubkey) => {
     set((state) => {
-      const sessionGrants = state.sessionGrants.filter((g) => g.expiresAt > nowMs);
-      return sessionGrants.length === state.sessionGrants.length ? state : { sessionGrants };
+      const sessionAllows = state.sessionAllows.filter((a) => a.clientPubkey !== clientPubkey);
+      return sessionAllows.length === state.sessionAllows.length ? state : { sessionAllows };
     });
   },
 

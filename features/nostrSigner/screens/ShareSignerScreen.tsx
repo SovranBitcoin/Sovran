@@ -48,7 +48,7 @@ const QR_SIZE = 220;
 
 // ── Copy ────────────────────────────────────────────────────────
 
-const SCREEN_TITLE = 'Share My Signer';
+const SCREEN_TITLE = 'Share Remote Login';
 const COPY_LINK_LABEL = 'Copy Link';
 const RELAYS_SECTION_TITLE = 'Relays';
 const SECRET_SECTION_TITLE = 'Secret';

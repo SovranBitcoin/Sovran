@@ -9,16 +9,13 @@
  */
 
 import React from 'react';
-import { Result } from 'neverthrow';
 
 import type { CopySegment } from '@/features/nostrSigner/components/permissionCatalog';
 import { Text } from '@/shared/ui/primitives/Text';
 
-/** Hostname of a (https) url, or an error sentinel — the url may embed a secret. */
-export const safeHostname = Result.fromThrowable(
-  (url: string) => new URL(url).hostname,
-  () => 'invalid_url' as const
-);
+// Hostname parsing lives in lib/boundedDisplay so headless lib modules
+// (connectionMatch) share the same parser; re-exported for existing importers.
+export { safeHostname } from '@/features/nostrSigner/lib/boundedDisplay';
 
 /** First-8 … last-4 pubkey fallback for the app-identity subtitle. */
 export function shortPubkey(pubkey: string): string {

@@ -42,6 +42,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { NostrKeysContextBridge, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { alpha } from '@/shared/styles/tokens';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
@@ -522,6 +523,11 @@ function SheetActionButton({ button, variant, feedbackVariant, close }: SheetAct
 function SheetPopup() {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
+  // Captured here (inside the account-scoped providers) and re-provided
+  // across the portal boundary below — sheet content renders in the
+  // PortalHost's subtree, outside NostrKeysProvider. Any other account-scoped
+  // context a sheet needs must be bridged the same way.
+  const nostrKeysContextValue = useNostrKeysContext();
   const current = usePopupStore((s) => s.current);
   const isOpen = usePopupStore((s) => s.isOpen);
   const destroyed = usePopupStore((s) => s.destroyed);
@@ -612,6 +618,10 @@ function SheetPopup() {
     customStack[0]?.sheetId ?? (isCustom && payload ? payload.sheetId : undefined);
   const layoutConfig =
     isCustom && customRootSheetId ? SHEET_LAYOUT_CONFIG[customRootSheetId] : undefined;
+  // Scrollable contentHeight sheets pin their footer via gorhom's
+  // footerComponent (an inline footer would scroll away with the body).
+  const isScrollableContentHeight =
+    isCustom && layoutConfig?.mode === 'contentHeight' && layoutConfig.scrollable === true;
   const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
   const hasLiveStatus = standardPayload?.status != null;
   const [foreground, overlay, success] = useThemeColor([
@@ -677,6 +687,34 @@ function SheetPopup() {
     [insets.top, isCustom, layoutConfig?.mode, windowHeight]
   );
 
+  // Pinned-footer clearance for scrollable sheets: the gorhom footer overlays
+  // the scroll content, so the content needs bottom padding to scroll fully
+  // clear of it. Measured from the footer's onLayout; estimated until then.
+  const [pinnedFooterHeight, setPinnedFooterHeight] = useState(0);
+  useEffect(() => {
+    if (customFooterConfig === null) setPinnedFooterHeight(0);
+  }, [customFooterConfig]);
+
+  // Patched heroui container flags (see patches/heroui-native+1.0.2.patch):
+  // snapPoints sheets need a plain View so nested gorhom scrollables stay
+  // active; scrollable contentHeight sheets need a BottomSheetScrollView so
+  // tall content scrolls instead of clipping at the dynamic-size cap.
+  const patchedContentContainerProps = useMemo(() => {
+    if (!isCustom || layoutConfig === undefined) return undefined;
+    if (layoutConfig.mode === 'snapPoints') return { useDirectView: true };
+    if (!layoutConfig.scrollable) return undefined;
+    const buttonCount = customFooterConfig?.buttons.length ?? 0;
+    if (buttonCount === 0) return { useScrollableContainer: true };
+    const rows = customFooterConfig?.layout === 'row' ? 1 : buttonCount;
+    const estimatedClearance = rows * 54 + 88;
+    return {
+      useScrollableContainer: true,
+      contentContainerStyle: {
+        paddingBottom: pinnedFooterHeight > 0 ? pinnedFooterHeight + 8 : estimatedClearance,
+      },
+    };
+  }, [isCustom, layoutConfig, customFooterConfig, pinnedFooterHeight]);
+
   const customContentContainerClassName = useMemo(() => {
     if (!isCustom) return undefined;
     if (layoutConfig?.mode === 'snapPoints') return 'h-full px-0 pt-0 pb-0';
@@ -713,7 +751,20 @@ function SheetPopup() {
       if (!customFooterConfig || customFooterConfig.buttons.length === 0) return null;
       return (
         <BottomSheetFooter {...props}>
-          <View className={getStickyFooterClass(layoutConfig?.mode)}>
+          <View
+            // Pinned footers over a scrollable body match the sheet surface
+            // (bg-overlay + the content's px-3) so the body scrolls "under"
+            // the sheet's own bottom; snapPoints footers keep their bar look.
+            className={
+              isScrollableContentHeight
+                ? 'bg-overlay pb-safe-offset-4 px-3 pt-3'
+                : getStickyFooterClass(layoutConfig?.mode)
+            }
+            onLayout={
+              isScrollableContentHeight
+                ? (event) => setPinnedFooterHeight(event.nativeEvent.layout.height)
+                : undefined
+            }>
             <View
               className={customFooterConfig.layout === 'row' ? 'flex-row' : undefined}
               style={{ gap: 10 }}>
@@ -743,7 +794,7 @@ function SheetPopup() {
         </BottomSheetFooter>
       );
     },
-    [isCustom, customFooterConfig, layoutConfig?.mode]
+    [isCustom, customFooterConfig, isScrollableContentHeight, layoutConfig?.mode]
   );
 
   if (destroyed) return null;
@@ -751,125 +802,134 @@ function SheetPopup() {
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
       <BottomSheet.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-        <BottomSheet.Overlay
-          isCloseOnPress={standardPayload?.dismissable ?? true}
-          onPress={() => Keyboard.dismiss()}
-          style={{ backgroundColor: `rgba(0,0,0,${alpha.strong})` }}
-        />
-        <BottomSheet.Content
-          accessible={false}
-          detached={!isCustom}
-          bottomInset={isCustom ? undefined : insets.bottom}
-          snapPoints={isCustom ? customSnapPoints : undefined}
-          enableDynamicSizing={isCustom ? layoutConfig?.mode === 'contentHeight' : undefined}
-          maxDynamicContentSize={customMaxDynamicContentSize}
-          enableOverDrag={isCustom ? false : undefined}
-          // Same keyboard recipe as ActionMenuHost's input forms. Gorhom's
-          // interactive mode lifts the sheet by keyboard height; restore
-          // settles it back after the input blurs.
-          keyboardBehavior="interactive"
-          keyboardBlurBehavior="restore"
-          android_keyboardInputMode="adjustResize"
-          footerComponent={
-            isCustom && layoutConfig?.mode !== 'contentHeight' ? renderCustomFooter : undefined
-          }
-          handleComponent={
-            isCustom
-              ? // Custom sheets render the same chrome as `ActionMenuHost`'s
-                // `<Menu>` — heroui's default handle indicator. Suppressing
-                // it leaves no top breathing room and the title sits flush
-                // against the sheet edge, which makes the picker look
-                // cramped vs Select Profile. Both snapPoints and
-                // contentHeight modes show the default handle.
-                undefined
-              : hasLiveStatus
-                ? (props: any) => <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
-                : undefined
-          }
-          className={isCustom ? undefined : 'mx-4'}
-          // Custom sheets render the same chrome as `ActionMenuHost`
-          // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
-          // its content background. Match it here so surfaces routed through
-          // PopupHost (e.g. emoji picker, payment-options — both need
-          // FullWindowOverlay above route modals) are visually
-          // indistinguishable from menu-lane surfaces.
-          backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}
-          backgroundComponent={
-            hasLiveStatus
-              ? (props: any) => (
-                  <LiveSheetBackground {...props} animatedStyle={liveBackgroundStyle} />
-                )
-              : undefined
-          }
-          contentContainerClassName={
-            // Zero out heroui's default `p-5` and `pb-safe-offset-3` for
-            // custom snapPoints sheets — exact same recipe as
-            // `ActionMenuHost`'s `'h-full px-0 pt-0 pb-0'` for tabbed
-            // menus. The inner content (e.g. `SectionAnchorList`) handles
-            // its own bottom inset via `contentBottomInset` so the last
-            // row clears the iOS home indicator without the wrapper
-            // forcing a visible padding band beneath the BlurView.
-            //
-            // contentHeight custom sheets: tighten horizontal padding from
-            // heroui's default `p-5` (20px) to `px-3` (12px) to match the
-            // menu-lane chrome. heroui's `<Menu presentation="bottom-sheet">`
-            // applies a `px-3` override on top of the same `p-5` base (see
-            // `node_modules/heroui-native/src/components/menu/menu.styles.ts`'s
-            // `contentBottomSheet`), so without this override the FWO-lane
-            // custom sheets render with 8px more horizontal padding per
-            // side than visually-identical menu-lane sheets like "Select
-            // option".
-            customContentContainerClassName
-          }
-          // Patched flag (see patches/heroui-native+1.0.2.patch): snap-point
-          // custom sheets use a plain RN `View` so their nested
-          // gorhom-registered scrollables stay active. Content-height sheets
-          // must keep `BottomSheetView`; it is the wrapper that reports
-          // dynamic content height back to gorhom.
-          contentContainerProps={
-            isCustom && layoutConfig?.mode === 'snapPoints'
-              ? ({ useDirectView: true } as never)
-              : undefined
-          }>
-          <SheetContent
-            payload={payload}
-            activeCustomPage={activeCustomPage}
-            close={close}
-            openCycle={openCycle}
-            confirmedAnimation={confirmedAnimation}
-            customNavDirection={customNavDirection}
-            isContentHeight={layoutConfig?.mode === 'contentHeight'}
-            pushCustomPage={pushCustomPage}
-            popCustomPage={popCustomPage}
-            canPopCustomPage={canPopCustomPage}
-            onCustomFooterConfigChange={setCustomFooterConfig}
+        <NostrKeysContextBridge value={nostrKeysContextValue}>
+          <BottomSheet.Overlay
+            isCloseOnPress={standardPayload?.dismissable ?? true}
+            onPress={() => Keyboard.dismiss()}
+            style={{ backgroundColor: `rgba(0,0,0,${alpha.strong})` }}
           />
-          {isCustom &&
-            layoutConfig?.mode === 'contentHeight' &&
-            customFooterConfig &&
-            customFooterConfig.buttons.length > 0 && (
-              <View className={getStickyFooterClass(layoutConfig?.mode)}>
-                <View style={{ gap: 10 }}>
-                  {customFooterConfig.buttons.map((button, index) => {
-                    const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
+          <BottomSheet.Content
+            accessible={false}
+            detached={!isCustom}
+            bottomInset={isCustom ? undefined : insets.bottom}
+            snapPoints={isCustom ? customSnapPoints : undefined}
+            enableDynamicSizing={isCustom ? layoutConfig?.mode === 'contentHeight' : undefined}
+            maxDynamicContentSize={customMaxDynamicContentSize}
+            enableOverDrag={isCustom ? false : undefined}
+            // Same keyboard recipe as ActionMenuHost's input forms. Gorhom's
+            // interactive mode lifts the sheet by keyboard height; restore
+            // settles it back after the input blurs.
+            keyboardBehavior="interactive"
+            keyboardBlurBehavior="restore"
+            android_keyboardInputMode="adjustResize"
+            footerComponent={
+              isCustom && (layoutConfig?.mode !== 'contentHeight' || isScrollableContentHeight)
+                ? renderCustomFooter
+                : undefined
+            }
+            handleComponent={
+              isCustom
+                ? // Custom sheets render the same chrome as `ActionMenuHost`'s
+                  // `<Menu>` — heroui's default handle indicator. Suppressing
+                  // it leaves no top breathing room and the title sits flush
+                  // against the sheet edge, which makes the picker look
+                  // cramped vs Select Profile. Both snapPoints and
+                  // contentHeight modes show the default handle.
+                  undefined
+                : hasLiveStatus
+                  ? (props: any) => (
+                      <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
+                    )
+                  : undefined
+            }
+            className={isCustom ? undefined : 'mx-4'}
+            // Custom sheets render the same chrome as `ActionMenuHost`
+            // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
+            // its content background. Match it here so surfaces routed through
+            // PopupHost (e.g. emoji picker, payment-options — both need
+            // FullWindowOverlay above route modals) are visually
+            // indistinguishable from menu-lane surfaces.
+            backgroundClassName={isCustom ? 'bg-overlay' : 'bg-surface rounded-[32px]'}
+            backgroundComponent={
+              hasLiveStatus
+                ? (props: any) => (
+                    <LiveSheetBackground {...props} animatedStyle={liveBackgroundStyle} />
+                  )
+                : undefined
+            }
+            contentContainerClassName={
+              // Zero out heroui's default `p-5` and `pb-safe-offset-3` for
+              // custom snapPoints sheets — exact same recipe as
+              // `ActionMenuHost`'s `'h-full px-0 pt-0 pb-0'` for tabbed
+              // menus. The inner content (e.g. `SectionAnchorList`) handles
+              // its own bottom inset via `contentBottomInset` so the last
+              // row clears the iOS home indicator without the wrapper
+              // forcing a visible padding band beneath the BlurView.
+              //
+              // contentHeight custom sheets: tighten horizontal padding from
+              // heroui's default `p-5` (20px) to `px-3` (12px) to match the
+              // menu-lane chrome. heroui's `<Menu presentation="bottom-sheet">`
+              // applies a `px-3` override on top of the same `p-5` base (see
+              // `node_modules/heroui-native/src/components/menu/menu.styles.ts`'s
+              // `contentBottomSheet`), so without this override the FWO-lane
+              // custom sheets render with 8px more horizontal padding per
+              // side than visually-identical menu-lane sheets like "Select
+              // option".
+              customContentContainerClassName
+            }
+            // Patched flag (see patches/heroui-native+1.0.2.patch): snap-point
+            // custom sheets use a plain RN `View` so their nested
+            // gorhom-registered scrollables stay active. Content-height sheets
+            // must keep `BottomSheetView`; it is the wrapper that reports
+            // dynamic content height back to gorhom — unless the sheet opts
+            // into `scrollable`, where the patched `useScrollableContainer`
+            // renders a BottomSheetScrollView instead (still reports dynamic
+            // height, but scrolls rather than clipping past the cap — the
+            // signer sheets' expandable sections need this).
+            contentContainerProps={patchedContentContainerProps as never}>
+            <SheetContent
+              payload={payload}
+              activeCustomPage={activeCustomPage}
+              close={close}
+              openCycle={openCycle}
+              confirmedAnimation={confirmedAnimation}
+              customNavDirection={customNavDirection}
+              isContentHeight={layoutConfig?.mode === 'contentHeight'}
+              pushCustomPage={pushCustomPage}
+              popCustomPage={popCustomPage}
+              canPopCustomPage={canPopCustomPage}
+              onCustomFooterConfigChange={setCustomFooterConfig}
+            />
+            {/* Inline footer for NON-scrollable contentHeight sheets only —
+                scrollable ones pin their footer via footerComponent above. */}
+            {isCustom &&
+              layoutConfig?.mode === 'contentHeight' &&
+              !isScrollableContentHeight &&
+              customFooterConfig &&
+              customFooterConfig.buttons.length > 0 && (
+                <View className={getStickyFooterClass(layoutConfig?.mode)}>
+                  <View style={{ gap: 10 }}>
+                    {customFooterConfig.buttons.map((button, index) => {
+                      const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
 
-                    return (
-                      <Button
-                        key={`${button.label}-${index}`}
-                        variant={variant}
-                        className={getSheetButtonClassName(variant)}
-                        onPress={button.onPress}
-                        isDisabled={button.isDisabled}>
-                        <Button.Label className={getSheetButtonLabelClassName(variant)}>
-                          {button.label}
-                        </Button.Label>
-                      </Button>
-                    );
-                  })}
+                      return (
+                        <Button
+                          key={`${button.label}-${index}`}
+                          variant={variant}
+                          className={getSheetButtonClassName(variant)}
+                          onPress={button.onPress}
+                          isDisabled={button.isDisabled}>
+                          <Button.Label className={getSheetButtonLabelClassName(variant)}>
+                            {button.label}
+                          </Button.Label>
+                        </Button>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
-            )}
-        </BottomSheet.Content>
+              )}
+          </BottomSheet.Content>
+        </NostrKeysContextBridge>
       </BottomSheet.Portal>
     </BottomSheet>
   );

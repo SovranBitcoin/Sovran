@@ -16,7 +16,8 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
+import { LegendList } from '@legendapp/list/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button as HerouiButton } from 'heroui-native';
 
@@ -30,7 +31,11 @@ import {
   useNip46ActivityStore,
   type Nip46ActivityEntry,
 } from '@/features/nostrSigner/data/nip46ActivityStore';
-import { useNip46ConnectionsStore } from '@/features/nostrSigner/data/nip46ConnectionsStore';
+import {
+  useNip46ConnectionsStore,
+  type Nip46Connection,
+} from '@/features/nostrSigner/data/nip46ConnectionsStore';
+import { connectionForClient } from '@/features/nostrSigner/lib/connectionMatch';
 import { ACTIVITY_CAP } from '@/features/nostrSigner/lib/nip46Types';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelative } from '@/shared/lib/date';
@@ -42,6 +47,10 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
+// ListRow compact: 8px vertical padding ×2 + 40px icon circle.
+const ESTIMATED_ROW_HEIGHT = 56;
+// Chip strip: 10px vertical padding ×2 + ~36px chip height.
+const CHIP_HEADER_HEIGHT = 56;
 const CHIP_AVATAR_SIZE = 18;
 
 const FOOTER_CAPTION = `Activity is stored only on this device. Sovran keeps your last ${ACTIVITY_CAP} requests. Decrypted content is never saved.`;
@@ -51,25 +60,41 @@ const EMPTY_SUBTITLE = 'Approvals, denials and auto-signed requests will be logg
 
 type ActivityFilter = { kind: 'all' } | { kind: 'denied' } | { kind: 'app'; clientPubkey: string };
 
-function entryMatchesFilter(entry: Nip46ActivityEntry, filter: ActivityFilter): boolean {
+function entryMatchesFilter(
+  entry: Nip46ActivityEntry,
+  filter: ActivityFilter,
+  appFilterKeys: ReadonlySet<string> | null
+): boolean {
   switch (filter.kind) {
     case 'all':
       return true;
     case 'denied':
       return ACTIVITY_VERDICT_DISPLAY[entry.verdict].tone === 'danger';
     case 'app':
-      return entry.clientPubkey === filter.clientPubkey;
+      // A replaced app's history spans its old client keys too.
+      return appFilterKeys !== null
+        ? appFilterKeys.has(entry.clientPubkey)
+        : entry.clientPubkey === filter.clientPubkey;
   }
 }
 
-/** Distinct client pubkeys in entry order (newest first), for per-app chips. */
-function distinctClients(entries: readonly Nip46ActivityEntry[]): string[] {
+/**
+ * Distinct apps for the per-app chips, in entry order (newest first). Entries
+ * from a REPLACED client key collapse into the live record's chip via the
+ * previousClientPubkeys chain; fully-orphaned keys keep their own chip.
+ */
+function distinctClients(
+  entries: readonly Nip46ActivityEntry[],
+  apps: Record<string, Nip46Connection>
+): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const entry of entries) {
-    if (seen.has(entry.clientPubkey)) continue;
-    seen.add(entry.clientPubkey);
-    out.push(entry.clientPubkey);
+    const representative =
+      connectionForClient(apps, entry.clientPubkey)?.clientPubkey ?? entry.clientPubkey;
+    if (seen.has(representative)) continue;
+    seen.add(representative);
+    out.push(representative);
   }
   return out;
 }
@@ -123,10 +148,16 @@ export function SignerActivityScreen(): React.ReactElement {
     [success, danger, warning]
   );
 
-  const clientPubkeys = useMemo(() => distinctClients(entries), [entries]);
+  const clientPubkeys = useMemo(() => distinctClients(entries, apps), [entries, apps]);
+  // Per-app filter allowed set: the live key plus every key it replaced.
+  const appFilterKeys = useMemo(() => {
+    if (filter.kind !== 'app') return null;
+    const live = apps[filter.clientPubkey];
+    return new Set<string>([filter.clientPubkey, ...(live?.previousClientPubkeys ?? [])]);
+  }, [filter, apps]);
   const filtered = useMemo(
-    () => entries.filter((entry) => entryMatchesFilter(entry, filter)),
-    [entries, filter]
+    () => entries.filter((entry) => entryMatchesFilter(entry, filter, appFilterKeys)),
+    [entries, filter, appFilterKeys]
   );
 
   const openDetail = useCallback((entryId: string) => {
@@ -140,12 +171,12 @@ export function SignerActivityScreen(): React.ReactElement {
         method: item.method,
         ...(item.kind !== undefined && { kind: item.kind }),
       });
-      const appName = appDisplayName(apps[item.clientPubkey]);
+      const appName = appDisplayName(connectionForClient(apps, item.clientPubkey));
       return (
         <ListRow
           padding="compact"
           iconCircle={{ icon: display.icon, color: toneColors[display.tone], size: 40 }}
-          title={entry.headline}
+          title={item.summaryV2?.headline ?? entry.headline}
           subtitle={`${appName} · ${formatRelative(item.at, 'chat-bubble')}`}
           accent={
             display.accentLine !== undefined ? (
@@ -204,10 +235,17 @@ export function SignerActivityScreen(): React.ReactElement {
 
   return (
     <Screen name="SignerActivityScreen" scroll="custom" safeArea>
-      <FlatList
+      {/* Legend List: the activity log holds up to ACTIVITY_CAP entries —
+          recycled fixed-height rows keep scrolling cheap. Rows are stateless
+          (ListRow + derived props), so recycling is safe. */}
+      <LegendList
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        recycleItems
+        estimatedItemSize={ESTIMATED_ROW_HEIGHT}
+        estimatedHeaderSize={CHIP_HEADER_HEIGHT}
+        drawDistance={400}
         ListHeaderComponent={chips}
         ListEmptyComponent={
           <EmptyState icon="lucide:activity" title={EMPTY_TITLE} subtitle={EMPTY_SUBTITLE} />

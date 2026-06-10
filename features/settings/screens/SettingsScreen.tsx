@@ -226,7 +226,7 @@ export const SettingsScreen = () => {
           <ListGroup variant="secondary">
             <SettingsListLinkItem
               href="/(signer-flow)"
-              title="Nostr Signer"
+              title="Remote Login"
               description={signerRowDescription(signerPendingCount)}
             />
             <Separator className="mx-4" />

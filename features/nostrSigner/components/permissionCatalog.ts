@@ -21,6 +21,12 @@
  */
 
 import { isCriticalGrantKey } from '@/features/nostrSigner/data/nip46ConnectionsStore';
+import {
+  boundDisplay,
+  MAX_APP_NAME_DISPLAY,
+  MAX_CONTEXT_LABEL_DISPLAY,
+  UNNAMED_APP_LABEL,
+} from '@/features/nostrSigner/lib/boundedDisplay';
 import type { ActivityVerdict, GrantKey, Nip46Method } from '@/features/nostrSigner/lib/nip46Types';
 import {
   classifyRequest,
@@ -32,7 +38,7 @@ import {
 // ── Public shapes ───────────────────────────────────────────────
 
 export type PermissionTier = 'standard' | 'protected' | 'wallet' | 'unknown';
-export type PermissionEditorGroup = 'basic' | 'content' | 'account' | 'wallet';
+export type PermissionEditorGroup = 'public' | 'account' | 'signin' | 'private' | 'wallet';
 
 /** One run of copy; the UI bolds `bold` segments (app names in templates). */
 export interface CopySegment {
@@ -68,16 +74,10 @@ export interface PermissionLookup {
 }
 
 // ── Untrusted-display bounds ────────────────────────────────────
+// boundDisplay lives in lib/boundedDisplay so the headless summary layer can
+// share the same choke point; re-exported here for existing importers.
 
-const MAX_APP_NAME_DISPLAY = 48;
-const MAX_CONTEXT_LABEL_DISPLAY = 64;
-
-export const UNNAMED_APP_LABEL = 'Unnamed app';
-
-/** Length-bound an untrusted display string; never log the value. */
-export function boundDisplay(value: string, max: number): string {
-  return value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1))}…`;
-}
+export { boundDisplay, UNNAMED_APP_LABEL };
 
 function boundedAppName(ctx: PermissionCopyContext): string {
   const trimmed = ctx.appName.trim();
@@ -108,12 +108,12 @@ interface CatalogRow {
 }
 
 const UNKNOWN_SIGN_ROW: CatalogRow = {
-  headline: (kind) => `Sign Event (kind ${kind ?? '?'})`,
-  body: " wants to sign an event type Sovran doesn't recognize. Review the raw event before allowing.",
-  alwaysVerbPhrase: 'sign this event type',
+  headline: 'Unrecognized Action',
+  body: " wants to do something Sovran doesn't recognize. Review the details before allowing.",
+  alwaysVerbPhrase: 'perform this action',
   icon: 'mdi:help-circle',
-  permissionEditorLabel: (kind) => `Sign event (kind ${kind ?? '?'})`,
-  permissionEditorGroup: 'content',
+  permissionEditorLabel: 'Unrecognized action',
+  permissionEditorGroup: 'public',
 };
 
 const SIGN_ROWS_BY_NAME = {
@@ -123,7 +123,7 @@ const SIGN_ROWS_BY_NAME = {
     alwaysVerbPhrase: 'sign posts',
     icon: 'lucide:pencil-line',
     permissionEditorLabel: 'Publish posts',
-    permissionEditorGroup: 'content',
+    permissionEditorGroup: 'public',
   },
   repost: {
     headline: 'Repost a Note',
@@ -131,7 +131,25 @@ const SIGN_ROWS_BY_NAME = {
     alwaysVerbPhrase: 'repost notes',
     icon: 'garden:arrow-retweet-fill-16',
     permissionEditorLabel: 'Repost notes',
-    permissionEditorGroup: 'content',
+    permissionEditorGroup: 'public',
+  },
+  // NIP-18 kind 16: reposts any event kind EXCEPT text notes.
+  genericRepost: {
+    headline: 'Repost Content',
+    body: ' wants to repost content (articles, media) as you.',
+    alwaysVerbPhrase: 'repost content',
+    icon: 'garden:arrow-retweet-fill-16',
+    permissionEditorLabel: 'Repost other content',
+    permissionEditorGroup: 'public',
+  },
+  // NIP-22 kind 1111: a comment threaded under non-note content.
+  comment: {
+    headline: 'Publish a Comment',
+    body: ' wants to comment on content as you.',
+    alwaysVerbPhrase: 'publish comments',
+    icon: 'iconamoon:comment-fill',
+    permissionEditorLabel: 'Comment on other content',
+    permissionEditorGroup: 'public',
   },
   react: {
     headline: 'React to a Post',
@@ -139,7 +157,7 @@ const SIGN_ROWS_BY_NAME = {
     alwaysVerbPhrase: 'react to posts',
     icon: 'iconamoon:heart-fill',
     permissionEditorLabel: 'React to posts',
-    permissionEditorGroup: 'content',
+    permissionEditorGroup: 'public',
   },
   privateMessage: {
     headline: 'Send a Private Message',
@@ -147,7 +165,7 @@ const SIGN_ROWS_BY_NAME = {
     alwaysVerbPhrase: 'sign private messages',
     icon: 'mdi:email',
     permissionEditorLabel: 'Send private messages',
-    permissionEditorGroup: 'content',
+    permissionEditorGroup: 'private',
   },
   profile: {
     headline: 'Update Your Profile',
@@ -188,7 +206,7 @@ const SIGN_ROWS_BY_NAME = {
     alwaysVerbPhrase: 'log in to services',
     icon: 'mdi:shield-check',
     permissionEditorLabel: 'Log in to services',
-    permissionEditorGroup: 'account',
+    permissionEditorGroup: 'signin',
   },
   appData: {
     headline: 'Save App Data',
@@ -197,6 +215,22 @@ const SIGN_ROWS_BY_NAME = {
     icon: 'fluent:apps-16-filled',
     permissionEditorLabel: 'Save app data',
     permissionEditorGroup: 'account',
+  },
+  article: {
+    headline: 'Publish an Article',
+    body: ' wants to publish a long-form article as you.',
+    alwaysVerbPhrase: 'publish articles',
+    icon: 'lucide:pencil-line',
+    permissionEditorLabel: 'Publish articles',
+    permissionEditorGroup: 'public',
+  },
+  zapRequest: {
+    headline: 'Approve a Zap Request',
+    body: ' wants to request a zap. Payment still happens in your lightning wallet.',
+    alwaysVerbPhrase: 'send zap requests',
+    icon: 'mdi:lightning-bolt',
+    permissionEditorLabel: 'Send zap requests',
+    permissionEditorGroup: 'public',
   },
   wallet: {
     headline: 'Wallet Access Request',
@@ -212,14 +246,15 @@ type SignRowName = keyof typeof SIGN_ROWS_BY_NAME;
 
 /**
  * Kind → copy row. NOT a sensitivity table (policy owns that) — purely which
- * words/icon a recognized kind gets. Kind 1111 (NIP-22 comments) shares the
- * post row: same normal class, same user mental model.
+ * words/icon a recognized kind gets. Sibling kinds get their own rows so the
+ * editor and prompts stay distinct: 1111 comments ≠ kind-1 notes, kind-16
+ * generic reposts ≠ kind-6 note reposts (NIP-18/22).
  */
 const SIGN_ROW_BY_KIND: Record<number, SignRowName> = {
   1: 'post',
-  1111: 'post',
+  1111: 'comment',
   6: 'repost',
-  16: 'repost',
+  16: 'genericRepost',
   7: 'react',
   4: 'privateMessage',
   13: 'privateMessage',
@@ -232,6 +267,8 @@ const SIGN_ROW_BY_KIND: Record<number, SignRowName> = {
   22242: 'login',
   27235: 'login',
   30078: 'appData',
+  30023: 'article',
+  9734: 'zapRequest',
   17375: 'wallet',
   7375: 'wallet',
   7374: 'wallet',
@@ -247,7 +284,7 @@ const METHOD_ROWS: Record<Exclude<Nip46Method, 'sign_event'>, CatalogRow> = {
     alwaysVerbPhrase: 'share your public key',
     icon: 'mdi:key-variant',
     permissionEditorLabel: 'Share public key',
-    permissionEditorGroup: 'basic',
+    permissionEditorGroup: 'signin',
   },
   // connect/ping are auto-class: they never prompt, so these rows only back
   // activity rows (connect) and catalog completeness (ping is never logged).
@@ -257,7 +294,7 @@ const METHOD_ROWS: Record<Exclude<Nip46Method, 'sign_event'>, CatalogRow> = {
     alwaysVerbPhrase: 'connect',
     icon: 'lucide:link',
     permissionEditorLabel: 'Connect',
-    permissionEditorGroup: 'basic',
+    permissionEditorGroup: 'signin',
   },
   ping: {
     headline: 'Ping',
@@ -265,7 +302,7 @@ const METHOD_ROWS: Record<Exclude<Nip46Method, 'sign_event'>, CatalogRow> = {
     alwaysVerbPhrase: 'check the connection',
     icon: 'feather:wifi',
     permissionEditorLabel: 'Ping',
-    permissionEditorGroup: 'basic',
+    permissionEditorGroup: 'signin',
   },
   nip04_encrypt: {
     headline: 'Encrypt a Message',
@@ -274,7 +311,7 @@ const METHOD_ROWS: Record<Exclude<Nip46Method, 'sign_event'>, CatalogRow> = {
     alwaysVerbPhrase: 'encrypt messages',
     icon: 'mdi:shield',
     permissionEditorLabel: 'Encrypt messages',
-    permissionEditorGroup: 'basic',
+    permissionEditorGroup: 'private',
   },
   nip44_encrypt: {
     headline: 'Encrypt a Message',
@@ -283,23 +320,23 @@ const METHOD_ROWS: Record<Exclude<Nip46Method, 'sign_event'>, CatalogRow> = {
     alwaysVerbPhrase: 'encrypt messages',
     icon: 'mdi:shield',
     permissionEditorLabel: 'Encrypt messages',
-    permissionEditorGroup: 'basic',
+    permissionEditorGroup: 'private',
   },
   nip04_decrypt: {
     headline: 'Decrypt Your Data',
-    body: ' wants to read encrypted data sent to you. Allowing reveals private content to this app.',
+    body: ' wants to read messages sent to you.',
     alwaysVerbPhrase: 'decrypt your data',
     icon: 'majesticons:eye',
     permissionEditorLabel: 'Decrypt your data',
-    permissionEditorGroup: 'wallet',
+    permissionEditorGroup: 'private',
   },
   nip44_decrypt: {
     headline: 'Decrypt Your Data',
-    body: ' wants to read encrypted data sent to you. Allowing reveals private content to this app.',
+    body: ' wants to read messages sent to you.',
     alwaysVerbPhrase: 'decrypt your data',
     icon: 'majesticons:eye',
     permissionEditorLabel: 'Decrypt your data',
-    permissionEditorGroup: 'wallet',
+    permissionEditorGroup: 'private',
   },
 };
 
@@ -421,17 +458,6 @@ export function tierBannerFor(tier: PermissionTier, appName: string): TierBanner
   }
 }
 
-// ── Always-scope footnote ───────────────────────────────────────
-
-/** "Always Allow lets Primal sign posts without asking. Change anytime in Connected Apps." */
-export function alwaysScopeFootnote(appName: string, alwaysVerbPhrase: string): CopySegment[] {
-  return [
-    { text: 'Always Allow lets ' },
-    { text: boundedAppName({ appName }), bold: true },
-    { text: ` ${alwaysVerbPhrase} without asking. Change anytime in Connected Apps.` },
-  ];
-}
-
 // ── Decrypt preview label (content is NEVER previewed) ──────────
 
 export function encryptedPayloadLabel(ciphertextLength: number): string {
@@ -473,7 +499,12 @@ export const ACTIVITY_VERDICT_DISPLAY: Record<ActivityVerdict, ActivityVerdictDi
   auto_approved_session: {
     ...AUTO_SIGNED,
     label: 'Auto-approved',
-    accentLine: 'Auto-approved — 1h session',
+    accentLine: 'Auto-approved — for this session',
+  },
+  auto_approved_peer_grant: {
+    ...AUTO_SIGNED,
+    label: 'Auto-approved',
+    accentLine: 'Auto-approved — always for this person',
   },
   auto_approved_method: { ...AUTO_SIGNED, label: 'Auto-approved' },
   denied_once: { ...DENIED, label: 'Denied' },
@@ -489,20 +520,44 @@ export const ACTIVITY_VERDICT_DISPLAY: Record<ActivityVerdict, ActivityVerdictDi
 // ── Approval-sheet fixed copy ───────────────────────────────────
 
 export const APPROVAL_BUTTON_LABELS = {
-  allowOnce: 'Allow Once',
+  allowSession: 'Allow This Session',
   alwaysAllow: 'Always Allow',
+  approveOnce: 'Approve',
   deny: 'Deny',
 } as const;
 
-export const SLIDE_TO_APPROVE_LABEL = 'Slide to Approve';
+export const BLOCK_APP_LABEL = 'Block this app';
 
-export const SESSION_GRANT_CHECKBOX_LABEL = 'Allow decrypts from this app for 1 hour';
+/** Confirm copy for the sheet's Block link. */
+export function blockAppConfirmTitle(appName: string): string {
+  return `Block ${boundedAppName({ appName })}? It won't be able to send requests until you unblock it in Connected Apps.`;
+}
+
+/**
+ * Banner for peer≠self decrypts. The generic wallet-tier banner ("touches
+ * your wallet") is wrong for a DM read — the accurate risk is conversation
+ * privacy. Self-decrypts keep the wallet banner (NIP-60 payloads live there).
+ */
+export function peerDecryptBanner(appName: string): {
+  tone: 'danger';
+  segments: CopySegment[];
+} {
+  return {
+    tone: 'danger',
+    segments: [
+      { text: 'Private — approving reveals this conversation to ' },
+      { text: boundedAppName({ appName }), bold: true },
+      { text: '.' },
+    ],
+  };
+}
 
 export const VIEW_ALL_LABEL = 'View All';
 
 export const SHOW_FULL_EVENT_LABEL = 'Show full event';
 export const HIDE_FULL_EVENT_LABEL = 'Hide full event';
 
+/** Counts DECISIONS (consolidated groups), not raw spam requests. */
 export function queueStripLabel(position: number, total: number): string {
   return `Request ${position} of ${total}`;
 }

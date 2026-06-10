@@ -30,8 +30,14 @@ export const MAX_CONNECTED_APPS = 64;
 export const BUNKER_SECRET_TTL_MS = 600_000;
 export const PAIRING_INTENT_TTL_MS = 600_000;
 
-/** Runtime-only opt-in grant for critical peer≠self decrypts. Never persisted. */
-export const SESSION_GRANT_TTL_MS = 3_600_000;
+/** Per-app cap on persisted per-peer decrypt grants (writes beyond it reject). */
+export const MAX_PEER_DECRYPT_GRANTS_PER_APP = 50;
+
+/**
+ * Cap on the replaced-client-key attribution chain a connection carries
+ * (`previousClientPubkeys`) — most recent kept, oldest dropped.
+ */
+export const MAX_PREVIOUS_CLIENT_PUBKEYS = 8;
 
 /** Wire error strings sent in RPC responses. Clients match on these — do not reword. */
 export const NIP46_ERRORS = {
@@ -103,6 +109,9 @@ export type ConnectionMode = z.infer<typeof ConnectionModeSchema>;
 export const ConnectionStatusSchema = z.enum(['active', 'blocked']);
 export type ConnectionStatus = z.infer<typeof ConnectionStatusSchema>;
 
+/** The two decrypt envelope methods — the only per-peer-grantable surface. */
+export type DecryptMethod = 'nip04_decrypt' | 'nip44_decrypt';
+
 /** Methods that can hold a standing grant without a kind qualifier. */
 export const ENCRYPTION_GRANT_METHODS = [
   'nip04_encrypt',
@@ -151,6 +160,7 @@ export const ActivityVerdictSchema = z.enum([
   'approved_pairing',
   'auto_approved_grant',
   'auto_approved_session',
+  'auto_approved_peer_grant',
   'auto_approved_method',
   'denied_once',
   'auto_denied_blocked',

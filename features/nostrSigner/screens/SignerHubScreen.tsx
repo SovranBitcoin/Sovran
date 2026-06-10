@@ -24,6 +24,7 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
+import { ListGroup, Separator } from 'heroui-native';
 
 import Icon from 'assets/icons';
 import { appDisplayName } from '@/features/nostrSigner/components/permissionCatalog';
@@ -57,8 +58,11 @@ const APPS_EMPTY_SUBTITLE =
   'Scan a QR code from any Nostr app to sign in with your Sovran identity.';
 
 const SCAN_QR_LABEL = 'Scan QR Code';
+const SCAN_QR_SUBTITLE = 'Sign in to a Nostr app showing a connect code';
 const PASTE_LINK_LABEL = 'Paste Connection Link';
-const SHARE_SIGNER_LABEL = 'Share My Signer';
+const PASTE_LINK_SUBTITLE = "Connect with a copied link when there's no code to scan";
+const SHARE_SIGNER_LABEL = 'Share Remote Login';
+const SHARE_SIGNER_SUBTITLE = 'Show a code other apps can scan to sign in as you';
 
 const PASTE_PROMPT_BODY = 'Paste the connection link from the app you want to sign in to.';
 const PASTE_CONNECT_LABEL = 'Connect';
@@ -163,14 +167,16 @@ export function SignerHubScreen(): React.ReactElement {
     <Screen name="SignerHubScreen">
       {pendingCount > 0 ? (
         <Section title="Pending">
-          <ListRow
-            iconCircle={{ icon: 'mdi:bell', color: warning }}
-            title={pendingRowTitle(pendingCount)}
-            subtitle={PENDING_ROW_SUBTITLE}
-            trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
-            onPress={openRequests}
-            testID="signer-hub-pending-row"
-          />
+          <ListGroup variant="secondary">
+            <ListRow
+              icon={{ name: 'mdi:bell', color: warning }}
+              title={pendingRowTitle(pendingCount)}
+              subtitle={PENDING_ROW_SUBTITLE}
+              trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
+              onPress={openRequests}
+              testID="signer-hub-pending-row"
+            />
+          </ListGroup>
         </Section>
       ) : null}
 
@@ -182,58 +188,71 @@ export function SignerHubScreen(): React.ReactElement {
             subtitle={APPS_EMPTY_SUBTITLE}
           />
         ) : (
-          connections.map((connection) => (
-            <ListRow
-              key={connection.clientPubkey}
-              leading={
-                <Avatar
-                  state={connection.image ? 'image' : 'fallback'}
-                  picture={connection.image}
-                  seed={connection.clientPubkey}
-                  fallbackVariant="beam"
-                  size={44}
-                  alt={appDisplayName(connection)}
+          <ListGroup variant="secondary">
+            {connections.map((connection, index) => (
+              <React.Fragment key={connection.clientPubkey}>
+                {index > 0 ? <Separator className="mx-4" /> : null}
+                <ListRow
+                  leading={
+                    <Avatar
+                      state={connection.image ? 'image' : 'fallback'}
+                      picture={connection.image}
+                      seed={connection.clientPubkey}
+                      fallbackVariant="beam"
+                      size={44}
+                      alt={appDisplayName(connection)}
+                    />
+                  }
+                  title={appDisplayName(connection)}
+                  subtitle={connectionSubtitle(connection)}
+                  trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
+                  onPress={() => openAppDetail(connection.clientPubkey)}
                 />
-              }
-              title={appDisplayName(connection)}
-              subtitle={connectionSubtitle(connection)}
-              trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
-              onPress={() => openAppDetail(connection.clientPubkey)}
-            />
-          ))
+              </React.Fragment>
+            ))}
+          </ListGroup>
         )}
       </Section>
 
       <Section title="Connect">
-        <ListRow
-          iconCircle={{ icon: 'mdi:qrcode-scan', color: foreground }}
-          title={SCAN_QR_LABEL}
-          onPress={openScan}
-          testID="signer-hub-scan-row"
-        />
-        <ListRow
-          iconCircle={{ icon: 'lucide:clipboard-paste', color: foreground }}
-          title={PASTE_LINK_LABEL}
-          onPress={openPasteLink}
-          testID="signer-hub-paste-row"
-        />
-        <ListRow
-          iconCircle={{ icon: 'mdi:share-variant', color: foreground }}
-          title={SHARE_SIGNER_LABEL}
-          onPress={openShare}
-          testID="signer-hub-share-row"
-        />
+        <ListGroup variant="secondary">
+          <ListRow
+            icon={{ name: 'mdi:qrcode-scan' }}
+            title={SCAN_QR_LABEL}
+            subtitle={SCAN_QR_SUBTITLE}
+            onPress={openScan}
+            testID="signer-hub-scan-row"
+          />
+          <Separator className="mx-4" />
+          <ListRow
+            icon={{ name: 'lucide:clipboard-paste' }}
+            title={PASTE_LINK_LABEL}
+            subtitle={PASTE_LINK_SUBTITLE}
+            onPress={openPasteLink}
+            testID="signer-hub-paste-row"
+          />
+          <Separator className="mx-4" />
+          <ListRow
+            icon={{ name: 'mdi:share-variant' }}
+            title={SHARE_SIGNER_LABEL}
+            subtitle={SHARE_SIGNER_SUBTITLE}
+            onPress={openShare}
+            testID="signer-hub-share-row"
+          />
+        </ListGroup>
       </Section>
 
       <Section title="History">
-        <ListRow
-          iconCircle={{ icon: 'lucide:activity', color: foreground }}
-          title={ACTIVITY_ROW_TITLE}
-          subtitle={ACTIVITY_ROW_SUBTITLE}
-          trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
-          onPress={openActivity}
-          testID="signer-hub-activity-row"
-        />
+        <ListGroup variant="secondary">
+          <ListRow
+            icon={{ name: 'lucide:activity' }}
+            title={ACTIVITY_ROW_TITLE}
+            subtitle={ACTIVITY_ROW_SUBTITLE}
+            trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
+            onPress={openActivity}
+            testID="signer-hub-activity-row"
+          />
+        </ListGroup>
       </Section>
     </Screen>
   );

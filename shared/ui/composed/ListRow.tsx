@@ -50,10 +50,21 @@ export interface ListRowIconCircle {
   backgroundColor?: string;
 }
 
+/** Plain leading icon — no circle chrome, settings-row style. */
+export interface ListRowIcon {
+  name: string;
+  /** Defaults to the foreground theme color. */
+  color?: string;
+  /** Glyph size. @default 22 */
+  size?: number;
+}
+
 interface ListRowProps {
   /** Leading slot — pick exactly one. `leading` takes priority as the escape hatch. */
   avatar?: ListRowAvatar;
   iconCircle?: ListRowIconCircle;
+  /** Plain icon, no circle — for action rows inside ListGroup containers. */
+  icon?: ListRowIcon;
   leading?: ReactNode;
 
   /** Primary line. String → 16/600 ellipsize. ReactNode → caller owns layout.
@@ -122,6 +133,7 @@ const ROW_GAP = 12;
 export function ListRow({
   avatar,
   iconCircle,
+  icon,
   leading,
   title,
   subtitle,
@@ -148,11 +160,20 @@ export function ListRow({
 
   const paddingVertical = padding === 'compact' ? 8 : 12;
 
-  // ----- Leading resolution (priority: custom leading > iconCircle > avatar) -----
+  // ----- Leading resolution (priority: leading > icon > iconCircle > avatar) -----
 
   let leadingEl: ReactNode = null;
   if (leading != null) {
     leadingEl = leading;
+  } else if (icon) {
+    // Fixed-width slot keeps titles aligned across rows whose glyphs differ
+    // in visual width; centered so the 12px row gap reads consistently.
+    const iconSize = icon.size ?? 22;
+    leadingEl = (
+      <View style={{ width: iconSize + 2, alignItems: 'center' }}>
+        <Icon name={icon.name} size={iconSize} color={icon.color ?? foreground} />
+      </View>
+    );
   } else if (iconCircle) {
     const size = iconCircle.size ?? DEFAULT_ICON_CIRCLE_SIZE;
     const iconSize = Math.round(size * 0.45);

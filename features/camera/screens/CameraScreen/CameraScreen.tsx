@@ -233,11 +233,14 @@ export function CameraScreen({ signerPairOnly = false }: CameraScreenProps = {})
   const handleClipboardPress = useCallback(async () => {
     if (!shouldAcceptScan()) return;
     log.info('camera.scan.clipboard');
-    if (signerPairOnly) {
-      // Signer-pair mode never feeds the payment machine: read the clipboard
-      // here (machine.scan would otherwise consume it) and route it through
-      // the NIP-46 entry path with the link-flavored error copy.
-      const text = (await Clipboard.getStringAsync().catch(() => '')).trim();
+    // Clipboard paste honors the same NIP-46 intercept as live scans — a
+    // copied nostrconnect:// link must never reach the payment machine
+    // (which would reject it as "Unsupported input"). The read here is
+    // check-only for the payment path: machine.scan() with no args reads
+    // the clipboard itself. In signer-pair mode EVERY paste routes to the
+    // signer path: no payment fallback.
+    const text = (await Clipboard.getStringAsync().catch(() => '')).trim();
+    if (NIP46_SCHEME_RE.test(text) || signerPairOnly) {
       handleSignerScan(text, PAIRING_ERROR_INVALID_LINK);
       return;
     }

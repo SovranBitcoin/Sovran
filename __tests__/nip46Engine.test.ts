@@ -726,6 +726,157 @@ describe('nostrconnect pairing', () => {
     expect(connectionFor(APP_B)?.grants['sign_event:1']).toMatchObject({ verdict: 'always' });
   });
 
+  describe('reconnect adoption (replacesClientPubkey)', () => {
+    const OLD_CLIENT = '9'.repeat(64);
+
+    /** Previous Primal pairing under an old ephemeral key, with saved config. */
+    function seedPreviousPrimal(): void {
+      const store = useNip46ConnectionsStore.getState();
+      expect(
+        store
+          .upsertApp({
+            clientPubkey: OLD_CLIENT,
+            relays: ['wss://old.relay.example'],
+            origin: 'nostrconnect',
+            name: 'Primal',
+            url: 'https://primal.net',
+          })
+          .isOk()
+      ).toBe(true);
+      expect(store.setGrant(OLD_CLIENT, 'sign_event:1', 'always').isOk()).toBe(true);
+      expect(
+        store.setPeerDecryptGrant(OLD_CLIENT, 'e'.repeat(64), 'nip44_decrypt', {
+          peerIsSelf: false,
+        }).isOk
+      ).toBeDefined();
+    }
+
+    const reconnectUri = () => nostrconnectUri({ name: 'Primal', url: 'https://primal.net' });
+
+    it('active match: adopts config, deletes the old record, revokes its session grants', async () => {
+      seedPreviousPrimal();
+      useNip46RequestsStore
+        .getState()
+        .grantSession(OLD_CLIENT, 'nip44_decrypt', 'e'.repeat(64), { peerIsSelf: false });
+      const { engine, sent } = makeEngine();
+      const parsed = reconnectUri();
+      engine.startNostrconnectPairing(parsed);
+
+      const result = await engine.completeNostrconnectPairing({
+        parsed,
+        acceptedGrantKeys: [],
+        presentedGrantKeys: [],
+        replacesClientPubkey: OLD_CLIENT,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(connectionFor(OLD_CLIENT)).toBeUndefined();
+      const adopted = connectionFor(APP_B);
+      expect(adopted?.grants['sign_event:1']).toMatchObject({ verdict: 'always' });
+      expect(adopted?.peerDecryptGrants['e'.repeat(64)]?.methods).toEqual(['nip44_decrypt']);
+      expect(adopted?.previousClientPubkeys).toEqual([OLD_CLIENT]);
+      expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
+      // Secret still echoed; activity logged under the NEW key.
+      expect(parsedResponse(sent[0]!)).toEqual({ id: 'minted-id', result: parsed.secret });
+      expect(activityEntries()[0]).toMatchObject({ clientPubkey: APP_B, method: 'connect' });
+    });
+
+    it('forged replacesClientPubkey (matcher disagrees) fails the pairing, nothing written', async () => {
+      // The previous record claims a DIFFERENT hostname — the matcher would
+      // never pick it, so inheritance must be refused outright.
+      const store = useNip46ConnectionsStore.getState();
+      expect(
+        store
+          .upsertApp({
+            clientPubkey: OLD_CLIENT,
+            relays: ['wss://old.relay.example'],
+            origin: 'nostrconnect',
+            name: 'Primal',
+            url: 'https://evil.example',
+          })
+          .isOk()
+      ).toBe(true);
+      store.setGrant(OLD_CLIENT, 'sign_event:1', 'always');
+      const { engine, sent } = makeEngine();
+      const parsed = reconnectUri();
+      engine.startNostrconnectPairing(parsed);
+
+      const result = await engine.completeNostrconnectPairing({
+        parsed,
+        acceptedGrantKeys: [],
+        replacesClientPubkey: OLD_CLIENT,
+      });
+
+      expect(result._unsafeUnwrapErr()).toEqual({
+        type: 'adopt-failed',
+        cause: 'inherit_mismatch',
+      });
+      expect(connectionFor(OLD_CLIENT)?.grants['sign_event:1']).toMatchObject({
+        verdict: 'always',
+      });
+      expect(connectionFor(APP_B)).toBeUndefined();
+      expect(sent).toHaveLength(0);
+    });
+
+    it('vanished previous record fails the pairing (no silent fresh fallback)', async () => {
+      const { engine } = makeEngine();
+      const parsed = reconnectUri();
+      engine.startNostrconnectPairing(parsed);
+
+      const result = await engine.completeNostrconnectPairing({
+        parsed,
+        acceptedGrantKeys: [],
+        replacesClientPubkey: OLD_CLIENT,
+      });
+
+      expect(result._unsafeUnwrapErr()).toEqual({
+        type: 'adopt-failed',
+        cause: 'inherit_mismatch',
+      });
+      expect(connectionFor(APP_B)).toBeUndefined();
+    });
+
+    it('blocked match: fresh grants only, chain carried, block deliberately forgotten', async () => {
+      seedPreviousPrimal();
+      useNip46ConnectionsStore.getState().blockApp(OLD_CLIENT);
+      const { engine } = makeEngine();
+      const parsed = reconnectUri();
+      engine.startNostrconnectPairing(parsed);
+
+      const result = await engine.completeNostrconnectPairing({
+        parsed,
+        acceptedGrantKeys: ['sign_event:7'],
+        replacesClientPubkey: OLD_CLIENT,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(connectionFor(OLD_CLIENT)).toBeUndefined();
+      const adopted = connectionFor(APP_B);
+      expect(adopted?.status).toBe('active');
+      expect(adopted?.grants['sign_event:1']).toBeUndefined(); // nothing inherited
+      expect(adopted?.grants['sign_event:7']).toMatchObject({ verdict: 'always' }); // fresh accept
+      expect(adopted?.peerDecryptGrants).toEqual({});
+      expect(adopted?.previousClientPubkeys).toEqual([OLD_CLIENT]);
+    });
+
+    it('expanded reconcile downgrades an inherited always-grant on the new record', async () => {
+      seedPreviousPrimal();
+      const { engine } = makeEngine();
+      const parsed = reconnectUri();
+      engine.startNostrconnectPairing(parsed);
+
+      const result = await engine.completeNostrconnectPairing({
+        parsed,
+        acceptedGrantKeys: [],
+        presentedGrantKeys: ['sign_event:1'],
+        replacesClientPubkey: OLD_CLIENT,
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(connectionFor(APP_B)?.grants['sign_event:1']).toBeUndefined();
+    });
+  });
+
   it('cancelNostrconnectPairing closes the stranger window again', async () => {
     const { engine, emit, transport } = makeEngine();
     engine.startNostrconnectPairing(nostrconnectUri());
@@ -866,19 +1017,68 @@ describe('resolveRequest', () => {
     expect(activityEntries()[0]).toMatchObject({ verdict: 'auto_approved_grant' });
   });
 
-  it('always on a critical request executes once but the ceiling blocks the grant', async () => {
+  it('always grants the WHOLE bundle of the request key (one human concept)', async () => {
+    const { engine, requestId } = await makeAsk('nip44_encrypt', [PEER, 'hello']);
+
+    expect((await engine.resolveRequest(requestId, { action: 'always' })).isOk()).toBe(true);
+
+    const grants = connectionFor(APP)?.grants ?? {};
+    for (const key of [
+      'sign_event:4',
+      'sign_event:13',
+      'nip04_encrypt',
+      'nip44_encrypt',
+    ] as const) {
+      expect(grants[key]).toMatchObject({ verdict: 'always' });
+    }
+    // Never-sign kinds stay outside the bundle.
+    expect(grants['sign_event:14']).toBeUndefined();
+  });
+
+  it('always on an unbundled key grants only that key', async () => {
+    const { engine, requestId } = await makeAsk('sign_event', signEventParams({ kind: 31337 }));
+
+    expect((await engine.resolveRequest(requestId, { action: 'always' })).isOk()).toBe(true);
+
+    const grants = connectionFor(APP)?.grants ?? {};
+    expect(grants['sign_event:31337']).toMatchObject({ verdict: 'always' });
+    expect(Object.keys(grants)).toEqual(['sign_event:31337']);
+  });
+
+  it('per-key reconcile downgrades one bundle member, siblings survive', async () => {
+    const { engine, requestId } = await makeAsk('nip44_encrypt', [PEER, 'hello']);
+    await engine.resolveRequest(requestId, { action: 'always' });
+
+    // Re-pair presents nip44_encrypt unchecked → only that member downgrades.
+    const parsed = nostrconnectUri({ clientPubkey: APP });
+    engine.startNostrconnectPairing(parsed);
+    const result = await engine.completeNostrconnectPairing({
+      parsed,
+      acceptedGrantKeys: [],
+      presentedGrantKeys: ['nip44_encrypt'],
+    });
+
+    expect(result.isOk()).toBe(true);
+    const grants = connectionFor(APP)?.grants ?? {};
+    expect(grants['nip44_encrypt']).toBeUndefined();
+    expect(grants['sign_event:4']).toMatchObject({ verdict: 'always' });
+    expect(grants['sign_event:13']).toMatchObject({ verdict: 'always' });
+  });
+
+  it('always on a SELF-decrypt executes once but the ceiling blocks any grant', async () => {
     pairApp();
     const harness = makeEngine();
-    const { requestId } = await makeAsk('nip44_decrypt', [PEER, 'ciphertext'], harness);
+    const { requestId } = await makeAsk('nip44_decrypt', [USER, 'ciphertext'], harness);
 
     const result = await harness.engine.resolveRequest(requestId, { action: 'always' });
 
     expect(result.isOk()).toBe(true);
     expect(connectionFor(APP)?.grants['nip44_decrypt']).toBeUndefined();
+    expect(connectionFor(APP)?.peerDecryptGrants).toEqual({});
     expect(parsedResponse(harness.sent[0]!)).toEqual({ id: requestId, result: 'pt44' });
 
     // Next identical request still asks — nothing was persisted.
-    const second = rpc('nip44_decrypt', [PEER, 'ciphertext-2']);
+    const second = rpc('nip44_decrypt', [USER, 'ciphertext-2']);
     harness.emit(makeEvent(second));
     await flush();
     expect(useNip46RequestsStore.getState().pending.map((p) => p.id)).toEqual([second.id]);
@@ -984,19 +1184,59 @@ describe('resolveRequest', () => {
   });
 });
 
-describe('session grants', () => {
-  it('approve_once + sessionGrant mints a 1h grant for peer≠self decrypt; next auto-approves', async () => {
+describe('structured activity summaries (summaryV2)', () => {
+  it('approve path logs a human-readable headline/line for a kind-7 like', async () => {
+    const target = '2'.repeat(64);
+    const { engine, requestId } = await makeAsk(
+      'sign_event',
+      signEventParams({ kind: 7, content: '+', tags: [['e', target]] })
+    );
+
+    expect((await engine.resolveRequest(requestId, { action: 'approve_once' })).isOk()).toBe(true);
+
+    expect(activityEntries()[0]).toMatchObject({
+      verdict: 'approved_once',
+      summaryV2: { headline: 'Like a Post', line: 'Liked a post', refEventId: target },
+    });
+  });
+
+  it('denied requests keep the structured summary', async () => {
+    const { engine, requestId } = await makeAsk(
+      'sign_event',
+      signEventParams({ kind: 30078, tags: [['d', 'Primal-Web App', 'get_app_settings']] })
+    );
+
+    await engine.resolveRequest(requestId, { action: 'deny_once' });
+
+    expect(activityEntries()[0]).toMatchObject({
+      verdict: 'denied_once',
+      summaryV2: { headline: 'Load App Settings' },
+    });
+  });
+
+  it('decrypt entries carry the peer pubkey and never ciphertext', async () => {
+    const { engine, requestId } = await makeAsk('nip44_decrypt', [PEER, 'ct-secret-material']);
+
+    await engine.resolveRequest(requestId, { action: 'approve_once' });
+
+    const entry = activityEntries()[0] as unknown as Record<string, unknown>;
+    expect(entry).toMatchObject({ summaryV2: { refPubkey: PEER } });
+    expect(JSON.stringify(entry)).not.toContain('ct-secret-material');
+  });
+});
+
+describe('session approvals', () => {
+  it('approve_session on a peer decrypt mints a session grant; next same-peer auto-approves even much later', async () => {
     const { engine, emit, sent, requestId } = await makeAsk('nip44_decrypt', [PEER, 'ct-1']);
 
-    const result = await engine.resolveRequest(requestId, {
-      action: 'approve_once',
-      sessionGrant: true,
-    });
+    const result = await engine.resolveRequest(requestId, { action: 'approve_session' });
     expect(result.isOk()).toBe(true);
     expect(useNip46RequestsStore.getState().sessionGrants).toMatchObject([
-      { clientPubkey: APP, grantKey: 'nip44_decrypt' },
+      { clientPubkey: APP, grantKey: 'nip44_decrypt', peerPubkey: PEER },
     ]);
 
+    // Sessions have no TTL — a day later still auto-approves.
+    now += 24 * 3_600_000;
     emit(makeEvent(rpc('nip44_decrypt', [PEER, 'ct-2'])));
     await flush();
 
@@ -1005,15 +1245,116 @@ describe('session grants', () => {
     expect(activityEntries()[0]).toMatchObject({ verdict: 'auto_approved_session' });
   });
 
-  it('refuses a session grant for decrypt-to-self and keeps prompting', async () => {
-    const { engine, requestId } = await makeAsk('nip44_decrypt', [USER, 'wallet-ct']);
+  it('a session grant for one peer does NOT cover a different peer — prompts again', async () => {
+    const otherPeer = 'd'.repeat(64);
+    const { engine, emit, requestId } = await makeAsk('nip44_decrypt', [PEER, 'ct-1']);
+    await engine.resolveRequest(requestId, { action: 'approve_session' });
 
-    const result = await engine.resolveRequest(requestId, {
-      action: 'approve_once',
-      sessionGrant: true,
-    });
+    emit(makeEvent(rpc('nip44_decrypt', [otherPeer, 'ct-2'])));
+    await flush();
+
+    expect(useNip46RequestsStore.getState().pending).toHaveLength(1);
+  });
+
+  it('always on a peer decrypt persists a peerDecryptGrants entry; next same-peer auto-approves', async () => {
+    const { engine, emit, sent, requestId } = await makeAsk('nip44_decrypt', [PEER, 'ct-1']);
+
+    const result = await engine.resolveRequest(requestId, { action: 'always' });
+    expect(result.isOk()).toBe(true);
+    expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
+    const app = useNip46ConnectionsStore.getState().apps[APP]!;
+    expect(app.peerDecryptGrants[PEER]).toMatchObject({ methods: ['nip44_decrypt'] });
+    // The blanket grants map stays untouched — the critical ceiling holds.
+    expect(app.grants.nip44_decrypt).toBeUndefined();
+
+    emit(makeEvent(rpc('nip44_decrypt', [PEER, 'ct-2'])));
+    await flush();
+
+    expect(sent).toHaveLength(2);
+    expect(parsedResponse(sent[1]!).result).toBe('pt44');
+    expect(activityEntries()[0]).toMatchObject({ verdict: 'auto_approved_peer_grant' });
+  });
+
+  it('approve_session on decrypt-to-self falls back to once — keeps prompting', async () => {
+    const { engine, emit, requestId } = await makeAsk('nip44_decrypt', [USER, 'wallet-ct']);
+
+    const result = await engine.resolveRequest(requestId, { action: 'approve_session' });
 
     expect(result.isOk()).toBe(true);
+    expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
+    expect(useNip46RequestsStore.getState().sessionAllows).toEqual([]);
+
+    emit(makeEvent(rpc('nip44_decrypt', [USER, 'wallet-ct-2'])));
+    await flush();
+    expect(useNip46RequestsStore.getState().pending).toHaveLength(1);
+  });
+
+  it('approve_session on a bundled sign kind covers the whole bundle for the session', async () => {
+    const { engine, emit, sent, requestId } = await makeAsk();
+
+    const result = await engine.resolveRequest(requestId, { action: 'approve_session' });
+    expect(result.isOk()).toBe(true);
+    // Kind 1 belongs to postPublicly — siblings ride along, runtime-only.
+    const allowKeys = useNip46RequestsStore.getState().sessionAllows.map((a) => a.grantKey);
+    expect(allowKeys).toEqual(
+      expect.arrayContaining(['sign_event:1', 'sign_event:1111', 'sign_event:30023'])
+    );
+    // Nothing persisted.
+    expect(useNip46ConnectionsStore.getState().apps[APP]!.grants).toEqual({});
+
+    emit(makeEvent(rpc('sign_event', signEventParams({ kind: 30023 }))));
+    await flush();
+
+    expect(sent).toHaveLength(2);
+    expect(activityEntries()[0]).toMatchObject({ verdict: 'auto_approved_session' });
+  });
+
+  it('approve_session on a WALLET sign kind auto-approves for the session (runtime-only)', async () => {
+    const { engine, emit, sent, requestId } = await makeAsk(
+      'sign_event',
+      signEventParams({ kind: 17375 })
+    );
+
+    const result = await engine.resolveRequest(requestId, { action: 'approve_session' });
+    expect(result.isOk()).toBe(true);
+    expect(useNip46RequestsStore.getState().sessionAllows).toMatchObject([
+      { clientPubkey: APP, grantKey: 'sign_event:17375' },
+    ]);
+    // The persisted critical ceiling is untouched.
+    expect(useNip46ConnectionsStore.getState().apps[APP]!.grants).toEqual({});
+
+    emit(makeEvent(rpc('sign_event', signEventParams({ kind: 17375 }))));
+    await flush();
+
+    expect(sent).toHaveLength(2);
+    expect(activityEntries()[0]).toMatchObject({ verdict: 'auto_approved_session' });
+  });
+
+  it('stop() ends the session — all session state cleared', async () => {
+    const { engine, requestId } = await makeAsk('nip44_decrypt', [PEER, 'ct-1']);
+    await engine.resolveRequest(requestId, { action: 'approve_session' });
+    const harness2 = await makeAsk();
+    await harness2.engine.resolveRequest(harness2.requestId, { action: 'approve_session' });
+
+    engine.stop();
+    harness2.engine.stop();
+
+    expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
+    expect(useNip46RequestsStore.getState().sessionAllows).toEqual([]);
+  });
+
+  it('block clears the app session state', async () => {
+    const { engine, requestId } = await makeAsk();
+    await engine.resolveRequest(requestId, { action: 'approve_session' });
+    expect(useNip46RequestsStore.getState().sessionAllows.length).toBeGreaterThan(0);
+
+    const second = rpc('sign_event', signEventParams({ kind: 7 }));
+    // kind 7 is in a different bundle — still session-pending? It auto-asks;
+    // resolve directly via a fresh ask.
+    const harness = await makeAsk('sign_event', signEventParams({ kind: 5 }), undefined);
+    await harness.engine.resolveRequest(harness.requestId, { action: 'block' });
+
+    expect(useNip46RequestsStore.getState().sessionAllows).toEqual([]);
     expect(useNip46RequestsStore.getState().sessionGrants).toEqual([]);
   });
 });
