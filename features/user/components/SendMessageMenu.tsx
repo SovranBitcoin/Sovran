@@ -11,6 +11,8 @@ import { nostrLog } from '@/shared/lib/logger';
 type Props = {
   pubkey: string;
   displayName: string;
+  /** Button emphasis — profile footer renders it secondary beside Send Money. */
+  variant?: 'primary' | 'secondary';
 };
 
 /**
@@ -24,7 +26,7 @@ type Props = {
  * is rendered as disabled with a "not in BLE range" reason instead of being
  * hidden, so the user understands it's a possible transport at all.
  */
-export function SendMessageMenu({ pubkey, displayName }: Props) {
+export function SendMessageMenu({ pubkey, displayName, variant = 'primary' }: Props) {
   const { peers } = useBLEPeers();
   const { isReady: whitenoiseReady } = useWhitenoiseSetup();
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
@@ -125,7 +127,7 @@ export function SendMessageMenu({ pubkey, displayName }: Props) {
   return (
     <ActionMenuButton
       label="Send Message"
-      variant="primary"
+      variant={variant}
       testID="send-message-menu"
       variants={variants}
       menuTitle="Send via"

@@ -374,6 +374,15 @@ const PARAM_POPUPS = {
     type: 'error',
   }),
 
+  /** Generic "this action can't run" toast with caller-supplied wording —
+   *  e.g. Send Money on a profile without a Lightning address. */
+  'action-unavailable': (p: { title: string; message: string }): PopupSpec => ({
+    message: p.title,
+    text: p.message,
+    icon: 'icon:mdi:alert-circle',
+    type: 'error',
+  }),
+
   'dev-mode': (enabled: boolean): PopupSpec => ({
     message: enabled ? 'Developer mode enabled' : 'Developer mode disabled',
     icon: 'icon:material-symbols:report-rounded',
