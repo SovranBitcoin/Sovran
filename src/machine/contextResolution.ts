@@ -424,7 +424,10 @@ export function resolveFromContext(
   if (revalidated.kind === 'redirect') return revalidated.result;
   const effectiveMintUrl = revalidated.mintUrl;
 
-  if (destination === 'sendEcash') {
+  if (destination === 'sendEcash' && !ctx.p2pkLockPubkey) {
+    // Locked sends skip local-proof routing entirely — local proofs cannot
+    // carry a P2PK lock, so the flow proceeds to confirmSend where the
+    // offline case fails fast instead of degrading to a bearer token.
     const proofAmounts = walletCtx.proofAmounts[effectiveMintUrl] ?? [];
     if (proofAmounts.length > 0 && ctx.offline) {
       const built = buildProofSuggestions(proofAmounts, amount);

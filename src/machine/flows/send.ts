@@ -33,7 +33,12 @@ export interface StartSendEcashOptions {
   meltTarget?: string;
   recipientPubkey?: string;
   recipientProfile?: RecipientProfile;
+  /** See `FlowContext.p2pkLockPubkey` — 33-byte compressed hex, `02`-prefixed. */
+  p2pkLockPubkey?: string;
 }
+
+/** 33-byte compressed secp256k1 pubkey, `02`-prefixed per the Cashu↔Nostr convention. */
+const P2PK_LOCK_PUBKEY_PATTERN = /^02[0-9a-f]{64}$/i;
 
 export interface SendFlowDefinition {
   initial: SendFlowState;
@@ -58,7 +63,20 @@ export function startSendEcashFlow(
     ...(opts.meltTarget ? { meltTarget: opts.meltTarget } : {}),
     ...(opts.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
     ...(opts.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
+    ...(opts.p2pkLockPubkey ? { p2pkLockPubkey: opts.p2pkLockPubkey.toLowerCase() } : {}),
   };
+  // A malformed lock key must abort the flow — silently dropping it would
+  // downgrade the send to a bearer token on whatever surface requested a lock.
+  if (opts.p2pkLockPubkey && !P2PK_LOCK_PUBKEY_PATTERN.test(opts.p2pkLockPubkey)) {
+    return {
+      step: 'error',
+      context,
+      data: {
+        code: 'INVALID_P2PK_LOCK',
+        message: 'Invalid P2PK lock key for this send.',
+      },
+    };
+  }
   const selection = selectMint(walletCtx);
 
   switch (selection.type) {

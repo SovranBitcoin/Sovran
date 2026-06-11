@@ -271,8 +271,12 @@ function handleProofsChosen(
 ): TransitionResult {
   const destination = currentCtx.destination ?? 'sendEcash';
   const proofAmounts = currentCtx.mintUrl ? (walletCtx.proofAmounts[currentCtx.mintUrl] ?? []) : [];
+  // P2PK-locked sends require a mint swap — local proofs can never satisfy a
+  // lock, so locked flows must not take the local-proof shortcut.
   const canSendLocally =
-    destination === 'sendEcash' && buildProofSuggestions(proofAmounts, event.amount).exactMatch;
+    destination === 'sendEcash' &&
+    !currentCtx.p2pkLockPubkey &&
+    buildProofSuggestions(proofAmounts, event.amount).exactMatch;
   const ctx: FlowContext = {
     ...currentCtx,
     amount: event.amount,
@@ -403,6 +407,7 @@ export function transition(
         hasMeltTarget: !!event.meltTarget,
         recipientPubkeyPresent: !!event.recipientPubkey,
         recipientProfilePresent: !!event.recipientProfile,
+        p2pkLockPubkeyPresent: !!event.p2pkLockPubkey,
       });
       return stamp(
         startSendEcashFlow(walletCtx, unit, {
@@ -410,6 +415,7 @@ export function transition(
           ...(event.meltTarget ? { meltTarget: event.meltTarget } : {}),
           ...(event.recipientPubkey ? { recipientPubkey: event.recipientPubkey } : {}),
           ...(event.recipientProfile ? { recipientProfile: event.recipientProfile } : {}),
+          ...(event.p2pkLockPubkey ? { p2pkLockPubkey: event.p2pkLockPubkey } : {}),
         })
       );
     case 'START_RECEIVE_LIGHTNING':
