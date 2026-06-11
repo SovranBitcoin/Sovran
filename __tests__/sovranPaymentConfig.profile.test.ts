@@ -252,7 +252,7 @@ describe('createSovranHandlers profile routing', () => {
         nickname: 'Nearby Alice',
         hasDirectLink: true,
         lastSeen: 2,
-        p2pkPubkeyHex: lockPubkey,
+        delivery: { mode: 'p2pk', p2pkPubkeyHex: lockPubkey },
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-near-pay-token');
@@ -303,7 +303,7 @@ describe('createSovranHandlers profile routing', () => {
         nickname: 'Nearby Bob',
         hasDirectLink: true,
         lastSeen: 2,
-        p2pkPubkeyHex: `02${'ab'.repeat(32)}`,
+        delivery: { mode: 'p2pk', p2pkPubkeyHex: `02${'ab'.repeat(32)}` },
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-unlocked-token');
@@ -334,6 +334,86 @@ describe('createSovranHandlers profile routing', () => {
       pathname: '/(send-flow)/sendToken',
       params: { sendHistoryEntry: historyEntry },
     });
+  });
+
+  it('broadcasts an explicit bearer Near Pay token, including offline-created sends', async () => {
+    mockNearPayActive = {
+      id: 'near-pay-3',
+      startedAt: 1,
+      recipient: {
+        peerID: 'peer-789',
+        nickname: 'Vanilla Carol',
+        hasDirectLink: true,
+        lastSeen: 2,
+        delivery: { mode: 'bearer' },
+      },
+    };
+    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-bearer-token');
+    (sendBLEPublicMessage as jest.Mock).mockResolvedValue({ startupMs: 1, sendMs: 3 });
+    // @ts-expect-error sendComplete only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+    });
+    const historyEntry = JSON.stringify({
+      id: 'send-3',
+      type: 'send',
+      mintUrl: 'https://mint.example',
+      token: { proofs: [] },
+    });
+
+    // Bearer drops take the local-proof shortcut when offline — delivery
+    // must still broadcast (BLE needs no internet).
+    await handlers.sendComplete?.({
+      historyEntry,
+      createdOffline: true,
+      mintWasOffline: true,
+    });
+
+    expect(sendBLEPublicMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ content: 'cashuA-bearer-token' })
+    );
+    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to broadcast when a bearer session unexpectedly produced a locked token', async () => {
+    mockNearPayActive = {
+      id: 'near-pay-4',
+      startedAt: 1,
+      recipient: {
+        peerID: 'peer-999',
+        nickname: 'Vanilla Dave',
+        hasDirectLink: true,
+        lastSeen: 2,
+        delivery: { mode: 'bearer' },
+      },
+    };
+    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-mislocked-token');
+    // @ts-expect-error sendComplete only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+    });
+    const historyEntry = JSON.stringify({
+      id: 'send-4',
+      type: 'send',
+      mintUrl: 'https://mint.example',
+      token: { proofs: [] },
+    });
+
+    // A lock on a bearer session means the token is locked to a key the
+    // recipient can't use — broadcasting would burn the funds for everyone.
+    await handlers.sendComplete?.({
+      historyEntry,
+      createdOffline: false,
+      mintWasOffline: false,
+      p2pkLockPubkey: `02${'ef'.repeat(32)}`,
+    });
+
+    expect(sendBLEPublicMessage).not.toHaveBeenCalled();
+    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
   });
 
   it('skips P2PK key regeneration when the current-profile P2PK plugin is active', async () => {

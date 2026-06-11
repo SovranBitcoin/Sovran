@@ -860,17 +860,32 @@ async function deliverNearPayIfActive(
   const active = useNearPaySessionStore.getState().active;
   if (!active) return;
 
-  // Never broadcast an unlocked (or wrongly locked) token into the public
-  // mesh from this flow: every Nut Drop session is created with the
-  // recipient's lock key, and a missing/mismatched lock on the completed
-  // send means some machine path dropped it. The token stays in send
-  // history where the user can deliver it deliberately.
-  const expectedLock = (active.recipient.p2pkPubkeyHex ?? '').toLowerCase();
-  if (!expectedLock || p2pkLockPubkey?.toLowerCase() !== expectedLock) {
-    paymentLog.error('near_pay.delivery.lock_mismatch', {
+  // The session's delivery mode is the single source of truth for whether
+  // the completed send may hit the public mesh. Anything else means some
+  // machine path dropped or invented a lock — refuse to broadcast and leave
+  // the token in send history where the user can deliver it deliberately.
+  const delivery = active.recipient.delivery;
+  if (delivery.mode === 'p2pk') {
+    // P2PK sessions must broadcast a token locked to exactly the key the
+    // recipient announced; a missing/mismatched lock would leak a claimable
+    // (or unredeemable) token.
+    const expectedLock = delivery.p2pkPubkeyHex.toLowerCase();
+    if (!expectedLock || p2pkLockPubkey?.toLowerCase() !== expectedLock) {
+      paymentLog.error('near_pay.delivery.lock_mismatch', {
+        peerID: active.recipient.peerID,
+        expectedLockPresent: expectedLock.length > 0,
+        actualLockPresent: !!p2pkLockPubkey,
+      });
+      useNearPaySessionStore.getState().complete();
+      return;
+    }
+  } else if (p2pkLockPubkey) {
+    // Bearer sessions are created without a lock key (the user explicitly
+    // confirmed an unlocked send to a vanilla bitchat peer). A lock showing
+    // up here means the token is locked to a key the recipient can't use —
+    // broadcasting it would burn the funds for everyone.
+    paymentLog.error('near_pay.delivery.unexpected_lock', {
       peerID: active.recipient.peerID,
-      expectedLockPresent: expectedLock.length > 0,
-      actualLockPresent: !!p2pkLockPubkey,
     });
     useNearPaySessionStore.getState().complete();
     return;

@@ -31,7 +31,7 @@ interface ClassifiedNutDropToken {
 /**
  * Classify a cashu token against the active profile's P2PK lock key
  * (`myPubkey33` = "02" + x-only Nostr pubkey, the key Sovran announces in
- * its SVRN TLV and that coco's keyring can sign for).
+ * its ecash capability TLV and that coco's keyring can sign for).
  *
  * `locked-to-me` requires EVERY proof to be single-sig locked to my key —
  * coco's receive path rejects multisig and would only partially own a mixed

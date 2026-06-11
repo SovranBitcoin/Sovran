@@ -7,7 +7,7 @@ import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.noise.NoiseSession
 import com.bitchat.android.services.NicknameProvider
-import com.bitchat.android.sovran.SovranAnnounceExtension
+import com.bitchat.android.ecash.EcashAnnounceExtension
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
@@ -155,11 +155,12 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             activeNickname = nickname
             dmSummaries = loadDmSummaries(context, suffix)
 
-            // SVRN announce TLV must be live before startServices() — the first
-            // announce fires during startup and every announce must carry it.
-            SovranAnnounceExtension.localTLV = SovranAnnounceExtension.encodeLocalTLV(
+            // The ecash capability announce TLV must be live before
+            // startServices() — the first announce fires during startup and
+            // every announce must carry it.
+            EcashAnnounceExtension.localTLV = EcashAnnounceExtension.encodeLocalTLV(
                 p2pkPubkey = identity.p2pkPubkey,
-                flags = SovranAnnounceExtension.CAPABILITY_CASHU_AUTO_REDEEM,
+                flags = EcashAnnounceExtension.CAPABILITY_CASHU_AUTO_REDEEM,
             )
 
             val service = BluetoothMeshService(scopedContext)
@@ -197,10 +198,10 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         NicknameProvider.currentNickname = null
         dmSummaries = mutableMapOf()
         pendingSends.clear()
-        // Clear SVRN state so a profile switch can never announce the previous
-        // profile's lock key or surface its peers.
-        SovranAnnounceExtension.localTLV = null
-        SovranAnnounceExtension.clear()
+        // Clear ecash announce state so a profile switch can never announce
+        // the previous profile's lock key or surface its peers.
+        EcashAnnounceExtension.localTLV = null
+        EcashAnnounceExtension.clear()
     }
 
     // MARK: - Public mesh messaging
@@ -293,10 +294,10 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         val service = mesh ?: return emptyList()
         return service.getPeerNicknames().keys.mapNotNull { peerID ->
             val info = service.getPeerInfo(peerID) ?: return@mapNotNull null
-            // SVRN extension fields come from the peer's last verified
-            // announce. `isSovranPeer` gates the Nut Drop peer list;
-            // `p2pkPubkeyHex` is the Cashu P2PK lock target for that peer.
-            val svrn = SovranAnnounceExtension.lookup(peerID)
+            // Ecash capability fields come from the peer's last verified
+            // announce. `supportsP2pkEcash` marks peers that can receive
+            // P2PK-locked drops; `p2pkPubkeyHex` is the lock target.
+            val ecashExt = EcashAnnounceExtension.lookup(peerID)
             mapOf(
                 "peerID" to info.id,
                 "nickname" to info.nickname,
@@ -306,9 +307,9 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 "isConnected" to info.isConnected,
                 "hasDirectLink" to service.connectionManager.addressPeerMap.containsValue(peerID),
                 "lastSeen" to info.lastSeen.toDouble(),
-                "isSovranPeer" to (svrn != null),
-                "capabilities" to (svrn?.flags ?: 0),
-                "p2pkPubkeyHex" to svrn?.p2pkPubkeyHex,
+                "supportsP2pkEcash" to (ecashExt != null),
+                "ecashCapabilities" to (ecashExt?.flags ?: 0),
+                "p2pkPubkeyHex" to ecashExt?.p2pkPubkeyHex,
             )
         }
     }

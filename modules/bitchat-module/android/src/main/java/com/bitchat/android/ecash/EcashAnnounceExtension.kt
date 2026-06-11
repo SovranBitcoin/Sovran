@@ -1,15 +1,17 @@
-package com.bitchat.android.sovran
+package com.bitchat.android.ecash
 
 /**
- * Sovran extension TLV appended to bitchat announce packets, plus the
- * per-peer registry of extensions parsed from verified inbound announces.
+ * Ecash capability announce extension TLV (0xF0) appended to bitchat announce
+ * packets, plus the per-peer registry of extensions parsed from verified
+ * inbound announces. Open extension — any bitchat client may implement it;
+ * spec draft in `modules/bitchat-module/docs/nut-xx-ecash-capability-announcement.md`.
  *
  * Wire format (announce payload is a TLV stream; vanilla bitchat decoders
  * skip unknown TLV types — "tolerant decoder" in IdentityAnnouncement.kt):
  *
  *   type  = 0xF0
- *   len   = 39
- *   value = "SVRN" (4) | version 0x01 (1) | capability flags (1)
+ *   len   = 40
+ *   value = "NUTXX" (5) | version 0x01 (1) | capability flags (1)
  *           | P2PK pubkey (33 = 0x02 || nostr x-only pubkey)
  *
  * 0xF0 sits far above upstream's sequential allocation (0x01–0x04 today; the
@@ -17,18 +19,18 @@ package com.bitchat.android.sovran
  * territory. The TLV is appended before the announce is signed — exactly how
  * upstream appends its gossip TLV (0x04) — so the Ed25519 announce signature
  * covers it and vanilla verification still passes. Decoders accept
- * len >= 39 so future versions can append fields.
+ * len >= 40 so future versions can append fields.
  *
- * Mirror of ios/SovranAnnounceExtension.swift — keep the two in sync.
+ * Mirror of ios/EcashAnnounceExtension.swift — keep the two in sync.
  */
-object SovranAnnounceExtension {
+object EcashAnnounceExtension {
     const val TLV_TYPE: Byte = 0xF0.toByte()
     const val VERSION: Byte = 0x01
     /** Capability bit 0: auto-redeems P2PK-locked cashu tokens from the public mesh. */
     const val CAPABILITY_CASHU_AUTO_REDEEM: Int = 0x01
-    /** magic(4) + version(1) + flags(1) + compressed pubkey(33) */
-    private const val VALUE_LENGTH = 39
-    private val MAGIC = "SVRN".toByteArray(Charsets.US_ASCII)
+    /** magic(5) + version(1) + flags(1) + compressed pubkey(33) */
+    private const val VALUE_LENGTH = 40
+    private val MAGIC = "NUTXX".toByteArray(Charsets.US_ASCII)
     /** Backstop against unbounded memory on a hostile mesh (announces are rate-policed upstream). */
     private const val MAX_ENTRIES = 256
 
@@ -52,16 +54,16 @@ object SovranAnnounceExtension {
         out[0] = TLV_TYPE
         out[1] = VALUE_LENGTH.toByte()
         MAGIC.copyInto(out, 2)
-        out[6] = VERSION
-        out[7] = flags.toByte()
-        p2pkPubkey.copyInto(out, 8)
+        out[7] = VERSION
+        out[8] = flags.toByte()
+        p2pkPubkey.copyInto(out, 9)
         return out
     }
 
     /**
      * Records (or clears) the extension for a peer from a VERIFIED announce
      * payload. Announce TLVs are authoritative per-announce: a verified
-     * announce without the SVRN TLV clears the peer's entry.
+     * announce without the ecash TLV clears the peer's entry.
      */
     @Synchronized
     fun record(peerID: String, announcePayload: ByteArray) {
@@ -83,7 +85,7 @@ object SovranAnnounceExtension {
     }
 
     /**
-     * Walks the announce TLV stream looking for a valid SVRN extension.
+     * Walks the announce TLV stream looking for a valid ecash extension.
      * Tolerant of unknown TLVs (same loop shape as upstream decoders);
      * returns null on missing TLV, bad magic, or malformed pubkey.
      */
@@ -100,10 +102,10 @@ object SovranAnnounceExtension {
                 for (i in MAGIC.indices) {
                     if (value[i] != MAGIC[i]) return null
                 }
-                // value[4] is the version — fields are fixed-offset for all
+                // value[5] is the version — fields are fixed-offset for all
                 // versions, so unknown future versions still parse.
-                val flags = value[5].toInt() and 0xFF
-                val pubkey = value.copyOfRange(6, 39)
+                val flags = value[6].toInt() and 0xFF
+                val pubkey = value.copyOfRange(7, 40)
                 if (pubkey[0] != 0x02.toByte()) return null
                 return PeerExtension(
                     flags = flags,

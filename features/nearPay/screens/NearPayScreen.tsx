@@ -28,6 +28,11 @@ import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
 import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
 import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
+import {
+  confirmBearerSend,
+  nearPaySendPlan,
+  planDelivery,
+} from '@/features/nearPay/lib/startNearPaySend';
 import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
 import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -143,6 +148,10 @@ const PEER_OVERVIEW_TIMING = {
   easing: Easing.out(Easing.cubic),
 };
 const FOREGROUND_THEME_KEYS = ['foreground'] as const;
+const PEER_NODE_THEME_KEYS = ['foreground', 'surface'] as const;
+/** Open-padlock chip marking vanilla bitchat peers (bearer sends only). */
+const BEARER_BADGE_SIZE = 18;
+const BEARER_BADGE_ICON_SIZE = 11;
 const HEADER_BADGE_THEME_KEYS = ['foreground', 'shade-400', 'accent', 'accent-foreground'] as const;
 const PEER_LAYOUT_CONFIG = {
   nodeWidth: NODE_WIDTH,
@@ -286,6 +295,7 @@ function peerTargetsEqual(a: PeerLayoutTarget, b: PeerLayoutTarget): boolean {
     a.peer.nickname === b.peer.nickname &&
     a.peer.isConnected === b.peer.isConnected &&
     a.peer.hasDirectLink === b.peer.hasDirectLink &&
+    a.peer.supportsP2pkEcash === b.peer.supportsP2pkEcash &&
     a.peer.avatarUrl === b.peer.avatarUrl &&
     a.peer.profileLoading === b.peer.profileLoading
   );
@@ -314,7 +324,7 @@ const PeerNode = React.memo(function PeerNode({
   hideSharedElementSource?: boolean;
   strike?: StrikeState | null;
 }) {
-  const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
+  const [foreground, surface] = useThemeColor(PEER_NODE_THEME_KEYS);
   const hasAnimatedInRef = useRef(false);
   const baseX = useSharedValue(target.x);
   const baseY = useSharedValue(target.y);
@@ -536,6 +546,10 @@ const PeerNode = React.memo(function PeerNode({
     () => [styles.peerAvatarName, { color: opacity(foreground, alpha.prominent) }],
     [foreground]
   );
+  const bearerBadgeStyle = useMemo(
+    () => [styles.bearerBadge, { backgroundColor: surface }],
+    [surface]
+  );
 
   const handlePress = useCallback(() => {
     if (target.phase === 'exiting') return;
@@ -571,6 +585,15 @@ const PeerNode = React.memo(function PeerNode({
               entrance={strike.entrance}
               seed={target.peer.peerID}
             />
+          ) : null}
+          {!target.peer.supportsP2pkEcash ? (
+            <View style={bearerBadgeStyle}>
+              <Icon
+                name="mdi:lock-open-variant-outline"
+                size={BEARER_BADGE_ICON_SIZE}
+                color={opacity(foreground, alpha.prominent)}
+              />
+            </View>
           ) : null}
         </View>
         <Animated.View pointerEvents="none" style={peerAvatarNameLabelStyle}>
@@ -1290,14 +1313,10 @@ export function NearPayScreen() {
   useRenderLogger('NearPayScreen', 30, paymentLog);
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  const { peers: allPeers } = useBLEPeers();
-  // Nut Drop is Sovran-to-Sovran: tokens are P2PK-locked to the recipient's
-  // announced lock key, so vanilla bitchat peers (no SVRN announce extension)
-  // can't receive a drop and are hidden from the radar entirely.
-  const peers = useMemo(
-    () => allPeers.filter((peer) => peer.isSovranPeer && !!peer.p2pkPubkeyHex),
-    [allPeers]
-  );
+  // Every bitchat peer is on the radar: peers announcing the ecash
+  // capability TLV get P2PK-locked drops; vanilla peers are bearer-only
+  // (visually marked, gated behind an explicit confirm in handleSelectPeer).
+  const { peers } = useBLEPeers();
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
   const inlineAmountEntry = nearPaySession?.amountEntry ?? null;
@@ -1354,6 +1373,10 @@ export function NearPayScreen() {
     const recipient = nearPaySession?.recipient;
     if (!recipient) return null;
     if (selectedPeer?.peerID === recipient.peerID) return selectedPeer;
+    // Bearer recipients have no announced lock key — identity falls back to
+    // the peerID seed, same as the radar node for a vanilla peer.
+    const p2pkPubkeyHex =
+      recipient.delivery.mode === 'p2pk' ? recipient.delivery.p2pkPubkeyHex : '';
     return {
       peerID: recipient.peerID,
       nickname: recipient.nickname,
@@ -1362,8 +1385,9 @@ export function NearPayScreen() {
       hasDirectLink: recipient.hasDirectLink,
       lastSeen: recipient.lastSeen,
       avatarUrl: null,
-      p2pkPubkeyHex: recipient.p2pkPubkeyHex,
-      nostrPubkey: recipient.p2pkPubkeyHex.slice(2),
+      supportsP2pkEcash: recipient.delivery.mode === 'p2pk',
+      p2pkPubkeyHex,
+      nostrPubkey: p2pkPubkeyHex.slice(2),
       profileLoading: false,
     };
   }, [nearPaySession?.recipient, selectedPeer]);
@@ -1494,11 +1518,23 @@ export function NearPayScreen() {
 
   const handleSelectPeer = useCallback(
     async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
+      const plan = nearPaySendPlan(peer);
       paymentLog.info('near_pay.peer.select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
+        deliveryMode: plan.mode,
       });
+      if (plan.mode === 'bearer') {
+        // Consent gate BEFORE any session/transition state — declining must
+        // leave the radar exactly as it was. This also covers the Random
+        // button landing on a vanilla peer.
+        const confirmed = await confirmBearerSend(peer.name);
+        if (!confirmed) {
+          paymentLog.info('near_pay.peer.bearer_declined', { peerID: peer.peerID });
+          return;
+        }
+      }
       setSelectedPeer(peer);
       setSelectedPeerRect(avatarRect);
       stopSharedElementAnimations();
@@ -1517,7 +1553,7 @@ export function NearPayScreen() {
         nickname: peer.name,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
-        p2pkPubkeyHex: peer.p2pkPubkeyHex,
+        delivery: planDelivery(plan),
       });
       const startSendSpan = paymentLog
         .child({ flowId: `near-pay-start-send-${Date.now()}` })
@@ -1537,10 +1573,18 @@ export function NearPayScreen() {
       try {
         await machine.startSendEcash({
           reset: true,
-          p2pkLockPubkey: peer.p2pkPubkeyHex,
-          // The Nostr pubkey lets colada's resolveRecipientProfile refresh
-          // the header live; the snapshot below paints the first frame.
-          ...(peer.nostrPubkey ? { recipientPubkey: peer.nostrPubkey } : {}),
+          // Bearer plans omit the lock entirely — the machine then mints an
+          // unlocked token and deliverNearPayIfActive enforces that the
+          // completed send really is lock-free before broadcasting.
+          ...(plan.mode === 'p2pk'
+            ? {
+                p2pkLockPubkey: plan.p2pkLockPubkey,
+                // The Nostr pubkey lets colada's resolveRecipientProfile
+                // refresh the header live; the snapshot below paints the
+                // first frame. Vanilla peers have no Nostr identity.
+                recipientPubkey: plan.recipientPubkey,
+              }
+            : {}),
           recipientProfile: {
             displayName: peer.name,
             avatarUrl: peer.avatarUrl ?? null,
@@ -1918,6 +1962,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
+  },
+  bearerBadge: {
+    alignItems: 'center',
+    borderRadius: BEARER_BADGE_SIZE / 2,
+    bottom: -2,
+    height: BEARER_BADGE_SIZE,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -2,
+    width: BEARER_BADGE_SIZE,
   },
   peerAvatarNameLabel: {
     alignItems: 'center',

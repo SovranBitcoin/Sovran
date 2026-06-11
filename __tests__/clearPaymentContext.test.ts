@@ -15,7 +15,7 @@ describe('clearPaymentContext', () => {
       nickname: 'bob',
       hasDirectLink: true,
       lastSeen: 0,
-      p2pkPubkeyHex: `02${'ab'.repeat(32)}`,
+      delivery: { mode: 'p2pk', p2pkPubkeyHex: `02${'ab'.repeat(32)}` },
     });
 
     expect(useRoutstrTopUpStore.getState().active).toBe(true);

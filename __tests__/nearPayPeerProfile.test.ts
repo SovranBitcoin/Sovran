@@ -16,8 +16,8 @@ function blePeer(overrides: Partial<BLEPeer> = {}): BLEPeer {
     isConnected: true,
     hasDirectLink: true,
     lastSeen: 1,
-    isSovranPeer: true,
-    capabilities: 1,
+    supportsP2pkEcash: true,
+    ecashCapabilities: 1,
     p2pkPubkeyHex: `02${NOSTR_PUBKEY}`,
     ...overrides,
   };
@@ -35,7 +35,7 @@ function profileRow(
 }
 
 describe('peerNostrPubkey', () => {
-  it('strips the 02 parity prefix from the SVRN lock key', () => {
+  it('strips the 02 parity prefix from the announced lock key', () => {
     expect(peerNostrPubkey(blePeer())).toBe(NOSTR_PUBKEY);
     expect(peerNostrPubkey(blePeer({ p2pkPubkeyHex: undefined }))).toBe('');
   });

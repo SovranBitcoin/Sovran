@@ -4,18 +4,24 @@ import { storeLog } from '@/shared/lib/logger';
 
 type NearPaySessionPhase = 'picking' | 'transitioning' | 'amount';
 
+/**
+ * How the broadcast token must be protected for this session. Discriminated
+ * so every consumer is forced to handle both modes explicitly:
+ * - `p2pk`: the recipient announced the ecash capability TLV; the token is
+ *   locked to their announced key ("02" + x-only Nostr pubkey) so only they
+ *   can redeem it.
+ * - `bearer`: vanilla bitchat recipient — the token is broadcast UNLOCKED
+ *   and anyone on the mesh can claim it. Only ever chosen after the sender
+ *   explicitly confirmed the bearer warning.
+ */
+export type NearPayDelivery = { mode: 'p2pk'; p2pkPubkeyHex: string } | { mode: 'bearer' };
+
 interface NearPayRecipient {
   peerID: string;
   nickname: string;
   hasDirectLink: boolean;
   lastSeen: number;
-  /**
-   * The recipient's Cashu P2PK lock target from their SVRN announce
-   * ("02" + their x-only Nostr pubkey). Required — Nut Drop sessions can
-   * only start for Sovran peers, and the broadcast token is locked to this
-   * key so only the chosen recipient can redeem it.
-   */
-  p2pkPubkeyHex: string;
+  delivery: NearPayDelivery;
 }
 
 interface NearPaySession {
@@ -47,7 +53,7 @@ export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => 
     storeLog.info('near_pay.session.start', {
       peerID: recipient.peerID,
       hasDirectLink: recipient.hasDirectLink,
-      p2pkPubkeyPresent: recipient.p2pkPubkeyHex.length > 0,
+      deliveryMode: recipient.delivery.mode,
     });
     set({
       active: {

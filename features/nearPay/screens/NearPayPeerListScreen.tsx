@@ -15,6 +15,11 @@ import {
   type RecentPeopleProfileRow,
 } from '@/features/feed/hooks/useRecentPeopleProfiles';
 import { peerDisplayName, peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
+import {
+  confirmBearerSend,
+  nearPaySendPlan,
+  planDelivery,
+} from '@/features/nearPay/lib/startNearPaySend';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -38,6 +43,25 @@ interface NearPayPeerRowProps {
   onSelect: (peer: BLEPeer) => void;
 }
 
+/** Trailing pill marking vanilla bitchat peers — drops to them are bearer tokens. */
+function BearerTag() {
+  const [foreground] = useThemeColor(['foreground'] as const);
+  const tagStyle = useMemo(
+    () => [styles.bearerTag, { backgroundColor: opacity(foreground, 0.08) }],
+    [foreground]
+  );
+  const tagTextStyle = useMemo(() => ({ color: opacity(foreground, 0.55) }), [foreground]);
+
+  return (
+    <HStack align="center" spacing={4} style={tagStyle}>
+      <Icon name="mdi:lock-open-variant-outline" size={12} color={opacity(foreground, 0.55)} />
+      <Text size={11} style={tagTextStyle}>
+        Bearer
+      </Text>
+    </HStack>
+  );
+}
+
 function NearPayPeerRow({ peer, profile, onSelect }: NearPayPeerRowProps) {
   const handlePress = useCallback(() => onSelect(peer), [onSelect, peer]);
   // BLE identity stays primary (peerID seed, connection status); the Nostr
@@ -53,10 +77,15 @@ function NearPayPeerRow({ peer, profile, onSelect }: NearPayPeerRowProps) {
       nostrIdentity(nostrPubkey, profile?.metadata, { isLoadingProfile: profile?.isLoading }),
     ];
   }, [peer, profile]);
+  const trailing = useMemo(
+    () => (peer.supportsP2pkEcash ? undefined : <BearerTag />),
+    [peer.supportsP2pkEcash]
+  );
 
   return (
     <ContactRow
       identity={identity}
+      trailing={trailing}
       onPress={handlePress}
       testID={`near-pay-peer-row:${peer.peerID}`}
     />
@@ -71,36 +100,24 @@ export function NearPayPeerListScreen() {
   const { peers } = useBLEPeers();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
-  // Nut Drop is Sovran-to-Sovran: tokens are P2PK-locked to the recipient's
-  // announced lock key, so vanilla bitchat peers (no SVRN announce extension)
-  // can't receive a drop and are hidden from this list entirely.
-  const sovranPeers = useMemo(
-    () => peers.filter((peer) => peer.isSovranPeer && !!peer.p2pkPubkeyHex),
-    [peers]
-  );
-  const vanillaPeerCount = peers.length - sovranPeers.length;
-  const connectedCount = useMemo(
-    () => sovranPeers.filter((peer) => peer.isConnected).length,
-    [sovranPeers]
-  );
-  const directLinkCount = useMemo(
-    () => sovranPeers.filter((peer) => peer.hasDirectLink).length,
-    [sovranPeers]
-  );
+  // Every bitchat peer is listed: peers announcing the ecash capability TLV
+  // get P2PK-locked drops; vanilla peers are bearer-only (tagged, and gated
+  // behind an explicit confirm in handleSelectPeer).
+  const connectedCount = useMemo(() => peers.filter((peer) => peer.isConnected).length, [peers]);
+  const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
   const sortedPeers = useMemo(() => {
-    return [...sovranPeers].sort((a, b) => {
+    return [...peers].sort((a, b) => {
+      if (a.supportsP2pkEcash !== b.supportsP2pkEcash) return a.supportsP2pkEcash ? -1 : 1;
       if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
       if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
       return b.lastSeen - a.lastSeen;
     });
-  }, [sovranPeers]);
+  }, [peers]);
 
-  // Batch-fetch kind-0 profiles for all visible Sovran peers via nagg
-  // (warms the shared nostrMetadataCache; cache hits render instantly).
-  const peerNostrPubkeys = useMemo(
-    () => sovranPeers.map(peerNostrPubkey).filter(Boolean),
-    [sovranPeers]
-  );
+  // Batch-fetch kind-0 profiles for all visible peers via nagg (warms the
+  // shared nostrMetadataCache; cache hits render instantly). Vanilla peers
+  // have no Nostr pubkey and drop out of the fetch.
+  const peerNostrPubkeys = useMemo(() => peers.map(peerNostrPubkey).filter(Boolean), [peers]);
   const profileRows = useRecentPeopleProfiles(peerNostrPubkeys);
   const profileByPubkey = useMemo(
     () => new Map(profileRows.map((row) => [row.pubkey, row])),
@@ -108,13 +125,13 @@ export function NearPayPeerListScreen() {
   );
 
   const subtitleText = useMemo(() => {
-    if (sovranPeers.length === 0) return 'Scanning for nearby Sovran users...';
-    if (connectedCount === 0) return `${sovranPeers.length} nearby · 0 connected`;
+    if (peers.length === 0) return 'Scanning for nearby people...';
+    if (connectedCount === 0) return `${peers.length} nearby · 0 connected`;
     if (directLinkCount === connectedCount) {
-      return `${connectedCount} connected · ${sovranPeers.length} nearby`;
+      return `${connectedCount} connected · ${peers.length} nearby`;
     }
-    return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${sovranPeers.length} nearby`;
-  }, [connectedCount, directLinkCount, sovranPeers.length]);
+    return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${peers.length} nearby`;
+  }, [connectedCount, directLinkCount, peers.length]);
 
   const rootStyle = useMemo(() => [styles.root, { backgroundColor: background }], [background]);
   const contentStyle = useMemo(
@@ -137,35 +154,42 @@ export function NearPayPeerListScreen() {
   );
 
   const handleSelectPeer = useCallback(
-    (peer: BLEPeer) => {
+    async (peer: BLEPeer) => {
       const nostrPubkey = peerNostrPubkey(peer);
       const profile = profileByPubkey.get(nostrPubkey);
       const displayName = peerDisplayName(peer, profile);
+      const plan = nearPaySendPlan(peer);
       paymentLog.info('near_pay.peer.list_select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
+        deliveryMode: plan.mode,
       });
-      const p2pkPubkeyHex = peer.p2pkPubkeyHex;
-      if (!p2pkPubkeyHex) {
-        // Should be unreachable — the list only renders Sovran peers — but a
-        // missing lock key must never start an (unlockable) session.
-        paymentLog.error('near_pay.peer.list_select_missing_p2pk', { peerID: peer.peerID });
-        return;
+      if (plan.mode === 'bearer') {
+        // Consent gate BEFORE any session or navigation state — declining
+        // must leave the list exactly as it was.
+        const confirmed = await confirmBearerSend(displayName);
+        if (!confirmed) {
+          paymentLog.info('near_pay.peer.bearer_declined', { peerID: peer.peerID });
+          return;
+        }
       }
       useNearPaySessionStore.getState().start({
         peerID: peer.peerID,
         nickname: displayName,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
-        p2pkPubkeyHex,
+        delivery: planDelivery(plan),
       });
       router.back();
       void machine
         .startSendEcash({
           reset: true,
-          p2pkLockPubkey: p2pkPubkeyHex,
-          ...(nostrPubkey ? { recipientPubkey: nostrPubkey } : {}),
+          // Bearer plans omit the lock — deliverNearPayIfActive enforces the
+          // completed send is lock-free before broadcasting.
+          ...(plan.mode === 'p2pk'
+            ? { p2pkLockPubkey: plan.p2pkLockPubkey, recipientPubkey: plan.recipientPubkey }
+            : {}),
           recipientProfile: {
             displayName,
             avatarUrl: profile?.metadata?.picture ?? null,
@@ -198,16 +222,14 @@ export function NearPayPeerListScreen() {
       <VStack align="center" spacing={12} style={styles.emptyState}>
         <Icon name="mdi:bluetooth" size={32} color={emptyIconColor} />
         <Text size={16} style={emptyTitleStyle}>
-          No Sovran users nearby
+          No one nearby
         </Text>
         <Text size={13} style={emptyTextStyle}>
-          {vanillaPeerCount > 0
-            ? `Nut Drop needs both people on Sovran. ${vanillaPeerCount} nearby BitChat ${vanillaPeerCount === 1 ? 'user' : 'users'} can chat in the mesh instead.`
-            : 'Keep Sovran open and nearby Sovran users will appear here.'}
+          Keep the app open and nearby BitChat users will appear here.
         </Text>
       </VStack>
     ),
-    [emptyIconColor, emptyTextStyle, emptyTitleStyle, vanillaPeerCount]
+    [emptyIconColor, emptyTextStyle, emptyTitleStyle]
   );
 
   return (
@@ -261,5 +283,10 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingHorizontal: 40,
+  },
+  bearerTag: {
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
 });

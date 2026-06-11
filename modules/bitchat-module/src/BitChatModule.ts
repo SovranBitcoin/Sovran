@@ -112,7 +112,7 @@ export function startBLE(
         profileScope,
         identityMaterial.noisePrivateKeyHex,
         identityMaterial.signingPrivateKeyHex,
-        // Cashu P2PK lock target announced in the SVRN extension TLV:
+        // Cashu P2PK lock target announced in the ecash capability TLV:
         // "02" + the profile's x-only Nostr pubkey (NUT-11 / Minibits
         // convention — BIP340 signing ignores Y parity).
         `02${identityMaterial.nostrPubkey}`

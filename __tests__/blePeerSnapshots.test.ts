@@ -9,8 +9,8 @@ function peer(peerID: string, overrides: Partial<BLEPeer> = {}): BLEPeer {
     isConnected: true,
     hasDirectLink: true,
     lastSeen: 1,
-    isSovranPeer: false,
-    capabilities: 0,
+    supportsP2pkEcash: false,
+    ecashCapabilities: 0,
     ...overrides,
   };
 }
@@ -40,19 +40,19 @@ describe('BLE peer snapshot equality', () => {
     );
   });
 
-  it('updates when the SVRN extension appears or its lock key changes', () => {
-    const sovran = peer('a', {
-      isSovranPeer: true,
-      capabilities: 1,
+  it('updates when the ecash capability extension appears or its lock key changes', () => {
+    const capable = peer('a', {
+      supportsP2pkEcash: true,
+      ecashCapabilities: 1,
       p2pkPubkeyHex: `02${'ab'.repeat(32)}`,
     });
-    expect(areBLEPeerSnapshotsEquivalent([peer('a')], [sovran])).toBe(false);
+    expect(areBLEPeerSnapshotsEquivalent([peer('a')], [capable])).toBe(false);
     expect(
       areBLEPeerSnapshotsEquivalent(
-        [sovran],
-        [{ ...sovran, p2pkPubkeyHex: `02${'cd'.repeat(32)}` }]
+        [capable],
+        [{ ...capable, p2pkPubkeyHex: `02${'cd'.repeat(32)}` }]
       )
     ).toBe(false);
-    expect(areBLEPeerSnapshotsEquivalent([sovran], [{ ...sovran, lastSeen: 99 }])).toBe(true);
+    expect(areBLEPeerSnapshotsEquivalent([capable], [{ ...capable, lastSeen: 99 }])).toBe(true);
   });
 });

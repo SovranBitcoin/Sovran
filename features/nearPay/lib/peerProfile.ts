@@ -5,7 +5,7 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 
 import type { NearPayLayoutPeer } from './peerLayout';
 
-/** The peer's Nostr pubkey: the SVRN lock key minus its "02" parity prefix. */
+/** The peer's Nostr pubkey: the announced lock key minus its "02" parity prefix. */
 export function peerNostrPubkey(peer: Pick<BLEPeer, 'p2pkPubkeyHex'>): string {
   return (peer.p2pkPubkeyHex ?? '').slice(2);
 }
@@ -32,6 +32,7 @@ export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): N
     lastSeen: peer.lastSeen,
     name: peerDisplayName(peer, profile),
     avatarUrl: profile?.metadata?.picture ?? null,
+    supportsP2pkEcash: peer.supportsP2pkEcash,
     p2pkPubkeyHex: peer.p2pkPubkeyHex ?? '',
     nostrPubkey: peerNostrPubkey(peer),
     profileLoading: profile?.isLoading ?? false,

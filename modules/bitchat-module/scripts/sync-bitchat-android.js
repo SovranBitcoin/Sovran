@@ -98,28 +98,30 @@ const PATCHES = [
       '    // sessions via encryptionService; the vendor exposes no public reset.\n' +
       '    internal val encryptionService = EncryptionService(context)',
   },
-  // --- SVRN announce extension TLV (0xF0) ---
+  // --- Ecash capability announce extension TLV (0xF0) ---
   //
-  // Sovran clients mark themselves on the mesh with a custom announce TLV
-  // (magic "SVRN" + capability flags + the profile's Cashu P2PK pubkey) so
-  // the Nut Drop UI can list only Sovran peers and P2PK-lock tokens to them.
+  // Clients that can receive P2PK-locked cashu advertise it with an announce
+  // TLV (magic "NUTXX" + capability flags + the profile's Cashu P2PK pubkey)
+  // so the Nut Drop UI can lock tokens to capable peers. Open extension —
+  // any bitchat client may implement it (spec draft in
+  // modules/bitchat-module/docs/nut-xx-ecash-capability-announcement.md).
   // Vanilla decoders skip unknown announce TLVs ("tolerant decoder" in
   // IdentityAnnouncement.kt), and the TLV is appended BEFORE signing —
   // exactly how upstream already appends its gossip TLV (0x04) here — so the
   // Ed25519 announce signature covers it. TLV bytes + the inbound registry
-  // live in the Sovran-owned com.bitchat.android.sovran.SovranAnnounceExtension.
+  // live in the Sovran-owned com.bitchat.android.ecash.EcashAnnounceExtension.
   {
     file: 'mesh/BluetoothMeshService.kt',
-    name: 'SVRN_ANNOUNCE_INJECT_BROADCAST',
+    name: 'ECASH_ANNOUNCE_INJECT_BROADCAST',
     anchor:
       /            val announcePacket = BitchatPacket\(\n                type = MessageType\.ANNOUNCE\.value,/,
     replacement:
-      '            // [sovran] append SVRN extension TLV (0xF0); appended before signing\n' +
+      '            // [sovran] append ecash capability TLV (0xF0); appended before signing\n' +
       '            // so the announce signature covers it. Plain `if` (not ?.let) keeps\n' +
       '            // the tlvPayload smart cast valid at the packet construction below.\n' +
-      '            val sovranTLV = com.bitchat.android.sovran.SovranAnnounceExtension.localTLV\n' +
-      '            if (sovranTLV != null) {\n' +
-      '                tlvPayload = tlvPayload + sovranTLV\n' +
+      '            val ecashTLV = com.bitchat.android.ecash.EcashAnnounceExtension.localTLV\n' +
+      '            if (ecashTLV != null) {\n' +
+      '                tlvPayload = tlvPayload + ecashTLV\n' +
       '            }\n' +
       '\n' +
       '            val announcePacket = BitchatPacket(\n' +
@@ -127,34 +129,34 @@ const PATCHES = [
   },
   {
     file: 'mesh/BluetoothMeshService.kt',
-    name: 'SVRN_ANNOUNCE_INJECT_PEER',
+    name: 'ECASH_ANNOUNCE_INJECT_PEER',
     anchor:
       /        val packet = BitchatPacket\(\n            type = MessageType\.ANNOUNCE\.value,/,
     replacement:
-      '        // [sovran] append SVRN extension TLV (0xF0); appended before signing\n' +
+      '        // [sovran] append ecash capability TLV (0xF0); appended before signing\n' +
       '        // so the announce signature covers it. Plain `if` (not ?.let) keeps\n' +
       '        // the tlvPayload smart cast valid at the packet construction below.\n' +
-      '        val sovranTLV = com.bitchat.android.sovran.SovranAnnounceExtension.localTLV\n' +
-      '        if (sovranTLV != null) {\n' +
-      '            tlvPayload = tlvPayload + sovranTLV\n' +
+      '        val ecashTLV = com.bitchat.android.ecash.EcashAnnounceExtension.localTLV\n' +
+      '        if (ecashTLV != null) {\n' +
+      '            tlvPayload = tlvPayload + ecashTLV\n' +
       '        }\n' +
       '\n' +
       '        val packet = BitchatPacket(\n' +
       '            type = MessageType.ANNOUNCE.value,',
   },
-  // Records (or clears) the SVRN extension from the raw announce payload —
+  // Records (or clears) the ecash extension from the raw announce payload —
   // the same out-of-band re-parse upstream uses for its gossip TLV. The
   // insertion point is reached only after the `if (!verified) return false`
   // gate, so unverified announces never touch the registry.
   {
     file: 'mesh/MessageHandler.kt',
-    name: 'SVRN_ANNOUNCE_PARSE',
+    name: 'ECASH_ANNOUNCE_PARSE',
     anchor:
       /        \/\/ Update peer info with verification status through new method\n        val isFirstAnnounce = delegate\?\.updatePeerInfo\(/,
     replacement:
-      '        // [sovran] record/clear the SVRN extension TLV (0xF0). Verified\n' +
+      '        // [sovran] record/clear the ecash capability TLV (0xF0). Verified\n' +
       '        // announces only; absence of the TLV clears the entry.\n' +
-      '        com.bitchat.android.sovran.SovranAnnounceExtension.record(peerID, packet.payload)\n' +
+      '        com.bitchat.android.ecash.EcashAnnounceExtension.record(peerID, packet.payload)\n' +
       '\n' +
       '        // Update peer info with verification status through new method\n' +
       '        val isFirstAnnounce = delegate?.updatePeerInfo(',

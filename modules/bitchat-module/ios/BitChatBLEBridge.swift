@@ -248,11 +248,12 @@ final class BitChatBLEBridge: NSObject {
         activeIdentityID = identityMaterial.identityID
         activeNickname = nickname
         loadDmSummaries(for: scope)
-        // SVRN announce TLV must be live before startServices() — the first
-        // announce fires during startup and every announce must carry it.
-        SovranAnnounceState.shared.localTLV = SovranAnnounceTLV.encode(
+        // The ecash capability announce TLV must be live before
+        // startServices() — the first announce fires during startup and every
+        // announce must carry it.
+        EcashAnnounceState.shared.localTLV = EcashAnnounceTLV.encode(
             p2pkPubkey: identityMaterial.p2pkPubkey,
-            flags: SovranAnnounceTLV.capabilityCashuAutoRedeem
+            flags: EcashAnnounceTLV.capabilityCashuAutoRedeem
         )
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
@@ -276,10 +277,10 @@ final class BitChatBLEBridge: NSObject {
         activeIdentityID = nil
         activeNickname = nil
         dmSummaries = [:]
-        // Clear SVRN state so a profile switch can never announce the previous
-        // profile's lock key or surface its peers.
-        SovranAnnounceState.shared.localTLV = nil
-        SovranAnnounceState.shared.removeAll()
+        // Clear ecash announce state so a profile switch can never announce
+        // the previous profile's lock key or surface its peers.
+        EcashAnnounceState.shared.localTLV = nil
+        EcashAnnounceState.shared.removeAll()
     }
 
     func sendMessage(_ content: String) throws {
@@ -396,21 +397,21 @@ final class BitChatBLEBridge: NSObject {
             // through the mesh-flood + 15s spool fallback. Surface both so
             // UI can warn users when "connected" doesn't mean reachable.
             let link = service.linkState(for: peer.peerID)
-            // SVRN extension fields come from the peer's last verified
-            // announce. `isSovranPeer` gates the Nut Drop peer list;
-            // `p2pkPubkeyHex` is the Cashu P2PK lock target for that peer.
-            let svrn = SovranAnnounceState.shared.lookup(peerID: peer.peerID.id)
+            // Ecash capability fields come from the peer's last verified
+            // announce. `supportsP2pkEcash` marks peers that can receive
+            // P2PK-locked drops; `p2pkPubkeyHex` is the lock target.
+            let ecashExt = EcashAnnounceState.shared.lookup(peerID: peer.peerID.id)
             var dict: [String: Any] = [
                 "peerID": peer.peerID.id,
                 "nickname": peer.nickname,
                 "isConnected": peer.isConnected,
                 "hasDirectLink": link.hasPeripheral || link.hasCentral,
                 "lastSeen": peer.lastSeen.timeIntervalSince1970 * 1000,
-                "isSovranPeer": svrn != nil,
-                "capabilities": Int(svrn?.flags ?? 0),
+                "supportsP2pkEcash": ecashExt != nil,
+                "ecashCapabilities": Int(ecashExt?.flags ?? 0),
             ]
-            if let svrn {
-                dict["p2pkPubkeyHex"] = svrn.p2pkPubkeyHex
+            if let ecashExt {
+                dict["p2pkPubkeyHex"] = ecashExt.p2pkPubkeyHex
             }
             return dict
         }
