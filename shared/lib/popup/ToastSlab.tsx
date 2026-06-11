@@ -32,6 +32,15 @@ export function useToastFrosted(): boolean {
 // is the foreground (icon/text). Hardcoded since the toast is theme-
 // invariant — these values match `--success-foreground` /
 // `--danger-foreground` in the light-theme palette.
+//
+// On non-frosted platforms these hexes must never be used raw: with no
+// blur softening them, a fully opaque #089A2C slab reads garishly strong.
+// Blend them into the toast's surface color instead (same alpha-composite
+// math the frosted tint performs optically over the blur). 0.45 rather
+// than TINT_ALPHA because the opaque slab is dark — the frosted branch
+// tints over mostly-light page content, so the same ratio over a dark
+// base would under-read; 0.45 lands at the same perceived strength.
+export const OPAQUE_TINT_MIX = 0.45;
 export const SUCCESS_DARK_BG = '#089A2C';
 export const DANGER_DARK_BG = '#9A082E';
 
