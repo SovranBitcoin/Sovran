@@ -37,6 +37,8 @@ import { walletLog } from '@/shared/lib/logger';
 /** Pause between re-arm cycles; also the NFC-disabled re-check interval. */
 const REARM_DELAY_MS = 600;
 const DISABLED_RECHECK_MS = 4000;
+/** Re-check interval while paused under a non-nfc popup (payment sheets). */
+const POPUP_RECHECK_MS = 1500;
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -54,14 +56,32 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
     useCallback(() => {
       if (Platform.OS !== 'android') return;
       let active = true;
+      // Dismissal is sticky: once the user swipes the nfc-tap sheet away,
+      // the tag-connected listener must NOT re-surface it on the next tag
+      // arrival (an NFC card resting against the phone would re-open it
+      // ~1.2s after every dismissal, mid-exit-animation). Cleared when the
+      // sheet is shown again (explicit button press) or the loop restarts.
+      let userDismissedSheet = false;
       const { setArmed, setPhase } = useNfcTapStore.getState();
 
+      const unsubscribePopup = usePopupStore.subscribe((state, prev) => {
+        const wasTapSheet =
+          prev.current != null && 'sheetId' in prev.current && prev.current.sheetId === 'nfc-tap';
+        const isTapSheet =
+          state.current != null &&
+          'sheetId' in state.current &&
+          state.current.sheetId === 'nfc-tap';
+        if (wasTapSheet && state.current == null) userDismissedSheet = true;
+        if (isTapSheet) userDismissedSheet = false;
+      });
+
       // A tag entered the field: flip the sheet to 'Reading' and surface it
-      // if nothing else is showing (ambient tap with the sheet closed).
+      // if nothing else is showing (ambient tap with the sheet closed) and
+      // the user hasn't dismissed it this focus session.
       setNfcTagConnectedListener(() => {
         if (!active) return;
         useNfcTapStore.getState().setPhase('reading');
-        if (usePopupStore.getState().current == null) {
+        if (!userDismissedSheet && usePopupStore.getState().current == null) {
           showActionSheet('nfc-tap', {});
         }
       });
@@ -75,10 +95,24 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
             await delay(DISABLED_RECHECK_MS);
             continue;
           }
+          // Popup-lane payment surfaces (payment-options, proof-selector,
+          // send-memo) are NOT routes — the wallet stays focused beneath
+          // them, so without this guard the loop would keep cycling and its
+          // clearPaymentContext would wipe the amount draft mid-flow every
+          // ~31s. Pause (no clear, no scan) while any popup other than our
+          // own tap sheet is up.
+          const popupCurrent = usePopupStore.getState().current;
+          const popupBlocks =
+            popupCurrent != null &&
+            !('sheetId' in popupCurrent && popupCurrent.sheetId === 'nfc-tap');
+          if (popupBlocks) {
+            await delay(POPUP_RECHECK_MS);
+            continue;
+          }
           setArmed(true);
           setAmbientNfcCycle(true);
-          // Root-entry reset (sovran-payment-flow-guards): the wallet being
-          // focused means no payment flow is active, so clearing stale
+          // Root-entry reset (sovran-payment-flow-guards): wallet focused +
+          // no payment popup up means no flow is active, so clearing stale
           // amount/mint context before a read can enter the machine is safe.
           clearPaymentContext('wallet.nfc_ambient');
           try {
@@ -98,9 +132,16 @@ export function useAmbientNfcArm(machine: AmbientNfcMachine): void {
 
       return () => {
         active = false;
+        unsubscribePopup();
         setNfcTagConnectedListener(null);
         useNfcTapStore.getState().setArmed(false);
         setPhase('armed');
+        // Don't leave a sheet claiming "listening" after the listener is
+        // gone (e.g. navigating away with the sheet up).
+        const popup = usePopupStore.getState();
+        if (popup.current && 'sheetId' in popup.current && popup.current.sheetId === 'nfc-tap') {
+          popup.close();
+        }
         // Cancel the held requestTechnology so the pending cycle resolves
         // (as a quiet user-cancel) instead of dangling for up to 30s.
         void releaseSession();
