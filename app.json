@@ -90,6 +90,7 @@
         }
       ],
       "./plugins/withLowerPodDeploymentTarget",
+      "./plugins/withNeutralAndroidTextColors",
       [
         "expo-font",
         {

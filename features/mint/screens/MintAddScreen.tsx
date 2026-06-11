@@ -147,6 +147,11 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
     <View
       style={{
         flex: 1,
+        // FlowSheetHeader's titleSlot is a centered column (alignItems
+        // 'center' disables cross-axis stretch), so without an explicit
+        // stretch this collapses to padding-only width — the 'malformed,
+        // no width' search bar.
+        alignSelf: 'stretch',
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: surfaceSecondary,

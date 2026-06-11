@@ -134,12 +134,14 @@ export function LiquidChatComposer({
   testID,
   surface,
 }: LiquidChatComposerProps) {
-  const [foreground, background, surfaceSecondary, shade400, shade500] = useThemeColor([
+  // field-placeholder (NOT the shade ramp): shade-400/500 are the STATIC
+  // brand-blue ramp, which made 'Ask anything'/'Write here' placeholders and
+  // the mic icon read as accent-colored on the fallback tier.
+  const [foreground, background, surfaceSecondary, fieldPlaceholder] = useThemeColor([
     'foreground',
     'background',
     'surface-secondary',
-    'shade-400',
-    'shade-500',
+    'field-placeholder',
   ] as const);
 
   const trimmedHasText = value.trim().length > 0;
@@ -348,7 +350,7 @@ export function LiquidChatComposer({
                       <SwiftUIImage
                         systemName={'mic.fill' as never}
                         size={ICON_SIZE}
-                        color={shade400}
+                        color={fieldPlaceholder}
                       />
                     </SwiftUIButton>
                   ) : null}
@@ -414,7 +416,7 @@ export function LiquidChatComposer({
           hitSlop={6}
           accessibilityLabel="Voice message"
           testID={testID ? `${testID}-voice` : undefined}>
-          <Icon name="mdi:microphone" size={20} color={shade400} />
+          <Icon name="mdi:microphone" size={20} color={fieldPlaceholder} />
         </Pressable>
       </HStack>
     ) : null;
@@ -478,7 +480,7 @@ export function LiquidChatComposer({
               value={value}
               onChangeText={onChangeText}
               placeholder={placeholder}
-              placeholderTextColor={shade500}
+              placeholderTextColor={fieldPlaceholder}
               editable={!disabled}
               multiline
               maxLength={1000}
