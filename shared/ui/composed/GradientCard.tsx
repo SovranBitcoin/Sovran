@@ -3,6 +3,7 @@ import { StyleSheet, View as RNView, type StyleProp, type ViewStyle } from 'reac
 import opacity from 'hex-color-opacity';
 
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
@@ -37,11 +38,11 @@ export function GradientCard({
 
   return (
     <Log name="GradientCard">
-      <RNView testID={testID} style={[styles.card, { borderColor }, style]}>
+      <SquircleView testID={testID} style={[styles.card, { borderColor }, style]}>
         <BlurCardFrame accentColor={muted} variant={variant}>
           <RNView style={[styles.content, contentStyle]}>{children}</RNView>
         </BlurCardFrame>
-      </RNView>
+      </SquircleView>
     </Log>
   );
 }

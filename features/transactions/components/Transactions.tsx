@@ -25,6 +25,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import {
@@ -444,11 +445,11 @@ export const Transactions = React.memo(
           <Text size={14} heavy color={opacity(foreground, 0.33)} style={{ height: HEADER_HEIGHT }}>
             {section.title}
           </Text>
-          <View style={[styles.card, { borderColor }]}>
+          <SquircleView style={[styles.card, { borderColor }]}>
             <BlurCardFrame accentColor={muted}>
               <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
             </BlurCardFrame>
-          </View>
+          </SquircleView>
         </VStack>
       ),
       [foreground, muted, borderColor, renderTimelineItem]
@@ -462,7 +463,7 @@ export const Transactions = React.memo(
     const emptyComponent = useMemo(
       () => (
         <View className="pt-8">
-          <View style={[styles.card, { borderColor }]}>
+          <SquircleView style={[styles.card, { borderColor }]}>
             <BlurCardFrame accentColor={muted}>
               <View style={styles.emptyState}>
                 <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
@@ -485,7 +486,7 @@ export const Transactions = React.memo(
                 </Text>
               </View>
             </BlurCardFrame>
-          </View>
+          </SquircleView>
         </View>
       ),
       [muted, borderColor, foreground]
@@ -515,7 +516,7 @@ export const Transactions = React.memo(
         return (
           <View>
             <Spacer size={24} />
-            <View style={[styles.card, { borderColor }]}>
+            <SquircleView style={[styles.card, { borderColor }]}>
               <BlurCardFrame accentColor={muted}>
                 <View style={styles.emptyState}>
                   <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
@@ -538,7 +539,7 @@ export const Transactions = React.memo(
                   </Text>
                 </View>
               </BlurCardFrame>
-            </View>
+            </SquircleView>
           </View>
         );
       }
@@ -551,7 +552,7 @@ export const Transactions = React.memo(
               {sects.map((section) => (
                 <View key={section.title}>
                   <VStack spacing={8}>
-                    <View style={[styles.card, { borderColor }]}>
+                    <SquircleView style={[styles.card, { borderColor }]}>
                       <BlurCardFrame accentColor={muted}>
                         <View style={styles.content}>
                           <View style={styles.sectionHeader}>
@@ -565,7 +566,7 @@ export const Transactions = React.memo(
                           {section.data.map(renderTimelineItem)}
                         </View>
                       </BlurCardFrame>
-                    </View>
+                    </SquircleView>
                     {label === 'Confirmed' && (
                       <Link
                         href={{
@@ -577,7 +578,7 @@ export const Transactions = React.memo(
                         }}
                         asChild>
                         <Pressable>
-                          <View style={[styles.viewAllButton, { borderColor }]}>
+                          <SquircleView style={[styles.viewAllButton, { borderColor }]}>
                             <BlurCardFrame accentColor={muted}>
                               <View style={styles.viewAllContent}>
                                 <Text size={14} bold>
@@ -585,7 +586,7 @@ export const Transactions = React.memo(
                                 </Text>
                               </View>
                             </BlurCardFrame>
-                          </View>
+                          </SquircleView>
                         </Pressable>
                       </Link>
                     )}
