@@ -22,7 +22,9 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
         style={{
           backgroundColor: opacity(INVARIANT_WHITE, 0.15),
           borderWidth: 1,
-          borderColor: opacity(INVARIANT_WHITE, 0.2),
+          // Standard border alpha (the app-wide 0.3 contract); fill stays
+          // INVARIANT_WHITE — this pill sits over the wallet wallpaper.
+          borderColor: opacity(INVARIANT_WHITE, 0.3),
           paddingHorizontal: 14,
           paddingVertical: 6,
           minHeight: iosHeight,

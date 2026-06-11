@@ -70,6 +70,7 @@ import {
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { controlHeight, fontSize } from '@/shared/styles/tokens';
 import { Pressable, type HapticConfig } from './Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -261,20 +262,20 @@ const SIZES: Record<
   default: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    minHeight: 48,
+    minHeight: controlHeight.cta,
     iconOnlyDimension: 52,
     iconTextSpacing: 8,
-    fontSize: 14,
+    fontSize: fontSize.md,
     margin: 4,
     marginBottom: 8,
   },
   compact: {
     paddingVertical: 10,
     paddingHorizontal: 12,
-    minHeight: 36,
+    minHeight: controlHeight.compact,
     iconOnlyDimension: 40,
     iconTextSpacing: 6,
-    fontSize: 13,
+    fontSize: fontSize.sm,
     margin: 0,
     marginBottom: 0,
   },

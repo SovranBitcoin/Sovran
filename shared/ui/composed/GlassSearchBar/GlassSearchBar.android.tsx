@@ -5,6 +5,7 @@ import opacity from 'hex-color-opacity';
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { radius } from '@/shared/styles/tokens';
 import type { GlassSearchBarProps } from './types';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
@@ -64,7 +65,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: surfaceSecondary,
-          borderRadius: 12,
+          borderRadius: radius.lg,
           paddingHorizontal: 12,
           paddingVertical: 8,
           marginRight: 8,

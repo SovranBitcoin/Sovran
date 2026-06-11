@@ -16,7 +16,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { alpha, radius, shadow, spacing, zIndex } from '@/shared/styles/tokens';
+import { alpha, radius, shadow, spacing, zIndex, fontSize } from '@/shared/styles/tokens';
 import { useCapabilities } from '@/shared/ui/capability';
 import { BITCOIN_ACCENT } from '@/shared/lib/brandColors';
 import { MERCHANT_CATEGORIES, type MerchantCategoryId } from '@/shared/lib/map/categories';
@@ -239,11 +239,11 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   fallbackTitle: {
-    fontSize: 18,
+    fontSize: fontSize['2xl'],
     fontWeight: '700',
   },
   fallbackSubtitle: {
-    fontSize: 12,
+    fontSize: fontSize.sm,
     marginTop: 1,
   },
 });
