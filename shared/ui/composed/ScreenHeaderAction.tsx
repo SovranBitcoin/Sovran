@@ -5,6 +5,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
+import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
 import { alpha, headerButtonSize, hitSlop } from '@/shared/styles/tokens';
 
 /**
@@ -15,11 +16,13 @@ import { alpha, headerButtonSize, hitSlop } from '@/shared/styles/tokens';
  * to match the wallet mint selector (54 on Android; 44 on iOS, whose native
  * nav bars cap custom views). ≥44pt touch target everywhere.
  *
- * On liquid-glass devices (iOS 26+) the system wraps header bar items in
- * its own glass capsule (react-native-screens 4.25 surfaces this) and the
- * capsule's refraction warps any chrome rendered inside it — the flat
- * circle + 1px border reads as smeared/double-stacked glass. So on liquid
- * the button renders the bare glyph and the system capsule IS the chrome.
+ * On liquid-glass devices (iOS 26+) the button renders inside the
+ * app-owned HeaderGlassCircle: the system bar-item capsule is squat and
+ * content-width (a pill, shorter than the mint selector), so we suppress
+ * it (native-stack hidesSharedBackground patch) and draw the same
+ * glassEffect circle the rest of the design system uses, at
+ * headerButtonSize — header buttons and the mint selector share one glass
+ * geometry.
  */
 interface ScreenHeaderActionProps {
   icon: string;
@@ -48,6 +51,19 @@ export function ScreenHeaderAction({
     'muted',
   ] as const);
 
+  const glyph = (
+    <Icon name={icon} size={size} color={color ?? opacity(foreground, alpha.prominent)} />
+  );
+
+  if (supportsLiquidGlass()) {
+    return (
+      <HeaderGlassCircle onPress={onPress} disabled={disabled}>
+        {glyph}
+        {accessory}
+      </HeaderGlassCircle>
+    );
+  }
+
   return (
     <Pressable
       onPress={onPress}
@@ -55,14 +71,12 @@ export function ScreenHeaderAction({
       activeOpacity={0.7}
       style={[
         styles.circle,
-        supportsLiquidGlass()
-          ? styles.liquidBare
-          : { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) },
+        { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) },
         { opacity: disabled ? 0.4 : 1 },
       ]}
       disabled={disabled}
       testID={testID}>
-      <Icon name={icon} size={size} color={color ?? opacity(foreground, alpha.prominent)} />
+      {glyph}
       {accessory}
     </Pressable>
   );
@@ -76,11 +90,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // Bare glyph inside the iOS 26 system glass capsule — size preserved for
-  // the touch target, no fill or hairline for the glass to refract.
-  liquidBare: {
-    backgroundColor: 'transparent',
-    borderWidth: 0,
   },
 });
