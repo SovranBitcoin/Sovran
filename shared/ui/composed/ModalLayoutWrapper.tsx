@@ -223,7 +223,11 @@ export function ModalLayoutWrapper({
           />
         )}
 
-        {headerGradient && (
+        {/* Skip inside Android formSheets: FlowSheetHeader already paints the
+            header scrim there, and this fade's entire ramp lands inside the
+            header band (its lower half paints nothing) — it only doubled the
+            gradient, in the wrong color on bgColor-overriding screens. */}
+        {headerGradient && sheetHeaderHeight == null && (
           <ScrollEdgeFade edge="top" height={gradientHeight * 2} color={background} />
         )}
 

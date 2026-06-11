@@ -25,7 +25,6 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import {
@@ -445,11 +444,11 @@ export const Transactions = React.memo(
           <Text size={14} heavy color={opacity(foreground, 0.33)} style={{ height: HEADER_HEIGHT }}>
             {section.title}
           </Text>
-          <SquircleView style={[styles.card, { borderColor }]}>
+          <View style={[styles.card, { borderColor }]}>
             <BlurCardFrame accentColor={muted}>
               <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
             </BlurCardFrame>
-          </SquircleView>
+          </View>
         </VStack>
       ),
       [foreground, muted, borderColor, renderTimelineItem]
@@ -463,7 +462,7 @@ export const Transactions = React.memo(
     const emptyComponent = useMemo(
       () => (
         <View className="pt-8">
-          <SquircleView style={[styles.card, { borderColor }]}>
+          <View style={[styles.card, { borderColor }]}>
             <BlurCardFrame accentColor={muted}>
               <View style={styles.emptyState}>
                 <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
@@ -486,7 +485,7 @@ export const Transactions = React.memo(
                 </Text>
               </View>
             </BlurCardFrame>
-          </SquircleView>
+          </View>
         </View>
       ),
       [muted, borderColor, foreground]
@@ -516,7 +515,7 @@ export const Transactions = React.memo(
         return (
           <View>
             <Spacer size={24} />
-            <SquircleView style={[styles.card, { borderColor }]}>
+            <View style={[styles.card, { borderColor }]}>
               <BlurCardFrame accentColor={muted}>
                 <View style={styles.emptyState}>
                   <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
@@ -539,7 +538,7 @@ export const Transactions = React.memo(
                   </Text>
                 </View>
               </BlurCardFrame>
-            </SquircleView>
+            </View>
           </View>
         );
       }
@@ -552,7 +551,7 @@ export const Transactions = React.memo(
               {sects.map((section) => (
                 <View key={section.title}>
                   <VStack spacing={8}>
-                    <SquircleView style={[styles.card, { borderColor }]}>
+                    <View style={[styles.card, { borderColor }]}>
                       <BlurCardFrame accentColor={muted}>
                         <View style={styles.content}>
                           <View style={styles.sectionHeader}>
@@ -566,7 +565,7 @@ export const Transactions = React.memo(
                           {section.data.map(renderTimelineItem)}
                         </View>
                       </BlurCardFrame>
-                    </SquircleView>
+                    </View>
                     {label === 'Confirmed' && (
                       <Link
                         href={{
@@ -578,7 +577,7 @@ export const Transactions = React.memo(
                         }}
                         asChild>
                         <Pressable>
-                          <SquircleView style={[styles.viewAllButton, { borderColor }]}>
+                          <View style={[styles.viewAllButton, { borderColor }]}>
                             <BlurCardFrame accentColor={muted}>
                               <View style={styles.viewAllContent}>
                                 <Text size={14} bold>
@@ -586,7 +585,7 @@ export const Transactions = React.memo(
                                 </Text>
                               </View>
                             </BlurCardFrame>
-                          </SquircleView>
+                          </View>
                         </Pressable>
                       </Link>
                     )}
@@ -648,6 +647,11 @@ export const Transactions = React.memo(
 Transactions.displayName = 'Transactions';
 
 const styles = StyleSheet.create({
+  // Plain View, NOT SquircleView: react-native-fast-squircle's RN-0.83 source
+  // set has a no-op dispatchDraw (no child clipping), so squircle cards whose
+  // visible fill is a child (BlurCardFrame's absolute-fill) render SQUARE on
+  // Android. Plain View clips children to borderRadius correctly; iOS keeps
+  // continuous corners via borderCurve.
   card: {
     borderRadius: 20,
     borderCurve: 'continuous',

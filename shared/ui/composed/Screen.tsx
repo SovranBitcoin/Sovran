@@ -23,7 +23,7 @@ import React, {
   useState,
   useLayoutEffect,
 } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -157,6 +157,17 @@ export function Screen({
   const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
   const themeBackground = useThemeColor('background');
   const resolvedBgColor = bgColor ?? themeBackground;
+
+  // Inside an Android formSheet, declare the page's actual background to the
+  // sheet header: FlowSheetHeader reads headerStyle.backgroundColor for its
+  // scrim color. Without this, screens that override bgColor (mint list/add,
+  // notifications) get a scrim fading from the darker theme background — a
+  // visibly wrong-colored slab across the top of the page.
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    if (Platform.OS !== 'android' || sheetHeaderHeight == null || bgColor == null) return;
+    navigation.setOptions({ headerStyle: { backgroundColor: bgColor } });
+  }, [navigation, sheetHeaderHeight, bgColor]);
 
   const resolvedBottomPadding =
     bottomPadding ??

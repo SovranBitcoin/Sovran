@@ -655,11 +655,15 @@ export function MintAddScreen() {
   const screenOptions = useMemo(
     () => ({
       headerTransparent: true as const,
-      headerStyle: { backgroundColor: 'transparent' },
+      // Declares the page background (bgColor={surface} below) so the Android
+      // sheet header's scrim fades from the page's color, not the darker
+      // theme background. FlowSheetHeader reads this; iOS ignores it under a
+      // transparent header.
+      headerStyle: { backgroundColor: surface },
       headerTitle: renderHeaderTitle,
       headerRight: renderHeaderRight,
     }),
-    [renderHeaderTitle, renderHeaderRight]
+    [renderHeaderTitle, renderHeaderRight, surface]
   );
 
   // ── Sticky content & bottom ────────────────────────────────────────────

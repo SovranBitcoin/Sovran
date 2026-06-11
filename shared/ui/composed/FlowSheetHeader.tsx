@@ -69,21 +69,30 @@ export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps
   const left = options.headerLeft?.({ tintColor, canGoBack: !!back });
   const right = options.headerRight?.({ tintColor, canGoBack: !!back });
 
-  // Solid background only when the screen opted out of the transparent
-  // default (NetworkSheet/GeohashChat/DmChatHeader set surfaceSecondary).
+  // headerStyle.backgroundColor plays two roles: with headerTransparent off
+  // it is a SOLID header fill (NetworkSheet/GeohashChat/DmChatHeader set
+  // surfaceSecondary); with headerTransparent ON it declares the page's
+  // actual background so the scrim fades from the right color — screens that
+  // override their page color (e.g. MintListScreen bgColor={surface}) must
+  // declare it here too, or the scrim fades from the (darker) theme
+  // background and reads as a wrong-colored slab.
   const headerStyleBackground = (
     StyleSheet.flatten(options.headerStyle) as { backgroundColor?: string } | undefined
   )?.backgroundColor;
-  const backgroundColor =
-    options.headerTransparent !== true && headerStyleBackground ? headerStyleBackground : undefined;
+  const transparentHeader = options.headerTransparent === true;
+  const declaredBackground =
+    headerStyleBackground && headerStyleBackground !== 'transparent'
+      ? headerStyleBackground
+      : undefined;
+  const backgroundColor = !transparentHeader ? declaredBackground : undefined;
 
   // Background layer: a screen-provided headerBackground wins; solid-header
-  // screens (backgroundColor set, e.g. NetworkSheet/DmChatHeader) need no
-  // scrim; transparent headers get the default Android color-fade scrim.
+  // screens (backgroundColor set) need no scrim; transparent headers get the
+  // Android color-fade scrim in the page's declared color (theme fallback).
   const backgroundLayer = options.headerBackground ? (
     options.headerBackground()
   ) : backgroundColor ? null : (
-    <AndroidHeaderScrim backgroundColor={background} />
+    <AndroidHeaderScrim backgroundColor={declaredBackground ?? background} />
   );
 
   return (
