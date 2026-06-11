@@ -23,7 +23,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { NativeStackHeaderProps } from '@react-navigation/native-stack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { minTouchTarget, spacing } from '@/shared/styles/tokens';
+import { minTouchTarget, spacing, fontSize } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
@@ -52,7 +52,7 @@ export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps
     typeof options.headerTitle === 'function' ? (
       options.headerTitle({ children: titleText, tintColor })
     ) : (
-      <Text bold size={17} numberOfLines={1} style={{ color: titleColor }}>
+      <Text bold size={fontSize.xl} numberOfLines={1} style={{ color: titleColor }}>
         {titleText}
       </Text>
     );

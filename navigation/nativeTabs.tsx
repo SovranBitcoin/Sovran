@@ -5,7 +5,6 @@
 
 import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
-import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
@@ -44,46 +43,38 @@ export function HeaderIconButton({
   style,
   accessibilityLabel,
 }: HeaderIconButtonProps) {
-  const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
+  const [flatSurface] = useThemeColor(['surface-secondary'] as const);
 
-  if (Platform.OS === 'android') {
-    const androidIconName = ANDROID_HEADER_ICON_MAP[icon];
-    return (
-      <Pressable
-        onPress={onPress}
-        hitSlop={HEADER_BUTTON_HIT_SLOP}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        style={[
-          {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: flatSurface,
-            borderWidth: 1,
-            borderColor: opacity(muted, 0.3),
-            alignItems: 'center',
-            justifyContent: 'center',
-          },
-          style,
-        ]}>
-        {androidIconName ? (
-          <Icon name={androidIconName} size={size} color={color} />
-        ) : (
-          <Icon name="mdi:menu" size={size} color={color} />
-        )}
-      </Pressable>
+  // Soft circle on BOTH platforms (the app-wide non-liquid-glass header-button
+  // contract — see ScreenHeaderAction): surface-secondary fill, no border,
+  // opacity press. Only the glyph source forks: SF symbol on iOS, monicon map
+  // on Android (expo-symbols renders nothing there).
+  const glyph =
+    Platform.OS === 'android' ? (
+      <Icon name={ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu'} size={size} color={color} />
+    ) : (
+      <IconSymbol name={icon as any} size={size} color={color} />
     );
-  }
 
   return (
     <Pressable
       onPress={onPress}
       hitSlop={HEADER_BUTTON_HIT_SLOP}
+      activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={[{ margin: 2 }, style]}>
-      <IconSymbol name={icon as any} size={size} color={color} />
+      style={[
+        {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: flatSurface,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        style,
+      ]}>
+      {glyph}
     </Pressable>
   );
 }

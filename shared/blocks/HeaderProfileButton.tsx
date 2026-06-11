@@ -10,7 +10,6 @@ import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, interpolate } from 'react-native-reanimated';
 import { useDrawerProgress } from '@react-navigation/drawer';
-import opacity from 'hex-color-opacity';
 
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -40,6 +39,9 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
     opacity: interpolate(progress.value, [0, 1], [1, 0]),
   }));
 
+  // Soft circle (no border) on Android — matches the app-wide header-button
+  // contract (ScreenHeaderAction / HeaderIconButton). iOS renders the bare
+  // avatar inside the native header chrome.
   const androidStyle =
     Platform.OS === 'android'
       ? {
@@ -47,8 +49,6 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
           height: ANDROID_BUTTON_SIZE,
           borderRadius: ANDROID_BUTTON_SIZE / 2,
           backgroundColor: flatSurface,
-          borderWidth: 1,
-          borderColor: opacity(muted, 0.3),
           alignItems: 'center' as const,
           justifyContent: 'center' as const,
         }

@@ -58,7 +58,6 @@ export function StandaloneCameraScreen() {
             headerLeft: () => (
               <ScreenHeaderAction
                 icon="material-symbols:close-rounded"
-                color={foreground}
                 onPress={() => {
                   if (router.canGoBack()) {
                     router.back();

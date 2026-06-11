@@ -254,13 +254,7 @@ function ProfileMetadataSync() {
 // otherwise React Navigation tears down and remounts the header's left button
 // (re-parsing its SVG icon) on every root re-render.
 const CloseButton = React.memo(function CloseButton({ foreground }: { foreground: string }) {
-  return (
-    <ScreenHeaderAction
-      icon="material-symbols:close-rounded"
-      color={foreground}
-      onPress={() => router.back()}
-    />
-  );
+  return <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />;
 });
 
 // Inner component that can access theme context

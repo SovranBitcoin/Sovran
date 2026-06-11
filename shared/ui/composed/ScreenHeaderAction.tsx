@@ -1,17 +1,17 @@
 import React from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { hitSlop, minTouchTarget } from '@/shared/styles/tokens';
+import { alpha, hitSlop, minTouchTarget } from '@/shared/styles/tokens';
 
 /**
  * Canonical header icon button (headerLeft / headerRight). One component so
- * every header action shares the same ≥44pt touch target and the same
- * platform treatment: iOS renders the bare glyph (system headers carry the
- * affordance), Android gets a filled circular chip since its headers have no
- * native button chrome.
+ * every header action shares the same treatment on BOTH platforms: the
+ * "soft circle" — a quiet surface-secondary circle with no border and a
+ * slightly dimmed glyph (the iOS-15-sheet close-button idiom, and the flat
+ * analog of the liquid-glass circle). ≥44pt touch target everywhere.
  */
 interface ScreenHeaderActionProps {
   icon: string;
@@ -34,43 +34,35 @@ export function ScreenHeaderAction({
   disabled,
   accessory,
 }: ScreenHeaderActionProps) {
-  const [foreground, surfaceSecondary, muted] = useThemeColor([
+  const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
     'surface-secondary',
-    'muted',
   ] as const);
 
   return (
     <Pressable
       onPress={onPress}
       hitSlop={hitSlop.default}
+      activeOpacity={0.7}
       style={[
-        styles.base,
-        Platform.OS === 'android' ? styles.androidFlat : null,
-        Platform.OS === 'android'
-          ? { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) }
-          : null,
+        styles.circle,
+        { backgroundColor: surfaceSecondary },
         { opacity: disabled ? 0.4 : 1 },
       ]}
       disabled={disabled}
       testID={testID}>
-      <Icon name={icon} size={size} color={color ?? foreground} />
+      <Icon name={icon} size={size} color={color ?? opacity(foreground, alpha.prominent)} />
       {accessory}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  base: {
-    minWidth: minTouchTarget,
-    minHeight: minTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  androidFlat: {
+  circle: {
     width: minTouchTarget,
     height: minTouchTarget,
     borderRadius: minTouchTarget / 2,
-    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -1732,13 +1732,7 @@ export function NearPayScreen() {
     [emptyTextStyle, emptyTitleStyle, foregroundSoft]
   );
   const renderHeaderLeft = useCallback(
-    () => (
-      <ScreenHeaderAction
-        icon="material-symbols:arrow-back-rounded"
-        color={foreground}
-        onPress={resetToPicker}
-      />
-    ),
+    () => <ScreenHeaderAction icon="material-symbols:arrow-back-rounded" onPress={resetToPicker} />,
     [foreground, resetToPicker]
   );
   const renderEmptyHeader = useCallback(() => null, []);

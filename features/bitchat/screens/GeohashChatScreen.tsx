@@ -169,11 +169,7 @@ export function GeohashChatScreen({
         headerTitleAlign: 'center',
         title,
         headerLeft: () => (
-          <ScreenHeaderAction
-            icon="material-symbols:arrow-back-rounded"
-            color={foreground}
-            onPress={handleBack}
-          />
+          <ScreenHeaderAction icon="material-symbols:arrow-back-rounded" onPress={handleBack} />
         ),
         headerRight: () =>
           transport === 'ble' ? (

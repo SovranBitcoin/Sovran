@@ -122,11 +122,7 @@ export default function NetworkSheet() {
           headerTintColor: foreground,
           title: 'Network',
           headerLeft: () => (
-            <ScreenHeaderAction
-              icon="material-symbols:close-rounded"
-              color={foreground}
-              onPress={handleClose}
-            />
+            <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={handleClose} />
           ),
         }}
       />

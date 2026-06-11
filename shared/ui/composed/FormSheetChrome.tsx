@@ -15,7 +15,7 @@ import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { minTouchTarget, spacing } from '@/shared/styles/tokens';
+import { minTouchTarget, spacing, fontSize } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -36,12 +36,8 @@ function AndroidFormSheetChrome({ title, children }: FormSheetChromeProps) {
       <View style={styles.container}>
         <SheetGrabber />
         <HStack align="center" style={styles.titleRow}>
-          <ScreenHeaderAction
-            icon="material-symbols:close-rounded"
-            color={foreground}
-            onPress={() => router.back()}
-          />
-          <Text bold size={17} style={styles.title} numberOfLines={1}>
+          <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />
+          <Text bold size={fontSize.xl} style={styles.title} numberOfLines={1}>
             {title ?? ''}
           </Text>
           {/* Balances the close button so the title stays visually centered. */}

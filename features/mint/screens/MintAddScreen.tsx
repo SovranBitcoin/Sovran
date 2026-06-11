@@ -640,14 +640,12 @@ export function MintAddScreen() {
         <ScreenHeaderAction
           icon="material-symbols:close-rounded"
           size={20}
-          color={foreground}
           onPress={onCloseSearch}
         />
       ) : (
         <ScreenHeaderAction
           icon="material-symbols:search-rounded"
           size={20}
-          color={foreground}
           onPress={onOpenSearch}
         />
       ),

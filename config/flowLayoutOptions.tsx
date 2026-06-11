@@ -6,13 +6,14 @@
  */
 
 import { memo } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import type {
   NativeStackHeaderProps,
   NativeStackNavigationOptions,
 } from '@react-navigation/native-stack';
 import type { ParamListBase, NavigationProp } from '@react-navigation/native';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
@@ -23,19 +24,34 @@ interface FlowColors {
 }
 
 /**
- * Android stand-in for the iOS header blur: a near-opaque tint of the screen
- * background. headerBlurEffect is a silent no-op on Android, which left
- * transparent headers floating over scrolling content with no scrim. Keeping
- * headerTransparent + painting headerBackground preserves each screen's
- * layout (content still lays out under the header) — flipping
- * headerTransparent off would shift everything down by the header height.
+ * Android stand-in for the iOS header blur: solid background behind the bar
+ * fading to transparent toward its bottom edge — a pure color gradient (no
+ * blur — expo-blur on Android reads as a muddy dark tint), rendered fully
+ * within the header's own bounds so it can't be clipped by the native
+ * headerBackground container. The previous flat 92%-tint band ended in a hard
+ * edge that looked broken over scrolling content. Keeping headerTransparent +
+ * painting headerBackground preserves each screen's layout (content still
+ * lays out under the header).
  */
 const AndroidHeaderScrim = memo(function AndroidHeaderScrim({
   backgroundColor,
 }: {
   backgroundColor: string;
 }) {
-  return <View style={{ flex: 1, backgroundColor: opacity(backgroundColor, 0.92) }} />;
+  return (
+    <LinearGradient
+      // Solid through ~78% (title text always sits over full background),
+      // easing out over the bottom ~22% of the bar.
+      colors={[
+        backgroundColor,
+        backgroundColor,
+        opacity(backgroundColor, 0.85),
+        opacity(backgroundColor, 0),
+      ]}
+      locations={[0, 0.78, 0.9, 1]}
+      style={{ flex: 1 }}
+    />
+  );
 });
 
 /** Spread into header options on Android only; empty on iOS (blur handles it). */
@@ -54,17 +70,14 @@ export const androidHeaderScrimOptions = (
 // re-render) doesn't re-parse the SVG icon unless isFirstScreen/foreground change.
 const FlowHeaderButton = memo(function FlowHeaderButton({
   isFirstScreen,
-  foreground,
 }: {
   isFirstScreen: boolean;
-  foreground: string;
 }) {
   return (
     <ScreenHeaderAction
       icon={
         isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
       }
-      color={foreground}
       onPress={() => router.back()}
     />
   );
@@ -127,9 +140,7 @@ export const createFlowLayoutScreenOptions = (
       ...getBaseFlowScreenOptions(colors),
       ...(sheetHeader ? { header: renderFlowSheetHeader } : {}),
       // Dynamic back/close button based on stack depth
-      headerLeft: () => (
-        <FlowHeaderButton isFirstScreen={isFirstScreen} foreground={colors.foreground} />
-      ),
+      headerLeft: () => <FlowHeaderButton isFirstScreen={isFirstScreen} />,
     };
   };
 };
