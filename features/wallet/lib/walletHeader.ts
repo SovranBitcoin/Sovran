@@ -27,10 +27,12 @@ export const HEADER_LAYOUT = {
 // iOS 26 nav bars reserve wider margins around bar items than the classic
 // 16pt math; a titleView sized to the classic slot overflows the available
 // center space and UIKit pins it off-center instead of centering it (the
-// wallet mint selector visibly drifted right). Trim the title slot on
-// liquid devices so it fits and UIKit centers it. Tuned on device — adjust
-// this single constant if the pill drifts again.
-const LIQUID_TITLE_EXTRA_SIDE = supportsLiquidGlass() ? 12 : 0;
+// wallet mint selector visibly drifted right). Device-derived bounds:
+// width-144 drifted (didn't fit) and width-168 centered with ~16pt gaps,
+// which puts UIKit's edge reservation at ~24pt per side — so width-152
+// (extra side = 4) targets the design's max-8pt gap between the title and
+// the headerLeft/headerRight buttons. Single tunable constant.
+const LIQUID_TITLE_EXTRA_SIDE = supportsLiquidGlass() ? 4 : 0;
 
 const SIDE =
   HEADER_LAYOUT.TOOLBAR_BUTTON_WIDTH +

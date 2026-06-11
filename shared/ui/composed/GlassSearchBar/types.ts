@@ -2,6 +2,12 @@ import type { KeyboardTypeOptions } from 'react-native';
 
 export interface GlassSearchBarProps {
   width?: number;
+  /**
+   * Field height (default 44). The wallet/search headers pass
+   * HEADER_LAYOUT.BUTTON_HEIGHT so the bar swaps in at exactly the mint
+   * selector's footprint instead of a visibly shorter field.
+   */
+  height?: number;
   clearKey: number;
   onChangeText: (text: string) => void;
   placeholder: string;

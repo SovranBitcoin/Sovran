@@ -12,6 +12,7 @@ import type { GlassSearchBarProps } from './types';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
   width,
+  height = 44,
   clearKey,
   onChangeText,
   placeholder,
@@ -76,8 +77,10 @@ export const GlassSearchBar = memo(function GlassSearchBar({
       accessibilityRole="search"
       style={[
         styles.input,
-        liquid ? styles.inputLiquid : { backgroundColor: surfaceSecondary },
-        { color: foreground },
+        liquid
+          ? [styles.inputLiquid, { borderRadius: height / 2 }]
+          : { backgroundColor: surfaceSecondary },
+        { color: foreground, height },
       ]}
     />
   );
@@ -86,7 +89,9 @@ export const GlassSearchBar = memo(function GlassSearchBar({
     <Log name="GlassSearchBar">
       <View style={{ alignItems: 'center', ...(width != null ? { width } : { flex: 1 }) }}>
         {liquid ? (
-          <GlassView style={styles.glassShell} glassEffectStyle="regular">
+          <GlassView
+            style={[styles.glassShell, { borderRadius: height / 2, height }]}
+            glassEffectStyle="regular">
             {input}
           </GlassView>
         ) : (
@@ -98,16 +103,13 @@ export const GlassSearchBar = memo(function GlassSearchBar({
 });
 
 const styles = StyleSheet.create({
-  // Capsule (radius = height/2) matching the liquid design language; the
-  // GlassView owns the material, the input goes transparent inside it.
+  // Capsule (radius = height/2 applied inline) matching the liquid design
+  // language; the GlassView owns the material, the input goes transparent.
   glassShell: {
-    borderRadius: 22,
-    height: 44,
     overflow: 'hidden',
     width: '100%',
   },
   input: {
-    height: 44,
     width: '100%',
     borderRadius: 12,
     paddingHorizontal: 12,
@@ -116,6 +118,5 @@ const styles = StyleSheet.create({
   },
   inputLiquid: {
     backgroundColor: 'transparent',
-    borderRadius: 22,
   },
 });
