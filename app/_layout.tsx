@@ -55,6 +55,7 @@ import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
+import { AndroidImageOverlayHost } from '@/features/feed/components/nostr/image-overlay/AndroidImageOverlayHost';
 import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineProvider';
 import {
   clearTransitionGuardOnStartup,
@@ -801,6 +802,10 @@ export default function RootLayout() {
                 key={`account-${activeAccountIndex}`}
                 accountIndex={activeAccountIndex}>
                 <RootLayoutContent />
+                {/* Same-window host for the Android feed media lightbox; must
+                    sit BEFORE PopupHost so popups triggered from inside the
+                    lightbox stack above it. No-op on iOS / when empty. */}
+                <AndroidImageOverlayHost />
                 <PopupHost />
                 <ActionMenuHost />
               </AccountScopedProviders>

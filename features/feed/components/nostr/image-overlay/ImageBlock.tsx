@@ -5,15 +5,20 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import Reanimated, { useAnimatedProps, useSharedValue } from 'react-native-reanimated';
+import Reanimated, {
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { View } from '@/shared/ui/primitives/View/View';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../feedTypes';
 import { useImageOverlay } from './provider';
-import type { ImageOverlayPost, MediaType } from './types';
+import type { ImageOverlayPost, MediaType, ThumbnailLayout } from './types';
+import { ANDROID_THUMB_DIM_MAX_OPACITY, THUMB_BLUR_MAX_INTENSITY } from './config';
 import { Log } from '@/shared/lib/logger';
 
 const AnimatedBlurView = Reanimated.createAnimatedComponent(BlurView);
@@ -95,6 +100,29 @@ export const ImageBlock = React.memo(function ImageBlock({
     return null;
   }, []);
 
+  /**
+   * Just-in-time re-measure for dismiss targeting. Recycled LegendList rows
+   * never re-fire onLayout when size is unchanged, so the rect registered at
+   * onLayout can be stale by close time; close() calls this to re-measure the
+   * live node. Resolves null when the node is unmounted/unmeasurable.
+   */
+  const measureNow = useCallback((): Promise<ThumbnailLayout | null> => {
+    return new Promise((resolve) => {
+      const node = measureSourceRef();
+      if (!node) {
+        resolve(null);
+        return;
+      }
+      node.measureInWindow((pageX: number, pageY: number, width: number, height: number) => {
+        if (!Number.isFinite(pageX) || !Number.isFinite(pageY) || !(width > 0) || !(height > 0)) {
+          resolve(null);
+          return;
+        }
+        resolve({ pageX, pageY, width, height });
+      });
+    });
+  }, [measureSourceRef]);
+
   const registerLayout = useCallback(() => {
     const node = measureSourceRef();
     if (!node) return;
@@ -103,11 +131,11 @@ export const ImageBlock = React.memo(function ImageBlock({
         url,
         { pageX, pageY, width, height },
         overlayEvent?.id != null && layoutIndex != null
-          ? { eventId: overlayEvent.id, imageIndex: layoutIndex }
-          : undefined
+          ? { eventId: overlayEvent.id, imageIndex: layoutIndex, measureNow }
+          : { measureNow }
       );
     });
-  }, [imageOverlay, url, overlayEvent?.id, layoutIndex, measureSourceRef]);
+  }, [imageOverlay, url, overlayEvent?.id, layoutIndex, measureSourceRef, measureNow]);
 
   const handlePress = useCallback(() => {
     if (!imageOverlay?.open) return;
@@ -115,6 +143,15 @@ export const ImageBlock = React.memo(function ImageBlock({
     const node = measureSourceRef();
     if (!node) return;
     node.measureInWindow((pageX: number, pageY: number, width: number, height: number) => {
+      // Tap-time registration so close() has a measureNow for this key even
+      // when the row was recycled and onLayout never re-fired.
+      imageOverlay.registerThumbnailLayout(
+        url,
+        { pageX, pageY, width, height },
+        overlayEvent?.id != null
+          ? { eventId: overlayEvent.id, imageIndex: layoutIndex, measureNow }
+          : { measureNow }
+      );
       const post: ImageOverlayPost | undefined =
         overlayEvent && overlayMetrics
           ? {
@@ -167,6 +204,7 @@ export const ImageBlock = React.memo(function ImageBlock({
   }, [
     imageOverlay,
     measureSourceRef,
+    measureNow,
     url,
     aspectRatio,
     allImageUrls,
@@ -174,6 +212,7 @@ export const ImageBlock = React.memo(function ImageBlock({
     mediaTypes,
     mediaIndex,
     imageIndex,
+    layoutIndex,
     onBeforeOpen,
     overlayEvent,
     overlayMetrics,
@@ -195,6 +234,16 @@ export const ImageBlock = React.memo(function ImageBlock({
   const thumbnailBlur = imageOverlay?.thumbnailBlurIntensity ?? fallbackBlur;
   const thumbnailBlurAnimatedProps = useAnimatedProps(() => ({
     intensity: thumbnailBlur.value,
+  }));
+  /**
+   * Android: expo-blur without experimentalBlurMethod renders as a weak tint
+   * while paying animatedProps cost every frame. Dim the thumbnail with a
+   * plain animated-opacity scrim driven by the same displacement value
+   * instead, preserving the intent (hide the duplicate thumbnail while the
+   * overlay image is displaced; fade out as the dismiss morph lands on it).
+   */
+  const thumbnailDimStyle = useAnimatedStyle(() => ({
+    opacity: (thumbnailBlur.value / THUMB_BLUR_MAX_INTENSITY) * ANDROID_THUMB_DIM_MAX_OPACITY,
   }));
 
   if (error) return null;
@@ -236,14 +285,20 @@ export const ImageBlock = React.memo(function ImageBlock({
           ) : (
             image
           )}
-          {isOverlayActive && (
-            <AnimatedBlurView
-              tint="dark"
-              style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
-              pointerEvents="none"
-              animatedProps={thumbnailBlurAnimatedProps}
-            />
-          )}
+          {isOverlayActive &&
+            (Platform.OS === 'android' ? (
+              <Reanimated.View
+                style={[StyleSheet.absoluteFill, styles.thumbnailDimAndroid, thumbnailDimStyle]}
+                pointerEvents="none"
+              />
+            ) : (
+              <AnimatedBlurView
+                tint="dark"
+                style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
+                pointerEvents="none"
+                animatedProps={thumbnailBlurAnimatedProps}
+              />
+            ))}
         </View>
       </View>
     </Log>
@@ -255,5 +310,9 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  thumbnailDimAndroid: {
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,1)',
   },
 });

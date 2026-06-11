@@ -3,14 +3,13 @@
  * Renders only when ImageOverlayProvider is present and activeUrl is set.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { BackHandler, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   type GestureType,
   Gesture,
   GestureDetector,
-  GestureHandlerRootView,
   ScrollView as GHScrollView,
 } from 'react-native-gesture-handler';
 import { FullWindowOverlay } from 'react-native-screens';
@@ -35,6 +34,7 @@ import Icon from 'assets/icons';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import type { ImageOverlayContextValue } from './types';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './provider';
+import { clearAndroidOverlayNode, setAndroidOverlayNode } from './AndroidImageOverlayHost';
 import { MemoizedMediaPagerPage } from './MediaPagerPage';
 import { OverlayDot } from './PagerDots';
 import { duration, zIndex } from '@/shared/styles/tokens';
@@ -45,6 +45,7 @@ import {
   PANEL_BG,
 } from './BottomPanel';
 import {
+  ANDROID_SCRIM_MAX_OPACITY,
   DISMISS_ACTIVE_OFFSET_Y,
   DISMISS_BLUR_AT_REST,
   DISMISS_CLOSE_BTN_FADE_DURATION_MS,
@@ -349,6 +350,18 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
 
   const backdropAnimatedProps = useAnimatedProps(() => ({
     intensity: blurIntensity.value,
+  }));
+
+  /**
+   * Android backdrop: expo-blur without experimentalBlurMethod renders as a
+   * weak translucent tint while paying animatedProps cost every frame, so the
+   * backdrop is a solid black scrim instead. Its opacity is driven by the
+   * same shared value as the blur intensity (0..DISMISS_BLUR_AT_REST →
+   * 0..ANDROID_SCRIM_MAX_OPACITY) so drag-to-dismiss fades the scrim exactly
+   * like the iOS blur.
+   */
+  const rAndroidScrimStyle = useAnimatedStyle(() => ({
+    opacity: (blurIntensity.value / DISMISS_BLUR_AT_REST) * ANDROID_SCRIM_MAX_OPACITY,
   }));
 
   const rCloseBtnStyle = useAnimatedStyle(() => ({
@@ -1101,12 +1114,19 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           <AnimatedPressable style={[StyleSheet.absoluteFill, rContainerStyle]}>
             {/* box-none so taps on the blur fall through to the gesture (tapBackdrop → triggerClose); overlay root still blocks content behind */}
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
-            <AnimatedBlurView
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-              animatedProps={backdropAnimatedProps}
-              pointerEvents="none"
-            />
+            {Platform.OS === 'android' ? (
+              <Animated.View
+                style={[StyleSheet.absoluteFill, overlayStyles.androidScrim, rAndroidScrimStyle]}
+                pointerEvents="none"
+              />
+            ) : (
+              <AnimatedBlurView
+                tint="dark"
+                style={StyleSheet.absoluteFill}
+                animatedProps={backdropAnimatedProps}
+                pointerEvents="none"
+              />
+            )}
             <Animated.View
               style={[
                 overlayStyles.closeButton,
@@ -1134,6 +1154,8 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                             mediaType={layout.mediaTypes?.[0] ?? 'image'}
                             index={0}
                             isActive={index === videoFeedLayoutIndex}
+                            activeIndex={videoFeedLayoutIndex}
+                            pagerIndex={index}
                             expandedWidthSv={expandedWidthSv}
                             expandedHeightSv={expandedHeightSv}
                           />
@@ -1153,6 +1175,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                               mediaType={activeMediaTypes[i] ?? 'image'}
                               index={i}
                               isActive={i === activeIndex}
+                              activeIndex={activeIndex}
                               expandedWidthSv={expandedWidthSv}
                               expandedHeightSv={expandedHeightSv}
                             />
@@ -1182,6 +1205,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                           mediaType="image"
                           index={0}
                           isActive={true}
+                          activeIndex={0}
                           expandedWidthSv={expandedWidthSv}
                           expandedHeightSv={expandedHeightSv}
                         />
@@ -1192,6 +1216,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                         mediaType={activeMediaTypes[0] ?? 'video'}
                         index={0}
                         isActive={true}
+                        activeIndex={0}
                         expandedWidthSv={expandedWidthSv}
                         expandedHeightSv={expandedHeightSv}
                         containerWidthSv={imageWidth}
@@ -1321,14 +1346,55 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
 
 /**
  * Renders the image overlay. iOS wraps in FullWindowOverlay so it appears
- * above the Expo Router tab bar and header. Android uses a native transparent
- * Modal: react-native-screens falls back to a constrained plain View for
- * FullWindowOverlay there, while an in-route absolute overlay can be torn
- * down during native-stack navigation.
+ * above the Expo Router tab bar and header (same-window, correct
+ * coordinates). Android registers the overlay element into
+ * <AndroidImageOverlayHost /> (mounted once in app/_layout.tsx):
+ * react-native-screens falls back to a constrained plain View for
+ * FullWindowOverlay there, and the previous transparent RN Modal was a
+ * SEPARATE native window, so measureInWindow thumbnail rects (main-surface
+ * coordinates) didn't match overlay coordinates and the open/dismiss morph
+ * landed offset. The same-window host makes both coordinate spaces identical
+ * by construction, and removes the Modal mount latency that ate the first
+ * frames of the open morph plus the teardown flash on close. The root
+ * GestureHandlerRootView in app/_layout.tsx covers the hosted element, and
+ * the element carries its data via the explicit `ctx` prop, so no contexts
+ * need re-providing.
  */
 export function AnimatedImageOverlay() {
   const ctx = useImageOverlay();
+  // Hooks stay unconditional (this component renders on every platform and
+  // with ctx possibly null); platform/ctx branching lives in effect bodies
+  // and the render path below.
+  const ownerKey = useId();
+  const androidActive = Platform.OS === 'android' && ctx?.activeUrl != null;
+
+  // While a media url is active, host the overlay element in the main window.
+  // Re-registers whenever ctx identity changes so the hosted element always
+  // sees fresh state; ownerKey scoping means one feed's teardown can't
+  // clobber another feed's registration.
+  useEffect(() => {
+    if (!androidActive || !ctx) return;
+    setAndroidOverlayNode(
+      ownerKey,
+      <Log name="AnimatedImageOverlay">
+        <AnimatedImageOverlayContent ctx={ctx} />
+      </Log>
+    );
+    return () => clearAndroidOverlayNode(ownerKey);
+  }, [androidActive, ctx, ownerKey]);
+
+  // Hardware back closes the overlay — replaces the old Modal onRequestClose.
+  useEffect(() => {
+    if (!androidActive || !ctx) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      ctx.close();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [androidActive, ctx]);
+
   if (!ctx) return null;
+  if (Platform.OS === 'android') return null;
   const content = <AnimatedImageOverlayContent ctx={ctx} />;
   if (Platform.OS === 'ios') {
     return (
@@ -1337,30 +1403,12 @@ export function AnimatedImageOverlay() {
       </Log>
     );
   }
-  if (Platform.OS === 'android') {
-    return (
-      <Modal
-        visible={ctx.activeUrl != null}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        navigationBarTranslucent
-        hardwareAccelerated
-        onRequestClose={() => ctx.close()}>
-        <Log name="AnimatedImageOverlay">
-          <GestureHandlerRootView style={overlayStyles.androidModalRoot}>
-            {content}
-          </GestureHandlerRootView>
-        </Log>
-      </Modal>
-    );
-  }
   return <Log name="AnimatedImageOverlay">{content}</Log>;
 }
 
 const overlayStyles = StyleSheet.create({
-  androidModalRoot: {
-    flex: 1,
+  androidScrim: {
+    backgroundColor: 'rgba(0,0,0,1)',
   },
   closeButton: {
     position: 'absolute',

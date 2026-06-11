@@ -74,11 +74,19 @@ export type ImageOverlayContextValue = {
   /** Close overlay. Pass current pager index when multiple images so dismiss animates to the visible thumbnail. */
   close: (dismissedPageIndex?: number) => void;
   openToCenter: () => void;
-  /** Register a thumbnail's layout (e.g. from onLayout + measureInWindow). Use eventId + imageIndex when opening from a post so dismiss uses this post's position, not another card's. */
+  /**
+   * Register a thumbnail's layout (e.g. from onLayout + measureInWindow). Use eventId + imageIndex when opening from a post so dismiss uses this post's position, not another card's.
+   * Pass measureNow so close() can re-measure the live node just-in-time: recycled LegendList rows never re-fire onLayout when size is unchanged, so the registered rect can be stale.
+   */
   registerThumbnailLayout: (
     url: string,
     layout: ThumbnailLayout,
-    options?: { eventId?: string; imageIndex?: number }
+    options?: {
+      eventId?: string;
+      imageIndex?: number;
+      /** Re-measure the live thumbnail node in window coordinates; resolves null when unmounted. */
+      measureNow?: () => Promise<ThumbnailLayout | null>;
+    }
   ) => void;
   /** Set panel height (drives image area); used after content measure and when panel is dragged. */
   setPanelHeight: (height: number) => void;
