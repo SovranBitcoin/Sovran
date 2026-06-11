@@ -19,8 +19,11 @@
  * option on sheet flows because native-stack renders it ITSELF in a wrapper
  * with elevation:1 when headerTransparent — on Android that composites the
  * gradient ABOVE this (elevation-0) header, covering the title and buttons.
- * Flow-sheet screens must not set a per-screen headerBackground; doing so
- * re-triggers that elevated duplicate.
+ * Flow-sheet screens must not set a NON-null per-screen headerBackground;
+ * doing so re-triggers that elevated duplicate. `headerBackground: () => null`
+ * is the sanctioned per-screen scrim OPT-OUT (used by the profile screen,
+ * whose banner the scrim would cover) — the elevated wrapper mounts but
+ * renders nothing.
  *
  * Deliberately ignored options (iOS/native-only): headerBackButtonMenuEnabled,
  * headerBlurEffect, headerBackVisible, headerLargeStyle, header shadows. The

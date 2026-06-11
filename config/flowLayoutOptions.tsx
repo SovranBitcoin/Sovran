@@ -118,7 +118,8 @@ export const createFlowLayoutScreenOptions = (
       // absolutely-positioned wrapper with elevation:1 (styles.translucent)
       // when headerTransparent — and on Android that elevation composites the
       // gradient ABOVE the elevation-0 custom header, covering the title and
-      // headerLeft/headerRight buttons.
+      // headerLeft/headerRight buttons. Per-screen `headerBackground: () =>
+      // null` remains the sanctioned scrim opt-out (renders nothing).
       ...(sheetHeader ? { header: renderFlowSheetHeader, headerBackground: undefined } : {}),
       // Dynamic back/close button based on stack depth
       headerLeft: () => <FlowHeaderButton isFirstScreen={isFirstScreen} />,
