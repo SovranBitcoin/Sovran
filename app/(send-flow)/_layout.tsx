@@ -22,6 +22,8 @@ import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
+import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 const MINT_SELECT_OPTIONS = { title: 'Select mint' };
 const NEAR_PAY_HEADER_OPTIONS = {
@@ -68,17 +70,19 @@ export default function SendFlowLayout() {
   );
 
   return (
-    <Stack screenOptions={screenOptions}>
-      <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
-      <Stack.Screen name="nearPay" options={NEAR_PAY_OPTIONS} />
-      <Stack.Screen name="nearPayPeers" options={NEAR_PAY_PEERS_OPTIONS} />
-      <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
-      <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
-      <Stack.Screen name="lightningSend" options={LIGHTNING_SEND_OPTIONS} />
-      <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
-      <Stack.Screen name="meltQuote" options={MELT_QUOTE_OPTIONS} />
-      <Stack.Screen name="paymentRequest" options={PAYMENT_REQUEST_OPTIONS} />
-      <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
-    </Stack>
+    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
+      <Stack screenOptions={screenOptions}>
+        <Stack.Screen name="mintSelect" options={MINT_SELECT_OPTIONS} />
+        <Stack.Screen name="nearPay" options={NEAR_PAY_OPTIONS} />
+        <Stack.Screen name="nearPayPeers" options={NEAR_PAY_PEERS_OPTIONS} />
+        <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
+        <Stack.Screen name="sendToken" options={SEND_TOKEN_OPTIONS} />
+        <Stack.Screen name="lightningSend" options={LIGHTNING_SEND_OPTIONS} />
+        <Stack.Screen name="onchainSend" options={ONCHAIN_SEND_OPTIONS} />
+        <Stack.Screen name="meltQuote" options={MELT_QUOTE_OPTIONS} />
+        <Stack.Screen name="paymentRequest" options={PAYMENT_REQUEST_OPTIONS} />
+        <Stack.Screen name="camera" options={CAMERA_OPTIONS} />
+      </Stack>
+    </AndroidSheetRoot>
   );
 }

@@ -40,6 +40,8 @@ import {
 } from '@/features/splitBill/hooks/useSplitBillParticipantPicker';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
+import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 const PickerContext = createContext<UseSplitBillParticipantPickerResult | null>(null);
 const AMOUNT_OPTIONS = { title: 'Split bill' };
@@ -91,13 +93,15 @@ export default function SplitBillLayout() {
 
   return (
     <PickerContext.Provider value={picker}>
-      <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
-        <Stack.Screen name="participants" options={PARTICIPANTS_OPTIONS} />
-        <Stack.Screen name="search" options={SEARCH_OPTIONS} />
-        <Stack.Screen name="summary" options={SUMMARY_OPTIONS} />
-        <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
-      </Stack>
+      <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
+        <Stack screenOptions={screenOptions}>
+          <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
+          <Stack.Screen name="participants" options={PARTICIPANTS_OPTIONS} />
+          <Stack.Screen name="search" options={SEARCH_OPTIONS} />
+          <Stack.Screen name="summary" options={SUMMARY_OPTIONS} />
+          <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
+        </Stack>
+      </AndroidSheetRoot>
     </PickerContext.Provider>
   );
 }

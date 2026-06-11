@@ -20,6 +20,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
 
 interface FormSheetChromeProps {
   title?: string;
@@ -29,22 +30,26 @@ interface FormSheetChromeProps {
 function AndroidFormSheetChrome({ title, children }: FormSheetChromeProps) {
   const [foreground] = useThemeColor(['foreground'] as const);
   return (
-    <View style={styles.container}>
-      <SheetGrabber />
-      <HStack align="center" style={styles.titleRow}>
-        <ScreenHeaderAction
-          icon="material-symbols:close-rounded"
-          color={foreground}
-          onPress={() => router.back()}
-        />
-        <Text bold size={17} style={styles.title} numberOfLines={1}>
-          {title ?? ''}
-        </Text>
-        {/* Balances the close button so the title stays visually centered. */}
-        <View style={styles.titleSpacer} />
-      </HStack>
-      {children}
-    </View>
+    // AndroidSheetRoot pins the sheet to exact full height — RNS single-detent
+    // sheets otherwise size to content (variable top gap).
+    <AndroidSheetRoot>
+      <View style={styles.container}>
+        <SheetGrabber />
+        <HStack align="center" style={styles.titleRow}>
+          <ScreenHeaderAction
+            icon="material-symbols:close-rounded"
+            color={foreground}
+            onPress={() => router.back()}
+          />
+          <Text bold size={17} style={styles.title} numberOfLines={1}>
+            {title ?? ''}
+          </Text>
+          {/* Balances the close button so the title stays visually centered. */}
+          <View style={styles.titleSpacer} />
+        </HStack>
+        {children}
+      </View>
+    </AndroidSheetRoot>
   );
 }
 

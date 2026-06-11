@@ -28,6 +28,15 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
 
+/**
+ * Fixed total height: SheetGrabber (8 marginTop + 4) + title row (44 min
+ * content + 4×2 padding) = 64. Fixed (not min) so native-stack's measured
+ * HeaderHeightContext is a stable constant — sheet content must not shift
+ * when the default header height settles to the measured one. Custom
+ * headerTitle components must fit within the 44dp row.
+ */
+export const FLOW_SHEET_HEADER_HEIGHT = 64;
+
 export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps) {
   const [foreground] = useThemeColor(['foreground'] as const);
 
@@ -60,7 +69,7 @@ export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps
     options.headerTransparent !== true && headerStyleBackground ? headerStyleBackground : undefined;
 
   return (
-    <View style={backgroundColor ? { backgroundColor } : null}>
+    <View style={[styles.container, backgroundColor ? { backgroundColor } : null]}>
       {options.headerBackground ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {options.headerBackground()}
@@ -77,6 +86,9 @@ export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps
 }
 
 const styles = StyleSheet.create({
+  container: {
+    height: FLOW_SHEET_HEADER_HEIGHT,
+  },
   titleRow: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
