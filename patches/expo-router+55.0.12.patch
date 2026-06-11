@@ -1,7 +1,7 @@
 diff --git a/node_modules/expo-router/build/native-tabs/NativeTabsView.js b/node_modules/expo-router/build/native-tabs/NativeTabsView.js
 --- a/node_modules/expo-router/build/native-tabs/NativeTabsView.js
 +++ b/node_modules/expo-router/build/native-tabs/NativeTabsView.js
-@@ -55,6 +55,16 @@
+@@ -55,6 +55,28 @@ function NativeTabsView(props) {
      // In that case the deferred index will still point to the last tab, but after re-render
      // it will be out of bounds
      const inBoundsDeferredFocusedIndex = deferredFocusedIndex < tabs.length ? deferredFocusedIndex : focusedIndex;
@@ -11,14 +11,26 @@ diff --git a/node_modules/expo-router/build/native-tabs/NativeTabsView.js b/node
 +    // expo-router 55.x still speaks the old contract, which leaves every
 +    // tab's native screenKey nil and crashes on tab selection with
 +    // "[RNScreens] screenKey MUST NOT be nil". This adapter speaks the new
-+    // contract: provenance of the last acknowledged native state is echoed
-+    // back with each JS-driven selection request.
-+    const lastAckProvenanceRef = (0, react_1.useRef)(0);
++    // contract: each render emits a navStateRequest carrying the provenance
++    // of the native state that render's focused key was derived from.
++    const lastNativeAckRef = (0, react_1.useRef)({ screenKey: undefined, provenance: 0 });
++    const committedBaseProvenanceRef = (0, react_1.useRef)(0);
 +    const focusedRouteKey = tabs[inBoundsDeferredFocusedIndex]?.routeKey ?? tabs[0]?.routeKey;
++    // [sovran] baseProvenance must describe the state this request was
++    // DERIVED from (TabsHost.types.d.ts), not simply the newest ack. The
++    // deferred focused index guarantees one commit per tab change where
++    // focusedRouteKey still predates the last native ack; advancing the
++    // provenance there would disguise that stale request as fresh and the
++    // native side would yank the selection back to the old tab. Commit the
++    // acked provenance only once the rendered key has incorporated the ack —
++    // until then the emitted request stays stale and is rejected natively.
++    if (focusedRouteKey != null && focusedRouteKey === lastNativeAckRef.current.screenKey) {
++        committedBaseProvenanceRef.current = lastNativeAckRef.current.provenance;
++    }
      const appearances = tabs.map((tab) => ({
          standardAppearance: (0, appearance_1.createStandardAppearanceFromOptions)(tab.options),
          scrollEdgeAppearance: (0, appearance_1.createScrollEdgeAppearanceFromOptions)(tab.options),
-@@ -99,9 +109,16 @@
+@@ -99,9 +121,22 @@ function NativeTabsView(props) {
      // #region iOS props
      tabBarTintColor={props?.tintColor} tabBarMinimizeBehavior={minimizeBehavior} tabBarControllerMode={tabBarControllerMode} bottomAccessory={bottomAccessoryFn} tabBarHidden={props.hidden} 
      // #endregion
@@ -26,19 +38,25 @@ diff --git a/node_modules/expo-router/build/native-tabs/NativeTabsView.js b/node
 -            props.onTabChange(tabKey);
 -        }}>
 +    onTabSelected={({ nativeEvent }) => {
-+            // [sovran] new-contract selection event; repeated taps are
-+            // handled natively (scroll-to-top) and must not re-dispatch.
-+            lastAckProvenanceRef.current = nativeEvent.provenance;
-+            if (!nativeEvent.isRepeated) {
++            // [sovran] new-contract selection event. Repeated taps are
++            // handled natively (scroll-to-top), and 'programmatic-js'
++            // acceptances only confirm a request this component itself
++            // sent — re-dispatching either feeds navigation state back on
++            // itself (tab flips, then reverses).
++            lastNativeAckRef.current = {
++                screenKey: nativeEvent.selectedScreenKey,
++                provenance: nativeEvent.provenance,
++            };
++            if (!nativeEvent.isRepeated && nativeEvent.actionOrigin !== 'programmatic-js') {
 +                props.onTabChange(nativeEvent.selectedScreenKey);
 +            }
-+        }} navStateRequest={focusedRouteKey
-+            ? { selectedScreenKey: focusedRouteKey, baseProvenance: lastAckProvenanceRef.current }
++        }} rejectStaleNavStateUpdates navStateRequest={focusedRouteKey
++            ? { selectedScreenKey: focusedRouteKey, baseProvenance: committedBaseProvenanceRef.current }
 +            : undefined}>
        {children}
      </TabsHostWrapper>);
  }
-@@ -136,7 +153,21 @@
+@@ -136,7 +171,21 @@ function Screen(props) {
              return content;
          }
      }, [content, options.disableAutomaticContentInsets]);
@@ -61,7 +79,7 @@ diff --git a/node_modules/expo-router/build/native-tabs/NativeTabsView.js b/node
        {wrappedContent}
      </react_native_screens_1.Tabs.Screen>);
  }
-@@ -153,6 +184,14 @@
+@@ -153,6 +202,14 @@ function TabsHostWrapper(props) {
          console.warn(`Unsupported labelVisibilityMode: ${tabBarItemLabelVisibilityMode}. Supported values are: ${types_1.SUPPORTED_TAB_BAR_ITEM_LABEL_VISIBILITY_MODES.map((mode) => `"${mode}"`).join(', ')}`);
          tabBarItemLabelVisibilityMode = undefined;
      }
