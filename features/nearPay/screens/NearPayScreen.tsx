@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
+import { LayoutChangeEvent, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
@@ -23,6 +23,8 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
+import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
+import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -1700,7 +1702,10 @@ export function NearPayScreen() {
     [sharedAvatarStyle]
   );
 
-  const unavailable = Platform.OS !== 'ios';
+  const bluetooth = useBluetoothState();
+  // 'unknown' stays on the scanning path — iOS reports a real state only after
+  // startBLE has spun up CoreBluetooth, and useBLEPeers starts it on mount.
+  const bluetoothBlocked = bluetooth.status !== 'ready' && bluetooth.status !== 'unknown';
   const amountActive = hasInlineAmountEntry;
   const sharedAvatarVisible = !!sharedAvatarPeer || inlinePhase === 'transitioning';
   const foregroundSoft = useMemo(() => opacity(foreground, alpha.soft), [foreground]);
@@ -1720,20 +1725,6 @@ export function NearPayScreen() {
         </Text>
         <Text size={13} style={emptyTextStyle}>
           Keep Sovran open and nearby BitChat users will appear as fallback avatars.
-        </Text>
-      </VStack>
-    ),
-    [emptyTextStyle, emptyTitleStyle, foregroundSoft]
-  );
-  const unavailableContent = useMemo(
-    () => (
-      <VStack align="center" justify="center" gap={spacing.md} style={styles.emptyState}>
-        <Icon name="mdi:bluetooth" size={iconSize['3xl']} color={foregroundSoft} />
-        <Text size={17} weight="bold" style={emptyTitleStyle}>
-          Nut Drop is unavailable here
-        </Text>
-        <Text size={13} style={emptyTextStyle}>
-          BitChat BLE is Apple-only, so this screen stays quiet on this platform.
         </Text>
       </VStack>
     ),
@@ -1773,8 +1764,10 @@ export function NearPayScreen() {
       <Stack.Screen options={stackOptions} />
       <Screen name="NearPayScreen" scroll="none" contentPadding={0} bottomPadding={0}>
         <View onLayout={handleContainerLayout} style={styles.container}>
-          {unavailable ? (
-            unavailableContent
+          {bluetoothBlocked ? (
+            <VStack align="center" justify="center" style={styles.emptyState}>
+              <BluetoothNotice bluetooth={bluetooth} />
+            </VStack>
           ) : (
             <>
               <Animated.View

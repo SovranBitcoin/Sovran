@@ -26,6 +26,8 @@ import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { useBLEPeers } from '../hooks/useBLEPeers';
+import { useBluetoothState } from '../hooks/useBluetoothState';
+import { BluetoothNotice } from '../components/BluetoothNotice';
 
 interface PeerRowProps {
   peer: BLEPeer;
@@ -69,6 +71,8 @@ export default function NetworkSheet() {
   ] as const);
 
   const { peers, connectedCount } = useBLEPeers();
+  const bluetooth = useBluetoothState();
+  const bluetoothBlocked = bluetooth.status !== 'ready' && bluetooth.status !== 'unknown';
 
   // Direct-link peers are the ones DMs can actually reach without bouncing
   // through the mesh-flood spool (which expires after 15s). Surface this
@@ -92,6 +96,7 @@ export default function NetworkSheet() {
   }, []);
 
   const subtitleText = useMemo(() => {
+    if (bluetoothBlocked) return 'Bluetooth unavailable';
     if (peers.length === 0) return 'Scanning for devices…';
     if (connectedCount === 0) return `${peers.length} nearby · 0 connected`;
     if (directLinkCount === connectedCount) {
@@ -100,7 +105,7 @@ export default function NetworkSheet() {
     // Some peers are reachable only via mesh relay — call it out so users
     // know not every "connected" peer is good for a DM.
     return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${peers.length} nearby`;
-  }, [peers.length, connectedCount, directLinkCount]);
+  }, [bluetoothBlocked, peers.length, connectedCount, directLinkCount]);
 
   return (
     <Log name="BitchatNetworkSheet" style={{ flex: 1 }}>
@@ -154,18 +159,22 @@ export default function NetworkSheet() {
             : undefined
         }
         ListEmptyComponent={
-          <VStack
-            align="center"
-            spacing={12}
-            style={{ paddingHorizontal: 40, alignItems: 'center' }}>
-            <Icon name="mdi:bluetooth" size={32} color={opacity(foreground, 0.3)} />
-            <Text size={16} style={{ color: opacity(foreground, 0.5) }}>
-              No devices found yet
-            </Text>
-            <Text size={13} style={{ color: opacity(foreground, 0.35) }}>
-              Keep Sovran open; nearby bitchat users will appear as they connect.
-            </Text>
-          </VStack>
+          bluetoothBlocked ? (
+            <BluetoothNotice bluetooth={bluetooth} />
+          ) : (
+            <VStack
+              align="center"
+              spacing={12}
+              style={{ paddingHorizontal: 40, alignItems: 'center' }}>
+              <Icon name="mdi:bluetooth" size={32} color={opacity(foreground, 0.3)} />
+              <Text size={16} style={{ color: opacity(foreground, 0.5) }}>
+                No devices found yet
+              </Text>
+              <Text size={13} style={{ color: opacity(foreground, 0.35) }}>
+                Keep Sovran open; nearby bitchat users will appear as they connect.
+              </Text>
+            </VStack>
+          )
         }
       />
     </Log>
