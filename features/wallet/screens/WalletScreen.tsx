@@ -30,6 +30,10 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useNfcSupported } from '@/shared/lib/nfc';
+import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
+import { AmbientNfcPulseDot } from '@/features/wallet/components/AmbientNfcPulseDot';
+import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
+import { showActionSheet } from '@/shared/lib/popup';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -139,11 +143,25 @@ export function WalletScreen() {
   }, []);
 
   const nfcSupported = useNfcSupported();
+  // Android hybrid tap-to-pay: the ambient focus loop owns NFC scanning, so
+  // the button only surfaces the tap-to-pay sheet (the "visual indicator").
+  // iOS keeps press-to-scan — the system "Ready to Scan" sheet IS the UI and
+  // iOS cannot listen ambiently.
+  useAmbientNfcArm(machine);
+  const nfcArmed = useNfcTapStore((s) => s.armed);
   const handleNfc = useCallback(() => {
-    walletLog.info('wallet.action.nfc', { unit: ACCOUNT.unit });
+    walletLog.info('wallet.action.nfc', { unit: ACCOUNT.unit, armed: nfcArmed });
+    if (Platform.OS === 'android' && nfcArmed) {
+      showActionSheet('nfc-tap', {});
+      return;
+    }
+    // iOS always; Android only when the ambient loop is NOT armed (NFC off /
+    // start failure) — a one-shot press scan surfaces the existing
+    // "NFC is turned off" popups instead of a sheet that falsely claims to
+    // be listening.
     clearPaymentContext('wallet.nfc');
     void machine.scan?.(undefined, { source: 'nfc' });
-  }, [machine]);
+  }, [machine, nfcArmed]);
 
   // Keep BootEntrance mounted across the search toggle so the splash→QR morph
   // never replays; swap only the inner body. The transparent wallet header means
@@ -187,14 +205,17 @@ export function WalletScreen() {
                 }}
               />
               {nfcSupported ? (
-                <CircleActionButton
-                  icon="lucide:nfc"
-                  systemIcon="wave.3.right"
-                  label="NFC"
-                  testID="wallet-nfc"
-                  disabled={isSwapping}
-                  onPress={handleNfc}
-                />
+                <View>
+                  <CircleActionButton
+                    icon="lucide:nfc"
+                    systemIcon="wave.3.right"
+                    label="NFC"
+                    testID="wallet-nfc"
+                    disabled={isSwapping}
+                    onPress={handleNfc}
+                  />
+                  {nfcArmed ? <AmbientNfcPulseDot /> : null}
+                </View>
               ) : null}
               <Menu presentation="bottom-sheet">
                 <Menu.Trigger

@@ -46,6 +46,7 @@ import { alpha } from '@/shared/styles/tokens';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
+import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
@@ -326,6 +327,17 @@ const CUSTOM_SHEET_CONTENT: Record<
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
   'send-memo': SendMemoContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'nfc-tap': NfcTapContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(

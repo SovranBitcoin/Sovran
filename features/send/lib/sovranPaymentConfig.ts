@@ -50,7 +50,9 @@ import {
   resolvePrimaryReceiveP2PKPublicKey,
 } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
-import { writeTokenToNFC, NfcError, isUserCancelError } from '@/shared/lib/nfc';
+import { writeTokenToNFC, NfcError, isUserCancelError, isAmbientNfcCycle } from '@/shared/lib/nfc';
+import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
+import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import {
   copyPopup,
@@ -542,6 +544,12 @@ export function createSovranNotifications(
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
       paramPopup('nfc-error', { title: 'NFC Write Failed', message: errorMsg });
     },
+    // Drives the Android tap-to-pay sheet's phase text ('Preparing payment…'
+    // etc.). 'creating'/'writing' only fire once executeNfcSend write-back
+    // is wired; harmless to map them now.
+    onNfcPaymentProgress: ({ phase }) => {
+      useNfcTapStore.getState().setPhase(phase);
+    },
 
     // ── Screen action notifications ─────────────────────────────────
 
@@ -739,8 +747,25 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
     },
     nfc: nfcAdapter
       ? async () => {
+          // Ambient cycles (wallet-screen listening loop) re-arm every ~30s,
+          // so their per-cycle failures must stay quiet; explicit presses
+          // keep the popups.
+          const ambient = isAmbientNfcCycle();
+          const closeTapSheet = () => {
+            const popup = usePopupStore.getState();
+            if (
+              popup.current &&
+              'sheetId' in popup.current &&
+              popup.current.sheetId === 'nfc-tap'
+            ) {
+              popup.close();
+            }
+          };
           try {
             const data = await nfcAdapter.readPaymentRequest();
+            // The flow navigates to the payment screen now — don't leave the
+            // tap sheet floating over it.
+            closeTapSheet();
             return { data };
           } catch (err) {
             // User dismissed the system NFC sheet — treat as a no-op,
@@ -749,24 +774,42 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
             // Preflight failures from acquireSession get their own popups —
             // before this, an Android tap with NFC off hung forever silently.
             if (err instanceof NfcError && err.code === 'NOT_ENABLED') {
-              paramPopup('nfc-error', {
-                title: 'NFC is turned off',
-                message: 'Turn on NFC in system settings to scan.',
-              });
+              if (!ambient) {
+                paramPopup('nfc-error', {
+                  title: 'NFC is turned off',
+                  message: 'Turn on NFC in system settings to scan.',
+                });
+              }
               return { empty: true };
             }
             if (err instanceof NfcError && err.code === 'NOT_SUPPORTED') {
-              paramPopup('nfc-error', {
-                title: 'NFC not supported',
-                message: 'This device has no NFC hardware.',
-              });
+              if (!ambient) {
+                paramPopup('nfc-error', {
+                  title: 'NFC not supported',
+                  message: 'This device has no NFC hardware.',
+                });
+              }
               return { empty: true };
             }
             if (err instanceof NfcError && err.code === 'TIMEOUT') {
               // Nothing was tapped within the window — quiet no-op.
               return { empty: true };
             }
+            if (ambient) {
+              // A garbled ambient read (non-payment tag, partial APDU) must
+              // not surface the general-error popup; the loop just re-arms.
+              paymentLog.debug('nfc.ambient.read_failed', {
+                error: err instanceof Error ? err.message : String(err),
+              });
+              return { empty: true };
+            }
             return { error: err instanceof Error ? err : new Error(String(err)) };
+          } finally {
+            // Timeouts deliberately leave the sheet up: the ambient loop
+            // re-arms immediately and the sheet should read as continuous
+            // listening, not blink every 30s. Error popups replace the sheet
+            // through the popup store; the success path closed it above.
+            useNfcTapStore.getState().setPhase('armed');
           }
         }
       : undefined,

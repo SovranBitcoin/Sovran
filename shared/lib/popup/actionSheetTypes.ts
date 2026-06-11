@@ -29,6 +29,9 @@ type SendMemoPayload = StepDataMap['enterSendMemo'] & {
   machine: PaymentMachine;
 };
 
+/** No payload — the nfc-tap sheet reads everything from nfcTapStore. */
+type NfcTapPayload = Record<string, never>;
+
 /**
  * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
  * should stay internal to that sheet.
@@ -90,6 +93,13 @@ type BaseActionSheetPayloads = {
    * the same FullWindowOverlay-backed lane as the other send-flow sheets.
    */
   'send-memo': SendMemoPayload;
+  /**
+   * Android tap-to-pay surface ("Hold near a payment terminal"). Android has
+   * no system NFC sheet, and the wallet NFC button also exists inside
+   * send-flow route modals — same above-modal stacking need as the rest of
+   * this lane. Phase text is driven by nfcTapStore, not the payload.
+   */
+  'nfc-tap': NfcTapPayload;
 };
 
 /** Payload types for custom action sheets. */

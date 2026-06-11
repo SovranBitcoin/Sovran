@@ -39,6 +39,15 @@ function ensureNfcStarted(): Promise<void> {
   return nfcStartPromise;
 }
 
+// Fired the moment requestTechnology resolves (a tag entered the field).
+// The ambient tap-to-pay hook uses it to flip the sheet to 'Reading' and
+// auto-surface the sheet on ambient taps. Plain callback (not a store
+// import) so this lib layer stays UI-free.
+let tagConnectedListener: (() => void) | null = null;
+export function setNfcTagConnectedListener(listener: (() => void) | null): void {
+  tagConnectedListener = listener;
+}
+
 async function cancelStaleSession(): Promise<void> {
   try {
     await NfcManager.cancelTechnologyRequest();
@@ -59,7 +68,11 @@ export async function acquireSession(): Promise<void> {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   try {
     await Promise.race([
-      NfcManager.requestTechnology(NfcTech.IsoDep),
+      // alertMessage shows in iOS's system "Ready to Scan" sheet; Android
+      // ignores it (the app's own nfc-tap sheet is the UI there).
+      NfcManager.requestTechnology(NfcTech.IsoDep, {
+        alertMessage: 'Hold near the payment terminal',
+      }),
       new Promise<never>((_resolve, reject) => {
         timeout = setTimeout(() => {
           void cancelStaleSession();
@@ -71,6 +84,7 @@ export async function acquireSession(): Promise<void> {
     if (timeout) clearTimeout(timeout);
   }
   nfcLog.info('nfc.session.acquired');
+  tagConnectedListener?.();
 }
 
 export async function releaseSession(): Promise<void> {
