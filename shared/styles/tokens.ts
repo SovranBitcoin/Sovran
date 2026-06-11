@@ -209,3 +209,35 @@ export const shadow: Record<'sm' | 'md' | 'lg', Shadow> = {
     default: { elevation: 12 },
   }),
 };
+
+// ─── Typography scale ─────────────────────────────────────────────────────
+// One scale for label/text sizing so visual hierarchy is consistent across
+// screens. Map to the nearest step instead of inventing sizes:
+//   xs  — badges, tiny counters ("CURRENT", filter count)
+//   sm  — captions, list subtitles, empty-state subtitles
+//   md  — body text, secondary button labels
+//   lg  — primary button labels, list titles, inputs
+//   xl  — screen/header titles
+//   2xl — large card titles (map stats)
+// Keypads and balance displays are display-scale and stay bespoke.
+
+export const fontSize = {
+  xs: 11,
+  sm: 13,
+  md: 14,
+  lg: 16,
+  xl: 17,
+  '2xl': 18,
+} as const;
+
+// ─── Control heights ──────────────────────────────────────────────────────
+// Interactive-element height scale. `base` matches minTouchTarget (44pt,
+// Apple HIG); `cta` is the Material-density footer button; `fab` is the
+// circular action button tier.
+
+export const controlHeight = {
+  compact: 36,
+  base: 44,
+  cta: 48,
+  fab: 52,
+} as const;
