@@ -13,6 +13,8 @@ import { useDrawerProgress } from '@react-navigation/drawer';
 
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
+import { supportsLiquidGlass } from '@/shared/lib/version';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import opacity from 'hex-color-opacity';
@@ -59,6 +61,29 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
         }
       : null;
 
+  const avatar = (
+    <Avatar
+      state={picture ? 'image' : 'fallback'}
+      seed={pubkey}
+      picture={picture}
+      name={displayName}
+      size={AVATAR_SIZE}
+      fallbackVariant="beam"
+    />
+  );
+
+  // Liquid devices: the same app-owned glass circle as every other header
+  // button (the system bar-item capsule is suppressed app-wide via the
+  // native-stack hidesSharedBackground patch — without this wrapper the
+  // avatar would sit glass-less next to glass-circled siblings).
+  if (supportsLiquidGlass()) {
+    return (
+      <Animated.View style={[animatedStyle, style]}>
+        <HeaderGlassCircle onPress={onPress}>{avatar}</HeaderGlassCircle>
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View style={[animatedStyle, style]}>
       <Pressable
@@ -67,14 +92,7 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
         style={androidStyle}
         accessibilityRole="button"
         accessibilityLabel="Open drawer">
-        <Avatar
-          state={picture ? 'image' : 'fallback'}
-          seed={pubkey}
-          picture={picture}
-          name={displayName}
-          size={AVATAR_SIZE}
-          fallbackVariant="beam"
-        />
+        {avatar}
       </Pressable>
     </Animated.View>
   );
