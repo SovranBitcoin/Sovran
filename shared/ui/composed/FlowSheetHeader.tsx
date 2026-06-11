@@ -10,9 +10,17 @@
  * headerShown:false screens.
  *
  * It interprets the SAME per-screen options the native header would have —
- * headerLeft/headerRight/headerTitle/title/headerStyle/headerBackground —
- * so screens need no changes. Visuals match FormSheetChrome (grabber +
- * centered bold title + 44pt side slots).
+ * headerLeft/headerRight/headerTitle/title/headerStyle — so screens need no
+ * changes. Visuals match FormSheetChrome (grabber + centered bold title +
+ * 44pt side slots).
+ *
+ * The header OWNS the Android scrim (AndroidHeaderScrim) rather than reading
+ * it from options.headerBackground: createFlowLayoutScreenOptions strips that
+ * option on sheet flows because native-stack renders it ITSELF in a wrapper
+ * with elevation:1 when headerTransparent — on Android that composites the
+ * gradient ABOVE this (elevation-0) header, covering the title and buttons.
+ * Flow-sheet screens must not set a per-screen headerBackground; doing so
+ * re-triggers that elevated duplicate.
  *
  * Deliberately ignored options (iOS/native-only): headerBackButtonMenuEnabled,
  * headerBlurEffect, headerBackVisible, headerLargeStyle, header shadows. The
@@ -27,6 +35,7 @@ import { minTouchTarget, spacing, fontSize } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
+import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
 
 /**
  * Fixed total height: SheetGrabber (8 marginTop + 4) + title row (44 min
@@ -38,7 +47,7 @@ import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
 export const FLOW_SHEET_HEADER_HEIGHT = 64;
 
 export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps) {
-  const [foreground] = useThemeColor(['foreground'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
   const tintColor = options.headerTintColor ?? foreground;
   const titleColor =
@@ -68,11 +77,20 @@ export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps
   const backgroundColor =
     options.headerTransparent !== true && headerStyleBackground ? headerStyleBackground : undefined;
 
+  // Background layer: a screen-provided headerBackground wins; solid-header
+  // screens (backgroundColor set, e.g. NetworkSheet/DmChatHeader) need no
+  // scrim; transparent headers get the default Android color-fade scrim.
+  const backgroundLayer = options.headerBackground ? (
+    options.headerBackground()
+  ) : backgroundColor ? null : (
+    <AndroidHeaderScrim backgroundColor={background} />
+  );
+
   return (
     <View style={[styles.container, backgroundColor ? { backgroundColor } : null]}>
-      {options.headerBackground ? (
+      {backgroundLayer ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {options.headerBackground()}
+          {backgroundLayer}
         </View>
       ) : null}
       <SheetGrabber />

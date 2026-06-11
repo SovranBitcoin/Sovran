@@ -13,10 +13,9 @@ import type {
 } from '@react-navigation/native-stack';
 import type { ParamListBase, NavigationProp } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import opacity from 'hex-color-opacity';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
+import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
 
 interface FlowColors {
   foreground: string;
@@ -24,37 +23,13 @@ interface FlowColors {
 }
 
 /**
- * Android stand-in for the iOS header blur: solid background behind the bar
- * fading to transparent toward its bottom edge — a pure color gradient (no
- * blur — expo-blur on Android reads as a muddy dark tint), rendered fully
- * within the header's own bounds so it can't be clipped by the native
- * headerBackground container. The previous flat 92%-tint band ended in a hard
- * edge that looked broken over scrolling content. Keeping headerTransparent +
- * painting headerBackground preserves each screen's layout (content still
- * lays out under the header).
+ * Spread into header options on Android only; empty on iOS (blur handles it).
+ * NATIVE-header stacks only ((settings-flow)/(user-flow), root default-title
+ * modals): react-navigation renders this as a content-level layer beneath the
+ * natively-later toolbar, which is exactly where the fade belongs. The sheet
+ * flows must NOT let this option reach native-stack — see
+ * createFlowLayoutScreenOptions below.
  */
-const AndroidHeaderScrim = memo(function AndroidHeaderScrim({
-  backgroundColor,
-}: {
-  backgroundColor: string;
-}) {
-  return (
-    <LinearGradient
-      // Solid through ~78% (title text always sits over full background),
-      // easing out over the bottom ~22% of the bar.
-      colors={[
-        backgroundColor,
-        backgroundColor,
-        opacity(backgroundColor, 0.85),
-        opacity(backgroundColor, 0),
-      ]}
-      locations={[0, 0.78, 0.9, 1]}
-      style={{ flex: 1 }}
-    />
-  );
-});
-
-/** Spread into header options on Android only; empty on iOS (blur handles it). */
 export const androidHeaderScrimOptions = (
   backgroundColor: string
 ): Partial<NativeStackNavigationOptions> =>
@@ -138,7 +113,13 @@ export const createFlowLayoutScreenOptions = (
 
     return {
       ...getBaseFlowScreenOptions(colors),
-      ...(sheetHeader ? { header: renderFlowSheetHeader } : {}),
+      // Sheet flows render the scrim INSIDE FlowSheetHeader and must strip the
+      // headerBackground option: native-stack renders that option ITSELF in an
+      // absolutely-positioned wrapper with elevation:1 (styles.translucent)
+      // when headerTransparent — and on Android that elevation composites the
+      // gradient ABOVE the elevation-0 custom header, covering the title and
+      // headerLeft/headerRight buttons.
+      ...(sheetHeader ? { header: renderFlowSheetHeader, headerBackground: undefined } : {}),
       // Dynamic back/close button based on stack depth
       headerLeft: () => <FlowHeaderButton isFirstScreen={isFirstScreen} />,
     };
