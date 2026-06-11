@@ -6,7 +6,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { buildExpoRouterHeaderOptions, HeaderIconButton } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
-import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
+import { getHeaderTitleWidthFromWidth, HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 // --- Context ---
@@ -42,6 +42,9 @@ function SearchBarTitle({ placeholder }: { placeholder: string }) {
   return (
     <GlassSearchBar
       width={searchBarWidth}
+      // Match the mint selector pill exactly — the search bar swaps into
+      // the same title slot, and a shorter field reads as a jarring jump.
+      height={HEADER_LAYOUT.BUTTON_HEIGHT}
       clearKey={clearKey}
       seedText={seedText}
       onChangeText={onSearchChange}

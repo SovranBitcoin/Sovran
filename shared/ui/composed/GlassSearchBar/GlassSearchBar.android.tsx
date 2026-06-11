@@ -17,6 +17,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   debounceMs,
   seedText = '',
   width,
+  height = 44,
 }: GlassSearchBarProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -68,12 +69,12 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           // to nothing (mirrors GlassSearchBar.ios). flex:1 only as the
           // fallback outside headers.
           ...(width != null ? { width } : { flex: 1, marginRight: 8 }),
+          height,
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: surfaceSecondary,
           borderRadius: radius.lg,
           paddingHorizontal: 12,
-          paddingVertical: 8,
         }}>
         <TextInput
           key={clearKey}
