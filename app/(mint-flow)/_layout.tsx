@@ -27,7 +27,7 @@ const USER_MESSAGES_OPTIONS = { headerShown: false };
 export default function MintFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]
   );
 

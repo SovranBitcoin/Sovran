@@ -7,11 +7,15 @@
 
 import { memo } from 'react';
 import { Platform, View } from 'react-native';
-import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import type {
+  NativeStackHeaderProps,
+  NativeStackNavigationOptions,
+} from '@react-navigation/native-stack';
 import type { ParamListBase, NavigationProp } from '@react-navigation/native';
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { FlowSheetHeader } from '@/shared/ui/composed/FlowSheetHeader';
 
 interface FlowColors {
   foreground: string;
@@ -94,11 +98,26 @@ const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOpti
   },
 });
 
+// Module-scope so the header's component identity is stable across renders
+// (same reasoning as CloseButton in app/_layout.tsx).
+const renderFlowSheetHeader = (props: NativeStackHeaderProps) => <FlowSheetHeader {...props} />;
+
 /**
  * Create screen options function for flow layouts.
  * This returns a function that can be passed to Stack's screenOptions prop.
+ *
+ * `androidSheet`: set by the nine MODAL flow groups, whose root screens
+ * present as native Android formSheets (config/modalScreens.ts modalFlow).
+ * Native headers don't render inside Android formSheets (RNS #2657), so the
+ * nested stack swaps in the JS FlowSheetHeader, which interprets the same
+ * per-screen options. The card-presented stacks ((settings-flow),
+ * (user-flow)) must NOT set this — their native headers work.
  */
-export const createFlowLayoutScreenOptions = (colors: FlowColors) => {
+export const createFlowLayoutScreenOptions = (
+  colors: FlowColors,
+  config?: { androidSheet?: boolean }
+) => {
+  const sheetHeader = config?.androidSheet === true && Platform.OS === 'android';
   return ({ navigation }: { navigation: NavigationProp<ParamListBase> }) => {
     // Get the current stack index - 0 means first screen
     const state = navigation.getState();
@@ -106,6 +125,7 @@ export const createFlowLayoutScreenOptions = (colors: FlowColors) => {
 
     return {
       ...getBaseFlowScreenOptions(colors),
+      ...(sheetHeader ? { header: renderFlowSheetHeader } : {}),
       // Dynamic back/close button based on stack depth
       headerLeft: () => (
         <FlowHeaderButton isFirstScreen={isFirstScreen} foreground={colors.foreground} />

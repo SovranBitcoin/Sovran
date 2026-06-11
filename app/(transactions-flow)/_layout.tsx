@@ -46,7 +46,7 @@ const SWAP_OPTIONS = { title: 'Swap' };
 function TransactionsFlowContent() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]
   );
   const transactionsOptions = useMemo(

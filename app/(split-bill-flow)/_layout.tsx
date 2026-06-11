@@ -31,6 +31,7 @@
  */
 
 import React, { createContext, useContext, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import { Stack, useSegments } from 'expo-router';
 
 import {
@@ -43,11 +44,14 @@ import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 const PickerContext = createContext<UseSplitBillParticipantPickerResult | null>(null);
 const AMOUNT_OPTIONS = { title: 'Split bill' };
 const PARTICIPANTS_OPTIONS = { title: 'Who pays' };
-const SEARCH_OPTIONS = {
-  title: 'Search Nostr',
-  presentation: 'modal',
-  headerTransparent: false,
-} as const;
+// iOS: sheet-over-modal. Android: a regular push — the flow group itself is a
+// native formSheet there, and a nested modal inside an Android formSheet is
+// untested RNS territory (#2657/#2693-class). FlowHeaderButton's router.back()
+// is the correct dismissal either way.
+const SEARCH_OPTIONS =
+  Platform.OS === 'android'
+    ? ({ title: 'Search Nostr', headerTransparent: false } as const)
+    : ({ title: 'Search Nostr', presentation: 'modal', headerTransparent: false } as const);
 const SUMMARY_OPTIONS = { title: 'Review' };
 const DETAIL_OPTIONS = { title: 'Split bill' };
 
@@ -66,7 +70,7 @@ const PICKER_ROUTES = new Set(['participants', 'search']);
 export default function SplitBillLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]
   );
   const segments = useSegments();

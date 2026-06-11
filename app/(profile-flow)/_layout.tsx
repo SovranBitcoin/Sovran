@@ -23,7 +23,7 @@ const BITCHAT_DM_OPTIONS = { headerShown: false };
 export default function ProfileFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]
   );
 

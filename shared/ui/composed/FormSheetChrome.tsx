@@ -14,12 +14,12 @@
 import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { alpha, minTouchTarget, spacing } from '@/shared/styles/tokens';
+import { minTouchTarget, spacing } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
 
 interface FormSheetChromeProps {
   title?: string;
@@ -30,7 +30,7 @@ function AndroidFormSheetChrome({ title, children }: FormSheetChromeProps) {
   const [foreground] = useThemeColor(['foreground'] as const);
   return (
     <View style={styles.container}>
-      <View style={[styles.grabber, { backgroundColor: opacity(foreground, alpha.disabled) }]} />
+      <SheetGrabber />
       <HStack align="center" style={styles.titleRow}>
         <ScreenHeaderAction
           icon="material-symbols:close-rounded"
@@ -55,13 +55,6 @@ export function FormSheetChrome({ title, children }: FormSheetChromeProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  grabber: {
-    alignSelf: 'center',
-    width: 32,
-    height: 4,
-    borderRadius: 2,
-    marginTop: spacing.sm,
-  },
   titleRow: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,

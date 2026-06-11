@@ -14,21 +14,19 @@ const BLUR_HEADER_OPTIONS = {
 } satisfies Partial<NativeStackNavigationOptions>;
 
 /**
- * Android presentation for the standalone single-screen modals: a native
- * bottom sheet (react-native-screens formSheet, Material BottomSheetBehavior)
- * at full height — drag-to-dismiss, dim scrim, rounded top corners. The
- * closest Android analog of the iOS pageSheet card.
+ * Android sheet presentation: a native bottom sheet (react-native-screens
+ * formSheet, Material BottomSheetBehavior) at full height — drag-to-dismiss,
+ * dim scrim, rounded top corners. The closest Android analog of the iOS
+ * pageSheet card. Used by the standalone single-screen modals AND the flow
+ * groups (modalFlow).
  *
- * The nine flow GROUPS stay fullscreen `modal` on Android on purpose: nested
- * stacks inside an Android formSheet render no native headers (RNS #2657 —
- * not fixed in any 4.x) and nested ScrollViews still fight the
- * scroll-to-dismiss gesture (#2693). Single-screen modals have neither
- * problem.
- *
- * No native header renders inside an Android formSheet either, so these
- * screens get `headerShown: false` and their route files render
- * FormSheetChrome (grabber + title + close) instead. sheetGrabberVisible /
- * sheetCornerRadius are iOS-only props — Android draws its own sheet corners.
+ * No native header renders inside an Android formSheet (RNS #2657, not fixed
+ * in any 4.x), so everything here carries `headerShown: false` and the JS
+ * side draws the chrome instead: standalone route files wrap their screens in
+ * FormSheetChrome; flow groups' nested stacks render FlowSheetHeader via
+ * createFlowLayoutScreenOptions({...}, { androidSheet: true }).
+ * sheetGrabberVisible / sheetCornerRadius are iOS-only props — Android draws
+ * its own sheet corners and the JS chrome draws the grabber.
  */
 const ANDROID_SHEET_OPTIONS = {
   presentation: 'formSheet' as const,
@@ -41,13 +39,27 @@ const ANDROID_SHEET_OPTIONS = {
 /** Card: default stack presentation. */
 const card = (name: string): ModalConfig => ({ name });
 
-/** Modal flow: slides up from bottom, nested layout handles headers. */
-const modalFlow = (name: string): ModalConfig => ({
+/**
+ * Modal flow hosting a nested stack. iOS: fullscreen pageSheet-style modal
+ * (unchanged). Android: native bottom sheet — requires the flow's _layout to
+ * pass { androidSheet: true } to createFlowLayoutScreenOptions so the nested
+ * stack renders the JS FlowSheetHeader (native headers don't exist inside
+ * Android formSheets). Opting a flow out is the two co-located lines:
+ * `modalFlow('(x-flow)', { androidSheet: false })` here + `{ androidSheet:
+ * false }` in its _layout — that reverts it to today's fullscreen modal.
+ */
+const modalFlow = (
+  name: string,
+  { androidSheet = true }: { androidSheet?: boolean } = {}
+): ModalConfig => ({
   name,
-  options: {
-    presentation: 'modal',
-    headerShown: false,
-  },
+  options:
+    Platform.OS === 'android' && androidSheet
+      ? ANDROID_SHEET_OPTIONS
+      : {
+          presentation: 'modal',
+          headerShown: false,
+        },
 });
 
 /** Slide from right: nested layout handles headers, horizontal slide animation. */
@@ -136,7 +148,7 @@ const flowGroups = [
   '(split-bill-flow)',
   '(theme-flow)',
   '(profile-flow)',
-].map(modalFlow);
+].map((name) => modalFlow(name));
 
 const standaloneScreens: ModalConfig[] = [
   card('userMessages'),
