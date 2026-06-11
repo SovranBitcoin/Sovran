@@ -50,6 +50,10 @@ import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
  */
 export const FLOW_SHEET_HEADER_HEIGHT = 12 + headerButtonSize + spacing.xs * 2;
 
+/** Scrim gradient height: the bar plus a ~32dp eased fade tail painting
+ *  below it over scrolling content. */
+export const SCRIM_TOTAL_HEIGHT = FLOW_SHEET_HEADER_HEIGHT + 32;
+
 export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps) {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
@@ -93,16 +97,25 @@ export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps
   // Background layer: a screen-provided headerBackground wins; solid-header
   // screens (backgroundColor set) need no scrim; transparent headers get the
   // Android color-fade scrim in the page's declared color (theme fallback).
+  // The scrim is TALLER than the bar: solid through the title row, then an
+  // eased fade whose tail paints ~32dp below the bar over scrolling content.
+  // Safe because native-stack's custom-header wrapper has no overflow clip
+  // and absolute children don't contribute to the onLayout that feeds
+  // HeaderHeightContext (the measured height stays FLOW_SHEET_HEADER_HEIGHT).
   const backgroundLayer = options.headerBackground ? (
     options.headerBackground()
   ) : backgroundColor ? null : (
-    <AndroidHeaderScrim backgroundColor={declaredBackground ?? background} />
+    <AndroidHeaderScrim
+      backgroundColor={declaredBackground ?? background}
+      height={SCRIM_TOTAL_HEIGHT}
+      anchor={FLOW_SHEET_HEADER_HEIGHT / SCRIM_TOTAL_HEIGHT - 0.1}
+    />
   );
 
   return (
     <View style={[styles.container, backgroundColor ? { backgroundColor } : null]}>
       {backgroundLayer ? (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <View style={styles.backgroundLayer} pointerEvents="none">
           {backgroundLayer}
         </View>
       ) : null}
@@ -119,6 +132,15 @@ export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps
 const styles = StyleSheet.create({
   container: {
     height: FLOW_SHEET_HEADER_HEIGHT,
+  },
+  // Taller than the container (fade tail below the bar) — overflow stays
+  // default-visible; pointerEvents none so it can't intercept touches.
+  backgroundLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCRIM_TOTAL_HEIGHT,
   },
   titleRow: {
     paddingHorizontal: spacing.sm,
