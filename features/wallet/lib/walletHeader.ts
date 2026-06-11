@@ -7,16 +7,20 @@
  * and split-view changes.
  */
 
+import { headerButtonSize } from '@/shared/styles/tokens';
+
 /** Shared header layout constants for calculating title dimensions. */
 export const HEADER_LAYOUT = {
-  TOOLBAR_BUTTON_WIDTH: 44,
+  // Header icon buttons follow the mint-selector chrome (see
+  // shared/styles/tokens headerButtonSize): 54 on Android, 44 on iOS.
+  TOOLBAR_BUTTON_WIDTH: headerButtonSize,
   HORIZONTAL_PADDING: 16,
   BUTTON_SPACING: 12,
   BUTTON_HEIGHT: 54,
   CONTENT_PADDING_HORIZONTAL: 16,
   CONTENT_PADDING_VERTICAL: 14,
   ANDROID_OVERLAY_OFFSET: 8,
-  ANDROID_BUTTON_SIZE: 44,
+  ANDROID_BUTTON_SIZE: headerButtonSize,
 } as const;
 
 const SIDE =

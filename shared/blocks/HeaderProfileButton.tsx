@@ -15,10 +15,12 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
+import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { headerButtonSize } from '@/shared/styles/tokens';
 
 const HEADER_BUTTON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
-const ANDROID_BUTTON_SIZE = 44;
+const ANDROID_BUTTON_SIZE = headerButtonSize;
 const AVATAR_SIZE = 32;
 
 type HeaderProfileButtonProps = {
@@ -39,9 +41,10 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
     opacity: interpolate(progress.value, [0, 1], [1, 0]),
   }));
 
-  // Soft circle (no border) on Android — matches the app-wide header-button
-  // contract (ScreenHeaderAction / HeaderIconButton). iOS renders the bare
-  // avatar inside the native header chrome.
+  // Mint-selector chrome on Android — matches the app-wide header-button
+  // contract (ScreenHeaderAction / HeaderIconButton): surface-secondary
+  // circle, 1px muted border. iOS renders the bare avatar inside the native
+  // header chrome.
   const androidStyle =
     Platform.OS === 'android'
       ? {
@@ -49,6 +52,8 @@ export function HeaderProfileButton({ onPress, style }: HeaderProfileButtonProps
           height: ANDROID_BUTTON_SIZE,
           borderRadius: ANDROID_BUTTON_SIZE / 2,
           backgroundColor: flatSurface,
+          borderWidth: 1,
+          borderColor: opacity(muted, 0.3),
           alignItems: 'center' as const,
           justifyContent: 'center' as const,
         }

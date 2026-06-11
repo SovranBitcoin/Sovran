@@ -10,7 +10,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 const CURRENCY_OPTIONS: {
@@ -27,7 +26,11 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
   const { text, iosHeight, handleSelectCurrency, onPress, enableCurrencyMenu, textSize } =
     useFiatCurrencyPill(props);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
-  const textColor = useThemeColor('foreground');
+  const [textColor, surfaceSecondary, muted] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'muted',
+  ] as const);
   const [success] = useThemeColor(['success'] as const);
   const menuTriggerRef = useRef<MenuTriggerRef>(null);
 
@@ -49,11 +52,11 @@ export function FiatCurrencyPillAndroidMenu(props: FiatCurrencyPillProps): React
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: opacity(INVARIANT_WHITE, 0.15),
+          // The approved flat contract (CircleActionButton/BalancePill recipe);
+          // these sit over the same wallet wallpaper as those buttons do.
+          backgroundColor: surfaceSecondary,
           borderWidth: 1,
-          // Standard border alpha (the app-wide 0.3 contract); fill stays
-          // INVARIANT_WHITE — this pill sits over the wallet wallpaper.
-          borderColor: opacity(INVARIANT_WHITE, 0.3),
+          borderColor: opacity(muted, 0.3),
           paddingHorizontal: 14,
           paddingVertical: 6,
           minHeight: iosHeight,

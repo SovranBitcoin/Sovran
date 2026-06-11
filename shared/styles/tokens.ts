@@ -241,3 +241,12 @@ export const controlHeight = {
   cta: 48,
   fab: 52,
 } as const;
+
+/**
+ * Header icon-button diameter — the "mint-selector chrome" contract: every
+ * headerLeft/headerRight control is a surface-secondary circle with a 1px
+ * `opacity(muted, 0.3)` border, sized to match the wallet mint selector
+ * (HEADER_LAYOUT.BUTTON_HEIGHT, 54) on Android. iOS native nav bars cap
+ * custom views at ~44pt, so iOS keeps the 44 diameter (border still applies).
+ */
+export const headerButtonSize = Platform.select({ android: 54, default: minTouchTarget });

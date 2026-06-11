@@ -14,8 +14,7 @@
 import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { minTouchTarget, spacing, fontSize } from '@/shared/styles/tokens';
+import { headerButtonSize, spacing, fontSize } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
@@ -28,7 +27,6 @@ interface FormSheetChromeProps {
 }
 
 function AndroidFormSheetChrome({ title, children }: FormSheetChromeProps) {
-  const [foreground] = useThemeColor(['foreground'] as const);
   return (
     // AndroidSheetRoot pins the sheet to exact full height — RNS single-detent
     // sheets otherwise size to content (variable top gap).
@@ -64,5 +62,5 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  titleSpacer: { width: minTouchTarget },
+  titleSpacer: { width: headerButtonSize },
 });

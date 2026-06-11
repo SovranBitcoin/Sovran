@@ -9,10 +9,12 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
+import opacity from 'hex-color-opacity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { headerButtonSize } from '@/shared/styles/tokens';
 
 type HeaderIconName = string;
 
@@ -43,12 +45,13 @@ export function HeaderIconButton({
   style,
   accessibilityLabel,
 }: HeaderIconButtonProps) {
-  const [flatSurface] = useThemeColor(['surface-secondary'] as const);
+  const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
 
-  // Soft circle on BOTH platforms (the app-wide non-liquid-glass header-button
-  // contract — see ScreenHeaderAction): surface-secondary fill, no border,
-  // opacity press. Only the glyph source forks: SF symbol on iOS, monicon map
-  // on Android (expo-symbols renders nothing there).
+  // Mint-selector chrome on BOTH platforms (the app-wide non-liquid-glass
+  // header-button contract — see ScreenHeaderAction): surface-secondary
+  // circle, 1px muted border, opacity press. Only the glyph source forks:
+  // SF symbol on iOS, monicon map on Android (expo-symbols renders nothing
+  // there).
   const glyph =
     Platform.OS === 'android' ? (
       <Icon name={ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu'} size={size} color={color} />
@@ -65,10 +68,12 @@ export function HeaderIconButton({
       accessibilityLabel={accessibilityLabel}
       style={[
         {
-          width: 44,
-          height: 44,
-          borderRadius: 22,
+          width: headerButtonSize,
+          height: headerButtonSize,
+          borderRadius: headerButtonSize / 2,
           backgroundColor: flatSurface,
+          borderWidth: 1,
+          borderColor: opacity(muted, 0.3),
           alignItems: 'center',
           justifyContent: 'center',
         },

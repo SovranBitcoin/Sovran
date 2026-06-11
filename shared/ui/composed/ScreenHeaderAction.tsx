@@ -4,14 +4,15 @@ import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { alpha, hitSlop, minTouchTarget } from '@/shared/styles/tokens';
+import { alpha, headerButtonSize, hitSlop } from '@/shared/styles/tokens';
 
 /**
  * Canonical header icon button (headerLeft / headerRight). One component so
- * every header action shares the same treatment on BOTH platforms: the
- * "soft circle" — a quiet surface-secondary circle with no border and a
- * slightly dimmed glyph (the iOS-15-sheet close-button idiom, and the flat
- * analog of the liquid-glass circle). ≥44pt touch target everywhere.
+ * every header action shares the mint-selector chrome on BOTH platforms:
+ * a surface-secondary circle with a 1px `opacity(muted, 0.3)` border and a
+ * slightly dimmed glyph — the flat analog of the liquid-glass circle, sized
+ * to match the wallet mint selector (54 on Android; 44 on iOS, whose native
+ * nav bars cap custom views). ≥44pt touch target everywhere.
  */
 interface ScreenHeaderActionProps {
   icon: string;
@@ -34,9 +35,10 @@ export function ScreenHeaderAction({
   disabled,
   accessory,
 }: ScreenHeaderActionProps) {
-  const [foreground, surfaceSecondary] = useThemeColor([
+  const [foreground, surfaceSecondary, muted] = useThemeColor([
     'foreground',
     'surface-secondary',
+    'muted',
   ] as const);
 
   return (
@@ -46,7 +48,7 @@ export function ScreenHeaderAction({
       activeOpacity={0.7}
       style={[
         styles.circle,
-        { backgroundColor: surfaceSecondary },
+        { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) },
         { opacity: disabled ? 0.4 : 1 },
       ]}
       disabled={disabled}
@@ -59,9 +61,10 @@ export function ScreenHeaderAction({
 
 const styles = StyleSheet.create({
   circle: {
-    width: minTouchTarget,
-    height: minTouchTarget,
-    borderRadius: minTouchTarget / 2,
+    width: headerButtonSize,
+    height: headerButtonSize,
+    borderRadius: headerButtonSize / 2,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

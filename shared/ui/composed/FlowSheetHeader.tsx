@@ -31,20 +31,21 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { NativeStackHeaderProps } from '@react-navigation/native-stack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { minTouchTarget, spacing, fontSize } from '@/shared/styles/tokens';
+import { headerButtonSize, spacing, fontSize } from '@/shared/styles/tokens';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { SheetGrabber } from '@/shared/ui/composed/SheetGrabber';
 import { AndroidHeaderScrim } from '@/shared/ui/composed/AndroidHeaderScrim';
 
 /**
- * Fixed total height: SheetGrabber (8 marginTop + 4) + title row (44 min
- * content + 4×2 padding) = 64. Fixed (not min) so native-stack's measured
- * HeaderHeightContext is a stable constant — sheet content must not shift
- * when the default header height settles to the measured one. Custom
- * headerTitle components must fit within the 44dp row.
+ * Fixed total height: SheetGrabber (8 marginTop + 4) + title row
+ * (headerButtonSize content + 4×2 padding) = 74 on Android. Fixed (not min)
+ * so native-stack's measured HeaderHeightContext is a stable constant —
+ * sheet content must not shift when the default header height settles to
+ * the measured one. Custom headerTitle components must fit within the
+ * headerButtonSize row.
  */
-export const FLOW_SHEET_HEADER_HEIGHT = 64;
+export const FLOW_SHEET_HEADER_HEIGHT = 12 + headerButtonSize + spacing.xs * 2;
 
 export function FlowSheetHeader({ back, options, route }: NativeStackHeaderProps) {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
@@ -119,12 +120,12 @@ const styles = StyleSheet.create({
   titleRow: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    minHeight: minTouchTarget,
+    minHeight: headerButtonSize,
   },
   // Min-width (not fixed) so wide headerRight content (e.g. mint list's
   // inspect Link) isn't clipped; empty slots still balance the title.
   sideSlot: {
-    minWidth: minTouchTarget,
+    minWidth: headerButtonSize,
     justifyContent: 'center',
   },
   rightSlot: {
