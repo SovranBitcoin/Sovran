@@ -1,3 +1,4 @@
+import type React from 'react';
 /**
  * Shared types for the image overlay system.
  * Used by provider, overlay, image block, and bottom panel.
@@ -61,6 +62,18 @@ export type ImageOverlayReplaceLayout = Omit<
 export type ThumbnailLayout = { pageX: number; pageY: number; width: number; height: number };
 
 export type ImageOverlayContextValue = {
+  /**
+   * Android-only systematic correction from Fabric measureInWindow space to
+   * true root-window (overlay host) space, calibrated at tap time from the
+   * touch event (see ImageBlock). RNS is SUPPOSED to feed the native header /
+   * sheet displacement into the shadow tree via contentOffset state, but that
+   * state update can be dropped (Screen.onLayout `changed` guard,
+   * FabricEnabledViewGroup dedupe), leaving measureInWindow under-reporting y
+   * by exactly statusBar+toolbar — the "dismiss lands too high" bug. The
+   * delta self-calibrates to ~0 when the RNS pipeline works, so this never
+   * double-corrects. Per-provider (per feed surface).
+   */
+  measureSpaceCorrection: React.MutableRefObject<{ dx: number; dy: number }>;
   scrollHandler: ReturnType<typeof useScrollViewOffset>['scrollHandler'];
   scrollOffsetY: ReturnType<typeof useScrollViewOffset>['scrollOffsetY'];
   /** Scroll Y when overlay was opened; used to compute close target in screen coords (targetY = pageY - scrollY + scrollAtOpen). */

@@ -193,6 +193,9 @@ export function ImageOverlayProvider({
   }, []);
 
   const thumbnailLayoutsRef = useRef<Record<string, ThumbnailLayout>>({});
+  /** See ImageOverlayContextValue.measureSpaceCorrection — tap-calibrated
+   *  measure-space delta, stable ref so actionsValue identity is unaffected. */
+  const measureSpaceCorrection = useRef({ dx: 0, dy: 0 });
   /** Per-key just-in-time measure callbacks: close() re-measures the live thumbnail because recycled LegendList rows never re-fire onLayout when size is unchanged, leaving the registered rect stale. */
   const thumbnailMeasureNowRef = useRef<Record<string, () => Promise<ThumbnailLayout | null>>>({});
   /** Bumped on every open/openReplace; a close() awaiting a re-measure aborts when the session changed under it (no double-close / close-after-reopen race). */
@@ -1015,6 +1018,7 @@ export function ImageOverlayProvider({
 
   const actionsValue = useMemo<ImageOverlayActionsValue>(() => {
     return {
+      measureSpaceCorrection,
       scrollHandler,
       scrollOffsetY,
       scrollOffsetAtOpen,
