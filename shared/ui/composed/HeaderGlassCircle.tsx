@@ -50,7 +50,10 @@ export function HeaderGlassCircle({
 
   return (
     <View style={containerStyle}>
-      <Host style={styles.host} matchContents>
+      {/* No matchContents: SwiftUI ideal-size measurement can report
+          fractional widths that nudge UIKit's bar-item math; the host is
+          a fixed headerButtonSize square. */}
+      <Host style={styles.host}>
         <SwiftUIButton modifiers={buttonModifiers} onPress={disabled ? undefined : onPress}>
           <View style={styles.content}>{children}</View>
         </SwiftUIButton>
