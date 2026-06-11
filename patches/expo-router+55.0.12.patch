@@ -38,12 +38,43 @@ diff --git a/node_modules/expo-router/build/native-tabs/NativeTabsView.js b/node
        {children}
      </TabsHostWrapper>);
  }
-@@ -136,7 +153,7 @@
+@@ -136,7 +153,21 @@
              return content;
          }
      }, [content, options.disableAutomaticContentInsets]);
 -    return (<react_native_screens_1.Tabs.Screen {...options} overrideScrollViewContentInsetAdjustmentBehavior={!options.disableAutomaticContentInsets} tabBarItemBadgeBackgroundColor={standardAppearance.stacked?.normal?.tabBarItemBadgeBackgroundColor} tabBarItemBadgeTextColor={badgeTextColor} standardAppearance={standardAppearance} scrollEdgeAppearance={scrollEdgeAppearance} icon={(0, icon_1.convertOptionsIconToRNScreensPropsIcon)(icon, standardAppearance?.stacked?.normal?.tabBarItemIconColor)} selectedIcon={(0, icon_1.convertOptionsIconToIOSPropsIcon)(selectedIcon, standardAppearance?.stacked?.selected?.tabBarItemIconColor)} title={title} freezeContents={false} systemItem={options.role} {...options.nativeProps} tabKey={routeKey} isFocused={isFocused}>
-+    return (<react_native_screens_1.Tabs.Screen {...options} overrideScrollViewContentInsetAdjustmentBehavior={!options.disableAutomaticContentInsets} tabBarItemBadgeBackgroundColor={standardAppearance.stacked?.normal?.tabBarItemBadgeBackgroundColor} tabBarItemBadgeTextColor={badgeTextColor} standardAppearance={standardAppearance} scrollEdgeAppearance={scrollEdgeAppearance} icon={(0, icon_1.convertOptionsIconToRNScreensPropsIcon)(icon, standardAppearance?.stacked?.normal?.tabBarItemIconColor)} selectedIcon={(0, icon_1.convertOptionsIconToIOSPropsIcon)(selectedIcon, standardAppearance?.stacked?.selected?.tabBarItemIconColor)} title={title} systemItem={options.role} {...options.nativeProps} screenKey={routeKey}>
++    // [sovran] react-native-screens 4.25 reads icons, appearance, systemItem
++    // and inset behavior from nested ios/android prop objects; top-level
++    // values are overridden with undefined by the explicit ios?.* assignments
++    // inside Tabs.Screen — leaving them top-level renders a blank tab bar.
++    const combinedIcon = (0, icon_1.convertOptionsIconToRNScreensPropsIcon)(icon, standardAppearance?.stacked?.normal?.tabBarItemIconColor);
++    return (<react_native_screens_1.Tabs.Screen {...options} title={title} {...options.nativeProps} screenKey={routeKey} ios={{
++            icon: combinedIcon?.ios,
++            selectedIcon: (0, icon_1.convertOptionsIconToIOSPropsIcon)(selectedIcon, standardAppearance?.stacked?.selected?.tabBarItemIconColor),
++            standardAppearance,
++            scrollEdgeAppearance,
++            systemItem: options.role,
++            overrideScrollViewContentInsetAdjustmentBehavior: !options.disableAutomaticContentInsets,
++        }} android={{
++            icon: combinedIcon?.android,
++        }}>
        {wrappedContent}
      </react_native_screens_1.Tabs.Screen>);
  }
+@@ -153,6 +184,14 @@
+         console.warn(`Unsupported labelVisibilityMode: ${tabBarItemLabelVisibilityMode}. Supported values are: ${types_1.SUPPORTED_TAB_BAR_ITEM_LABEL_VISIBILITY_MODES.map((mode) => `"${mode}"`).join(', ')}`);
+         tabBarItemLabelVisibilityMode = undefined;
+     }
+-    return (<react_native_screens_1.Tabs.Host tabBarItemLabelVisibilityMode={tabBarItemLabelVisibilityMode} tabBarMinimizeBehavior={tabBarMinimizeBehavior} {...rest}/>);
++    // [sovran] same nesting requirement on the host: iOS-specific props are
++    // read exclusively from the `ios` object in react-native-screens 4.25.
++    const { tabBarTintColor, tabBarControllerMode, bottomAccessory, ...hostRest } = rest;
++    return (<react_native_screens_1.Tabs.Host tabBarItemLabelVisibilityMode={tabBarItemLabelVisibilityMode} ios={{
++            tabBarMinimizeBehavior,
++            tabBarTintColor,
++            tabBarControllerMode,
++            bottomAccessory,
++        }} {...hostRest}/>);
+ }
+ //# sourceMappingURL=NativeTabsView.js.map
+\ No newline at end of file
