@@ -1,12 +1,10 @@
 import { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
 import { useWindowDimensions } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
-import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
+import { buildExpoRouterHeaderOptions, HeaderIconButton } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
@@ -59,14 +57,17 @@ function SearchHeaderRight() {
   const { isSearching, onOpenSearch, onCloseSearch } = useSearchContext();
   const iconColor = useThemeColor('foreground');
 
+  // HeaderIconButton (not IconSymbol directly): expo-symbols renders NOTHING
+  // on Android for string symbol names, which left this button an invisible
+  // tap target there.
   return (
-    <Pressable
+    <HeaderIconButton
+      icon={isSearching ? 'xmark' : 'magnifyingglass'}
+      size={20}
+      color={iconColor}
       onPress={isSearching ? onCloseSearch : onOpenSearch}
-      style={{ padding: 8 }}
-      accessibilityRole="button"
-      accessibilityLabel={isSearching ? 'Close search' : 'Open search'}>
-      <IconSymbol name={isSearching ? 'xmark' : 'magnifyingglass'} size={20} color={iconColor} />
-    </Pressable>
+      accessibilityLabel={isSearching ? 'Close search' : 'Open search'}
+    />
   );
 }
 

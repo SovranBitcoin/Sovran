@@ -30,12 +30,20 @@ type HeaderIconButtonProps = {
   onPress: () => void;
   size: number;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 };
 
 /** Minimum 44pt touch target; hitSlop extends so taps near the edge still register. */
 const HEADER_BUTTON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
-function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButtonProps) {
+export function HeaderIconButton({
+  icon,
+  color,
+  onPress,
+  size,
+  style,
+  accessibilityLabel,
+}: HeaderIconButtonProps) {
   const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
 
   if (Platform.OS === 'android') {
@@ -44,6 +52,8 @@ function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButto
       <Pressable
         onPress={onPress}
         hitSlop={HEADER_BUTTON_HIT_SLOP}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         style={[
           {
             width: 44,
@@ -67,7 +77,12 @@ function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButto
   }
 
   return (
-    <Pressable onPress={onPress} hitSlop={HEADER_BUTTON_HIT_SLOP} style={[{ margin: 2 }, style]}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={HEADER_BUTTON_HIT_SLOP}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={[{ margin: 2 }, style]}>
       <IconSymbol name={icon as any} size={size} color={color} />
     </Pressable>
   );

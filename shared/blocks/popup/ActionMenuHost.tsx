@@ -21,7 +21,6 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
@@ -178,7 +177,7 @@ function MenuSearchField({
           onPress={onClear}
           hitSlop={8}
           style={{ position: 'absolute', right: 10, padding: 4 }}>
-          <IconSymbol name="xmark.circle.fill" size={18} color={opacity(foreground, 0.33)} />
+          <Icon name="mdi:close-circle" size={18} color={opacity(foreground, 0.33)} />
         </Pressable>
       ) : null}
     </View>

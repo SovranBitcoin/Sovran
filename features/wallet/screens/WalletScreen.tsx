@@ -49,7 +49,9 @@ const PRIMARY_ACTION_ROW_HEIGHT = Math.max(QR_BUTTON_SIZE, CAPSULE_BUTTON_HEIGHT
 // Value: circle (52) + label margin-top (6) + label line height (~18).
 const SECONDARY_ACTION_ROW_HEIGHT = 76;
 const WALLET_TOP_SECTION_GAP = 18;
-const WALLET_HEADER_TO_BALANCE_GAP = 24;
+// Android's default header row is 56dp vs iOS's 44pt — shrink the gap by the
+// structural delta so the balance sits at the same visual offset.
+const WALLET_HEADER_TO_BALANCE_GAP = Platform.select({ android: 12, default: 24 }) as number;
 
 const RECEIVE_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.down.left' : undefined;
 const SEND_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.up.right' : undefined;
