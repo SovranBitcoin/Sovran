@@ -31,7 +31,6 @@ import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
 import { useNfcSupported } from '@/shared/lib/nfc';
 import { useAmbientNfcArm } from '@/features/wallet/hooks/useAmbientNfcArm';
-import { AmbientNfcPulseDot } from '@/features/wallet/components/AmbientNfcPulseDot';
 import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
 import { showActionSheet } from '@/shared/lib/popup';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
@@ -205,17 +204,14 @@ export function WalletScreen() {
                 }}
               />
               {nfcSupported ? (
-                <View>
-                  <CircleActionButton
-                    icon="lucide:nfc"
-                    systemIcon="wave.3.right"
-                    label="NFC"
-                    testID="wallet-nfc"
-                    disabled={isSwapping}
-                    onPress={handleNfc}
-                  />
-                  {nfcArmed ? <AmbientNfcPulseDot /> : null}
-                </View>
+                <CircleActionButton
+                  icon="lucide:nfc"
+                  systemIcon="wave.3.right"
+                  label="NFC"
+                  testID="wallet-nfc"
+                  disabled={isSwapping}
+                  onPress={handleNfc}
+                />
               ) : null}
               <Menu presentation="bottom-sheet">
                 <Menu.Trigger
