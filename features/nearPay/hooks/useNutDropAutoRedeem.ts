@@ -78,6 +78,7 @@ export function useNutDropAutoRedeem(): void {
         mintUrl: classified.mintUrl,
         amount: classified.amount,
         unit: classified.unit ?? 'sat',
+        senderPeerID: event.senderPeerID,
       });
       paymentLog.info('near_pay.redeem.locked_token_received', {
         amount: classified.amount,

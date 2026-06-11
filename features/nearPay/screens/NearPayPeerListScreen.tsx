@@ -10,13 +10,17 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
+import {
+  useRecentPeopleProfiles,
+  type RecentPeopleProfileRow,
+} from '@/features/feed/hooks/useRecentPeopleProfiles';
+import { peerDisplayName, peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { resolveIdentityName } from '@/shared/lib/identity';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
-import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
+import { ContactRow, bleIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -28,21 +32,27 @@ const STACK_OPTIONS = {
   headerShadowVisible: false,
 };
 
-function peerDisplayName(peer: BLEPeer): string {
-  return resolveIdentityName({
-    pubkey: peer.peerID,
-    bleNickname: peer.nickname,
-  });
-}
-
 interface NearPayPeerRowProps {
   peer: BLEPeer;
+  profile?: RecentPeopleProfileRow;
   onSelect: (peer: BLEPeer) => void;
 }
 
-function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
+function NearPayPeerRow({ peer, profile, onSelect }: NearPayPeerRowProps) {
   const handlePress = useCallback(() => onSelect(peer), [onSelect, peer]);
-  const identity = useMemo(() => bleIdentity({ ...peer }), [peer]);
+  // BLE identity stays primary (peerID seed, connection status); the Nostr
+  // identity layers in the kind-0 profile (name/picture) and drives
+  // ContactRow's standard skeleton while the profile fetch is in flight —
+  // the identicon never flashes before the fetch resolves.
+  const identity = useMemo(() => {
+    const ble = bleIdentity({ ...peer });
+    const nostrPubkey = peerNostrPubkey(peer);
+    if (!nostrPubkey) return ble;
+    return [
+      ble,
+      nostrIdentity(nostrPubkey, profile?.metadata, { isLoadingProfile: profile?.isLoading }),
+    ];
+  }, [peer, profile]);
 
   return (
     <ContactRow
@@ -85,6 +95,18 @@ export function NearPayPeerListScreen() {
     });
   }, [sovranPeers]);
 
+  // Batch-fetch kind-0 profiles for all visible Sovran peers via nagg
+  // (warms the shared nostrMetadataCache; cache hits render instantly).
+  const peerNostrPubkeys = useMemo(
+    () => sovranPeers.map(peerNostrPubkey).filter(Boolean),
+    [sovranPeers]
+  );
+  const profileRows = useRecentPeopleProfiles(peerNostrPubkeys);
+  const profileByPubkey = useMemo(
+    () => new Map(profileRows.map((row) => [row.pubkey, row])),
+    [profileRows]
+  );
+
   const subtitleText = useMemo(() => {
     if (sovranPeers.length === 0) return 'Scanning for nearby Sovran users...';
     if (connectedCount === 0) return `${sovranPeers.length} nearby · 0 connected`;
@@ -116,7 +138,9 @@ export function NearPayPeerListScreen() {
 
   const handleSelectPeer = useCallback(
     (peer: BLEPeer) => {
-      const displayName = peerDisplayName(peer);
+      const nostrPubkey = peerNostrPubkey(peer);
+      const profile = profileByPubkey.get(nostrPubkey);
+      const displayName = peerDisplayName(peer, profile);
       paymentLog.info('near_pay.peer.list_select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
@@ -141,10 +165,11 @@ export function NearPayPeerListScreen() {
         .startSendEcash({
           reset: true,
           p2pkLockPubkey: p2pkPubkeyHex,
+          ...(nostrPubkey ? { recipientPubkey: nostrPubkey } : {}),
           recipientProfile: {
             displayName,
-            avatarUrl: null,
-            nip05: null,
+            avatarUrl: profile?.metadata?.picture ?? null,
+            nip05: profile?.metadata?.nip05 ?? null,
           },
         })
         .catch((err) => {
@@ -154,12 +179,18 @@ export function NearPayPeerListScreen() {
           });
         });
     },
-    [machine]
+    [machine, profileByPubkey]
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: BLEPeer }) => <NearPayPeerRow peer={item} onSelect={handleSelectPeer} />,
-    [handleSelectPeer]
+    ({ item }: { item: BLEPeer }) => (
+      <NearPayPeerRow
+        peer={item}
+        profile={profileByPubkey.get(peerNostrPubkey(item))}
+        onSelect={handleSelectPeer}
+      />
+    ),
+    [handleSelectPeer, profileByPubkey]
   );
   const keyExtractor = useCallback((peer: BLEPeer) => peer.peerID, []);
   const emptyContent = useMemo(

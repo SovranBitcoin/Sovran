@@ -12,6 +12,13 @@ export interface NearPayLayoutPeer {
   avatarUrl?: string | null;
   /** Cashu P2PK lock target from the peer's SVRN announce ("02" + x-only). */
   p2pkPubkeyHex: string;
+  /** The peer's Nostr pubkey (x-only hex) — `p2pkPubkeyHex` minus the "02". */
+  nostrPubkey: string;
+  /**
+   * True while the peer's kind-0 profile fetch is in flight — the avatar
+   * shows the loading state instead of flashing the identicon fallback.
+   */
+  profileLoading: boolean;
 }
 
 export interface PeerLayoutRegistryEntry {

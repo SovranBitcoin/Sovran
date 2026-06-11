@@ -1,3 +1,5 @@
+import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+
 jest.mock('@sovranbitcoin/schemas', () => ({
   loggableIssues: () => [],
 }));
@@ -15,8 +17,6 @@ jest.mock('@/shared/lib/cashu/profileScopedStorage', () => ({
     removeItem: async () => {},
   }),
 }));
-
-import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 
 const HASH = 'f'.repeat(64);
 const ENTRY = {

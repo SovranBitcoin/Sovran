@@ -38,6 +38,12 @@ interface NutDropRedeemEntry {
   nextAttemptAt: number;
   receivedAt: number;
   lastError?: string;
+  /**
+   * 16-hex BLE peer ID of the mesh sender — drives the NearPay lightning
+   * effect on that peer's avatar while the entry redeems. Optional:
+   * additive field, entries persisted by older builds lack it.
+   */
+  senderPeerID?: string;
 }
 
 interface NutDropRedeemQueueState {
@@ -48,7 +54,7 @@ interface NutDropRedeemQueueActions {
   /** Idempotent on token hash — mesh re-delivery never duplicates an entry. */
   enqueue: (
     tokenHash: string,
-    entry: Pick<NutDropRedeemEntry, 'token' | 'mintUrl' | 'amount' | 'unit'>
+    entry: Pick<NutDropRedeemEntry, 'token' | 'mintUrl' | 'amount' | 'unit' | 'senderPeerID'>
   ) => boolean;
   markStatus: (tokenHash: string, status: NutDropRedeemStatus, error?: string) => void;
   scheduleRetry: (tokenHash: string, error: string) => void;
@@ -87,6 +93,7 @@ const PersistedNutDropRedeemQueueStore = z.object({
         nextAttemptAt: z.number().int().nonnegative(),
         receivedAt: z.number().int().nonnegative(),
         lastError: z.string().max(500).optional(),
+        senderPeerID: z.string().max(128).optional(),
       })
     )
     .default({}),

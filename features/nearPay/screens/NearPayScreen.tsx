@@ -23,12 +23,16 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
+import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';
+import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
+import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
+import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
+import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
 import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
 import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, useLifecycleLogger, useRenderLogger } from '@/shared/lib/logger';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -187,26 +191,6 @@ function roundMetric(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function peerDisplayName(peer: BLEPeer): string {
-  return resolveIdentityName({
-    pubkey: peer.peerID,
-    bleNickname: peer.nickname,
-  });
-}
-
-function toLayoutPeer(peer: BLEPeer): NearPayLayoutPeer {
-  return {
-    peerID: peer.peerID,
-    nickname: peer.nickname,
-    isConnected: peer.isConnected,
-    hasDirectLink: peer.hasDirectLink,
-    lastSeen: peer.lastSeen,
-    name: peerDisplayName(peer),
-    avatarUrl: null,
-    p2pkPubkeyHex: peer.p2pkPubkeyHex ?? '',
-  };
-}
-
 const HeaderBadge = React.memo(function HeaderBadge({
   count,
   onPress,
@@ -301,7 +285,9 @@ function peerTargetsEqual(a: PeerLayoutTarget, b: PeerLayoutTarget): boolean {
     a.peer.name === b.peer.name &&
     a.peer.nickname === b.peer.nickname &&
     a.peer.isConnected === b.peer.isConnected &&
-    a.peer.hasDirectLink === b.peer.hasDirectLink
+    a.peer.hasDirectLink === b.peer.hasDirectLink &&
+    a.peer.avatarUrl === b.peer.avatarUrl &&
+    a.peer.profileLoading === b.peer.profileLoading
   );
 }
 
@@ -315,6 +301,7 @@ const PeerNode = React.memo(function PeerNode({
   overviewTranslateY,
   onSelect,
   hideSharedElementSource,
+  strike,
 }: {
   target: PeerLayoutTarget;
   fieldSize: PeerLayoutSize;
@@ -325,6 +312,7 @@ const PeerNode = React.memo(function PeerNode({
   overviewTranslateY: SharedValue<number>;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   hideSharedElementSource?: boolean;
+  strike?: StrikeState | null;
 }) {
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const hasAnimatedInRef = useRef(false);
@@ -569,7 +557,7 @@ const PeerNode = React.memo(function PeerNode({
         style={peerPressableStyle}>
         <View pointerEvents="none" style={styles.peerAvatarFrame}>
           <Avatar
-            state={target.peer.avatarUrl ? 'image' : 'fallback'}
+            state={peerAvatarState(target.peer)}
             picture={target.peer.avatarUrl ?? undefined}
             size={AVATAR_SIZE}
             name={target.peer.name}
@@ -577,6 +565,13 @@ const PeerNode = React.memo(function PeerNode({
             alt={`${target.peer.name} avatar`}
             fallbackVariant="beam"
           />
+          {strike ? (
+            <LightningStrike
+              status={strike.status}
+              entrance={strike.entrance}
+              seed={target.peer.peerID}
+            />
+          ) : null}
         </View>
         <Animated.View pointerEvents="none" style={peerAvatarNameLabelStyle}>
           <Text
@@ -652,6 +647,7 @@ function arePeerNodePropsEqual(
     overviewTranslateY: SharedValue<number>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
+    strike?: StrikeState | null;
   },
   next: {
     target: PeerLayoutTarget;
@@ -663,11 +659,14 @@ function arePeerNodePropsEqual(
     overviewTranslateY: SharedValue<number>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
+    strike?: StrikeState | null;
   }
 ): boolean {
   return (
     prev.onSelect === next.onSelect &&
     prev.hideSharedElementSource === next.hideSharedElementSource &&
+    prev.strike?.status === next.strike?.status &&
+    prev.strike?.entrance === next.strike?.entrance &&
     prev.fieldSize.width === next.fieldSize.width &&
     prev.fieldSize.height === next.fieldSize.height &&
     prev.panX === next.panX &&
@@ -693,7 +692,7 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
     <VStack align="center" gap={spacing.xs} style={styles.inlineAmountHeader}>
       <View style={[styles.amountHeaderAvatarSlot, hideAvatar ? styles.sharedElementHidden : null]}>
         <Avatar
-          state={recipient.avatarUrl ? 'image' : 'fallback'}
+          state={peerAvatarState(recipient)}
           picture={recipient.avatarUrl ?? undefined}
           size={AVATAR_SIZE}
           name={recipient.name}
@@ -798,10 +797,24 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     };
   }, [peers]);
 
+  // Lightning effect per sender while a received Nut Drop redeems —
+  // re-renders gate component mount/unmount only; the animation itself
+  // runs on the UI thread inside LightningStrike.
+  const strikeMap = useNutDropStrike();
+
+  // Batch-fetch kind-0 profiles for every visible Sovran peer via nagg
+  // (warms the shared nostrMetadataCache; cache hits render instantly).
+  const peerNostrPubkeys = useMemo(() => peers.map(peerNostrPubkey).filter(Boolean), [peers]);
+  const profileRows = useRecentPeopleProfiles(peerNostrPubkeys);
+  const profileByPubkey = useMemo(
+    () => new Map(profileRows.map((row) => [row.pubkey, row])),
+    [profileRows]
+  );
+
   const layoutPeersResult = useMemo(() => {
     const startedAt = nowMs();
     return {
-      value: peers.map(toLayoutPeer),
+      value: peers.map((peer) => toLayoutPeer(peer, profileByPubkey.get(peerNostrPubkey(peer)))),
       peerCount: peerStats.peerCount,
       connectedCount: peerStats.connectedCount,
       directCount: peerStats.directCount,
@@ -814,6 +827,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     peerStats.peerCount,
     peerStats.reachableCount,
     peers,
+    profileByPubkey,
   ]);
   const layoutPeers = layoutPeersResult.value;
   const layoutPeersResultRef = useRef(layoutPeersResult);
@@ -1233,6 +1247,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
               overviewTranslateY={overviewTranslateY}
               onSelect={onSelect}
               hideSharedElementSource={selectedPeerID === target.peer.peerID}
+              strike={strikeMap.get(target.peer.peerID) ?? null}
             />
           ))}
         </Animated.View>
@@ -1348,6 +1363,8 @@ export function NearPayScreen() {
       lastSeen: recipient.lastSeen,
       avatarUrl: null,
       p2pkPubkeyHex: recipient.p2pkPubkeyHex,
+      nostrPubkey: recipient.p2pkPubkeyHex.slice(2),
+      profileLoading: false,
     };
   }, [nearPaySession?.recipient, selectedPeer]);
 
@@ -1521,6 +1538,9 @@ export function NearPayScreen() {
         await machine.startSendEcash({
           reset: true,
           p2pkLockPubkey: peer.p2pkPubkeyHex,
+          // The Nostr pubkey lets colada's resolveRecipientProfile refresh
+          // the header live; the snapshot below paints the first frame.
+          ...(peer.nostrPubkey ? { recipientPubkey: peer.nostrPubkey } : {}),
           recipientProfile: {
             displayName: peer.name,
             avatarUrl: peer.avatarUrl ?? null,
@@ -1822,7 +1842,7 @@ export function NearPayScreen() {
                 <Animated.View pointerEvents="none" style={sharedAvatarCombinedStyle}>
                   <View pointerEvents="none" style={styles.peerAvatarFrame}>
                     <Avatar
-                      state={sharedAvatarPeer.avatarUrl ? 'image' : 'fallback'}
+                      state={peerAvatarState(sharedAvatarPeer)}
                       picture={sharedAvatarPeer.avatarUrl ?? undefined}
                       size={AVATAR_SIZE}
                       name={sharedAvatarPeer.name}
