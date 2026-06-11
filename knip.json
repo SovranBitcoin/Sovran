@@ -6,6 +6,7 @@
     "metro.config.js",
     "app/**/*.{ts,tsx}",
     "plugins/withLowerPodDeploymentTarget.js",
+    "plugins/withNeutralAndroidTextColors.js",
     "scripts/*.{js,ts}"
   ],
   "project": ["**/*.{ts,tsx,js,jsx}"],

@@ -34,8 +34,6 @@ import { useNfcTapStore, type NfcTapPhase } from '@/shared/stores/runtime/nfcTap
 import { fontSize, spacing } from '@/shared/styles/tokens';
 import type { CustomSheetSharedProps } from '@/shared/lib/popup/sheets/types';
 
-export type NfcTapPayload = Record<string, never>;
-
 const GLYPH_CIRCLE = 96;
 const RING_MAX_SCALE = 1.55;
 const PULSE_MS = 1600;
