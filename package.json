@@ -42,7 +42,7 @@
     "pretty:check": "prettier --check \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "knip": "npx knip",
     "vendor:marmot-ts": "bash scripts/vendor-marmot-ts.sh",
-    "postinstall": "node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js",
+    "postinstall": "node scripts/apply-patches.js && node modules/bitchat-module/scripts/patch-bitchat-imports.js && node modules/bitchat-module/scripts/sync-bitchat-android.js",
     "prebuild": "expo prebuild --clean",
     "maestro": "maestro test ./.maestro",
     "build:themes": "node scripts/build-background-themes.js",

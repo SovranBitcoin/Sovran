@@ -82,7 +82,13 @@
           }
         }
       ],
-      ["expo-build-properties", { "ios": { "deploymentTarget": "16.4" } }],
+      [
+        "expo-build-properties",
+        {
+          "ios": { "deploymentTarget": "16.4" },
+          "android": { "minSdkVersion": 26 }
+        }
+      ],
       "./plugins/withLowerPodDeploymentTarget",
       [
         "expo-font",

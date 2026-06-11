@@ -1,0 +1,26 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+  <!-- Single source of truth for the BLE mesh permission set. Kept here (not
+       app.json android.permissions) because that array cannot express
+       usesPermissionFlags, and a duplicate flag-less BLUETOOTH_SCAN entry
+       would conflict in the manifest merger. -->
+
+  <!-- Legacy Bluetooth permissions, API 26-30 only. -->
+  <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+  <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+  <!-- BLE scan on API 26-30 requires location permission. -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+
+  <!-- API 31+ runtime Bluetooth permissions. neverForLocation strips
+       location-derivable data from scan results and removes the location
+       permission requirement — correct for the mesh use-case. -->
+  <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+                   android:usesPermissionFlags="neverForLocation"
+                   tools:targetApi="s" />
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+  <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+  <!-- required=false keeps the Play listing available to BLE-less devices;
+       NearPayScreen shows the 'unsupported' notice on those. -->
+  <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+</manifest>
