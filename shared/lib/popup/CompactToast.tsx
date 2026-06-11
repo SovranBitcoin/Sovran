@@ -3,11 +3,9 @@ import { StyleSheet, View } from 'react-native';
 import { Button, Toast } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
-import { supportsBlur } from '@/shared/lib/version';
-
 import { resolvePopupIcon, type PopupIcon } from './icons';
 import { useToastSurface } from './useToastSurface';
-import { ToastSlab, TINT_ALPHA } from './ToastSlab';
+import { ToastSlab, TINT_ALPHA, useToastFrosted } from './ToastSlab';
 
 type CompactToastVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger';
 
@@ -26,8 +24,9 @@ type CompactToastProps = {
  * Compact toast layout for normal toasts. The frosted-glass slab structure
  * (Toast root, BlurView, tint layer, content row) lives in `<ToastSlab>` so
  * this component only owns its row content. The tint hex comes from
- * `useToastSurface` so it follows the active theme; on platforms without
- * blur the opaque surface bg keeps the toast from looking ghosted.
+ * `useToastSurface` so it follows the active theme; on non-frosted
+ * platforms (Android) the opaque surface bg keeps the toast from looking
+ * ghosted — expo-blur there is a weak tint, not real blur.
  */
 export function CompactToast({
   variant = 'default',
@@ -41,9 +40,10 @@ export function CompactToast({
 }: CompactToastProps) {
   const { bg, fg } = useToastSurface();
   const resolvedIcon = icon != null ? resolvePopupIcon(icon, 28, fg) : null;
-  // Fall back to opaque surface bg when blur is unavailable so the toast
-  // doesn't look ghosted (BlurView returns null on those platforms).
-  const tintColor = supportsBlur() ? opacity(bg, TINT_ALPHA) : bg;
+  // Opaque surface bg on non-frosted platforms so the toast doesn't look
+  // ghosted (the slab renders no BlurView there).
+  const frosted = useToastFrosted();
+  const tintColor = frosted ? opacity(bg, TINT_ALPHA) : bg;
 
   const handleActionPress = () => {
     if (onActionPress && hide) {
