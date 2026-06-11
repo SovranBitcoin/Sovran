@@ -9,3 +9,4 @@
 export { NfcError, isUserCancelError } from './errors';
 export { createNfcAdapter } from './adapter';
 export { writeTokenToNFC } from './write-token';
+export { useNfcSupported } from './useNfcSupported';

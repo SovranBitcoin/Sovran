@@ -29,6 +29,7 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { clearPaymentContext } from '@/shared/stores/runtime/clearPaymentContext';
+import { useNfcSupported } from '@/shared/lib/nfc';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -135,6 +136,7 @@ export function WalletScreen() {
     router.push('/(send-flow)/nearPay');
   }, []);
 
+  const nfcSupported = useNfcSupported();
   const handleNfc = useCallback(() => {
     walletLog.info('wallet.action.nfc', { unit: ACCOUNT.unit });
     clearPaymentContext('wallet.nfc');
@@ -182,14 +184,16 @@ export function WalletScreen() {
                   });
                 }}
               />
-              <CircleActionButton
-                icon="lucide:nfc"
-                systemIcon="wave.3.right"
-                label="NFC"
-                testID="wallet-nfc"
-                disabled={isSwapping}
-                onPress={handleNfc}
-              />
+              {nfcSupported ? (
+                <CircleActionButton
+                  icon="lucide:nfc"
+                  systemIcon="wave.3.right"
+                  label="NFC"
+                  testID="wallet-nfc"
+                  disabled={isSwapping}
+                  onPress={handleNfc}
+                />
+              ) : null}
               <Menu presentation="bottom-sheet">
                 <Menu.Trigger
                   ref={moreMenuTriggerRef}

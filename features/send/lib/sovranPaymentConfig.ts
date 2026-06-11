@@ -746,6 +746,26 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
             // User dismissed the system NFC sheet — treat as a no-op,
             // not an error (suppresses the `general-error` popup).
             if (isUserCancelError(err)) return { empty: true };
+            // Preflight failures from acquireSession get their own popups —
+            // before this, an Android tap with NFC off hung forever silently.
+            if (err instanceof NfcError && err.code === 'NOT_ENABLED') {
+              paramPopup('nfc-error', {
+                title: 'NFC is turned off',
+                message: 'Turn on NFC in system settings to scan.',
+              });
+              return { empty: true };
+            }
+            if (err instanceof NfcError && err.code === 'NOT_SUPPORTED') {
+              paramPopup('nfc-error', {
+                title: 'NFC not supported',
+                message: 'This device has no NFC hardware.',
+              });
+              return { empty: true };
+            }
+            if (err instanceof NfcError && err.code === 'TIMEOUT') {
+              // Nothing was tapped within the window — quiet no-op.
+              return { empty: true };
+            }
             return { error: err instanceof Error ? err : new Error(String(err)) };
           }
         }
