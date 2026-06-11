@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import {
   Host,
   Button as SwiftUIButton,
@@ -9,7 +9,10 @@ import {
   Text as SwiftUIText,
 } from '@expo/ui/swift-ui';
 import { font, foregroundStyle, frame, glassEffect, padding } from '@expo/ui/swift-ui/modifiers';
+import { Menu as HeroMenu, type MenuTriggerRef } from 'heroui-native';
 import { ActionSheetIOS, Platform, StyleSheet, Text } from 'react-native';
+import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -51,12 +54,17 @@ export const StatsCard = memo(function StatsCard({
   onCategoryChange,
   cardWidth,
 }: StatsCardProps) {
-  const [foreground, surfaceSecondary, muted] = useThemeColor([
+  const [foreground, surfaceSecondary, muted, success] = useThemeColor([
     'foreground',
     'surface-secondary',
     'muted',
+    'success',
   ] as const);
   const { liquidGlass } = useCapabilities();
+  const menuTriggerRef = useRef<MenuTriggerRef>(null);
+  const openCategoryMenu = useCallback(() => {
+    setTimeout(() => menuTriggerRef.current?.open(), 0);
+  }, []);
 
   const visibleText = loading ? '...' : `${visibleCount.toLocaleString()} visible`;
   const totalText = loading
@@ -65,7 +73,13 @@ export const StatsCard = memo(function StatsCard({
 
   if (!liquidGlass) {
     const handlePress = () => {
-      if (Platform.OS !== 'ios') return;
+      if (Platform.OS !== 'ios') {
+        // Android: heroui Menu bottom sheet (the canonical pick-one-of-N
+        // surface) — ActionSheetIOS doesn't exist here, which used to leave
+        // this card a dead control.
+        openCategoryMenu();
+        return;
+      }
 
       ActionSheetIOS.showActionSheetWithOptions(
         {
@@ -79,7 +93,7 @@ export const StatsCard = memo(function StatsCard({
       );
     };
 
-    return (
+    const card = (
       <View style={styles.statsContainer}>
         <Pressable
           onPress={handlePress}
@@ -108,6 +122,39 @@ export const StatsCard = memo(function StatsCard({
           <Icon name="mdi:chevron-down" size={20} color={opacity(foreground, alpha.muted)} />
         </Pressable>
       </View>
+    );
+
+    if (Platform.OS !== 'android') {
+      return card;
+    }
+
+    return (
+      <HeroMenu presentation="bottom-sheet">
+        <HeroMenu.Trigger
+          ref={menuTriggerRef}
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+          <View style={{ width: 1, height: 1 }} />
+        </HeroMenu.Trigger>
+        {card}
+        <HeroMenu.Portal disableFullWindowOverlay>
+          <MenuScrim />
+          <HeroMenu.Content presentation="bottom-sheet">
+            <HeroMenu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
+              Merchant category
+            </HeroMenu.Label>
+            {CATEGORY_FILTERS.map((cat) => (
+              <HeroMenu.Item key={cat} onPress={() => onCategoryChange(cat)}>
+                <HStack align="center" gap={10} style={{ flex: 1 }}>
+                  <View style={{ flex: 1 }}>
+                    <HeroMenu.ItemTitle>{categoryLabel(cat)}</HeroMenu.ItemTitle>
+                  </View>
+                  {cat === category ? <Icon name="mdi:check" size={20} color={success} /> : null}
+                </HStack>
+              </HeroMenu.Item>
+            ))}
+          </HeroMenu.Content>
+        </HeroMenu.Portal>
+      </HeroMenu>
     );
   }
 
