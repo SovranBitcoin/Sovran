@@ -3,8 +3,9 @@ import { NetworkError, HttpResponseError } from '@cashu/coco-core';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { paymentLog } from '@/shared/lib/logger';
-import { nutDropReceivedPopup } from '@/shared/lib/popup';
+import { paymentStatusPopup } from '@/shared/lib/popup';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 
 /**
@@ -89,6 +90,30 @@ export async function drainNutDropRedeemQueue(): Promise<void> {
       }
 
       markStatus(tokenHash, 'redeeming');
+      // Same toast pipeline as a manually redeemed token (processing →
+      // green confirmed): mount it before the receive so coco's
+      // receive-op:finalized / history:updated events flip it to confirmed
+      // through usePaymentStatusListener, exactly like the regular flow.
+      // Only when the user can see it; backgrounded redeems surface through
+      // the transaction history (coco persists the receive entry).
+      const toastShown = AppState.currentState === 'active';
+      if (toastShown) {
+        usePaymentStatusStore.getState().setActive({
+          variant: 'receive-ecash',
+          id: tokenHash,
+          mintUrl: entry.mintUrl,
+          amount: entry.amount,
+          unit: entry.unit,
+          state: 'processing',
+        });
+        paymentStatusPopup({
+          variant: 'receive-ecash',
+          id: tokenHash,
+          mintUrl: entry.mintUrl,
+          amount: entry.amount,
+          unit: entry.unit,
+        });
+      }
       try {
         await manager.wallet.receive(entry.token);
         markStatus(tokenHash, 'redeemed');
@@ -97,11 +122,6 @@ export async function drainNutDropRedeemQueue(): Promise<void> {
           amount: entry.amount,
           mintUrl: entry.mintUrl,
         });
-        // Toast only when the user can see it; backgrounded redeems surface
-        // through the transaction history (coco persists the receive entry).
-        if (AppState.currentState === 'active') {
-          nutDropReceivedPopup({ amount: entry.amount, unit: entry.unit });
-        }
       } catch (err) {
         const kind = classifyReceiveError(err);
         const message = err instanceof Error ? err.message : String(err);
@@ -112,12 +132,19 @@ export async function drainNutDropRedeemQueue(): Promise<void> {
         });
         if (kind === 'spent') {
           // Duplicate delivery race (we already redeemed an equivalent token)
-          // or sender reclaimed. Silent — nothing actionable for the user.
+          // or sender reclaimed. Nothing actionable for the user.
           markStatus(tokenHash, 'spent', message);
         } else if (kind === 'network' || kind === 'retryable') {
           scheduleRetry(tokenHash, message);
         } else {
           markStatus(tokenHash, 'failed', message);
+        }
+        // Don't leave a mounted toast spinning forever — flip it to the
+        // standard failed state (the retry path mounts a fresh one later).
+        if (toastShown && usePaymentStatusStore.getState().active?.id === tokenHash) {
+          usePaymentStatusStore
+            .getState()
+            .setFailed(tokenHash, kind === 'spent' ? new Error('Token was already redeemed') : err);
         }
       }
     }
