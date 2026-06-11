@@ -34,6 +34,9 @@ import opacity from 'hex-color-opacity';
 import {
   BLUETOOTH_ACCENT,
   INVARIANT_WHITE,
+  LIGHTNING_GOLD,
+  LIGHTNING_GOLD_GLOW,
+  LIGHTNING_GOLD_RIM,
   LIGHTNING_INNER_GLOW,
   LIGHTNING_RIM,
 } from '@/shared/lib/brandColors';
@@ -64,13 +67,52 @@ const FACE_CLIP_RADIUS = 23;
 const RIM_RING_RADIUS = AVATAR_RADIUS + 0.5;
 const HALO_RADIUS = 34;
 
-const CORE_COLOR = INVARIANT_WHITE;
-const INNER_GLOW_COLOR = LIGHTNING_INNER_GLOW;
-const OUTER_GLOW_COLOR = BLUETOOTH_ACCENT;
-const RIM_COLOR = LIGHTNING_RIM;
+// ---------------------------------------------------------------------------
+// Tuning knobs — edit + Metro reload to experiment.
 
-/** Desynchronized ambient flicker offsets — co-prime-ish so bolts never sync. */
-const AMBIENT_DELAYS_MS = [560, 760, 940, 1180];
+/** Dev toggle: 'electric-blue' (shipped) | 'storm-gold'. */
+const LIGHTNING_PALETTE: 'electric-blue' | 'storm-gold' = 'electric-blue';
+
+/**
+ * 1 = the originally shipped look. Raise to intensify: brighter peaks,
+ * thicker strokes/glows, faster crackle cadence. Useful range ~1–2.5;
+ * opacity targets clamp at 1 so overdriving is safe.
+ */
+const LIGHTNING_INTENSITY = 1.5;
+
+// ---------------------------------------------------------------------------
+
+const PALETTES = {
+  'electric-blue': {
+    core: INVARIANT_WHITE,
+    innerGlow: LIGHTNING_INNER_GLOW,
+    outerGlow: BLUETOOTH_ACCENT,
+    rim: LIGHTNING_RIM,
+  },
+  'storm-gold': {
+    core: INVARIANT_WHITE,
+    innerGlow: LIGHTNING_GOLD_GLOW,
+    outerGlow: LIGHTNING_GOLD,
+    rim: LIGHTNING_GOLD_RIM,
+  },
+} as const;
+
+const PALETTE = PALETTES[LIGHTNING_PALETTE];
+const CORE_COLOR = PALETTE.core;
+const INNER_GLOW_COLOR = PALETTE.innerGlow;
+const OUTER_GLOW_COLOR = PALETTE.outerGlow;
+const RIM_COLOR = PALETTE.rim;
+
+/** Opacity target scaled by intensity, clamped — additive blend stays sane. */
+const op = (v: number) => Math.min(1, v * LIGHTNING_INTENSITY);
+/** Strokes/blur sigmas grow sub-linearly so high intensity reads bright, not chunky. */
+const WIDTH_SCALE = 1 + (LIGHTNING_INTENSITY - 1) * 0.5;
+/** Higher intensity crackles more often; floored so it never strobes. */
+const DELAY_SCALE = Math.max(0.4, 1 / LIGHTNING_INTENSITY);
+
+/** Desynchronized ambient flicker offsets — co-prime-ish so bolts never sync.
+ *  Scaled by DELAY_SCALE (ratios preserved, so desync survives intensity). */
+const AMBIENT_DELAYS_MS = [560, 760, 940, 1180].map((d) => Math.round(d * DELAY_SCALE));
 /** Crackle dies down to a faint rim breath after this long without resolve. */
 const STUCK_DECAY_MS = 6000;
 
@@ -166,20 +208,20 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
       if (strike) {
         haloOpacity.set(
           withSequence(
-            withTiming(0.9, { duration: 80, easing: Easing.out(Easing.cubic) }),
-            withTiming(0.35, { duration: 250, easing: Easing.out(Easing.quad) })
+            withTiming(op(0.9), { duration: 80, easing: Easing.out(Easing.cubic) }),
+            withTiming(op(0.35), { duration: 250, easing: Easing.out(Easing.quad) })
           )
         );
         pulseScale.set(1.06);
         pulseScale.set(withSpring(1, { damping: 14, stiffness: 220 }));
         rimOpacity.set(
           withSequence(
-            withTiming(0.9, { duration: 60 }),
-            withTiming(0.35, { duration: 240 }),
+            withTiming(op(0.9), { duration: 60 }),
+            withTiming(op(0.35), { duration: 240 }),
             withRepeat(
               withSequence(
-                withTiming(0.45, { duration: 750, easing: Easing.inOut(Easing.quad) }),
-                withTiming(0.25, { duration: 750, easing: Easing.inOut(Easing.quad) })
+                withTiming(op(0.45), { duration: 750, easing: Easing.inOut(Easing.quad) }),
+                withTiming(op(0.25), { duration: 750, easing: Easing.inOut(Easing.quad) })
               ),
               -1,
               false
@@ -187,15 +229,15 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
           )
         );
       } else {
-        haloOpacity.set(withTiming(0.3, { duration: 300 }));
+        haloOpacity.set(withTiming(op(0.3), { duration: 300 }));
         pulseScale.set(1);
         rimOpacity.set(
           withSequence(
-            withTiming(0.35, { duration: 300 }),
+            withTiming(op(0.35), { duration: 300 }),
             withRepeat(
               withSequence(
-                withTiming(0.45, { duration: 750, easing: Easing.inOut(Easing.quad) }),
-                withTiming(0.25, { duration: 750, easing: Easing.inOut(Easing.quad) })
+                withTiming(op(0.45), { duration: 750, easing: Easing.inOut(Easing.quad) }),
+                withTiming(op(0.25), { duration: 750, easing: Easing.inOut(Easing.quad) })
               ),
               -1,
               false
@@ -205,7 +247,7 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
       }
 
       boltOpacities.forEach((boltOpacity, index) => {
-        const peak = index === 0 ? 0.95 : 0.85 - index * 0.05;
+        const peak = op(index === 0 ? 0.95 : 0.85 - index * 0.05);
         const ambient = withRepeat(
           withSequence(withTiming(0, { duration: AMBIENT_DELAYS_MS[index] }), ambientFlicker(peak)),
           -1,
@@ -216,8 +258,8 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
           boltOpacity.set(
             withSequence(
               withTiming(0, { duration: index * 60 }),
-              withTiming(index === 0 ? 1 : 0.85, { duration: 40 }),
-              withTiming(index === 0 ? 1 : 0.85, { duration: 70 }),
+              withTiming(index === 0 ? 1 : op(0.85), { duration: 40 }),
+              withTiming(index === 0 ? 1 : op(0.85), { duration: 70 }),
               withTiming(0, { duration: 90, easing: Easing.in(Easing.quad) }),
               ambient
             )
@@ -264,7 +306,7 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
       ringOpacity.set(
         withSequence(
           withTiming(0, { duration: 160 }),
-          withTiming(0.8, { duration: 40 }),
+          withTiming(op(0.8), { duration: 40 }),
           withTiming(0, { duration: 450, easing: Easing.out(Easing.cubic) })
         )
       );
@@ -334,7 +376,7 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
             <RadialGradient
               c={vec(BOLT_CANVAS_CENTER, BOLT_CANVAS_CENTER)}
               r={HALO_RADIUS}
-              colors={[opacity(BLUETOOTH_ACCENT, 0.45), opacity(BLUETOOTH_ACCENT, 0)]}
+              colors={[opacity(OUTER_GLOW_COLOR, op(0.45)), opacity(OUTER_GLOW_COLOR, 0)]}
             />
           </Circle>
           <Circle
@@ -342,10 +384,10 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
             cy={BOLT_CANVAS_CENTER}
             r={RIM_RING_RADIUS}
             style="stroke"
-            strokeWidth={1.5}
+            strokeWidth={1.5 * WIDTH_SCALE}
             color={RIM_COLOR}
             opacity={rimOpacity}>
-            <BlurMask blur={2} style="solid" />
+            <BlurMask blur={2 * WIDTH_SCALE} style="solid" />
           </Circle>
           <Group clip={faceClip} invertClip>
             {paths.map((path, index) => (
@@ -353,26 +395,26 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
                 <Path
                   path={path}
                   style="stroke"
-                  strokeWidth={5.5}
+                  strokeWidth={5.5 * WIDTH_SCALE}
                   strokeJoin="round"
                   strokeCap="round"
                   color={OUTER_GLOW_COLOR}
-                  opacity={0.55}>
-                  <BlurMask blur={6} style="normal" />
+                  opacity={op(0.55)}>
+                  <BlurMask blur={6 * WIDTH_SCALE} style="normal" />
                 </Path>
                 <Path
                   path={path}
                   style="stroke"
-                  strokeWidth={2.5}
+                  strokeWidth={2.5 * WIDTH_SCALE}
                   strokeJoin="round"
                   strokeCap="round"
                   color={INNER_GLOW_COLOR}>
-                  <BlurMask blur={2.5} style="normal" />
+                  <BlurMask blur={2.5 * WIDTH_SCALE} style="normal" />
                 </Path>
                 <Path
                   path={path}
                   style="stroke"
-                  strokeWidth={1.25}
+                  strokeWidth={1.25 * WIDTH_SCALE}
                   strokeJoin="round"
                   strokeCap="round"
                   color={CORE_COLOR}

@@ -38,3 +38,14 @@ export const LIGHTNING_INNER_GLOW = '#9CCBFF';
  *  Slightly bluer than INVARIANT_WHITE so the white bolt cores stay the
  *  brightest element in the effect. */
 export const LIGHTNING_RIM = '#BFE0FF';
+
+/** Storm-gold lightning palette — warm analog of the electric-blue set
+ *  (same derivation: glow = outer blended ~60% toward white, rim ~75%).
+ *  Selected via LIGHTNING_PALETTE in LightningStrike.tsx. */
+export const LIGHTNING_GOLD = '#FFB300';
+
+/** Warm pale-gold corona — LIGHTNING_GOLD analog of LIGHTNING_INNER_GLOW. */
+export const LIGHTNING_GOLD_GLOW = '#FFE099';
+
+/** Pale gold rim-light — LIGHTNING_GOLD analog of LIGHTNING_RIM. */
+export const LIGHTNING_GOLD_RIM = '#FFECBF';
