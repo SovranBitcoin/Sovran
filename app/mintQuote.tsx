@@ -7,7 +7,12 @@
  */
 
 import { MintQuoteRoute } from '@/features/receive';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function ModalScreen() {
-  return <MintQuoteRoute where="app.mintQuote" />;
+  return (
+    <FormSheetChrome title="Receive Lightning">
+      <MintQuoteRoute where="app.mintQuote" />
+    </FormSheetChrome>
+  );
 }

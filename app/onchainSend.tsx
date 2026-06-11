@@ -3,7 +3,12 @@
  */
 
 import { OnchainSendRoute } from '@/features/send';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function OnchainSendStandaloneRoute() {
-  return <OnchainSendRoute where="app.onchainSend" />;
+  return (
+    <FormSheetChrome title="Send Onchain">
+      <OnchainSendRoute where="app.onchainSend" />
+    </FormSheetChrome>
+  );
 }

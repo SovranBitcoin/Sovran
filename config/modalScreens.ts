@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
 export interface ModalConfig {
@@ -10,6 +11,31 @@ const BLUR_HEADER_OPTIONS = {
   headerBlurEffect: 'systemMaterial' as const,
   headerTransparent: true,
   headerBackButtonDisplayMode: 'minimal' as const,
+} satisfies Partial<NativeStackNavigationOptions>;
+
+/**
+ * Android presentation for the standalone single-screen modals: a native
+ * bottom sheet (react-native-screens formSheet, Material BottomSheetBehavior)
+ * at full height — drag-to-dismiss, dim scrim, rounded top corners. The
+ * closest Android analog of the iOS pageSheet card.
+ *
+ * The nine flow GROUPS stay fullscreen `modal` on Android on purpose: nested
+ * stacks inside an Android formSheet render no native headers (RNS #2657 —
+ * not fixed in any 4.x) and nested ScrollViews still fight the
+ * scroll-to-dismiss gesture (#2693). Single-screen modals have neither
+ * problem.
+ *
+ * No native header renders inside an Android formSheet either, so these
+ * screens get `headerShown: false` and their route files render
+ * FormSheetChrome (grabber + title + close) instead. sheetGrabberVisible /
+ * sheetCornerRadius are iOS-only props — Android draws its own sheet corners.
+ */
+const ANDROID_SHEET_OPTIONS = {
+  presentation: 'formSheet' as const,
+  sheetAllowedDetents: [1.0],
+  sheetInitialDetentIndex: 0 as const,
+  sheetElevation: 24,
+  headerShown: false,
 } satisfies Partial<NativeStackNavigationOptions>;
 
 /** Card: default stack presentation. */
@@ -34,7 +60,10 @@ const slideFromRight = (name: string, presentation: 'modal' | 'card' = 'card'): 
   },
 });
 
-/** Modal or form sheet with material blur header. */
+/**
+ * Standalone single-screen modal. iOS: pageSheet/formSheet with material blur
+ * header (unchanged). Android: native bottom sheet (see ANDROID_SHEET_OPTIONS).
+ */
 const modalWithBlur = (
   name: string,
   presentation: 'modal' | 'formSheet',
@@ -42,10 +71,13 @@ const modalWithBlur = (
 ): ModalConfig => ({
   name,
   ...(title && { title }),
-  options: {
-    presentation,
-    ...BLUR_HEADER_OPTIONS,
-  },
+  options:
+    Platform.OS === 'android'
+      ? ANDROID_SHEET_OPTIONS
+      : {
+          presentation,
+          ...BLUR_HEADER_OPTIONS,
+        },
 });
 
 /** Card with fade: for shared-element transitions. */
@@ -111,7 +143,6 @@ const standaloneScreens: ModalConfig[] = [
   slideFromRight('(settings-flow)'),
   slideFromRight('(user-flow)'),
   fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
-  modalWithBlur('currency', 'formSheet', 'Select Amount'),
   modalTransparent('camera', 'Scan QR'),
   modalWithBlur('share', 'formSheet'),
   modalWithBlur('lightningSend', 'modal', 'Send Lightning'),
