@@ -203,6 +203,7 @@ function toLayoutPeer(peer: BLEPeer): NearPayLayoutPeer {
     lastSeen: peer.lastSeen,
     name: peerDisplayName(peer),
     avatarUrl: null,
+    p2pkPubkeyHex: peer.p2pkPubkeyHex ?? '',
   };
 }
 
@@ -1274,7 +1275,14 @@ export function NearPayScreen() {
   useRenderLogger('NearPayScreen', 30, paymentLog);
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  const { peers } = useBLEPeers();
+  const { peers: allPeers } = useBLEPeers();
+  // Nut Drop is Sovran-to-Sovran: tokens are P2PK-locked to the recipient's
+  // announced lock key, so vanilla bitchat peers (no SVRN announce extension)
+  // can't receive a drop and are hidden from the radar entirely.
+  const peers = useMemo(
+    () => allPeers.filter((peer) => peer.isSovranPeer && !!peer.p2pkPubkeyHex),
+    [allPeers]
+  );
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
   const inlineAmountEntry = nearPaySession?.amountEntry ?? null;
@@ -1339,6 +1347,7 @@ export function NearPayScreen() {
       hasDirectLink: recipient.hasDirectLink,
       lastSeen: recipient.lastSeen,
       avatarUrl: null,
+      p2pkPubkeyHex: recipient.p2pkPubkeyHex,
     };
   }, [nearPaySession?.recipient, selectedPeer]);
 
@@ -1491,6 +1500,7 @@ export function NearPayScreen() {
         nickname: peer.name,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
+        p2pkPubkeyHex: peer.p2pkPubkeyHex,
       });
       const startSendSpan = paymentLog
         .child({ flowId: `near-pay-start-send-${Date.now()}` })
@@ -1510,6 +1520,7 @@ export function NearPayScreen() {
       try {
         await machine.startSendEcash({
           reset: true,
+          p2pkLockPubkey: peer.p2pkPubkeyHex,
           recipientProfile: {
             displayName: peer.name,
             avatarUrl: peer.avatarUrl ?? null,

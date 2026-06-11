@@ -10,9 +10,13 @@ import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore'
 describe('clearPaymentContext', () => {
   it('clears Routstr top-up and Nut-Drop context', () => {
     useRoutstrTopUpStore.getState().start('pending retry message');
-    useNearPaySessionStore
-      .getState()
-      .start({ peerID: 'peer-1', nickname: 'bob', hasDirectLink: true, lastSeen: 0 });
+    useNearPaySessionStore.getState().start({
+      peerID: 'peer-1',
+      nickname: 'bob',
+      hasDirectLink: true,
+      lastSeen: 0,
+      p2pkPubkeyHex: `02${'ab'.repeat(32)}`,
+    });
 
     expect(useRoutstrTopUpStore.getState().active).toBe(true);
     expect(useNearPaySessionStore.getState().active).not.toBeNull();

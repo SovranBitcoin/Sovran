@@ -18,20 +18,40 @@ class BitchatIdentityException(message: String) : Exception(message)
  * injected keys, which is what makes Sovran iOS and Android builds
  * protocol-identical peers.
  */
-class BitchatIdentityMaterial(noisePrivateKeyHex: String, signingPrivateKeyHex: String) {
+class BitchatIdentityMaterial(
+    noisePrivateKeyHex: String,
+    signingPrivateKeyHex: String,
+    p2pkPubkeyHex: String,
+) {
     val noisePrivateKey: ByteArray = decodeKey(noisePrivateKeyHex, "noise")
     val signingPrivateKey: ByteArray = decodeKey(signingPrivateKeyHex, "signing")
+
+    /**
+     * 33-byte compressed Cashu P2PK pubkey ("02" + nostr x-only) announced in
+     * the SVRN extension TLV so nearby Sovran peers can lock tokens to us.
+     */
+    val p2pkPubkey: ByteArray = decodeP2pkPubkey(p2pkPubkeyHex)
     val noisePublicKey: ByteArray =
         X25519PrivateKeyParameters(noisePrivateKey, 0).generatePublicKey().encoded
     val signingPublicKey: ByteArray =
         Ed25519PrivateKeyParameters(signingPrivateKey, 0).generatePublicKey().encoded
     val peerID: String = sha256Hex(noisePublicKey).take(16)
-    val identityID: String = "$peerID:${signingPublicKey.toHex()}"
+
+    // The p2pk pubkey participates so a profile switch that changes only the
+    // announced lock key still tears down and recreates the mesh service.
+    val identityID: String = "$peerID:${signingPublicKey.toHex()}:${p2pkPubkey.toHex()}"
 
     private companion object {
         fun decodeKey(hex: String, name: String): ByteArray {
             if (!hex.matches(Regex("^[0-9a-f]{64}$"))) {
                 throw BitchatIdentityException("Invalid BitChat identity material: $name key must be 32-byte lowercase hex")
+            }
+            return hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+        }
+
+        fun decodeP2pkPubkey(hex: String): ByteArray {
+            if (!hex.matches(Regex("^02[0-9a-f]{64}$"))) {
+                throw BitchatIdentityException("Invalid BitChat identity material: p2pk pubkey must be 33-byte 02-prefixed lowercase hex")
             }
             return hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         }

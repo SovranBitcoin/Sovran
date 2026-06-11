@@ -67,6 +67,25 @@ export interface BLEPeer {
    */
   hasDirectLink: boolean;
   lastSeen: number;
+  /**
+   * True when the peer's last verified announce carried the SVRN extension
+   * TLV — i.e. the peer is a Sovran client, not vanilla bitchat. Gates the
+   * Nut Drop peer list. Authentic to the announcing peer (announces are
+   * Ed25519-signed) but any client could claim it — treat as a feature
+   * gate, not a trust signal.
+   */
+  isSovranPeer: boolean;
+  /**
+   * SVRN capability bitmask (0 for non-Sovran peers). Bit 0 (0x01): the
+   * peer auto-redeems P2PK-locked cashu tokens seen on the public mesh.
+   */
+  capabilities: number;
+  /**
+   * The peer's Cashu P2PK lock target: 33-byte compressed hex
+   * ("02" + their x-only Nostr pubkey). Lock Nut Drop tokens to this key.
+   * Absent for non-Sovran peers.
+   */
+  p2pkPubkeyHex?: string;
 }
 
 export interface BLEMessageEvent {

@@ -243,6 +243,7 @@ describe('createSovranHandlers profile routing', () => {
   });
 
   it('delivers an active Near Pay token over BitChat before showing the send token screen', async () => {
+    const lockPubkey = `02${'ab'.repeat(32)}`;
     mockNearPayActive = {
       id: 'near-pay-1',
       startedAt: 1,
@@ -251,6 +252,7 @@ describe('createSovranHandlers profile routing', () => {
         nickname: 'Nearby Alice',
         hasDirectLink: true,
         lastSeen: 2,
+        p2pkPubkeyHex: lockPubkey,
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-near-pay-token');
@@ -275,6 +277,7 @@ describe('createSovranHandlers profile routing', () => {
       historyEntry,
       createdOffline: false,
       mintWasOffline: false,
+      p2pkLockPubkey: lockPubkey,
     });
 
     expect(sendBLEPublicMessage).toHaveBeenCalledWith(
@@ -284,6 +287,48 @@ describe('createSovranHandlers profile routing', () => {
         profileScope: 'profile-scope',
       })
     );
+    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith({
+      pathname: '/(send-flow)/sendToken',
+      params: { sendHistoryEntry: historyEntry },
+    });
+  });
+
+  it('refuses to broadcast a Near Pay token whose P2PK lock is missing or wrong', async () => {
+    mockNearPayActive = {
+      id: 'near-pay-2',
+      startedAt: 1,
+      recipient: {
+        peerID: 'peer-456',
+        nickname: 'Nearby Bob',
+        hasDirectLink: true,
+        lastSeen: 2,
+        p2pkPubkeyHex: `02${'ab'.repeat(32)}`,
+      },
+    };
+    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-unlocked-token');
+    // @ts-expect-error sendComplete only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+    });
+    const historyEntry = JSON.stringify({
+      id: 'send-2',
+      type: 'send',
+      mintUrl: 'https://mint.example',
+      token: { proofs: [] },
+    });
+
+    // sendComplete data carries NO p2pkLockPubkey — some path dropped the
+    // lock. The bearer token must never reach the public mesh.
+    await handlers.sendComplete?.({
+      historyEntry,
+      createdOffline: false,
+      mintWasOffline: false,
+    });
+
+    expect(sendBLEPublicMessage).not.toHaveBeenCalled();
     expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledWith({
       pathname: '/(send-flow)/sendToken',

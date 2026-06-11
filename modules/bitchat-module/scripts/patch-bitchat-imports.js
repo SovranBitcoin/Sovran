@@ -100,8 +100,58 @@ const LINKSTATE_REPLACEMENT =
   '    // state for the hasDirectLink peer flag.\n' +
   '    func linkState(for peerID: PeerID)';
 
+// --- Append the SVRN extension TLV (0xF0) to outgoing announces ---
+//
+// Sovran clients mark themselves on the mesh with a custom announce TLV
+// (magic "SVRN" + capability flags + the profile's Cashu P2PK pubkey) so the
+// Nut Drop UI can list only Sovran peers and P2PK-lock tokens to them.
+// Vanilla bitchat decoders skip unknown announce TLVs by design (upstream
+// Packets.swift "tolerant decoder" + unit test), and the TLV is appended
+// BEFORE signPacket so the Ed25519 announce signature covers it — vanilla
+// verification still passes. TLV bytes come from SovranAnnounceState
+// (SovranAnnounceExtension.swift, Sovran-owned, same compiled module).
+// Idempotent: once `guard var payload` is in place, the anchor won't match.
+const SVRN_ANNOUNCE_INJECT_ANCHOR =
+  /        guard let payload = announcement\.encode\(\) else \{\n            SecureLogger\.error\("❌ Failed to encode announce packet", category: \.session\)\n            return\n        \}\n/;
+const SVRN_ANNOUNCE_INJECT_REPLACEMENT =
+  '        guard var payload = announcement.encode() else {\n' +
+  '            SecureLogger.error("❌ Failed to encode announce packet", category: .session)\n' +
+  '            return\n' +
+  '        }\n' +
+  '        // [sovran] append SVRN extension TLV (0xF0). Vanilla decoders skip\n' +
+  '        // unknown announce TLVs; appended before signPacket so the announce\n' +
+  '        // signature covers it.\n' +
+  '        if let sovranTLV = SovranAnnounceState.shared.localTLV {\n' +
+  '            payload.append(sovranTLV)\n' +
+  '        }\n';
+
+// --- Record the SVRN extension TLV from verified incoming announces ---
+//
+// Parses the raw announce payload out-of-band (same pattern upstream Android
+// uses for its gossip TLV) and stores per-peer flags + P2PK pubkey for
+// BitChatBLEBridge.getPeers(). Verified announces only — the recording sits
+// after the unverified-announce early return inside the registry barrier, at
+// the same spot upstream persists identity. A verified announce WITHOUT the
+// TLV clears the entry (announce TLVs are authoritative per-announce).
+const SVRN_ANNOUNCE_PARSE_ANCHOR =
+  /        \/\/ Persist cryptographic identity and signing key for robust offline verification\n        env\.persistIdentity\(announcement\)\n/;
+const SVRN_ANNOUNCE_PARSE_REPLACEMENT =
+  '        // [sovran] record/clear the SVRN extension TLV (0xF0). Verified\n' +
+  '        // announces only; absence of the TLV clears the entry.\n' +
+  '        if verifiedAnnounce {\n' +
+  '            SovranAnnounceState.shared.record(peerID: peerID.id, announcePayload: packet.payload)\n' +
+  '        }\n' +
+  '\n' +
+  '        // Persist cryptographic identity and signing key for robust offline verification\n' +
+  '        env.persistIdentity(announcement)\n';
+
 let patched = 0;
-const applied = { mismatchGuard: false, linkState: false };
+const applied = {
+  mismatchGuard: false,
+  linkState: false,
+  svrnAnnounceInject: false,
+  svrnAnnounceParse: false,
+};
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
   let after = before
@@ -114,9 +164,21 @@ for (const file of walk(ROOT)) {
     after = next;
   }
   if (file.endsWith('BLEService.swift')) {
-    const next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
+    let next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
     if (next !== after) applied.linkState = true;
     after = next;
+    next = after.replace(SVRN_ANNOUNCE_INJECT_ANCHOR, SVRN_ANNOUNCE_INJECT_REPLACEMENT);
+    if (next !== after) applied.svrnAnnounceInject = true;
+    after = next;
+  }
+  if (file.endsWith('BLEAnnounceHandler.swift')) {
+    // The anchor text survives inside the replacement (the persist block is
+    // re-emitted), so gate on the marker to stay idempotent.
+    if (!after.includes('[sovran] record/clear the SVRN extension TLV')) {
+      const next = after.replace(SVRN_ANNOUNCE_PARSE_ANCHOR, SVRN_ANNOUNCE_PARSE_REPLACEMENT);
+      if (next !== after) applied.svrnAnnounceParse = true;
+      after = next;
+    }
   }
   if (after !== before) {
     fs.writeFileSync(file, after);
@@ -148,5 +210,17 @@ assertApplied(
   applied.linkState,
   path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
   /\[sovran\] de-privatized/
+);
+assertApplied(
+  'SVRN_ANNOUNCE_INJECT',
+  applied.svrnAnnounceInject,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
+  /\[sovran\] append SVRN extension TLV/
+);
+assertApplied(
+  'SVRN_ANNOUNCE_PARSE',
+  applied.svrnAnnounceParse,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandler.swift'),
+  /\[sovran\] record\/clear the SVRN extension TLV/
 );
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);

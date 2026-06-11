@@ -85,8 +85,8 @@ interface AmountSelectorProps {
   /** Hide variant menu when the caller owns delivery after ecash creation. */
   suppressNextVariants?: boolean;
   /**
-   * Nut-Drop context: surfaces a persistent warning that the ecash is sent over
-   * the public BLE mesh (anyone nearby can claim it).
+   * Nut-Drop context: surfaces a persistent notice that the ecash travels
+   * over the public BLE mesh but is P2PK-locked to the chosen recipient.
    */
   isNutDrop?: boolean;
 }
@@ -239,8 +239,12 @@ export function AmountSelector({
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
   const nextNoticeText = nextDisabled ? actions.next.reason : undefined;
+  // Nut Drop tokens are P2PK-locked to the chosen recipient, so the public
+  // mesh broadcast is no longer claimable by bystanders.
   const warningText = isNutDrop
-    ? 'Sent over public mesh chat — anyone nearby can claim it. Private mesh DMs are coming when longer messages are supported.'
+    ? recipientProfile?.displayName
+      ? `Locked to ${recipientProfile.displayName} — sent over the public mesh, but only they can redeem it.`
+      : 'Locked to your chosen recipient — sent over the public mesh, but only they can redeem it.'
     : undefined;
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
 

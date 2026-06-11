@@ -22,6 +22,7 @@ export {
   nfcEcashSharedPopup,
   nfcConnectionLostPopup,
   nfcSendFailedPopup,
+  nutDropReceivedPopup,
 } from './payment';
 
 const KEY_ICON = 'icon:solar:key-bold';

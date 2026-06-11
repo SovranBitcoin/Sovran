@@ -31,6 +31,7 @@ class BitChatModule : Module() {
             "onBLEDeliveryStatus",
             "onBLEPeerUpdate",
             "onBLEStateChanged",
+            "onBLEBackgroundTaskExpiring",
             "onNostrMessage",
             "onNostrPrivateMessage",
         )
@@ -60,8 +61,9 @@ class BitChatModule : Module() {
                 profileScope: String,
                 noisePrivateKeyHex: String,
                 signingPrivateKeyHex: String,
+                p2pkPubkeyHex: String,
             ->
-            BitChatBLEBridge.start(nickname, profileScope, noisePrivateKeyHex, signingPrivateKeyHex)
+            BitChatBLEBridge.start(nickname, profileScope, noisePrivateKeyHex, signingPrivateKeyHex, p2pkPubkeyHex)
         }
 
         AsyncFunction("sendBLEMessage") { content: String ->
@@ -95,6 +97,16 @@ class BitChatModule : Module() {
 
         Function("getBLEState") {
             BitChatBLEBridge.bluetoothState()
+        }
+
+        // iOS-only background-task assertions; the mesh foreground service
+        // already keeps the process alive on Android, so these are no-ops
+        // kept for a platform-uniform JS API.
+        AsyncFunction("beginBLEBackgroundTask") { _: String ->
+            -1
+        }
+
+        AsyncFunction("endBLEBackgroundTask") { _: Int ->
         }
 
         // --- Bluetooth helpers (Android-only natively; iOS falls back in JS) ---

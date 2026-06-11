@@ -11,6 +11,7 @@ public class BitChatModule: Module {
             "onBLEDeliveryStatus",
             "onBLEPeerUpdate",
             "onBLEStateChanged",
+            "onBLEBackgroundTaskExpiring",
             "onNostrMessage",
             "onNostrPrivateMessage"
         )
@@ -34,13 +35,15 @@ public class BitChatModule: Module {
                 nickname: String,
                 profileScope: String,
                 noisePrivateKeyHex: String,
-                signingPrivateKeyHex: String
+                signingPrivateKeyHex: String,
+                p2pkPubkeyHex: String
             ) in
             try await BitChatBLEBridge.shared.start(
                 nickname: nickname,
                 profileScope: profileScope,
                 noisePrivateKeyHex: noisePrivateKeyHex,
-                signingPrivateKeyHex: signingPrivateKeyHex
+                signingPrivateKeyHex: signingPrivateKeyHex,
+                p2pkPubkeyHex: p2pkPubkeyHex
             )
         }
 
@@ -91,6 +94,23 @@ public class BitChatModule: Module {
 
         Function("getBLEState") { () -> String in
             return BitChatBLEBridge.shared.bluetoothState
+        }
+
+        /// Begin a UIKit background task so a JS network call (e.g. the Nut
+        /// Drop auto-redeem mint swap) can finish after a BLE background
+        /// wake. Returns an opaque handle (-1 when refused). The
+        /// `onBLEBackgroundTaskExpiring` event fires if the system reclaims
+        /// the task before `endBLEBackgroundTask` is called.
+        AsyncFunction("beginBLEBackgroundTask") { (name: String) -> Int in
+            await MainActor.run {
+                BitChatBLEBridge.shared.beginJSBackgroundTask(name: name)
+            }
+        }
+
+        AsyncFunction("endBLEBackgroundTask") { (handle: Int) in
+            await MainActor.run {
+                BitChatBLEBridge.shared.endJSBackgroundTask(handle: handle)
+            }
         }
 
         // --- Nostr (upstream bitchat's NostrRelayManager + GeoRelayDirectory + per-geohash identity) ---

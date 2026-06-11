@@ -9,6 +9,13 @@ interface NearPayRecipient {
   nickname: string;
   hasDirectLink: boolean;
   lastSeen: number;
+  /**
+   * The recipient's Cashu P2PK lock target from their SVRN announce
+   * ("02" + their x-only Nostr pubkey). Required — Nut Drop sessions can
+   * only start for Sovran peers, and the broadcast token is locked to this
+   * key so only the chosen recipient can redeem it.
+   */
+  p2pkPubkeyHex: string;
 }
 
 interface NearPaySession {
@@ -40,6 +47,7 @@ export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => 
     storeLog.info('near_pay.session.start', {
       peerID: recipient.peerID,
       hasDirectLink: recipient.hasDirectLink,
+      p2pkPubkeyPresent: recipient.p2pkPubkeyHex.length > 0,
     });
     set({
       active: {

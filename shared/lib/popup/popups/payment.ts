@@ -103,3 +103,13 @@ export const nfcSendFailedPopup = makeParamPopup<
   icon: 'icon:lucide:nfc',
   type: 'error',
 }));
+
+/** A nearby Sovran peer's P2PK-locked Nut Drop was auto-redeemed. */
+export const nutDropReceivedPopup = makeParamPopup<{ amount: number; unit: string }>(
+  ({ amount, unit }) => ({
+    message: 'Nut Drop received',
+    text: `${amount} ${unit === 'sat' ? 'sats' : unit} redeemed automatically.`,
+    icon: 'icon:mdi:bluetooth',
+    type: 'success',
+  })
+);

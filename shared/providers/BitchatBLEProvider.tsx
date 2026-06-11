@@ -16,6 +16,7 @@
 import React, { useEffect } from 'react';
 import { addBLEDeliveryStatusListener, addBLEPrivateMessageListener } from 'bitchat-module';
 import { useBitchatDmMessagesStore } from '@/features/bitchat/stores/bitchatDmMessages';
+import { useNutDropAutoRedeem } from '@/features/nearPay/hooks/useNutDropAutoRedeem';
 import { bitchatLog, initLog, useInitMount } from '@/shared/lib/logger';
 
 initLog('Module', 'BitchatBLEProvider loaded');
@@ -26,6 +27,12 @@ initLog('Module', 'BitchatBLEProvider loaded');
  */
 export function BitchatBLEProvider({ children }: { children: React.ReactNode }) {
   useInitMount('BitchatBLEProvider');
+
+  // Nut Drop auto-redeem: classifies every public mesh message against the
+  // active profile's P2PK lock key and redeems locked-to-me tokens via the
+  // persisted queue. Lives here (not on a screen) so drops are captured and
+  // redeemed regardless of which surface is open.
+  useNutDropAutoRedeem();
 
   // App-wide BLE-DM message + delivery-status listeners. Mounted here (not
   // on the DM screen) so:

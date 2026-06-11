@@ -1,7 +1,10 @@
 import type { BLEPeer } from 'bitchat-module';
 
 function peerKey(peer: BLEPeer): string {
-  return `${peer.peerID}:${peer.nickname}:${peer.isConnected ? 1 : 0}:${peer.hasDirectLink ? 1 : 0}`;
+  // SVRN fields participate so a later announce that adds/changes the Sovran
+  // extension (isSovranPeer flip, new lock key after a profile switch) is not
+  // swallowed as an equivalent snapshot.
+  return `${peer.peerID}:${peer.nickname}:${peer.isConnected ? 1 : 0}:${peer.hasDirectLink ? 1 : 0}:${peer.isSovranPeer ? 1 : 0}:${peer.capabilities}:${peer.p2pkPubkeyHex ?? ''}`;
 }
 
 export function areBLEPeerSnapshotsEquivalent(

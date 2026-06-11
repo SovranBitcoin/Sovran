@@ -10,6 +10,8 @@ export interface NearPayLayoutPeer {
   lastSeen: number;
   name: string;
   avatarUrl?: string | null;
+  /** Cashu P2PK lock target from the peer's SVRN announce ("02" + x-only). */
+  p2pkPubkeyHex: string;
 }
 
 export interface PeerLayoutRegistryEntry {

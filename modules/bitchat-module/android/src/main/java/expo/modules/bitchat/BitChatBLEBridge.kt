@@ -7,6 +7,7 @@ import com.bitchat.android.mesh.BluetoothMeshService
 import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.noise.NoiseSession
 import com.bitchat.android.services.NicknameProvider
+import com.bitchat.android.sovran.SovranAnnounceExtension
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +52,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     private const val DM_SUMMARIES_PREFS = "bitchat_dm_summaries"
     private const val DM_SUMMARIES_KEY = "bitchat.dmPeerSummaries"
     private const val HANDSHAKE_TIMEOUT_MS = 12_000L
+    private const val MESSAGE_WAKE_LOCK_MS = 30_000L
     private val PEER_ID_RE = Regex("^[0-9a-fA-F]{16}$")
 
     private data class DmPeerSummary(
@@ -121,12 +123,13 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         profileScope: String,
         noisePrivateKeyHex: String,
         signingPrivateKeyHex: String,
+        p2pkPubkeyHex: String,
     ) {
         val context = appContext ?: throw BitChatNotStartedException()
         if (!BluetoothStateMonitor.hasPermissions(context)) {
             throw BitChatUnauthorizedException()
         }
-        val identity = BitchatIdentityMaterial(noisePrivateKeyHex, signingPrivateKeyHex)
+        val identity = BitchatIdentityMaterial(noisePrivateKeyHex, signingPrivateKeyHex, p2pkPubkeyHex)
         val suffix = BitchatProfileScope.storageSuffix(profileScope)
 
         synchronized(lock) {
@@ -152,6 +155,13 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             activeNickname = nickname
             dmSummaries = loadDmSummaries(context, suffix)
 
+            // SVRN announce TLV must be live before startServices() — the first
+            // announce fires during startup and every announce must carry it.
+            SovranAnnounceExtension.localTLV = SovranAnnounceExtension.encodeLocalTLV(
+                p2pkPubkey = identity.p2pkPubkey,
+                flags = SovranAnnounceExtension.CAPABILITY_CASHU_AUTO_REDEEM,
+            )
+
             val service = BluetoothMeshService(scopedContext)
             if (service.myPeerID != identity.peerID) {
                 // Defensive: would mean the persisted noise key differs from the
@@ -164,6 +174,11 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             service.delegate = this
             service.startServices()
             mesh = service
+
+            // Pin the process while the mesh runs so background BLE messages
+            // still reach JS (Nut Drop auto-redeem). start() is only called
+            // from a foregrounded app, so startForegroundService is legal.
+            BitchatMeshForegroundService.start(context)
         }
     }
 
@@ -172,6 +187,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     }
 
     private fun stopLocked() {
+        appContext?.let { BitchatMeshForegroundService.stop(it) }
         mesh?.stopServices()
         mesh = null
         isRunning = false
@@ -181,6 +197,10 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         NicknameProvider.currentNickname = null
         dmSummaries = mutableMapOf()
         pendingSends.clear()
+        // Clear SVRN state so a profile switch can never announce the previous
+        // profile's lock key or surface its peers.
+        SovranAnnounceExtension.localTLV = null
+        SovranAnnounceExtension.clear()
     }
 
     // MARK: - Public mesh messaging
@@ -273,6 +293,10 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         val service = mesh ?: return emptyList()
         return service.getPeerNicknames().keys.mapNotNull { peerID ->
             val info = service.getPeerInfo(peerID) ?: return@mapNotNull null
+            // SVRN extension fields come from the peer's last verified
+            // announce. `isSovranPeer` gates the Nut Drop peer list;
+            // `p2pkPubkeyHex` is the Cashu P2PK lock target for that peer.
+            val svrn = SovranAnnounceExtension.lookup(peerID)
             mapOf(
                 "peerID" to info.id,
                 "nickname" to info.nickname,
@@ -282,6 +306,9 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 "isConnected" to info.isConnected,
                 "hasDirectLink" to service.connectionManager.addressPeerMap.containsValue(peerID),
                 "lastSeen" to info.lastSeen.toDouble(),
+                "isSovranPeer" to (svrn != null),
+                "capabilities" to (svrn?.flags ?: 0),
+                "p2pkPubkeyHex" to svrn?.p2pkPubkeyHex,
             )
         }
     }
@@ -376,9 +403,36 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         emitter?.invoke("onBLEDeliveryStatus", payload)
     }
 
+    // MARK: - Background execution
+
+    /**
+     * Timed PARTIAL_WAKE_LOCK (auto-released) so JS processing + the Nut Drop
+     * mint call survive a screen-off BLE message. Timed acquire never leaks —
+     * the OS releases it even if the process is killed mid-redeem.
+     */
+    private fun holdMessageWakeLock() {
+        val context = appContext ?: return
+        try {
+            val powerManager =
+                context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            val wakeLock = powerManager.newWakeLock(
+                android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                "sovran:bitchat-msg",
+            )
+            wakeLock.setReferenceCounted(false)
+            wakeLock.acquire(MESSAGE_WAKE_LOCK_MS)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to acquire message wake lock: ${e.message}")
+        }
+    }
+
     // MARK: - BluetoothMeshDelegate (payload shapes mirror the iOS bridge)
 
     override fun didReceiveMessage(message: BitchatMessage) {
+        // BLE callbacks wake the CPU only briefly; a short timed wake lock
+        // carries it through JS classification + a possible mint call when
+        // the screen is off (auto-released, never held persistently).
+        holdMessageWakeLock()
         val senderPeerID = message.senderPeerID ?: ""
         val timestampMs = message.timestamp.time.toDouble()
         if (message.isPrivate) {

@@ -58,26 +58,41 @@ export function NearPayPeerListScreen() {
   const headerHeight = useHeaderHeight();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  const { peers, connectedCount } = useBLEPeers();
+  const { peers } = useBLEPeers();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
-  const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
+  // Nut Drop is Sovran-to-Sovran: tokens are P2PK-locked to the recipient's
+  // announced lock key, so vanilla bitchat peers (no SVRN announce extension)
+  // can't receive a drop and are hidden from this list entirely.
+  const sovranPeers = useMemo(
+    () => peers.filter((peer) => peer.isSovranPeer && !!peer.p2pkPubkeyHex),
+    [peers]
+  );
+  const vanillaPeerCount = peers.length - sovranPeers.length;
+  const connectedCount = useMemo(
+    () => sovranPeers.filter((peer) => peer.isConnected).length,
+    [sovranPeers]
+  );
+  const directLinkCount = useMemo(
+    () => sovranPeers.filter((peer) => peer.hasDirectLink).length,
+    [sovranPeers]
+  );
   const sortedPeers = useMemo(() => {
-    return [...peers].sort((a, b) => {
+    return [...sovranPeers].sort((a, b) => {
       if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
       if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
       return b.lastSeen - a.lastSeen;
     });
-  }, [peers]);
+  }, [sovranPeers]);
 
   const subtitleText = useMemo(() => {
-    if (peers.length === 0) return 'Scanning for nearby BitChat users...';
-    if (connectedCount === 0) return `${peers.length} nearby · 0 connected`;
+    if (sovranPeers.length === 0) return 'Scanning for nearby Sovran users...';
+    if (connectedCount === 0) return `${sovranPeers.length} nearby · 0 connected`;
     if (directLinkCount === connectedCount) {
-      return `${connectedCount} connected · ${peers.length} nearby`;
+      return `${connectedCount} connected · ${sovranPeers.length} nearby`;
     }
-    return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${peers.length} nearby`;
-  }, [connectedCount, directLinkCount, peers.length]);
+    return `${directLinkCount} direct · ${connectedCount - directLinkCount} mesh · ${sovranPeers.length} nearby`;
+  }, [connectedCount, directLinkCount, sovranPeers.length]);
 
   const rootStyle = useMemo(() => [styles.root, { backgroundColor: background }], [background]);
   const contentStyle = useMemo(
@@ -107,16 +122,25 @@ export function NearPayPeerListScreen() {
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
       });
+      const p2pkPubkeyHex = peer.p2pkPubkeyHex;
+      if (!p2pkPubkeyHex) {
+        // Should be unreachable — the list only renders Sovran peers — but a
+        // missing lock key must never start an (unlockable) session.
+        paymentLog.error('near_pay.peer.list_select_missing_p2pk', { peerID: peer.peerID });
+        return;
+      }
       useNearPaySessionStore.getState().start({
         peerID: peer.peerID,
         nickname: displayName,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
+        p2pkPubkeyHex,
       });
       router.back();
       void machine
         .startSendEcash({
           reset: true,
+          p2pkLockPubkey: p2pkPubkeyHex,
           recipientProfile: {
             displayName,
             avatarUrl: null,
@@ -143,14 +167,16 @@ export function NearPayPeerListScreen() {
       <VStack align="center" spacing={12} style={styles.emptyState}>
         <Icon name="mdi:bluetooth" size={32} color={emptyIconColor} />
         <Text size={16} style={emptyTitleStyle}>
-          No nearby users yet
+          No Sovran users nearby
         </Text>
         <Text size={13} style={emptyTextStyle}>
-          Keep Sovran open and nearby BitChat users will appear here.
+          {vanillaPeerCount > 0
+            ? `Nut Drop needs both people on Sovran. ${vanillaPeerCount} nearby BitChat ${vanillaPeerCount === 1 ? 'user' : 'users'} can chat in the mesh instead.`
+            : 'Keep Sovran open and nearby Sovran users will appear here.'}
         </Text>
       </VStack>
     ),
-    [emptyIconColor, emptyTextStyle, emptyTitleStyle]
+    [emptyIconColor, emptyTextStyle, emptyTitleStyle, vanillaPeerCount]
   );
 
   return (

@@ -48,6 +48,7 @@ function peer(
     hasDirectLink: false,
     isConnected: true,
     lastSeen: 1,
+    p2pkPubkeyHex: `02${'ab'.repeat(32)}`,
     ...overrides,
   };
 }

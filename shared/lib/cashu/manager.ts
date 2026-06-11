@@ -27,7 +27,7 @@ import {
 } from '@/shared/lib/nostr/keyDerivation';
 import { getInflightProofs, restoreProofsToReady } from './managerInternals';
 import * as FileSystem from 'expo-file-system/legacy';
-import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
+import { EventTemplate, finalizeEvent, getPublicKey, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
 import { cashuLog, initLog, initPhase } from '../logger';
 import {
@@ -175,7 +175,18 @@ export class CocoManager {
         );
         this.db = db;
         const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
-        const repositories = createSovranCocoRepositories(new ExpoSqliteRepositories({ database }));
+        // The profile's signer key is imported into coco's keyring (p2pk-import
+        // plugin below) so P2PK receives auto-sign — but it must never reach
+        // coco's plaintext SQLite keyring table. The overlay keeps it
+        // in-memory for this manager session and scrubs legacy rows.
+        const ephemeralKeyringPubkeys = new Set<string>();
+        if (p2pkImportSecretKey) {
+          ephemeralKeyringPubkeys.add(`02${getPublicKey(new Uint8Array(p2pkImportSecretKey))}`);
+        }
+        const repositories = createSovranCocoRepositories(
+          new ExpoSqliteRepositories({ database }),
+          { ephemeralKeyringPubkeys }
+        );
         await initPhase('CocoManager.reposInit', () => repositories.init());
 
         // 2. Seed getter (lazy — no crypto work until first call, cached after)

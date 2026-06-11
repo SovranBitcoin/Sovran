@@ -854,10 +854,27 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
 
 async function deliverNearPayIfActive(
   historyEntry: string,
-  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null
+  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null,
+  p2pkLockPubkey?: string
 ): Promise<void> {
   const active = useNearPaySessionStore.getState().active;
   if (!active) return;
+
+  // Never broadcast an unlocked (or wrongly locked) token into the public
+  // mesh from this flow: every Nut Drop session is created with the
+  // recipient's lock key, and a missing/mismatched lock on the completed
+  // send means some machine path dropped it. The token stays in send
+  // history where the user can deliver it deliberately.
+  const expectedLock = (active.recipient.p2pkPubkeyHex ?? '').toLowerCase();
+  if (!expectedLock || p2pkLockPubkey?.toLowerCase() !== expectedLock) {
+    paymentLog.error('near_pay.delivery.lock_mismatch', {
+      peerID: active.recipient.peerID,
+      expectedLockPresent: expectedLock.length > 0,
+      actualLockPresent: !!p2pkLockPubkey,
+    });
+    useNearPaySessionStore.getState().complete();
+    return;
+  }
 
   try {
     const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
@@ -914,11 +931,18 @@ export function createSovranHandlers({
       });
     },
 
-    sendComplete: async ({ historyEntry, createdOffline, mintWasOffline, recipientPubkey }) => {
+    sendComplete: async ({
+      historyEntry,
+      createdOffline,
+      mintWasOffline,
+      recipientPubkey,
+      p2pkLockPubkey,
+    }) => {
       paymentLog.info('payment.step.send_complete', {
         createdOffline: !!createdOffline,
         mintWasOffline: !!mintWasOffline,
         recipientPubkeyPresent: !!recipientPubkey,
+        p2pkLocked: !!p2pkLockPubkey,
       });
 
       // Routstr top-up: intercept the token and send it to the Routstr API
@@ -972,7 +996,11 @@ export function createSovranHandlers({
         }
       }
 
-      await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
+      await deliverNearPayIfActive(
+        enrichedHistoryEntry,
+        getBitchatIdentityMaterial,
+        p2pkLockPubkey
+      );
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',

@@ -23,4 +23,21 @@
   <!-- required=false keeps the Play listing available to BLE-less devices;
        NearPayScreen shows the 'unsupported' notice on those. -->
   <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+  <!-- connectedDevice foreground service pins the process while the mesh is
+       active so background BLE messages reach JS (Nut Drop auto-redeem). The
+       BLUETOOTH_CONNECT/SCAN runtime grants above satisfy the API 34+
+       eligibility precondition for this FGS type. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <!-- Short timed wake lock carries the CPU through JS processing + the mint
+       call after a BLE message arrives with the screen off. -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <application>
+    <service
+        android:name="expo.modules.bitchat.BitchatMeshForegroundService"
+        android:exported="false"
+        android:foregroundServiceType="connectedDevice" />
+  </application>
 </manifest>
