@@ -47,11 +47,13 @@ export function HeaderIconButton({
 }: HeaderIconButtonProps) {
   const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
 
-  // Mint-selector chrome on BOTH platforms (the app-wide non-liquid-glass
-  // header-button contract — see ScreenHeaderAction): surface-secondary
-  // circle, 1px muted border, opacity press. Only the glyph source forks:
-  // SF symbol on iOS, monicon map on Android (expo-symbols renders nothing
-  // there).
+  // Mint-selector chrome (the app-wide non-liquid-glass header-button
+  // contract — see ScreenHeaderAction): surface-secondary circle, 1px muted
+  // border, opacity press. Only the glyph source forks: SF symbol on iOS,
+  // monicon map on Android (expo-symbols renders nothing there). On liquid
+  // devices (iOS 26+) the system glass capsule around header bar items IS
+  // the chrome — render the bare glyph; flat fill/border inside the capsule
+  // gets refracted into a smeared double-glass look.
   const glyph =
     Platform.OS === 'android' ? (
       <Icon name={ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu'} size={size} color={color} />
@@ -71,12 +73,16 @@ export function HeaderIconButton({
           width: headerButtonSize,
           height: headerButtonSize,
           borderRadius: headerButtonSize / 2,
-          backgroundColor: flatSurface,
-          borderWidth: 1,
-          borderColor: opacity(muted, 0.3),
           alignItems: 'center',
           justifyContent: 'center',
         },
+        supportsLiquidGlass()
+          ? null
+          : {
+              backgroundColor: flatSurface,
+              borderWidth: 1,
+              borderColor: opacity(muted, 0.3),
+            },
         style,
       ]}>
       {glyph}
