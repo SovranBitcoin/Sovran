@@ -73,26 +73,80 @@ const MAINNET_UUID = 'F47B5E2D-4A9E-4C5A-9B3F-8E1D2C3A4B5C';
 // our newer strict code rejects every one, so we never receive any peer
 // announce from App Store bitchat devices.
 //
-// Restore v1.5.1 semantics by removing just the `return` after the warn line.
-// Idempotent: if the return has already been removed, the anchor won't match.
-const MISMATCH_RETURN_ANCHOR =
-  /(            SecureLogger\.warning\("⚠️ Announce sender mismatch: [^\n]+\n)            return\n/;
-const MISMATCH_RETURN_REPLACEMENT =
-  '$1            // [sovran] return removed — App Store bitchat v1.5.1 treats this as warn-only.\n            // Without this relax, every inbound announce from v1.5.1 peers is rejected.\n';
+// As of upstream 3caf2d7 the check lives in BLEAnnouncePreflightPolicy.evaluate
+// (bitchat/Services/BLE/BLEAnnounceHandlingPolicy.swift). Restore v1.5.1
+// semantics by removing the guard that rejects on mismatch. `derivedPeerID`
+// stays live — the accept path below still consumes it. Idempotent: once the
+// guard is gone, the anchor won't match.
+// TODO(sovran): re-test against a current App Store bitchat build; if its
+// announces now pass the derived-peerID check, drop this patch entirely.
+const MISMATCH_GUARD_ANCHOR =
+  /        guard derivedPeerID == peerID else \{\n            return \.reject\(\.senderMismatch\(derivedPeerID: derivedPeerID\)\)\n        \}\n/;
+const MISMATCH_GUARD_REPLACEMENT =
+  '        // [sovran] sender-mismatch reject relaxed to v1.5.1 warn-only semantics.\n' +
+  '        // App Store bitchat v1.5.1 sends announces whose packet senderID differs\n' +
+  '        // from PeerID(publicKey:); without this relax every one is rejected and\n' +
+  '        // Sovran never discovers App Store peers.\n';
+
+// --- De-privatize BLEService.linkState(for:) ---
+//
+// Upstream 3caf2d7 made `linkState(for:)` private (the new BLEAnnounceHandler
+// reaches it through an environment closure). Our BitChatBLEBridge.getPeers()
+// uses it for the real-time `hasDirectLink` flag (src/types.ts contract), so
+// restore internal visibility. Idempotent: once de-privatized, no match.
+const LINKSTATE_ANCHOR = /    private func linkState\(for peerID: PeerID\)/;
+const LINKSTATE_REPLACEMENT =
+  '    // [sovran] de-privatized — BitChatBLEBridge.getPeers() reads real-time link\n' +
+  '    // state for the hasDirectLink peer flag.\n' +
+  '    func linkState(for peerID: PeerID)';
 
 let patched = 0;
+const applied = { mismatchGuard: false, linkState: false };
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
   let after = before
     .replace(PATTERN, REPLACEMENT)
     .replace(SCOPED_PRIVATE_IMPORT, SCOPED_PRIVATE_REPLACEMENT)
     .split(TESTNET_UUID).join(MAINNET_UUID);
+  if (file.endsWith('BLEAnnounceHandlingPolicy.swift')) {
+    const next = after.replace(MISMATCH_GUARD_ANCHOR, MISMATCH_GUARD_REPLACEMENT);
+    if (next !== after) applied.mismatchGuard = true;
+    after = next;
+  }
   if (file.endsWith('BLEService.swift')) {
-    after = after.replace(MISMATCH_RETURN_ANCHOR, MISMATCH_RETURN_REPLACEMENT);
+    const next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
+    if (next !== after) applied.linkState = true;
+    after = next;
   }
   if (after !== before) {
     fs.writeFileSync(file, after);
     patched++;
   }
 }
+
+// Anchored patches must either apply now or already be applied from a previous
+// run. Anything else means upstream changed shape — fail loudly so the vendor
+// bump doesn't silently ship without the patch.
+function assertApplied(name, appliedNow, file, alreadyPattern) {
+  if (appliedNow) return;
+  const content = fs.readFileSync(file, 'utf8');
+  if (alreadyPattern.test(content)) return;
+  console.error(
+    `[patch-bitchat-imports] FATAL: ${name} anchor matched nothing in ${path.relative(ROOT, file)} ` +
+      `and the patched form is absent. Upstream changed shape — fix the anchor.`
+  );
+  process.exit(1);
+}
+assertApplied(
+  'MISMATCH_GUARD',
+  applied.mismatchGuard,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandlingPolicy.swift'),
+  /\[sovran\] sender-mismatch reject relaxed/
+);
+assertApplied(
+  'LINKSTATE',
+  applied.linkState,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
+  /\[sovran\] de-privatized/
+);
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);
