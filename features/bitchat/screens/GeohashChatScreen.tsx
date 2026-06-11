@@ -8,7 +8,6 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
@@ -27,6 +26,7 @@ import { useBitChat } from '../hooks/useBitChat';
 import { useBLEPeers } from '../hooks/useBLEPeers';
 import { useBluetoothState } from '../hooks/useBluetoothState';
 import { BluetoothInlineNotice } from '../components/BluetoothNotice';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import {
   ChatMessageBubble,
   ChatScreen,
@@ -169,28 +169,26 @@ export function GeohashChatScreen({
         headerTitleAlign: 'center',
         title,
         headerLeft: () => (
-          <Pressable onPress={handleBack} hitSlop={8}>
-            <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
-          </Pressable>
+          <ScreenHeaderAction
+            icon="material-symbols:arrow-back-rounded"
+            color={foreground}
+            onPress={handleBack}
+          />
         ),
         headerRight: () =>
           transport === 'ble' ? (
-            <Pressable
+            <ScreenHeaderAction
+              icon="mdi:account-group"
+              size={22}
+              color={bleConnectedCount > 0 ? foreground : shade400}
               onPress={() => router.push('/(user-flow)/bitchatNetwork')}
-              hitSlop={8}
-              style={{ padding: 8 }}>
-              <View>
-                <Icon
-                  name="mdi:account-group"
-                  size={22}
-                  color={bleConnectedCount > 0 ? foreground : shade400}
-                />
-                {bleConnectedCount > 0 && (
+              accessory={
+                bleConnectedCount > 0 ? (
                   <View
                     style={{
                       position: 'absolute',
-                      right: -6,
-                      top: -4,
+                      right: 2,
+                      top: 2,
                       minWidth: 16,
                       height: 16,
                       paddingHorizontal: 4,
@@ -209,9 +207,9 @@ export function GeohashChatScreen({
                       {bleConnectedCount}
                     </Text>
                   </View>
-                )}
-              </View>
-            </Pressable>
+                ) : undefined
+              }
+            />
           ) : (
             <HStack spacing={8} align="center">
               <View

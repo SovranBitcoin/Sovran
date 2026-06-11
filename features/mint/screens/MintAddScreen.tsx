@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { Platform, TextInput, useWindowDimensions } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -8,6 +7,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMintValidation';
@@ -36,7 +36,6 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
-import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
 import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -632,16 +631,25 @@ export function MintAddScreen() {
     [isSearching, searchBarWidth, onSearchChange, clearKey, searchQuery, validationState]
   );
 
+  // ScreenHeaderAction + monicon glyphs (not IconSymbol/SF Symbols —
+  // expo-symbols renders nothing on Android, which left this button invisible
+  // there).
   const renderHeaderRight = useCallback(
     () =>
       isSearching ? (
-        <Pressable onPress={onCloseSearch} style={{ padding: 8 }}>
-          <IconSymbol name="xmark" size={20} color={foreground} />
-        </Pressable>
+        <ScreenHeaderAction
+          icon="material-symbols:close-rounded"
+          size={20}
+          color={foreground}
+          onPress={onCloseSearch}
+        />
       ) : (
-        <Pressable onPress={onOpenSearch} style={{ padding: 8 }}>
-          <IconSymbol name="magnifyingglass" size={20} color={foreground} />
-        </Pressable>
+        <ScreenHeaderAction
+          icon="material-symbols:search-rounded"
+          size={20}
+          color={foreground}
+          onPress={onOpenSearch}
+        />
       ),
     [isSearching, onCloseSearch, onOpenSearch, foreground]
   );

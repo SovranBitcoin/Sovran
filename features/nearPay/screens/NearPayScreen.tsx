@@ -25,6 +25,7 @@ import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
 import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
 import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -1732,9 +1733,11 @@ export function NearPayScreen() {
   );
   const renderHeaderLeft = useCallback(
     () => (
-      <Pressable onPress={resetToPicker} hitSlop={8} style={styles.flowHeaderButton}>
-        <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
-      </Pressable>
+      <ScreenHeaderAction
+        icon="material-symbols:arrow-back-rounded"
+        color={foreground}
+        onPress={resetToPicker}
+      />
     ),
     [foreground, resetToPicker]
   );

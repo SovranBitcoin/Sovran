@@ -11,15 +11,14 @@
  */
 
 import React, { useCallback } from 'react';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { HistoryEntry, ReceiveHistoryEntry } from '@cashu/coco-core';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
-import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import {
@@ -45,27 +44,28 @@ function FilterButton() {
   const { openFilterSheet, hasActiveFilters, activeFilterCount } = useTransactionsFilter();
 
   return (
-    <Pressable onPress={openFilterSheet} className="relative p-2">
-      <Icon
-        name="fluent:filter-16-filled"
-        size={22}
-        color={hasActiveFilters ? opacity(foreground, 0.4) : foreground}
-      />
-      {hasActiveFilters && (
-        <View
-          className="absolute right-1 top-1 h-4 min-w-4 items-center justify-center rounded-[10px]"
-          style={{ backgroundColor: accent }}>
-          <Text
-            size={10}
-            style={{
-              color: accentForeground,
-              fontFamily: 'OxygenBold',
-            }}>
-            {activeFilterCount}
-          </Text>
-        </View>
-      )}
-    </Pressable>
+    <ScreenHeaderAction
+      icon="fluent:filter-16-filled"
+      size={22}
+      color={hasActiveFilters ? opacity(foreground, 0.4) : foreground}
+      onPress={openFilterSheet}
+      accessory={
+        hasActiveFilters ? (
+          <View
+            className="absolute right-1 top-1 h-4 min-w-4 items-center justify-center rounded-[10px]"
+            style={{ backgroundColor: accent }}>
+            <Text
+              size={10}
+              style={{
+                color: accentForeground,
+                fontFamily: 'OxygenBold',
+              }}>
+              {activeFilterCount}
+            </Text>
+          </View>
+        ) : undefined
+      }
+    />
   );
 }
 

@@ -7,12 +7,12 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list/react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -122,9 +122,11 @@ export default function NetworkSheet() {
           headerTintColor: foreground,
           title: 'Network',
           headerLeft: () => (
-            <Pressable onPress={handleClose} hitSlop={8}>
-              <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-            </Pressable>
+            <ScreenHeaderAction
+              icon="material-symbols:close-rounded"
+              color={foreground}
+              onPress={handleClose}
+            />
           ),
         }}
       />

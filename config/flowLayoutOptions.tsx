@@ -6,16 +6,41 @@
  */
 
 import { memo } from 'react';
+import { Platform, View } from 'react-native';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { ParamListBase, NavigationProp } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
-import Icon from 'assets/icons';
+import opacity from 'hex-color-opacity';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 
 interface FlowColors {
   foreground: string;
   background: string;
 }
+
+/**
+ * Android stand-in for the iOS header blur: a near-opaque tint of the screen
+ * background. headerBlurEffect is a silent no-op on Android, which left
+ * transparent headers floating over scrolling content with no scrim. Keeping
+ * headerTransparent + painting headerBackground preserves each screen's
+ * layout (content still lays out under the header) — flipping
+ * headerTransparent off would shift everything down by the header height.
+ */
+export const AndroidHeaderScrim = memo(function AndroidHeaderScrim({
+  backgroundColor,
+}: {
+  backgroundColor: string;
+}) {
+  return <View style={{ flex: 1, backgroundColor: opacity(backgroundColor, 0.92) }} />;
+});
+
+/** Spread into header options on Android only; empty on iOS (blur handles it). */
+export const androidHeaderScrimOptions = (
+  backgroundColor: string
+): Partial<NativeStackNavigationOptions> =>
+  Platform.OS === 'android'
+    ? { headerBackground: () => <AndroidHeaderScrim backgroundColor={backgroundColor} /> }
+    : {};
 
 /**
  * Shared header button component for flow layouts.
@@ -31,15 +56,13 @@ const FlowHeaderButton = memo(function FlowHeaderButton({
   foreground: string;
 }) {
   return (
-    <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon
-        name={
-          isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
-        }
-        size={24}
-        color={foreground}
-      />
-    </Pressable>
+    <ScreenHeaderAction
+      icon={
+        isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
+      }
+      color={foreground}
+      onPress={() => router.back()}
+    />
   );
 });
 
@@ -61,6 +84,7 @@ const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOpti
   // Hide any back title that might show parent route names
   headerBackButtonDisplayMode: 'minimal',
   headerBackVisible: false,
+  ...androidHeaderScrimOptions(colors.background),
   // Horizontal slide animation within the modal
   animation: 'slide_from_right',
   gestureEnabled: true,
