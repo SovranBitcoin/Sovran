@@ -112,6 +112,9 @@ export function buildChooseAmountFallback(args: {
   if (!fallbackMint) return null;
 
   if (args.destination === 'sendEcash' && args.ctx.offline) {
+    // Offline fallbacks route to local-proof tokens, which can never carry a
+    // P2PK lock — locked sends get no offline amount fallback.
+    if (args.ctx.p2pkLockPubkey) return null;
     const built = buildProofSuggestions(fallbackMint.proofAmounts, args.amount);
     if (built.exactMatch || !built.hasSuggestion) return null;
     return {

@@ -664,6 +664,9 @@ function buildSendCompleteResult(args: {
       ...(args.mintWasOffline ? { mintWasOffline: true } : {}),
       recipientPubkey: effectiveContext.recipientPubkey,
       recipientProfile: effectiveContext.recipientProfile,
+      ...(effectiveContext.p2pkLockPubkey
+        ? { p2pkLockPubkey: effectiveContext.p2pkLockPubkey }
+        : {}),
     },
     ...(args.contextPatch ? { context: args.contextPatch } : {}),
     notifications: buildTransactionCreatedNotifications({
@@ -680,12 +683,15 @@ function buildSendCompleteResult(args: {
 function executeSendOperation(
   operation: SendOperation,
   data: StepDataMap['confirmSend'],
+  options?: { p2pkLockPubkey?: string },
 ): ResultAsync<SendOperationResult, unknown> {
   return ResultAsync.fromThrowable(
     () =>
-      data.memo
-        ? operation(data.mintUrl, data.amount, data.memo)
-        : operation(data.mintUrl, data.amount),
+      options?.p2pkLockPubkey
+        ? operation(data.mintUrl, data.amount, data.memo, options)
+        : data.memo
+          ? operation(data.mintUrl, data.amount, data.memo)
+          : operation(data.mintUrl, data.amount),
     (cause) => cause,
   )();
 }
@@ -749,6 +755,18 @@ function handleConfirmSendFailure(args: {
     shouldCreateLocalTokenFirst: args.shouldCreateLocalTokenFirst,
   });
   const effectiveContext = { ...config.context, ...contextPatch };
+
+  // A locked send has no offline fallback and no local-proof rerouting —
+  // both would produce a bearer token. Surface the original failure.
+  if (config.context.p2pkLockPubkey) {
+    return errAsync(
+      toConfirmSendEffectError({
+        cause: args.cause,
+        locale: args.locale,
+        contextPatch,
+      }),
+    );
+  }
 
   if (
     isMintOfflineError(args.cause) &&
@@ -1174,12 +1192,17 @@ export function runConfirmSendEffect({
   ConfirmSendEffectError
 > {
   const locale = getLocale();
+  // P2PK-locked sends require a mint swap (P2pkSendHandler always swaps) —
+  // every local/offline token path would silently produce a bearer token
+  // instead of a locked one, so all of them are disabled for locked sends.
+  const p2pkLocked = !!context.p2pkLockPubkey;
   const localProofs = buildProofSuggestions(proofAmounts, data.amount);
   const hasExactLocalProofs = proofAmounts.length > 0 && localProofs.exactMatch;
   const shouldCreateLocalTokenFirst =
-    hasExactLocalProofs && !!operations.executeOfflineSend;
+    hasExactLocalProofs && !p2pkLocked && !!operations.executeOfflineSend;
   const appOffline = getOffline() || context.offline === true;
-  const forceLocalSend = appOffline || context.localProofSend === true;
+  const forceLocalSend =
+    !p2pkLocked && (appOffline || context.localProofSend === true);
   const config: RunConfirmSendEffectConfig = {
     data,
     operations,
@@ -1189,6 +1212,20 @@ export function runConfirmSendEffect({
     getLocale,
     isStale,
   };
+
+  // Locked + offline fails fast: there is no offline shape of a locked send,
+  // so don't even attempt the operation or any fallback routing.
+  if (p2pkLocked && appOffline) {
+    return errAsync({
+      kind: 'failed',
+      cause: createOfflineSendError(locale),
+      data: {
+        code: 'SEND_FAILED',
+        message: t('MINT_UNREACHABLE', locale),
+        data: { mintUnreachable: true, p2pkLocked: true },
+      },
+    } satisfies ConfirmSendEffectError);
+  }
 
   if (shouldCreateLocalTokenFirst && operations.executeOfflineSend) {
     return executeSendOperation(operations.executeOfflineSend, data)
@@ -1228,7 +1265,11 @@ export function runConfirmSendEffect({
     });
   }
 
-  return executeSendOperation(operations.executeSend, data)
+  return executeSendOperation(
+    operations.executeSend,
+    data,
+    p2pkLocked ? { p2pkLockPubkey: context.p2pkLockPubkey } : undefined,
+  )
     .andThen((result) => {
       if (isStale('executeSend')) return okAsync({ kind: 'stale' } as const);
 

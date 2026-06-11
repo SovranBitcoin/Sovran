@@ -147,6 +147,8 @@ export interface StepDataMap {
     mintWasOffline?: boolean;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
+    /** See `FlowContext.p2pkLockPubkey` — present when the sent token is P2PK-locked. */
+    p2pkLockPubkey?: string;
   };
   navigateToMeltPreview: {
     mintUrl: string;
@@ -200,6 +202,7 @@ export type ErrorCode =
   | 'UNSUPPORTED_PAYMENT_METHOD'
   | 'ALL_OPTIONS_DISABLED'
   | 'MISSING_MELT_TARGET'
+  | 'INVALID_P2PK_LOCK'
   | 'SEND_FAILED'
   | 'MINT_QUOTE_FAILED'
   | 'MELT_FAILED'
@@ -240,6 +243,14 @@ export interface FlowContext {
    * melt-preview headers without each screen re-running the fetch.
    */
   recipientProfile?: RecipientProfile;
+  /**
+   * Cashu P2PK lock target (33-byte compressed secp256k1 hex, `02`-prefixed)
+   * for ecash sends. When set, the send MUST produce P2PK-locked outputs:
+   * local-first and offline token creation are disabled because locking
+   * requires a mint swap — a locked send must never silently degrade to a
+   * bearer token.
+   */
+  p2pkLockPubkey?: string;
   amountEntryDisplay?: AmountEntryDisplayMetadata;
   /**
    * True after the user accepts a locally composable proof suggestion. The
@@ -402,6 +413,8 @@ export type FlowEvent =
       recipientPubkey?: string;
       /** See `FlowContext.recipientProfile` — chat-launched flows can seed this. */
       recipientProfile?: RecipientProfile;
+      /** See `FlowContext.p2pkLockPubkey` — nearby-pay flows seed this. */
+      p2pkLockPubkey?: string;
     }
   | { type: 'START_RECEIVE_LIGHTNING' }
   | { type: 'START_RECEIVE' }
@@ -685,7 +698,11 @@ export interface MachineOperations {
   executeSend: (
     mintUrl: string,
     amount: number,
-    memo?: string
+    memo?: string,
+    options?: {
+      /** See `FlowContext.p2pkLockPubkey` — lock outputs to this pubkey via a mint swap. */
+      p2pkLockPubkey?: string;
+    }
   ) => Promise<{ historyEntry: string }>;
   /**
    * Execute a send using only local proofs (no mint contact).
@@ -998,6 +1015,8 @@ export interface PaymentMachine {
     meltTarget?: string;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
+    /** See `FlowContext.p2pkLockPubkey` — P2PK-lock the sent token to this key. */
+    p2pkLockPubkey?: string;
   }) => Promise<void>;
   /** Start a receive lightning flow. Opens amount screen for mint quote. */
   startReceiveLightning: (opts?: { reset?: boolean }) => Promise<void>;

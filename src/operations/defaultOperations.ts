@@ -351,15 +351,24 @@ export function createDefaultOperations(
   };
 
   return {
-    executeSend: async (mintUrl, amount, memo) => {
+    executeSend: async (mintUrl, amount, memo, options) => {
       const mgr = requireManager();
       // send.execute is atomic — there is no rollback to exercise — so the
       // mock-fail gate runs before prepare to leave no reservation behind.
       if (mockFailEnabled('send')) {
         throw new Error('Mock send failure (dev)');
       }
-      logger.info('operations.executeSend.prepare', { mintUrl, amount });
-      const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      const p2pkLockPubkey = options?.p2pkLockPubkey;
+      logger.info('operations.executeSend.prepare', {
+        mintUrl,
+        amount,
+        p2pkLocked: !!p2pkLockPubkey,
+      });
+      const prepared = await mgr.ops.send.prepare({
+        mintUrl,
+        amount,
+        ...(p2pkLockPubkey ? { target: { type: 'p2pk' as const, pubkey: p2pkLockPubkey } } : {}),
+      });
       logger.info('operations.executeSend.execute', { operationId: prepared.id });
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
       const tokenWithMemo = applyTokenMemo(token, memo);

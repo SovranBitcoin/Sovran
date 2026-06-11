@@ -4,11 +4,17 @@ export default defineConfig({
   title: 'Colada',
   description: 'Cashu payment flow orchestration for wallet apps',
   themeConfig: {
-    nav: [{ text: 'Conventions', link: '/CONVENTIONS' }],
+    nav: [
+      { text: 'State Machine', link: '/STATE_MACHINE' },
+      { text: 'Conventions', link: '/CONVENTIONS' },
+    ],
     sidebar: [
       {
         text: 'Docs',
-        items: [{ text: 'Conventions', link: '/CONVENTIONS' }],
+        items: [
+          { text: 'State Machine', link: '/STATE_MACHINE' },
+          { text: 'Conventions', link: '/CONVENTIONS' },
+        ],
       },
     ],
   },

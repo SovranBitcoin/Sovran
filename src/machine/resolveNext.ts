@@ -160,6 +160,9 @@ function checkProofComposition(
   // swap server-side, so showing a proof picker is incorrect.
   if (ctx.destination !== 'sendEcash') return null;
 
+  // Locked sends never use local proofs — a P2PK lock requires a mint swap.
+  if (ctx.p2pkLockPubkey) return null;
+
   const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
   if (proofAmounts.length === 0) return null;
 

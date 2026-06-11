@@ -1365,6 +1365,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     meltTarget?: string;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
+    p2pkLockPubkey?: string;
   }) => {
     if (opts?.reset) resetInternal();
     return send({
@@ -1372,6 +1373,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       ...(opts?.meltTarget ? { meltTarget: opts.meltTarget } : {}),
       ...(opts?.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
       ...(opts?.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
+      ...(opts?.p2pkLockPubkey ? { p2pkLockPubkey: opts.p2pkLockPubkey } : {}),
     });
   };
 

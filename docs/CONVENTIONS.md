@@ -9,10 +9,16 @@ The shipped docs are:
 
 - `README.md`: public package overview and integration guide.
 - `docs/CONVENTIONS.md`: rules for maintaining the docs.
+- `docs/STATE_MACHINE.md`: authoritative `PaymentMachine` expectations reference
+  (steps, destinations, per-flow sequencing, offline semantics, invariants). It
+  is source-cited and hand-maintained; its own prime rule keeps it current --
+  any flow change updates the doc and its named invariant in the same change.
 
 Do not add flow, guide, pipeline, or method pages unless the content is generated
-from source or kept current by tests. Delete stale docs instead of leaving
-examples that compile only against old APIs.
+from source or kept current by tests. `docs/STATE_MACHINE.md` is the one
+hand-maintained exception, allowed because every claim cites source and its
+invariants are the durable guard against silent flow regressions. Delete stale
+docs instead of leaving examples that compile only against old APIs.
 
 ## Accuracy Rules
 
