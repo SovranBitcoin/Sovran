@@ -13,6 +13,7 @@ import opacity from 'hex-color-opacity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
 import { supportsLiquidGlass } from '@/shared/lib/version';
+import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { headerButtonSize } from '@/shared/styles/tokens';
 
@@ -51,15 +52,19 @@ export function HeaderIconButton({
   // contract — see ScreenHeaderAction): surface-secondary circle, 1px muted
   // border, opacity press. Only the glyph source forks: SF symbol on iOS,
   // monicon map on Android (expo-symbols renders nothing there). On liquid
-  // devices (iOS 26+) the system glass capsule around header bar items IS
-  // the chrome — render the bare glyph; flat fill/border inside the capsule
-  // gets refracted into a smeared double-glass look.
+  // devices (iOS 26+) the app-owned HeaderGlassCircle replaces both the flat
+  // chrome AND the system bar-item capsule (squat content-width pill) so
+  // header buttons share the mint selector's glass geometry.
   const glyph =
     Platform.OS === 'android' ? (
       <Icon name={ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu'} size={size} color={color} />
     ) : (
       <IconSymbol name={icon as any} size={size} color={color} />
     );
+
+  if (supportsLiquidGlass()) {
+    return <HeaderGlassCircle onPress={onPress}>{glyph}</HeaderGlassCircle>;
+  }
 
   return (
     <Pressable
@@ -73,16 +78,12 @@ export function HeaderIconButton({
           width: headerButtonSize,
           height: headerButtonSize,
           borderRadius: headerButtonSize / 2,
+          backgroundColor: flatSurface,
+          borderWidth: 1,
+          borderColor: opacity(muted, 0.3),
           alignItems: 'center',
           justifyContent: 'center',
         },
-        supportsLiquidGlass()
-          ? null
-          : {
-              backgroundColor: flatSurface,
-              borderWidth: 1,
-              borderColor: opacity(muted, 0.3),
-            },
         style,
       ]}>
       {glyph}
