@@ -25,14 +25,19 @@ const BLUR_HEADER_OPTIONS = {
  * side draws the chrome instead: standalone route files wrap their screens in
  * FormSheetChrome; flow groups' nested stacks render FlowSheetHeader via
  * createFlowLayoutScreenOptions({...}, { androidSheet: true }).
- * sheetGrabberVisible / sheetCornerRadius are iOS-only props — Android draws
- * its own sheet corners and the JS chrome draws the grabber.
+ * sheetGrabberVisible is iOS-only (the JS chrome draws the grabber);
+ * sheetCornerRadius IS cross-platform — unset it clamps to 0 on Android
+ * (RNS Screen.kt default -1 → max(...,0)), which rendered SQUARE sheet
+ * corners.
  */
 const ANDROID_SHEET_OPTIONS = {
   presentation: 'formSheet' as const,
   sheetAllowedDetents: [1.0],
   sheetInitialDetentIndex: 0 as const,
   sheetElevation: 24,
+  // Rounded top corners via RNS's MaterialShapeDrawable — matches the app's
+  // card radius and the iOS sheet look.
+  sheetCornerRadius: 24,
   headerShown: false,
 } satisfies Partial<NativeStackNavigationOptions>;
 

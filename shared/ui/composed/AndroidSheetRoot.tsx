@@ -7,8 +7,10 @@
  * BottomSheetBehaviorExt.kt), so the sheet's expanded offset tracks the
  * measured content height — short content produced a shorter sheet and a
  * content-dependent top gap. An exact-height frame (container minus the top
- * inset, mirroring RNS's own detent math with sheetShouldOverflowTopInset
- * false) makes every sheet open at the same position regardless of content.
+ * inset minus a small deliberate gap) makes every sheet open at the same
+ * position regardless of content. The gap mirrors iOS pageSheet's visible
+ * margin below the status bar (~10pt), so the screen behind — and RNS's
+ * native dim scrim — peeks through at the top like it does on iOS.
  *
  * Why the context: native-stack initializes HeaderHeightContext to a default
  * (~56dp + top inset) and only corrects it after the custom header's first
@@ -25,6 +27,11 @@ import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 export const SheetHeaderHeightContext = createContext<number | null>(null);
 
+/** Visible gap between the status bar and the sheet's top edge — the iOS
+ *  pageSheet margin equivalent. Content height controls the sheet position
+ *  (isFitToContents), so the gap lives in the height math. */
+const ANDROID_SHEET_TOP_GAP = 12;
+
 interface AndroidSheetRootProps {
   children: React.ReactNode;
   /** Fixed JS-header height inside this sheet (e.g. FLOW_SHEET_HEADER_HEIGHT). */
@@ -34,7 +41,7 @@ interface AndroidSheetRootProps {
 function AndroidSheetFrame({ children, headerHeight }: AndroidSheetRootProps) {
   const frame = useSafeAreaFrame();
   const insets = useSafeAreaInsets();
-  const sheetHeight = Math.round(frame.height - insets.top);
+  const sheetHeight = Math.round(frame.height - insets.top - ANDROID_SHEET_TOP_GAP);
   return (
     <SheetHeaderHeightContext.Provider value={headerHeight ?? null}>
       <View style={{ height: sheetHeight, width: '100%' }}>{children}</View>
