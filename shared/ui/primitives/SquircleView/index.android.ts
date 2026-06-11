@@ -7,4 +7,3 @@
 import FastSquircleView from 'react-native-fast-squircle';
 
 export const SquircleView = FastSquircleView;
-export type { FastSquircleViewProps as SquircleViewProps } from 'react-native-fast-squircle';

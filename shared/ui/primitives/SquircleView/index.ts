@@ -11,4 +11,3 @@
  * circles gain nothing from corner smoothing — keep plain View there.
  */
 export { View as SquircleView } from 'react-native';
-export type { ViewProps as SquircleViewProps } from 'react-native';

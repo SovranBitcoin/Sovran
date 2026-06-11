@@ -26,7 +26,7 @@ interface FlowColors {
  * layout (content still lays out under the header) — flipping
  * headerTransparent off would shift everything down by the header height.
  */
-export const AndroidHeaderScrim = memo(function AndroidHeaderScrim({
+const AndroidHeaderScrim = memo(function AndroidHeaderScrim({
   backgroundColor,
 }: {
   backgroundColor: string;

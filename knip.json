@@ -21,9 +21,10 @@
     "metro-minify-terser",
     "number-flow-react-native",
     "nutpatch",
-    "patch-package"
+    "patch-package",
+    "react-native-fast-squircle"
   ],
-  "ignoreBinaries": ["claude", "eas", "maestro", "tsx"],
+  "ignoreBinaries": ["claude", "eas", "gh", "maestro", "tsx"],
   "ignoreIssues": {
     "**/*.android.{ts,tsx}": ["files"],
     "**/*.liquid.{ts,tsx}": ["files"],
