@@ -23,6 +23,10 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
+import {
+  BLE_PEER_FRESHNESS_TICK_MS,
+  filterFreshBLEPeers,
+} from '@/features/bitchat/lib/blePeerSnapshots';
 import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';
 import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
 import {
@@ -1438,7 +1442,19 @@ export function NearPayScreen() {
   // Every bitchat peer is on the radar: peers announcing the ecash
   // capability TLV get P2PK-locked drops; vanilla peers are bearer-only
   // (visually marked, gated behind an explicit confirm in handleSelectPeer).
-  const { peers } = useBLEPeers();
+  // Ghost entries (a nearby device's previous profile identities, which
+  // upstream's registry can retain forever) are dropped by the freshness
+  // filter; the periodic tick re-evaluates it as lastSeen values age out.
+  const { peers: blePeers } = useBLEPeers();
+  const [peerFreshnessNow, setPeerFreshnessNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setPeerFreshnessNow(Date.now()), BLE_PEER_FRESHNESS_TICK_MS);
+    return () => clearInterval(interval);
+  }, []);
+  const peers = useMemo(
+    () => filterFreshBLEPeers(blePeers, peerFreshnessNow),
+    [blePeers, peerFreshnessNow]
+  );
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
   const inlineAmountEntry = nearPaySession?.amountEntry ?? null;

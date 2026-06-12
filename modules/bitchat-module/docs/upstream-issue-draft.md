@@ -89,3 +89,33 @@ existing public path that works with unmodified receivers.
    extension (Proposal B)? We're happy to adapt our allocation (type byte,
    magic, layout) to whatever upstream prefers — nothing is frozen on our
    side.
+
+## Separate finding: packet signatures are not verifiable cross-platform once payloads compress
+
+While testing the TLV above we hit what looks like a latent protocol bug
+worth its own issue (happy to file separately if preferred):
+
+`toBinaryDataForSigning()` — identical on iOS
+(`BitFoundation/BitchatPacket.swift`) and Android
+(`protocol/BinaryProtocol.kt`) — serializes the packet through
+`BinaryProtocol.encode(...)`, which **compresses payloads ≥ 100 bytes**
+before signing. The verifier re-encodes the decoded packet through *its
+own* `encode(...)` to reconstruct the signed bytes. Raw-deflate output is
+not canonical across implementations (Apple `COMPRESSION_ZLIB` and
+`java.util.zip.Deflater` emit different bytes for identical input), so any
+signed packet whose payload crosses the threshold verifies on the sender's
+platform and **fails on the other one**.
+
+Announces sit just under the threshold today (~76 B for nickname + the two
+key TLVs), which is why this doesn't bite stock clients — but an announce
+with a populated `0x04` neighbors TLV (3+ neighbors) or any vendor TLV
+crosses it. Android's announce handler requires a verified signature
+("no backward compatibility"), so an affected iOS announce is silently
+dropped on Android while the reverse direction appears to work (iOS
+tolerates unverified announces), producing confusing one-way visibility.
+
+Suggested fix: make the signing form compression-independent — e.g.
+`toBinaryDataForSigning()` encodes with compression disabled on both
+platforms. Wire format stays unchanged (transmitted packets still
+compress); only the signature input becomes canonical. We're running this
+patch in our fork and can PR it if there's interest.

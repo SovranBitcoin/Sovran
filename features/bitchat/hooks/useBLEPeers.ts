@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   getBLEPeers,
+  getBLEState,
   addBLEPeerListener,
   addBLEStateListener,
   startBLE,
@@ -65,17 +66,31 @@ export function useBLEPeers(): UseBLEPeersResult {
   }, [refresh]);
 
   useEffect(() => {
-    if (!nickname || !profileScope || !identityMaterial) return;
+    if (!nickname || !profileScope || !identityMaterial) {
+      // Without this line a missing input is indistinguishable from "started
+      // but alone" — the #1 cause of a forever-"Scanning nearby" radar.
+      bitchatLog.warn('bitchat.peers.ble_start_blocked', {
+        hasNickname: !!nickname,
+        hasProfileScope: !!profileScope,
+        hasIdentityMaterial: !!identityMaterial,
+      });
+      return;
+    }
 
     let cancelled = false;
     const attempt = () => {
       startBLE(nickname, profileScope, identityMaterial)
         .then(() => {
           if (cancelled) return;
+          bitchatLog.info('bitchat.peers.ble_start_ok', {
+            bleState: getBLEState(),
+            initialPeerCount: getBLEPeers().length,
+          });
           refresh();
         })
         .catch((err) => {
           bitchatLog.error('bitchat.peers.ble_start_failed', {
+            bleState: getBLEState(),
             error: err instanceof Error ? err.message : String(err),
           });
         });
@@ -86,6 +101,7 @@ export function useBLEPeers(): UseBLEPeersResult {
     // idempotent natively (same scope + identity → no-op), so re-attempts
     // after a permission grant or radio toggle are safe on both platforms.
     const stateSub = addBLEStateListener((event) => {
+      bitchatLog.info('bitchat.peers.ble_state_changed', { state: event.state });
       if (event.state === 'poweredOn') attempt();
     });
 
