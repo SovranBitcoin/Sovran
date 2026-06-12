@@ -77,17 +77,36 @@ function pointOnRim(angleRad: number, radius: number): BoltPoint {
   };
 }
 
+interface DisplaceOptions {
+  iterations: number;
+  /** First-iteration amplitude as a fraction of the chord length. */
+  amplitudeFactor: number;
+  /**
+   * Outward-bias origin: displacement favors the side facing away from this
+   * point ([-0.35, 1] of the amplitude). `null` = symmetric displacement
+   * ([-1, 1]) for long bolts with no rim to hug.
+   */
+  biasCenter: BoltPoint | null;
+  maxBulge: number;
+  clampPoint: (point: BoltPoint) => BoltPoint;
+}
+
 /**
- * Midpoint-displacement polyline between two rim points. Displacement runs
- * along the segment normal, biased outward (away from the canvas center) so
- * the bolt hugs the rim's outside; amplitude halves per iteration.
+ * Midpoint-displacement polyline core. Displacement runs along the segment
+ * normal; amplitude halves per iteration. Exactly one `random()` call per
+ * midpoint regardless of options, so seeded sequences stay stable.
  */
-function displacePolyline(start: BoltPoint, end: BoltPoint, random: () => number): BoltPoint[] {
+function displacePolylineWith(
+  start: BoltPoint,
+  end: BoltPoint,
+  random: () => number,
+  options: DisplaceOptions
+): BoltPoint[] {
   let points: BoltPoint[] = [start, end];
   const chord = Math.hypot(end.x - start.x, end.y - start.y);
 
-  for (let iteration = 0; iteration < BOLT_DISPLACEMENT_ITERATIONS; iteration++) {
-    const amplitude = chord * 0.18 * 0.5 ** iteration;
+  for (let iteration = 0; iteration < options.iterations; iteration++) {
+    const amplitude = chord * options.amplitudeFactor * 0.5 ** iteration;
     const next: BoltPoint[] = [];
     for (let i = 0; i < points.length - 1; i++) {
       const a = points[i];
@@ -102,23 +121,45 @@ function displacePolyline(start: BoltPoint, end: BoltPoint, random: () => number
       // Unit normal to the segment.
       let nx = -dy / length;
       let ny = dx / length;
-      // Bias outward: flip the normal when it points toward the center.
-      const outX = midX - BOLT_CANVAS_CENTER;
-      const outY = midY - BOLT_CANVAS_CENTER;
-      if (nx * outX + ny * outY < 0) {
-        nx = -nx;
-        ny = -ny;
+      let displacement: number;
+      if (options.biasCenter) {
+        // Bias outward: flip the normal when it points toward the center.
+        const outX = midX - options.biasCenter.x;
+        const outY = midY - options.biasCenter.y;
+        if (nx * outX + ny * outY < 0) {
+          nx = -nx;
+          ny = -ny;
+        }
+        // [-0.35, 1] of the amplitude: mostly outward, occasional inward nick
+        // for jaggedness, with the bulge hard-capped.
+        displacement = Math.min((random() * 1.35 - 0.35) * amplitude, options.maxBulge);
+      } else {
+        displacement = Math.max(
+          -options.maxBulge,
+          Math.min((random() * 2 - 1) * amplitude, options.maxBulge)
+        );
       }
-      // [-0.35, 1] of the amplitude: mostly outward, occasional inward nick
-      // for jaggedness, with the bulge hard-capped.
-      const displacement = Math.min((random() * 1.35 - 0.35) * amplitude, BOLT_MAX_BULGE);
-      next.push(clampToCanvas({ x: midX + nx * displacement, y: midY + ny * displacement }));
+      next.push(options.clampPoint({ x: midX + nx * displacement, y: midY + ny * displacement }));
     }
     next.push(points[points.length - 1]);
     points = next;
   }
 
   return points;
+}
+
+/**
+ * Rim-bolt polyline between two rim points, biased outward (away from the
+ * canvas center) so the bolt hugs the rim's outside.
+ */
+function displacePolyline(start: BoltPoint, end: BoltPoint, random: () => number): BoltPoint[] {
+  return displacePolylineWith(start, end, random, {
+    iterations: BOLT_DISPLACEMENT_ITERATIONS,
+    amplitudeFactor: 0.18,
+    biasCenter: { x: BOLT_CANVAS_CENTER, y: BOLT_CANVAS_CENTER },
+    maxBulge: BOLT_MAX_BULGE,
+    clampPoint: clampToCanvas,
+  });
 }
 
 function generateFork(main: BoltPoint[], random: () => number): BoltPoint[] {
@@ -166,4 +207,121 @@ export function generateStrikeVariants(seedString: string): BoltVariant[] {
     variants.push({ main, fork: generateFork(main, random) });
   }
   return variants;
+}
+
+// ---------------------------------------------------------------------------
+// Sky bolts — full-field strikes for the Nut Drop receive celebration.
+
+export interface SkyBoltConfig {
+  /** Field (celebration canvas) size in px. */
+  width: number;
+  height: number;
+  /** Strike target — the centered celebration avatar's center. */
+  targetX: number;
+  targetY: number;
+  /**
+   * Bolts terminate on this radius around the target and no vertex ever
+   * enters it — the geometry-level face-protection twin of the canvas's
+   * inverted clip.
+   */
+  targetRadius: number;
+  count: number;
+}
+
+/** Long bolts need a finer fractal: 2^4 = 16 segments. */
+const SKY_BOLT_DISPLACEMENT_ITERATIONS = 4;
+/** Approach corridor around straight-down: ±35° from vertical. */
+const SKY_BOLT_MAX_TILT_RAD = (35 * Math.PI) / 180;
+
+/** Keep vertices inside the field and outside the avatar face circle. */
+function clampSkyPoint(config: SkyBoltConfig, point: BoltPoint): BoltPoint {
+  let x = Math.min(Math.max(point.x, 0), config.width);
+  let y = Math.min(Math.max(point.y, 0), config.height);
+  const dx = x - config.targetX;
+  const dy = y - config.targetY;
+  const distance = Math.hypot(dx, dy);
+  if (distance < config.targetRadius) {
+    if (distance === 0) {
+      y = config.targetY - config.targetRadius;
+    } else {
+      x = config.targetX + (dx / distance) * config.targetRadius;
+      y = config.targetY + (dy / distance) * config.targetRadius;
+    }
+  }
+  return { x, y };
+}
+
+function generateSkyFork(
+  main: BoltPoint[],
+  random: () => number,
+  chord: number,
+  clampPoint: (point: BoltPoint) => BoltPoint
+): BoltPoint[] {
+  // Branch from a vertex in the bolt's middle stretch (t ≈ 0.4–0.65).
+  const branchIndex = Math.round((main.length - 1) * (0.4 + random() * 0.25));
+  const branchPoint = main[branchIndex];
+  const nextPoint = main[Math.min(branchIndex + 1, main.length - 1)];
+  const travelAngle = Math.atan2(nextPoint.y - branchPoint.y, nextPoint.x - branchPoint.x);
+  const side = random() < 0.5 ? -1 : 1;
+  const forkAngle = travelAngle + side * ((25 + random() * 25) * (Math.PI / 180));
+  const reach = chord * (0.12 + random() * 0.08);
+
+  const fork: BoltPoint[] = [branchPoint];
+  for (let i = 1; i <= BOLT_FORK_SEGMENTS; i++) {
+    const t = i / BOLT_FORK_SEGMENTS;
+    const jitter = (random() - 0.5) * reach * 0.3;
+    fork.push(
+      clampPoint({
+        x: branchPoint.x + Math.cos(forkAngle) * reach * t + jitter,
+        y: branchPoint.y + Math.sin(forkAngle) * reach * t + jitter,
+      })
+    );
+  }
+  return fork;
+}
+
+/**
+ * Full-field celebration bolts: each starts where its approach ray exits the
+ * field (top edge for a centered target) and ends on the face-clearance rim
+ * around the target. Deterministic per seed; bolt `i` approaches from the
+ * left/right alternately so a pair never lands on the same side.
+ */
+export function generateSkyBolts(seedString: string, config: SkyBoltConfig): BoltVariant[] {
+  const bolts: BoltVariant[] = [];
+  const clampPoint = (point: BoltPoint) => clampSkyPoint(config, point);
+
+  for (let i = 0; i < config.count; i++) {
+    const random = mulberry32(hashSeed(`${seedString}:sky:${i}`));
+    const side = i % 2 === 0 ? -1 : 1;
+    const angle = -Math.PI / 2 + side * random() * SKY_BOLT_MAX_TILT_RAD;
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+
+    // Distance along the ray to the first field boundary (top, or a side
+    // when the target sits near an edge). dirY < 0 always (±35° corridor).
+    let exitT = -config.targetY / dirY;
+    if (dirX > 1e-9) exitT = Math.min(exitT, (config.width - config.targetX) / dirX);
+    if (dirX < -1e-9) exitT = Math.min(exitT, -config.targetX / dirX);
+
+    const start = {
+      x: config.targetX + dirX * exitT,
+      y: config.targetY + dirY * exitT,
+    };
+    const end = {
+      x: config.targetX + dirX * config.targetRadius,
+      y: config.targetY + dirY * config.targetRadius,
+    };
+    const chord = Math.max(exitT - config.targetRadius, 1);
+
+    const main = displacePolylineWith(start, end, random, {
+      iterations: SKY_BOLT_DISPLACEMENT_ITERATIONS,
+      // Long bolts need proportionally less wiggle than rim arcs.
+      amplitudeFactor: 0.1,
+      biasCenter: null,
+      maxBulge: chord * 0.12,
+      clampPoint,
+    });
+    bolts.push({ main, fork: generateSkyFork(main, random, chord, clampPoint) });
+  }
+  return bolts;
 }

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet } from 'react-native';
 import {
   BlurMask,
   Canvas,
@@ -70,9 +69,6 @@ const HALO_RADIUS = 34;
 // ---------------------------------------------------------------------------
 // Tuning knobs — edit + Metro reload to experiment.
 
-/** Dev toggle: 'electric-blue' (shipped) | 'storm-gold'. */
-const LIGHTNING_PALETTE: 'electric-blue' | 'storm-gold' = 'electric-blue';
-
 /**
  * 1 = the originally shipped look. Raise to intensify: brighter peaks,
  * thicker strokes/glows, faster crackle cadence. Useful range ~1–2.5;
@@ -97,11 +93,7 @@ const PALETTES = {
   },
 } as const;
 
-const PALETTE = PALETTES[LIGHTNING_PALETTE];
-const CORE_COLOR = PALETTE.core;
-const INNER_GLOW_COLOR = PALETTE.innerGlow;
-const OUTER_GLOW_COLOR = PALETTE.outerGlow;
-const RIM_COLOR = PALETTE.rim;
+type LightningPalette = keyof typeof PALETTES;
 
 /** Opacity target scaled by intensity, clamped — additive blend stays sane. */
 const op = (v: number) => Math.min(1, v * LIGHTNING_INTENSITY);
@@ -121,6 +113,14 @@ interface LightningStrikeProps {
   entrance: 'strike' | 'ambient';
   /** Stable seed (peer ID) — same peer always gets the same bolt shapes. */
   seed: string;
+  /**
+   * Rendered avatar frame size. The effect was designed against a 48px
+   * frame; other sizes scale geometry, strokes, and blurs uniformly via a
+   * root canvas transform — no per-size retuning.
+   */
+  frameSize?: number;
+  /** 'electric-blue' = pending/radar identity; 'storm-gold' = money landed. */
+  palette?: LightningPalette;
 }
 
 function variantToSkPath(variant: BoltVariant) {
@@ -143,7 +143,30 @@ function ambientFlicker(peak: number) {
   );
 }
 
-export function LightningStrike({ status, entrance, seed }: LightningStrikeProps) {
+export function LightningStrike({
+  status,
+  entrance,
+  seed,
+  frameSize = AVATAR_FRAME_SIZE,
+  palette = 'electric-blue',
+}: LightningStrikeProps) {
+  const { core, innerGlow, outerGlow, rim } = PALETTES[palette];
+  const frameScale = frameSize / AVATAR_FRAME_SIZE;
+  const canvasStyle = useMemo(
+    () => ({
+      position: 'absolute' as const,
+      width: BOLT_CANVAS_SIZE * frameScale,
+      height: BOLT_CANVAS_SIZE * frameScale,
+      left: -CANVAS_OFFSET * frameScale,
+      top: -CANVAS_OFFSET * frameScale,
+    }),
+    [frameScale]
+  );
+  const frameTransform = useMemo(() => [{ scale: frameScale }], [frameScale]);
+  const haloGradientColors = useMemo(
+    () => [opacity(outerGlow, op(0.45)), opacity(outerGlow, 0)],
+    [outerGlow]
+  );
   const variants = useMemo(() => generateStrikeVariants(seed), [seed]);
   const paths = useMemo(() => variants.map(variantToSkPath), [variants]);
   const faceClip = useMemo(() => {
@@ -362,75 +385,77 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
   const scaledBolts = [scaledBolt0, scaledBolt1, scaledBolt2, scaledBolt3];
 
   return (
-    <Canvas style={styles.canvas} pointerEvents="none">
-      <Group
-        opacity={rootOpacity}
-        transform={groupTransform}
-        origin={vec(BOLT_CANVAS_CENTER, BOLT_CANVAS_CENTER)}>
-        <Group blendMode="plus">
-          <Circle
-            cx={BOLT_CANVAS_CENTER}
-            cy={BOLT_CANVAS_CENTER}
-            r={HALO_RADIUS}
-            opacity={haloOpacity}>
-            <RadialGradient
-              c={vec(BOLT_CANVAS_CENTER, BOLT_CANVAS_CENTER)}
+    <Canvas style={canvasStyle} pointerEvents="none">
+      <Group transform={frameTransform}>
+        <Group
+          opacity={rootOpacity}
+          transform={groupTransform}
+          origin={vec(BOLT_CANVAS_CENTER, BOLT_CANVAS_CENTER)}>
+          <Group blendMode="plus">
+            <Circle
+              cx={BOLT_CANVAS_CENTER}
+              cy={BOLT_CANVAS_CENTER}
               r={HALO_RADIUS}
-              colors={[opacity(OUTER_GLOW_COLOR, op(0.45)), opacity(OUTER_GLOW_COLOR, 0)]}
+              opacity={haloOpacity}>
+              <RadialGradient
+                c={vec(BOLT_CANVAS_CENTER, BOLT_CANVAS_CENTER)}
+                r={HALO_RADIUS}
+                colors={haloGradientColors}
+              />
+            </Circle>
+            <Circle
+              cx={BOLT_CANVAS_CENTER}
+              cy={BOLT_CANVAS_CENTER}
+              r={RIM_RING_RADIUS}
+              style="stroke"
+              strokeWidth={1.5 * WIDTH_SCALE}
+              color={rim}
+              opacity={rimOpacity}>
+              <BlurMask blur={2 * WIDTH_SCALE} style="solid" />
+            </Circle>
+            <Group clip={faceClip} invertClip>
+              {paths.map((path, index) => (
+                <Group key={index} opacity={scaledBolts[index]}>
+                  <Path
+                    path={path}
+                    style="stroke"
+                    strokeWidth={5.5 * WIDTH_SCALE}
+                    strokeJoin="round"
+                    strokeCap="round"
+                    color={outerGlow}
+                    opacity={op(0.55)}>
+                    <BlurMask blur={6 * WIDTH_SCALE} style="normal" />
+                  </Path>
+                  <Path
+                    path={path}
+                    style="stroke"
+                    strokeWidth={2.5 * WIDTH_SCALE}
+                    strokeJoin="round"
+                    strokeCap="round"
+                    color={innerGlow}>
+                    <BlurMask blur={2.5 * WIDTH_SCALE} style="normal" />
+                  </Path>
+                  <Path
+                    path={path}
+                    style="stroke"
+                    strokeWidth={1.25 * WIDTH_SCALE}
+                    strokeJoin="round"
+                    strokeCap="round"
+                    color={core}
+                  />
+                </Group>
+              ))}
+            </Group>
+            <Circle
+              cx={BOLT_CANVAS_CENTER}
+              cy={BOLT_CANVAS_CENTER}
+              r={ringRadius}
+              style="stroke"
+              strokeWidth={ringWidth}
+              color={innerGlow}
+              opacity={ringOpacity}
             />
-          </Circle>
-          <Circle
-            cx={BOLT_CANVAS_CENTER}
-            cy={BOLT_CANVAS_CENTER}
-            r={RIM_RING_RADIUS}
-            style="stroke"
-            strokeWidth={1.5 * WIDTH_SCALE}
-            color={RIM_COLOR}
-            opacity={rimOpacity}>
-            <BlurMask blur={2 * WIDTH_SCALE} style="solid" />
-          </Circle>
-          <Group clip={faceClip} invertClip>
-            {paths.map((path, index) => (
-              <Group key={index} opacity={scaledBolts[index]}>
-                <Path
-                  path={path}
-                  style="stroke"
-                  strokeWidth={5.5 * WIDTH_SCALE}
-                  strokeJoin="round"
-                  strokeCap="round"
-                  color={OUTER_GLOW_COLOR}
-                  opacity={op(0.55)}>
-                  <BlurMask blur={6 * WIDTH_SCALE} style="normal" />
-                </Path>
-                <Path
-                  path={path}
-                  style="stroke"
-                  strokeWidth={2.5 * WIDTH_SCALE}
-                  strokeJoin="round"
-                  strokeCap="round"
-                  color={INNER_GLOW_COLOR}>
-                  <BlurMask blur={2.5 * WIDTH_SCALE} style="normal" />
-                </Path>
-                <Path
-                  path={path}
-                  style="stroke"
-                  strokeWidth={1.25 * WIDTH_SCALE}
-                  strokeJoin="round"
-                  strokeCap="round"
-                  color={CORE_COLOR}
-                />
-              </Group>
-            ))}
           </Group>
-          <Circle
-            cx={BOLT_CANVAS_CENTER}
-            cy={BOLT_CANVAS_CENTER}
-            r={ringRadius}
-            style="stroke"
-            strokeWidth={ringWidth}
-            color={INNER_GLOW_COLOR}
-            opacity={ringOpacity}
-          />
         </Group>
       </Group>
     </Canvas>
@@ -439,13 +464,3 @@ export function LightningStrike({ status, entrance, seed }: LightningStrikeProps
 
 const AVATAR_FRAME_SIZE = 48;
 const CANVAS_OFFSET = (BOLT_CANVAS_SIZE - AVATAR_FRAME_SIZE) / 2;
-
-const styles = StyleSheet.create({
-  canvas: {
-    height: BOLT_CANVAS_SIZE,
-    left: -CANVAS_OFFSET,
-    position: 'absolute',
-    top: -CANVAS_OFFSET,
-    width: BOLT_CANVAS_SIZE,
-  },
-});

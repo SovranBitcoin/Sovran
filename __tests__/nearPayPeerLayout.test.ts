@@ -963,4 +963,63 @@ describe('near pay peer layout registry', () => {
       );
     }
   });
+
+  describe('hero sizing config (peerFieldSizing)', () => {
+    // The hero-step config produced by buildPeerLayoutConfigForSizing — the
+    // honeycomb math must keep 1–5 hero avatars fully on a small phone field
+    // with zero peerLayout.ts changes (config-driven sizing contract).
+    const HERO_CONFIG: PeerLayoutConfig = {
+      ...CONFIG,
+      nodeWidth: 100,
+      nodeHeight: 98,
+      avatarSize: 72,
+      edgeScaleFalloff: 144,
+    };
+
+    it.each([1, 2, 3, 4, 5])('keeps %i hero avatars fully on a 360×520 field', (count) => {
+      const entries = reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: count }, (_, index) => peer(`hero-${index + 1}`)),
+        0
+      );
+      const targets = buildPeerLayoutTargets(entries, SIZE, HERO_CONFIG);
+      expect(targets).toHaveLength(count);
+
+      const avatarRadius = HERO_CONFIG.avatarSize / 2;
+      for (const target of targets) {
+        const presentation = getPeerViewportPresentation(target, SIZE, HERO_CONFIG);
+        const radius = avatarRadius * presentation.scale;
+        // Edge-lens may shave a few percent near the field border but every
+        // avatar body stays fully visible at near-full size.
+        expect(presentation.scale).toBeGreaterThanOrEqual(HERO_CONFIG.edgeBoundaryScale);
+        expect(presentation.avatarOpacity).toBe(1);
+        expect(presentation.centerX - radius).toBeGreaterThanOrEqual(HERO_CONFIG.edgePadding);
+        expect(presentation.centerY - radius).toBeGreaterThanOrEqual(HERO_CONFIG.edgePadding);
+        expect(presentation.centerX + radius).toBeLessThanOrEqual(
+          SIZE.width - HERO_CONFIG.edgePadding
+        );
+        expect(presentation.centerY + radius).toBeLessThanOrEqual(
+          SIZE.height - HERO_CONFIG.edgePadding
+        );
+      }
+    });
+
+    it('keeps hero spacious centers 120px apart on the first ring', () => {
+      const entries = reconcilePeerLayoutRegistry(
+        [],
+        Array.from({ length: 5 }, (_, index) => peer(`ring-${index + 1}`)),
+        0
+      );
+      const targets = buildPeerLayoutTargets(entries, SIZE, HERO_CONFIG);
+      const [first, ...rest] = targets;
+      const center = targetCenter(first, HERO_CONFIG);
+      for (const target of rest) {
+        const other = targetCenter(target, HERO_CONFIG);
+        const distance = Math.hypot(other.x - center.x, other.y - center.y);
+        expect(distance).toBeGreaterThanOrEqual(
+          HERO_CONFIG.avatarSize + HERO_CONFIG.spaciousAvatarGap - 0.001
+        );
+      }
+    });
+  });
 });
