@@ -68,25 +68,43 @@ export interface BLEPeer {
   hasDirectLink: boolean;
   lastSeen: number;
   /**
-   * True when the peer's last verified announce carried the ecash capability
-   * TLV — i.e. the peer can receive P2PK-locked cashu (open extension; any
-   * bitchat client may implement it). Invariant: equals
-   * `p2pkPubkeyHex !== undefined`. Authentic to the announcing peer
-   * (announces are Ed25519-signed) but any client could claim it — treat as
-   * a feature gate, not a trust signal.
+   * True when the peer's last verified announce carried the v2 capability
+   * beacon with the NUT-requests bit — the peer answers NUT-18
+   * payment-request solicits over the Noise channel (vendor payloads
+   * 0xA0–0xA3). Authentic to the announcing peer (announces are
+   * Ed25519-signed) but any client could claim it — treat as a feature
+   * gate, not a trust signal.
+   */
+  supportsNutRequests: boolean;
+  /**
+   * v2 beacon bit 1: the peer auto-redeems received ecash. Informational —
+   * drives the radar "instant" badge.
+   */
+  autoRedeem: boolean;
+  /**
+   * @deprecated Beacon v2 carries no key material, so this can no longer be
+   * true — synthesized `false` in the JS wrapper until the S3 rewire moves
+   * the send flow onto `supportsNutRequests` + per-send NUT-18 requests.
    */
   supportsP2pkEcash: boolean;
-  /**
-   * Ecash capability bitmask (0 for peers without the TLV). Bit 0 (0x01):
-   * the peer auto-redeems P2PK-locked cashu tokens seen on the public mesh.
-   */
+  /** @deprecated Replaced by `supportsNutRequests`/`autoRedeem`; synthesized 0. */
   ecashCapabilities: number;
   /**
-   * The peer's Cashu P2PK lock target: 33-byte compressed hex
-   * ("02" + their x-only Nostr pubkey). Lock Nut Drop tokens to this key.
-   * Absent for peers without the ecash capability TLV.
+   * @deprecated The P2PK lock key now arrives per-send inside the NUT-18
+   * payment request, never on the air. Always absent.
    */
   p2pkPubkeyHex?: string;
+}
+
+/**
+ * Payload dispatched on the `onNutPayload` event: a Nut Drop vendor Noise
+ * payload (0xA0–0xA3) decrypted by the vendored mesh stack. `payload` is the
+ * full typed bytes (type byte included) — decode with `nutDropProtocol.ts`.
+ */
+export interface BLENutPayloadEvent {
+  peerID: string;
+  payload: Uint8Array;
+  timestamp: number;
 }
 
 export interface BLEMessageEvent {

@@ -207,6 +207,46 @@ const NEIGHBOR_GOSSIP_REPLACEMENT =
   '            directNeighbors: nil\n' +
   '        )';
 
+// --- Route Nut Drop vendor Noise payloads (0xA0–0xA3) to the bridge relay ---
+//
+// The Nut Drop NUT-18 exchange (solicit / payment request / payment / status)
+// rides the Noise channel on a self-assigned vendor payload-type range that
+// upstream's dispatch drops as "unknown" — the sanctioned extension seam
+// (Android upstream added FILE_TRANSFER 0x20 the same way). Route the FULL
+// decrypted payload (type byte included) to NutPayloadRelay; all Cashu
+// semantics live in JS. Other unknown types keep the fail-silent drop.
+const NUT_PAYLOAD_ROUTE_ANCHOR =
+  /            guard let noisePayloadType = NoisePayloadType\(rawValue: payloadType\) else \{\n                SecureLogger\.warning\("⚠️ Unknown noise payload type: \\\(payloadType\)"\)\n                return\n            \}\n/;
+const NUT_PAYLOAD_ROUTE_REPLACEMENT =
+  '            guard let noisePayloadType = NoisePayloadType(rawValue: payloadType) else {\n' +
+  '                // [sovran] Nut Drop vendor Noise payloads (0xA0–0xA3): hand the\n' +
+  '                // full typed payload to the bridge relay — the native layer is a\n' +
+  '                // dumb byte pipe; Cashu semantics live in JS.\n' +
+  '                if NutPayloadRange.contains(payloadType) {\n' +
+  '                    NutPayloadRelay.shared.receive(\n' +
+  '                        peerID: peerID.id,\n' +
+  '                        typedPayload: decrypted,\n' +
+  '                        timestampMs: packet.timestamp\n' +
+  '                    )\n' +
+  '                    return\n' +
+  '                }\n' +
+  '                SecureLogger.warning("⚠️ Unknown noise payload type: \\(payloadType)")\n' +
+  '                return\n' +
+  '            }\n';
+
+// --- De-privatize BLEService.sendNoisePayload(_:to:) ---
+//
+// BitChatBLEBridge.sendNutPayload() sends the Nut Drop vendor payloads through
+// the same typed-payload path upstream uses for its own Noise payloads (session
+// check + pending-handshake queue + fragmentation). Same mechanism as the
+// linkState de-privatization above. Idempotent: once de-privatized, no match.
+const NOISE_SEND_DEPRIVATIZE_ANCHOR =
+  /    private func sendNoisePayload\(_ typedPayload: Data, to peerID: PeerID\) \{/;
+const NOISE_SEND_DEPRIVATIZE_REPLACEMENT =
+  '    // [sovran] de-privatized — BitChatBLEBridge.sendNutPayload() sends the Nut\n' +
+  '    // Drop vendor Noise payloads (0xA0–0xA3) through the same session/queue path.\n' +
+  '    func sendNoisePayload(_ typedPayload: Data, to peerID: PeerID) {';
+
 let patched = 0;
 const applied = {
   mismatchGuard: false,
@@ -216,6 +256,8 @@ const applied = {
   encodeCompressParam: false,
   signingNoCompress: false,
   neighborGossip: false,
+  nutPayloadRoute: false,
+  noiseSendDeprivatize: false,
 };
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
@@ -238,6 +280,18 @@ for (const file of walk(ROOT)) {
     next = after.replace(NEIGHBOR_GOSSIP_ANCHOR, NEIGHBOR_GOSSIP_REPLACEMENT);
     if (next !== after) applied.neighborGossip = true;
     after = next;
+    next = after.replace(NOISE_SEND_DEPRIVATIZE_ANCHOR, NOISE_SEND_DEPRIVATIZE_REPLACEMENT);
+    if (next !== after) applied.noiseSendDeprivatize = true;
+    after = next;
+  }
+  if (file.endsWith('BLENoisePacketHandler.swift')) {
+    // The anchor text survives inside the replacement (the guard is
+    // re-emitted), so gate on the marker to stay idempotent.
+    if (!after.includes('[sovran] Nut Drop vendor Noise payloads')) {
+      const next = after.replace(NUT_PAYLOAD_ROUTE_ANCHOR, NUT_PAYLOAD_ROUTE_REPLACEMENT);
+      if (next !== after) applied.nutPayloadRoute = true;
+      after = next;
+    }
   }
   if (file.endsWith('BinaryProtocol.swift')) {
     const next = after.replace(ENCODE_COMPRESS_PARAM_ANCHOR, ENCODE_COMPRESS_PARAM_REPLACEMENT);
@@ -325,5 +379,17 @@ assertApplied(
   applied.neighborGossip,
   path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
   /\[sovran\] neighbors gossip suppressed/
+);
+assertApplied(
+  'NUT_PAYLOAD_ROUTE',
+  applied.nutPayloadRoute,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLENoisePacketHandler.swift'),
+  /\[sovran\] Nut Drop vendor Noise payloads/
+);
+assertApplied(
+  'NOISE_SEND_DEPRIVATIZE',
+  applied.noiseSendDeprivatize,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
+  /\[sovran\] de-privatized — BitChatBLEBridge\.sendNutPayload/
 );
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);

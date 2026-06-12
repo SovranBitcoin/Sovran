@@ -16,6 +16,7 @@ enum BitChatBridgeError: Error, LocalizedError {
     case invalidPeerID
     case invalidIdentityMaterial(String)
     case identityKeySaveFailed(String)
+    case invalidNutPayload
 
     var errorDescription: String? {
         switch self {
@@ -27,6 +28,8 @@ enum BitChatBridgeError: Error, LocalizedError {
             return "Invalid BitChat identity material: \(reason)."
         case .identityKeySaveFailed(let keyName):
             return "Failed to persist BitChat \(keyName) identity key."
+        case .invalidNutPayload:
+            return "Invalid NUT payload (expected base64 bytes starting 0xA0–0xA3)."
         }
     }
 }
@@ -248,13 +251,24 @@ final class BitChatBLEBridge: NSObject {
         activeIdentityID = identityMaterial.identityID
         activeNickname = nickname
         loadDmSummaries(for: scope)
-        // The ecash capability announce TLV must be live before
-        // startServices() — the first announce fires during startup and every
-        // announce must carry it.
+        // The ecash capability beacon must be live before startServices() —
+        // the first announce fires during startup and every announce must
+        // carry it. v2 is flags-only: the profile's P2PK key is never
+        // announced; it travels per-send inside the Noise channel as a
+        // NUT-18 payment request.
         EcashAnnounceState.shared.localTLV = EcashAnnounceTLV.encode(
-            p2pkPubkey: identityMaterial.p2pkPubkey,
-            flags: EcashAnnounceTLV.capabilityCashuAutoRedeem
+            flags: EcashAnnounceTLV.capabilityNutRequests | EcashAnnounceTLV.capabilityAutoRedeem
         )
+        // Raw byte pipe for the NUT payloads (0xA0–0xA3): inbound vendor
+        // payloads surface as onNutPayload events; all Cashu semantics
+        // (creq parsing, solicit correlation, validation) live in JS.
+        NutPayloadRelay.shared.onInbound = { [weak self] peerID, typedPayload, timestampMs in
+            self?.module?.sendEvent("onNutPayload", [
+                "peerID": peerID,
+                "payloadBase64": typedPayload.base64EncodedString(),
+                "timestamp": timestampMs,
+            ])
+        }
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
@@ -277,10 +291,27 @@ final class BitChatBLEBridge: NSObject {
         activeIdentityID = nil
         activeNickname = nil
         dmSummaries = [:]
-        // Clear ecash announce state so a profile switch can never announce
-        // the previous profile's lock key or surface its peers.
+        // Clear ecash state so a profile switch can never announce the
+        // previous profile's capabilities, surface its peers, or deliver a
+        // stale NUT payload across profiles.
         EcashAnnounceState.shared.localTLV = nil
         EcashAnnounceState.shared.removeAll()
+        NutPayloadRelay.shared.onInbound = nil
+    }
+
+    /// Send a raw NUT payload (type byte 0xA0–0xA3 + body) to a peer over
+    /// the Noise channel. Queues behind the lazy handshake like every other
+    /// noise payload (vendor sendNoisePayload semantics).
+    func sendNutPayload(_ peerIDStr: String, payloadBase64: String) throws {
+        guard let service = bleService else {
+            throw BitChatBridgeError.notStarted
+        }
+        guard let payload = Data(base64Encoded: payloadBase64),
+              let first = payload.first,
+              NutPayloadRange.contains(first) else {
+            throw BitChatBridgeError.invalidNutPayload
+        }
+        service.sendNoisePayload(payload, to: PeerID(str: peerIDStr))
     }
 
     func sendMessage(_ content: String) throws {
@@ -397,22 +428,19 @@ final class BitChatBLEBridge: NSObject {
             // through the mesh-flood + 15s spool fallback. Surface both so
             // UI can warn users when "connected" doesn't mean reachable.
             let link = service.linkState(for: peer.peerID)
-            // Ecash capability fields come from the peer's last verified
-            // announce. `supportsP2pkEcash` marks peers that can receive
-            // P2PK-locked drops; `p2pkPubkeyHex` is the lock target.
+            // Capability fields come from the peer's last verified announce
+            // beacon (v2 carries flags only — the P2PK lock key now arrives
+            // per-send inside the NUT-18 payment request, never on the air).
             let ecashExt = EcashAnnounceState.shared.lookup(peerID: peer.peerID.id)
-            var dict: [String: Any] = [
+            let dict: [String: Any] = [
                 "peerID": peer.peerID.id,
                 "nickname": peer.nickname,
                 "isConnected": peer.isConnected,
                 "hasDirectLink": link.hasPeripheral || link.hasCentral,
                 "lastSeen": peer.lastSeen.timeIntervalSince1970 * 1000,
-                "supportsP2pkEcash": ecashExt != nil,
-                "ecashCapabilities": Int(ecashExt?.flags ?? 0),
+                "supportsNutRequests": ecashExt?.supportsNutRequests ?? false,
+                "autoRedeem": ecashExt?.autoRedeem ?? false,
             ]
-            if let ecashExt {
-                dict["p2pkPubkeyHex"] = ecashExt.p2pkPubkeyHex
-            }
             return dict
         }
     }

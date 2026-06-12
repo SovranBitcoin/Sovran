@@ -8,6 +8,7 @@ import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.noise.NoiseSession
 import com.bitchat.android.services.NicknameProvider
 import com.bitchat.android.ecash.EcashAnnounceExtension
+import com.bitchat.android.ecash.NutPayloadRelay
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +24,9 @@ class BitChatInvalidPeerException : Exception("Invalid peer ID (expected 16-char
 
 class BitChatUnauthorizedException :
     Exception("Bluetooth permissions are not granted. Request them before startBLE().")
+
+class BitChatInvalidNutPayloadException :
+    Exception("Invalid NUT payload (expected base64 bytes starting 0xA0–0xA3).")
 
 /**
  * Bridges the vendored bitchat-android BluetoothMeshService to the Expo module
@@ -155,13 +159,32 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             activeNickname = nickname
             dmSummaries = loadDmSummaries(context, suffix)
 
-            // The ecash capability announce TLV must be live before
-            // startServices() — the first announce fires during startup and
-            // every announce must carry it.
+            // The capability beacon TLV must be live before startServices() —
+            // the first announce fires during startup and every announce must
+            // carry it. v2 is flags-only: no key material on the air.
             EcashAnnounceExtension.localTLV = EcashAnnounceExtension.encodeLocalTLV(
-                p2pkPubkey = identity.p2pkPubkey,
-                flags = EcashAnnounceExtension.CAPABILITY_CASHU_AUTO_REDEEM,
+                flags = EcashAnnounceExtension.CAPABILITY_NUT_REQUESTS or
+                    EcashAnnounceExtension.CAPABILITY_AUTO_REDEEM,
             )
+
+            // Route inbound Nut Drop vendor Noise payloads (0xA0–0xA3) to JS.
+            // Raw bytes only — all Cashu semantics live in JS. Wake lock for
+            // the same reason as didReceiveMessage: a payment can arrive with
+            // the screen off and JS may need a mint call to redeem it.
+            NutPayloadRelay.onInbound = { peerID, typedPayload, timestampMs ->
+                holdMessageWakeLock()
+                emitter?.invoke(
+                    "onNutPayload",
+                    mapOf(
+                        "peerID" to peerID,
+                        "payloadBase64" to android.util.Base64.encodeToString(
+                            typedPayload,
+                            android.util.Base64.NO_WRAP,
+                        ),
+                        "timestamp" to timestampMs.toDouble(),
+                    ),
+                )
+            }
 
             val service = BluetoothMeshService(scopedContext)
             if (service.myPeerID != identity.peerID) {
@@ -198,10 +221,12 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         NicknameProvider.currentNickname = null
         dmSummaries = mutableMapOf()
         pendingSends.clear()
-        // Clear ecash announce state so a profile switch can never announce
-        // the previous profile's lock key or surface its peers.
+        // Clear capability-beacon state so a profile switch can never reuse
+        // the previous profile's announce or surface its peers, and drop the
+        // relay handler so stale payloads can't cross profiles.
         EcashAnnounceExtension.localTLV = null
         EcashAnnounceExtension.clear()
+        NutPayloadRelay.onInbound = null
     }
 
     // MARK: - Public mesh messaging
@@ -266,6 +291,27 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         service.encryptionService.removePeer(peerID)
     }
 
+    /**
+     * Send a Nut Drop vendor Noise payload (raw typed bytes, 0xA0–0xA3) to a
+     * peer. The native layer is a dumb byte pipe — payload semantics live in
+     * JS. Requires an established Noise session (the JS layer calls
+     * startBLEPrivateChat first); without one the vendor's encrypt fails and
+     * the send is logged + dropped, which the JS solicit timeout absorbs.
+     */
+    fun sendNutPayload(peerIDStr: String, payloadBase64: String) {
+        val service = mesh ?: throw BitChatNotStartedException()
+        val peerID = validPeerID(peerIDStr)
+        val payload = try {
+            android.util.Base64.decode(payloadBase64, android.util.Base64.NO_WRAP)
+        } catch (_: IllegalArgumentException) {
+            throw BitChatInvalidNutPayloadException()
+        }
+        if (payload.isEmpty() || !NutPayloadRelay.containsType(payload[0].toInt() and 0xFF)) {
+            throw BitChatInvalidNutPayloadException()
+        }
+        service.sendRawNoisePayload(payload, peerID, "nut payload")
+    }
+
     private fun flushPendingSends(peerID: String) {
         val service = mesh ?: return
         val queue = synchronized(lock) { pendingSends.remove(peerID) } ?: return
@@ -294,9 +340,9 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         val service = mesh ?: return emptyList()
         return service.getPeerNicknames().keys.mapNotNull { peerID ->
             val info = service.getPeerInfo(peerID) ?: return@mapNotNull null
-            // Ecash capability fields come from the peer's last verified
-            // announce. `supportsP2pkEcash` marks peers that can receive
-            // P2PK-locked drops; `p2pkPubkeyHex` is the lock target.
+            // Capability fields come from the peer's last verified announce
+            // beacon (v2 carries flags only — the P2PK lock key now arrives
+            // per-send inside the NUT-18 payment request, never on the air).
             val ecashExt = EcashAnnounceExtension.lookup(peerID)
             mapOf(
                 "peerID" to info.id,
@@ -307,9 +353,8 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 "isConnected" to info.isConnected,
                 "hasDirectLink" to service.connectionManager.addressPeerMap.containsValue(peerID),
                 "lastSeen" to info.lastSeen.toDouble(),
-                "supportsP2pkEcash" to (ecashExt != null),
-                "ecashCapabilities" to (ecashExt?.flags ?: 0),
-                "p2pkPubkeyHex" to ecashExt?.p2pkPubkeyHex,
+                "supportsNutRequests" to (ecashExt?.supportsNutRequests ?: false),
+                "autoRedeem" to (ecashExt?.autoRedeem ?: false),
             )
         }
     }

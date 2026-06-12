@@ -16,6 +16,8 @@ function blePeer(overrides: Partial<BLEPeer> = {}): BLEPeer {
     isConnected: true,
     hasDirectLink: true,
     lastSeen: 1,
+    supportsNutRequests: true,
+    autoRedeem: true,
     supportsP2pkEcash: true,
     ecashCapabilities: 1,
     p2pkPubkeyHex: `02${NOSTR_PUBKEY}`,
