@@ -52,6 +52,7 @@ export function classifyMeshToken(tokenString: string, myPubkey33: string): Clas
   let unit: string | null = null;
   let lockedToMeCount = 0;
   let p2pkCount = 0;
+  let otherConditionCount = 0;
 
   try {
     const token = getDecodedToken(tokenString);
@@ -67,7 +68,13 @@ export function classifyMeshToken(tokenString: string, myPubkey33: string): Clas
       try {
         secret = parseP2PKSecret(proof.secret);
       } catch {
-        // Plain (non-P2PK) secret — a bearer proof.
+        if (isWellKnownConditionSecret(proof.secret)) {
+          // A NUT-10 condition we can't satisfy (HTLC, future kinds, or
+          // malformed P2PK). NOT a bearer proof — receiving it would
+          // accept un-spendable funds.
+          otherConditionCount += 1;
+        }
+        // Otherwise a plain random secret — a bearer proof.
         continue;
       }
       p2pkCount += 1;
@@ -82,13 +89,29 @@ export function classifyMeshToken(tokenString: string, myPubkey33: string): Clas
       }
     }
 
-    if (p2pkCount === 0) return { classification: 'bearer', mintUrl, amount, unit };
+    if (p2pkCount === 0 && otherConditionCount === 0) {
+      return { classification: 'bearer', mintUrl, amount, unit };
+    }
     if (p2pkCount === token.proofs.length && lockedToMeCount === token.proofs.length) {
       return { classification: 'locked-to-me', mintUrl, amount, unit };
     }
     return { classification: 'locked-to-other', mintUrl, amount, unit };
   } catch {
     return { classification: 'invalid', mintUrl, amount, unit };
+  }
+}
+
+/**
+ * NUT-10 well-known secrets are JSON arrays of the form `["KIND", {...}]`.
+ * Anything matching that shape but failing the P2PK parser is a spending
+ * condition this wallet cannot satisfy.
+ */
+function isWellKnownConditionSecret(secret: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(secret);
+    return Array.isArray(parsed) && typeof parsed[0] === 'string';
+  } catch {
+    return false;
   }
 }
 

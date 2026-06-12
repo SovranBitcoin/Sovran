@@ -142,6 +142,17 @@ describe('classifyMeshToken', () => {
     expect(classifyMeshToken(token, MY_PUBKEY).classification).toBe('locked-to-other');
   });
 
+  it('never classifies non-P2PK spending conditions as bearer (HTLC etc.)', () => {
+    const htlcSecret = JSON.stringify(['HTLC', { nonce: '11'.repeat(16), data: 'ab'.repeat(32) }]);
+    expect(classifyMeshToken(encode([proof(htlcSecret)]), MY_PUBKEY).classification).toBe(
+      'locked-to-other'
+    );
+    expect(
+      classifyMeshToken(encode([proof('aa'.repeat(32)), proof(htlcSecret)]), MY_PUBKEY)
+        .classification
+    ).toBe('locked-to-other');
+  });
+
   it('classifies plain-secret tokens as bearer and junk as invalid', () => {
     expect(classifyMeshToken(encode([proof('aa'.repeat(32))]), MY_PUBKEY).classification).toBe(
       'bearer'
@@ -337,6 +348,18 @@ describe('createMeshRequestResponder', () => {
     fake.emit({ kind: 'solicit', peerId: PEER, solicitId: 'aa', senderOffline: false });
     await flush();
     expect(fake.respondCalls).toHaveLength(0);
+    stop();
+  });
+
+  it('caps live requests per peer (solicit flood guard)', async () => {
+    const fake = createFakeAdapter();
+    const responder = createResponder(fake);
+    const stop = responder.start();
+    for (let i = 0; i < 6; i++) {
+      fake.emit({ kind: 'solicit', peerId: PEER, solicitId: `0${i}`, senderOffline: false });
+      await flush();
+    }
+    expect(fake.respondCalls.length).toBe(4);
     stop();
   });
 

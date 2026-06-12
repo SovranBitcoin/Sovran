@@ -1000,16 +1000,21 @@ export function createDefaultOperations(
             expectedLock: meshRequest.lockPubkey ?? 'bearer',
             classification: verified.classification,
           });
-          await attemptRollback(mgr, operationId);
-          return buildRolledBackResult(
-            operationId,
-            mintUrl,
-            effectiveAmount,
-            unit,
-            paymentRequest,
-            'mesh',
-            'Created token did not match the requested lock'
-          );
+          const lockMismatchRolledBack = await attemptRollback(mgr, operationId);
+          if (lockMismatchRolledBack) {
+            return buildRolledBackResult(
+              operationId,
+              mintUrl,
+              effectiveAmount,
+              unit,
+              paymentRequest,
+              'mesh',
+              'Created token did not match the requested lock'
+            );
+          }
+          // Reclaim failed: the proofs are still reserved — surface the raw
+          // failure instead of reporting funds as recovered.
+          throw new Error('Created token did not match the requested lock');
         }
 
         const payload = {

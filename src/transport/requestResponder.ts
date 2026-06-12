@@ -19,6 +19,11 @@ import type { MeshTransportAdapter } from './types';
 
 const DEFAULT_REQUEST_TTL_MS = 120_000;
 const P2PK_RECEIVE_KEY_PATTERN = /^02[0-9a-f]{64}$/i;
+/** Flood guards: a hostile peer spamming solicits must not grow the issued
+ * map (memory) or buy unbounded encode/send work (CPU) — within one TTL a
+ * peer gets a handful of live requests, the mesh a bounded total. */
+const MAX_LIVE_REQUESTS = 64;
+const MAX_LIVE_REQUESTS_PER_PEER = 4;
 
 export interface IssuedMeshRequest {
   paymentId: string;
@@ -90,6 +95,19 @@ export function createMeshRequestResponder(
     solicitId: string,
     senderOffline: boolean
   ): Promise<void> {
+    pruneExpired();
+    let total = 0;
+    let fromPeer = 0;
+    for (const request of issued.values()) {
+      if (request.consumed) continue;
+      total += 1;
+      if (request.peerId === peerId) fromPeer += 1;
+    }
+    if (total >= MAX_LIVE_REQUESTS || fromPeer >= MAX_LIVE_REQUESTS_PER_PEER) {
+      logger.warn('transport.responder.floodCapped', { peerId, total, fromPeer });
+      return;
+    }
+
     const lockPubkey = senderOffline ? null : config.getP2pkReceiveKey();
     if (!senderOffline && !P2PK_RECEIVE_KEY_PATTERN.test(lockPubkey ?? '')) {
       // No usable lock key for an online (locked) solicit: stay silent. The
@@ -99,7 +117,12 @@ export function createMeshRequestResponder(
       return;
     }
 
-    const mintUrls = (await config.getTrustedMintUrls()).map(normalizeMintUrl);
+    // The creq carries the wallet's mint URLs VERBATIM — the sender's
+    // machine intersects them against its own raw wallet URLs (same as any
+    // non-mesh creq), so rewriting the casing here would break legitimate
+    // matches. Normalization is comparison-time only: the issued record
+    // below stores normalized URLs for inbound-payment validation.
+    const trustedMintUrls = await config.getTrustedMintUrls();
     const paymentId = randomPaymentId();
     const request = new PaymentRequest(
       // Empty transport = in-band reply (NUT-18): the payment arrives back
@@ -108,7 +131,7 @@ export function createMeshRequestResponder(
       paymentId,
       undefined,
       unit,
-      mintUrls,
+      trustedMintUrls,
       undefined,
       true,
       lockPubkey ? { kind: 'P2PK', data: lockPubkey.toLowerCase(), tags: [] } : undefined
@@ -121,7 +144,7 @@ export function createMeshRequestResponder(
       paymentId,
       peerId,
       creq,
-      mintUrls,
+      mintUrls: trustedMintUrls.map(normalizeMintUrl),
       lockPubkey: lockPubkey ? lockPubkey.toLowerCase() : null,
       unit,
       issuedAt,
@@ -135,7 +158,7 @@ export function createMeshRequestResponder(
         peerId,
         paymentId,
         locked: lockPubkey != null,
-        mintCount: mintUrls.length,
+        mintCount: trustedMintUrls.length,
       });
     } catch (err) {
       // The request stays issued — the sender retries the solicit and a
