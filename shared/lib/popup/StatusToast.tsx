@@ -44,9 +44,10 @@ type StatusToastProps = {
   /** Right-aligned action pill. Hidden when omitted. */
   action?: { label: string; onPress: () => void };
   /**
-   * Confirmed-state tint override (failures always use the danger tint).
-   * Goes through the same alpha/blend pipeline as the default success
-   * green — e.g. the Nut Drop radar's storm-gold receive toast.
+   * Confirmed-state accent override (failures always use the danger tint).
+   * Drives both the background tint — through the same alpha/blend pipeline
+   * as the default success green — and the drawn checkmark, e.g. the Nut
+   * Drop radar's blue-accent receive toast.
    */
   confirmedTint?: string;
   /**
@@ -125,6 +126,9 @@ export function StatusToast({
         phase={indicatorPhase}
         result={indicatorResult}
         color={surfaceFg}
+        // The success disc + checkmark draw in the confirmed accent when one
+        // is set; failures keep the default danger coloring.
+        successColor={confirmedTint}
       />
       <View style={{ flex: 1, gap: 2 }}>
         <RNText
