@@ -27,12 +27,11 @@ import { BottomSheet } from 'heroui-native';
 import { LegendList } from '@legendapp/list/react-native';
 import * as Clipboard from 'expo-clipboard';
 import opacity from 'hex-color-opacity';
-import Icon from 'assets/icons';
+import Icon, { CurrencyIcon } from 'assets/icons';
 
 import { encode } from '@/shared/lib/third-party/emoji';
 import { log, useRenderLogger } from '@/shared/lib/logger';
 import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
-import { CurrencyIcon } from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

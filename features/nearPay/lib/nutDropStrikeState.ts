@@ -24,12 +24,27 @@ export interface StrikeState {
   entrance: 'strike' | 'ambient';
   /** When the current status was entered (UNIX ms) — drives removal. */
   statusChangedAt: number;
+  /**
+   * Sum of this sender's redeemed (non-baseline) amounts — present on
+   * 'success' states only. Feeds the receive celebration's amount reveal.
+   * Per-cycle delta, NOT a session total: the hook retires the contributing
+   * hashes (below) into its terminal baseline as soon as a success state is
+   * observed, so redeemed entries lingering in the queue store (24h TTL)
+   * never recount into a later drop from the same sender.
+   */
+  redeemedAmount?: number;
+  /** Unit of `redeemedAmount` (first seen; mesh drops are sat-only today). */
+  unit?: string;
+  /** Token hashes whose amounts are included in `redeemedAmount`. */
+  redeemedHashes?: readonly string[];
 }
 
 export interface StrikeQueueEntry {
   status: 'pending' | 'redeeming' | 'redeemed' | 'spent' | 'untrusted-mint' | 'failed';
   senderPeerID?: string;
   receivedAt: number;
+  amount: number;
+  unit: string;
 }
 
 /** Minimum visible strike duration — instant redemptions still get a beat. */
@@ -67,7 +82,15 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
   // entries with no sender attribution.
   const byPeer = new Map<
     string,
-    { live: number; redeemed: number; failed: number; ambient: boolean }
+    {
+      live: number;
+      redeemed: number;
+      failed: number;
+      ambient: boolean;
+      redeemedAmount: number;
+      unit: string | null;
+      redeemedHashes: string[];
+    }
   >();
   for (const [hash, entry] of Object.entries(entries)) {
     if (!entry.senderPeerID) continue;
@@ -77,12 +100,18 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
       redeemed: 0,
       failed: 0,
       ambient: false,
+      redeemedAmount: 0,
+      unit: null,
+      redeemedHashes: [],
     };
     if (LIVE_STATUSES.has(entry.status)) {
       bucket.live += 1;
       if (baselineLiveHashes.has(hash)) bucket.ambient = true;
     } else if (entry.status === 'redeemed') {
       bucket.redeemed += 1;
+      bucket.redeemedAmount += entry.amount;
+      bucket.redeemedHashes.push(hash);
+      if (bucket.unit === null) bucket.unit = entry.unit;
     } else if (FAILURE_STATUSES.has(entry.status)) {
       bucket.failed += 1;
     }
@@ -131,7 +160,15 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
         map.set(peerID, { status: 'active', activatedAt, entrance, statusChangedAt: activatedAt });
         propose(activatedAt + STRIKE_MIN_VISIBLE_MS);
       } else {
-        map.set(peerID, { status: 'success', activatedAt, entrance, statusChangedAt: now });
+        map.set(peerID, {
+          status: 'success',
+          activatedAt,
+          entrance,
+          statusChangedAt: now,
+          redeemedAmount: bucket.redeemedAmount,
+          redeemedHashes: bucket.redeemedHashes,
+          ...(bucket.unit !== null ? { unit: bucket.unit } : {}),
+        });
         propose(now + STRIKE_SUCCESS_LINGER_MS);
       }
       continue;

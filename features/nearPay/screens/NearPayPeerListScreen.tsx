@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { LegendList } from '@legendapp/list/react-native';
@@ -10,6 +10,10 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
+import {
+  BLE_PEER_FRESHNESS_TICK_MS,
+  filterFreshBLEPeers,
+} from '@/features/bitchat/lib/blePeerSnapshots';
 import {
   useRecentPeopleProfiles,
   type RecentPeopleProfileRow,
@@ -97,8 +101,21 @@ export function NearPayPeerListScreen() {
   const headerHeight = useHeaderHeight();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  const { peers } = useBLEPeers();
+  const { peers: blePeers } = useBLEPeers();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+
+  // Ghost entries (a nearby device's previous profile identities) are
+  // dropped by the freshness filter — same rule as the radar; the tick
+  // re-evaluates it as lastSeen values age out.
+  const [peerFreshnessNow, setPeerFreshnessNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setPeerFreshnessNow(Date.now()), BLE_PEER_FRESHNESS_TICK_MS);
+    return () => clearInterval(interval);
+  }, []);
+  const peers = useMemo(
+    () => filterFreshBLEPeers(blePeers, peerFreshnessNow),
+    [blePeers, peerFreshnessNow]
+  );
 
   // Every bitchat peer is listed: peers announcing the ecash capability TLV
   // get P2PK-locked drops; vanilla peers are bearer-only (tagged, and gated

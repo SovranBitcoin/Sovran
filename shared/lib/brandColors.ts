@@ -41,7 +41,8 @@ export const LIGHTNING_RIM = '#BFE0FF';
 
 /** Storm-gold lightning palette — warm analog of the electric-blue set
  *  (same derivation: glow = outer blended ~60% toward white, rim ~75%).
- *  Selected via LIGHTNING_PALETTE in LightningStrike.tsx. */
+ *  Selected via the `palette` prop on LightningStrike — pending crackle
+ *  stays electric-blue; the receive celebration strikes in gold. */
 export const LIGHTNING_GOLD = '#FFB300';
 
 /** Warm pale-gold corona — LIGHTNING_GOLD analog of LIGHTNING_INNER_GLOW. */

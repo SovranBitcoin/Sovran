@@ -82,4 +82,20 @@ describe('near pay session store', () => {
 
     expect(useNearPaySessionStore.getState().active).toBeNull();
   });
+
+  it('tracks radar visibility independently of the send session', () => {
+    expect(useNearPaySessionStore.getState().radarVisible).toBe(false);
+
+    useNearPaySessionStore.getState().setRadarVisible(true);
+    expect(useNearPaySessionStore.getState().radarVisible).toBe(true);
+
+    // Session lifecycle never touches the visibility flag — the gold toast
+    // depends on "is the radar up", not "is a send in progress".
+    useNearPaySessionStore.getState().start(RECIPIENT);
+    useNearPaySessionStore.getState().clear();
+    expect(useNearPaySessionStore.getState().radarVisible).toBe(true);
+
+    useNearPaySessionStore.getState().setRadarVisible(false);
+    expect(useNearPaySessionStore.getState().radarVisible).toBe(false);
+  });
 });

@@ -151,12 +151,71 @@ const ECASH_ANNOUNCE_PARSE_REPLACEMENT =
   '        // Persist cryptographic identity and signing key for robust offline verification\n' +
   '        env.persistIdentity(announcement)\n';
 
+// --- Compression-independent signing form ---
+//
+// Upstream signs/verifies packets over BinaryProtocol.encode(unsignedPacket),
+// which COMPRESSES payloads above 100 bytes — and raw-deflate output is not
+// canonical across implementations (Apple libcompression vs java.util.zip
+// emit different bytes for identical input). Base announces (~76 B) stay
+// under the threshold, but Sovran's ecash TLV (+42 B) pushes them over, so a
+// cross-platform verifier re-compresses with ITS deflater, the bytes never
+// match the signature, and Android (which hard-requires verified announces)
+// drops every iOS Sovran announce. Fix: the SIGNING form is encoded without
+// compression on both Sovran platforms (wire format untouched — transmitted
+// packets still compress). Mirror patch lives in sync-bitchat-android.js.
+const ENCODE_COMPRESS_PARAM_ANCHOR =
+  /    static func encode\(_ packet: BitchatPacket, padding: Bool = true\) -> Data\? \{\n        let version = packet\.version\n        guard version == 1 \|\| version == 2 else \{ return nil \}\n\n        \/\/ Try to compress payload when beneficial, keeping original size for later decoding\n        var payload = packet\.payload\n        var isCompressed = false\n        var originalPayloadSize: Int\?\n        if CompressionUtil\.shouldCompress\(payload\) \{/;
+const ENCODE_COMPRESS_PARAM_REPLACEMENT =
+  '    // [sovran] compressPayload: lets the signing form opt out of compression —\n' +
+  '    // deflate output is not canonical across platforms, so signatures over a\n' +
+  '    // compressed encoding fail to verify between iOS and Android.\n' +
+  '    static func encode(_ packet: BitchatPacket, padding: Bool = true, compressPayload: Bool = true) -> Data? {\n' +
+  '        let version = packet.version\n' +
+  '        guard version == 1 || version == 2 else { return nil }\n' +
+  '\n' +
+  '        // Try to compress payload when beneficial, keeping original size for later decoding\n' +
+  '        var payload = packet.payload\n' +
+  '        var isCompressed = false\n' +
+  '        var originalPayloadSize: Int?\n' +
+  '        if compressPayload, CompressionUtil.shouldCompress(payload) {';
+const SIGNING_NO_COMPRESS_ANCHOR =
+  /            isRSR: false \/\/ RSR flag is mutable and not part of the signature\n        \)\n        return BinaryProtocol\.encode\(unsignedPacket\)/;
+const SIGNING_NO_COMPRESS_REPLACEMENT =
+  '            isRSR: false // RSR flag is mutable and not part of the signature\n' +
+  '        )\n' +
+  '        // [sovran] sign over the UNCOMPRESSED encoding: verifiers re-encode with\n' +
+  '        // their own compressor and cross-platform deflate bytes differ.\n' +
+  '        return BinaryProtocol.encode(unsignedPacket, compressPayload: false)';
+
+// --- Suppress the direct-neighbors gossip TLV (0x04) in our announces ---
+//
+// Upstream gossips the peerIDs of connected peers inside every announce.
+// Sovran's privacy contract is that an announce discloses ONLY the current
+// profile's own identity — never the set of peers this device has seen
+// (which can include the user's own other profiles on a second device).
+// Receivers treat the absent TLV as "no neighbor claims" (optional field).
+const NEIGHBOR_GOSSIP_ANCHOR =
+  /        let connectedPeerIDs: \[Data\] = collectionsQueue\.sync \{\n            peerRegistry\.connectedRoutingData\n        \}\n[ \t]*\n        let announcement = AnnouncementPacket\(\n            nickname: myNickname,\n            noisePublicKey: noisePub,\n            signingPublicKey: signingPub,\n            directNeighbors: connectedPeerIDs\n        \)/;
+const NEIGHBOR_GOSSIP_REPLACEMENT =
+  '        // [sovran] neighbors gossip suppressed: announces disclose only the\n' +
+  '        // current profile’s own identity, never the peerIDs this device has\n' +
+  '        // seen. Receivers treat the absent 0x04 TLV as "no neighbor claims".\n' +
+  '        let announcement = AnnouncementPacket(\n' +
+  '            nickname: myNickname,\n' +
+  '            noisePublicKey: noisePub,\n' +
+  '            signingPublicKey: signingPub,\n' +
+  '            directNeighbors: nil\n' +
+  '        )';
+
 let patched = 0;
 const applied = {
   mismatchGuard: false,
   linkState: false,
   ecashAnnounceInject: false,
   ecashAnnounceParse: false,
+  encodeCompressParam: false,
+  signingNoCompress: false,
+  neighborGossip: false,
 };
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
@@ -175,6 +234,19 @@ for (const file of walk(ROOT)) {
     after = next;
     next = after.replace(ECASH_ANNOUNCE_INJECT_ANCHOR, ECASH_ANNOUNCE_INJECT_REPLACEMENT);
     if (next !== after) applied.ecashAnnounceInject = true;
+    after = next;
+    next = after.replace(NEIGHBOR_GOSSIP_ANCHOR, NEIGHBOR_GOSSIP_REPLACEMENT);
+    if (next !== after) applied.neighborGossip = true;
+    after = next;
+  }
+  if (file.endsWith('BinaryProtocol.swift')) {
+    const next = after.replace(ENCODE_COMPRESS_PARAM_ANCHOR, ENCODE_COMPRESS_PARAM_REPLACEMENT);
+    if (next !== after) applied.encodeCompressParam = true;
+    after = next;
+  }
+  if (file.endsWith('BitchatPacket.swift')) {
+    const next = after.replace(SIGNING_NO_COMPRESS_ANCHOR, SIGNING_NO_COMPRESS_REPLACEMENT);
+    if (next !== after) applied.signingNoCompress = true;
     after = next;
   }
   if (file.endsWith('BLEAnnounceHandler.swift')) {
@@ -228,5 +300,30 @@ assertApplied(
   applied.ecashAnnounceParse,
   path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandler.swift'),
   /\[sovran\] record\/clear the ecash capability TLV/
+);
+const BIT_FOUNDATION = path.join(
+  ROOT,
+  'localPackages',
+  'BitFoundation',
+  'Sources',
+  'BitFoundation'
+);
+assertApplied(
+  'ENCODE_COMPRESS_PARAM',
+  applied.encodeCompressParam,
+  path.join(BIT_FOUNDATION, 'BinaryProtocol.swift'),
+  /\[sovran\] compressPayload: lets the signing form opt out/
+);
+assertApplied(
+  'SIGNING_NO_COMPRESS',
+  applied.signingNoCompress,
+  path.join(BIT_FOUNDATION, 'BitchatPacket.swift'),
+  /\[sovran\] sign over the UNCOMPRESSED encoding/
+);
+assertApplied(
+  'NEIGHBOR_GOSSIP',
+  applied.neighborGossip,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
+  /\[sovran\] neighbors gossip suppressed/
 );
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);

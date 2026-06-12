@@ -144,6 +144,40 @@ const PATCHES = [
       '        val packet = BitchatPacket(\n' +
       '            type = MessageType.ANNOUNCE.value,',
   },
+  // --- Compression-independent signing form (mirror of the iOS patch in
+  // patch-bitchat-imports.js — see its comment for the full rationale) ---
+  //
+  // Signing/verification must run over the UNCOMPRESSED encoding: raw-deflate
+  // output differs between java.util.zip and Apple libcompression, so a
+  // signature over a compressed payload (announces cross the 100-byte
+  // threshold once the ecash TLV is appended) never verifies cross-platform.
+  // Wire format untouched — transmitted packets still compress.
+  {
+    file: 'protocol/BinaryProtocol.kt',
+    name: 'SIGNING_COMPRESS_PARAM',
+    anchor: /    fun encode\(packet: BitchatPacket\): ByteArray\? \{/,
+    replacement:
+      '    // [sovran] compressPayload: lets the signing form opt out of compression —\n' +
+      '    // deflate output is not canonical across platforms, so signatures over a\n' +
+      '    // compressed encoding fail to verify between Android and iOS.\n' +
+      '    fun encode(packet: BitchatPacket, compressPayload: Boolean = true): ByteArray? {',
+  },
+  {
+    file: 'protocol/BinaryProtocol.kt',
+    name: 'SIGNING_COMPRESS_GATE',
+    anchor: /            if \(CompressionUtil\.shouldCompress\(payload\)\) \{/,
+    replacement: '            if (compressPayload && CompressionUtil.shouldCompress(payload)) {',
+  },
+  {
+    file: 'protocol/BinaryProtocol.kt',
+    name: 'SIGNING_NO_COMPRESS',
+    anchor: /        return BinaryProtocol\.encode\(unsignedPacket\)\n    \}/,
+    replacement:
+      '        // [sovran] sign over the UNCOMPRESSED encoding: verifiers re-encode with\n' +
+      '        // their own compressor and cross-platform deflate bytes differ.\n' +
+      '        return BinaryProtocol.encode(unsignedPacket, compressPayload = false)\n' +
+      '    }',
+  },
   // Records (or clears) the ecash extension from the raw announce payload —
   // the same out-of-band re-parse upstream uses for its gossip TLV. The
   // insertion point is reached only after the `if (!verified) return false`

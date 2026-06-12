@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet } from 'react-native';
+import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
@@ -23,8 +23,18 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
+import {
+  BLE_PEER_FRESHNESS_TICK_MS,
+  filterFreshBLEPeers,
+} from '@/features/bitchat/lib/blePeerSnapshots';
 import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';
 import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
+import {
+  CELEBRATION_LIGHTNING_PALETTE,
+  NutDropCelebrationOverlay,
+  type CelebrationPeerIdentity,
+} from '@/features/nearPay/components/NutDropCelebrationOverlay';
+import { useNutDropCelebration } from '@/features/nearPay/hooks/useNutDropCelebration';
 import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
 import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
@@ -60,43 +70,38 @@ import {
   pruneExitedPeerLayoutRegistry,
   reconcilePeerLayoutRegistry,
   type NearPayLayoutPeer,
+  type PeerLayoutConfig,
   type PeerLayoutRegistryEntry,
   type PeerLayoutSize,
   type PeerLayoutTarget,
 } from '@/features/nearPay/lib/peerLayout';
+import {
+  buildPeerLayoutConfigForSizing,
+  getPeerFieldSizing,
+  getPeerFieldSizingStep,
+  type PeerFieldSizing,
+  type PeerFieldSizingStep,
+} from '@/features/nearPay/lib/peerFieldSizing';
 import { buildDotFieldPathBuckets } from '@/features/nearPay/lib/dotField';
 import {
   getCenteredAvatarRectInSlot,
+  getSharedAvatarTransform,
   type AvatarRect,
 } from '@/features/nearPay/lib/avatarTransition';
 
-const AVATAR_SIZE = 48;
+/** Header avatar slot size — the send-flow flight's landing size. */
+const HEADER_AVATAR_SIZE = 48;
 const AMOUNT_HEADER_AVATAR_SLOT_SIZE = 56;
 const INLINE_AMOUNT_HEADER_TOP = spacing['4xl'];
 const INLINE_AMOUNT_HEADER_HEIGHT = 126;
 const NEAR_PAY_ACTION_ROW_HEIGHT = 76;
 const NEAR_PAY_ACTION_ROW_BOTTOM = spacing['3xl'];
-const NODE_WIDTH = 76;
-const NODE_HEIGHT = 74;
-const PEER_AVATAR_TOP = spacing.xs;
-const PEER_AVATAR_CENTER_Y = PEER_AVATAR_TOP + AVATAR_SIZE / 2;
-const PEER_AVATAR_GAP = spacing.sm;
-const PEER_AVATAR_SPACIOUS_GAP = spacing['4xl'];
-const PEER_AVATAR_SPACIOUS_COUNT = 7;
-const PEER_AVATAR_DENSE_COUNT = 31;
-const PEER_AVATAR_SPACING_CAP_COUNT = 20;
-const PEER_CANDIDATE_HEADER_AVOIDANCE = spacing['4xl'] + spacing['3xl'];
-const PEER_CANDIDATE_ACTION_AVOIDANCE =
-  NEAR_PAY_ACTION_ROW_HEIGHT + NEAR_PAY_ACTION_ROW_BOTTOM + spacing.lg;
-const PEER_AVATAR_NAME_SIZE = 10;
 const DOT_SPACING = 18;
 const DOT_RADIUS = 1;
-const FIELD_EDGE_PADDING = 0;
-const EDGE_SCALE_FALLOFF = AVATAR_SIZE * 2;
-const EDGE_BOUNDARY_SCALE = 0.9;
-const EDGE_TRANSLATION_STRENGTH = 1;
-const MIN_VISIBLE_PEER_SCALE = 0.16;
-const PEER_LABEL_MIN_SCALE = 0.58;
+/** Celebration band top — mirrors the honeycomb's header avoidance. */
+const CELEBRATION_TOP_INSET = spacing['4xl'] + spacing['3xl'];
+/** Stable element for the Android header-scrim opt-out (see stackOptions). */
+const renderNullHeaderBackground = () => null;
 const PEER_PAN_RUBBER_BAND_FACTOR = 0.36;
 const PEER_PAN_MOMENTUM_SECONDS = 0.18;
 const PEER_ENTRY_ANIMATION_MS = 460;
@@ -149,28 +154,75 @@ const PEER_OVERVIEW_TIMING = {
 };
 const FOREGROUND_THEME_KEYS = ['foreground'] as const;
 const PEER_NODE_THEME_KEYS = ['foreground', 'surface'] as const;
-/** Open-padlock chip marking vanilla bitchat peers (bearer sends only). */
-const BEARER_BADGE_SIZE = 18;
-const BEARER_BADGE_ICON_SIZE = 11;
 const HEADER_BADGE_THEME_KEYS = ['foreground', 'shade-400', 'accent', 'accent-foreground'] as const;
-const PEER_LAYOUT_CONFIG = {
-  nodeWidth: NODE_WIDTH,
-  nodeHeight: NODE_HEIGHT,
-  avatarSize: AVATAR_SIZE,
-  avatarGap: PEER_AVATAR_GAP,
-  spaciousAvatarGap: PEER_AVATAR_SPACIOUS_GAP,
-  spaciousPeerCount: PEER_AVATAR_SPACIOUS_COUNT,
-  densePeerCount: PEER_AVATAR_DENSE_COUNT,
-  spacingCapPeerCount: PEER_AVATAR_SPACING_CAP_COUNT,
-  preferredTopInset: PEER_CANDIDATE_HEADER_AVOIDANCE,
-  preferredBottomInset: PEER_CANDIDATE_ACTION_AVOIDANCE,
-  edgePadding: FIELD_EDGE_PADDING,
-  edgeScaleFalloff: EDGE_SCALE_FALLOFF,
-  edgeBoundaryScale: EDGE_BOUNDARY_SCALE,
-  edgeTranslationStrength: EDGE_TRANSLATION_STRENGTH,
-  minVisibleScale: MIN_VISIBLE_PEER_SCALE,
-  labelMinScale: PEER_LABEL_MIN_SCALE,
-};
+
+/**
+ * Per-step node styles. Sizing values are module singletons (two steps), so
+ * `useMemo` keyed on the sizing reference rebuilds these only on an actual
+ * hero ↔ standard transition.
+ */
+function buildPeerNodeStyles(sizing: PeerFieldSizing) {
+  const pressableBase = {
+    width: sizing.nodeWidth,
+    height: sizing.nodeHeight,
+    alignItems: 'center' as const,
+    justifyContent: 'flex-start' as const,
+    paddingTop: sizing.avatarTop,
+  };
+  return {
+    peerNode: {
+      position: 'absolute' as const,
+      width: sizing.nodeWidth,
+      height: sizing.nodeHeight,
+      zIndex: zIndex.sticky,
+    },
+    peerPressable: pressableBase,
+    peerPressableHidden: { ...pressableBase, opacity: 0 },
+    peerAvatarFrame: {
+      position: 'relative' as const,
+      width: sizing.avatarSize,
+      height: sizing.avatarSize,
+    },
+    // Open-padlock chip marking vanilla bitchat peers (bearer sends only).
+    bearerBadge: {
+      alignItems: 'center' as const,
+      borderRadius: sizing.bearerBadgeSize / 2,
+      bottom: -2,
+      height: sizing.bearerBadgeSize,
+      justifyContent: 'center' as const,
+      position: 'absolute' as const,
+      right: -2,
+      width: sizing.bearerBadgeSize,
+    },
+    peerAvatarNameLabel: {
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      width: sizing.nodeWidth,
+      height: spacing.lg,
+      marginTop: spacing.xs,
+      paddingHorizontal: spacing.xs,
+    },
+  };
+}
+
+/**
+ * Module-level cache keyed on the sizing singletons (two entries ever) —
+ * every PeerNode shares the same style objects instead of allocating a set
+ * per node per step flip. Same render-time-cache pattern as peerLayout's
+ * slot cache.
+ */
+const PEER_NODE_STYLE_CACHE = new Map<PeerFieldSizing, ReturnType<typeof buildPeerNodeStyles>>();
+
+function getPeerNodeStyles(sizing: PeerFieldSizing) {
+  const cached = PEER_NODE_STYLE_CACHE.get(sizing);
+  if (cached) return cached;
+  const built = buildPeerNodeStyles(sizing);
+  PEER_NODE_STYLE_CACHE.set(sizing, built);
+  return built;
+}
+
+/** Screen rect + layout identity for a radar peer, or null if off-radar. */
+type PeerStageResolver = (peerID: string) => { rect: AvatarRect; peer: NearPayLayoutPeer } | null;
 
 interface AnimatedPeerViewportPresentation {
   centerX: number;
@@ -304,6 +356,8 @@ function peerTargetsEqual(a: PeerLayoutTarget, b: PeerLayoutTarget): boolean {
 const PeerNode = React.memo(function PeerNode({
   target,
   fieldSize,
+  sizing,
+  layoutConfig,
   panX,
   panY,
   overviewScale,
@@ -315,6 +369,8 @@ const PeerNode = React.memo(function PeerNode({
 }: {
   target: PeerLayoutTarget;
   fieldSize: PeerLayoutSize;
+  sizing: PeerFieldSizing;
+  layoutConfig: PeerLayoutConfig;
   panX: SharedValue<number>;
   panY: SharedValue<number>;
   overviewScale: SharedValue<number>;
@@ -330,7 +386,8 @@ const PeerNode = React.memo(function PeerNode({
   const baseY = useSharedValue(target.y);
   const nodeOpacity = useSharedValue(0);
   const visibilityScale = useSharedValue(0);
-  const labelOpacityProgress = useSharedValue(target.scale >= PEER_LABEL_MIN_SCALE ? 1 : 0);
+  const labelOpacityProgress = useSharedValue(target.scale >= layoutConfig.labelMinScale ? 1 : 0);
+  const nodeStyles = getPeerNodeStyles(sizing);
 
   useEffect(() => {
     const firstPlacement = !hasAnimatedInRef.current;
@@ -365,8 +422,8 @@ const PeerNode = React.memo(function PeerNode({
   }, [baseX, baseY, nodeOpacity, target.phase, target.x, target.y, visibilityScale]);
 
   const viewportPresentation = useDerivedValue<AnimatedPeerViewportPresentation>(() => {
-    const rawCenterX = baseX.get() + NODE_WIDTH / 2 + panX.get();
-    const rawCenterY = baseY.get() + NODE_HEIGHT / 2 + panY.get();
+    const rawCenterX = baseX.get() + layoutConfig.nodeWidth / 2 + panX.get();
+    const rawCenterY = baseY.get() + layoutConfig.nodeHeight / 2 + panY.get();
     const overviewScaleValue = overviewScale.get();
     const overviewTranslateXValue = overviewTranslateX.get();
     const overviewTranslateYValue = overviewTranslateY.get();
@@ -392,7 +449,7 @@ const PeerNode = React.memo(function PeerNode({
       };
     }
 
-    if (fieldSize.width <= 0 || fieldSize.height <= 0 || AVATAR_SIZE <= 0) {
+    if (fieldSize.width <= 0 || fieldSize.height <= 0 || layoutConfig.avatarSize <= 0) {
       return {
         centerX: rawCenterX,
         centerY: rawCenterY,
@@ -404,30 +461,31 @@ const PeerNode = React.memo(function PeerNode({
       };
     }
 
-    const avatarRadius = AVATAR_SIZE / 2;
-    const leftInset = rawCenterX - FIELD_EDGE_PADDING;
-    const rightInset = fieldSize.width - FIELD_EDGE_PADDING - rawCenterX;
-    const topInset = rawCenterY - FIELD_EDGE_PADDING;
-    const bottomInset = fieldSize.height - FIELD_EDGE_PADDING - rawCenterY;
+    const avatarRadius = layoutConfig.avatarSize / 2;
+    const leftInset = rawCenterX - layoutConfig.edgePadding;
+    const rightInset = fieldSize.width - layoutConfig.edgePadding - rawCenterX;
+    const topInset = rawCenterY - layoutConfig.edgePadding;
+    const bottomInset = fieldSize.height - layoutConfig.edgePadding - rawCenterY;
     const edgeDistance = Math.min(leftInset, rightInset, topInset, bottomInset);
     const fitScale = Math.min(Math.max((edgeDistance + avatarRadius) / (avatarRadius * 2), 0), 1);
     const edgeProgress = Math.min(
-      Math.max((edgeDistance - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+      Math.max((edgeDistance - avatarRadius) / layoutConfig.edgeScaleFalloff, 0),
       1
     );
     const edgeSmooth = edgeProgress * edgeProgress * (3 - 2 * edgeProgress);
-    const edgeLensScale = EDGE_BOUNDARY_SCALE + (1 - EDGE_BOUNDARY_SCALE) * edgeSmooth;
+    const edgeLensScale =
+      layoutConfig.edgeBoundaryScale + (1 - layoutConfig.edgeBoundaryScale) * edgeSmooth;
     const rawViewportScale = Math.min(fitScale, edgeLensScale);
     const scale =
       rawViewportScale >= 1
         ? 1
         : rawViewportScale <= 0
-          ? MIN_VISIBLE_PEER_SCALE
-          : Math.max(rawViewportScale, MIN_VISIBLE_PEER_SCALE);
+          ? layoutConfig.minVisibleScale
+          : Math.max(rawViewportScale, layoutConfig.minVisibleScale);
     const layoutScale = Math.min(scale, 1);
-    const fadeProgress = Math.min(Math.max(rawViewportScale / MIN_VISIBLE_PEER_SCALE, 0), 1);
+    const fadeProgress = Math.min(Math.max(rawViewportScale / layoutConfig.minVisibleScale, 0), 1);
     const avatarOpacity =
-      rawViewportScale >= MIN_VISIBLE_PEER_SCALE
+      rawViewportScale >= layoutConfig.minVisibleScale
         ? 1
         : fadeProgress * fadeProgress * (3 - 2 * fadeProgress);
     const nudgesEdge = layoutScale > 0 && layoutScale < 1;
@@ -444,14 +502,20 @@ const PeerNode = React.memo(function PeerNode({
       };
     }
 
-    const leftProgress = Math.min(Math.max((leftInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0), 1);
-    const rightProgress = Math.min(
-      Math.max((rightInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+    const leftProgress = Math.min(
+      Math.max((leftInset - avatarRadius) / layoutConfig.edgeScaleFalloff, 0),
       1
     );
-    const topProgress = Math.min(Math.max((topInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0), 1);
+    const rightProgress = Math.min(
+      Math.max((rightInset - avatarRadius) / layoutConfig.edgeScaleFalloff, 0),
+      1
+    );
+    const topProgress = Math.min(
+      Math.max((topInset - avatarRadius) / layoutConfig.edgeScaleFalloff, 0),
+      1
+    );
     const bottomProgress = Math.min(
-      Math.max((bottomInset - avatarRadius) / EDGE_SCALE_FALLOFF, 0),
+      Math.max((bottomInset - avatarRadius) / layoutConfig.edgeScaleFalloff, 0),
       1
     );
     const leftSmooth = leftProgress * leftProgress * (3 - 2 * leftProgress);
@@ -464,7 +528,8 @@ const PeerNode = React.memo(function PeerNode({
     const bottomPressure = 1 - bottomSmooth;
     const scaledRadius = avatarRadius * layoutScale;
     const lostRadius = avatarRadius - scaledRadius;
-    const edgeTranslation = lostRadius * Math.min(Math.max(EDGE_TRANSLATION_STRENGTH, 0), 1);
+    const edgeTranslation =
+      lostRadius * Math.min(Math.max(layoutConfig.edgeTranslationStrength, 0), 1);
     const nudgeX = Math.min(
       Math.max((leftPressure - rightPressure) * edgeTranslation, -avatarRadius),
       avatarRadius
@@ -476,12 +541,12 @@ const PeerNode = React.memo(function PeerNode({
 
     return {
       centerX: Math.min(
-        Math.max(rawCenterX + nudgeX, FIELD_EDGE_PADDING + scaledRadius),
-        fieldSize.width - FIELD_EDGE_PADDING - scaledRadius
+        Math.max(rawCenterX + nudgeX, layoutConfig.edgePadding + scaledRadius),
+        fieldSize.width - layoutConfig.edgePadding - scaledRadius
       ),
       centerY: Math.min(
-        Math.max(rawCenterY + nudgeY, FIELD_EDGE_PADDING + scaledRadius),
-        fieldSize.height - FIELD_EDGE_PADDING - scaledRadius
+        Math.max(rawCenterY + nudgeY, layoutConfig.edgePadding + scaledRadius),
+        fieldSize.height - layoutConfig.edgePadding - scaledRadius
       ),
       scale,
       layoutScale,
@@ -492,7 +557,7 @@ const PeerNode = React.memo(function PeerNode({
   });
 
   useAnimatedReaction(
-    () => (viewportPresentation.get().scale >= PEER_LABEL_MIN_SCALE ? 1 : 0),
+    () => (viewportPresentation.get().scale >= layoutConfig.labelMinScale ? 1 : 0),
     (nextLabelOpacity, previousLabelOpacity) => {
       if (previousLabelOpacity === null) {
         labelOpacityProgress.set(nextLabelOpacity);
@@ -503,7 +568,7 @@ const PeerNode = React.memo(function PeerNode({
         labelOpacityProgress.set(withTiming(nextLabelOpacity, PEER_LABEL_FADE_TIMING));
       }
     },
-    [labelOpacityProgress, viewportPresentation]
+    [labelOpacityProgress, layoutConfig.labelMinScale, viewportPresentation]
   );
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -512,7 +577,8 @@ const PeerNode = React.memo(function PeerNode({
       (presentation.overviewActive ? presentation.overviewScale : presentation.scale) *
       visibilityScale.get();
     const scaledAvatarCenterY =
-      NODE_HEIGHT / 2 + totalScale * (PEER_AVATAR_CENTER_Y - NODE_HEIGHT / 2);
+      layoutConfig.nodeHeight / 2 +
+      totalScale * (sizing.avatarCenterY - layoutConfig.nodeHeight / 2);
 
     return {
       opacity: nodeOpacity.get() * presentation.avatarOpacity,
@@ -520,7 +586,7 @@ const PeerNode = React.memo(function PeerNode({
         ? zIndex.sticky
         : zIndex.sticky + Math.round(presentation.layoutScale * 100),
       transform: [
-        { translateX: presentation.centerX - NODE_WIDTH / 2 },
+        { translateX: presentation.centerX - layoutConfig.nodeWidth / 2 },
         { translateY: presentation.centerY - scaledAvatarCenterY },
         { scale: totalScale },
       ],
@@ -534,32 +600,38 @@ const PeerNode = React.memo(function PeerNode({
         viewportPresentation.get().avatarOpacity,
     };
   });
-  const nodeStyle = useMemo(() => [styles.peerNode, animatedStyle], [animatedStyle]);
+  const nodeStyle = useMemo(
+    () => [nodeStyles.peerNode, animatedStyle],
+    [animatedStyle, nodeStyles]
+  );
   const peerAvatarNameLabelStyle = useMemo(
-    () => [styles.peerAvatarNameLabel, labelAnimatedStyle],
-    [labelAnimatedStyle]
+    () => [nodeStyles.peerAvatarNameLabel, labelAnimatedStyle],
+    [labelAnimatedStyle, nodeStyles]
   );
   const peerPressableStyle = hideSharedElementSource
-    ? styles.peerPressableHidden
-    : styles.peerPressable;
+    ? nodeStyles.peerPressableHidden
+    : nodeStyles.peerPressable;
   const peerAvatarNameStyle = useMemo(
     () => [styles.peerAvatarName, { color: opacity(foreground, alpha.prominent) }],
     [foreground]
   );
   const bearerBadgeStyle = useMemo(
-    () => [styles.bearerBadge, { backgroundColor: surface }],
-    [surface]
+    () => [nodeStyles.bearerBadge, { backgroundColor: surface }],
+    [nodeStyles, surface]
   );
 
   const handlePress = useCallback(() => {
     if (target.phase === 'exiting') return;
-    const presentation = getPeerViewportPresentation(target, fieldSize, PEER_LAYOUT_CONFIG, {
+    const presentation = getPeerViewportPresentation(target, fieldSize, layoutConfig, {
       x: panX.get(),
       y: panY.get(),
     });
     if (presentation.scale <= 0 || presentation.avatarOpacity <= 0.05) return;
-    onSelect(target.peer, getScaledAvatarRect(target, fieldSize, { x: panX.get(), y: panY.get() }));
-  }, [fieldSize, onSelect, panX, panY, target]);
+    onSelect(
+      target.peer,
+      getScaledAvatarRect(target, fieldSize, { x: panX.get(), y: panY.get() }, layoutConfig)
+    );
+  }, [fieldSize, layoutConfig, onSelect, panX, panY, target]);
 
   return (
     <Animated.View style={nodeStyle}>
@@ -569,11 +641,11 @@ const PeerNode = React.memo(function PeerNode({
         accessibilityRole="button"
         accessibilityLabel={`Pay ${target.peer.name}`}
         style={peerPressableStyle}>
-        <View pointerEvents="none" style={styles.peerAvatarFrame}>
+        <View pointerEvents="none" style={nodeStyles.peerAvatarFrame}>
           <Avatar
             state={peerAvatarState(target.peer)}
             picture={target.peer.avatarUrl ?? undefined}
-            size={AVATAR_SIZE}
+            size={sizing.avatarSize}
             name={target.peer.name}
             seed={target.peer.peerID}
             alt={`${target.peer.name} avatar`}
@@ -584,13 +656,18 @@ const PeerNode = React.memo(function PeerNode({
               status={strike.status}
               entrance={strike.entrance}
               seed={target.peer.peerID}
+              frameSize={sizing.avatarSize}
+              // The celebration owns fresh drops, so the node strike only
+              // covers edge cases (gated/queued/ambient/reduced-motion) and
+              // must match the ceremony's palette knob.
+              palette={CELEBRATION_LIGHTNING_PALETTE}
             />
           ) : null}
           {!target.peer.supportsP2pkEcash ? (
             <View style={bearerBadgeStyle}>
               <Icon
                 name="mdi:lock-open-variant-outline"
-                size={BEARER_BADGE_ICON_SIZE}
+                size={sizing.bearerBadgeIconSize}
                 color={opacity(foreground, alpha.prominent)}
               />
             </View>
@@ -598,7 +675,7 @@ const PeerNode = React.memo(function PeerNode({
         </View>
         <Animated.View pointerEvents="none" style={peerAvatarNameLabelStyle}>
           <Text
-            size={PEER_AVATAR_NAME_SIZE}
+            size={sizing.labelFontSize}
             weight="bold"
             numberOfLines={1}
             ellipsizeMode="tail"
@@ -615,23 +692,16 @@ const PeerNode = React.memo(function PeerNode({
 function getScaledAvatarRect(
   target: PeerLayoutTarget,
   fieldSize: PeerLayoutSize,
-  pan: { x: number; y: number }
+  pan: { x: number; y: number },
+  config: PeerLayoutConfig
 ): AvatarRect {
-  const presentation = getPeerViewportPresentation(target, fieldSize, PEER_LAYOUT_CONFIG, pan);
-  const scaledAvatarSize = AVATAR_SIZE * presentation.scale;
+  const presentation = getPeerViewportPresentation(target, fieldSize, config, pan);
+  const scaledAvatarSize = config.avatarSize * presentation.scale;
 
   return {
     x: presentation.centerX - scaledAvatarSize / 2,
     y: presentation.centerY - scaledAvatarSize / 2,
     size: scaledAvatarSize,
-  };
-}
-
-function getSharedAvatarTransform(rect: AvatarRect): { x: number; y: number; scale: number } {
-  return {
-    x: rect.x + rect.size / 2 - AVATAR_SIZE / 2,
-    y: rect.y + rect.size / 2 - AVATAR_SIZE / 2,
-    scale: rect.size / AVATAR_SIZE,
   };
 }
 
@@ -663,6 +733,8 @@ function arePeerNodePropsEqual(
   prev: {
     target: PeerLayoutTarget;
     fieldSize: PeerLayoutSize;
+    sizing: PeerFieldSizing;
+    layoutConfig: PeerLayoutConfig;
     panX: SharedValue<number>;
     panY: SharedValue<number>;
     overviewScale: SharedValue<number>;
@@ -675,6 +747,8 @@ function arePeerNodePropsEqual(
   next: {
     target: PeerLayoutTarget;
     fieldSize: PeerLayoutSize;
+    sizing: PeerFieldSizing;
+    layoutConfig: PeerLayoutConfig;
     panX: SharedValue<number>;
     panY: SharedValue<number>;
     overviewScale: SharedValue<number>;
@@ -692,6 +766,8 @@ function arePeerNodePropsEqual(
     prev.strike?.entrance === next.strike?.entrance &&
     prev.fieldSize.width === next.fieldSize.width &&
     prev.fieldSize.height === next.fieldSize.height &&
+    prev.sizing === next.sizing &&
+    prev.layoutConfig === next.layoutConfig &&
     prev.panX === next.panX &&
     prev.panY === next.panY &&
     prev.overviewScale === next.overviewScale &&
@@ -717,7 +793,7 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
         <Avatar
           state={peerAvatarState(recipient)}
           picture={recipient.avatarUrl ?? undefined}
-          size={AVATAR_SIZE}
+          size={HEADER_AVATAR_SIZE}
           name={recipient.name}
           seed={recipient.peerID}
           alt={`${recipient.name} avatar`}
@@ -733,11 +809,33 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
 
 const NearPayPeerField = React.memo(function NearPayPeerField({
   peers,
+  sizing,
+  strikeMap,
+  celebrationPeerID,
+  getPeerStageRef,
+  onRegistryCountChange,
   emptyContent,
   onSelect,
   selectedPeerID,
 }: {
   peers: BLEPeer[];
+  sizing: PeerFieldSizing;
+  strikeMap: ReadonlyMap<string, StrikeState>;
+  /** Peer whose node (and strike) the celebration overlay is impersonating. */
+  celebrationPeerID: string | null;
+  /**
+   * Populated by the field with a resolver from peerID to the node's current
+   * screen rect + layout identity — the celebration overlay's source/return
+   * anchor. Field and container share an origin (both absolute-fill chains),
+   * so rects translate 1:1, exactly like the send flow's selectedPeerRect.
+   */
+  getPeerStageRef: React.MutableRefObject<PeerStageResolver | null>;
+  /**
+   * Reports the layout REGISTRY length (visible + exiting) upward — the
+   * sizing hysteresis contract needs it so a peer's exit animation never
+   * triggers a mid-flight resize.
+   */
+  onRegistryCountChange: (count: number) => void;
   emptyContent: React.ReactNode;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   selectedPeerID?: string | null;
@@ -758,8 +856,8 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
   const actionAvoidance =
     NEAR_PAY_ACTION_ROW_HEIGHT + NEAR_PAY_ACTION_ROW_BOTTOM + spacing.lg + insets.bottom;
   const peerLayoutConfig = useMemo(
-    () => ({ ...PEER_LAYOUT_CONFIG, preferredBottomInset: actionAvoidance }),
-    [actionAvoidance]
+    () => buildPeerLayoutConfigForSizing(sizing, actionAvoidance),
+    [actionAvoidance, sizing]
   );
   const [fieldSize, setFieldSize] = useState<PeerLayoutSize>({ width: 0, height: 0 });
   const [registry, setRegistry] = useState<PeerLayoutRegistryEntry[]>([]);
@@ -820,11 +918,6 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     };
   }, [peers]);
 
-  // Lightning effect per sender while a received Nut Drop redeems —
-  // re-renders gate component mount/unmount only; the animation itself
-  // runs on the UI thread inside LightningStrike.
-  const strikeMap = useNutDropStrike();
-
   // Batch-fetch kind-0 profiles for every visible Sovran peer via nagg
   // (warms the shared nostrMetadataCache; cache hits render instantly).
   const peerNostrPubkeys = useMemo(() => peers.map(peerNostrPubkey).filter(Boolean), [peers]);
@@ -863,6 +956,10 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     setRegistry((current) => reconcilePeerLayoutRegistry(current, layoutPeers, Date.now()));
   }, [layoutPeers]);
 
+  useEffect(() => {
+    onRegistryCountChange(registry.length);
+  }, [onRegistryCountChange, registry.length]);
+
   const hasExitingPeer = registry.some((entry) => entry.phase === 'exiting');
   useEffect(() => {
     if (!hasExitingPeer) return;
@@ -896,7 +993,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
       fieldHeight: roundMetric(fieldSize.height),
       duration_ms: durationSinceMs(startedAt),
     };
-  }, [fieldSize, registry]);
+  }, [fieldSize, peerLayoutConfig, registry]);
   const targets = targetsResult.value;
 
   const panBoundsResult = useMemo(() => {
@@ -911,8 +1008,31 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
       maxY: roundMetric(value.maxY),
       duration_ms: durationSinceMs(startedAt),
     };
-  }, [fieldSize, targets]);
+  }, [fieldSize, peerLayoutConfig, targets]);
   const panBounds = panBoundsResult.value;
+
+  // Expose the celebration's source/return anchor resolver. Reading the pan
+  // shared values on the JS thread here matches the press/random handlers.
+  useEffect(() => {
+    getPeerStageRef.current = (peerID: string) => {
+      const target = targets.find(
+        (candidate) => candidate.peer.peerID === peerID && candidate.phase !== 'exiting'
+      );
+      if (!target) return null;
+      return {
+        rect: getScaledAvatarRect(
+          target,
+          fieldSize,
+          { x: panX.get(), y: panY.get() },
+          peerLayoutConfig
+        ),
+        peer: target.peer,
+      };
+    };
+    return () => {
+      getPeerStageRef.current = null;
+    };
+  }, [fieldSize, getPeerStageRef, panX, panY, peerLayoutConfig, targets]);
 
   useEffect(() => {
     if (fieldSize.width <= 0 || fieldSize.height <= 0) return;
@@ -1063,12 +1183,14 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     overviewTranslateX.set(withTiming(overview.translateX, PEER_OVERVIEW_TIMING));
     overviewTranslateY.set(withTiming(overview.translateY, PEER_OVERVIEW_TIMING));
   }, [
+    actionAvoidance,
     fieldSize,
     overviewScale,
     overviewTranslateX,
     overviewTranslateY,
     panX,
     panY,
+    peerLayoutConfig,
     targetCount,
     targets,
   ]);
@@ -1120,8 +1242,8 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
       duration_ms: durationSinceMs(startedAt),
     });
 
-    onSelect(target.peer, getScaledAvatarRect(target, fieldSize, pan));
-  }, [fieldSize, onSelect, panX, panY, targetCount, targets]);
+    onSelect(target.peer, getScaledAvatarRect(target, fieldSize, pan, peerLayoutConfig));
+  }, [fieldSize, onSelect, panX, panY, peerLayoutConfig, targetCount, targets]);
 
   const logPanEnd = useCallback((payload: Record<string, number>) => {
     paymentLog.debug('near_pay.perf.pan_end', payload);
@@ -1263,14 +1385,24 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
               key={target.peer.peerID}
               target={target}
               fieldSize={fieldSize}
+              sizing={sizing}
+              layoutConfig={peerLayoutConfig}
               panX={panX}
               panY={panY}
               overviewScale={overviewScale}
               overviewTranslateX={overviewTranslateX}
               overviewTranslateY={overviewTranslateY}
               onSelect={onSelect}
-              hideSharedElementSource={selectedPeerID === target.peer.peerID}
-              strike={strikeMap.get(target.peer.peerID) ?? null}
+              hideSharedElementSource={
+                selectedPeerID === target.peer.peerID || celebrationPeerID === target.peer.peerID
+              }
+              strike={
+                // The overlay impersonates this node (gold, center stage) —
+                // suppress the node-level strike so lightning never doubles.
+                celebrationPeerID === target.peer.peerID
+                  ? null
+                  : (strikeMap.get(target.peer.peerID) ?? null)
+              }
             />
           ))}
         </Animated.View>
@@ -1311,12 +1443,25 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 export function NearPayScreen() {
   useLifecycleLogger('NearPayScreen');
   useRenderLogger('NearPayScreen', 30, paymentLog);
+  const insets = useSafeAreaInsets();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   // Every bitchat peer is on the radar: peers announcing the ecash
   // capability TLV get P2PK-locked drops; vanilla peers are bearer-only
   // (visually marked, gated behind an explicit confirm in handleSelectPeer).
-  const { peers } = useBLEPeers();
+  // Ghost entries (a nearby device's previous profile identities, which
+  // upstream's registry can retain forever) are dropped by the freshness
+  // filter; the periodic tick re-evaluates it as lastSeen values age out.
+  const { peers: blePeers } = useBLEPeers();
+  const [peerFreshnessNow, setPeerFreshnessNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setPeerFreshnessNow(Date.now()), BLE_PEER_FRESHNESS_TICK_MS);
+    return () => clearInterval(interval);
+  }, []);
+  const peers = useMemo(
+    () => filterFreshBLEPeers(blePeers, peerFreshnessNow),
+    [blePeers, peerFreshnessNow]
+  );
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
   const inlineAmountEntry = nearPaySession?.amountEntry ?? null;
@@ -1353,6 +1498,85 @@ export function NearPayScreen() {
   const pickerPeers = inlineAmountEntry ? pickerPeersRef.current : peers;
   const headerBadgeCount = hasInlineAmountEntry ? 0 : reachableCount;
 
+  // Lightning effect per sender while a received Nut Drop redeems —
+  // re-renders gate component mount/unmount only; the animation itself runs
+  // on the UI thread inside LightningStrike. Lifted to the screen so the
+  // celebration hook observes the same map the radar renders from.
+  const strikeMap = useNutDropStrike();
+  const { celebration, skip: skipCelebration } = useNutDropCelebration({
+    strikeMap,
+    // Any send-flow stage (transitioning/amount or a shared-avatar flight)
+    // defers ceremonies — never hijack the amount panel.
+    gated: inlinePhase !== 'picking' || !!sharedAvatarPeer,
+  });
+
+  // Adaptive radar sizing: hero avatars while few peers are around, the
+  // compact step in a crowd, with hysteresis (see peerFieldSizing.ts). Owned
+  // here (not in the field) because the shared-avatar flight element must
+  // render at the radar's current avatar size. Fed by the field's layout
+  // REGISTRY length (visible + exiting) so exit animations never resize the
+  // grid mid-flight, and frozen whenever any overlay flight is active (send
+  // shared-avatar, amount entry, or a celebration) so captured rects stay
+  // valid.
+  const [radarRegistryCount, setRadarRegistryCount] = useState(0);
+  const [fieldSizingStep, setFieldSizingStep] = useState<PeerFieldSizingStep>('hero');
+  const sizingFrozen =
+    hasInlineAmountEntry || sharedAvatarPeer !== null || celebration.phase !== 'idle';
+  useEffect(() => {
+    if (sizingFrozen) return;
+    setFieldSizingStep((prev) => getPeerFieldSizingStep(radarRegistryCount, prev));
+  }, [radarRegistryCount, sizingFrozen]);
+  const fieldSizing = getPeerFieldSizing(fieldSizingStep);
+  const getPeerStageRef = useRef<PeerStageResolver | null>(null);
+  const [celebrationStage, setCelebrationStage] = useState<{
+    ceremonyId: number;
+    peerID: string;
+    sourceRect: AvatarRect | null;
+    peer: CelebrationPeerIdentity;
+  } | null>(null);
+
+  // Stage the flying identity once per ceremony (keyed by ceremonyId — a
+  // repeat ceremony from the same sender re-captures the rect): identity is
+  // snapshotted at fire time so a sender vanishing mid-ceremony cannot blank
+  // the overlay.
+  useEffect(() => {
+    const current = celebration.phase !== 'idle' ? celebration.current : null;
+    if (!current) {
+      setCelebrationStage(null);
+      return;
+    }
+    setCelebrationStage((previous) => {
+      if (previous?.ceremonyId === celebration.ceremonyId) return previous;
+      const staged = getPeerStageRef.current?.(current.peerID) ?? null;
+      return {
+        ceremonyId: celebration.ceremonyId,
+        peerID: current.peerID,
+        sourceRect: staged?.rect ?? null,
+        peer: staged
+          ? {
+              peerID: current.peerID,
+              name: staged.peer.name,
+              avatarUrl: staged.peer.avatarUrl ?? null,
+              profileLoading: staged.peer.profileLoading,
+            }
+          : { peerID: current.peerID, name: '', avatarUrl: null, profileLoading: false },
+      };
+    });
+  }, [celebration]);
+
+  // Node suppression and overlay mount MUST flip in the same commit at both
+  // ends (atomic swap) — gating either on reducer state alone or stage state
+  // alone paints one frame with the avatar missing from both layers.
+  const celebrationActive = !!(
+    celebrationStage &&
+    celebration.phase !== 'idle' &&
+    celebration.current
+  );
+
+  const handleRegistryCountChange = useCallback((count: number) => {
+    setRadarRegistryCount(count);
+  }, []);
+
   useEffect(() => {
     paymentLog.debug('near_pay.perf.session_state', {
       phase: inlinePhase,
@@ -1364,8 +1588,12 @@ export function NearPayScreen() {
 
   useEffect(() => {
     useNearPaySessionStore.getState().clear();
+    // While the radar is up, the receive toast is titled "Received payment"
+    // (PaymentStatusToast keys on this flag).
+    useNearPaySessionStore.getState().setRadarVisible(true);
     return () => {
       useNearPaySessionStore.getState().clear();
+      useNearPaySessionStore.getState().setRadarVisible(false);
     };
   }, []);
 
@@ -1397,7 +1625,7 @@ export function NearPayScreen() {
       containerWidth: containerSize.width,
       slotTop: INLINE_AMOUNT_HEADER_TOP,
       slotSize: AMOUNT_HEADER_AVATAR_SLOT_SIZE,
-      avatarSize: AVATAR_SIZE,
+      avatarSize: HEADER_AVATAR_SIZE,
     });
   }, [containerSize.width]);
 
@@ -1543,7 +1771,7 @@ export function NearPayScreen() {
       setSharedAvatarPeer(peer);
       amountPanelTranslateX.set(0);
       amountPanelTranslateY.set(0);
-      const sharedAvatarStart = getSharedAvatarTransform(avatarRect);
+      const sharedAvatarStart = getSharedAvatarTransform(avatarRect, fieldSizing.avatarSize);
       sharedAvatarX.set(sharedAvatarStart.x);
       sharedAvatarY.set(sharedAvatarStart.y);
       sharedAvatarScale.set(sharedAvatarStart.scale);
@@ -1618,6 +1846,7 @@ export function NearPayScreen() {
       amountContentTranslateY,
       amountPanelTranslateX,
       amountPanelTranslateY,
+      fieldSizing.avatarSize,
       sharedAvatarOpacity,
       sharedAvatarScale,
       sharedAvatarX,
@@ -1658,8 +1887,8 @@ export function NearPayScreen() {
     const transitionToken = sharedAvatarTransitionTokenRef.current + 1;
     sharedAvatarTransitionTokenRef.current = transitionToken;
     setSharedAvatarPeer(activeRecipientPeer);
-    const sharedAvatarStart = getSharedAvatarTransform(selectedPeerRect);
-    const sharedAvatarEnd = getSharedAvatarTransform(headerAvatarRect);
+    const sharedAvatarStart = getSharedAvatarTransform(selectedPeerRect, fieldSizing.avatarSize);
+    const sharedAvatarEnd = getSharedAvatarTransform(headerAvatarRect, fieldSizing.avatarSize);
     const amountPanelStartShift = getAmountPanelStartShift(selectedPeerRect, headerAvatarRect);
     sharedAvatarTransitionSpanRef.current = paymentLog
       .child({ flowId: `near-pay-shared-avatar-${transitionToken}` })
@@ -1739,6 +1968,7 @@ export function NearPayScreen() {
     amountOpacity,
     amountPanelTranslateX,
     amountPanelTranslateY,
+    fieldSizing.avatarSize,
     headerAvatarRect,
     inlineAmountEntry,
     inlinePhase,
@@ -1790,9 +2020,28 @@ export function NearPayScreen() {
     () => [styles.inlineAmountBody, amountContentStyle],
     [amountContentStyle]
   );
+  const sharedAvatarBaseStyle = useMemo(
+    () => ({
+      position: 'absolute' as const,
+      left: 0,
+      top: 0,
+      width: fieldSizing.avatarSize,
+      height: fieldSizing.avatarSize,
+      zIndex: zIndex.overlay,
+    }),
+    [fieldSizing.avatarSize]
+  );
+  const sharedAvatarFrameStyle = useMemo(
+    () => ({
+      position: 'relative' as const,
+      width: fieldSizing.avatarSize,
+      height: fieldSizing.avatarSize,
+    }),
+    [fieldSizing.avatarSize]
+  );
   const sharedAvatarCombinedStyle = useMemo(
-    () => [styles.sharedAvatar, sharedAvatarStyle],
-    [sharedAvatarStyle]
+    () => [sharedAvatarBaseStyle, sharedAvatarStyle],
+    [sharedAvatarBaseStyle, sharedAvatarStyle]
   );
 
   const bluetooth = useBluetoothState();
@@ -1844,6 +2093,12 @@ export function NearPayScreen() {
       headerBackVisible: false,
       headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
       headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
+      // The send flow's shared-element avatar lands inside the header band,
+      // and Android's sheet header (FlowSheetHeader) composites its scrim
+      // gradient ABOVE screen content — the avatar ended up underneath it.
+      // A null headerBackground is the sanctioned per-screen scrim opt-out;
+      // the radar's faint dot field doesn't need the legibility fade.
+      ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),
     }),
     [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
   );
@@ -1864,6 +2119,11 @@ export function NearPayScreen() {
                 style={pickerPanelCombinedStyle}>
                 <NearPayPeerField
                   peers={pickerPeers}
+                  sizing={fieldSizing}
+                  strikeMap={strikeMap}
+                  celebrationPeerID={celebrationActive ? (celebrationStage?.peerID ?? null) : null}
+                  getPeerStageRef={getPeerStageRef}
+                  onRegistryCountChange={handleRegistryCountChange}
                   emptyContent={emptyContent}
                   onSelect={handleSelectPeer}
                   selectedPeerID={sharedAvatarPeer?.peerID ?? null}
@@ -1884,11 +2144,11 @@ export function NearPayScreen() {
               ) : null}
               {sharedAvatarPeer ? (
                 <Animated.View pointerEvents="none" style={sharedAvatarCombinedStyle}>
-                  <View pointerEvents="none" style={styles.peerAvatarFrame}>
+                  <View pointerEvents="none" style={sharedAvatarFrameStyle}>
                     <Avatar
                       state={peerAvatarState(sharedAvatarPeer)}
                       picture={sharedAvatarPeer.avatarUrl ?? undefined}
-                      size={AVATAR_SIZE}
+                      size={fieldSizing.avatarSize}
                       name={sharedAvatarPeer.name}
                       seed={sharedAvatarPeer.peerID}
                       alt={`${sharedAvatarPeer.name} avatar`}
@@ -1896,6 +2156,30 @@ export function NearPayScreen() {
                     />
                   </View>
                 </Animated.View>
+              ) : null}
+              {/* Same conjunction as celebrationActive — restated inline so
+                  TS narrows celebration.phase for the overlay's prop. */}
+              {celebrationStage && celebration.phase !== 'idle' && celebration.current ? (
+                <NutDropCelebrationOverlay
+                  // Fresh instance per ceremony: back-to-back queued
+                  // ceremonies never pass through 'idle', so without the key
+                  // the second flight would start from the first's landing.
+                  key={celebrationStage.ceremonyId}
+                  peer={celebrationStage.peer}
+                  amount={celebration.current.amount}
+                  unit={celebration.current.unit}
+                  phase={celebration.phase}
+                  sourceRect={celebrationStage.sourceRect}
+                  containerSize={containerSize}
+                  topInset={CELEBRATION_TOP_INSET}
+                  bottomAvoidance={
+                    NEAR_PAY_ACTION_ROW_HEIGHT +
+                    NEAR_PAY_ACTION_ROW_BOTTOM +
+                    spacing.lg +
+                    insets.bottom
+                  }
+                  onSkip={skipCelebration}
+                />
               ) : null}
             </>
           )}
@@ -1937,50 +2221,6 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: zIndex.overlay,
   },
-  peerNode: {
-    position: 'absolute',
-    width: NODE_WIDTH,
-    height: NODE_HEIGHT,
-    zIndex: zIndex.sticky,
-  },
-  peerPressable: {
-    width: NODE_WIDTH,
-    height: NODE_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: PEER_AVATAR_TOP,
-  },
-  peerPressableHidden: {
-    width: NODE_WIDTH,
-    height: NODE_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: PEER_AVATAR_TOP,
-    opacity: 0,
-  },
-  peerAvatarFrame: {
-    position: 'relative',
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-  },
-  bearerBadge: {
-    alignItems: 'center',
-    borderRadius: BEARER_BADGE_SIZE / 2,
-    bottom: -2,
-    height: BEARER_BADGE_SIZE,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: -2,
-    width: BEARER_BADGE_SIZE,
-  },
-  peerAvatarNameLabel: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: NODE_WIDTH,
-    height: spacing.lg,
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.xs,
-  },
   peerAvatarName: {
     width: '100%',
     textAlign: 'center',
@@ -1989,14 +2229,6 @@ const styles = StyleSheet.create({
   },
   sharedElementHidden: {
     opacity: 0,
-  },
-  sharedAvatar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    zIndex: zIndex.overlay,
   },
   inlineAmountHeader: {
     height: INLINE_AMOUNT_HEADER_HEIGHT,

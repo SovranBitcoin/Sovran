@@ -1,6 +1,10 @@
 import type { BLEPeer } from 'bitchat-module';
 
-import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
+import {
+  areBLEPeerSnapshotsEquivalent,
+  BLE_PEER_STALE_MS,
+  filterFreshBLEPeers,
+} from '@/features/bitchat/lib/blePeerSnapshots';
 
 function peer(peerID: string, overrides: Partial<BLEPeer> = {}): BLEPeer {
   return {
@@ -54,5 +58,32 @@ describe('BLE peer snapshot equality', () => {
       )
     ).toBe(false);
     expect(areBLEPeerSnapshotsEquivalent([capable], [{ ...capable, lastSeen: 99 }])).toBe(true);
+  });
+});
+
+describe('filterFreshBLEPeers', () => {
+  const NOW = 10_000_000;
+
+  it('keeps peers with a live direct link regardless of lastSeen age', () => {
+    const ancient = peer('a', { hasDirectLink: true, lastSeen: 0 });
+    expect(filterFreshBLEPeers([ancient], NOW)).toEqual([ancient]);
+  });
+
+  it('keeps linkless peers until their last announce goes stale', () => {
+    const fresh = peer('a', { hasDirectLink: false, lastSeen: NOW - BLE_PEER_STALE_MS });
+    expect(filterFreshBLEPeers([fresh], NOW)).toEqual([fresh]);
+  });
+
+  it('drops ghost identities: no link and a stale announce', () => {
+    // The profile-switch ghost: the old peerID's link rebound to the new
+    // identity (hasDirectLink false) while isConnected stays cached true —
+    // upstream's registry never expires it, so the filter must.
+    const ghost = peer('old-profile', {
+      hasDirectLink: false,
+      isConnected: true,
+      lastSeen: NOW - BLE_PEER_STALE_MS - 1,
+    });
+    const live = peer('current-profile', { hasDirectLink: true, lastSeen: NOW });
+    expect(filterFreshBLEPeers([ghost, live], NOW)).toEqual([live]);
   });
 });
