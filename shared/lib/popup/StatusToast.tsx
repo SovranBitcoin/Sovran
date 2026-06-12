@@ -44,13 +44,6 @@ type StatusToastProps = {
   /** Right-aligned action pill. Hidden when omitted. */
   action?: { label: string; onPress: () => void };
   /**
-   * Confirmed-state accent override (failures always use the danger tint).
-   * Drives both the background tint — through the same alpha/blend pipeline
-   * as the default success green — and the drawn checkmark, e.g. the Nut
-   * Drop radar's blue-accent receive toast.
-   */
-  confirmedTint?: string;
-  /**
    * From the heroui toast manager — `hide` plus internal positioning props.
    * Spread onto the underlying `<Toast>` root.
    */
@@ -68,21 +61,14 @@ type StatusToastProps = {
  * told to hide. `'pending'` and `'delivered'` are non-terminal and keep the
  * toast visible until the caller flips status or unmounts the component.
  */
-export function StatusToast({
-  status,
-  title,
-  subtitle,
-  action,
-  confirmedTint,
-  toastProps,
-}: StatusToastProps) {
+export function StatusToast({ status, title, subtitle, action, toastProps }: StatusToastProps) {
   const { bg: surfaceBg, fg: surfaceFg } = useToastSurface();
   // Opaque on non-frosted platforms (Android) — see ToastSlab.
   const frosted = useToastFrosted();
   const surfaceBgTint = frosted ? opacity(surfaceBg, TINT_ALPHA) : surfaceBg;
 
   const isTerminal = status === 'confirmed' || status === 'failed';
-  const targetBg = status === 'failed' ? DANGER_DARK_BG : (confirmedTint ?? SUCCESS_DARK_BG);
+  const targetBg = status === 'failed' ? DANGER_DARK_BG : SUCCESS_DARK_BG;
   // Frosted: translucent tint, the blur supplies the softness. Opaque:
   // composite the same tint into the surface slab mathematically —
   // raw SUCCESS/DANGER hexes at full opacity read far too strong.
@@ -126,9 +112,6 @@ export function StatusToast({
         phase={indicatorPhase}
         result={indicatorResult}
         color={surfaceFg}
-        // The success disc + checkmark draw in the confirmed accent when one
-        // is set; failures keep the default danger coloring.
-        successColor={confirmedTint}
       />
       <View style={{ flex: 1, gap: 2 }}>
         <RNText

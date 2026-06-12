@@ -4,9 +4,9 @@ import { useReducedMotion } from 'react-native-reanimated';
 import {
   CELEBRATION_AWAITING_TIMEOUT_MS,
   CELEBRATION_CENTERING_MS,
+  CELEBRATION_EXIT_MS,
   CELEBRATION_HOLD_ABBREVIATED_MS,
   CELEBRATION_HOLD_MS,
-  CELEBRATION_RETURN_MS,
 } from '@/features/nearPay/components/NutDropCelebrationOverlay';
 import {
   celebrationReducer,
@@ -145,7 +145,7 @@ export function useNutDropCelebration({
           ? CELEBRATION_AWAITING_TIMEOUT_MS
           : celebration.phase === 'held'
             ? holdMs
-            : CELEBRATION_RETURN_MS;
+            : CELEBRATION_EXIT_MS;
     // Token the dispatch with the phase this timer was scheduled for: the
     // reducer drops it if a skip/gate/success flip won the race.
     const scheduledPhase = celebration.phase;

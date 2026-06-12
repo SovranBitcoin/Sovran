@@ -5,7 +5,6 @@ import { createPaymentCopyGroups, type PaymentCopyResolver } from '@sovranbitcoi
 
 import { popupLog } from '../logger';
 import { formatAmount } from '@/shared/lib/currency';
-import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
@@ -262,19 +261,18 @@ export function PaymentStatusToast({
     isConfirmed && !isFailed ? { label: 'View', onPress: onPressViewTransaction } : undefined;
 
   // Nut Drop special case: while the radar screen is up, an incoming ecash
-  // receive picks up the radar's blue accent — background tint AND drawn
-  // checkmark — plus the "Received payment" title, instead of the generic
-  // green. Reactive on purpose: leave the radar and the toast reverts.
+  // receive is titled "Received payment" (the lightning ceremony is already
+  // playing — the toast just confirms it). Standard green coloring.
+  // Reactive on purpose: leave the radar and the title reverts.
   const radarVisible = useNearPaySessionStore((s) => s.radarVisible);
-  const nutDropAccent = variant === 'receive-ecash' && radarVisible;
+  const onNutDropRadar = variant === 'receive-ecash' && radarVisible;
 
   return (
     <StatusToast
       status={status}
-      title={nutDropAccent ? 'Received payment' : config.message}
+      title={onNutDropRadar ? 'Received payment' : config.message}
       subtitle={subtitleNode}
       action={action}
-      confirmedTint={nutDropAccent ? BLUETOOTH_ACCENT : undefined}
       toastProps={{ ...toastProps, hide }}
     />
   );

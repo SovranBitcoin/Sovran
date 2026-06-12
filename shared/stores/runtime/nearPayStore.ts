@@ -36,9 +36,8 @@ interface NearPaySessionStore {
   active: NearPaySession | null;
   /**
    * True while the Nut Drop radar screen is mounted. Surfaces outside the
-   * screen key presentation on it — e.g. the receive toast picks up the
-   * radar's blue accent (tint + checkmark) only when the radar is what the
-   * user is looking at.
+   * screen key presentation on it — e.g. the receive toast is titled
+   * "Received payment" only when the radar is what the user is looking at.
    */
   radarVisible: boolean;
   start: (recipient: NearPayRecipient) => void;

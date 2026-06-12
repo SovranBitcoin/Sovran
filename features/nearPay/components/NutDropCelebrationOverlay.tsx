@@ -36,7 +36,7 @@ import { alpha, duration, spacing, zIndex } from '@/shared/styles/tokens';
  * Full-screen receive celebration: the sender's avatar flies from its radar
  * slot to center stage behind a dimming scrim, gold sky bolts strike it on
  * arrival (the impact frame — the hook fires the success haptic at the same
- * phase flip), the amount reveals, and the avatar flies home.
+ * phase flip), the amount reveals, and the whole stage dissolves in place.
  *
  * Driven entirely by the celebration reducer's `phase` — this component
  * renders the act it is told to; the hook owns the beat clock. Tapping
@@ -48,20 +48,24 @@ const CELEBRATION_AVATAR_SIZE = 96;
 /**
  * One knob for every lightning surface on the radar (celebration canvas,
  * the flying avatar's strike, and the node-level edge-case strikes in
- * NearPayScreen). Edit + Metro reload to experiment — matches the blue
- * accent the radar receive toast uses.
+ * NearPayScreen). Edit + Metro reload to experiment.
  */
-export const CELEBRATION_LIGHTNING_PALETTE: LightningPalette = 'electric-blue';
+export const CELEBRATION_LIGHTNING_PALETTE: LightningPalette = 'storm-gold';
 /** Beat lengths — consumed by useNutDropCelebration's phase scheduler. */
 export const CELEBRATION_CENTERING_MS = duration.standard;
 /**
- * The payoff act — the amount is on screen here, so it gets the longest
- * beat on the scale (and the label keeps fading through the return flight
- * for a little extra read time).
+ * The payoff act — the amount is on screen here, so it runs past the top
+ * of the duration scale (loop + slow, a deliberate composition: the scale
+ * caps at 1500ms and the read window earns more).
  */
-export const CELEBRATION_HOLD_MS = duration.loop;
-export const CELEBRATION_HOLD_ABBREVIATED_MS = duration.deliberate;
-export const CELEBRATION_RETURN_MS = duration.standard;
+export const CELEBRATION_HOLD_MS = duration.loop + duration.slow;
+export const CELEBRATION_HOLD_ABBREVIATED_MS = duration.spin;
+/**
+ * The exit act dissolves in place — the focus is never undone spatially;
+ * the centered avatar, amount, and scrim all fade out together while the
+ * radar node returns underneath.
+ */
+export const CELEBRATION_EXIT_MS = duration.slow;
 /**
  * Safety cap for the 'awaiting' act (avatar parked center-stage while the
  * redeem runs). The strike layer normally ends the wait first — success or
@@ -90,7 +94,6 @@ export function NutDropCelebrationOverlay({
   unit,
   phase,
   sourceRect,
-  resolveReturnRect,
   containerSize,
   topInset,
   bottomAvoidance,
@@ -103,8 +106,6 @@ export function NutDropCelebrationOverlay({
   phase: Exclude<CelebrationPhase, 'idle'>;
   /** Radar rect captured at fire time; null = sender off-radar (fade in). */
   sourceRect: AvatarRect | null;
-  /** Re-resolved at return time — the user may have panned mid-ceremony. */
-  resolveReturnRect: () => AvatarRect | null;
   containerSize: PeerLayoutSize;
   topInset: number;
   bottomAvoidance: number;
@@ -192,26 +193,15 @@ export function NutDropCelebrationOverlay({
       return;
     }
 
-    // 'returning' — fly home to the freshly resolved slot, or fade out in
-    // place when the sender's node is gone.
-    const returnRect = resolveReturnRect();
-    const returnTiming = { duration: CELEBRATION_RETURN_MS, easing: Easing.out(Easing.cubic) };
-    if (returnRect) {
-      const end = getSharedAvatarTransform(returnRect, CELEBRATION_AVATAR_SIZE);
-      avatarX.set(withTiming(end.x, returnTiming));
-      avatarY.set(withTiming(end.y, returnTiming));
-      avatarScale.set(withTiming(end.scale, returnTiming));
-    } else {
-      avatarScale.set(withTiming(0.7, returnTiming));
-      avatarOpacity.set(withTiming(0, { duration: duration.quick }));
-    }
+    // 'returning' — dissolve in place: the center focus is never undone
+    // spatially. Avatar, amount, and scrim fade together; the radar node
+    // un-hides underneath when the overlay unmounts.
+    const exitTiming = { duration: CELEBRATION_EXIT_MS, easing: Easing.in(Easing.quad) };
+    avatarOpacity.set(withTiming(0, exitTiming));
     scrimOpacity.set(
-      withTiming(0, { duration: duration.standard, easing: Easing.out(Easing.quad) })
+      withTiming(0, { duration: CELEBRATION_EXIT_MS, easing: Easing.out(Easing.quad) })
     );
-    // Amount stays readable through the whole return flight.
-    labelOpacity.set(
-      withTiming(0, { duration: CELEBRATION_RETURN_MS, easing: Easing.in(Easing.quad) })
-    );
+    labelOpacity.set(withTiming(0, exitTiming));
   }, [
     avatarOpacity,
     avatarScale,
@@ -221,7 +211,6 @@ export function NutDropCelebrationOverlay({
     labelOpacity,
     labelTranslateY,
     phase,
-    resolveReturnRect,
     scrimOpacity,
     sourceRect,
   ]);

@@ -1562,12 +1562,6 @@ export function NearPayScreen() {
     });
   }, [celebration]);
 
-  const resolveCelebrationReturnRect = useCallback(() => {
-    const peerID = celebrationStage?.peerID;
-    if (!peerID) return null;
-    return getPeerStageRef.current?.(peerID)?.rect ?? null;
-  }, [celebrationStage?.peerID]);
-
   // Node suppression and overlay mount MUST flip in the same commit at both
   // ends (atomic swap) — gating either on reducer state alone or stage state
   // alone paints one frame with the avatar missing from both layers.
@@ -1592,8 +1586,8 @@ export function NearPayScreen() {
 
   useEffect(() => {
     useNearPaySessionStore.getState().clear();
-    // While the radar is up, the receive toast picks up the radar's blue
-    // accent (PaymentStatusToast keys on this flag).
+    // While the radar is up, the receive toast is titled "Received payment"
+    // (PaymentStatusToast keys on this flag).
     useNearPaySessionStore.getState().setRadarVisible(true);
     return () => {
       useNearPaySessionStore.getState().clear();
@@ -2168,7 +2162,6 @@ export function NearPayScreen() {
                   unit={celebration.current.unit}
                   phase={celebration.phase}
                   sourceRect={celebrationStage.sourceRect}
-                  resolveReturnRect={resolveCelebrationReturnRect}
                   containerSize={containerSize}
                   topInset={CELEBRATION_TOP_INSET}
                   bottomAvoidance={
