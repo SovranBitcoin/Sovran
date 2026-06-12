@@ -34,12 +34,20 @@ interface NearPaySession {
 
 interface NearPaySessionStore {
   active: NearPaySession | null;
+  /**
+   * True while the Nut Drop radar screen is mounted. Surfaces outside the
+   * screen key presentation on it — e.g. the receive toast goes storm-gold
+   * (matching the lightning) only when the radar is what the user is
+   * looking at.
+   */
+  radarVisible: boolean;
   start: (recipient: NearPayRecipient) => void;
   setAmountEntry: (amountEntry: string) => void;
   showAmount: () => void;
   resetToPicker: () => void;
   complete: () => void;
   clear: () => void;
+  setRadarVisible: (visible: boolean) => void;
 }
 
 function createSessionId(peerID: string): string {
@@ -48,6 +56,7 @@ function createSessionId(peerID: string): string {
 
 export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => ({
   active: null,
+  radarVisible: false,
 
   start: (recipient) => {
     storeLog.info('near_pay.session.start', {
@@ -116,5 +125,9 @@ export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => 
   clear: () => {
     if (get().active) storeLog.debug('near_pay.session.clear');
     set({ active: null });
+  },
+
+  setRadarVisible: (visible) => {
+    if (get().radarVisible !== visible) set({ radarVisible: visible });
   },
 }));

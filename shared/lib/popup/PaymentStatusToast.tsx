@@ -5,8 +5,10 @@ import { createPaymentCopyGroups, type PaymentCopyResolver } from '@sovranbitcoi
 
 import { popupLog } from '../logger';
 import { formatAmount } from '@/shared/lib/currency';
+import { LIGHTNING_GOLD } from '@/shared/lib/brandColors';
 import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
@@ -259,12 +261,20 @@ export function PaymentStatusToast({
   const action =
     isConfirmed && !isFailed ? { label: 'View', onPress: onPressViewTransaction } : undefined;
 
+  // Nut Drop special case: while the radar screen is up, an incoming ecash
+  // receive is already being celebrated with storm-gold lightning — the
+  // toast matches it (title + confirmed tint) instead of the generic green.
+  // Reactive on purpose: leave the radar and the toast reverts.
+  const radarVisible = useNearPaySessionStore((s) => s.radarVisible);
+  const nutDropGold = variant === 'receive-ecash' && radarVisible;
+
   return (
     <StatusToast
       status={status}
-      title={config.message}
+      title={nutDropGold ? 'Received payment' : config.message}
       subtitle={subtitleNode}
       action={action}
+      confirmedTint={nutDropGold ? LIGHTNING_GOLD : undefined}
       toastProps={{ ...toastProps, hide }}
     />
   );

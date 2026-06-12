@@ -44,8 +44,13 @@ import { alpha, duration, spacing, zIndex } from '@/shared/styles/tokens';
 const CELEBRATION_AVATAR_SIZE = 96;
 /** Beat lengths — consumed by useNutDropCelebration's phase scheduler. */
 export const CELEBRATION_CENTERING_MS = duration.standard;
-export const CELEBRATION_HOLD_MS = duration.deliberate;
-export const CELEBRATION_HOLD_ABBREVIATED_MS = duration.slow;
+/**
+ * The payoff act — the amount is on screen here, so it gets the longest
+ * beat on the scale (and the label keeps fading through the return flight
+ * for a little extra read time).
+ */
+export const CELEBRATION_HOLD_MS = duration.loop;
+export const CELEBRATION_HOLD_ABBREVIATED_MS = duration.deliberate;
 export const CELEBRATION_RETURN_MS = duration.standard;
 /**
  * Safety cap for the 'awaiting' act (avatar parked center-stage while the
@@ -193,7 +198,10 @@ export function NutDropCelebrationOverlay({
     scrimOpacity.set(
       withTiming(0, { duration: duration.standard, easing: Easing.out(Easing.quad) })
     );
-    labelOpacity.set(withTiming(0, { duration: duration.quick }));
+    // Amount stays readable through the whole return flight.
+    labelOpacity.set(
+      withTiming(0, { duration: CELEBRATION_RETURN_MS, easing: Easing.in(Easing.quad) })
+    );
   }, [
     avatarOpacity,
     avatarScale,

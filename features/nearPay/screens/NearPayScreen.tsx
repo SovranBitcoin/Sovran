@@ -1591,8 +1591,12 @@ export function NearPayScreen() {
 
   useEffect(() => {
     useNearPaySessionStore.getState().clear();
+    // While the radar is up, the receive toast goes storm-gold to match
+    // the lightning (PaymentStatusToast keys on this flag).
+    useNearPaySessionStore.getState().setRadarVisible(true);
     return () => {
       useNearPaySessionStore.getState().clear();
+      useNearPaySessionStore.getState().setRadarVisible(false);
     };
   }, []);
 
