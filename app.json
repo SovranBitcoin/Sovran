@@ -4,7 +4,17 @@
     "slug": "sovran",
     "version": "0.1.0",
     "orientation": "portrait",
-    "scheme": ["sovran", "cashu", "lightning", "lnurl", "lnurlw", "lnurlp", "bitcoin", "nostr"],
+    "scheme": [
+      "sovran",
+      "cashu",
+      "lightning",
+      "lnurl",
+      "lnurlw",
+      "lnurlp",
+      "bitcoin",
+      "nostr",
+      "nostrconnect"
+    ],
     "userInterfaceStyle": "dark",
     "icon": "./assets/images/light.png",
     "assetBundlePatterns": ["**/*"],

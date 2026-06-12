@@ -24,6 +24,7 @@ import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { AVATAR_FALLBACK_VARIANT_LABELS } from '@/shared/lib/avatarFallback';
 import { useNotificationPolicyStore } from '@/features/feed/stores/notificationPolicyStore';
 import { notificationPolicyLabel } from '@/features/feed/lib/notificationCopy';
+import { useNip46RequestsStore } from '@/features/nostrSigner';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -66,6 +67,14 @@ const ProfileButton = () => {
 };
 
 const TRIPLE_TAP_WINDOW_MS = 1500;
+
+const SIGNER_ROW_DESCRIPTION = 'Sign in to Nostr apps with this device';
+
+/** Live row description: pending-count variant when the signer queue is non-empty. */
+function signerRowDescription(pendingCount: number): string {
+  if (pendingCount <= 0) return SIGNER_ROW_DESCRIPTION;
+  return pendingCount === 1 ? '1 pending request' : `${pendingCount} pending requests`;
+}
 
 const SettingsListLinkItem: React.FC<{
   href: Href;
@@ -153,6 +162,7 @@ export const SettingsScreen = () => {
   const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
   const avatarFallbackVariant = useSettingsStore((state) => state.avatarFallbackVariant);
   const notificationPolicy = useNotificationPolicyStore((state) => state.policy);
+  const signerPendingCount = useNip46RequestsStore((state) => state.pending.length);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -229,6 +239,12 @@ export const SettingsScreen = () => {
         </Section>
         <Section title="Security">
           <ListGroup variant="secondary">
+            <SettingsListLinkItem
+              href="/(signer-flow)"
+              title="Remote Login"
+              description={signerRowDescription(signerPendingCount)}
+            />
+            <Separator className="mx-4" />
             <SettingsListLinkItem href="/(settings-flow)/keyring" title="P2PK Keys" />
             <Separator className="mx-4" />
             <SettingsListLinkItem

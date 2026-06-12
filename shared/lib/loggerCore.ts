@@ -1053,7 +1053,10 @@ export const mapLog = log.child({ module: 'map' });
  * would otherwise dump every enumerable field. Always route catch sites
  * through this helper.
  */
-export function redactError(e: unknown): { name: string; message: string } {
+/** The stable `{ name, message }` shape `redactError` produces. */
+export type RedactedError = { name: string; message: string };
+
+export function redactError(e: unknown): RedactedError {
   if (e instanceof Error) return { name: e.name, message: redactKnownSecretSubstrings(e.message) };
   if (typeof e === 'string') return { name: 'NonError', message: redactKnownSecretSubstrings(e) };
   if (e && typeof e === 'object') {

@@ -50,10 +50,21 @@ export interface ListRowIconCircle {
   backgroundColor?: string;
 }
 
+/** Plain leading icon — no circle chrome, settings-row style. */
+interface ListRowIcon {
+  name: string;
+  /** Defaults to the foreground theme color. */
+  color?: string;
+  /** Glyph size. @default 22 */
+  size?: number;
+}
+
 interface ListRowProps {
   /** Leading slot — pick exactly one. `leading` takes priority as the escape hatch. */
   avatar?: ListRowAvatar;
   iconCircle?: ListRowIconCircle;
+  /** Plain icon, no circle — for action rows inside ListGroup containers. */
+  icon?: ListRowIcon;
   leading?: ReactNode;
 
   /** Primary line. String → 16/600 ellipsize. ReactNode → caller owns layout.
@@ -100,6 +111,14 @@ interface ListRowProps {
   /** Default: `paddingHorizontal: 20, paddingVertical: 12`. Compact: pv 8. */
   padding?: 'default' | 'compact';
 
+  /**
+   * Horizontal inset of the row content. Defaults to the app-wide 20; pass 16
+   * when the row sits beside heroui `ListGroup.Item` siblings (p-4 = 16) so
+   * adjacent groups align. NOTE: the `style` prop lands on the OUTER wrapper —
+   * padding there stacks on top of this inset instead of replacing it.
+   */
+  paddingHorizontal?: number;
+
   style?: StyleProp<ViewStyle>;
 
   /** VoiceOver/TalkBack label for the row. Defaults to `title` when `title`
@@ -122,6 +141,7 @@ const ROW_GAP = 12;
 export function ListRow({
   avatar,
   iconCircle,
+  icon,
   leading,
   title,
   subtitle,
@@ -137,6 +157,7 @@ export function ListRow({
   subtitleFallback,
   testID,
   padding = 'default',
+  paddingHorizontal = 20,
   style,
   accessibilityLabel,
   accessibilityHint,
@@ -148,11 +169,20 @@ export function ListRow({
 
   const paddingVertical = padding === 'compact' ? 8 : 12;
 
-  // ----- Leading resolution (priority: custom leading > iconCircle > avatar) -----
+  // ----- Leading resolution (priority: leading > icon > iconCircle > avatar) -----
 
   let leadingEl: ReactNode = null;
   if (leading != null) {
     leadingEl = leading;
+  } else if (icon) {
+    // Fixed-width slot keeps titles aligned across rows whose glyphs differ
+    // in visual width; centered so the 12px row gap reads consistently.
+    const iconSize = icon.size ?? 22;
+    leadingEl = (
+      <View style={{ width: iconSize + 2, alignItems: 'center' }}>
+        <Icon name={icon.name} size={iconSize} color={icon.color ?? foreground} />
+      </View>
+    );
   } else if (iconCircle) {
     const size = iconCircle.size ?? DEFAULT_ICON_CIRCLE_SIZE;
     const iconSize = Math.round(size * 0.45);
@@ -227,13 +257,15 @@ export function ListRow({
   const accentBelow = accentPosition === 'below' && accent != null;
   const leadingWidth =
     avatar?.size ?? iconCircle?.size ?? (leading != null ? DEFAULT_AVATAR_SIZE : 0);
-  const accentInsetLeft = leadingEl ? 20 + leadingWidth + ROW_GAP : 20;
+  const accentInsetLeft = leadingEl
+    ? paddingHorizontal + leadingWidth + ROW_GAP
+    : paddingHorizontal;
 
   const mainRow = (
     <HStack
       align="center"
       style={{
-        paddingHorizontal: 20,
+        paddingHorizontal,
         paddingTop: paddingVertical,
         paddingBottom: accentBelow ? 0 : paddingVertical,
         gap: ROW_GAP,
@@ -254,7 +286,7 @@ export function ListRow({
       <View
         style={{
           paddingLeft: accentInsetLeft,
-          paddingRight: 20,
+          paddingRight: paddingHorizontal,
           paddingTop: 4,
           paddingBottom: paddingVertical,
         }}>

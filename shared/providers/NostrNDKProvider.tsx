@@ -1,4 +1,12 @@
-import React, { createContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  ReactNode,
+} from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from '@/shared/ndk';
 import { giftWrapCache } from '@/shared/lib/nostr/giftWrapCache';
@@ -15,6 +23,16 @@ interface NostrNDKContextValue {
 const NostrNDKContext = createContext<NostrNDKContextValue>({
   isInitialized: false,
 });
+
+/**
+ * NDK init readiness (`initializeNDK` runs ~800ms deferred — see the effect
+ * below). Consumers that wire NDK-dependent services (e.g. the NIP-46 signer)
+ * must gate on `isInitialized`. Outside the provider this returns the context
+ * default (`isInitialized: false`), which fails safe.
+ */
+export function useNostrNDKContext(): NostrNDKContextValue {
+  return useContext(NostrNDKContext);
+}
 
 interface NostrNDKProviderProps {
   children: ReactNode;
@@ -122,5 +140,9 @@ export function NostrNDKProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage.canStart, initializeNDK, nostrKeys?.privateKey]);
 
-  return <NostrNDKContext.Provider value={{ isInitialized }}>{children}</NostrNDKContext.Provider>;
+  // Memoized so context consumers (e.g. the NIP-46 signer service) only
+  // re-render when readiness actually flips, not on every provider render.
+  const contextValue = useMemo(() => ({ isInitialized }), [isInitialized]);
+
+  return <NostrNDKContext.Provider value={contextValue}>{children}</NostrNDKContext.Provider>;
 }

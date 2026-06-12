@@ -19,7 +19,7 @@
 // Side-effect import: must run on barrel load so the dev heartbeat starts.
 import './loggerJsThread';
 
-export type { Logger } from './loggerCore';
+export type { Logger, RedactedError } from './loggerCore';
 
 export {
   createLogger,

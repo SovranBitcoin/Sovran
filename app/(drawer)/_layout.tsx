@@ -20,6 +20,8 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { DrawerProfileChrome } from '@/shared/blocks/DrawerProfileChrome';
 import { alpha, iconSize, radius, spacing } from '@/shared/styles/tokens';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
+import { Badge } from '@/shared/ui/primitives/Badge';
+import { useNip46RequestsStore } from '@/features/nostrSigner';
 
 type MenuRoute =
   | '/(drawer)/(tabs)/feed'
@@ -27,6 +29,7 @@ type MenuRoute =
   | '/(drawer)/(tabs)/contacts'
   | '/(drawer)/(tabs)/notifications'
   | '/(drawer)/(tabs)/ai'
+  | '/(signer-flow)'
   | '/(settings-flow)';
 
 type MenuIconPair = {
@@ -40,7 +43,16 @@ type MenuItem = {
   route: MenuRoute;
   /** Segment-prefix that, when matched against `useSegments()`, marks this menu item active. */
   activeSegments: readonly string[];
+  /**
+   * Optional live badge-count selector hook. Must be a stable module-level
+   * hook (rules-of-hooks: every MenuButton calls exactly one count hook).
+   * The badge renders only while the count is > 0.
+   */
+  useBadgeCount?: () => number;
 };
+
+const useNoBadgeCount = () => 0;
+const useSignerPendingCount = () => useNip46RequestsStore((s) => s.pending.length);
 
 const MENU_ITEMS: MenuItem[] = [
   {
@@ -72,6 +84,13 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'AI',
     route: '/(drawer)/(tabs)/ai',
     activeSegments: ['(drawer)', '(tabs)', 'ai'],
+  },
+  {
+    icon: { default: 'mdi:key-variant', selected: 'mdi:key-variant' },
+    label: 'Remote Login',
+    route: '/(signer-flow)',
+    activeSegments: ['(signer-flow)'],
+    useBadgeCount: useSignerPendingCount,
   },
   {
     icon: {
@@ -112,14 +131,17 @@ const MenuButton = React.memo(function MenuButton({
   route,
   onNavigate,
   isActive,
+  useBadgeCount = useNoBadgeCount,
 }: {
   icon: MenuIconPair;
   label: string;
   route: MenuRoute;
   onNavigate: (route: MenuRoute) => void;
   isActive: boolean;
+  useBadgeCount?: () => number;
 }) {
   const foreground = useThemeColor('foreground');
+  const badgeCount = useBadgeCount();
 
   return (
     <GesturePressable
@@ -135,6 +157,7 @@ const MenuButton = React.memo(function MenuButton({
         <Text size={18} bold style={{ color: foreground }}>
           {label}
         </Text>
+        {badgeCount > 0 ? <Badge variant="primary">{badgeCount}</Badge> : null}
       </HStack>
     </GesturePressable>
   );
@@ -211,6 +234,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
               route={item.route}
               onNavigate={handleNavigation}
               isActive={isRouteActive(item.route)}
+              useBadgeCount={item.useBadgeCount}
             />
           ))}
         </VStack>

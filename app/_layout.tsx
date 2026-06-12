@@ -28,6 +28,7 @@ import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { compose } from '@/shared/lib/utils';
 import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
+import { NostrSignerProvider } from '@/shared/providers/NostrSignerProvider';
 import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
 import { CapabilityProvider, useCapabilities } from '@/shared/ui/capability';
@@ -145,6 +146,10 @@ function AccountScopedProviders({
         MigrationGate,
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
         [NostrNDKProvider, { accountIndex }],
+        // NIP-46 signer service — stays cold (no sockets) until the user has
+        // ≥1 connected app or an in-flight pairing. Must sit directly after
+        // NostrNDKProvider: it gates on its isInitialized flag.
+        NostrSignerProvider,
         [WhitenoiseProvider, { accountIndex }],
         CocoProvider,
         WalletContextProvider,

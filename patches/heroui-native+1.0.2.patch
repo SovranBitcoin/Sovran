@@ -1,5 +1,4 @@
 diff --git a/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js b/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
-index f9ea035..e410eb8 100644
 --- a/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
 +++ b/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
 @@ -1,7 +1,7 @@
@@ -28,7 +27,7 @@ index f9ea035..e410eb8 100644
        isClosingOnSwipe.set(true);
        scheduleOnRN(closeBottomSheet);
      }
-@@ -81,9 +87,20 @@ export function BottomSheetContentContainer({
+@@ -81,9 +87,38 @@ export function BottomSheetContentContainer({
      // We only want to snap when isOpen or initialIndex changes.
      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [isOpen, initialIndex]);
@@ -42,7 +41,25 @@ index f9ea035..e410eb8 100644
 +  // the inner list. Setting `useDirectView: true` on contentContainerProps
 +  // skips that registration so `<BottomSheetScrollView>` works inside
 +  // heroui Menu / BottomSheet content.
-+  const { useDirectView, ...restContentContainerProps } = contentContainerProps ?? {};
++  //
++  // sovran-app patch: `useScrollableContainer: true` swaps the container for
++  // gorhom's BottomSheetScrollView. Under enableDynamicSizing it still
++  // reports content height (the sheet auto-fits short content) AND becomes
++  // scrollable once the sheet caps at maxDynamicContentSize — BottomSheetView
++  // just clips there. The nativewind className stays on an inner plain View
++  // (the scrollable is not css-interop'd).
++  const { useDirectView, useScrollableContainer, ...restContentContainerProps } =
++    contentContainerProps ?? {};
++  const BottomSheetScrollView = GorhomBottomSheetPackage?.BottomSheetScrollView;
++  if (useScrollableContainer && BottomSheetScrollView) {
++    return /*#__PURE__*/_jsx(BottomSheetScrollView, {
++      ...restContentContainerProps,
++      children: /*#__PURE__*/_jsx(View, {
++        className: contentContainerClassName,
++        children: children
++      })
++    });
++  }
 +  const Container = useDirectView ? View : BottomSheetView;
 +  return /*#__PURE__*/_jsx(Container, {
      className: contentContainerClassName,
@@ -52,7 +69,6 @@ index f9ea035..e410eb8 100644
    });
  }
 diff --git a/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx b/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
-index 23de843..ce0c87a 100644
 --- a/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
 +++ b/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
 @@ -1,5 +1,5 @@
@@ -82,7 +98,7 @@ index 23de843..ce0c87a 100644
          isClosingOnSwipe.set(true);
          scheduleOnRN(closeBottomSheet);
        }
-@@ -90,12 +96,24 @@ export function BottomSheetContentContainer({
+@@ -90,12 +96,40 @@ export function BottomSheetContentContainer({
      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [isOpen, initialIndex]);
  
@@ -95,8 +111,24 @@ index 23de843..ce0c87a 100644
 +  // the inner list. Setting `useDirectView: true` on contentContainerProps
 +  // skips that registration so `<BottomSheetScrollView>` works inside
 +  // heroui Menu / BottomSheet content.
-+  const { useDirectView, ...restContentContainerProps } =
-+    (contentContainerProps as { useDirectView?: boolean } | undefined) ?? {};
++  // sovran-app patch: `useScrollableContainer: true` swaps the container for
++  // gorhom's BottomSheetScrollView. Under enableDynamicSizing it still
++  // reports content height (the sheet auto-fits short content) AND becomes
++  // scrollable once the sheet caps at maxDynamicContentSize — BottomSheetView
++  // just clips there. The nativewind className stays on an inner plain View
++  // (the scrollable is not css-interop'd).
++  const { useDirectView, useScrollableContainer, ...restContentContainerProps } =
++    (contentContainerProps as
++      | { useDirectView?: boolean; useScrollableContainer?: boolean }
++      | undefined) ?? {};
++  const BottomSheetScrollView = GorhomBottomSheetPackage?.BottomSheetScrollView;
++  if (useScrollableContainer && BottomSheetScrollView) {
++    return (
++      <BottomSheetScrollView {...restContentContainerProps}>
++        <View className={contentContainerClassName}>{children}</View>
++      </BottomSheetScrollView>
++    );
++  }
 +  const Container = useDirectView ? View : BottomSheetView;
    return (
 -    <BottomSheetView

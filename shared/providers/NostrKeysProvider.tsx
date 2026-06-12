@@ -64,6 +64,25 @@ export const useNostrKeysContext = (): NostrKeysContextValue => {
   return context;
 };
 
+/**
+ * Re-provides the NostrKeys context across a portal boundary. heroui-native
+ * portals (e.g. `BottomSheet.Portal`) render their children inside the
+ * `PortalHost` mounted in `HeroUINativeProvider` — which sits ABOVE the
+ * account-scoped providers — so portaled content loses this context. Capture
+ * the value with `useNostrKeysContext()` at the declaration site (inside the
+ * provider) and pass it here to re-provide it inside the portal. Same pattern
+ * heroui's own `BottomSheetPortal` uses for its animation contexts.
+ */
+export function NostrKeysContextBridge({
+  value,
+  children,
+}: {
+  value: NostrKeysContextValue;
+  children: ReactNode;
+}) {
+  return <NostrKeysContext.Provider value={value}>{children}</NostrKeysContext.Provider>;
+}
+
 interface NostrKeysProviderProps {
   children: ReactNode;
   defaultAccountIndex?: number;

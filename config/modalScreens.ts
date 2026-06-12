@@ -158,6 +158,7 @@ const flowGroups = [
 const standaloneScreens: ModalConfig[] = [
   card('userMessages'),
   slideFromRight('(settings-flow)'),
+  slideFromRight('(signer-flow)'),
   slideFromRight('(user-flow)'),
   fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
   modalTransparent('camera', 'Scan QR'),
