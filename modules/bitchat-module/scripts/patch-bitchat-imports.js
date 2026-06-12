@@ -32,8 +32,12 @@ const PATTERN = new RegExp(
 );
 const REPLACEMENT = '// $1  // bundled / stubbed in BitChatModule';
 
-if (!fs.existsSync(ROOT)) {
-  console.log(`[patch-bitchat-imports] ${ROOT} not present, skipping.`);
+// Probe a real file, not the directory: BitChatVendor is a git submodule,
+// and a `submodules: false` checkout (CI) leaves the path as an EMPTY dir —
+// the dir check passes, walk() finds nothing, and the assertApplied() reads
+// at the bottom then crash with ENOENT on the missing vendor files.
+if (!fs.existsSync(path.join(ROOT, 'Package.swift'))) {
+  console.log(`[patch-bitchat-imports] ${ROOT} not checked out, skipping.`);
   process.exit(0);
 }
 
