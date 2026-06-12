@@ -132,14 +132,28 @@ export function createMeshRedeemOrchestrator(
     try {
       config.queue.prune();
       const cutoff = now();
+      // `redeeming` entries are recovered too: the single-flight latch means
+      // they can only exist from a drain interrupted by a crash or an
+      // expired background budget. Retrying is safe — a receive that
+      // actually completed re-classifies as `spent`.
       const due = Object.entries(config.queue.entries()).filter(
-        ([, entry]) => entry.status === 'pending' && entry.nextAttemptAt <= cutoff
+        ([, entry]) =>
+          (entry.status === 'pending' || entry.status === 'redeeming') &&
+          entry.nextAttemptAt <= cutoff
       );
       if (due.length === 0) return;
 
       logger.info('transport.redeem.drainStart', { dueCount: due.length });
 
       for (const [tokenHash, entry] of due) {
+        // A profile switch swaps the manager (and the profile-scoped queue
+        // behind the port) mid-drain. Redeeming a queued token into the NEW
+        // profile's wallet would bleed funds across profiles — abort the
+        // drain the moment the manager identity changes.
+        if (config.getManager() !== manager) {
+          logger.warn('transport.redeem.managerChanged');
+          return;
+        }
         let trusted: boolean;
         try {
           trusted = await manager.mint.isTrustedMint(entry.mintUrl);

@@ -552,7 +552,10 @@ function createQueue(initial: Record<string, MeshRedeemEntry>) {
 }
 
 function fakeManager(trusted = true) {
-  return { mint: { isTrustedMint: async () => trusted } } as never;
+  // Stable identity: the orchestrator aborts a drain if getManager() returns
+  // a different object mid-drain (profile-switch guard).
+  const manager = { mint: { isTrustedMint: async () => trusted } } as never;
+  return () => manager;
 }
 
 describe('createMeshRedeemOrchestrator', () => {
@@ -560,7 +563,7 @@ describe('createMeshRedeemOrchestrator', () => {
     const queue = createQueue({ h1: entry() });
     const redeemed: string[] = [];
     const orchestrator = createMeshRedeemOrchestrator({
-      getManager: () => fakeManager(),
+      getManager: fakeManager(),
       queue: queue.port,
       executeAutoRedeem: async (token) => {
         redeemed.push(token);
@@ -581,7 +584,7 @@ describe('createMeshRedeemOrchestrator', () => {
   it('parks untrusted-mint entries without touching the wallet', async () => {
     const queue = createQueue({ h1: entry() });
     const orchestrator = createMeshRedeemOrchestrator({
-      getManager: () => fakeManager(false),
+      getManager: fakeManager(false),
       queue: queue.port,
       executeAutoRedeem: async () => {
         throw new Error('must not be called');
@@ -603,7 +606,7 @@ describe('createMeshRedeemOrchestrator', () => {
       fatal: new Error('proof verification failed'),
     };
     const orchestrator = createMeshRedeemOrchestrator({
-      getManager: () => fakeManager(),
+      getManager: fakeManager(),
       queue: queue.port,
       executeAutoRedeem: async (token) => {
         throw errors[token as keyof typeof errors] ?? new Error('unknown');
@@ -633,7 +636,7 @@ describe('createMeshRedeemOrchestrator', () => {
     await noManager.drain();
 
     const restoring = createMeshRedeemOrchestrator({
-      getManager: () => fakeManager(),
+      getManager: fakeManager(),
       queue: queue.port,
       executeAutoRedeem: execute,
       isRestoreSettled: () => false,
@@ -641,7 +644,7 @@ describe('createMeshRedeemOrchestrator', () => {
     await restoring.drain();
 
     const backoff = createMeshRedeemOrchestrator({
-      getManager: () => fakeManager(),
+      getManager: fakeManager(),
       queue: queue.port,
       executeAutoRedeem: execute,
     });
