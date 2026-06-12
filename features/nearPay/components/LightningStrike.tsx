@@ -78,7 +78,7 @@ const LIGHTNING_INTENSITY = 1.5;
 
 // ---------------------------------------------------------------------------
 
-const PALETTES = {
+export const LIGHTNING_PALETTES = {
   'electric-blue': {
     core: INVARIANT_WHITE,
     innerGlow: LIGHTNING_INNER_GLOW,
@@ -93,7 +93,7 @@ const PALETTES = {
   },
 } as const;
 
-type LightningPalette = keyof typeof PALETTES;
+export type LightningPalette = keyof typeof LIGHTNING_PALETTES;
 
 /** Opacity target scaled by intensity, clamped — additive blend stays sane. */
 const op = (v: number) => Math.min(1, v * LIGHTNING_INTENSITY);
@@ -150,7 +150,7 @@ export function LightningStrike({
   frameSize = AVATAR_FRAME_SIZE,
   palette = 'electric-blue',
 }: LightningStrikeProps) {
-  const { core, innerGlow, outerGlow, rim } = PALETTES[palette];
+  const { core, innerGlow, outerGlow, rim } = LIGHTNING_PALETTES[palette];
   const frameScale = frameSize / AVATAR_FRAME_SIZE;
   const canvasStyle = useMemo(
     () => ({

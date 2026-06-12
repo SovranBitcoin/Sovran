@@ -10,7 +10,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
-import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
+import {
+  LightningStrike,
+  type LightningPalette,
+} from '@/features/nearPay/components/LightningStrike';
 import { NutDropCelebrationCanvas } from '@/features/nearPay/components/NutDropCelebrationCanvas';
 import {
   getCelebrationCenterRect,
@@ -42,6 +45,13 @@ import { alpha, duration, spacing, zIndex } from '@/shared/styles/tokens';
  */
 
 const CELEBRATION_AVATAR_SIZE = 96;
+/**
+ * One knob for every lightning surface on the radar (celebration canvas,
+ * the flying avatar's strike, and the node-level edge-case strikes in
+ * NearPayScreen). Edit + Metro reload to experiment — matches the blue
+ * accent the radar receive toast uses.
+ */
+export const CELEBRATION_LIGHTNING_PALETTE: LightningPalette = 'electric-blue';
 /** Beat lengths — consumed by useNutDropCelebration's phase scheduler. */
 export const CELEBRATION_CENTERING_MS = duration.standard;
 /**
@@ -273,6 +283,7 @@ export function NutDropCelebrationOverlay({
         avatarRadius={CELEBRATION_AVATAR_SIZE / 2}
         seed={peer.peerID}
         phase={phase}
+        palette={CELEBRATION_LIGHTNING_PALETTE}
       />
       <Pressable
         accessibilityRole="button"
@@ -296,7 +307,7 @@ export function NutDropCelebrationOverlay({
             entrance="ambient"
             seed={peer.peerID}
             frameSize={CELEBRATION_AVATAR_SIZE}
-            palette="storm-gold"
+            palette={CELEBRATION_LIGHTNING_PALETTE}
           />
         </View>
       </Animated.View>

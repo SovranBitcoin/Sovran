@@ -30,6 +30,7 @@ import {
 import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';
 import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
 import {
+  CELEBRATION_LIGHTNING_PALETTE,
   NutDropCelebrationOverlay,
   type CelebrationPeerIdentity,
 } from '@/features/nearPay/components/NutDropCelebrationOverlay';
@@ -654,10 +655,10 @@ const PeerNode = React.memo(function PeerNode({
               entrance={strike.entrance}
               seed={target.peer.peerID}
               frameSize={sizing.avatarSize}
-              // Gold everywhere: the celebration owns fresh drops, so the
-              // node strike only covers edge cases (gated/queued/ambient/
-              // reduced-motion) and must match the ceremony's palette.
-              palette="storm-gold"
+              // The celebration owns fresh drops, so the node strike only
+              // covers edge cases (gated/queued/ambient/reduced-motion) and
+              // must match the ceremony's palette knob.
+              palette={CELEBRATION_LIGHTNING_PALETTE}
             />
           ) : null}
           {!target.peer.supportsP2pkEcash ? (

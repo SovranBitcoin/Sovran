@@ -20,23 +20,27 @@ import {
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
+import {
+  LIGHTNING_PALETTES,
+  type LightningPalette,
+} from '@/features/nearPay/components/LightningStrike';
 import { generateSkyBolts, type BoltVariant } from '@/features/nearPay/lib/boltGeometry';
 import type { CelebrationPhase } from '@/features/nearPay/lib/nutDropCelebration';
 import type { PeerLayoutSize } from '@/features/nearPay/lib/peerLayout';
-import { INVARIANT_WHITE, LIGHTNING_GOLD, LIGHTNING_GOLD_GLOW } from '@/shared/lib/brandColors';
 import { alpha } from '@/shared/styles/tokens';
 
 /**
  * Field-sized Skia layer for the Nut Drop receive celebration's impact act:
- * two storm-gold sky bolts snapping from the field edge to the centered
- * avatar's rim, a contained gold bloom, and two expanding resolve rings.
+ * two sky bolts snapping from the field edge to the centered avatar's rim,
+ * a contained bloom, and two expanding resolve rings — all in the shared
+ * lightning palette (CELEBRATION_LIGHTNING_PALETTE in the overlay).
  *
  * Same discipline as the avatar-level LightningStrike, scaled to the field:
  * - one additive ("plus") group so overlapping glows brighten like light;
  * - an inverted circle clip so no bolt pixel ever crosses the portrait;
  * - the bloom is a radial gradient hard-capped at `alpha.soft` — a contained
  *   glow behind the avatar, never a full-field flash (photosensitivity);
- * - storm-gold emission colors are deliberately theme-invariant (see
+ * - the emission colors are deliberately theme-invariant (see
  *   brandColors.ts) — light reads as light on every wallpaper theme.
  *
  * All animation rides Reanimated shared values passed as Skia props (UI
@@ -75,6 +79,7 @@ export function NutDropCelebrationCanvas({
   avatarRadius,
   seed,
   phase,
+  palette,
 }: {
   fieldSize: PeerLayoutSize;
   /** Center of the parked celebration avatar, in field coordinates. */
@@ -84,7 +89,10 @@ export function NutDropCelebrationCanvas({
   /** Stable seed (peer ID) — same sender always gets the same sky bolts. */
   seed: string;
   phase: CelebrationPhase;
+  /** Shared with the avatar-level strike — one knob flips the whole show. */
+  palette: LightningPalette;
 }) {
+  const { core, innerGlow, outerGlow } = LIGHTNING_PALETTES[palette];
   const bolts = useMemo(
     () =>
       generateSkyBolts(seed, {
@@ -225,8 +233,8 @@ export function NutDropCelebrationCanvas({
   const boltOpacities = [boltPrimary, boltSecondary];
   const bloomRadius = Math.max(fieldSize.width, fieldSize.height) * 0.75;
   const bloomGradientColors = useMemo(
-    () => [opacity(LIGHTNING_GOLD, op(0.5)), opacity(LIGHTNING_GOLD, 0)],
-    []
+    () => [opacity(outerGlow, op(0.5)), opacity(outerGlow, 0)],
+    [outerGlow]
   );
 
   if (fieldSize.width <= 0 || fieldSize.height <= 0) return null;
@@ -246,7 +254,7 @@ export function NutDropCelebrationCanvas({
                 strokeWidth={5.5 * SKY_WIDTH_SCALE}
                 strokeJoin="round"
                 strokeCap="round"
-                color={LIGHTNING_GOLD}
+                color={outerGlow}
                 opacity={op(0.55)}>
                 <BlurMask blur={6 * SKY_WIDTH_SCALE} style="normal" />
               </Path>
@@ -256,7 +264,7 @@ export function NutDropCelebrationCanvas({
                 strokeWidth={2.5 * SKY_WIDTH_SCALE}
                 strokeJoin="round"
                 strokeCap="round"
-                color={LIGHTNING_GOLD_GLOW}>
+                color={innerGlow}>
                 <BlurMask blur={2.5 * SKY_WIDTH_SCALE} style="normal" />
               </Path>
               <Path
@@ -265,7 +273,7 @@ export function NutDropCelebrationCanvas({
                 strokeWidth={1.25 * SKY_WIDTH_SCALE}
                 strokeJoin="round"
                 strokeCap="round"
-                color={INVARIANT_WHITE}
+                color={core}
               />
             </Group>
           ))}
@@ -276,7 +284,7 @@ export function NutDropCelebrationCanvas({
           r={ring1Radius}
           style="stroke"
           strokeWidth={ring1Width}
-          color={LIGHTNING_GOLD_GLOW}
+          color={innerGlow}
           opacity={ring1Opacity}
         />
         <Circle
@@ -285,7 +293,7 @@ export function NutDropCelebrationCanvas({
           r={ring2Radius}
           style="stroke"
           strokeWidth={ring2Width}
-          color={LIGHTNING_GOLD_GLOW}
+          color={innerGlow}
           opacity={ring2Opacity}
         />
       </Group>
