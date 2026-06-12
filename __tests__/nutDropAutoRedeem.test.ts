@@ -48,7 +48,21 @@ jest.mock('@/shared/lib/cashu/manager', () => ({
 
 const mockPopup = jest.fn();
 jest.mock('@/shared/lib/popup', () => ({
-  nutDropReceivedPopup: (args: unknown) => mockPopup(args),
+  paymentStatusPopup: (args: unknown) => mockPopup(args),
+}));
+
+const mockSetActive = jest.fn();
+const mockSetFailed = jest.fn();
+jest.mock('@/shared/stores/runtime/paymentStatusStore', () => ({
+  usePaymentStatusStore: {
+    getState: () => ({
+      setActive: mockSetActive,
+      setFailed: mockSetFailed,
+      // Matches the seeded entry's token hash so the failure path sees its
+      // own toast mounted and flips it instead of leaving it spinning.
+      active: { id: 'f'.repeat(64) },
+    }),
+  },
 }));
 
 let mockRestoreStatus = 'complete';
@@ -101,7 +115,24 @@ describe('drainNutDropRedeemQueue', () => {
 
     expect(mockReceive).toHaveBeenCalledWith('cashuBexample');
     expect(entry().status).toBe('redeemed');
-    expect(mockPopup).toHaveBeenCalledWith({ amount: 21, unit: 'sat' });
+    // Same toast pipeline as a manual redeem: processing state mounted in
+    // the status store, paymentStatusPopup shown; coco's receive events flip
+    // it to confirmed downstream.
+    expect(mockSetActive).toHaveBeenCalledWith({
+      variant: 'receive-ecash',
+      id: HASH,
+      mintUrl: 'https://mint.test',
+      amount: 21,
+      unit: 'sat',
+      state: 'processing',
+    });
+    expect(mockPopup).toHaveBeenCalledWith({
+      variant: 'receive-ecash',
+      id: HASH,
+      mintUrl: 'https://mint.test',
+      amount: 21,
+      unit: 'sat',
+    });
   });
 
   it('never auto-trusts an unknown mint', async () => {
@@ -119,7 +150,9 @@ describe('drainNutDropRedeemQueue', () => {
     await drainNutDropRedeemQueue();
 
     expect(entry().status).toBe('spent');
-    expect(mockPopup).not.toHaveBeenCalled();
+    // The processing toast mounts before the receive attempt; a spent token
+    // flips it to the standard failed state instead of leaving it spinning.
+    expect(mockSetFailed).toHaveBeenCalledWith(HASH, expect.any(Error));
   });
 
   it('schedules a retry on network failures', async () => {
