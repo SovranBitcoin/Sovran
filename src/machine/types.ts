@@ -10,6 +10,25 @@ import type {
   Detectors,
   MintMethodRequirement,
 } from '../types';
+import type { MeshSendAbortReason } from '../transport/plan';
+import type { MeshTransportAdapter } from '../transport/types';
+
+/**
+ * Outcome of `machine.startMeshSend`. `started` means the solicit succeeded
+ * and the machine entered the standard payment-request flow (amount entry →
+ * confirm → in-band mesh delivery). `vanilla` means the peer has no
+ * capability beacon — the caller owns the public-broadcast consent path.
+ * `abort` is terminal for this attempt; the machine state is unchanged.
+ */
+export type MeshSendStart =
+  | { kind: 'started'; mode: 'locked' | 'bearer-dm' }
+  | { kind: 'vanilla' }
+  | {
+      kind: 'abort';
+      reason: MeshSendAbortReason;
+      theirMintUrls?: string[];
+      ourMintUrls?: string[];
+    };
 
 // ---------------------------------------------------------------------------
 // Flow Steps — every state the machine can be in
@@ -167,6 +186,14 @@ export interface StepDataMap {
     unit: string;
     recipientPubkey?: string;
     recipientProfile?: RecipientProfile;
+    /** Mesh peer this payment will be delivered to in-band (Nut Drop). */
+    meshPeerId?: string;
+    /**
+     * True when the mesh request is a bearer (sender-offline) send — the
+     * confirm screen must render the bearer consent; locked mesh sends may
+     * auto-confirm.
+     */
+    meshBearer?: boolean;
     /** Populated after a successful payment request send. */
     historyEntry?: string;
   };
@@ -251,6 +278,19 @@ export interface FlowContext {
    * bearer token.
    */
   p2pkLockPubkey?: string;
+  /**
+   * Mesh peer the in-band NUT-18 payment will be delivered to (Nut Drop).
+   * Set by `startMeshSend` after the solicit exchange; routes
+   * `executePaymentRequest` through the mesh adapter instead of Nostr/HTTP.
+   */
+  meshPeerId?: string;
+  /**
+   * Sender-offline intent for a mesh send: the payment is a bearer token
+   * from existing local proofs (no swap, no lock). A dedicated field — not
+   * `offline` — because the machine re-stamps `offline` from connectivity
+   * on every transition, while this is a per-flow protocol commitment.
+   */
+  meshBearer?: boolean;
   amountEntryDisplay?: AmountEntryDisplayMetadata;
   /**
    * True after the user accepts a locally composable proof suggestion. The
@@ -364,7 +404,16 @@ export type ExecutionState =
 // ---------------------------------------------------------------------------
 
 export type FlowEvent =
-  | { type: 'EXECUTE'; input: string }
+  | {
+      type: 'EXECUTE';
+      input: string;
+      /**
+       * In-band mesh delivery context (Nut Drop): set when the input is a
+       * creq obtained from a mesh solicit. `senderOffline` marks a bearer
+       * send from local proofs (forces the offline path).
+       */
+      mesh?: { peerId: string; senderOffline: boolean };
+    }
   | { type: 'OPTION_CHOSEN'; option: PaymentOption }
   | {
       type: 'AMOUNT_ENTERED';
@@ -756,12 +805,20 @@ export interface MachineOperations {
    * Execute a payment request send. Called when the user confirms from the
    * payment request screen via `confirmPaymentRequest()`. The machine routes
    * to the result handler on success or BIP321 fallback / error on failure.
+   * `options.meshPeerId` selects the in-band mesh branch: the payment
+   * payload is delivered over the mesh adapter to that peer instead of
+   * Nostr/HTTP (same prepare/execute/rollback path).
    */
   executePaymentRequest?: (
     mintUrl: string,
     paymentRequest: string,
     amount: number,
-    unit: string
+    unit: string,
+    options?: {
+      meshPeerId?: string;
+      /** Bearer send from existing local proofs — the mesh branch must not swap. */
+      offline?: boolean;
+    }
   ) => Promise<{ historyEntry: string; rolledBack?: boolean; errorMessage?: string }>;
   /**
    * Link a scanned input string to a transaction ID for history provenance.
@@ -804,6 +861,18 @@ export interface MachineOperations {
     mintUrl: string,
     amount: number
   ) => Promise<{ historyEntry: string; hadP2PKProofs?: boolean }>;
+
+  /**
+   * Background mesh auto-redeem: receive a token and resolve the REAL
+   * persisted receive-history id (set-difference polling over history —
+   * coco's flush races the receive). Returns null ids when the linkage
+   * couldn't be resolved in time; the receive itself still succeeded.
+   * Wire this into `createMeshRedeemOrchestrator`.
+   */
+  executeAutoRedeem?: (
+    tokenString: string,
+    mintUrl: string
+  ) => Promise<{ historyEntryId: string | null; historyEntry: string | null }>;
 
   /**
    * Roll back a melt operation. Called when the user cancels from the
@@ -950,6 +1019,11 @@ export interface CreateMachineConfig {
    */
   getOffline?: () => boolean;
   /**
+   * Mesh transport adapter for `startMeshSend` (Nut Drop). A getter because
+   * the adapter's lifetime tracks the mesh radio, not the machine.
+   */
+  getMeshTransport?: () => MeshTransportAdapter | null;
+  /**
    * When true, ecash sends pause after amount/mint selection and ask the
    * consumer UI for an optional Cashu token memo before token creation.
    * Defaults to false for backwards compatibility.
@@ -1018,6 +1092,18 @@ export interface PaymentMachine {
     /** See `FlowContext.p2pkLockPubkey` — P2PK-lock the sent token to this key. */
     p2pkLockPubkey?: string;
   }) => Promise<void>;
+  /**
+   * Start a mesh (Nut Drop) send to a capable peer: runs the NUT-18 solicit
+   * exchange through the mesh adapter, plans the send against the safety
+   * matrix, and on success enters the standard payment-request flow with
+   * in-band mesh delivery. `offline: true` requests a bearer send from
+   * local proofs (the receiver omits its lock). Requires
+   * `CreateMachineConfig.getMeshTransport`.
+   */
+  startMeshSend: (
+    peerId: string,
+    opts?: { reset?: boolean; offline?: boolean }
+  ) => Promise<MeshSendStart>;
   /** Start a receive lightning flow. Opens amount screen for mint quote. */
   startReceiveLightning: (opts?: { reset?: boolean }) => Promise<void>;
   /** Open the receive hub screen (Lightning address, P2PK). */

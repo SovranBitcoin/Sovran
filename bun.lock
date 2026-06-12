@@ -7,6 +7,7 @@
       "dependencies": {
         "@cashu/cashu-ts": "3.5.0",
         "@gandlaf21/bolt11-decode": "^3.1.1",
+        "@noble/hashes": "^2.0.0",
         "@scure/bip39": "2.0.1",
         "@sovranbitcoin/nagg-ts": "^0.3.0",
         "@sovranbitcoin/schemas": "^2.0.6",

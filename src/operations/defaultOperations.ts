@@ -42,6 +42,9 @@ import {
   buildMethodAwareMintCandidates,
   deriveMintMethodCapabilityMapFromTrustedMints,
 } from '../mint-capabilities';
+import { classifyMeshToken } from '../transport/classify';
+import { parseMeshPaymentRequest } from '../transport/plan';
+import type { MeshTransportAdapter } from '../transport/types';
 import { parseHistoryEntryOnce } from './historyEntry';
 
 // MintInfo is the cashu-ts GetInfoResponse — coco-core re-derives but does
@@ -221,7 +224,7 @@ function buildRolledBackResult(
   amount: number,
   unit: string,
   paymentRequest: string,
-  transportType: 'nostr' | 'http',
+  transportType: 'nostr' | 'http' | 'mesh',
   errorMessage: string
 ): { historyEntry: string; rolledBack: true; errorMessage: string } {
   const entry = {
@@ -258,6 +261,12 @@ export interface DefaultOperationsConfig {
   getPreferredMintUrl?: () => string | undefined;
   /** Required for Nostr payment request transport. Wallet supplies a NIP-17 publisher bound to the user's private key. */
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+  /**
+   * Required for in-band mesh payment requests (Nut Drop). The wallet's
+   * adapter over its mesh bridge; `executePaymentRequest` delivers the
+   * payment payload through it when the flow carries a mesh peer.
+   */
+  getMeshTransport?: () => MeshTransportAdapter | null;
   /**
    * Bulk catalog fetcher for mint list items. Awaited inside `buildMintListItems`
    * before items are produced, so audit / KYM / operator-profile data flows
@@ -912,7 +921,7 @@ export function createDefaultOperations(
       return result;
     },
 
-    executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
+    executePaymentRequest: async (mintUrl, paymentRequest, amount, unit, options) => {
       const mgr = requireManager();
       logger.info('operations.executePaymentRequest.start', { mintUrl, amount });
 
@@ -926,10 +935,127 @@ export function createDefaultOperations(
 
       const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
       const httpTransport = info.transports?.find((t) => t.type === 'post');
+      const meshPeerId = options?.meshPeerId;
 
       let operationId: string;
 
-      if (nostrTransport && !httpTransport) {
+      if (meshPeerId) {
+        logger.info('operations.executePaymentRequest.transport', { transport: 'mesh' });
+        // In-band mesh delivery (NUT-18: the request's empty transport means
+        // the payment goes back over the channel it arrived on — here the
+        // mesh Noise session to `meshPeerId`).
+        const meshAdapter = config.getMeshTransport?.();
+        if (!meshAdapter) {
+          logger.warn('operations.executePaymentRequest.mesh.unconfigured');
+          throw new Error('Mesh transport adapter is required for mesh payment requests');
+        }
+        const parsedMesh = parseMeshPaymentRequest(paymentRequest);
+        if (!parsedMesh.ok) {
+          logger.warn('operations.executePaymentRequest.mesh.parseFailed', {
+            reason: parsedMesh.reason,
+          });
+          throw new Error('Invalid mesh payment request');
+        }
+        const meshRequest = parsedMesh.request;
+
+        const effectiveAmount = meshRequest.amount ?? amount;
+        if (!effectiveAmount) {
+          throw new Error('Amount is required for mesh payment requests');
+        }
+
+        const prepared = await mgr.ops.send.prepare({
+          mintUrl,
+          amount: effectiveAmount,
+          ...(meshRequest.lockPubkey
+            ? { target: { type: 'p2pk' as const, pubkey: meshRequest.lockPubkey } }
+            : {}),
+        });
+        if (options?.offline && prepared.needsSwap) {
+          // Bearer-offline sends draw from existing proofs by definition — a
+          // swap would hit the mint we may not be able to reach. Same guard
+          // as executeOfflineSend.
+          logger.warn('operations.executePaymentRequest.mesh.needsSwapOffline', {
+            operationId: prepared.id,
+            mintUrl,
+            amount: effectiveAmount,
+          });
+          await mgr.ops.send.cancel(prepared.id);
+          throw new Error('Offline send requires exact proof match');
+        }
+        const { operation, token } = await mgr.ops.send.execute(prepared.id);
+        operationId = operation.id;
+
+        // Byte-exact lock verification before anything leaves the device:
+        // a locked request must yield proofs locked to exactly the creq key;
+        // a bearer request must yield no locks at all. A mismatch is a local
+        // bug, never a deliverable token — roll back instead of sending.
+        const verifyToken = getEncodedToken({ mint: mintUrl, proofs: token.proofs, unit });
+        const verified = classifyMeshToken(verifyToken, meshRequest.lockPubkey ?? '');
+        const lockSatisfied = meshRequest.lockPubkey
+          ? verified.classification === 'locked-to-me'
+          : verified.classification === 'bearer';
+        if (!lockSatisfied) {
+          logger.error('operations.executePaymentRequest.mesh.lockMismatch', {
+            operationId,
+            expectedLock: meshRequest.lockPubkey ?? 'bearer',
+            classification: verified.classification,
+          });
+          const lockMismatchRolledBack = await attemptRollback(mgr, operationId);
+          if (lockMismatchRolledBack) {
+            return buildRolledBackResult(
+              operationId,
+              mintUrl,
+              effectiveAmount,
+              unit,
+              paymentRequest,
+              'mesh',
+              'Created token did not match the requested lock'
+            );
+          }
+          // Reclaim failed: the proofs are still reserved — surface the raw
+          // failure instead of reporting funds as recovered.
+          throw new Error('Created token did not match the requested lock');
+        }
+
+        const payload = {
+          // NUT-18 PaymentRequestPayload: `id` is the request's `i`, the
+          // receiver's correlation handle for validation + statuses.
+          id: meshRequest.paymentId,
+          mint: mintUrl,
+          unit,
+          proofs: token.proofs,
+        };
+        try {
+          if (mockFailEnabled('paymentRequest')) {
+            throw new Error('Mock delivery failure (dev)');
+          }
+          await meshAdapter.deliverPayment(meshPeerId, JSON.stringify(payload));
+          logger.info('operations.executePaymentRequest.mesh.sent', {
+            operationId,
+            paymentId: meshRequest.paymentId,
+          });
+        } catch (deliveryErr) {
+          logger.warn('operations.executePaymentRequest.mesh.deliveryFailed', {
+            operationId,
+            error: errField(deliveryErr),
+          });
+          const rollbackResult = await attemptRollback(mgr, operationId);
+          if (rollbackResult) {
+            const errorMessage =
+              deliveryErr instanceof Error ? deliveryErr.message : 'Mesh delivery failed';
+            return buildRolledBackResult(
+              operationId,
+              mintUrl,
+              effectiveAmount,
+              unit,
+              paymentRequest,
+              'mesh',
+              errorMessage
+            );
+          }
+          throw deliveryErr;
+        }
+      } else if (nostrTransport && !httpTransport) {
         logger.info('operations.executePaymentRequest.transport', { transport: 'nostr' });
         // Nostr transport: use ops.send directly since PaymentRequestsApi doesn't support Nostr
         const sendNostrDM = config.sendNostrDM;
@@ -1033,16 +1159,86 @@ export function createDefaultOperations(
           paymentRequest,
           phase: 'delivered',
           tokenCreated: 'true',
-          ...(nostrTransport
-            ? { nostrSent: 'true', transportType: 'nostr' }
-            : { transportType: 'http' }),
+          ...(meshPeerId
+            ? { transportType: 'mesh', meshPeerId }
+            : nostrTransport
+              ? { nostrSent: 'true', transportType: 'nostr' }
+              : { transportType: 'http' }),
         },
       };
       logger.info('operations.executePaymentRequest.done', {
         operationId,
-        transport: nostrTransport ? 'nostr' : 'http',
+        transport: meshPeerId ? 'mesh' : nostrTransport ? 'nostr' : 'http',
       });
       return { historyEntry: JSON.stringify(enriched) };
+    },
+
+    // Background mesh auto-redeem: receives a token and resolves the REAL
+    // persisted receive-history id by set difference (snapshot ids before,
+    // poll after) — coco's history flush races the receive call, and a
+    // synthesized id would break downstream linkage (location stamps,
+    // scan-history links). Retires the wallet-side direct-coco exception.
+    executeAutoRedeem: async (tokenString, mintUrl) => {
+      const mgr = requireManager();
+
+      let beforeIds = new Set<string>();
+      try {
+        const beforeHistory = await mgr.history.getPaginatedHistory(0, 100);
+        beforeIds = new Set(
+          beforeHistory
+            .filter((h) => h.type === 'receive' && h.mintUrl === mintUrl)
+            .map((h) => h.id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        );
+      } catch (e) {
+        logger.warn('operations.executeAutoRedeem.snapshotFailed', { error: errField(e) });
+      }
+
+      logger.info('operations.executeAutoRedeem.start', {
+        mintUrl,
+        beforeCount: beforeIds.size,
+      });
+      await mgr.wallet.receive(tokenString);
+
+      // ~10s of polling at 200ms — waits out coco's history flush.
+      const MAX_ATTEMPTS = 50;
+      const DELAY_MS = 200;
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        try {
+          const after = await mgr.history.getPaginatedHistory(0, 100);
+          const newEntry = after.find(
+            (h) =>
+              h.type === 'receive' &&
+              h.mintUrl === mintUrl &&
+              typeof h.id === 'string' &&
+              h.id.length > 0 &&
+              !beforeIds.has(h.id)
+          );
+          if (newEntry) {
+            logger.info('operations.executeAutoRedeem.found', {
+              mintUrl,
+              historyEntryId: newEntry.id,
+              attempts: attempt + 1,
+            });
+            return { historyEntryId: newEntry.id, historyEntry: JSON.stringify(newEntry) };
+          }
+        } catch (e) {
+          logger.warn('operations.executeAutoRedeem.pollFailed', {
+            attempt,
+            error: errField(e),
+          });
+        }
+        await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+      }
+
+      // The receive itself succeeded (proofs are persisted); only the
+      // history linkage couldn't be resolved. Callers treat null as
+      // "redeemed, unlinked" — loud log so the flush issue gets attention.
+      logger.error('operations.executeAutoRedeem.timeoutFallback', {
+        mintUrl,
+        polledMs: MAX_ATTEMPTS * DELAY_MS,
+      });
+      return { historyEntryId: null, historyEntry: null };
     },
 
     // Lightning Address → Nostr hex pubkey via NIP-05. Best-effort. The
