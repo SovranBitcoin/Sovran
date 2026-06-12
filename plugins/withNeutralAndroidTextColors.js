@@ -10,9 +10,14 @@
  */
 const { withAndroidStyles } = require('expo/config-plugins');
 
+// Build-time config plugin: these land as literal strings in Android style
+// XML at prebuild — the theme system / brandColors (TS, runtime) can't reach
+// here, so the hex-color lint rule doesn't apply.
 // Material blue-gray — legible as a caret on both dark and light surfaces.
+// eslint-disable-next-line no-restricted-syntax
 const NEUTRAL = '#90A4AE';
 // Selection highlight wants low alpha (#AARRGGBB) or selected text is unreadable.
+// eslint-disable-next-line no-restricted-syntax
 const NEUTRAL_HIGHLIGHT = '#3D90A4AE';
 
 const ITEMS = [

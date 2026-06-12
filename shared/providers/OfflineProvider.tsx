@@ -101,7 +101,10 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
     let recheckTimer: ReturnType<typeof setTimeout> | null = null;
     let lastEvalAt = 0;
 
-    const commit = (nowOffline: boolean, reachabilityLog: ReturnType<typeof summarizeReachability>) => {
+    const commit = (
+      nowOffline: boolean,
+      reachabilityLog: ReturnType<typeof summarizeReachability>
+    ) => {
       setNetworkOffline((prev) => {
         if (prev !== nowOffline) {
           log.info('provider.offline.transition', {
@@ -148,8 +151,7 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
         offlineEvals += 1;
         offlineSince ??= Date.now();
         const confirmed =
-          offlineEvals >= OFFLINE_CONFIRM_CHECKS &&
-          Date.now() - offlineSince >= OFFLINE_CONFIRM_MS;
+          offlineEvals >= OFFLINE_CONFIRM_CHECKS && Date.now() - offlineSince >= OFFLINE_CONFIRM_MS;
         if (confirmed) {
           commit(true, reachabilityLog);
           return;

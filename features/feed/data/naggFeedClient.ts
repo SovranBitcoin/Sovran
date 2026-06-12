@@ -827,8 +827,7 @@ async function runNaggQuery<TSchema extends z.ZodType>(
   // binding/base, or when the app-view attempt errors or comes back empty. The
   // optional per-call `transport: 'graphql'` still forces GraphQL outright.
   const appViewBase = backendConfig.nostrAppViewBaseUrl?.trim();
-  const canAppView =
-    !!options.appView && !!appViewBase && options.transport !== 'graphql';
+  const canAppView = !!options.appView && !!appViewBase && options.transport !== 'graphql';
   const preferred: 'appview' | 'graphql' = canAppView ? 'appview' : 'graphql';
 
   logBackendConfigOnce();
