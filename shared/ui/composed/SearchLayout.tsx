@@ -1,14 +1,13 @@
 import { createContext, useContext, useCallback, useMemo, type ReactNode } from 'react';
-import { useWindowDimensions } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { useWindowDimensions, View as RNView } from 'react-native';
 import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
-import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
+import { supportsLiquidGlass } from '@/shared/lib/version';
+import { buildExpoRouterHeaderOptions, HeaderIconButton } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
-import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
+import { getHeaderTitleWidthFromWidth, HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import { HeaderProfileButton } from '@/shared/blocks/HeaderProfileButton';
 
 // --- Context ---
@@ -42,31 +41,50 @@ function SearchBarTitle({ placeholder }: { placeholder: string }) {
   const searchBarWidth = getHeaderTitleWidthFromWidth(width);
 
   return (
-    <GlassSearchBar
-      width={searchBarWidth}
-      clearKey={clearKey}
-      seedText={seedText}
-      onChangeText={onSearchChange}
-      placeholder={placeholder}
-      keyboardType="web-search"
-      debounceMs={300}
-      autoFocus
-    />
+    <RNView style={liquidTitleBiasStyle}>
+      <GlassSearchBar
+        width={searchBarWidth}
+        // Match the mint selector pill exactly — the search bar swaps into
+        // the same title slot, and a shorter field reads as a jarring jump.
+        height={HEADER_LAYOUT.BUTTON_HEIGHT}
+        clearKey={clearKey}
+        seedText={seedText}
+        onChangeText={onSearchChange}
+        placeholder={placeholder}
+        keyboardType="web-search"
+        debounceMs={300}
+        autoFocus
+      />
+    </RNView>
   );
 }
+
+// Measured on device (320pt window): UIKit places a fitting custom
+// titleView at +2pt right of true center on iOS 26 even with perfectly
+// symmetric bar items (probe data: left gap 16 / right gap 12). The bias is
+// additive, so it can't be fixed with width math — compensate the title
+// content by the same constant. Tune here if a different device class
+// measures a different bias.
+const LIQUID_TITLE_BIAS_PX = -2;
+const liquidTitleBiasStyle = supportsLiquidGlass()
+  ? { transform: [{ translateX: LIQUID_TITLE_BIAS_PX }] }
+  : null;
 
 function SearchHeaderRight() {
   const { isSearching, onOpenSearch, onCloseSearch } = useSearchContext();
   const iconColor = useThemeColor('foreground');
 
+  // HeaderIconButton (not IconSymbol directly): expo-symbols renders NOTHING
+  // on Android for string symbol names, which left this button an invisible
+  // tap target there.
   return (
-    <Pressable
+    <HeaderIconButton
+      icon={isSearching ? 'xmark' : 'magnifyingglass'}
+      size={20}
+      color={iconColor}
       onPress={isSearching ? onCloseSearch : onOpenSearch}
-      style={{ padding: 8 }}
-      accessibilityRole="button"
-      accessibilityLabel={isSearching ? 'Close search' : 'Open search'}>
-      <IconSymbol name={isSearching ? 'xmark' : 'magnifyingglass'} size={20} color={iconColor} />
-    </Pressable>
+      accessibilityLabel={isSearching ? 'Close search' : 'Open search'}
+    />
   );
 }
 
@@ -135,7 +153,11 @@ export function SearchLayout({
           ...(search.isSearching
             ? { headerTitle: searchBarTitle }
             : renderIdleTitle
-              ? { headerTitle: renderIdleTitle }
+              ? {
+                  headerTitle: () => (
+                    <RNView style={liquidTitleBiasStyle}>{renderIdleTitle()}</RNView>
+                  ),
+                }
               : {}),
         },
       }),

@@ -25,6 +25,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import opacity from 'hex-color-opacity';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -83,23 +84,28 @@ function MintInspectButton({ onPress }: { onPress: () => void }) {
       style={{
         width: INSPECT_BUTTON_SIZE,
         height: INSPECT_BUTTON_SIZE,
-        borderRadius: INSPECT_BUTTON_RADIUS,
-        borderCurve: 'continuous',
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor,
       }}>
-      <BlurCardFrame accentColor={muted} glow={false}>
-        <View
-          style={{
-            flex: 1,
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: zIndex.raised,
-          }}>
-          <Icon name="bx:dots-vertical-rounded" size={20} color={foreground} />
-        </View>
-      </BlurCardFrame>
+      <SquircleView
+        style={{
+          flex: 1,
+          borderRadius: INSPECT_BUTTON_RADIUS,
+          borderCurve: 'continuous',
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor,
+        }}>
+        <BlurCardFrame accentColor={muted} glow={false}>
+          <View
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: zIndex.raised,
+            }}>
+            <Icon name="bx:dots-vertical-rounded" size={20} color={foreground} />
+          </View>
+        </BlurCardFrame>
+      </SquircleView>
     </Pressable>
   );
 }

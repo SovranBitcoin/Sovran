@@ -20,6 +20,7 @@ import Animated, {
   SharedValue,
 } from 'react-native-reanimated';
 import { HeaderHeightContext } from '@react-navigation/elements';
+import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
@@ -158,7 +159,12 @@ export function ModalLayoutWrapper({
   // TermsAndConditionsScreen directly during onboarding before the user has
   // entered the navigation tree). `useHeaderHeight()` throws when the
   // context is missing; we just want 0 in that case.
-  const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  // Inside an Android formSheet, the sheet's KNOWN fixed header height wins —
+  // the navigator context starts at a default (~80dp) and only settles to the
+  // measured value a frame later, shifting content (see AndroidSheetRoot).
+  const sheetHeaderHeight = useContext(SheetHeaderHeightContext);
+  const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
+  const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
   const insets = useSafeAreaInsets();
   const themeBackground = useThemeColor('background');
   const background = bgColor ?? themeBackground;
@@ -182,7 +188,11 @@ export function ModalLayoutWrapper({
   }, []);
 
   const gradientHeight = headerGradientHeight ?? headerHeight;
-  const totalHeaderHeight = headerHeight + stickyContentHeight;
+  // The declared stickyContentHeight prop is only a first-frame estimate —
+  // prefer the measured height so a wrong declaration (or wrapping content)
+  // can't permanently misplace the spacer/list padding.
+  const [measuredStickyHeight, setMeasuredStickyHeight] = useState<number | null>(null);
+  const totalHeaderHeight = headerHeight + (measuredStickyHeight ?? stickyContentHeight);
 
   useEffect(() => {
     onHeaderHeightChange?.(totalHeaderHeight);
@@ -213,12 +223,25 @@ export function ModalLayoutWrapper({
           />
         )}
 
-        {headerGradient && (
+        {/* Skip inside Android formSheets: FlowSheetHeader already paints the
+            header scrim there, and this fade's entire ramp lands inside the
+            header band (its lower half paints nothing) — it only doubled the
+            gradient, in the wrong color on bgColor-overriding screens. */}
+        {headerGradient && sheetHeaderHeight == null && (
           <ScrollEdgeFade edge="top" height={gradientHeight * 2} color={background} />
         )}
 
         {stickyContent && (
-          <View style={[styles.stickyContainer, { top: headerHeight }]}>{stickyContent}</View>
+          <View
+            style={[styles.stickyContainer, { top: headerHeight }]}
+            onLayout={(e) => {
+              const measured = Math.round(e.nativeEvent.layout.height);
+              setMeasuredStickyHeight((prev) =>
+                prev !== null && Math.abs(prev - measured) < 2 ? prev : measured
+              );
+            }}>
+            {stickyContent}
+          </View>
         )}
 
         {debug && (

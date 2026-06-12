@@ -23,6 +23,15 @@ const OfflineContext = createContext<OfflineContextValue>({ isOffline: false });
 const BORDER_WIDTH = 2;
 const BANNER_HEIGHT = 14;
 const CONNECTIVITY_POLL_MS = 3000;
+// Offline hysteresis: going offline must be CONFIRMED (consecutive failed
+// evaluations spanning a minimum window) while coming back online is instant.
+// Android's network listener fires per transport change (Wi-Fi<->cell, VPN,
+// Doze) with transiently-false reachability fields, which used to flap the
+// banner several times a minute while genuinely online.
+const OFFLINE_CONFIRM_CHECKS = 2;
+const OFFLINE_CONFIRM_MS = 5000;
+const OFFLINE_RECHECK_DELAY_MS = 1200;
+const MIN_EVAL_INTERVAL_MS = 750;
 
 // iOS uses continuous corners. React Native doesn't expose the exact hardware corner radius,
 // so this is a best-effort map by point height for modern rounded-corner iPhones.
@@ -86,6 +95,27 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
     let networkSubscription: { remove: () => void } | null = null;
     let lastOffline: boolean | null = null;
     let lastCheckId = 0;
+    // Offline-confirmation (hysteresis) state — see constants above.
+    let offlineSince: number | null = null;
+    let offlineEvals = 0;
+    let recheckTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastEvalAt = 0;
+
+    const commit = (
+      nowOffline: boolean,
+      reachabilityLog: ReturnType<typeof summarizeReachability>
+    ) => {
+      setNetworkOffline((prev) => {
+        if (prev !== nowOffline) {
+          log.info('provider.offline.transition', {
+            from: prev ? 'offline' : 'online',
+            to: nowOffline ? 'offline' : 'online',
+            ...reachabilityLog,
+          });
+        }
+        return nowOffline;
+      });
+    };
 
     const applyState = async (state: Network.NetworkState) => {
       const checkId = ++lastCheckId;
@@ -105,16 +135,36 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
           });
           lastOffline = nowOffline;
         }
-        setNetworkOffline((prev) => {
-          if (prev !== nowOffline) {
-            log.info('provider.offline.transition', {
-              from: prev ? 'offline' : 'online',
-              to: nowOffline ? 'offline' : 'online',
-              ...reachabilityLog,
-            });
+        if (!nowOffline) {
+          if (offlineSince !== null) {
+            log.debug('provider.offline.pending_cancelled', { evals: offlineEvals });
           }
-          return nowOffline;
+          offlineSince = null;
+          offlineEvals = 0;
+          if (recheckTimer) {
+            clearTimeout(recheckTimer);
+            recheckTimer = null;
+          }
+          commit(false, reachabilityLog);
+          return;
+        }
+        offlineEvals += 1;
+        offlineSince ??= Date.now();
+        const confirmed =
+          offlineEvals >= OFFLINE_CONFIRM_CHECKS && Date.now() - offlineSince >= OFFLINE_CONFIRM_MS;
+        if (confirmed) {
+          commit(true, reachabilityLog);
+          return;
+        }
+        log.debug('provider.offline.pending', {
+          evals: offlineEvals,
+          sinceMs: Date.now() - offlineSince,
+          ...reachabilityLog,
         });
+        recheckTimer ??= setTimeout(() => {
+          recheckTimer = null;
+          void runConnectivityCheck();
+        }, OFFLINE_RECHECK_DELAY_MS);
       } catch (err) {
         log.warn('provider.offline.check_failed', {
           error: err instanceof Error ? err : new Error(String(err)),
@@ -124,6 +174,10 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
 
     const runConnectivityCheck = async () => {
       if (!mounted || isCheckingRef.current) return;
+      // Coalesce listener bursts and overlapping poll/listener triggers — the
+      // pending re-check (1200ms) and the poll (3000ms) clear this naturally.
+      if (Date.now() - lastEvalAt < MIN_EVAL_INTERVAL_MS) return;
+      lastEvalAt = Date.now();
       isCheckingRef.current = true;
       try {
         const state = await Network.getNetworkStateAsync();
@@ -139,8 +193,11 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
 
     log.debug('provider.offline.init', { pollIntervalMs: CONNECTIVITY_POLL_MS });
     void runConnectivityCheck();
-    networkSubscription = Network.addNetworkStateListener((state) => {
-      void applyState(state);
+    // Route listener events through runConnectivityCheck (mutex + coalescing)
+    // instead of applyState directly: getNetworkStateAsync re-reads fresh
+    // state, and the native module already delays emissions for staleness.
+    networkSubscription = Network.addNetworkStateListener(() => {
+      void runConnectivityCheck();
     });
     interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
 
@@ -173,6 +230,10 @@ export function OfflineStatusProvider({ children }: { children: React.ReactNode 
       }
       networkSubscription?.remove();
       appStateSubscription.remove();
+      if (recheckTimer) {
+        clearTimeout(recheckTimer);
+        recheckTimer = null;
+      }
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.removeEventListener('online', onWebOnline);
         window.removeEventListener('offline', onWebOffline);

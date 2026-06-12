@@ -10,12 +10,19 @@ import Animated, {
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
-import { supportsBlur } from '@/shared/lib/version';
-
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
 
+import { blendColors } from '@/shared/lib/colorExtraction';
+
 import { useToastSurface } from './useToastSurface';
-import { DANGER_DARK_BG, SUCCESS_DARK_BG, TINT_ALPHA, ToastSlab } from './ToastSlab';
+import {
+  DANGER_DARK_BG,
+  OPAQUE_TINT_MIX,
+  SUCCESS_DARK_BG,
+  TINT_ALPHA,
+  ToastSlab,
+  useToastFrosted,
+} from './ToastSlab';
 
 const ICON_SIZE = 32;
 const TITLE_FONT_SIZE = 15;
@@ -56,12 +63,18 @@ type StatusToastProps = {
  */
 export function StatusToast({ status, title, subtitle, action, toastProps }: StatusToastProps) {
   const { bg: surfaceBg, fg: surfaceFg } = useToastSurface();
-  const blurSupported = supportsBlur();
-  const surfaceBgTint = blurSupported ? opacity(surfaceBg, TINT_ALPHA) : surfaceBg;
+  // Opaque on non-frosted platforms (Android) — see ToastSlab.
+  const frosted = useToastFrosted();
+  const surfaceBgTint = frosted ? opacity(surfaceBg, TINT_ALPHA) : surfaceBg;
 
   const isTerminal = status === 'confirmed' || status === 'failed';
   const targetBg = status === 'failed' ? DANGER_DARK_BG : SUCCESS_DARK_BG;
-  const targetBgTint = blurSupported ? opacity(targetBg, TINT_ALPHA) : targetBg;
+  // Frosted: translucent tint, the blur supplies the softness. Opaque:
+  // composite the same tint into the surface slab mathematically —
+  // raw SUCCESS/DANGER hexes at full opacity read far too strong.
+  const targetBgTint = frosted
+    ? opacity(targetBg, TINT_ALPHA)
+    : blendColors(surfaceBg, targetBg, OPAQUE_TINT_MIX);
 
   const indicatorPhase: Phase = isTerminal ? 'done' : 'loading';
   const indicatorResult: Result = status === 'failed' ? 'error' : 'success';

@@ -4,14 +4,13 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
-import Icon from 'assets/icons';
 import { CameraScreen } from '@/features/camera';
 import { cameraRouteParamsSchema } from './CameraScreen/CameraScreen';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useColadaContext } from '@sovranbitcoin/colada/react';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
@@ -57,7 +56,8 @@ export function StandaloneCameraScreen() {
             headerTintColor: foreground,
             headerTitleStyle: { color: foreground },
             headerLeft: () => (
-              <Pressable
+              <ScreenHeaderAction
+                icon="material-symbols:close-rounded"
                 onPress={() => {
                   if (router.canGoBack()) {
                     router.back();
@@ -65,9 +65,7 @@ export function StandaloneCameraScreen() {
                     router.replace('/');
                   }
                 }}
-                style={{ padding: 8 }}>
-                <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-              </Pressable>
+              />
             ),
           }}
         />

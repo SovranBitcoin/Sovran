@@ -1,14 +1,18 @@
 import React, { memo, useCallback, useEffect, useRef } from 'react';
 import { TextInput, StyleSheet } from 'react-native';
 
+import { GlassView } from 'expo-glass-effect';
+
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { supportsLiquidGlass } from '@/shared/lib/version';
 import opacity from 'hex-color-opacity';
 import type { GlassSearchBarProps } from './types';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
   width,
+  height = 44,
   clearKey,
   onChangeText,
   placeholder,
@@ -56,34 +60,63 @@ export const GlassSearchBar = memo(function GlassSearchBar({
     [debounceMs]
   );
 
+  // Liquid devices get a real glass capsule (the component's namesake);
+  // everywhere else keeps the flat surface-secondary field.
+  const liquid = supportsLiquidGlass();
+  const input = (
+    <TextInput
+      key={clearKey}
+      defaultValue={seedText}
+      placeholder={placeholder}
+      placeholderTextColor={opacity(foreground, 0.33)}
+      onChangeText={handleTextChange}
+      keyboardType={keyboardType}
+      autoCorrect={false}
+      autoFocus={autoFocus}
+      accessibilityLabel={placeholder}
+      accessibilityRole="search"
+      style={[
+        styles.input,
+        liquid
+          ? [styles.inputLiquid, { borderRadius: height / 2 }]
+          : { backgroundColor: surfaceSecondary },
+        { color: foreground, height },
+      ]}
+    />
+  );
+
   return (
     <Log name="GlassSearchBar">
       <View style={{ alignItems: 'center', ...(width != null ? { width } : { flex: 1 }) }}>
-        <TextInput
-          key={clearKey}
-          defaultValue={seedText}
-          placeholder={placeholder}
-          placeholderTextColor={opacity(foreground, 0.33)}
-          onChangeText={handleTextChange}
-          keyboardType={keyboardType}
-          autoCorrect={false}
-          autoFocus={autoFocus}
-          accessibilityLabel={placeholder}
-          accessibilityRole="search"
-          style={[styles.input, { backgroundColor: surfaceSecondary, color: foreground }]}
-        />
+        {liquid ? (
+          <GlassView
+            style={[styles.glassShell, { borderRadius: height / 2, height }]}
+            glassEffectStyle="regular">
+            {input}
+          </GlassView>
+        ) : (
+          input
+        )}
       </View>
     </Log>
   );
 });
 
 const styles = StyleSheet.create({
+  // Capsule (radius = height/2 applied inline) matching the liquid design
+  // language; the GlassView owns the material, the input goes transparent.
+  glassShell: {
+    overflow: 'hidden',
+    width: '100%',
+  },
   input: {
-    height: 44,
     width: '100%',
     borderRadius: 12,
     paddingHorizontal: 12,
     fontSize: 16,
     borderWidth: 0,
+  },
+  inputLiquid: {
+    backgroundColor: 'transparent',
   },
 });

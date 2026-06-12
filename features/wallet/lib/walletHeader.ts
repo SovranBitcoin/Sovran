@@ -7,22 +7,42 @@
  * and split-view changes.
  */
 
+import { headerButtonSize } from '@/shared/styles/tokens';
+import { supportsLiquidGlass } from '@/shared/lib/version';
+
 /** Shared header layout constants for calculating title dimensions. */
 export const HEADER_LAYOUT = {
-  TOOLBAR_BUTTON_WIDTH: 44,
+  // Header icon buttons follow the mint-selector chrome (see
+  // shared/styles/tokens headerButtonSize): 54 on Android, 44 on iOS.
+  TOOLBAR_BUTTON_WIDTH: headerButtonSize,
   HORIZONTAL_PADDING: 16,
   BUTTON_SPACING: 12,
   BUTTON_HEIGHT: 54,
   CONTENT_PADDING_HORIZONTAL: 16,
   CONTENT_PADDING_VERTICAL: 14,
   ANDROID_OVERLAY_OFFSET: 8,
-  ANDROID_BUTTON_SIZE: 44,
+  ANDROID_BUTTON_SIZE: headerButtonSize,
 } as const;
+
+// iOS 26 nav bars reserve wider margins around bar items than the classic
+// 16pt math; a titleView sized to the classic slot overflows the available
+// center space and UIKit pins it off-center instead of centering it (the
+// wallet mint selector visibly drifted right). Device-derived geometry:
+// width-168 centered with ~16pt gaps -> per-side reservation is 68pt
+// (24 margin + 44 button), so the centered maximum is width-136 and the
+// 8pt-gap target sits exactly at width-152 — ON the boundary, where
+// rounding tips UIKit into pinning the titleView to the trailing side
+// (big left gap, small right gap). Keep 2pt of slack: extra side = 6
+// (width-156) -> ~10pt symmetric gaps, stable against fractional item
+// widths. Lower toward 4 only with on-device confirmation it still
+// centers. Single tunable constant.
+const LIQUID_TITLE_EXTRA_SIDE = supportsLiquidGlass() ? 6 : 0;
 
 const SIDE =
   HEADER_LAYOUT.TOOLBAR_BUTTON_WIDTH +
   HEADER_LAYOUT.HORIZONTAL_PADDING +
-  HEADER_LAYOUT.BUTTON_SPACING;
+  HEADER_LAYOUT.BUTTON_SPACING +
+  LIQUID_TITLE_EXTRA_SIDE;
 
 /** Use in components with useWindowDimensions().width for reactive layout. */
 export function getHeaderTitleWidthFromWidth(windowWidth: number): number {

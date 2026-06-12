@@ -12,4 +12,6 @@ export const SHEET_LAYOUT_CONFIG: Record<CustomSheetId, SheetLayoutConfig> = {
   'payment-fallback': { mode: 'contentHeight' },
   'proof-selector': { mode: 'contentHeight' },
   'send-memo': { mode: 'contentHeight' },
+  // Tap-to-pay auto-fits: pulsing glyph + two text lines + Close footer.
+  'nfc-tap': { mode: 'contentHeight' },
 };

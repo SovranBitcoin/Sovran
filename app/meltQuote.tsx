@@ -7,7 +7,12 @@
  */
 
 import { MeltQuoteRoute } from '@/features/send';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function ModalScreen() {
-  return <MeltQuoteRoute where="app.meltQuote" />;
+  return (
+    <FormSheetChrome title="Send Lightning">
+      <MeltQuoteRoute where="app.meltQuote" />
+    </FormSheetChrome>
+  );
 }

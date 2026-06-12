@@ -195,13 +195,21 @@ describe('naggFeedClient transport equivalence', () => {
     const notificationNodes = [{ reason: 'mention', actorVertexScore: 7, event: rootGql }];
 
     setupEnv();
+    // Notifications ALWAYS prefer the app-view; miss it (404) so this leg
+    // rides the documented fallback onto the GraphQL transport under test.
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      json: async () => ({}),
+    });
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         data: { notifications: { nodes: notificationNodes, pageInfo: { hasNextPage: false } } },
       })
     );
     const graphqlNotifs = await loadClient().getNotifications({ viewerPubkey: PAD('viewer') });
-    const graphqlUrl = String(mockFetch.mock.calls[0][0]);
+    const graphqlUrl = String(mockFetch.mock.calls[1][0]);
 
     // Canonical notifications body the REST `/nostr/notifications` route emits.
     const canonicalNotifications = {

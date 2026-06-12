@@ -13,6 +13,7 @@ import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
 import { ShareScreen, SHARE_CONFIGS, ShareType } from '@/features/user';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 import { useScreenOptions } from '@/shared/ui/composed/Screen';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { CompressedPubkey, Hex64, LightningAddress, Npub } from '@/shared/lib/nav/routeSchemas';
@@ -61,12 +62,14 @@ function ShareRoute() {
   if (!parsed) return null;
 
   return (
-    <ShareScreen
-      type={type}
-      data={parsed.data}
-      npub={parsed.npub}
-      onTitleChange={handleTitleChange}
-    />
+    <FormSheetChrome title={headerTitle}>
+      <ShareScreen
+        type={type}
+        data={parsed.data}
+        npub={parsed.npub}
+        onTitleChange={handleTitleChange}
+      />
+    </FormSheetChrome>
   );
 }
 

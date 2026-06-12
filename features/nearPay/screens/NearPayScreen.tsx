@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
+import { LayoutChangeEvent, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
@@ -23,10 +23,14 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
+import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
+import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, useLifecycleLogger, useRenderLogger } from '@/shared/lib/logger';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -90,7 +94,6 @@ const PEER_ENTRY_ANIMATION_MS = 460;
 const PEER_REBALANCE_ANIMATION_MS = 320;
 const PEER_OVERVIEW_SIDE_INSET = spacing.lg;
 const PEER_OVERVIEW_TOP_INSET = spacing.lg;
-const PEER_OVERVIEW_BOTTOM_INSET = PEER_CANDIDATE_ACTION_AVOIDANCE;
 const PEER_OVERVIEW_MAX_SCALE = 0.84;
 const PEER_OVERVIEW_SCALE_FACTOR = 0.94;
 const SHARED_AVATAR_ANIMATION_MS = 430;
@@ -718,6 +721,23 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 }) {
   useRenderLogger('NearPayPeerField', 30, paymentLog);
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
+  // The action row (Random/Focus/Zoom) is absolutely positioned from the
+  // field's bottom edge, which reaches the physical screen bottom inside the
+  // edge-to-edge formSheet — without the bottom inset the row sits under
+  // Android's 3-button/gesture nav (and the iOS home indicator). Peer
+  // placement/zoom-fit avoidance must grow by the same amount.
+  const insets = useSafeAreaInsets();
+  const actionRowBottom = NEAR_PAY_ACTION_ROW_BOTTOM + insets.bottom;
+  const actionRowStyle = useMemo(
+    () => [styles.nearPayActionRow, { bottom: actionRowBottom }],
+    [actionRowBottom]
+  );
+  const actionAvoidance =
+    NEAR_PAY_ACTION_ROW_HEIGHT + NEAR_PAY_ACTION_ROW_BOTTOM + spacing.lg + insets.bottom;
+  const peerLayoutConfig = useMemo(
+    () => ({ ...PEER_LAYOUT_CONFIG, preferredBottomInset: actionAvoidance }),
+    [actionAvoidance]
+  );
   const [fieldSize, setFieldSize] = useState<PeerLayoutSize>({ width: 0, height: 0 });
   const [registry, setRegistry] = useState<PeerLayoutRegistryEntry[]>([]);
   const panX = useSharedValue(0);
@@ -824,7 +844,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 
   const targetsResult = useMemo(() => {
     const startedAt = nowMs();
-    const value = buildPeerLayoutTargets(registry, fieldSize, PEER_LAYOUT_CONFIG);
+    const value = buildPeerLayoutTargets(registry, fieldSize, peerLayoutConfig);
     let exitingCount = 0;
     for (const target of value) {
       if (target.phase === 'exiting') exitingCount += 1;
@@ -843,7 +863,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 
   const panBoundsResult = useMemo(() => {
     const startedAt = nowMs();
-    const value = getPeerLayoutPanBounds(targets, fieldSize, PEER_LAYOUT_CONFIG);
+    const value = getPeerLayoutPanBounds(targets, fieldSize, peerLayoutConfig);
     return {
       value,
       targetCount: targets.length,
@@ -977,12 +997,12 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     const overview = getPeerLayoutOverviewTransform(
       targets,
       fieldSize,
-      PEER_LAYOUT_CONFIG,
+      peerLayoutConfig,
       pan,
       {
         top: PEER_OVERVIEW_TOP_INSET,
         right: PEER_OVERVIEW_SIDE_INSET,
-        bottom: PEER_OVERVIEW_BOTTOM_INSET,
+        bottom: actionAvoidance,
         left: PEER_OVERVIEW_SIDE_INSET,
       },
       PEER_OVERVIEW_MAX_SCALE,
@@ -1029,7 +1049,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     const pan = { x: panX.get(), y: panY.get() };
     const selectableTargets = targets.filter((target) => {
       if (target.phase === 'exiting') return false;
-      const presentation = getPeerViewportPresentation(target, fieldSize, PEER_LAYOUT_CONFIG, pan);
+      const presentation = getPeerViewportPresentation(target, fieldSize, peerLayoutConfig, pan);
       return presentation.scale > 0 && presentation.avatarOpacity > 0.05;
     });
     if (selectableTargets.length === 0) {
@@ -1216,7 +1236,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
           ))}
         </Animated.View>
       </GestureDetector>
-      <HStack justify="space-around" style={styles.nearPayActionRow}>
+      <HStack justify="space-around" style={actionRowStyle}>
         <CircleActionButton
           icon="mdi:shuffle-variant"
           systemIcon="shuffle"
@@ -1700,7 +1720,10 @@ export function NearPayScreen() {
     [sharedAvatarStyle]
   );
 
-  const unavailable = Platform.OS !== 'ios';
+  const bluetooth = useBluetoothState();
+  // 'unknown' stays on the scanning path — iOS reports a real state only after
+  // startBLE has spun up CoreBluetooth, and useBLEPeers starts it on mount.
+  const bluetoothBlocked = bluetooth.status !== 'ready' && bluetooth.status !== 'unknown';
   const amountActive = hasInlineAmountEntry;
   const sharedAvatarVisible = !!sharedAvatarPeer || inlinePhase === 'transitioning';
   const foregroundSoft = useMemo(() => opacity(foreground, alpha.soft), [foreground]);
@@ -1725,26 +1748,8 @@ export function NearPayScreen() {
     ),
     [emptyTextStyle, emptyTitleStyle, foregroundSoft]
   );
-  const unavailableContent = useMemo(
-    () => (
-      <VStack align="center" justify="center" gap={spacing.md} style={styles.emptyState}>
-        <Icon name="mdi:bluetooth" size={iconSize['3xl']} color={foregroundSoft} />
-        <Text size={17} weight="bold" style={emptyTitleStyle}>
-          Nut Drop is unavailable here
-        </Text>
-        <Text size={13} style={emptyTextStyle}>
-          BitChat BLE is Apple-only, so this screen stays quiet on this platform.
-        </Text>
-      </VStack>
-    ),
-    [emptyTextStyle, emptyTitleStyle, foregroundSoft]
-  );
   const renderHeaderLeft = useCallback(
-    () => (
-      <Pressable onPress={resetToPicker} hitSlop={8} style={styles.flowHeaderButton}>
-        <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
-      </Pressable>
-    ),
+    () => <ScreenHeaderAction icon="material-symbols:arrow-back-rounded" onPress={resetToPicker} />,
     [foreground, resetToPicker]
   );
   const renderEmptyHeader = useCallback(() => null, []);
@@ -1773,8 +1778,10 @@ export function NearPayScreen() {
       <Stack.Screen options={stackOptions} />
       <Screen name="NearPayScreen" scroll="none" contentPadding={0} bottomPadding={0}>
         <View onLayout={handleContainerLayout} style={styles.container}>
-          {unavailable ? (
-            unavailableContent
+          {bluetoothBlocked ? (
+            <VStack align="center" justify="center" style={styles.emptyState}>
+              <BluetoothNotice bluetooth={bluetooth} />
+            </VStack>
           ) : (
             <>
               <Animated.View
@@ -1846,7 +1853,8 @@ const styles = StyleSheet.create({
   },
   nearPayActionRow: {
     alignItems: 'flex-start',
-    bottom: NEAR_PAY_ACTION_ROW_BOTTOM,
+    // `bottom` is applied dynamically: NEAR_PAY_ACTION_ROW_BOTTOM + safe-area
+    // bottom inset (see actionRowStyle in NearPayPeerField).
     height: NEAR_PAY_ACTION_ROW_HEIGHT,
     left: 0,
     paddingHorizontal: 32,

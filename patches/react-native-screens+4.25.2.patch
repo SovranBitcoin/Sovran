@@ -1,0 +1,15 @@
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
+index 885c2b0..140180c 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/bottomsheet/DimmingViewManager.kt
+@@ -17,7 +17,9 @@ class DimmingViewManager(
+     screen: Screen,
+ ) {
+     internal val dimmingView: DimmingView = createDimmingView(screen)
+-    internal val maxAlpha: Float = 0.3f
++    // PATCHED (sovran): 0.3f -> 0.5f. RNS hardcodes the formSheet dim with no
++    // prop to configure it; 0.5 mirrors the iOS pageSheet underlay weight.
++    internal val maxAlpha: Float = 0.5f
+     private var dimmingViewCallback: BottomSheetCallback? = null
+ 
+     /**

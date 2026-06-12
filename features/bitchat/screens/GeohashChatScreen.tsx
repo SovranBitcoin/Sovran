@@ -8,7 +8,6 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
@@ -25,6 +24,9 @@ import { CONNECTED_ACCENT } from '@/shared/lib/brandColors';
 import { useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { useBitChat } from '../hooks/useBitChat';
 import { useBLEPeers } from '../hooks/useBLEPeers';
+import { useBluetoothState } from '../hooks/useBluetoothState';
+import { BluetoothInlineNotice } from '../components/BluetoothNotice';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import {
   ChatMessageBubble,
   ChatScreen,
@@ -87,6 +89,7 @@ export function GeohashChatScreen({
   // list for two things: the peer-count badge on the mesh tier header, and
   // the reachability banner above the BLE-DM composer.
   const { peers: blePeers, connectedCount: bleConnectedCount } = useBLEPeers();
+  const bluetooth = useBluetoothState();
   const dmPeerSnapshot = useMemo(
     () =>
       transport === 'ble-dm' && dmPeerID ? blePeers.find((p) => p.peerID === dmPeerID) : undefined,
@@ -166,28 +169,22 @@ export function GeohashChatScreen({
         headerTitleAlign: 'center',
         title,
         headerLeft: () => (
-          <Pressable onPress={handleBack} hitSlop={8}>
-            <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
-          </Pressable>
+          <ScreenHeaderAction icon="material-symbols:arrow-back-rounded" onPress={handleBack} />
         ),
         headerRight: () =>
           transport === 'ble' ? (
-            <Pressable
+            <ScreenHeaderAction
+              icon="mdi:account-group"
+              size={22}
+              color={bleConnectedCount > 0 ? foreground : shade400}
               onPress={() => router.push('/(user-flow)/bitchatNetwork')}
-              hitSlop={8}
-              style={{ padding: 8 }}>
-              <View>
-                <Icon
-                  name="mdi:account-group"
-                  size={22}
-                  color={bleConnectedCount > 0 ? foreground : shade400}
-                />
-                {bleConnectedCount > 0 && (
+              accessory={
+                bleConnectedCount > 0 ? (
                   <View
                     style={{
                       position: 'absolute',
-                      right: -6,
-                      top: -4,
+                      right: 2,
+                      top: 2,
                       minWidth: 16,
                       height: 16,
                       paddingHorizontal: 4,
@@ -206,9 +203,9 @@ export function GeohashChatScreen({
                       {bleConnectedCount}
                     </Text>
                   </View>
-                )}
-              </View>
-            </Pressable>
+                ) : undefined
+              }
+            />
           ) : (
             <HStack spacing={8} align="center">
               <View
@@ -228,6 +225,14 @@ export function GeohashChatScreen({
     />
   );
 
+  // Bluetooth readiness gates both BLE transports — when the radio is off or
+  // unauthorized, peer-reachability states below are meaningless, so the
+  // Bluetooth banner takes precedence. Relay-based nostr transports are
+  // unaffected.
+  const isBleTransport = transport === 'ble' || transport === 'ble-dm';
+  const bluetoothBlocked =
+    isBleTransport && bluetooth.status !== 'ready' && bluetooth.status !== 'unknown';
+
   // Surface peer reachability for BLE-DM so users aren't surprised when a
   // "connected" peer's DM stalls. Three states map cleanly to upstream's
   // transport behavior:
@@ -235,7 +240,9 @@ export function GeohashChatScreen({
   //   - mesh-only      → warning banner (DMs mesh-flood; 15s spool)
   //   - unknown/offline → muted banner (peer not currently nearby)
   let bleDmBanner: React.ReactNode = null;
-  if (transport === 'ble-dm') {
+  if (bluetoothBlocked) {
+    bleDmBanner = <BluetoothInlineNotice bluetooth={bluetooth} />;
+  } else if (transport === 'ble-dm') {
     const isMeshOnly =
       !!dmPeerSnapshot && dmPeerSnapshot.isConnected && dmPeerSnapshot.hasDirectLink === false;
     const isUnknownOrOffline = !dmPeerSnapshot || !dmPeerSnapshot.isConnected;

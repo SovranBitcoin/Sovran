@@ -29,6 +29,15 @@ const originalFetchDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'fet
 const originalEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 const mockFetch = jest.fn();
 
+/** App-view 404 — notifications prefer the REST app-view, so GraphQL-mapping
+ *  tests miss it first and ride the documented fallback. */
+const appViewMiss = () => ({
+  ok: false,
+  status: 404,
+  statusText: 'Not Found',
+  json: async () => ({}),
+});
+
 const root = {
   id: 'root',
   kind: 1,
@@ -202,6 +211,9 @@ describe('createNaggFeedClient', () => {
   });
 
   it('loads notifications with policy and maps hydrated events', async () => {
+    // Notifications prefer the REST app-view; miss it (404) so the documented
+    // GraphQL fallback carries the mapping this test pins.
+    mockFetch.mockResolvedValueOnce(appViewMiss());
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -233,10 +245,11 @@ describe('createNaggFeedClient', () => {
       limit: 12,
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    // calls[0] is the app-view miss (GET, no body); the GraphQL POST is second.
+    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
     expect(body.query).toContain('notifications(input: $input)');
     expect(body.variables.input).toEqual({
-      viewer: 'viewer'.padEnd(64, '0'),
+      pubkey: 'viewer'.padEnd(64, '0'),
       tab: 'MENTIONS',
       policy: 'STRICT',
       replyScope: 'THREAD',
@@ -254,6 +267,9 @@ describe('createNaggFeedClient', () => {
   });
 
   it('orders notifications newest first after GraphQL mapping', async () => {
+    // Notifications prefer the REST app-view; miss it (404) so the documented
+    // GraphQL fallback carries the mapping this test pins.
+    mockFetch.mockResolvedValueOnce(appViewMiss());
     const older = {
       ...rootGql,
       id: 'older',
@@ -308,6 +324,9 @@ describe('createNaggFeedClient', () => {
   });
 
   it('maps notification target posts from selected references', async () => {
+    // Notifications prefer the REST app-view; miss it (404) so the documented
+    // GraphQL fallback carries the mapping this test pins.
+    mockFetch.mockResolvedValueOnce(appViewMiss());
     const reactionGql = {
       id: 'reaction',
       kind: 7,
@@ -368,7 +387,8 @@ describe('createNaggFeedClient', () => {
       limit: 12,
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    // calls[0] is the app-view miss (GET, no body); the GraphQL POST is second.
+    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
     expect(body.query).toContain('eventRefs: selectedReferences');
     expect(body.variables.input.replyScope).toBe('DIRECT');
     expect(result.notifications[0]).toMatchObject({
@@ -383,6 +403,9 @@ describe('createNaggFeedClient', () => {
   });
 
   it('uses the direct NIP-10 parent as the reply notification target', async () => {
+    // Notifications prefer the REST app-view; miss it (404) so the documented
+    // GraphQL fallback carries the mapping this test pins.
+    mockFetch.mockResolvedValueOnce(appViewMiss());
     const parentGql = {
       ...rootGql,
       id: 'parent'.padEnd(64, '0'),
@@ -654,7 +677,10 @@ describe('createNaggFeedClient', () => {
         'http://nagg.test/graphql'
       );
       expect(parsedRequestUrl.searchParams.get('refresh')).toBe('1');
-      expect(parsedRequestUrl.searchParams.get('_refresh')).toBe('1234567890');
+      // nagg-ts deliberately appends NO volatile `_refresh` timestamp: the
+      // GraphQL cache key is the POST body, and a per-request timestamp would
+      // bust nagg's shared response cache. `refresh=1` + no-store carry it.
+      expect(parsedRequestUrl.searchParams.get('_refresh')).toBeNull();
       expect(mockFetch).toHaveBeenCalledWith(
         requestUrl,
         expect.objectContaining({

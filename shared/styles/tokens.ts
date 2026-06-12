@@ -209,3 +209,44 @@ export const shadow: Record<'sm' | 'md' | 'lg', Shadow> = {
     default: { elevation: 12 },
   }),
 };
+
+// ─── Typography scale ─────────────────────────────────────────────────────
+// One scale for label/text sizing so visual hierarchy is consistent across
+// screens. Map to the nearest step instead of inventing sizes:
+//   xs  — badges, tiny counters ("CURRENT", filter count)
+//   sm  — captions, list subtitles, empty-state subtitles
+//   md  — body text, secondary button labels
+//   lg  — primary button labels, list titles, inputs
+//   xl  — screen/header titles
+//   2xl — large card titles (map stats)
+// Keypads and balance displays are display-scale and stay bespoke.
+
+export const fontSize = {
+  xs: 11,
+  sm: 13,
+  md: 14,
+  lg: 16,
+  xl: 17,
+  '2xl': 18,
+} as const;
+
+// ─── Control heights ──────────────────────────────────────────────────────
+// Interactive-element height scale. `base` matches minTouchTarget (44pt,
+// Apple HIG); `cta` is the Material-density footer button; `fab` is the
+// circular action button tier.
+
+export const controlHeight = {
+  compact: 36,
+  base: 44,
+  cta: 48,
+  fab: 52,
+} as const;
+
+/**
+ * Header icon-button diameter — the "mint-selector chrome" contract: every
+ * headerLeft/headerRight control is a surface-secondary circle with a 1px
+ * `opacity(muted, 0.3)` border, sized to match the wallet mint selector
+ * (HEADER_LAYOUT.BUTTON_HEIGHT, 54) on Android. iOS native nav bars cap
+ * custom views at ~44pt, so iOS keeps the 44 diameter (border still applies).
+ */
+export const headerButtonSize = Platform.select({ android: 54, default: minTouchTarget });

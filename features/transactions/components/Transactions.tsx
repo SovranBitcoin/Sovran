@@ -647,6 +647,11 @@ export const Transactions = React.memo(
 Transactions.displayName = 'Transactions';
 
 const styles = StyleSheet.create({
+  // Plain View, NOT SquircleView: react-native-fast-squircle's RN-0.83 source
+  // set has a no-op dispatchDraw (no child clipping), so squircle cards whose
+  // visible fill is a child (BlurCardFrame's absolute-fill) render SQUARE on
+  // Android. Plain View clips children to borderRadius correctly; iOS keeps
+  // continuous corners via borderCurve.
   card: {
     borderRadius: 20,
     borderCurve: 'continuous',

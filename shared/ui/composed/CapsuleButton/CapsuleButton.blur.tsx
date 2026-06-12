@@ -5,13 +5,15 @@ import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { controlHeight } from '@/shared/styles/tokens';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
 
-const DEFAULT_HEIGHT = 46;
+// controlHeight.cta — matches the liquid variant (48) so all three tiers agree.
+const DEFAULT_HEIGHT = controlHeight.cta;
 
 export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);

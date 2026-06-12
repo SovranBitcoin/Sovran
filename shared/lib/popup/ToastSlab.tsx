@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Toast } from 'heroui-native';
 
 import { BlurView } from '@/shared/ui/primitives/BlurView';
-import { supportsBlur } from '@/shared/lib/version';
+import { useCapabilities } from '@/shared/ui/capability';
 
 /**
  * Frosted-glass toast frame shared by every custom toast (CompactToast,
@@ -15,14 +15,32 @@ import { supportsBlur } from '@/shared/lib/version';
 
 const BLUR_INTENSITY = 60;
 // Semi-transparent tint over the BlurView gives the toast its theme-tinted
-// hue without flattening the frosted-glass look. On platforms without blur
-// support (Android < 12, iOS < 13) the BlurView wrapper renders null and
-// callers fall back to the opaque tint so the toast doesn't look ghosted.
+// hue without flattening the frosted-glass look. The frosted branch is
+// gated on Capabilities.frostedSurface (iOS-only): expo-blur on Android
+// renders a weak translucent tint, NOT real blur (no experimentalBlurMethod
+// set), so a 0.3-alpha tint over it read as a ghosted ~30%-opaque toast.
+// Non-frosted platforms take the opaque surface branch instead.
 export const TINT_ALPHA = 0.3;
+
+/** Whether toasts render the iOS frosted-glass treatment (blur + 0.3 tint).
+ *  Everywhere else (Android, by design) the tint is fully opaque. One hook
+ *  so ToastSlab/CompactToast/StatusToast can't drift apart. */
+export function useToastFrosted(): boolean {
+  return useCapabilities().frostedSurface;
+}
 // "dark" variant is the surface, the bright theme `success`/`danger` token
 // is the foreground (icon/text). Hardcoded since the toast is theme-
 // invariant — these values match `--success-foreground` /
 // `--danger-foreground` in the light-theme palette.
+//
+// On non-frosted platforms these hexes must never be used raw: with no
+// blur softening them, a fully opaque #089A2C slab reads garishly strong.
+// Blend them into the toast's surface color instead (same alpha-composite
+// math the frosted tint performs optically over the blur). 0.45 rather
+// than TINT_ALPHA because the opaque slab is dark — the frosted branch
+// tints over mostly-light page content, so the same ratio over a dark
+// base would under-read; 0.45 lands at the same perceived strength.
+export const OPAQUE_TINT_MIX = 0.45;
 export const SUCCESS_DARK_BG = '#089A2C';
 export const DANGER_DARK_BG = '#9A082E';
 
@@ -44,7 +62,7 @@ type ToastSlabProps = {
 };
 
 export function ToastSlab({ toastProps, variant, tint, children }: ToastSlabProps) {
-  const blurSupported = supportsBlur();
+  const frosted = useToastFrosted();
   return (
     <Toast
       placement="top"
@@ -54,7 +72,7 @@ export function ToastSlab({ toastProps, variant, tint, children }: ToastSlabProp
       // toastProps carries manager-injected props (index, total, heights,
       // show, hide) that aren't part of the public Toast type.
       {...(toastProps as any)}>
-      {blurSupported && (
+      {frosted && (
         <BlurView intensity={BLUR_INTENSITY} tint="dark" style={StyleSheet.absoluteFill} />
       )}
       {tint}

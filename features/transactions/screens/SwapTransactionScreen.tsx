@@ -57,7 +57,6 @@ import { useMintManagement } from '@/features/mint';
 import Icon from 'assets/icons';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
@@ -428,11 +427,10 @@ export function SwapTransactionScreen({ groupId }: Props) {
               Transactions
             </UntranslatedText>
             <Animated.View style={chevronAnimatedStyle}>
-              <IconSymbol
-                name="chevron.down"
-                size={14}
+              <Icon
+                name="material-symbols:keyboard-arrow-down-rounded"
+                size={16}
                 color={opacity(foreground, 0.5)}
-                weight="semibold"
               />
             </Animated.View>
           </HStack>

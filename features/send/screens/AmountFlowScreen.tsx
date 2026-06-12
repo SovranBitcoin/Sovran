@@ -21,7 +21,7 @@ import { useWalletContextWithOverride } from '@/shared/providers/WalletContextPr
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
+import Icon from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
@@ -256,12 +256,13 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   );
   const renderHeaderRight = useCallback(
     () => (
-      <IconSymbol
-        name={canSendOffline === true ? 'airplane' : 'wifi'}
-        size={18}
-        color={foreground}
-        style={offlineIconStyle}
-      />
+      <View style={offlineIconStyle}>
+        <Icon
+          name={canSendOffline === true ? 'mdi:airplane' : 'mdi:wifi'}
+          size={18}
+          color={foreground}
+        />
+      </View>
     ),
     [canSendOffline, foreground, offlineIconStyle]
   );

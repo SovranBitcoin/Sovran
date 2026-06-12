@@ -1,0 +1,98 @@
+diff --git a/node_modules/expo-router/build/native-tabs/NativeTabsView.js b/node_modules/expo-router/build/native-tabs/NativeTabsView.js
+--- a/node_modules/expo-router/build/native-tabs/NativeTabsView.js
++++ b/node_modules/expo-router/build/native-tabs/NativeTabsView.js
+@@ -55,6 +55,28 @@ function NativeTabsView(props) {
+     // In that case the deferred index will still point to the last tab, but after re-render
+     // it will be out of bounds
+     const inBoundsDeferredFocusedIndex = deferredFocusedIndex < tabs.length ? deferredFocusedIndex : focusedIndex;
++    // [sovran] react-native-screens 4.25+ replaced the old native-tabs JS
++    // contract (Screen tabKey/isFocused + Host onNativeFocusChange) with a
++    // host-driven one (Screen screenKey + Host navStateRequest/onTabSelected).
++    // expo-router 55.x still speaks the old contract, which leaves every
++    // tab's native screenKey nil and crashes on tab selection with
++    // "[RNScreens] screenKey MUST NOT be nil". This adapter speaks the new
++    // contract: each render emits a navStateRequest carrying the provenance
++    // of the native state that render's focused key was derived from.
++    const lastNativeAckRef = (0, react_1.useRef)({ screenKey: undefined, provenance: 0 });
++    const committedBaseProvenanceRef = (0, react_1.useRef)(0);
++    const focusedRouteKey = tabs[inBoundsDeferredFocusedIndex]?.routeKey ?? tabs[0]?.routeKey;
++    // [sovran] baseProvenance must describe the state this request was
++    // DERIVED from (TabsHost.types.d.ts), not simply the newest ack. The
++    // deferred focused index guarantees one commit per tab change where
++    // focusedRouteKey still predates the last native ack; advancing the
++    // provenance there would disguise that stale request as fresh and the
++    // native side would yank the selection back to the old tab. Commit the
++    // acked provenance only once the rendered key has incorporated the ack —
++    // until then the emitted request stays stale and is rejected natively.
++    if (focusedRouteKey != null && focusedRouteKey === lastNativeAckRef.current.screenKey) {
++        committedBaseProvenanceRef.current = lastNativeAckRef.current.provenance;
++    }
+     const appearances = tabs.map((tab) => ({
+         standardAppearance: (0, appearance_1.createStandardAppearanceFromOptions)(tab.options),
+         scrollEdgeAppearance: (0, appearance_1.createScrollEdgeAppearanceFromOptions)(tab.options),
+@@ -99,9 +121,22 @@ function NativeTabsView(props) {
+     // #region iOS props
+     tabBarTintColor={props?.tintColor} tabBarMinimizeBehavior={minimizeBehavior} tabBarControllerMode={tabBarControllerMode} bottomAccessory={bottomAccessoryFn} tabBarHidden={props.hidden} 
+     // #endregion
+-    onNativeFocusChange={({ nativeEvent: { tabKey } }) => {
+-            props.onTabChange(tabKey);
+-        }}>
++    onTabSelected={({ nativeEvent }) => {
++            // [sovran] new-contract selection event. Repeated taps are
++            // handled natively (scroll-to-top), and 'programmatic-js'
++            // acceptances only confirm a request this component itself
++            // sent — re-dispatching either feeds navigation state back on
++            // itself (tab flips, then reverses).
++            lastNativeAckRef.current = {
++                screenKey: nativeEvent.selectedScreenKey,
++                provenance: nativeEvent.provenance,
++            };
++            if (!nativeEvent.isRepeated && nativeEvent.actionOrigin !== 'programmatic-js') {
++                props.onTabChange(nativeEvent.selectedScreenKey);
++            }
++        }} rejectStaleNavStateUpdates navStateRequest={focusedRouteKey
++            ? { selectedScreenKey: focusedRouteKey, baseProvenance: committedBaseProvenanceRef.current }
++            : undefined}>
+       {children}
+     </TabsHostWrapper>);
+ }
+@@ -136,7 +171,21 @@ function Screen(props) {
+             return content;
+         }
+     }, [content, options.disableAutomaticContentInsets]);
+-    return (<react_native_screens_1.Tabs.Screen {...options} overrideScrollViewContentInsetAdjustmentBehavior={!options.disableAutomaticContentInsets} tabBarItemBadgeBackgroundColor={standardAppearance.stacked?.normal?.tabBarItemBadgeBackgroundColor} tabBarItemBadgeTextColor={badgeTextColor} standardAppearance={standardAppearance} scrollEdgeAppearance={scrollEdgeAppearance} icon={(0, icon_1.convertOptionsIconToRNScreensPropsIcon)(icon, standardAppearance?.stacked?.normal?.tabBarItemIconColor)} selectedIcon={(0, icon_1.convertOptionsIconToIOSPropsIcon)(selectedIcon, standardAppearance?.stacked?.selected?.tabBarItemIconColor)} title={title} freezeContents={false} systemItem={options.role} {...options.nativeProps} tabKey={routeKey} isFocused={isFocused}>
++    // [sovran] react-native-screens 4.25 reads icons, appearance, systemItem
++    // and inset behavior from nested ios/android prop objects; top-level
++    // values are overridden with undefined by the explicit ios?.* assignments
++    // inside Tabs.Screen — leaving them top-level renders a blank tab bar.
++    const combinedIcon = (0, icon_1.convertOptionsIconToRNScreensPropsIcon)(icon, standardAppearance?.stacked?.normal?.tabBarItemIconColor);
++    return (<react_native_screens_1.Tabs.Screen {...options} title={title} {...options.nativeProps} screenKey={routeKey} ios={{
++            icon: combinedIcon?.ios,
++            selectedIcon: (0, icon_1.convertOptionsIconToIOSPropsIcon)(selectedIcon, standardAppearance?.stacked?.selected?.tabBarItemIconColor),
++            standardAppearance,
++            scrollEdgeAppearance,
++            systemItem: options.role,
++            overrideScrollViewContentInsetAdjustmentBehavior: !options.disableAutomaticContentInsets,
++        }} android={{
++            icon: combinedIcon?.android,
++        }}>
+       {wrappedContent}
+     </react_native_screens_1.Tabs.Screen>);
+ }
+@@ -153,6 +202,14 @@ function TabsHostWrapper(props) {
+         console.warn(`Unsupported labelVisibilityMode: ${tabBarItemLabelVisibilityMode}. Supported values are: ${types_1.SUPPORTED_TAB_BAR_ITEM_LABEL_VISIBILITY_MODES.map((mode) => `"${mode}"`).join(', ')}`);
+         tabBarItemLabelVisibilityMode = undefined;
+     }
+-    return (<react_native_screens_1.Tabs.Host tabBarItemLabelVisibilityMode={tabBarItemLabelVisibilityMode} tabBarMinimizeBehavior={tabBarMinimizeBehavior} {...rest}/>);
++    // [sovran] same nesting requirement on the host: iOS-specific props are
++    // read exclusively from the `ios` object in react-native-screens 4.25.
++    const { tabBarTintColor, tabBarControllerMode, bottomAccessory, ...hostRest } = rest;
++    return (<react_native_screens_1.Tabs.Host tabBarItemLabelVisibilityMode={tabBarItemLabelVisibilityMode} ios={{
++            tabBarMinimizeBehavior,
++            tabBarTintColor,
++            tabBarControllerMode,
++            bottomAccessory,
++        }} {...hostRest}/>);
+ }
+ //# sourceMappingURL=NativeTabsView.js.map
+\ No newline at end of file

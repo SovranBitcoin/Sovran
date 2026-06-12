@@ -5,6 +5,7 @@ import opacity from 'hex-color-opacity';
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { radius } from '@/shared/styles/tokens';
 import type { GlassSearchBarProps } from './types';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
@@ -15,6 +16,8 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   autoFocus,
   debounceMs,
   seedText = '',
+  width,
+  height = 44,
 }: GlassSearchBarProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -60,14 +63,18 @@ export const GlassSearchBar = memo(function GlassSearchBar({
     <Log name="GlassSearchBar">
       <View
         style={{
-          flex: 1,
+          // A definite width is REQUIRED inside Android native-header title
+          // slots: RNS's center subview is auto-width, so a flex:1 child
+          // contributes 0 to the parent's content size and the bar collapses
+          // to nothing (mirrors GlassSearchBar.ios). flex:1 only as the
+          // fallback outside headers.
+          ...(width != null ? { width } : { flex: 1, marginRight: 8 }),
+          height,
           flexDirection: 'row',
           alignItems: 'center',
           backgroundColor: surfaceSecondary,
-          borderRadius: 12,
+          borderRadius: radius.lg,
           paddingHorizontal: 12,
-          paddingVertical: 8,
-          marginRight: 8,
         }}>
         <TextInput
           key={clearKey}

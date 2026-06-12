@@ -3,7 +3,12 @@
  */
 
 import { LightningSendRoute } from '@/features/send';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function LightningSendStandaloneRoute() {
-  return <LightningSendRoute where="app.lightningSend" />;
+  return (
+    <FormSheetChrome title="Send Lightning">
+      <LightningSendRoute where="app.lightningSend" />
+    </FormSheetChrome>
+  );
 }

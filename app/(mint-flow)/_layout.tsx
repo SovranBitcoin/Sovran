@@ -15,6 +15,8 @@ import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
+import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 const LIST_OPTIONS = { title: 'Select mint' };
 const ADD_OPTIONS = { title: 'Add mints' };
@@ -27,19 +29,21 @@ const USER_MESSAGES_OPTIONS = { headerShown: false };
 export default function MintFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]
   );
 
   return (
-    <Stack screenOptions={screenOptions}>
-      <Stack.Screen name="list" options={LIST_OPTIONS} />
-      <Stack.Screen name="add" options={ADD_OPTIONS} />
-      <Stack.Screen name="info" options={INFO_OPTIONS} />
-      <Stack.Screen name="reviews" options={REVIEWS_OPTIONS} />
-      <Stack.Screen name="distribution" options={DISTRIBUTION_OPTIONS} />
-      <Stack.Screen name="rebalancePlan" options={REBALANCE_PLAN_OPTIONS} />
-      <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
-    </Stack>
+    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
+      <Stack screenOptions={screenOptions}>
+        <Stack.Screen name="list" options={LIST_OPTIONS} />
+        <Stack.Screen name="add" options={ADD_OPTIONS} />
+        <Stack.Screen name="info" options={INFO_OPTIONS} />
+        <Stack.Screen name="reviews" options={REVIEWS_OPTIONS} />
+        <Stack.Screen name="distribution" options={DISTRIBUTION_OPTIONS} />
+        <Stack.Screen name="rebalancePlan" options={REBALANCE_PLAN_OPTIONS} />
+        <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
+      </Stack>
+    </AndroidSheetRoot>
   );
 }

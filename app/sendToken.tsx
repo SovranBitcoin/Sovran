@@ -7,7 +7,12 @@
  */
 
 import { SendTokenRoute } from '@/features/send';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function ModalScreen() {
-  return <SendTokenRoute where="app.sendToken" />;
+  return (
+    <FormSheetChrome title="Send Ecash">
+      <SendTokenRoute where="app.sendToken" />
+    </FormSheetChrome>
+  );
 }

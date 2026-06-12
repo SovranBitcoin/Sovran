@@ -27,12 +27,12 @@ import { BottomSheet } from 'heroui-native';
 import { LegendList } from '@legendapp/list/react-native';
 import * as Clipboard from 'expo-clipboard';
 import opacity from 'hex-color-opacity';
+import Icon from 'assets/icons';
 
 import { encode } from '@/shared/lib/third-party/emoji';
 import { log, useRenderLogger } from '@/shared/lib/logger';
 import { AnimatedEmoji } from '@/shared/ui/primitives/AnimatedEmoji';
 import { CurrencyIcon } from 'assets/icons';
-import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -186,7 +186,7 @@ function EmojiSearchField({
             onPress={onClear}
             hitSlop={8}
             style={{ position: 'absolute', right: 10, padding: 4 }}>
-            <IconSymbol name="xmark.circle.fill" size={18} color={opacity(foreground, 0.33)} />
+            <Icon name="mdi:close-circle" size={18} color={opacity(foreground, 0.33)} />
           </Pressable>
         ) : null}
       </View>

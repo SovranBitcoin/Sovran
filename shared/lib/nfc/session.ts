@@ -14,6 +14,39 @@
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 
 import { nfcLog } from '../logger';
+import { NfcError } from './errors';
+import { isNfcEnabled, isNfcSupported } from './status';
+
+// Android has no system NFC sheet: with the adapter disabled or absent,
+// requestTechnology never resolves OR rejects — the tap is silently dead.
+// Cap how long an unanswered session request can dangle.
+const REQUEST_TECHNOLOGY_TIMEOUT_MS = 30_000;
+
+// NfcManager.start() registers the Android adapter-state receiver and captures
+// the launch-intent tag. It is the library's documented init contract and is
+// NOT idempotent (re-registers the receiver per call) — once-guard it, lazily,
+// so users who never touch NFC never pay for it. Reset on failure to allow a
+// retry after the user enables NFC.
+let nfcStartPromise: Promise<void> | null = null;
+function ensureNfcStarted(): Promise<void> {
+  nfcStartPromise ??= Promise.resolve(NfcManager.start()).catch((error) => {
+    nfcStartPromise = null;
+    nfcLog.warn('nfc.start_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new NfcError('NFC is not supported on this device', 'NOT_SUPPORTED');
+  });
+  return nfcStartPromise;
+}
+
+// Fired the moment requestTechnology resolves (a tag entered the field).
+// The ambient tap-to-pay hook uses it to flip the sheet to 'Reading' and
+// auto-surface the sheet on ambient taps. Plain callback (not a store
+// import) so this lib layer stays UI-free.
+let tagConnectedListener: (() => void) | null = null;
+export function setNfcTagConnectedListener(listener: (() => void) | null): void {
+  tagConnectedListener = listener;
+}
 
 async function cancelStaleSession(): Promise<void> {
   try {
@@ -24,9 +57,34 @@ async function cancelStaleSession(): Promise<void> {
 }
 
 export async function acquireSession(): Promise<void> {
+  if (!(await isNfcSupported())) {
+    throw new NfcError('NFC is not supported on this device', 'NOT_SUPPORTED');
+  }
+  if (!(await isNfcEnabled())) {
+    throw new NfcError('NFC is disabled in system settings', 'NOT_ENABLED');
+  }
+  await ensureNfcStarted();
   await cancelStaleSession();
-  await NfcManager.requestTechnology(NfcTech.IsoDep);
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    await Promise.race([
+      // alertMessage shows in iOS's system "Ready to Scan" sheet; Android
+      // ignores it (the app's own nfc-tap sheet is the UI there).
+      NfcManager.requestTechnology(NfcTech.IsoDep, {
+        alertMessage: 'Hold near the payment terminal',
+      }),
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          void cancelStaleSession();
+          reject(new NfcError('No NFC tag detected', 'TIMEOUT'));
+        }, REQUEST_TECHNOLOGY_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
   nfcLog.info('nfc.session.acquired');
+  tagConnectedListener?.();
 }
 
 export async function releaseSession(): Promise<void> {

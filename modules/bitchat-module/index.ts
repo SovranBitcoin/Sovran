@@ -13,6 +13,9 @@ export {
   addBLEDeliveryStatusListener,
   addBLEPeerListener,
   addBLEStateListener,
+  // Bluetooth helpers
+  requestEnableBluetooth,
+  openBluetoothSettings,
   // Nostr (native)
   startNostr,
   joinGeohash,
