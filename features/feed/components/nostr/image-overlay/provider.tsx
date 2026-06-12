@@ -33,6 +33,7 @@ import {
   BOTTOM_PANEL_STIFF_DURATION_MS,
   CLEAR_URL_DELAY_MS,
   CLOSE_BLUR_AND_BTN_DURATION_MS,
+  CLOSE_REMEASURE_TIMEOUT_MS,
   CLOSE_SPRING,
   OPEN_START_DELAY_MS,
   THUMB_BLUR_DISTANCE_FACTOR,
@@ -110,6 +111,38 @@ export function inferMediaType(url: string): 'image' | 'video' {
   return VIDEO_EXT.test(url) ? 'video' : 'image';
 }
 
+/**
+ * Resolve a just-in-time thumbnail re-measure with a timeout so close() never
+ * hangs on a dead view (measureInWindow may never call back after unmount).
+ * Resolves null on timeout or error; callers fall back to the open-time snapshot.
+ */
+function measureWithTimeout(
+  measureNow: () => Promise<ThumbnailLayout | null>,
+  timeoutMs: number
+): Promise<ThumbnailLayout | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    }, timeoutMs);
+    measureNow()
+      .then((layout) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(layout);
+      })
+      .catch(() => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(null);
+      });
+  });
+}
+
 export type ImageOverlayProviderProps = {
   children: React.ReactNode;
   /** When provided, overlay panel shows live metrics (optimistic counts) for the active post. */
@@ -160,6 +193,13 @@ export function ImageOverlayProvider({
   }, []);
 
   const thumbnailLayoutsRef = useRef<Record<string, ThumbnailLayout>>({});
+  /** See ImageOverlayContextValue.measureSpaceCorrection — tap-calibrated
+   *  measure-space delta, stable ref so actionsValue identity is unaffected. */
+  const measureSpaceCorrection = useRef({ dx: 0, dy: 0 });
+  /** Per-key just-in-time measure callbacks: close() re-measures the live thumbnail because recycled LegendList rows never re-fire onLayout when size is unchanged, leaving the registered rect stale. */
+  const thumbnailMeasureNowRef = useRef<Record<string, () => Promise<ThumbnailLayout | null>>>({});
+  /** Bumped on every open/openReplace; a close() awaiting a re-measure aborts when the session changed under it (no double-close / close-after-reopen race). */
+  const openSessionIdRef = useRef(0);
   /** Layout of the image we opened from (tap-time). Used for dismiss so we don't get overwritten by registerThumbnailLayout from other cards. */
   const openSessionInitialLayoutRef = useRef<ThumbnailLayout | null>(null);
   const openSessionInitialIndexRef = useRef(0);
@@ -170,12 +210,21 @@ export function ImageOverlayProvider({
   const openPanelAnimationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const registerThumbnailLayout = useCallback(
-    (url: string, layout: ThumbnailLayout, options?: { eventId?: string; imageIndex?: number }) => {
+    (
+      url: string,
+      layout: ThumbnailLayout,
+      options?: {
+        eventId?: string;
+        imageIndex?: number;
+        measureNow?: () => Promise<ThumbnailLayout | null>;
+      }
+    ) => {
       const key =
         options?.eventId != null && options?.imageIndex != null
           ? `${options.eventId}-${options.imageIndex}`
           : url;
       thumbnailLayoutsRef.current[key] = layout;
+      if (options?.measureNow) thumbnailMeasureNowRef.current[key] = options.measureNow;
     },
     []
   );
@@ -272,7 +321,10 @@ export function ImageOverlayProvider({
     openSessionLayoutsByIndexRef.current = [];
     // No overlay is open at clear-time, so cached thumbnail positions are
     // unreachable. Resetting bounds the ref's lifetime (audit 58 F-004).
+    // Measure callbacks are reset for the same reason — they hold component
+    // closures; live rows re-register via onLayout/tap before the next open.
     thumbnailLayoutsRef.current = {};
+    thumbnailMeasureNowRef.current = {};
     if (clearUrlTimeoutRef.current) clearTimeout(clearUrlTimeoutRef.current);
     clearUrlTimeoutRef.current = setTimeout(() => {
       clearUrlTimeoutRef.current = null;
@@ -380,6 +432,7 @@ export function ImageOverlayProvider({
 
   const open = useCallback(
     (layout: ImageOverlayLayout) => {
+      openSessionIdRef.current += 1;
       safeTopSv.value = safeTop;
       safeBottomSv.value = safeBottom;
       const hasPanel = !!layout.post;
@@ -560,6 +613,7 @@ export function ImageOverlayProvider({
   /** Replace overlay content in-place (e.g. next video post). No open animation; image stays expanded. */
   const openReplace = useCallback(
     (layout: ImageOverlayReplaceLayout, options?: { preserveCloseTarget?: boolean }) => {
+      openSessionIdRef.current += 1;
       const preserveCloseTarget = options?.preserveCloseTarget === true;
       safeTopSv.value = safeTop;
       safeBottomSv.value = safeBottom;
@@ -804,6 +858,12 @@ export function ImageOverlayProvider({
    * Close overlay: animates image back to thumbnail.
    * When multiple images, pass the current pager index so we dismiss to the visible image's thumbnail
    * (activeIndex can lag behind the pager, so we use the index passed from the overlay).
+   *
+   * When the dismiss-target key has a registered measureNow, the live node is
+   * re-measured just-in-time (recycled LegendList rows never re-fire onLayout
+   * when size is unchanged, so the open-time snapshot can be stale). The close
+   * animation then starts one tick later; the snapshot path stays the fallback
+   * (timeout, unmounted node, or no callback).
    */
   const close = useCallback(
     (dismissedPageIndex?: number) => {
@@ -822,17 +882,49 @@ export function ImageOverlayProvider({
       const sessionLayout = openSessionLayoutsByIndexRef.current[closeIndex] ?? null;
       const keyedLayout = refKey ? thumbnailLayoutsRef.current[refKey] : undefined;
       const initialLayout = openSessionInitialLayoutRef.current;
-      const layout =
+      const fallbackLayout =
         eventId != null
           ? (keyedLayout ?? sessionLayout ?? initialLayout ?? undefined)
           : (sessionLayout ?? keyedLayout ?? initialLayout ?? undefined);
-      if (layout) {
-        closeTargetPageX.value = layout.pageX;
-        closeTargetPageY.value = layout.pageY;
-        closeTargetWidth.value = layout.width;
-        closeTargetHeight.value = layout.height;
+
+      const applyTargetAndAnimate = (
+        layout: ThumbnailLayout | undefined,
+        isFreshWindowRect: boolean
+      ) => {
+        if (layout) {
+          closeTargetPageX.value = layout.pageX;
+          closeTargetPageY.value = layout.pageY;
+          closeTargetWidth.value = layout.width;
+          closeTargetHeight.value = layout.height;
+          if (isFreshWindowRect) {
+            // A just-measured rect is already in current window coordinates;
+            // zero the worklet's scroll-at-open correction so it isn't applied
+            // on top (targetY = pageY - scrollY + scrollAtOpen).
+            scrollOffsetAtOpen.value = scrollOffsetY.value;
+          }
+        }
+        scheduleOnUI(closeAnimationWorklet);
+      };
+
+      const measureNow = refKey != null ? thumbnailMeasureNowRef.current[refKey] : undefined;
+      // Already closing (e.g. double-tap on close): keep the synchronous path;
+      // the worklet's isClosing guard makes the second invocation a no-op.
+      if (!measureNow || isClosing.value) {
+        applyTargetAndAnimate(fallbackLayout, false);
+        return;
       }
-      scheduleOnUI(closeAnimationWorklet);
+      const sessionId = openSessionIdRef.current;
+      void measureWithTimeout(measureNow, CLOSE_REMEASURE_TIMEOUT_MS).then((fresh) => {
+        // Overlay was reopened/replaced (or a parallel close won) while we
+        // awaited — don't retarget or restart the animation.
+        if (openSessionIdRef.current !== sessionId) return;
+        if (isClosing.value) return;
+        if (fresh && fresh.width > 0 && fresh.height > 0) {
+          applyTargetAndAnimate(fresh, true);
+        } else {
+          applyTargetAndAnimate(fallbackLayout, false);
+        }
+      });
     },
     [
       activeIndex,
@@ -842,6 +934,9 @@ export function ImageOverlayProvider({
       closeTargetPageY,
       closeTargetWidth,
       closeTargetHeight,
+      scrollOffsetAtOpen,
+      scrollOffsetY,
+      isClosing,
       closeAnimationWorklet,
     ]
   );
@@ -923,6 +1018,7 @@ export function ImageOverlayProvider({
 
   const actionsValue = useMemo<ImageOverlayActionsValue>(() => {
     return {
+      measureSpaceCorrection,
       scrollHandler,
       scrollOffsetY,
       scrollOffsetAtOpen,

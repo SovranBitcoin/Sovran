@@ -1,0 +1,43 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+  <!-- Single source of truth for the BLE mesh permission set. Kept here (not
+       app.json android.permissions) because that array cannot express
+       usesPermissionFlags, and a duplicate flag-less BLUETOOTH_SCAN entry
+       would conflict in the manifest merger. -->
+
+  <!-- Legacy Bluetooth permissions, API 26-30 only. -->
+  <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+  <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+  <!-- BLE scan on API 26-30 requires location permission. -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+
+  <!-- API 31+ runtime Bluetooth permissions. neverForLocation strips
+       location-derivable data from scan results and removes the location
+       permission requirement — correct for the mesh use-case. -->
+  <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+                   android:usesPermissionFlags="neverForLocation"
+                   tools:targetApi="s" />
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+  <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+  <!-- required=false keeps the Play listing available to BLE-less devices;
+       NearPayScreen shows the 'unsupported' notice on those. -->
+  <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+  <!-- connectedDevice foreground service pins the process while the mesh is
+       active so background BLE messages reach JS (Nut Drop auto-redeem). The
+       BLUETOOTH_CONNECT/SCAN runtime grants above satisfy the API 34+
+       eligibility precondition for this FGS type. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <!-- Short timed wake lock carries the CPU through JS processing + the mint
+       call after a BLE message arrives with the screen off. -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <application>
+    <service
+        android:name="expo.modules.bitchat.BitchatMeshForegroundService"
+        android:exported="false"
+        android:foregroundServiceType="connectedDevice" />
+  </application>
+</manifest>

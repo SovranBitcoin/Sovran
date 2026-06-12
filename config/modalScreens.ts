@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
 export interface ModalConfig {
@@ -12,16 +13,58 @@ const BLUR_HEADER_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal' as const,
 } satisfies Partial<NativeStackNavigationOptions>;
 
+/**
+ * Android sheet presentation: a native bottom sheet (react-native-screens
+ * formSheet, Material BottomSheetBehavior) at full height — drag-to-dismiss,
+ * dim scrim, rounded top corners. The closest Android analog of the iOS
+ * pageSheet card. Used by the standalone single-screen modals AND the flow
+ * groups (modalFlow).
+ *
+ * No native header renders inside an Android formSheet (RNS #2657, not fixed
+ * in any 4.x), so everything here carries `headerShown: false` and the JS
+ * side draws the chrome instead: standalone route files wrap their screens in
+ * FormSheetChrome; flow groups' nested stacks render FlowSheetHeader via
+ * createFlowLayoutScreenOptions({...}, { androidSheet: true }).
+ * sheetGrabberVisible is iOS-only (the JS chrome draws the grabber);
+ * sheetCornerRadius IS cross-platform — unset it clamps to 0 on Android
+ * (RNS Screen.kt default -1 → max(...,0)), which rendered SQUARE sheet
+ * corners.
+ */
+const ANDROID_SHEET_OPTIONS = {
+  presentation: 'formSheet' as const,
+  sheetAllowedDetents: [1.0],
+  sheetInitialDetentIndex: 0 as const,
+  sheetElevation: 24,
+  // Rounded top corners via RNS's MaterialShapeDrawable — matches the app's
+  // card radius and the iOS sheet look.
+  sheetCornerRadius: 24,
+  headerShown: false,
+} satisfies Partial<NativeStackNavigationOptions>;
+
 /** Card: default stack presentation. */
 const card = (name: string): ModalConfig => ({ name });
 
-/** Modal flow: slides up from bottom, nested layout handles headers. */
-const modalFlow = (name: string): ModalConfig => ({
+/**
+ * Modal flow hosting a nested stack. iOS: fullscreen pageSheet-style modal
+ * (unchanged). Android: native bottom sheet — requires the flow's _layout to
+ * pass { androidSheet: true } to createFlowLayoutScreenOptions so the nested
+ * stack renders the JS FlowSheetHeader (native headers don't exist inside
+ * Android formSheets). Opting a flow out is the two co-located lines:
+ * `modalFlow('(x-flow)', { androidSheet: false })` here + `{ androidSheet:
+ * false }` in its _layout — that reverts it to today's fullscreen modal.
+ */
+const modalFlow = (
+  name: string,
+  { androidSheet = true }: { androidSheet?: boolean } = {}
+): ModalConfig => ({
   name,
-  options: {
-    presentation: 'modal',
-    headerShown: false,
-  },
+  options:
+    Platform.OS === 'android' && androidSheet
+      ? ANDROID_SHEET_OPTIONS
+      : {
+          presentation: 'modal',
+          headerShown: false,
+        },
 });
 
 /** Slide from right: nested layout handles headers, horizontal slide animation. */
@@ -34,7 +77,10 @@ const slideFromRight = (name: string, presentation: 'modal' | 'card' = 'card'): 
   },
 });
 
-/** Modal or form sheet with material blur header. */
+/**
+ * Standalone single-screen modal. iOS: pageSheet/formSheet with material blur
+ * header (unchanged). Android: native bottom sheet (see ANDROID_SHEET_OPTIONS).
+ */
 const modalWithBlur = (
   name: string,
   presentation: 'modal' | 'formSheet',
@@ -42,10 +88,13 @@ const modalWithBlur = (
 ): ModalConfig => ({
   name,
   ...(title && { title }),
-  options: {
-    presentation,
-    ...BLUR_HEADER_OPTIONS,
-  },
+  options:
+    Platform.OS === 'android'
+      ? ANDROID_SHEET_OPTIONS
+      : {
+          presentation,
+          ...BLUR_HEADER_OPTIONS,
+        },
 });
 
 /** Card with fade: for shared-element transitions. */
@@ -104,7 +153,7 @@ const flowGroups = [
   '(split-bill-flow)',
   '(theme-flow)',
   '(profile-flow)',
-].map(modalFlow);
+].map((name) => modalFlow(name));
 
 const standaloneScreens: ModalConfig[] = [
   card('userMessages'),
@@ -112,7 +161,6 @@ const standaloneScreens: ModalConfig[] = [
   slideFromRight('(signer-flow)'),
   slideFromRight('(user-flow)'),
   fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
-  modalWithBlur('currency', 'formSheet', 'Select Amount'),
   modalTransparent('camera', 'Scan QR'),
   modalWithBlur('share', 'formSheet'),
   modalWithBlur('lightningSend', 'modal', 'Send Lightning'),

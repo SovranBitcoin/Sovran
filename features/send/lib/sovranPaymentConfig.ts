@@ -50,7 +50,9 @@ import {
   resolvePrimaryReceiveP2PKPublicKey,
 } from '@sovranbitcoin/coco-cashu-plugin-p2pk-import';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
-import { writeTokenToNFC, NfcError, isUserCancelError } from '@/shared/lib/nfc';
+import { writeTokenToNFC, NfcError, isUserCancelError, isAmbientNfcCycle } from '@/shared/lib/nfc';
+import { useNfcTapStore } from '@/shared/stores/runtime/nfcTapStore';
+import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { buildModalProfileHref } from '@/shared/lib/nav/profileRoutes';
 import {
   copyPopup,
@@ -542,6 +544,12 @@ export function createSovranNotifications(
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
       paramPopup('nfc-error', { title: 'NFC Write Failed', message: errorMsg });
     },
+    // Drives the Android tap-to-pay sheet's phase text ('Preparing payment…'
+    // etc.). 'creating'/'writing' only fire once executeNfcSend write-back
+    // is wired; harmless to map them now.
+    onNfcPaymentProgress: ({ phase }) => {
+      useNfcTapStore.getState().setPhase(phase);
+    },
 
     // ── Screen action notifications ─────────────────────────────────
 
@@ -739,14 +747,69 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
     },
     nfc: nfcAdapter
       ? async () => {
+          // Ambient cycles (wallet-screen listening loop) re-arm every ~30s,
+          // so their per-cycle failures must stay quiet; explicit presses
+          // keep the popups.
+          const ambient = isAmbientNfcCycle();
+          const closeTapSheet = () => {
+            const popup = usePopupStore.getState();
+            if (
+              popup.current &&
+              'sheetId' in popup.current &&
+              popup.current.sheetId === 'nfc-tap'
+            ) {
+              popup.close();
+            }
+          };
           try {
             const data = await nfcAdapter.readPaymentRequest();
+            // The flow navigates to the payment screen now — don't leave the
+            // tap sheet floating over it.
+            closeTapSheet();
             return { data };
           } catch (err) {
             // User dismissed the system NFC sheet — treat as a no-op,
             // not an error (suppresses the `general-error` popup).
             if (isUserCancelError(err)) return { empty: true };
+            // Preflight failures from acquireSession get their own popups —
+            // before this, an Android tap with NFC off hung forever silently.
+            if (err instanceof NfcError && err.code === 'NOT_ENABLED') {
+              if (!ambient) {
+                paramPopup('nfc-error', {
+                  title: 'NFC is turned off',
+                  message: 'Turn on NFC in system settings to scan.',
+                });
+              }
+              return { empty: true };
+            }
+            if (err instanceof NfcError && err.code === 'NOT_SUPPORTED') {
+              if (!ambient) {
+                paramPopup('nfc-error', {
+                  title: 'NFC not supported',
+                  message: 'This device has no NFC hardware.',
+                });
+              }
+              return { empty: true };
+            }
+            if (err instanceof NfcError && err.code === 'TIMEOUT') {
+              // Nothing was tapped within the window — quiet no-op.
+              return { empty: true };
+            }
+            if (ambient) {
+              // A garbled ambient read (non-payment tag, partial APDU) must
+              // not surface the general-error popup; the loop just re-arms.
+              paymentLog.debug('nfc.ambient.read_failed', {
+                error: err instanceof Error ? err.message : String(err),
+              });
+              return { empty: true };
+            }
             return { error: err instanceof Error ? err : new Error(String(err)) };
+          } finally {
+            // Timeouts deliberately leave the sheet up: the ambient loop
+            // re-arms immediately and the sheet should read as continuous
+            // listening, not blink every 30s. Error popups replace the sheet
+            // through the popup store; the success path closed it above.
+            useNfcTapStore.getState().setPhase('armed');
           }
         }
       : undefined,
@@ -791,10 +854,42 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
 
 async function deliverNearPayIfActive(
   historyEntry: string,
-  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null
+  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null,
+  p2pkLockPubkey?: string
 ): Promise<void> {
   const active = useNearPaySessionStore.getState().active;
   if (!active) return;
+
+  // The session's delivery mode is the single source of truth for whether
+  // the completed send may hit the public mesh. Anything else means some
+  // machine path dropped or invented a lock — refuse to broadcast and leave
+  // the token in send history where the user can deliver it deliberately.
+  const delivery = active.recipient.delivery;
+  if (delivery.mode === 'p2pk') {
+    // P2PK sessions must broadcast a token locked to exactly the key the
+    // recipient announced; a missing/mismatched lock would leak a claimable
+    // (or unredeemable) token.
+    const expectedLock = delivery.p2pkPubkeyHex.toLowerCase();
+    if (!expectedLock || p2pkLockPubkey?.toLowerCase() !== expectedLock) {
+      paymentLog.error('near_pay.delivery.lock_mismatch', {
+        peerID: active.recipient.peerID,
+        expectedLockPresent: expectedLock.length > 0,
+        actualLockPresent: !!p2pkLockPubkey,
+      });
+      useNearPaySessionStore.getState().complete();
+      return;
+    }
+  } else if (p2pkLockPubkey) {
+    // Bearer sessions are created without a lock key (the user explicitly
+    // confirmed an unlocked send to a vanilla bitchat peer). A lock showing
+    // up here means the token is locked to a key the recipient can't use —
+    // broadcasting it would burn the funds for everyone.
+    paymentLog.error('near_pay.delivery.unexpected_lock', {
+      peerID: active.recipient.peerID,
+    });
+    useNearPaySessionStore.getState().complete();
+    return;
+  }
 
   try {
     const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
@@ -851,11 +946,18 @@ export function createSovranHandlers({
       });
     },
 
-    sendComplete: async ({ historyEntry, createdOffline, mintWasOffline, recipientPubkey }) => {
+    sendComplete: async ({
+      historyEntry,
+      createdOffline,
+      mintWasOffline,
+      recipientPubkey,
+      p2pkLockPubkey,
+    }) => {
       paymentLog.info('payment.step.send_complete', {
         createdOffline: !!createdOffline,
         mintWasOffline: !!mintWasOffline,
         recipientPubkeyPresent: !!recipientPubkey,
+        p2pkLocked: !!p2pkLockPubkey,
       });
 
       // Routstr top-up: intercept the token and send it to the Routstr API
@@ -909,7 +1011,11 @@ export function createSovranHandlers({
         }
       }
 
-      await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
+      await deliverNearPayIfActive(
+        enrichedHistoryEntry,
+        getBitchatIdentityMaterial,
+        p2pkLockPubkey
+      );
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',

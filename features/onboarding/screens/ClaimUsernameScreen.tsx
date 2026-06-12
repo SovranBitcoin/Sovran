@@ -21,6 +21,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { log, redactError, useLifecycleLogger } from '@/shared/lib/logger';
@@ -132,7 +133,7 @@ function UsernameInput({
   );
 
   return (
-    <View
+    <SquircleView
       style={[
         styles.inputContainer,
         {
@@ -159,7 +160,7 @@ function UsernameInput({
           <LoadingIndicator size={20} phase="loading" color={accentColor} />
         </View>
       )}
-    </View>
+    </SquircleView>
   );
 }
 
@@ -550,7 +551,7 @@ export function ClaimUsernameScreen() {
         scrollY={scrollY}
         disableHeaderSpacer>
         <VStack style={{ paddingBottom: 24 }}>
-          <RNView
+          <SquircleView
             ref={heroRef}
             onLayout={handleHeroLayout}
             collapsable={false}
@@ -598,7 +599,7 @@ export function ClaimUsernameScreen() {
                 />
               </VStack>
             </ClaimUsernameCardFrame>
-          </RNView>
+          </SquircleView>
 
           <Animated.View style={contentAnimStyle}>
             <View style={{ paddingHorizontal: 16 }}>

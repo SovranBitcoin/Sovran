@@ -1,7 +1,10 @@
 import type { BLEPeer } from 'bitchat-module';
 
 function peerKey(peer: BLEPeer): string {
-  return `${peer.peerID}:${peer.nickname}:${peer.isConnected ? 1 : 0}:${peer.hasDirectLink ? 1 : 0}`;
+  // Ecash capability fields participate so a later announce that adds or
+  // changes the extension (supportsP2pkEcash flip, new lock key after a
+  // profile switch) is not swallowed as an equivalent snapshot.
+  return `${peer.peerID}:${peer.nickname}:${peer.isConnected ? 1 : 0}:${peer.hasDirectLink ? 1 : 0}:${peer.supportsP2pkEcash ? 1 : 0}:${peer.ecashCapabilities}:${peer.p2pkPubkeyHex ?? ''}`;
 }
 
 export function areBLEPeerSnapshotsEquivalent(

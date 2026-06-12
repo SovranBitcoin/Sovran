@@ -41,6 +41,21 @@ describe('offline reachability', () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it('probes instead of trusting a transient isInternetReachable=false (Android transport flap)', async () => {
+    // Android's expo-network derives isInternetReachable from activeNetwork
+    // presence with no validation — it flips false on every Wi-Fi<->cell/VPN
+    // handoff while the device is genuinely online. The probe must decide.
+    const fetcher = jest.fn().mockResolvedValue(response(200));
+
+    const result = await resolveOfflineReachability(
+      { isConnected: true, isInternetReachable: false, type: 'WIFI' as NetworkState['type'] },
+      { fetcher, probes: [primaryProbe] }
+    );
+
+    expect(result).toMatchObject({ isOffline: false, reason: 'probe-reachable' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it('treats connected-but-unreachable iOS-style Wi-Fi as offline when probes fail', async () => {
     const fetcher = jest.fn().mockRejectedValue(new Error('Network request failed'));
 

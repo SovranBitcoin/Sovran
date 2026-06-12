@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedRef,
@@ -101,7 +102,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
           activeOpacity={0.75}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           onPress={onPress}>
-          <View style={[styles.container, containerStyle]} pointerEvents="none">
+          <SquircleView style={[styles.container, containerStyle]} pointerEvents="none">
             <View style={[StyleSheet.absoluteFillObject, { backgroundColor: background }]} />
             <View
               style={[
@@ -127,7 +128,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
                 { borderWidth: 1, borderColor: opacity(foreground, 0.4) },
               ]}
             />
-          </View>
+          </SquircleView>
           <View
             style={[
               StyleSheet.absoluteFillObject,

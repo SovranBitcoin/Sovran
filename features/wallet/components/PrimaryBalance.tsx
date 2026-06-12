@@ -37,6 +37,7 @@ import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { isReservedSendHistoryEntry } from '@sovranbitcoin/colada';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { alpha } from '@/shared/styles/tokens';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog, Log } from '@/shared/lib/logger';
@@ -111,7 +112,11 @@ function EcashStatusPill({
   tintColor,
   onPress,
 }: EcashStatusPillProps): React.ReactElement | null {
-  const [foreground] = useThemeColor(['foreground'] as const);
+  const [foreground, surfaceSecondary, mutedColor] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'muted',
+  ] as const);
   const colorScheme = useColorScheme();
   const tint = tintColor ?? foreground;
   const { liquidGlass } = useCapabilities();
@@ -165,9 +170,12 @@ function EcashStatusPill({
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: tintColor ? opacity(tint, 0.3) : opacity(foreground, 0.08),
+          // Standard flat-pill recipe: untinted = surface-secondary + muted
+          // border (CircleActionButton contract); tinted (RESERVED) mirrors
+          // the liquid glassEffect tint at alpha.subtle.
+          backgroundColor: tintColor ? opacity(tint, alpha.subtle) : surfaceSecondary,
           borderWidth: 1,
-          borderColor: tintColor ? opacity(tint, 0.3) : opacity(foreground, 0.12),
+          borderColor: tintColor ? opacity(tint, 0.3) : opacity(mutedColor, 0.3),
           paddingHorizontal: 12,
           paddingVertical: 5,
         }}>

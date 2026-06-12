@@ -149,7 +149,10 @@ export function ScrollEdgeFade({
         height,
         zIndex,
       }}>
-      {blur && (
+      {/* Blur layer is iOS-only by design: expo-blur on Android renders as a
+          muddy dark tint rather than frosted glass, which made header fades
+          look broken. Android keeps the pure eased color gradient below. */}
+      {blur && Platform.OS === 'ios' && (
         <MaskedView
           style={StyleSheet.absoluteFill}
           maskElement={

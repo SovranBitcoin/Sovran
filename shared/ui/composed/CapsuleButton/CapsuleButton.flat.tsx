@@ -4,13 +4,15 @@ import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { controlHeight } from '@/shared/styles/tokens';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
 
-const DEFAULT_HEIGHT = 46;
+// controlHeight.cta — matches the liquid variant (48) so all three tiers agree.
+const DEFAULT_HEIGHT = controlHeight.cta;
 
 export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, surfaceSecondary, muted] = useThemeColor([

@@ -10,6 +10,8 @@ import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
+import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
 const USER_MESSAGES_OPTIONS = { headerShown: false };
@@ -23,20 +25,22 @@ const BITCHAT_DM_OPTIONS = { headerShown: false };
 export default function ProfileFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]
   );
 
   return (
-    <Stack screenOptions={screenOptions}>
-      <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
-      <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
-      <Stack.Screen name="share" options={SHARE_OPTIONS} />
-      <Stack.Screen name="thread" options={THREAD_OPTIONS} />
-      <Stack.Screen name="whitenoiseSetup" options={WHITENOISE_SETUP_OPTIONS} />
-      <Stack.Screen name="whitenoiseDM" options={WHITENOISE_DM_OPTIONS} />
-      <Stack.Screen name="bitchatNetwork" options={BITCHAT_NETWORK_OPTIONS} />
-      <Stack.Screen name="bitchatDM" options={BITCHAT_DM_OPTIONS} />
-    </Stack>
+    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
+      <Stack screenOptions={screenOptions}>
+        <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
+        <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
+        <Stack.Screen name="share" options={SHARE_OPTIONS} />
+        <Stack.Screen name="thread" options={THREAD_OPTIONS} />
+        <Stack.Screen name="whitenoiseSetup" options={WHITENOISE_SETUP_OPTIONS} />
+        <Stack.Screen name="whitenoiseDM" options={WHITENOISE_DM_OPTIONS} />
+        <Stack.Screen name="bitchatNetwork" options={BITCHAT_NETWORK_OPTIONS} />
+        <Stack.Screen name="bitchatDM" options={BITCHAT_DM_OPTIONS} />
+      </Stack>
+    </AndroidSheetRoot>
   );
 }

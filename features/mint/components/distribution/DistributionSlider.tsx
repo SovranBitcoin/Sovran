@@ -82,9 +82,9 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
   }, [width, value, progress, lastStepIndex]);
 
   const fireHaptic = useCallback(() => {
-    if (Platform.OS === 'ios') {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    // expo-haptics works on both platforms — the old iOS guard silently
+    // dropped slider feedback on Android.
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
   const notifyValueChange = useCallback(

@@ -31,6 +31,7 @@
  */
 
 import React, { createContext, useContext, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import { Stack, useSegments } from 'expo-router';
 
 import {
@@ -39,15 +40,20 @@ import {
 } from '@/features/splitBill/hooks/useSplitBillParticipantPicker';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
+import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 const PickerContext = createContext<UseSplitBillParticipantPickerResult | null>(null);
 const AMOUNT_OPTIONS = { title: 'Split bill' };
 const PARTICIPANTS_OPTIONS = { title: 'Who pays' };
-const SEARCH_OPTIONS = {
-  title: 'Search Nostr',
-  presentation: 'modal',
-  headerTransparent: false,
-} as const;
+// iOS: sheet-over-modal. Android: a regular push — the flow group itself is a
+// native formSheet there, and a nested modal inside an Android formSheet is
+// untested RNS territory (#2657/#2693-class). FlowHeaderButton's router.back()
+// is the correct dismissal either way.
+const SEARCH_OPTIONS =
+  Platform.OS === 'android'
+    ? ({ title: 'Search Nostr', headerTransparent: false } as const)
+    : ({ title: 'Search Nostr', presentation: 'modal', headerTransparent: false } as const);
 const SUMMARY_OPTIONS = { title: 'Review' };
 const DETAIL_OPTIONS = { title: 'Split bill' };
 
@@ -66,7 +72,7 @@ const PICKER_ROUTES = new Set(['participants', 'search']);
 export default function SplitBillLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]
   );
   const segments = useSegments();
@@ -87,13 +93,15 @@ export default function SplitBillLayout() {
 
   return (
     <PickerContext.Provider value={picker}>
-      <Stack screenOptions={screenOptions}>
-        <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
-        <Stack.Screen name="participants" options={PARTICIPANTS_OPTIONS} />
-        <Stack.Screen name="search" options={SEARCH_OPTIONS} />
-        <Stack.Screen name="summary" options={SUMMARY_OPTIONS} />
-        <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
-      </Stack>
+      <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
+        <Stack screenOptions={screenOptions}>
+          <Stack.Screen name="amount" options={AMOUNT_OPTIONS} />
+          <Stack.Screen name="participants" options={PARTICIPANTS_OPTIONS} />
+          <Stack.Screen name="search" options={SEARCH_OPTIONS} />
+          <Stack.Screen name="summary" options={SUMMARY_OPTIONS} />
+          <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
+        </Stack>
+      </AndroidSheetRoot>
     </PickerContext.Provider>
   );
 }

@@ -1,3 +1,4 @@
+import type React from 'react';
 /**
  * Shared types for the image overlay system.
  * Used by provider, overlay, image block, and bottom panel.
@@ -61,6 +62,18 @@ export type ImageOverlayReplaceLayout = Omit<
 export type ThumbnailLayout = { pageX: number; pageY: number; width: number; height: number };
 
 export type ImageOverlayContextValue = {
+  /**
+   * Android-only systematic correction from Fabric measureInWindow space to
+   * true root-window (overlay host) space, calibrated at tap time from the
+   * touch event (see ImageBlock). RNS is SUPPOSED to feed the native header /
+   * sheet displacement into the shadow tree via contentOffset state, but that
+   * state update can be dropped (Screen.onLayout `changed` guard,
+   * FabricEnabledViewGroup dedupe), leaving measureInWindow under-reporting y
+   * by exactly statusBar+toolbar — the "dismiss lands too high" bug. The
+   * delta self-calibrates to ~0 when the RNS pipeline works, so this never
+   * double-corrects. Per-provider (per feed surface).
+   */
+  measureSpaceCorrection: React.MutableRefObject<{ dx: number; dy: number }>;
   scrollHandler: ReturnType<typeof useScrollViewOffset>['scrollHandler'];
   scrollOffsetY: ReturnType<typeof useScrollViewOffset>['scrollOffsetY'];
   /** Scroll Y when overlay was opened; used to compute close target in screen coords (targetY = pageY - scrollY + scrollAtOpen). */
@@ -74,11 +87,19 @@ export type ImageOverlayContextValue = {
   /** Close overlay. Pass current pager index when multiple images so dismiss animates to the visible thumbnail. */
   close: (dismissedPageIndex?: number) => void;
   openToCenter: () => void;
-  /** Register a thumbnail's layout (e.g. from onLayout + measureInWindow). Use eventId + imageIndex when opening from a post so dismiss uses this post's position, not another card's. */
+  /**
+   * Register a thumbnail's layout (e.g. from onLayout + measureInWindow). Use eventId + imageIndex when opening from a post so dismiss uses this post's position, not another card's.
+   * Pass measureNow so close() can re-measure the live node just-in-time: recycled LegendList rows never re-fire onLayout when size is unchanged, so the registered rect can be stale.
+   */
   registerThumbnailLayout: (
     url: string,
     layout: ThumbnailLayout,
-    options?: { eventId?: string; imageIndex?: number }
+    options?: {
+      eventId?: string;
+      imageIndex?: number;
+      /** Re-measure the live thumbnail node in window coordinates; resolves null when unmounted. */
+      measureNow?: () => Promise<ThumbnailLayout | null>;
+    }
   ) => void;
   /** Set panel height (drives image area); used after content measure and when panel is dragged. */
   setPanelHeight: (height: number) => void;

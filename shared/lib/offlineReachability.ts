@@ -29,7 +29,7 @@ export type ReachabilityProbeAttempt = {
 
 export type OfflineReachabilityResult = {
   isOffline: boolean;
-  reason: 'network-disconnected' | 'network-unreachable' | 'probe-reachable' | 'probe-unreachable';
+  reason: 'network-disconnected' | 'probe-reachable' | 'probe-unreachable';
   probes: ReachabilityProbeAttempt[];
 };
 
@@ -62,9 +62,11 @@ export async function resolveOfflineReachability(
     return { isOffline: true, reason: 'network-disconnected', probes: [] };
   }
 
-  if (state.isInternetReachable === false) {
-    return { isOffline: true, reason: 'network-unreachable', probes: [] };
-  }
+  // `isInternetReachable === false` is deliberately NOT a short-circuit: on
+  // Android, expo-network derives it from `activeNetwork != null` with no
+  // validation, and it flaps to false transiently on every transport change
+  // (Wi-Fi<->cell handoff, VPN, Doze). The probe below is the authoritative
+  // signal; the raw field is still logged by the provider for diagnosis.
 
   const probes = options.probes ?? DEFAULT_REACHABILITY_PROBES;
   const attempts: ReachabilityProbeAttempt[] = [];

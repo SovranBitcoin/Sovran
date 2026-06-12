@@ -121,16 +121,22 @@ function segmentsMatch(segments: string[], prefix: readonly string[]): boolean {
   return prefix.every((seg, i) => segments[i] === seg);
 }
 
-function MenuButton({
+// Memoized with a STABLE navigate callback: the drawer re-renders inside the
+// same commit native-stack gates the push animation on (useSegments flips when
+// a route is pushed), so each row must bail out unless ITS active state
+// changed — otherwise 6 rows + chrome re-render while the card slide waits.
+const MenuButton = React.memo(function MenuButton({
   icon,
   label,
-  onPress,
+  route,
+  onNavigate,
   isActive,
   useBadgeCount = useNoBadgeCount,
 }: {
   icon: MenuIconPair;
   label: string;
-  onPress: () => void;
+  route: MenuRoute;
+  onNavigate: (route: MenuRoute) => void;
   isActive: boolean;
   useBadgeCount?: () => number;
 }) {
@@ -140,7 +146,7 @@ function MenuButton({
   return (
     <GesturePressable
       disabled={isActive}
-      onPress={onPress}
+      onPress={() => onNavigate(route)}
       style={({ pressed }) => [styles.menuButton, pressed && { opacity: alpha.strong }]}>
       <HStack align="center" spacing={spacing.md}>
         <Icon
@@ -155,10 +161,15 @@ function MenuButton({
       </HStack>
     </GesturePressable>
   );
-}
+});
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
   const segments = useSegments();
+  // Read segments through a ref inside the navigation callback so its
+  // identity survives segment changes — keeps the memoized MenuButtons from
+  // re-rendering during the push-gated commit.
+  const segmentsRef = useRef(segments);
+  segmentsRef.current = segments;
   const navInProgressRef = useRef(false);
 
   // Fire a single Light-impact haptic the moment the drawer commits to a
@@ -186,7 +197,11 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   const handleNavigation = useCallback(
     (route: MenuRoute) => {
       if (navInProgressRef.current) return;
-      if (isRouteActive(route)) {
+      const item = MENU_ITEMS.find((m) => m.route === route);
+      const active = item
+        ? segmentsMatch(segmentsRef.current as string[], item.activeSegments)
+        : false;
+      if (active) {
         props.navigation.closeDrawer();
         return;
       }
@@ -197,7 +212,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
         navInProgressRef.current = false;
       }, 400);
     },
-    [isRouteActive, props.navigation]
+    [props.navigation]
   );
 
   const surface = useThemeColor('surface');
@@ -216,7 +231,8 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
               key={index}
               icon={item.icon}
               label={item.label}
-              onPress={() => handleNavigation(item.route)}
+              route={item.route}
+              onNavigate={handleNavigation}
               isActive={isRouteActive(item.route)}
               useBadgeCount={item.useBadgeCount}
             />

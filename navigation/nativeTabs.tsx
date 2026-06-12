@@ -5,15 +5,17 @@
 
 import React from 'react';
 import { Platform, StyleProp, ViewStyle } from 'react-native';
-import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
+import opacity from 'hex-color-opacity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
 import { supportsLiquidGlass } from '@/shared/lib/version';
+import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { headerButtonSize } from '@/shared/styles/tokens';
 
 type HeaderIconName = string;
 
@@ -30,45 +32,61 @@ type HeaderIconButtonProps = {
   onPress: () => void;
   size: number;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
 };
 
 /** Minimum 44pt touch target; hitSlop extends so taps near the edge still register. */
 const HEADER_BUTTON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
 
-function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButtonProps) {
+export function HeaderIconButton({
+  icon,
+  color,
+  onPress,
+  size,
+  style,
+  accessibilityLabel,
+}: HeaderIconButtonProps) {
   const [flatSurface, muted] = useThemeColor(['surface-secondary', 'muted'] as const);
 
-  if (Platform.OS === 'android') {
-    const androidIconName = ANDROID_HEADER_ICON_MAP[icon];
-    return (
-      <Pressable
-        onPress={onPress}
-        hitSlop={HEADER_BUTTON_HIT_SLOP}
-        style={[
-          {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: flatSurface,
-            borderWidth: 1,
-            borderColor: opacity(muted, 0.3),
-            alignItems: 'center',
-            justifyContent: 'center',
-          },
-          style,
-        ]}>
-        {androidIconName ? (
-          <Icon name={androidIconName} size={size} color={color} />
-        ) : (
-          <Icon name="mdi:menu" size={size} color={color} />
-        )}
-      </Pressable>
+  // Mint-selector chrome (the app-wide non-liquid-glass header-button
+  // contract — see ScreenHeaderAction): surface-secondary circle, 1px muted
+  // border, opacity press. Only the glyph source forks: SF symbol on iOS,
+  // monicon map on Android (expo-symbols renders nothing there). On liquid
+  // devices (iOS 26+) the app-owned HeaderGlassCircle replaces both the flat
+  // chrome AND the system bar-item capsule (squat content-width pill) so
+  // header buttons share the mint selector's glass geometry.
+  const glyph =
+    Platform.OS === 'android' ? (
+      <Icon name={ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu'} size={size} color={color} />
+    ) : (
+      <IconSymbol name={icon as any} size={size} color={color} />
     );
+
+  if (supportsLiquidGlass()) {
+    return <HeaderGlassCircle onPress={onPress}>{glyph}</HeaderGlassCircle>;
   }
 
   return (
-    <Pressable onPress={onPress} hitSlop={HEADER_BUTTON_HIT_SLOP} style={[{ margin: 2 }, style]}>
-      <IconSymbol name={icon as any} size={size} color={color} />
+    <Pressable
+      onPress={onPress}
+      hitSlop={HEADER_BUTTON_HIT_SLOP}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={[
+        {
+          width: headerButtonSize,
+          height: headerButtonSize,
+          borderRadius: headerButtonSize / 2,
+          backgroundColor: flatSurface,
+          borderWidth: 1,
+          borderColor: opacity(muted, 0.3),
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        style,
+      ]}>
+      {glyph}
     </Pressable>
   );
 }

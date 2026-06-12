@@ -24,7 +24,20 @@ export function extractCashuToken(content: string): string | null {
 
   const remainingText = content.slice(tokenStartIndex);
   let token = '';
-  const maxTokenLength = 5000;
+  // P2PK-locked proofs carry ~150-byte JSON secrets (vs 64-hex plain), so a
+  // many-proof locked token comfortably exceeds the old 5000-char cap.
+  const maxTokenLength = 10000;
+
+  // Fast path: a Nut Drop message body IS the token (no trailing prose), so
+  // try the whole run up to the first whitespace before the O(n²) per-char
+  // scan — that loop decodes the candidate on every iteration.
+  const whitespaceMatch = /\s/.exec(remainingText);
+  const wholeCandidate = remainingText
+    .slice(0, whitespaceMatch ? whitespaceMatch.index : remainingText.length)
+    .slice(0, maxTokenLength);
+  if (wholeCandidate.length > 6 && isValidEcashToken(wholeCandidate)) {
+    return wholeCandidate;
+  }
 
   for (let i = 6; i <= Math.min(remainingText.length, maxTokenLength); i++) {
     const candidate = remainingText.slice(0, i);

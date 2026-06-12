@@ -117,11 +117,6 @@
       "count": 2
     }
   },
-  "features/mint/screens/MintRebalancePlanScreen.tsx": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "features/onboarding/components/types.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1

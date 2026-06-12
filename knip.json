@@ -6,6 +6,7 @@
     "metro.config.js",
     "app/**/*.{ts,tsx}",
     "plugins/withLowerPodDeploymentTarget.js",
+    "plugins/withNeutralAndroidTextColors.js",
     "scripts/*.{js,ts}"
   ],
   "project": ["**/*.{ts,tsx,js,jsx}"],
@@ -21,7 +22,8 @@
     "metro-minify-terser",
     "number-flow-react-native",
     "nutpatch",
-    "patch-package"
+    "patch-package",
+    "react-native-fast-squircle"
   ],
   "ignoreBinaries": ["claude", "eas", "gh", "maestro", "tsx"],
   "ignoreIssues": {

@@ -2,6 +2,7 @@ import Foundation
 import ExpoModulesCore
 import CoreBluetooth
 import CryptoKit
+import UIKit
 
 /// Bridges BitChat's BLEService to the Expo module event system.
 /// Manages the lifecycle of the BLE mesh transport and forwards
@@ -33,15 +34,21 @@ enum BitChatBridgeError: Error, LocalizedError {
 private struct BitchatBLEIdentityMaterial {
     let noisePrivateKey: Data
     let signingPrivateKey: Data
+    /// 33-byte compressed Cashu P2PK pubkey ("02" + nostr x-only) announced
+    /// in the SVRN extension TLV so nearby Sovran peers can lock tokens to us.
+    let p2pkPubkey: Data
     let peerID: String
     let identityID: String
 
-    init(noisePrivateKeyHex: String, signingPrivateKeyHex: String) throws {
+    init(noisePrivateKeyHex: String, signingPrivateKeyHex: String, p2pkPubkeyHex: String) throws {
         guard let noiseData = Data(hexString: noisePrivateKeyHex), noiseData.count == 32 else {
             throw BitChatBridgeError.invalidIdentityMaterial("noise key must be 32-byte hex")
         }
         guard let signingData = Data(hexString: signingPrivateKeyHex), signingData.count == 32 else {
             throw BitChatBridgeError.invalidIdentityMaterial("signing key must be 32-byte hex")
+        }
+        guard let p2pkData = Data(hexString: p2pkPubkeyHex), p2pkData.count == 33, p2pkData.first == 0x02 else {
+            throw BitChatBridgeError.invalidIdentityMaterial("p2pk pubkey must be 33-byte 02-prefixed hex")
         }
         guard let noiseKey = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: noiseData) else {
             throw BitChatBridgeError.invalidIdentityMaterial("noise key is not a valid Curve25519 key")
@@ -52,9 +59,14 @@ private struct BitchatBLEIdentityMaterial {
 
         self.noisePrivateKey = noiseData
         self.signingPrivateKey = signingData
+        self.p2pkPubkey = p2pkData
         let peerID = PeerID(publicKey: noiseKey.publicKey.rawRepresentation).id
         self.peerID = peerID
-        self.identityID = "\(peerID):\(signingKey.publicKey.rawRepresentation.hexEncodedString())"
+        // The p2pk pubkey participates so a profile switch that changes only
+        // the announced lock key still tears down and recreates the service
+        // (the SVRN TLV is set at start()).
+        self.identityID =
+            "\(peerID):\(signingKey.publicKey.rawRepresentation.hexEncodedString()):\(p2pkPubkeyHex.lowercased())"
     }
 }
 
@@ -208,11 +220,13 @@ final class BitChatBLEBridge: NSObject {
         nickname: String,
         profileScope: String,
         noisePrivateKeyHex: String,
-        signingPrivateKeyHex: String
+        signingPrivateKeyHex: String,
+        p2pkPubkeyHex: String
     ) throws {
         let identityMaterial = try BitchatBLEIdentityMaterial(
             noisePrivateKeyHex: noisePrivateKeyHex,
-            signingPrivateKeyHex: signingPrivateKeyHex
+            signingPrivateKeyHex: signingPrivateKeyHex,
+            p2pkPubkeyHex: p2pkPubkeyHex
         )
         let scope = BitchatProfileScope.storageSuffix(for: profileScope)
         if isRunning, activeProfileScope == scope, activeIdentityID == identityMaterial.identityID {
@@ -234,6 +248,13 @@ final class BitChatBLEBridge: NSObject {
         activeIdentityID = identityMaterial.identityID
         activeNickname = nickname
         loadDmSummaries(for: scope)
+        // The ecash capability announce TLV must be live before
+        // startServices() — the first announce fires during startup and every
+        // announce must carry it.
+        EcashAnnounceState.shared.localTLV = EcashAnnounceTLV.encode(
+            p2pkPubkey: identityMaterial.p2pkPubkey,
+            flags: EcashAnnounceTLV.capabilityCashuAutoRedeem
+        )
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
@@ -256,6 +277,10 @@ final class BitChatBLEBridge: NSObject {
         activeIdentityID = nil
         activeNickname = nil
         dmSummaries = [:]
+        // Clear ecash announce state so a profile switch can never announce
+        // the previous profile's lock key or surface its peers.
+        EcashAnnounceState.shared.localTLV = nil
+        EcashAnnounceState.shared.removeAll()
     }
 
     func sendMessage(_ content: String) throws {
@@ -372,14 +397,81 @@ final class BitChatBLEBridge: NSObject {
             // through the mesh-flood + 15s spool fallback. Surface both so
             // UI can warn users when "connected" doesn't mean reachable.
             let link = service.linkState(for: peer.peerID)
-            return [
+            // Ecash capability fields come from the peer's last verified
+            // announce. `supportsP2pkEcash` marks peers that can receive
+            // P2PK-locked drops; `p2pkPubkeyHex` is the lock target.
+            let ecashExt = EcashAnnounceState.shared.lookup(peerID: peer.peerID.id)
+            var dict: [String: Any] = [
                 "peerID": peer.peerID.id,
                 "nickname": peer.nickname,
                 "isConnected": peer.isConnected,
                 "hasDirectLink": link.hasPeripheral || link.hasCentral,
                 "lastSeen": peer.lastSeen.timeIntervalSince1970 * 1000,
-            ] as [String: Any]
+                "supportsP2pkEcash": ecashExt != nil,
+                "ecashCapabilities": Int(ecashExt?.flags ?? 0),
+            ]
+            if let ecashExt {
+                dict["p2pkPubkeyHex"] = ecashExt.p2pkPubkeyHex
+            }
+            return dict
         }
+    }
+
+    // MARK: - Background execution
+
+    /// JS-managed background tasks, keyed by an opaque handle returned to JS.
+    /// MainActor-only.
+    private var jsBackgroundTasks: [Int: UIBackgroundTaskIdentifier] = [:]
+    private var nextJSBackgroundTaskHandle = 1
+
+    /// Hold a short background-task assertion so the JS runtime gets
+    /// scheduled (and has runway for a mint HTTP call) after a CoreBluetooth
+    /// background wake — without it the app is suspended again almost
+    /// immediately after the BLE delegate returns. No-op while active.
+    /// Self-expiring: always ends after `seconds` or on system expiration.
+    @MainActor
+    func holdBackgroundAssertion(seconds: TimeInterval = 20, name: String) {
+        guard UIApplication.shared.applicationState != .active else { return }
+        var taskID: UIBackgroundTaskIdentifier = .invalid
+        taskID = UIApplication.shared.beginBackgroundTask(withName: name) {
+            if taskID != .invalid {
+                UIApplication.shared.endBackgroundTask(taskID)
+                taskID = .invalid
+            }
+        }
+        guard taskID != .invalid else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+            if taskID != .invalid {
+                UIApplication.shared.endBackgroundTask(taskID)
+                taskID = .invalid
+            }
+        }
+    }
+
+    /// Explicit JS-managed background task for the auto-redeem mint call.
+    /// Returns an opaque handle (-1 when the system refuses). On system
+    /// expiration the module emits `onBLEBackgroundTaskExpiring` with the
+    /// handle, then the task is ended natively — JS must treat the work as
+    /// interrupted and rely on its persisted queue.
+    @MainActor
+    func beginJSBackgroundTask(name: String) -> Int {
+        let handle = nextJSBackgroundTaskHandle
+        nextJSBackgroundTaskHandle += 1
+        var taskID: UIBackgroundTaskIdentifier = .invalid
+        taskID = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+            guard let self else { return }
+            self.module?.sendEvent("onBLEBackgroundTaskExpiring", ["handle": handle])
+            self.endJSBackgroundTask(handle: handle)
+        }
+        guard taskID != .invalid else { return -1 }
+        jsBackgroundTasks[handle] = taskID
+        return handle
+    }
+
+    @MainActor
+    func endJSBackgroundTask(handle: Int) {
+        guard let taskID = jsBackgroundTasks.removeValue(forKey: handle) else { return }
+        UIApplication.shared.endBackgroundTask(taskID)
     }
 
     var bluetoothState: String {
@@ -399,6 +491,9 @@ final class BitChatBLEBridge: NSObject {
 extension BitChatBLEBridge: BitchatDelegate {
     nonisolated func didReceiveMessage(_ message: BitchatMessage) {
         Task { @MainActor in
+            // BLE wake in background: keep the process alive long enough for
+            // JS to classify the message (and queue a locked Nut Drop).
+            holdBackgroundAssertion(name: "ble-message")
             module?.sendEvent("onBLEMessage", [
                 "id": message.id,
                 "content": message.content,
@@ -412,6 +507,7 @@ extension BitChatBLEBridge: BitchatDelegate {
 
     nonisolated func didReceivePublicMessage(from peerID: PeerID, nickname: String, content: String, timestamp: Date, messageID: String?) {
         Task { @MainActor in
+            holdBackgroundAssertion(name: "ble-public-message")
             module?.sendEvent("onBLEMessage", [
                 "id": messageID ?? UUID().uuidString,
                 "content": content,
@@ -496,6 +592,7 @@ extension BitChatBLEBridge: BitchatDelegate {
             return
         }
         Task { @MainActor in
+            BitChatBLEBridge.shared.holdBackgroundAssertion(name: "ble-noise-payload")
             let senderNickname = BitChatBLEBridge.shared.bleService?
                 .currentPeerSnapshots()
                 .first(where: { $0.peerID == peerID })?

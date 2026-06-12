@@ -5,12 +5,15 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
 export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactElement {
   const { text, iosHeight, onPress, textSize } = useFiatCurrencyPill(props);
-  const textColor = useThemeColor('foreground');
+  const [textColor, surfaceSecondary, muted] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'muted',
+  ] as const);
 
   return (
     <Pressable disabled={!onPress} onPress={onPress}>
@@ -20,9 +23,11 @@ export function FiatCurrencyPillFlat(props: FiatCurrencyPillProps): React.ReactE
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: opacity(INVARIANT_WHITE, 0.15),
+          // The approved flat contract (CircleActionButton/BalancePill recipe);
+          // these sit over the same wallet wallpaper as those buttons do.
+          backgroundColor: surfaceSecondary,
           borderWidth: 1,
-          borderColor: opacity(INVARIANT_WHITE, 0.2),
+          borderColor: opacity(muted, 0.3),
           paddingHorizontal: 14,
           paddingVertical: 6,
           minHeight: iosHeight,

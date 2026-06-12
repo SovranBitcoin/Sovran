@@ -35,12 +35,30 @@ describe('Android portal flags', () => {
       'utf8'
     );
 
+    // Android registers the overlay element into the same-window
+    // AndroidImageOverlayHost (mounted in app/_layout.tsx) instead of a
+    // separate-window transparent <Modal>, so measureInWindow thumbnail
+    // rects and overlay coordinates share one coordinate space.
     expect(source).toContain("Platform.OS === 'android'");
-    expect(source).toContain('<Modal');
-    expect(source).toContain('navigationBarTranslucent');
-    expect(source).toContain('<GestureHandlerRootView');
+    expect(source).toContain('setAndroidOverlayNode');
+    expect(source).toContain('clearAndroidOverlayNode');
+    expect(source).toContain('hardwareBackPress');
+    expect(source).not.toContain('<Modal');
     expect(source).toContain("Platform.OS === 'ios'");
     expect(source).toContain('<FullWindowOverlay>{content}</FullWindowOverlay>');
+
+    const host = readFileSync(
+      resolve(ROOT, 'features/feed/components/nostr/image-overlay/AndroidImageOverlayHost.tsx'),
+      'utf8'
+    );
+
+    expect(host).toContain('useSyncExternalStore');
+    expect(host).not.toContain("from 'react-native-screens'");
+    expect(host).not.toContain('<FullWindowOverlay');
+    expect(host).not.toContain('<Modal');
+
+    const layout = readFileSync(resolve(ROOT, 'app/_layout.tsx'), 'utf8');
+    expect(layout).toMatch(/<AndroidImageOverlayHost \/>[\s\S]*?<PopupHost \/>/);
   });
 
   it('measures the Android QR boot-morph anchor in window coordinates', () => {
@@ -57,9 +75,12 @@ describe('Android portal flags', () => {
   it('keeps the custom Android header-left profile button on a flat touch surface', () => {
     const source = readFileSync(resolve(ROOT, 'shared/blocks/HeaderProfileButton.tsx'), 'utf8');
 
+    // Mint-selector chrome: shared headerButtonSize token (54 on Android via
+    // Platform.select) with the surface-secondary circle and muted border.
     expect(source).toContain("Platform.OS === 'android'");
-    expect(source).toContain('ANDROID_BUTTON_SIZE = 44');
+    expect(source).toContain('ANDROID_BUTTON_SIZE = headerButtonSize');
     expect(source).toContain('backgroundColor: flatSurface');
+    expect(source).toContain('borderColor: opacity(muted, 0.3)');
   });
 
   it('keeps Android bottom footers out of the masked blur native path', () => {

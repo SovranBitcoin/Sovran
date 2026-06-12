@@ -12,6 +12,8 @@ import { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
+import { AndroidSheetRoot } from '@/shared/ui/composed/AndroidSheetRoot';
+import { FLOW_SHEET_HEADER_HEIGHT } from '@/shared/ui/composed/FlowSheetHeader';
 
 const INDEX_OPTIONS = { title: 'Bitcoin map' };
 const DETAIL_OPTIONS = { title: 'Merchant details' };
@@ -19,14 +21,16 @@ const DETAIL_OPTIONS = { title: 'Merchant details' };
 export default function MapFlowLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const screenOptions = useMemo(
-    () => createFlowLayoutScreenOptions({ foreground, background }),
+    () => createFlowLayoutScreenOptions({ foreground, background }, { androidSheet: true }),
     [foreground, background]
   );
 
   return (
-    <Stack screenOptions={screenOptions}>
-      <Stack.Screen name="index" options={INDEX_OPTIONS} />
-      <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
-    </Stack>
+    <AndroidSheetRoot headerHeight={FLOW_SHEET_HEADER_HEIGHT}>
+      <Stack screenOptions={screenOptions}>
+        <Stack.Screen name="index" options={INDEX_OPTIONS} />
+        <Stack.Screen name="detail" options={DETAIL_OPTIONS} />
+      </Stack>
+    </AndroidSheetRoot>
   );
 }

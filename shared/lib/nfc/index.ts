@@ -9,3 +9,7 @@
 export { NfcError, isUserCancelError } from './errors';
 export { createNfcAdapter } from './adapter';
 export { writeTokenToNFC } from './write-token';
+export { useNfcSupported } from './useNfcSupported';
+export { isNfcEnabled, isNfcSupported } from './status';
+export { releaseSession, setNfcTagConnectedListener } from './session';
+export { isAmbientNfcCycle, setAmbientNfcCycle } from './ambient';

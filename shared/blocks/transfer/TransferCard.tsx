@@ -15,6 +15,7 @@ import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Log } from '@/shared/lib/logger';
 import { zIndex } from '@/shared/styles/tokens';
@@ -37,11 +38,11 @@ export const TransferCard = React.memo(
 
     return (
       <Log name="TransferCard">
-        <View style={[styles.card, { borderColor }]}>
+        <SquircleView style={[styles.card, { borderColor }]}>
           <BlurCardFrame accentColor={accentColor}>
             <View style={styles.content}>{children}</View>
           </BlurCardFrame>
-        </View>
+        </SquircleView>
       </Log>
     );
   }

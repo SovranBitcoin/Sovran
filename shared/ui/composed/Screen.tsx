@@ -23,11 +23,12 @@ import React, {
   useState,
   useLayoutEffect,
 } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderHeightContext } from '@react-navigation/elements';
+import { SheetHeaderHeightContext } from '@/shared/ui/composed/AndroidSheetRoot';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
 import { Log } from '@/shared/lib/logger';
@@ -147,10 +148,26 @@ export function Screen({
 
   const insets = useSafeAreaInsets();
   // Match ModalLayoutWrapper: read header height directly so this is safe to
-  // render outside a Stack navigator (returns 0 in that case).
-  const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  // render outside a Stack navigator (returns 0 in that case). Inside an
+  // Android formSheet, prefer the sheet's KNOWN fixed header height — the
+  // navigator context starts at a default (~80dp) and only settles to the
+  // measured value a frame later, shifting content (see AndroidSheetRoot).
+  const sheetHeaderHeight = useContext(SheetHeaderHeightContext);
+  const navigatorHeaderHeight = useContext(HeaderHeightContext) ?? 0;
+  const headerHeight = sheetHeaderHeight ?? navigatorHeaderHeight;
   const themeBackground = useThemeColor('background');
   const resolvedBgColor = bgColor ?? themeBackground;
+
+  // Inside an Android formSheet, declare the page's actual background to the
+  // sheet header: FlowSheetHeader reads headerStyle.backgroundColor for its
+  // scrim color. Without this, screens that override bgColor (mint list/add,
+  // notifications) get a scrim fading from the darker theme background — a
+  // visibly wrong-colored slab across the top of the page.
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    if (Platform.OS !== 'android' || sheetHeaderHeight == null || bgColor == null) return;
+    navigation.setOptions({ headerStyle: { backgroundColor: bgColor } });
+  }, [navigation, sheetHeaderHeight, bgColor]);
 
   const resolvedBottomPadding =
     bottomPadding ??

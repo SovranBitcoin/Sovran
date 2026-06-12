@@ -288,6 +288,7 @@ export const icons: string[] = [
   'mdi:shield-check',
   'mdi:shield-refresh',
   'mdi:shield-remove',
+  'mdi:shuffle-variant',
   'mdi:skip-next',
   'mdi:swap-horizontal',
   'mdi:ticket-percent',

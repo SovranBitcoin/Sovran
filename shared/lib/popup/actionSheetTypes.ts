@@ -31,6 +31,9 @@ type SendMemoPayload = StepDataMap['enterSendMemo'] & {
   machine: PaymentMachine;
 };
 
+/** No payload — the nfc-tap sheet reads everything from nfcTapStore. */
+type NfcTapPayload = Record<string, never>;
+
 /**
  * The approval sheet reads the live NIP-46 pending queue from
  * `useNip46RequestsStore` directly (it advances request-by-request as
@@ -134,6 +137,13 @@ type BaseActionSheetPayloads = {
    * here because the custom-page mechanism routes through the same registry.
    */
   'signer-profile-picker': SignerProfilePickerPayload;
+  /**
+   * Android tap-to-pay surface ("Hold near a payment terminal"). Android has
+   * no system NFC sheet, and the wallet NFC button also exists inside
+   * send-flow route modals — same above-modal stacking need as the rest of
+   * this lane. Phase text is driven by nfcTapStore, not the payload.
+   */
+  'nfc-tap': NfcTapPayload;
 };
 
 /** Payload types for custom action sheets. */

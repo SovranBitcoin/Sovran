@@ -179,6 +179,19 @@ export const CLOSE_BLUR_AND_BTN_DURATION_MS = 320;
 /** Delay (ms) after close animation before clearing overlay URLs (avoids flash). */
 export const CLEAR_URL_DELAY_MS = 50;
 
+/** Max wait (ms) for the just-in-time dismiss-target re-measure before falling back to the open-time snapshot. */
+export const CLOSE_REMEASURE_TIMEOUT_MS = 50;
+
+// -----------------------------------------------------------------------------
+// Android backdrop (no real blur without experimentalBlurMethod; solid scrims)
+// -----------------------------------------------------------------------------
+
+/** Android backdrop scrim opacity at full blur intensity (intensity 0..100 → opacity 0..this). */
+export const ANDROID_SCRIM_MAX_OPACITY = 0.92;
+
+/** Android thumbnail dim opacity at full displacement (thumbnail blur 0..THUMB_BLUR_MAX_INTENSITY → opacity 0..this). */
+export const ANDROID_THUMB_DIM_MAX_OPACITY = 0.85;
+
 // -----------------------------------------------------------------------------
 // Provider: thumbnail blur (feed thumbnails blur while overlay is displaced)
 // -----------------------------------------------------------------------------

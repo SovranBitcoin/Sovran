@@ -183,7 +183,14 @@ function ProfileSwitcherButtons({
   );
 }
 
-export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }) {
+// Memoized: this 290-line chrome re-rendered inside the very commit
+// native-stack gates push animations on (the drawer re-renders when
+// useSegments flips). closeDrawer is a stable useCallback at the call site.
+export const DrawerProfileChrome = React.memo(function DrawerProfileChrome({
+  closeDrawer,
+}: {
+  closeDrawer: () => void;
+}) {
   const { keys: nostrKeys } = useNostrKeysContext();
   const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
@@ -290,4 +297,4 @@ export function DrawerProfileChrome({ closeDrawer }: { closeDrawer: () => void }
       <Spacer size={spacing.lg} />
     </View>
   );
-}
+});

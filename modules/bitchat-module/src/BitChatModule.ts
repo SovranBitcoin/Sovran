@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { requireNativeModule, type EventSubscription } from 'expo-modules-core';
 import type {
   BLEDeliveryStatusEvent,
@@ -18,7 +18,8 @@ interface BitChatNativeModule {
     nickname: string,
     profileScope: string,
     noisePrivateKeyHex: string,
-    signingPrivateKeyHex: string
+    signingPrivateKeyHex: string,
+    p2pkPubkeyHex: string
   ): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
   startBLEPrivateChat(peerID: string): Promise<void>;
@@ -32,6 +33,12 @@ interface BitChatNativeModule {
   getBLEPeers(): BLEPeer[];
   getBLEDmHistory(profileScope: string): BLEDmContact[];
   getBLEState(): string;
+  beginBLEBackgroundTask(name: string): Promise<number>;
+  endBLEBackgroundTask(handle: number): Promise<void>;
+  // Bluetooth helpers — implemented natively on Android only; the JS wrappers
+  // below provide the iOS fallbacks.
+  requestEnableBluetooth?(): Promise<boolean>;
+  openBluetoothSettings?(): Promise<void>;
   // Nostr (native — wraps upstream bitchat's NostrRelayManager + GeoRelayDirectory)
   startNostr(profileScope: string): Promise<void>;
   joinGeohash(hash: string): Promise<void>;
@@ -44,12 +51,13 @@ interface BitChatNativeModule {
   removeListeners(count: number): void;
 }
 
-// expo-module.config.json declares `{ "platforms": ["apple"] }` — calling
-// `requireNativeModule('BitChat')` on Android throws synchronously at module
-// load. Mirror the canonical pattern used by liquid-glass-text: resolve to
-// `null` off-iOS, and have each export degrade gracefully.
+// Native implementations exist for both apple and android
+// (expo-module.config.json platforms). Other platforms (web) resolve to
+// `null` and every export degrades gracefully.
 const NativeModule: BitChatNativeModule | null =
-  Platform.OS === 'ios' ? requireNativeModule<BitChatNativeModule>('BitChat') : null;
+  Platform.OS === 'ios' || Platform.OS === 'android'
+    ? requireNativeModule<BitChatNativeModule>('BitChat')
+    : null;
 
 class BitChatUnavailableError extends Error {
   constructor() {
@@ -103,7 +111,11 @@ export function startBLE(
         nickname,
         profileScope,
         identityMaterial.noisePrivateKeyHex,
-        identityMaterial.signingPrivateKeyHex
+        identityMaterial.signingPrivateKeyHex,
+        // Cashu P2PK lock target announced in the ecash capability TLV:
+        // "02" + the profile's x-only Nostr pubkey (NUT-11 / Minibits
+        // convention — BIP340 signing ignores Y parity).
+        `02${identityMaterial.nostrPubkey}`
       )
     : unavailable();
 }
@@ -178,8 +190,8 @@ export function getBLEPeers(): BLEPeer[] {
 /**
  * Returns the persisted 1:1 DM-peer history (peerID + best-known nickname +
  * last activity timestamp). Survives app restarts — fed by both inbound and
- * outbound BLE DMs in the native bridge. Empty array on Android (no native
- * bridge) and on first-launch iOS before any DM has flowed.
+ * outbound BLE DMs in the native bridge. Empty array on first launch before
+ * any DM has flowed.
  */
 export function getBLEDmHistory(profileScope: string): BLEDmContact[] {
   return NativeModule && profileScope ? NativeModule.getBLEDmHistory(profileScope) : [];
@@ -206,6 +218,64 @@ export function addBLEStateListener(
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onBLEStateChanged', listener as (e: unknown) => void);
+}
+
+// --- Background execution ---
+
+/**
+ * Begin an iOS background-task assertion so a network call (e.g. the Nut
+ * Drop auto-redeem mint swap) can finish after a BLE background wake (~30s
+ * budget). Returns an opaque handle, or -1 when unavailable (Android — the
+ * mesh foreground service already keeps the process alive — or refused by
+ * the system). Always pair with `endBLEBackgroundTask` in a `finally`.
+ */
+export function beginBLEBackgroundTask(name: string): Promise<number> {
+  return NativeModule ? NativeModule.beginBLEBackgroundTask(name) : Promise.resolve(-1);
+}
+
+export function endBLEBackgroundTask(handle: number): Promise<void> {
+  if (!NativeModule || handle < 0) return Promise.resolve();
+  return NativeModule.endBLEBackgroundTask(handle);
+}
+
+/**
+ * Fires when iOS reclaims a `beginBLEBackgroundTask` assertion before it was
+ * ended — the in-flight work is about to be suspended; rely on persisted
+ * state to resume on next foreground.
+ */
+export function addBLEBackgroundTaskExpiringListener(
+  listener: (event: { handle: number }) => void
+): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
+  return NativeModule.addListener('onBLEBackgroundTaskExpiring', listener as (e: unknown) => void);
+}
+
+// --- Bluetooth helpers ---
+
+/**
+ * Ask the OS to enable Bluetooth. Android shows the system
+ * "Allow Sovran to turn on Bluetooth?" dialog (ACTION_REQUEST_ENABLE) and
+ * resolves with whether the adapter ended up enabled. iOS has no such
+ * affordance — resolves `false` so callers fall back to `openBluetoothSettings`.
+ */
+export function requestEnableBluetooth(): Promise<boolean> {
+  if (NativeModule?.requestEnableBluetooth) {
+    return NativeModule.requestEnableBluetooth();
+  }
+  return Promise.resolve(false);
+}
+
+/**
+ * Open the closest thing to Bluetooth settings the platform allows:
+ * Android jumps straight to the system Bluetooth settings screen; iOS has no
+ * public deep link to Bluetooth settings, so it opens the app's settings page
+ * (the legal target), where the Bluetooth permission toggle lives.
+ */
+export function openBluetoothSettings(): Promise<void> {
+  if (NativeModule?.openBluetoothSettings) {
+    return NativeModule.openBluetoothSettings();
+  }
+  return Linking.openSettings();
 }
 
 // --- Nostr ---

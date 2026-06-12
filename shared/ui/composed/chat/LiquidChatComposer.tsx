@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
+  Platform,
   TextInput,
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
@@ -36,6 +37,7 @@ import {
   submitLabel,
   textInputAutocapitalization,
 } from '@expo/ui/swift-ui/modifiers';
+import Animated, { ZoomIn, ZoomOut } from 'react-native-reanimated';
 import Icon from 'assets/icons';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -132,11 +134,14 @@ export function LiquidChatComposer({
   testID,
   surface,
 }: LiquidChatComposerProps) {
-  const [foreground, surfaceTertiary, shade400, shade500] = useThemeColor([
+  // field-placeholder (NOT the shade ramp): shade-400/500 are the STATIC
+  // brand-blue ramp, which made 'Ask anything'/'Write here' placeholders and
+  // the mic icon read as accent-colored on the fallback tier.
+  const [foreground, background, surfaceSecondary, fieldPlaceholder] = useThemeColor([
     'foreground',
-    'surface-tertiary',
-    'shade-400',
-    'shade-500',
+    'background',
+    'surface-secondary',
+    'field-placeholder',
   ] as const);
 
   const trimmedHasText = value.trim().length > 0;
@@ -345,7 +350,7 @@ export function LiquidChatComposer({
                       <SwiftUIImage
                         systemName={'mic.fill' as never}
                         size={ICON_SIZE}
-                        color={shade400}
+                        color={fieldPlaceholder}
                       />
                     </SwiftUIButton>
                   ) : null}
@@ -398,9 +403,11 @@ export function LiquidChatComposer({
     );
   }
 
-  // Fallback — three RN Pressables/Views with the existing blur primitive.
-  // No SwiftUI morph here; the [→] simply mounts/unmounts. The RN multiline
+  // Fallback — iOS (<26) keeps real frosted-glass blur; Android gets the flat
+  // contract (surface-secondary fills, no blur — expo-blur there reads as a
+  // muddy tint). The [→] springs in/out via reanimated. The RN multiline
   // TextInput drives `fallbackRowHeight` so the bubble grows with content.
+  const useBlur = Platform.OS === 'ios';
   const insideIcons =
     isEmpty && onVoicePress ? (
       <HStack align="center" spacing={8} style={{ paddingRight: 4 }}>
@@ -409,7 +416,7 @@ export function LiquidChatComposer({
           hitSlop={6}
           accessibilityLabel="Voice message"
           testID={testID ? `${testID}-voice` : undefined}>
-          <Icon name="mdi:microphone" size={20} color={shade400} />
+          <Icon name="mdi:microphone" size={20} color={fieldPlaceholder} />
         </Pressable>
       </HStack>
     ) : null;
@@ -429,7 +436,7 @@ export function LiquidChatComposer({
           accessibilityLabel="Composer actions"
           accessibilityRole="button">
           <View
-            blur
+            blur={useBlur}
             blurIntensity={60}
             blurTint="prominent"
             style={{
@@ -439,8 +446,9 @@ export function LiquidChatComposer({
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
+              backgroundColor: useBlur ? undefined : surfaceSecondary,
             }}>
-            <Icon name="mdi:plus" size={ICON_SIZE} color="#FFFFFF" />
+            <Icon name="mdi:plus" size={ICON_SIZE} color={useBlur ? '#FFFFFF' : foreground} />
           </View>
         </Pressable>
 
@@ -453,7 +461,7 @@ export function LiquidChatComposer({
           }}>
           <View
             pointerEvents="none"
-            blur
+            blur={useBlur}
             blurIntensity={60}
             blurTint="prominent"
             style={{
@@ -464,7 +472,7 @@ export function LiquidChatComposer({
               bottom: 0,
               borderRadius: fallbackRowHeight / 2,
               overflow: 'hidden',
-              backgroundColor: surfaceTertiary,
+              backgroundColor: surfaceSecondary,
             }}
           />
           <HStack align="center" spacing={8} style={{ paddingHorizontal: 16 }}>
@@ -472,7 +480,7 @@ export function LiquidChatComposer({
               value={value}
               onChangeText={onChangeText}
               placeholder={placeholder}
-              placeholderTextColor={shade500}
+              placeholderTextColor={fieldPlaceholder}
               editable={!disabled}
               multiline
               maxLength={1000}
@@ -494,27 +502,35 @@ export function LiquidChatComposer({
         </View>
 
         {trimmedHasText ? (
-          <Pressable
-            onPress={canSend ? handleSendPress : undefined}
-            disabled={!canSend}
-            accessibilityLabel="Send message"
-            accessibilityRole="button"
-            testID={testID ? `${testID}-send` : undefined}>
-            <View
-              blur
-              blurIntensity={60}
-              blurTint="prominent"
-              style={{
-                width: BUTTON_SIZE,
-                height: BUTTON_SIZE,
-                borderRadius: BUTTON_SIZE / 2,
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-              }}>
-              <Icon name="iconamoon:send-fill" size={ICON_SIZE} color="#FFFFFF" />
-            </View>
-          </Pressable>
+          <Animated.View entering={ZoomIn.springify().damping(16)} exiting={ZoomOut.duration(120)}>
+            <Pressable
+              onPress={canSend ? handleSendPress : undefined}
+              disabled={!canSend}
+              accessibilityLabel="Send message"
+              accessibilityRole="button"
+              testID={testID ? `${testID}-send` : undefined}>
+              <View
+                blur={useBlur}
+                blurIntensity={60}
+                blurTint="prominent"
+                style={{
+                  width: BUTTON_SIZE,
+                  height: BUTTON_SIZE,
+                  borderRadius: BUTTON_SIZE / 2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  // Flat tier: emphasized primary-button fill for the send CTA.
+                  backgroundColor: useBlur ? undefined : foreground,
+                }}>
+                <Icon
+                  name="iconamoon:send-fill"
+                  size={ICON_SIZE}
+                  color={useBlur ? '#FFFFFF' : background}
+                />
+              </View>
+            </Pressable>
+          </Animated.View>
         ) : null}
       </HStack>
     </View>

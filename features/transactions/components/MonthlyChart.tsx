@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View as RNView } from 'react-native';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Svg, { Path, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -282,7 +283,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   return (
     <Log name="MonthlyChart">
-      <RNView style={[styles.card, { borderColor }]}>
+      <SquircleView style={[styles.card, { borderColor }]}>
         <BlurCardFrame accentColor={muted}>
           <RNView style={styles.container}>
             {/* Header */}
@@ -375,7 +376,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
             </Svg>
           </RNView>
         </BlurCardFrame>
-      </RNView>
+      </SquircleView>
     </Log>
   );
 });

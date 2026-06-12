@@ -53,15 +53,15 @@ const MAP_CONTAINER_CN = 'mx-4 rounded-xl overflow-hidden h-[150px]';
 function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
   const surfaceSecondary = useThemeColor('surface-secondary');
 
-  if (Platform.OS === 'android') return null;
-
   return (
     <>
       <View
         className="absolute inset-0"
         style={{
           backgroundColor: 'black',
-          // @ts-ignore - mixBlendMode supported on iOS
+          // mixBlendMode is supported on both platforms under the New
+          // Architecture (RN ≥0.76) — the desaturation works over the
+          // GoogleMaps surface too.
           mixBlendMode: 'saturation',
         }}
         pointerEvents="none"
@@ -72,7 +72,10 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
         pointerEvents="none"
       />
 
-      {withBlur && <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFillObject} />}
+      {/* Blur stays iOS-only — Android keeps flat surfaces by design. */}
+      {withBlur && Platform.OS === 'ios' && (
+        <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFillObject} />
+      )}
 
       <View
         className="absolute inset-0"

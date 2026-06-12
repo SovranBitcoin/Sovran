@@ -14,6 +14,13 @@ jest.mock('bitchat-module', () => ({
   addBLEPrivateMessageListener: jest.fn(() => ({ remove: jest.fn() })),
 }));
 
+// The auto-redeem hook pulls in the popup engine, coco manager, and Nostr
+// keys context — all out of scope for this startup test (covered by
+// nutDropAutoRedeem.test.ts).
+jest.mock('@/features/nearPay/hooks/useNutDropAutoRedeem', () => ({
+  useNutDropAutoRedeem: jest.fn(),
+}));
+
 const mockAppendIncoming = jest.fn();
 const mockApplyDeliveryStatus = jest.fn();
 

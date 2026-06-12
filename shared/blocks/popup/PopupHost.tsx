@@ -47,6 +47,7 @@ import { alpha } from '@/shared/styles/tokens';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { PaymentOptionsContent } from '@/shared/lib/popup/popups/paymentOptionsSheet';
+import { NfcTapContent } from '@/shared/lib/popup/popups/nfcTapSheet';
 import { ProofSelectorContent } from '@/shared/lib/popup/popups/proofSelectorSheet';
 import { SendMemoContent } from '@/shared/lib/popup/popups/sendMemoSheet';
 import { SignerApprovalSheetContent } from '@/features/nostrSigner/components/SignerApprovalSheetContent';
@@ -375,6 +376,17 @@ const CUSTOM_SHEET_CONTENT: Record<
     canPop: boolean;
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
+  'nfc-tap': NfcTapContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
 };
 
 function SheetContent({
@@ -537,6 +549,13 @@ function SheetPopup() {
   const lastPayloadRef = useRef<typeof current>(null);
   const wasOpenRef = useRef(false);
   const [openCycle, setOpenCycle] = useState(0);
+  // Bumped (through STATE, not just the ref) when the exit-animation cache is
+  // dropped: clearing only the ref left the previous popup's content MOUNTED
+  // inside the closed sheet until some unrelated re-render — including any
+  // infinite reanimated loops it runs (e.g. nfc-tap's pulse), which then
+  // animate forever. The state bump forces the render below to re-read the
+  // now-null ref and actually unmount the content.
+  const [, setExitCacheEpoch] = useState(0);
   if (current) {
     lastPayloadRef.current = current;
   }
@@ -553,6 +572,7 @@ function SheetPopup() {
     if (!isOpen) {
       const timer = setTimeout(() => {
         lastPayloadRef.current = null;
+        setExitCacheEpoch((value) => value + 1);
       }, 400);
       return () => clearTimeout(timer);
     }
@@ -745,6 +765,16 @@ function SheetPopup() {
     }
   };
 
+  // Authoritative close, straight from gorhom: fires whenever the sheet
+  // settles at the closed position. heroui's own close-detection reaction
+  // can MISS a slow full drag-to-bottom — its prepare closure keys only on
+  // `progress`, and a short (contentHeight) sheet bottoms out while the
+  // finger is still down, so onOpenChange(false) is never delivered and the
+  // store stays open with an INVISIBLE full-screen Overlay eating every
+  // touch in the app. popupStore.close() is idempotent, so double-delivery
+  // alongside heroui's path is safe.
+  const handleNativeSheetClose = () => handleOpenChange(false);
+
   const renderCustomFooter = useCallback(
     (props: { animatedFooterPosition: any }) => {
       if (!isCustom) return null;
@@ -810,6 +840,7 @@ function SheetPopup() {
           />
           <BottomSheet.Content
             accessible={false}
+            onClose={handleNativeSheetClose}
             detached={!isCustom}
             bottomInset={isCustom ? undefined : insets.bottom}
             snapPoints={isCustom ? customSnapPoints : undefined}

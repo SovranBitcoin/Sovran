@@ -12,8 +12,7 @@ import { useFonts } from '@/shared/hooks/useFonts';
 import { initLog, useInitMount } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Dimensions, Image, LogBox, StyleSheet, View } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { Dimensions, Image, LogBox, Platform, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import AppGate from '@/shared/blocks/AppGate';
@@ -40,7 +39,8 @@ import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistor, store } from '@/redux/store/store.deprecated';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
-import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
+import { androidHeaderScrimOptions, getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
 import { WhitenoiseProvider } from '@/features/whitenoise/WhitenoiseProvider';
@@ -56,6 +56,7 @@ import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
+import { AndroidImageOverlayHost } from '@/features/feed/components/nostr/image-overlay/AndroidImageOverlayHost';
 import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineProvider';
 import {
   clearTransitionGuardOnStartup,
@@ -259,11 +260,7 @@ function ProfileMetadataSync() {
 // otherwise React Navigation tears down and remounts the header's left button
 // (re-parsing its SVG icon) on every root re-render.
 const CloseButton = React.memo(function CloseButton({ foreground }: { foreground: string }) {
-  return (
-    <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-    </Pressable>
-  );
+  return <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />;
 });
 
 // Inner component that can access theme context
@@ -317,16 +314,20 @@ function RootLayoutContent() {
         };
       }
 
-      // Default options for screens with titles (non-modal screens)
+      // Default options for screens with titles (non-modal screens).
+      // iOS gets a blurred transparent header; Android (where
+      // headerBlurEffect is a no-op) paints a near-opaque scrim instead so
+      // the title never floats unreadably over scrolling content.
       if (screen.title !== undefined) {
         return {
           ...baseHeaderOptions,
           headerShown: true,
           headerTitle: screen.title,
-          headerBlurEffect: 'regular' as const,
+          ...(Platform.OS === 'ios' ? { headerBlurEffect: 'regular' as const } : {}),
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
           headerLargeStyle: { backgroundColor: 'transparent' },
+          ...androidHeaderScrimOptions(background),
           headerBackTitle: 'Back',
         };
       }
@@ -806,6 +807,10 @@ export default function RootLayout() {
                 key={`account-${activeAccountIndex}`}
                 accountIndex={activeAccountIndex}>
                 <RootLayoutContent />
+                {/* Same-window host for the Android feed media lightbox; must
+                    sit BEFORE PopupHost so popups triggered from inside the
+                    lightbox stack above it. No-op on iOS / when empty. */}
+                <AndroidImageOverlayHost />
                 <PopupHost />
                 <ActionMenuHost />
               </AccountScopedProviders>

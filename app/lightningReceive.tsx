@@ -3,7 +3,12 @@
  */
 
 import { LightningReceiveRoute } from '@/features/receive';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function LightningReceiveStandaloneRoute() {
-  return <LightningReceiveRoute where="app.lightningReceive" />;
+  return (
+    <FormSheetChrome title="Receive Lightning">
+      <LightningReceiveRoute where="app.lightningReceive" />
+    </FormSheetChrome>
+  );
 }

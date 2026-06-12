@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
+import { LayoutChangeEvent, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
@@ -23,10 +23,23 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 
 import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
+import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';
+import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
+import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
+import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
+import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
+import {
+  confirmBearerSend,
+  nearPaySendPlan,
+  planDelivery,
+} from '@/features/nearPay/lib/startNearPaySend';
+import { useBluetoothState } from '@/features/bitchat/hooks/useBluetoothState';
+import { BluetoothNotice } from '@/features/bitchat/components/BluetoothNotice';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { AmountFlowContent } from '@/features/send/screens/AmountFlowScreen';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { resolveIdentityName } from '@/shared/lib/identity';
 import { paymentLog, useLifecycleLogger, useRenderLogger } from '@/shared/lib/logger';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
@@ -90,7 +103,6 @@ const PEER_ENTRY_ANIMATION_MS = 460;
 const PEER_REBALANCE_ANIMATION_MS = 320;
 const PEER_OVERVIEW_SIDE_INSET = spacing.lg;
 const PEER_OVERVIEW_TOP_INSET = spacing.lg;
-const PEER_OVERVIEW_BOTTOM_INSET = PEER_CANDIDATE_ACTION_AVOIDANCE;
 const PEER_OVERVIEW_MAX_SCALE = 0.84;
 const PEER_OVERVIEW_SCALE_FACTOR = 0.94;
 const SHARED_AVATAR_ANIMATION_MS = 430;
@@ -136,6 +148,10 @@ const PEER_OVERVIEW_TIMING = {
   easing: Easing.out(Easing.cubic),
 };
 const FOREGROUND_THEME_KEYS = ['foreground'] as const;
+const PEER_NODE_THEME_KEYS = ['foreground', 'surface'] as const;
+/** Open-padlock chip marking vanilla bitchat peers (bearer sends only). */
+const BEARER_BADGE_SIZE = 18;
+const BEARER_BADGE_ICON_SIZE = 11;
 const HEADER_BADGE_THEME_KEYS = ['foreground', 'shade-400', 'accent', 'accent-foreground'] as const;
 const PEER_LAYOUT_CONFIG = {
   nodeWidth: NODE_WIDTH,
@@ -182,25 +198,6 @@ function durationSinceMs(startedAtMs: number): number {
 
 function roundMetric(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-function peerDisplayName(peer: BLEPeer): string {
-  return resolveIdentityName({
-    pubkey: peer.peerID,
-    bleNickname: peer.nickname,
-  });
-}
-
-function toLayoutPeer(peer: BLEPeer): NearPayLayoutPeer {
-  return {
-    peerID: peer.peerID,
-    nickname: peer.nickname,
-    isConnected: peer.isConnected,
-    hasDirectLink: peer.hasDirectLink,
-    lastSeen: peer.lastSeen,
-    name: peerDisplayName(peer),
-    avatarUrl: null,
-  };
 }
 
 const HeaderBadge = React.memo(function HeaderBadge({
@@ -297,7 +294,10 @@ function peerTargetsEqual(a: PeerLayoutTarget, b: PeerLayoutTarget): boolean {
     a.peer.name === b.peer.name &&
     a.peer.nickname === b.peer.nickname &&
     a.peer.isConnected === b.peer.isConnected &&
-    a.peer.hasDirectLink === b.peer.hasDirectLink
+    a.peer.hasDirectLink === b.peer.hasDirectLink &&
+    a.peer.supportsP2pkEcash === b.peer.supportsP2pkEcash &&
+    a.peer.avatarUrl === b.peer.avatarUrl &&
+    a.peer.profileLoading === b.peer.profileLoading
   );
 }
 
@@ -311,6 +311,7 @@ const PeerNode = React.memo(function PeerNode({
   overviewTranslateY,
   onSelect,
   hideSharedElementSource,
+  strike,
 }: {
   target: PeerLayoutTarget;
   fieldSize: PeerLayoutSize;
@@ -321,8 +322,9 @@ const PeerNode = React.memo(function PeerNode({
   overviewTranslateY: SharedValue<number>;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   hideSharedElementSource?: boolean;
+  strike?: StrikeState | null;
 }) {
-  const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
+  const [foreground, surface] = useThemeColor(PEER_NODE_THEME_KEYS);
   const hasAnimatedInRef = useRef(false);
   const baseX = useSharedValue(target.x);
   const baseY = useSharedValue(target.y);
@@ -544,6 +546,10 @@ const PeerNode = React.memo(function PeerNode({
     () => [styles.peerAvatarName, { color: opacity(foreground, alpha.prominent) }],
     [foreground]
   );
+  const bearerBadgeStyle = useMemo(
+    () => [styles.bearerBadge, { backgroundColor: surface }],
+    [surface]
+  );
 
   const handlePress = useCallback(() => {
     if (target.phase === 'exiting') return;
@@ -565,7 +571,7 @@ const PeerNode = React.memo(function PeerNode({
         style={peerPressableStyle}>
         <View pointerEvents="none" style={styles.peerAvatarFrame}>
           <Avatar
-            state={target.peer.avatarUrl ? 'image' : 'fallback'}
+            state={peerAvatarState(target.peer)}
             picture={target.peer.avatarUrl ?? undefined}
             size={AVATAR_SIZE}
             name={target.peer.name}
@@ -573,6 +579,22 @@ const PeerNode = React.memo(function PeerNode({
             alt={`${target.peer.name} avatar`}
             fallbackVariant="beam"
           />
+          {strike ? (
+            <LightningStrike
+              status={strike.status}
+              entrance={strike.entrance}
+              seed={target.peer.peerID}
+            />
+          ) : null}
+          {!target.peer.supportsP2pkEcash ? (
+            <View style={bearerBadgeStyle}>
+              <Icon
+                name="mdi:lock-open-variant-outline"
+                size={BEARER_BADGE_ICON_SIZE}
+                color={opacity(foreground, alpha.prominent)}
+              />
+            </View>
+          ) : null}
         </View>
         <Animated.View pointerEvents="none" style={peerAvatarNameLabelStyle}>
           <Text
@@ -648,6 +670,7 @@ function arePeerNodePropsEqual(
     overviewTranslateY: SharedValue<number>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
+    strike?: StrikeState | null;
   },
   next: {
     target: PeerLayoutTarget;
@@ -659,11 +682,14 @@ function arePeerNodePropsEqual(
     overviewTranslateY: SharedValue<number>;
     onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
     hideSharedElementSource?: boolean;
+    strike?: StrikeState | null;
   }
 ): boolean {
   return (
     prev.onSelect === next.onSelect &&
     prev.hideSharedElementSource === next.hideSharedElementSource &&
+    prev.strike?.status === next.strike?.status &&
+    prev.strike?.entrance === next.strike?.entrance &&
     prev.fieldSize.width === next.fieldSize.width &&
     prev.fieldSize.height === next.fieldSize.height &&
     prev.panX === next.panX &&
@@ -689,7 +715,7 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
     <VStack align="center" gap={spacing.xs} style={styles.inlineAmountHeader}>
       <View style={[styles.amountHeaderAvatarSlot, hideAvatar ? styles.sharedElementHidden : null]}>
         <Avatar
-          state={recipient.avatarUrl ? 'image' : 'fallback'}
+          state={peerAvatarState(recipient)}
           picture={recipient.avatarUrl ?? undefined}
           size={AVATAR_SIZE}
           name={recipient.name}
@@ -718,6 +744,23 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 }) {
   useRenderLogger('NearPayPeerField', 30, paymentLog);
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
+  // The action row (Random/Focus/Zoom) is absolutely positioned from the
+  // field's bottom edge, which reaches the physical screen bottom inside the
+  // edge-to-edge formSheet — without the bottom inset the row sits under
+  // Android's 3-button/gesture nav (and the iOS home indicator). Peer
+  // placement/zoom-fit avoidance must grow by the same amount.
+  const insets = useSafeAreaInsets();
+  const actionRowBottom = NEAR_PAY_ACTION_ROW_BOTTOM + insets.bottom;
+  const actionRowStyle = useMemo(
+    () => [styles.nearPayActionRow, { bottom: actionRowBottom }],
+    [actionRowBottom]
+  );
+  const actionAvoidance =
+    NEAR_PAY_ACTION_ROW_HEIGHT + NEAR_PAY_ACTION_ROW_BOTTOM + spacing.lg + insets.bottom;
+  const peerLayoutConfig = useMemo(
+    () => ({ ...PEER_LAYOUT_CONFIG, preferredBottomInset: actionAvoidance }),
+    [actionAvoidance]
+  );
   const [fieldSize, setFieldSize] = useState<PeerLayoutSize>({ width: 0, height: 0 });
   const [registry, setRegistry] = useState<PeerLayoutRegistryEntry[]>([]);
   const panX = useSharedValue(0);
@@ -777,10 +820,24 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     };
   }, [peers]);
 
+  // Lightning effect per sender while a received Nut Drop redeems —
+  // re-renders gate component mount/unmount only; the animation itself
+  // runs on the UI thread inside LightningStrike.
+  const strikeMap = useNutDropStrike();
+
+  // Batch-fetch kind-0 profiles for every visible Sovran peer via nagg
+  // (warms the shared nostrMetadataCache; cache hits render instantly).
+  const peerNostrPubkeys = useMemo(() => peers.map(peerNostrPubkey).filter(Boolean), [peers]);
+  const profileRows = useRecentPeopleProfiles(peerNostrPubkeys);
+  const profileByPubkey = useMemo(
+    () => new Map(profileRows.map((row) => [row.pubkey, row])),
+    [profileRows]
+  );
+
   const layoutPeersResult = useMemo(() => {
     const startedAt = nowMs();
     return {
-      value: peers.map(toLayoutPeer),
+      value: peers.map((peer) => toLayoutPeer(peer, profileByPubkey.get(peerNostrPubkey(peer)))),
       peerCount: peerStats.peerCount,
       connectedCount: peerStats.connectedCount,
       directCount: peerStats.directCount,
@@ -793,6 +850,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     peerStats.peerCount,
     peerStats.reachableCount,
     peers,
+    profileByPubkey,
   ]);
   const layoutPeers = layoutPeersResult.value;
   const layoutPeersResultRef = useRef(layoutPeersResult);
@@ -824,7 +882,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 
   const targetsResult = useMemo(() => {
     const startedAt = nowMs();
-    const value = buildPeerLayoutTargets(registry, fieldSize, PEER_LAYOUT_CONFIG);
+    const value = buildPeerLayoutTargets(registry, fieldSize, peerLayoutConfig);
     let exitingCount = 0;
     for (const target of value) {
       if (target.phase === 'exiting') exitingCount += 1;
@@ -843,7 +901,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 
   const panBoundsResult = useMemo(() => {
     const startedAt = nowMs();
-    const value = getPeerLayoutPanBounds(targets, fieldSize, PEER_LAYOUT_CONFIG);
+    const value = getPeerLayoutPanBounds(targets, fieldSize, peerLayoutConfig);
     return {
       value,
       targetCount: targets.length,
@@ -977,12 +1035,12 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     const overview = getPeerLayoutOverviewTransform(
       targets,
       fieldSize,
-      PEER_LAYOUT_CONFIG,
+      peerLayoutConfig,
       pan,
       {
         top: PEER_OVERVIEW_TOP_INSET,
         right: PEER_OVERVIEW_SIDE_INSET,
-        bottom: PEER_OVERVIEW_BOTTOM_INSET,
+        bottom: actionAvoidance,
         left: PEER_OVERVIEW_SIDE_INSET,
       },
       PEER_OVERVIEW_MAX_SCALE,
@@ -1029,7 +1087,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     const pan = { x: panX.get(), y: panY.get() };
     const selectableTargets = targets.filter((target) => {
       if (target.phase === 'exiting') return false;
-      const presentation = getPeerViewportPresentation(target, fieldSize, PEER_LAYOUT_CONFIG, pan);
+      const presentation = getPeerViewportPresentation(target, fieldSize, peerLayoutConfig, pan);
       return presentation.scale > 0 && presentation.avatarOpacity > 0.05;
     });
     if (selectableTargets.length === 0) {
@@ -1212,11 +1270,12 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
               overviewTranslateY={overviewTranslateY}
               onSelect={onSelect}
               hideSharedElementSource={selectedPeerID === target.peer.peerID}
+              strike={strikeMap.get(target.peer.peerID) ?? null}
             />
           ))}
         </Animated.View>
       </GestureDetector>
-      <HStack justify="space-around" style={styles.nearPayActionRow}>
+      <HStack justify="space-around" style={actionRowStyle}>
         <CircleActionButton
           icon="mdi:shuffle-variant"
           systemIcon="shuffle"
@@ -1254,6 +1313,9 @@ export function NearPayScreen() {
   useRenderLogger('NearPayScreen', 30, paymentLog);
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+  // Every bitchat peer is on the radar: peers announcing the ecash
+  // capability TLV get P2PK-locked drops; vanilla peers are bearer-only
+  // (visually marked, gated behind an explicit confirm in handleSelectPeer).
   const { peers } = useBLEPeers();
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
@@ -1311,6 +1373,10 @@ export function NearPayScreen() {
     const recipient = nearPaySession?.recipient;
     if (!recipient) return null;
     if (selectedPeer?.peerID === recipient.peerID) return selectedPeer;
+    // Bearer recipients have no announced lock key — identity falls back to
+    // the peerID seed, same as the radar node for a vanilla peer.
+    const p2pkPubkeyHex =
+      recipient.delivery.mode === 'p2pk' ? recipient.delivery.p2pkPubkeyHex : '';
     return {
       peerID: recipient.peerID,
       nickname: recipient.nickname,
@@ -1319,6 +1385,10 @@ export function NearPayScreen() {
       hasDirectLink: recipient.hasDirectLink,
       lastSeen: recipient.lastSeen,
       avatarUrl: null,
+      supportsP2pkEcash: recipient.delivery.mode === 'p2pk',
+      p2pkPubkeyHex,
+      nostrPubkey: p2pkPubkeyHex.slice(2),
+      profileLoading: false,
     };
   }, [nearPaySession?.recipient, selectedPeer]);
 
@@ -1448,11 +1518,23 @@ export function NearPayScreen() {
 
   const handleSelectPeer = useCallback(
     async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
+      const plan = nearPaySendPlan(peer);
       paymentLog.info('near_pay.peer.select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
+        deliveryMode: plan.mode,
       });
+      if (plan.mode === 'bearer') {
+        // Consent gate BEFORE any session/transition state — declining must
+        // leave the radar exactly as it was. This also covers the Random
+        // button landing on a vanilla peer.
+        const confirmed = await confirmBearerSend(peer.name);
+        if (!confirmed) {
+          paymentLog.info('near_pay.peer.bearer_declined', { peerID: peer.peerID });
+          return;
+        }
+      }
       setSelectedPeer(peer);
       setSelectedPeerRect(avatarRect);
       stopSharedElementAnimations();
@@ -1471,6 +1553,7 @@ export function NearPayScreen() {
         nickname: peer.name,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
+        delivery: planDelivery(plan),
       });
       const startSendSpan = paymentLog
         .child({ flowId: `near-pay-start-send-${Date.now()}` })
@@ -1490,6 +1573,18 @@ export function NearPayScreen() {
       try {
         await machine.startSendEcash({
           reset: true,
+          // Bearer plans omit the lock entirely — the machine then mints an
+          // unlocked token and deliverNearPayIfActive enforces that the
+          // completed send really is lock-free before broadcasting.
+          ...(plan.mode === 'p2pk'
+            ? {
+                p2pkLockPubkey: plan.p2pkLockPubkey,
+                // The Nostr pubkey lets colada's resolveRecipientProfile
+                // refresh the header live; the snapshot below paints the
+                // first frame. Vanilla peers have no Nostr identity.
+                recipientPubkey: plan.recipientPubkey,
+              }
+            : {}),
           recipientProfile: {
             displayName: peer.name,
             avatarUrl: peer.avatarUrl ?? null,
@@ -1700,7 +1795,10 @@ export function NearPayScreen() {
     [sharedAvatarStyle]
   );
 
-  const unavailable = Platform.OS !== 'ios';
+  const bluetooth = useBluetoothState();
+  // 'unknown' stays on the scanning path — iOS reports a real state only after
+  // startBLE has spun up CoreBluetooth, and useBLEPeers starts it on mount.
+  const bluetoothBlocked = bluetooth.status !== 'ready' && bluetooth.status !== 'unknown';
   const amountActive = hasInlineAmountEntry;
   const sharedAvatarVisible = !!sharedAvatarPeer || inlinePhase === 'transitioning';
   const foregroundSoft = useMemo(() => opacity(foreground, alpha.soft), [foreground]);
@@ -1725,26 +1823,8 @@ export function NearPayScreen() {
     ),
     [emptyTextStyle, emptyTitleStyle, foregroundSoft]
   );
-  const unavailableContent = useMemo(
-    () => (
-      <VStack align="center" justify="center" gap={spacing.md} style={styles.emptyState}>
-        <Icon name="mdi:bluetooth" size={iconSize['3xl']} color={foregroundSoft} />
-        <Text size={17} weight="bold" style={emptyTitleStyle}>
-          Nut Drop is unavailable here
-        </Text>
-        <Text size={13} style={emptyTextStyle}>
-          BitChat BLE is Apple-only, so this screen stays quiet on this platform.
-        </Text>
-      </VStack>
-    ),
-    [emptyTextStyle, emptyTitleStyle, foregroundSoft]
-  );
   const renderHeaderLeft = useCallback(
-    () => (
-      <Pressable onPress={resetToPicker} hitSlop={8} style={styles.flowHeaderButton}>
-        <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
-      </Pressable>
-    ),
+    () => <ScreenHeaderAction icon="material-symbols:arrow-back-rounded" onPress={resetToPicker} />,
     [foreground, resetToPicker]
   );
   const renderEmptyHeader = useCallback(() => null, []);
@@ -1773,8 +1853,10 @@ export function NearPayScreen() {
       <Stack.Screen options={stackOptions} />
       <Screen name="NearPayScreen" scroll="none" contentPadding={0} bottomPadding={0}>
         <View onLayout={handleContainerLayout} style={styles.container}>
-          {unavailable ? (
-            unavailableContent
+          {bluetoothBlocked ? (
+            <VStack align="center" justify="center" style={styles.emptyState}>
+              <BluetoothNotice bluetooth={bluetooth} />
+            </VStack>
           ) : (
             <>
               <Animated.View
@@ -1804,7 +1886,7 @@ export function NearPayScreen() {
                 <Animated.View pointerEvents="none" style={sharedAvatarCombinedStyle}>
                   <View pointerEvents="none" style={styles.peerAvatarFrame}>
                     <Avatar
-                      state={sharedAvatarPeer.avatarUrl ? 'image' : 'fallback'}
+                      state={peerAvatarState(sharedAvatarPeer)}
                       picture={sharedAvatarPeer.avatarUrl ?? undefined}
                       size={AVATAR_SIZE}
                       name={sharedAvatarPeer.name}
@@ -1846,7 +1928,8 @@ const styles = StyleSheet.create({
   },
   nearPayActionRow: {
     alignItems: 'flex-start',
-    bottom: NEAR_PAY_ACTION_ROW_BOTTOM,
+    // `bottom` is applied dynamically: NEAR_PAY_ACTION_ROW_BOTTOM + safe-area
+    // bottom inset (see actionRowStyle in NearPayPeerField).
     height: NEAR_PAY_ACTION_ROW_HEIGHT,
     left: 0,
     paddingHorizontal: 32,
@@ -1879,6 +1962,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
+  },
+  bearerBadge: {
+    alignItems: 'center',
+    borderRadius: BEARER_BADGE_SIZE / 2,
+    bottom: -2,
+    height: BEARER_BADGE_SIZE,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -2,
+    width: BEARER_BADGE_SIZE,
   },
   peerAvatarNameLabel: {
     alignItems: 'center',

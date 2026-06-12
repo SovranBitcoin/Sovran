@@ -32,8 +32,12 @@ const PATTERN = new RegExp(
 );
 const REPLACEMENT = '// $1  // bundled / stubbed in BitChatModule';
 
-if (!fs.existsSync(ROOT)) {
-  console.log(`[patch-bitchat-imports] ${ROOT} not present, skipping.`);
+// Probe a real file, not the directory: BitChatVendor is a git submodule,
+// and a `submodules: false` checkout (CI) leaves the path as an EMPTY dir —
+// the dir check passes, walk() finds nothing, and the assertApplied() reads
+// at the bottom then crash with ENOENT on the missing vendor files.
+if (!fs.existsSync(path.join(ROOT, 'Package.swift'))) {
+  console.log(`[patch-bitchat-imports] ${ROOT} not checked out, skipping.`);
   process.exit(0);
 }
 
@@ -73,26 +77,156 @@ const MAINNET_UUID = 'F47B5E2D-4A9E-4C5A-9B3F-8E1D2C3A4B5C';
 // our newer strict code rejects every one, so we never receive any peer
 // announce from App Store bitchat devices.
 //
-// Restore v1.5.1 semantics by removing just the `return` after the warn line.
-// Idempotent: if the return has already been removed, the anchor won't match.
-const MISMATCH_RETURN_ANCHOR =
-  /(            SecureLogger\.warning\("⚠️ Announce sender mismatch: [^\n]+\n)            return\n/;
-const MISMATCH_RETURN_REPLACEMENT =
-  '$1            // [sovran] return removed — App Store bitchat v1.5.1 treats this as warn-only.\n            // Without this relax, every inbound announce from v1.5.1 peers is rejected.\n';
+// As of upstream 3caf2d7 the check lives in BLEAnnouncePreflightPolicy.evaluate
+// (bitchat/Services/BLE/BLEAnnounceHandlingPolicy.swift). Restore v1.5.1
+// semantics by removing the guard that rejects on mismatch. `derivedPeerID`
+// stays live — the accept path below still consumes it. Idempotent: once the
+// guard is gone, the anchor won't match.
+// TODO(sovran): re-test against a current App Store bitchat build; if its
+// announces now pass the derived-peerID check, drop this patch entirely.
+const MISMATCH_GUARD_ANCHOR =
+  /        guard derivedPeerID == peerID else \{\n            return \.reject\(\.senderMismatch\(derivedPeerID: derivedPeerID\)\)\n        \}\n/;
+const MISMATCH_GUARD_REPLACEMENT =
+  '        // [sovran] sender-mismatch reject relaxed to v1.5.1 warn-only semantics.\n' +
+  '        // App Store bitchat v1.5.1 sends announces whose packet senderID differs\n' +
+  '        // from PeerID(publicKey:); without this relax every one is rejected and\n' +
+  '        // Sovran never discovers App Store peers.\n';
+
+// --- De-privatize BLEService.linkState(for:) ---
+//
+// Upstream 3caf2d7 made `linkState(for:)` private (the new BLEAnnounceHandler
+// reaches it through an environment closure). Our BitChatBLEBridge.getPeers()
+// uses it for the real-time `hasDirectLink` flag (src/types.ts contract), so
+// restore internal visibility. Idempotent: once de-privatized, no match.
+const LINKSTATE_ANCHOR = /    private func linkState\(for peerID: PeerID\)/;
+const LINKSTATE_REPLACEMENT =
+  '    // [sovran] de-privatized — BitChatBLEBridge.getPeers() reads real-time link\n' +
+  '    // state for the hasDirectLink peer flag.\n' +
+  '    func linkState(for peerID: PeerID)';
+
+// --- Append the ecash capability TLV (0xF0) to outgoing announces ---
+//
+// Clients that can receive P2PK-locked cashu advertise it with an announce
+// TLV (magic "NUTXX" + capability flags + the profile's Cashu P2PK pubkey)
+// so the Nut Drop UI can lock tokens to capable peers. Open extension — any
+// bitchat client may implement it (spec draft in
+// modules/bitchat-module/docs/nut-xx-ecash-capability-announcement.md).
+// Vanilla bitchat decoders skip unknown announce TLVs by design (upstream
+// Packets.swift "tolerant decoder" + unit test), and the TLV is appended
+// BEFORE signPacket so the Ed25519 announce signature covers it — vanilla
+// verification still passes. TLV bytes come from EcashAnnounceState
+// (EcashAnnounceExtension.swift, Sovran-owned, same compiled module).
+// Idempotent: once `guard var payload` is in place, the anchor won't match.
+const ECASH_ANNOUNCE_INJECT_ANCHOR =
+  /        guard let payload = announcement\.encode\(\) else \{\n            SecureLogger\.error\("❌ Failed to encode announce packet", category: \.session\)\n            return\n        \}\n/;
+const ECASH_ANNOUNCE_INJECT_REPLACEMENT =
+  '        guard var payload = announcement.encode() else {\n' +
+  '            SecureLogger.error("❌ Failed to encode announce packet", category: .session)\n' +
+  '            return\n' +
+  '        }\n' +
+  '        // [sovran] append ecash capability TLV (0xF0). Vanilla decoders skip\n' +
+  '        // unknown announce TLVs; appended before signPacket so the announce\n' +
+  '        // signature covers it.\n' +
+  '        if let ecashTLV = EcashAnnounceState.shared.localTLV {\n' +
+  '            payload.append(ecashTLV)\n' +
+  '        }\n';
+
+// --- Record the ecash capability TLV from verified incoming announces ---
+//
+// Parses the raw announce payload out-of-band (same pattern upstream Android
+// uses for its gossip TLV) and stores per-peer flags + P2PK pubkey for
+// BitChatBLEBridge.getPeers(). Verified announces only — the recording sits
+// after the unverified-announce early return inside the registry barrier, at
+// the same spot upstream persists identity. A verified announce WITHOUT the
+// TLV clears the entry (announce TLVs are authoritative per-announce).
+const ECASH_ANNOUNCE_PARSE_ANCHOR =
+  /        \/\/ Persist cryptographic identity and signing key for robust offline verification\n        env\.persistIdentity\(announcement\)\n/;
+const ECASH_ANNOUNCE_PARSE_REPLACEMENT =
+  '        // [sovran] record/clear the ecash capability TLV (0xF0). Verified\n' +
+  '        // announces only; absence of the TLV clears the entry.\n' +
+  '        if verifiedAnnounce {\n' +
+  '            EcashAnnounceState.shared.record(peerID: peerID.id, announcePayload: packet.payload)\n' +
+  '        }\n' +
+  '\n' +
+  '        // Persist cryptographic identity and signing key for robust offline verification\n' +
+  '        env.persistIdentity(announcement)\n';
 
 let patched = 0;
+const applied = {
+  mismatchGuard: false,
+  linkState: false,
+  ecashAnnounceInject: false,
+  ecashAnnounceParse: false,
+};
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
   let after = before
     .replace(PATTERN, REPLACEMENT)
     .replace(SCOPED_PRIVATE_IMPORT, SCOPED_PRIVATE_REPLACEMENT)
     .split(TESTNET_UUID).join(MAINNET_UUID);
+  if (file.endsWith('BLEAnnounceHandlingPolicy.swift')) {
+    const next = after.replace(MISMATCH_GUARD_ANCHOR, MISMATCH_GUARD_REPLACEMENT);
+    if (next !== after) applied.mismatchGuard = true;
+    after = next;
+  }
   if (file.endsWith('BLEService.swift')) {
-    after = after.replace(MISMATCH_RETURN_ANCHOR, MISMATCH_RETURN_REPLACEMENT);
+    let next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
+    if (next !== after) applied.linkState = true;
+    after = next;
+    next = after.replace(ECASH_ANNOUNCE_INJECT_ANCHOR, ECASH_ANNOUNCE_INJECT_REPLACEMENT);
+    if (next !== after) applied.ecashAnnounceInject = true;
+    after = next;
+  }
+  if (file.endsWith('BLEAnnounceHandler.swift')) {
+    // The anchor text survives inside the replacement (the persist block is
+    // re-emitted), so gate on the marker to stay idempotent.
+    if (!after.includes('[sovran] record/clear the ecash capability TLV')) {
+      const next = after.replace(ECASH_ANNOUNCE_PARSE_ANCHOR, ECASH_ANNOUNCE_PARSE_REPLACEMENT);
+      if (next !== after) applied.ecashAnnounceParse = true;
+      after = next;
+    }
   }
   if (after !== before) {
     fs.writeFileSync(file, after);
     patched++;
   }
 }
+
+// Anchored patches must either apply now or already be applied from a previous
+// run. Anything else means upstream changed shape — fail loudly so the vendor
+// bump doesn't silently ship without the patch.
+function assertApplied(name, appliedNow, file, alreadyPattern) {
+  if (appliedNow) return;
+  const content = fs.readFileSync(file, 'utf8');
+  if (alreadyPattern.test(content)) return;
+  console.error(
+    `[patch-bitchat-imports] FATAL: ${name} anchor matched nothing in ${path.relative(ROOT, file)} ` +
+      `and the patched form is absent. Upstream changed shape — fix the anchor.`
+  );
+  process.exit(1);
+}
+assertApplied(
+  'MISMATCH_GUARD',
+  applied.mismatchGuard,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandlingPolicy.swift'),
+  /\[sovran\] sender-mismatch reject relaxed/
+);
+assertApplied(
+  'LINKSTATE',
+  applied.linkState,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
+  /\[sovran\] de-privatized/
+);
+assertApplied(
+  'ECASH_ANNOUNCE_INJECT',
+  applied.ecashAnnounceInject,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
+  /\[sovran\] append ecash capability TLV/
+);
+assertApplied(
+  'ECASH_ANNOUNCE_PARSE',
+  applied.ecashAnnounceParse,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandler.swift'),
+  /\[sovran\] record\/clear the ecash capability TLV/
+);
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);

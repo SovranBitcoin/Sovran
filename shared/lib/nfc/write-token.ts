@@ -14,7 +14,6 @@
 import { NfcError, isUserCancelError } from './errors';
 import { SELECT_AID, SELECT_NDEF } from './constants';
 import { sendApdu, getStatusMessage } from './apdu';
-import { isNfcSupported, isNfcEnabled } from './status';
 import { writeNdefTextRecord } from './write';
 import { withSession } from './session';
 import { nfcLog } from '../logger';
@@ -22,13 +21,8 @@ import { nfcLog } from '../logger';
 export async function writeTokenToNFC(token: string): Promise<void> {
   nfcLog.info('nfc.write.start');
 
-  if (!(await isNfcSupported())) {
-    throw new NfcError('NFC is not supported on this device', 'NOT_SUPPORTED');
-  }
-  if (!(await isNfcEnabled())) {
-    throw new NfcError('NFC is disabled', 'NOT_ENABLED');
-  }
-
+  // Support/enabled preflight (typed NOT_SUPPORTED / NOT_ENABLED throws) is
+  // owned by acquireSession inside withSession.
   try {
     await withSession(async () => {
       let r = await sendApdu(SELECT_AID, 'SELECT AID');

@@ -37,6 +37,7 @@ import {
 } from '@/features/mint/lib/rebalanceRunState';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useLifecycleLogger } from '@/shared/lib/logger';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
@@ -442,9 +443,14 @@ export function MintRebalancePlanScreen() {
                 params: { groupId: swapGroupId },
               });
             }}>
-            <View
-              className="overflow-hidden rounded-[20px] border"
-              style={{ borderColor: surfaceTertiary, borderCurve: 'continuous' as any }}>
+            <SquircleView
+              style={{
+                overflow: 'hidden',
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: surfaceTertiary,
+                borderCurve: 'continuous',
+              }}>
               <BlurCardFrame accentColor={fgMuted}>
                 <View className="z-[1] items-center p-3">
                   <Text size={14} bold style={{ color: foreground }}>
@@ -452,7 +458,7 @@ export function MintRebalancePlanScreen() {
                   </Text>
                 </View>
               </BlurCardFrame>
-            </View>
+            </SquircleView>
           </Pressable>
         </View>
       )}

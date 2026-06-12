@@ -28,3 +28,24 @@ export const INVARIANT_WHITE = '#FFFFFF';
 /** Fixed black for theme-invariant QR foregrounds. Scanners expect dark modules
  *  on a light background, so this intentionally does not follow app theme. */
 export const INVARIANT_BLACK = '#000000';
+
+/** Blue-white corona for the NearPay lightning effect — BLUETOOTH_ACCENT
+ *  blended ~60% toward white. Theme-invariant: it reads as light emission
+ *  (additive blend over the radar), not as a surface color. */
+export const LIGHTNING_INNER_GLOW = '#9CCBFF';
+
+/** Pale rim-light hugging the avatar circle during a lightning strike.
+ *  Slightly bluer than INVARIANT_WHITE so the white bolt cores stay the
+ *  brightest element in the effect. */
+export const LIGHTNING_RIM = '#BFE0FF';
+
+/** Storm-gold lightning palette — warm analog of the electric-blue set
+ *  (same derivation: glow = outer blended ~60% toward white, rim ~75%).
+ *  Selected via LIGHTNING_PALETTE in LightningStrike.tsx. */
+export const LIGHTNING_GOLD = '#FFB300';
+
+/** Warm pale-gold corona — LIGHTNING_GOLD analog of LIGHTNING_INNER_GLOW. */
+export const LIGHTNING_GOLD_GLOW = '#FFE099';
+
+/** Pale gold rim-light — LIGHTNING_GOLD analog of LIGHTNING_RIM. */
+export const LIGHTNING_GOLD_RIM = '#FFECBF';

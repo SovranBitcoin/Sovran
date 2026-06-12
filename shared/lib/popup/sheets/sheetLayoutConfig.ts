@@ -21,4 +21,6 @@ export const SHEET_LAYOUT_CONFIG: Record<CustomSheetId, SheetLayoutConfig> = {
   // Only ever pushed inside the signer-connect sheet, so the root's layout
   // governs at runtime; the entry exists because the registry is total.
   'signer-profile-picker': { mode: 'contentHeight', scrollable: true },
+  // Tap-to-pay auto-fits: pulsing glyph + two text lines + Close footer.
+  'nfc-tap': { mode: 'contentHeight' },
 };

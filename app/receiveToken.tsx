@@ -7,7 +7,12 @@
  */
 
 import { ReceiveTokenRoute } from '@/features/receive';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function ModalScreen() {
-  return <ReceiveTokenRoute where="app.receiveToken" />;
+  return (
+    <FormSheetChrome title="Receive Ecash">
+      <ReceiveTokenRoute where="app.receiveToken" />
+    </FormSheetChrome>
+  );
 }

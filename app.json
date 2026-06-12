@@ -55,7 +55,8 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.NFC"
+        "android.permission.NFC",
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "package": "com.sovranbitcoin"
     },
@@ -92,8 +93,15 @@
           }
         }
       ],
-      ["expo-build-properties", { "ios": { "deploymentTarget": "16.4" } }],
+      [
+        "expo-build-properties",
+        {
+          "ios": { "deploymentTarget": "16.4" },
+          "android": { "minSdkVersion": 26 }
+        }
+      ],
       "./plugins/withLowerPodDeploymentTarget",
+      "./plugins/withNeutralAndroidTextColors",
       [
         "expo-font",
         {

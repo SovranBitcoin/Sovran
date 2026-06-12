@@ -7,6 +7,7 @@ import { Link } from 'expo-router';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
@@ -280,9 +281,14 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     <Log name="BitcoinNearYou">
       <Link href="/(map-flow)" asChild>
         <Pressable activeOpacity={0.85}>
-          <RNView
-            className="overflow-hidden rounded-[20px] border"
-            style={{ borderCurve: 'continuous', borderColor: opacity(muted, 0.3) }}>
+          <SquircleView
+            style={{
+              overflow: 'hidden',
+              borderRadius: 20,
+              borderWidth: 1,
+              borderCurve: 'continuous',
+              borderColor: opacity(muted, 0.3),
+            }}>
             <BlurCardFrame accentColor={muted}>
               <RNView className="relative z-[1]">
                 <MapPreview
@@ -313,7 +319,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
                 </RNView>
               </RNView>
             </BlurCardFrame>
-          </RNView>
+          </SquircleView>
         </Pressable>
       </Link>
     </Log>

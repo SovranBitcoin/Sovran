@@ -1,5 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { getBLEPeers, addBLEPeerListener, startBLE, type BLEPeer } from 'bitchat-module';
+import {
+  getBLEPeers,
+  addBLEPeerListener,
+  addBLEStateListener,
+  startBLE,
+  type BLEPeer,
+} from 'bitchat-module';
 import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitchatBLEIdentityMaterial';
@@ -62,19 +68,30 @@ export function useBLEPeers(): UseBLEPeersResult {
     if (!nickname || !profileScope || !identityMaterial) return;
 
     let cancelled = false;
-    startBLE(nickname, profileScope, identityMaterial)
-      .then(() => {
-        if (cancelled) return;
-        refresh();
-      })
-      .catch((err) => {
-        bitchatLog.error('bitchat.peers.ble_start_failed', {
-          error: err instanceof Error ? err.message : String(err),
+    const attempt = () => {
+      startBLE(nickname, profileScope, identityMaterial)
+        .then(() => {
+          if (cancelled) return;
+          refresh();
+        })
+        .catch((err) => {
+          bitchatLog.error('bitchat.peers.ble_start_failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
-      });
+    };
+    attempt();
+    // startBLE rejects while Bluetooth is unauthorized or powered off
+    // (Android). Retry when the adapter reports ready — startBLE is
+    // idempotent natively (same scope + identity → no-op), so re-attempts
+    // after a permission grant or radio toggle are safe on both platforms.
+    const stateSub = addBLEStateListener((event) => {
+      if (event.state === 'poweredOn') attempt();
+    });
 
     return () => {
       cancelled = true;
+      stateSub.remove();
     };
   }, [identityMaterial, nickname, profileScope, refresh]);
 

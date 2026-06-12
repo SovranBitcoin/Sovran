@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -19,7 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
-import { Stack, Link } from 'expo-router';
+import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -40,6 +40,10 @@ import { openExternalUrl } from '@/shared/lib/url';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
+import { Button } from '@/shared/ui/primitives/Button';
+import { LightningAddress } from '@sovranbitcoin/schemas';
+import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
@@ -726,6 +730,37 @@ export function UserProfileScreen() {
   // profile body.
   const displayName = resolveIdentityName({ pubkey, nostrProfile: cachedProfile });
 
+  // Send Money enters through colada's normal Send entrypoint so no-balance
+  // and multi-mint selection behavior stays identical to the wallet Send
+  // button (same pattern as UserMessagesScreen). Gated on a valid lightning
+  // address in the profile metadata.
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+  const rawLud16 = cachedProfile?.lud16;
+  const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
+  const handleSendMoney = useCallback(() => {
+    if (!lud16) {
+      // Button always renders (no pop-in after the profile metadata
+      // resolves) — a missing/invalid Lightning address answers on press.
+      paramPopup('action-unavailable', {
+        title: "Can't send money",
+        message: `${displayName} hasn't set up a Lightning address.`,
+      });
+      return;
+    }
+    nostrLog.debug('user.profile.send_money', { lud16 });
+    void machine.startSendEcash({
+      reset: true,
+      meltTarget: lud16,
+      recipientPubkey: pubkey,
+      recipientProfile: {
+        displayName,
+        avatarUrl: cachedProfile?.picture ?? null,
+        nip05: cachedProfile?.nip05 ?? null,
+      },
+    });
+  }, [lud16, machine, pubkey, displayName, cachedProfile?.picture, cachedProfile?.nip05]);
+
   const followerCount = profileData?.followers;
   const reputationScore = typeof profileData?.score === 'number' ? profileData.score : undefined;
   const joinedDate =
@@ -966,6 +1001,13 @@ export function UserProfileScreen() {
       <Stack.Screen
         options={{
           title: isMetadataLoading ? 'Profile' : displayName,
+          // The profile renders its own full-bleed banner at the top — the
+          // default Android header scrim painted a theme-background band
+          // over it. A null headerBackground is the sanctioned scrim opt-out
+          // (renders nothing in both the native-header and sheet-header
+          // paths); only NON-null per-screen backgrounds are forbidden on
+          // sheet flows.
+          ...(Platform.OS === 'android' ? { headerBackground: () => null } : {}),
           headerRight: () => (
             <HStack gap={4}>
               {profileMintUrl && (
@@ -975,23 +1017,23 @@ export function UserProfileScreen() {
                   testID="profile-mint-info"
                 />
               )}
-              <Link
-                href={
-                  buildProfileHref(
-                    'share',
-                    {
-                      type: 'npub',
-                      data: npub,
-                      ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
-                    },
-                    profileFlowGroup
-                  ) as never
+              <ScreenHeaderAction
+                icon="mdi:qrcode"
+                testID="profile-share-qr"
+                onPress={() =>
+                  router.push(
+                    buildProfileHref(
+                      'share',
+                      {
+                        type: 'npub',
+                        data: npub,
+                        ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
+                      },
+                      profileFlowGroup
+                    ) as never
+                  )
                 }
-                asChild>
-                <Pressable style={{ padding: 8 }}>
-                  <Icon name="mdi:qrcode" size={24} color={foreground} />
-                </Pressable>
-              </Link>
+              />
             </HStack>
           ),
         }}
@@ -1085,9 +1127,26 @@ export function UserProfileScreen() {
         />
       ) : null}
 
-      <BottomButtons>
-        <SendMessageMenu pubkey={pubkey} displayName={displayName} />
-      </BottomButtons>
+      {/* Both actions render unconditionally (for OTHER people's profiles)
+          so the row never snaps in when the profile metadata resolves; a
+          missing Lightning address surfaces as a popup on press instead. */}
+      {!isOwnProfile ? (
+        <BottomButtons>
+          <HStack>
+            <View style={{ flex: 1 }}>
+              <Button
+                text="Send Money"
+                variant="primary"
+                onPress={handleSendMoney}
+                testID="profile-send-money"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <SendMessageMenu pubkey={pubkey} displayName={displayName} variant="secondary" />
+            </View>
+          </HStack>
+        </BottomButtons>
+      ) : null}
     </Log>
   );
 }

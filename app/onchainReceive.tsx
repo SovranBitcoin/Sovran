@@ -3,7 +3,12 @@
  */
 
 import { OnchainReceiveRoute } from '@/features/receive';
+import { FormSheetChrome } from '@/shared/ui/composed/FormSheetChrome';
 
 export default function OnchainReceiveStandaloneRoute() {
-  return <OnchainReceiveRoute where="app.onchainReceive" />;
+  return (
+    <FormSheetChrome title="Receive Onchain">
+      <OnchainReceiveRoute where="app.onchainReceive" />
+    </FormSheetChrome>
+  );
 }
