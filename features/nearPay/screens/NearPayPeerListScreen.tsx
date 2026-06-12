@@ -186,6 +186,14 @@ export function NearPayPeerListScreen() {
         lastSeen: peer.lastSeen,
         delivery,
       });
+      // Failure paths must only unwind THIS selection — a newer session
+      // started during the solicit window must survive a stale failure.
+      const sessionId = useNearPaySessionStore.getState().active?.id ?? null;
+      const clearOwnSession = () => {
+        if (useNearPaySessionStore.getState().active?.id === sessionId) {
+          useNearPaySessionStore.getState().clear();
+        }
+      };
       router.back();
       const startPromise =
         delivery.mode === 'mesh'
@@ -198,14 +206,14 @@ export function NearPayPeerListScreen() {
                 } else {
                   staticPopup('mesh-solicit-failed');
                 }
-                useNearPaySessionStore.getState().clear();
+                clearOwnSession();
               })
           : machine.startSendEcash({
               reset: true,
               recipientProfile: { displayName, avatarUrl: null, nip05: null },
             });
       void startPromise.catch((err) => {
-        useNearPaySessionStore.getState().clear();
+        clearOwnSession();
         paymentLog.error('near_pay.peer.list_start_send_failed', {
           error: err instanceof Error ? err.message : String(err),
         });

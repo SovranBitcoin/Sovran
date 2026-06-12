@@ -331,9 +331,13 @@ export async function nutSolicit(
         resolve(value);
       };
       const timer = setTimeout(() => settle(null), SOLICIT_TIMEOUT_MS);
-      pendingSolicits.set(key, { peerID, resolve: settle });
+      const pending = { peerID, resolve: settle };
+      pendingSolicits.set(key, pending);
       ensureSolicitSubscription();
       native.nutSendPayload(peerID, payloadBase64).catch((err: unknown) => {
+        // Retries reuse the solicitId — a LATE rejection from a previous
+        // attempt must not tear down the current attempt's pending entry.
+        if (pendingSolicits.get(key) !== pending) return;
         clearTimeout(timer);
         pendingSolicits.delete(key);
         pruneSolicitSubscription();

@@ -1788,6 +1788,10 @@ export function NearPayScreen() {
         lastSeen: peer.lastSeen,
         delivery,
       });
+      // Failure paths must only unwind THIS selection — the radar stays
+      // tappable during the (up to ~20s) solicit, so a slow attempt's
+      // failure must not clear a newer session started meanwhile.
+      const sessionId = useNearPaySessionStore.getState().active?.id ?? null;
       const startSendSpan = paymentLog
         .child({ flowId: `near-pay-start-send-${Date.now()}` })
         .startSpan(
@@ -1862,7 +1866,9 @@ export function NearPayScreen() {
         amountPanelTranslateY.set(0);
         amountContentOpacity.set(0);
         amountContentTranslateY.set(AMOUNT_CONTENT_ENTER_OFFSET);
-        useNearPaySessionStore.getState().clear();
+        if (useNearPaySessionStore.getState().active?.id === sessionId) {
+          useNearPaySessionStore.getState().clear();
+        }
         paymentLog.error('near_pay.peer.start_send_failed', {
           error: err instanceof Error ? err.message : String(err),
         });

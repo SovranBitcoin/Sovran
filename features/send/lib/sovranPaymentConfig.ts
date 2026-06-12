@@ -1030,23 +1030,30 @@ export function createSovranHandlers({
       if (meshPeerId && !historyEntry) {
         // Mesh (Nut Drop) delivery: consent — bearer or broadcast — was
         // secured at peer selection, before the solicit. No confirm screen;
-        // execute the in-band delivery immediately.
+        // execute the in-band delivery. The confirm MUST be a macrotask:
+        // this handler runs while the machine still holds its send lock
+        // (released only after the handler's await chain settles), so a
+        // synchronous CONFIRM_PAYMENT_REQUEST would be dropped by the lock
+        // guard and the flow would park here forever.
         paymentLog.info('payment.step.mesh_payment_request.auto_confirm', {
           mintUrl,
           amount,
           meshPeerId,
         });
-        void machine.confirmPaymentRequest();
+        // Track BEFORE delivering so the receiver's immediate `received`
+        // status isn't dropped by an unknown payment id.
+        const parsedMeshRequest = parseMeshPaymentRequest(paymentRequest);
+        if (parsedMeshRequest.ok) {
+          trackMeshDelivery(parsedMeshRequest.request.paymentId, meshPeerId);
+        }
+        setTimeout(() => {
+          void machine.confirmPaymentRequest();
+        }, 0);
         return;
       }
       if (meshPeerId && historyEntry) {
-        // Delivery succeeded — start tracking the receiver's status stream
-        // (received → redeemed) and complete on the same surface as the
-        // legacy radar flow: the send-token screen with the executed entry.
-        const parsedMesh = parseMeshPaymentRequest(paymentRequest);
-        if (parsedMesh.ok) {
-          trackMeshDelivery(parsedMesh.request.paymentId, meshPeerId);
-        }
+        // Delivery succeeded — complete on the same surface as the legacy
+        // radar flow: the send-token screen with the executed entry.
         useNearPaySessionStore.getState().complete();
         router.navigate({
           pathname: '/(send-flow)/sendToken',
@@ -1239,7 +1246,13 @@ export function createSovranHandlers({
       };
       const params = { amountEntry: JSON.stringify(entry) };
       const nearPaySessionStore = useNearPaySessionStore.getState();
-      if (constraints.destination === 'sendEcash' && nearPaySessionStore.active) {
+      // Radar-launched sends stay inline on the radar: the vanilla ladder
+      // arrives as destination 'sendEcash', mesh sends as 'paymentRequest'
+      // (the solicited creq rides the payment-request machinery).
+      if (
+        nearPaySessionStore.active &&
+        (constraints.destination === 'sendEcash' || constraints.destination === 'paymentRequest')
+      ) {
         nearPaySessionStore.setAmountEntry(params.amountEntry);
         paymentLog.info('navigate.enterAmount.near_pay_inline', {
           duration_ms: performance.now() - t0,
