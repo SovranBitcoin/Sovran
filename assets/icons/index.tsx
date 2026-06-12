@@ -193,6 +193,8 @@ export const icons: string[] = [
   'mdi:instagram',
   'mdi:close-circle',
   'mdi:close',
+  'mdi:lock-open-variant-outline',
+  'mdi:lan-disconnect',
   'mdi:coffee',
   'mdi:silverware-fork-knife',
   'mdi:cart',

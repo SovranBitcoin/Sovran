@@ -15,8 +15,6 @@ function peer(peerID: string, overrides: Partial<BLEPeer> = {}): BLEPeer {
     lastSeen: 1,
     supportsNutRequests: false,
     autoRedeem: false,
-    supportsP2pkEcash: false,
-    ecashCapabilities: 0,
     ...overrides,
   };
 }

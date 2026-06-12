@@ -1,13 +1,6 @@
 import type { BLEPeer } from 'bitchat-module';
 
-import {
-  peerAvatarState,
-  peerDisplayName,
-  peerNostrPubkey,
-  toLayoutPeer,
-} from '@/features/nearPay/lib/peerProfile';
-
-const NOSTR_PUBKEY = 'ab'.repeat(32);
+import { peerAvatarState, peerDisplayName, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
 
 function blePeer(overrides: Partial<BLEPeer> = {}): BLEPeer {
   return {
@@ -18,58 +11,39 @@ function blePeer(overrides: Partial<BLEPeer> = {}): BLEPeer {
     lastSeen: 1,
     supportsNutRequests: true,
     autoRedeem: true,
-    supportsP2pkEcash: true,
-    ecashCapabilities: 1,
-    p2pkPubkeyHex: `02${NOSTR_PUBKEY}`,
     ...overrides,
   };
 }
 
-function profileRow(
-  metadata?: { displayName?: string; name?: string; picture?: string },
-  isLoading = false
-) {
-  return {
-    pubkey: NOSTR_PUBKEY,
-    metadata: metadata ? { ...metadata, fetchedAt: 1 } : undefined,
-    isLoading,
-  };
-}
-
-describe('peerNostrPubkey', () => {
-  it('strips the 02 parity prefix from the announced lock key', () => {
-    expect(peerNostrPubkey(blePeer())).toBe(NOSTR_PUBKEY);
-    expect(peerNostrPubkey(blePeer({ p2pkPubkeyHex: undefined }))).toBe('');
-  });
-});
-
 describe('peerDisplayName', () => {
-  it('prefers the Nostr profile name over the BLE nickname', () => {
-    expect(peerDisplayName(blePeer(), profileRow({ displayName: 'Alice' }))).toBe('Alice');
-    expect(peerDisplayName(blePeer(), profileRow({ name: 'alice' }))).toBe('alice');
+  it('prefers a known Nostr profile name over the BLE nickname', () => {
+    expect(
+      peerDisplayName(blePeer(), {
+        pubkey: 'ab'.repeat(32),
+        metadata: { displayName: 'Alice', fetchedAt: 1 },
+        isLoading: false,
+      })
+    ).toBe('Alice');
   });
 
-  it('falls back to the BLE nickname while no profile is known', () => {
-    expect(peerDisplayName(blePeer(), profileRow(undefined, true))).toBe('mesh-nick');
+  it('falls back to the BLE nickname without a profile (v2 beacon carries no key)', () => {
     expect(peerDisplayName(blePeer())).toBe('mesh-nick');
   });
 });
 
 describe('toLayoutPeer', () => {
-  it('carries profile picture, pubkey, and loading state into the layout peer', () => {
-    const loaded = toLayoutPeer(
-      blePeer(),
-      profileRow({ displayName: 'Alice', picture: 'https://x/p.png' })
-    );
-    expect(loaded).toMatchObject({
-      name: 'Alice',
-      avatarUrl: 'https://x/p.png',
-      nostrPubkey: NOSTR_PUBKEY,
+  it('maps capability-beacon flags onto the layout peer', () => {
+    expect(toLayoutPeer(blePeer())).toMatchObject({
+      name: 'mesh-nick',
+      avatarUrl: null,
+      supportsNutRequests: true,
+      autoRedeem: true,
       profileLoading: false,
     });
-
-    const loading = toLayoutPeer(blePeer(), profileRow(undefined, true));
-    expect(loading).toMatchObject({ avatarUrl: null, profileLoading: true, name: 'mesh-nick' });
+    expect(toLayoutPeer(blePeer({ supportsNutRequests: false, autoRedeem: false }))).toMatchObject({
+      supportsNutRequests: false,
+      autoRedeem: false,
+    });
   });
 });
 

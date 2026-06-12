@@ -95,6 +95,20 @@ const STATIC_POPUPS = {
     type: 'info',
   },
 
+  // nut drop (mesh sends)
+  'mesh-solicit-failed': {
+    message: "Couldn't confirm receiver",
+    text: "Their device didn't answer the payment request. Move closer and try again.",
+    icon: 'icon:mdi:lan-disconnect',
+    type: 'error',
+  },
+  'mesh-no-mint-overlap': {
+    message: 'No shared mint',
+    text: "You don't hold balance at any mint they accept.",
+    icon: BANK_ICON,
+    type: 'error',
+  },
+
   // send
   'send-payment-failed': {
     message: 'Failed to send payment',

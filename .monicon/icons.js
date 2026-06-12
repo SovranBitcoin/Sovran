@@ -745,6 +745,16 @@ module.exports = {
     "width": 16,
     "height": 16
   },
+  "mdi:lock-open-variant-outline": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M10 13a2 2 0 0 1 2 2c0 1.11-.89 2-2 2s-2-.89-2-2s.9-2 2-2m8-12c-2.76 0-5 2.24-5 5v2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2h-1V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2h2V6c0-2.76-2.24-5-5-5m-2 9v10H4V10z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:lan-disconnect": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M4 1c-1.11 0-2 .89-2 2v4c0 1.11.89 2 2 2H1v2h12V9h-3c1.11 0 2-.89 2-2V3c0-1.11-.89-2-2-2zm0 2h6v4H4zm10 10c-1.11 0-2 .89-2 2v4c0 1.11.89 2 2 2h-3v2h12v-2h-3c1.11 0 2-.89 2-2v-4c0-1.11-.89-2-2-2zm-10.12.46l-1.42 1.42L4.59 17l-2.13 2.12l1.42 1.42L6 18.41l2.12 2.13l1.42-1.42L7.41 17l2.13-2.12l-1.42-1.42L6 15.59zM14 15h6v4h-6z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
   "mdi:coffee": {
     "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M2 21h18v-2H2M20 8h-2V5h2m0-2H4v10a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-3h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2\"/></svg>",
     "width": 16,

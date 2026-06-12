@@ -20,6 +20,14 @@ let mockNearPayActive: unknown = null;
 
 jest.mock('@sovranbitcoin/colada', () => ({
   withTimeout: jest.fn((promise: Promise<unknown>) => promise),
+  parseMeshPaymentRequest: jest.fn(() => ({ ok: false, reason: 'invalid' })),
+}));
+
+// The mesh runtime drags the persisted redeem-queue store (and its async
+// rehydrate) into this suite's module graph — stub the seam the handlers use.
+jest.mock('@/features/nearPay/lib/meshNutDrop', () => ({
+  getMeshTransportAdapter: jest.fn(() => null),
+  trackMeshDelivery: jest.fn(),
 }));
 
 jest.mock('expo-router', () => ({
@@ -242,8 +250,7 @@ describe('createSovranHandlers profile routing', () => {
     expect(submitSendMemo).not.toHaveBeenCalled();
   });
 
-  it('delivers an active Near Pay token over BitChat before showing the send token screen', async () => {
-    const lockPubkey = `02${'ab'.repeat(32)}`;
+  it('never broadcasts for mesh sessions — in-band delivery owns them', async () => {
     mockNearPayActive = {
       id: 'near-pay-1',
       startedAt: 1,
@@ -252,14 +259,10 @@ describe('createSovranHandlers profile routing', () => {
         nickname: 'Nearby Alice',
         hasDirectLink: true,
         lastSeen: 2,
-        delivery: { mode: 'p2pk', p2pkPubkeyHex: lockPubkey },
+        delivery: { mode: 'mesh', locked: true },
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-near-pay-token');
-    (sendBLEPublicMessage as jest.Mock).mockResolvedValue({
-      startupMs: 1,
-      sendMs: 3,
-    });
     // @ts-expect-error sendComplete only reads no machine methods.
     const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
     const handlers = createSovranHandlers({
@@ -277,66 +280,20 @@ describe('createSovranHandlers profile routing', () => {
       historyEntry,
       createdOffline: false,
       mintWasOffline: false,
-      p2pkLockPubkey: lockPubkey,
     });
 
-    expect(sendBLEPublicMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        content: 'cashuA-near-pay-token',
-        nickname: 'Self Sender',
-        profileScope: 'profile-scope',
-      })
-    );
-    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
-    expect(mockNavigate).toHaveBeenCalledWith({
-      pathname: '/(send-flow)/sendToken',
-      params: { sendHistoryEntry: historyEntry },
-    });
-  });
-
-  it('refuses to broadcast a Near Pay token whose P2PK lock is missing or wrong', async () => {
-    mockNearPayActive = {
-      id: 'near-pay-2',
-      startedAt: 1,
-      recipient: {
-        peerID: 'peer-456',
-        nickname: 'Nearby Bob',
-        hasDirectLink: true,
-        lastSeen: 2,
-        delivery: { mode: 'p2pk', p2pkPubkeyHex: `02${'ab'.repeat(32)}` },
-      },
-    };
-    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-unlocked-token');
-    // @ts-expect-error sendComplete only reads no machine methods.
-    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
-    const handlers = createSovranHandlers({
-      machine,
-      getManager: () => null,
-    });
-    const historyEntry = JSON.stringify({
-      id: 'send-2',
-      type: 'send',
-      mintUrl: 'https://mint.example',
-      token: { proofs: [] },
-    });
-
-    // sendComplete data carries NO p2pkLockPubkey — some path dropped the
-    // lock. The bearer token must never reach the public mesh.
-    await handlers.sendComplete?.({
-      historyEntry,
-      createdOffline: false,
-      mintWasOffline: false,
-    });
-
+    // Mesh payments travel in-band via executePaymentRequest; the public
+    // mesh must never see them, and the session stays open for the
+    // payment-request completion handler.
     expect(sendBLEPublicMessage).not.toHaveBeenCalled();
-    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
+    expect(mockNearPayComplete).not.toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith({
       pathname: '/(send-flow)/sendToken',
       params: { sendHistoryEntry: historyEntry },
     });
   });
 
-  it('broadcasts an explicit bearer Near Pay token, including offline-created sends', async () => {
+  it('broadcasts an explicit vanilla-ladder bearer token, including offline-created sends', async () => {
     mockNearPayActive = {
       id: 'near-pay-3',
       startedAt: 1,
@@ -345,7 +302,7 @@ describe('createSovranHandlers profile routing', () => {
         nickname: 'Vanilla Carol',
         hasDirectLink: true,
         lastSeen: 2,
-        delivery: { mode: 'bearer' },
+        delivery: { mode: 'broadcast' },
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-bearer-token');
@@ -377,7 +334,7 @@ describe('createSovranHandlers profile routing', () => {
     expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('refuses to broadcast when a bearer session unexpectedly produced a locked token', async () => {
+  it('refuses to broadcast when a broadcast session unexpectedly produced a locked token', async () => {
     mockNearPayActive = {
       id: 'near-pay-4',
       startedAt: 1,
@@ -386,7 +343,7 @@ describe('createSovranHandlers profile routing', () => {
         nickname: 'Vanilla Dave',
         hasDirectLink: true,
         lastSeen: 2,
-        delivery: { mode: 'bearer' },
+        delivery: { mode: 'broadcast' },
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-mislocked-token');

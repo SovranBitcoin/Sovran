@@ -11,14 +11,13 @@ export interface NearPayLayoutPeer {
   name: string;
   avatarUrl?: string | null;
   /**
-   * True when the peer announced the ecash capability TLV — they can receive
-   * P2PK-locked drops. False ⇒ vanilla bitchat peer (bearer sends only).
+   * True when the peer's capability beacon says it answers NUT-18 payment
+   * request solicits — a locked mesh send is possible. False ⇒ vanilla
+   * bitchat peer (public-broadcast bearer sends only).
    */
-  supportsP2pkEcash: boolean;
-  /** Cashu P2PK lock target from the peer's announce ("02" + x-only); '' for vanilla peers. */
-  p2pkPubkeyHex: string;
-  /** The peer's Nostr pubkey (x-only hex) — `p2pkPubkeyHex` minus the "02". */
-  nostrPubkey: string;
+  supportsNutRequests: boolean;
+  /** Beacon bit: the peer auto-redeems received ecash (radar "instant" badge). */
+  autoRedeem: boolean;
   /**
    * True while the peer's kind-0 profile fetch is in flight — the avatar
    * shows the loading state instead of flashing the identicon fallback.

@@ -14,22 +14,19 @@ import {
   BLE_PEER_FRESHNESS_TICK_MS,
   filterFreshBLEPeers,
 } from '@/features/bitchat/lib/blePeerSnapshots';
-import {
-  useRecentPeopleProfiles,
-  type RecentPeopleProfileRow,
-} from '@/features/feed/hooks/useRecentPeopleProfiles';
-import { peerDisplayName, peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
+import { peerDisplayName } from '@/features/nearPay/lib/peerProfile';
 import {
   confirmBearerSend,
-  nearPaySendPlan,
-  planDelivery,
+  confirmPublicBroadcastSend,
 } from '@/features/nearPay/lib/startNearPaySend';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
+import { staticPopup } from '@/shared/lib/popup';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
-import { ContactRow, bleIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
+import { useNearPaySessionStore, type NearPayDelivery } from '@/shared/stores/runtime/nearPayStore';
+import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -43,7 +40,6 @@ const STACK_OPTIONS = {
 
 interface NearPayPeerRowProps {
   peer: BLEPeer;
-  profile?: RecentPeopleProfileRow;
   onSelect: (peer: BLEPeer) => void;
 }
 
@@ -66,24 +62,15 @@ function BearerTag() {
   );
 }
 
-function NearPayPeerRow({ peer, profile, onSelect }: NearPayPeerRowProps) {
+function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
   const handlePress = useCallback(() => onSelect(peer), [onSelect, peer]);
-  // BLE identity stays primary (peerID seed, connection status); the Nostr
-  // identity layers in the kind-0 profile (name/picture) and drives
-  // ContactRow's standard skeleton while the profile fetch is in flight —
-  // the identicon never flashes before the fetch resolves.
-  const identity = useMemo(() => {
-    const ble = bleIdentity({ ...peer });
-    const nostrPubkey = peerNostrPubkey(peer);
-    if (!nostrPubkey) return ble;
-    return [
-      ble,
-      nostrIdentity(nostrPubkey, profile?.metadata, { isLoadingProfile: profile?.isLoading }),
-    ];
-  }, [peer, profile]);
+  // BLE identity only: the v2 capability beacon carries no key material, so
+  // there is no Nostr identity to resolve until send time (the NUT-18
+  // request reveals the recipient's lock key).
+  const identity = useMemo(() => bleIdentity({ ...peer }), [peer]);
   const trailing = useMemo(
-    () => (peer.supportsP2pkEcash ? undefined : <BearerTag />),
-    [peer.supportsP2pkEcash]
+    () => (peer.supportsNutRequests ? undefined : <BearerTag />),
+    [peer.supportsNutRequests]
   );
 
   return (
@@ -101,6 +88,7 @@ export function NearPayPeerListScreen() {
   const headerHeight = useHeaderHeight();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+  const { isOffline } = useOfflineStatus();
   const { peers: blePeers } = useBLEPeers();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
@@ -117,29 +105,20 @@ export function NearPayPeerListScreen() {
     [blePeers, peerFreshnessNow]
   );
 
-  // Every bitchat peer is listed: peers announcing the ecash capability TLV
-  // get P2PK-locked drops; vanilla peers are bearer-only (tagged, and gated
-  // behind an explicit confirm in handleSelectPeer).
+  // Every bitchat peer is listed: peers whose capability beacon answers
+  // NUT-18 solicits get locked in-band drops; vanilla peers are
+  // public-broadcast bearer only (tagged, and gated behind an explicit
+  // confirm in handleSelectPeer).
   const connectedCount = useMemo(() => peers.filter((peer) => peer.isConnected).length, [peers]);
   const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
   const sortedPeers = useMemo(() => {
     return [...peers].sort((a, b) => {
-      if (a.supportsP2pkEcash !== b.supportsP2pkEcash) return a.supportsP2pkEcash ? -1 : 1;
+      if (a.supportsNutRequests !== b.supportsNutRequests) return a.supportsNutRequests ? -1 : 1;
       if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
       if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
       return b.lastSeen - a.lastSeen;
     });
   }, [peers]);
-
-  // Batch-fetch kind-0 profiles for all visible peers via nagg (warms the
-  // shared nostrMetadataCache; cache hits render instantly). Vanilla peers
-  // have no Nostr pubkey and drop out of the fetch.
-  const peerNostrPubkeys = useMemo(() => peers.map(peerNostrPubkey).filter(Boolean), [peers]);
-  const profileRows = useRecentPeopleProfiles(peerNostrPubkeys);
-  const profileByPubkey = useMemo(
-    () => new Map(profileRows.map((row) => [row.pubkey, row])),
-    [profileRows]
-  );
 
   const subtitleText = useMemo(() => {
     if (peers.length === 0) return 'Scanning for nearby people...';
@@ -172,66 +151,72 @@ export function NearPayPeerListScreen() {
 
   const handleSelectPeer = useCallback(
     async (peer: BLEPeer) => {
-      const nostrPubkey = peerNostrPubkey(peer);
-      const profile = profileByPubkey.get(nostrPubkey);
-      const displayName = peerDisplayName(peer, profile);
-      const plan = nearPaySendPlan(peer);
-      paymentLog.info('near_pay.peer.list_select', {
-        peerID: peer.peerID,
-        hasDirectLink: peer.hasDirectLink,
-        isConnected: peer.isConnected,
-        deliveryMode: plan.mode,
-      });
-      if (plan.mode === 'bearer') {
-        // Consent gate BEFORE any session or navigation state — declining
-        // must leave the list exactly as it was.
+      const displayName = peerDisplayName(peer);
+      // Consent gates BEFORE any session or navigation state — declining
+      // must leave the list exactly as it was. Locked mesh sends need no
+      // consent (the token is locked to the key the recipient issues).
+      let delivery: NearPayDelivery;
+      if (!peer.supportsNutRequests) {
+        const confirmed = await confirmPublicBroadcastSend(displayName);
+        if (!confirmed) {
+          paymentLog.info('near_pay.peer.broadcast_declined', { peerID: peer.peerID });
+          return;
+        }
+        delivery = { mode: 'broadcast' };
+      } else if (isOffline) {
         const confirmed = await confirmBearerSend(displayName);
         if (!confirmed) {
           paymentLog.info('near_pay.peer.bearer_declined', { peerID: peer.peerID });
           return;
         }
+        delivery = { mode: 'mesh', locked: false };
+      } else {
+        delivery = { mode: 'mesh', locked: true };
       }
+      paymentLog.info('near_pay.peer.list_select', {
+        peerID: peer.peerID,
+        hasDirectLink: peer.hasDirectLink,
+        isConnected: peer.isConnected,
+        deliveryMode: delivery.mode,
+      });
       useNearPaySessionStore.getState().start({
         peerID: peer.peerID,
         nickname: displayName,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
-        delivery: planDelivery(plan),
+        delivery,
       });
       router.back();
-      void machine
-        .startSendEcash({
-          reset: true,
-          // Bearer plans omit the lock — deliverNearPayIfActive enforces the
-          // completed send is lock-free before broadcasting.
-          ...(plan.mode === 'p2pk'
-            ? { p2pkLockPubkey: plan.p2pkLockPubkey, recipientPubkey: plan.recipientPubkey }
-            : {}),
-          recipientProfile: {
-            displayName,
-            avatarUrl: profile?.metadata?.picture ?? null,
-            nip05: profile?.metadata?.nip05 ?? null,
-          },
-        })
-        .catch((err) => {
-          useNearPaySessionStore.getState().clear();
-          paymentLog.error('near_pay.peer.list_start_send_failed', {
-            error: err instanceof Error ? err.message : String(err),
-          });
+      const startPromise =
+        delivery.mode === 'mesh'
+          ? machine
+              .startMeshSend(peer.peerID, { reset: true, offline: !delivery.locked })
+              .then((result) => {
+                if (result.kind === 'started') return;
+                if (result.kind === 'abort' && result.reason === 'no-mint-overlap') {
+                  staticPopup('mesh-no-mint-overlap');
+                } else {
+                  staticPopup('mesh-solicit-failed');
+                }
+                useNearPaySessionStore.getState().clear();
+              })
+          : machine.startSendEcash({
+              reset: true,
+              recipientProfile: { displayName, avatarUrl: null, nip05: null },
+            });
+      void startPromise.catch((err) => {
+        useNearPaySessionStore.getState().clear();
+        paymentLog.error('near_pay.peer.list_start_send_failed', {
+          error: err instanceof Error ? err.message : String(err),
         });
+      });
     },
-    [machine, profileByPubkey]
+    [machine, isOffline]
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: BLEPeer }) => (
-      <NearPayPeerRow
-        peer={item}
-        profile={profileByPubkey.get(peerNostrPubkey(item))}
-        onSelect={handleSelectPeer}
-      />
-    ),
-    [handleSelectPeer, profileByPubkey]
+    ({ item }: { item: BLEPeer }) => <NearPayPeerRow peer={item} onSelect={handleSelectPeer} />,
+    [handleSelectPeer]
   );
   const keyExtractor = useCallback((peer: BLEPeer) => peer.peerID, []);
   const emptyContent = useMemo(

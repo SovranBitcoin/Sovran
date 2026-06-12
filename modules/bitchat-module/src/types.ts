@@ -81,19 +81,6 @@ export interface BLEPeer {
    * drives the radar "instant" badge.
    */
   autoRedeem: boolean;
-  /**
-   * @deprecated Beacon v2 carries no key material, so this can no longer be
-   * true — synthesized `false` in the JS wrapper until the S3 rewire moves
-   * the send flow onto `supportsNutRequests` + per-send NUT-18 requests.
-   */
-  supportsP2pkEcash: boolean;
-  /** @deprecated Replaced by `supportsNutRequests`/`autoRedeem`; synthesized 0. */
-  ecashCapabilities: number;
-  /**
-   * @deprecated The P2PK lock key now arrives per-send inside the NUT-18
-   * payment request, never on the air. Always absent.
-   */
-  p2pkPubkeyHex?: string;
 }
 
 /**

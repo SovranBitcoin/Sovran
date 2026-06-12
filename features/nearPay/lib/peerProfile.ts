@@ -5,19 +5,16 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 
 import type { NearPayLayoutPeer } from './peerLayout';
 
-/** The peer's Nostr pubkey: the announced lock key minus its "02" parity prefix. */
-export function peerNostrPubkey(peer: Pick<BLEPeer, 'p2pkPubkeyHex'>): string {
-  return (peer.p2pkPubkeyHex ?? '').slice(2);
-}
-
 /**
- * Resolve the peer's display name: Nostr profile name (via nagg) wins over
- * the BLE nickname; the word-pair fallback seeds from the Nostr pubkey so
- * this peer reads as the same identity here as on every other Nostr surface.
+ * Resolve the peer's display name. The v2 capability beacon carries no key
+ * material, so there is no announced Nostr identity to resolve pre-send —
+ * the word-pair fallback seeds from the BLE peer ID, and the recipient's
+ * real profile surfaces at send time once the NUT-18 request reveals their
+ * lock key.
  */
 export function peerDisplayName(peer: BLEPeer, profile?: RecentPeopleProfileRow): string {
   return resolveIdentityName({
-    pubkey: peerNostrPubkey(peer) || peer.peerID,
+    pubkey: peer.peerID,
     nostrProfile: profile?.metadata,
     bleNickname: peer.nickname,
   });
@@ -32,9 +29,8 @@ export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): N
     lastSeen: peer.lastSeen,
     name: peerDisplayName(peer, profile),
     avatarUrl: profile?.metadata?.picture ?? null,
-    supportsP2pkEcash: peer.supportsP2pkEcash,
-    p2pkPubkeyHex: peer.p2pkPubkeyHex ?? '',
-    nostrPubkey: peerNostrPubkey(peer),
+    supportsNutRequests: peer.supportsNutRequests,
+    autoRedeem: peer.autoRedeem,
     profileLoading: profile?.isLoading ?? false,
   };
 }

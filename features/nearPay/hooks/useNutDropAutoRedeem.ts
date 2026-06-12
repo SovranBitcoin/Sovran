@@ -5,9 +5,11 @@ import {
   beginBLEBackgroundTask,
   endBLEBackgroundTask,
 } from 'bitchat-module';
+import { classifyMeshToken, meshTokenDedupeKey } from '@sovranbitcoin/colada';
 
+import { startMeshNutDrop, stopMeshNutDrop } from '@/features/nearPay/lib/meshNutDrop';
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
-import { classifyToken, tokenDedupeKey } from '@/features/nearPay/lib/nutDropTokens';
+import { deriveBitchatBLEIdentityMaterial } from '@/features/bitchat/lib/bleIdentity';
 import { paymentLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
@@ -15,20 +17,21 @@ import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedee
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
 
 /**
- * App-wide Nut Drop auto-redeem pipeline. Mounted in BitchatBLEProvider
- * (inside AccountScopedProviders, so it remounts per profile and always
- * classifies against the ACTIVE profile's lock key).
+ * App-wide Nut Drop receive pipeline. Mounted in BitchatBLEProvider (inside
+ * AccountScopedProviders, so it remounts per profile and always answers
+ * solicits with the ACTIVE profile's lock key).
  *
- * Every public BLE mesh message is checked for a cashu token:
- * - locked to my key  → persist into the redeem queue, then drain.
- * - locked to someone else → silent ignore. This also covers the sender
- *   seeing its own broadcast echo (the lock is the recipient's key).
- * - bearer (vanilla bitchat sender) → untouched; the chat surface keeps
- *   today's manual CashuTokenBubble tap-to-redeem.
+ * Two inbound paths feed the same persisted redeem queue:
+ * - In-band NUT-18 payments (capable peers): colada's responder answers
+ *   solicits with single-use payment requests and the intake validates +
+ *   enqueues payments (`startMeshNutDrop`).
+ * - Public-broadcast tokens (legacy + vanilla ladder): every public mesh
+ *   message is classified — locked to my key → enqueue; locked to someone
+ *   else (incl. our own broadcast echo) → silent; bearer → left to the chat
+ *   surface's manual tap-to-redeem.
  *
- * Drain triggers beyond message arrival: app returning to foreground,
- * offline→online transitions, and profile mount (manager init catches
- * entries queued while the app was dead).
+ * Drain triggers: payment/message arrival, app foreground, offline→online,
+ * and profile mount (manager init catches entries queued while dead).
  */
 /**
  * Drain wrapped in an iOS background-task assertion when the app is
@@ -56,7 +59,14 @@ export function useNutDropAutoRedeem(): void {
   const wasOffline = useRef(isOffline);
 
   useEffect(() => {
-    if (!myPubkey33) return;
+    if (!myPubkey33 || !keys) return;
+
+    startMeshNutDrop({
+      p2pkReceiveKey: myPubkey33,
+      getIdentityMaterial: () =>
+        deriveBitchatBLEIdentityMaterial({ privateKey: keys.privateKey, pubkey: keys.pubkey }),
+      onPaymentAccepted: () => void drainWithBackgroundBudget(),
+    });
 
     paymentLog.info('near_pay.redeem.listener_mounted');
     const subscription = addBLEMessageListener((event) => {
@@ -64,7 +74,7 @@ export function useNutDropAutoRedeem(): void {
       const token = extractCashuToken(event.content);
       if (!token) return;
 
-      const classified = classifyToken(token, myPubkey33);
+      const classified = classifyMeshToken(token, myPubkey33);
       if (classified.classification !== 'locked-to-me') {
         if (classified.classification === 'locked-to-other') {
           paymentLog.debug('near_pay.redeem.ignored_locked_to_other');
@@ -73,7 +83,7 @@ export function useNutDropAutoRedeem(): void {
       }
       if (!classified.mintUrl) return;
 
-      const enqueued = useNutDropRedeemQueueStore.getState().enqueue(tokenDedupeKey(token), {
+      const enqueued = useNutDropRedeemQueueStore.getState().enqueue(meshTokenDedupeKey(token), {
         token,
         mintUrl: classified.mintUrl,
         amount: classified.amount,
@@ -100,8 +110,9 @@ export function useNutDropAutoRedeem(): void {
     return () => {
       subscription.remove();
       appStateSub.remove();
+      stopMeshNutDrop();
     };
-  }, [myPubkey33]);
+  }, [keys, myPubkey33]);
 
   // Offline → online: retry anything parked on mint unreachability.
   useEffect(() => {

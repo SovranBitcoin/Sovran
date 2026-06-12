@@ -44,6 +44,12 @@ interface NutDropRedeemEntry {
    * additive field, entries persisted by older builds lack it.
    */
   senderPeerID?: string;
+  /**
+   * NUT-18 payment id when the token arrived as an in-band mesh payment —
+   * lets the drain push the `redeemed` status back to the sender. Absent
+   * for public-broadcast drops.
+   */
+  paymentId?: string;
 }
 
 interface NutDropRedeemQueueState {
@@ -54,7 +60,10 @@ interface NutDropRedeemQueueActions {
   /** Idempotent on token hash — mesh re-delivery never duplicates an entry. */
   enqueue: (
     tokenHash: string,
-    entry: Pick<NutDropRedeemEntry, 'token' | 'mintUrl' | 'amount' | 'unit' | 'senderPeerID'>
+    entry: Pick<
+      NutDropRedeemEntry,
+      'token' | 'mintUrl' | 'amount' | 'unit' | 'senderPeerID' | 'paymentId'
+    >
   ) => boolean;
   markStatus: (tokenHash: string, status: NutDropRedeemStatus, error?: string) => void;
   scheduleRetry: (tokenHash: string, error: string) => void;
@@ -94,6 +103,7 @@ const PersistedNutDropRedeemQueueStore = z.object({
         receivedAt: z.number().int().nonnegative(),
         lastError: z.string().max(500).optional(),
         senderPeerID: z.string().max(128).optional(),
+        paymentId: z.string().max(128).optional(),
       })
     )
     .default({}),

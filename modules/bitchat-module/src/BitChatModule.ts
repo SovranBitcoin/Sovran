@@ -22,13 +22,6 @@ import {
   solicitIdHex,
 } from './nutDropProtocol';
 
-/**
- * The peer shape native actually returns. The deprecated announced-key fields
- * still present on `BLEPeer` are synthesized in the `getBLEPeers` wrapper —
- * the v2 beacon carries no key material, so they can never be truthy.
- */
-type NativeBLEPeer = Omit<BLEPeer, 'supportsP2pkEcash' | 'ecashCapabilities' | 'p2pkPubkeyHex'>;
-
 interface NativeNutPayloadEvent {
   peerID: string;
   payloadBase64: string;
@@ -53,7 +46,7 @@ interface BitChatNativeModule {
     nickname: string,
     messageID: string
   ): Promise<string>;
-  getBLEPeers(): NativeBLEPeer[];
+  getBLEPeers(): BLEPeer[];
   getBLEDmHistory(profileScope: string): BLEDmContact[];
   getBLEState(): string;
   nutSendPayload(peerID: string, payloadBase64: string): Promise<void>;
@@ -208,15 +201,7 @@ export function addBLEDeliveryStatusListener(
 }
 
 export function getBLEPeers(): BLEPeer[] {
-  if (!NativeModule) return [];
-  // Deprecated announced-key fields synthesized until the S3 rewire: the v2
-  // beacon carries no key material, so the announced-key P2PK path can never
-  // apply — every peer reads as bearer-only to the legacy send flow.
-  return NativeModule.getBLEPeers().map((peer) => ({
-    ...peer,
-    supportsP2pkEcash: false,
-    ecashCapabilities: 0,
-  }));
+  return NativeModule ? NativeModule.getBLEPeers() : [];
 }
 
 /**

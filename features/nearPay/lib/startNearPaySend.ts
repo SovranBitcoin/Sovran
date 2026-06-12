@@ -1,52 +1,19 @@
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
-import type { NearPayDelivery } from '@/shared/stores/runtime/nearPayStore';
 
 /**
- * How a Nut Drop to this peer must be built. Decided purely from the peer's
- * announced ecash capability:
- * - `p2pk`: lock the token to the announced key; the recipient's Nostr
- *   pubkey (lock key minus the "02" parity prefix) resolves their profile.
- * - `bearer`: vanilla bitchat peer — no lock key exists, the token would be
- *   broadcast unlocked. Callers MUST get explicit user confirmation
- *   (`confirmBearerSend`) before starting a bearer session.
+ * Consent gates for the two unlocked Nut Drop delivery modes. Locked mesh
+ * sends never prompt — the token is P2PK-locked to the key the recipient
+ * just issued, so nobody else can claim it. Both gates resolve `true` only
+ * on the explicit confirm tap; overlay tap, swipe-down, or Cancel resolve
+ * `false`, leaving the radar untouched.
  */
-type NearPaySendPlan =
-  | { mode: 'p2pk'; p2pkLockPubkey: string; recipientPubkey: string }
-  | { mode: 'bearer' };
-
-/** Structural input so both `BLEPeer` and `NearPayLayoutPeer` fit. */
-export function nearPaySendPlan(peer: {
-  supportsP2pkEcash: boolean;
-  p2pkPubkeyHex?: string;
-}): NearPaySendPlan {
-  // Both checks: the capability flag and the key travel together (bridge
-  // invariant), but a lock key must never be synthesized from a peer that
-  // only half-claims the capability.
-  if (peer.supportsP2pkEcash && peer.p2pkPubkeyHex) {
-    return {
-      mode: 'p2pk',
-      p2pkLockPubkey: peer.p2pkPubkeyHex,
-      recipientPubkey: peer.p2pkPubkeyHex.slice(2),
-    };
-  }
-  return { mode: 'bearer' };
-}
-
-/** The session-store delivery descriptor for a computed plan. */
-export function planDelivery(plan: NearPaySendPlan): NearPayDelivery {
-  return plan.mode === 'p2pk'
-    ? { mode: 'p2pk', p2pkPubkeyHex: plan.p2pkLockPubkey }
-    : { mode: 'bearer' };
-}
-
-/**
- * Explicit consent gate for bearer drops. Resolves `true` only when the user
- * taps the send button; overlay tap, swipe-down, or Cancel resolve `false`.
- * Resolve-once guard: the host fires `onPress` before its auto-dismiss, and
- * `onDismiss` doesn't fire after an in-flight selection — but keep the gate
- * defensive so a double event can never start two sessions.
- */
-export function confirmBearerSend(displayName: string): Promise<boolean> {
+function consentGate(options: {
+  title: string;
+  confirmTestID: string;
+  cancelTestID: string;
+  confirmText: string;
+  description: string;
+}): Promise<boolean> {
   return new Promise((resolve) => {
     let settled = false;
     const settle = (confirmed: boolean) => {
@@ -55,12 +22,12 @@ export function confirmBearerSend(displayName: string): Promise<boolean> {
       resolve(confirmed);
     };
     actionMenuPopup({
-      title: 'Send without a lock?',
+      title: options.title,
       buttons: [
         {
-          testID: 'near-pay-bearer-confirm',
-          text: 'Send bearer token',
-          description: `${displayName}'s app can't receive locked payments. The sats are broadcast as a bearer token — anyone nearby who sees it first can claim it.`,
+          testID: options.confirmTestID,
+          text: options.confirmText,
+          description: options.description,
           icon: 'mdi:lock-open-variant-outline',
           variant: 'dangerous',
           onPress: (close) => {
@@ -69,7 +36,7 @@ export function confirmBearerSend(displayName: string): Promise<boolean> {
           },
         },
         {
-          testID: 'near-pay-bearer-cancel',
+          testID: options.cancelTestID,
           text: 'Cancel',
           icon: 'mdi:close',
           variant: 'secondary',
@@ -81,5 +48,35 @@ export function confirmBearerSend(displayName: string): Promise<boolean> {
       ],
       onDismiss: () => settle(false),
     });
+  });
+}
+
+/**
+ * Bearer-DM consent (capable peer, sender offline): the token travels over
+ * the encrypted Noise session — only the recipient sees it — but it is not
+ * locked, so anyone who later obtains it could claim it.
+ */
+export function confirmBearerSend(displayName: string): Promise<boolean> {
+  return consentGate({
+    title: 'Send without a lock?',
+    confirmTestID: 'near-pay-bearer-confirm',
+    cancelTestID: 'near-pay-bearer-cancel',
+    confirmText: 'Send bearer token',
+    description: `You're offline, so the sats can't be locked to ${displayName}. They're sent privately to ${displayName}'s device as a bearer token anyone could claim if it leaked.`,
+  });
+}
+
+/**
+ * Public-broadcast consent (vanilla bitchat peer): the strongest warning —
+ * the bearer token is visible to EVERY peer in mesh range, not just the
+ * recipient, and the fastest redeemer wins.
+ */
+export function confirmPublicBroadcastSend(displayName: string): Promise<boolean> {
+  return consentGate({
+    title: 'Broadcast to everyone nearby?',
+    confirmTestID: 'near-pay-broadcast-confirm',
+    cancelTestID: 'near-pay-broadcast-cancel',
+    confirmText: 'Broadcast bearer token',
+    description: `${displayName}'s app can't receive private payments. The sats are broadcast publicly as a bearer token — anyone nearby who sees it first can claim it.`,
   });
 }

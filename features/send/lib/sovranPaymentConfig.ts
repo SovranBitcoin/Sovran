@@ -30,6 +30,7 @@ import type {
 import {
   isSendTokenCancelled,
   isSendTokenComplete,
+  parseMeshPaymentRequest,
   withTimeout,
   type MachineOperations,
   type NotificationHandlerMap,
@@ -72,6 +73,7 @@ import {
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
 import { sendBLEPublicMessage } from '@/features/bitchat/lib/blePrivateDelivery';
+import { trackMeshDelivery } from '@/features/nearPay/lib/meshNutDrop';
 import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
@@ -864,23 +866,12 @@ async function deliverNearPayIfActive(
   // the completed send may hit the public mesh. Anything else means some
   // machine path dropped or invented a lock — refuse to broadcast and leave
   // the token in send history where the user can deliver it deliberately.
-  const delivery = active.recipient.delivery;
-  if (delivery.mode === 'p2pk') {
-    // P2PK sessions must broadcast a token locked to exactly the key the
-    // recipient announced; a missing/mismatched lock would leak a claimable
-    // (or unredeemable) token.
-    const expectedLock = delivery.p2pkPubkeyHex.toLowerCase();
-    if (!expectedLock || p2pkLockPubkey?.toLowerCase() !== expectedLock) {
-      paymentLog.error('near_pay.delivery.lock_mismatch', {
-        peerID: active.recipient.peerID,
-        expectedLockPresent: expectedLock.length > 0,
-        actualLockPresent: !!p2pkLockPubkey,
-      });
-      useNearPaySessionStore.getState().complete();
-      return;
-    }
-  } else if (p2pkLockPubkey) {
-    // Bearer sessions are created without a lock key (the user explicitly
+  // Mesh sessions deliver in-band through executePaymentRequest and complete
+  // in the navigateToPaymentRequest handler — only the vanilla
+  // public-broadcast ladder flows through here.
+  if (active.recipient.delivery.mode !== 'broadcast') return;
+  if (p2pkLockPubkey) {
+    // Broadcast sessions are created without a lock key (the user explicitly
     // confirmed an unlocked send to a vanilla bitchat peer). A lock showing
     // up here means the token is locked to a key the recipient can't use —
     // broadcasting it would burn the funds for everyone.
@@ -1027,7 +1018,42 @@ export function createSovranHandlers({
       });
     },
 
-    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit, recipientPubkey }) => {
+    navigateToPaymentRequest: ({
+      mintUrl,
+      paymentRequest,
+      amount,
+      unit,
+      recipientPubkey,
+      meshPeerId,
+      historyEntry,
+    }) => {
+      if (meshPeerId && !historyEntry) {
+        // Mesh (Nut Drop) delivery: consent — bearer or broadcast — was
+        // secured at peer selection, before the solicit. No confirm screen;
+        // execute the in-band delivery immediately.
+        paymentLog.info('payment.step.mesh_payment_request.auto_confirm', {
+          mintUrl,
+          amount,
+          meshPeerId,
+        });
+        void machine.confirmPaymentRequest();
+        return;
+      }
+      if (meshPeerId && historyEntry) {
+        // Delivery succeeded — start tracking the receiver's status stream
+        // (received → redeemed) and complete on the same surface as the
+        // legacy radar flow: the send-token screen with the executed entry.
+        const parsedMesh = parseMeshPaymentRequest(paymentRequest);
+        if (parsedMesh.ok) {
+          trackMeshDelivery(parsedMesh.request.paymentId, meshPeerId);
+        }
+        useNearPaySessionStore.getState().complete();
+        router.navigate({
+          pathname: '/(send-flow)/sendToken',
+          params: { sendHistoryEntry: historyEntry },
+        });
+        return;
+      }
       paymentLog.info('payment.step.navigate_payment_request', {
         mintUrl,
         amount,

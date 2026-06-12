@@ -47,6 +47,7 @@ import {
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
 import { deriveBitchatBLEIdentityMaterial } from '@/features/bitchat/lib/bleIdentity';
+import { getMeshTransportAdapter } from '@/features/nearPay/lib/meshNutDrop';
 import {
   createSovranScreenActionsBridge,
   getSovranMintEnrichment,
@@ -156,6 +157,9 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
           if (!pk) throw new Error('Nostr keys not available');
           await sendDirectMessageToRelays({ senderPrivateKey: pk, nprofile, message });
         },
+        // Nut Drop in-band delivery. A getter: the adapter's lifetime tracks
+        // the mesh runtime (useNutDropAutoRedeem), not this provider.
+        getMeshTransport: getMeshTransportAdapter,
         getOffline,
         // Disabled while the send-memo UI is WIP. With memos on, a proof-selector
         // round-up/round-down routes PROOFS_CHOSEN -> enterSendMemo, whose sheet is

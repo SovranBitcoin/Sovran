@@ -48,9 +48,8 @@ function peer(
     hasDirectLink: false,
     isConnected: true,
     lastSeen: 1,
-    supportsP2pkEcash: true,
-    p2pkPubkeyHex: `02${'ab'.repeat(32)}`,
-    nostrPubkey: 'ab'.repeat(32),
+    supportsNutRequests: true,
+    autoRedeem: true,
     profileLoading: false,
     ...overrides,
   };

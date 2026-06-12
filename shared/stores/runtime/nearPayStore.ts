@@ -5,16 +5,17 @@ import { storeLog } from '@/shared/lib/logger';
 type NearPaySessionPhase = 'picking' | 'transitioning' | 'amount';
 
 /**
- * How the broadcast token must be protected for this session. Discriminated
- * so every consumer is forced to handle both modes explicitly:
- * - `p2pk`: the recipient announced the ecash capability TLV; the token is
- *   locked to their announced key ("02" + x-only Nostr pubkey) so only they
- *   can redeem it.
- * - `bearer`: vanilla bitchat recipient — the token is broadcast UNLOCKED
- *   and anyone on the mesh can claim it. Only ever chosen after the sender
- *   explicitly confirmed the bearer warning.
+ * How this session's payment travels. Discriminated so every consumer is
+ * forced to handle both modes explicitly:
+ * - `mesh`: the recipient answers NUT-18 solicits; the payment is delivered
+ *   in-band over the Noise session. `locked: true` = P2PK-locked to the key
+ *   from their payment request (no consent needed); `locked: false` = a
+ *   bearer token from local proofs (sender-offline, explicitly confirmed).
+ * - `broadcast`: vanilla bitchat recipient — the token is broadcast UNLOCKED
+ *   on the public mesh and anyone in range can claim it. Only ever chosen
+ *   after the sender explicitly confirmed the broadcast warning.
  */
-export type NearPayDelivery = { mode: 'p2pk'; p2pkPubkeyHex: string } | { mode: 'bearer' };
+export type NearPayDelivery = { mode: 'mesh'; locked: boolean } | { mode: 'broadcast' };
 
 interface NearPayRecipient {
   peerID: string;
