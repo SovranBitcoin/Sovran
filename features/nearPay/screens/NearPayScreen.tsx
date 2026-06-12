@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet } from 'react-native';
+import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import type { BLEPeer } from 'bitchat-module';
@@ -100,6 +100,8 @@ const DOT_SPACING = 18;
 const DOT_RADIUS = 1;
 /** Celebration band top — mirrors the honeycomb's header avoidance. */
 const CELEBRATION_TOP_INSET = spacing['4xl'] + spacing['3xl'];
+/** Stable element for the Android header-scrim opt-out (see stackOptions). */
+const renderNullHeaderBackground = () => null;
 const PEER_PAN_RUBBER_BAND_FACTOR = 0.36;
 const PEER_PAN_MOMENTUM_SECONDS = 0.18;
 const PEER_ENTRY_ANIMATION_MS = 460;
@@ -2091,6 +2093,12 @@ export function NearPayScreen() {
       headerBackVisible: false,
       headerLeft: amountActive ? renderHeaderLeft : renderEmptyHeader,
       headerRight: amountActive ? renderEmptyHeader : renderHeaderRight,
+      // The send flow's shared-element avatar lands inside the header band,
+      // and Android's sheet header (FlowSheetHeader) composites its scrim
+      // gradient ABOVE screen content — the avatar ended up underneath it.
+      // A null headerBackground is the sanctioned per-screen scrim opt-out;
+      // the radar's faint dot field doesn't need the legibility fade.
+      ...(Platform.OS === 'android' ? { headerBackground: renderNullHeaderBackground } : {}),
     }),
     [amountActive, renderEmptyHeader, renderHeaderLeft, renderHeaderRight]
   );
