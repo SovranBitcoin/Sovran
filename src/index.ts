@@ -399,3 +399,8 @@ export type {
   CompositionResult,
   FiatCompositionResult,
 } from './types';
+
+// Mesh transport (Nut Drop NUT-18 over a BLE mesh): planning, request
+// issuance, payment validation, delivery tracking, auto-redeem orchestration.
+// The wallet implements `MeshTransportAdapter` over its mesh bridge.
+export * from './transport';

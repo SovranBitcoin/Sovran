@@ -34,13 +34,21 @@ function handleExecute(
   detectors: Detectors,
   walletCtx: WalletContext,
   unit: string,
-  offline?: boolean
+  offline?: boolean,
+  mesh?: { peerId: string; senderOffline: boolean }
 ): TransitionResult {
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
   logger.info('transitions.execute', { parsedType: parsed.type, intentType: intent.type });
 
-  const ctx: FlowContext = { parsed, intent, unit, rawInput: input, offline };
+  const ctx: FlowContext = {
+    parsed,
+    intent,
+    unit,
+    rawInput: input,
+    offline,
+    ...(mesh ? { meshPeerId: mesh.peerId, meshBearer: mesh.senderOffline } : {}),
+  };
 
   // Extract known data from the intent into context
   switch (intent.type) {
@@ -299,6 +307,9 @@ function handleProofsChosen(
         amount: event.amount,
         recipientPubkey: ctx.recipientPubkey,
         recipientProfile: ctx.recipientProfile,
+        ...(ctx.meshPeerId
+          ? { meshPeerId: ctx.meshPeerId, meshBearer: ctx.meshBearer === true }
+          : {}),
       },
     };
   }
@@ -393,7 +404,7 @@ export function transition(
   // Global events: work from any state
   switch (event.type) {
     case 'EXECUTE':
-      return stamp(handleExecute(event.input, detectors, walletCtx, unit, offline));
+      return stamp(handleExecute(event.input, detectors, walletCtx, unit, offline, event.mesh));
     case 'RESET':
       return stamp({ step: 'idle', context: { unit }, data: {} as any });
     case 'REQUEST_MINT_SELECTOR':
