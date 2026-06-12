@@ -116,6 +116,42 @@ describe('deriveStrikeMap', () => {
     expect(map.get(PEER)).toMatchObject({ status: 'success', redeemedAmount: 21 });
   });
 
+  it('reports per-cycle deltas across two drops from the same sender', () => {
+    // Redeemed entries persist in the queue store for 24h. The hook retires
+    // each success state's redeemedHashes into the terminal baseline, so a
+    // SECOND drop from the same sender must announce only its own amount —
+    // never the session total (the bug class: "Received 150" for a 50 drop).
+    const baseline = new Set<string>();
+
+    // Cycle 1: 100-sat drop succeeds.
+    const first = derive({
+      entries: { h1: entry('redeemed', PEER, 100) },
+      prev: new Map([[PEER, strikeState()]]),
+      baselineTerminalHashes: baseline,
+      now: T0 + STRIKE_MIN_VISIBLE_MS,
+    });
+    const firstSuccess = first.map.get(PEER);
+    expect(firstSuccess).toMatchObject({ status: 'success', redeemedAmount: 100 });
+    for (const hash of firstSuccess?.redeemedHashes ?? []) baseline.add(hash);
+
+    // Cycle 2 (after the linger): a fresh 50-sat drop from the same sender.
+    const T1 = T0 + 60_000;
+    const second = derive({
+      entries: {
+        h1: entry('redeemed', PEER, 100),
+        h2: { ...entry('redeemed', PEER, 50), receivedAt: T1 },
+      },
+      prev: new Map([[PEER, strikeState({ activatedAt: T1, statusChangedAt: T1 })]]),
+      baselineTerminalHashes: baseline,
+      now: T1 + STRIKE_MIN_VISIBLE_MS,
+    });
+    expect(second.map.get(PEER)).toMatchObject({
+      status: 'success',
+      redeemedAmount: 50,
+      redeemedHashes: ['h2'],
+    });
+  });
+
   it('leaves redeemedAmount off non-success states', () => {
     const { map } = derive({ entries: { h1: entry('pending') } });
     expect(map.get(PEER)?.redeemedAmount).toBeUndefined();

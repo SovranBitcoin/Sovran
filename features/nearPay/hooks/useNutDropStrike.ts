@@ -50,6 +50,16 @@ export function useNutDropStrike(): ReadonlyMap<string, StrikeState> {
       now: Date.now(),
     });
     prevRef.current = nextMap;
+
+    // Retire surfaced redemptions: redeemed entries persist in the queue
+    // store for 24h, so without this a later drop from the same sender
+    // would recount them and the celebration would announce a session
+    // total instead of the drop's amount. The lingering success state is
+    // unaffected (the derive carries `prev` forward past the baseline).
+    for (const state of nextMap.values()) {
+      if (state.status !== 'success' || !state.redeemedHashes) continue;
+      for (const hash of state.redeemedHashes) baseline.terminal.add(hash);
+    }
     setMap((current) => (strikeMapsEqual(current, nextMap) ? current : nextMap));
 
     if (timerRef.current) clearTimeout(timerRef.current);

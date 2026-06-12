@@ -47,16 +47,17 @@ export function useNutDropCelebration({
   const [celebration, dispatch] = useReducer(celebrationReducer, INITIAL_CELEBRATION_STATE);
   const prevStrikeRef = useRef<ReadonlyMap<string, StrikeState>>(new Map());
   const pendingImpactHapticRef = useRef(false);
-  // Mirrors the reducer inputs the strike effect needs without re-running it
-  // on every reducer tick (a re-run would re-diff an unchanged strike map).
-  const gateRef = useRef(gated);
-  const phaseRef = useRef(celebration.phase);
-  gateRef.current = gated;
-  phaseRef.current = celebration.phase;
 
+  // Re-runs on gate/phase ticks are harmless no-ops: an unchanged strike map
+  // diffs against itself, so no transition can fire twice.
   useEffect(() => {
     const prev = prevStrikeRef.current;
     prevStrikeRef.current = strikeMap;
+
+    // Only ONE success per batch can claim the immediate-start slot — the
+    // reducer queues the rest, whose haptic must therefore fire now (the
+    // dispatch's state isn't visible until the next render).
+    let idleSlotAvailable = !gated && celebration.phase === 'idle';
 
     for (const [peerID, state] of strikeMap) {
       const prevStatus = prev.get(peerID)?.status;
@@ -72,7 +73,8 @@ export function useNutDropCelebration({
       const amount = state.redeemedAmount ?? 0;
       const unit = state.unit ?? 'sat';
       const now = Date.now();
-      const startsImmediately = !reducedMotion && !gateRef.current && phaseRef.current === 'idle';
+      const startsImmediately = !reducedMotion && idleSlotAvailable;
+      idleSlotAvailable = false;
 
       if (startsImmediately) {
         pendingImpactHapticRef.current = true;
@@ -89,7 +91,7 @@ export function useNutDropCelebration({
       if (reducedMotion) continue;
       dispatch({ type: 'strike-success', peerID, amount, unit, now });
     }
-  }, [reducedMotion, strikeMap]);
+  }, [celebration.phase, gated, reducedMotion, strikeMap]);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -120,8 +122,11 @@ export function useNutDropCelebration({
         : celebration.phase === 'held'
           ? holdMs
           : CELEBRATION_RETURN_MS;
+    // Token the dispatch with the phase this timer was scheduled for: the
+    // reducer drops it if a skip/gate flip won the race.
+    const scheduledPhase = celebration.phase;
     const timer = setTimeout(() => {
-      dispatch({ type: 'phase-complete', now: Date.now() });
+      dispatch({ type: 'phase-complete', phase: scheduledPhase, now: Date.now() });
     }, delay);
     return () => clearTimeout(timer);
   }, [abbreviated, celebration.phase]);

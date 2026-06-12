@@ -27,10 +27,16 @@ export interface StrikeState {
   /**
    * Sum of this sender's redeemed (non-baseline) amounts — present on
    * 'success' states only. Feeds the receive celebration's amount reveal.
+   * Per-cycle delta, NOT a session total: the hook retires the contributing
+   * hashes (below) into its terminal baseline as soon as a success state is
+   * observed, so redeemed entries lingering in the queue store (24h TTL)
+   * never recount into a later drop from the same sender.
    */
   redeemedAmount?: number;
   /** Unit of `redeemedAmount` (first seen; mesh drops are sat-only today). */
   unit?: string;
+  /** Token hashes whose amounts are included in `redeemedAmount`. */
+  redeemedHashes?: readonly string[];
 }
 
 export interface StrikeQueueEntry {
@@ -83,6 +89,7 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
       ambient: boolean;
       redeemedAmount: number;
       unit: string | null;
+      redeemedHashes: string[];
     }
   >();
   for (const [hash, entry] of Object.entries(entries)) {
@@ -95,6 +102,7 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
       ambient: false,
       redeemedAmount: 0,
       unit: null,
+      redeemedHashes: [],
     };
     if (LIVE_STATUSES.has(entry.status)) {
       bucket.live += 1;
@@ -102,6 +110,7 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
     } else if (entry.status === 'redeemed') {
       bucket.redeemed += 1;
       bucket.redeemedAmount += entry.amount;
+      bucket.redeemedHashes.push(hash);
       if (bucket.unit === null) bucket.unit = entry.unit;
     } else if (FAILURE_STATUSES.has(entry.status)) {
       bucket.failed += 1;
@@ -157,6 +166,7 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
           entrance,
           statusChangedAt: now,
           redeemedAmount: bucket.redeemedAmount,
+          redeemedHashes: bucket.redeemedHashes,
           ...(bucket.unit !== null ? { unit: bucket.unit } : {}),
         });
         propose(now + STRIKE_SUCCESS_LINGER_MS);

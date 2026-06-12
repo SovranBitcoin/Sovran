@@ -198,6 +198,22 @@ function buildPeerNodeStyles(sizing: PeerFieldSizing) {
   };
 }
 
+/**
+ * Module-level cache keyed on the sizing singletons (two entries ever) —
+ * every PeerNode shares the same style objects instead of allocating a set
+ * per node per step flip. Same render-time-cache pattern as peerLayout's
+ * slot cache.
+ */
+const PEER_NODE_STYLE_CACHE = new Map<PeerFieldSizing, ReturnType<typeof buildPeerNodeStyles>>();
+
+function getPeerNodeStyles(sizing: PeerFieldSizing) {
+  const cached = PEER_NODE_STYLE_CACHE.get(sizing);
+  if (cached) return cached;
+  const built = buildPeerNodeStyles(sizing);
+  PEER_NODE_STYLE_CACHE.set(sizing, built);
+  return built;
+}
+
 /** Screen rect + layout identity for a radar peer, or null if off-radar. */
 type PeerStageResolver = (peerID: string) => { rect: AvatarRect; peer: NearPayLayoutPeer } | null;
 
@@ -364,7 +380,7 @@ const PeerNode = React.memo(function PeerNode({
   const nodeOpacity = useSharedValue(0);
   const visibilityScale = useSharedValue(0);
   const labelOpacityProgress = useSharedValue(target.scale >= layoutConfig.labelMinScale ? 1 : 0);
-  const nodeStyles = useMemo(() => buildPeerNodeStyles(sizing), [sizing]);
+  const nodeStyles = getPeerNodeStyles(sizing);
 
   useEffect(() => {
     const firstPlacement = !hasAnimatedInRef.current;
@@ -786,6 +802,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
   strikeMap,
   celebrationPeerID,
   getPeerStageRef,
+  onRegistryCountChange,
   emptyContent,
   onSelect,
   selectedPeerID,
@@ -802,6 +819,12 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
    * so rects translate 1:1, exactly like the send flow's selectedPeerRect.
    */
   getPeerStageRef: React.MutableRefObject<PeerStageResolver | null>;
+  /**
+   * Reports the layout REGISTRY length (visible + exiting) upward — the
+   * sizing hysteresis contract needs it so a peer's exit animation never
+   * triggers a mid-flight resize.
+   */
+  onRegistryCountChange: (count: number) => void;
   emptyContent: React.ReactNode;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   selectedPeerID?: string | null;
@@ -921,6 +944,10 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
   useEffect(() => {
     setRegistry((current) => reconcilePeerLayoutRegistry(current, layoutPeers, Date.now()));
   }, [layoutPeers]);
+
+  useEffect(() => {
+    onRegistryCountChange(registry.length);
+  }, [onRegistryCountChange, registry.length]);
 
   const hasExitingPeer = registry.some((entry) => entry.phase === 'exiting');
   useEffect(() => {
@@ -1448,17 +1475,6 @@ export function NearPayScreen() {
   const pickerPeers = inlineAmountEntry ? pickerPeersRef.current : peers;
   const headerBadgeCount = hasInlineAmountEntry ? 0 : reachableCount;
 
-  // Adaptive radar sizing: hero avatars while few peers are around, the
-  // compact step in a crowd, with hysteresis (see peerFieldSizing.ts). Owned
-  // here (not in the field) because the shared-avatar flight element must
-  // render at the radar's current avatar size. pickerPeers freezes during
-  // amount entry, so the grid never resizes behind the amount panel.
-  const [fieldSizingStep, setFieldSizingStep] = useState<PeerFieldSizingStep>('hero');
-  useEffect(() => {
-    setFieldSizingStep((prev) => getPeerFieldSizingStep(pickerPeers.length, prev));
-  }, [pickerPeers.length]);
-  const fieldSizing = getPeerFieldSizing(fieldSizingStep);
-
   // Lightning effect per sender while a received Nut Drop redeems —
   // re-renders gate component mount/unmount only; the animation itself runs
   // on the UI thread inside LightningStrike. Lifted to the screen so the
@@ -1470,15 +1486,36 @@ export function NearPayScreen() {
     // defers ceremonies — never hijack the amount panel.
     gated: inlinePhase !== 'picking' || !!sharedAvatarPeer,
   });
+
+  // Adaptive radar sizing: hero avatars while few peers are around, the
+  // compact step in a crowd, with hysteresis (see peerFieldSizing.ts). Owned
+  // here (not in the field) because the shared-avatar flight element must
+  // render at the radar's current avatar size. Fed by the field's layout
+  // REGISTRY length (visible + exiting) so exit animations never resize the
+  // grid mid-flight, and frozen whenever any overlay flight is active (send
+  // shared-avatar, amount entry, or a celebration) so captured rects stay
+  // valid.
+  const [radarRegistryCount, setRadarRegistryCount] = useState(0);
+  const [fieldSizingStep, setFieldSizingStep] = useState<PeerFieldSizingStep>('hero');
+  const sizingFrozen =
+    hasInlineAmountEntry || sharedAvatarPeer !== null || celebration.phase !== 'idle';
+  useEffect(() => {
+    if (sizingFrozen) return;
+    setFieldSizingStep((prev) => getPeerFieldSizingStep(radarRegistryCount, prev));
+  }, [radarRegistryCount, sizingFrozen]);
+  const fieldSizing = getPeerFieldSizing(fieldSizingStep);
   const getPeerStageRef = useRef<PeerStageResolver | null>(null);
   const [celebrationStage, setCelebrationStage] = useState<{
+    ceremonyId: number;
     peerID: string;
     sourceRect: AvatarRect | null;
     peer: CelebrationPeerIdentity;
   } | null>(null);
 
-  // Stage the flying identity once per ceremony: rect + identity captured at
-  // fire time so a sender vanishing mid-ceremony cannot blank the overlay.
+  // Stage the flying identity once per ceremony (keyed by ceremonyId — a
+  // repeat ceremony from the same sender re-captures the rect): identity is
+  // snapshotted at fire time so a sender vanishing mid-ceremony cannot blank
+  // the overlay.
   useEffect(() => {
     const current = celebration.phase !== 'idle' ? celebration.current : null;
     if (!current) {
@@ -1486,9 +1523,10 @@ export function NearPayScreen() {
       return;
     }
     setCelebrationStage((previous) => {
-      if (previous?.peerID === current.peerID) return previous;
+      if (previous?.ceremonyId === celebration.ceremonyId) return previous;
       const staged = getPeerStageRef.current?.(current.peerID) ?? null;
       return {
+        ceremonyId: celebration.ceremonyId,
         peerID: current.peerID,
         sourceRect: staged?.rect ?? null,
         peer: staged
@@ -1508,6 +1546,19 @@ export function NearPayScreen() {
     if (!peerID) return null;
     return getPeerStageRef.current?.(peerID)?.rect ?? null;
   }, [celebrationStage?.peerID]);
+
+  // Node suppression and overlay mount MUST flip in the same commit at both
+  // ends (atomic swap) — gating either on reducer state alone or stage state
+  // alone paints one frame with the avatar missing from both layers.
+  const celebrationActive = !!(
+    celebrationStage &&
+    celebration.phase !== 'idle' &&
+    celebration.current
+  );
+
+  const handleRegistryCountChange = useCallback((count: number) => {
+    setRadarRegistryCount(count);
+  }, []);
 
   useEffect(() => {
     paymentLog.debug('near_pay.perf.session_state', {
@@ -2043,8 +2094,9 @@ export function NearPayScreen() {
                   peers={pickerPeers}
                   sizing={fieldSizing}
                   strikeMap={strikeMap}
-                  celebrationPeerID={celebrationStage?.peerID ?? null}
+                  celebrationPeerID={celebrationActive ? (celebrationStage?.peerID ?? null) : null}
                   getPeerStageRef={getPeerStageRef}
+                  onRegistryCountChange={handleRegistryCountChange}
                   emptyContent={emptyContent}
                   onSelect={handleSelectPeer}
                   selectedPeerID={sharedAvatarPeer?.peerID ?? null}
@@ -2078,8 +2130,14 @@ export function NearPayScreen() {
                   </View>
                 </Animated.View>
               ) : null}
+              {/* Same conjunction as celebrationActive — restated inline so
+                  TS narrows celebration.phase for the overlay's prop. */}
               {celebrationStage && celebration.phase !== 'idle' && celebration.current ? (
                 <NutDropCelebrationOverlay
+                  // Fresh instance per ceremony: back-to-back queued
+                  // ceremonies never pass through 'idle', so without the key
+                  // the second flight would start from the first's landing.
+                  key={celebrationStage.ceremonyId}
                   peer={celebrationStage.peer}
                   amount={celebration.current.amount}
                   unit={celebration.current.unit}

@@ -35,12 +35,24 @@ export interface CelebrationState {
   queue: CelebrationRequest[];
   gated: boolean;
   lastStartedAt: number | null;
+  /**
+   * Increments every time a ceremony starts (direct or popped from the
+   * queue). Consecutive queued ceremonies never pass through 'idle', so the
+   * overlay keys on this to get a fresh instance (and a fresh flight) per
+   * ceremony.
+   */
+  ceremonyId: number;
 }
 
 export type CelebrationEvent =
   | { type: 'strike-success'; peerID: string; amount: number; unit: string; now: number }
   | { type: 'gate-changed'; gated: boolean; now: number }
-  | { type: 'phase-complete'; now: number }
+  /**
+   * `phase` is the phase the sender's timer was scheduled FOR — a stale
+   * callback racing a skip/gate flip is ignored instead of fast-forwarding
+   * whatever phase happens to be current.
+   */
+  | { type: 'phase-complete'; phase: CelebrationPhase; now: number }
   | { type: 'skip'; now: number }
   | { type: 'reset' };
 
@@ -56,6 +68,7 @@ export const INITIAL_CELEBRATION_STATE: CelebrationState = {
   queue: [],
   gated: false,
   lastStartedAt: null,
+  ceremonyId: 0,
 };
 
 function pruneFresh(queue: readonly CelebrationRequest[], now: number): CelebrationRequest[] {
@@ -76,13 +89,15 @@ function startNext(state: CelebrationState, now: number): CelebrationState {
     current: { ...next, abbreviated: true },
     queue: rest,
     lastStartedAt: now,
+    ceremonyId: state.ceremonyId + 1,
   };
 }
 
 function enqueue(state: CelebrationState, request: CelebrationRequest): CelebrationState {
-  const existingIndex = state.queue.findIndex((queued) => queued.peerID === request.peerID);
+  // Stale deferrals must not hold cap slots against fresh ceremonies.
+  const queue = pruneFresh(state.queue, request.firedAt);
+  const existingIndex = queue.findIndex((queued) => queued.peerID === request.peerID);
   if (existingIndex >= 0) {
-    const queue = [...state.queue];
     const existing = queue[existingIndex];
     queue[existingIndex] = {
       ...existing,
@@ -92,8 +107,8 @@ function enqueue(state: CelebrationState, request: CelebrationRequest): Celebrat
     };
     return { ...state, queue };
   }
-  if (state.queue.length >= CELEBRATION_QUEUE_CAP) return state;
-  return { ...state, queue: [...state.queue, request] };
+  if (queue.length >= CELEBRATION_QUEUE_CAP) return { ...state, queue };
+  return { ...state, queue: [...queue, request] };
 }
 
 export function celebrationReducer(
@@ -133,10 +148,14 @@ export function celebrationReducer(
         phase: 'centering',
         current: { ...request, abbreviated: withinCooldown },
         lastStartedAt: event.now,
+        ceremonyId: state.ceremonyId + 1,
       };
     }
 
     case 'gate-changed': {
+      // Bail on no-ops (mount sync, repeated flips) — useReducer skips the
+      // re-render entirely when the same reference comes back.
+      if (event.gated === state.gated) return state;
       if (event.gated) {
         // A send flow took the stage: fast-forward any playing ceremony to
         // its return flight. The haptic/toast already happened — only the
@@ -149,6 +168,9 @@ export function celebrationReducer(
     }
 
     case 'phase-complete': {
+      // A timer scheduled for an earlier phase lost a race (skip, gate
+      // interrupt) — ignore it rather than cutting the new phase short.
+      if (event.phase !== state.phase) return state;
       switch (state.phase) {
         case 'centering':
           return { ...state, phase: 'held' };
