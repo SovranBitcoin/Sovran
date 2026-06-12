@@ -13,6 +13,10 @@ export {
   addBLEDeliveryStatusListener,
   addBLEPeerListener,
   addBLEStateListener,
+  // Background execution (iOS background-task assertions; Android no-ops)
+  beginBLEBackgroundTask,
+  endBLEBackgroundTask,
+  addBLEBackgroundTaskExpiringListener,
   // Bluetooth helpers
   requestEnableBluetooth,
   openBluetoothSettings,

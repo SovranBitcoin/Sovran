@@ -1,0 +1,155 @@
+import {
+  deriveStrikeMap,
+  STRIKE_FADE_LINGER_MS,
+  STRIKE_MAX_ACTIVE_MS,
+  STRIKE_MIN_VISIBLE_MS,
+  STRIKE_SUCCESS_LINGER_MS,
+  type DeriveStrikeMapInput,
+  type StrikeQueueEntry,
+  type StrikeState,
+} from '@/features/nearPay/lib/nutDropStrikeState';
+
+const PEER = 'aaaa111122223333';
+const T0 = 1_000_000;
+
+function entry(
+  status: StrikeQueueEntry['status'],
+  senderPeerID: string | null = PEER
+): StrikeQueueEntry {
+  return { status, senderPeerID: senderPeerID ?? undefined, receivedAt: T0 };
+}
+
+function strikeState(overrides: Partial<StrikeState> = {}): StrikeState {
+  return {
+    status: 'active',
+    activatedAt: T0,
+    entrance: 'strike',
+    statusChangedAt: T0,
+    ...overrides,
+  };
+}
+
+function derive(overrides: Partial<DeriveStrikeMapInput>) {
+  return deriveStrikeMap({
+    entries: {},
+    prev: new Map<string, StrikeState>(),
+    baselineTerminalHashes: new Set(),
+    baselineLiveHashes: new Set(),
+    now: T0,
+    ...overrides,
+  });
+}
+
+describe('deriveStrikeMap', () => {
+  it('activates on a live entry with a strike entrance', () => {
+    const { map, nextDeadline } = derive({ entries: { h1: entry('pending') } });
+    expect(map.get(PEER)).toMatchObject({ status: 'active', entrance: 'strike' });
+    expect(nextDeadline).toBe(T0 + STRIKE_MAX_ACTIVE_MS);
+  });
+
+  it('uses the ambient entrance when the entry was live at the first snapshot', () => {
+    const { map } = derive({
+      entries: { h1: entry('redeeming') },
+      baselineLiveHashes: new Set(['h1']),
+    });
+    expect(map.get(PEER)).toMatchObject({ status: 'active', entrance: 'ambient' });
+  });
+
+  it('never animates entries that were terminal at mount', () => {
+    const { map } = derive({
+      entries: { h1: entry('redeemed') },
+      baselineTerminalHashes: new Set(['h1']),
+    });
+    expect(map.size).toBe(0);
+  });
+
+  it('ignores entries without a sender attribution', () => {
+    const { map } = derive({ entries: { h1: entry('pending', null) } });
+    expect(map.size).toBe(0);
+  });
+
+  it('holds active until the minimum beat, then resolves to success', () => {
+    const prev = new Map([[PEER, strikeState()]]);
+    // Redeemed almost instantly — still active until MIN elapses.
+    const early = derive({ entries: { h1: entry('redeemed') }, prev, now: T0 + 200 });
+    expect(early.map.get(PEER)?.status).toBe('active');
+    expect(early.nextDeadline).toBe(T0 + STRIKE_MIN_VISIBLE_MS);
+
+    const after = derive({
+      entries: { h1: entry('redeemed') },
+      prev,
+      now: T0 + STRIKE_MIN_VISIBLE_MS,
+    });
+    expect(after.map.get(PEER)?.status).toBe('success');
+    expect(after.nextDeadline).toBe(T0 + STRIKE_MIN_VISIBLE_MS + STRIKE_SUCCESS_LINGER_MS);
+  });
+
+  it('removes the success state after its linger and never resurrects it', () => {
+    const success = new Map([
+      [PEER, strikeState({ status: 'success', statusChangedAt: T0 + 2000 })],
+    ]);
+    const lingering = derive({
+      entries: { h1: entry('redeemed') },
+      prev: success,
+      now: T0 + 2000 + STRIKE_SUCCESS_LINGER_MS - 1,
+    });
+    expect(lingering.map.get(PEER)?.status).toBe('success');
+
+    const gone = derive({
+      entries: { h1: entry('redeemed') },
+      prev: success,
+      now: T0 + 2000 + STRIKE_SUCCESS_LINGER_MS,
+    });
+    expect(gone.map.size).toBe(0);
+  });
+
+  it('coalesces multiple drops from the same peer without resetting activatedAt', () => {
+    const prev = new Map([[PEER, strikeState()]]);
+    const { map } = derive({
+      entries: { h1: entry('redeemed'), h2: entry('pending') },
+      prev,
+      now: T0 + 500,
+    });
+    expect(map.get(PEER)).toMatchObject({ status: 'active', activatedAt: T0 });
+  });
+
+  it('fades quietly on terminal failure', () => {
+    const prev = new Map([[PEER, strikeState()]]);
+    const { map, nextDeadline } = derive({
+      entries: { h1: entry('untrusted-mint') },
+      prev,
+      now: T0 + 700,
+    });
+    expect(map.get(PEER)?.status).toBe('fading');
+    expect(nextDeadline).toBe(T0 + 700 + STRIKE_FADE_LINGER_MS);
+  });
+
+  it('does not animate an instant failure that was never active', () => {
+    const { map } = derive({ entries: { h1: entry('failed') } });
+    expect(map.size).toBe(0);
+  });
+
+  it('caps a backoff-stuck active strike at the max duration', () => {
+    const prev = new Map([[PEER, strikeState()]]);
+    const { map } = derive({
+      entries: { h1: entry('pending') },
+      prev,
+      now: T0 + STRIKE_MAX_ACTIVE_MS,
+    });
+    expect(map.get(PEER)?.status).toBe('fading');
+  });
+
+  it('redeemed entries that were never tracked live do not animate', () => {
+    const { map } = derive({ entries: { h1: entry('redeemed') } });
+    expect(map.size).toBe(0);
+  });
+
+  it('tracks two peers independently', () => {
+    const OTHER = 'bbbb111122223333';
+    const { map } = derive({
+      entries: { h1: entry('pending'), h2: entry('pending', OTHER) },
+    });
+    expect(map.get(PEER)?.status).toBe('active');
+    expect(map.get(OTHER)?.status).toBe('active');
+  });
+});

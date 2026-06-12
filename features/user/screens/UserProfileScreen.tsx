@@ -739,7 +739,15 @@ export function UserProfileScreen() {
   const rawLud16 = cachedProfile?.lud16;
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
   const handleSendMoney = useCallback(() => {
-    if (!lud16) return;
+    if (!lud16) {
+      // Button always renders (no pop-in after the profile metadata
+      // resolves) — a missing/invalid Lightning address answers on press.
+      paramPopup('action-unavailable', {
+        title: "Can't send money",
+        message: `${displayName} hasn't set up a Lightning address.`,
+      });
+      return;
+    }
     nostrLog.debug('user.profile.send_money', { lud16 });
     void machine.startSendEcash({
       reset: true,
@@ -1119,24 +1127,26 @@ export function UserProfileScreen() {
         />
       ) : null}
 
-      <BottomButtons>
-        <HStack>
-          {lud16 ? (
+      {/* Both actions render unconditionally (for OTHER people's profiles)
+          so the row never snaps in when the profile metadata resolves; a
+          missing Lightning address surfaces as a popup on press instead. */}
+      {!isOwnProfile ? (
+        <BottomButtons>
+          <HStack>
             <View style={{ flex: 1 }}>
               <Button
                 text="Send Money"
                 variant="primary"
-                icon={<Icon name="mingcute:lightning-fill" size={16} color={background} />}
                 onPress={handleSendMoney}
                 testID="profile-send-money"
               />
             </View>
-          ) : null}
-          <View style={{ flex: 1 }}>
-            <SendMessageMenu pubkey={pubkey} displayName={displayName} />
-          </View>
-        </HStack>
-      </BottomButtons>
+            <View style={{ flex: 1 }}>
+              <SendMessageMenu pubkey={pubkey} displayName={displayName} variant="secondary" />
+            </View>
+          </HStack>
+        </BottomButtons>
+      ) : null}
     </Log>
   );
 }

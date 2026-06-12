@@ -19,6 +19,7 @@ const RECIPIENT = {
   nickname: 'Nearby Alice',
   hasDirectLink: true,
   lastSeen: 123,
+  delivery: { mode: 'p2pk', p2pkPubkeyHex: `02${'ab'.repeat(32)}` } as const,
 };
 
 describe('near pay session store', () => {

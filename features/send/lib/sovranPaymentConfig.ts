@@ -854,10 +854,42 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
 
 async function deliverNearPayIfActive(
   historyEntry: string,
-  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null
+  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null,
+  p2pkLockPubkey?: string
 ): Promise<void> {
   const active = useNearPaySessionStore.getState().active;
   if (!active) return;
+
+  // The session's delivery mode is the single source of truth for whether
+  // the completed send may hit the public mesh. Anything else means some
+  // machine path dropped or invented a lock — refuse to broadcast and leave
+  // the token in send history where the user can deliver it deliberately.
+  const delivery = active.recipient.delivery;
+  if (delivery.mode === 'p2pk') {
+    // P2PK sessions must broadcast a token locked to exactly the key the
+    // recipient announced; a missing/mismatched lock would leak a claimable
+    // (or unredeemable) token.
+    const expectedLock = delivery.p2pkPubkeyHex.toLowerCase();
+    if (!expectedLock || p2pkLockPubkey?.toLowerCase() !== expectedLock) {
+      paymentLog.error('near_pay.delivery.lock_mismatch', {
+        peerID: active.recipient.peerID,
+        expectedLockPresent: expectedLock.length > 0,
+        actualLockPresent: !!p2pkLockPubkey,
+      });
+      useNearPaySessionStore.getState().complete();
+      return;
+    }
+  } else if (p2pkLockPubkey) {
+    // Bearer sessions are created without a lock key (the user explicitly
+    // confirmed an unlocked send to a vanilla bitchat peer). A lock showing
+    // up here means the token is locked to a key the recipient can't use —
+    // broadcasting it would burn the funds for everyone.
+    paymentLog.error('near_pay.delivery.unexpected_lock', {
+      peerID: active.recipient.peerID,
+    });
+    useNearPaySessionStore.getState().complete();
+    return;
+  }
 
   try {
     const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
@@ -914,11 +946,18 @@ export function createSovranHandlers({
       });
     },
 
-    sendComplete: async ({ historyEntry, createdOffline, mintWasOffline, recipientPubkey }) => {
+    sendComplete: async ({
+      historyEntry,
+      createdOffline,
+      mintWasOffline,
+      recipientPubkey,
+      p2pkLockPubkey,
+    }) => {
       paymentLog.info('payment.step.send_complete', {
         createdOffline: !!createdOffline,
         mintWasOffline: !!mintWasOffline,
         recipientPubkeyPresent: !!recipientPubkey,
+        p2pkLocked: !!p2pkLockPubkey,
       });
 
       // Routstr top-up: intercept the token and send it to the Routstr API
@@ -972,7 +1011,11 @@ export function createSovranHandlers({
         }
       }
 
-      await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
+      await deliverNearPayIfActive(
+        enrichedHistoryEntry,
+        getBitchatIdentityMaterial,
+        p2pkLockPubkey
+      );
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',

@@ -104,8 +104,60 @@ const LINKSTATE_REPLACEMENT =
   '    // state for the hasDirectLink peer flag.\n' +
   '    func linkState(for peerID: PeerID)';
 
+// --- Append the ecash capability TLV (0xF0) to outgoing announces ---
+//
+// Clients that can receive P2PK-locked cashu advertise it with an announce
+// TLV (magic "NUTXX" + capability flags + the profile's Cashu P2PK pubkey)
+// so the Nut Drop UI can lock tokens to capable peers. Open extension — any
+// bitchat client may implement it (spec draft in
+// modules/bitchat-module/docs/nut-xx-ecash-capability-announcement.md).
+// Vanilla bitchat decoders skip unknown announce TLVs by design (upstream
+// Packets.swift "tolerant decoder" + unit test), and the TLV is appended
+// BEFORE signPacket so the Ed25519 announce signature covers it — vanilla
+// verification still passes. TLV bytes come from EcashAnnounceState
+// (EcashAnnounceExtension.swift, Sovran-owned, same compiled module).
+// Idempotent: once `guard var payload` is in place, the anchor won't match.
+const ECASH_ANNOUNCE_INJECT_ANCHOR =
+  /        guard let payload = announcement\.encode\(\) else \{\n            SecureLogger\.error\("❌ Failed to encode announce packet", category: \.session\)\n            return\n        \}\n/;
+const ECASH_ANNOUNCE_INJECT_REPLACEMENT =
+  '        guard var payload = announcement.encode() else {\n' +
+  '            SecureLogger.error("❌ Failed to encode announce packet", category: .session)\n' +
+  '            return\n' +
+  '        }\n' +
+  '        // [sovran] append ecash capability TLV (0xF0). Vanilla decoders skip\n' +
+  '        // unknown announce TLVs; appended before signPacket so the announce\n' +
+  '        // signature covers it.\n' +
+  '        if let ecashTLV = EcashAnnounceState.shared.localTLV {\n' +
+  '            payload.append(ecashTLV)\n' +
+  '        }\n';
+
+// --- Record the ecash capability TLV from verified incoming announces ---
+//
+// Parses the raw announce payload out-of-band (same pattern upstream Android
+// uses for its gossip TLV) and stores per-peer flags + P2PK pubkey for
+// BitChatBLEBridge.getPeers(). Verified announces only — the recording sits
+// after the unverified-announce early return inside the registry barrier, at
+// the same spot upstream persists identity. A verified announce WITHOUT the
+// TLV clears the entry (announce TLVs are authoritative per-announce).
+const ECASH_ANNOUNCE_PARSE_ANCHOR =
+  /        \/\/ Persist cryptographic identity and signing key for robust offline verification\n        env\.persistIdentity\(announcement\)\n/;
+const ECASH_ANNOUNCE_PARSE_REPLACEMENT =
+  '        // [sovran] record/clear the ecash capability TLV (0xF0). Verified\n' +
+  '        // announces only; absence of the TLV clears the entry.\n' +
+  '        if verifiedAnnounce {\n' +
+  '            EcashAnnounceState.shared.record(peerID: peerID.id, announcePayload: packet.payload)\n' +
+  '        }\n' +
+  '\n' +
+  '        // Persist cryptographic identity and signing key for robust offline verification\n' +
+  '        env.persistIdentity(announcement)\n';
+
 let patched = 0;
-const applied = { mismatchGuard: false, linkState: false };
+const applied = {
+  mismatchGuard: false,
+  linkState: false,
+  ecashAnnounceInject: false,
+  ecashAnnounceParse: false,
+};
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
   let after = before
@@ -118,9 +170,21 @@ for (const file of walk(ROOT)) {
     after = next;
   }
   if (file.endsWith('BLEService.swift')) {
-    const next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
+    let next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
     if (next !== after) applied.linkState = true;
     after = next;
+    next = after.replace(ECASH_ANNOUNCE_INJECT_ANCHOR, ECASH_ANNOUNCE_INJECT_REPLACEMENT);
+    if (next !== after) applied.ecashAnnounceInject = true;
+    after = next;
+  }
+  if (file.endsWith('BLEAnnounceHandler.swift')) {
+    // The anchor text survives inside the replacement (the persist block is
+    // re-emitted), so gate on the marker to stay idempotent.
+    if (!after.includes('[sovran] record/clear the ecash capability TLV')) {
+      const next = after.replace(ECASH_ANNOUNCE_PARSE_ANCHOR, ECASH_ANNOUNCE_PARSE_REPLACEMENT);
+      if (next !== after) applied.ecashAnnounceParse = true;
+      after = next;
+    }
   }
   if (after !== before) {
     fs.writeFileSync(file, after);
@@ -152,5 +216,17 @@ assertApplied(
   applied.linkState,
   path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
   /\[sovran\] de-privatized/
+);
+assertApplied(
+  'ECASH_ANNOUNCE_INJECT',
+  applied.ecashAnnounceInject,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
+  /\[sovran\] append ecash capability TLV/
+);
+assertApplied(
+  'ECASH_ANNOUNCE_PARSE',
+  applied.ecashAnnounceParse,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandler.swift'),
+  /\[sovran\] record\/clear the ecash capability TLV/
 );
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);

@@ -1,5 +1,7 @@
 import type {
   HistoryRepository,
+  Keypair,
+  KeyRingRepository,
   MeltOperation,
   MeltOperationRepository,
   MeltQuoteRepository,
@@ -246,9 +248,77 @@ function wrapReceiveOperationRepository(
   };
 }
 
-function normalizeRepositoryScope(scope: RepositoryTransactionScope): RepositoryTransactionScope {
+/**
+ * In-memory overlay for "ephemeral" keyring keys — keys that must NEVER be
+ * written to SQLite (the active profile's Nostr signer key, imported by the
+ * p2pk-import plugin so coco can auto-sign P2PK receives). Coco's SQLite
+ * KeyRingRepository stores secret keys as PLAINTEXT hex; the Sovran invariant
+ * is that profile private keys live in SecureStore only.
+ *
+ * The plugin re-imports its keys on every manager init, so an in-process Map
+ * (scoped to this repositories instance — one per manager, one manager per
+ * profile session) repopulates each session and can never bleed across a
+ * profile switch. Self-healing: when an ephemeral key is (re-)imported, any
+ * legacy plaintext row from earlier builds is deleted from SQLite.
+ *
+ * Everything else — coco-derived keys (with derivationIndex), NUT-20 quote
+ * keys, user-imported keys from the Settings keyring screen, the bundled
+ * giveaway key (a build-time constant, extractable from the binary anyway) —
+ * keeps persisting through the delegate unchanged.
+ */
+function wrapKeyRingRepository(
+  repository: KeyRingRepository,
+  ephemeralPubkeys: ReadonlySet<string>,
+  overlay: Map<string, Keypair>
+): KeyRingRepository {
+  return {
+    getPersistedKeyPair: async (publicKey) =>
+      overlay.get(publicKey) ?? repository.getPersistedKeyPair(publicKey),
+    setPersistedKeyPair: async (keyPair) => {
+      if (ephemeralPubkeys.has(keyPair.publicKeyHex)) {
+        overlay.set(keyPair.publicKeyHex, keyPair);
+        // Scrub any legacy plaintext row written by builds that predate the
+        // overlay. Exact primary-key match — cannot touch other keys.
+        await repository.deletePersistedKeyPair(keyPair.publicKeyHex);
+        return;
+      }
+      return repository.setPersistedKeyPair(keyPair);
+    },
+    deletePersistedKeyPair: async (publicKey) => {
+      overlay.delete(publicKey);
+      return repository.deletePersistedKeyPair(publicKey);
+    },
+    getAllPersistedKeyPairs: async () => {
+      const persisted = await repository.getAllPersistedKeyPairs();
+      const filtered = persisted.filter((keyPair) => !overlay.has(keyPair.publicKeyHex));
+      return [...filtered, ...overlay.values()];
+    },
+    getLatestKeyPair: async () => {
+      const latest = await repository.getLatestKeyPair();
+      if (latest) return latest;
+      const first = overlay.values().next();
+      return first.done ? null : first.value;
+    },
+    getLastDerivationIndex: () => repository.getLastDerivationIndex(),
+  };
+}
+
+interface SovranCocoRepositoriesOptions {
+  /**
+   * `02`-prefixed compressed pubkeys whose keypairs must stay in memory
+   * instead of coco's plaintext SQLite keyring (the active profile's signer
+   * key). Empty set → keyring passes through untouched.
+   */
+  ephemeralKeyringPubkeys?: ReadonlySet<string>;
+}
+
+function normalizeRepositoryScope(
+  scope: RepositoryTransactionScope,
+  keyRing: KeyRingRepository | null
+): RepositoryTransactionScope {
   return {
     ...scope,
+    ...(keyRing ? { keyRingRepository: keyRing } : {}),
     proofRepository: wrapProofRepository(scope.proofRepository),
     mintQuoteRepository: wrapMintQuoteRepository(scope.mintQuoteRepository),
     meltQuoteRepository: wrapMeltQuoteRepository(scope.meltQuoteRepository),
@@ -260,11 +330,24 @@ function normalizeRepositoryScope(scope: RepositoryTransactionScope): Repository
   };
 }
 
-export function createSovranCocoRepositories(repositories: Repositories): Repositories {
+export function createSovranCocoRepositories(
+  repositories: Repositories,
+  options: SovranCocoRepositoriesOptions = {}
+): Repositories {
+  const ephemeralPubkeys = options.ephemeralKeyringPubkeys ?? new Set<string>();
+  // One overlay per repositories instance (one manager per profile session);
+  // the SAME wrapped keyring is shared by the top-level repo and every
+  // transaction scope so reads inside transactions see overlay keys.
+  const overlay = new Map<string, Keypair>();
+  const keyRing =
+    ephemeralPubkeys.size > 0
+      ? wrapKeyRingRepository(repositories.keyRingRepository, ephemeralPubkeys, overlay)
+      : null;
+
   return {
-    ...normalizeRepositoryScope(repositories),
+    ...normalizeRepositoryScope(repositories, keyRing),
     init: () => repositories.init(),
     withTransaction: (fn) =>
-      repositories.withTransaction((scope) => fn(normalizeRepositoryScope(scope))),
+      repositories.withTransaction((scope) => fn(normalizeRepositoryScope(scope, keyRing))),
   };
 }

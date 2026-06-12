@@ -45,7 +45,8 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.NFC"
+        "android.permission.NFC",
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "package": "com.sovranbitcoin"
     },

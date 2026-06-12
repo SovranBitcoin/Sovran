@@ -18,7 +18,8 @@ interface BitChatNativeModule {
     nickname: string,
     profileScope: string,
     noisePrivateKeyHex: string,
-    signingPrivateKeyHex: string
+    signingPrivateKeyHex: string,
+    p2pkPubkeyHex: string
   ): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
   startBLEPrivateChat(peerID: string): Promise<void>;
@@ -32,6 +33,8 @@ interface BitChatNativeModule {
   getBLEPeers(): BLEPeer[];
   getBLEDmHistory(profileScope: string): BLEDmContact[];
   getBLEState(): string;
+  beginBLEBackgroundTask(name: string): Promise<number>;
+  endBLEBackgroundTask(handle: number): Promise<void>;
   // Bluetooth helpers — implemented natively on Android only; the JS wrappers
   // below provide the iOS fallbacks.
   requestEnableBluetooth?(): Promise<boolean>;
@@ -108,7 +111,11 @@ export function startBLE(
         nickname,
         profileScope,
         identityMaterial.noisePrivateKeyHex,
-        identityMaterial.signingPrivateKeyHex
+        identityMaterial.signingPrivateKeyHex,
+        // Cashu P2PK lock target announced in the ecash capability TLV:
+        // "02" + the profile's x-only Nostr pubkey (NUT-11 / Minibits
+        // convention — BIP340 signing ignores Y parity).
+        `02${identityMaterial.nostrPubkey}`
       )
     : unavailable();
 }
@@ -211,6 +218,36 @@ export function addBLEStateListener(
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onBLEStateChanged', listener as (e: unknown) => void);
+}
+
+// --- Background execution ---
+
+/**
+ * Begin an iOS background-task assertion so a network call (e.g. the Nut
+ * Drop auto-redeem mint swap) can finish after a BLE background wake (~30s
+ * budget). Returns an opaque handle, or -1 when unavailable (Android — the
+ * mesh foreground service already keeps the process alive — or refused by
+ * the system). Always pair with `endBLEBackgroundTask` in a `finally`.
+ */
+export function beginBLEBackgroundTask(name: string): Promise<number> {
+  return NativeModule ? NativeModule.beginBLEBackgroundTask(name) : Promise.resolve(-1);
+}
+
+export function endBLEBackgroundTask(handle: number): Promise<void> {
+  if (!NativeModule || handle < 0) return Promise.resolve();
+  return NativeModule.endBLEBackgroundTask(handle);
+}
+
+/**
+ * Fires when iOS reclaims a `beginBLEBackgroundTask` assertion before it was
+ * ended — the in-flight work is about to be suspended; rely on persisted
+ * state to resume on next foreground.
+ */
+export function addBLEBackgroundTaskExpiringListener(
+  listener: (event: { handle: number }) => void
+): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
+  return NativeModule.addListener('onBLEBackgroundTaskExpiring', listener as (e: unknown) => void);
 }
 
 // --- Bluetooth helpers ---

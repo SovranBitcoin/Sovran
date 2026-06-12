@@ -308,7 +308,6 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
           recipientPubkey={recipientPubkey}
           recipientProfile={forwardedRecipientProfile}
           suppressNextVariants={!!nearPayRecipient}
-          isNutDrop={!!nearPayRecipient}
         />
       </View>
     </Log>

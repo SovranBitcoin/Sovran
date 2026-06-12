@@ -67,6 +67,26 @@ export interface BLEPeer {
    */
   hasDirectLink: boolean;
   lastSeen: number;
+  /**
+   * True when the peer's last verified announce carried the ecash capability
+   * TLV — i.e. the peer can receive P2PK-locked cashu (open extension; any
+   * bitchat client may implement it). Invariant: equals
+   * `p2pkPubkeyHex !== undefined`. Authentic to the announcing peer
+   * (announces are Ed25519-signed) but any client could claim it — treat as
+   * a feature gate, not a trust signal.
+   */
+  supportsP2pkEcash: boolean;
+  /**
+   * Ecash capability bitmask (0 for peers without the TLV). Bit 0 (0x01):
+   * the peer auto-redeems P2PK-locked cashu tokens seen on the public mesh.
+   */
+  ecashCapabilities: number;
+  /**
+   * The peer's Cashu P2PK lock target: 33-byte compressed hex
+   * ("02" + their x-only Nostr pubkey). Lock Nut Drop tokens to this key.
+   * Absent for peers without the ecash capability TLV.
+   */
+  p2pkPubkeyHex?: string;
 }
 
 export interface BLEMessageEvent {

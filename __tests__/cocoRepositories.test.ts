@@ -3,6 +3,8 @@
  */
 
 import type {
+  Keypair,
+  KeyRingRepository,
   MintOperation,
   MintOperationRepository,
   Repositories,
@@ -106,5 +108,105 @@ describe('createSovranCocoRepositories', () => {
     await expect(repositories.mintOperationRepository.getById('mint-op')).rejects.toThrow(
       'Invalid persisted Coco mint operation.amount'
     );
+  });
+});
+
+describe('ephemeral keyring overlay', () => {
+  const EPHEMERAL_PUBKEY = `02${'ab'.repeat(32)}`;
+  const PERSISTED_PUBKEY = `02${'cd'.repeat(32)}`;
+
+  function keypair(publicKeyHex: string, derivationIndex?: number): Keypair {
+    return { publicKeyHex, secretKey: new Uint8Array(32).fill(7), derivationIndex };
+  }
+
+  function createKeyRingRepository(persisted: Keypair[] = []): KeyRingRepository {
+    const rows = new Map(persisted.map((kp) => [kp.publicKeyHex, kp]));
+    return {
+      getPersistedKeyPair: jest.fn(async (publicKey: string) => rows.get(publicKey) ?? null),
+      setPersistedKeyPair: jest.fn(async (kp: Keypair) => {
+        rows.set(kp.publicKeyHex, kp);
+      }),
+      deletePersistedKeyPair: jest.fn(async (publicKey: string) => {
+        rows.delete(publicKey);
+      }),
+      getAllPersistedKeyPairs: jest.fn(async () => [...rows.values()]),
+      getLatestKeyPair: jest.fn(async () => [...rows.values()].pop() ?? null),
+      getLastDerivationIndex: jest.fn(async () => 0),
+    };
+  }
+
+  function build(keyRing: KeyRingRepository) {
+    const scope = createScope({ keyRingRepository: keyRing });
+    return createSovranCocoRepositories(createRepositories(scope), {
+      ephemeralKeyringPubkeys: new Set([EPHEMERAL_PUBKEY]),
+    });
+  }
+
+  it('keeps ephemeral keypairs in memory and out of the delegate', async () => {
+    const delegate = createKeyRingRepository();
+    const repositories = build(delegate);
+
+    await repositories.keyRingRepository.setPersistedKeyPair(keypair(EPHEMERAL_PUBKEY));
+
+    expect(delegate.setPersistedKeyPair).not.toHaveBeenCalled();
+    const fetched = await repositories.keyRingRepository.getPersistedKeyPair(EPHEMERAL_PUBKEY);
+    expect(fetched?.publicKeyHex).toBe(EPHEMERAL_PUBKEY);
+    expect(await delegate.getPersistedKeyPair(EPHEMERAL_PUBKEY)).toBeNull();
+  });
+
+  it('scrubs a legacy plaintext row when the ephemeral key is re-imported', async () => {
+    const delegate = createKeyRingRepository([keypair(EPHEMERAL_PUBKEY)]);
+    const repositories = build(delegate);
+
+    await repositories.keyRingRepository.setPersistedKeyPair(keypair(EPHEMERAL_PUBKEY));
+
+    expect(delegate.deletePersistedKeyPair).toHaveBeenCalledWith(EPHEMERAL_PUBKEY);
+    expect(await delegate.getPersistedKeyPair(EPHEMERAL_PUBKEY)).toBeNull();
+    // Still resolvable through the overlay — auto-sign keeps working.
+    const fetched = await repositories.keyRingRepository.getPersistedKeyPair(EPHEMERAL_PUBKEY);
+    expect(fetched?.publicKeyHex).toBe(EPHEMERAL_PUBKEY);
+  });
+
+  it('persists non-ephemeral keypairs through the delegate unchanged', async () => {
+    const delegate = createKeyRingRepository();
+    const repositories = build(delegate);
+
+    const derived = keypair(PERSISTED_PUBKEY, 3);
+    await repositories.keyRingRepository.setPersistedKeyPair(derived);
+
+    expect(delegate.setPersistedKeyPair).toHaveBeenCalledWith(derived);
+    expect(await delegate.getPersistedKeyPair(PERSISTED_PUBKEY)).toEqual(derived);
+  });
+
+  it('merges overlay keys into getAllPersistedKeyPairs without duplicates', async () => {
+    const delegate = createKeyRingRepository([keypair(PERSISTED_PUBKEY, 1)]);
+    const repositories = build(delegate);
+    await repositories.keyRingRepository.setPersistedKeyPair(keypair(EPHEMERAL_PUBKEY));
+
+    const all = await repositories.keyRingRepository.getAllPersistedKeyPairs();
+    expect(all.map((kp) => kp.publicKeyHex).sort()).toEqual(
+      [EPHEMERAL_PUBKEY, PERSISTED_PUBKEY].sort()
+    );
+  });
+
+  it('shares the overlay with transaction scopes', async () => {
+    const delegate = createKeyRingRepository();
+    const repositories = build(delegate);
+    await repositories.keyRingRepository.setPersistedKeyPair(keypair(EPHEMERAL_PUBKEY));
+
+    await repositories.withTransaction(async (transactionScope) => {
+      const fetched =
+        await transactionScope.keyRingRepository.getPersistedKeyPair(EPHEMERAL_PUBKEY);
+      expect(fetched?.publicKeyHex).toBe(EPHEMERAL_PUBKEY);
+    });
+  });
+
+  it('leaves the keyring untouched when no ephemeral pubkeys are configured', async () => {
+    const delegate = createKeyRingRepository();
+    const scope = createScope({ keyRingRepository: delegate });
+    const repositories = createSovranCocoRepositories(createRepositories(scope));
+
+    await repositories.keyRingRepository.setPersistedKeyPair(keypair(EPHEMERAL_PUBKEY));
+    expect(delegate.setPersistedKeyPair).toHaveBeenCalled();
   });
 });

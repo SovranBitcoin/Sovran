@@ -86,8 +86,9 @@
     "@scure/base": "^2.0.0",
     "@scure/bip32": "^1.3.3",
     "@scure/bip39": "^1.2.2",
+    "@shopify/react-native-skia": "2.4.18",
     "@sovranbitcoin/coco-cashu-plugin-p2pk-import": "^0.1.0",
-    "@sovranbitcoin/colada": "^0.1.1",
+    "@sovranbitcoin/colada": "^0.2.0",
     "@sovranbitcoin/nagg-ts": "^0.5.0",
     "@sovranbitcoin/schemas": "^2.0.6",
     "bitchat-module": "file:./modules/bitchat-module",
@@ -255,5 +256,8 @@
       "ENABLE_SHARED_ELEMENT_TRANSITIONS": false
     }
   },
-  "private": true
+  "private": true,
+  "trustedDependencies": [
+    "@shopify/react-native-skia"
+  ]
 }
