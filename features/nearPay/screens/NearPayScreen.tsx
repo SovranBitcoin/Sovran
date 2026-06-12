@@ -25,6 +25,11 @@ import Icon from 'assets/icons';
 import { useBLEPeers } from '@/features/bitchat/hooks/useBLEPeers';
 import { useRecentPeopleProfiles } from '@/features/feed/hooks/useRecentPeopleProfiles';
 import { LightningStrike } from '@/features/nearPay/components/LightningStrike';
+import {
+  NutDropCelebrationOverlay,
+  type CelebrationPeerIdentity,
+} from '@/features/nearPay/components/NutDropCelebrationOverlay';
+import { useNutDropCelebration } from '@/features/nearPay/hooks/useNutDropCelebration';
 import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
 import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
@@ -88,6 +93,8 @@ const NEAR_PAY_ACTION_ROW_HEIGHT = 76;
 const NEAR_PAY_ACTION_ROW_BOTTOM = spacing['3xl'];
 const DOT_SPACING = 18;
 const DOT_RADIUS = 1;
+/** Celebration band top — mirrors the honeycomb's header avoidance. */
+const CELEBRATION_TOP_INSET = spacing['4xl'] + spacing['3xl'];
 const PEER_PAN_RUBBER_BAND_FACTOR = 0.36;
 const PEER_PAN_MOMENTUM_SECONDS = 0.18;
 const PEER_ENTRY_ANIMATION_MS = 460;
@@ -190,6 +197,9 @@ function buildPeerNodeStyles(sizing: PeerFieldSizing) {
     },
   };
 }
+
+/** Screen rect + layout identity for a radar peer, or null if off-radar. */
+type PeerStageResolver = (peerID: string) => { rect: AvatarRect; peer: NearPayLayoutPeer } | null;
 
 interface AnimatedPeerViewportPresentation {
   centerX: number;
@@ -773,12 +783,25 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
 const NearPayPeerField = React.memo(function NearPayPeerField({
   peers,
   sizing,
+  strikeMap,
+  celebrationPeerID,
+  getPeerStageRef,
   emptyContent,
   onSelect,
   selectedPeerID,
 }: {
   peers: BLEPeer[];
   sizing: PeerFieldSizing;
+  strikeMap: ReadonlyMap<string, StrikeState>;
+  /** Peer whose node (and strike) the celebration overlay is impersonating. */
+  celebrationPeerID: string | null;
+  /**
+   * Populated by the field with a resolver from peerID to the node's current
+   * screen rect + layout identity — the celebration overlay's source/return
+   * anchor. Field and container share an origin (both absolute-fill chains),
+   * so rects translate 1:1, exactly like the send flow's selectedPeerRect.
+   */
+  getPeerStageRef: React.MutableRefObject<PeerStageResolver | null>;
   emptyContent: React.ReactNode;
   onSelect: (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => void;
   selectedPeerID?: string | null;
@@ -860,11 +883,6 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
       reachableCount,
     };
   }, [peers]);
-
-  // Lightning effect per sender while a received Nut Drop redeems —
-  // re-renders gate component mount/unmount only; the animation itself
-  // runs on the UI thread inside LightningStrike.
-  const strikeMap = useNutDropStrike();
 
   // Batch-fetch kind-0 profiles for every visible Sovran peer via nagg
   // (warms the shared nostrMetadataCache; cache hits render instantly).
@@ -954,6 +972,29 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
     };
   }, [fieldSize, peerLayoutConfig, targets]);
   const panBounds = panBoundsResult.value;
+
+  // Expose the celebration's source/return anchor resolver. Reading the pan
+  // shared values on the JS thread here matches the press/random handlers.
+  useEffect(() => {
+    getPeerStageRef.current = (peerID: string) => {
+      const target = targets.find(
+        (candidate) => candidate.peer.peerID === peerID && candidate.phase !== 'exiting'
+      );
+      if (!target) return null;
+      return {
+        rect: getScaledAvatarRect(
+          target,
+          fieldSize,
+          { x: panX.get(), y: panY.get() },
+          peerLayoutConfig
+        ),
+        peer: target.peer,
+      };
+    };
+    return () => {
+      getPeerStageRef.current = null;
+    };
+  }, [fieldSize, getPeerStageRef, panX, panY, peerLayoutConfig, targets]);
 
   useEffect(() => {
     if (fieldSize.width <= 0 || fieldSize.height <= 0) return;
@@ -1314,8 +1355,16 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
               overviewTranslateX={overviewTranslateX}
               overviewTranslateY={overviewTranslateY}
               onSelect={onSelect}
-              hideSharedElementSource={selectedPeerID === target.peer.peerID}
-              strike={strikeMap.get(target.peer.peerID) ?? null}
+              hideSharedElementSource={
+                selectedPeerID === target.peer.peerID || celebrationPeerID === target.peer.peerID
+              }
+              strike={
+                // The overlay impersonates this node (gold, center stage) —
+                // suppress the node-level strike so lightning never doubles.
+                celebrationPeerID === target.peer.peerID
+                  ? null
+                  : (strikeMap.get(target.peer.peerID) ?? null)
+              }
             />
           ))}
         </Animated.View>
@@ -1356,6 +1405,7 @@ const NearPayPeerField = React.memo(function NearPayPeerField({
 export function NearPayScreen() {
   useLifecycleLogger('NearPayScreen');
   useRenderLogger('NearPayScreen', 30, paymentLog);
+  const insets = useSafeAreaInsets();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   // Every bitchat peer is on the radar: peers announcing the ecash
@@ -1408,6 +1458,56 @@ export function NearPayScreen() {
     setFieldSizingStep((prev) => getPeerFieldSizingStep(pickerPeers.length, prev));
   }, [pickerPeers.length]);
   const fieldSizing = getPeerFieldSizing(fieldSizingStep);
+
+  // Lightning effect per sender while a received Nut Drop redeems —
+  // re-renders gate component mount/unmount only; the animation itself runs
+  // on the UI thread inside LightningStrike. Lifted to the screen so the
+  // celebration hook observes the same map the radar renders from.
+  const strikeMap = useNutDropStrike();
+  const { celebration, skip: skipCelebration } = useNutDropCelebration({
+    strikeMap,
+    // Any send-flow stage (transitioning/amount or a shared-avatar flight)
+    // defers ceremonies — never hijack the amount panel.
+    gated: inlinePhase !== 'picking' || !!sharedAvatarPeer,
+  });
+  const getPeerStageRef = useRef<PeerStageResolver | null>(null);
+  const [celebrationStage, setCelebrationStage] = useState<{
+    peerID: string;
+    sourceRect: AvatarRect | null;
+    peer: CelebrationPeerIdentity;
+  } | null>(null);
+
+  // Stage the flying identity once per ceremony: rect + identity captured at
+  // fire time so a sender vanishing mid-ceremony cannot blank the overlay.
+  useEffect(() => {
+    const current = celebration.phase !== 'idle' ? celebration.current : null;
+    if (!current) {
+      setCelebrationStage(null);
+      return;
+    }
+    setCelebrationStage((previous) => {
+      if (previous?.peerID === current.peerID) return previous;
+      const staged = getPeerStageRef.current?.(current.peerID) ?? null;
+      return {
+        peerID: current.peerID,
+        sourceRect: staged?.rect ?? null,
+        peer: staged
+          ? {
+              peerID: current.peerID,
+              name: staged.peer.name,
+              avatarUrl: staged.peer.avatarUrl ?? null,
+              profileLoading: staged.peer.profileLoading,
+            }
+          : { peerID: current.peerID, name: '', avatarUrl: null, profileLoading: false },
+      };
+    });
+  }, [celebration]);
+
+  const resolveCelebrationReturnRect = useCallback(() => {
+    const peerID = celebrationStage?.peerID;
+    if (!peerID) return null;
+    return getPeerStageRef.current?.(peerID)?.rect ?? null;
+  }, [celebrationStage?.peerID]);
 
   useEffect(() => {
     paymentLog.debug('near_pay.perf.session_state', {
@@ -1942,6 +2042,9 @@ export function NearPayScreen() {
                 <NearPayPeerField
                   peers={pickerPeers}
                   sizing={fieldSizing}
+                  strikeMap={strikeMap}
+                  celebrationPeerID={celebrationStage?.peerID ?? null}
+                  getPeerStageRef={getPeerStageRef}
                   emptyContent={emptyContent}
                   onSelect={handleSelectPeer}
                   selectedPeerID={sharedAvatarPeer?.peerID ?? null}
@@ -1974,6 +2077,25 @@ export function NearPayScreen() {
                     />
                   </View>
                 </Animated.View>
+              ) : null}
+              {celebrationStage && celebration.phase !== 'idle' && celebration.current ? (
+                <NutDropCelebrationOverlay
+                  peer={celebrationStage.peer}
+                  amount={celebration.current.amount}
+                  unit={celebration.current.unit}
+                  phase={celebration.phase}
+                  sourceRect={celebrationStage.sourceRect}
+                  resolveReturnRect={resolveCelebrationReturnRect}
+                  containerSize={containerSize}
+                  topInset={CELEBRATION_TOP_INSET}
+                  bottomAvoidance={
+                    NEAR_PAY_ACTION_ROW_HEIGHT +
+                    NEAR_PAY_ACTION_ROW_BOTTOM +
+                    spacing.lg +
+                    insets.bottom
+                  }
+                  onSkip={skipCelebration}
+                />
               ) : null}
             </>
           )}

@@ -48,6 +48,15 @@ describe('classifyToken', () => {
     expect(classifyToken(token, MY_PUBKEY).classification).toBe('locked-to-other');
   });
 
+  it("never classifies the sender's own broadcast echo as locked-to-me", () => {
+    // Celebration guard: a Nut Drop sender sees their own public-mesh
+    // broadcast echoed back. The token is locked to the RECIPIENT's key, so
+    // from the sender's perspective it classifies locked-to-other — keeping
+    // it out of the redeem queue and therefore out of the celebration.
+    const senderEcho = encode([proof(p2pkSecret(OTHER_PUBKEY), 21)]);
+    expect(classifyToken(senderEcho, MY_PUBKEY).classification).toBe('locked-to-other');
+  });
+
   it('treats mixed locked + bearer proofs as locked-to-other', () => {
     const token = encode([proof(p2pkSecret(MY_PUBKEY)), proof('aa'.repeat(32))]);
     expect(classifyToken(token, MY_PUBKEY).classification).toBe('locked-to-other');

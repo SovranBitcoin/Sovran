@@ -72,7 +72,14 @@ function strikeMapsEqual(
   if (a.size !== b.size) return false;
   for (const [peerID, state] of a) {
     const other = b.get(peerID);
-    if (!other || other.status !== state.status || other.entrance !== state.entrance) {
+    if (
+      !other ||
+      other.status !== state.status ||
+      other.entrance !== state.entrance ||
+      // A coalesced second redemption must propagate to the celebration's
+      // amount reveal even though the status stays 'success'.
+      other.redeemedAmount !== state.redeemedAmount
+    ) {
       return false;
     }
   }
