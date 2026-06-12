@@ -1,14 +1,20 @@
 /**
  * Pure state machine for the Nut Drop receive celebration — the full-screen
- * gold takeover that plays when a P2PK-locked drop finishes redeeming while
- * the radar is open. No timers, no store access: the hook observes strike
- * 'active' → 'success' transitions, dispatches events with explicit `now`
- * stamps, and schedules `phase-complete` for the choreography beats.
+ * gold takeover on the radar. No timers, no store access: the hook observes
+ * strike-map transitions, dispatches events with explicit `now` stamps, and
+ * schedules `phase-complete` for the choreography beats.
+ *
+ * The ceremony starts when a locked drop ARRIVES (fresh strike turns
+ * active): the sender's avatar flies to center stage and crackles gold
+ * while the redeem runs ('awaiting'). The impact (sky bolts + haptic +
+ * amount reveal) fires only on CONFIRMED success — truth still gates the
+ * payoff, the staging just starts earlier. A failed or stuck redeem exits
+ * with a quiet return flight, no impact.
  *
  * Restraint rules live here (unit-tested), not in the animation code:
- * - one ceremony at a time; same-sender drops mid-ceremony coalesce into the
- *   displayed amount; other senders queue (cap 2 — overflow drops silently,
- *   the payment toast already carried the money truth);
+ * - one ceremony at a time; same-sender redemptions fold into the displayed
+ *   amount; other senders queue (cap 2 — overflow drops silently, the
+ *   payment toast already carried the money truth);
  * - repeats inside the cooldown and anything played from the queue use the
  *   abbreviated hold (repeat-exposure fatigue);
  * - while gated (send flow active) requests defer, and only requests still
@@ -17,13 +23,14 @@
  *   flight — the celebration never blocks an interaction.
  */
 
-export type CelebrationPhase = 'idle' | 'centering' | 'held' | 'returning';
+export type CelebrationPhase = 'idle' | 'centering' | 'awaiting' | 'held' | 'returning';
 
 export interface CelebrationRequest {
   peerID: string;
-  amount: number;
+  /** Confirmed redeemed amount — null until the strike reports success. */
+  amount: number | null;
   unit: string;
-  /** When the strike success was observed (UNIX ms) — freshness anchor. */
+  /** When the request was last refreshed (UNIX ms) — freshness anchor. */
   firedAt: number;
   /** Abbreviated hold for queued / inside-cooldown repeats. */
   abbreviated: boolean;
@@ -45,7 +52,12 @@ export interface CelebrationState {
 }
 
 export type CelebrationEvent =
+  /** A fresh locked drop started redeeming — begin the takeover. */
+  | { type: 'strike-active'; peerID: string; unit: string; now: number }
+  /** The redeem confirmed; `amount` is the per-cycle delta. */
   | { type: 'strike-success'; peerID: string; amount: number; unit: string; now: number }
+  /** The redeem failed or went backoff-stuck — exit without an impact. */
+  | { type: 'strike-failed'; peerID: string; now: number }
   | { type: 'gate-changed'; gated: boolean; now: number }
   /**
    * `phase` is the phase the sender's timer was scheduled FOR — a stale
@@ -71,8 +83,31 @@ export const INITIAL_CELEBRATION_STATE: CelebrationState = {
   ceremonyId: 0,
 };
 
+const ACTIVE_PHASES: readonly CelebrationPhase[] = ['centering', 'awaiting', 'held'];
+
+function isPlaying(state: CelebrationState): boolean {
+  return ACTIVE_PHASES.includes(state.phase);
+}
+
 function pruneFresh(queue: readonly CelebrationRequest[], now: number): CelebrationRequest[] {
   return queue.filter((request) => now - request.firedAt <= CELEBRATION_FRESHNESS_MS);
+}
+
+function startCeremony(
+  state: CelebrationState,
+  request: CelebrationRequest,
+  now: number,
+  forceAbbreviated: boolean
+): CelebrationState {
+  const withinCooldown =
+    state.lastStartedAt !== null && now - state.lastStartedAt < CELEBRATION_COOLDOWN_MS;
+  return {
+    ...state,
+    phase: 'centering',
+    current: { ...request, abbreviated: forceAbbreviated || withinCooldown },
+    lastStartedAt: now,
+    ceremonyId: state.ceremonyId + 1,
+  };
 }
 
 /** Pop the next fresh queued request into a playing ceremony, if allowed. */
@@ -82,15 +117,8 @@ function startNext(state: CelebrationState, now: number): CelebrationState {
     return { ...state, phase: 'idle', current: null, queue: fresh };
   }
   const [next, ...rest] = fresh;
-  return {
-    ...state,
-    phase: 'centering',
-    // Anything that had to wait plays the abbreviated hold.
-    current: { ...next, abbreviated: true },
-    queue: rest,
-    lastStartedAt: now,
-    ceremonyId: state.ceremonyId + 1,
-  };
+  // Anything that had to wait plays the abbreviated hold.
+  return startCeremony({ ...state, queue: rest }, next, now, true);
 }
 
 function enqueue(state: CelebrationState, request: CelebrationRequest): CelebrationState {
@@ -101,7 +129,7 @@ function enqueue(state: CelebrationState, request: CelebrationRequest): Celebrat
     const existing = queue[existingIndex];
     queue[existingIndex] = {
       ...existing,
-      amount: existing.amount + request.amount,
+      amount: request.amount === null ? existing.amount : (existing.amount ?? 0) + request.amount,
       // A fresh drop refreshes the freshness anchor.
       firedAt: request.firedAt,
     };
@@ -116,7 +144,40 @@ export function celebrationReducer(
   event: CelebrationEvent
 ): CelebrationState {
   switch (event.type) {
+    case 'strike-active': {
+      // Already celebrating this sender — the success event will fold in.
+      if (state.current?.peerID === event.peerID && isPlaying(state)) return state;
+      const request: CelebrationRequest = {
+        peerID: event.peerID,
+        amount: null,
+        unit: event.unit,
+        firedAt: event.now,
+        abbreviated: false,
+      };
+      if (state.phase !== 'idle' || state.gated) return enqueue(state, request);
+      return startCeremony(state, request, event.now, false);
+    }
+
     case 'strike-success': {
+      // Same sender mid-ceremony: confirm/extend the displayed amount. From
+      // 'awaiting' the impact fires immediately; from 'centering' it fires
+      // on arrival (the beat clock sees the amount and goes to 'held').
+      if (state.current && state.current.peerID === event.peerID) {
+        if (state.phase === 'centering' || state.phase === 'awaiting' || state.phase === 'held') {
+          return {
+            ...state,
+            phase: state.phase === 'awaiting' ? 'held' : state.phase,
+            current: {
+              ...state.current,
+              amount: (state.current.amount ?? 0) + event.amount,
+              unit: event.unit,
+            },
+          };
+        }
+        // 'returning' — this redeem already had its ceremony interrupted or
+        // is a fresh drop landing late; queue a fresh (abbreviated) one.
+      }
+
       const request: CelebrationRequest = {
         peerID: event.peerID,
         amount: event.amount,
@@ -124,32 +185,23 @@ export function celebrationReducer(
         firedAt: event.now,
         abbreviated: false,
       };
+      if (state.phase !== 'idle' || state.gated) return enqueue(state, request);
+      // Success with no prior staging (ambient entries, races): play the
+      // whole ceremony with the amount known — impact on arrival.
+      return startCeremony(state, request, event.now, false);
+    }
 
-      // Same sender mid-ceremony: fold into the displayed amount.
+    case 'strike-failed': {
+      // Quiet exit: no impact, no amount — the toast carries the error.
+      const queue = state.queue.filter((queued) => queued.peerID !== event.peerID);
+      const queueChanged = queue.length !== state.queue.length;
       if (
-        state.current &&
-        state.current.peerID === event.peerID &&
-        (state.phase === 'centering' || state.phase === 'held')
+        state.current?.peerID === event.peerID &&
+        (state.phase === 'centering' || state.phase === 'awaiting')
       ) {
-        return {
-          ...state,
-          current: { ...state.current, amount: state.current.amount + event.amount },
-        };
+        return { ...state, queue, phase: 'returning' };
       }
-
-      if (state.phase !== 'idle' || state.gated) {
-        return enqueue(state, request);
-      }
-
-      const withinCooldown =
-        state.lastStartedAt !== null && event.now - state.lastStartedAt < CELEBRATION_COOLDOWN_MS;
-      return {
-        ...state,
-        phase: 'centering',
-        current: { ...request, abbreviated: withinCooldown },
-        lastStartedAt: event.now,
-        ceremonyId: state.ceremonyId + 1,
-      };
+      return queueChanged ? { ...state, queue } : state;
     }
 
     case 'gate-changed': {
@@ -158,10 +210,8 @@ export function celebrationReducer(
       if (event.gated === state.gated) return state;
       if (event.gated) {
         // A send flow took the stage: fast-forward any playing ceremony to
-        // its return flight. The haptic/toast already happened — only the
-        // decorative tier yields.
-        const interrupted = state.phase === 'centering' || state.phase === 'held';
-        return { ...state, gated: true, phase: interrupted ? 'returning' : state.phase };
+        // its return flight. Only the decorative tier yields.
+        return { ...state, gated: true, phase: isPlaying(state) ? 'returning' : state.phase };
       }
       const ungated = { ...state, gated: false };
       return ungated.phase === 'idle' ? startNext(ungated, event.now) : ungated;
@@ -169,11 +219,21 @@ export function celebrationReducer(
 
     case 'phase-complete': {
       // A timer scheduled for an earlier phase lost a race (skip, gate
-      // interrupt) — ignore it rather than cutting the new phase short.
+      // interrupt, success-driven 'awaiting' → 'held') — ignore it rather
+      // than cutting the new phase short.
       if (event.phase !== state.phase) return state;
       switch (state.phase) {
         case 'centering':
-          return { ...state, phase: 'held' };
+          // Arrival: impact if the redeem already confirmed, otherwise park
+          // at center and crackle until it does.
+          return {
+            ...state,
+            phase: state.current !== null && state.current.amount !== null ? 'held' : 'awaiting',
+          };
+        case 'awaiting':
+          // Safety timeout — the strike layer normally reports failure
+          // first (its own max-active cap), but never hold center forever.
+          return { ...state, phase: 'returning' };
         case 'held':
           return { ...state, phase: 'returning' };
         case 'returning':
@@ -185,9 +245,7 @@ export function celebrationReducer(
     }
 
     case 'skip': {
-      if (state.phase === 'centering' || state.phase === 'held') {
-        return { ...state, phase: 'returning' };
-      }
+      if (isPlaying(state)) return { ...state, phase: 'returning' };
       return state;
     }
 

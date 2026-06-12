@@ -654,6 +654,10 @@ const PeerNode = React.memo(function PeerNode({
               entrance={strike.entrance}
               seed={target.peer.peerID}
               frameSize={sizing.avatarSize}
+              // Gold everywhere: the celebration owns fresh drops, so the
+              // node strike only covers edge cases (gated/queued/ambient/
+              // reduced-motion) and must match the ceremony's palette.
+              palette="storm-gold"
             />
           ) : null}
           {!target.peer.supportsP2pkEcash ? (

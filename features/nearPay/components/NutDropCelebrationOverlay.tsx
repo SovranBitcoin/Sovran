@@ -47,9 +47,16 @@ export const CELEBRATION_CENTERING_MS = duration.standard;
 export const CELEBRATION_HOLD_MS = duration.deliberate;
 export const CELEBRATION_HOLD_ABBREVIATED_MS = duration.slow;
 export const CELEBRATION_RETURN_MS = duration.standard;
+/**
+ * Safety cap for the 'awaiting' act (avatar parked center-stage while the
+ * redeem runs). The strike layer normally ends the wait first — success or
+ * its own max-active failure — this only guards against a vanished entry.
+ */
+export const CELEBRATION_AWAITING_TIMEOUT_MS = 10_000;
 
 const PHASE_STRIKE_STATUS: Record<Exclude<CelebrationPhase, 'idle'>, StrikeStatus> = {
   centering: 'active',
+  awaiting: 'active',
   held: 'success',
   returning: 'fading',
 };
@@ -75,7 +82,8 @@ export function NutDropCelebrationOverlay({
   onSkip,
 }: {
   peer: CelebrationPeerIdentity;
-  amount: number;
+  /** Null while the redeem is still running ('centering'/'awaiting'). */
+  amount: number | null;
   unit: string;
   phase: Exclude<CelebrationPhase, 'idle'>;
   /** Radar rect captured at fire time; null = sender off-radar (fade in). */
@@ -152,6 +160,12 @@ export function NutDropCelebrationOverlay({
       scrimOpacity.set(
         withTiming(alpha.strong, { duration: duration.standard, easing: Easing.out(Easing.quad) })
       );
+      return;
+    }
+
+    if (phase === 'awaiting') {
+      // Parked center-stage, gold crackle running — nothing new to animate;
+      // the strike layer ends this act (success → impact, failure → return).
       return;
     }
 
@@ -278,7 +292,7 @@ export function NutDropCelebrationOverlay({
           />
         </View>
       </Animated.View>
-      {labelContainerStyle ? (
+      {labelContainerStyle && amount !== null ? (
         <Animated.View pointerEvents="none" style={labelContainerStyle}>
           <Text size={20} weight="bold" style={receivedTextStyle}>
             Received {formatAmount({ amount, unit }, { currencyDisplay: 'name' })}

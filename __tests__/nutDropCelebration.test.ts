@@ -14,17 +14,27 @@ const ALICE = 'aaaa111122223333';
 const BOB = 'bbbb111122223333';
 const CAROL = 'cccc111122223333';
 
+function active(peerID: string, now = T0): CelebrationEvent {
+  return { type: 'strike-active', peerID, unit: 'sat', now };
+}
+
 function success(peerID: string, amount = 21, now = T0): CelebrationEvent {
   return { type: 'strike-success', peerID, amount, unit: 'sat', now };
+}
+
+function failed(peerID: string, now = T0): CelebrationEvent {
+  return { type: 'strike-failed', peerID, now };
 }
 
 function complete(phase: CelebrationPhase, now: number): CelebrationEvent {
   return { type: 'phase-complete', phase, now };
 }
 
-/** The standard full-beat sequence: centering → held → returning → idle. */
-function fullCycle(startNow = T0): CelebrationEvent[] {
+/** Drop arrives → confirms mid-flight → full beat sequence back to idle. */
+function fullCycle(peerID = ALICE, startNow = T0): CelebrationEvent[] {
   return [
+    active(peerID, startNow),
+    success(peerID, 21, startNow + 100),
     complete('centering', startNow + 300),
     complete('held', startNow + 1100),
     complete('returning', startNow + 1500),
@@ -36,12 +46,12 @@ function run(events: CelebrationEvent[], from = INITIAL_CELEBRATION_STATE): Cele
 }
 
 describe('celebrationReducer', () => {
-  it('starts a full-length ceremony from idle when ungated', () => {
-    const state = run([success(ALICE)]);
+  it('starts the takeover when a fresh drop arrives, amount unknown', () => {
+    const state = run([active(ALICE)]);
     expect(state.phase).toBe('centering');
     expect(state.current).toMatchObject({
       peerID: ALICE,
-      amount: 21,
+      amount: null,
       unit: 'sat',
       abbreviated: false,
     });
@@ -49,20 +59,47 @@ describe('celebrationReducer', () => {
     expect(state.ceremonyId).toBe(1);
   });
 
-  it('assigns a fresh ceremonyId to every ceremony, including queue pops', () => {
-    // Back-to-back ceremonies never pass through 'idle' — the overlay keys
-    // on ceremonyId to remount, so a queue pop MUST increment it.
-    let state = run([success(ALICE), success(BOB, 8, T0 + 100)]);
-    expect(state.ceremonyId).toBe(1);
-    state = run(fullCycle(), state);
-    expect(state.phase).toBe('centering');
-    expect(state.current?.peerID).toBe(BOB);
-    expect(state.ceremonyId).toBe(2);
+  it('parks at center (awaiting) when arrival precedes confirmation', () => {
+    let state = run([active(ALICE), complete('centering', T0 + 300)]);
+    expect(state.phase).toBe('awaiting');
+    // Confirmation while parked fires the impact immediately.
+    state = celebrationReducer(state, success(ALICE, 21, T0 + 900));
+    expect(state.phase).toBe('held');
+    expect(state.current).toMatchObject({ amount: 21 });
   });
 
-  it('advances centering → held → returning → idle on phase-complete', () => {
-    let state = run([success(ALICE)]);
+  it('fires the impact on arrival when confirmation lands mid-flight', () => {
+    let state = run([active(ALICE), success(ALICE, 21, T0 + 100)]);
+    expect(state.phase).toBe('centering');
+    expect(state.current).toMatchObject({ amount: 21 });
     state = celebrationReducer(state, complete('centering', T0 + 300));
+    expect(state.phase).toBe('held');
+  });
+
+  it('starts a ceremony from a bare success (ambient entries)', () => {
+    let state = run([success(ALICE, 21)]);
+    expect(state.phase).toBe('centering');
+    expect(state.current).toMatchObject({ peerID: ALICE, amount: 21 });
+    state = celebrationReducer(state, complete('centering', T0 + 300));
+    expect(state.phase).toBe('held');
+  });
+
+  it('exits quietly (no impact) when the redeem fails mid-ceremony', () => {
+    const fromAwaiting = run([active(ALICE), complete('centering', T0 + 300)]);
+    expect(celebrationReducer(fromAwaiting, failed(ALICE, T0 + 900)).phase).toBe('returning');
+
+    const fromCentering = run([active(ALICE)]);
+    expect(celebrationReducer(fromCentering, failed(ALICE, T0 + 100)).phase).toBe('returning');
+  });
+
+  it('times out the awaiting act instead of holding center forever', () => {
+    let state = run([active(ALICE), complete('centering', T0 + 300)]);
+    state = celebrationReducer(state, complete('awaiting', T0 + 10_300));
+    expect(state.phase).toBe('returning');
+  });
+
+  it('advances held → returning → idle on phase-complete', () => {
+    let state = run([active(ALICE), success(ALICE, 21, T0 + 100), complete('centering', T0 + 300)]);
     expect(state.phase).toBe('held');
     state = celebrationReducer(state, complete('held', T0 + 1100));
     expect(state.phase).toBe('returning');
@@ -75,7 +112,7 @@ describe('celebrationReducer', () => {
     // Timer armed for 'centering' fires just after a skip already moved the
     // ceremony to 'returning' — without the token it would cut the return
     // flight to zero and end the ceremony instantly.
-    let state = run([success(ALICE), { type: 'skip', now: T0 + 100 }]);
+    let state = run([active(ALICE), { type: 'skip', now: T0 + 100 }]);
     expect(state.phase).toBe('returning');
     const afterStale = celebrationReducer(state, complete('centering', T0 + 300));
     expect(afterStale).toBe(state);
@@ -83,52 +120,71 @@ describe('celebrationReducer', () => {
     expect(state.phase).toBe('idle');
   });
 
-  it('coalesces a same-sender drop into the playing ceremony amount', () => {
-    const state = run([success(ALICE, 21), success(ALICE, 34, T0 + 100)]);
-    expect(state.phase).toBe('centering');
+  it('a duplicate strike-active for the playing sender is a no-op', () => {
+    const playing = run([active(ALICE)]);
+    expect(celebrationReducer(playing, active(ALICE, T0 + 50))).toBe(playing);
+  });
+
+  it('folds a second same-sender confirmation into the held amount', () => {
+    let state = run([active(ALICE), success(ALICE, 21, T0 + 100), complete('centering', T0 + 300)]);
+    state = celebrationReducer(state, success(ALICE, 34, T0 + 500));
+    expect(state.phase).toBe('held');
     expect(state.current).toMatchObject({ amount: 55 });
     expect(state.queue).toHaveLength(0);
   });
 
   it('queues a different sender and plays them abbreviated afterwards', () => {
-    let state = run([success(ALICE), success(BOB, 8, T0 + 200)]);
+    let state = run([active(ALICE), active(BOB, T0 + 200)]);
+    expect(state.queue).toMatchObject([{ peerID: BOB, amount: null }]);
+
+    // Bob's redeem confirms while queued — the queued request is enriched.
+    state = celebrationReducer(state, success(BOB, 8, T0 + 400));
     expect(state.queue).toMatchObject([{ peerID: BOB, amount: 8 }]);
 
-    state = run(fullCycle(), state);
+    state = run(
+      [
+        success(ALICE, 21, T0 + 500),
+        complete('centering', T0 + 600),
+        complete('held', T0 + 1400),
+        complete('returning', T0 + 1800),
+      ],
+      state
+    );
     expect(state.phase).toBe('centering');
     expect(state.current).toMatchObject({ peerID: BOB, amount: 8, abbreviated: true });
+    expect(state.ceremonyId).toBe(2);
   });
 
-  it('coalesces same-sender requests inside the queue', () => {
-    const state = run([success(ALICE), success(BOB, 8, T0 + 100), success(BOB, 5, T0 + 200)]);
-    expect(state.queue).toMatchObject([{ peerID: BOB, amount: 13, firedAt: T0 + 200 }]);
+  it('removes a queued sender whose redeem fails', () => {
+    let state = run([active(ALICE), active(BOB, T0 + 200)]);
+    state = celebrationReducer(state, failed(BOB, T0 + 400));
+    expect(state.queue).toHaveLength(0);
+    expect(state.phase).toBe('centering');
   });
 
   it('caps the queue and drops overflow silently', () => {
     const state = run([
-      success(ALICE),
-      success(BOB, 8, T0 + 100),
-      success(CAROL, 5, T0 + 200),
-      success('dddd111122223333', 3, T0 + 300),
+      active(ALICE),
+      active(BOB, T0 + 100),
+      active(CAROL, T0 + 200),
+      active('dddd111122223333', T0 + 300),
     ]);
     expect(state.queue).toHaveLength(CELEBRATION_QUEUE_CAP);
     expect(state.queue.map((request) => request.peerID)).toEqual([BOB, CAROL]);
   });
 
   it('evicts stale queue entries instead of letting them hold cap slots', () => {
-    // Bob and Carol defer while gated, then go stale; a fresh sender must
-    // still find room — stale deferrals never block fresh ceremonies.
     let state = run([
       { type: 'gate-changed', gated: true, now: T0 },
-      success(ALICE, 21, T0 + 100),
-      success(BOB, 8, T0 + 100),
-      success(CAROL, 5, T0 + 100),
+      active(ALICE, T0 + 100),
+      active(BOB, T0 + 100),
+      active(CAROL, T0 + 100),
     ]);
     expect(state.queue).toHaveLength(2);
 
     const lateNow = T0 + 100 + CELEBRATION_FRESHNESS_MS + 1;
-    state = celebrationReducer(state, success('eeee111122223333', 3, lateNow));
-    expect(state.queue).toMatchObject([{ peerID: 'eeee111122223333', amount: 3 }]);
+    state = celebrationReducer(state, active('eeee111122223333', lateNow));
+    expect(state.queue).toMatchObject([{ peerID: 'eeee111122223333' }]);
   });
 
   it('defers requests while gated and plays only fresh ones when the gate lifts', () => {
@@ -144,30 +200,23 @@ describe('celebrationReducer', () => {
     const ungateAt = T0 + 100 + CELEBRATION_FRESHNESS_MS + 1;
     state = celebrationReducer(state, { type: 'gate-changed', gated: false, now: ungateAt });
     expect(state.phase).toBe('centering');
-    expect(state.current).toMatchObject({ peerID: BOB, abbreviated: true });
-    expect(state.queue).toHaveLength(0);
-  });
-
-  it('stays idle when the gate lifts and every deferred request went stale', () => {
-    let state = run([{ type: 'gate-changed', gated: true, now: T0 }, success(ALICE, 21, T0 + 100)]);
-    state = celebrationReducer(state, {
-      type: 'gate-changed',
-      gated: false,
-      now: T0 + 100 + CELEBRATION_FRESHNESS_MS + 1,
-    });
-    expect(state.phase).toBe('idle');
+    expect(state.current).toMatchObject({ peerID: BOB, amount: 8, abbreviated: true });
     expect(state.queue).toHaveLength(0);
   });
 
   it('fast-forwards a playing ceremony to returning when the gate closes', () => {
-    const state = run([success(ALICE), { type: 'gate-changed', gated: true, now: T0 + 100 }]);
-    expect(state.phase).toBe('returning');
-    expect(state.gated).toBe(true);
+    const centering = run([active(ALICE), { type: 'gate-changed', gated: true, now: T0 + 100 }]);
+    expect(centering.phase).toBe('returning');
+
+    const awaiting = run([
+      active(ALICE),
+      complete('centering', T0 + 300),
+      { type: 'gate-changed', gated: true, now: T0 + 400 },
+    ]);
+    expect(awaiting.phase).toBe('returning');
   });
 
   it('bails identically (same reference) on no-op gate events', () => {
-    // The hook syncs the gate on mount and on unrelated re-renders;
-    // useReducer skips the re-render entirely when the reference is stable.
     expect(
       celebrationReducer(INITIAL_CELEBRATION_STATE, {
         type: 'gate-changed',
@@ -175,34 +224,37 @@ describe('celebrationReducer', () => {
         now: T0,
       })
     ).toBe(INITIAL_CELEBRATION_STATE);
-
-    const playing = run([success(ALICE)]);
-    expect(celebrationReducer(playing, { type: 'gate-changed', gated: false, now: T0 + 50 })).toBe(
-      playing
-    );
   });
 
-  it('skip jumps to the return flight and is a no-op while idle', () => {
-    const playing = run([success(ALICE)]);
-    expect(celebrationReducer(playing, { type: 'skip', now: T0 + 100 }).phase).toBe('returning');
+  it('skip jumps to the return flight from any playing act', () => {
+    expect(celebrationReducer(run([active(ALICE)]), { type: 'skip', now: T0 + 100 }).phase).toBe(
+      'returning'
+    );
+    const awaiting = run([active(ALICE), complete('centering', T0 + 300)]);
+    expect(celebrationReducer(awaiting, { type: 'skip', now: T0 + 400 }).phase).toBe('returning');
     expect(celebrationReducer(INITIAL_CELEBRATION_STATE, { type: 'skip', now: T0 })).toBe(
       INITIAL_CELEBRATION_STATE
     );
   });
 
   it('abbreviates a fresh start inside the cooldown window', () => {
-    let state = run([success(ALICE), ...fullCycle()]);
-    state = celebrationReducer(state, success(BOB, 8, T0 + 2000));
+    let state = run(fullCycle());
+    state = celebrationReducer(state, active(BOB, T0 + 2000));
     expect(state.current).toMatchObject({ peerID: BOB, abbreviated: true });
 
     // Past the cooldown the full ceremony returns.
-    let later = run([success(ALICE), ...fullCycle()]);
-    later = celebrationReducer(later, success(BOB, 8, T0 + CELEBRATION_COOLDOWN_MS + 1));
+    let later = run(fullCycle());
+    later = celebrationReducer(later, active(BOB, T0 + CELEBRATION_COOLDOWN_MS + 1));
     expect(later.current).toMatchObject({ peerID: BOB, abbreviated: false });
   });
 
-  it('a same-sender drop during the return flight queues a fresh ceremony', () => {
-    let state = run([success(ALICE), complete('centering', T0 + 300), complete('held', T0 + 1100)]);
+  it('a same-sender confirmation during the return flight queues a fresh ceremony', () => {
+    let state = run([
+      active(ALICE),
+      success(ALICE, 21, T0 + 100),
+      complete('centering', T0 + 300),
+      complete('held', T0 + 1100),
+    ]);
     expect(state.phase).toBe('returning');
     state = celebrationReducer(state, success(ALICE, 5, T0 + 1200));
     expect(state.queue).toMatchObject([{ peerID: ALICE, amount: 5 }]);
@@ -211,8 +263,25 @@ describe('celebrationReducer', () => {
     expect(state.current).toMatchObject({ peerID: ALICE, amount: 5, abbreviated: true });
   });
 
+  it('assigns a fresh ceremonyId to every ceremony, including queue pops', () => {
+    let state = run([active(ALICE), active(BOB, T0 + 100), success(BOB, 8, T0 + 150)]);
+    expect(state.ceremonyId).toBe(1);
+    state = run(
+      [
+        success(ALICE, 21, T0 + 200),
+        complete('centering', T0 + 300),
+        complete('held', T0 + 1100),
+        complete('returning', T0 + 1500),
+      ],
+      state
+    );
+    expect(state.phase).toBe('centering');
+    expect(state.current?.peerID).toBe(BOB);
+    expect(state.ceremonyId).toBe(2);
+  });
+
   it('reset returns to the initial state', () => {
-    const state = run([success(ALICE), { type: 'reset' }]);
+    const state = run([active(ALICE), { type: 'reset' }]);
     expect(state).toBe(INITIAL_CELEBRATION_STATE);
   });
 });
