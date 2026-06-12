@@ -5,90 +5,94 @@
 
 ---
 
-**Title:** Proposal: reserved announce-TLV range for vendor extensions (and/or a standard ecash-capability TLV)
+**Title:** Proposal: documented vendor ranges for announce TLVs and Noise payload types
 
 ## Context
 
-The announce payload decoders on both platforms are deliberately tolerant —
-unknown TLV types are skipped (`Packets.swift` / `IdentityAnnouncement.kt`,
-"tolerant decoder for forward compatibility", covered by
-`announcementPacketRoundTripsNeighborsAndSkipsUnknownTLVs`). That makes
-announce TLVs a clean, vanilla-compatible extension point, and the ecosystem
-is already using it that way:
+Both extension seams in the protocol are already tolerant by design:
 
-- upstream itself added `0x04` (direct neighbors) for source routing;
+- **Announce TLVs**: unknown types are skipped (`Packets.swift` /
+  `IdentityAnnouncement.kt`, "tolerant decoder for forward compatibility",
+  covered by `announcementPacketRoundTripsNeighborsAndSkipsUnknownTLVs`).
+- **Noise payload types**: unknown first bytes after decryption are dropped
+  silently on both platforms — Android upstream itself used this seam to
+  add file transfer (`0x20`+) without an iOS counterpart breaking.
+
+The ecosystem is already extending through both seams without coordination:
+
+- upstream added announce TLV `0x04` (direct neighbors) for source routing;
 - at least one fork (bitpoints.me) shipped its own TLV at… also `0x04`,
   colliding with upstream's later allocation;
-- we (Sovran) ship a capability TLV at `0xF0` (details below).
+- #1053 informally squats Noise payload types `0x20`/`0x21` for
+  Lightning/Cashu packets while Android file transfer already uses `0x20`+;
+- we (Sovran) ship an announce TLV at `0xF0` and Noise payload types
+  `0xA0`–`0xA3` (details below).
 
-Meanwhile #1053 (Lightning/Cashu payment payloads over Noise, types
-0x20/0x21) shows payments are an active direction for the protocol, and
-#1073 (protocol SDKs) anticipates more third-party implementations. More
-extensions are coming; today there is no guidance on how they should claim
-TLV space, so collisions like the `0x04` one will repeat silently — a TLV
-collision in announce parsing means one client misreads another's bytes as
-its own structure.
+More extensions are coming (#1073 anticipates third-party SDKs). Without
+guidance, collisions like the `0x04` one will repeat silently — a collision
+means one client misreads another's bytes as its own structure.
 
-## Proposal A — reserve a vendor extension range
+## Proposal — reserve vendor ranges (documentation only)
 
 Document in the protocol docs (WHITEPAPER / SOURCE_ROUTING style):
 
-1. Announce TLV types `0x01`–`0xEF` are reserved for the core protocol,
-   allocated sequentially by upstream.
-2. Types `0xF0`–`0xFE` are open for vendor/application extensions.
-3. A vendor extension's value MUST begin with a short fixed ASCII magic
-   (4–8 bytes) identifying the extension, so two vendors landing on the same
-   type fail closed on the magic check instead of misparsing each other.
-4. Decoders MUST continue to skip unknown TLVs (already true) and SHOULD
-   ignore trailing bytes beyond an extension's documented length, so
-   extensions can append fields without version dances.
+1. Announce TLV types `0x01`–`0xEF` and Noise payload types `0x01`–`0x9F`
+   are reserved for the core protocol, allocated by upstream.
+2. Announce TLVs `0xF0`–`0xFE` and Noise payload types `0xA0`–`0xEF` are
+   open for vendor/application extensions.
+3. A vendor announce TLV's value MUST begin with a short fixed ASCII magic
+   (4–8 bytes), so two vendors landing on the same type fail closed on the
+   magic check instead of misparsing each other. (Noise payloads need no
+   magic — they only flow between peers that negotiated the capability,
+   e.g. via an announce TLV.)
+4. Decoders MUST keep skipping unknown TLVs / dropping unknown payload
+   types (already true) and SHOULD ignore trailing bytes beyond an
+   extension's documented length, so extensions can append fields without
+   version dances.
 
-This costs upstream nothing in code — it's pure documentation of the
-behavior the decoders already have.
+This costs upstream nothing in code — it documents behavior the decoders
+already have.
 
-## Proposal B — standardize an ecash-capability TLV
+## What we ship through these seams (concrete example)
 
-If upstream would rather absorb the concrete use case: we ship a TLV that
-advertises "this peer's wallet can receive P2PK-locked cashu, locked to this
-key". It exists because broadcasting a bearer `cashu…` token (which stock
-bitchat already renders as redeemable) is claimable by anyone in range, and
-locking (Cashu NUT-11) is only safe if the sender knows the recipient can
-redeem the lock — otherwise the funds are destroyed for both sides.
-
-Wire format (full spec + test vector in our repo, happy to PR it as a doc):
+A 6-byte ecash capability beacon and an in-band Cashu payment exchange —
+full spec in [`nut18-bitchat-transport.md`](./nut18-bitchat-transport.md)
+(being proposed to cashubtc/nuts as a NUT-18 transport definition):
 
 ```
-type  = 0xF0
-len   = 40            (decoders accept len >= 40)
-value = "NUTXX" (5) | version 0x01 (1) | flags (1)
-        | compressed P2PK pubkey (33 = 0x02 || x-only key)
+announce TLV 0xF0, len 6:  "NUTB" | version 0x02 | flags
+  bit0 = answers cashu payment-request solicits over Noise
+  bit1 = auto-redeems received ecash
 
-flags bit0 = auto-redeems tokens locked to the announced key
+Noise payloads (between capable peers only):
+  0xA0 solicit a payment request   0xA1 the request ("creq…")
+  0xA2 the payment (NUT-18 JSON)   0xA3 received/redeemed/rejected
 ```
 
 Properties worth noting:
 
-- appended **before** the announce is signed, so the Ed25519 signature
-  covers it and unmodified clients verify the announce normally;
-- per-announce authoritative (a verified announce without the TLV clears the
-  peer's recorded capability) — same semantics as the `0x04` neighbors TLV;
-- vanilla clients are unaffected: they skip the TLV and still render
-  broadcast tokens as today. Clients implementing it stop sending bearer
-  tokens to peers that can receive locked ones.
+- the TLV is appended **before** the announce is signed, so the Ed25519
+  signature covers it and unmodified clients verify normally;
+- per-announce authoritative (a verified announce without the TLV clears
+  the peer's recorded capability) — same semantics as the `0x04` TLV;
+- no key material on the air: the receiver's lock key and trusted mints
+  travel per-exchange inside a standard NUT-18 payment request, so locked
+  payments are only ever made against a request the receiver just issued;
+- vanilla clients are completely unaffected on both seams.
 
-This is complementary to #1053: #1053 moves payment payloads into the Noise
-channel between two upgraded clients; this TLV solves discovery — knowing
-*before sending* that the peer can receive a locked payment at all, over the
-existing public path that works with unmodified receivers.
+This is complementary to #1053 (which moves payment payloads into Noise
+with a new packet model): the same outcome falls out of existing NUT-18
+artifacts over the existing typed-payload seam, with no protocol-version
+bump. And it sidesteps #784's 255-byte private-message cap — the payloads
+ride `noiseEncrypted` packets, which the transport already fragments.
 
 ## Ask
 
-1. Would you take a docs PR reserving `0xF0`–`0xFE` for vendor extensions
-   with the magic-prefix convention (Proposal A)?
-2. Any interest in the ecash-capability TLV as a documented optional
-   extension (Proposal B)? We're happy to adapt our allocation (type byte,
-   magic, layout) to whatever upstream prefers — nothing is frozen on our
-   side.
+1. Would you take a docs PR reserving the two vendor ranges above?
+2. If upstream would rather absorb the concrete use case into the protocol
+   docs as an optional extension, we're happy to adapt our allocation
+   (type bytes, magic, layout) to whatever upstream prefers — nothing is
+   frozen on our side, and both ends of the exchange are ours.
 
 ## Separate finding: packet signatures are not verifiable cross-platform once payloads compress
 
@@ -119,3 +123,28 @@ Suggested fix: make the signing form compression-independent — e.g.
 platforms. Wire format stays unchanged (transmitted packets still
 compress); only the signature input becomes canonical. We're running this
 patch in our fork and can PR it if there's interest.
+
+---
+
+# Calle brief (off-GitHub outreach)
+
+> Short message for Calle (Cashu author, bitchat collaborator — the
+> designated reviewer for cashu-adjacent bitchat work, who asked the
+> bitpoints author to take exactly this conversation to DMs). Telegram /
+> X / Nostr; trim to taste.
+
+Hey — we built what #784 / bitchat-android#506 / #1053 have been circling:
+Cashu over bitchat, but as a **NUT-18 transport** instead of a new
+protocol. Receiver answers an in-band solicit with a real single-use
+`creq` (fresh P2PK `nut10`, their trusted mints as `m`, empty transport =
+in-band per spec); sender pays it as a normal PaymentRequestPayload over
+the Noise session; received/redeemed statuses come back the same way. A
+6-byte announce TLV is the only discovery surface — no keys on the air.
+Stock clients are untouched (both platforms drop unknown Noise payload
+types / announce TLVs by design), it clears the 255-byte DM cap via the
+existing fragmentation, and it kills the untrusted-mint and blind-locking
+footguns before any money moves. Shipping in Sovran on iOS + Android now.
+Draft spec: `nut18-bitchat-transport.md` (happy to PR it to cashubtc/nuts
+as a transport definition if you think it fits). Would love your read on
+whether the wallet-side conventions (single-use, 120s expiry, sender-offline
+bearer flag) match how you'd want wallets to do this.

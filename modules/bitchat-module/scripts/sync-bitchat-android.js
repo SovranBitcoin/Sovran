@@ -98,13 +98,14 @@ const PATCHES = [
       '    // sessions via encryptionService; the vendor exposes no public reset.\n' +
       '    internal val encryptionService = EncryptionService(context)',
   },
-  // --- Ecash capability announce extension TLV (0xF0) ---
+  // --- Ecash capability beacon TLV (0xF0) ---
   //
-  // Clients that can receive P2PK-locked cashu advertise it with an announce
-  // TLV (magic "NUTXX" + capability flags + the profile's Cashu P2PK pubkey)
-  // so the Nut Drop UI can lock tokens to capable peers. Open extension —
-  // any bitchat client may implement it (spec draft in
-  // modules/bitchat-module/docs/nut-xx-ecash-capability-announcement.md).
+  // A 6-byte flags-only beacon (magic "NUTB" + version + capability flags):
+  // "this peer answers NUT-18 payment-request solicits over Noise". No key
+  // material on the air — the lock key + trusted mints travel per-send
+  // inside the payment request. Open extension — any bitchat client may
+  // implement it (spec draft in
+  // modules/bitchat-module/docs/nut18-bitchat-transport.md).
   // Vanilla decoders skip unknown announce TLVs ("tolerant decoder" in
   // IdentityAnnouncement.kt), and the TLV is appended BEFORE signing —
   // exactly how upstream already appends its gossip TLV (0x04) here — so the

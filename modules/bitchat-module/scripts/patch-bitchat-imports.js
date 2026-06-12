@@ -104,13 +104,13 @@ const LINKSTATE_REPLACEMENT =
   '    // state for the hasDirectLink peer flag.\n' +
   '    func linkState(for peerID: PeerID)';
 
-// --- Append the ecash capability TLV (0xF0) to outgoing announces ---
+// --- Append the ecash capability beacon TLV (0xF0) to outgoing announces ---
 //
-// Clients that can receive P2PK-locked cashu advertise it with an announce
-// TLV (magic "NUTXX" + capability flags + the profile's Cashu P2PK pubkey)
-// so the Nut Drop UI can lock tokens to capable peers. Open extension — any
-// bitchat client may implement it (spec draft in
-// modules/bitchat-module/docs/nut-xx-ecash-capability-announcement.md).
+// A 6-byte flags-only beacon (magic "NUTB" + version + capability flags):
+// "this peer answers NUT-18 payment-request solicits over Noise". No key
+// material on the air — the lock key + trusted mints travel per-send inside
+// the payment request. Open extension — any bitchat client may implement it
+// (spec draft in modules/bitchat-module/docs/nut18-bitchat-transport.md).
 // Vanilla bitchat decoders skip unknown announce TLVs by design (upstream
 // Packets.swift "tolerant decoder" + unit test), and the TLV is appended
 // BEFORE signPacket so the Ed25519 announce signature covers it — vanilla
