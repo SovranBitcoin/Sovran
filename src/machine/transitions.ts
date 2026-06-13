@@ -35,8 +35,7 @@ function handleExecute(
   detectors: Detectors,
   walletCtx: WalletContext,
   unit: string,
-  offline?: boolean,
-  mesh?: { peerId: string; senderOffline: boolean }
+  offline?: boolean
 ): TransitionResult {
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
@@ -48,7 +47,6 @@ function handleExecute(
     unit,
     rawInput: input,
     offline,
-    ...(mesh ? { meshPeerId: mesh.peerId, meshBearer: mesh.senderOffline } : {}),
   };
 
   // Extract known data from the intent into context
@@ -66,10 +64,9 @@ function handleExecute(
       }
       if (intent.info.unit) ctx.unit = intent.info.unit;
       // A nostr transport entry is the request's identity disclosure
-      // (NUT-18 convention; mesh-solicited creqs carry the receiver's
-      // nprofile). Seeding recipientPubkey here lets the stage-2 profile
-      // resolver paint "Pay <name>" on the amount screen — for ANY creq,
-      // scanned or solicited.
+      // (NUT-18 convention). Seeding recipientPubkey here lets the stage-2
+      // profile resolver paint "Pay <name>" on the amount screen for any
+      // scanned creq.
       const nostrTransport = intent.info.transports?.find(
         (transport) => transport.type === 'nostr'
       );
@@ -320,9 +317,6 @@ function handleProofsChosen(
         amount: event.amount,
         recipientPubkey: ctx.recipientPubkey,
         recipientProfile: ctx.recipientProfile,
-        ...(ctx.meshPeerId
-          ? { meshPeerId: ctx.meshPeerId, meshBearer: ctx.meshBearer === true }
-          : {}),
       },
     };
   }
@@ -417,7 +411,7 @@ export function transition(
   // Global events: work from any state
   switch (event.type) {
     case 'EXECUTE':
-      return stamp(handleExecute(event.input, detectors, walletCtx, unit, offline, event.mesh));
+      return stamp(handleExecute(event.input, detectors, walletCtx, unit, offline));
     case 'RESET':
       return stamp({ step: 'idle', context: { unit }, data: {} as any });
     case 'REQUEST_MINT_SELECTOR':

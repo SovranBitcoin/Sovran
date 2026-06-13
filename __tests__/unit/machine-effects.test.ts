@@ -598,7 +598,6 @@ describe('runConfirmPaymentRequestEffect', () => {
       'creq1request',
       250,
       'sat',
-      undefined,
     );
     expect(result.value).toMatchObject({
       kind: 'completed',

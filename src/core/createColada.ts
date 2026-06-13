@@ -29,7 +29,6 @@ import type {
   WalletContext,
 } from '../types';
 import { createDefaultOperations } from '../operations/defaultOperations';
-import type { MeshTransportAdapter } from '../transport/types';
 import { createWalletContextTracker, type WalletContextTracker } from './walletContextTracker';
 import { createNostrGraphqlMintEnrichment } from '../nostr-graphql';
 
@@ -46,13 +45,6 @@ export interface ColadaConfig {
   manager: Manager;
 
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
-
-  /**
-   * Mesh transport adapter for in-band NUT-18 payment requests (Nut Drop).
-   * A getter because the adapter's lifetime tracks the mesh radio, not the
-   * colada instance — return null while the mesh is down.
-   */
-  getMeshTransport?: () => MeshTransportAdapter | null;
 
   unit?: string;
   getOffline?: () => boolean;
@@ -150,7 +142,6 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     getProofAmounts: () => tracker.getContext().proofAmounts,
     getPreferredMintUrl: config.getPreferredMintUrl,
     sendNostrDM,
-    getMeshTransport: config.getMeshTransport,
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
     fetchMintInfo: config.fetchMintInfo,
@@ -203,7 +194,6 @@ export function createMachineFromInstance(config: CreateMachineFromInstanceConfi
     getContext: instance.tracker.getContext,
     getUnit: () => unit,
     getOffline: getOffline ?? (() => false),
-    getMeshTransport: instance.config.getMeshTransport,
     getLocale: getLocale ?? (() => 'en'),
     unit,
     operations: instance.operations as MachineOperations,

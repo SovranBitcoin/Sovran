@@ -1,31 +1,13 @@
 // ---------------------------------------------------------------------------
 // Mesh transport — public surface
 //
-// Colada's half of the Nut Drop NUT-18-over-mesh exchange. The wallet app
-// implements `MeshTransportAdapter` over its mesh bridge (bytes); everything
-// semantic — send planning, request issuance, payment validation, delivery
-// tracking, auto-redeem orchestration — lives here.
+// Colada's half of Nut Drop. Ecash is sent by locking a token to the
+// recipient's announced P2PK key and broadcasting it on the public mesh; the
+// receiver classifies inbound public-mesh tokens and drains anything locked to
+// it through the auto-redeem orchestrator. There is no in-band handshake.
 // ---------------------------------------------------------------------------
 
-export type {
-  MeshInboundEvent,
-  MeshPaymentStatus,
-  MeshPeerCapabilities,
-  MeshRejectReason,
-  MeshTransportAdapter,
-  ParsedMeshPaymentRequest,
-} from './types';
-
-export {
-  normalizeMintUrl,
-  parseMeshPaymentRequest,
-  planMeshSend,
-  type MeshSendAbortReason,
-  type MeshSendPlan,
-  type MeshSolicitOutcome,
-  type ParseMeshPaymentRequestResult,
-  type PlanMeshSendInput,
-} from './plan';
+export { normalizeMintUrl } from './plan';
 
 export {
   classifyMeshToken,
@@ -33,34 +15,6 @@ export {
   type ClassifiedMeshToken,
   type MeshTokenClass,
 } from './classify';
-
-export {
-  createMeshRequestResponder,
-  type IssuedMeshRequest,
-  type MeshRequestResponder,
-  type MeshRequestResponderConfig,
-} from './requestResponder';
-
-export {
-  validateInboundMeshPayment,
-  type AcceptedMeshPayment,
-  type ValidateInboundMeshPaymentResult,
-} from './validateInboundPayment';
-
-export {
-  createMeshPaymentIntake,
-  type MeshPaymentIntake,
-  type MeshPaymentIntakeConfig,
-  type MeshPaymentIntakeQueuePort,
-} from './paymentIntake';
-
-export {
-  createMeshDeliveryTracker,
-  type MeshDeliveryState,
-  type MeshDeliveryTracker,
-  type MeshDeliveryTrackerConfig,
-  type MeshDeliveryUpdate,
-} from './deliveryTracker';
 
 export {
   classifyMeshRedeemError,
