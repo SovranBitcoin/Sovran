@@ -35,6 +35,12 @@ export interface StartSendEcashOptions {
   recipientProfile?: RecipientProfile;
   /** See `FlowContext.p2pkLockPubkey` — 33-byte compressed hex, `02`-prefixed. */
   p2pkLockPubkey?: string;
+  /**
+   * Constrain the source mint to this set (the intersection of our trusted
+   * mints and the recipient's accepted mints, e.g. from a NUT-18 `creq`), so the
+   * recipient can actually redeem the token. Passed to `selectMint`.
+   */
+  allowedMints?: string[];
 }
 
 /** 33-byte compressed secp256k1 pubkey, `02`-prefixed per the Cashu↔Nostr convention. */
@@ -77,7 +83,10 @@ export function startSendEcashFlow(
       },
     };
   }
-  const selection = selectMint(walletCtx);
+  const selection = selectMint(
+    walletCtx,
+    opts.allowedMints && opts.allowedMints.length > 0 ? { allowedMints: opts.allowedMints } : {},
+  );
 
   switch (selection.type) {
     case 'selected':

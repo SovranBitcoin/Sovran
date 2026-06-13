@@ -434,6 +434,7 @@ export function transition(
           ...(event.recipientPubkey ? { recipientPubkey: event.recipientPubkey } : {}),
           ...(event.recipientProfile ? { recipientProfile: event.recipientProfile } : {}),
           ...(event.p2pkLockPubkey ? { p2pkLockPubkey: event.p2pkLockPubkey } : {}),
+          ...(event.allowedMints ? { allowedMints: event.allowedMints } : {}),
         })
       );
     case 'START_RECEIVE_LIGHTNING':

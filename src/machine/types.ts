@@ -417,6 +417,8 @@ export type FlowEvent =
       recipientProfile?: RecipientProfile;
       /** See `FlowContext.p2pkLockPubkey` — nearby-pay flows seed this. */
       p2pkLockPubkey?: string;
+      /** Constrain the source mint to a set the recipient accepts (NUT-18 creq). */
+      allowedMints?: string[];
     }
   | { type: 'START_RECEIVE_LIGHTNING' }
   | { type: 'START_RECEIVE' }
