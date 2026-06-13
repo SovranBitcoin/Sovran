@@ -16,7 +16,6 @@ import {
   runTrustMintEffect,
 } from './effects';
 import { transition } from './transitions';
-import { parseMeshPaymentRequest, planMeshSend, type MeshSolicitOutcome } from '../transport/plan';
 import type { MintListItem, PaymentOption } from '../types';
 import type {
   CreateMachineConfig,
@@ -26,7 +25,6 @@ import type {
   FlowContext,
   FlowStep,
   MeltQuoteMethod,
-  MeshSendStart,
   MintQuoteMethod,
   PaymentMachine,
   ProcessResult,
@@ -182,7 +180,6 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     getContext,
     getUnit,
     getOffline,
-    getMeshTransport,
     enableEcashSendMemo = false,
     getLocale,
     unit: configUnit = 'sat',
@@ -1380,73 +1377,6 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     });
   };
 
-  const startMeshSend = async (
-    peerId: string,
-    opts?: { reset?: boolean; offline?: boolean }
-  ): Promise<MeshSendStart> => {
-    const adapter = getMeshTransport?.();
-    if (!adapter) {
-      throw new Error('Mesh transport adapter is not configured');
-    }
-    const senderOffline = opts?.offline === true;
-    const capabilities = adapter.getPeerCapabilities(peerId);
-
-    // The whole solicit→plan stage runs BEFORE any machine transition: an
-    // abort (or a vanilla peer) leaves the current step untouched, so the
-    // caller's screen decides how to surface it.
-    if (!capabilities?.supportsNutRequests) {
-      logger.info('machine.startMeshSend.vanilla', { peerId });
-      return { kind: 'vanilla' };
-    }
-
-    let solicit: MeshSolicitOutcome;
-    try {
-      const creq = await adapter.solicitPaymentRequest(peerId, { senderOffline });
-      const parsed = parseMeshPaymentRequest(creq);
-      solicit = parsed.ok
-        ? { outcome: 'request', request: parsed.request }
-        : { outcome: 'invalid-request', reason: parsed.reason };
-    } catch (err) {
-      logger.warn('machine.startMeshSend.solicitTimeout', {
-        peerId,
-        error: errField(err),
-      });
-      solicit = { outcome: 'timeout' };
-    }
-
-    // Mints where we hold spendable balance — planMeshSend intersects these
-    // with the receiver's allowlist so an empty overlap aborts pre-amount.
-    const localMintUrls = Object.entries(getContext().proofAmounts)
-      .filter(([, amounts]) => amounts.length > 0)
-      .map(([mintUrl]) => mintUrl);
-
-    const plan = planMeshSend({ capabilities, senderOffline, solicit, localMintUrls });
-    logger.info('machine.startMeshSend.plan', { peerId, mode: plan.mode });
-
-    if (plan.mode === 'vanilla-broadcast') {
-      return { kind: 'vanilla' };
-    }
-    if (plan.mode === 'abort') {
-      return {
-        kind: 'abort',
-        reason: plan.reason,
-        ...(plan.theirMintUrls ? { theirMintUrls: plan.theirMintUrls } : {}),
-        ...(plan.ourMintUrls ? { ourMintUrls: plan.ourMintUrls } : {}),
-      };
-    }
-
-    if (opts?.reset) resetInternal();
-    // The creq enters the standard payment-request flow (amount entry, mint
-    // constraint from its `m`, confirm, rollback); ctx.meshPeerId routes the
-    // final delivery through the mesh adapter in-band.
-    await send({
-      type: 'EXECUTE',
-      input: plan.creq,
-      mesh: { peerId, senderOffline },
-    });
-    return { kind: 'started', mode: plan.mode === 'locked' ? 'locked' : 'bearer-dm' };
-  };
-
   const startReceiveLightning = (opts?: { reset?: boolean }) => {
     if (opts?.reset) resetInternal();
     return send({ type: 'START_RECEIVE_LIGHTNING' });
@@ -1494,7 +1424,6 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     changeMint,
     requestMintSelector,
     startSendEcash,
-    startMeshSend,
     startReceiveLightning,
     startReceive,
     reviewMint,

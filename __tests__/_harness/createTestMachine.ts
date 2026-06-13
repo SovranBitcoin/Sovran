@@ -182,7 +182,6 @@ export function createTestMachine(config?: TestMachineConfig): TestMachine {
     getContext: () => walletCtx,
     getUnit: () => config?.unit ?? 'sat',
     getOffline: () => config?.offline ?? false,
-    getMeshTransport: () => config?.meshTransport ?? null,
     getLocale: () => config?.locale ?? 'en',
     enableEcashSendMemo: config?.enableEcashSendMemo ?? false,
     // Mock operations with recording — see mockOperations.ts

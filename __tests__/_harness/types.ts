@@ -24,7 +24,6 @@ import type {
   NfcIOAdapter,
 } from '../../src/machine/types';
 import type { Detectors, PaymentOptionKind, WalletContext } from '../../src/types';
-import type { MeshTransportAdapter } from '../../src/transport/types';
 
 // ---------------------------------------------------------------------------
 // Test machine — wraps PaymentMachine with recording + assertion helpers
@@ -55,8 +54,6 @@ export interface TestMachineConfig {
   locale?: string;
   /** NFC adapter for NFC-related tests. */
   nfcAdapter?: NfcIOAdapter;
-  /** Mesh transport adapter for startMeshSend tests. */
-  meshTransport?: MeshTransportAdapter;
   /** Enables the optional ecash token memo step. Defaults to false. */
   enableEcashSendMemo?: boolean;
 }

@@ -400,7 +400,7 @@ export type {
   FiatCompositionResult,
 } from './types';
 
-// Mesh transport (Nut Drop NUT-18 over a BLE mesh): planning, request
-// issuance, payment validation, delivery tracking, auto-redeem orchestration.
-// The wallet implements `MeshTransportAdapter` over its mesh bridge.
+// Mesh transport (Nut Drop): token classification on receive and the
+// auto-redeem orchestrator. Ecash is locked to the recipient's announced
+// P2PK key and broadcast on the public mesh — no in-band handshake.
 export * from './transport';

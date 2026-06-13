@@ -231,9 +231,6 @@ function terminalStep(
           unit,
           recipientPubkey,
           recipientProfile,
-          ...(ctx.meshPeerId
-            ? { meshPeerId: ctx.meshPeerId, meshBearer: ctx.meshBearer === true }
-            : {}),
         },
       };
     case 'sendEcash':

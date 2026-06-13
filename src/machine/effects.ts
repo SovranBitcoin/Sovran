@@ -937,16 +937,7 @@ export function runConfirmPaymentRequestEffect({
   ConfirmPaymentRequestEffectError
 > {
   return ResultAsync.fromThrowable(
-    () =>
-      operation(
-        data.mintUrl,
-        data.paymentRequest,
-        data.amount,
-        data.unit,
-        context?.meshPeerId
-          ? { meshPeerId: context.meshPeerId, offline: context.meshBearer === true }
-          : undefined,
-      ),
+    () => operation(data.mintUrl, data.paymentRequest, data.amount, data.unit),
     (cause): ConfirmPaymentRequestEffectError => ({
       kind: 'failed',
       cause,
