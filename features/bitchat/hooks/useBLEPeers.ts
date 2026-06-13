@@ -44,9 +44,25 @@ export function useBLEPeers(): UseBLEPeersResult {
   const [peers, setPeers] = useState<BLEPeer[]>(() => getBLEPeers());
 
   const setPeersIfChanged = useCallback((nextPeers: BLEPeer[]) => {
-    setPeers((current) =>
-      areBLEPeerSnapshotsEquivalent(current, nextPeers) ? current : nextPeers
-    );
+    setPeers((current) => {
+      if (areBLEPeerSnapshotsEquivalent(current, nextPeers)) return current;
+      // One line per snapshot change with the v2 capability flags — the
+      // ground truth for "why does this peer show the bearer badge" and
+      // "why is there no Nostr identity" (the v2 beacon carries flags ONLY;
+      // no key material arrives with an announce anymore).
+      bitchatLog.info('bitchat.peers.snapshot', {
+        count: nextPeers.length,
+        peers: nextPeers.map((peer) => ({
+          peerID: peer.peerID,
+          nickname: peer.nickname,
+          supportsNutRequests: peer.supportsNutRequests,
+          autoRedeem: peer.autoRedeem,
+          hasDirectLink: peer.hasDirectLink,
+          isConnected: peer.isConnected,
+        })),
+      });
+      return nextPeers;
+    });
   }, []);
 
   const refresh = useCallback(() => {

@@ -59,7 +59,10 @@ export function useNutDropAutoRedeem(): void {
   const wasOffline = useRef(isOffline);
 
   useEffect(() => {
-    if (!myPubkey33 || !keys) return;
+    if (!myPubkey33 || !keys) {
+      paymentLog.info('near_pay.mesh.runtime_skipped', { hasKeys: !!keys });
+      return;
+    }
 
     startMeshNutDrop({
       p2pkReceiveKey: myPubkey33,

@@ -26,7 +26,7 @@ import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedee
 interface MeshNutDropRuntime {
   adapter: MeshTransportAdapter;
   tracker: MeshDeliveryTracker;
-  stops: Array<() => void>;
+  stops: (() => void)[];
 }
 
 let runtime: MeshNutDropRuntime | null = null;
@@ -41,6 +41,9 @@ interface StartMeshNutDropOptions {
 
 export function startMeshNutDrop(options: StartMeshNutDropOptions): void {
   stopMeshNutDrop();
+  paymentLog.info('near_pay.mesh.runtime_starting', {
+    receiveKeyPrefix: options.p2pkReceiveKey.slice(0, 10),
+  });
 
   const adapter = createBitchatMeshTransportAdapter({
     broadcastBearerToken: async (encodedToken) => {
@@ -123,7 +126,13 @@ export function stopMeshNutDrop(): void {
 
 /** The live adapter, or null while the runtime is down (no active profile). */
 export function getMeshTransportAdapter(): MeshTransportAdapter | null {
-  return runtime?.adapter ?? null;
+  if (!runtime) {
+    // Callers hitting this during a send mean the mesh runtime never
+    // mounted (no keys / provider not mounted) or was torn down mid-flow.
+    paymentLog.warn('near_pay.mesh.adapter_unavailable');
+    return null;
+  }
+  return runtime.adapter;
 }
 
 /**

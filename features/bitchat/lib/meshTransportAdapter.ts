@@ -38,7 +38,17 @@ export function createBitchatMeshTransportAdapter(deps: {
   return {
     getPeerCapabilities(peerId) {
       const peer = getBLEPeers().find((p) => p.peerID === peerId);
-      if (!peer) return null;
+      if (!peer) {
+        paymentLog.warn('near_pay.mesh.adapter.peer_unknown', { peerID: peerId });
+        return null;
+      }
+      paymentLog.info('near_pay.mesh.adapter.capabilities', {
+        peerID: peerId,
+        supportsNutRequests: peer.supportsNutRequests,
+        autoRedeem: peer.autoRedeem,
+        hasDirectLink: peer.hasDirectLink,
+        isConnected: peer.isConnected,
+      });
       return {
         supportsNutRequests: peer.supportsNutRequests,
         autoRedeem: peer.autoRedeem,
@@ -46,25 +56,78 @@ export function createBitchatMeshTransportAdapter(deps: {
     },
 
     async solicitPaymentRequest(peerId, opts) {
-      // Establish the Noise session before the first vendor payload —
-      // Android's raw send has no pending-handshake queue, and a dropped
-      // solicit would otherwise eat one of the two attempts.
-      await startBLEPrivateChat(peerId);
-      return nutSolicit(peerId, { senderOffline: opts.senderOffline });
+      const startedAt = performance.now();
+      paymentLog.info('near_pay.mesh.adapter.solicit_start', {
+        peerID: peerId,
+        senderOffline: opts.senderOffline,
+      });
+      try {
+        // Establish the Noise session before the first vendor payload —
+        // Android's raw send has no pending-handshake queue, and a dropped
+        // solicit would otherwise eat one of the two attempts.
+        await startBLEPrivateChat(peerId);
+        paymentLog.debug('near_pay.mesh.adapter.session_ready', {
+          peerID: peerId,
+          duration_ms: Math.round(performance.now() - startedAt),
+        });
+        const creq = await nutSolicit(peerId, { senderOffline: opts.senderOffline });
+        paymentLog.info('near_pay.mesh.adapter.solicit_ok', {
+          peerID: peerId,
+          creqLength: creq.length,
+          duration_ms: Math.round(performance.now() - startedAt),
+        });
+        return creq;
+      } catch (err) {
+        paymentLog.warn('near_pay.mesh.adapter.solicit_failed', {
+          peerID: peerId,
+          error: err instanceof Error ? err.message : String(err),
+          duration_ms: Math.round(performance.now() - startedAt),
+        });
+        throw err;
+      }
     },
 
     async respondToSolicit(peerId, solicitId, creq) {
       const solicitIdBytes = hexToBytes(solicitId);
       if (!solicitIdBytes) throw new Error('Invalid solicit id');
+      paymentLog.info('near_pay.mesh.adapter.respond_to_solicit', {
+        peerID: peerId,
+        solicitId,
+        creqLength: creq.length,
+      });
       await nutSendPayload(peerId, encodeRequest({ solicitId: solicitIdBytes, creq }));
     },
 
     async deliverPayment(peerId, payloadJson) {
-      await startBLEPrivateChat(peerId);
-      await nutSendPayload(peerId, encodePayment(payloadJson));
+      const startedAt = performance.now();
+      paymentLog.info('near_pay.mesh.adapter.deliver_payment_start', {
+        peerID: peerId,
+        payloadBytes: payloadJson.length,
+      });
+      try {
+        await startBLEPrivateChat(peerId);
+        await nutSendPayload(peerId, encodePayment(payloadJson));
+        paymentLog.info('near_pay.mesh.adapter.deliver_payment_ok', {
+          peerID: peerId,
+          duration_ms: Math.round(performance.now() - startedAt),
+        });
+      } catch (err) {
+        paymentLog.warn('near_pay.mesh.adapter.deliver_payment_failed', {
+          peerID: peerId,
+          error: err instanceof Error ? err.message : String(err),
+          duration_ms: Math.round(performance.now() - startedAt),
+        });
+        throw err;
+      }
     },
 
     async sendPaymentStatus(peerId, paymentId, status, reason) {
+      paymentLog.info('near_pay.mesh.adapter.send_status', {
+        peerID: peerId,
+        paymentId,
+        status,
+        reason,
+      });
       await nutSendPayload(
         peerId,
         encodeStatus({
@@ -80,7 +143,28 @@ export function createBitchatMeshTransportAdapter(deps: {
     onInbound(listener) {
       const subscription = addNutPayloadListener((event) => {
         const decoded = decodeInbound(event.peerID, event.payload);
-        if (decoded) listener(decoded);
+        if (!decoded) {
+          // 0xA1 responses are consumed by nutSolicit's correlation inside
+          // the bridge wrapper — expected here, not a drop.
+          if (event.payload[0] !== NUT_PAYLOAD_TYPE.request) {
+            paymentLog.warn('near_pay.mesh.adapter.inbound_dropped', {
+              peerID: event.peerID,
+              type: event.payload[0],
+              bytes: event.payload.length,
+            });
+          }
+          return;
+        }
+        paymentLog.info('near_pay.mesh.adapter.inbound', {
+          peerID: event.peerID,
+          kind: decoded.kind,
+          ...(decoded.kind === 'solicit' ? { senderOffline: decoded.senderOffline } : {}),
+          ...(decoded.kind === 'status'
+            ? { status: decoded.status, paymentId: decoded.paymentId }
+            : {}),
+          ...(decoded.kind === 'payment' ? { payloadBytes: decoded.payloadJson.length } : {}),
+        });
+        listener(decoded);
       });
       return () => subscription.remove();
     },

@@ -1737,6 +1737,14 @@ export function NearPayScreen() {
 
   const handleSelectPeer = useCallback(
     async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
+      paymentLog.info('near_pay.peer.tap', {
+        peerID: peer.peerID,
+        supportsNutRequests: peer.supportsNutRequests,
+        autoRedeem: peer.autoRedeem,
+        hasDirectLink: peer.hasDirectLink,
+        isConnected: peer.isConnected,
+        senderOffline: isOffline,
+      });
       // Delivery resolves up front so consent comes BEFORE any session or
       // transition state — declining must leave the radar exactly as it
       // was. This also covers the Random button landing on a vanilla peer.
@@ -1745,6 +1753,10 @@ export function NearPayScreen() {
       const senderOffline = isOffline;
       let delivery: NearPayDelivery;
       if (!peer.supportsNutRequests) {
+        paymentLog.info('near_pay.peer.consent_prompt', {
+          peerID: peer.peerID,
+          kind: 'public-broadcast',
+        });
         const confirmed = await confirmPublicBroadcastSend(peer.name);
         if (!confirmed) {
           paymentLog.info('near_pay.peer.broadcast_declined', { peerID: peer.peerID });
@@ -1752,6 +1764,10 @@ export function NearPayScreen() {
         }
         delivery = { mode: 'broadcast' };
       } else if (senderOffline) {
+        paymentLog.info('near_pay.peer.consent_prompt', {
+          peerID: peer.peerID,
+          kind: 'bearer-dm',
+        });
         const confirmed = await confirmBearerSend(peer.name);
         if (!confirmed) {
           paymentLog.info('near_pay.peer.bearer_declined', { peerID: peer.peerID });
@@ -1812,9 +1828,25 @@ export function NearPayScreen() {
           // startMeshSend runs the NUT-18 solicit (the receiver answers
           // with a single-use payment request carrying their lock key +
           // trusted mints) and only then enters the amount flow.
+          paymentLog.info('near_pay.mesh.start_send', {
+            peerID: peer.peerID,
+            offline: !delivery.locked,
+          });
           const result = await machine.startMeshSend(peer.peerID, {
             reset: true,
             offline: !delivery.locked,
+          });
+          paymentLog.info('near_pay.mesh.start_send_result', {
+            peerID: peer.peerID,
+            kind: result.kind,
+            ...(result.kind === 'started' ? { mode: result.mode } : {}),
+            ...(result.kind === 'abort'
+              ? {
+                  reason: result.reason,
+                  theirMintUrls: result.theirMintUrls,
+                  ourMintUrls: result.ourMintUrls,
+                }
+              : {}),
           });
           if (result.kind !== 'started') {
             // Abort (or beacon raced off): unwind the optimistic transition

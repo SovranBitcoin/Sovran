@@ -152,6 +152,15 @@ export function NearPayPeerListScreen() {
   const handleSelectPeer = useCallback(
     async (peer: BLEPeer) => {
       const displayName = peerDisplayName(peer);
+      paymentLog.info('near_pay.peer.tap', {
+        peerID: peer.peerID,
+        source: 'peer-list',
+        supportsNutRequests: peer.supportsNutRequests,
+        autoRedeem: peer.autoRedeem,
+        hasDirectLink: peer.hasDirectLink,
+        isConnected: peer.isConnected,
+        senderOffline: isOffline,
+      });
       // Consent gates BEFORE any session or navigation state — declining
       // must leave the list exactly as it was. Locked mesh sends need no
       // consent (the token is locked to the key the recipient issues).
@@ -200,6 +209,12 @@ export function NearPayPeerListScreen() {
           ? machine
               .startMeshSend(peer.peerID, { reset: true, offline: !delivery.locked })
               .then((result) => {
+                paymentLog.info('near_pay.mesh.start_send_result', {
+                  peerID: peer.peerID,
+                  source: 'peer-list',
+                  kind: result.kind,
+                  ...(result.kind === 'abort' ? { reason: result.reason } : {}),
+                });
                 if (result.kind === 'started') return;
                 if (result.kind === 'abort' && result.reason === 'no-mint-overlap') {
                   staticPopup('mesh-no-mint-overlap');

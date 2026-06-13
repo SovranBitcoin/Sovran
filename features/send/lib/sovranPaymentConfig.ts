@@ -1255,6 +1255,7 @@ export function createSovranHandlers({
       ) {
         nearPaySessionStore.setAmountEntry(params.amountEntry);
         paymentLog.info('navigate.enterAmount.near_pay_inline', {
+          destination: constraints.destination,
           duration_ms: performance.now() - t0,
         });
         return;
