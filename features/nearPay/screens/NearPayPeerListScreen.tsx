@@ -14,7 +14,7 @@ import {
   BLE_PEER_FRESHNESS_TICK_MS,
   filterFreshBLEPeers,
 } from '@/features/bitchat/lib/blePeerSnapshots';
-import { peerDisplayName } from '@/features/nearPay/lib/peerProfile';
+import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerProfile';
 import {
   confirmBearerSend,
   confirmPublicBroadcastSend,
@@ -67,7 +67,10 @@ function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
   // BLE identity only: the v2 capability beacon carries no key material, so
   // there is no Nostr identity to resolve until send time (the NUT-18
   // request reveals the recipient's lock key).
-  const identity = useMemo(() => bleIdentity({ ...peer }), [peer]);
+  const identity = useMemo(
+    () => bleIdentity({ ...peer, identitySeed: peerIdentitySeed(peer) }),
+    [peer]
+  );
   const trailing = useMemo(
     () => (peer.supportsNutRequests ? undefined : <BearerTag />),
     [peer.supportsNutRequests]

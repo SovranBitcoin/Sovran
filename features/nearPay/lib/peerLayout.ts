@@ -19,6 +19,12 @@ export interface NearPayLayoutPeer {
   /** Beacon bit: the peer auto-redeems received ecash (radar "instant" badge). */
   autoRedeem: boolean;
   /**
+   * Identity seed for identicons/word-pair names: the peer's announced
+   * noise key (stable across nickname changes, present for every peer) with
+   * the 16-hex peerID as fallback. A pseudonym — not a Nostr pubkey.
+   */
+  identitySeed: string;
+  /**
    * True while the peer's kind-0 profile fetch is in flight — the avatar
    * shows the loading state instead of flashing the identicon fallback.
    */

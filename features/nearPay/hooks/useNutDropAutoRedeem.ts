@@ -5,6 +5,7 @@ import {
   beginBLEBackgroundTask,
   endBLEBackgroundTask,
 } from 'bitchat-module';
+import { nip19 } from 'nostr-tools';
 import { classifyMeshToken, meshTokenDedupeKey } from '@sovranbitcoin/colada';
 
 import { startMeshNutDrop, stopMeshNutDrop } from '@/features/nearPay/lib/meshNutDrop';
@@ -66,6 +67,7 @@ export function useNutDropAutoRedeem(): void {
 
     startMeshNutDrop({
       p2pkReceiveKey: myPubkey33,
+      nprofile: nip19.nprofileEncode({ pubkey: keys.pubkey }),
       getIdentityMaterial: () =>
         deriveBitchatBLEIdentityMaterial({ privateKey: keys.privateKey, pubkey: keys.pubkey }),
       onPaymentAccepted: () => void drainWithBackgroundBudget(),

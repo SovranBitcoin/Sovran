@@ -432,7 +432,7 @@ final class BitChatBLEBridge: NSObject {
             // beacon (v2 carries flags only — the P2PK lock key now arrives
             // per-send inside the NUT-18 payment request, never on the air).
             let ecashExt = EcashAnnounceState.shared.lookup(peerID: peer.peerID.id)
-            let dict: [String: Any] = [
+            var dict: [String: Any] = [
                 "peerID": peer.peerID.id,
                 "nickname": peer.nickname,
                 "isConnected": peer.isConnected,
@@ -441,6 +441,13 @@ final class BitChatBLEBridge: NSObject {
                 "supportsNutRequests": ecashExt?.supportsNutRequests ?? false,
                 "autoRedeem": ecashExt?.autoRedeem ?? false,
             ]
+            // The peer's announced Curve25519 noise static key — bitchat's
+            // own identity, present for EVERY peer (stock clients included).
+            // A stable pseudonym seed for identicons/word-pair names; it is
+            // NOT a Nostr pubkey and must never be used for profile lookups.
+            if let noisePublicKey = peer.noisePublicKey {
+                dict["noisePublicKeyHex"] = noisePublicKey.hexEncodedString()
+            }
             return dict
         }
     }

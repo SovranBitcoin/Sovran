@@ -355,6 +355,11 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 "lastSeen" to info.lastSeen.toDouble(),
                 "supportsNutRequests" to (ecashExt?.supportsNutRequests ?: false),
                 "autoRedeem" to (ecashExt?.autoRedeem ?: false),
+                // The peer's announced Curve25519 noise static key — bitchat's
+                // own identity, present for EVERY peer (stock clients
+                // included). A stable pseudonym seed for identicons/word-pair
+                // names; NOT a Nostr pubkey — never use it for profile lookups.
+                "noisePublicKeyHex" to info.noisePublicKey?.joinToString("") { "%02x".format(it) },
             )
         }
     }

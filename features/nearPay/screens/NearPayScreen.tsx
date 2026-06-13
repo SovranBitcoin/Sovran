@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { LayoutChangeEvent, Platform, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -648,7 +655,7 @@ const PeerNode = React.memo(function PeerNode({
             picture={target.peer.avatarUrl ?? undefined}
             size={sizing.avatarSize}
             name={target.peer.name}
-            seed={target.peer.peerID}
+            seed={target.peer.identitySeed}
             alt={`${target.peer.name} avatar`}
             fallbackVariant="beam"
           />
@@ -796,7 +803,7 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
           picture={recipient.avatarUrl ?? undefined}
           size={HEADER_AVATAR_SIZE}
           name={recipient.name}
-          seed={recipient.peerID}
+          seed={recipient.identitySeed}
           alt={`${recipient.name} avatar`}
           fallbackVariant="beam"
         />
@@ -1593,23 +1600,44 @@ export function NearPayScreen() {
     };
   }, []);
 
+  // The recipient's REAL identity arrives mid-flow: a mesh solicit's
+  // payment request carries their nprofile, the machine seeds
+  // ctx.recipientPubkey, and the stage-2 resolver fills ctx.recipientProfile.
+  // Subscribing to the live ctx lets the radar header upgrade from the BLE
+  // pseudonym to the resolved name/face the moment it lands.
+  const liveFlowCtx = useSyncExternalStore(
+    machine.subscribe,
+    machine.getContext,
+    machine.getContext
+  );
+  const recipientProfile = liveFlowCtx.recipientProfile;
+
   const activeRecipientPeer = useMemo<NearPayLayoutPeer | null>(() => {
     const recipient = nearPaySession?.recipient;
     if (!recipient) return null;
-    if (selectedPeer?.peerID === recipient.peerID) return selectedPeer;
+    const base: NearPayLayoutPeer =
+      selectedPeer?.peerID === recipient.peerID
+        ? selectedPeer
+        : {
+            peerID: recipient.peerID,
+            nickname: recipient.nickname,
+            name: recipient.nickname,
+            isConnected: true,
+            hasDirectLink: recipient.hasDirectLink,
+            lastSeen: recipient.lastSeen,
+            avatarUrl: null,
+            supportsNutRequests: recipient.delivery.mode === 'mesh',
+            autoRedeem: false,
+            identitySeed: recipient.peerID,
+            profileLoading: false,
+          };
+    if (!recipientProfile) return base;
     return {
-      peerID: recipient.peerID,
-      nickname: recipient.nickname,
-      name: recipient.nickname,
-      isConnected: true,
-      hasDirectLink: recipient.hasDirectLink,
-      lastSeen: recipient.lastSeen,
-      avatarUrl: null,
-      supportsNutRequests: recipient.delivery.mode === 'mesh',
-      autoRedeem: false,
-      profileLoading: false,
+      ...base,
+      name: recipientProfile.displayName || base.name,
+      avatarUrl: recipientProfile.avatarUrl ?? base.avatarUrl,
     };
-  }, [nearPaySession?.recipient, selectedPeer]);
+  }, [nearPaySession?.recipient, recipientProfile, selectedPeer]);
 
   const headerAvatarRect = useMemo<AvatarRect | null>(() => {
     return getCenteredAvatarRectInSlot({
@@ -2217,7 +2245,7 @@ export function NearPayScreen() {
                       picture={sharedAvatarPeer.avatarUrl ?? undefined}
                       size={fieldSizing.avatarSize}
                       name={sharedAvatarPeer.name}
-                      seed={sharedAvatarPeer.peerID}
+                      seed={sharedAvatarPeer.identitySeed}
                       alt={`${sharedAvatarPeer.name} avatar`}
                       fallbackVariant="beam"
                     />

@@ -122,6 +122,9 @@ interface BleIdentity {
    *  15s spool fallback and may not arrive. */
   hasDirectLink?: boolean;
   lastSeen?: number;
+  /** Preferred identicon/word-pair seed (e.g. the peer's announced noise
+   *  key — stable across nickname changes); falls back to `peerID`. */
+  identitySeed?: string;
 }
 
 interface GeohashIdentity {
@@ -240,6 +243,8 @@ export function bleIdentity(peer: {
   isConnected?: boolean;
   hasDirectLink?: boolean;
   lastSeen?: number;
+  /** Preferred identicon/word-pair seed (e.g. the announced noise key). */
+  identitySeed?: string;
 }): BleIdentity {
   return { kind: 'ble', ...peer };
 }
@@ -416,7 +421,7 @@ function deriveSeed(ids: Identity[]): string | undefined {
   const self = find(ids, 'self');
   if (self) return self.pubkey;
   const ble = find(ids, 'ble');
-  if (ble) return ble.peerID;
+  if (ble) return ble.identitySeed ?? ble.peerID;
   const geohash = find(ids, 'geohash');
   if (geohash) return geohash.geohash;
   return undefined;

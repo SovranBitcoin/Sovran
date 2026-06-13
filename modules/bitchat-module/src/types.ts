@@ -81,6 +81,13 @@ export interface BLEPeer {
    * drives the radar "instant" badge.
    */
   autoRedeem: boolean;
+  /**
+   * The peer's announced Curve25519 noise static key (64-hex) — bitchat's
+   * own identity, present for EVERY peer including stock clients. A stable
+   * pseudonym seed for identicons/word-pair names across nickname changes.
+   * NOT a Nostr pubkey: never use it for kind-0 profile lookups.
+   */
+  noisePublicKeyHex?: string;
 }
 
 /**

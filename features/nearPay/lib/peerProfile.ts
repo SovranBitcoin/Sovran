@@ -6,15 +6,20 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 import type { NearPayLayoutPeer } from './peerLayout';
 
 /**
- * Resolve the peer's display name. The v2 capability beacon carries no key
- * material, so there is no announced Nostr identity to resolve pre-send —
- * the word-pair fallback seeds from the BLE peer ID, and the recipient's
- * real profile surfaces at send time once the NUT-18 request reveals their
- * lock key.
+ * Identity seed for identicons/word-pair names. Every bitchat announce
+ * (stock clients included) carries the peer's Curve25519 noise static key —
+ * a stable pseudonym across nickname changes. NOT a Nostr pubkey (wrong
+ * curve, and for Sovran peers it is one-way derived from the Nostr key):
+ * the recipient's REAL profile surfaces at send time, when the NUT-18
+ * request's nostr transport reveals their nprofile.
  */
+export function peerIdentitySeed(peer: Pick<BLEPeer, 'noisePublicKeyHex' | 'peerID'>): string {
+  return peer.noisePublicKeyHex ?? peer.peerID;
+}
+
 export function peerDisplayName(peer: BLEPeer, profile?: RecentPeopleProfileRow): string {
   return resolveIdentityName({
-    pubkey: peer.peerID,
+    pubkey: peerIdentitySeed(peer),
     nostrProfile: profile?.metadata,
     bleNickname: peer.nickname,
   });
@@ -31,6 +36,7 @@ export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): N
     avatarUrl: profile?.metadata?.picture ?? null,
     supportsNutRequests: peer.supportsNutRequests,
     autoRedeem: peer.autoRedeem,
+    identitySeed: peerIdentitySeed(peer),
     profileLoading: profile?.isLoading ?? false,
   };
 }

@@ -50,6 +50,7 @@ function peer(
     lastSeen: 1,
     supportsNutRequests: true,
     autoRedeem: true,
+    identitySeed: `${'ab'.repeat(32)}`,
     profileLoading: false,
     ...overrides,
   };

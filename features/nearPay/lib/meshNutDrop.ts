@@ -34,6 +34,11 @@ let runtime: MeshNutDropRuntime | null = null;
 interface StartMeshNutDropOptions {
   /** "02" + the active profile's x-only Nostr pubkey. */
   p2pkReceiveKey: string;
+  /**
+   * The profile's Nostr identity as an nprofile — disclosed to soliciting
+   * peers via the issued request's standard NUT-18 nostr transport entry.
+   */
+  nprofile: string;
   getIdentityMaterial: () => BitchatBLEIdentityMaterial | null;
   /** A validated in-band payment was enqueued — kick the redeem drain. */
   onPaymentAccepted: () => void;
@@ -59,6 +64,7 @@ export function startMeshNutDrop(options: StartMeshNutDropOptions): void {
   const responder = createMeshRequestResponder({
     adapter,
     getP2pkReceiveKey: () => options.p2pkReceiveKey,
+    getNostrTransportTarget: () => options.nprofile,
     getTrustedMintUrls: async () => {
       if (!CocoManager.isInitialized()) return [];
       const mints = await CocoManager.getInstance().mint.getAllTrustedMints();
