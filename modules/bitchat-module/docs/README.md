@@ -1,107 +1,143 @@
 # Cashu over bitchat (Sovran) — how it works
 
-Send P2PK-locked Cashu ecash to a nearby bitchat peer, **offline**, by reusing
-bitchat's own mechanisms — no protocol fork. This is the 1-page overview; the
-full byte-level spec is [`cashu-bitchat-compatibility.md`](./cashu-bitchat-compatibility.md)
-and the rationale is [`nut18-bitchat-transport.md`](./nut18-bitchat-transport.md).
+This explains how Sovran sends **P2PK-locked Cashu ecash to a nearby bitchat
+peer, fully offline**, by reusing bitchat's own mechanisms — no protocol fork,
+no new wire format. It's self-contained: read it top to bottom.
 
 ## The whole thing in four steps
 
-1. **Learn identity** — a peer's Nostr pubkey arrives in bitchat's native
+1. **Learn identity** — a peer's Nostr public key arrives in bitchat's native
    favorite notification: `[FAVORITED]:<npub>:nut` (a Noise-encrypted private
-   message). The npub *is* the peer's identity.
-2. **Lock** — P2PK-lock (NUT-11) a Cashu token to `02` + that x-only pubkey.
+   message). The peer's Nostr key *is* its identity.
+2. **Lock** — P2PK-lock (Cashu NUT-11) a token to `02` + that x-only key.
 3. **Deliver** — broadcast the locked token as an ordinary **public** mesh
-   message (already fragmented; stock bitchat renders it as a `cashu…` chip).
-4. **Redeem** — the receiver auto-redeems anything locked to its key; everyone
-   else (including the sender's own echo) ignores it. A locked token is safe in
-   the open because only the target key can redeem it.
+   message (bitchat already fragments these, and stock clients already render a
+   `cashu…` string as a redeemable chip).
+4. **Redeem** — the receiver auto-redeems any token locked to its key; everyone
+   else (including the sender's own echo) ignores it.
 
-The peer's x-only Nostr key is one value used three ways: kind-0 profile key,
+The peer's x-only Nostr key is one value used three ways: kind-0 profile lookup,
 identity, and (02-prefixed) the P2PK lock target.
 
-## What's standard (reused unchanged)
+## Why P2PK + a public broadcast, instead of a simple private DM
 
-- bitchat's **favorite notification** — its only native mesh channel for sharing
-  a Nostr identity.
-- bitchat's **public mesh message** — already fragmented; already chip-rendered.
-- **NUT-11 P2PK** lock — standard Cashu.
-- **Nostr** secp256k1 identity — the key everything keys off.
+The obvious design is: just DM a bearer Cashu token straight to the recipient —
+private, simple, no P2PK needed. **We can't, and the whole design falls out of
+why not:**
 
-## What we added (and why each is as small as possible)
+1. **A token doesn't fit a private DM.** bitchat private messages carry their
+   content in a TLV with a **single-byte length field — a hard 255-byte cap.** A
+   Cashu token (proofs + secrets, and per-proof witnesses if locked) is
+   comfortably larger than 255 bytes for any real amount, so it simply won't fit
+   in a DM. (Raising the cap is a protocol-breaking change the bitchat maintainer
+   flagged as needing iOS+Android lockstep — it's open and stalled, see #784
+   below.)
+2. **So we must use the public mesh.** It's the only channel with no length
+   limit (messages are transparently fragmented). But a public message is
+   visible to *every* peer in range — a **bearer** token broadcast in the open
+   would be grabbed by whoever sees it first.
+3. **So the token must be P2PK-locked before it's broadcast.** A NUT-11
+   P2PK-locked token is safe in the open: only the holder of the target key can
+   redeem it; everyone else just sees an inert chip. That turns "broadcast money
+   to the room" into "broadcast money only its owner can pick up."
+4. **P2PK needs the recipient's key up front** — which is why we exchange Nostr
+   identities first (next section).
 
-| # | Non-standard bit | Why minimal |
-|---|---|---|
-| 1 | **`:nut` suffix** on the favorite (`[FAVORITED]:npub:nut`) — the *only* wire addition | Rides the native favorite message. Placed *after* the npub so stock iOS (`split(":")[1]`) and stock Android (`substringAfter(":")`) still recover a usable npub. It only flags "I'm a cashu wallet" so two wallets recognise each other; a bare favorite (a stock user who favorited us) is treated as **not lockable**, so we never lock funds to a key that can't redeem. |
-| 2 | **Eager favoriting** — we favorite every peer on discovery | Behavior only, no wire change. Needed because bitchat puts **no** Nostr key in its announce, so the only way to learn a peer's key is to exchange favorites. |
-| 3 | **Single-initiator handshake tie-breaker** (lower peerID initiates) | Behavior only, no wire change. Eager *mutual* favoriting makes both peers start a Noise XX handshake at once; XX needs exactly one initiator, so one side defers. (This is the standard simultaneous-handshake resolution, à la WireGuard.) |
-| 4 | A few **build/privacy patches** to vendored bitchat — force mainnet BLE UUID in debug, suppress the neighbor-gossip announce TLV (privacy), de-privatize a link-state getter, relax an announce sender-mismatch check for old App Store builds, comment out split-module imports | **None are cashu-specific.** No announce TLV, no new packet type, no new Noise payload type, no signing change. |
+In short: the **255-byte DM cap** forces us onto the **public mesh**, and the
+public mesh forces us to **P2PK-lock** — the design is a consequence of those two
+constraints, not a preference. A non-P2PK private DM would be simpler, but it is
+impossible under today's bitchat without lifting the 255-byte cap.
 
-## What we deliberately did NOT do
+## How identity is exchanged
 
-No custom announce TLV / capability beacon, no new Noise payload type, no new
-packet model, no protocol-version bump, and no dependency on >255-byte DMs. We
-went out of our way to avoid the heavier paths other proposals took (see below).
+bitchat puts **no** Nostr key in its announce, so there's no passive way to learn
+a peer's key. Its one native mesh channel for sharing a Nostr identity is the
+**favorite notification**: when A favorites B, A sends B a Noise-encrypted
+private message `[FAVORITED]:<A's npub>`, and B records `A → npub`. Sovran rides
+this unchanged, plus a `:nut` capability marker:
 
-## Do the same thing in your client
+- **Eager exchange** — while the nearby-pay radar is open, Sovran favorites every
+  peer it discovers (`[FAVORITED]:<our npub>:nut`); a Sovran peer reciprocates and
+  both become lockable-on-sight, a stock peer just sees a normal "favorited you".
+- **The `:nut` marker is a fund-safety gate.** **Never P2PK-lock ecash to a peer
+  unless you have positive proof it runs a cashu-aware wallet that can redeem
+  it.** A bare `[FAVORITED]:npub` comes from a plain bitchat user — locking to
+  their key would strand the funds (only that key can redeem, they never will,
+  the token isn't a grabbable bearer note, and there's no refund path). The
+  `:nut` marker is that proof-of-capability, so we only ever lock to peers that
+  can actually collect. The marker sits *after* the npub so stock iOS
+  (`split(":")[1]`) and stock Android (`substringAfter(":")`) still recover a
+  usable npub and harmlessly ignore the suffix.
+- **One initiator per pair.** Eager *mutual* favoriting makes both peers start a
+  Noise XX handshake at the same instant — and XX needs exactly one initiator and
+  one responder, so two simultaneous initiators collide and the session never
+  establishes. We resolve it the standard way: the lower-peerID side initiates,
+  the higher side defers and sends its favorite once the single session is live.
 
-1. Emit `[FAVORITED]:<your npub>:nut` to peers (eagerly, so you're discoverable),
-   and tie-break the Noise handshake (lower peerID initiates).
-2. On receiving a `:nut` favorite, record `peer → npub`; treat a bare
-   `[FAVORITED]:npub` as **not lockable**. This gate is the fund-safety
-   invariant: **never P2PK-lock ecash to a peer unless you have positive proof
-   it runs a cashu-aware wallet that can redeem it.** A bare favorite comes from
-   a plain bitchat user — locking to their key would strand the funds, because
-   only that key can redeem and they never will (the token isn't a bearer note
-   they can grab, and there's no refund path). The `:nut` marker is that
-   proof-of-capability: it says "this key belongs to a wallet that understands
-   and can redeem P2PK Cashu," so you only ever lock to peers that can actually
-   collect.
+## What's standard vs. what we added
+
+**Standard, reused unchanged:** the favorite notification (identity), the public
+mesh message (delivery), NUT-11 P2PK (the lock), and the Nostr secp256k1 identity
+(the key).
+
+**Non-standard, kept as small as possible:**
+
+| Addition | Why it's minimal |
+|---|---|
+| **`:nut` suffix** on the native favorite — the *only* wire addition | Rides the existing favorite message; placed after the npub so both stock parsers still read the npub. Flags cashu-capability and gates locking (above). |
+| **Eager favoriting** | Behavior only, no wire change — the only way to learn a key bitchat doesn't put in the announce. |
+| **Single-initiator handshake tie-breaker** | Behavior only, in our bridge code — the standard fix for simultaneous Noise handshakes (no vendored-Noise change). |
+| A few **build/privacy patches** to vendored bitchat (mainnet BLE UUID in debug, neighbor-gossip suppression, a link-state de-privatize, an announce sender-mismatch relax for old App Store builds, split-module import fix-ups) | **None are cashu-specific.** |
+
+**Deliberately NOT done:** no custom announce TLV / capability beacon, no new
+packet type, no new Noise payload type, no protocol-version bump, and no
+dependency on >255-byte DMs.
+
+## Do the same in another client
+
+1. Emit `[FAVORITED]:<your npub>:nut` to peers (eagerly, to be discoverable), and
+   tie-break the Noise handshake (lower peerID initiates).
+2. On a `:nut` favorite, record `peer → npub`; treat a bare `[FAVORITED]:npub` as
+   **not lockable** (the fund-safety gate above).
 3. To pay: NUT-11-lock to `02`+npub and broadcast on the public mesh.
 4. Classify inbound public cashu tokens: locked-to-you → auto-redeem (park
    untrusted mints), locked-to-other → ignore, bearer → manual tap.
 
-That's it — every byte rides a mechanism bitchat already ships.
+Every byte rides a mechanism bitchat already ships.
 
-## Upstream context (why we minimized)
+## Upstream context
 
-Maintainer **Jack** ([@jackjackbits](https://github.com/jackjackbits)) keeps the
-protocol intentionally small and lets third-party *protocol* PRs sit; cashu work
-is routed to Calle (the Cashu author / repo collaborator) off-GitHub. So we
-touch the wire as little as possible and reuse native channels. Relevant
-[`permissionlesstech/bitchat`](https://github.com/permissionlesstech/bitchat)
-threads:
+bitchat's maintainer **Jack** ([@jackjackbits](https://github.com/jackjackbits))
+keeps the protocol intentionally small and lets third-party *protocol* PRs sit;
+cashu-adjacent work is routed to Calle (the Cashu author / repo collaborator)
+off-GitHub. That's why we touch the wire as little as possible and reuse native
+channels. Relevant live threads on
+[`permissionlesstech/bitchat`](https://github.com/permissionlesstech/bitchat):
 
 - **[#784](https://github.com/permissionlesstech/bitchat/issues/784)** — *Allow
-  private message content to exceed 255 bytes* (OPEN). Jack: protocol-breaking,
-  needs iOS+Android lockstep. This is why we **don't** deliver ecash over DMs (a
-  locked token exceeds 255 B) and use the public mesh instead.
+  private message content to exceed 255 bytes* (OPEN). The exact cap that blocks
+  a private-DM design; maintainer says it's protocol-breaking and needs
+  iOS+Android lockstep.
 - **[#1053](https://github.com/permissionlesstech/bitchat/pull/1053)** — *add
-  Lightning and Cashu payment packets to the Noise protocol layer* (OPEN PR).
-  The heavier path we avoided: new `NoisePayloadType`s + a new packet model, for
-  *bearer* tokens. We get the same outcome with NUT-11 on the existing public
-  mesh and no new packet type.
+  Lightning and Cashu payment packets to the Noise protocol layer* (OPEN PR). The
+  heavier path we avoided: new `NoisePayloadType`s + a new packet model for
+  *bearer* tokens. We get the same outcome with NUT-11 on the public mesh.
 - **[#1327](https://github.com/permissionlesstech/bitchat/pull/1327)** — *Fix
-  Cashu long-message guard bypass* (OPEN, Jack's). Confirms his direction:
+  Cashu long-message guard bypass* (OPEN, maintainer's) — confirms his direction:
   structured payloads over giant raw-text cashu blobs.
-- **[#1073](https://github.com/permissionlesstech/bitchat/issues/1073)** —
-  *Proposal: SDK packages for the BitChat protocol* (OPEN) and
-  **[#124](https://github.com/permissionlesstech/bitchat/issues/124)** —
-  *WHITEPAPER.md enhancement for client compatibility* (OPEN): there's demand for
-  an official extension/interop story, but none exists — another reason to stay
-  on native mechanisms.
+- **[#1073](https://github.com/permissionlesstech/bitchat/issues/1073)**
+  (*SDK packages*) and
+  **[#124](https://github.com/permissionlesstech/bitchat/issues/124)**
+  (*WHITEPAPER enhancement for client compatibility*) — demand for an official
+  extension/interop story, but none exists; another reason to stay native.
 - Prior cashu-over-mesh attempts:
   **[#416](https://github.com/permissionlesstech/bitchat/issues/416)** /
   **[#417](https://github.com/permissionlesstech/bitchat/issues/417)** (cashu for
-  hops / per-message read),
-  bitchat-android
+  hops / per-message read), bitchat-android
   **[#506](https://github.com/permissionlesstech/bitchat-android/pull/506)**
-  (*Feat/dm 2byte tlv* — the bitpoints 2-byte-TLV cashu DM),
-  **[#679](https://github.com/permissionlesstech/bitchat/issues/679)** (deep-link
-  cashu redeem).
+  (*Feat/dm 2byte tlv* — the bitpoints 2-byte-TLV cashu DM), and
+  **[#679](https://github.com/permissionlesstech/bitchat/issues/679)**
+  (deep-link cashu redeem).
 - Adjacent: **[#283](https://github.com/permissionlesstech/bitchat/issues/283)**
-  (remove compression — relevant to cross-platform signing) and
+  (remove compression) and
   **[#368](https://github.com/permissionlesstech/bitchat/issues/368)** (nostr).
-
-> Nothing in this repo is posted upstream automatically. Paste-ready outreach to
-> Calle lives in [`upstream-issue-draft.md`](./upstream-issue-draft.md).
