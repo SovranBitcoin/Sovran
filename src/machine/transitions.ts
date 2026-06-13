@@ -2,6 +2,7 @@ import { resolveIntent } from '../intent';
 import { logger } from '../logger';
 import { parsePaymentInput } from '../parse';
 import { isValidSatAmount } from '../guards';
+import { normalizeNostrPubkey } from '../recipient';
 import type { Detectors, WalletContext } from '../types';
 import { resolveNext, type StepResult } from './resolveNext';
 import { buildProofSuggestions } from './amountFallback';
@@ -64,6 +65,18 @@ function handleExecute(
         });
       }
       if (intent.info.unit) ctx.unit = intent.info.unit;
+      // A nostr transport entry is the request's identity disclosure
+      // (NUT-18 convention; mesh-solicited creqs carry the receiver's
+      // nprofile). Seeding recipientPubkey here lets the stage-2 profile
+      // resolver paint "Pay <name>" on the amount screen — for ANY creq,
+      // scanned or solicited.
+      const nostrTransport = intent.info.transports?.find(
+        (transport) => transport.type === 'nostr'
+      );
+      if (nostrTransport?.target) {
+        const recipientPubkey = normalizeNostrPubkey(nostrTransport.target);
+        if (recipientPubkey) ctx.recipientPubkey = recipientPubkey;
+      }
       break;
     }
     case 'meltLightningInvoice':

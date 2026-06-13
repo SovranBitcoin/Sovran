@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { nip19 } from 'nostr-tools';
+import { decodePaymentRequest } from '@cashu/cashu-ts';
 import { PaymentRequest, getEncodedToken } from '@cashu/cashu-ts';
 import {
   classifyMeshToken,
@@ -302,11 +304,15 @@ describe('planMeshSend (safety matrix)', () => {
 // responder
 // ---------------------------------------------------------------------------
 
-function createResponder(fake: FakeAdapter, opts?: { key?: string | null; now?: () => number }) {
+function createResponder(
+  fake: FakeAdapter,
+  opts?: { key?: string | null; now?: () => number; nprofile?: string | null }
+) {
   return createMeshRequestResponder({
     adapter: fake.adapter,
     getP2pkReceiveKey: () => (opts && 'key' in opts ? (opts.key ?? null) : MY_PUBKEY),
     getTrustedMintUrls: async () => [MINT_URL],
+    getNostrTransportTarget: () => opts?.nprofile ?? null,
     now: opts?.now,
   });
 }
@@ -327,6 +333,25 @@ describe('createMeshRequestResponder', () => {
     if (!parsed.ok) return;
     expect(parsed.request.lockPubkey).toBe(MY_PUBKEY);
     expect(responder.getOutstanding(parsed.request.paymentId)?.peerId).toBe(PEER);
+    stop();
+  });
+
+  it('discloses the receiver identity as a standard nostr transport entry', async () => {
+    const nprofile = nip19.nprofileEncode({ pubkey: 'ab'.repeat(32) });
+    const fake = createFakeAdapter();
+    const responder = createResponder(fake, { nprofile });
+    const stop = responder.start();
+    fake.emit({ kind: 'solicit', peerId: PEER, solicitId: 'aa', senderOffline: false });
+    await flush();
+
+    const creq = fake.respondCalls[0]![2];
+    // In-band mesh semantics survive the transport entry: the mesh parser
+    // still accepts the request unchanged.
+    expect(parseMeshPaymentRequest(creq).ok).toBe(true);
+    const decoded = decodePaymentRequest(creq);
+    expect(decoded.transport).toEqual([
+      { type: 'nostr', target: nprofile, tags: [['n', '17']] },
+    ]);
     stop();
   });
 

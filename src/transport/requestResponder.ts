@@ -12,7 +12,7 @@
 // id-match, mint-allowlist, lock-match, expiry, and single-use.
 // ---------------------------------------------------------------------------
 
-import { PaymentRequest } from '@cashu/cashu-ts';
+import { PaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
 import { logger } from '../logger';
 import { normalizeMintUrl } from './plan';
 import type { MeshTransportAdapter } from './types';
@@ -46,6 +46,16 @@ export interface MeshRequestResponderConfig {
   getP2pkReceiveKey: () => string | null;
   /** Trusted-mint allowlist for `m`. Empty list = accept any mint (NUT-18). */
   getTrustedMintUrls: () => Promise<string[]>;
+  /**
+   * The receiver's Nostr identity as an `nprofile1…` string. When present,
+   * issued requests carry a standard NUT-18 nostr transport entry
+   * (`{type:"nostr", target:nprofile, tags:[["n","17"]]}`) — the spec-native
+   * way to disclose who is being paid (and a future NIP-17 DM delivery
+   * fallback). Mesh delivery stays in-band: the sender's mesh branch is
+   * selected by peer, not by the transport list. Null = no identity
+   * disclosure (request ships with an empty transport list).
+   */
+  getNostrTransportTarget?: () => string | null;
   unit?: string;
   requestTtlMs?: number;
   now?: () => number;
@@ -124,10 +134,17 @@ export function createMeshRequestResponder(
     // below stores normalized URLs for inbound-payment validation.
     const trustedMintUrls = await config.getTrustedMintUrls();
     const paymentId = randomPaymentId();
+    // The nostr transport entry discloses the receiver's identity to the
+    // soliciting peer (NIP-17 tag per NUT-18 convention). Without one the
+    // transport list is empty = in-band reply; WITH one, mesh delivery is
+    // still in-band — the sender pays the peer it solicited, and inbound
+    // validation matches on payment id, never on transport.
+    const nostrTarget = config.getNostrTransportTarget?.() ?? null;
+    const transports = nostrTarget
+      ? [{ type: PaymentRequestTransportType.NOSTR, target: nostrTarget, tags: [['n', '17']] }]
+      : [];
     const request = new PaymentRequest(
-      // Empty transport = in-band reply (NUT-18): the payment arrives back
-      // over the same mesh channel as a payment payload.
-      [],
+      transports,
       paymentId,
       undefined,
       unit,
