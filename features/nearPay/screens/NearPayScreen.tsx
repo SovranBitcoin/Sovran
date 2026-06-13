@@ -45,7 +45,10 @@ import { useEagerPeerFavorite } from '@/features/nearPay/hooks/useEagerPeerFavor
 import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
 import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
-import { confirmPublicBroadcastSend } from '@/features/nearPay/lib/startNearPaySend';
+import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
+import { creqParseDiagnostics } from '@/shared/lib/nutCreq';
+import { notifyNoSharedMint } from '@/features/nearPay/lib/startNearPaySend';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   useRecentPeopleProfiles,
   type RecentPeopleProfileRow,
@@ -1467,6 +1470,7 @@ export function NearPayScreen() {
   useRenderLogger('NearPayScreen', 30, paymentLog);
   const insets = useSafeAreaInsets();
   const walletContext = useWalletContext();
+  const { isOffline } = useOfflineStatus();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
   // Every bitchat peer is on the radar: peers announcing the ecash
   // capability TLV get P2PK-locked drops; vanilla peers are bearer-only
@@ -1787,33 +1791,33 @@ export function NearPayScreen() {
 
   const handleSelectPeer = useCallback(
     async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
-      // "02"-prefix the x-only Nostr pubkey learned via the favorite exchange
-      // to get the 33-byte NUT-11 P2PK lock target. Null ⇒ bearer broadcast.
-      const lockPubkey = peer.nostrPubkeyHex ? `02${peer.nostrPubkeyHex}` : null;
+      // Decide lock vs bearer from the peer's creq (accepted mints + lock key),
+      // our trusted mints, and online status. Delivery is always a private DM.
+      const plan = planNearPaySend({
+        peer,
+        ourMints: walletContext.trustedMintUrls,
+        isOffline,
+      });
       paymentLog.info('near_pay.peer.tap', {
         peerID: peer.peerID,
-        lockable: !!lockPubkey,
+        mode: plan.mode,
+        // Did we decode the receiver's creq, and which mints did we get?
+        ...creqParseDiagnostics(peer),
+        ourMints: walletContext.trustedMintUrls,
+        allowedMints: plan.mode === 'block' ? null : plan.allowedMints,
+        isOffline,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
       });
-      // Consent resolves up front so it comes BEFORE any session or
-      // transition state — declining must leave the radar exactly as it was
-      // (also covers the Random button landing on a vanilla peer). A locked
-      // send (the peer announced a P2PK key) needs no consent: only that key
-      // can redeem the token. A bearer send (stock peer) is broadcast
-      // publicly and must be confirmed.
-      if (!lockPubkey) {
-        paymentLog.info('near_pay.peer.consent_prompt', {
-          peerID: peer.peerID,
-          kind: 'public-broadcast',
-        });
-        const confirmed = await confirmPublicBroadcastSend(peer.name);
-        if (!confirmed) {
-          paymentLog.info('near_pay.peer.broadcast_declined', { peerID: peer.peerID });
-          return;
-        }
+      // No mint in common ⇒ the recipient couldn't redeem a token from our
+      // mint, so block BEFORE any session/transition state (leaves the radar
+      // exactly as it was; also covers the Random button).
+      if (plan.mode === 'block') {
+        paymentLog.info('near_pay.peer.no_shared_mint', { peerID: peer.peerID });
+        await notifyNoSharedMint(peer.name);
+        return;
       }
-      const delivery: NearPayDelivery = { locked: !!lockPubkey };
+      const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
       paymentLog.info('near_pay.peer.select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
@@ -1861,19 +1865,21 @@ export function NearPayScreen() {
         );
       try {
         // One path for every peer: enter the amount flow, then the
-        // sendComplete handler broadcasts the finished token on the public
-        // mesh. A locked token is P2PK-locked to the peer's announced key
-        // (only they can redeem it); a bearer token is claimable by anyone.
-        // recipientPubkey (the x-only Nostr key) seeds their real profile.
+        // sendComplete handler delivers the finished token as a private Noise
+        // DM to the recipient peer (no public mesh). A locked token is
+        // P2PK-locked to the peer's key + minted from a mint they accept;
+        // `allowedMints` constrains the source mint. recipientPubkey seeds
+        // their real profile.
         paymentLog.info('near_pay.start_send', {
           peerID: peer.peerID,
           locked: delivery.locked,
         });
         await machine.startSendEcash({
           reset: true,
-          ...(lockPubkey
-            ? { p2pkLockPubkey: lockPubkey, recipientPubkey: lockPubkey.slice(2) }
+          ...(plan.mode === 'lock'
+            ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
             : {}),
+          ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
           recipientProfile: {
             displayName: peer.name,
             avatarUrl: peer.avatarUrl ?? null,
@@ -1905,6 +1911,8 @@ export function NearPayScreen() {
     },
     [
       machine,
+      walletContext.trustedMintUrls,
+      isOffline,
       amountContentOpacity,
       amountContentTranslateY,
       amountPanelTranslateX,

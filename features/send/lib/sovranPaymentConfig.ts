@@ -71,7 +71,7 @@ import {
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
-import { sendBLEPublicMessage } from '@/features/bitchat/lib/blePrivateDelivery';
+import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
 import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
@@ -859,13 +859,11 @@ async function deliverNearPayIfActive(
   const active = useNearPaySessionStore.getState().active;
   if (!active) return;
 
-  // Every Nut Drop send is delivered the same way: broadcast the finished
-  // token on the public mesh. A locked token (P2PK-locked to the recipient's
-  // announced key) and a bearer token broadcast identically — only the
-  // recipient can redeem a locked one, while everyone else classifies it
-  // `locked-to-other` and ignores it; bearer tokens are claimable by anyone
-  // nearby (the user confirmed that at peer selection). There is no in-band
-  // Noise handshake.
+  // Every Nut Drop send is delivered as a SINGLE private Noise DM to the
+  // recipient peer — encrypted to them, so a locked OR bearer token stays
+  // private (no public-mesh broadcast of payment metadata). The whole multi-KB
+  // token fits one message thanks to the extended PrivateMessagePacket length.
+  // Payments are Sovran↔Sovran (stock can't decode our extended DMs).
 
   try {
     const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
@@ -874,13 +872,8 @@ async function deliverNearPayIfActive(
     const profileScope = getBitchatProfileScope();
     const identityMaterial = getBitchatIdentityMaterial?.() ?? null;
     const nickname = getBitchatNickname() || 'sovran';
-    // Deliver the whole token as a SINGLE public BLE message. The private Noise
-    // DM path caps content at 255 bytes (one-byte TLV length), so a multi-KB
-    // token would be split into many messages that unmodified bitchat receivers
-    // cannot reassemble. The public path transparently fragments/reassembles
-    // into one message and stock bitchat renders the `cashu…` token as a single
-    // redeemable chip. See sendBLEPublicMessage for the full rationale/trade-off.
-    const result = await sendBLEPublicMessage({
+    const result = await sendBLEPrivateMessageWhole({
+      peerID: active.recipient.peerID,
       content: encodedToken,
       nickname,
       profileScope,
@@ -892,7 +885,9 @@ async function deliverNearPayIfActive(
       tokenBytes: encodedToken.length,
       hasDirectLink: active.recipient.hasDirectLink,
       startupMs: Math.round(result.startupMs * 100) / 100,
+      handshakeMs: Math.round(result.handshakeMs * 100) / 100,
       sendMs: Math.round(result.sendMs * 100) / 100,
+      ...(result.handshakeError ? { handshakeError: result.handshakeError } : {}),
     });
   } catch (err) {
     paymentLog.error('near_pay.delivery.failed', {

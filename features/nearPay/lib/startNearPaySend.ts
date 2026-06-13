@@ -1,67 +1,37 @@
 import { actionMenuPopup } from '@/shared/lib/popup/popups/actionMenu';
 
 /**
- * Consent gate for an unlocked (bearer) Nut Drop. Locked sends never prompt —
- * the token is P2PK-locked to the recipient's announced key, so nobody else
- * can claim it. The gate resolves `true` only on the explicit confirm tap;
- * overlay tap, swipe-down, or Cancel resolve `false`, leaving the radar
- * untouched.
+ * Informs the user that a Nut Drop can't be sent because we share no mint the
+ * recipient accepts (read from their `creq`). A token from a mint they don't
+ * accept would be unredeemable, so the send is blocked. Single acknowledge.
+ *
+ * (Nut Drops deliver as a private Noise DM encrypted to the recipient, so there
+ * is no public-exposure consent — only this mint-compatibility notice.)
  */
-function consentGate(options: {
-  title: string;
-  confirmTestID: string;
-  cancelTestID: string;
-  confirmText: string;
-  description: string;
-}): Promise<boolean> {
+export function notifyNoSharedMint(displayName: string): Promise<void> {
   return new Promise((resolve) => {
     let settled = false;
-    const settle = (confirmed: boolean) => {
+    const settle = () => {
       if (settled) return;
       settled = true;
-      resolve(confirmed);
+      resolve();
     };
     actionMenuPopup({
-      title: options.title,
+      title: 'No shared mint',
       buttons: [
         {
-          testID: options.confirmTestID,
-          text: options.confirmText,
-          description: options.description,
-          icon: 'mdi:lock-open-variant-outline',
-          variant: 'dangerous',
-          onPress: (close) => {
-            settle(true);
-            close();
-          },
-        },
-        {
-          testID: options.cancelTestID,
-          text: 'Cancel',
-          icon: 'mdi:close',
+          testID: 'near-pay-no-shared-mint-ok',
+          text: 'OK',
+          description: `You and ${displayName} don't have a mint in common, so they couldn't redeem the payment. Add one of their mints to pay them.`,
+          icon: 'mdi:bank-off-outline',
           variant: 'secondary',
           onPress: (close) => {
-            settle(false);
+            settle();
             close();
           },
         },
       ],
-      onDismiss: () => settle(false),
+      onDismiss: () => settle(),
     });
-  });
-}
-
-/**
- * Public-broadcast consent (vanilla bitchat peer with no announced key): the
- * bearer token is visible to EVERY peer in mesh range, not just the
- * recipient, and the fastest redeemer wins.
- */
-export function confirmPublicBroadcastSend(displayName: string): Promise<boolean> {
-  return consentGate({
-    title: 'Broadcast to everyone nearby?',
-    confirmTestID: 'near-pay-broadcast-confirm',
-    cancelTestID: 'near-pay-broadcast-cancel',
-    confirmText: 'Broadcast bearer token',
-    description: `${displayName}'s app can't receive private payments. The sats are broadcast publicly as a bearer token — anyone nearby who sees it first can claim it.`,
   });
 }

@@ -107,25 +107,39 @@ final class BitChatBLEBridge: NSObject {
     /// establishes and the favorite never delivers.
     private var selfPeerID: String?
 
-    /// peerID (16-hex) → peer's x-only Nostr pubkey hex, learned from an inbound
-    /// `[FAVORITED]:npub` notification. Drives lockable-on-sight in NearPay.
+    /// Our standing NUT-18 payment request (`creq…`) — advertises the mints we
+    /// accept + our P2PK lock key. Built in JS (cashu-ts) from our trusted mints
+    /// and passed to `start()`; sent in the favorite as `[FAVORITED]:<npub>:<creq>`.
+    private var selfCreq: String?
+
+    /// peerID (16-hex) → peer's x-only Nostr pubkey hex (from npub) and raw creq,
+    /// learned from an inbound `[FAVORITED]:<npub>:<creq>` notification. Drives
+    /// lockable-on-sight in NearPay (JS decodes the creq for mints + lock key).
     /// Guarded by `peerIdentityLock` — written on the Noise-delivery path, read
     /// from `getPeers()` on the JS thread.
     private let peerIdentityLock = NSLock()
     private var peerNostrPubkeyHexMap: [String: String] = [:]
+    private var peerCreqMap: [String: String] = [:]
     /// Higher-peerID peers whose favorite send is deferred until the session the
     /// lower-peerID side establishes goes live (flushed in didReceiveNoisePayload).
     private var pendingFavoritePeers: Set<String> = []
 
-    private func setPeerNostr(_ peerID: String, _ hex: String?) {
+    private func setPeerIdentity(_ peerID: String, nostrHex: String?, creq: String?) {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
-        if let hex { peerNostrPubkeyHexMap[peerID] = hex }
+        if let nostrHex { peerNostrPubkeyHexMap[peerID] = nostrHex }
         else { peerNostrPubkeyHexMap.removeValue(forKey: peerID) }
+        if let creq { peerCreqMap[peerID] = creq }
+        else { peerCreqMap.removeValue(forKey: peerID) }
     }
 
     private func peerNostr(_ peerID: String) -> String? {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
         return peerNostrPubkeyHexMap[peerID]
+    }
+
+    private func peerCreq(_ peerID: String) -> String? {
+        peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
+        return peerCreqMap[peerID]
     }
 
     private func deferFavorite(_ peerID: String) {
@@ -142,6 +156,7 @@ final class BitChatBLEBridge: NSObject {
     private func clearPeerNostr() {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
         peerNostrPubkeyHexMap.removeAll()
+        peerCreqMap.removeAll()
         pendingFavoritePeers.removeAll()
     }
 
@@ -273,7 +288,8 @@ final class BitChatBLEBridge: NSObject {
         profileScope: String,
         noisePrivateKeyHex: String,
         signingPrivateKeyHex: String,
-        p2pkPubkeyHex: String
+        p2pkPubkeyHex: String,
+        creq: String?
     ) throws {
         let identityMaterial = try BitchatBLEIdentityMaterial(
             noisePrivateKeyHex: noisePrivateKeyHex,
@@ -286,6 +302,11 @@ final class BitChatBLEBridge: NSObject {
                 bleService?.setNickname(nickname)
                 activeNickname = nickname
             }
+            // Update the advertised creq when provided (the user's trusted mints
+            // can change without a profile switch). Only SET it — a startBLE call
+            // without a creq (e.g. the delivery path) must not clear it; only
+            // stop() (a profile switch) clears it.
+            if let creq, !creq.isEmpty { selfCreq = creq }
             return
         }
         if isRunning {
@@ -306,6 +327,7 @@ final class BitChatBLEBridge: NSObject {
         // announce TLV. p2pkPubkey is "02" + the 32-byte x-only key.
         selfNpub = try? Bech32.encode(hrp: "npub", data: Data(identityMaterial.p2pkPubkey.dropFirst()))
         selfPeerID = identityMaterial.peerID
+        if let creq, !creq.isEmpty { selfCreq = creq }
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
@@ -332,6 +354,7 @@ final class BitChatBLEBridge: NSObject {
         // previous profile's npub or surfaces its learned peer identities.
         selfNpub = nil
         selfPeerID = nil
+        selfCreq = nil
         clearPeerNostr()
     }
 
@@ -474,15 +497,17 @@ final class BitChatBLEBridge: NSObject {
         }
     }
 
-    /// Sends the `[FAVORITED]:npub:nut` favorite to `peerID`. The ":nut" marker
-    /// lets a receiving Sovran peer tell us apart from a stock bitchat user who
-    /// merely favorited them (and could never redeem a P2PK-locked token); stock
-    /// clients keep parsing the npub and ignore the suffix. When no session
-    /// exists yet, BLEService queues this and initiates the handshake, flushing
-    /// the queue on completion (so the lower-peerID initiator delivers reliably).
+    /// Sends `[FAVORITED]:<npub>:<creq>` to `peerID` — bitchat's native favorite
+    /// notification carrying our identity (npub) and a standing NUT-18 payment
+    /// request (creq: accepted mints + P2PK lock key). A receiving Sovran peer
+    /// decodes the creq to decide lockability + which mint to use; stock clients
+    /// just parse the npub and ignore the rest (and misparse the >255-byte
+    /// favorite, so they never register it). When no session exists yet,
+    /// BLEService queues this and initiates the handshake, flushing on completion.
     private func dispatchFavorite(_ service: BLEService, to peerID: PeerID, isFavorite: Bool) {
         guard let npub = selfNpub else { return }
-        let content = (isFavorite ? "[FAVORITED]" : "[UNFAVORITED]") + ":" + npub + ":nut"
+        var content = (isFavorite ? "[FAVORITED]" : "[UNFAVORITED]") + ":" + npub
+        if let creq = selfCreq { content += ":" + creq }
         service.sendMessage(content, mentions: [], to: peerID, messageID: UUID().uuidString, timestamp: nil)
     }
 
@@ -504,12 +529,17 @@ final class BitChatBLEBridge: NSObject {
                 "lastSeen": peer.lastSeen.timeIntervalSince1970 * 1000,
             ]
             // The peer's x-only Nostr pubkey, learned via bitchat's native
-            // favorite-notification exchange (`[FAVORITED]:npub`). It IS the
-            // peer's Sovran identity (kind-0 profile key) AND, "02"-prefixed,
+            // favorite-notification exchange (`[FAVORITED]:<npub>:<creq>`). It IS
+            // the peer's Sovran identity (kind-0 profile key) AND, "02"-prefixed,
             // the P2PK lock target. Present only once the peer has favorited us
             // back; absent for peers we haven't exchanged identity with.
             if let nostrHex = self.peerNostr(peer.peerID.id) {
                 dict["nostrPubkeyHex"] = nostrHex
+            }
+            // The peer's standing NUT-18 payment request (creq) — JS decodes it
+            // for accepted mints + the P2PK lock key. Present ⇒ lockable.
+            if let creq = self.peerCreq(peer.peerID.id) {
+                dict["creq"] = creq
             }
             // The peer's announced Curve25519 noise static key — bitchat's
             // own identity, present for EVERY peer (stock clients included).
@@ -704,31 +734,36 @@ extension BitChatBLEBridge: BitchatDelegate {
             BitChatBLEBridge.shared.dispatchFavorite(service, to: peerID, isFavorite: true)
         }
         // [sovran] Intercept bitchat's native favorite notification —
-        // `[FAVORITED]:npub` / `[UNFAVORITED]:npub` carries the sender's Nostr
-        // npub. We use it as the identity-exchange channel (peer = Nostr = P2PK
-        // lock target) and handle it here so it never surfaces as a chat DM,
+        // `[FAVORITED]:<npub>:<creq>` carries the sender's Nostr npub (identity)
+        // and a standing NUT-18 payment request (accepted mints + P2PK lock key).
+        // We surface npub + raw creq to JS (which decodes the creq for mints +
+        // lockability) and handle it here so it never surfaces as a chat DM,
         // mirroring upstream ChatViewModel.handleFavoriteNotificationFromMesh.
         if pm.content.hasPrefix("[FAVORITED]") || pm.content.hasPrefix("[UNFAVORITED]") {
             let isFavorite = pm.content.hasPrefix("[FAVORITED]")
-            // Format: "[FAVORITED]:npub[:nut]". The ":nut" marker is present only
-            // for cashu-capable Sovran peers — a bare favorite from a stock
-            // bitchat user must NOT make them lockable (they can't redeem a
-            // locked token → funds would be stuck).
+            // Format: "[FAVORITED]:<npub>[:<creq>]". npub (bech32) and creq
+            // (base64) contain no ":", so split on ":" yields clean fields.
             let parts = pm.content.split(separator: ":", omittingEmptySubsequences: false)
-            let isCashuCapable = parts.count >= 3 && parts[2] == "nut"
-            if isCashuCapable {
-                var nostrHex: String? = nil
-                if let decoded = try? Bech32.decode(String(parts[1])),
-                   decoded.hrp == "npub", decoded.data.count == 32 {
-                    nostrHex = decoded.data.hexEncodedString()
-                }
-                BitChatBLEBridge.shared.setPeerNostr(peerID.id, isFavorite ? nostrHex : nil)
-                Task { @MainActor in
-                    BitChatBLEBridge.shared.holdBackgroundAssertion(name: "ble-favorite")
-                    var event: [String: Any] = ["peerID": peerID.id, "isFavorite": isFavorite]
-                    if let nostrHex { event["nostrPubkeyHex"] = nostrHex }
-                    BitChatBLEBridge.shared.module?.sendEvent("onBLEPeerIdentity", event)
-                }
+            var nostrHex: String? = nil
+            if parts.count >= 2,
+               let decoded = try? Bech32.decode(String(parts[1])),
+               decoded.hrp == "npub", decoded.data.count == 32 {
+                nostrHex = decoded.data.hexEncodedString()
+            }
+            // The creq is everything after the npub (a creq has no ":" but
+            // rejoin defensively in case of future fields).
+            let creq: String? = parts.count >= 3 ? parts[2...].joined(separator: ":") : nil
+            if isFavorite {
+                BitChatBLEBridge.shared.setPeerIdentity(peerID.id, nostrHex: nostrHex, creq: creq)
+            } else {
+                BitChatBLEBridge.shared.setPeerIdentity(peerID.id, nostrHex: nil, creq: nil)
+            }
+            Task { @MainActor in
+                BitChatBLEBridge.shared.holdBackgroundAssertion(name: "ble-favorite")
+                var event: [String: Any] = ["peerID": peerID.id, "isFavorite": isFavorite]
+                if let nostrHex { event["nostrPubkeyHex"] = nostrHex }
+                if let creq { event["creq"] = creq }
+                BitChatBLEBridge.shared.module?.sendEvent("onBLEPeerIdentity", event)
             }
             // Ack regardless (and never surface a favorite notification as chat).
             if let service = BitChatBLEBridge.shared.bleService {

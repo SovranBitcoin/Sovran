@@ -20,7 +20,8 @@ interface BitChatNativeModule {
     profileScope: string,
     noisePrivateKeyHex: string,
     signingPrivateKeyHex: string,
-    p2pkPubkeyHex: string
+    p2pkPubkeyHex: string,
+    creq: string | null
   ): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
   startBLEPrivateChat(peerID: string): Promise<void>;
@@ -101,7 +102,8 @@ function validateBLEIdentityMaterial(
 export function startBLE(
   nickname: string,
   profileScope: string,
-  identityMaterial: BitchatBLEIdentityMaterial
+  identityMaterial: BitchatBLEIdentityMaterial,
+  creq?: string | null
 ): Promise<void> {
   try {
     validateBLEIdentityMaterial(identityMaterial);
@@ -117,9 +119,12 @@ export function startBLE(
         // Our identity / P2PK lock target: "02" + the profile's x-only Nostr
         // pubkey (NUT-11 / Minibits convention — BIP340 signing ignores Y
         // parity). The native bridge derives our bech32 npub from this and
-        // hands it to peers via bitchat's native `[FAVORITED]:npub` favorite
-        // notification — there is no custom announce TLV.
-        `02${identityMaterial.nostrPubkey}`
+        // sends it (plus `creq`) via bitchat's native `[FAVORITED]:<npub>:<creq>`
+        // favorite notification — there is no custom announce TLV.
+        `02${identityMaterial.nostrPubkey}`,
+        // Our standing NUT-18 payment request (accepted mints + P2PK lock key),
+        // built in JS from the user's trusted mints. null until mints load.
+        creq ?? null
       )
     : unavailable();
 }

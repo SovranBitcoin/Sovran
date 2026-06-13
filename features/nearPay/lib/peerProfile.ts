@@ -45,8 +45,12 @@ export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): N
     lastSeen: peer.lastSeen,
     name: peerDisplayName(peer, profile),
     avatarUrl: profile?.metadata?.picture ?? null,
-    lockable: !!peer.nostrPubkeyHex,
+    // Lockable ⇒ the peer advertised a standing creq (Sovran/cashu-capable).
+    // The full check (creq valid + shared mint) runs at tap time; this drives
+    // the radar badge/sort cheaply.
+    lockable: !!peer.creq && !!peer.nostrPubkeyHex,
     nostrPubkeyHex: peer.nostrPubkeyHex,
+    creq: peer.creq,
     identitySeed: peerIdentitySeed(peer),
     profileLoading: profile?.isLoading ?? false,
   };

@@ -11,18 +11,24 @@ export interface NearPayLayoutPeer {
   name: string;
   avatarUrl?: string | null;
   /**
-   * True once we've learned the peer's Nostr identity via the native favorite
-   * exchange — i.e. a Sovran peer we can lock ecash to. False ⇒ stock/vanilla
-   * peer or one we haven't exchanged identity with (bearer broadcast only).
-   * Coincides with `nostrPubkeyHex` being present.
+   * True once the peer's favorite carried a valid `creq` (identity + accepted
+   * mints) — i.e. a Sovran peer we can lock ecash to. False ⇒ stock/vanilla peer
+   * or one we haven't exchanged identity with (bearer DM only).
+   * Coincides with `nostrPubkeyHex` and `creq` being present.
    */
   lockable: boolean;
   /**
    * The peer's x-only Nostr pubkey (64-hex), learned via the favorite exchange.
-   * Present ⇒ lockable: use it for the kind-0 profile and "02"-prefix it for
-   * the NUT-11 P2PK lock target. Absent ⇒ bearer broadcast only.
+   * Use it for the kind-0 profile and "02"-prefix it for the NUT-11 P2PK lock
+   * target.
    */
   nostrPubkeyHex?: string;
+  /**
+   * The peer's standing NUT-18 payment request (`creq…`) — accepted mints +
+   * P2PK lock key. Present ⇒ lockable; decoded at tap time to pick a shared
+   * mint and verify the lock key.
+   */
+  creq?: string;
   /**
    * Identity seed for identicons/word-pair names. For Sovran peers it is the
    * x-only Nostr pubkey (real identity); for stock peers the announced noise

@@ -8,11 +8,13 @@ import {
   startBLE,
   type BLEPeer,
 } from 'bitchat-module';
+import { useMints } from '@cashu/coco-react';
 import { areBLEPeerSnapshotsEquivalent } from '@/features/bitchat/lib/blePeerSnapshots';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { useBitchatBLEIdentityMaterial } from '@/features/bitchat/hooks/useBitchatBLEIdentityMaterial';
 import { useBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import { bitchatLog } from '@/shared/lib/logger';
+import { buildStandingCreq } from '@/shared/lib/nutCreq';
 
 interface UseBLEPeersResult {
   peers: BLEPeer[];
@@ -42,6 +44,26 @@ export function useBLEPeers(): UseBLEPeersResult {
   const nickname = useBitchatNickname();
   const profileScope = useBitchatProfileScope();
   const identityMaterial = useBitchatBLEIdentityMaterial();
+  // Build our standing NUT-18 payment request (accepted mints + P2PK lock key)
+  // so the favorite advertises it (`[FAVORITED]:<npub>:<creq>`). Keyed on the
+  // mint-URL set so it only rebuilds when trusted mints change; startBLE updates
+  // the native creq without restarting the mesh.
+  const { trustedMints } = useMints();
+  const mintUrlsKey = useMemo(
+    () =>
+      trustedMints
+        .map((m) => m.mintUrl)
+        .sort()
+        .join(','),
+    [trustedMints]
+  );
+  const creq = useMemo(() => {
+    if (!identityMaterial || !mintUrlsKey) return null;
+    return buildStandingCreq({
+      mints: mintUrlsKey.split(','),
+      pubkey33: `02${identityMaterial.nostrPubkey}`,
+    });
+  }, [mintUrlsKey, identityMaterial]);
   const [peers, setPeers] = useState<BLEPeer[]>(() => getBLEPeers());
 
   const setPeersIfChanged = useCallback((nextPeers: BLEPeer[]) => {
@@ -57,6 +79,12 @@ export function useBLEPeers(): UseBLEPeersResult {
           peerID: peer.peerID,
           nickname: peer.nickname,
           hasNostrIdentity: !!peer.nostrPubkeyHex,
+          // Whether the peer's favorite carried a NUT-18 creq (its accepted
+          // mints + lock key). Identity can arrive without a creq, so this is
+          // the ground truth for "is this peer lockable" vs bearer-only. The
+          // parse itself is verified at send time (`near_pay.send.plan`).
+          hasCreq: !!peer.creq,
+          creqLen: peer.creq?.length ?? 0,
           hasDirectLink: peer.hasDirectLink,
           isConnected: peer.isConnected,
         })),
@@ -74,8 +102,8 @@ export function useBLEPeers(): UseBLEPeersResult {
     const sub = addBLEPeerListener(() => {
       refresh();
     });
-    // A peer handing us its Nostr identity (favoriting us back with the :nut
-    // marker) flips it bearer → lockable; refresh immediately so the radar
+    // A peer handing us its Nostr identity (favoriting us back with a creq
+    // suffix) flips it bearer → lockable; refresh immediately so the radar
     // doesn't wait up to 5 s for the next poll. iOS emits this; Android relies
     // on the poll. peerKey includes nostrPubkeyHex, so the snapshot updates.
     const identitySub = addBLEPeerIdentityListener(() => {
@@ -103,7 +131,7 @@ export function useBLEPeers(): UseBLEPeersResult {
 
     let cancelled = false;
     const attempt = () => {
-      startBLE(nickname, profileScope, identityMaterial)
+      startBLE(nickname, profileScope, identityMaterial, creq)
         .then(() => {
           if (cancelled) return;
           bitchatLog.info('bitchat.peers.ble_start_ok', {
@@ -133,7 +161,7 @@ export function useBLEPeers(): UseBLEPeersResult {
       cancelled = true;
       stateSub.remove();
     };
-  }, [identityMaterial, nickname, profileScope, refresh]);
+  }, [identityMaterial, nickname, profileScope, creq, refresh]);
 
   const connectedCount = useMemo(() => peers.filter((p) => p.isConnected).length, [peers]);
 

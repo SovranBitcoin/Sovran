@@ -93,6 +93,9 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     /// favoriting otherwise collides both initiators and the session (hence the
     /// favorite exchange) never completes.
     private var selfPeerID: String? = null
+    /// Our standing NUT-18 payment request (creq…) — accepted mints + P2PK lock
+    /// key, built in JS and passed to start(). Sent as `[FAVORITED]:<npub>:<creq>`.
+    private var selfCreq: String? = null
     /// peerIDs awaiting a favorite-send once their Noise session establishes.
     private val pendingFavorites: MutableSet<String> = mutableSetOf()
 
@@ -137,6 +140,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         noisePrivateKeyHex: String,
         signingPrivateKeyHex: String,
         p2pkPubkeyHex: String,
+        creq: String?,
     ) {
         val context = appContext ?: throw BitChatNotStartedException()
         if (!BluetoothStateMonitor.hasPermissions(context)) {
@@ -152,6 +156,10 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                     activeNickname = nickname
                     mesh?.sendBroadcastAnnounce()
                 }
+                // Update the advertised creq when provided (trusted mints can
+                // change without a profile switch). Only SET it — a startBLE call
+                // without a creq (e.g. the delivery path) must not clear it.
+                creq?.takeIf { it.isNotEmpty() }?.let { selfCreq = it }
                 return
             }
             if (isRunning) {
@@ -178,6 +186,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 Bech32.encode("npub", identity.p2pkPubkey.copyOfRange(1, identity.p2pkPubkey.size))
             }.getOrNull()
             selfPeerID = identity.peerID
+            creq?.takeIf { it.isNotEmpty() }?.let { selfCreq = it }
 
             val service = BluetoothMeshService(scopedContext)
             if (service.myPeerID != identity.peerID) {
@@ -219,6 +228,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         // previous profile's npub or replays its pending favorites.
         selfNpub = null
         selfPeerID = null
+        selfCreq = null
         pendingFavorites.clear()
     }
 
@@ -343,29 +353,32 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
 
     private fun dispatchFavorite(service: BluetoothMeshService, peerID: String, isFavorite: Boolean) {
         val npub = selfNpub ?: return
-        // Append the ":nut" capability marker so a receiving Sovran peer can tell
-        // us apart from a stock bitchat user who merely favorited them (and could
-        // never redeem a P2PK-locked token). The vendored MessageHandler stores
-        // the value via substringAfter(":"), so the whole "npub:nut" lands in
-        // FavoritesPersistenceService — npubToXOnlyHex reads the marker back off.
-        val content = (if (isFavorite) "[FAVORITED]" else "[UNFAVORITED]") + ":" + npub + ":nut"
+        // `[FAVORITED]:<npub>:<creq>` — identity (npub) + a standing NUT-18 payment
+        // request (accepted mints + P2PK lock key). The vendored MessageHandler
+        // stores the value via substringAfter(":"), so the whole "npub:creq" lands
+        // in FavoritesPersistenceService and parseStoredIdentity() splits it back.
+        val content = StringBuilder(if (isFavorite) "[FAVORITED]" else "[UNFAVORITED]")
+            .append(":").append(npub)
+        selfCreq?.let { content.append(":").append(it) }
         val recipientNickname = peerNickname(peerID) ?: peerID
-        service.sendPrivateMessage(content, peerID, recipientNickname, java.util.UUID.randomUUID().toString())
+        service.sendPrivateMessage(content.toString(), peerID, recipientNickname, java.util.UUID.randomUUID().toString())
     }
 
     /**
-     * Decode the value stored by the vendored favorite handler to a 64-char
-     * x-only pubkey hex, gated on the ":nut" capability marker. A bare `npub…`
-     * (a stock bitchat user who favorited us) is NOT cashu-capable → returns
-     * null so they never become lockable.
+     * Split the value the vendored favorite handler stored (`"<npub>:<creq>"` or
+     * a bare `"<npub>"`) into (x-only-pubkey-hex, creq). The creq (base64) and
+     * npub (bech32) contain no ":", so split on the first ":".
      */
-    private fun npubToXOnlyHex(stored: String?): String? {
-        if (stored == null || !stored.endsWith(":nut")) return null
-        val npub = stored.removeSuffix(":nut")
-        return runCatching {
+    private fun parseStoredIdentity(stored: String?): Pair<String?, String?> {
+        if (stored == null) return Pair(null, null)
+        val idx = stored.indexOf(':')
+        val npub = if (idx >= 0) stored.substring(0, idx) else stored
+        val creq = if (idx >= 0) stored.substring(idx + 1).ifEmpty { null } else null
+        val hex = runCatching {
             val (hrp, data) = Bech32.decode(npub)
             if (hrp == "npub" && data.size == 32) data.joinToString("") { "%02x".format(it) } else null
         }.getOrNull()
+        return Pair(hex, creq)
     }
 
     // MARK: - Peers
@@ -374,6 +387,14 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         val service = mesh ?: return emptyList()
         return service.getPeerNicknames().keys.mapNotNull { peerID ->
             val info = service.getPeerInfo(peerID) ?: return@mapNotNull null
+            // The peer's identity, learned via bitchat's native favorite exchange
+            // (`[FAVORITED]:<npub>:<creq>`) and stored by the vendored
+            // MessageHandler. nostrHex = kind-0 profile key AND (02-prefixed) the
+            // P2PK lock target; creq = standing NUT-18 request (mints + lock key).
+            // Both null until the peer has favorited us back.
+            val (nostrHex, creq) = parseStoredIdentity(
+                runCatching { FavoritesPersistenceService.shared.findNostrPubkeyForPeerID(peerID) }.getOrNull()
+            )
             mapOf(
                 "peerID" to info.id,
                 "nickname" to info.nickname,
@@ -383,15 +404,8 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 "isConnected" to info.isConnected,
                 "hasDirectLink" to service.connectionManager.addressPeerMap.containsValue(peerID),
                 "lastSeen" to info.lastSeen.toDouble(),
-                // The peer's x-only Nostr pubkey, learned via bitchat's native
-                // favorite-notification exchange ([FAVORITED]:npub) and stored by
-                // the vendored MessageHandler. The kind-0 profile key AND
-                // (02-prefixed) the P2PK lock target. Present only once the peer
-                // has favorited us back; null for peers/stock we haven't
-                // exchanged identity with.
-                "nostrPubkeyHex" to npubToXOnlyHex(
-                    runCatching { FavoritesPersistenceService.shared.findNostrPubkeyForPeerID(peerID) }.getOrNull()
-                ),
+                "nostrPubkeyHex" to nostrHex,
+                "creq" to creq,
                 // The peer's announced Curve25519 noise static key — bitchat's
                 // own identity, present for EVERY peer (stock clients
                 // included). A stable pseudonym seed for identicons/word-pair

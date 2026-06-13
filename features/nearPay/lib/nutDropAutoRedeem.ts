@@ -16,7 +16,7 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
  * resolves the REAL persisted history id by set-difference polling —
  * retiring the old direct-coco exception). This module owns what's
  * app-shaped: the persisted queue store behind the port and the toast
- * pipeline. Tokens arrive as public-mesh broadcasts (classified in
+ * pipeline. Tokens arrive as private Noise DMs (classified in
  * `useNutDropAutoRedeem`), so there is no sender to push status back to.
  */
 

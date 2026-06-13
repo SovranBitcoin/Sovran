@@ -10,7 +10,7 @@ import {
 } from '@/features/send/lib/sovranPaymentConfig';
 import { sendMemoPopup } from '@/shared/lib/popup';
 import { getEncodedToken } from '@cashu/cashu-ts';
-import { sendBLEPublicMessage } from '@/features/bitchat/lib/blePrivateDelivery';
+import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 const mockNavigate = jest.fn();
@@ -37,7 +37,7 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn() }));
 jest.mock('react-native', () => ({ Share: { share: jest.fn() } }));
 jest.mock('@cashu/cashu-ts', () => ({ getDecodedToken: jest.fn(), getEncodedToken: jest.fn() }));
 jest.mock('@/features/bitchat/lib/blePrivateDelivery', () => ({
-  sendBLEPublicMessage: jest.fn(),
+  sendBLEPrivateMessageWhole: jest.fn(),
 }));
 jest.mock('@/features/bitchat/hooks/useBitchatNickname', () => ({
   getBitchatNickname: jest.fn(() => 'Self Sender'),
@@ -128,7 +128,7 @@ describe('createSovranHandlers profile routing', () => {
     mockNearPaySetAmountEntry.mockReset();
     mockNearPayActive = null;
     (getEncodedToken as jest.Mock).mockReset();
-    (sendBLEPublicMessage as jest.Mock).mockReset();
+    (sendBLEPrivateMessageWhole as jest.Mock).mockReset();
     (sendMemoPopup as jest.Mock).mockReset();
   });
 
@@ -242,7 +242,7 @@ describe('createSovranHandlers profile routing', () => {
     expect(submitSendMemo).not.toHaveBeenCalled();
   });
 
-  it('broadcasts an explicit bearer token, including offline-created sends', async () => {
+  it('DMs an explicit bearer token, including offline-created sends', async () => {
     mockNearPayActive = {
       id: 'near-pay-3',
       startedAt: 1,
@@ -255,7 +255,12 @@ describe('createSovranHandlers profile routing', () => {
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-bearer-token');
-    (sendBLEPublicMessage as jest.Mock).mockResolvedValue({ startupMs: 1, sendMs: 3 });
+    (sendBLEPrivateMessageWhole as jest.Mock).mockResolvedValue({
+      messageId: 'm',
+      startupMs: 1,
+      handshakeMs: 2,
+      sendMs: 3,
+    });
     // @ts-expect-error sendComplete only reads no machine methods.
     const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
     const handlers = createSovranHandlers({
@@ -270,20 +275,20 @@ describe('createSovranHandlers profile routing', () => {
     });
 
     // Bearer drops take the local-proof shortcut when offline — delivery
-    // must still broadcast (BLE needs no internet).
+    // must still send the DM (BLE needs no internet).
     await handlers.sendComplete?.({
       historyEntry,
       createdOffline: true,
       mintWasOffline: true,
     });
 
-    expect(sendBLEPublicMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ content: 'cashuA-bearer-token' })
+    expect(sendBLEPrivateMessageWhole).toHaveBeenCalledWith(
+      expect.objectContaining({ content: 'cashuA-bearer-token', peerID: 'peer-789' })
     );
     expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
   });
 
-  it('broadcasts a locked token on the public mesh (only the recipient can redeem it)', async () => {
+  it('DMs a locked token privately to the recipient peer', async () => {
     mockNearPayActive = {
       id: 'near-pay-4',
       startedAt: 1,
@@ -296,7 +301,12 @@ describe('createSovranHandlers profile routing', () => {
       },
     };
     (getEncodedToken as jest.Mock).mockReturnValue('cashuA-locked-token');
-    (sendBLEPublicMessage as jest.Mock).mockResolvedValue({ startupMs: 1, sendMs: 3 });
+    (sendBLEPrivateMessageWhole as jest.Mock).mockResolvedValue({
+      messageId: 'm',
+      startupMs: 1,
+      handshakeMs: 2,
+      sendMs: 3,
+    });
     // @ts-expect-error sendComplete only reads no machine methods.
     const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
     const handlers = createSovranHandlers({
@@ -310,9 +320,9 @@ describe('createSovranHandlers profile routing', () => {
       token: { proofs: [] },
     });
 
-    // A locked token broadcasts identically to a bearer token — it is
-    // P2PK-locked to the recipient's announced key, so only they can redeem
-    // it; everyone else classifies it `locked-to-other` and ignores it.
+    // A locked token is delivered as a private Noise DM addressed to the
+    // recipient peer — encrypted to them, so the payment stays private and
+    // only they can redeem the P2PK-locked proofs.
     await handlers.sendComplete?.({
       historyEntry,
       createdOffline: false,
@@ -320,8 +330,8 @@ describe('createSovranHandlers profile routing', () => {
       p2pkLockPubkey: `02${'ef'.repeat(32)}`,
     });
 
-    expect(sendBLEPublicMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ content: 'cashuA-locked-token' })
+    expect(sendBLEPrivateMessageWhole).toHaveBeenCalledWith(
+      expect.objectContaining({ content: 'cashuA-locked-token', peerID: 'peer-999' })
     );
     expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
   });

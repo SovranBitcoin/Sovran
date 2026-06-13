@@ -131,11 +131,56 @@ const NEIGHBOR_GOSSIP_REPLACEMENT =
   '            directNeighbors: nil\n' +
   '        )';
 
+// --- Extend PrivateMessagePacket content length (0xFF sentinel) ---
+//
+// Upstream caps private-message content at 255 bytes (1-byte TLV length;
+// encode() returns nil above it). Sovran delivers an ecash token — and a
+// creq-bearing favorite — as a single private Noise DM that exceeds 255 bytes.
+// The transport already fragments large encrypted packets, so the only blocker
+// is the content-length field. Extend it: length 0x00–0xFE = literal 1 byte
+// (byte-identical to stock); 0xFF = sentinel + 2-byte big-endian length
+// (≤64 KB). messageID stays 1-byte. Stock misparses our >254-byte content,
+// which is acceptable (Sovran↔Sovran payments). Mirror in sync-bitchat-android.js.
+const EXTENDED_PM_ENCODE_ANCHOR =
+  /        guard let contentData = content\.data\(using: \.utf8\), contentData\.count <= 255 else \{ return nil \}\n        data\.append\(TLVType\.content\.rawValue\)\n        data\.append\(UInt8\(contentData\.count\)\)/;
+const EXTENDED_PM_ENCODE_REPLACEMENT =
+  '        // [sovran] extended content length: 0x00–0xFE literal; 0xFF sentinel\n' +
+  '        // + 2-byte big-endian length (≤64 KB). messageID stays 1-byte.\n' +
+  '        guard let contentData = content.data(using: .utf8), contentData.count <= 0xFFFF else { return nil }\n' +
+  '        data.append(TLVType.content.rawValue)\n' +
+  '        if contentData.count <= 0xFE {\n' +
+  '            data.append(UInt8(contentData.count))\n' +
+  '        } else {\n' +
+  '            data.append(0xFF)\n' +
+  '            data.append(UInt8((contentData.count >> 8) & 0xFF))\n' +
+  '            data.append(UInt8(contentData.count & 0xFF))\n' +
+  '        }';
+const EXTENDED_PM_DECODE_ANCHOR =
+  /            let length = Int\(data\[offset\]\)\n            offset \+= 1\n\n            guard offset \+ length <= data\.count else \{ return nil \}\n            let value = data\[offset\.\.<offset \+ length\]\n            offset \+= length\n\n            switch type \{\n            case \.messageID:/;
+const EXTENDED_PM_DECODE_REPLACEMENT =
+  '            // [sovran] extended length read: 0xFF sentinel → 2-byte big-endian.\n' +
+  '            var length = Int(data[offset])\n' +
+  '            offset += 1\n' +
+  '            if length == 0xFF {\n' +
+  '                guard offset + 2 <= data.count else { return nil }\n' +
+  '                length = (Int(data[offset]) << 8) | Int(data[offset + 1])\n' +
+  '                offset += 2\n' +
+  '            }\n' +
+  '\n' +
+  '            guard offset + length <= data.count else { return nil }\n' +
+  '            let value = data[offset..<offset + length]\n' +
+  '            offset += length\n' +
+  '\n' +
+  '            switch type {\n' +
+  '            case .messageID:';
+
 let patched = 0;
 const applied = {
   mismatchGuard: false,
   linkState: false,
   neighborGossip: false,
+  extendedPmEncode: false,
+  extendedPmDecode: false,
 };
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
@@ -154,6 +199,14 @@ for (const file of walk(ROOT)) {
     after = next;
     next = after.replace(NEIGHBOR_GOSSIP_ANCHOR, NEIGHBOR_GOSSIP_REPLACEMENT);
     if (next !== after) applied.neighborGossip = true;
+    after = next;
+  }
+  if (file.endsWith('Packets.swift')) {
+    let next = after.replace(EXTENDED_PM_ENCODE_ANCHOR, EXTENDED_PM_ENCODE_REPLACEMENT);
+    if (next !== after) applied.extendedPmEncode = true;
+    after = next;
+    next = after.replace(EXTENDED_PM_DECODE_ANCHOR, EXTENDED_PM_DECODE_REPLACEMENT);
+    if (next !== after) applied.extendedPmDecode = true;
     after = next;
   }
   if (after !== before) {
@@ -192,5 +245,17 @@ assertApplied(
   applied.neighborGossip,
   path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
   /\[sovran\] neighbors gossip suppressed/
+);
+assertApplied(
+  'EXTENDED_PM_ENCODE',
+  applied.extendedPmEncode,
+  path.join(ROOT, 'bitchat', 'Protocols', 'Packets.swift'),
+  /\[sovran\] extended content length: 0x00/
+);
+assertApplied(
+  'EXTENDED_PM_DECODE',
+  applied.extendedPmDecode,
+  path.join(ROOT, 'bitchat', 'Protocols', 'Packets.swift'),
+  /\[sovran\] extended length read: 0xFF sentinel/
 );
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);

@@ -78,6 +78,13 @@ export interface BLEPeer {
    */
   nostrPubkeyHex?: string;
   /**
+   * The peer's standing NUT-18 payment request (`creq…`) from its favorite —
+   * advertises the mints it accepts + its P2PK lock key. Decode it (cashu-ts)
+   * to gate lockability (its `nut10` key must match `02`+`nostrPubkeyHex`) and
+   * to pick a mint the receiver actually accepts. Absent ⇒ not lockable.
+   */
+  creq?: string;
+  /**
    * The peer's announced Curve25519 noise static key (64-hex) — bitchat's
    * own identity, present for EVERY peer including stock clients. A stable
    * pseudonym seed for identicons/word-pair names across nickname changes.
@@ -100,6 +107,8 @@ export interface BLEPeerIdentityEvent {
   peerID: string;
   isFavorite: boolean;
   nostrPubkeyHex?: string;
+  /** The peer's standing NUT-18 payment request (mints + P2PK lock key). */
+  creq?: string;
 }
 
 export interface BLEMessageEvent {

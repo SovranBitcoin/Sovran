@@ -98,9 +98,52 @@ const PATCHES = [
       '    // sessions via encryptionService; the vendor exposes no public reset.\n' +
       '    internal val encryptionService = EncryptionService(context)',
   },
-  // Nut Drop note: peer Nostr identity is exchanged via bitchat's NATIVE
-  // favorite notification ([FAVORITED]:npub), not a custom announce TLV, so
-  // there are NO ecash-injection or signing-canonicalization patches here.
+  // --- Extend PrivateMessagePacket content length (0xFF sentinel) ---
+  //
+  // Mirror of the iOS Packets.swift patch (patch-bitchat-imports.js). Lets a
+  // private DM carry content >255 bytes (a whole ecash token + a creq-bearing
+  // favorite): content length 0x00–0xFE = literal 1 byte (stock-identical);
+  // 0xFF = sentinel + 2-byte big-endian length (≤64 KB). messageID stays 1-byte.
+  // Stock misparses our >254-byte content — acceptable (Sovran↔Sovran payments).
+  {
+    file: 'model/NoiseEncrypted.kt',
+    name: 'EXTENDED_PM_ENCODE_GUARD',
+    anchor: /        if \(messageIDData\.size > 255 \|\| contentData\.size > 255\) \{\n            return null\n        \}/,
+    replacement:
+      '        // [sovran] extended content length: messageID 1-byte, content ≤64 KB.\n' +
+      '        if (messageIDData.size > 255 || contentData.size > 0xFFFF) {\n' +
+      '            return null\n' +
+      '        }',
+  },
+  {
+    file: 'model/NoiseEncrypted.kt',
+    name: 'EXTENDED_PM_ENCODE_LEN',
+    anchor: /        result\.add\(TLVType\.CONTENT\.value\.toByte\(\)\)\n        result\.add\(contentData\.size\.toByte\(\)\)/,
+    replacement:
+      '        result.add(TLVType.CONTENT.value.toByte())\n' +
+      '        // [sovran] 0x00–0xFE literal; 0xFF sentinel + 2-byte big-endian length.\n' +
+      '        if (contentData.size <= 0xFE) {\n' +
+      '            result.add(contentData.size.toByte())\n' +
+      '        } else {\n' +
+      '            result.add(0xFF.toByte())\n' +
+      '            result.add(((contentData.size shr 8) and 0xFF).toByte())\n' +
+      '            result.add((contentData.size and 0xFF).toByte())\n' +
+      '        }',
+  },
+  {
+    file: 'model/NoiseEncrypted.kt',
+    name: 'EXTENDED_PM_DECODE_LEN',
+    anchor: /                val length = data\[offset\]\.toUByte\(\)\.toInt\(\)\n                offset \+= 1/,
+    replacement:
+      '                // [sovran] extended length read: 0xFF sentinel → 2-byte BE.\n' +
+      '                var length = data[offset].toUByte().toInt()\n' +
+      '                offset += 1\n' +
+      '                if (length == 0xFF) {\n' +
+      '                    if (offset + 2 > data.size) return null\n' +
+      '                    length = (data[offset].toUByte().toInt() shl 8) or data[offset + 1].toUByte().toInt()\n' +
+      '                    offset += 2\n' +
+      '                }',
+  },
 ];
 
 function rmrf(p) {

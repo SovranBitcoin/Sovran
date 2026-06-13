@@ -30,13 +30,20 @@ describe('peerDisplayName', () => {
 });
 
 describe('toLayoutPeer', () => {
-  it('marks a peer that exchanged its Nostr identity as lockable', () => {
-    expect(toLayoutPeer(blePeer({ nostrPubkeyHex: 'ab'.repeat(32) }))).toMatchObject({
+  it('marks a peer that advertised identity + a creq as lockable', () => {
+    expect(
+      toLayoutPeer(blePeer({ nostrPubkeyHex: 'ab'.repeat(32), creq: 'creqAabc' }))
+    ).toMatchObject({
       name: 'mesh-nick',
       avatarUrl: null,
       lockable: true,
       nostrPubkeyHex: 'ab'.repeat(32),
+      creq: 'creqAabc',
       profileLoading: false,
+    });
+    // Identity but no creq → not lockable (we don't know their accepted mints).
+    expect(toLayoutPeer(blePeer({ nostrPubkeyHex: 'ab'.repeat(32) }))).toMatchObject({
+      lockable: false,
     });
     // No identity exchanged → bearer-only (not lockable).
     expect(toLayoutPeer(blePeer())).toMatchObject({ lockable: false });

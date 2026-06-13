@@ -37,14 +37,16 @@ public class BitChatModule: Module {
                 profileScope: String,
                 noisePrivateKeyHex: String,
                 signingPrivateKeyHex: String,
-                p2pkPubkeyHex: String
+                p2pkPubkeyHex: String,
+                creq: String?
             ) in
             try await BitChatBLEBridge.shared.start(
                 nickname: nickname,
                 profileScope: profileScope,
                 noisePrivateKeyHex: noisePrivateKeyHex,
                 signingPrivateKeyHex: signingPrivateKeyHex,
-                p2pkPubkeyHex: p2pkPubkeyHex
+                p2pkPubkeyHex: p2pkPubkeyHex,
+                creq: creq
             )
         }
 

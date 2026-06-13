@@ -5,13 +5,13 @@ import { sendBLEFavorite, type BLEPeer } from 'bitchat-module';
 import { paymentLog } from '@/shared/lib/logger';
 
 /**
- * Eagerly hand our Nostr identity to every nearby peer via bitchat's NATIVE
- * favorite notification (`[FAVORITED]:npub`). bitchat exposes no other way to
- * learn a peer's Nostr identity over the mesh (the announce carries no Nostr
- * key), so we favorite on discovery: a Sovran peer reciprocates and becomes
- * lockable-on-sight (its `nostrPubkeyHex` arrives on the next peer poll), while
- * a stock peer simply sees a normal "favorited you" and never reciprocates
- * (→ bearer broadcast only).
+ * Eagerly hand our identity + accepted mints to every nearby peer via bitchat's
+ * NATIVE favorite notification (`[FAVORITED]:<npub>:<creq>`). bitchat exposes no
+ * other way to learn a peer's Nostr identity over the mesh (the announce carries
+ * no Nostr key), so we favorite on discovery: a Sovran peer reciprocates and
+ * becomes lockable-on-sight (its `nostrPubkeyHex` + `creq` arrive on the next
+ * peer poll), while a stock peer can't decode our creq-bearing favorite (it
+ * exceeds the stock 255-byte cap) and so never reciprocates (→ bearer only).
  *
  * Active only while the calling NearPay surface is mounted, so the favorite
  * signal is bounded to "the user is actively looking to pay nearby". Each peer

@@ -16,7 +16,10 @@ import {
 } from '@/features/bitchat/lib/blePeerSnapshots';
 import { useEagerPeerFavorite } from '@/features/nearPay/hooks/useEagerPeerFavorite';
 import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerProfile';
-import { confirmPublicBroadcastSend } from '@/features/nearPay/lib/startNearPaySend';
+import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
+import { creqParseDiagnostics } from '@/shared/lib/nutCreq';
+import { notifyNoSharedMint } from '@/features/nearPay/lib/startNearPaySend';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -87,6 +90,7 @@ export function NearPayPeerListScreen() {
   const headerHeight = useHeaderHeight();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+  const { isOffline } = useOfflineStatus();
   const { peers: blePeers } = useBLEPeers();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
@@ -106,9 +110,9 @@ export function NearPayPeerListScreen() {
   // identity (bitchat's only native mesh identity channel) and become lockable.
   useEagerPeerFavorite(peers);
 
-  // Every bitchat peer is listed: Sovran peers (those announcing a P2PK key)
-  // get a locked broadcast; vanilla peers are public-broadcast bearer only
-  // (tagged, and gated behind an explicit confirm in handleSelectPeer).
+  // Every bitchat peer is listed: Sovran peers (those advertising a creq) get a
+  // locked token DM when we share a mint and are online; everyone else gets a
+  // bearer token DM (the send decision lives in planNearPaySend/handleSelectPeer).
   const connectedCount = useMemo(() => peers.filter((peer) => peer.isConnected).length, [peers]);
   const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
   const sortedPeers = useMemo(() => {
@@ -154,34 +158,32 @@ export function NearPayPeerListScreen() {
   const handleSelectPeer = useCallback(
     async (peer: BLEPeer) => {
       const displayName = peerDisplayName(peer);
-      // "02"-prefix the favorite-learned x-only Nostr pubkey for the NUT-11
-      // P2PK lock target. Null ⇒ bearer broadcast.
-      const lockPubkey = peer.nostrPubkeyHex ? `02${peer.nostrPubkeyHex}` : null;
+      // Decide lock vs bearer from the peer's creq (accepted mints + lock key),
+      // our trusted mints, and online status. Delivery is always a private DM.
+      const plan = planNearPaySend({
+        peer,
+        ourMints: walletContext.trustedMintUrls,
+        isOffline,
+      });
       paymentLog.info('near_pay.peer.tap', {
         peerID: peer.peerID,
         source: 'peer-list',
-        lockable: !!lockPubkey,
+        mode: plan.mode,
+        // Did we decode the receiver's creq, and which mints did we get?
+        ...creqParseDiagnostics(peer),
+        ourMints: walletContext.trustedMintUrls,
+        allowedMints: plan.mode === 'block' ? null : plan.allowedMints,
+        isOffline,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
       });
-      // Consent gate BEFORE any session or navigation state — declining must
-      // leave the list exactly as it was. A locked send (the peer announced a
-      // P2PK key) needs no consent: only that key can redeem the token. A
-      // bearer send (stock peer) is broadcast publicly and must be confirmed.
-      if (!lockPubkey) {
-        const confirmed = await confirmPublicBroadcastSend(displayName);
-        if (!confirmed) {
-          paymentLog.info('near_pay.peer.broadcast_declined', { peerID: peer.peerID });
-          return;
-        }
+      // No mint in common ⇒ the recipient couldn't redeem a token from our
+      // mint, so block before any session/navigation state.
+      if (plan.mode === 'block') {
+        await notifyNoSharedMint(displayName);
+        return;
       }
-      const delivery: NearPayDelivery = { locked: !!lockPubkey };
-      paymentLog.info('near_pay.peer.list_select', {
-        peerID: peer.peerID,
-        hasDirectLink: peer.hasDirectLink,
-        isConnected: peer.isConnected,
-        locked: delivery.locked,
-      });
+      const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
       useNearPaySessionStore.getState().start({
         peerID: peer.peerID,
         nickname: displayName,
@@ -198,17 +200,17 @@ export function NearPayPeerListScreen() {
         }
       };
       router.back();
-      // One path for every peer: enter the amount flow, then the sendComplete
-      // handler broadcasts the finished token on the public mesh. A locked
-      // token is P2PK-locked to the peer's announced key (only they redeem);
-      // a bearer token is claimable by anyone. recipientPubkey (the x-only
-      // Nostr key) resolves their real profile on the amount screen.
+      // The sendComplete handler delivers the finished token as a private Noise
+      // DM to the recipient peer (no public mesh). A locked token is P2PK-locked
+      // to the peer's key + minted from a mint they accept; a bearer token rides
+      // the same private DM. `allowedMints` constrains the source mint.
       void machine
         .startSendEcash({
           reset: true,
-          ...(lockPubkey
-            ? { p2pkLockPubkey: lockPubkey, recipientPubkey: lockPubkey.slice(2) }
+          ...(plan.mode === 'lock'
+            ? { p2pkLockPubkey: plan.lockPubkey, recipientPubkey: plan.recipientPubkey }
             : {}),
+          ...(plan.allowedMints ? { allowedMints: plan.allowedMints } : {}),
           recipientProfile: { displayName, avatarUrl: null, nip05: null },
         })
         .catch((err) => {
@@ -218,7 +220,7 @@ export function NearPayPeerListScreen() {
           });
         });
     },
-    [machine]
+    [machine, walletContext.trustedMintUrls, isOffline]
   );
 
   const renderItem = useCallback(
