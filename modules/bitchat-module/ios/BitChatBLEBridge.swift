@@ -99,12 +99,23 @@ final class BitChatBLEBridge: NSObject {
     /// way — no custom announce TLV.
     private var selfNpub: String?
 
+    /// Our own 16-hex peerID. Used as a deterministic handshake tie-breaker:
+    /// only the lexicographically-lower peerID side initiates the Noise
+    /// handshake for the favorite exchange. Eager mutual favoriting otherwise
+    /// makes both sides initiate simultaneously, which collides the Noise XX
+    /// handshake (no tie-breaker in NoiseSession) so the session never
+    /// establishes and the favorite never delivers.
+    private var selfPeerID: String?
+
     /// peerID (16-hex) → peer's x-only Nostr pubkey hex, learned from an inbound
     /// `[FAVORITED]:npub` notification. Drives lockable-on-sight in NearPay.
     /// Guarded by `peerIdentityLock` — written on the Noise-delivery path, read
     /// from `getPeers()` on the JS thread.
     private let peerIdentityLock = NSLock()
     private var peerNostrPubkeyHexMap: [String: String] = [:]
+    /// Higher-peerID peers whose favorite send is deferred until the session the
+    /// lower-peerID side establishes goes live (flushed in didReceiveNoisePayload).
+    private var pendingFavoritePeers: Set<String> = []
 
     private func setPeerNostr(_ peerID: String, _ hex: String?) {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
@@ -117,9 +128,21 @@ final class BitChatBLEBridge: NSObject {
         return peerNostrPubkeyHexMap[peerID]
     }
 
+    private func deferFavorite(_ peerID: String) {
+        peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
+        pendingFavoritePeers.insert(peerID)
+    }
+
+    /// Removes `peerID` from the deferred set, returning true if it was pending.
+    private func takePendingFavorite(_ peerID: String) -> Bool {
+        peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
+        return pendingFavoritePeers.remove(peerID) != nil
+    }
+
     private func clearPeerNostr() {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
         peerNostrPubkeyHexMap.removeAll()
+        pendingFavoritePeers.removeAll()
     }
 
     /// In-memory mirror of the persisted DM-peer summaries. Mutated only on the
@@ -282,6 +305,7 @@ final class BitChatBLEBridge: NSObject {
         // notification (the identity-exchange channel) — there is no custom
         // announce TLV. p2pkPubkey is "02" + the 32-byte x-only key.
         selfNpub = try? Bech32.encode(hrp: "npub", data: Data(identityMaterial.p2pkPubkey.dropFirst()))
+        selfPeerID = identityMaterial.peerID
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
@@ -307,6 +331,7 @@ final class BitChatBLEBridge: NSObject {
         // Clear identity-exchange state so a profile switch never advertises the
         // previous profile's npub or surfaces its learned peer identities.
         selfNpub = nil
+        selfPeerID = nil
         clearPeerNostr()
     }
 
@@ -427,12 +452,36 @@ final class BitChatBLEBridge: NSObject {
         guard let peerIDData = Data(hexString: peerIDStr) else {
             throw BitChatBridgeError.invalidPeerID
         }
-        guard let npub = selfNpub else { return }  // identity not ready yet
+        guard selfNpub != nil else { return }  // identity not ready yet
         let peerID = PeerID(hexData: peerIDData)
-        // Append the ":nut" capability marker so a receiving Sovran peer can tell
-        // us apart from a stock bitchat user who merely favorited them (and could
-        // never redeem a P2PK-locked token). Rides bitchat's native favorite
-        // message; stock clients keep parsing the npub and ignore the suffix.
+        // Handshake tie-breaker: eager favoriting fires on BOTH peers at once, and
+        // if both initiate a Noise handshake the XX exchange collides and never
+        // establishes (no tie-breaker in NoiseSession). So only the lower-peerID
+        // side initiates here; the higher side defers and flushes once the lower
+        // side's session lands (didReceiveNoisePayload). If a session already
+        // exists, just send.
+        let established: Bool
+        switch service.getNoiseSessionState(for: peerID) {
+        case .established: established = true
+        default: established = false
+        }
+        let weInitiate = (selfPeerID.map { $0 < peerID.id } ?? true)
+        if established || weInitiate {
+            dispatchFavorite(service, to: peerID, isFavorite: isFavorite)
+        } else if isFavorite {
+            // Higher-peerID side: wait for the lower side to establish the session.
+            deferFavorite(peerID.id)
+        }
+    }
+
+    /// Sends the `[FAVORITED]:npub:nut` favorite to `peerID`. The ":nut" marker
+    /// lets a receiving Sovran peer tell us apart from a stock bitchat user who
+    /// merely favorited them (and could never redeem a P2PK-locked token); stock
+    /// clients keep parsing the npub and ignore the suffix. When no session
+    /// exists yet, BLEService queues this and initiates the handshake, flushing
+    /// the queue on completion (so the lower-peerID initiator delivers reliably).
+    private func dispatchFavorite(_ service: BLEService, to peerID: PeerID, isFavorite: Bool) {
+        guard let npub = selfNpub else { return }
         let content = (isFavorite ? "[FAVORITED]" : "[UNFAVORITED]") + ":" + npub + ":nut"
         service.sendMessage(content, mentions: [], to: peerID, messageID: UUID().uuidString, timestamp: nil)
     }
@@ -646,6 +695,13 @@ extension BitChatBLEBridge: BitchatDelegate {
         guard type == .privateMessage,
               let pm = PrivateMessagePacket.decode(from: payload) else {
             return
+        }
+        // [sovran] Receiving a decrypted payload means a Noise session with this
+        // peer is live. If we deferred our favorite to them (we were the
+        // higher-peerID side of the tie-breaker), flush it now over that session.
+        if BitChatBLEBridge.shared.takePendingFavorite(peerID.id),
+           let service = BitChatBLEBridge.shared.bleService {
+            BitChatBLEBridge.shared.dispatchFavorite(service, to: peerID, isFavorite: true)
         }
         // [sovran] Intercept bitchat's native favorite notification —
         // `[FAVORITED]:npub` / `[UNFAVORITED]:npub` carries the sender's Nostr

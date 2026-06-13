@@ -88,6 +88,11 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     /// in bitchat's native [FAVORITED]:npub favorite notification — Sovran's
     /// identity-exchange channel. No custom announce TLV.
     private var selfNpub: String? = null
+    /// Our own 16-hex peerID — deterministic handshake tie-breaker so only the
+    /// lower-peerID side of a pair initiates the Noise handshake. Eager mutual
+    /// favoriting otherwise collides both initiators and the session (hence the
+    /// favorite exchange) never completes.
+    private var selfPeerID: String? = null
     /// peerIDs awaiting a favorite-send once their Noise session establishes.
     private val pendingFavorites: MutableSet<String> = mutableSetOf()
 
@@ -172,6 +177,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             selfNpub = runCatching {
                 Bech32.encode("npub", identity.p2pkPubkey.copyOfRange(1, identity.p2pkPubkey.size))
             }.getOrNull()
+            selfPeerID = identity.peerID
 
             val service = BluetoothMeshService(scopedContext)
             if (service.myPeerID != identity.peerID) {
@@ -212,6 +218,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         // Clear identity-exchange state so a profile switch never advertises the
         // previous profile's npub or replays its pending favorites.
         selfNpub = null
+        selfPeerID = null
         pendingFavorites.clear()
     }
 
@@ -314,8 +321,16 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         if (service.hasEstablishedSession(peerID)) {
             dispatchFavorite(service, peerID, isFavorite)
         } else if (isFavorite) {
+            // Both sides queue their favorite, but only the lower-peerID side
+            // initiates the handshake — eager mutual favoriting otherwise makes
+            // both initiate at once and the Noise XX handshake collides (no
+            // tie-breaker in NoiseSessionManager), so the session never
+            // establishes. The higher side waits; once the lower side's
+            // handshake lands, onSessionEstablished → flushPendingFavorite sends
+            // both queued favorites.
             synchronized(lock) { pendingFavorites.add(peerID) }
-            service.initiateNoiseHandshake(peerID)
+            val weInitiate = selfPeerID?.let { it < peerID } ?: true
+            if (weInitiate) service.initiateNoiseHandshake(peerID)
         }
         // unfavorite with no session: nothing established to revoke — no-op.
     }

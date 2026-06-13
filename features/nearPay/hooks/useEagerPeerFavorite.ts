@@ -24,6 +24,11 @@ export function useEagerPeerFavorite(peers: readonly Pick<BLEPeer, 'peerID'>[]):
     for (const peer of peers) {
       if (favorited.current.has(peer.peerID)) continue;
       favorited.current.add(peer.peerID);
+      // Breadcrumb so log.txt shows the exchange firing — pair with the
+      // `bitchat.peers.snapshot` `hasNostrIdentity` flag to confirm a peer goes
+      // bearer → lockable. (Whether the favorite actually reaches the peer is
+      // gated natively on the handshake tie-breaker.)
+      paymentLog.debug('near_pay.favorite.send', { peerID: peer.peerID });
       void sendBLEFavorite(peer.peerID, true).catch((err: unknown) => {
         // Allow a retry on the next poll if the send threw (e.g. mesh not
         // ready yet) rather than permanently skipping the peer.
