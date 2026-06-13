@@ -41,6 +41,7 @@ import {
   type CelebrationPeerIdentity,
 } from '@/features/nearPay/components/NutDropCelebrationOverlay';
 import { useNutDropCelebration } from '@/features/nearPay/hooks/useNutDropCelebration';
+import { useEagerPeerFavorite } from '@/features/nearPay/hooks/useEagerPeerFavorite';
 import { useNutDropStrike } from '@/features/nearPay/hooks/useNutDropStrike';
 import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
@@ -354,8 +355,7 @@ function peerTargetsEqual(a: PeerLayoutTarget, b: PeerLayoutTarget): boolean {
     a.peer.nickname === b.peer.nickname &&
     a.peer.isConnected === b.peer.isConnected &&
     a.peer.hasDirectLink === b.peer.hasDirectLink &&
-    a.peer.supportsNutRequests === b.peer.supportsNutRequests &&
-    a.peer.autoRedeem === b.peer.autoRedeem &&
+    a.peer.lockable === b.peer.lockable &&
     a.peer.avatarUrl === b.peer.avatarUrl &&
     a.peer.profileLoading === b.peer.profileLoading
   );
@@ -671,7 +671,7 @@ const PeerNode = React.memo(function PeerNode({
               palette={CELEBRATION_LIGHTNING_PALETTE}
             />
           ) : null}
-          {!target.peer.supportsNutRequests ? (
+          {!target.peer.lockable ? (
             <View style={bearerBadgeStyle}>
               <Icon
                 name="mdi:lock-open-variant-outline"
@@ -1484,6 +1484,10 @@ export function NearPayScreen() {
     () => filterFreshBLEPeers(blePeers, peerFreshnessNow),
     [blePeers, peerFreshnessNow]
   );
+  // Eagerly favorite each nearby peer so Sovran peers reciprocate and become
+  // lockable-on-sight — bitchat's only native mesh channel for exchanging a
+  // Nostr identity. Bounded to while the radar is mounted.
+  useEagerPeerFavorite(peers);
   const [foreground] = useThemeColor(FOREGROUND_THEME_KEYS);
   const nearPaySession = useNearPaySessionStore((state) => state.active);
   const inlineAmountEntry = nearPaySession?.amountEntry ?? null;
@@ -1645,8 +1649,7 @@ export function NearPayScreen() {
             hasDirectLink: recipient.hasDirectLink,
             lastSeen: recipient.lastSeen,
             avatarUrl: null,
-            supportsNutRequests: recipient.delivery.locked,
-            autoRedeem: false,
+            lockable: recipient.delivery.locked,
             identitySeed: recipient.peerID,
             profileLoading: false,
           };
@@ -1784,11 +1787,12 @@ export function NearPayScreen() {
 
   const handleSelectPeer = useCallback(
     async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
-      const lockPubkey = peer.p2pkPubkeyHex ?? null;
+      // "02"-prefix the x-only Nostr pubkey learned via the favorite exchange
+      // to get the 33-byte NUT-11 P2PK lock target. Null ⇒ bearer broadcast.
+      const lockPubkey = peer.nostrPubkeyHex ? `02${peer.nostrPubkeyHex}` : null;
       paymentLog.info('near_pay.peer.tap', {
         peerID: peer.peerID,
         lockable: !!lockPubkey,
-        autoRedeem: peer.autoRedeem,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
       });

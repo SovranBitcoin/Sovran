@@ -93,6 +93,35 @@ final class BitChatBLEBridge: NSObject {
     private var activeNickname: String?
     private var lastCBState: CBManagerState = .unknown
 
+    /// Our own Nostr npub (bech32), derived from the profile key at `start()`.
+    /// Sent in bitchat's native `[FAVORITED]:npub` favorite notification so
+    /// nearby Sovran peers learn our identity / P2PK lock target the bitchat
+    /// way — no custom announce TLV.
+    private var selfNpub: String?
+
+    /// peerID (16-hex) → peer's x-only Nostr pubkey hex, learned from an inbound
+    /// `[FAVORITED]:npub` notification. Drives lockable-on-sight in NearPay.
+    /// Guarded by `peerIdentityLock` — written on the Noise-delivery path, read
+    /// from `getPeers()` on the JS thread.
+    private let peerIdentityLock = NSLock()
+    private var peerNostrPubkeyHexMap: [String: String] = [:]
+
+    private func setPeerNostr(_ peerID: String, _ hex: String?) {
+        peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
+        if let hex { peerNostrPubkeyHexMap[peerID] = hex }
+        else { peerNostrPubkeyHexMap.removeValue(forKey: peerID) }
+    }
+
+    private func peerNostr(_ peerID: String) -> String? {
+        peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
+        return peerNostrPubkeyHexMap[peerID]
+    }
+
+    private func clearPeerNostr() {
+        peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
+        peerNostrPubkeyHexMap.removeAll()
+    }
+
     /// In-memory mirror of the persisted DM-peer summaries. Mutated only on the
     /// main actor (didReceiveNoisePayload + sendPrivateMessage both hop there
     /// before calling `recordDmPeer`).
@@ -248,15 +277,11 @@ final class BitChatBLEBridge: NSObject {
         activeIdentityID = identityMaterial.identityID
         activeNickname = nickname
         loadDmSummaries(for: scope)
-        // The ecash capability beacon must be live before startServices() —
-        // the first announce fires during startup and every announce must
-        // carry it. v3 announces the profile's 33-byte P2PK key so nearby
-        // Sovran peers derive identity + lock target from one announced key
-        // and lock+broadcast ecash directly (no Noise handshake).
-        EcashAnnounceState.shared.localTLV = EcashAnnounceTLV.encode(
-            flags: EcashAnnounceTLV.capabilityNutRequests | EcashAnnounceTLV.capabilityAutoRedeem,
-            p2pkPubkey: identityMaterial.p2pkPubkey
-        )
+        // Derive our npub (bech32) from the profile's x-only Nostr key. We hand
+        // it to nearby peers via bitchat's native `[FAVORITED]:npub` favorite
+        // notification (the identity-exchange channel) — there is no custom
+        // announce TLV. p2pkPubkey is "02" + the 32-byte x-only key.
+        selfNpub = try? Bech32.encode(hrp: "npub", data: Data(identityMaterial.p2pkPubkey.dropFirst()))
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
@@ -279,11 +304,10 @@ final class BitChatBLEBridge: NSObject {
         activeIdentityID = nil
         activeNickname = nil
         dmSummaries = [:]
-        // Clear ecash state so a profile switch can never announce the
-        // previous profile's capabilities, surface its peers, or deliver a
-        // stale NUT payload across profiles.
-        EcashAnnounceState.shared.localTLV = nil
-        EcashAnnounceState.shared.removeAll()
+        // Clear identity-exchange state so a profile switch never advertises the
+        // previous profile's npub or surfaces its learned peer identities.
+        selfNpub = nil
+        clearPeerNostr()
     }
 
     func sendMessage(_ content: String) throws {
@@ -390,6 +414,29 @@ final class BitChatBLEBridge: NSObject {
         service.getNoiseService().clearSession(for: peerID)
     }
 
+    /// Send bitchat's native favorite notification (`[FAVORITED]:npub`) to
+    /// `peerIDStr`, carrying our Nostr npub. This is Sovran's identity-exchange
+    /// mechanism — the recipient learns our npub (= P2PK lock target) the
+    /// bitchat way, with no custom wire. If no Noise session exists yet,
+    /// BLEService queues the message and triggers a handshake automatically, so
+    /// callers can fire this eagerly on peer discovery. Not recorded as a DM.
+    func sendFavorite(_ peerIDStr: String, isFavorite: Bool) throws {
+        guard let service = bleService else {
+            throw BitChatBridgeError.notStarted
+        }
+        guard let peerIDData = Data(hexString: peerIDStr) else {
+            throw BitChatBridgeError.invalidPeerID
+        }
+        guard let npub = selfNpub else { return }  // identity not ready yet
+        let peerID = PeerID(hexData: peerIDData)
+        // Append the ":nut" capability marker so a receiving Sovran peer can tell
+        // us apart from a stock bitchat user who merely favorited them (and could
+        // never redeem a P2PK-locked token). Rides bitchat's native favorite
+        // message; stock clients keep parsing the npub and ignore the suffix.
+        let content = (isFavorite ? "[FAVORITED]" : "[UNFAVORITED]") + ":" + npub + ":nut"
+        service.sendMessage(content, mentions: [], to: peerID, messageID: UUID().uuidString, timestamp: nil)
+    }
+
     func getPeers() -> [[String: Any]] {
         guard let service = bleService else { return [] }
         return service.currentPeerSnapshots().map { peer in
@@ -400,26 +447,20 @@ final class BitChatBLEBridge: NSObject {
             // through the mesh-flood + 15s spool fallback. Surface both so
             // UI can warn users when "connected" doesn't mean reachable.
             let link = service.linkState(for: peer.peerID)
-            // Capability fields come from the peer's last verified announce
-            // beacon. v3 also carries the peer's 33-byte P2PK key — that
-            // single announced key IS the peer's Sovran identity (Nostr
-            // pubkey + lock target), surfaced as `p2pkPubkeyHex` below.
-            let ecashExt = EcashAnnounceState.shared.lookup(peerID: peer.peerID.id)
             var dict: [String: Any] = [
                 "peerID": peer.peerID.id,
                 "nickname": peer.nickname,
                 "isConnected": peer.isConnected,
                 "hasDirectLink": link.hasPeripheral || link.hasCentral,
                 "lastSeen": peer.lastSeen.timeIntervalSince1970 * 1000,
-                "supportsNutRequests": ecashExt?.supportsNutRequests ?? false,
-                "autoRedeem": ecashExt?.autoRedeem ?? false,
             ]
-            // The peer's announced 33-byte "02"-prefixed P2PK key. Drop the
-            // "02" prefix for the x-only Nostr pubkey (kind-0 profile lookup);
-            // use the full 33 bytes as the P2PK lock target. Present only for
-            // Sovran v3 peers; absent for stock/vanilla clients.
-            if let p2pkPubkey = ecashExt?.p2pkPubkey {
-                dict["p2pkPubkeyHex"] = p2pkPubkey.hexEncodedString()
+            // The peer's x-only Nostr pubkey, learned via bitchat's native
+            // favorite-notification exchange (`[FAVORITED]:npub`). It IS the
+            // peer's Sovran identity (kind-0 profile key) AND, "02"-prefixed,
+            // the P2PK lock target. Present only once the peer has favorited us
+            // back; absent for peers we haven't exchanged identity with.
+            if let nostrHex = self.peerNostr(peer.peerID.id) {
+                dict["nostrPubkeyHex"] = nostrHex
             }
             // The peer's announced Curve25519 noise static key — bitchat's
             // own identity, present for EVERY peer (stock clients included).
@@ -604,6 +645,42 @@ extension BitChatBLEBridge: BitchatDelegate {
     nonisolated func didReceiveNoisePayload(from peerID: PeerID, type: NoisePayloadType, payload: Data, timestamp: Date) {
         guard type == .privateMessage,
               let pm = PrivateMessagePacket.decode(from: payload) else {
+            return
+        }
+        // [sovran] Intercept bitchat's native favorite notification —
+        // `[FAVORITED]:npub` / `[UNFAVORITED]:npub` carries the sender's Nostr
+        // npub. We use it as the identity-exchange channel (peer = Nostr = P2PK
+        // lock target) and handle it here so it never surfaces as a chat DM,
+        // mirroring upstream ChatViewModel.handleFavoriteNotificationFromMesh.
+        if pm.content.hasPrefix("[FAVORITED]") || pm.content.hasPrefix("[UNFAVORITED]") {
+            let isFavorite = pm.content.hasPrefix("[FAVORITED]")
+            // Format: "[FAVORITED]:npub[:nut]". The ":nut" marker is present only
+            // for cashu-capable Sovran peers — a bare favorite from a stock
+            // bitchat user must NOT make them lockable (they can't redeem a
+            // locked token → funds would be stuck).
+            let parts = pm.content.split(separator: ":", omittingEmptySubsequences: false)
+            let isCashuCapable = parts.count >= 3 && parts[2] == "nut"
+            if isCashuCapable {
+                var nostrHex: String? = nil
+                if let decoded = try? Bech32.decode(String(parts[1])),
+                   decoded.hrp == "npub", decoded.data.count == 32 {
+                    nostrHex = decoded.data.hexEncodedString()
+                }
+                BitChatBLEBridge.shared.setPeerNostr(peerID.id, isFavorite ? nostrHex : nil)
+                Task { @MainActor in
+                    BitChatBLEBridge.shared.holdBackgroundAssertion(name: "ble-favorite")
+                    var event: [String: Any] = ["peerID": peerID.id, "isFavorite": isFavorite]
+                    if let nostrHex { event["nostrPubkeyHex"] = nostrHex }
+                    BitChatBLEBridge.shared.module?.sendEvent("onBLEPeerIdentity", event)
+                }
+            }
+            // Ack regardless (and never surface a favorite notification as chat).
+            if let service = BitChatBLEBridge.shared.bleService {
+                let messageID = pm.messageID
+                DispatchQueue.global(qos: .utility).async {
+                    service.sendDeliveryAck(for: messageID, to: peerID)
+                }
+            }
             return
         }
         Task { @MainActor in

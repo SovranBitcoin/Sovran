@@ -1,10 +1,10 @@
 import type { BLEPeer } from 'bitchat-module';
 
 function peerKey(peer: BLEPeer): string {
-  // Capability-beacon fields participate so a later announce that flips a
-  // capability (supportsNutRequests/autoRedeem) is not swallowed as an
-  // equivalent snapshot.
-  return `${peer.peerID}:${peer.nickname}:${peer.isConnected ? 1 : 0}:${peer.hasDirectLink ? 1 : 0}:${peer.supportsNutRequests ? 1 : 0}:${peer.autoRedeem ? 1 : 0}`;
+  // `nostrPubkeyHex` participates so the moment a peer hands us its Nostr
+  // identity (favorites us back) the snapshot is not swallowed as equivalent —
+  // that transition flips the peer from bearer to lockable.
+  return `${peer.peerID}:${peer.nickname}:${peer.isConnected ? 1 : 0}:${peer.hasDirectLink ? 1 : 0}:${peer.nostrPubkeyHex ?? ''}`;
 }
 
 export function areBLEPeerSnapshotsEquivalent(

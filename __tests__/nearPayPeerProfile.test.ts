@@ -9,8 +9,6 @@ function blePeer(overrides: Partial<BLEPeer> = {}): BLEPeer {
     isConnected: true,
     hasDirectLink: true,
     lastSeen: 1,
-    supportsNutRequests: true,
-    autoRedeem: true,
     ...overrides,
   };
 }
@@ -26,24 +24,22 @@ describe('peerDisplayName', () => {
     ).toBe('Alice');
   });
 
-  it('falls back to the BLE nickname without a profile (v2 beacon carries no key)', () => {
+  it('falls back to the BLE nickname without a profile (no identity exchanged yet)', () => {
     expect(peerDisplayName(blePeer())).toBe('mesh-nick');
   });
 });
 
 describe('toLayoutPeer', () => {
-  it('maps capability-beacon flags onto the layout peer', () => {
-    expect(toLayoutPeer(blePeer())).toMatchObject({
+  it('marks a peer that exchanged its Nostr identity as lockable', () => {
+    expect(toLayoutPeer(blePeer({ nostrPubkeyHex: 'ab'.repeat(32) }))).toMatchObject({
       name: 'mesh-nick',
       avatarUrl: null,
-      supportsNutRequests: true,
-      autoRedeem: true,
+      lockable: true,
+      nostrPubkeyHex: 'ab'.repeat(32),
       profileLoading: false,
     });
-    expect(toLayoutPeer(blePeer({ supportsNutRequests: false, autoRedeem: false }))).toMatchObject({
-      supportsNutRequests: false,
-      autoRedeem: false,
-    });
+    // No identity exchanged → bearer-only (not lockable).
+    expect(toLayoutPeer(blePeer())).toMatchObject({ lockable: false });
   });
 });
 

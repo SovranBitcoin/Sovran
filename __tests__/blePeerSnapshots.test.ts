@@ -13,8 +13,6 @@ function peer(peerID: string, overrides: Partial<BLEPeer> = {}): BLEPeer {
     isConnected: true,
     hasDirectLink: true,
     lastSeen: 1,
-    supportsNutRequests: false,
-    autoRedeem: false,
     ...overrides,
   };
 }
@@ -44,13 +42,15 @@ describe('BLE peer snapshot equality', () => {
     );
   });
 
-  it('updates when a capability-beacon flag flips', () => {
-    const capable = peer('a', { supportsNutRequests: true, autoRedeem: true });
-    expect(areBLEPeerSnapshotsEquivalent([peer('a')], [capable])).toBe(false);
-    expect(areBLEPeerSnapshotsEquivalent([capable], [{ ...capable, autoRedeem: false }])).toBe(
-      false
+  it('updates when a peer hands us its Nostr identity (favorites us back)', () => {
+    const identified = peer('a', { nostrPubkeyHex: 'ab'.repeat(32) });
+    expect(areBLEPeerSnapshotsEquivalent([peer('a')], [identified])).toBe(false);
+    expect(
+      areBLEPeerSnapshotsEquivalent([identified], [{ ...identified, nostrPubkeyHex: undefined }])
+    ).toBe(false);
+    expect(areBLEPeerSnapshotsEquivalent([identified], [{ ...identified, lastSeen: 99 }])).toBe(
+      true
     );
-    expect(areBLEPeerSnapshotsEquivalent([capable], [{ ...capable, lastSeen: 99 }])).toBe(true);
   });
 });
 

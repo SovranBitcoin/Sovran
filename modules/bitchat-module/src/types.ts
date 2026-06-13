@@ -68,37 +68,38 @@ export interface BLEPeer {
   hasDirectLink: boolean;
   lastSeen: number;
   /**
-   * True when the peer's last verified announce carried the v2 capability
-   * beacon with the NUT-requests bit — the peer answers NUT-18
-   * payment-request solicits over the Noise channel (vendor payloads
-   * 0xA0–0xA3). Authentic to the announcing peer (announces are
-   * Ed25519-signed) but any client could claim it — treat as a feature
-   * gate, not a trust signal.
+   * The peer's x-only Nostr pubkey (64-hex), learned via bitchat's native
+   * favorite-notification exchange (`[FAVORITED]:npub`). THIS is the peer's
+   * Sovran identity: use it directly for the kind-0 profile lookup, and
+   * "02"-prefix it for the NUT-11 P2PK lock target. Present only once the peer
+   * has favorited us back (Sovran ↔ Sovran); absent for stock/vanilla clients
+   * and peers we haven't exchanged identity with (they can only receive bearer
+   * broadcasts).
    */
-  supportsNutRequests: boolean;
-  /**
-   * v2 beacon bit 1: the peer auto-redeems received ecash. Informational —
-   * drives the radar "instant" badge.
-   */
-  autoRedeem: boolean;
-  /**
-   * The peer's announced 33-byte compressed secp256k1 P2PK key (66-hex,
-   * "02"-prefixed), carried in the v3 capability beacon. THIS is the peer's
-   * whole Sovran identity: drop the "02" prefix for the x-only Nostr pubkey
-   * (kind-0 profile lookup) and use the full 33 bytes as the P2PK lock
-   * target. Present only for Sovran v3 peers; absent for stock/vanilla
-   * clients (which can only receive bearer broadcasts).
-   */
-  p2pkPubkeyHex?: string;
+  nostrPubkeyHex?: string;
   /**
    * The peer's announced Curve25519 noise static key (64-hex) — bitchat's
    * own identity, present for EVERY peer including stock clients. A stable
    * pseudonym seed for identicons/word-pair names across nickname changes.
-   * NOT a Nostr pubkey: never use it for kind-0 profile lookups. For Sovran
-   * peers prefer `p2pkPubkeyHex` (the real Nostr identity); this is the
-   * fallback identicon seed for stock peers with no announced key.
+   * NOT a Nostr pubkey: never use it for kind-0 profile lookups. For peers we
+   * have exchanged identity with prefer `nostrPubkeyHex` (the real Nostr
+   * identity); this is the fallback identicon seed otherwise.
    */
   noisePublicKeyHex?: string;
+}
+
+/**
+ * Payload dispatched on the `onBLEPeerIdentity` event when a peer hands us
+ * their Nostr identity via bitchat's native favorite notification
+ * (`[FAVORITED]:npub`). `nostrPubkeyHex` is the peer's x-only pubkey (64-hex,
+ * absent on an `[UNFAVORITED]` or an unparseable npub). iOS emits this for
+ * immediacy; on both platforms the same value also appears on the polled
+ * `BLEPeer.nostrPubkeyHex`, which NearPay treats as the source of truth.
+ */
+export interface BLEPeerIdentityEvent {
+  peerID: string;
+  isFavorite: boolean;
+  nostrPubkeyHex?: string;
 }
 
 export interface BLEMessageEvent {

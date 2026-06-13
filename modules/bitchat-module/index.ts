@@ -5,6 +5,7 @@ export {
   startBLEPrivateChat,
   resetBLEPrivateChat,
   sendBLEPrivateMessage,
+  sendBLEFavorite,
   getBLEPeers,
   getBLEDmHistory,
   getBLEState,
@@ -12,6 +13,7 @@ export {
   addBLEPrivateMessageListener,
   addBLEDeliveryStatusListener,
   addBLEPeerListener,
+  addBLEPeerIdentityListener,
   addBLEStateListener,
   // Background execution (iOS background-task assertions; Android no-ops)
   beginBLEBackgroundTask,
@@ -32,10 +34,6 @@ export {
 
 export { encodeGeohash, isValidGeohash } from './src/geohash';
 
-// Capability-beacon constants + encoder (announce TLV 0xF0) — consumed by the
-// golden-vector test and spec/colada references.
-export * from './src/nutDropProtocol';
-
 export type {
   BitchatBLEIdentityMaterial,
   BLEDeliveryStatus,
@@ -44,6 +42,7 @@ export type {
   BLEMessageEvent,
   BLEPeer,
   BLEPeerEvent,
+  BLEPeerIdentityEvent,
   BLEPrivateMessageEvent,
   ChatMessage,
   LocationTier,

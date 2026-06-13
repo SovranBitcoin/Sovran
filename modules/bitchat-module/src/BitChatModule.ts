@@ -6,6 +6,7 @@ import type {
   BLEMessageEvent,
   BLEPeer,
   BLEPeerEvent,
+  BLEPeerIdentityEvent,
   BLEPrivateMessageEvent,
   BitchatBLEIdentityMaterial,
   NostrMessageEvent,
@@ -30,6 +31,7 @@ interface BitChatNativeModule {
     nickname: string,
     messageID: string
   ): Promise<string>;
+  sendBLEFavorite(peerID: string, isFavorite: boolean): Promise<void>;
   getBLEPeers(): BLEPeer[];
   getBLEDmHistory(profileScope: string): BLEDmContact[];
   getBLEState(): string;
@@ -112,9 +114,11 @@ export function startBLE(
         profileScope,
         identityMaterial.noisePrivateKeyHex,
         identityMaterial.signingPrivateKeyHex,
-        // Cashu P2PK lock target announced in the ecash capability TLV:
-        // "02" + the profile's x-only Nostr pubkey (NUT-11 / Minibits
-        // convention — BIP340 signing ignores Y parity).
+        // Our identity / P2PK lock target: "02" + the profile's x-only Nostr
+        // pubkey (NUT-11 / Minibits convention — BIP340 signing ignores Y
+        // parity). The native bridge derives our bech32 npub from this and
+        // hands it to peers via bitchat's native `[FAVORITED]:npub` favorite
+        // notification — there is no custom announce TLV.
         `02${identityMaterial.nostrPubkey}`
       )
     : unavailable();
@@ -168,6 +172,30 @@ export function addBLEPrivateMessageListener(
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onBLEPrivateMessage', listener as (e: unknown) => void);
+}
+
+/**
+ * Hand a peer our Nostr identity via bitchat's native favorite notification
+ * (`[FAVORITED]:npub`). NearPay calls this eagerly for each discovered peer;
+ * Sovran peers reciprocate and we learn theirs (surfaced as
+ * `BLEPeer.nostrPubkeyHex` / `onBLEPeerIdentity`). If no Noise session exists
+ * yet the native side defers the send until the handshake completes.
+ */
+export function sendBLEFavorite(peerID: string, isFavorite: boolean): Promise<void> {
+  return NativeModule ? NativeModule.sendBLEFavorite(peerID, isFavorite) : unavailable();
+}
+
+/**
+ * Fires when a peer hands us their Nostr identity over the native favorite
+ * channel. iOS emits this immediately; on both platforms the same value also
+ * appears on the polled `BLEPeer.nostrPubkeyHex`. Use it to flip a peer to
+ * "lockable" without waiting for the next peer poll.
+ */
+export function addBLEPeerIdentityListener(
+  listener: (event: BLEPeerIdentityEvent) => void
+): EventSubscription {
+  if (!NativeModule) return NOOP_SUBSCRIPTION;
+  return NativeModule.addListener('onBLEPeerIdentity', listener as (e: unknown) => void);
 }
 
 /**

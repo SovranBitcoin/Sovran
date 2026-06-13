@@ -10,6 +10,7 @@ public class BitChatModule: Module {
             "onBLEPrivateMessage",
             "onBLEDeliveryStatus",
             "onBLEPeerUpdate",
+            "onBLEPeerIdentity",
             "onBLEStateChanged",
             "onBLEBackgroundTaskExpiring",
             "onNostrMessage",
@@ -78,6 +79,15 @@ public class BitChatModule: Module {
                 nickname: nickname,
                 messageID: messageID
             )
+        }
+
+        /// Send bitchat's native favorite notification (`[FAVORITED]:npub`) to a
+        /// peer, handing them our Nostr identity the bitchat way. NearPay calls
+        /// this eagerly on peer discovery; the recipient (if Sovran) reciprocates
+        /// and learns our P2PK lock target. Queued + handshake-triggered if no
+        /// Noise session exists yet.
+        AsyncFunction("sendBLEFavorite") { (peerID: String, isFavorite: Bool) in
+            try BitChatBLEBridge.shared.sendFavorite(peerID, isFavorite: isFavorite)
         }
 
         Function("getBLEPeers") { () -> [[String: Any]] in

@@ -1,124 +1,103 @@
-# Cashu over bitchat: capability beacon + public-mesh ecash
+# Cashu over bitchat: native identity exchange + public-mesh ecash
 
-> Draft note for cashubtc/nuts + permissionlesstech/bitchat — a **minimal way
-> to send P2PK-locked ecash between two nearby bitchat devices with no
-> internet**. Local document only; nothing here is posted upstream
-> automatically. The contribution is deliberately small: one vendor TLV on the
-> announce, and the existing public mesh for delivery. No new packet types, no
-> handshake.
+> Draft note for cashubtc/nuts + permissionlesstech/bitchat — a **minimal way to
+> send P2PK-locked ecash between two nearby bitchat devices with no internet**.
+> Local document only; nothing here is posted upstream automatically. The
+> contribution is deliberately **zero new wire format**: identity rides
+> bitchat's existing favorite notification, ecash rides the existing public
+> mesh. No announce TLV, no new packet type, no Noise payload type, no handshake
+> beyond bitchat's own favorite exchange.
 
-Status: implemented (Sovran iOS + Android, vendor extension); seeking feedback
-before a cashubtc/nuts note.
+Status: implemented (Sovran iOS + Android); seeking feedback before a
+cashubtc/nuts note. Interop contract: [`cashu-bitchat-compatibility.md`](./cashu-bitchat-compatibility.md).
 
 ## Motivation
 
 bitchat gives two phones an encrypted Bluetooth mesh with no internet. Cashu
-gives them a bearer-token money format. Gluing them naively — pasting a
-`cashuA…` token into a public chat message — works, but the token is a bearer
-instrument readable (and claimable) by every peer in range.
+gives them a bearer-token money format. Pasting a `cashuA…` token into a public
+message works, but a bearer token is claimable by every peer in range. P2PK
+(NUT-11) fixes that: lock the token to the recipient's key and only they can
+redeem it. The only thing the sender needs is the recipient's key — and bitchat
+already has a native way to share one.
 
-P2PK-locking the token (NUT-11) fixes the theft problem: only the holder of the
-target key can redeem it. The only thing the sender needs is the recipient's
-key — and bitchat already broadcasts a per-peer identity in every announce. So:
-**announce a P2PK key, lock to it, and broadcast the locked token on the public
-mesh.** A locked token is safe in the open — everyone who isn't the recipient
-just ignores it.
+## The key insight
+
+bitchat's **Nostr identity** is a secp256k1 Schnorr x-only key — exactly a
+NUT-11 P2PK target. And bitchat already shares it over the mesh: the
+**favorite notification** (`[FAVORITED]:npub`, a Noise-encrypted private
+message) is its one native channel for handing a peer your Nostr identity. So we
+don't invent a transport — we reuse the favorite exchange to learn the key, then
+lock to it and broadcast on the public mesh.
 
 ## Overview
 
 ```
- Receiver announces (always, in every signed announce):
-   capability beacon TLV 0xF0 → "NUTB" v3 | flags | 33-byte P2PK key
+ Discovery (eager, while the nearby-pay radar is open):
+   favorite each peer  →  "[FAVORITED]:<my npub>:nut"   (native favorite + a
+                                                          ":nut" capability tag)
+   a Sovran peer reciprocates → both now hold each other's x-only key
 
- Sender (on tapping that peer):
-   lock a cashu token to the announced key  →  broadcast it on the public mesh
+ Pay a peer you hold a :nut key for:
+   lock a cashu token to "02"+key (NUT-11)  →  broadcast on the public mesh
 
- Every device on the mesh, on seeing a public cashu token:
-   classify against my key →  locked-to-me   → redeem (auto)
-                              locked-to-other → ignore (incl. my own echo)
-                              bearer          → manual tap-to-redeem
+ Every device, on a public cashu token:
+   locked-to-me   → redeem (auto)
+   locked-to-other→ ignore (incl. my own echo)
+   bearer         → manual tap-to-redeem
 ```
 
-That single announced key is the peer's whole identity: drop the `02` prefix
-for the x-only Nostr pubkey (profile lookup), use the full 33 bytes as the P2PK
-lock target. There is no solicit, no payment request, no status handshake — the
-locked token rides bitchat's existing public-message path (transparently
-fragmented; stock bitchat already renders a `cashu…` token as a redeemable
-chip).
+That one x-only key is the peer's whole identity: the kind-0 profile key, and
+`02`-prefixed, the P2PK lock target.
 
-## Wire format
+## The `:nut` capability marker
 
-### Capability beacon (announce TLV `0xF0`)
-
-Appended to the bitchat announce payload (a TLV stream; vanilla decoders skip
-unknown types) **before signing**, so the Ed25519 announce signature covers it
-and vanilla verification still passes.
-
-```
-type   = 0xF0
-length = 39
-value  = "NUTB" (4) | version 0x03 (1) | flags (1) | p2pk (33)
-flags  : bit0 = answers cashu payment requests (legacy/informational)
-         bit1 = auto-redeems received ecash (informational, drives UI)
-         bits 2–7 reserved: 0 on send, ignored on receive
-p2pk   : 33-byte compressed secp256k1 key, "02"-prefixed
-         ("02" + the announcer's x-only Nostr pubkey, NUT-11 / Minibits
-          convention — BIP340 signing ignores Y parity)
-```
-
-Golden vector (both flag bits, key `02aa…aa`):
-`f0 27 4e 55 54 42 03 03` + `02` + `aa×32`
-
-Decoders MUST ignore trailing value bytes (append-only evolution); an unknown
-version (including the v2 flags-only beacon) means "treat the peer as vanilla".
-`0xF0` sits in the vendor TLV range that upstream's tolerant announce decoder
-already skips, so non-implementing clients are unaffected.
-
-**Privacy note.** Announcing a static key is a cross-nickname correlator — a
-passive observer in BLE range can link a device's announces over time. This is
-an accepted trade-off: it makes the peer's identity, Nostr profile, and P2PK
-lock target all derivable from one announced value, with no extra round-trip.
+A *stock* bitchat user who favorites you sends a bare `[FAVORITED]:npub` carrying
+their bitchat identity — but they can't redeem P2PK ecash. Locking to them would
+strand the funds. So Sovran appends `:nut` to its own favorites and treats a peer
+as **lockable only when its favorite carries `:nut`**. The marker goes **after**
+the npub so both stock parsers (iOS `split(":")[1]`, Android `substringAfter(":")`)
+still recover a usable npub and ignore — or harmlessly store — the suffix.
 
 ## Delivery
 
-A locked token is delivered as a single **public** bitchat message (the
-existing fragmented public-mesh path — not a private DM, which caps content at
-255 bytes). Because the token is P2PK-locked, broadcasting it in the open is
-safe: only the recipient's key can redeem it. Bearer (unlocked) sends to
-non-implementing peers use the same public path behind an explicit "anyone
-nearby can claim this" consent.
+A locked token is one **public** bitchat message (the existing fragmented
+public-mesh path — not a 255-byte-capped private DM). Locked, it's safe in the
+open. Bearer sends to non-`:nut` peers use the same path behind explicit consent.
 
 ## Receiver rules
 
-Classify every inbound public cashu token against your own P2PK key:
-
-- **locked-to-me** — every proof is single-sig P2PK to my key → redeem (the
-  wallet auto-trusts nothing: an untrusted mint parks the token for manual
-  review, never an automatic swap).
-- **locked-to-other** — any proof P2PK-locked to a different key, multisig, or
-  a mixed token → ignore. This silently drops the sender's own broadcast echo.
-- **bearer** — no P2PK locks → leave to the chat surface's manual
-  tap-to-redeem.
-
-There is no status reply: delivery is best-effort over the mesh, exactly like
-any other public message.
+Classify every inbound public cashu token against your own key:
+**locked-to-me** → auto-redeem (untrusted mint parks, never auto-swaps);
+**locked-to-other / multisig / mixed** → ignore (drops your own echo);
+**bearer** → manual tap-to-redeem. No status reply — best-effort, like any
+public message.
 
 ## Relationship to existing work
 
-- **permissionlesstech/bitchat #784 / #1327** — >255-byte private messages.
-  Irrelevant here: locked tokens ride the *public* mesh (already fragmented),
-  and a locked token is safe in the open.
-- **bitchat-android #506 (bitpoints)** — same instinct (cashu over the mesh);
-  this approach needs no bespoke payload format and no new packet model — just
-  a vendor announce TLV and a P2PK-locked token on the existing public path.
-- A companion note asks bitchat upstream to document a vendor range for announce
-  TLVs (see `upstream-issue-draft.md`).
+- **bitchat #784 / #1327** (>255-byte private messages) — irrelevant here:
+  locked tokens ride the *public* mesh, and a locked token is safe in the open.
+- **bitchat #1053** (Lightning/Cashu Noise payload types `0x20`/`0x21`) — a
+  heavier path that adds a new packet model and *bearer* tokens over the Noise
+  seam (and `0x20` collides with Android's `FILE_TRANSFER`). Our approach needs
+  none of it: NUT-11 P2PK on the existing public mesh, identity on the existing
+  favorite channel.
+- **bitchat-android #506** (bitpoints) — same instinct; this needs no bespoke
+  payload format and no new packet type.
+
+## Trade-offs
+
+- **Active, relationship-gated discovery.** bitchat keeps Nostr keys out of the
+  announce, so there's no passive lockable-on-sight. You favorite peers (stock
+  users see "favorited you") and only hold keys for peers you've exchanged
+  favorites with. This is the cost of touching the protocol *not at all*.
+- **Pairwise Noise sessions.** Learning a key requires the favorite DM, hence a
+  Noise session per peer — heavier than a one-shot broadcast, but uses only
+  mechanisms bitchat already ships.
 
 ## Reference implementation
 
-Sovran (this repo): the beacon constants + encoder and golden-vector test in
-`modules/bitchat-module/src/nutDropProtocol.ts` and
-`__tests__/nutDropProtocol.test.ts`; the native TLV encode/parse in
-`EcashAnnounceExtension.swift`/`.kt`; token classification + auto-redeem in
-`@sovranbitcoin/colada` `src/transport/` (`classifyMeshToken`,
-`createMeshRedeemOrchestrator`).
+Favorite send/receive + `:nut` gate: `BitChatBLEBridge.swift` / `.kt`. JS
+surface (`sendBLEFavorite`, `onBLEPeerIdentity`, `BLEPeer.nostrPubkeyHex`):
+`modules/bitchat-module/src/`. Eager discovery:
+`features/nearPay/hooks/useEagerPeerFavorite.ts`. Classification + auto-redeem:
+`@sovranbitcoin/colada` `src/transport/`.

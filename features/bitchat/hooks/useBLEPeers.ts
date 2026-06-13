@@ -3,6 +3,7 @@ import {
   getBLEPeers,
   getBLEState,
   addBLEPeerListener,
+  addBLEPeerIdentityListener,
   addBLEStateListener,
   startBLE,
   type BLEPeer,
@@ -46,17 +47,16 @@ export function useBLEPeers(): UseBLEPeersResult {
   const setPeersIfChanged = useCallback((nextPeers: BLEPeer[]) => {
     setPeers((current) => {
       if (areBLEPeerSnapshotsEquivalent(current, nextPeers)) return current;
-      // One line per snapshot change with the v2 capability flags — the
-      // ground truth for "why does this peer show the bearer badge" and
-      // "why is there no Nostr identity" (the v2 beacon carries flags ONLY;
-      // no key material arrives with an announce anymore).
+      // One line per snapshot change — the ground truth for "why does this
+      // peer show the bearer badge" / "why is there no Nostr identity yet".
+      // A peer's Nostr identity arrives only after it favorites us back over
+      // bitchat's native favorite channel (`nostrPubkeyHex`).
       bitchatLog.info('bitchat.peers.snapshot', {
         count: nextPeers.length,
         peers: nextPeers.map((peer) => ({
           peerID: peer.peerID,
           nickname: peer.nickname,
-          supportsNutRequests: peer.supportsNutRequests,
-          autoRedeem: peer.autoRedeem,
+          hasNostrIdentity: !!peer.nostrPubkeyHex,
           hasDirectLink: peer.hasDirectLink,
           isConnected: peer.isConnected,
         })),
@@ -74,9 +74,17 @@ export function useBLEPeers(): UseBLEPeersResult {
     const sub = addBLEPeerListener(() => {
       refresh();
     });
+    // A peer handing us its Nostr identity (favoriting us back with the :nut
+    // marker) flips it bearer → lockable; refresh immediately so the radar
+    // doesn't wait up to 5 s for the next poll. iOS emits this; Android relies
+    // on the poll. peerKey includes nostrPubkeyHex, so the snapshot updates.
+    const identitySub = addBLEPeerIdentityListener(() => {
+      refresh();
+    });
     const interval = setInterval(refresh, 5_000);
     return () => {
       sub.remove();
+      identitySub.remove();
       clearInterval(interval);
     };
   }, [refresh]);

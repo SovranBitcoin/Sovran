@@ -30,6 +30,7 @@ class BitChatModule : Module() {
             "onBLEPrivateMessage",
             "onBLEDeliveryStatus",
             "onBLEPeerUpdate",
+            "onBLEPeerIdentity",
             "onBLEStateChanged",
             "onBLEBackgroundTaskExpiring",
             "onNostrMessage",
@@ -85,6 +86,10 @@ class BitChatModule : Module() {
                 messageID: String,
             ->
             BitChatBLEBridge.sendPrivateMessage(content, peerID, nickname, messageID)
+        }
+
+        AsyncFunction("sendBLEFavorite") { peerID: String, isFavorite: Boolean ->
+            BitChatBLEBridge.sendFavorite(peerID, isFavorite)
         }
 
         Function("getBLEPeers") {

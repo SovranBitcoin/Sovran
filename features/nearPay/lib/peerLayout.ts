@@ -11,19 +11,18 @@ export interface NearPayLayoutPeer {
   name: string;
   avatarUrl?: string | null;
   /**
-   * True when the peer's capability beacon says it answers cashu payment
-   * requests. For v3 Sovran peers this coincides with `p2pkPubkeyHex` being
-   * present; stock/vanilla peers have neither (public-broadcast bearer only).
+   * True once we've learned the peer's Nostr identity via the native favorite
+   * exchange — i.e. a Sovran peer we can lock ecash to. False ⇒ stock/vanilla
+   * peer or one we haven't exchanged identity with (bearer broadcast only).
+   * Coincides with `nostrPubkeyHex` being present.
    */
-  supportsNutRequests: boolean;
-  /** Beacon bit: the peer auto-redeems received ecash (radar "instant" badge). */
-  autoRedeem: boolean;
+  lockable: boolean;
   /**
-   * The peer's announced 33-byte "02"-prefixed P2PK key (v3 beacon). Present
-   * ⇒ a Sovran peer we can lock ecash to (drop "02" for the x-only Nostr
-   * pubkey). Absent ⇒ stock/vanilla peer (bearer broadcast only).
+   * The peer's x-only Nostr pubkey (64-hex), learned via the favorite exchange.
+   * Present ⇒ lockable: use it for the kind-0 profile and "02"-prefix it for
+   * the NUT-11 P2PK lock target. Absent ⇒ bearer broadcast only.
    */
-  p2pkPubkeyHex?: string;
+  nostrPubkeyHex?: string;
   /**
    * Identity seed for identicons/word-pair names. For Sovran peers it is the
    * x-only Nostr pubkey (real identity); for stock peers the announced noise

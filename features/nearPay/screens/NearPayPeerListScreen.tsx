@@ -14,6 +14,7 @@ import {
   BLE_PEER_FRESHNESS_TICK_MS,
   filterFreshBLEPeers,
 } from '@/features/bitchat/lib/blePeerSnapshots';
+import { useEagerPeerFavorite } from '@/features/nearPay/hooks/useEagerPeerFavorite';
 import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerProfile';
 import { confirmPublicBroadcastSend } from '@/features/nearPay/lib/startNearPaySend';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
@@ -67,8 +68,8 @@ function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
     [peer]
   );
   const trailing = useMemo(
-    () => (peer.p2pkPubkeyHex ? undefined : <BearerTag />),
-    [peer.p2pkPubkeyHex]
+    () => (peer.nostrPubkeyHex ? undefined : <BearerTag />),
+    [peer.nostrPubkeyHex]
   );
 
   return (
@@ -101,6 +102,9 @@ export function NearPayPeerListScreen() {
     () => filterFreshBLEPeers(blePeers, peerFreshnessNow),
     [blePeers, peerFreshnessNow]
   );
+  // Eagerly favorite nearby peers so Sovran peers reciprocate their Nostr
+  // identity (bitchat's only native mesh identity channel) and become lockable.
+  useEagerPeerFavorite(peers);
 
   // Every bitchat peer is listed: Sovran peers (those announcing a P2PK key)
   // get a locked broadcast; vanilla peers are public-broadcast bearer only
@@ -109,8 +113,8 @@ export function NearPayPeerListScreen() {
   const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
   const sortedPeers = useMemo(() => {
     return [...peers].sort((a, b) => {
-      const aLockable = !!a.p2pkPubkeyHex;
-      const bLockable = !!b.p2pkPubkeyHex;
+      const aLockable = !!a.nostrPubkeyHex;
+      const bLockable = !!b.nostrPubkeyHex;
       if (aLockable !== bLockable) return aLockable ? -1 : 1;
       if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
       if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
@@ -150,12 +154,13 @@ export function NearPayPeerListScreen() {
   const handleSelectPeer = useCallback(
     async (peer: BLEPeer) => {
       const displayName = peerDisplayName(peer);
-      const lockPubkey = peer.p2pkPubkeyHex ?? null;
+      // "02"-prefix the favorite-learned x-only Nostr pubkey for the NUT-11
+      // P2PK lock target. Null ⇒ bearer broadcast.
+      const lockPubkey = peer.nostrPubkeyHex ? `02${peer.nostrPubkeyHex}` : null;
       paymentLog.info('near_pay.peer.tap', {
         peerID: peer.peerID,
         source: 'peer-list',
         lockable: !!lockPubkey,
-        autoRedeem: peer.autoRedeem,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
       });
