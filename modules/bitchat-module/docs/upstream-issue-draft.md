@@ -25,8 +25,8 @@ The ecosystem is already extending through both seams without coordination:
   colliding with upstream's later allocation;
 - #1053 informally squats Noise payload types `0x20`/`0x21` for
   Lightning/Cashu packets while Android file transfer already uses `0x20`+;
-- we (Sovran) ship an announce TLV at `0xF0` and Noise payload types
-  `0xA0`–`0xA3` (details below).
+- we (Sovran) ship a single announce TLV at `0xF0` (details below) — and
+  nothing on the Noise payload seam.
 
 More extensions are coming (#1073 anticipates third-party SDKs). Without
 guidance, collisions like the `0x04` one will repeat silently — a collision
@@ -53,21 +53,22 @@ Document in the protocol docs (WHITEPAPER / SOURCE_ROUTING style):
 This costs upstream nothing in code — it documents behavior the decoders
 already have.
 
-## What we ship through these seams (concrete example)
+## What we ship through this seam (concrete example)
 
-A 6-byte ecash capability beacon and an in-band Cashu payment exchange —
-full spec in [`nut18-bitchat-transport.md`](./nut18-bitchat-transport.md)
-(being proposed to cashubtc/nuts as a NUT-18 transport definition):
+A single ecash capability beacon on the announce — full note in
+[`nut18-bitchat-transport.md`](./nut18-bitchat-transport.md):
 
 ```
-announce TLV 0xF0, len 6:  "NUTB" | version 0x02 | flags
-  bit0 = answers cashu payment-request solicits over Noise
-  bit1 = auto-redeems received ecash
-
-Noise payloads (between capable peers only):
-  0xA0 solicit a payment request   0xA1 the request ("creq…")
-  0xA2 the payment (NUT-18 JSON)   0xA3 received/redeemed/rejected
+announce TLV 0xF0, len 39:  "NUTB" | version 0x03 | flags | p2pk (33)
+  flags bit0/bit1 = informational (answers cashu requests / auto-redeems)
+  p2pk            = 33-byte "02"-prefixed secp256k1 key (the peer's P2PK
+                    lock target == "02" + its x-only Nostr pubkey)
 ```
+
+The exchange itself uses **no new packet types**: the sender locks a cashu
+token to the announced key and broadcasts it on the existing public mesh; a
+P2PK-locked token is safe in the open because only the recipient can redeem
+it. Receivers classify inbound public cashu tokens against their own key.
 
 Properties worth noting:
 
@@ -75,16 +76,17 @@ Properties worth noting:
   signature covers it and unmodified clients verify normally;
 - per-announce authoritative (a verified announce without the TLV clears
   the peer's recorded capability) — same semantics as the `0x04` TLV;
-- no key material on the air: the receiver's lock key and trusted mints
-  travel per-exchange inside a standard NUT-18 payment request, so locked
-  payments are only ever made against a request the receiver just issued;
-- vanilla clients are completely unaffected on both seams.
+- the only on-air addition is this one announce TLV — we touch neither the
+  Noise payload seam nor the packet model;
+- vanilla clients are completely unaffected (the `0xF0` TLV is skipped, and
+  a locked `cashu…` token on the public mesh renders as a normal token chip
+  they simply can't redeem).
 
-This is complementary to #1053 (which moves payment payloads into Noise
-with a new packet model): the same outcome falls out of existing NUT-18
-artifacts over the existing typed-payload seam, with no protocol-version
-bump. And it sidesteps #784's 255-byte private-message cap — the payloads
-ride `noiseEncrypted` packets, which the transport already fragments.
+This is complementary to #1053 (which moves payment payloads into Noise with
+a new packet model): here the same outcome falls out of a standard NUT-11
+P2PK lock on the existing public mesh, with no protocol-version bump and no
+255-byte DM-cap concern (locked tokens ride the public, already-fragmented
+path rather than a private DM).
 
 ## Ask
 
@@ -113,7 +115,9 @@ platform and **fails on the other one**.
 Announces sit just under the threshold today (~76 B for nickname + the two
 key TLVs), which is why this doesn't bite stock clients — but an announce
 with a populated `0x04` neighbors TLV (3+ neighbors) or any vendor TLV
-crosses it. Android's announce handler requires a verified signature
+crosses it. Our 41-byte `0xF0` beacon TLV crosses it on every announce, so
+this fix is a hard prerequisite for the capability beacon to be visible
+cross-platform at all. Android's announce handler requires a verified signature
 ("no backward compatibility"), so an affected iOS announce is silently
 dropped on Android while the reverse direction appears to work (iOS
 tolerates unverified announces), producing confusing one-way visibility.
@@ -134,17 +138,19 @@ patch in our fork and can PR it if there's interest.
 > X / Nostr; trim to taste.
 
 Hey — we built what #784 / bitchat-android#506 / #1053 have been circling:
-Cashu over bitchat, but as a **NUT-18 transport** instead of a new
-protocol. Receiver answers an in-band solicit with a real single-use
-`creq` (fresh P2PK `nut10`, their trusted mints as `m`, empty transport =
-in-band per spec); sender pays it as a normal PaymentRequestPayload over
-the Noise session; received/redeemed statuses come back the same way. A
-6-byte announce TLV is the only discovery surface — no keys on the air.
-Stock clients are untouched (both platforms drop unknown Noise payload
-types / announce TLVs by design), it clears the 255-byte DM cap via the
-existing fragmentation, and it kills the untrusted-mint and blind-locking
-footguns before any money moves. Shipping in Sovran on iOS + Android now.
-Draft spec: `nut18-bitchat-transport.md` (happy to PR it to cashubtc/nuts
-as a transport definition if you think it fits). Would love your read on
-whether the wallet-side conventions (single-use, 120s expiry, sender-offline
-bearer flag) match how you'd want wallets to do this.
+Cashu over bitchat, but as small as it goes. Every announce carries one
+vendor TLV (`0xF0`, 39 B) holding the peer's 33-byte P2PK key — which is
+just `02` + their Nostr pubkey, so it doubles as their identity. To pay a
+nearby peer you lock a token (NUT-11) to that announced key and broadcast it
+on the existing public mesh; a locked token is safe in the open because only
+they can redeem it, and everyone else (including your own echo) just ignores
+it. Receivers auto-redeem anything locked to their key; untrusted mints get
+parked, never auto-swapped. No solicit, no payment-request round-trip, no new
+Noise payload types — the only on-air change is that one announce TLV, which
+stock clients skip. (We did need one upstream-shaped fix: signing over the
+*uncompressed* packet form, since deflate isn't canonical cross-platform and
+the TLV pushes the announce past the 100 B compress threshold — write-up in
+the issue draft.) Shipping in Sovran on iOS + Android now. Note:
+`nut18-bitchat-transport.md`. Would love your read on whether announcing a
+static P2PK key (the identity↔lock-target unification, and its passive
+correlation trade-off) matches how you'd want wallets to do nearby cashu.

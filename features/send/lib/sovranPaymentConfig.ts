@@ -30,7 +30,6 @@ import type {
 import {
   isSendTokenCancelled,
   isSendTokenComplete,
-  parseMeshPaymentRequest,
   withTimeout,
   type MachineOperations,
   type NotificationHandlerMap,
@@ -73,7 +72,6 @@ import {
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
 import { sendBLEPublicMessage } from '@/features/bitchat/lib/blePrivateDelivery';
-import { trackMeshDelivery } from '@/features/nearPay/lib/meshNutDrop';
 import { getBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
 import { getBitchatProfileScope } from '@/features/bitchat/lib/profileScope';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
@@ -856,31 +854,18 @@ function getEncodedEcashTokenFromSendHistoryEntry(historyEntry: string): string 
 
 async function deliverNearPayIfActive(
   historyEntry: string,
-  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null,
-  p2pkLockPubkey?: string
+  getBitchatIdentityMaterial?: () => BitchatBLEIdentityMaterial | null
 ): Promise<void> {
   const active = useNearPaySessionStore.getState().active;
   if (!active) return;
 
-  // The session's delivery mode is the single source of truth for whether
-  // the completed send may hit the public mesh. Anything else means some
-  // machine path dropped or invented a lock — refuse to broadcast and leave
-  // the token in send history where the user can deliver it deliberately.
-  // Mesh sessions deliver in-band through executePaymentRequest and complete
-  // in the navigateToPaymentRequest handler — only the vanilla
-  // public-broadcast ladder flows through here.
-  if (active.recipient.delivery.mode !== 'broadcast') return;
-  if (p2pkLockPubkey) {
-    // Broadcast sessions are created without a lock key (the user explicitly
-    // confirmed an unlocked send to a vanilla bitchat peer). A lock showing
-    // up here means the token is locked to a key the recipient can't use —
-    // broadcasting it would burn the funds for everyone.
-    paymentLog.error('near_pay.delivery.unexpected_lock', {
-      peerID: active.recipient.peerID,
-    });
-    useNearPaySessionStore.getState().complete();
-    return;
-  }
+  // Every Nut Drop send is delivered the same way: broadcast the finished
+  // token on the public mesh. A locked token (P2PK-locked to the recipient's
+  // announced key) and a bearer token broadcast identically — only the
+  // recipient can redeem a locked one, while everyone else classifies it
+  // `locked-to-other` and ignores it; bearer tokens are claimable by anyone
+  // nearby (the user confirmed that at peer selection). There is no in-band
+  // Noise handshake.
 
   try {
     const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
@@ -1002,11 +987,7 @@ export function createSovranHandlers({
         }
       }
 
-      await deliverNearPayIfActive(
-        enrichedHistoryEntry,
-        getBitchatIdentityMaterial,
-        p2pkLockPubkey
-      );
+      await deliverNearPayIfActive(enrichedHistoryEntry, getBitchatIdentityMaterial);
 
       router.navigate({
         pathname: '/(send-flow)/sendToken',
@@ -1018,49 +999,7 @@ export function createSovranHandlers({
       });
     },
 
-    navigateToPaymentRequest: ({
-      mintUrl,
-      paymentRequest,
-      amount,
-      unit,
-      recipientPubkey,
-      meshPeerId,
-      historyEntry,
-    }) => {
-      if (meshPeerId && !historyEntry) {
-        // Mesh (Nut Drop) delivery: consent — bearer or broadcast — was
-        // secured at peer selection, before the solicit. No confirm screen;
-        // execute the in-band delivery. The confirm MUST be a macrotask:
-        // this handler runs while the machine still holds its send lock
-        // (released only after the handler's await chain settles), so a
-        // synchronous CONFIRM_PAYMENT_REQUEST would be dropped by the lock
-        // guard and the flow would park here forever.
-        paymentLog.info('payment.step.mesh_payment_request.auto_confirm', {
-          mintUrl,
-          amount,
-          meshPeerId,
-        });
-        // Track BEFORE delivering so the receiver's immediate `received`
-        // status isn't dropped by an unknown payment id.
-        const parsedMeshRequest = parseMeshPaymentRequest(paymentRequest);
-        if (parsedMeshRequest.ok) {
-          trackMeshDelivery(parsedMeshRequest.request.paymentId, meshPeerId);
-        }
-        setTimeout(() => {
-          void machine.confirmPaymentRequest();
-        }, 0);
-        return;
-      }
-      if (meshPeerId && historyEntry) {
-        // Delivery succeeded — complete on the same surface as the legacy
-        // radar flow: the send-token screen with the executed entry.
-        useNearPaySessionStore.getState().complete();
-        router.navigate({
-          pathname: '/(send-flow)/sendToken',
-          params: { sendHistoryEntry: historyEntry },
-        });
-        return;
-      }
+    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit, recipientPubkey }) => {
       paymentLog.info('payment.step.navigate_payment_request', {
         mintUrl,
         amount,

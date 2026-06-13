@@ -2,9 +2,7 @@ import { AppState } from 'react-native';
 import { createMeshRedeemOrchestrator, type MeshRedeemOrchestrator } from '@sovranbitcoin/colada';
 import { createDefaultOperations } from '@sovranbitcoin/colada/operations';
 
-import { getMeshTransportAdapter } from '@/features/nearPay/lib/meshNutDrop';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { paymentLog } from '@/shared/lib/logger';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
@@ -17,8 +15,9 @@ import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleS
  * retry ordering, and the receive itself (`executeAutoRedeem`, which
  * resolves the REAL persisted history id by set-difference polling —
  * retiring the old direct-coco exception). This module owns what's
- * app-shaped: the persisted queue store behind the port, the toast
- * pipeline, and pushing the `redeemed` status back to mesh senders.
+ * app-shaped: the persisted queue store behind the port and the toast
+ * pipeline. Tokens arrive as public-mesh broadcasts (classified in
+ * `useNutDropAutoRedeem`), so there is no sender to push status back to.
  */
 
 function restoreSettled(): boolean {
@@ -76,21 +75,6 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         amount: entry.amount,
         unit: entry.unit,
       });
-    },
-    onRedeemed: (_tokenHash, entry) => {
-      // In-band mesh payments carry the NUT-18 payment id — push `redeemed`
-      // back so the sender's tracker completes. Best-effort: the sender may
-      // be out of range; their tracker just stays at `received`.
-      if (!entry.paymentId || !entry.senderPeerID) return;
-      const adapter = getMeshTransportAdapter();
-      if (!adapter) return;
-      void adapter
-        .sendPaymentStatus(entry.senderPeerID, entry.paymentId, 'redeemed')
-        .catch((err: unknown) => {
-          paymentLog.debug('near_pay.redeem.status_push_failed', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
     },
     onFailed: (tokenHash, _entry, kind) => {
       // Don't leave a mounted toast spinning forever — flip it to the

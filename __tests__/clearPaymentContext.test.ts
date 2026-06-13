@@ -15,7 +15,7 @@ describe('clearPaymentContext', () => {
       nickname: 'bob',
       hasDirectLink: true,
       lastSeen: 0,
-      delivery: { mode: 'mesh', locked: true },
+      delivery: { locked: true },
     });
 
     expect(useRoutstrTopUpStore.getState().active).toBe(true);

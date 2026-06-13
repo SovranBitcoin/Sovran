@@ -4,7 +4,6 @@ import type {
   BLEDeliveryStatusEvent,
   BLEDmContact,
   BLEMessageEvent,
-  BLENutPayloadEvent,
   BLEPeer,
   BLEPeerEvent,
   BLEPrivateMessageEvent,
@@ -12,21 +11,6 @@ import type {
   NostrMessageEvent,
   NostrPrivateMessageEvent,
 } from './types';
-import {
-  NUT_PAYLOAD_TYPE,
-  base64ToBytes,
-  bytesToBase64,
-  decodeRequest,
-  encodeSolicit,
-  generateSolicitId,
-  solicitIdHex,
-} from './nutDropProtocol';
-
-interface NativeNutPayloadEvent {
-  peerID: string;
-  payloadBase64: string;
-  timestamp: number;
-}
 
 interface BitChatNativeModule {
   // BLE
@@ -49,7 +33,6 @@ interface BitChatNativeModule {
   getBLEPeers(): BLEPeer[];
   getBLEDmHistory(profileScope: string): BLEDmContact[];
   getBLEState(): string;
-  nutSendPayload(peerID: string, payloadBase64: string): Promise<void>;
   beginBLEBackgroundTask(name: string): Promise<number>;
   endBLEBackgroundTask(handle: number): Promise<void>;
   // Bluetooth helpers — implemented natively on Android only; the JS wrappers
@@ -235,118 +218,6 @@ export function addBLEStateListener(
 ): EventSubscription {
   if (!NativeModule) return NOOP_SUBSCRIPTION;
   return NativeModule.addListener('onBLEStateChanged', listener as (e: unknown) => void);
-}
-
-// --- Nut Drop NUT-18 exchange (vendor Noise payloads 0xA0–0xA3) ---
-
-const SOLICIT_TIMEOUT_MS = 10_000;
-const SOLICIT_RETRIES = 1;
-
-interface PendingSolicit {
-  peerID: string;
-  resolve: (creq: string) => void;
-}
-
-/** Outstanding solicits keyed by solicitId hex; resolved by 0xA1 responses. */
-const pendingSolicits = new Map<string, PendingSolicit>();
-let solicitSubscription: EventSubscription | null = null;
-
-function ensureSolicitSubscription(): void {
-  if (solicitSubscription || !NativeModule) return;
-  solicitSubscription = NativeModule.addListener('onNutPayload', ((event: NativeNutPayloadEvent) => {
-    const payload = base64ToBytes(event.payloadBase64);
-    if (!payload || payload[0] !== NUT_PAYLOAD_TYPE.request) return;
-    const request = decodeRequest(payload);
-    if (!request) return;
-    const pending = pendingSolicits.get(solicitIdHex(request.solicitId));
-    // The creq must come from the peer we solicited — a matching id from
-    // anyone else is foreign/forged content and drops.
-    if (!pending || pending.peerID !== event.peerID) return;
-    pending.resolve(request.creq);
-  }) as (e: unknown) => void);
-}
-
-function pruneSolicitSubscription(): void {
-  if (pendingSolicits.size > 0 || !solicitSubscription) return;
-  solicitSubscription.remove();
-  solicitSubscription = null;
-}
-
-/**
- * Send a raw Nut Drop vendor Noise payload (full typed bytes from
- * `nutDropProtocol.ts`, type byte included) to a peer. Requires an
- * established Noise session — call `startBLEPrivateChat` first; without one
- * iOS queues behind the handshake while Android drops the send (the solicit
- * timeout absorbs either).
- */
-export function nutSendPayload(peerID: string, payload: Uint8Array): Promise<void> {
-  return NativeModule
-    ? NativeModule.nutSendPayload(peerID, bytesToBase64(payload))
-    : unavailable();
-}
-
-/**
- * Subscribe to inbound Nut Drop vendor Noise payloads (all types). Raw bytes
- * — decode with `nutDropProtocol.ts`. Events with undecodable base64 are
- * dropped. The 0xA1 responses consumed by `nutSolicit` still appear here;
- * payload semantics and dedup live with the consumer (colada transport).
- */
-export function addNutPayloadListener(
-  listener: (event: BLENutPayloadEvent) => void
-): EventSubscription {
-  if (!NativeModule) return NOOP_SUBSCRIPTION;
-  return NativeModule.addListener('onNutPayload', ((event: NativeNutPayloadEvent) => {
-    const payload = base64ToBytes(event.payloadBase64);
-    if (!payload || payload.length === 0) return;
-    listener({ peerID: event.peerID, payload, timestamp: event.timestamp });
-  }) as (e: unknown) => void);
-}
-
-/**
- * Ask `peerID` for a single-use NUT-18 payment request and resolve with the
- * serialized `creq…` string. Sends a 0xA0 solicit and correlates the 0xA1
- * response by solicitId; 10s timeout with one retry (same solicitId, so a
- * slow response to the first attempt still correlates instead of racing a
- * fresh id). Rejects on timeout — callers must treat that as "couldn't
- * confirm receiver", never as a downgraded yes.
- */
-export async function nutSolicit(
-  peerID: string,
-  options?: { senderOffline?: boolean }
-): Promise<string> {
-  if (!NativeModule) return unavailable();
-  const native = NativeModule;
-  const solicitId = generateSolicitId();
-  const key = solicitIdHex(solicitId);
-  const payloadBase64 = bytesToBase64(
-    encodeSolicit({ solicitId, senderOffline: options?.senderOffline ?? false })
-  );
-
-  for (let attempt = 0; attempt <= SOLICIT_RETRIES; attempt++) {
-    const creq = await new Promise<string | null>((resolve, reject) => {
-      const settle = (value: string | null) => {
-        clearTimeout(timer);
-        pendingSolicits.delete(key);
-        pruneSolicitSubscription();
-        resolve(value);
-      };
-      const timer = setTimeout(() => settle(null), SOLICIT_TIMEOUT_MS);
-      const pending = { peerID, resolve: settle };
-      pendingSolicits.set(key, pending);
-      ensureSolicitSubscription();
-      native.nutSendPayload(peerID, payloadBase64).catch((err: unknown) => {
-        // Retries reuse the solicitId — a LATE rejection from a previous
-        // attempt must not tear down the current attempt's pending entry.
-        if (pendingSolicits.get(key) !== pending) return;
-        clearTimeout(timer);
-        pendingSolicits.delete(key);
-        pruneSolicitSubscription();
-        reject(err instanceof Error ? err : new Error(String(err)));
-      });
-    });
-    if (creq !== null) return creq;
-  }
-  throw new Error(`NUT-18 solicit to peer ${peerID} timed out`);
 }
 
 // --- Background execution ---

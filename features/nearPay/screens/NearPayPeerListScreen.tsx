@@ -15,13 +15,8 @@ import {
   filterFreshBLEPeers,
 } from '@/features/bitchat/lib/blePeerSnapshots';
 import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerProfile';
-import {
-  confirmBearerSend,
-  confirmPublicBroadcastSend,
-} from '@/features/nearPay/lib/startNearPaySend';
+import { confirmPublicBroadcastSend } from '@/features/nearPay/lib/startNearPaySend';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
-import { staticPopup } from '@/shared/lib/popup';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -64,16 +59,16 @@ function BearerTag() {
 
 function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
   const handlePress = useCallback(() => onSelect(peer), [onSelect, peer]);
-  // BLE identity only: the v2 capability beacon carries no key material, so
-  // there is no Nostr identity to resolve until send time (the NUT-18
-  // request reveals the recipient's lock key).
+  // Seed identity from the announced P2PK key (real Nostr identity) when the
+  // peer is a Sovran v3 client; stock peers fall back to the noise-key
+  // pseudonym. The real face resolves on the radar; this list stays BLE-name.
   const identity = useMemo(
     () => bleIdentity({ ...peer, identitySeed: peerIdentitySeed(peer) }),
     [peer]
   );
   const trailing = useMemo(
-    () => (peer.supportsNutRequests ? undefined : <BearerTag />),
-    [peer.supportsNutRequests]
+    () => (peer.p2pkPubkeyHex ? undefined : <BearerTag />),
+    [peer.p2pkPubkeyHex]
   );
 
   return (
@@ -91,7 +86,6 @@ export function NearPayPeerListScreen() {
   const headerHeight = useHeaderHeight();
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  const { isOffline } = useOfflineStatus();
   const { peers: blePeers } = useBLEPeers();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
@@ -108,15 +102,16 @@ export function NearPayPeerListScreen() {
     [blePeers, peerFreshnessNow]
   );
 
-  // Every bitchat peer is listed: peers whose capability beacon answers
-  // NUT-18 solicits get locked in-band drops; vanilla peers are
-  // public-broadcast bearer only (tagged, and gated behind an explicit
-  // confirm in handleSelectPeer).
+  // Every bitchat peer is listed: Sovran peers (those announcing a P2PK key)
+  // get a locked broadcast; vanilla peers are public-broadcast bearer only
+  // (tagged, and gated behind an explicit confirm in handleSelectPeer).
   const connectedCount = useMemo(() => peers.filter((peer) => peer.isConnected).length, [peers]);
   const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
   const sortedPeers = useMemo(() => {
     return [...peers].sort((a, b) => {
-      if (a.supportsNutRequests !== b.supportsNutRequests) return a.supportsNutRequests ? -1 : 1;
+      const aLockable = !!a.p2pkPubkeyHex;
+      const bLockable = !!b.p2pkPubkeyHex;
+      if (aLockable !== bLockable) return aLockable ? -1 : 1;
       if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
       if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
       return b.lastSeen - a.lastSeen;
@@ -155,41 +150,32 @@ export function NearPayPeerListScreen() {
   const handleSelectPeer = useCallback(
     async (peer: BLEPeer) => {
       const displayName = peerDisplayName(peer);
+      const lockPubkey = peer.p2pkPubkeyHex ?? null;
       paymentLog.info('near_pay.peer.tap', {
         peerID: peer.peerID,
         source: 'peer-list',
-        supportsNutRequests: peer.supportsNutRequests,
+        lockable: !!lockPubkey,
         autoRedeem: peer.autoRedeem,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
-        senderOffline: isOffline,
       });
-      // Consent gates BEFORE any session or navigation state — declining
-      // must leave the list exactly as it was. Locked mesh sends need no
-      // consent (the token is locked to the key the recipient issues).
-      let delivery: NearPayDelivery;
-      if (!peer.supportsNutRequests) {
+      // Consent gate BEFORE any session or navigation state — declining must
+      // leave the list exactly as it was. A locked send (the peer announced a
+      // P2PK key) needs no consent: only that key can redeem the token. A
+      // bearer send (stock peer) is broadcast publicly and must be confirmed.
+      if (!lockPubkey) {
         const confirmed = await confirmPublicBroadcastSend(displayName);
         if (!confirmed) {
           paymentLog.info('near_pay.peer.broadcast_declined', { peerID: peer.peerID });
           return;
         }
-        delivery = { mode: 'broadcast' };
-      } else if (isOffline) {
-        const confirmed = await confirmBearerSend(displayName);
-        if (!confirmed) {
-          paymentLog.info('near_pay.peer.bearer_declined', { peerID: peer.peerID });
-          return;
-        }
-        delivery = { mode: 'mesh', locked: false };
-      } else {
-        delivery = { mode: 'mesh', locked: true };
       }
+      const delivery: NearPayDelivery = { locked: !!lockPubkey };
       paymentLog.info('near_pay.peer.list_select', {
         peerID: peer.peerID,
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
-        deliveryMode: delivery.mode,
+        locked: delivery.locked,
       });
       useNearPaySessionStore.getState().start({
         peerID: peer.peerID,
@@ -199,7 +185,7 @@ export function NearPayPeerListScreen() {
         delivery,
       });
       // Failure paths must only unwind THIS selection — a newer session
-      // started during the solicit window must survive a stale failure.
+      // started meanwhile must survive a stale failure.
       const sessionId = useNearPaySessionStore.getState().active?.id ?? null;
       const clearOwnSession = () => {
         if (useNearPaySessionStore.getState().active?.id === sessionId) {
@@ -207,37 +193,27 @@ export function NearPayPeerListScreen() {
         }
       };
       router.back();
-      const startPromise =
-        delivery.mode === 'mesh'
-          ? machine
-              .startMeshSend(peer.peerID, { reset: true, offline: !delivery.locked })
-              .then((result) => {
-                paymentLog.info('near_pay.mesh.start_send_result', {
-                  peerID: peer.peerID,
-                  source: 'peer-list',
-                  kind: result.kind,
-                  ...(result.kind === 'abort' ? { reason: result.reason } : {}),
-                });
-                if (result.kind === 'started') return;
-                if (result.kind === 'abort' && result.reason === 'no-mint-overlap') {
-                  staticPopup('mesh-no-mint-overlap');
-                } else {
-                  staticPopup('mesh-solicit-failed');
-                }
-                clearOwnSession();
-              })
-          : machine.startSendEcash({
-              reset: true,
-              recipientProfile: { displayName, avatarUrl: null, nip05: null },
-            });
-      void startPromise.catch((err) => {
-        clearOwnSession();
-        paymentLog.error('near_pay.peer.list_start_send_failed', {
-          error: err instanceof Error ? err.message : String(err),
+      // One path for every peer: enter the amount flow, then the sendComplete
+      // handler broadcasts the finished token on the public mesh. A locked
+      // token is P2PK-locked to the peer's announced key (only they redeem);
+      // a bearer token is claimable by anyone. recipientPubkey (the x-only
+      // Nostr key) resolves their real profile on the amount screen.
+      void machine
+        .startSendEcash({
+          reset: true,
+          ...(lockPubkey
+            ? { p2pkLockPubkey: lockPubkey, recipientPubkey: lockPubkey.slice(2) }
+            : {}),
+          recipientProfile: { displayName, avatarUrl: null, nip05: null },
+        })
+        .catch((err) => {
+          clearOwnSession();
+          paymentLog.error('near_pay.peer.list_start_send_failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
-      });
     },
-    [machine, isOffline]
+    [machine]
   );
 
   const renderItem = useCallback(

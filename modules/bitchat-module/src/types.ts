@@ -82,23 +82,23 @@ export interface BLEPeer {
    */
   autoRedeem: boolean;
   /**
+   * The peer's announced 33-byte compressed secp256k1 P2PK key (66-hex,
+   * "02"-prefixed), carried in the v3 capability beacon. THIS is the peer's
+   * whole Sovran identity: drop the "02" prefix for the x-only Nostr pubkey
+   * (kind-0 profile lookup) and use the full 33 bytes as the P2PK lock
+   * target. Present only for Sovran v3 peers; absent for stock/vanilla
+   * clients (which can only receive bearer broadcasts).
+   */
+  p2pkPubkeyHex?: string;
+  /**
    * The peer's announced Curve25519 noise static key (64-hex) — bitchat's
    * own identity, present for EVERY peer including stock clients. A stable
    * pseudonym seed for identicons/word-pair names across nickname changes.
-   * NOT a Nostr pubkey: never use it for kind-0 profile lookups.
+   * NOT a Nostr pubkey: never use it for kind-0 profile lookups. For Sovran
+   * peers prefer `p2pkPubkeyHex` (the real Nostr identity); this is the
+   * fallback identicon seed for stock peers with no announced key.
    */
   noisePublicKeyHex?: string;
-}
-
-/**
- * Payload dispatched on the `onNutPayload` event: a Nut Drop vendor Noise
- * payload (0xA0–0xA3) decrypted by the vendored mesh stack. `payload` is the
- * full typed bytes (type byte included) — decode with `nutDropProtocol.ts`.
- */
-export interface BLENutPayloadEvent {
-  peerID: string;
-  payload: Uint8Array;
-  timestamp: number;
 }
 
 export interface BLEMessageEvent {

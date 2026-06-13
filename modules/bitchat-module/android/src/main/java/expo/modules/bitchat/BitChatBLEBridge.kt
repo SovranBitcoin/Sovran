@@ -8,7 +8,6 @@ import com.bitchat.android.model.BitchatMessage
 import com.bitchat.android.noise.NoiseSession
 import com.bitchat.android.services.NicknameProvider
 import com.bitchat.android.ecash.EcashAnnounceExtension
-import com.bitchat.android.ecash.NutPayloadRelay
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
@@ -24,9 +23,6 @@ class BitChatInvalidPeerException : Exception("Invalid peer ID (expected 16-char
 
 class BitChatUnauthorizedException :
     Exception("Bluetooth permissions are not granted. Request them before startBLE().")
-
-class BitChatInvalidNutPayloadException :
-    Exception("Invalid NUT payload (expected base64 bytes starting 0xA0–0xA3).")
 
 /**
  * Bridges the vendored bitchat-android BluetoothMeshService to the Expo module
@@ -161,30 +157,14 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
 
             // The capability beacon TLV must be live before startServices() —
             // the first announce fires during startup and every announce must
-            // carry it. v2 is flags-only: no key material on the air.
+            // carry it. v3 announces the profile's 33-byte P2PK key so nearby
+            // Sovran peers derive identity + lock target from one announced key
+            // and lock+broadcast ecash directly (no Noise handshake).
             EcashAnnounceExtension.localTLV = EcashAnnounceExtension.encodeLocalTLV(
                 flags = EcashAnnounceExtension.CAPABILITY_NUT_REQUESTS or
                     EcashAnnounceExtension.CAPABILITY_AUTO_REDEEM,
+                p2pkPubkey = identity.p2pkPubkey,
             )
-
-            // Route inbound Nut Drop vendor Noise payloads (0xA0–0xA3) to JS.
-            // Raw bytes only — all Cashu semantics live in JS. Wake lock for
-            // the same reason as didReceiveMessage: a payment can arrive with
-            // the screen off and JS may need a mint call to redeem it.
-            NutPayloadRelay.onInbound = { peerID, typedPayload, timestampMs ->
-                holdMessageWakeLock()
-                emitter?.invoke(
-                    "onNutPayload",
-                    mapOf(
-                        "peerID" to peerID,
-                        "payloadBase64" to android.util.Base64.encodeToString(
-                            typedPayload,
-                            android.util.Base64.NO_WRAP,
-                        ),
-                        "timestamp" to timestampMs.toDouble(),
-                    ),
-                )
-            }
 
             val service = BluetoothMeshService(scopedContext)
             if (service.myPeerID != identity.peerID) {
@@ -222,11 +202,9 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         dmSummaries = mutableMapOf()
         pendingSends.clear()
         // Clear capability-beacon state so a profile switch can never reuse
-        // the previous profile's announce or surface its peers, and drop the
-        // relay handler so stale payloads can't cross profiles.
+        // the previous profile's announce or surface its peers.
         EcashAnnounceExtension.localTLV = null
         EcashAnnounceExtension.clear()
-        NutPayloadRelay.onInbound = null
     }
 
     // MARK: - Public mesh messaging
@@ -291,27 +269,6 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         service.encryptionService.removePeer(peerID)
     }
 
-    /**
-     * Send a Nut Drop vendor Noise payload (raw typed bytes, 0xA0–0xA3) to a
-     * peer. The native layer is a dumb byte pipe — payload semantics live in
-     * JS. Requires an established Noise session (the JS layer calls
-     * startBLEPrivateChat first); without one the vendor's encrypt fails and
-     * the send is logged + dropped, which the JS solicit timeout absorbs.
-     */
-    fun sendNutPayload(peerIDStr: String, payloadBase64: String) {
-        val service = mesh ?: throw BitChatNotStartedException()
-        val peerID = validPeerID(peerIDStr)
-        val payload = try {
-            android.util.Base64.decode(payloadBase64, android.util.Base64.NO_WRAP)
-        } catch (_: IllegalArgumentException) {
-            throw BitChatInvalidNutPayloadException()
-        }
-        if (payload.isEmpty() || !NutPayloadRelay.containsType(payload[0].toInt() and 0xFF)) {
-            throw BitChatInvalidNutPayloadException()
-        }
-        service.sendRawNoisePayload(payload, peerID, "nut payload")
-    }
-
     private fun flushPendingSends(peerID: String) {
         val service = mesh ?: return
         val queue = synchronized(lock) { pendingSends.remove(peerID) } ?: return
@@ -341,8 +298,9 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         return service.getPeerNicknames().keys.mapNotNull { peerID ->
             val info = service.getPeerInfo(peerID) ?: return@mapNotNull null
             // Capability fields come from the peer's last verified announce
-            // beacon (v2 carries flags only — the P2PK lock key now arrives
-            // per-send inside the NUT-18 payment request, never on the air).
+            // beacon. v3 also carries the peer's 33-byte P2PK key — that
+            // single announced key IS the peer's Sovran identity (Nostr
+            // pubkey + lock target), surfaced as `p2pkPubkeyHex` below.
             val ecashExt = EcashAnnounceExtension.lookup(peerID)
             mapOf(
                 "peerID" to info.id,
@@ -355,6 +313,11 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 "lastSeen" to info.lastSeen.toDouble(),
                 "supportsNutRequests" to (ecashExt?.supportsNutRequests ?: false),
                 "autoRedeem" to (ecashExt?.autoRedeem ?: false),
+                // The peer's announced 33-byte "02"-prefixed P2PK key (null for
+                // stock/vanilla peers). Drop the "02" for the x-only Nostr
+                // pubkey (kind-0 profile); use the full 33 bytes as the lock
+                // target.
+                "p2pkPubkeyHex" to ecashExt?.p2pkPubkey?.joinToString("") { "%02x".format(it) },
                 // The peer's announced Curve25519 noise static key — bitchat's
                 // own identity, present for EVERY peer (stock clients
                 // included). A stable pseudonym seed for identicons/word-pair

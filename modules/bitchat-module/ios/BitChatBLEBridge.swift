@@ -16,7 +16,6 @@ enum BitChatBridgeError: Error, LocalizedError {
     case invalidPeerID
     case invalidIdentityMaterial(String)
     case identityKeySaveFailed(String)
-    case invalidNutPayload
 
     var errorDescription: String? {
         switch self {
@@ -28,8 +27,6 @@ enum BitChatBridgeError: Error, LocalizedError {
             return "Invalid BitChat identity material: \(reason)."
         case .identityKeySaveFailed(let keyName):
             return "Failed to persist BitChat \(keyName) identity key."
-        case .invalidNutPayload:
-            return "Invalid NUT payload (expected base64 bytes starting 0xA0–0xA3)."
         }
     }
 }
@@ -253,22 +250,13 @@ final class BitChatBLEBridge: NSObject {
         loadDmSummaries(for: scope)
         // The ecash capability beacon must be live before startServices() —
         // the first announce fires during startup and every announce must
-        // carry it. v2 is flags-only: the profile's P2PK key is never
-        // announced; it travels per-send inside the Noise channel as a
-        // NUT-18 payment request.
+        // carry it. v3 announces the profile's 33-byte P2PK key so nearby
+        // Sovran peers derive identity + lock target from one announced key
+        // and lock+broadcast ecash directly (no Noise handshake).
         EcashAnnounceState.shared.localTLV = EcashAnnounceTLV.encode(
-            flags: EcashAnnounceTLV.capabilityNutRequests | EcashAnnounceTLV.capabilityAutoRedeem
+            flags: EcashAnnounceTLV.capabilityNutRequests | EcashAnnounceTLV.capabilityAutoRedeem,
+            p2pkPubkey: identityMaterial.p2pkPubkey
         )
-        // Raw byte pipe for the NUT payloads (0xA0–0xA3): inbound vendor
-        // payloads surface as onNutPayload events; all Cashu semantics
-        // (creq parsing, solicit correlation, validation) live in JS.
-        NutPayloadRelay.shared.onInbound = { [weak self] peerID, typedPayload, timestampMs in
-            self?.module?.sendEvent("onNutPayload", [
-                "peerID": peerID,
-                "payloadBase64": typedPayload.base64EncodedString(),
-                "timestamp": timestampMs,
-            ])
-        }
         let idBridge = NostrIdentityBridge(keychain: keychain)
         let identityManager = SecureIdentityStateManager(keychain)
 
@@ -296,22 +284,6 @@ final class BitChatBLEBridge: NSObject {
         // stale NUT payload across profiles.
         EcashAnnounceState.shared.localTLV = nil
         EcashAnnounceState.shared.removeAll()
-        NutPayloadRelay.shared.onInbound = nil
-    }
-
-    /// Send a raw NUT payload (type byte 0xA0–0xA3 + body) to a peer over
-    /// the Noise channel. Queues behind the lazy handshake like every other
-    /// noise payload (vendor sendNoisePayload semantics).
-    func sendNutPayload(_ peerIDStr: String, payloadBase64: String) throws {
-        guard let service = bleService else {
-            throw BitChatBridgeError.notStarted
-        }
-        guard let payload = Data(base64Encoded: payloadBase64),
-              let first = payload.first,
-              NutPayloadRange.contains(first) else {
-            throw BitChatBridgeError.invalidNutPayload
-        }
-        service.sendNoisePayload(payload, to: PeerID(str: peerIDStr))
     }
 
     func sendMessage(_ content: String) throws {
@@ -429,8 +401,9 @@ final class BitChatBLEBridge: NSObject {
             // UI can warn users when "connected" doesn't mean reachable.
             let link = service.linkState(for: peer.peerID)
             // Capability fields come from the peer's last verified announce
-            // beacon (v2 carries flags only — the P2PK lock key now arrives
-            // per-send inside the NUT-18 payment request, never on the air).
+            // beacon. v3 also carries the peer's 33-byte P2PK key — that
+            // single announced key IS the peer's Sovran identity (Nostr
+            // pubkey + lock target), surfaced as `p2pkPubkeyHex` below.
             let ecashExt = EcashAnnounceState.shared.lookup(peerID: peer.peerID.id)
             var dict: [String: Any] = [
                 "peerID": peer.peerID.id,
@@ -441,6 +414,13 @@ final class BitChatBLEBridge: NSObject {
                 "supportsNutRequests": ecashExt?.supportsNutRequests ?? false,
                 "autoRedeem": ecashExt?.autoRedeem ?? false,
             ]
+            // The peer's announced 33-byte "02"-prefixed P2PK key. Drop the
+            // "02" prefix for the x-only Nostr pubkey (kind-0 profile lookup);
+            // use the full 33 bytes as the P2PK lock target. Present only for
+            // Sovran v3 peers; absent for stock/vanilla clients.
+            if let p2pkPubkey = ecashExt?.p2pkPubkey {
+                dict["p2pkPubkeyHex"] = p2pkPubkey.hexEncodedString()
+            }
             // The peer's announced Curve25519 noise static key — bitchat's
             // own identity, present for EVERY peer (stock clients included).
             // A stable pseudonym seed for identicons/word-pair names; it is

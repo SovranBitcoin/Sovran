@@ -13,8 +13,7 @@ public class BitChatModule: Module {
             "onBLEStateChanged",
             "onBLEBackgroundTaskExpiring",
             "onNostrMessage",
-            "onNostrPrivateMessage",
-            "onNutPayload"
+            "onNostrPrivateMessage"
         )
 
         OnCreate {
@@ -83,15 +82,6 @@ public class BitChatModule: Module {
 
         Function("getBLEPeers") { () -> [[String: Any]] in
             return BitChatBLEBridge.shared.getPeers()
-        }
-
-        /// Send a Nut Drop vendor Noise payload (raw typed bytes, 0xA0–0xA3)
-        /// to a peer over the established Noise session. The native layer is
-        /// a dumb byte pipe — payload semantics (solicit / request / payment /
-        /// status) live entirely in JS. Inbound counterparts arrive via the
-        /// `onNutPayload` event.
-        AsyncFunction("nutSendPayload") { (peerID: String, payloadBase64: String) in
-            try BitChatBLEBridge.shared.sendNutPayload(peerID, payloadBase64: payloadBase64)
         }
 
         /// Returns the persisted 1:1 DM-peer history (peerID + best-known

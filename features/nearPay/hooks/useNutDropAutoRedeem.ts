@@ -5,12 +5,9 @@ import {
   beginBLEBackgroundTask,
   endBLEBackgroundTask,
 } from 'bitchat-module';
-import { nip19 } from 'nostr-tools';
 import { classifyMeshToken, meshTokenDedupeKey } from '@sovranbitcoin/colada';
 
-import { startMeshNutDrop, stopMeshNutDrop } from '@/features/nearPay/lib/meshNutDrop';
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
-import { deriveBitchatBLEIdentityMaterial } from '@/features/bitchat/lib/bleIdentity';
 import { paymentLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
@@ -19,20 +16,16 @@ import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
 
 /**
  * App-wide Nut Drop receive pipeline. Mounted in BitchatBLEProvider (inside
- * AccountScopedProviders, so it remounts per profile and always answers
- * solicits with the ACTIVE profile's lock key).
+ * AccountScopedProviders, so it remounts per profile and classifies against
+ * the ACTIVE profile's P2PK key).
  *
- * Two inbound paths feed the same persisted redeem queue:
- * - In-band NUT-18 payments (capable peers): colada's responder answers
- *   solicits with single-use payment requests and the intake validates +
- *   enqueues payments (`startMeshNutDrop`).
- * - Public-broadcast tokens (legacy + vanilla ladder): every public mesh
- *   message is classified — locked to my key → enqueue; locked to someone
- *   else (incl. our own broadcast echo) → silent; bearer → left to the chat
- *   surface's manual tap-to-redeem.
+ * Every Nut Drop token arrives the same way — a public mesh broadcast. Each
+ * public message is classified against my key: locked to me → enqueue for
+ * auto-redeem; locked to someone else (incl. our own broadcast echo) →
+ * silent; bearer → left to the chat surface's manual tap-to-redeem.
  *
- * Drain triggers: payment/message arrival, app foreground, offline→online,
- * and profile mount (manager init catches entries queued while dead).
+ * Drain triggers: message arrival, app foreground, offline→online, and
+ * profile mount (manager init catches entries queued while dead).
  */
 /**
  * Drain wrapped in an iOS background-task assertion when the app is
@@ -64,14 +57,6 @@ export function useNutDropAutoRedeem(): void {
       paymentLog.info('near_pay.mesh.runtime_skipped', { hasKeys: !!keys });
       return;
     }
-
-    startMeshNutDrop({
-      p2pkReceiveKey: myPubkey33,
-      nprofile: nip19.nprofileEncode({ pubkey: keys.pubkey }),
-      getIdentityMaterial: () =>
-        deriveBitchatBLEIdentityMaterial({ privateKey: keys.privateKey, pubkey: keys.pubkey }),
-      onPaymentAccepted: () => void drainWithBackgroundBudget(),
-    });
 
     paymentLog.info('near_pay.redeem.listener_mounted');
     const subscription = addBLEMessageListener((event) => {
@@ -115,7 +100,6 @@ export function useNutDropAutoRedeem(): void {
     return () => {
       subscription.remove();
       appStateSub.remove();
-      stopMeshNutDrop();
     };
   }, [keys, myPubkey33]);
 

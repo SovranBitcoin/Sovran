@@ -19,7 +19,7 @@ const RECIPIENT = {
   nickname: 'Nearby Alice',
   hasDirectLink: true,
   lastSeen: 123,
-  delivery: { mode: 'mesh', locked: true } as const,
+  delivery: { locked: true } as const,
 };
 
 describe('near pay session store', () => {

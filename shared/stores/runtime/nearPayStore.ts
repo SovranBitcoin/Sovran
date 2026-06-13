@@ -5,17 +5,16 @@ import { storeLog } from '@/shared/lib/logger';
 type NearPaySessionPhase = 'picking' | 'transitioning' | 'amount';
 
 /**
- * How this session's payment travels. Discriminated so every consumer is
- * forced to handle both modes explicitly:
- * - `mesh`: the recipient answers NUT-18 solicits; the payment is delivered
- *   in-band over the Noise session. `locked: true` = P2PK-locked to the key
- *   from their payment request (no consent needed); `locked: false` = a
- *   bearer token from local proofs (sender-offline, explicitly confirmed).
- * - `broadcast`: vanilla bitchat recipient — the token is broadcast UNLOCKED
- *   on the public mesh and anyone in range can claim it. Only ever chosen
- *   after the sender explicitly confirmed the broadcast warning.
+ * How this session's token is locked. Every Nut Drop send is delivered the
+ * same way — broadcast on the public mesh — so the only distinction is the
+ * lock:
+ * - `locked: true`: P2PK-locked to the recipient's announced key (a Sovran
+ *   v3 peer). Only they can redeem it; everyone else ignores it. No consent.
+ * - `locked: false`: an unlocked bearer token (a stock/vanilla peer with no
+ *   announced key). Anyone in range can claim it — chosen only after the
+ *   sender confirmed the broadcast warning.
  */
-export type NearPayDelivery = { mode: 'mesh'; locked: boolean } | { mode: 'broadcast' };
+export type NearPayDelivery = { locked: boolean };
 
 interface NearPayRecipient {
   peerID: string;
@@ -62,7 +61,7 @@ export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => 
     storeLog.info('near_pay.session.start', {
       peerID: recipient.peerID,
       hasDirectLink: recipient.hasDirectLink,
-      deliveryMode: recipient.delivery.mode,
+      locked: recipient.delivery.locked,
     });
     set({
       active: {
