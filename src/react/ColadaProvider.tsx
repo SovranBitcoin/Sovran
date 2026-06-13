@@ -53,6 +53,7 @@ import type {
   ScanSources,
   StepHandlerMap,
 } from '../machine/types';
+import type { MeshTransportAdapter } from '../transport/types';
 import type { ScreenActionHandlerMap, ScreenActionsBridge } from '../screen-actions/types';
 import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
 import { createSubscriptionBus } from '../subscriptions';
@@ -112,6 +113,12 @@ export interface ColadaProviderProps {
   /** Optional app bridge for `useScreenActions` enrichment/subscriptions. */
   screenActionsBridge?: ScreenActionsBridge;
   getOffline?: () => boolean;
+  /**
+   * Mesh transport adapter getter for `startMeshSend` (Nut Drop). Falls back
+   * to `instance.config.getMeshTransport`. A getter because the adapter's
+   * lifetime tracks the mesh radio, not the provider.
+   */
+  getMeshTransport?: () => MeshTransportAdapter | null;
   enableEcashSendMemo?: boolean;
   getBtcPrice?: () => number;
   getDisplayCurrency?: () => { code: string; symbol: string } | null;
@@ -219,6 +226,7 @@ export function ColadaProvider({
   actions,
   screenActionsBridge,
   getOffline: getOfflineProp,
+  getMeshTransport: getMeshTransportProp,
   enableEcashSendMemo: enableEcashSendMemoProp,
   getBtcPrice: getBtcPriceProp,
   getDisplayCurrency: getDisplayCurrencyProp,
@@ -293,6 +301,7 @@ export function ColadaProvider({
   const ic = instance?.config;
   const getLocale = getLocaleProp ?? ic?.getLocale;
   const getOffline = getOfflineProp ?? ic?.getOffline;
+  const getMeshTransport = getMeshTransportProp ?? ic?.getMeshTransport;
   const enableEcashSendMemo = enableEcashSendMemoProp ?? ic?.enableEcashSendMemo ?? false;
   const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
   const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
@@ -333,6 +342,7 @@ export function ColadaProvider({
   const shareContentRef = useLatestRef(shareContent);
 
   const getOfflineRef = useLatestRef(getOffline);
+  const getMeshTransportRef = useLatestRef(getMeshTransport);
   const getBtcPriceRef = useLatestRef(getBtcPrice);
   const getDisplayCurrencyRef = useLatestRef(getDisplayCurrency);
 
@@ -383,6 +393,7 @@ export function ColadaProvider({
           },
       getUnit: () => unitRef.current,
       getOffline: () => getOfflineRef.current?.() ?? false,
+      getMeshTransport: () => getMeshTransportRef.current?.() ?? null,
       enableEcashSendMemo,
       getLocale: () => getLocaleRef.current?.() ?? 'en',
       operations: operations as MachineOperations | undefined,

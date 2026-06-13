@@ -24,7 +24,6 @@ import type {
   SendHistoryEntry,
 } from '@cashu/coco-core';
 import { getEncodedToken } from '@cashu/coco-core';
-import { nip19 } from 'nostr-tools';
 import type { MachineOperations, StepDataMap } from '../machine/types';
 import type {
   MintCatalogEntry,
@@ -36,7 +35,7 @@ import type {
 import { defaultDetectors } from '../detectors';
 import { errField, logger } from '../logger';
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
-import { resolveRecipientPubkey } from '../recipient';
+import { normalizeNostrPubkey, resolveRecipientPubkey } from '../recipient';
 import { amountToNumber, type AmountLike } from '../amount';
 import {
   buildMethodAwareMintCandidates,
@@ -59,25 +58,6 @@ function hasMintInfo(value: MintInfo | undefined): value is MintInfo {
     value !== null &&
     Object.keys(value as Record<string, unknown>).length > 0
   );
-}
-
-function normalizeNostrPubkey(input: string): string | undefined {
-  const value = input.trim().replace(/^nostr:/i, '');
-  if (/^[0-9a-f]{64}$/i.test(value)) {
-    return value.toLowerCase();
-  }
-  try {
-    const decoded = nip19.decode(value);
-    if (decoded.type === 'npub') {
-      return decoded.data;
-    }
-    if (decoded.type === 'nprofile') {
-      return decoded.data.pubkey;
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
 }
 
 function extractMintNostrContactPubkey(mintInfo: MintInfo | undefined): string | undefined {

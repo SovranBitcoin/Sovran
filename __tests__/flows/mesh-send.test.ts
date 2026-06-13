@@ -8,7 +8,8 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { PaymentRequest } from '@cashu/cashu-ts';
+import { nip19 } from 'nostr-tools';
+import { PaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
 
 import { createTestMachine } from '../_harness';
 import { MINT1 } from '../_harness/fixtures';
@@ -17,9 +18,15 @@ import type { MeshTransportAdapter } from '../../src/transport/types';
 const PEER = 'deadbeefdeadbeef';
 const RECEIVER_KEY = `02${'cd'.repeat(32)}`;
 
-function buildCreq(opts: { lockPubkey?: string; mints?: string[] }): string {
+function buildCreq(opts: {
+  lockPubkey?: string;
+  mints?: string[];
+  nprofile?: string;
+}): string {
   return new PaymentRequest(
-    [],
+    opts.nprofile
+      ? [{ type: PaymentRequestTransportType.NOSTR, target: opts.nprofile, tags: [['n', '17']] }]
+      : [],
     'a1b2c3d4e5f60718',
     undefined,
     'sat',
@@ -65,6 +72,22 @@ describe('startMeshSend', () => {
     const call = tm.operationCalls.find((c) => c.name === 'executePaymentRequest');
     expect(call).toBeDefined();
     expect(call!.args[4]).toEqual({ meshPeerId: PEER, offline: false });
+  });
+
+  it('seeds recipientPubkey from the creq nostr transport (identity disclosure)', async () => {
+    const recipientPubkey = 'ab'.repeat(32);
+    const nprofile = nip19.nprofileEncode({ pubkey: recipientPubkey });
+    const tm = createTestMachine({
+      meshTransport: adapterWith({
+        solicitPaymentRequest: async () => buildCreq({ lockPubkey: RECEIVER_KEY, nprofile }),
+      }),
+    });
+
+    const start = await tm.machine.startMeshSend(PEER);
+    expect(start).toEqual({ kind: 'started', mode: 'locked' });
+    // The stage-2 profile resolver keys off this; the amount screen reads it
+    // for the "Pay <name>" header.
+    expect(tm.machine.getContext().recipientPubkey).toBe(recipientPubkey);
   });
 
   it('bearer send: offline option flags the request and the operation', async () => {

@@ -19,10 +19,35 @@
 // this value cosmetically — the melt flow does not depend on it.
 // ---------------------------------------------------------------------------
 
+import { nip19 } from 'nostr-tools';
 import { parseLightningAddress } from './lnurl';
 import { logger } from './logger';
 import { fetchNip05Pubkey } from './nip05';
 import { type RequestControls } from './safeFetch';
+
+/**
+ * Normalize a Nostr identity string (hex pubkey, `npub1…`, `nprofile1…`,
+ * optionally `nostr:`-prefixed) to a lowercase x-only hex pubkey.
+ * Undefined when the input is none of those.
+ */
+export function normalizeNostrPubkey(input: string): string | undefined {
+  const value = input.trim().replace(/^nostr:/i, '');
+  if (/^[0-9a-f]{64}$/i.test(value)) {
+    return value.toLowerCase();
+  }
+  try {
+    const decoded = nip19.decode(value);
+    if (decoded.type === 'npub') {
+      return decoded.data;
+    }
+    if (decoded.type === 'nprofile') {
+      return decoded.data.pubkey;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
 
 /**
  * Best-effort: resolve a melt target to a recipient Nostr hex pubkey for
