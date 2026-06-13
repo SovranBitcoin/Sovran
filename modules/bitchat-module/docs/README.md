@@ -25,13 +25,19 @@ The obvious design is: just DM a bearer Cashu token straight to the recipient �
 private, simple, no P2PK needed. **We can't, and the whole design falls out of
 why not:**
 
-1. **A token doesn't fit a private DM.** bitchat private messages carry their
-   content in a TLV with a **single-byte length field — a hard 255-byte cap.** A
-   Cashu token (proofs + secrets, and per-proof witnesses if locked) is
-   comfortably larger than 255 bytes for any real amount, so it simply won't fit
-   in a DM. (Raising the cap is a protocol-breaking change the bitchat maintainer
-   flagged as needing iOS+Android lockstep — it's open and stalled, see #784
-   below.)
+1. **A token doesn't fit a private DM — and that's a *message-format* limit, not
+   a radio one.** bitchat's transport happily fragments oversized packets across
+   BLE links (including Noise-encrypted ones), so the BLE MTU is a non-issue. The
+   real cap is one layer up: `PrivateMessagePacket.encode()` puts the message
+   `content` in a TLV with a **single-byte length field** and literally
+   `return nil`s above 255 bytes. A Cashu token (proofs + secrets, plus per-proof
+   witnesses once locked) is comfortably over 255 B for any real amount, so it
+   can't even be *encoded* into a private message — and since fragmentation runs
+   on an already-encoded packet, it can't help. The only fixes are to widen that
+   length field (#784 — protocol-breaking, stalled) or to carry the token in a
+   *custom* Noise payload type outside the standard private-message format
+   (#1053's path, which `sendEncrypted` would then auto-fragment) — both
+   non-standard, both avoided here.
 2. **So we must use the public mesh.** It's the only channel with no length
    limit (messages are transparently fragmented). But a public message is
    visible to *every* peer in range — a **bearer** token broadcast in the open
@@ -111,7 +117,14 @@ bitchat's maintainer **Jack** ([@jackjackbits](https://github.com/jackjackbits))
 keeps the protocol intentionally small and lets third-party *protocol* PRs sit;
 cashu-adjacent work is routed to Calle (the Cashu author / repo collaborator)
 off-GitHub. That's why we touch the wire as little as possible and reuse native
-channels. Relevant live threads on
+channels.
+
+The only Cashu code **merged** upstream is read-only **chip rendering** — detect
+a `cashu…` / `lnbc…` string in a message and show a tappable chip (the
+`MessageFormattingEngine`, PR #891/#961 + the *"Normalize Cashu chip URLs"* /
+*"Feat/b links"* commits). There is **no** merged wallet, lock, redeem, or
+payment protocol — everything below is open or closed, so our approach doesn't
+conflict with anything shipped. Relevant threads on
 [`permissionlesstech/bitchat`](https://github.com/permissionlesstech/bitchat):
 
 - **[#784](https://github.com/permissionlesstech/bitchat/issues/784)** — *Allow
@@ -135,7 +148,10 @@ channels. Relevant live threads on
   **[#417](https://github.com/permissionlesstech/bitchat/issues/417)** (cashu for
   hops / per-message read), bitchat-android
   **[#506](https://github.com/permissionlesstech/bitchat-android/pull/506)**
-  (*Feat/dm 2byte tlv* — the bitpoints 2-byte-TLV cashu DM), and
+  (*Feat/dm 2byte tlv* — the bitpoints 2-byte-TLV cashu DM),
+  bitchat-android
+  **[#132](https://github.com/permissionlesstech/bitchat-android/pull/132)**
+  (*Parse cashu* — an early cashu-parsing PR, closed/unmerged), and
   **[#679](https://github.com/permissionlesstech/bitchat/issues/679)**
   (deep-link cashu redeem).
 - Adjacent: **[#283](https://github.com/permissionlesstech/bitchat/issues/283)**
