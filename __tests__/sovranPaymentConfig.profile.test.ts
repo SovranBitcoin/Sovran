@@ -242,15 +242,52 @@ describe('createSovranHandlers profile routing', () => {
     expect(submitSendMemo).not.toHaveBeenCalled();
   });
 
-  it('DMs an explicit bearer token, including offline-created sends', async () => {
+  it('does not DM a token when the recipient has no creq capability proof', async () => {
+    mockNearPayActive = {
+      id: 'near-pay-no-creq',
+      startedAt: 1,
+      recipient: {
+        peerID: 'peer-no-creq',
+        nickname: 'Unconfirmed Carol',
+        hasDirectLink: true,
+        lastSeen: 2,
+        delivery: { locked: false },
+      },
+    };
+    (getEncodedToken as jest.Mock).mockReturnValue('cashuA-token-that-must-not-send');
+    // @ts-expect-error sendComplete only reads no machine methods.
+    const machine: PaymentMachine = { getContext: jest.fn(() => ({})) };
+    const handlers = createSovranHandlers({
+      machine,
+      getManager: () => null,
+    });
+    const historyEntry = JSON.stringify({
+      id: 'send-no-creq',
+      type: 'send',
+      mintUrl: 'https://mint.example',
+      token: { proofs: [] },
+    });
+
+    await handlers.sendComplete?.({
+      historyEntry,
+      createdOffline: false,
+      mintWasOffline: false,
+    });
+
+    expect(sendBLEPrivateMessageWhole).not.toHaveBeenCalled();
+    expect(mockNearPayComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('DMs an offline bearer token to a creq-confirmed peer', async () => {
     mockNearPayActive = {
       id: 'near-pay-3',
       startedAt: 1,
       recipient: {
         peerID: 'peer-789',
-        nickname: 'Vanilla Carol',
+        nickname: 'Sovran Carol',
         hasDirectLink: true,
         lastSeen: 2,
+        creq: 'creqA-confirmed',
         delivery: { locked: false },
       },
     };
@@ -274,8 +311,8 @@ describe('createSovranHandlers profile routing', () => {
       token: { proofs: [] },
     });
 
-    // Bearer drops take the local-proof shortcut when offline — delivery
-    // must still send the DM (BLE needs no internet).
+    // Bearer drops take the local-proof shortcut when offline, but only after a
+    // valid creq confirmed the recipient can decode extended private DMs.
     await handlers.sendComplete?.({
       historyEntry,
       createdOffline: true,
@@ -297,6 +334,7 @@ describe('createSovranHandlers profile routing', () => {
         nickname: 'Sovran Dave',
         hasDirectLink: true,
         lastSeen: 2,
+        creq: 'creqA-confirmed',
         delivery: { locked: true },
       },
     };

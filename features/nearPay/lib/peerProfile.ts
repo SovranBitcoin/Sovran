@@ -2,12 +2,13 @@ import type { BLEPeer } from 'bitchat-module';
 
 import type { RecentPeopleProfileRow } from '@/features/feed/hooks/useRecentPeopleProfiles';
 import { resolveIdentityName } from '@/shared/lib/identity';
+import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 
 import type { NearPayLayoutPeer } from './peerLayout';
 
 /**
  * The peer's x-only Nostr pubkey, learned via bitchat's native favorite
- * exchange (`[FAVORITED]:npub`) — THIS is the peer's real Nostr identity,
+ * exchange (`[FAVORITED]:<npub>:<creq>`) — THIS is the peer's real Nostr identity,
  * usable for kind-0 profile lookups (real face/name pre-tap). Returns null
  * until the peer has favorited us back (stock peers never do).
  */
@@ -37,6 +38,7 @@ export function peerDisplayName(peer: BLEPeer, profile?: RecentPeopleProfileRow)
 }
 
 export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): NearPayLayoutPeer {
+  const creqMints = lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex);
   return {
     peerID: peer.peerID,
     nickname: peer.nickname,
@@ -45,10 +47,10 @@ export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): N
     lastSeen: peer.lastSeen,
     name: peerDisplayName(peer, profile),
     avatarUrl: profile?.metadata?.picture ?? null,
-    // Lockable ⇒ the peer advertised a standing creq (Sovran/cashu-capable).
-    // The full check (creq valid + shared mint) runs at tap time; this drives
-    // the radar badge/sort cheaply.
-    lockable: !!peer.creq && !!peer.nostrPubkeyHex,
+    // Lockable ⇒ the peer advertised a valid standing creq (Sovran/cashu-capable).
+    // The shared-mint check still runs at tap time; this drives the radar
+    // badge/sort cheaply.
+    lockable: creqMints !== null,
     nostrPubkeyHex: peer.nostrPubkeyHex,
     creq: peer.creq,
     identitySeed: peerIdentitySeed(peer),

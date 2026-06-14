@@ -15,6 +15,7 @@ describe('clearPaymentContext', () => {
       nickname: 'bob',
       hasDirectLink: true,
       lastSeen: 0,
+      creq: 'creqA-confirmed',
       delivery: { locked: true },
     });
 

@@ -82,8 +82,9 @@ creq  : a NUT-18 standing payment request ("creqA…", URL-safe base64, no ":").
 says only "cashu-capable"; the creq additionally says *which mints I accept* and
 *what key to lock to*. That lets a sender lock **only to a shared mint** (or block
 the send when there's no overlap) instead of producing an unredeemable token. A
-peer is **lockable only when its favorite carries a valid creq** whose `nut10` key
-equals `02`+npub; anything else is treated as bearer-only. Build/parse it with
+peer is **eligible for token DMs only when its favorite carries a valid creq**
+whose `nut10` key equals `02`+npub; anything else is treated as unconfirmed.
+Build/parse it with
 `@cashu/cashu-ts` (`buildStandingCreq`/`parseCreq` in `shared/lib/nutCreq.ts`):
 no transport, no amount, reusable, mints capped at 5 to bound size. This mirrors
 [numo](https://github.com/cashubtc/numo)'s mint-advertisement-via-payment-request.
@@ -110,10 +111,11 @@ initiates** and the higher side defers.
 To pay a peer (`planNearPaySend` + `sendBLEPrivateMessageWhole`):
 
 1. Read their npub + accepted mints from their creq favorite.
-2. Decide the token: **online + a shared mint** → P2PK-lock (NUT-11, single-sig)
-   to `02`+npub, minted from a shared mint; **offline** or **no creq** → bearer;
-   **no shared mint** → block the send (clear message — a token from a mint they
-   don't accept is unredeemable).
+2. Decide the token: **online + a shared mint + valid creq** → P2PK-lock
+   (NUT-11, single-sig) to `02`+npub, minted from a shared mint; **offline +
+   valid creq + shared mint** → bearer from that shared mint; **no valid creq** or
+   **no shared mint** → block the send (a stock/stale peer may drop an extended DM,
+   and a token from a mint they don't accept is unredeemable).
 3. Send the whole token as a **single private Noise DM** to that peer (not the
    public mesh). The DM is encrypted to the recipient, so locked *or* bearer the
    payment stays private.
@@ -152,8 +154,8 @@ backward-compatible and client-local):
 2. **Emit** `[FAVORITED]:npub:creq` to peers (and eagerly, to be discoverable).
 3. **Parse** inbound creq favorites → record peer→npub + accepted mints; treat a
    missing/mismatched creq as not-lockable.
-4. **Classify + redeem** inbound token DMs, and **compose** locked/bearer tokens
-   and DM them to the peer.
+4. **Classify + redeem** inbound token DMs, and **compose** locked tokens (or
+   offline bearer tokens after a valid creq) and DM them to the peer.
 
 ### 3.1 What Sovran patches in the vendored bitchat (and what it does NOT)
 
@@ -163,11 +165,13 @@ public `sendPrivateMessage`. The **one** wire patch is the extended
 private-message content length (§5) in `Packets.swift` / `NoiseEncrypted.kt`,
 applied by the patch/sync scripts — backward-compatible (≤254 B is byte-identical
 to stock) and decoded only by our clients. The remaining vendor patches are
-build/privacy only: import fix-ups, mainnet-UUID forcing, a neighbor-gossip
-privacy suppression, a `linkState` de-privatize, and (iOS) a temporary relaxation
-of an announce sender-mismatch check for older App Store builds. There is **no**
-announce-TLV patch, **no** new packet/payload type, and **no**
-signing-canonicalization patch.
+integration plumbing: import fix-ups, mainnet-UUID forcing, `linkState` /
+`encryptionService` access widening for the bridge, Android BLE permission/start
+alignment, Android re-handshake recovery matching upstream iOS behavior, and
+(when present at a vendor pin) a temporary relaxation of an announce
+sender-mismatch check for older App Store builds. There is **no** announce-TLV
+patch, **no** neighbor-gossip suppression, **no** new packet/payload type, and
+**no** signing-canonicalization patch.
 
 ## 4. Why this is "the bitchat way"
 

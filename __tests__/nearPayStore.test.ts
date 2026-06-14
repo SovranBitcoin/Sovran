@@ -19,6 +19,7 @@ const RECIPIENT = {
   nickname: 'Nearby Alice',
   hasDirectLink: true,
   lastSeen: 123,
+  creq: 'creqA-confirmed',
   delivery: { locked: true } as const,
 };
 

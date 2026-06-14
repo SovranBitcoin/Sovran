@@ -56,6 +56,17 @@ function walk(dir, out = []) {
   return out;
 }
 
+function readExistingVendorCommit(file, pattern) {
+  try {
+    const match = fs.readFileSync(file, 'utf8').match(pattern);
+    const commit = match?.[1]?.trim();
+    if (commit && commit !== 'unknown') return commit;
+  } catch {
+    /* generated file absent — fall through to unknown */
+  }
+  return 'unknown';
+}
+
 // Bitchat uses Swift 5.9+ scoped imports like `private import struct CryptoKit.SHA256`
 // in BitFoundation. When all sources land in the same module, the same framework
 // is also imported plainly elsewhere — Swift then errors with "ambiguous implicit
@@ -158,12 +169,41 @@ const EXTENDED_PM_DECODE_REPLACEMENT =
   '            switch type {\n' +
   '            case .messageID:';
 
+// --- Keep iOS fragment packets below the BLE/GATT exact-boundary failure ---
+//
+// A 514-byte token produced a two-fragment Noise packet where fragment 0 encoded
+// to 513 bytes (14-byte v1 header + sender + recipient + 13-byte fragment
+// header + 470-byte chunk). Android received only the first 512 bytes, so its
+// decoder saw a declared payload length one byte larger than the bytes present.
+// Keep the vendor's transport fragmentation, but leave explicit headroom for
+// directed fragments.
+const FRAGMENT_CHUNK_HEADROOM_ANCHOR =
+  '        let chunk = context.maxChunk ?? calculatedChunk\n' +
+  '        let safeChunk = max(64, chunk)';
+const FRAGMENT_CHUNK_HEADROOM_REPLACEMENT =
+  '        let chunk = context.maxChunk ?? calculatedChunk\n' +
+  '        // [sovran] Keep each encoded fragment packet under the BLE/GATT\n' +
+  '        // 512-byte boundary. A directed v1 fragment carries a 14-byte\n' +
+  '        // BinaryProtocol header, sender, recipient, and a 13-byte fragment\n' +
+  '        // payload header; without headroom the first fragment can encode to\n' +
+  '        // 513 bytes and Android receives a truncated 512-byte frame.\n' +
+  '        let fragmentRouteBytes = (fragmentVersion == 2) ? (1 + ((packet.route?.count ?? 0) * 8)) : 0\n' +
+  '        let fragmentRecipientBytes = (context.directedPeer != nil || packet.recipientID != nil) ? 8 : 0\n' +
+  '        let fragmentBinaryHeaderBytes = (fragmentVersion == 2) ? 16 : 14\n' +
+  '        let fragmentWireHeadroomBytes = 16\n' +
+  '        let maxWireChunk = max(\n' +
+  '            64,\n' +
+  '            bleMaxMTU - fragmentBinaryHeaderBytes - 8 - fragmentRecipientBytes - fragmentRouteBytes - 13 - fragmentWireHeadroomBytes\n' +
+  '        )\n' +
+  '        let safeChunk = max(64, min(chunk, maxWireChunk))';
+
 let patched = 0;
 const applied = {
   mismatchGuard: false,
   linkState: false,
   extendedPmEncode: false,
   extendedPmDecode: false,
+  fragmentChunkHeadroom: false,
 };
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
@@ -177,8 +217,11 @@ for (const file of walk(ROOT)) {
     after = next;
   }
   if (file.endsWith('BLEService.swift')) {
-    const next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
+    let next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
     if (next !== after) applied.linkState = true;
+    after = next;
+    next = after.replace(FRAGMENT_CHUNK_HEADROOM_ANCHOR, FRAGMENT_CHUNK_HEADROOM_REPLACEMENT);
+    if (next !== after) applied.fragmentChunkHeadroom = true;
     after = next;
   }
   if (file.endsWith('Packets.swift')) {
@@ -246,24 +289,31 @@ assertApplied(
   path.join(ROOT, 'bitchat', 'Protocols', 'Packets.swift'),
   /\[sovran\] extended length read: 0xFF sentinel/
 );
+assertApplied(
+  'FRAGMENT_CHUNK_HEADROOM',
+  applied.fragmentChunkHeadroom,
+  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
+  /\[sovran\] Keep each encoded fragment packet under the BLE\/GATT/
+);
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);
 
 // Bake the vendored submodule commit into a generated Swift constant so the
 // running build's bitchat version is logged at startBLE (bitchat.peers.ble_start_ok)
 // — catching a stale build that predates a fragmentation/protocol fix. Best-effort;
-// leaves the committed "unknown" placeholder if git is unavailable.
+// preserves the existing baked SHA when EAS_NO_VCS archives strip .git metadata.
 (function writeVendorVersion() {
-  let commit = 'unknown';
-  try {
-    commit =
-      require('child_process')
-        .execSync('git rev-parse --short HEAD', { cwd: ROOT })
-        .toString()
-        .trim() || 'unknown';
-  } catch {
-    /* git unavailable — keep placeholder */
-  }
   const out = path.join(path.resolve(__dirname, '..', 'ios'), 'BitchatVendorVersion.swift');
+  let commit = readExistingVendorCommit(out, /static let commit = "([^"]+)"/);
+  try {
+    const gitCommit =
+      require('child_process')
+        .execSync('git rev-parse --short HEAD', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim();
+    if (gitCommit) commit = gitCommit;
+  } catch {
+    /* git unavailable — keep the existing baked SHA */
+  }
   fs.writeFileSync(
     out,
     '// GENERATED at prebuild by scripts/patch-bitchat-imports.js — do not edit by hand.\n' +

@@ -3,9 +3,12 @@ package expo.modules.bitchat
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import java.security.GeneralSecurityException
 import java.security.MessageDigest
+import javax.crypto.AEADBadTagException
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
 
@@ -82,16 +85,42 @@ class BitchatIdentityMaterial(
  */
 object BitchatIdentityInstaller {
 
-    fun install(scopedContext: Context, identity: BitchatIdentityMaterial) {
-        val identityPrefs = encryptedPrefs(scopedContext, "bitchat_identity")
-        // Base64.DEFAULT matches the vendor's encode/decode calls.
-        putIfDifferent(identityPrefs, "static_private_key", identity.noisePrivateKey)
-        putIfDifferent(identityPrefs, "static_public_key", identity.noisePublicKey)
-        putIfDifferent(identityPrefs, "signing_private_key", identity.signingPrivateKey)
-        putIfDifferent(identityPrefs, "signing_public_key", identity.signingPublicKey)
+    private const val TAG = "BitchatIdentityInstaller"
 
-        val cryptoPrefs = encryptedPrefs(scopedContext, "bitchat_crypto_secure")
-        putIfDifferent(cryptoPrefs, "ed25519_signing_private_key", identity.signingPrivateKey)
+    fun install(scopedContext: Context, identity: BitchatIdentityMaterial) {
+        withSelfHealingEncryptedPrefs(scopedContext, "bitchat_identity") { identityPrefs ->
+            // Base64.DEFAULT matches the vendor's encode/decode calls.
+            putIfDifferent(identityPrefs, "static_private_key", identity.noisePrivateKey)
+            putIfDifferent(identityPrefs, "static_public_key", identity.noisePublicKey)
+            putIfDifferent(identityPrefs, "signing_private_key", identity.signingPrivateKey)
+            putIfDifferent(identityPrefs, "signing_public_key", identity.signingPublicKey)
+        }
+
+        withSelfHealingEncryptedPrefs(scopedContext, "bitchat_crypto_secure") { cryptoPrefs ->
+            putIfDifferent(cryptoPrefs, "ed25519_signing_private_key", identity.signingPrivateKey)
+        }
+    }
+
+    private fun withSelfHealingEncryptedPrefs(
+        context: Context,
+        name: String,
+        block: (SharedPreferences) -> Unit,
+    ) {
+        try {
+            block(encryptedPrefs(context, name))
+        } catch (error: Exception) {
+            if (!isEncryptedPrefsCorruption(error)) {
+                throw error
+            }
+
+            Log.w(
+                TAG,
+                "BitChat encrypted prefs '$name' were unreadable; clearing the profile-scoped store and reinstalling deterministic identity.",
+                error,
+            )
+            context.deleteSharedPreferences(name)
+            block(encryptedPrefs(context, name))
+        }
     }
 
     private fun encryptedPrefs(context: Context, name: String): SharedPreferences {
@@ -116,5 +145,16 @@ object BitchatIdentityInstaller {
         if (!prefs.edit().putString(key, encoded).commit()) {
             throw BitchatIdentityException("Failed to persist BitChat $key identity key")
         }
+    }
+
+    private fun isEncryptedPrefsCorruption(error: Throwable): Boolean {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is AEADBadTagException || current is GeneralSecurityException) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
     }
 }

@@ -859,15 +859,19 @@ async function deliverNearPayIfActive(
   const active = useNearPaySessionStore.getState().active;
   if (!active) return;
 
-  // Every Nut Drop send is delivered as a SINGLE private Noise DM to the
-  // recipient peer — encrypted to them, so a locked OR bearer token stays
-  // private (no public-mesh broadcast of payment metadata). The whole multi-KB
-  // token fits one message thanks to the extended PrivateMessagePacket length.
-  // Payments are Sovran↔Sovran (stock can't decode our extended DMs).
+  // Every Nut Drop send is delivered as a SINGLE private Noise DM to a
+  // creq-confirmed Sovran peer — encrypted to them, so a locked OR offline
+  // bearer token stays private (no public-mesh broadcast of payment metadata).
+  // The whole multi-KB token fits one message thanks to the extended
+  // PrivateMessagePacket length. Stock clients can't decode extended DMs, so
+  // active sessions must carry a creq capability proof before we transmit.
 
   try {
     const encodedToken = getEncodedEcashTokenFromSendHistoryEntry(historyEntry);
     if (!encodedToken) throw new Error('Created send entry did not contain an ecash token');
+    if (!active.recipient.creq) {
+      throw new Error('Nut Drop recipient has not advertised a creq capability');
+    }
 
     const profileScope = getBitchatProfileScope();
     const identityMaterial = getBitchatIdentityMaterial?.() ?? null;

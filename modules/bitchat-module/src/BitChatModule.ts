@@ -182,10 +182,11 @@ export function addBLEPrivateMessageListener(
 
 /**
  * Hand a peer our Nostr identity via bitchat's native favorite notification
- * (`[FAVORITED]:npub`). NearPay calls this eagerly for each discovered peer;
- * Sovran peers reciprocate and we learn theirs (surfaced as
- * `BLEPeer.nostrPubkeyHex` / `onBLEPeerIdentity`). If no Noise session exists
- * yet the native side defers the send until the handshake completes.
+ * (`[FAVORITED]:<npub>:<creq>`). NearPay calls this eagerly for each discovered
+ * peer; Sovran peers reciprocate and we learn theirs (surfaced as
+ * `BLEPeer.nostrPubkeyHex` + `BLEPeer.creq` / `onBLEPeerIdentity`). If no Noise
+ * session exists yet the native side defers the send until the handshake
+ * completes.
  */
 export function sendBLEFavorite(peerID: string, isFavorite: boolean): Promise<void> {
   return NativeModule ? NativeModule.sendBLEFavorite(peerID, isFavorite) : unavailable();
@@ -194,8 +195,8 @@ export function sendBLEFavorite(peerID: string, isFavorite: boolean): Promise<vo
 /**
  * Fires when a peer hands us their Nostr identity over the native favorite
  * channel. iOS emits this immediately; on both platforms the same value also
- * appears on the polled `BLEPeer.nostrPubkeyHex`. Use it to flip a peer to
- * "lockable" without waiting for the next peer poll.
+ * appears on the polled `BLEPeer.nostrPubkeyHex` / `BLEPeer.creq`. Use it to
+ * mark a peer ready without waiting for the next peer poll.
  */
 export function addBLEPeerIdentityListener(
   listener: (event: BLEPeerIdentityEvent) => void

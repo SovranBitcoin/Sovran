@@ -12,9 +12,9 @@ export interface NearPayLayoutPeer {
   avatarUrl?: string | null;
   /**
    * True once the peer's favorite carried a valid `creq` (identity + accepted
-   * mints) — i.e. a Sovran peer we can lock ecash to. False ⇒ stock/vanilla peer
-   * or one we haven't exchanged identity with (bearer DM only).
-   * Coincides with `nostrPubkeyHex` and `creq` being present.
+   * mints) — i.e. a Sovran peer we can send an extended token DM to. False ⇒
+   * stock/vanilla peer or one we haven't exchanged identity with yet.
+   * Requires `nostrPubkeyHex`, `creq`, and a matching `nut10` lock key.
    */
   lockable: boolean;
   /**
@@ -25,8 +25,7 @@ export interface NearPayLayoutPeer {
   nostrPubkeyHex?: string;
   /**
    * The peer's standing NUT-18 payment request (`creq…`) — accepted mints +
-   * P2PK lock key. Present ⇒ lockable; decoded at tap time to pick a shared
-   * mint and verify the lock key.
+   * P2PK lock key. Decoded to verify the lock key and pick a shared mint.
    */
   creq?: string;
   /**

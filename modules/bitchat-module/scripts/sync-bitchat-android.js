@@ -33,6 +33,17 @@ if (!fs.existsSync(VENDOR_SRC)) {
   process.exit(0);
 }
 
+function readExistingVendorCommit(file, pattern) {
+  try {
+    const match = fs.readFileSync(file, 'utf8').match(pattern);
+    const commit = match?.[1]?.trim();
+    if (commit && commit !== 'unknown') return commit;
+  } catch {
+    /* generated file absent — fall through to unknown */
+  }
+  return 'unknown';
+}
+
 // Headless subset: BLE mesh + Noise + identity + low-level Nostr. Everything
 // Compose/Activity/Tor/location-coupled stays out; the four excluded classes
 // the subset still references (ui.NotificationManager, services.NicknameProvider,
@@ -97,6 +108,188 @@ const PATCHES = [
       '    // [sovran] internal — BitChatBLEBridge.resetPrivateChat() clears Noise\n' +
       '    // sessions via encryptionService; the vendor exposes no public reset.\n' +
       '    internal val encryptionService = EncryptionService(context)',
+  },
+  {
+    file: 'mesh/BluetoothPermissionManager.kt',
+    name: 'ANDROID_12_BLE_PERMISSIONS_NO_LOCATION',
+    anchor:
+      /    fun hasBluetoothPermissions\(\): Boolean \{\n[\s\S]*?\n    \}\n\}/,
+    replacement:
+      '    fun hasBluetoothPermissions(): Boolean {\n' +
+      '        // [sovran] Android 12+ BLE is gated by the runtime Bluetooth\n' +
+      '        // permissions only. Our manifest declares BLUETOOTH_SCAN with\n' +
+      '        // neverForLocation, so requiring location here makes a clean\n' +
+      '        // install report "poweredOn" in JS while the vendor refuses to\n' +
+      '        // advertise or scan. Keep this aligned with BluetoothStateMonitor.\n' +
+      '        val permissions =\n' +
+      '            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {\n' +
+      '                listOf(\n' +
+      '                    Manifest.permission.BLUETOOTH_ADVERTISE,\n' +
+      '                    Manifest.permission.BLUETOOTH_CONNECT,\n' +
+      '                    Manifest.permission.BLUETOOTH_SCAN\n' +
+      '                )\n' +
+      '            } else {\n' +
+      '                listOf(\n' +
+      '                    Manifest.permission.BLUETOOTH,\n' +
+      '                    Manifest.permission.BLUETOOTH_ADMIN,\n' +
+      '                    Manifest.permission.ACCESS_FINE_LOCATION\n' +
+      '                )\n' +
+      '            }\n' +
+      '\n' +
+      '        return permissions.all {\n' +
+      '            ActivityCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED\n' +
+      '        }\n' +
+      '    }\n' +
+      '}',
+  },
+  {
+    file: 'mesh/BluetoothConnectionManager.kt',
+    name: 'CONNECTION_START_RETURNS_REAL_FAILURE',
+    anchor:
+      /    \/\*\*\n     \* Start all Bluetooth services with power optimization\n     \*\/\n    fun startServices\(\): Boolean \{\n[\s\S]*?\n    \}\n    \n    \/\*\*\n     \* Stop all Bluetooth services with proper cleanup/,
+    replacement:
+      '    /**\n' +
+      '     * Start all Bluetooth services with power optimization\n' +
+      '     */\n' +
+      '    fun startServices(): Boolean {\n' +
+      '        Log.i(TAG, "Starting power-optimized Bluetooth services...")\n' +
+      '\n' +
+      '        if (!permissionManager.hasBluetoothPermissions()) {\n' +
+      '            Log.e(TAG, "Missing Bluetooth permissions")\n' +
+      '            return false\n' +
+      '        }\n' +
+      '\n' +
+      '        if (bluetoothAdapter?.isEnabled != true) {\n' +
+      '            Log.e(TAG, "Bluetooth is not enabled")\n' +
+      '            return false\n' +
+      '        }\n' +
+      '\n' +
+      '        try {\n' +
+      '            isActive = true\n' +
+      '            Log.d(TAG, "ConnectionManager activated (permissions and adapter OK)")\n' +
+      '\n' +
+      '        // set the adapter name to our 8-character peerID for iOS privacy, TODO: Make this configurable\n' +
+      '        // try {\n' +
+      '        //     if (bluetoothAdapter?.name != myPeerID) {\n' +
+      '        //         bluetoothAdapter?.name = myPeerID\n' +
+      '        //         Log.d(TAG, "Set Bluetooth adapter name to peerID: $myPeerID for iOS compatibility.")\n' +
+      '        //     }\n' +
+      '        // } catch (se: SecurityException) {\n' +
+      '        //     Log.e(TAG, "Missing BLUETOOTH_CONNECT permission to set adapter name.", se)\n' +
+      '        // }\n' +
+      '\n' +
+      '            // [sovran] Return a real startup failure to the Expo bridge. The\n' +
+      '            // upstream code launched this block asynchronously and returned\n' +
+      '            // true before server/client startup could fail, which made JS log\n' +
+      '            // ble_start_ok even when native BLE had refused to start.\n' +
+      '            connectionTracker.start()\n' +
+      '            powerManager.start()\n' +
+      '\n' +
+      '            val dbg = try { com.bitchat.android.ui.debug.DebugSettingsManager.getInstance() } catch (_: Exception) { null }\n' +
+      '            val startServer = dbg?.gattServerEnabled?.value != false\n' +
+      '            val startClient = dbg?.gattClientEnabled?.value != false\n' +
+      '\n' +
+      '            if (startServer) {\n' +
+      '                if (!serverManager.start()) {\n' +
+      '                    Log.e(TAG, "Failed to start server manager")\n' +
+      '                    powerManager.stop()\n' +
+      '                    connectionTracker.stop()\n' +
+      '                    isActive = false\n' +
+      '                    return false\n' +
+      '                }\n' +
+      '                Log.d(TAG, "GATT Server started")\n' +
+      '            } else {\n' +
+      '                Log.i(TAG, "GATT Server disabled by debug settings; not starting")\n' +
+      '            }\n' +
+      '\n' +
+      '            if (startClient) {\n' +
+      '                if (!clientManager.start()) {\n' +
+      '                    Log.e(TAG, "Failed to start client manager")\n' +
+      '                    serverManager.stop()\n' +
+      '                    powerManager.stop()\n' +
+      '                    connectionTracker.stop()\n' +
+      '                    isActive = false\n' +
+      '                    return false\n' +
+      '                }\n' +
+      '                Log.d(TAG, "GATT Client started")\n' +
+      '            } else {\n' +
+      '                Log.i(TAG, "GATT Client disabled by debug settings; not starting")\n' +
+      '            }\n' +
+      '\n' +
+      '            Log.i(TAG, "Bluetooth services started successfully")\n' +
+      '            return true\n' +
+      '        } catch (e: Exception) {\n' +
+      '            Log.e(TAG, "Failed to start Bluetooth services: ${e.message}")\n' +
+      '            isActive = false\n' +
+      '            return false\n' +
+      '        }\n' +
+      '    }\n' +
+      '    \n' +
+      '    /**\n' +
+      '     * Stop all Bluetooth services with proper cleanup',
+  },
+  {
+    file: 'mesh/BluetoothMeshService.kt',
+    name: 'MESH_START_RETURNS_BOOLEAN',
+    anchor:
+      /    \/\*\*\n     \* Start the mesh service\n     \*\/\n    fun startServices\(\) \{\n[\s\S]*?\n    \}\n    \n    \/\*\*\n     \* Stop all mesh services/,
+    replacement:
+      '    /**\n' +
+      '     * Start the mesh service\n' +
+      '     */\n' +
+      '    fun startServices(): Boolean {\n' +
+      '        // Prevent double starts (defensive programming)\n' +
+      '        if (isActive) {\n' +
+      '            Log.w(TAG, "Mesh service already active, ignoring duplicate start request")\n' +
+      '            return true\n' +
+      '        }\n' +
+      '        if (terminated) {\n' +
+      '            // This instance scope was cancelled previously; refuse to start to avoid using dead scopes.\n' +
+      '            Log.e(TAG, "Mesh service instance was terminated; create a new instance instead of restarting")\n' +
+      '            return false\n' +
+      '        }\n' +
+      '\n' +
+      '        Log.i(TAG, "Starting Bluetooth mesh service with peer ID: $myPeerID")\n' +
+      '\n' +
+      '        return if (connectionManager.startServices()) {\n' +
+      '            isActive = true\n' +
+      '\n' +
+      '            // Start periodic announcements for peer discovery and connectivity\n' +
+      '            sendPeriodicBroadcastAnnounce()\n' +
+      '            Log.d(TAG, "Started periodic broadcast announcements (every 30 seconds)")\n' +
+      '            // Start periodic syncs\n' +
+      '            gossipSyncManager.start()\n' +
+      '            Log.d(TAG, "GossipSyncManager started")\n' +
+      '            true\n' +
+      '        } else {\n' +
+      '            Log.e(TAG, "Failed to start Bluetooth services")\n' +
+      '            false\n' +
+      '        }\n' +
+      '    }\n' +
+      '    \n' +
+      '    /**\n' +
+      '     * Stop all mesh services',
+  },
+  {
+    file: 'protocol/BinaryProtocol.kt',
+    name: 'BINARY_PROTOCOL_HEADER_SIZES',
+    anchor:
+      /    private const val HEADER_SIZE_V1 = 13\n    private const val HEADER_SIZE_V2 = 15/,
+    replacement:
+      '    // [sovran] The fixed header is version/type/ttl (3) + timestamp (8)\n' +
+      '    // + flags (1) + payload length (2 for v1, 4 for v2). Upstream Android\n' +
+      '    // was off by one, which made exact-boundary 512-byte iOS fragments\n' +
+      '    // underflow while decoding.\n' +
+      '    private const val HEADER_SIZE_V1 = 14\n' +
+      '    private const val HEADER_SIZE_V2 = 16',
+  },
+  {
+    file: 'mesh/FragmentManager.kt',
+    name: 'FRAGMENT_MANAGER_HEADER_SIZES',
+    anchor: /        val headerSize = if \(version == 2\) 15 else 13/,
+    replacement:
+      '        // [sovran] Match BinaryProtocol: v1 header is 14 bytes, v2 is 16.\n' +
+      '        val headerSize = if (version == 2) 16 else 14',
   },
   // --- Re-handshake recovery (port of iOS NoiseSessionManager) ---
   //
@@ -252,21 +445,23 @@ if (fs.existsSync(NODE_MODULES_COPY) && fs.realpathSync(NODE_MODULES_COPY) !== M
 
 // Bake the vendored submodule commit into a generated Kotlin constant so the
 // running build's bitchat version is logged at startBLE (bitchat.peers.ble_start_ok)
-// — catching a stale build that predates a fragmentation/protocol fix. Best-effort.
+// — catching a stale build that predates a fragmentation/protocol fix. Best-effort;
+// preserves the existing baked SHA when EAS_NO_VCS archives strip .git metadata.
 (function writeVendorVersion() {
-  let commit = 'unknown';
-  try {
-    commit =
-      require('child_process')
-        .execSync('git rev-parse --short HEAD', { cwd: VENDOR })
-        .toString()
-        .trim() || 'unknown';
-  } catch {
-    /* git unavailable — keep placeholder */
-  }
   const out = path.join(
     MODULE_ROOT, 'src', 'main', 'java', 'expo', 'modules', 'bitchat', 'BitchatVendorVersion.kt'
   );
+  let commit = readExistingVendorCommit(out, /const val commit = "([^"]+)"/);
+  try {
+    const gitCommit =
+      require('child_process')
+        .execSync('git rev-parse --short HEAD', { cwd: VENDOR, stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim();
+    if (gitCommit) commit = gitCommit;
+  } catch {
+    /* git unavailable — keep the existing baked SHA */
+  }
   fs.writeFileSync(
     out,
     '// GENERATED at sync by scripts/sync-bitchat-android.js — do not edit by hand.\n' +

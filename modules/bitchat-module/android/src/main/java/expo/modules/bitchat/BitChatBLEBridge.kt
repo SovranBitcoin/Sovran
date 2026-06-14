@@ -25,6 +25,9 @@ class BitChatInvalidPeerException : Exception("Invalid peer ID (expected 16-char
 class BitChatUnauthorizedException :
     Exception("Bluetooth permissions are not granted. Request them before startBLE().")
 
+class BitChatStartFailedException :
+    Exception("BLE mesh failed to start. Check Bluetooth permissions, adapter state, and native BLE logs.")
+
 /**
  * Bridges the vendored bitchat-android BluetoothMeshService to the Expo module
  * event system — the Kotlin counterpart of ios/BitChatBLEBridge.swift, with
@@ -174,7 +177,6 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             BitchatIdentityInstaller.install(scopedContext, identity)
             NicknameProvider.currentNickname = nickname
 
-            isRunning = true
             activeScopeSuffix = suffix
             activeIdentityID = identity.identityID
             activeNickname = nickname
@@ -203,8 +205,21 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
                 resendFavoriteIfWanted(peerID)
             }
             service.delegate = this
-            service.startServices()
+            if (!service.startServices()) {
+                Log.e(TAG, "BluetoothMeshService.startServices() failed")
+                activeScopeSuffix = null
+                activeIdentityID = null
+                activeNickname = null
+                NicknameProvider.currentNickname = null
+                dmSummaries = mutableMapOf()
+                selfNpub = null
+                selfPeerID = null
+                selfCreq = null
+                favoritePeers.clear()
+                throw BitChatStartFailedException()
+            }
             mesh = service
+            isRunning = true
 
             // Pin the process while the mesh runs so background BLE messages
             // still reach JS (Nut Drop auto-redeem). start() is only called

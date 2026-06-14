@@ -9,10 +9,9 @@ import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
  * - **lock** — the peer is cashu-capable (valid creq), we're online (a P2PK lock
  *   needs a mint swap), and we share a mint it accepts → lock the token to its
  *   key, minting from a shared mint.
- * - **bearer** — either offline (can't lock; send from a shared mint), or the
- *   peer advertised no usable creq (best-effort, we don't know its mints).
- * - **block** — the peer has a creq but we share NO mint it accepts; a token
- *   from a mint it doesn't accept is unredeemable, so don't send.
+ * - **bearer** — offline only, after a valid creq proved the peer is a patched
+ *   Sovran client and we share a mint it accepts.
+ * - **block** — no usable creq (unconfirmed patched client), or no shared mint.
  *
  * Delivery is always a private Noise DM (handled by the caller); these modes
  * only decide the token's lock + source mint.
@@ -20,7 +19,7 @@ import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 type NearPaySendPlan =
   | { mode: 'lock'; lockPubkey: string; recipientPubkey: string; allowedMints: string[] }
   | { mode: 'bearer'; allowedMints: string[] | null }
-  | { mode: 'block'; reason: 'no-shared-mint' };
+  | { mode: 'block'; reason: 'no-creq' | 'invalid-creq' | 'no-shared-mint' };
 
 export function planNearPaySend(args: {
   peer: Pick<BLEPeer, 'creq' | 'nostrPubkeyHex'>;
@@ -30,10 +29,13 @@ export function planNearPaySend(args: {
   const { peer, ourMints, isOffline } = args;
   const acceptedMints = lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex);
 
-  // No valid creq (stock peer, or one we haven't exchanged identity with) →
-  // best-effort bearer from our own mint; we can't know what they accept.
-  if (!acceptedMints || !peer.nostrPubkeyHex) {
-    return { mode: 'bearer', allowedMints: null };
+  // A valid creq favorite is the capability signal for the extended private-DM
+  // wire format. Without it, a stock or stale client could drop the token.
+  if (!peer.creq || !peer.nostrPubkeyHex) {
+    return { mode: 'block', reason: 'no-creq' };
+  }
+  if (!acceptedMints) {
+    return { mode: 'block', reason: 'invalid-creq' };
   }
 
   const shared = ourMints.filter((m) => acceptedMints.includes(m));

@@ -49,17 +49,17 @@ describe('planNearPaySend', () => {
     expect(plan).toEqual({ mode: 'bearer', allowedMints: [MINT_B] });
   });
 
-  it('falls back to a best-effort bearer when the peer has no creq', () => {
+  it('blocks when the peer has not advertised a creq capability', () => {
     const plan = planNearPaySend({
       peer: { creq: undefined, nostrPubkeyHex: NOSTR_HEX },
       ourMints: [MINT_A],
       isOffline: false,
     });
 
-    expect(plan).toEqual({ mode: 'bearer', allowedMints: null });
+    expect(plan).toEqual({ mode: 'block', reason: 'no-creq' });
   });
 
-  it('falls back to a best-effort bearer when the creq lock key mismatches the npub', () => {
+  it('blocks when the creq lock key mismatches the npub', () => {
     const plan = planNearPaySend({
       // Valid creq, but announced under a different identity → not lockable.
       peer: { creq: creqFor([MINT_A]), nostrPubkeyHex: 'cd'.repeat(32) },
@@ -67,6 +67,6 @@ describe('planNearPaySend', () => {
       isOffline: false,
     });
 
-    expect(plan).toEqual({ mode: 'bearer', allowedMints: null });
+    expect(plan).toEqual({ mode: 'block', reason: 'invalid-creq' });
   });
 });

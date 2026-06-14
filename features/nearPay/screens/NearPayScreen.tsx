@@ -47,7 +47,10 @@ import type { StrikeState } from '@/features/nearPay/lib/nutDropStrikeState';
 import { peerAvatarState, peerNostrPubkey, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
 import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
 import { creqParseDiagnostics } from '@/shared/lib/nutCreq';
-import { notifyNoSharedMint } from '@/features/nearPay/lib/startNearPaySend';
+import {
+  notifyNoSharedMint,
+  notifyNutDropPeerNotReady,
+} from '@/features/nearPay/lib/startNearPaySend';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   useRecentPeopleProfiles,
@@ -194,7 +197,7 @@ function buildPeerNodeStyles(sizing: PeerFieldSizing) {
       width: sizing.avatarSize,
       height: sizing.avatarSize,
     },
-    // Open-padlock chip marking vanilla bitchat peers (bearer sends only).
+    // Open-padlock chip marking peers still missing a valid creq capability.
     bearerBadge: {
       alignItems: 'center' as const,
       borderRadius: sizing.bearerBadgeSize / 2,
@@ -797,10 +800,14 @@ const NearPayAmountHeader = React.memo(function NearPayAmountHeader({
 }) {
   const foreground = useThemeColor('foreground');
   const titleStyle = useMemo(() => ({ color: foreground }), [foreground]);
+  const avatarSlotStyle = useMemo(
+    () => [styles.amountHeaderAvatarSlot, hideAvatar ? styles.sharedElementHidden : null],
+    [hideAvatar]
+  );
 
   return (
     <VStack align="center" gap={spacing.xs} style={styles.inlineAmountHeader}>
-      <View style={[styles.amountHeaderAvatarSlot, hideAvatar ? styles.sharedElementHidden : null]}>
+      <View style={avatarSlotStyle}>
         <Avatar
           state={peerAvatarState(recipient)}
           picture={recipient.avatarUrl ?? undefined}
@@ -1472,9 +1479,8 @@ export function NearPayScreen() {
   const walletContext = useWalletContext();
   const { isOffline } = useOfflineStatus();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  // Every bitchat peer is on the radar: peers announcing the ecash
-  // capability TLV get P2PK-locked drops; vanilla peers are bearer-only
-  // (visually marked, gated behind an explicit confirm in handleSelectPeer).
+  // Every bitchat peer is on the radar so the favorite exchange can run, but a
+  // token DM is only enabled after the peer advertises a valid creq capability.
   // Ghost entries (a nearby device's previous profile identities, which
   // upstream's registry can retain forever) are dropped by the freshness
   // filter; the periodic tick re-evaluates it as lastSeen values age out.
@@ -1653,7 +1659,8 @@ export function NearPayScreen() {
             hasDirectLink: recipient.hasDirectLink,
             lastSeen: recipient.lastSeen,
             avatarUrl: null,
-            lockable: recipient.delivery.locked,
+            lockable: !!recipient.creq,
+            creq: recipient.creq,
             identitySeed: recipient.peerID,
             profileLoading: false,
           };
@@ -1791,8 +1798,9 @@ export function NearPayScreen() {
 
   const handleSelectPeer = useCallback(
     async (peer: NearPayLayoutPeer, avatarRect: AvatarRect) => {
-      // Decide lock vs bearer from the peer's creq (accepted mints + lock key),
-      // our trusted mints, and online status. Delivery is always a private DM.
+      // Decide lock vs offline bearer from the peer's creq (accepted mints +
+      // lock key), our trusted mints, and online status. Delivery is always a
+      // private DM, but only after a valid creq proved the peer is patched.
       const plan = planNearPaySend({
         peer,
         ourMints: walletContext.trustedMintUrls,
@@ -1809,12 +1817,21 @@ export function NearPayScreen() {
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
       });
-      // No mint in common ⇒ the recipient couldn't redeem a token from our
-      // mint, so block BEFORE any session/transition state (leaves the radar
-      // exactly as it was; also covers the Random button).
+      // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
+      // recipient couldn't redeem. Block BEFORE any session/transition state
+      // (leaves the radar exactly as it was; also covers the Random button).
       if (plan.mode === 'block') {
-        paymentLog.info('near_pay.peer.no_shared_mint', { peerID: peer.peerID });
-        await notifyNoSharedMint(peer.name);
+        paymentLog.info(
+          plan.reason === 'no-shared-mint'
+            ? 'near_pay.peer.no_shared_mint'
+            : 'near_pay.peer.not_ready',
+          { peerID: peer.peerID, reason: plan.reason }
+        );
+        if (plan.reason === 'no-shared-mint') {
+          await notifyNoSharedMint(peer.name);
+        } else {
+          await notifyNutDropPeerNotReady(peer.name);
+        }
         return;
       }
       const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
@@ -1842,6 +1859,7 @@ export function NearPayScreen() {
         nickname: peer.name,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
+        creq: peer.creq,
         delivery,
       });
       // Failure paths must only unwind THIS selection — the radar stays
@@ -1868,8 +1886,8 @@ export function NearPayScreen() {
         // sendComplete handler delivers the finished token as a private Noise
         // DM to the recipient peer (no public mesh). A locked token is
         // P2PK-locked to the peer's key + minted from a mint they accept;
-        // `allowedMints` constrains the source mint. recipientPubkey seeds
-        // their real profile.
+        // offline fallback is bearer from a shared mint. `allowedMints`
+        // constrains the source mint. recipientPubkey seeds their real profile.
         paymentLog.info('near_pay.start_send', {
           peerID: peer.peerID,
           locked: delivery.locked,
@@ -2145,7 +2163,7 @@ export function NearPayScreen() {
   );
   const renderHeaderLeft = useCallback(
     () => <ScreenHeaderAction icon="material-symbols:arrow-back-rounded" onPress={resetToPicker} />,
-    [foreground, resetToPicker]
+    [resetToPicker]
   );
   const renderEmptyHeader = useCallback(() => null, []);
   const openPeerList = useCallback(() => {

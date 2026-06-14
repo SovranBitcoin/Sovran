@@ -35,3 +35,37 @@ export function notifyNoSharedMint(displayName: string): Promise<void> {
     });
   });
 }
+
+/**
+ * Blocks a Nut Drop to a peer that has not advertised a valid creq favorite.
+ * That favorite is the capability signal that the receiver understands Sovran's
+ * extended private-message length; without it an extended token DM could be
+ * dropped by a stock or stale client.
+ */
+export function notifyNutDropPeerNotReady(displayName: string): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    actionMenuPopup({
+      title: 'Not ready for Nut Drop',
+      buttons: [
+        {
+          testID: 'near-pay-peer-not-ready-ok',
+          text: 'OK',
+          description: `${displayName} has not advertised a Sovran payment request yet. Keep both apps open nearby and try again.`,
+          icon: 'mdi:bluetooth-off',
+          variant: 'secondary',
+          onPress: (close) => {
+            settle();
+            close();
+          },
+        },
+      ],
+      onDismiss: () => settle(),
+    });
+  });
+}

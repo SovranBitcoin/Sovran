@@ -11,7 +11,7 @@ import { paymentLog } from '@/shared/lib/logger';
  * no Nostr key), so we favorite on discovery: a Sovran peer reciprocates and
  * becomes lockable-on-sight (its `nostrPubkeyHex` + `creq` arrive on the next
  * peer poll), while a stock peer can't decode our creq-bearing favorite (it
- * exceeds the stock 255-byte cap) and so never reciprocates (→ bearer only).
+ * exceeds the stock 255-byte cap) and so never becomes eligible for token DMs.
  *
  * Active only while the calling NearPay surface is mounted, so the favorite
  * signal is bounded to "the user is actively looking to pay nearby". Each peer
@@ -26,7 +26,7 @@ export function useEagerPeerFavorite(peers: readonly Pick<BLEPeer, 'peerID'>[]):
       favorited.current.add(peer.peerID);
       // Breadcrumb so log.txt shows the exchange firing — pair with the
       // `bitchat.peers.snapshot` `hasNostrIdentity` flag to confirm a peer goes
-      // bearer → lockable. (Whether the favorite actually reaches the peer is
+      // waiting → ready. (Whether the favorite actually reaches the peer is
       // gated natively on the handshake tie-breaker.)
       paymentLog.debug('near_pay.favorite.send', { peerID: peer.peerID });
       void sendBLEFavorite(peer.peerID, true).catch((err: unknown) => {

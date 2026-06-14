@@ -17,8 +17,11 @@ import {
 import { useEagerPeerFavorite } from '@/features/nearPay/hooks/useEagerPeerFavorite';
 import { peerDisplayName, peerIdentitySeed } from '@/features/nearPay/lib/peerProfile';
 import { planNearPaySend } from '@/features/nearPay/lib/nearPaySendDecision';
-import { creqParseDiagnostics } from '@/shared/lib/nutCreq';
-import { notifyNoSharedMint } from '@/features/nearPay/lib/startNearPaySend';
+import { creqParseDiagnostics, lockableMintsFromCreq } from '@/shared/lib/nutCreq';
+import {
+  notifyNoSharedMint,
+  notifyNutDropPeerNotReady,
+} from '@/features/nearPay/lib/startNearPaySend';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { BLUETOOTH_ACCENT } from '@/shared/lib/brandColors';
@@ -42,8 +45,12 @@ interface NearPayPeerRowProps {
   onSelect: (peer: BLEPeer) => void;
 }
 
-/** Trailing pill marking vanilla bitchat peers — drops to them are bearer tokens. */
-function BearerTag() {
+function peerHasValidCreq(peer: Pick<BLEPeer, 'creq' | 'nostrPubkeyHex'>): boolean {
+  return lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex) !== null;
+}
+
+/** Trailing pill for peers that have not advertised the creq capability yet. */
+function WaitingTag() {
   const [foreground] = useThemeColor(['foreground'] as const);
   const tagStyle = useMemo(
     () => [styles.bearerTag, { backgroundColor: opacity(foreground, 0.08) }],
@@ -55,7 +62,7 @@ function BearerTag() {
     <HStack align="center" spacing={4} style={tagStyle}>
       <Icon name="mdi:lock-open-variant-outline" size={12} color={opacity(foreground, 0.55)} />
       <Text size={11} style={tagTextStyle}>
-        Bearer
+        Waiting
       </Text>
     </HStack>
   );
@@ -63,16 +70,17 @@ function BearerTag() {
 
 function NearPayPeerRow({ peer, onSelect }: NearPayPeerRowProps) {
   const handlePress = useCallback(() => onSelect(peer), [onSelect, peer]);
-  // Seed identity from the announced P2PK key (real Nostr identity) when the
-  // peer is a Sovran v3 client; stock peers fall back to the noise-key
-  // pseudonym. The real face resolves on the radar; this list stays BLE-name.
+  // Seed identity from the favorite-exchanged Nostr key when the peer is a
+  // Sovran client; stock peers fall back to the noise-key pseudonym. The real
+  // face resolves on the radar; this list stays BLE-name.
   const identity = useMemo(
     () => bleIdentity({ ...peer, identitySeed: peerIdentitySeed(peer) }),
     [peer]
   );
   const trailing = useMemo(
-    () => (peer.nostrPubkeyHex ? undefined : <BearerTag />),
-    [peer.nostrPubkeyHex]
+    () =>
+      lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex) !== null ? undefined : <WaitingTag />,
+    [peer.creq, peer.nostrPubkeyHex]
   );
 
   return (
@@ -110,15 +118,14 @@ export function NearPayPeerListScreen() {
   // identity (bitchat's only native mesh identity channel) and become lockable.
   useEagerPeerFavorite(peers);
 
-  // Every bitchat peer is listed: Sovran peers (those advertising a creq) get a
-  // locked token DM when we share a mint and are online; everyone else gets a
-  // bearer token DM (the send decision lives in planNearPaySend/handleSelectPeer).
+  // Every bitchat peer is listed so the favorite exchange can run, but token DMs
+  // are only enabled after the peer advertises a valid creq capability.
   const connectedCount = useMemo(() => peers.filter((peer) => peer.isConnected).length, [peers]);
   const directLinkCount = useMemo(() => peers.filter((peer) => peer.hasDirectLink).length, [peers]);
   const sortedPeers = useMemo(() => {
     return [...peers].sort((a, b) => {
-      const aLockable = !!a.nostrPubkeyHex;
-      const bLockable = !!b.nostrPubkeyHex;
+      const aLockable = peerHasValidCreq(a);
+      const bLockable = peerHasValidCreq(b);
       if (aLockable !== bLockable) return aLockable ? -1 : 1;
       if (a.hasDirectLink !== b.hasDirectLink) return a.hasDirectLink ? -1 : 1;
       if (a.isConnected !== b.isConnected) return a.isConnected ? -1 : 1;
@@ -158,8 +165,9 @@ export function NearPayPeerListScreen() {
   const handleSelectPeer = useCallback(
     async (peer: BLEPeer) => {
       const displayName = peerDisplayName(peer);
-      // Decide lock vs bearer from the peer's creq (accepted mints + lock key),
-      // our trusted mints, and online status. Delivery is always a private DM.
+      // Decide lock vs offline bearer from the peer's creq (accepted mints +
+      // lock key), our trusted mints, and online status. Delivery is always a
+      // private DM, but only after a valid creq proved the peer is patched.
       const plan = planNearPaySend({
         peer,
         ourMints: walletContext.trustedMintUrls,
@@ -177,10 +185,14 @@ export function NearPayPeerListScreen() {
         hasDirectLink: peer.hasDirectLink,
         isConnected: peer.isConnected,
       });
-      // No mint in common ⇒ the recipient couldn't redeem a token from our
-      // mint, so block before any session/navigation state.
+      // No valid creq ⇒ not confirmed patched; no mint in common ⇒ the
+      // recipient couldn't redeem. Block before any session/navigation state.
       if (plan.mode === 'block') {
-        await notifyNoSharedMint(displayName);
+        if (plan.reason === 'no-shared-mint') {
+          await notifyNoSharedMint(displayName);
+        } else {
+          await notifyNutDropPeerNotReady(displayName);
+        }
         return;
       }
       const delivery: NearPayDelivery = { locked: plan.mode === 'lock' };
@@ -189,6 +201,7 @@ export function NearPayPeerListScreen() {
         nickname: displayName,
         hasDirectLink: peer.hasDirectLink,
         lastSeen: peer.lastSeen,
+        creq: peer.creq,
         delivery,
       });
       // Failure paths must only unwind THIS selection — a newer session
@@ -202,8 +215,8 @@ export function NearPayPeerListScreen() {
       router.back();
       // The sendComplete handler delivers the finished token as a private Noise
       // DM to the recipient peer (no public mesh). A locked token is P2PK-locked
-      // to the peer's key + minted from a mint they accept; a bearer token rides
-      // the same private DM. `allowedMints` constrains the source mint.
+      // to the peer's key + minted from a mint they accept; offline fallback is
+      // bearer from a shared mint. `allowedMints` constrains the source mint.
       void machine
         .startSendEcash({
           reset: true,

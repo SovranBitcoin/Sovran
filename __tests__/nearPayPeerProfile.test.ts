@@ -1,6 +1,13 @@
 import type { BLEPeer } from 'bitchat-module';
 
 import { peerAvatarState, peerDisplayName, toLayoutPeer } from '@/features/nearPay/lib/peerProfile';
+import { buildStandingCreq } from '@/shared/lib/nutCreq';
+
+const NOSTR_HEX = 'ab'.repeat(32);
+const CREQ = buildStandingCreq({
+  mints: ['https://mint.example'],
+  pubkey33: `02${NOSTR_HEX}`,
+})!;
 
 function blePeer(overrides: Partial<BLEPeer> = {}): BLEPeer {
   return {
@@ -31,21 +38,19 @@ describe('peerDisplayName', () => {
 
 describe('toLayoutPeer', () => {
   it('marks a peer that advertised identity + a creq as lockable', () => {
-    expect(
-      toLayoutPeer(blePeer({ nostrPubkeyHex: 'ab'.repeat(32), creq: 'creqAabc' }))
-    ).toMatchObject({
+    expect(toLayoutPeer(blePeer({ nostrPubkeyHex: NOSTR_HEX, creq: CREQ }))).toMatchObject({
       name: 'mesh-nick',
       avatarUrl: null,
       lockable: true,
-      nostrPubkeyHex: 'ab'.repeat(32),
-      creq: 'creqAabc',
+      nostrPubkeyHex: NOSTR_HEX,
+      creq: CREQ,
       profileLoading: false,
     });
     // Identity but no creq → not lockable (we don't know their accepted mints).
     expect(toLayoutPeer(blePeer({ nostrPubkeyHex: 'ab'.repeat(32) }))).toMatchObject({
       lockable: false,
     });
-    // No identity exchanged → bearer-only (not lockable).
+    // No identity exchanged → not eligible for token DMs yet.
     expect(toLayoutPeer(blePeer())).toMatchObject({ lockable: false });
   });
 });

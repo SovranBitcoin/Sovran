@@ -69,12 +69,12 @@ export interface BLEPeer {
   lastSeen: number;
   /**
    * The peer's x-only Nostr pubkey (64-hex), learned via bitchat's native
-   * favorite-notification exchange (`[FAVORITED]:npub`). THIS is the peer's
+   * favorite-notification exchange (`[FAVORITED]:<npub>:<creq>`). THIS is the peer's
    * Sovran identity: use it directly for the kind-0 profile lookup, and
    * "02"-prefix it for the NUT-11 P2PK lock target. Present only once the peer
    * has favorited us back (Sovran ↔ Sovran); absent for stock/vanilla clients
-   * and peers we haven't exchanged identity with (they can only receive bearer
-   * broadcasts).
+   * and peers we haven't exchanged identity with, which are not eligible for
+   * Nut Drop token DMs.
    */
   nostrPubkeyHex?: string;
   /**
@@ -98,7 +98,7 @@ export interface BLEPeer {
 /**
  * Payload dispatched on the `onBLEPeerIdentity` event when a peer hands us
  * their Nostr identity via bitchat's native favorite notification
- * (`[FAVORITED]:npub`). `nostrPubkeyHex` is the peer's x-only pubkey (64-hex,
+ * (`[FAVORITED]:<npub>:<creq>`). `nostrPubkeyHex` is the peer's x-only pubkey (64-hex,
  * absent on an `[UNFAVORITED]` or an unparseable npub). iOS emits this for
  * immediacy; on both platforms the same value also appears on the polled
  * `BLEPeer.nostrPubkeyHex`, which NearPay treats as the source of truth.
