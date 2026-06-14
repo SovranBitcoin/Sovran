@@ -120,9 +120,12 @@ final class BitChatBLEBridge: NSObject {
     private let peerIdentityLock = NSLock()
     private var peerNostrPubkeyHexMap: [String: String] = [:]
     private var peerCreqMap: [String: String] = [:]
-    /// Higher-peerID peers whose favorite send is deferred until the session the
-    /// lower-peerID side establishes goes live (flushed in didReceiveNoisePayload).
-    private var pendingFavoritePeers: Set<String> = []
+    /// peerIDs we intend to keep favorited. Persistent (NOT a one-shot queue):
+    /// our favorite is (re-)sent every time a Noise session with one of these
+    /// peers (re-)establishes — see the `onPeerAuthenticated` hook in `start()`.
+    /// A peer that restarts/reinstalls and loses our identity thus re-learns it on
+    /// the next handshake. Cleared only on un-favorite or stop().
+    private var favoritePeers: Set<String> = []
 
     private func setPeerIdentity(_ peerID: String, nostrHex: String?, creq: String?) {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
@@ -142,22 +145,21 @@ final class BitChatBLEBridge: NSObject {
         return peerCreqMap[peerID]
     }
 
-    private func deferFavorite(_ peerID: String) {
+    private func setFavoriteIntent(_ peerID: String, _ wanted: Bool) {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
-        pendingFavoritePeers.insert(peerID)
+        if wanted { favoritePeers.insert(peerID) } else { favoritePeers.remove(peerID) }
     }
 
-    /// Removes `peerID` from the deferred set, returning true if it was pending.
-    private func takePendingFavorite(_ peerID: String) -> Bool {
+    private func wantsFavorite(_ peerID: String) -> Bool {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
-        return pendingFavoritePeers.remove(peerID) != nil
+        return favoritePeers.contains(peerID)
     }
 
     private func clearPeerNostr() {
         peerIdentityLock.lock(); defer { peerIdentityLock.unlock() }
         peerNostrPubkeyHexMap.removeAll()
         peerCreqMap.removeAll()
-        pendingFavoritePeers.removeAll()
+        favoritePeers.removeAll()
     }
 
     /// In-memory mirror of the persisted DM-peer summaries. Mutated only on the
@@ -337,6 +339,14 @@ final class BitChatBLEBridge: NSObject {
             identityManager: identityManager
         )
         service.delegate = self
+        // Re-send our favorite (identity + creq) whenever a Noise session with a
+        // peer we favorite (re-)establishes. `onPeerAuthenticated` APPENDS a
+        // handler (NoiseEncryptionService keeps an array), so BLEService's own
+        // handling is preserved. Fires symmetrically on both sides, so a peer that
+        // restarted and re-handshook re-learns our identity over the fresh session.
+        service.getNoiseService().onPeerAuthenticated = { [weak self] peerID, _ in
+            self?.resendFavoriteIfWanted(peerID)
+        }
         service.setNickname(nickname)
         service.startServices()
         self.bleService = service
@@ -477,12 +487,17 @@ final class BitChatBLEBridge: NSObject {
         }
         guard selfNpub != nil else { return }  // identity not ready yet
         let peerID = PeerID(hexData: peerIDData)
+        // Record (or drop) the standing intent to favorite this peer, so our
+        // favorite is re-sent every time a session with them (re-)establishes
+        // (the onPeerAuthenticated hook in start()). This is what re-shares our
+        // identity after the peer restarts/reinstalls.
+        setFavoriteIntent(peerID.id, isFavorite)
         // Handshake tie-breaker: eager favoriting fires on BOTH peers at once, and
         // if both initiate a Noise handshake the XX exchange collides and never
         // establishes (no tie-breaker in NoiseSession). So only the lower-peerID
-        // side initiates here; the higher side defers and flushes once the lower
-        // side's session lands (didReceiveNoisePayload). If a session already
-        // exists, just send.
+        // side initiates here; the higher side waits and is served by
+        // onPeerAuthenticated once the session lands. If a session already exists,
+        // just send.
         let established: Bool
         switch service.getNoiseSessionState(for: peerID) {
         case .established: established = true
@@ -491,10 +506,17 @@ final class BitChatBLEBridge: NSObject {
         let weInitiate = (selfPeerID.map { $0 < peerID.id } ?? true)
         if established || weInitiate {
             dispatchFavorite(service, to: peerID, isFavorite: isFavorite)
-        } else if isFavorite {
-            // Higher-peerID side: wait for the lower side to establish the session.
-            deferFavorite(peerID.id)
         }
+        // Higher-peerID side with no session: wait — onPeerAuthenticated dispatches.
+    }
+
+    /// Re-send our favorite to a peer we intend to keep favorited, called when a
+    /// Noise session with them (re-)establishes (onPeerAuthenticated). Idempotent:
+    /// a duplicate favorite just re-stores the same npub/creq, and receiving one
+    /// never opens a new session, so there is no favorite loop.
+    private func resendFavoriteIfWanted(_ peerID: PeerID) {
+        guard let service = bleService, wantsFavorite(peerID.id) else { return }
+        dispatchFavorite(service, to: peerID, isFavorite: true)
     }
 
     /// Sends `[FAVORITED]:<npub>:<creq>` to `peerID` — bitchat's native favorite
@@ -726,13 +748,10 @@ extension BitChatBLEBridge: BitchatDelegate {
               let pm = PrivateMessagePacket.decode(from: payload) else {
             return
         }
-        // [sovran] Receiving a decrypted payload means a Noise session with this
-        // peer is live. If we deferred our favorite to them (we were the
-        // higher-peerID side of the tie-breaker), flush it now over that session.
-        if BitChatBLEBridge.shared.takePendingFavorite(peerID.id),
-           let service = BitChatBLEBridge.shared.bleService {
-            BitChatBLEBridge.shared.dispatchFavorite(service, to: peerID, isFavorite: true)
-        }
+        // [sovran] Our favorite (re-)send now rides the onPeerAuthenticated hook
+        // (registered in start()), which fires once per Noise session
+        // establishment — so it re-shares identity after a peer restarts, not just
+        // on the first deferred flush. Nothing to do here.
         // [sovran] Intercept bitchat's native favorite notification —
         // `[FAVORITED]:<npub>:<creq>` carries the sender's Nostr npub (identity)
         // and a standing NUT-18 payment request (accepted mints + P2PK lock key).

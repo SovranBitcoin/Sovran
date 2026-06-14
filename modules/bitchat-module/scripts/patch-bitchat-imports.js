@@ -109,31 +109,11 @@ const LINKSTATE_REPLACEMENT =
   '    // state for the hasDirectLink peer flag.\n' +
   '    func linkState(for peerID: PeerID)';
 
-// --- Suppress the direct-neighbors gossip TLV (0x04) in our announces ---
-//
-// Upstream gossips the peerIDs of connected peers inside every announce.
-// Sovran's privacy contract is that an announce discloses ONLY the current
-// profile's own identity — never the set of peers this device has seen
-// (which can include the user's own other profiles on a second device).
-// Receivers treat the absent TLV as "no neighbor claims" (optional field).
-// Bonus: it keeps announces under the 100-byte compression threshold, so the
-// signing form stays canonical cross-platform with no further patch.
-// Anchored on the AnnouncementPacket construction only (stable across vendor
-// versions); the preceding `connectedPeerIDs` computation differs by version and
-// is left in place (harmlessly unused once we pass nil).
-const NEIGHBOR_GOSSIP_ANCHOR =
-  /        let announcement = AnnouncementPacket\(\n            nickname: myNickname,\n            noisePublicKey: noisePub,\n            signingPublicKey: signingPub,\n            directNeighbors: connectedPeerIDs\n        \)/;
-const NEIGHBOR_GOSSIP_REPLACEMENT =
-  '        // [sovran] neighbors gossip suppressed: announces disclose only the\n' +
-  '        // current profile’s own identity, never the peerIDs this device has\n' +
-  '        // seen. Receivers treat the absent 0x04 TLV as "no neighbor claims".\n' +
-  '        _ = connectedPeerIDs\n' +
-  '        let announcement = AnnouncementPacket(\n' +
-  '            nickname: myNickname,\n' +
-  '            noisePublicKey: noisePub,\n' +
-  '            signingPublicKey: signingPub,\n' +
-  '            directNeighbors: nil\n' +
-  '        )';
+// (Removed: the neighbor-gossip suppression patch. Sovran now announces its
+// direct-neighbors TLV exactly like upstream bitchat — matching Android, which
+// never suppressed it, and restoring visibility to stock clients. Keeping vendor
+// divergence to the agreed minimum: extended length, the favorite/creq, the
+// tie-breaker, and the upstream-iOS re-handshake recovery.)
 
 // --- Extend PrivateMessagePacket content length (0xFF sentinel) ---
 //
@@ -182,7 +162,6 @@ let patched = 0;
 const applied = {
   mismatchGuard: false,
   linkState: false,
-  neighborGossip: false,
   extendedPmEncode: false,
   extendedPmDecode: false,
 };
@@ -198,11 +177,8 @@ for (const file of walk(ROOT)) {
     after = next;
   }
   if (file.endsWith('BLEService.swift')) {
-    let next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
+    const next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
     if (next !== after) applied.linkState = true;
-    after = next;
-    next = after.replace(NEIGHBOR_GOSSIP_ANCHOR, NEIGHBOR_GOSSIP_REPLACEMENT);
-    if (next !== after) applied.neighborGossip = true;
     after = next;
   }
   if (file.endsWith('Packets.swift')) {
@@ -259,12 +235,6 @@ assertApplied(
   /\[sovran\] de-privatized/
 );
 assertApplied(
-  'NEIGHBOR_GOSSIP',
-  applied.neighborGossip,
-  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
-  /\[sovran\] neighbors gossip suppressed/
-);
-assertApplied(
   'EXTENDED_PM_ENCODE',
   applied.extendedPmEncode,
   path.join(ROOT, 'bitchat', 'Protocols', 'Packets.swift'),
@@ -277,3 +247,31 @@ assertApplied(
   /\[sovran\] extended length read: 0xFF sentinel/
 );
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);
+
+// Bake the vendored submodule commit into a generated Swift constant so the
+// running build's bitchat version is logged at startBLE (bitchat.peers.ble_start_ok)
+// — catching a stale build that predates a fragmentation/protocol fix. Best-effort;
+// leaves the committed "unknown" placeholder if git is unavailable.
+(function writeVendorVersion() {
+  let commit = 'unknown';
+  try {
+    commit =
+      require('child_process')
+        .execSync('git rev-parse --short HEAD', { cwd: ROOT })
+        .toString()
+        .trim() || 'unknown';
+  } catch {
+    /* git unavailable — keep placeholder */
+  }
+  const out = path.join(path.resolve(__dirname, '..', 'ios'), 'BitchatVendorVersion.swift');
+  fs.writeFileSync(
+    out,
+    '// GENERATED at prebuild by scripts/patch-bitchat-imports.js — do not edit by hand.\n' +
+      '// Short SHA of the vendored ios/BitChatVendor submodule this build compiled from,\n' +
+      '// logged at startBLE so the running build’s bitchat version is verifiable.\n' +
+      'enum BitchatVendor {\n' +
+      `    static let commit = "${commit}"\n` +
+      '}\n'
+  );
+  console.log(`[patch-bitchat-imports] vendor version: ${commit}`);
+})();

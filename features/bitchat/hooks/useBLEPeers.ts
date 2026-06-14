@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   getBLEPeers,
   getBLEState,
+  bitchatVendorVersion,
   addBLEPeerListener,
   addBLEPeerIdentityListener,
   addBLEStateListener,
@@ -137,6 +138,10 @@ export function useBLEPeers(): UseBLEPeersResult {
           bitchatLog.info('bitchat.peers.ble_start_ok', {
             bleState: getBLEState(),
             initialPeerCount: getBLEPeers().length,
+            // The vendored bitchat commit this native build compiled from. Verify
+            // it matches the intended pin — a stale build (e.g. one predating the
+            // fragment fix) shows the wrong SHA here.
+            vendorVersion: bitchatVendorVersion(),
           });
           refresh();
         })

@@ -108,6 +108,13 @@ public class BitChatModule: Module {
             return BitChatBLEBridge.shared.bluetoothState
         }
 
+        // Short SHA of the vendored bitchat submodule this build compiled from —
+        // logged at startBLE so a stale build (e.g. one predating a fragmentation
+        // fix) is obvious from log.txt. Baked by scripts/patch-bitchat-imports.js.
+        Function("bitchatVendorVersion") { () -> String in
+            return BitchatVendor.commit
+        }
+
         /// Begin a UIKit background task so a JS network call (e.g. the Nut
         /// Drop auto-redeem mint swap) can finish after a BLE background
         /// wake. Returns an opaque handle (-1 when refused). The

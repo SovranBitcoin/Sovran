@@ -98,6 +98,36 @@ const PATCHES = [
       '    // sessions via encryptionService; the vendor exposes no public reset.\n' +
       '    internal val encryptionService = EncryptionService(context)',
   },
+  // --- Re-handshake recovery (port of iOS NoiseSessionManager) ---
+  //
+  // When a fresh Noise handshake init arrives while we already hold an
+  // ESTABLISHED session, the peer restarted / cleared its session (e.g. app
+  // reinstall). Upstream iOS tears the stale session down and re-handshakes as
+  // responder (NoiseSessionManager.handleIncomingHandshake:112-132); Android did
+  // not — it processed the init on the stale session, so the session never
+  // re-established and onSessionEstablished never re-fired, leaving identity (the
+  // [FAVORITED] favorite) un-re-exchanged. Mirror the iOS behavior here.
+  {
+    file: 'noise/NoiseSessionManager.kt',
+    name: 'REHANDSHAKE_RECOVERY',
+    anchor:
+      /            \/\/ If no session exists, create one as responder\n            if \(session == null\) \{/,
+    replacement:
+      '            // [sovran] re-handshake recovery (port of iOS\n' +
+      '            // NoiseSessionManager.handleIncomingHandshake): a fresh handshake init\n' +
+      '            // while we hold an ESTABLISHED session means the peer restarted /\n' +
+      '            // cleared its session. Tear ours down so a new responder session is\n' +
+      '            // created below and onSessionEstablished re-fires, re-exchanging\n' +
+      '            // identity (the [FAVORITED] favorite).\n' +
+      '            if (session != null && session.isEstablished()) {\n' +
+      '                Log.d(TAG, "Accepting handshake from $peerID despite established session — peer likely restarted")\n' +
+      '                removeSession(peerID)\n' +
+      '                session = null\n' +
+      '            }\n' +
+      '\n' +
+      '            // If no session exists, create one as responder\n' +
+      '            if (session == null) {',
+  },
   // --- Extend PrivateMessagePacket content length (0xFF sentinel) ---
   //
   // Mirror of the iOS Packets.swift patch (patch-bitchat-imports.js). Lets a
@@ -219,5 +249,35 @@ if (fs.existsSync(NODE_MODULES_COPY) && fs.realpathSync(NODE_MODULES_COPY) !== M
     fs.cpSync(path.join(MODULE_ROOT, sub), path.join(NODE_MODULES_COPY, sub), { recursive: true });
   }
 }
+
+// Bake the vendored submodule commit into a generated Kotlin constant so the
+// running build's bitchat version is logged at startBLE (bitchat.peers.ble_start_ok)
+// — catching a stale build that predates a fragmentation/protocol fix. Best-effort.
+(function writeVendorVersion() {
+  let commit = 'unknown';
+  try {
+    commit =
+      require('child_process')
+        .execSync('git rev-parse --short HEAD', { cwd: VENDOR })
+        .toString()
+        .trim() || 'unknown';
+  } catch {
+    /* git unavailable — keep placeholder */
+  }
+  const out = path.join(
+    MODULE_ROOT, 'src', 'main', 'java', 'expo', 'modules', 'bitchat', 'BitchatVendorVersion.kt'
+  );
+  fs.writeFileSync(
+    out,
+    '// GENERATED at sync by scripts/sync-bitchat-android.js — do not edit by hand.\n' +
+      '// Short SHA of the vendored android/BitChatVendor submodule this build compiled from,\n' +
+      '// logged at startBLE so the running build’s bitchat version is verifiable.\n' +
+      'package expo.modules.bitchat\n\n' +
+      'object BitchatVendorVersion {\n' +
+      `    const val commit = "${commit}"\n` +
+      '}\n'
+  );
+  console.log(`[sync-bitchat-android] vendor version: ${commit}`);
+})();
 
 console.log(`[sync-bitchat-android] copied ${copied} source file(s) + ${INCLUDE_ASSETS.length} asset(s)`);

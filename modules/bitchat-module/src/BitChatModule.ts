@@ -36,6 +36,7 @@ interface BitChatNativeModule {
   getBLEPeers(): BLEPeer[];
   getBLEDmHistory(profileScope: string): BLEDmContact[];
   getBLEState(): string;
+  bitchatVendorVersion(): string;
   beginBLEBackgroundTask(name: string): Promise<number>;
   endBLEBackgroundTask(handle: number): Promise<void>;
   // Bluetooth helpers — implemented natively on Android only; the JS wrappers
@@ -232,6 +233,17 @@ export function getBLEDmHistory(profileScope: string): BLEDmContact[] {
 
 export function getBLEState(): string {
   return NativeModule ? NativeModule.getBLEState() : 'unavailable';
+}
+
+/** Short SHA of the vendored bitchat submodule this native build compiled from.
+ * Logged at startBLE (`bitchat.peers.ble_start_ok`) so a stale build — e.g. one
+ * predating a fragmentation fix — is verifiable from log.txt. */
+export function bitchatVendorVersion(): string {
+  try {
+    return NativeModule ? NativeModule.bitchatVendorVersion() : 'unavailable';
+  } catch {
+    return 'unknown';
+  }
 }
 
 export function addBLEMessageListener(

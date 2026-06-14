@@ -105,6 +105,13 @@ class BitChatModule : Module() {
             BitChatBLEBridge.bluetoothState()
         }
 
+        // Short SHA of the vendored bitchat submodule this build compiled from —
+        // logged at startBLE so a stale build (e.g. one predating a fragmentation
+        // fix) is obvious from log.txt. Baked by scripts/sync-bitchat-android.js.
+        Function("bitchatVendorVersion") {
+            BitchatVendorVersion.commit
+        }
+
         // iOS-only background-task assertions; the mesh foreground service
         // already keeps the process alive on Android, so these are no-ops
         // kept for a platform-uniform JS API.

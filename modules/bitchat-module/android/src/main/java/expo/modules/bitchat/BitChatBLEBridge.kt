@@ -96,8 +96,12 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     /// Our standing NUT-18 payment request (creq…) — accepted mints + P2PK lock
     /// key, built in JS and passed to start(). Sent as `[FAVORITED]:<npub>:<creq>`.
     private var selfCreq: String? = null
-    /// peerIDs awaiting a favorite-send once their Noise session establishes.
-    private val pendingFavorites: MutableSet<String> = mutableSetOf()
+    /// peerIDs we intend to keep favorited. Persistent (NOT a one-shot queue):
+    /// our favorite is (re-)sent every time a Noise session with one of these
+    /// peers (re-)establishes, so a peer that restarts/reinstalls and loses our
+    /// identity re-learns it on the next handshake. Cleared only on un-favorite
+    /// or stop().
+    private val favoritePeers: MutableSet<String> = mutableSetOf()
 
     // MARK: - Lifecycle
 
@@ -196,7 +200,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
             }
             service.encryptionService.onSessionEstablished = { peerID ->
                 flushPendingSends(peerID)
-                flushPendingFavorite(peerID)
+                resendFavoriteIfWanted(peerID)
             }
             service.delegate = this
             service.startServices()
@@ -229,7 +233,7 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
         selfNpub = null
         selfPeerID = null
         selfCreq = null
-        pendingFavorites.clear()
+        favoritePeers.clear()
     }
 
     // MARK: - Public mesh messaging
@@ -328,27 +332,37 @@ object BitChatBLEBridge : BluetoothMeshDelegate {
     fun sendFavorite(peerIDStr: String, isFavorite: Boolean) {
         val service = mesh ?: throw BitChatNotStartedException()
         val peerID = validPeerID(peerIDStr)
+        // Record (or drop) the standing intent to favorite this peer, so our
+        // favorite is re-sent on every future session with them (handled by
+        // resendFavoriteIfWanted on onSessionEstablished).
+        synchronized(lock) {
+            if (isFavorite) favoritePeers.add(peerID) else favoritePeers.remove(peerID)
+        }
         if (service.hasEstablishedSession(peerID)) {
             dispatchFavorite(service, peerID, isFavorite)
         } else if (isFavorite) {
-            // Both sides queue their favorite, but only the lower-peerID side
-            // initiates the handshake — eager mutual favoriting otherwise makes
-            // both initiate at once and the Noise XX handshake collides (no
-            // tie-breaker in NoiseSessionManager), so the session never
-            // establishes. The higher side waits; once the lower side's
-            // handshake lands, onSessionEstablished → flushPendingFavorite sends
-            // both queued favorites.
-            synchronized(lock) { pendingFavorites.add(peerID) }
+            // No session yet. Only the lower-peerID side initiates the handshake
+            // — eager mutual favoriting otherwise makes both initiate at once and
+            // the Noise XX handshake collides (no tie-breaker in
+            // NoiseSessionManager), so the session never establishes. The higher
+            // side waits; once the handshake lands, onSessionEstablished →
+            // resendFavoriteIfWanted sends our favorite.
             val weInitiate = selfPeerID?.let { it < peerID } ?: true
             if (weInitiate) service.initiateNoiseHandshake(peerID)
         }
         // unfavorite with no session: nothing established to revoke — no-op.
     }
 
-    private fun flushPendingFavorite(peerID: String) {
+    /**
+     * Re-send our favorite to a peer we intend to keep favorited, called when a
+     * Noise session with them (re-)establishes. Idempotent: a duplicate favorite
+     * just re-stores the same npub/creq, and receiving one never opens a new
+     * session, so there is no favorite loop.
+     */
+    private fun resendFavoriteIfWanted(peerID: String) {
         val service = mesh ?: return
-        val pending = synchronized(lock) { pendingFavorites.remove(peerID) }
-        if (pending) dispatchFavorite(service, peerID, true)
+        val wanted = synchronized(lock) { favoritePeers.contains(peerID) }
+        if (wanted) dispatchFavorite(service, peerID, true)
     }
 
     private fun dispatchFavorite(service: BluetoothMeshService, peerID: String, isFavorite: Boolean) {

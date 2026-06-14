@@ -9,6 +9,7 @@ export {
   getBLEPeers,
   getBLEDmHistory,
   getBLEState,
+  bitchatVendorVersion,
   addBLEMessageListener,
   addBLEPrivateMessageListener,
   addBLEDeliveryStatusListener,
