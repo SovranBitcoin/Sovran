@@ -118,12 +118,16 @@ const LINKSTATE_REPLACEMENT =
 // Receivers treat the absent TLV as "no neighbor claims" (optional field).
 // Bonus: it keeps announces under the 100-byte compression threshold, so the
 // signing form stays canonical cross-platform with no further patch.
+// Anchored on the AnnouncementPacket construction only (stable across vendor
+// versions); the preceding `connectedPeerIDs` computation differs by version and
+// is left in place (harmlessly unused once we pass nil).
 const NEIGHBOR_GOSSIP_ANCHOR =
-  /        let connectedPeerIDs: \[Data\] = collectionsQueue\.sync \{\n            peerRegistry\.connectedRoutingData\n        \}\n[ \t]*\n        let announcement = AnnouncementPacket\(\n            nickname: myNickname,\n            noisePublicKey: noisePub,\n            signingPublicKey: signingPub,\n            directNeighbors: connectedPeerIDs\n        \)/;
+  /        let announcement = AnnouncementPacket\(\n            nickname: myNickname,\n            noisePublicKey: noisePub,\n            signingPublicKey: signingPub,\n            directNeighbors: connectedPeerIDs\n        \)/;
 const NEIGHBOR_GOSSIP_REPLACEMENT =
   '        // [sovran] neighbors gossip suppressed: announces disclose only the\n' +
   '        // current profile’s own identity, never the peerIDs this device has\n' +
   '        // seen. Receivers treat the absent 0x04 TLV as "no neighbor claims".\n' +
+  '        _ = connectedPeerIDs\n' +
   '        let announcement = AnnouncementPacket(\n' +
   '            nickname: myNickname,\n' +
   '            noisePublicKey: noisePub,\n' +
@@ -218,8 +222,19 @@ for (const file of walk(ROOT)) {
 // Anchored patches must either apply now or already be applied from a previous
 // run. Anything else means upstream changed shape — fail loudly so the vendor
 // bump doesn't silently ship without the patch.
-function assertApplied(name, appliedNow, file, alreadyPattern) {
+function assertApplied(name, appliedNow, file, alreadyPattern, optional = false) {
   if (appliedNow) return;
+  // A patch whose target file does not exist at the pinned vendor version is
+  // skipped (the upstream code it adjusts isn't there to adjust). Used for
+  // version-specific files like BLEAnnounceHandlingPolicy.swift (post-v1.5.1).
+  if (!fs.existsSync(file)) {
+    if (optional) {
+      console.warn(`[patch-bitchat-imports] SKIP: ${name} — target file absent at this vendor version`);
+      return;
+    }
+    console.error(`[patch-bitchat-imports] FATAL: ${name} target file missing: ${path.relative(ROOT, file)}`);
+    process.exit(1);
+  }
   const content = fs.readFileSync(file, 'utf8');
   if (alreadyPattern.test(content)) return;
   console.error(
@@ -232,7 +247,10 @@ assertApplied(
   'MISMATCH_GUARD',
   applied.mismatchGuard,
   path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandlingPolicy.swift'),
-  /\[sovran\] sender-mismatch reject relaxed/
+  /\[sovran\] sender-mismatch reject relaxed/,
+  // Optional: this file (and the strict sender-mismatch check it relaxes) was
+  // added after v1.5.1. On the v1.5.1 pin there is nothing to relax.
+  true
 );
 assertApplied(
   'LINKSTATE',
