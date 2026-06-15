@@ -151,6 +151,7 @@ export {
   getScanSource,
   getSwap,
   isP2PKLocked,
+  mergeAnnotationRecords,
   mergeAnnotationsIntoEntry,
   normaliseAnnotationRaw,
   rawAnnotationKey,

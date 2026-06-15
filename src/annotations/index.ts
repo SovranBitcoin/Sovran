@@ -23,7 +23,11 @@ export type { AnnotationEntryLike } from "./key";
 
 export { mergeAnnotationsIntoEntry } from "./merge";
 
-export { createInMemoryAnnotationStore, firstAnnotationRecord } from "./store";
+export {
+  createInMemoryAnnotationStore,
+  firstAnnotationRecord,
+  mergeAnnotationRecords,
+} from "./store";
 export type { AnnotationStoreAdapter } from "./store";
 
 export {

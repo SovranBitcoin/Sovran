@@ -10,7 +10,7 @@ import {
 } from "../history/aggregate";
 import {
   candidateKeys,
-  firstAnnotationRecord,
+  mergeAnnotationRecords,
   mergeAnnotationsIntoEntry,
 } from "../annotations";
 import { useAnnotationStore, useColadaManager } from "./ColadaProvider";
@@ -312,7 +312,7 @@ export function useColadaTransactions(
     const annotated = baseHistory.map((entry) =>
       mergeAnnotationsIntoEntry(
         entry,
-        firstAnnotationRecord(annotationStore.getMany(candidateKeys(entry))),
+        mergeAnnotationRecords(annotationStore.getMany(candidateKeys(entry))),
       ),
     );
     if (sameAnnotatedList(prevAnnotatedRef.current, annotated)) {

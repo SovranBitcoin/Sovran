@@ -7,6 +7,7 @@ import {
   decodeAnnotation,
   encodeAnnotation,
   firstAnnotationRecord,
+  mergeAnnotationRecords,
   getCounterparty,
   getScanSource,
   getSwap,
@@ -237,6 +238,21 @@ describe("in-memory annotation store", () => {
     store.set("op:1", {});
     expect(store.has("op:1")).toBe(false);
     expect(notifications).toBe(0);
+  });
+
+  it("mergeAnnotationRecords combines split-key annotations, canonical wins", () => {
+    // distribution under quote:, location under id: — both belong to one entry.
+    const store = createInMemoryAnnotationStore();
+    store.set("quote:Q", { distributionSource: "copy", scanMethod: "qr" });
+    store.set("id:E", { geoLat: "1", geoLng: "2", scanMethod: "nfc" });
+    // candidateKeys order for a mint: [quote:Q, id:E] -> quote: wins on scanMethod.
+    const merged = mergeAnnotationRecords(store.getMany(["quote:Q", "id:E"]));
+    expect(merged).toEqual({
+      distributionSource: "copy",
+      scanMethod: "qr",
+      geoLat: "1",
+      geoLng: "2",
+    });
   });
 
   it("getMany + firstAnnotationRecord resolves the first hit across candidate keys", () => {

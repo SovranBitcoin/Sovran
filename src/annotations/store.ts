@@ -65,3 +65,24 @@ export function firstAnnotationRecord(
   }
   return undefined;
 }
+
+/**
+ * Merge every candidate-key record into one. An entry's annotations can be
+ * split across keys — e.g. distribution written under `quote:` while a migrated
+ * location sits under `id:`, or a scan bridged from a `raw:` key. `records` is
+ * candidate-key order (most-canonical first); the more canonical key wins on
+ * conflict. Returns undefined when nothing is present.
+ */
+export function mergeAnnotationRecords(
+  records: ReadonlyArray<AnnotationRecord | undefined>,
+): AnnotationRecord | undefined {
+  let merged: AnnotationRecord | undefined;
+  // Apply least-canonical first so the most-canonical record overwrites.
+  for (let i = records.length - 1; i >= 0; i--) {
+    const record = records[i];
+    if (record && Object.keys(record).length > 0) {
+      merged = { ...(merged ?? {}), ...record };
+    }
+  }
+  return merged;
+}

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   candidateKeys,
   decodeAnnotation,
-  firstAnnotationRecord,
+  mergeAnnotationRecords,
   type AnnotationEntryLike,
   type TransactionAnnotation,
 } from "../annotations";
@@ -27,7 +27,7 @@ export function useColadaTransactionAnnotation(
 
   return useMemo(() => {
     if (!entry) return {};
-    const record = firstAnnotationRecord(store.getMany(candidateKeys(entry)));
+    const record = mergeAnnotationRecords(store.getMany(candidateKeys(entry)));
     return record ? decodeAnnotation(record) : {};
     // version drives recompute when the store mutates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
