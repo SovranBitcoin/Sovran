@@ -16,7 +16,6 @@ import {
 
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
-import { SplitBillTransactionRow } from '@/features/transactions/components/SplitBillTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
@@ -42,20 +41,13 @@ import {
   useSwapTransactionsStore,
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
-import {
-  useSplitBillTransactionsStore,
-  type SplitBillGroup,
-} from '@/shared/stores/profile/splitBillTransactionsStore';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
 // live in the same sorted list.
 // ---------------------------------------------------------------------------
 
-type TimelineItem =
-  | { kind: 'transaction'; data: HistoryEntry }
-  | { kind: 'swap'; data: SwapGroup }
-  | { kind: 'split-bill'; data: SplitBillGroup };
+type TimelineItem = { kind: 'transaction'; data: HistoryEntry } | { kind: 'swap'; data: SwapGroup };
 
 function getTimelineCreatedAt(item: TimelineItem): number {
   return item.data.createdAt;
@@ -63,7 +55,6 @@ function getTimelineCreatedAt(item: TimelineItem): number {
 
 function getTimelineKey(item: TimelineItem): string {
   if (item.kind === 'swap') return `swap-${item.data.id}`;
-  if (item.kind === 'split-bill') return `split-bill-${item.data.id}`;
   const entry = item.data;
   if (entry.id) return entry.id;
   // Bearer tokens MUST NOT become React keys; Math.random() destroys list
@@ -157,18 +148,11 @@ export const Transactions = React.memo(
     const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
     const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
-    const quoteIdToSplitBill = useSplitBillTransactionsStore((state) => state.quoteIdToSplitBill);
-    const splitBillGroupsById = useSplitBillTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {
       if (account.unit === 'all') return Object.values(swapGroupsById);
       return Object.values(swapGroupsById).filter((g) => g.unit === account.unit);
     }, [swapGroupsById, account.unit]);
-
-    const splitBillGroups = useMemo(() => {
-      if (account.unit === 'all') return Object.values(splitBillGroupsById);
-      return Object.values(splitBillGroupsById).filter((g) => g.unit === account.unit);
-    }, [splitBillGroupsById, account.unit]);
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
@@ -182,9 +166,6 @@ export const Transactions = React.memo(
         if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
           const quoteId = (historyEntry as MintHistoryEntry | MeltHistoryEntry).quoteId;
           if (quoteId && quoteIdToGroup[quoteId]) return false;
-          // Also hide individual mint entries that belong to a split-bill
-          // group — they're surfaced through the meta-row instead.
-          if (quoteId && quoteIdToSplitBill[quoteId]) return false;
         }
 
         if (!matchesTransactionFilters(historyEntry, { paymentType: type, direction: filter })) {
@@ -236,7 +217,6 @@ export const Transactions = React.memo(
       hideExpired,
       selectedMonth,
       quoteIdToGroup,
-      quoteIdToSplitBill,
     ]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
@@ -265,15 +245,8 @@ export const Transactions = React.memo(
           data: group,
         }));
 
-      const splitBillItems: TimelineItem[] = splitBillGroups
-        .filter((group) => monthFilter(group.createdAt))
-        .map((group) => ({
-          kind: 'split-bill' as const,
-          data: group,
-        }));
-
-      return [...txItems, ...swapItems, ...splitBillItems];
-    }, [filteredHistory, swapGroups, splitBillGroups, filter, type, selectedMonth]);
+      return [...txItems, ...swapItems];
+    }, [filteredHistory, swapGroups, filter, type, selectedMonth]);
 
     const sortedTimeline = useMemo(
       () => _.orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
@@ -285,12 +258,6 @@ export const Transactions = React.memo(
         _.groupBy(sortedTimeline, (item: TimelineItem) => {
           // Swap items are always "confirmed"
           if (item.kind === 'swap') return 'confirmed';
-          if (item.kind === 'split-bill') {
-            // Bucket split-bill groups into pending until fully paid.
-            if (item.data.state === 'paid') return 'confirmed';
-            if (item.data.state === 'expired' || item.data.state === 'cancelled') return 'expired';
-            return 'pending';
-          }
 
           const historyEntry = item.data;
           const isCollapsingGhost =
@@ -403,9 +370,6 @@ export const Transactions = React.memo(
         if (item.kind === 'swap') {
           return <SwapTransactionRow key={key} group={item.data} />;
         }
-        if (item.kind === 'split-bill') {
-          return <SplitBillTransactionRow key={key} group={item.data} />;
-        }
         return (
           <Transaction
             key={key}
@@ -425,9 +389,7 @@ export const Transactions = React.memo(
       // 69px-per-row constant there mis-sized them and caused overlap, gaps,
       // and scroll jumps. Returning `undefined` tells LegendList to measure
       // those sections instead.
-      const hasVariableRow = section.data.some(
-        (item) => item.kind === 'swap' || item.kind === 'split-bill'
-      );
+      const hasVariableRow = section.data.some((item) => item.kind === 'swap');
       if (hasVariableRow) return undefined;
       return HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16;
     }, []);
