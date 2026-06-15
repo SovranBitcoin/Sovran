@@ -20,6 +20,13 @@ let mockNearPayActive: unknown = null;
 
 jest.mock('@sovranbitcoin/colada', () => ({
   withTimeout: jest.fn((promise: Promise<unknown>) => promise),
+  rawAnnotationKey: jest.fn((raw: string) => `raw:${raw}`),
+}));
+
+jest.mock('@/shared/stores/profile/transactionAnnotationStore', () => ({
+  setTransactionAnnotation: jest.fn(),
+  linkTransactionAnnotation: jest.fn(),
+  setDistributionAnnotation: jest.fn(),
 }));
 
 jest.mock('expo-router', () => ({

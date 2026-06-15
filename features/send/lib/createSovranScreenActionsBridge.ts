@@ -27,6 +27,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
+import { setDistributionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 
 type EntryRecord = Record<string, unknown>;
 
@@ -316,6 +317,7 @@ export function createSovranScreenActionsBridge({
           });
           if (isMintQuotePaymentObserved({ state }) && quoteId) {
             useTransactionDistributionStore.getState().setDistribution(quoteId, 'displayed');
+            setDistributionAnnotation(`quote:${quoteId}`, 'displayed');
             bus.publish({ type: 'screenActions.changed', reason: 'transactionDistribution' });
             paymentLog.debug('payment.mint_quote.displayed_inference.applied', {
               quoteId,

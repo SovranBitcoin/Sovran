@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
 
-import { HistoryEntry, MintHistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
+import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import opacity from 'hex-color-opacity';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -32,19 +32,16 @@ import {
   getMintDetailPathname,
 } from '@/shared/lib/nav/transactionDetailRoutes';
 import { cashuLog, log, Log } from '@/shared/lib/logger';
-import { useScanEntryForTransactionId, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
-import {
-  useTransactionDistributionStore,
-  DistributionSource,
-} from '@/shared/stores/profile/transactionDistributionStore';
+import { useColadaTransactionAnnotation } from '@sovranbitcoin/colada/react';
+import type { DistributionSource, ScanMethod } from '@sovranbitcoin/colada';
 import { getOnchainTransactionStatusLabel } from '../lib/onchainTransactionStatus';
 
 /**
- * Unified source for the row badge. Combines inbound (scan history) and
- * outbound (transaction distribution) sources into one type so the icon
- * switch and label maps cover every value in one place.
+ * Unified source for the row badge. Combines inbound (scan source) and
+ * outbound (distribution) sources into one type so the icon switch and label
+ * maps cover every value in one place.
  */
-type TransactionSource = ScanSource | DistributionSource;
+type TransactionSource = ScanMethod | DistributionSource;
 
 /**
  * Icon name for each source value. Every value here MUST be present in the
@@ -88,20 +85,18 @@ const SOURCE_ICONS: Record<TransactionSource, string> = {
  * is the more specific signal.
  */
 const useTransactionSource = (historyEntry: HistoryEntry): TransactionSource | null => {
-  const scanEntry = useScanEntryForTransactionId(historyEntry.id);
-  const distKey =
-    historyEntry.type === 'mint' ? (historyEntry as MintHistoryEntry).quoteId : historyEntry.id;
-  const fromDistribution = useTransactionDistributionStore(
-    (state) => state.distributions[distKey]?.source ?? null
-  );
-  return scanEntry?.source ?? fromDistribution;
+  // Pass the full entry so colada resolves the scan (id:) and distribution
+  // (quote:) annotations across the entry's candidate keys.
+  const annotation = useColadaTransactionAnnotation(historyEntry);
+  return annotation.scan?.method ?? annotation.distribution?.source ?? null;
 };
 
 /** Returns BIP321 option kinds for a transaction, or null if not BIP321. */
 const useBip321Options = (transactionId: string): string[] | null => {
-  const scanEntry = useScanEntryForTransactionId(transactionId);
-  if (scanEntry?.container !== 'bip321' || !scanEntry.optionKinds?.length) return null;
-  return scanEntry.optionKinds;
+  const annotation = useColadaTransactionAnnotation({ id: transactionId });
+  const scan = annotation.scan;
+  if (scan?.container !== 'bip321' || !scan.optionKinds?.length) return null;
+  return scan.optionKinds;
 };
 
 /**

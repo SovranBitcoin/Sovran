@@ -41,6 +41,7 @@ import {
   type ScreenActionHandlerMap,
   type StepHandlerMap,
   type NfcIOAdapter,
+  rawAnnotationKey,
 } from '@sovranbitcoin/colada';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
@@ -86,6 +87,11 @@ import { getNpcAddress } from '@/shared/lib/cashu/npc';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import {
+  linkTransactionAnnotation,
+  setDistributionAnnotation,
+  setTransactionAnnotation,
+} from '@/shared/stores/profile/transactionAnnotationStore';
 import { useSendReachabilityStore } from '@/shared/stores/profile/sendReachabilityStore';
 import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 
@@ -811,6 +817,17 @@ export function createSovranNotifications(
       useScanHistoryStore
         .getState()
         .addScan(rawInput, scanType, scanSource, parsedType, container, optionKinds);
+      // Annotation: stash the scan under a raw key now; bridged onto the final
+      // transaction id in onTransactionCreated (colada owns the read model).
+      setTransactionAnnotation(rawAnnotationKey(rawInput), {
+        scan: {
+          method: scanSource,
+          raw: rawInput,
+          container,
+          optionKinds,
+          inputType: parsedType,
+        },
+      });
     },
     onNfcWriteFailed: ({ message, rolledBack }) => {
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
@@ -1007,6 +1024,8 @@ export function createSovranNotifications(
     onTransactionCreated: async ({ transactionId, rawInput }) => {
       if (rawInput) {
         useScanHistoryStore.getState().linkTransaction(rawInput, transactionId);
+        // Bridge the scan annotation from its raw key onto the final entry id.
+        linkTransactionAnnotation(rawAnnotationKey(rawInput), `id:${transactionId}`);
       }
       await captureAndStoreLocation(transactionId);
     },
@@ -1750,6 +1769,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         try {
           await Clipboard.setStringAsync(paymentValue);
           useTransactionDistributionStore.getState().setDistribution(quoteId, 'copy');
+          setDistributionAnnotation(`quote:${quoteId}`, 'copy');
           paymentLog.info('payment.mint_quote.copy.success', {
             quoteId,
             entryId: entry.id,
@@ -1789,6 +1809,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           const isAirDrop = result.activityType === 'com.apple.UIKit.activity.AirDrop';
           const source = isAirDrop ? 'airdrop' : 'share';
           useTransactionDistributionStore.getState().setDistribution(quoteId, source);
+          setDistributionAnnotation(`quote:${quoteId}`, source);
           paymentLog.info('payment.mint_quote.share.success', {
             quoteId,
             entryId: entry.id,

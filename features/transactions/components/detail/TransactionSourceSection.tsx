@@ -4,9 +4,10 @@ import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
-import { useScanEntryForTransactionId, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
+import { useColadaTransactionAnnotation } from '@sovranbitcoin/colada/react';
+import type { ScanMethod } from '@sovranbitcoin/colada';
 
-const SOURCE_LABELS: Record<ScanSource, string> = {
+const SOURCE_LABELS: Record<ScanMethod, string> = {
   qr: 'QR Code',
   nfc: 'NFC',
   paste: 'Clipboard',
@@ -30,8 +31,9 @@ function isOnchainKind(k: string) {
  * Intended for use as a row in DetailsSection.
  */
 export function useTransactionSource(transactionId: string | undefined): string | null {
-  const entry = useScanEntryForTransactionId(transactionId);
-  return entry?.source ? SOURCE_LABELS[entry.source] : null;
+  const annotation = useColadaTransactionAnnotation(transactionId ? { id: transactionId } : null);
+  const method = annotation.scan?.method;
+  return method ? SOURCE_LABELS[method] : null;
 }
 
 /**
@@ -41,9 +43,10 @@ export function useBip321Info(transactionId: string | undefined): {
   isBip321: boolean;
   optionKinds: string[] | null;
 } {
-  const entry = useScanEntryForTransactionId(transactionId);
-  const isBip321 = entry?.container === 'bip321';
-  const optionKinds = isBip321 && entry.optionKinds?.length ? entry.optionKinds : null;
+  const annotation = useColadaTransactionAnnotation(transactionId ? { id: transactionId } : null);
+  const scan = annotation.scan;
+  const isBip321 = scan?.container === 'bip321';
+  const optionKinds = isBip321 && scan?.optionKinds?.length ? scan.optionKinds : null;
   return { isBip321, optionKinds };
 }
 
