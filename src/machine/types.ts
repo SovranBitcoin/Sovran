@@ -41,6 +41,25 @@ export type PaymentQuoteMethod = 'bolt11' | 'onchain';
 export type MintQuoteMethod = PaymentQuoteMethod;
 export type MeltQuoteMethod = PaymentQuoteMethod;
 
+export type ReceiveExecutePendingReason = 'network';
+
+export type ReceiveExecuteFinalizedResult = {
+  status?: 'finalized';
+  historyEntry: string;
+  hadP2PKProofs?: boolean;
+};
+
+export type ReceiveExecutePendingResult = {
+  status: 'pending';
+  operationId: string;
+  historyEntry: string;
+  pendingReason: ReceiveExecutePendingReason;
+  message?: string;
+  hadP2PKProofs?: boolean;
+};
+
+export type ReceiveExecuteResult = ReceiveExecuteFinalizedResult | ReceiveExecutePendingResult;
+
 // ---------------------------------------------------------------------------
 // Recipient identity — populated by `operations.resolveRecipientPubkey`
 // (Lightning Address → Nostr hex pubkey via NIP-05) and
@@ -588,6 +607,22 @@ export type NotificationHandlerMap = {
   }) => MaybeAsync;
 
   /**
+   * Called when an ecash receive was accepted locally but is waiting for
+   * recoverable mint/network completion. The wallet keeps the receive UI in a
+   * pending state and lets wallet-core recovery finalize it later.
+   */
+  onReceivePending?: (data: {
+    id: string;
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    operationId: string;
+    pendingReason: ReceiveExecutePendingReason;
+    historyEntry: string;
+    message?: string;
+  }) => MaybeAsync;
+
+  /**
    * Called when an ecash receive completes successfully.
    * The wallet updates the processing indicator and may capture metadata
    * (location, scan history linking, etc.).
@@ -807,7 +842,7 @@ export interface MachineOperations {
     tokenString: string,
     mintUrl: string,
     amount: number
-  ) => Promise<{ historyEntry: string; hadP2PKProofs?: boolean }>;
+  ) => Promise<ReceiveExecuteResult>;
 
   /**
    * Background mesh auto-redeem: receive a token and resolve the REAL

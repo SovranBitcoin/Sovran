@@ -49,7 +49,10 @@ function roundFiat(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function buildReachableSums(proofAmounts: number[], maxAmount: number): number[] {
+function buildReachableSums(
+  proofAmounts: number[],
+  maxAmount: number,
+): number[] {
   const reachable = new Set<number>([0]);
 
   for (const amt of proofAmounts) {
@@ -74,7 +77,7 @@ function compositionResult(
   nearestLower: number | null,
   nearestUpper: number | null,
   strategy: CompositionResult['strategy'],
-  startedAt: number
+  startedAt: number,
 ): CompositionResult {
   return {
     exactMatch,
@@ -84,6 +87,39 @@ function compositionResult(
     strategy,
     elapsedMs: performance.now() - startedAt,
   };
+}
+
+function proofSummary(proofAmounts: number[]): {
+  proofCount: number;
+  validProofCount: number;
+  proofTotal: number;
+} {
+  const valid = proofAmounts.filter(isPositiveInteger);
+  return {
+    proofCount: proofAmounts.length,
+    validProofCount: valid.length,
+    proofTotal: valid.reduce((total, amount) => total + amount, 0),
+  };
+}
+
+function logCompositionResult(
+  event: string,
+  coins: number[],
+  result: CompositionResult,
+  fields: Record<string, unknown> = {},
+): void {
+  logger.debug(event, {
+    ...proofSummary(coins),
+    target: result.target,
+    exactMatch: result.exactMatch,
+    hasNearestLower: result.nearestLower != null,
+    nearestLower: result.nearestLower,
+    hasNearestUpper: result.nearestUpper != null,
+    nearestUpper: result.nearestUpper,
+    strategy: result.strategy,
+    elapsedMs: result.elapsedMs,
+    ...fields,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +160,11 @@ function binarySearchClosest(sorted: number[], target: number): number {
   return lo;
 }
 
-function exhaustiveSearch(coins: number[], target: number, startedAt: number): CompositionResult {
+function exhaustiveSearch(
+  coins: number[],
+  target: number,
+  startedAt: number,
+): CompositionResult {
   const total = 1 << coins.length;
   let bestLower: number | null = null;
   let bestUpper: number | null = null;
@@ -142,14 +182,27 @@ function exhaustiveSearch(coins: number[], target: number, startedAt: number): C
       bestUpper = target;
       break;
     }
-    if (sum < target && (bestLower === null || sum > bestLower)) bestLower = sum;
-    if (sum > target && (bestUpper === null || sum < bestUpper)) bestUpper = sum;
+    if (sum < target && (bestLower === null || sum > bestLower))
+      bestLower = sum;
+    if (sum > target && (bestUpper === null || sum < bestUpper))
+      bestUpper = sum;
   }
 
-  return compositionResult(exact, target, bestLower, bestUpper, 'exhaustive', startedAt);
+  return compositionResult(
+    exact,
+    target,
+    bestLower,
+    bestUpper,
+    'exhaustive',
+    startedAt,
+  );
 }
 
-function meetInTheMiddle(coins: number[], target: number, startedAt: number): CompositionResult {
+function meetInTheMiddle(
+  coins: number[],
+  target: number,
+  startedAt: number,
+): CompositionResult {
   const mid = Math.floor(coins.length / 2);
   const leftSums = generateSubsetSums(coins.slice(0, mid));
   const rightSums = generateSubsetSums(coins.slice(mid)).sort((a, b) => a - b);
@@ -172,16 +225,29 @@ function meetInTheMiddle(coins: number[], target: number, startedAt: number): Co
         bestLower = target;
         bestUpper = target;
       }
-      if (total <= target && (bestLower === null || total > bestLower)) bestLower = total;
-      if (total >= target && (bestUpper === null || total < bestUpper)) bestUpper = total;
+      if (total <= target && (bestLower === null || total > bestLower))
+        bestLower = total;
+      if (total >= target && (bestUpper === null || total < bestUpper))
+        bestUpper = total;
     }
     if (exact) break;
   }
 
-  return compositionResult(exact, target, bestLower, bestUpper, 'meet-in-the-middle', startedAt);
+  return compositionResult(
+    exact,
+    target,
+    bestLower,
+    bestUpper,
+    'meet-in-the-middle',
+    startedAt,
+  );
 }
 
-function bitsetDP(coins: number[], target: number, startedAt: number): CompositionResult {
+function bitsetDP(
+  coins: number[],
+  target: number,
+  startedAt: number,
+): CompositionResult {
   let bits = 1n;
   for (const coin of coins) bits |= bits << BigInt(coin);
 
@@ -190,17 +256,29 @@ function bitsetDP(coins: number[], target: number, startedAt: number): Compositi
 
   const lowerMask = (1n << (tBig + 1n)) - 1n;
   const lowerBits = bits & lowerMask;
-  let nearestLower: number | null = lowerBits > 0n ? bitLength(lowerBits) - 1 : null;
+  let nearestLower: number | null =
+    lowerBits > 0n ? bitLength(lowerBits) - 1 : null;
   if (nearestLower === 0) nearestLower = null;
 
   const upperBits = bits >> tBig;
   const offset = lowestSetBit(upperBits);
   const nearestUpper = offset >= 0 ? target + offset : null;
 
-  return compositionResult(exact, target, nearestLower, nearestUpper, 'bitset-dp', startedAt);
+  return compositionResult(
+    exact,
+    target,
+    nearestLower,
+    nearestUpper,
+    'bitset-dp',
+    startedAt,
+  );
 }
 
-function prefilterCoins(coins: number[], target: number, maxCoins: number): number[] {
+function prefilterCoins(
+  coins: number[],
+  target: number,
+  maxCoins: number,
+): number[] {
   const sorted = [...coins].sort((a, b) => a - b);
   const atOrBelow = sorted.filter((c) => c <= target).reverse();
   const above = sorted.filter((c) => c > target);
@@ -229,61 +307,137 @@ function prefilterCoins(coins: number[], target: number, maxCoins: number): numb
  *
  * Auto-selects the best algorithm based on input size.
  */
-export function composeSatoshis(coins: number[], target: number): CompositionResult {
+export function composeSatoshis(
+  coins: number[],
+  target: number,
+): CompositionResult {
   const t0 = performance.now();
 
   if (coins.length === 0) {
-    return compositionResult(false, target, null, null, 'exhaustive', t0);
+    const result = compositionResult(
+      false,
+      target,
+      null,
+      null,
+      'exhaustive',
+      t0,
+    );
+    logCompositionResult('offline.composeSatoshis.result', coins, result, {
+      reason: 'empty-proofs',
+    });
+    return result;
   }
 
   const valid = coins.filter((c) => c > 0);
   if (valid.length === 0) {
-    return compositionResult(false, target, null, null, 'exhaustive', t0);
+    const result = compositionResult(
+      false,
+      target,
+      null,
+      null,
+      'exhaustive',
+      t0,
+    );
+    logCompositionResult('offline.composeSatoshis.result', coins, result, {
+      reason: 'no-positive-proofs',
+    });
+    return result;
   }
 
   const totalSum = valid.reduce((a, b) => a + b, 0);
 
   if (target <= 0) {
-    return compositionResult(
+    const result = compositionResult(
       false,
       target,
       null,
       valid.length > 0 ? Math.min(...valid) : null,
       'exhaustive',
-      t0
+      t0,
     );
+    logCompositionResult('offline.composeSatoshis.result', coins, result, {
+      reason: 'non-positive-target',
+    });
+    return result;
   }
   if (totalSum === target) {
-    return compositionResult(true, target, target, target, 'exhaustive', t0);
+    const result = compositionResult(
+      true,
+      target,
+      target,
+      target,
+      'exhaustive',
+      t0,
+    );
+    logCompositionResult('offline.composeSatoshis.result', coins, result, {
+      reason: 'total-equals-target',
+    });
+    return result;
   }
   if (totalSum < target) {
-    return compositionResult(false, target, totalSum, null, 'exhaustive', t0);
+    const result = compositionResult(
+      false,
+      target,
+      totalSum,
+      null,
+      'exhaustive',
+      t0,
+    );
+    logCompositionResult('offline.composeSatoshis.result', coins, result, {
+      reason: 'insufficient-total',
+    });
+    return result;
   }
   if (valid.includes(target)) {
-    return compositionResult(true, target, target, target, 'exhaustive', t0);
+    const result = compositionResult(
+      true,
+      target,
+      target,
+      target,
+      'exhaustive',
+      t0,
+    );
+    logCompositionResult('offline.composeSatoshis.result', coins, result, {
+      reason: 'single-proof-match',
+    });
+    return result;
   }
 
   const maxCoin = valid.reduce((m, c) => (c > m ? c : m), 0);
   const bitsetSafe = totalSum <= BITSET_LIMIT && maxCoin <= BITSET_MAX_COIN;
 
   let result: CompositionResult;
+  let reason: string;
   try {
     if (valid.length <= EXHAUSTIVE_LIMIT) {
+      reason = 'exhaustive-limit';
       result = exhaustiveSearch(valid, target, t0);
     } else if (bitsetSafe) {
+      reason = 'bitset-safe';
       result = bitsetDP(valid, target, t0);
     } else {
       const selected =
-        valid.length <= MITM_LIMIT ? valid : prefilterCoins(valid, target, MITM_LIMIT);
+        valid.length <= MITM_LIMIT
+          ? valid
+          : prefilterCoins(valid, target, MITM_LIMIT);
+      reason = valid.length <= MITM_LIMIT ? 'mitm-limit' : 'mitm-prefiltered';
       result = meetInTheMiddle(selected, target, t0);
     }
   } catch (err) {
     // Defense in depth: if the chosen strategy throws (e.g. bitset-DP hitting
     // Hermes' BigInt ceiling on an unusually large denomination), degrade to
     // an unknown-composition result rather than crashing the amount screen.
-    logger.warn('offline.composeSatoshis.strategyFailed', { error: errField(err) });
+    logger.warn('offline.composeSatoshis.strategyFailed', {
+      error: errField(err),
+    });
     result = compositionResult(false, target, null, null, 'exhaustive', t0);
+    reason = 'strategy-failed';
   }
+  logCompositionResult('offline.composeSatoshis.result', coins, result, {
+    reason,
+    bitsetSafe,
+    maxCoin,
+  });
   return result;
 }
 
@@ -299,7 +453,7 @@ export function composeSatoshis(coins: number[], target: number): CompositionRes
 export function composeFiat(
   coins: number[],
   fiatAmount: number,
-  satsPerFiat: number
+  satsPerFiat: number,
 ): FiatCompositionResult {
   const t0 = performance.now();
 
@@ -314,7 +468,10 @@ export function composeFiat(
   let matchedSatoshis: number | null = null;
   if (highResult.exactMatch) {
     matchedSatoshis = satHigh;
-  } else if (highResult.nearestLower !== null && highResult.nearestLower >= satLow) {
+  } else if (
+    highResult.nearestLower !== null &&
+    highResult.nearestLower >= satLow
+  ) {
     matchedSatoshis = highResult.nearestLower;
   }
 
@@ -323,13 +480,16 @@ export function composeFiat(
     lowResult = composeSatoshis(coins, satLow);
     if (lowResult.exactMatch) {
       matchedSatoshis = satLow;
-    } else if (lowResult.nearestUpper !== null && lowResult.nearestUpper <= satHigh) {
+    } else if (
+      lowResult.nearestUpper !== null &&
+      lowResult.nearestUpper <= satHigh
+    ) {
       matchedSatoshis = lowResult.nearestUpper;
     }
   }
 
   if (matchedSatoshis !== null) {
-    return {
+    const result: FiatCompositionResult = {
       requestedFiat: fiatAmount,
       satoshiInterval,
       exactFiatMatch: true,
@@ -338,6 +498,19 @@ export function composeFiat(
       nearestUpperFiat: null,
       elapsedMs: performance.now() - t0,
     };
+    logger.debug('offline.composeFiat.result', {
+      ...proofSummary(coins),
+      requestedFiat: result.requestedFiat,
+      satsPerFiat,
+      satoshiIntervalLow: satoshiInterval[0],
+      satoshiIntervalHigh: satoshiInterval[1],
+      exactFiatMatch: result.exactFiatMatch,
+      matchedSatoshis: result.matchedSatoshis,
+      hasNearestLowerFiat: false,
+      hasNearestUpperFiat: false,
+      elapsedMs: result.elapsedMs,
+    });
+    return result;
   }
 
   let nearestLowerFiat: { fiat: number; satoshis: number } | null = null;
@@ -374,7 +547,7 @@ export function composeFiat(
     }
   }
 
-  return {
+  const result: FiatCompositionResult = {
     requestedFiat: fiatAmount,
     satoshiInterval,
     exactFiatMatch: false,
@@ -383,6 +556,21 @@ export function composeFiat(
     nearestUpperFiat,
     elapsedMs: performance.now() - t0,
   };
+  logger.debug('offline.composeFiat.result', {
+    ...proofSummary(coins),
+    requestedFiat: result.requestedFiat,
+    satsPerFiat,
+    satoshiIntervalLow: satoshiInterval[0],
+    satoshiIntervalHigh: satoshiInterval[1],
+    exactFiatMatch: result.exactFiatMatch,
+    matchedSatoshis: result.matchedSatoshis,
+    hasNearestLowerFiat: result.nearestLowerFiat != null,
+    nearestLowerSatoshis: result.nearestLowerFiat?.satoshis ?? null,
+    hasNearestUpperFiat: result.nearestUpperFiat != null,
+    nearestUpperSatoshis: result.nearestUpperFiat?.satoshis ?? null,
+    elapsedMs: result.elapsedMs,
+  });
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -394,16 +582,29 @@ export function composeFiat(
  * proof denominations (subset sums). The wallet can use this index to
  * quickly check whether specific amounts are reachable.
  */
-export function buildExactOfflineAmountIndex(proofAmounts: number[]): ExactOfflineAmountIndex {
+export function buildExactOfflineAmountIndex(
+  proofAmounts: number[],
+): ExactOfflineAmountIndex {
   const valid = proofAmounts.filter(isPositiveInteger);
   const total = valid.reduce((a, b) => a + b, 0);
 
   if (valid.length === 0 || total === 0) {
+    logger.debug('offline.exactAmountIndex.result', {
+      ...proofSummary(proofAmounts),
+      reachableCount: 0,
+      reason: 'empty',
+    });
     return { reachableSums: [], totalReadyBalance: total };
   }
 
+  const reachableSums = buildReachableSums(valid, total).filter((s) => s > 0);
+  logger.debug('offline.exactAmountIndex.result', {
+    ...proofSummary(proofAmounts),
+    reachableCount: reachableSums.length,
+    reason: 'built',
+  });
   return {
-    reachableSums: buildReachableSums(valid, total).filter((s) => s > 0),
+    reachableSums,
     totalReadyBalance: total,
   };
 }
@@ -415,16 +616,30 @@ export function buildExactOfflineAmountIndex(proofAmounts: number[]): ExactOffli
 export function getRoundedFiatMinorUnitForSats(
   sats: number,
   btcPrice: number,
-  minorUnitsPerUnit: number = 100
+  minorUnitsPerUnit: number = 100,
 ): number | null {
   if (
     !isPositiveInteger(sats) ||
     !isFinitePositiveNumber(btcPrice) ||
     !isPositiveInteger(minorUnitsPerUnit)
   ) {
+    logger.debug('offline.fiatMinorUnitForSats.invalid', {
+      sats,
+      btcPrice,
+      minorUnitsPerUnit,
+    });
     return null;
   }
-  return Math.round((sats * btcPrice * minorUnitsPerUnit) / SATS_PER_BTC);
+  const result = Math.round(
+    (sats * btcPrice * minorUnitsPerUnit) / SATS_PER_BTC,
+  );
+  logger.debug('offline.fiatMinorUnitForSats.result', {
+    sats,
+    btcPrice,
+    minorUnitsPerUnit,
+    result,
+  });
+  return result;
 }
 
 /**
@@ -434,7 +649,7 @@ export function getRoundedFiatMinorUnitForSats(
 export function getSatRangeForDisplayedFiatMinorUnit(
   targetMinorUnit: number,
   btcPrice: number,
-  minorUnitsPerUnit: number = 100
+  minorUnitsPerUnit: number = 100,
 ): FiatMinorUnitSatRange | null {
   if (
     !Number.isInteger(targetMinorUnit) ||
@@ -442,16 +657,39 @@ export function getSatRangeForDisplayedFiatMinorUnit(
     !isFinitePositiveNumber(btcPrice) ||
     !isPositiveInteger(minorUnitsPerUnit)
   ) {
+    logger.debug('offline.satRangeForFiatMinorUnit.invalid', {
+      targetMinorUnit,
+      btcPrice,
+      minorUnitsPerUnit,
+    });
     return null;
   }
 
   const minorUnitsPerBtc = btcPrice * minorUnitsPerUnit;
-  if (!isFinitePositiveNumber(minorUnitsPerBtc)) return null;
+  if (!isFinitePositiveNumber(minorUnitsPerBtc)) {
+    logger.debug('offline.satRangeForFiatMinorUnit.invalid', {
+      reason: 'minor-units-per-btc',
+      targetMinorUnit,
+      btcPrice,
+      minorUnitsPerUnit,
+    });
+    return null;
+  }
 
   const rawMin = ((targetMinorUnit - 0.5) * SATS_PER_BTC) / minorUnitsPerBtc;
-  const rawMaxExcl = ((targetMinorUnit + 0.5) * SATS_PER_BTC) / minorUnitsPerBtc;
+  const rawMaxExcl =
+    ((targetMinorUnit + 0.5) * SATS_PER_BTC) / minorUnitsPerBtc;
   const minSat = Math.max(1, Math.ceil(rawMin - RANGE_EPSILON));
   const maxSat = Math.max(0, Math.floor(rawMaxExcl - RANGE_EPSILON));
 
-  return maxSat >= minSat ? { minSat, maxSat } : null;
+  const result = maxSat >= minSat ? { minSat, maxSat } : null;
+  logger.debug('offline.satRangeForFiatMinorUnit.result', {
+    targetMinorUnit,
+    btcPrice,
+    minorUnitsPerUnit,
+    hasRange: result != null,
+    minSat: result?.minSat ?? null,
+    maxSat: result?.maxSat ?? null,
+  });
+  return result;
 }

@@ -11,7 +11,7 @@
 
 import type { Manager } from '@cashu/coco-core';
 import { createPaymentMachine } from '../machine/createMachine';
-import { setLogger, type CocoLogger } from '../logger';
+import { logger, setLogger, type CocoLogger } from '../logger';
 import type {
   MachineOperations,
   NfcIOAdapter,
@@ -29,7 +29,10 @@ import type {
   WalletContext,
 } from '../types';
 import { createDefaultOperations } from '../operations/defaultOperations';
-import { createWalletContextTracker, type WalletContextTracker } from './walletContextTracker';
+import {
+  createWalletContextTracker,
+  type WalletContextTracker,
+} from './walletContextTracker';
 import { createNostrGraphqlMintEnrichment } from '../nostr-graphql';
 
 // NUT-06 mint info as returned by coco's `Manager`. Re-derived here (rather than
@@ -60,7 +63,9 @@ export interface ColadaConfig {
    * operator-profile data flows directly into each row. One call per list
    * build, regardless of mint count.
    */
-  fetchMintCatalog?: (mintUrls: string[]) => Promise<Record<string, MintCatalogEntry>>;
+  fetchMintCatalog?: (
+    mintUrls: string[],
+  ) => Promise<Record<string, MintCatalogEntry>>;
   /**
    * Per-mint NUT-06 fetcher used by `buildMintListItems`. Lets the wallet route
    * through its own SWR cache + per-mint deadline so one slow/dead mint can't
@@ -121,21 +126,46 @@ export interface ColadaInstance {
 // ---------------------------------------------------------------------------
 
 export function createColada(config: ColadaConfig): ColadaInstance {
-  const {
-    manager,
-    sendNostrDM,
-    enrichMintReviewInfo,
-  } = config;
+  const { manager, sendNostrDM, enrichMintReviewInfo } = config;
 
   if (config.logger) setLogger(config.logger);
+
+  logger.info('core.createColada.start', {
+    unit: config.unit ?? 'sat',
+    hasLogger: !!config.logger,
+    hasOfflineGetter: !!config.getOffline,
+    hasLocaleGetter: !!config.getLocale,
+    hasBtcPriceGetter: !!config.getBtcPrice,
+    hasDisplayCurrencyGetter: !!config.getDisplayCurrency,
+    enableEcashSendMemo: config.enableEcashSendMemo === true,
+    hasPreferredMintGetter: !!config.getPreferredMintUrl,
+    hasFetchMintCatalog: !!config.fetchMintCatalog,
+    hasFetchMintInfo: !!config.fetchMintInfo,
+    hasEnrichMintReviewInfo: !!enrichMintReviewInfo,
+    hasNostrGraphqlEndpoint: !!config.nostrGraphqlEndpoint,
+    hasResolveMintContactProfile: !!config.resolveMintContactProfile,
+    hasFetchMintReviews: !!config.fetchMintReviews,
+    hasSendNostrDM: !!sendNostrDM,
+    hasMockPaymentRequestFlag: !!config.shouldMockFailPaymentRequest,
+    hasMockMeltFlag: !!config.shouldMockFailMelt,
+    hasMockSendFlag: !!config.shouldMockFailSend,
+    lightningTimeoutMs: config.lightningTimeoutMs ?? null,
+  });
 
   const tracker = createWalletContextTracker(manager, {
     getPreferredMintUrl: config.getPreferredMintUrl,
   });
 
   const graphqlEnrichment = config.nostrGraphqlEndpoint
-    ? createNostrGraphqlMintEnrichment({ endpoint: config.nostrGraphqlEndpoint })
+    ? createNostrGraphqlMintEnrichment({
+        endpoint: config.nostrGraphqlEndpoint,
+      })
     : null;
+  logger.info('core.createColada.enrichment', {
+    graphqlEnabled: !!graphqlEnrichment,
+    explicitContactResolver: !!config.resolveMintContactProfile,
+    explicitReviewsFetcher: !!config.fetchMintReviews,
+  });
 
   const operations = createDefaultOperations({
     getManager: () => manager,
@@ -146,12 +176,24 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     fetchMintCatalog: config.fetchMintCatalog,
     fetchMintInfo: config.fetchMintInfo,
     resolveMintContactProfile:
-      config.resolveMintContactProfile ?? graphqlEnrichment?.resolveMintContactProfile,
-    fetchMintReviews: config.fetchMintReviews ?? graphqlEnrichment?.fetchMintReviews,
+      config.resolveMintContactProfile ??
+      graphqlEnrichment?.resolveMintContactProfile,
+    fetchMintReviews:
+      config.fetchMintReviews ?? graphqlEnrichment?.fetchMintReviews,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
     shouldMockFailMelt: config.shouldMockFailMelt,
     shouldMockFailSend: config.shouldMockFailSend,
     lightningTimeoutMs: config.lightningTimeoutMs,
+  });
+  logger.info('core.createColada.operations.ready', {
+    operationCount: Object.keys(operations).length,
+    hasExecuteReceive: !!operations.executeReceive,
+    hasExecuteSend: !!operations.executeSend,
+    hasExecuteOfflineSend: !!operations.executeOfflineSend,
+    hasExecuteMintQuote: !!operations.executeMintQuote,
+    hasExecuteMelt: !!operations.executeMelt,
+    hasExecutePaymentRequest: !!operations.executePaymentRequest,
+    hasExecuteNfcSend: !!operations.executeNfcSend,
   });
 
   return {
@@ -160,7 +202,10 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     getWalletContext: tracker.getContext,
     subscribeWalletContext: tracker.subscribe,
     operations,
-    dispose: tracker.dispose,
+    dispose: () => {
+      logger.info('core.createColada.dispose');
+      tracker.dispose();
+    },
   };
 }
 
@@ -176,7 +221,9 @@ export interface CreateMachineFromInstanceConfig {
   createURDecoder?: () => URDecoderLike;
 }
 
-export function createMachineFromInstance(config: CreateMachineFromInstanceConfig): PaymentMachine {
+export function createMachineFromInstance(
+  config: CreateMachineFromInstanceConfig,
+): PaymentMachine {
   const {
     instance,
     handlers,
@@ -189,7 +236,19 @@ export function createMachineFromInstance(config: CreateMachineFromInstanceConfi
     createURDecoder,
   } = config;
 
-  return createPaymentMachine({
+  logger.info('core.createMachineFromInstance.start', {
+    unit,
+    handlerCount: Object.keys(handlers).length,
+    notificationCount: Object.keys(notifications ?? {}).length,
+    hasOfflineGetter: !!getOffline,
+    hasLocaleGetter: !!getLocale,
+    hasNfcAdapter: !!nfcAdapter,
+    scanSourceCount: Object.keys(scanSources ?? {}).length,
+    hasUrDecoder: !!createURDecoder,
+    operationCount: Object.keys(instance.operations ?? {}).length,
+  });
+
+  const machine = createPaymentMachine({
     handlers,
     getContext: instance.tracker.getContext,
     getUnit: () => unit,
@@ -203,4 +262,7 @@ export function createMachineFromInstance(config: CreateMachineFromInstanceConfi
     scanSources,
     nfcAdapter,
   });
+
+  logger.info('core.createMachineFromInstance.ready');
+  return machine;
 }

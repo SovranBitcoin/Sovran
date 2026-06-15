@@ -6,6 +6,8 @@
 // `getLocale()`. Falls back to 'en' when a locale or key is missing.
 // ---------------------------------------------------------------------------
 
+import { logger } from '../logger';
+
 export interface LocalizedReason {
   code: string;
   message: string;
@@ -143,7 +145,15 @@ const locales: Record<string, TranslationMap> = { en, ar, de };
  *   // ...
  * });
  */
-export function registerLocale(lang: string, translations: TranslationMap): void {
+export function registerLocale(
+  lang: string,
+  translations: TranslationMap,
+): void {
+  logger.info('formatting.locale.register', {
+    lang,
+    translationCount: Object.keys(translations).length,
+    existingTranslationCount: Object.keys(locales[lang] ?? {}).length,
+  });
   locales[lang] = { ...(locales[lang] ?? {}), ...translations };
 }
 
@@ -156,7 +166,13 @@ function resolveLocale(locale: string): TranslationMap {
   if (exact) return exact;
 
   const lang = locale.split('-')[0].toLowerCase();
-  return locales[lang] ?? en;
+  const fallback = locales[lang] ?? en;
+  logger.debug('formatting.locale.resolveFallback', {
+    locale,
+    lang,
+    fallback: locales[lang] ? 'language' : 'en',
+  });
+  return fallback;
 }
 
 /**
@@ -165,7 +181,19 @@ function resolveLocale(locale: string): TranslationMap {
  */
 export function t(code: string, locale: string = 'en'): string {
   const dict = resolveLocale(locale);
-  return dict[code] ?? en[code] ?? code;
+  const localized = dict[code];
+  if (localized !== undefined) return localized;
+  const english = en[code];
+  if (english !== undefined) {
+    logger.debug('formatting.locale.translationFallback', {
+      code,
+      locale,
+      fallback: 'en',
+    });
+    return english;
+  }
+  logger.warn('formatting.locale.translationMissing', { code, locale });
+  return code;
 }
 
 /**
@@ -174,8 +202,11 @@ export function t(code: string, locale: string = 'en'): string {
  */
 export function localizeReason(
   code: string | null | undefined,
-  locale: string = 'en'
+  locale: string = 'en',
 ): LocalizedReason | null {
-  if (code == null) return null;
+  if (code == null) {
+    logger.debug('formatting.locale.reasonSkipped', { locale });
+    return null;
+  }
   return { code, message: t(code, locale) };
 }

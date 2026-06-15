@@ -16,56 +16,58 @@
 //                           createColada({ nostrGraphqlEndpoint })
 // ---------------------------------------------------------------------------
 
-import { getTokenMetadata } from '@cashu/cashu-ts';
+import { getTokenMetadata } from "@cashu/cashu-ts";
 import type {
   Manager,
   Mint,
   ReceiveHistoryEntry,
   SendHistoryEntry,
-} from '@cashu/coco-core';
-import { getEncodedToken } from '@cashu/coco-core';
-import type { MachineOperations, StepDataMap } from '../machine/types';
+} from "@cashu/coco-core";
+import { getEncodedToken } from "@cashu/coco-core";
+import type { MachineOperations, StepDataMap } from "../machine/types";
 import type {
   MintCatalogEntry,
   MintContactProfileResolver,
   MintListItem,
   MintReviewInfo,
   MintReviewsFetcher,
-} from '../types';
-import { defaultDetectors } from '../detectors';
-import { errField, logger } from '../logger';
-import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
-import { normalizeNostrPubkey, resolveRecipientPubkey } from '../recipient';
-import { amountToNumber, type AmountLike } from '../amount';
+} from "../types";
+import { defaultDetectors } from "../detectors";
+import { errField, logger, mintUrlFields } from "../logger";
+import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from "../lnurl";
+import { normalizeNostrPubkey, resolveRecipientPubkey } from "../recipient";
+import { amountToNumber, type AmountLike } from "../amount";
 import {
   buildMethodAwareMintCandidates,
   deriveMintMethodCapabilityMapFromTrustedMints,
-} from '../mint-capabilities';
-import { parseHistoryEntryOnce } from './historyEntry';
+} from "../mint-capabilities";
+import { parseHistoryEntryOnce } from "./historyEntry";
 
 // MintInfo is the cashu-ts GetInfoResponse — coco-core re-derives but does
 // not export it as a named type, so we infer it from the manager API to
 // stay aligned with whatever shape mgr.mint.getMintInfo actually returns.
-type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
-type CoreToken = NonNullable<SendHistoryEntry['token']>;
+type MintInfo = Awaited<ReturnType<Manager["mint"]["getMintInfo"]>>;
+type CoreToken = NonNullable<SendHistoryEntry["token"]>;
 
 function hasMintInfo(value: MintInfo | undefined): value is MintInfo {
   return (
-    typeof value === 'object' &&
+    typeof value === "object" &&
     value !== null &&
     Object.keys(value as Record<string, unknown>).length > 0
   );
 }
 
-function extractMintNostrContactPubkey(mintInfo: MintInfo | undefined): string | undefined {
+function extractMintNostrContactPubkey(
+  mintInfo: MintInfo | undefined,
+): string | undefined {
   const contacts = (mintInfo as { contact?: unknown } | undefined)?.contact;
   if (!Array.isArray(contacts)) return undefined;
   for (const contact of contacts) {
-    if (typeof contact !== 'object' || contact === null) continue;
+    if (typeof contact !== "object" || contact === null) continue;
     const method = (contact as { method?: unknown }).method;
     const info = (contact as { info?: unknown }).info;
-    if (typeof method !== 'string' || typeof info !== 'string') continue;
-    if (method.trim().toLowerCase() !== 'nostr') continue;
+    if (typeof method !== "string" || typeof info !== "string") continue;
+    if (method.trim().toLowerCase() !== "nostr") continue;
     const pubkey = normalizeNostrPubkey(info);
     if (pubkey) return pubkey;
   }
@@ -78,25 +80,36 @@ function extractMintNostrContactPubkey(mintInfo: MintInfo | undefined): string |
 
 async function findSendHistoryEntryByOperationId(
   mgr: Manager,
-  operationId: string
+  operationId: string,
 ): Promise<string | null> {
+  logger.debug("operations.history.send.lookup.start", {
+    operationId,
+    limit: 50,
+  });
   const history = await mgr.history.getPaginatedHistory(0, 50);
   const entry = history.find(
     (h): h is SendHistoryEntry =>
-      h.type === 'send' &&
-      (h.operationId === operationId || h.metadata?.operationId === operationId)
+      h.type === "send" &&
+      (h.operationId === operationId ||
+        h.metadata?.operationId === operationId),
   );
+  logger.debug("operations.history.send.lookup.done", {
+    operationId,
+    found: !!entry,
+    historyCount: history.length,
+    entryState: entry?.state ?? null,
+  });
   return entry ? JSON.stringify(entry) : null;
 }
 
 function mapMeltOperationState(state: string): string {
-  if (state === 'finalized') return 'PAID';
-  if (state === 'pending' || state === 'executing') return 'PENDING';
-  return 'UNPAID';
+  if (state === "finalized") return "PAID";
+  if (state === "pending" || state === "executing") return "PENDING";
+  return "UNPAID";
 }
 
-function requireSatUnit(unit: string | undefined): 'sat' {
-  if (unit == null || unit === 'sat') return 'sat';
+function requireSatUnit(unit: string | undefined): "sat" {
+  if (unit == null || unit === "sat") return "sat";
   throw new Error(`Unsupported unit ${unit}; only sat is supported`);
 }
 
@@ -115,14 +128,17 @@ interface SendOperationLike {
   amount: AmountLike;
 }
 
-function buildSyntheticSendEntry(operation: SendOperationLike, token: CoreToken): SendHistoryEntry {
+function buildSyntheticSendEntry(
+  operation: SendOperationLike,
+  token: CoreToken,
+): SendHistoryEntry {
   return {
     id: operation.id,
-    type: 'send',
+    type: "send",
     createdAt: operation.createdAt,
     mintUrl: operation.mintUrl,
-    unit: 'sat',
-    state: 'pending',
+    unit: "sat",
+    state: "pending",
     amount: amountToNumber(operation.amount),
     operationId: operation.id,
     token,
@@ -145,8 +161,9 @@ function ensureSendEntryToken(historyEntry: string, token: CoreToken): string {
   // resolving and HistoryService persisting; inject it before returning so
   // the caller never sees a tokenless send entry.
   const parsed = parseHistoryEntryOnce(historyEntry);
-  if (!parsed || parsed.type !== 'send') return historyEntry;
-  if (parsed.token) return JSON.stringify({ ...parsed, token: { ...parsed.token, ...token } });
+  if (!parsed || parsed.type !== "send") return historyEntry;
+  if (parsed.token)
+    return JSON.stringify({ ...parsed, token: { ...parsed.token, ...token } });
   return JSON.stringify({ ...parsed, token });
 }
 
@@ -154,7 +171,7 @@ function hasP2PKProofs(proofs: readonly { secret: string }[]): boolean {
   return proofs.some((proof) => {
     try {
       const parsed = JSON.parse(proof.secret);
-      return Array.isArray(parsed) && parsed[0] === 'P2PK';
+      return Array.isArray(parsed) && parsed[0] === "P2PK";
     } catch {
       return false;
     }
@@ -165,29 +182,35 @@ function hasP2PKProofs(proofs: readonly { secret: string }[]): boolean {
 // Payment request rollback helpers
 // ---------------------------------------------------------------------------
 
-async function attemptRollback(mgr: Manager, operationId: string): Promise<boolean> {
+async function attemptRollback(
+  mgr: Manager,
+  operationId: string,
+): Promise<boolean> {
   try {
     const operation = await mgr.ops.send.get(operationId);
-    if (operation && operation.state === 'prepared') {
-      logger.info('operations.attemptRollback.cancelPrepared', { operationId });
+    if (operation && operation.state === "prepared") {
+      logger.info("operations.attemptRollback.cancelPrepared", { operationId });
       await mgr.ops.send.cancel(operationId);
-    } else if (operation && ['executing', 'pending'].includes(operation.state)) {
-      logger.info('operations.attemptRollback.reclaim', {
+    } else if (
+      operation &&
+      ["executing", "pending"].includes(operation.state)
+    ) {
+      logger.info("operations.attemptRollback.reclaim", {
         state: operation.state,
         operationId,
       });
       await mgr.ops.send.reclaim(operationId);
     } else {
-      logger.warn('operations.attemptRollback.unexpectedState', {
+      logger.warn("operations.attemptRollback.unexpectedState", {
         state: operation?.state,
         operationId,
       });
       return false;
     }
-    logger.info('operations.attemptRollback.success', { operationId });
+    logger.info("operations.attemptRollback.success", { operationId });
     return true;
   } catch (e) {
-    logger.warn('operations.attemptRollback.failed', {
+    logger.warn("operations.attemptRollback.failed", {
       operationId,
       error: errField(e),
     });
@@ -201,31 +224,35 @@ function buildRolledBackResult(
   amount: number,
   unit: string,
   paymentRequest: string,
-  transportType: 'nostr' | 'http' | 'mesh',
-  errorMessage: string
+  transportType: "nostr" | "http" | "mesh",
+  errorMessage: string,
 ): { historyEntry: string; rolledBack: true; errorMessage: string } {
   const entry = {
     id: operationId,
-    type: 'send' as const,
+    type: "send" as const,
     createdAt: Date.now(),
     mintUrl,
     amount,
     unit,
     operationId,
-    state: 'rolledBack',
+    state: "rolledBack",
     metadata: {
       paymentRequest,
-      phase: 'rolledBack',
-      tokenCreated: 'true',
+      phase: "rolledBack",
+      tokenCreated: "true",
       transportType,
       errorMessage,
     },
   };
-  logger.info('operations.executePaymentRequest.rolledBack', {
+  logger.info("operations.executePaymentRequest.rolledBack", {
     operationId,
     errorMessage,
   });
-  return { historyEntry: JSON.stringify(entry), rolledBack: true, errorMessage };
+  return {
+    historyEntry: JSON.stringify(entry),
+    rolledBack: true,
+    errorMessage,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +277,9 @@ export interface DefaultOperationsConfig {
    * Mints not present in the returned record render with no catalog data — the
    * row falls back to the mint URL / NUT-06 info already on screen.
    */
-  fetchMintCatalog?: (mintUrls: string[]) => Promise<Record<string, MintCatalogEntry>>;
+  fetchMintCatalog?: (
+    mintUrls: string[],
+  ) => Promise<Record<string, MintCatalogEntry>>;
   /**
    * Per-mint NUT-06 fetcher used by `buildMintListItems` to resolve name/icon.
    *
@@ -298,15 +327,15 @@ export interface DefaultOperationsConfig {
 // ---------------------------------------------------------------------------
 
 export function createDefaultOperations(
-  config: DefaultOperationsConfig
+  config: DefaultOperationsConfig,
 ): Partial<MachineOperations> {
   const { getManager } = config;
 
   function requireManager(): Manager {
     const mgr = getManager();
     if (!mgr) {
-      logger.warn('operations.requireManager.unavailable');
-      throw new Error('Wallet manager is not available');
+      logger.warn("operations.requireManager.unavailable");
+      throw new Error("Wallet manager is not available");
     }
     return mgr;
   }
@@ -318,13 +347,16 @@ export function createDefaultOperations(
   // and Bun both define `process.env.NODE_ENV`; we treat anything other than
   // 'production' as dev. `process` is read off `globalThis` so this compiles
   // in both the React Native (no @types/node) and Bun build contexts.
-  const mockFailEnabled = (kind: 'paymentRequest' | 'melt' | 'send'): boolean => {
-    const proc = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process;
-    if (proc?.env?.NODE_ENV === 'production') return false;
+  const mockFailEnabled = (
+    kind: "paymentRequest" | "melt" | "send",
+  ): boolean => {
+    const proc = (globalThis as { process?: { env?: { NODE_ENV?: string } } })
+      .process;
+    if (proc?.env?.NODE_ENV === "production") return false;
     const getter =
-      kind === 'paymentRequest'
+      kind === "paymentRequest"
         ? config.shouldMockFailPaymentRequest
-        : kind === 'melt'
+        : kind === "melt"
           ? config.shouldMockFailMelt
           : config.shouldMockFailSend;
     return getter?.() === true;
@@ -335,95 +367,171 @@ export function createDefaultOperations(
       const mgr = requireManager();
       // send.execute is atomic — there is no rollback to exercise — so the
       // mock-fail gate runs before prepare to leave no reservation behind.
-      if (mockFailEnabled('send')) {
-        throw new Error('Mock send failure (dev)');
+      if (mockFailEnabled("send")) {
+        logger.warn("operations.executeSend.mockFailure", {
+          ...mintUrlFields(mintUrl),
+          amount,
+        });
+        throw new Error("Mock send failure (dev)");
       }
       const p2pkLockPubkey = options?.p2pkLockPubkey;
-      logger.info('operations.executeSend.prepare', {
-        mintUrl,
+      logger.info("operations.executeSend.prepare", {
+        ...mintUrlFields(mintUrl),
         amount,
         p2pkLocked: !!p2pkLockPubkey,
       });
       const prepared = await mgr.ops.send.prepare({
         mintUrl,
         amount,
-        ...(p2pkLockPubkey ? { target: { type: 'p2pk' as const, pubkey: p2pkLockPubkey } } : {}),
+        ...(p2pkLockPubkey
+          ? { target: { type: "p2pk" as const, pubkey: p2pkLockPubkey } }
+          : {}),
       });
-      logger.info('operations.executeSend.execute', { operationId: prepared.id });
+      logger.info("operations.executeSend.prepared", {
+        operationId: prepared.id,
+        ...mintUrlFields(mintUrl),
+        amount,
+        needsSwap: !!prepared.needsSwap,
+      });
+      logger.info("operations.executeSend.execute", {
+        operationId: prepared.id,
+      });
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
       const tokenWithMemo = applyTokenMemo(token, memo);
-      logger.info('operations.executeSend.complete', {
+      logger.info("operations.executeSend.complete", {
         operationId: operation.id,
         state: operation.state,
+        proofCount: token.proofs.length,
+        hadMemo: !!normalizeMemo(memo),
       });
 
       // Try history first (should be there after execute), fall back to
       // constructing from the operation result to avoid a race.
-      const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
+      const historyEntry = await findSendHistoryEntryByOperationId(
+        mgr,
+        operation.id,
+      );
       if (historyEntry) {
-        return { historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo) };
+        logger.info("operations.executeSend.historyFound", {
+          operationId: operation.id,
+        });
+        return {
+          historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo),
+        };
       }
 
-      logger.warn('operations.executeSend.historyMissing', { operationId: operation.id });
-      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, tokenWithMemo)) };
+      logger.warn("operations.executeSend.historyMissing", {
+        operationId: operation.id,
+      });
+      return {
+        historyEntry: JSON.stringify(
+          buildSyntheticSendEntry(operation, tokenWithMemo),
+        ),
+      };
     },
 
     executeOfflineSend: async (mintUrl, amount, memo) => {
       const mgr = requireManager();
+      logger.info("operations.executeOfflineSend.prepare", {
+        ...mintUrlFields(mintUrl),
+        amount,
+        hadMemo: !!normalizeMemo(memo),
+      });
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      logger.info("operations.executeOfflineSend.prepared", {
+        operationId: prepared.id,
+        ...mintUrlFields(mintUrl),
+        amount,
+        needsSwap: !!prepared.needsSwap,
+      });
 
       if (prepared.needsSwap) {
-        logger.warn('operations.executeOfflineSend.needsSwap', {
+        logger.warn("operations.executeOfflineSend.needsSwap", {
           operationId: prepared.id,
-          mintUrl,
+          ...mintUrlFields(mintUrl),
           amount,
         });
         await mgr.ops.send.cancel(prepared.id);
-        throw new Error('Offline send requires exact proof match');
+        logger.info("operations.executeOfflineSend.cancelledAfterNeedsSwap", {
+          operationId: prepared.id,
+        });
+        throw new Error("Offline send requires exact proof match");
       }
 
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
       const tokenWithMemo = applyTokenMemo(token, memo);
+      logger.info("operations.executeOfflineSend.complete", {
+        operationId: operation.id,
+        state: operation.state,
+        proofCount: token.proofs.length,
+      });
 
-      const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
+      const historyEntry = await findSendHistoryEntryByOperationId(
+        mgr,
+        operation.id,
+      );
       if (historyEntry) {
-        return { historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo) };
+        logger.info("operations.executeOfflineSend.historyFound", {
+          operationId: operation.id,
+        });
+        return {
+          historyEntry: ensureSendEntryToken(historyEntry, tokenWithMemo),
+        };
       }
 
-      logger.warn('operations.executeOfflineSend.historyMissing', { operationId: operation.id });
-      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, tokenWithMemo)) };
+      logger.warn("operations.executeOfflineSend.historyMissing", {
+        operationId: operation.id,
+      });
+      return {
+        historyEntry: JSON.stringify(
+          buildSyntheticSendEntry(operation, tokenWithMemo),
+        ),
+      };
     },
 
-    executeMintQuote: async (mintUrl, amount, _unit, method = 'bolt11') => {
+    executeMintQuote: async (mintUrl, amount, _unit, method = "bolt11") => {
       const mgr = requireManager();
-      logger.info('operations.executeMintQuote.prepare', { mintUrl, amount, method });
-      if (method === 'onchain') {
-        throw new Error('Onchain mint quotes are not supported by @cashu/coco-core 1.0.1');
+      logger.info("operations.executeMintQuote.prepare", {
+        ...mintUrlFields(mintUrl),
+        amount,
+        method,
+      });
+      if (method === "onchain") {
+        logger.warn("operations.executeMintQuote.onchainUnsupported", {
+          ...mintUrlFields(mintUrl),
+          amount,
+          method,
+        });
+        throw new Error(
+          "Onchain mint quotes are not supported by @cashu/coco-core 1.0.1",
+        );
       }
 
       const mintOp = await mgr.ops.mint.prepare({
         mintUrl,
         amount,
-        method: 'bolt11',
+        method: "bolt11",
         unit: requireSatUnit(_unit),
         methodData: {},
       });
-      logger.info('operations.executeMintQuote.created', {
+      logger.info("operations.executeMintQuote.created", {
         operationId: mintOp.id,
         quoteId: mintOp.quoteId,
+        state: mintOp.lastObservedRemoteState ?? "UNPAID",
+        unit: mintOp.unit,
       });
 
       // Build entry directly from the operation result to avoid a race
       // where getPaginatedHistory runs before HistoryService persists the row.
       const entry = {
         id: mintOp.id,
-        type: 'mint' as const,
+        type: "mint" as const,
         operationId: mintOp.id,
         createdAt: mintOp.createdAt,
         mintUrl: mintOp.mintUrl,
         unit: mintOp.unit,
         quoteId: mintOp.quoteId,
-        state: mintOp.lastObservedRemoteState ?? ('UNPAID' as const),
+        state: mintOp.lastObservedRemoteState ?? ("UNPAID" as const),
         amount: mintOp.amount,
         paymentRequest: mintOp.request,
         metadata: { operationId: mintOp.id },
@@ -431,10 +539,12 @@ export function createDefaultOperations(
       return { historyEntry: JSON.stringify(entry) };
     },
 
-    buildMintListItems: async (data: StepDataMap['selectMint']): Promise<MintListItem[]> => {
+    buildMintListItems: async (
+      data: StepDataMap["selectMint"],
+    ): Promise<MintListItem[]> => {
       const mgr = requireManager();
       const t0 = performance.now();
-      logger.info('operations.buildMintListItems.start', {
+      logger.info("operations.buildMintListItems.start", {
         unit: data.unit,
         scope: data.scope,
         destination: data.destination,
@@ -444,8 +554,19 @@ export function createDefaultOperations(
         mgr.wallet.balances.byMint(),
       ]);
       const balances: Record<string, number> = Object.fromEntries(
-        Object.entries(balancesByMint).map(([url, snap]) => [url, amountToNumber(snap.total)])
+        Object.entries(balancesByMint).map(([url, snap]) => [
+          url,
+          amountToNumber(snap.total),
+        ]),
       );
+      logger.info("operations.buildMintListItems.context.loaded", {
+        trustedMintCount: allTrustedMints.length,
+        balanceMintCount: Object.keys(balances).length,
+        totalBalance: Object.values(balances).reduce(
+          (sum, balance) => sum + balance,
+          0,
+        ),
+      });
 
       // Seed from coco's local trusted-mint records first, then refresh via
       // getMintInfo. Offline or timed-out refreshes must not erase the
@@ -453,7 +574,8 @@ export function createDefaultOperations(
       // When the wallet injects `config.fetchMintInfo`, it can route through
       // its own SWR cache + per-mint deadline so a dead mint doesn't gate the
       // whole list.
-      const fetchInfo = config.fetchMintInfo ?? ((url: string) => mgr.mint.getMintInfo(url));
+      const fetchInfo =
+        config.fetchMintInfo ?? ((url: string) => mgr.mint.getMintInfo(url));
       const mintInfoMap = new Map<string, MintInfo>();
       for (const mint of allTrustedMints) {
         if (hasMintInfo(mint.mintInfo)) {
@@ -466,25 +588,25 @@ export function createDefaultOperations(
             const info = await fetchInfo(mint.mintUrl);
             if (info) {
               mintInfoMap.set(mint.mintUrl, info);
-              logger.info('operations.buildMintListItems.getMintInfo.ok', {
-                mintUrl: mint.mintUrl,
+              logger.info("operations.buildMintListItems.getMintInfo.ok", {
+                ...mintUrlFields(mint.mintUrl),
                 name: info.name,
                 hasIcon: !!info.icon_url,
               });
             } else {
-              logger.warn('operations.buildMintListItems.getMintInfo.null', {
-                mintUrl: mint.mintUrl,
+              logger.warn("operations.buildMintListItems.getMintInfo.null", {
+                ...mintUrlFields(mint.mintUrl),
               });
             }
           } catch (e) {
-            logger.warn('operations.buildMintListItems.getMintInfo.failed', {
-              mintUrl: mint.mintUrl,
+            logger.warn("operations.buildMintListItems.getMintInfo.failed", {
+              ...mintUrlFields(mint.mintUrl),
               error: errField(e),
             });
           }
-        })
+        }),
       );
-      logger.info('operations.buildMintListItems.info.resolved', {
+      logger.info("operations.buildMintListItems.info.resolved", {
         resolved: mintInfoMap.size,
         total: allTrustedMints.length,
         durationMs: Math.round(performance.now() - t0),
@@ -497,15 +619,24 @@ export function createDefaultOperations(
       let catalog: Record<string, MintCatalogEntry> = {};
       if (config.fetchMintCatalog) {
         try {
+          logger.info("operations.buildMintListItems.fetchMintCatalog.start", {
+            mintCount: mintUrls.length,
+          });
           catalog = await config.fetchMintCatalog(mintUrls);
+          logger.info("operations.buildMintListItems.fetchMintCatalog.done", {
+            mintCount: mintUrls.length,
+            returnedCount: Object.keys(catalog).length,
+          });
         } catch (e) {
-          logger.warn('operations.buildMintListItems.fetchMintCatalog.failed', {
+          logger.warn("operations.buildMintListItems.fetchMintCatalog.failed", {
             error: errField(e),
           });
         }
       }
 
-      const supportedSet = data.supportedMintUrls ? new Set(data.supportedMintUrls) : null;
+      const supportedSet = data.supportedMintUrls
+        ? new Set(data.supportedMintUrls)
+        : null;
       const capabilityCtx = {
         trustedMintUrls: mintUrls,
         mintBalances: balances,
@@ -514,39 +645,49 @@ export function createDefaultOperations(
             mintUrl: mint.mintUrl,
             mintInfo: mintInfoMap.get(mint.mintUrl) ?? mint.mintInfo,
           })),
-          data.unit
+          data.unit,
         ),
       };
       const methodCandidates = data.methodRequirement
-        ? buildMethodAwareMintCandidates(capabilityCtx, data.methodRequirement, {
-            amount: data.amount,
-            allowedMints: data.supportedMintUrls,
-            requireBalance:
-              data.destination === 'paymentRequest' ||
-              data.destination === 'meltQuote' ||
-              data.destination === 'sendEcash',
-          })
+        ? buildMethodAwareMintCandidates(
+            capabilityCtx,
+            data.methodRequirement,
+            {
+              amount: data.amount,
+              allowedMints: data.supportedMintUrls,
+              requireBalance:
+                data.destination === "paymentRequest" ||
+                data.destination === "meltQuote" ||
+                data.destination === "sendEcash",
+            },
+          )
         : data.candidates;
-      const candidateByMint = new Map(methodCandidates.map((candidate) => [candidate.mintUrl, candidate]));
+      const candidateByMint = new Map(
+        methodCandidates.map((candidate) => [candidate.mintUrl, candidate]),
+      );
 
       const items = allTrustedMints.map((mint: Mint): MintListItem => {
         const mintUrl = mint.mintUrl;
         const info = mintInfoMap.get(mintUrl);
         const balance = balances[mintUrl] ?? 0;
         const candidate = candidateByMint.get(mintUrl);
-        const isInCandidate = data.candidates.some((c) => c.mintUrl === mintUrl);
+        const isInCandidate = data.candidates.some(
+          (c) => c.mintUrl === mintUrl,
+        );
 
-        let status: 'available' | 'disabled' = 'available';
-        let reason: MintListItem['reason'] = null;
+        let status: "available" | "disabled" = "available";
+        let reason: MintListItem["reason"] = null;
 
         // Balance checks only apply in send-type flows (melt/send/payment request).
         // All other cases (no destination, mintQuote, scope override) allow every mint.
         const needsBalanceCheck =
-          data.destination === 'paymentRequest' ||
-          data.destination === 'meltQuote' ||
-          data.destination === 'sendEcash';
+          data.destination === "paymentRequest" ||
+          data.destination === "meltQuote" ||
+          data.destination === "sendEcash";
         const skipBalanceCheck =
-          !needsBalanceCheck || data.scope === 'selected' || data.scope === 'npc';
+          !needsBalanceCheck ||
+          data.scope === "selected" ||
+          data.scope === "npc";
 
         // NPC receive only works against mints that speak NUT-17 websockets:
         // the npub.cash plugin forwards paid quotes to the mint operation
@@ -554,22 +695,34 @@ export function createDefaultOperations(
         // quote settles. Mints without NUT-17 are shown for context but
         // disabled so the user can't pick one that won't auto-receive.
         const supportsWebsocket =
-          (info?.nuts?.['17']?.supported?.length ?? 0) > 0;
-        if (data.scope === 'npc' && !supportsWebsocket) {
-          status = 'disabled';
-          reason = { code: 'NO_WEBSOCKET', message: 'Does not support live updates (NUT-17)' };
+          (info?.nuts?.["17"]?.supported?.length ?? 0) > 0;
+        if (data.scope === "npc" && !supportsWebsocket) {
+          status = "disabled";
+          reason = {
+            code: "NO_WEBSOCKET",
+            message: "Does not support live updates (NUT-17)",
+          };
         } else if (supportedSet && !supportedSet.has(mintUrl)) {
-          status = 'disabled';
-          reason = { code: 'NOT_IN_PAYMENT_REQUEST', message: 'Not accepted by payment request' };
-        } else if (candidate?.status === 'disabled') {
-          status = 'disabled';
-          reason = candidate.reason ?? { code: 'UNSUPPORTED_FOR_FLOW', message: 'Unsupported for this flow' };
+          status = "disabled";
+          reason = {
+            code: "NOT_IN_PAYMENT_REQUEST",
+            message: "Not accepted by payment request",
+          };
+        } else if (candidate?.status === "disabled") {
+          status = "disabled";
+          reason = candidate.reason ?? {
+            code: "UNSUPPORTED_FOR_FLOW",
+            message: "Unsupported for this flow",
+          };
         } else if (!skipBalanceCheck && data.amount && balance < data.amount) {
-          status = 'disabled';
-          reason = { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient balance' };
+          status = "disabled";
+          reason = {
+            code: "INSUFFICIENT_BALANCE",
+            message: "Insufficient balance",
+          };
         } else if (!skipBalanceCheck && !isInCandidate && balance <= 0) {
-          status = 'disabled';
-          reason = { code: 'NO_BALANCE', message: 'No balance' };
+          status = "disabled";
+          reason = { code: "NO_BALANCE", message: "No balance" };
         }
 
         const entry = catalog[mintUrl] ?? {};
@@ -593,8 +746,24 @@ export function createDefaultOperations(
       });
 
       items.sort((a, b) => {
-        if (a.status !== b.status) return a.status === 'available' ? -1 : 1;
+        if (a.status !== b.status) return a.status === "available" ? -1 : 1;
         return b.balance - a.balance;
+      });
+      const disabledReasons = items.reduce<Record<string, number>>(
+        (acc, item) => {
+          if (item.status !== "disabled") return acc;
+          const code = item.reason?.code ?? "UNKNOWN";
+          acc[code] = (acc[code] ?? 0) + 1;
+          return acc;
+        },
+        {},
+      );
+      logger.info("operations.buildMintListItems.done", {
+        total: items.length,
+        available: items.filter((item) => item.status === "available").length,
+        disabled: items.filter((item) => item.status === "disabled").length,
+        disabledReasons,
+        durationMs: Math.round(performance.now() - t0),
       });
 
       return items;
@@ -602,25 +771,43 @@ export function createDefaultOperations(
 
     trustMint: async (mintUrl) => {
       const mgr = requireManager();
-      logger.info('operations.trustMint', { mintUrl });
+      logger.info("operations.trustMint", { ...mintUrlFields(mintUrl) });
       await mgr.mint.addMint(mintUrl, { trusted: true });
+      logger.info("operations.trustMint.done", { ...mintUrlFields(mintUrl) });
     },
 
     executeNfcSend: async (mintUrl, amount) => {
       const mgr = requireManager();
-      logger.info('operations.executeNfcSend.prepare', { mintUrl, amount });
+      logger.info("operations.executeNfcSend.prepare", {
+        ...mintUrlFields(mintUrl),
+        amount,
+      });
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      logger.info("operations.executeNfcSend.prepared", {
+        operationId: prepared.id,
+        needsSwap: !!prepared.needsSwap,
+      });
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
-      logger.info('operations.executeNfcSend.tokenCreated', { operationId: operation.id });
-      const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
+      logger.info("operations.executeNfcSend.tokenCreated", {
+        operationId: operation.id,
+        state: operation.state,
+        proofCount: token.proofs.length,
+      });
+      const historyEntry = await findSendHistoryEntryByOperationId(
+        mgr,
+        operation.id,
+      );
       if (!historyEntry) {
-        logger.warn('operations.executeNfcSend.historyMissing', {
+        logger.warn("operations.executeNfcSend.historyMissing", {
           operationId: operation.id,
-          mintUrl,
+          ...mintUrlFields(mintUrl),
           amount,
         });
-        throw new Error('Send history entry not found after creation');
+        throw new Error("Send history entry not found after creation");
       }
+      logger.info("operations.executeNfcSend.historyFound", {
+        operationId: operation.id,
+      });
       return {
         token: getEncodedToken(token),
         historyEntry,
@@ -630,17 +817,20 @@ export function createDefaultOperations(
 
     rollbackSend: async (operationId) => {
       const mgr = getManager();
-      if (!mgr) return;
-      logger.info('operations.rollbackSend.start', { operationId });
+      if (!mgr) {
+        logger.warn("operations.rollbackSend.noManager", { operationId });
+        return;
+      }
+      logger.info("operations.rollbackSend.start", { operationId });
       const operation = await mgr.ops.send.get(operationId).catch((e) => {
-        logger.warn('operations.rollbackSend.lookupFailed', {
+        logger.warn("operations.rollbackSend.lookupFailed", {
           operationId,
           error: errField(e),
         });
         return null;
       });
       if (!operation) {
-        logger.info('operations.rollbackSend.notFound', { operationId });
+        logger.info("operations.rollbackSend.notFound", { operationId });
         return;
       }
       // Only swallow "already gone" — surface every other reclaim/cancel
@@ -648,15 +838,28 @@ export function createDefaultOperations(
       // hold the spent proofs in pending state. Silently telling the user
       // a send was cancelled when reclaim failed leaves wallet state and
       // mint state divergent.
-      if (operation.state === 'prepared') {
-        logger.info('operations.rollbackSend.cancelPrepared', { operationId });
+      if (operation.state === "prepared") {
+        logger.info("operations.rollbackSend.cancelPrepared", { operationId });
         await mgr.ops.send.cancel(operationId);
-      } else if (['executing', 'pending'].includes(operation.state)) {
-        logger.info('operations.rollbackSend.reclaim', {
+        logger.info("operations.rollbackSend.done", {
+          operationId,
+          action: "cancel",
+        });
+      } else if (["executing", "pending"].includes(operation.state)) {
+        logger.info("operations.rollbackSend.reclaim", {
           state: operation.state,
           operationId,
         });
         await mgr.ops.send.reclaim(operationId);
+        logger.info("operations.rollbackSend.done", {
+          operationId,
+          action: "reclaim",
+        });
+      } else {
+        logger.info("operations.rollbackSend.noop", {
+          operationId,
+          state: operation.state,
+        });
       }
     },
 
@@ -664,26 +867,38 @@ export function createDefaultOperations(
 
     checkSendStatus: async (operationId) => {
       const mgr = requireManager();
+      logger.info("operations.checkSendStatus.start", { operationId });
       const operation = await mgr.ops.send.get(operationId);
       if (!operation) {
-        return { state: 'not_found' };
+        logger.info("operations.checkSendStatus.notFound", { operationId });
+        return { state: "not_found" };
       }
-      if (operation.state === 'pending') {
+      if (operation.state === "pending") {
+        logger.info("operations.checkSendStatus.refresh", { operationId });
         await mgr.ops.send.refresh(operationId);
         const updated = await mgr.ops.send.get(operationId);
+        logger.info("operations.checkSendStatus.done", {
+          operationId,
+          from: operation.state,
+          to: updated?.state ?? operation.state,
+        });
         return { state: updated?.state ?? operation.state };
       }
+      logger.info("operations.checkSendStatus.done", {
+        operationId,
+        state: operation.state,
+      });
       return { state: operation.state };
     },
 
     executeReceive: async (tokenString, mintUrl, _amount) => {
       const mgr = requireManager();
-      logger.info('operations.executeReceive.start', {
-        mintUrl,
-        tokenPreview: tokenString.slice(0, 20) + '…',
+      logger.info("operations.executeReceive.start", {
+        ...mintUrlFields(mintUrl),
+        tokenLength: tokenString.length,
       });
       await mgr.wallet.receive(tokenString);
-      logger.info('operations.executeReceive.received');
+      logger.info("operations.executeReceive.received", { ...mintUrlFields(mintUrl) });
 
       let hadP2PK = false;
       let tokenAmount = 0;
@@ -691,26 +906,47 @@ export function createDefaultOperations(
         const metadata = getTokenMetadata(tokenString);
         hadP2PK = hasP2PKProofs(metadata.incompleteProofs);
         tokenAmount = amountToNumber(metadata.amount);
+        logger.info("operations.executeReceive.tokenDecoded", {
+          ...mintUrlFields(mintUrl),
+          amount: tokenAmount,
+          unit: metadata.unit ?? "sat",
+          proofCount: metadata.incompleteProofs.length,
+          hadP2PKProofs: hadP2PK,
+        });
       } catch (e) {
-        logger.warn('operations.executeReceive.p2pkDetectionFailed', { error: errField(e) });
+        logger.warn("operations.executeReceive.p2pkDetectionFailed", {
+          error: errField(e),
+        });
       }
 
       // Try history first, fall back to constructing from known data
       // to avoid race where history write hasn't flushed yet.
-      const historyEntry = await findReceiveHistoryEntry(mgr, tokenString, mintUrl);
-      if (historyEntry) return { historyEntry, hadP2PKProofs: hadP2PK };
+      const historyEntry = await findReceiveHistoryEntry(
+        mgr,
+        tokenString,
+        mintUrl,
+      );
+      if (historyEntry) {
+        logger.info("operations.executeReceive.historyFound", {
+          ...mintUrlFields(mintUrl),
+          hadP2PKProofs: hadP2PK,
+        });
+        return { historyEntry, hadP2PKProofs: hadP2PK };
+      }
 
-      logger.warn('operations.executeReceive.historyMissing', { mintUrl });
+      logger.warn("operations.executeReceive.historyMissing", {
+        ...mintUrlFields(mintUrl),
+      });
       // Synthetic fallback only — coco-core's history row is the canonical
       // store of the encoded token. Echoing it here would put a bearer
       // instrument into notifications.onTransactionCreated subscribers and
       // every entry-update listener that doesn't read from the DB.
       const entry = {
         id: `redeemed-${Date.now()}`,
-        type: 'receive' as const,
+        type: "receive" as const,
         createdAt: Date.now(),
         mintUrl,
-        unit: 'sat',
+        unit: "sat",
         amount: tokenAmount,
       };
       return { historyEntry: JSON.stringify(entry), hadP2PKProofs: hadP2PK };
@@ -718,30 +954,49 @@ export function createDefaultOperations(
 
     isMintTrusted: async (mintUrl) => {
       const mgr = requireManager();
-      return mgr.mint.isTrustedMint(mintUrl);
+      const trusted = await mgr.mint.isTrustedMint(mintUrl);
+      logger.info("operations.isMintTrusted.result", {
+        ...mintUrlFields(mintUrl),
+        trusted,
+      });
+      return trusted;
     },
 
     executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
       requireSatUnit(_unit);
-      logger.info('operations.executeMelt.start', {
-        mintUrl,
+      const targetKind = isLightningInvoiceBolt11(meltTarget)
+        ? "bolt11"
+        : "lnurl";
+      logger.info("operations.executeMelt.start", {
+        ...mintUrlFields(mintUrl),
         amount,
-        targetPreview: meltTarget.slice(0, 30) + '…',
+        targetKind,
+        targetLength: meltTarget.length,
       });
 
-      const bolt11 = isLightningInvoiceBolt11(meltTarget)
-        ? meltTarget
-        : await requestInvoiceFromLnurl(meltTarget, amount, {
-            timeoutMs: config.lightningTimeoutMs,
-          });
+      const bolt11 =
+        targetKind === "bolt11"
+          ? meltTarget
+          : await requestInvoiceFromLnurl(meltTarget, amount, {
+              timeoutMs: config.lightningTimeoutMs,
+            });
+      logger.info("operations.executeMelt.invoiceReady", {
+        ...mintUrlFields(mintUrl),
+        amount,
+        source: targetKind,
+        invoiceLength: bolt11.length,
+      });
 
       const operation = await mgr.ops.melt.prepare({
         mintUrl,
-        method: 'bolt11',
+        method: "bolt11",
         methodData: { invoice: bolt11 },
       });
-      logger.info('operations.executeMelt.execute', { operationId: operation.id });
+      logger.info("operations.executeMelt.execute", {
+        operationId: operation.id,
+        quoteId: operation.quoteId,
+      });
       // prepare() reserves proofs at the mint. If execute() throws — mint
       // unreachable mid-flight, network drop, mint 5xx — the reservation
       // stays live until the next manager restart unless we cancel here.
@@ -751,34 +1006,36 @@ export function createDefaultOperations(
       try {
         // Mock-fail gate inside the try so the existing cancel-after-failure
         // rescue runs — exercising the same path the QA toggle exists to test.
-        if (mockFailEnabled('melt')) {
-          throw new Error('Mock melt failure (dev)');
+        if (mockFailEnabled("melt")) {
+          throw new Error("Mock melt failure (dev)");
         }
         result = await mgr.ops.melt.execute(operation.id);
       } catch (e) {
-        logger.warn('operations.executeMelt.executeFailed', {
+        logger.warn("operations.executeMelt.executeFailed", {
           operationId: operation.id,
           error: errField(e),
         });
-        await mgr.ops.melt.cancel(operation.id, 'Execute failed').catch((cancelErr) => {
-          logger.warn('operations.executeMelt.cancelAfterFailureFailed', {
-            operationId: operation.id,
-            error: errField(cancelErr),
+        await mgr.ops.melt
+          .cancel(operation.id, "Execute failed")
+          .catch((cancelErr) => {
+            logger.warn("operations.executeMelt.cancelAfterFailureFailed", {
+              operationId: operation.id,
+              error: errField(cancelErr),
+            });
           });
-        });
         throw e;
       }
-      logger.info('operations.executeMelt.complete', {
+      logger.info("operations.executeMelt.complete", {
         operationId: result.id,
         state: result.state,
       });
 
       const entry = {
         id: result.id,
-        type: 'melt' as const,
+        type: "melt" as const,
         createdAt: result.createdAt,
         mintUrl: result.mintUrl,
-        unit: 'sat',
+        unit: "sat",
         quoteId: result.quoteId,
         state: mapMeltOperationState(result.state),
         amount: result.amount,
@@ -789,17 +1046,22 @@ export function createDefaultOperations(
 
     rollbackMelt: async (operationId) => {
       const mgr = requireManager();
-      logger.info('operations.rollbackMelt.start', { operationId });
-      await mgr.ops.melt.cancel(operationId, 'User cancelled');
-      logger.info('operations.rollbackMelt.done', { operationId });
+      logger.info("operations.rollbackMelt.start", { operationId });
+      await mgr.ops.melt.cancel(operationId, "User cancelled");
+      logger.info("operations.rollbackMelt.done", { operationId });
     },
 
     buildMintReviewInfo: async (mintUrl, item): Promise<MintReviewInfo> => {
       const mgr = requireManager();
+      const t0 = performance.now();
+      logger.info("operations.buildMintReviewInfo.start", {
+        ...mintUrlFields(mintUrl),
+        hasItem: !!item,
+      });
       const [mintInfo, balancesByMint, isTrusted] = await Promise.all([
         mgr.mint.getMintInfo(mintUrl).catch((e) => {
-          logger.warn('operations.buildMintReviewInfo.getMintInfo.failed', {
-            mintUrl,
+          logger.warn("operations.buildMintReviewInfo.getMintInfo.failed", {
+            ...mintUrlFields(mintUrl),
             error: errField(e),
           });
           return undefined;
@@ -810,6 +1072,13 @@ export function createDefaultOperations(
 
       const preferredMintUrl = config.getPreferredMintUrl?.();
       const enrichment = config.enrichMintReviewInfo?.(mintUrl) ?? {};
+      logger.info("operations.buildMintReviewInfo.base.resolved", {
+        ...mintUrlFields(mintUrl),
+        hasMintInfo: !!mintInfo,
+        isTrusted,
+        hasPreferredMint: !!preferredMintUrl,
+        enrichmentKeys: Object.keys(enrichment).length,
+      });
 
       // The Select Mint row already carries fresh catalog data from
       // `fetchMintCatalog`; prefer it over `enrichMintReviewInfo`'s cache
@@ -818,26 +1087,33 @@ export function createDefaultOperations(
       const rowCatalog: Partial<MintReviewInfo> = {};
       if (item) {
         if (item.kymScore !== undefined) rowCatalog.kymScore = item.kymScore;
-        if (item.auditScore !== undefined) rowCatalog.auditScore = item.auditScore;
-        if (item.auditState !== undefined) rowCatalog.auditState = item.auditState;
+        if (item.auditScore !== undefined)
+          rowCatalog.auditScore = item.auditScore;
+        if (item.auditState !== undefined)
+          rowCatalog.auditState = item.auditState;
       }
 
       const contactPubkey = extractMintNostrContactPubkey(mintInfo);
       const [contactProfile, reviews] = await Promise.all([
         contactPubkey && config.resolveMintContactProfile
-          ? config.resolveMintContactProfile(contactPubkey, mintUrl).catch((e) => {
-              logger.warn('operations.buildMintReviewInfo.contactProfile.failed', {
-                mintUrl,
-                pubkey: contactPubkey,
-                error: errField(e),
-              });
-              return undefined;
-            })
+          ? config
+              .resolveMintContactProfile(contactPubkey, mintUrl)
+              .catch((e) => {
+                logger.warn(
+                  "operations.buildMintReviewInfo.contactProfile.failed",
+                  {
+                    ...mintUrlFields(mintUrl),
+                    pubkey: contactPubkey,
+                    error: errField(e),
+                  },
+                );
+                return undefined;
+              })
           : Promise.resolve(undefined),
         config.fetchMintReviews
           ? config.fetchMintReviews(mintUrl).catch((e) => {
-              logger.warn('operations.buildMintReviewInfo.reviews.failed', {
-                mintUrl,
+              logger.warn("operations.buildMintReviewInfo.reviews.failed", {
+                ...mintUrlFields(mintUrl),
                 error: errField(e),
               });
               return undefined;
@@ -848,17 +1124,17 @@ export function createDefaultOperations(
       const asyncEnrichment: Partial<MintReviewInfo> = {};
       if (contactProfile) {
         asyncEnrichment.contactProfile = contactProfile;
-        if (typeof contactProfile.followers === 'number') {
+        if (typeof contactProfile.followers === "number") {
           asyncEnrichment.contactFollowers = contactProfile.followers;
         }
-        if (typeof contactProfile.score === 'number') {
+        if (typeof contactProfile.score === "number") {
           asyncEnrichment.contactReputation = Math.round(contactProfile.score);
         }
       }
       if (reviews) {
         asyncEnrichment.reviews = reviews;
         asyncEnrichment.reviewCount = reviews.recommendations.length;
-        if (typeof reviews.score === 'number') {
+        if (typeof reviews.score === "number") {
           asyncEnrichment.kymScore = reviews.score;
         }
       }
@@ -871,9 +1147,13 @@ export function createDefaultOperations(
         longDescription: mintInfo?.description_long,
         motd: mintInfo?.motd,
         contact: mintInfo?.contact,
-        nuts: mintInfo?.nuts ? Object.keys(mintInfo.nuts).map(Number) : undefined,
-        balance: amountToNumber(balancesByMint[mintUrl]?.total ?? item?.balance ?? 0),
-        unit: item?.unit ?? 'sat',
+        nuts: mintInfo?.nuts
+          ? Object.keys(mintInfo.nuts).map(Number)
+          : undefined,
+        balance: amountToNumber(
+          balancesByMint[mintUrl]?.total ?? item?.balance ?? 0,
+        ),
+        unit: item?.unit ?? "sat",
         isPreferred: item?.isPreferred ?? mintUrl === preferredMintUrl,
         isTrusted,
         ...enrichment,
@@ -885,47 +1165,86 @@ export function createDefaultOperations(
       // local cache; when the user came straight from the selector without a
       // warm cache, fall back to the success rate implied by auditScore so
       // the StatsGrid's headline number stays meaningful.
-      if (result.successRate === undefined && typeof result.auditScore === 'number') {
+      if (
+        result.successRate === undefined &&
+        typeof result.auditScore === "number"
+      ) {
         result.successRate = result.auditScore / 5;
       }
+      logger.info("operations.buildMintReviewInfo.done", {
+        ...mintUrlFields(mintUrl),
+        balance: result.balance,
+        isTrusted: result.isTrusted,
+        hasContactProfile: !!contactProfile,
+        reviewCount: result.reviewCount ?? 0,
+        durationMs: Math.round(performance.now() - t0),
+      });
 
       return result;
     },
 
     executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
       const mgr = requireManager();
-      logger.info('operations.executePaymentRequest.start', { mintUrl, amount });
+      logger.info("operations.executePaymentRequest.start", {
+        ...mintUrlFields(mintUrl),
+        amount,
+        unit,
+        paymentRequestLength: paymentRequest.length,
+      });
 
       const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
       if (!info) {
-        logger.warn('operations.executePaymentRequest.parseFailed', {
-          paymentRequestPreview: paymentRequest.slice(0, 60),
+        logger.warn("operations.executePaymentRequest.parseFailed", {
+          paymentRequestLength: paymentRequest.length,
         });
-        throw new Error('Invalid payment request');
+        throw new Error("Invalid payment request");
       }
+      logger.info("operations.executePaymentRequest.parseDone", {
+        ...mintUrlFields(mintUrl),
+        requestedAmount: info.amount ?? null,
+        transportCount: info.transports?.length ?? 0,
+      });
 
-      const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
-      const httpTransport = info.transports?.find((t) => t.type === 'post');
+      const nostrTransport = info.transports?.find((t) => t.type === "nostr");
+      const httpTransport = info.transports?.find((t) => t.type === "post");
       let operationId: string;
 
       if (nostrTransport && !httpTransport) {
-        logger.info('operations.executePaymentRequest.transport', { transport: 'nostr' });
+        logger.info("operations.executePaymentRequest.transport", {
+          transport: "nostr",
+        });
         // Nostr transport: use ops.send directly since PaymentRequestsApi doesn't support Nostr
         const sendNostrDM = config.sendNostrDM;
         if (!sendNostrDM) {
-          logger.warn('operations.executePaymentRequest.nostrDM.unconfigured');
-          throw new Error('sendNostrDM operation is required for Nostr payment requests');
+          logger.warn("operations.executePaymentRequest.nostrDM.unconfigured");
+          throw new Error(
+            "sendNostrDM operation is required for Nostr payment requests",
+          );
         }
 
         const effectiveAmount = info.amount ?? amount;
         if (!effectiveAmount) {
-          logger.warn('operations.executePaymentRequest.nostr.missingAmount');
-          throw new Error('Amount is required for Nostr payment requests');
+          logger.warn("operations.executePaymentRequest.nostr.missingAmount");
+          throw new Error("Amount is required for Nostr payment requests");
         }
 
-        const prepared = await mgr.ops.send.prepare({ mintUrl, amount: effectiveAmount });
+        const prepared = await mgr.ops.send.prepare({
+          mintUrl,
+          amount: effectiveAmount,
+        });
+        logger.info("operations.executePaymentRequest.nostr.prepared", {
+          operationId: prepared.id,
+          ...mintUrlFields(mintUrl),
+          amount: effectiveAmount,
+          needsSwap: !!prepared.needsSwap,
+        });
         const { operation, token } = await mgr.ops.send.execute(prepared.id);
         operationId = operation.id;
+        logger.info("operations.executePaymentRequest.nostr.tokenCreated", {
+          operationId,
+          state: operation.state,
+          proofCount: token.proofs.length,
+        });
 
         const payload = {
           id: paymentRequest,
@@ -934,68 +1253,98 @@ export function createDefaultOperations(
           proofs: token.proofs,
         };
         try {
-          if (mockFailEnabled('paymentRequest')) {
-            throw new Error('Mock delivery failure (dev)');
+          if (mockFailEnabled("paymentRequest")) {
+            throw new Error("Mock delivery failure (dev)");
           }
           await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
-          logger.info('operations.executePaymentRequest.nostr.sent', { operationId });
+          logger.info("operations.executePaymentRequest.nostr.sent", {
+            operationId,
+          });
         } catch (deliveryErr) {
-          logger.warn('operations.executePaymentRequest.nostr.deliveryFailed', {
+          logger.warn("operations.executePaymentRequest.nostr.deliveryFailed", {
             operationId,
             error: errField(deliveryErr),
           });
           const rollbackResult = await attemptRollback(mgr, operationId);
           if (rollbackResult) {
             const errorMessage =
-              deliveryErr instanceof Error ? deliveryErr.message : 'Nostr delivery failed';
+              deliveryErr instanceof Error
+                ? deliveryErr.message
+                : "Nostr delivery failed";
             return buildRolledBackResult(
               operationId,
               mintUrl,
               effectiveAmount,
               unit,
               paymentRequest,
-              'nostr',
-              errorMessage
+              "nostr",
+              errorMessage,
             );
           }
           throw deliveryErr;
         }
       } else {
-        logger.info('operations.executePaymentRequest.transport', { transport: 'http' });
+        logger.info("operations.executePaymentRequest.transport", {
+          transport: "http",
+        });
         // HTTP / transport-less payment request: use the paymentRequests API
         const parsed = await mgr.paymentRequests.parse(paymentRequest);
-        const transaction = await mgr.paymentRequests.prepare(parsed, { mintUrl, amount });
+        logger.info("operations.executePaymentRequest.http.parsed", {
+          ...mintUrlFields(mintUrl),
+          amount,
+          paymentRequestLength: paymentRequest.length,
+        });
+        const transaction = await mgr.paymentRequests.prepare(parsed, {
+          mintUrl,
+          amount,
+        });
         operationId = transaction.sendOperation.id;
+        logger.info("operations.executePaymentRequest.http.prepared", {
+          operationId,
+          ...mintUrlFields(mintUrl),
+          amount,
+        });
         try {
-          if (mockFailEnabled('paymentRequest')) {
-            throw new Error('Mock delivery failure (dev)');
+          if (mockFailEnabled("paymentRequest")) {
+            throw new Error("Mock delivery failure (dev)");
           }
           await mgr.paymentRequests.execute(transaction);
-          logger.info('operations.executePaymentRequest.http.executed', { operationId });
+          logger.info("operations.executePaymentRequest.http.executed", {
+            operationId,
+          });
         } catch (deliveryErr) {
-          logger.warn('operations.executePaymentRequest.http.deliveryFailed', {
+          logger.warn("operations.executePaymentRequest.http.deliveryFailed", {
             operationId,
             error: errField(deliveryErr),
           });
           const rollbackResult = await attemptRollback(mgr, operationId);
           if (rollbackResult) {
             const errorMessage =
-              deliveryErr instanceof Error ? deliveryErr.message : 'HTTP delivery failed';
+              deliveryErr instanceof Error
+                ? deliveryErr.message
+                : "HTTP delivery failed";
             return buildRolledBackResult(
               operationId,
               mintUrl,
               amount,
               unit,
               paymentRequest,
-              'http',
-              errorMessage
+              "http",
+              errorMessage,
             );
           }
           throw deliveryErr;
         }
       }
 
-      const historyEntry = await findSendHistoryEntryByOperationId(mgr, operationId);
+      const historyEntry = await findSendHistoryEntryByOperationId(
+        mgr,
+        operationId,
+      );
+      logger.info("operations.executePaymentRequest.historyLookup", {
+        operationId,
+        found: !!historyEntry,
+      });
       const baseEntry: SendHistoryEntry = historyEntry
         ? // findSendHistoryEntryByOperationId only returns 'send' rows, so the
           // narrow is safe; the cast is a pragmatic alternative to re-running
@@ -1010,16 +1359,16 @@ export function createDefaultOperations(
         metadata: {
           ...(baseEntry.metadata ?? {}),
           paymentRequest,
-          phase: 'delivered',
-          tokenCreated: 'true',
+          phase: "delivered",
+          tokenCreated: "true",
           ...(nostrTransport
-            ? { nostrSent: 'true', transportType: 'nostr' }
-            : { transportType: 'http' }),
+            ? { nostrSent: "true", transportType: "nostr" }
+            : { transportType: "http" }),
         },
       };
-      logger.info('operations.executePaymentRequest.done', {
+      logger.info("operations.executePaymentRequest.done", {
         operationId,
-        transport: nostrTransport ? 'nostr' : 'http',
+        transport: nostrTransport ? "nostr" : "http",
       });
       return { historyEntry: JSON.stringify(enriched) };
     },
@@ -1037,19 +1386,28 @@ export function createDefaultOperations(
         const beforeHistory = await mgr.history.getPaginatedHistory(0, 100);
         beforeIds = new Set(
           beforeHistory
-            .filter((h) => h.type === 'receive' && h.mintUrl === mintUrl)
+            .filter((h) => h.type === "receive" && h.mintUrl === mintUrl)
             .map((h) => h.id)
-            .filter((id): id is string => typeof id === 'string' && id.length > 0)
+            .filter(
+              (id): id is string => typeof id === "string" && id.length > 0,
+            ),
         );
       } catch (e) {
-        logger.warn('operations.executeAutoRedeem.snapshotFailed', { error: errField(e) });
+        logger.warn("operations.executeAutoRedeem.snapshotFailed", {
+          ...mintUrlFields(mintUrl),
+          error: errField(e),
+        });
       }
 
-      logger.info('operations.executeAutoRedeem.start', {
-        mintUrl,
+      logger.info("operations.executeAutoRedeem.start", {
+        ...mintUrlFields(mintUrl),
         beforeCount: beforeIds.size,
+        tokenLength: tokenString.length,
       });
       await mgr.wallet.receive(tokenString);
+      logger.info("operations.executeAutoRedeem.received", {
+        ...mintUrlFields(mintUrl),
+      });
 
       // ~10s of polling at 200ms — waits out coco's history flush.
       const MAX_ATTEMPTS = 50;
@@ -1059,22 +1417,25 @@ export function createDefaultOperations(
           const after = await mgr.history.getPaginatedHistory(0, 100);
           const newEntry = after.find(
             (h) =>
-              h.type === 'receive' &&
+              h.type === "receive" &&
               h.mintUrl === mintUrl &&
-              typeof h.id === 'string' &&
+              typeof h.id === "string" &&
               h.id.length > 0 &&
-              !beforeIds.has(h.id)
+              !beforeIds.has(h.id),
           );
           if (newEntry) {
-            logger.info('operations.executeAutoRedeem.found', {
-              mintUrl,
+            logger.info("operations.executeAutoRedeem.found", {
+              ...mintUrlFields(mintUrl),
               historyEntryId: newEntry.id,
               attempts: attempt + 1,
             });
-            return { historyEntryId: newEntry.id, historyEntry: JSON.stringify(newEntry) };
+            return {
+              historyEntryId: newEntry.id,
+              historyEntry: JSON.stringify(newEntry),
+            };
           }
         } catch (e) {
-          logger.warn('operations.executeAutoRedeem.pollFailed', {
+          logger.warn("operations.executeAutoRedeem.pollFailed", {
             attempt,
             error: errField(e),
           });
@@ -1085,8 +1446,8 @@ export function createDefaultOperations(
       // The receive itself succeeded (proofs are persisted); only the
       // history linkage couldn't be resolved. Callers treat null as
       // "redeemed, unlinked" — loud log so the flush issue gets attention.
-      logger.error('operations.executeAutoRedeem.timeoutFallback', {
-        mintUrl,
+      logger.error("operations.executeAutoRedeem.timeoutFallback", {
+        ...mintUrlFields(mintUrl),
         polledMs: MAX_ATTEMPTS * DELAY_MS,
       });
       return { historyEntryId: null, historyEntry: null };
@@ -1110,32 +1471,43 @@ export function createDefaultOperations(
 function buildSyntheticPaymentRequestEntry(
   operationId: string,
   mintUrl: string,
-  amount: number
+  amount: number,
 ): SendHistoryEntry {
   const now = Date.now();
   return {
     id: operationId,
-    type: 'send',
+    type: "send",
     createdAt: now,
     mintUrl,
-    unit: 'sat',
+    unit: "sat",
     amount,
     operationId,
-    state: 'pending',
+    state: "pending",
   };
 }
 
 async function findReceiveHistoryEntry(
   mgr: Manager,
   tokenString: string,
-  mintUrl: string
+  mintUrl: string,
 ): Promise<string | null> {
+  logger.debug("operations.history.receive.lookup.start", {
+    ...mintUrlFields(mintUrl),
+    tokenLength: tokenString.length,
+    limit: 50,
+  });
   const history = await mgr.history.getPaginatedHistory(0, 50);
   const entry = history.find(
     (h): h is ReceiveHistoryEntry =>
-      h.type === 'receive' &&
+      h.type === "receive" &&
       h.mintUrl === mintUrl &&
-      h.metadata?.rawToken === tokenString
+      h.metadata?.rawToken === tokenString,
   );
+  logger.debug("operations.history.receive.lookup.done", {
+    ...mintUrlFields(mintUrl),
+    found: !!entry,
+    historyCount: history.length,
+    entryState: entry?.state ?? null,
+  });
   return entry ? JSON.stringify(entry) : null;
 }

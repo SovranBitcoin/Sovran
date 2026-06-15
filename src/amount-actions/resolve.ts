@@ -6,8 +6,13 @@
 // (the math output). The manager adds display fields on top.
 // ---------------------------------------------------------------------------
 
-import { composeFiat, composeSatoshis } from '../offline';
-import type { AmountInputMode, AmountResolution, CoreAmountResolution } from './types';
+import { composeFiat, composeSatoshis } from "../offline";
+import { logger } from "../logger";
+import type {
+  AmountInputMode,
+  AmountResolution,
+  CoreAmountResolution,
+} from "./types";
 
 const SATS_PER_BTC = 100_000_000;
 
@@ -21,10 +26,20 @@ export function resolveAmount(
   numericValue: number,
   proofAmounts: number[],
   btcPrice: number,
-  offlineOptimization: boolean
+  offlineOptimization: boolean,
 ): CoreAmountResolution {
+  logger.debug("amount.resolve.start", {
+    inputMode,
+    rawInputLength: rawInput.length,
+    numericValue,
+    proofCount: proofAmounts.length,
+    proofTotal: proofAmounts.reduce((sum, amount) => sum + amount, 0),
+    hasBtcPrice: btcPrice > 0,
+    offlineOptimization,
+  });
+
   if (numericValue <= 0) {
-    return {
+    const result = {
       inputMode,
       rawInput,
       numericValue,
@@ -34,13 +49,30 @@ export function resolveAmount(
       displaySats: 0,
       autoOptimized: false,
     };
+    logger.debug("amount.resolve.zero", {
+      inputMode,
+      rawInputLength: rawInput.length,
+    });
+    return result;
   }
 
-  if (inputMode === 'sat') {
-    return resolveSatMode(rawInput, numericValue, proofAmounts, btcPrice, offlineOptimization);
+  if (inputMode === "sat") {
+    return resolveSatMode(
+      rawInput,
+      numericValue,
+      proofAmounts,
+      btcPrice,
+      offlineOptimization,
+    );
   }
 
-  return resolveFiatMode(rawInput, numericValue, proofAmounts, btcPrice, offlineOptimization);
+  return resolveFiatMode(
+    rawInput,
+    numericValue,
+    proofAmounts,
+    btcPrice,
+    offlineOptimization,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -52,17 +84,18 @@ function resolveSatMode(
   sats: number,
   proofAmounts: number[],
   btcPrice: number,
-  offlineOptimization: boolean
+  offlineOptimization: boolean,
 ): CoreAmountResolution {
-  const displayFiat = btcPrice > 0 ? roundFiat((sats / SATS_PER_BTC) * btcPrice) : null;
+  const displayFiat =
+    btcPrice > 0 ? roundFiat((sats / SATS_PER_BTC) * btcPrice) : null;
 
   let canSendOffline: boolean | null = null;
   if (offlineOptimization && proofAmounts.length > 0) {
     canSendOffline = composeSatoshis(proofAmounts, sats).exactMatch;
   }
 
-  return {
-    inputMode: 'sat',
+  const result: CoreAmountResolution = {
+    inputMode: "sat",
     rawInput,
     numericValue: sats,
     effectiveSatAmount: sats,
@@ -71,6 +104,13 @@ function resolveSatMode(
     displaySats: sats,
     autoOptimized: false,
   };
+  logger.debug("amount.resolve.sat.result", {
+    sats,
+    displayFiat,
+    canSendOffline,
+    proofCount: proofAmounts.length,
+  });
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,11 +122,11 @@ function resolveFiatMode(
   fiatAmount: number,
   proofAmounts: number[],
   btcPrice: number,
-  offlineOptimization: boolean
+  offlineOptimization: boolean,
 ): CoreAmountResolution {
   if (btcPrice <= 0) {
-    return {
-      inputMode: 'fiat',
+    const result: CoreAmountResolution = {
+      inputMode: "fiat",
       rawInput,
       numericValue: fiatAmount,
       effectiveSatAmount: 0,
@@ -95,14 +135,20 @@ function resolveFiatMode(
       displaySats: 0,
       autoOptimized: false,
     };
+    logger.warn("amount.resolve.fiat.noPrice", {
+      fiatAmount,
+      proofCount: proofAmounts.length,
+      offlineOptimization,
+    });
+    return result;
   }
 
   const satsPerFiat = SATS_PER_BTC / btcPrice;
   const centerSats = Math.round(fiatAmount * satsPerFiat);
 
   if (!offlineOptimization || proofAmounts.length === 0) {
-    return {
-      inputMode: 'fiat',
+    const result: CoreAmountResolution = {
+      inputMode: "fiat",
       rawInput,
       numericValue: fiatAmount,
       effectiveSatAmount: centerSats,
@@ -111,6 +157,13 @@ function resolveFiatMode(
       displaySats: centerSats,
       autoOptimized: false,
     };
+    logger.debug("amount.resolve.fiat.noOfflineOptimization", {
+      fiatAmount,
+      centerSats,
+      proofCount: proofAmounts.length,
+      offlineOptimization,
+    });
+    return result;
   }
 
   // Use composeFiat to find an offline-compatible sat amount in the fiat
@@ -121,8 +174,8 @@ function resolveFiatMode(
   const fiatResult = composeFiat(proofAmounts, fiatAmount, satsPerFiat);
 
   if (fiatResult.exactFiatMatch && fiatResult.matchedSatoshis !== null) {
-    return {
-      inputMode: 'fiat',
+    const result: CoreAmountResolution = {
+      inputMode: "fiat",
       rawInput,
       numericValue: fiatAmount,
       effectiveSatAmount: fiatResult.matchedSatoshis,
@@ -131,12 +184,20 @@ function resolveFiatMode(
       displaySats: fiatResult.matchedSatoshis,
       autoOptimized: fiatResult.matchedSatoshis !== centerSats,
     };
+    logger.debug("amount.resolve.fiat.offlineMatch", {
+      fiatAmount,
+      centerSats,
+      matchedSatoshis: fiatResult.matchedSatoshis,
+      autoOptimized: result.autoOptimized,
+      proofCount: proofAmounts.length,
+    });
+    return result;
   }
 
   // No offline amount in fiat window — fall back to center of range
   const composition = composeSatoshis(proofAmounts, centerSats);
-  return {
-    inputMode: 'fiat',
+  const result: CoreAmountResolution = {
+    inputMode: "fiat",
     rawInput,
     numericValue: fiatAmount,
     effectiveSatAmount: centerSats,
@@ -145,6 +206,13 @@ function resolveFiatMode(
     displaySats: centerSats,
     autoOptimized: false,
   };
+  logger.debug("amount.resolve.fiat.fallbackCenter", {
+    fiatAmount,
+    centerSats,
+    canSendOffline: composition.exactMatch,
+    proofCount: proofAmounts.length,
+  });
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +227,10 @@ function roundFiat(value: number): number {
  * Shallow equality check for AmountResolution (full, including display fields).
  * Used by the manager to return stable references for useSyncExternalStore.
  */
-export function resolutionEqual(a: AmountResolution, b: AmountResolution): boolean {
+export function resolutionEqual(
+  a: AmountResolution,
+  b: AmountResolution,
+): boolean {
   return (
     a.inputMode === b.inputMode &&
     a.rawInput === b.rawInput &&

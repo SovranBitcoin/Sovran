@@ -2,6 +2,8 @@
 // FormattedString — extends String with smart truncation
 // ---------------------------------------------------------------------------
 
+import { logger } from '../logger';
+
 export type TruncateMode = 'start' | 'middle' | 'end' | 'beforeAt';
 
 const RTL_LANGS = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'sd', 'yi']);
@@ -18,6 +20,36 @@ function isRTLLocale(locale?: string): boolean {
 // code-point iteration is the portable choice.
 function codePoints(str: string): string[] {
   return Array.from(str);
+}
+
+function localeBase(locale?: string): string | null {
+  return locale?.split('-')[0].toLowerCase() ?? null;
+}
+
+function logTruncateResult(fields: {
+  mode: TruncateMode;
+  locale?: string;
+  inputCodePoints: number;
+  outputCodePoints: number;
+  visibleCount: number;
+  truncated: boolean;
+  fallbackMode?: TruncateMode;
+  hasAtSign?: boolean;
+  rtl?: boolean;
+}): void {
+  if (!fields.truncated && !fields.fallbackMode && fields.visibleCount > 0)
+    return;
+  logger.debug('formatting.string.truncate', {
+    mode: fields.mode,
+    fallbackMode: fields.fallbackMode ?? null,
+    localeBase: localeBase(fields.locale),
+    inputCodePoints: fields.inputCodePoints,
+    outputCodePoints: fields.outputCodePoints,
+    visibleCount: fields.visibleCount,
+    truncated: fields.truncated,
+    hasAtSign: fields.hasAtSign ?? null,
+    rtl: fields.rtl ?? null,
+  });
 }
 
 function takeStart(cp: string[], n: number): string {
@@ -49,7 +81,11 @@ export class FormattedString extends String {
   private readonly _defaultMode: TruncateMode;
   private readonly _locale: string | undefined;
 
-  constructor(value: string, defaultMode: TruncateMode = 'end', locale?: string) {
+  constructor(
+    value: string,
+    defaultMode: TruncateMode = 'end',
+    locale?: string,
+  ) {
     super(value);
     this._defaultMode = defaultMode;
     this._locale = locale;
@@ -69,38 +105,163 @@ export class FormattedString extends String {
     const str = this.valueOf();
     const m = mode ?? this._defaultMode;
 
-    if (n <= 0 || !str) return str;
+    if (n <= 0 || !str) {
+      logTruncateResult({
+        mode: m,
+        locale: this._locale,
+        inputCodePoints: codePoints(str).length,
+        outputCodePoints: codePoints(str).length,
+        visibleCount: n,
+        truncated: false,
+      });
+      return str;
+    }
 
     switch (m) {
       case 'middle': {
         const cp = codePoints(str);
-        if (n * 2 >= cp.length) return str;
-        return `${takeStart(cp, n)}...${takeEnd(cp, n)}`;
+        if (n * 2 >= cp.length) {
+          logTruncateResult({
+            mode: m,
+            locale: this._locale,
+            inputCodePoints: cp.length,
+            outputCodePoints: cp.length,
+            visibleCount: n,
+            truncated: false,
+          });
+          return str;
+        }
+        const out = `${takeStart(cp, n)}...${takeEnd(cp, n)}`;
+        logTruncateResult({
+          mode: m,
+          locale: this._locale,
+          inputCodePoints: cp.length,
+          outputCodePoints: codePoints(out).length,
+          visibleCount: n,
+          truncated: true,
+        });
+        return out;
       }
       case 'end': {
         const cp = codePoints(str);
-        if (n >= cp.length) return str;
-        return `${takeStart(cp, n)}...`;
+        if (n >= cp.length) {
+          logTruncateResult({
+            mode: m,
+            locale: this._locale,
+            inputCodePoints: cp.length,
+            outputCodePoints: cp.length,
+            visibleCount: n,
+            truncated: false,
+          });
+          return str;
+        }
+        const out = `${takeStart(cp, n)}...`;
+        logTruncateResult({
+          mode: m,
+          locale: this._locale,
+          inputCodePoints: cp.length,
+          outputCodePoints: codePoints(out).length,
+          visibleCount: n,
+          truncated: true,
+        });
+        return out;
       }
       case 'start': {
         const cp = codePoints(str);
-        if (n >= cp.length) return str;
-        return `...${takeEnd(cp, n)}`;
+        if (n >= cp.length) {
+          logTruncateResult({
+            mode: m,
+            locale: this._locale,
+            inputCodePoints: cp.length,
+            outputCodePoints: cp.length,
+            visibleCount: n,
+            truncated: false,
+          });
+          return str;
+        }
+        const out = `...${takeEnd(cp, n)}`;
+        logTruncateResult({
+          mode: m,
+          locale: this._locale,
+          inputCodePoints: cp.length,
+          outputCodePoints: codePoints(out).length,
+          visibleCount: n,
+          truncated: true,
+        });
+        return out;
       }
       case 'beforeAt': {
         const atIdx = str.indexOf('@');
-        if (atIdx < 0) return this.truncate(n, 'middle');
+        if (atIdx < 0) {
+          logTruncateResult({
+            mode: m,
+            fallbackMode: 'middle',
+            locale: this._locale,
+            inputCodePoints: codePoints(str).length,
+            outputCodePoints: codePoints(str).length,
+            visibleCount: n,
+            truncated: false,
+            hasAtSign: false,
+          });
+          return this.truncate(n, 'middle');
+        }
         const local = str.substring(0, atIdx);
         const domain = str.substring(atIdx);
         const localCp = codePoints(local);
         if (isRTLLocale(this._locale)) {
-          if (n >= localCp.length) return str;
+          if (n >= localCp.length) {
+            logTruncateResult({
+              mode: m,
+              locale: this._locale,
+              inputCodePoints: codePoints(str).length,
+              outputCodePoints: codePoints(str).length,
+              visibleCount: n,
+              truncated: false,
+              hasAtSign: true,
+              rtl: true,
+            });
+            return str;
+          }
           const truncated = `...${takeEnd(localCp, n)}`;
-          return `${truncated}${domain}`;
+          const out = `${truncated}${domain}`;
+          logTruncateResult({
+            mode: m,
+            locale: this._locale,
+            inputCodePoints: codePoints(str).length,
+            outputCodePoints: codePoints(out).length,
+            visibleCount: n,
+            truncated: true,
+            hasAtSign: true,
+            rtl: true,
+          });
+          return out;
         }
-        if (n * 2 >= localCp.length) return str;
+        if (n * 2 >= localCp.length) {
+          logTruncateResult({
+            mode: m,
+            locale: this._locale,
+            inputCodePoints: codePoints(str).length,
+            outputCodePoints: codePoints(str).length,
+            visibleCount: n,
+            truncated: false,
+            hasAtSign: true,
+            rtl: false,
+          });
+          return str;
+        }
         const truncated = `${takeStart(localCp, n)}...${takeEnd(localCp, n)}`;
-        return `${truncated}${domain}`;
+        const out = `${truncated}${domain}`;
+        logTruncateResult({
+          mode: m,
+          locale: this._locale,
+          inputCodePoints: codePoints(str).length,
+          outputCodePoints: codePoints(out).length,
+          visibleCount: n,
+          truncated: true,
+          hasAtSign: true,
+          rtl: false,
+        });
+        return out;
       }
     }
   }

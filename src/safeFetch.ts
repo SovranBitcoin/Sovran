@@ -14,6 +14,8 @@
 // does not ship `DOMException`.
 // ---------------------------------------------------------------------------
 
+import { errField, logger } from "./logger";
+
 /**
  * Default per-request budget. Tuned for the slowest reasonable LNURL /
  * Nostr-relay round-trip on cellular; configurable per-call via
@@ -26,13 +28,29 @@ export interface RequestControls {
   timeoutMs?: number;
 }
 
+function summarizeUrl(rawUrl: string): Record<string, unknown> {
+  try {
+    const url = new URL(rawUrl);
+    return {
+      protocol: url.protocol,
+      host: url.host,
+      pathLength: url.pathname.length,
+      hasQuery: url.search.length > 0,
+    };
+  } catch {
+    return { urlLength: rawUrl.length, parseable: false };
+  }
+}
+
 /**
  * Combine an arbitrary number of signals into one. The result aborts when
  * any input aborts. Hand-rolled because `AbortSignal.any` is not yet on
  * every Hermes build the wallet ships against; the listener pattern works
  * everywhere `AbortController` does.
  */
-export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
+export function combineSignals(
+  ...signals: (AbortSignal | undefined)[]
+): AbortSignal {
   const controller = new AbortController();
   for (const signal of signals) {
     if (!signal) continue;
@@ -40,7 +58,9 @@ export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSi
       controller.abort(signal.reason);
       return controller.signal;
     }
-    signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
+    signal.addEventListener("abort", () => controller.abort(signal.reason), {
+      once: true,
+    });
   }
   return controller.signal;
 }
@@ -52,13 +72,16 @@ export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSi
  * keeps recognising it without `DOMException`.
  */
 export function timeoutSignal(ms: number): AbortSignal {
-  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+  if (
+    typeof AbortSignal !== "undefined" &&
+    typeof AbortSignal.timeout === "function"
+  ) {
     return AbortSignal.timeout(ms);
   }
   const controller = new AbortController();
   setTimeout(() => {
-    const error = new Error('Timed out');
-    error.name = 'TimeoutError';
+    const error = new Error("Timed out");
+    error.name = "TimeoutError";
     controller.abort(error);
   }, ms);
   return controller.signal;
@@ -71,19 +94,51 @@ export function timeoutSignal(ms: number): AbortSignal {
  * `.name` instead of using `instanceof`.
  */
 export function isAbortError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
+  if (typeof error !== "object" || error === null) return false;
   const name = (error as { name?: unknown }).name;
-  return name === 'AbortError' || name === 'TimeoutError';
+  return name === "AbortError" || name === "TimeoutError";
 }
 
 /**
  * `fetch` with a guaranteed timeout. The combined signal aborts on
  * caller cancellation or `timeoutMs`, whichever fires first.
  */
-export function safeFetch(url: string, controls: RequestControls = {}, init?: RequestInit) {
+export function safeFetch(
+  url: string,
+  controls: RequestControls = {},
+  init?: RequestInit,
+) {
   const { signal: callerSignal, timeoutMs = DEFAULT_TIMEOUT_MS } = controls;
   const signal = combineSignals(callerSignal, timeoutSignal(timeoutMs));
-  return fetch(url, { ...init, signal });
+  const startedAt = Date.now();
+  logger.debug("safeFetch.start", {
+    ...summarizeUrl(url),
+    timeoutMs,
+    hasCallerSignal: !!callerSignal,
+    method: init?.method ?? "GET",
+  });
+  return fetch(url, { ...init, signal }).then(
+    (response) => {
+      logger.debug("safeFetch.response", {
+        ...summarizeUrl(url),
+        timeoutMs,
+        status: response.status,
+        ok: response.ok,
+        durationMs: Date.now() - startedAt,
+      });
+      return response;
+    },
+    (error) => {
+      logger.warn("safeFetch.failed", {
+        ...summarizeUrl(url),
+        timeoutMs,
+        aborted: isAbortError(error),
+        durationMs: Date.now() - startedAt,
+        error: errField(error),
+      });
+      throw error;
+    },
+  );
 }
 
 /**
@@ -92,22 +147,44 @@ export function safeFetch(url: string, controls: RequestControls = {}, init?: Re
  * which returns per-relay promises that may never settle if every relay
  * stalls. The caller observes a `TimeoutError`-named Error on expiry.
  */
-export function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+export function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
+    const startedAt = Date.now();
+    logger.debug("safeFetch.withTimeout.start", { label, timeoutMs });
     const timer = setTimeout(() => {
       const error = new Error(`${label} timed out after ${timeoutMs}ms`);
-      error.name = 'TimeoutError';
+      error.name = "TimeoutError";
+      logger.warn("safeFetch.withTimeout.timeout", {
+        label,
+        timeoutMs,
+        durationMs: Date.now() - startedAt,
+      });
       reject(error);
     }, timeoutMs);
     promise.then(
       (value) => {
         clearTimeout(timer);
+        logger.debug("safeFetch.withTimeout.done", {
+          label,
+          timeoutMs,
+          durationMs: Date.now() - startedAt,
+        });
         resolve(value);
       },
       (error) => {
         clearTimeout(timer);
+        logger.warn("safeFetch.withTimeout.failed", {
+          label,
+          timeoutMs,
+          durationMs: Date.now() - startedAt,
+          error: errField(error),
+        });
         reject(error);
-      }
+      },
     );
   });
 }

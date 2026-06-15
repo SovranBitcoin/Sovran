@@ -1,5 +1,5 @@
 import { resolveIntent } from '../intent';
-import { logger } from '../logger';
+import { logger, mintUrlFields } from '../logger';
 import { parsePaymentInput } from '../parse';
 import { isValidSatAmount } from '../guards';
 import { normalizeNostrPubkey } from '../recipient';
@@ -190,7 +190,7 @@ function handleAmountEntered(
 ): TransitionResult {
   logger.info('transitions.amountEntered', {
     amount: event.amount,
-    mintUrl: event.mintUrl || null,
+    ...mintUrlFields(event.mintUrl),
     destination: event.destination ?? currentCtx.destination,
   });
   const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
@@ -242,7 +242,7 @@ function handleMintSelected(
   enableEcashSendMemo: boolean
 ): TransitionResult {
   logger.info('transitions.mintSelected', {
-    mintUrl: event.mintUrl,
+    ...mintUrlFields(event.mintUrl),
     amount: event.amount,
     destination: event.destination ?? currentCtx.destination,
   });
@@ -441,7 +441,7 @@ export function transition(
       const receiveLightning = startReceiveLightningFlow(walletCtx, unit);
       logger.info('transitions.startReceiveLightning', {
         unit,
-        mintUrl: receiveLightning.context.mintUrl ?? null,
+        ...mintUrlFields(receiveLightning.context.mintUrl),
       });
       return stamp(receiveLightning);
     case 'START_RECEIVE':

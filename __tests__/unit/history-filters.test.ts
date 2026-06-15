@@ -4,6 +4,7 @@ import {
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
   isMintQuotePaymentObserved,
+  isReceiveTokenPending,
   isReceiveTokenRedeemed,
   isReservedSendHistoryEntry,
   isSendTokenCancelled,
@@ -38,11 +39,13 @@ describe('history state filters', () => {
 
   it('classifies token detail terminal states', () => {
     expect(isReceiveTokenRedeemed({ state: 'finalized' })).toBe(true);
+    expect(isReceiveTokenPending({ state: 'executing' })).toBe(true);
     expect(isSendTokenComplete({ state: 'finalized' })).toBe(true);
     expect(isSendTokenCancelled({ state: 'rolledBack' })).toBe(true);
     expect(isSendTokenCancelled({ state: 'rolled_back' })).toBe(true);
 
     expect(isReceiveTokenRedeemed({ state: 'pending' })).toBe(false);
+    expect(isReceiveTokenPending({ state: 'finalized' })).toBe(false);
     expect(isSendTokenComplete({ state: 'pending' })).toBe(false);
     expect(isSendTokenCancelled({ state: 'pending' })).toBe(false);
   });

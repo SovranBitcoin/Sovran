@@ -8,14 +8,16 @@
 // recommended.
 // ---------------------------------------------------------------------------
 
-import { localizeReason } from './formatting/locales';
+import { localizeReason } from "./formatting/locales";
 import {
   buildMethodAwareMintCandidates,
   hasMintSupportingMethod,
   isMethodImplemented,
-} from './mint-capabilities';
+} from "./mint-capabilities";
+import { logger } from "./logger";
 import type {
   PaymentOption,
+  PaymentOptionKind,
   WalletContext,
   Detectors,
   PaymentRequestInfo,
@@ -23,7 +25,7 @@ import type {
   OptionStatus,
   RecommendationRule,
   MintMethodRequirement,
-} from './types';
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // Rule predicates
@@ -32,13 +34,15 @@ import type {
 function hasMatchingMintWithBalance(
   _option: PaymentOption,
   ctx: WalletContext,
-  info?: PaymentRequestInfo | null
+  info?: PaymentRequestInfo | null,
 ): boolean {
   const mints = info?.mints ?? [];
   const amount = info?.amount ?? 0;
 
   const candidates =
-    mints.length === 0 ? ctx.trustedMintUrls : mints.filter((m) => ctx.trustedMintUrls.includes(m));
+    mints.length === 0
+      ? ctx.trustedMintUrls
+      : mints.filter((m) => ctx.trustedMintUrls.includes(m));
 
   return candidates.some((m) => (ctx.mintBalances[m] ?? 0) >= amount);
 }
@@ -46,7 +50,7 @@ function hasMatchingMintWithBalance(
 function noTrustedMintInRequest(
   _option: PaymentOption,
   ctx: WalletContext,
-  info?: PaymentRequestInfo | null
+  info?: PaymentRequestInfo | null,
 ): boolean {
   const mints = info?.mints ?? [];
   if (mints.length === 0) return false;
@@ -58,17 +62,17 @@ function totalBalance(ctx: WalletContext): number {
 }
 
 function lightningMeltRequirement(): MintMethodRequirement {
-  return { operation: 'melt', method: 'bolt11', unit: 'sat' };
+  return { operation: "melt", method: "bolt11", unit: "sat" };
 }
 
 function onchainMeltRequirement(): MintMethodRequirement {
-  return { operation: 'melt', method: 'onchain', unit: 'sat' };
+  return { operation: "melt", method: "onchain", unit: "sat" };
 }
 
 function compatibleMeltCandidates(
   option: PaymentOption,
   ctx: WalletContext,
-  requirement: MintMethodRequirement
+  requirement: MintMethodRequirement,
 ) {
   return buildMethodAwareMintCandidates(ctx, requirement, {
     amount: option.amount ?? undefined,
@@ -79,10 +83,10 @@ function compatibleMeltCandidates(
 function hasCompatibleMeltMethod(
   option: PaymentOption,
   ctx: WalletContext,
-  requirement: MintMethodRequirement
+  requirement: MintMethodRequirement,
 ): boolean {
   return compatibleMeltCandidates(option, ctx, requirement).some(
-    (candidate) => candidate.status !== 'disabled'
+    (candidate) => candidate.status !== "disabled",
   );
 }
 
@@ -90,20 +94,25 @@ function firstMeltMethodReason(
   option: PaymentOption,
   ctx: WalletContext,
   requirement: MintMethodRequirement,
-  locale: string = 'en'
+  locale: string = "en",
 ) {
   return (
-    compatibleMeltCandidates(option, ctx, requirement).find((candidate) => candidate.reason)
-      ?.reason ?? localizeReason(totalBalance(ctx) > 0 ? 'MINT_METHOD_UNSUPPORTED' : 'NO_BALANCE', locale)
+    compatibleMeltCandidates(option, ctx, requirement).find(
+      (candidate) => candidate.reason,
+    )?.reason ??
+    localizeReason(
+      totalBalance(ctx) > 0 ? "MINT_METHOD_UNSUPPORTED" : "NO_BALANCE",
+      locale,
+    )
   );
 }
 
 function hasLightningOption(options: PaymentOption[]): boolean {
   return options.some(
     (option) =>
-      option.kind === 'lightningInvoice' ||
-      option.kind === 'lightningAddress' ||
-      option.kind === 'lnurlp'
+      option.kind === "lightningInvoice" ||
+      option.kind === "lightningAddress" ||
+      option.kind === "lnurlp",
   );
 }
 
@@ -114,9 +123,13 @@ function hasMintHint(info?: PaymentRequestInfo | null): boolean {
 function paymentRequestShouldPreferLightning(
   option: PaymentOption,
   options: PaymentOption[],
-  info?: PaymentRequestInfo | null
+  info?: PaymentRequestInfo | null,
 ): boolean {
-  return option.source === 'bip321' && !hasMintHint(info) && hasLightningOption(options);
+  return (
+    option.source === "bip321" &&
+    !hasMintHint(info) &&
+    hasLightningOption(options)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -125,66 +138,87 @@ function paymentRequestShouldPreferLightning(
 
 const PAYMENT_REQUEST_RULES: RecommendationRule[] = [
   {
-    applies: (option, ctx, info) => hasMatchingMintWithBalance(option, ctx, info),
-    status: 'recommended',
-    reason: (_o, _c, _i, locale) => localizeReason('PAYABLE_ECASH', locale ?? 'en'),
+    applies: (option, ctx, info) =>
+      hasMatchingMintWithBalance(option, ctx, info),
+    status: "recommended",
+    reason: (_o, _c, _i, locale) =>
+      localizeReason("PAYABLE_ECASH", locale ?? "en"),
   },
   {
     applies: (option, ctx, info) => noTrustedMintInRequest(option, ctx, info),
-    status: 'disabled',
-    reason: (_o, _c, _i, locale) => localizeReason('NO_VALID_MINT', locale ?? 'en'),
+    status: "disabled",
+    reason: (_o, _c, _i, locale) =>
+      localizeReason("NO_VALID_MINT", locale ?? "en"),
   },
   {
-    applies: (option, ctx, info) => !hasMatchingMintWithBalance(option, ctx, info),
-    status: 'disabled',
-    reason: (_o, _c, _i, locale) => localizeReason('INSUFFICIENT_BALANCE', locale ?? 'en'),
+    applies: (option, ctx, info) =>
+      !hasMatchingMintWithBalance(option, ctx, info),
+    status: "disabled",
+    reason: (_o, _c, _i, locale) =>
+      localizeReason("INSUFFICIENT_BALANCE", locale ?? "en"),
   },
 ];
 
 const LIGHTNING_RULES: RecommendationRule[] = [
   {
-    applies: (option, ctx) => hasCompatibleMeltMethod(option, ctx, lightningMeltRequirement()),
-    status: 'available',
+    applies: (option, ctx) =>
+      hasCompatibleMeltMethod(option, ctx, lightningMeltRequirement()),
+    status: "available",
     reason: () => null,
   },
   {
     applies: () => true,
-    status: 'disabled',
+    status: "disabled",
     reason: (option, ctx, _i, locale) =>
-      firstMeltMethodReason(option, ctx, lightningMeltRequirement(), locale ?? 'en'),
+      firstMeltMethodReason(
+        option,
+        ctx,
+        lightningMeltRequirement(),
+        locale ?? "en",
+      ),
   },
 ];
 
 const ONCHAIN_RULES: RecommendationRule[] = [
   {
-    applies: (_option, ctx) => !hasMintSupportingMethod(ctx, onchainMeltRequirement()),
-    status: 'disabled',
+    applies: (_option, ctx) =>
+      !hasMintSupportingMethod(ctx, onchainMeltRequirement()),
+    status: "disabled",
     reason: (_o, _c, _i, locale) => ({
-      code: 'MINT_METHOD_UNSUPPORTED',
+      code: "MINT_METHOD_UNSUPPORTED",
       message:
-        locale === 'en'
-          ? 'No trusted mint supports onchain sending'
-          : 'No trusted mint supports onchain sending',
+        locale === "en"
+          ? "No trusted mint supports onchain sending"
+          : "No trusted mint supports onchain sending",
     }),
   },
   {
     applies: () => !isMethodImplemented(onchainMeltRequirement()),
-    status: 'disabled',
+    status: "disabled",
     reason: (_o, _c, _i, locale) => ({
-      code: 'PAYMENT_METHOD_NOT_IMPLEMENTED',
-      message: locale === 'en' ? 'Onchain send is not supported yet' : 'Onchain send is not supported yet',
+      code: "PAYMENT_METHOD_NOT_IMPLEMENTED",
+      message:
+        locale === "en"
+          ? "Onchain send is not supported yet"
+          : "Onchain send is not supported yet",
     }),
   },
   {
-    applies: (option, ctx) => hasCompatibleMeltMethod(option, ctx, onchainMeltRequirement()),
-    status: 'available',
+    applies: (option, ctx) =>
+      hasCompatibleMeltMethod(option, ctx, onchainMeltRequirement()),
+    status: "available",
     reason: () => null,
   },
   {
     applies: () => true,
-    status: 'disabled',
+    status: "disabled",
     reason: (option, ctx, _i, locale) =>
-      firstMeltMethodReason(option, ctx, onchainMeltRequirement(), locale ?? 'en'),
+      firstMeltMethodReason(
+        option,
+        ctx,
+        onchainMeltRequirement(),
+        locale ?? "en",
+      ),
   },
 ];
 
@@ -206,7 +240,7 @@ const STATUS_SORT: Record<OptionStatus, number> = {
   disabled: 2,
 };
 
-const PROMOTION_SORT: Partial<Record<PaymentOption['kind'], number>> = {
+const PROMOTION_SORT: Partial<Record<PaymentOption["kind"], number>> = {
   lightningInvoice: 0,
   lightningAddress: 0,
   lnurlp: 0,
@@ -218,39 +252,89 @@ const PROMOTION_SORT: Partial<Record<PaymentOption['kind'], number>> = {
 // Annotate a single option
 // ---------------------------------------------------------------------------
 
+function summarizeOption(option: PaymentOption): {
+  kind: PaymentOptionKind;
+  source: PaymentOption["source"];
+  paramKey: string | null;
+  hasAmount: boolean;
+} {
+  return {
+    kind: option.kind,
+    source: option.source,
+    paramKey: option.paramKey ?? null,
+    hasAmount: option.amount != null,
+  };
+}
+
+function summarizeContext(ctx: WalletContext): Record<string, unknown> {
+  return {
+    trustedMintCount: ctx.trustedMintUrls.length,
+    balanceMintCount: Object.keys(ctx.mintBalances).length,
+    proofMintCount: Object.keys(ctx.proofAmounts).length,
+    hasPreferredMint: !!ctx.preferredMintUrl,
+    hasMethodCapabilities: !!ctx.mintMethodCapabilities,
+  };
+}
+
 function annotateOption(
   option: PaymentOption,
   options: PaymentOption[],
   ctx: WalletContext,
   detectors: Detectors,
-  locale: string = 'en'
+  locale: string = "en",
 ): AnnotatedOption {
   const rules = RULES_BY_KIND[option.kind];
   if (!rules) {
-    return { option, status: 'available', reason: null };
+    logger.debug("annotate.option.noRules", summarizeOption(option));
+    return { option, status: "available", reason: null };
   }
 
   const info =
-    option.kind === 'paymentRequest' ? detectors.getPaymentRequestInfo(option.value) : null;
+    option.kind === "paymentRequest"
+      ? detectors.getPaymentRequestInfo(option.value)
+      : null;
+  logger.debug("annotate.option.start", {
+    ...summarizeOption(option),
+    competingOptionKinds: options.map((candidate) => candidate.kind),
+    ruleCount: rules.length,
+    paymentRequestInfo: info
+      ? {
+          mintCount: info.mints.length,
+          hasAmount: info.amount != null,
+          unit: info.unit,
+          transportTypes:
+            info.transports?.map((transport) => transport.type) ?? [],
+        }
+      : null,
+  });
 
   if (
-    option.kind === 'paymentRequest' &&
+    option.kind === "paymentRequest" &&
     paymentRequestShouldPreferLightning(option, options, info)
   ) {
-    return { option, status: 'available', reason: null };
+    logger.info("annotate.option.preferLightning", summarizeOption(option));
+    return { option, status: "available", reason: null };
   }
 
-  for (const rule of rules) {
+  for (const [ruleIndex, rule] of rules.entries()) {
     if (rule.applies(option, ctx, info)) {
+      const reason = rule.reason(option, ctx, info, locale);
+      logger.info("annotate.option.ruleMatched", {
+        ...summarizeOption(option),
+        ruleIndex,
+        status: rule.status,
+        reasonCode: reason?.code,
+      });
       return {
         option,
         status: rule.status,
-        reason: rule.reason(option, ctx, info, locale),
+        reason,
       };
     }
   }
 
-  return { option, status: 'available', reason: null };
+  logger.info("annotate.option.defaultAvailable", summarizeOption(option));
+  return { option, status: "available", reason: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -261,25 +345,35 @@ export function annotateOptions(
   options: PaymentOption[],
   ctx: WalletContext,
   detectors: Detectors,
-  locale: string = 'en'
+  locale: string = "en",
 ): AnnotatedOption[] {
+  logger.debug("annotate.options.start", {
+    optionCount: options.length,
+    options: options.map(summarizeOption),
+    locale,
+    ...summarizeContext(ctx),
+  });
+
   const annotated = options
     .map((o) => annotateOption(o, options, ctx, detectors, locale))
     .sort((a, b) => STATUS_SORT[a.status] - STATUS_SORT[b.status]);
 
-  const hasRecommended = annotated.some((a) => a.status === 'recommended');
+  const hasRecommended = annotated.some((a) => a.status === "recommended");
   let result: AnnotatedOption[];
   if (!hasRecommended) {
     const available = annotated
-      .filter((a) => a.status === 'available')
+      .filter((a) => a.status === "available")
       .sort(
         (a, b) =>
-          (PROMOTION_SORT[a.option.kind] ?? 10) - (PROMOTION_SORT[b.option.kind] ?? 10)
+          (PROMOTION_SORT[a.option.kind] ?? 10) -
+          (PROMOTION_SORT[b.option.kind] ?? 10),
       );
     const firstAvailable = available[0];
     if (firstAvailable) {
       result = annotated.map((a) =>
-        a === firstAvailable ? { ...a, status: 'recommended' as OptionStatus } : a
+        a === firstAvailable
+          ? { ...a, status: "recommended" as OptionStatus }
+          : a,
       );
     } else {
       result = annotated;
@@ -288,5 +382,14 @@ export function annotateOptions(
     result = annotated;
   }
 
+  logger.info("annotate.options.result", {
+    optionCount: result.length,
+    hasRecommended: result.some((option) => option.status === "recommended"),
+    options: result.map((option) => ({
+      ...summarizeOption(option.option),
+      status: option.status,
+      reasonCode: option.reason?.code,
+    })),
+  });
   return result;
 }

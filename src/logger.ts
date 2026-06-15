@@ -27,6 +27,7 @@ const noopLogger: CocoLogger = {
 };
 
 let current: CocoLogger = noopLogger;
+let loggerGeneration = 0;
 
 /**
  * Replace the package-wide logger. Pass `null` to reset to the no-op
@@ -34,7 +35,21 @@ let current: CocoLogger = noopLogger;
  * with multiple concurrent payment surfaces would clobber prior wiring.
  */
 export function setLogger(next: CocoLogger | null): void {
-  current = next ?? noopLogger;
+  const previousWasNoop = current === noopLogger;
+  const nextLogger = next ?? noopLogger;
+  const generation = ++loggerGeneration;
+  const target = next ?? current;
+  try {
+    target.debug('logger.set', {
+      generation,
+      provided: next != null,
+      previousWasNoop,
+      nextIsNoop: nextLogger === noopLogger,
+    });
+  } catch {
+    // Logger wiring must never break payment setup.
+  }
+  current = nextLogger;
 }
 
 /**
@@ -61,4 +76,11 @@ export function errField(e: unknown): string {
   } catch {
     return '<unloggable>';
   }
+}
+
+export function mintUrlFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
 }

@@ -5,6 +5,7 @@ export {
   isMintQuotePaymentObserved,
   isOnchainHistoryEntry,
   isPendingTransaction,
+  isReceiveTokenPending,
   isReceiveTokenRedeemed,
   isReservedSendHistoryEntry,
   isSendTokenCancelled,

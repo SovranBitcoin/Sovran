@@ -53,7 +53,10 @@ import type {
   ScanSources,
   StepHandlerMap,
 } from '../machine/types';
-import type { ScreenActionHandlerMap, ScreenActionsBridge } from '../screen-actions/types';
+import type {
+  ScreenActionHandlerMap,
+  ScreenActionsBridge,
+} from '../screen-actions/types';
 import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
 import { createSubscriptionBus } from '../subscriptions';
 import type { ColadaSubscriptionBus } from '../subscriptions';
@@ -161,13 +164,17 @@ interface ColadaContextValue {
   getDisplayCurrencyRef: React.MutableRefObject<
     (() => { code: string; symbol: string } | null) | undefined
   >;
-  paymentCopyOverridesRef: React.MutableRefObject<Partial<PaymentCopyCatalog> | undefined>;
+  paymentCopyOverridesRef: React.MutableRefObject<
+    Partial<PaymentCopyCatalog> | undefined
+  >;
   adaptersRef: React.MutableRefObject<ColadaAdapters>;
   subscriptionBusRef: React.MutableRefObject<ColadaSubscriptionBus>;
   notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
   operationsRef: React.MutableRefObject<Partial<MachineOperations> | undefined>;
   navigationRef: React.MutableRefObject<NavigationCallbacks | undefined>;
-  writeClipboardRef: React.MutableRefObject<((text: string) => Promise<void>) | undefined>;
+  writeClipboardRef: React.MutableRefObject<
+    ((text: string) => Promise<void>) | undefined
+  >;
   shareContentRef: React.MutableRefObject<
     ((content: { message: string; url?: string }) => Promise<void>) | undefined
   >;
@@ -177,13 +184,37 @@ const ColadaContext = createContext<ColadaContextValue | null>(null);
 
 const EMPTY_SCREEN_ACTIONS = {} as ScreenActionHandlerMap;
 
-function scanSourceFromClipboard(adapter: ClipboardAdapter): () => Promise<ScanSourceResult> {
+function scanSourceFromClipboard(
+  adapter: ClipboardAdapter,
+): () => Promise<ScanSourceResult> {
   return async () => {
-    if (!adapter.readText) return { empty: true };
+    logger.debug('react.clipboardScan.start', {
+      hasReadText: !!adapter.readText,
+    });
+    if (!adapter.readText) {
+      logger.debug('react.clipboardScan.result', {
+        empty: true,
+        reason: 'missing_adapter',
+      });
+      return { empty: true };
+    }
     try {
       const data = await adapter.readText();
-      return data && data.trim() ? { data } : { empty: true };
+      if (data && data.trim()) {
+        logger.info('react.clipboardScan.result', {
+          empty: false,
+          dataLength: data.length,
+          trimmedLength: data.trim().length,
+        });
+        return { data };
+      }
+      logger.debug('react.clipboardScan.result', {
+        empty: true,
+        reason: 'empty_clipboard',
+      });
+      return { empty: true };
     } catch (error) {
+      logger.warn('react.clipboardScan.failed', { error: errField(error) });
       return {
         error: error instanceof Error ? error : new Error(String(error)),
       };
@@ -203,6 +234,21 @@ function buildAdapterScanSources(args: {
     sources.gallery = args.imagePickerAdapter.pickQrImage;
   }
   return Object.keys(sources).length > 0 ? sources : undefined;
+}
+
+function summarizeWalletContext(
+  context: WalletContext,
+): Record<string, unknown> {
+  return {
+    trustedMintCount: context.trustedMintUrls.length,
+    balanceMintCount: Object.keys(context.mintBalances).length,
+    proofMintCount: Object.keys(context.proofAmounts).length,
+    readyProofCount: Object.values(context.proofAmounts).reduce(
+      (sum, proofs) => sum + proofs.length,
+      0,
+    ),
+    hasPreferredMint: !!context.preferredMintUrl,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -293,18 +339,27 @@ export function ColadaProvider({
   const ic = instance?.config;
   const getLocale = getLocaleProp ?? ic?.getLocale;
   const getOffline = getOfflineProp ?? ic?.getOffline;
-  const enableEcashSendMemo = enableEcashSendMemoProp ?? ic?.enableEcashSendMemo ?? false;
+  const enableEcashSendMemo =
+    enableEcashSendMemoProp ?? ic?.enableEcashSendMemo ?? false;
   const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
   const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
   const writeClipboard = clipboardAdapter?.writeText;
   const shareContent = shareAdapter
-    ? (content: { message: string; url?: string }) => shareAdapter.share(content)
+    ? (content: { message: string; url?: string }) =>
+        shareAdapter.share(content)
     : undefined;
-  const adapterScanSources = buildAdapterScanSources({
-    clipboardAdapter,
-    imagePickerAdapter,
-  });
-  const scanSources = scanSourcesProp ?? adapterScanSources;
+  const adapterScanSources = useMemo(
+    () =>
+      buildAdapterScanSources({
+        clipboardAdapter,
+        imagePickerAdapter,
+      }),
+    [clipboardAdapter, imagePickerAdapter],
+  );
+  const scanSources = useMemo(
+    () => scanSourcesProp ?? adapterScanSources,
+    [adapterScanSources, scanSourcesProp],
+  );
   const nfcAdapter = nfcAdapterProp;
   const createURDecoder = qrDecoderAdapter?.createUrDecoder;
   const subscriptionBus = useMemo(() => createSubscriptionBus(), []);
@@ -313,22 +368,33 @@ export function ColadaProvider({
     if (!nostrAdapter?.sendDirectMessage && !nostrAdapter?.resolveProfile) {
       return baseOperations;
     }
+    logger.info('react.provider.operations.override', {
+      hasBaseOperations: !!baseOperations,
+      hasNostrSendDirectMessage: !!nostrAdapter.sendDirectMessage,
+      hasNostrResolveProfile: !!nostrAdapter.resolveProfile,
+    });
     return {
       ...baseOperations,
-      sendNostrDM: nostrAdapter.sendDirectMessage ?? baseOperations?.sendNostrDM,
+      sendNostrDM:
+        nostrAdapter.sendDirectMessage ?? baseOperations?.sendNostrDM,
       resolveRecipientProfile:
         nostrAdapter.resolveProfile ?? baseOperations?.resolveRecipientProfile,
     };
   }, [baseOperations, nostrAdapter]);
 
   const getLocaleRef = useLatestRef(getLocale);
-  const paymentCopyOverridesRef =
-    useLatestRef<Partial<PaymentCopyCatalog> | undefined>(paymentCopyOverrides);
+  const paymentCopyOverridesRef = useLatestRef<
+    Partial<PaymentCopyCatalog> | undefined
+  >(paymentCopyOverrides);
   const adaptersRef = useLatestRef(adapters);
   const subscriptionBusRef = useLatestRef(subscriptionBus);
   const notificationsRef = useLatestRef(notifications);
-  const operationsRef = useLatestRef<Partial<MachineOperations> | undefined>(operations);
-  const navigationRef = useLatestRef<NavigationCallbacks | undefined>(navigation);
+  const operationsRef = useLatestRef<Partial<MachineOperations> | undefined>(
+    operations,
+  );
+  const navigationRef = useLatestRef<NavigationCallbacks | undefined>(
+    navigation,
+  );
   const writeClipboardRef = useLatestRef(writeClipboard);
   const shareContentRef = useLatestRef(shareContent);
 
@@ -342,12 +408,58 @@ export function ColadaProvider({
   const handlersRef = useRef<StepHandlerMap>({});
   const machineRef = useRef<PaymentMachine | null>(null);
 
+  useEffect(() => {
+    logger.info('react.provider.config', {
+      hasInstance: !!instance,
+      hasOperationsProp: !!operationsProp,
+      operationCount: Object.keys(operations ?? {}).length,
+      detectorOverride: !!detectors,
+      notificationCount: Object.keys(notifications ?? {}).length,
+      actionScreenCount: Object.keys(actions ?? {}).length,
+      hasScreenActionsBridge: !!screenActionsBridge,
+      hasOfflineGetter: !!getOffline,
+      enableEcashSendMemo,
+      hasBtcPriceGetter: !!getBtcPrice,
+      hasDisplayCurrencyGetter: !!getDisplayCurrency,
+      hasLocaleGetter: !!getLocale,
+      adapterScanSourceCount: Object.keys(adapterScanSources ?? {}).length,
+      scanSourceCount: Object.keys(scanSources ?? {}).length,
+      hasNfcAdapter: !!nfcAdapter,
+      hasUrDecoder: !!createURDecoder,
+      hasDeepLinks: !!deepLinks,
+      hasLoggerAdapter: !!loggerAdapter,
+    });
+  }, [
+    actions,
+    adapterScanSources,
+    createURDecoder,
+    deepLinks,
+    detectors,
+    enableEcashSendMemo,
+    getBtcPrice,
+    getDisplayCurrency,
+    getLocale,
+    getOffline,
+    instance,
+    loggerAdapter,
+    nfcAdapter,
+    notifications,
+    operations,
+    operationsProp,
+    scanSources,
+    screenActionsBridge,
+  ]);
+
   // Translations register on a module-level locale map. Run as an effect so
   // the side effect happens after commit (StrictMode double-invoke of render
   // would otherwise duplicate the work and re-allocate Object.entries each
   // render).
   useEffect(() => {
     if (!translations) return;
+    logger.info('react.provider.translations.register', {
+      localeCount: Object.keys(translations).length,
+      locales: Object.keys(translations),
+    });
     for (const [lang, dict] of Object.entries(translations)) {
       registerLocale(lang, dict);
       registerPaymentCopyLocale(lang, dict);
@@ -356,20 +468,37 @@ export function ColadaProvider({
 
   useEffect(() => {
     if (!loggerAdapter) return undefined;
+    logger.info('react.provider.logger.bind');
     setLogger(loggerAdapter);
-    return () => setLogger(null);
+    return () => {
+      logger.info('react.provider.logger.unbind');
+      setLogger(null);
+    };
   }, [loggerAdapter]);
 
   useEffect(() => {
+    logger.info('react.provider.subscriptionBus.bind', {
+      hasBridge: !!screenActionsBridge,
+    });
     return screenActionsBridge?.bindSubscriptionBus?.(subscriptionBus);
   }, [screenActionsBridge, subscriptionBus]);
 
   if (!machineRef.current) {
+    logger.info('react.provider.machine.create', {
+      hasInstance: !!instance,
+      detectorOverride: !!detectors,
+      operationCount: Object.keys(operations ?? {}).length,
+      notificationCount: Object.keys(notifications ?? {}).length,
+      hasNfcAdapter: !!nfcAdapter,
+      scanSourceCount: Object.keys(scanSources ?? {}).length,
+      enableEcashSendMemo,
+    });
     machineRef.current = createPaymentMachine({
       handlers: new Proxy(
         {},
         {
-          get: (_target, key: string) => (handlersRef.current as Record<string, unknown>)[key],
+          get: (_target, key: string) =>
+            (handlersRef.current as Record<string, unknown>)[key],
         },
       ) as StepHandlerMap,
       detectors,
@@ -377,7 +506,9 @@ export function ColadaProvider({
         ? () => instance.tracker.getContext()
         : () => {
             if (!walletContextRef.current) {
-              throw new Error('ColadaProvider has no wallet context bound yet.');
+              throw new Error(
+                'ColadaProvider has no wallet context bound yet.',
+              );
             }
             return walletContextRef.current;
           },
@@ -395,6 +526,9 @@ export function ColadaProvider({
     handlersRef.current = handlersFactory(machineRef.current, {
       getOptionDismiss: () => optionDismissRef.current,
     });
+    logger.info('react.provider.machine.ready', {
+      handlerCount: Object.keys(handlersRef.current).length,
+    });
   }
 
   // Re-bind handlers when the factory identity changes. Runs in
@@ -405,6 +539,9 @@ export function ColadaProvider({
     handlersRef.current = handlersFactory(machineRef.current, {
       getOptionDismiss: () => optionDismissRef.current,
     });
+    logger.debug('react.provider.handlers.bound', {
+      handlerCount: Object.keys(handlersRef.current).length,
+    });
   }, [handlersFactory]);
 
   // Deep link processing
@@ -414,7 +551,10 @@ export function ColadaProvider({
 
     // Extract scheme and host from scheme://host or scheme:host
     const match = url.match(/^([a-zA-Z][a-zA-Z0-9+\-.]*):(?:\/\/)?([^/?#]+)/);
-    if (!match) return;
+    if (!match) {
+      logger.warn('deepLink.parse.failed', { urlLength: url.length });
+      return;
+    }
 
     const scheme = match[1].toLowerCase();
     const host = match[2];
@@ -427,10 +567,24 @@ export function ColadaProvider({
       'cashu',
       ...(deepLinks.customSchemes ?? []).map((s) => s.toLowerCase()),
     ]);
-    if (!accepted.has(scheme)) return;
+    if (!accepted.has(scheme)) {
+      logger.debug('deepLink.ignored', {
+        reason: 'scheme_not_accepted',
+        scheme,
+        hostLength: host.length,
+      });
+      return;
+    }
 
     const ignored = new Set(deepLinks.ignoredHosts ?? []);
-    if (ignored.has(host)) return;
+    if (ignored.has(host)) {
+      logger.debug('deepLink.ignored', {
+        reason: 'host_ignored',
+        scheme,
+        hostLength: host.length,
+      });
+      return;
+    }
 
     if (host.length > DEEP_LINK_HOST_MAX_LENGTH) {
       logger.warn('deepLink.host.too_long', { length: host.length });
@@ -438,8 +592,17 @@ export function ColadaProvider({
       return;
     }
 
+    logger.info('deepLink.scan.start', {
+      scheme,
+      hostLength: host.length,
+      customSchemeCount: deepLinks.customSchemes?.length ?? 0,
+    });
     machineRef.current.scan(host, { source: 'deeplink' }).catch((err) => {
-      logger.warn('deepLink.scan.failed', { host, error: errField(err) });
+      logger.warn('deepLink.scan.failed', {
+        scheme,
+        hostLength: host.length,
+        error: errField(err),
+      });
       deepLinks.onError?.(err instanceof Error ? err : new Error(String(err)));
     });
   }, [deepLinks?.url]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -477,7 +640,9 @@ export function ColadaProvider({
     ],
   );
 
-  return <ColadaContext.Provider value={value}>{children}</ColadaContext.Provider>;
+  return (
+    <ColadaContext.Provider value={value}>{children}</ColadaContext.Provider>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -487,7 +652,9 @@ export function ColadaProvider({
 export function useColadaContext(): ColadaContextValue {
   const ctx = useContext(ColadaContext);
   if (!ctx) {
-    throw new Error('ColadaProvider is missing. Wrap the app with ColadaProvider.');
+    throw new Error(
+      'ColadaProvider is missing. Wrap the app with ColadaProvider.',
+    );
   }
   return ctx;
 }
@@ -500,7 +667,10 @@ export function usePaymentCopy(): PaymentCopyResolver {
   const ctx = useContext(ColadaContext);
   const locale = ctx?.getLocaleRef.current?.() ?? 'en';
   const overrides = ctx?.paymentCopyOverridesRef.current;
-  return useMemo(() => createPaymentCopyResolver({ locale, overrides }), [locale, overrides]);
+  return useMemo(
+    () => createPaymentCopyResolver({ locale, overrides }),
+    [locale, overrides],
+  );
 }
 
 function usePaymentFlowContext(): ColadaContextValue {
@@ -534,13 +704,21 @@ export function usePaymentFlowMachine({
   useEffect(() => {
     ctx.walletContextRef.current = walletContext;
     ctx.unitRef.current = unit;
+    logger.debug('react.paymentFlowMachine.bindContext', {
+      unit,
+      ...summarizeWalletContext(walletContext),
+    });
   }, [ctx, walletContext, unit]);
 
   useEffect(() => {
     ctx.optionDismissRef.current = onOptionDismiss;
+    logger.debug('react.paymentFlowMachine.bindOptionDismiss', {
+      hasOptionDismiss: !!onOptionDismiss,
+    });
     return () => {
       if (ctx.optionDismissRef.current === onOptionDismiss) {
         ctx.optionDismissRef.current = undefined;
+        logger.debug('react.paymentFlowMachine.clearOptionDismiss');
       }
     };
   }, [ctx, onOptionDismiss]);

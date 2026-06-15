@@ -18,11 +18,12 @@
  * and exercises the handler through the ScreenActionManager's execute().
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { createDefaultScreenActionHandlers } from '../../src/screen-actions/defaultHandlers';
 import { createScreenActionManager } from '../../src/screen-actions/createManager';
 import { deriveMintMethodCapabilityMapFromTrustedMints } from '../../src/mint-capabilities';
+import { setLogger } from '../../src/logger';
 import type { MachineOperations, PaymentMachine, ProcessResult } from '../../src/machine/types';
 import type {
   ScreenActionContext,
@@ -42,6 +43,10 @@ import type {
 const MINT1 = 'https://mint1.example.com';
 const MINT2 = 'https://mint2.example.com';
 type MockFn = ReturnType<typeof vi.fn>;
+
+afterEach(() => {
+  setLogger(null);
+});
 
 function createMockConfig(overrides?: {
   operations?: Partial<MachineOperations>;
@@ -557,6 +562,60 @@ describe('receiveToken default handlers', () => {
       await mgr.execute('redeem');
 
       expect(ops.linkTransaction).toHaveBeenCalled();
+    });
+
+    it('updates entry and notifies pending without failing for recoverable receives', async () => {
+      const logs: Array<{ level: string; event: string; fields?: Record<string, unknown> }> = [];
+      setLogger({
+        debug: (event, fields) => logs.push({ level: 'debug', event, fields }),
+        info: (event, fields) => logs.push({ level: 'info', event, fields }),
+        warn: (event, fields) => logs.push({ level: 'warn', event, fields }),
+        error: (event, fields) => logs.push({ level: 'error', event, fields }),
+      });
+      const pendingEntry = {
+        id: 'receive-op-1',
+        type: 'receive',
+        mintUrl: MINT1,
+        amount: 1,
+        unit: 'sat',
+        state: 'executing',
+        operationId: 'op-1',
+      };
+      const { handlers, notifications } = createMockConfig({
+        operations: {
+          executeReceive: vi.fn(async () => ({
+            status: 'pending',
+            operationId: 'op-1',
+            pendingReason: 'network',
+            historyEntry: JSON.stringify(pendingEntry),
+            message: "We'll add it to your wallet when you're back online.",
+          })),
+          isMintTrusted: vi.fn(async () => true),
+        },
+      });
+
+      const { mgr, setEntry } = createManager('receiveToken', handlers, tokenEntry());
+      await mgr.execute('redeem');
+
+      expect(setEntry).toHaveBeenCalledWith(pendingEntry);
+      expect(notifications.map((n) => n.event)).toEqual([
+        'onReceiveProcessing',
+        'onReceivePending',
+      ]);
+      expect(logs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            event: 'screenAction.receiveToken.redeem.pending',
+            fields: expect.objectContaining({
+              id: 'receive-preview-1',
+              operationId: 'op-1',
+              pendingReason: 'network',
+              expectedNext: 'wallet_core_recovery_finalizes_receive',
+            }),
+          }),
+        ])
+      );
+      expect(JSON.stringify(logs)).not.toContain('test-secret-string');
     });
   });
 

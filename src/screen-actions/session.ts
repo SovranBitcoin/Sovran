@@ -2,6 +2,7 @@ import type {
   CreateAmountActionManagerConfig,
   QuickSendSuggestion,
 } from '../amount-actions';
+import { errField, logger } from '../logger';
 import type { ColadaSubscriptionBus } from '../subscriptions';
 import {
   createScreenActionManager,
@@ -129,6 +130,37 @@ function getSuggestions(
     : [];
 }
 
+function summarizeEntry(
+  entry: Record<string, unknown> | null,
+): Record<string, unknown> {
+  return {
+    hasEntry: !!entry,
+    id: typeof entry?.id === 'string' ? entry.id : null,
+    type: typeof entry?.type === 'string' ? entry.type : null,
+    state: typeof entry?.state === 'string' ? entry.state : null,
+    mintUrl: typeof entry?.mintUrl === 'string' ? entry.mintUrl : null,
+    keyCount: entry ? Object.keys(entry).length : 0,
+  };
+}
+
+function summarizeEntrySeed(
+  entrySeed: ScreenActionEntrySeed,
+): Record<string, unknown> {
+  return {
+    seedType:
+      typeof entrySeed === 'string'
+        ? 'string'
+        : entrySeed == null
+          ? 'empty'
+          : 'object',
+    seedLength: typeof entrySeed === 'string' ? entrySeed.length : 0,
+    keyCount:
+      entrySeed && typeof entrySeed === 'object'
+        ? Object.keys(entrySeed).length
+        : 0,
+  };
+}
+
 export function createScreenActionSession<S extends ScreenType>(
   config: CreateScreenActionSessionConfig<S>,
 ): ScreenActionSession<S> {
@@ -156,6 +188,19 @@ export function createScreenActionSession<S extends ScreenType>(
 
   let manager = null as unknown as ScreenActionManager<S>;
 
+  logger.info('screenActionSession.create', {
+    screenType,
+    hasDefaultHandlers: !!defaultHandlers,
+    hasExtraContextGetter: !!getExtraContext,
+    hasSubscribeEntryUpdates: !!subscribeEntryUpdates,
+    hasAmountConfig: !!amountConfig,
+    hasSubscriptionBus: !!subscriptionBus,
+    hasBridge: !!bridge,
+    hasLocaleGetter: !!getLocale,
+    hasDecorateEntry: !!decorateEntry,
+    ...summarizeEntrySeed(config.entrySeed),
+  });
+
   manager = createScreenActionManager<S>({
     screenType,
     handlers,
@@ -173,6 +218,10 @@ export function createScreenActionSession<S extends ScreenType>(
   function notify(): void {
     if (disposed) return;
     snapshot = null;
+    logger.debug('screenActionSession.notify', {
+      screenType,
+      listenerCount: listeners.size,
+    });
     for (const listener of listeners) {
       listener();
     }
@@ -185,7 +234,13 @@ export function createScreenActionSession<S extends ScreenType>(
   );
 
   function subscribeToEntryUpdates(): void {
-    if (entryUpdateUnsubscribe || screenType === 'amountEntry') return;
+    if (entryUpdateUnsubscribe || screenType === 'amountEntry') {
+      logger.debug('screenActionSession.entryUpdates.skipped', {
+        screenType,
+        reason: entryUpdateUnsubscribe ? 'already_subscribed' : 'amount_entry',
+      });
+      return;
+    }
 
     const subscriber =
       subscribeEntryUpdates ??
@@ -194,18 +249,38 @@ export function createScreenActionSession<S extends ScreenType>(
             bridge.subscribeEntryUpdates!(screenType, callback, subscriptionBus)
         : undefined);
 
-    if (!subscriber) return;
+    if (!subscriber) {
+      logger.debug('screenActionSession.entryUpdates.skipped', {
+        screenType,
+        reason: 'no_subscriber',
+      });
+      return;
+    }
 
+    logger.info('screenActionSession.entryUpdates.subscribe', { screenType });
     entryUpdateUnsubscribe = subscriber((updated) => {
       const currentEntry = manager.getEntry();
       const shouldApply =
         shouldApplyEntryUpdate ??
         bridge?.shouldApplyEntryUpdate ??
         defaultShouldApplyEntryUpdate;
-      if (!shouldApply(currentEntry, updated)) return;
+      if (!shouldApply(currentEntry, updated)) {
+        logger.debug('screenActionSession.entryUpdates.skipped', {
+          screenType,
+          reason: 'should_apply_false',
+          current: summarizeEntry(currentEntry),
+          updated: summarizeEntry(updated),
+        });
+        return;
+      }
 
       const merge =
         mergeEntryUpdate ?? bridge?.mergeEntryUpdate ?? defaultMergeEntryUpdate;
+      logger.info('screenActionSession.entryUpdates.apply', {
+        screenType,
+        current: summarizeEntry(currentEntry),
+        updated: summarizeEntry(updated),
+      });
       manager.setEntry(merge(currentEntry, updated));
     });
   }
@@ -213,6 +288,12 @@ export function createScreenActionSession<S extends ScreenType>(
   function setEntrySeed(entrySeed: ScreenActionEntrySeed): void {
     const { parsed, error } = parseEntrySeed(screenType, entrySeed);
     parseError = error;
+    logger.info('screenActionSession.setEntrySeed', {
+      screenType,
+      ...summarizeEntrySeed(entrySeed),
+      parsed: summarizeEntry(parsed),
+      error,
+    });
     if (parsed != null) {
       manager.setEntry(parsed);
       subscribeToEntryUpdates();
@@ -246,13 +327,34 @@ export function createScreenActionSession<S extends ScreenType>(
       source: source as ScreenActionSessionSnapshot<S>['source'],
       suggestions: getSuggestions(rawEntry),
     };
+    logger.debug('screenActionSession.inspect', {
+      screenType,
+      raw: summarizeEntry(rawEntry),
+      decorated: summarizeEntry(decoratedEntry),
+      error: parseError,
+      actionCount: Object.keys(snapshot.actions).length,
+      availableActionCount: (
+        Object.values(snapshot.actions) as ActionState[]
+      ).filter((action) => action.available).length,
+      suggestionCount: snapshot.suggestions.length,
+      hasSource: !!snapshot.source,
+      skipDecoration,
+    });
     return snapshot;
   }
 
   function subscribe(listener: () => void): () => void {
     listeners.add(listener);
+    logger.debug('screenActionSession.subscribe', {
+      screenType,
+      listenerCount: listeners.size,
+    });
     return () => {
       listeners.delete(listener);
+      logger.debug('screenActionSession.unsubscribe', {
+        screenType,
+        listenerCount: listeners.size,
+      });
     };
   }
 
@@ -261,12 +363,45 @@ export function createScreenActionSession<S extends ScreenType>(
   return {
     inspect,
     subscribe,
-    execute: manager.execute,
-    setEntry: manager.setEntry,
+    execute: async (action, params) => {
+      logger.info('screenActionSession.execute.start', {
+        screenType,
+        action,
+        paramKeys: Object.keys(params ?? {}),
+        entry: summarizeEntry(manager.getEntry()),
+      });
+      try {
+        await manager.execute(action, params);
+        logger.info('screenActionSession.execute.done', {
+          screenType,
+          action,
+          entry: summarizeEntry(manager.getEntry()),
+        });
+      } catch (error) {
+        logger.warn('screenActionSession.execute.failed', {
+          screenType,
+          action,
+          error: errField(error),
+        });
+        throw error;
+      }
+    },
+    setEntry: (entry) => {
+      logger.info('screenActionSession.setEntry', {
+        screenType,
+        entry: summarizeEntry(entry),
+      });
+      manager.setEntry(entry);
+    },
     setEntrySeed,
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      logger.info('screenActionSession.dispose', {
+        screenType,
+        listenerCount: listeners.size,
+        hadEntryUpdateSubscription: !!entryUpdateUnsubscribe,
+      });
       listeners.clear();
       entryUpdateUnsubscribe?.();
       unsubscribeManager();

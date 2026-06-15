@@ -6,8 +6,13 @@
 // mints requiring user choice, or a "no valid mint" signal.
 // ---------------------------------------------------------------------------
 
-import { localizeReason } from './formatting/locales';
-import type { WalletContext, MintSelectionResult, MintCandidate } from './types';
+import { localizeReason } from "./formatting/locales";
+import { logger, mintUrlFields } from "./logger";
+import type {
+  WalletContext,
+  MintSelectionResult,
+  MintCandidate,
+} from "./types";
 
 export interface MintSelectionConfig {
   /** Mints allowed by the payment request. Empty/undefined = any trusted mint. */
@@ -15,14 +20,20 @@ export interface MintSelectionConfig {
   /** Minimum balance required (e.g. from payment request amount). */
   minAmount?: number;
   /** Strategy when multiple mints qualify. Defaults to 'highestBalance'. */
-  strategy?: 'highestBalance' | 'preferredFirst';
+  strategy?: "highestBalance" | "preferredFirst";
 }
 
 export function getValidMintCandidates(
   ctx: WalletContext,
-  config: MintSelectionConfig = {}
+  config: MintSelectionConfig = {},
 ): MintCandidate[] {
-  const { allowedMints, minAmount, strategy = 'highestBalance' } = config;
+  const { allowedMints, minAmount, strategy = "highestBalance" } = config;
+  logger.debug("mintSelection.candidates.start", {
+    trustedMintCount: ctx.trustedMintUrls.length,
+    allowedMintCount: allowedMints?.length ?? 0,
+    hasMinAmount: minAmount != null && minAmount > 0,
+    strategy,
+  });
 
   let candidates: MintCandidate[] = ctx.trustedMintUrls
     .map((mintUrl) => ({
@@ -33,17 +44,31 @@ export function getValidMintCandidates(
 
   if (allowedMints && allowedMints.length > 0) {
     const allowedSet = new Set(allowedMints);
-    candidates = candidates.filter((candidate) => allowedSet.has(candidate.mintUrl));
+    candidates = candidates.filter((candidate) =>
+      allowedSet.has(candidate.mintUrl),
+    );
   }
 
   if (minAmount != null && minAmount > 0) {
-    candidates = candidates.filter((candidate) => candidate.balance >= minAmount);
+    candidates = candidates.filter(
+      (candidate) => candidate.balance >= minAmount,
+    );
   }
 
-  if (strategy === 'highestBalance') {
+  if (strategy === "highestBalance") {
     candidates.sort((a, b) => b.balance - a.balance);
   }
 
+  logger.info("mintSelection.candidates.result", {
+    candidateCount: candidates.length,
+    strategy,
+    allowedMintCount: allowedMints?.length ?? 0,
+    hasMinAmount: minAmount != null && minAmount > 0,
+    candidates: candidates.map((candidate) => ({
+      ...mintUrlFields(candidate.mintUrl),
+      balance: candidate.balance,
+    })),
+  });
   return candidates;
 }
 
@@ -63,48 +88,93 @@ export function getValidMintCandidates(
 export function selectMint(
   ctx: WalletContext,
   config: MintSelectionConfig = {},
-  locale: string = 'en'
+  locale: string = "en",
 ): MintSelectionResult {
-  const { allowedMints, strategy = 'highestBalance' } = config;
+  const { allowedMints, strategy = "highestBalance" } = config;
+  logger.debug("mintSelection.select.start", {
+    trustedMintCount: ctx.trustedMintUrls.length,
+    allowedMintCount: allowedMints?.length ?? 0,
+    hasMinAmount: config.minAmount != null && config.minAmount > 0,
+    hasPreferredMint: !!ctx.preferredMintUrl,
+    strategy,
+    locale,
+  });
   const candidates = getValidMintCandidates(ctx, config);
 
   if (candidates.length === 0) {
     let code: string;
     if (allowedMints && allowedMints.length > 0) {
-      const anyTrusted = allowedMints.some((m) => ctx.trustedMintUrls.includes(m));
-      code = !anyTrusted ? 'NO_ALLOWED_MINT_TRUSTED' : 'INSUFFICIENT_BALANCE_ALLOWED';
+      const anyTrusted = allowedMints.some((m) =>
+        ctx.trustedMintUrls.includes(m),
+      );
+      code = !anyTrusted
+        ? "NO_ALLOWED_MINT_TRUSTED"
+        : "INSUFFICIENT_BALANCE_ALLOWED";
     } else {
-      code = 'NO_MINT_SUFFICIENT_BALANCE';
+      code = "NO_MINT_SUFFICIENT_BALANCE";
     }
-    return { type: 'noValidMint', reason: localizeReason(code, locale)! };
+    const result = {
+      type: "noValidMint" as const,
+      reason: localizeReason(code, locale)!,
+    };
+    logger.warn("mintSelection.select.noValidMint", {
+      code,
+      allowedMintCount: allowedMints?.length ?? 0,
+      trustedMintCount: ctx.trustedMintUrls.length,
+    });
+    return result;
   }
 
   // Sort by strategy
-  if (strategy === 'highestBalance') {
+  if (strategy === "highestBalance") {
     candidates.sort((a, b) => b.balance - a.balance);
   }
 
   // Preferred mint gets priority when it's in the valid set
   if (ctx.preferredMintUrl) {
-    const preferred = candidates.find((c) => c.mintUrl === ctx.preferredMintUrl);
+    const preferred = candidates.find(
+      (c) => c.mintUrl === ctx.preferredMintUrl,
+    );
     if (preferred) {
-      return {
-        type: 'selected',
+      const result = {
+        type: "selected",
         mintUrl: preferred.mintUrl,
         balance: preferred.balance,
-      };
+      } as const;
+      logger.info("mintSelection.select.selected", {
+        reason: "preferred",
+        ...mintUrlFields(result.mintUrl),
+        balance: result.balance,
+        candidateCount: candidates.length,
+      });
+      return result;
     }
   }
 
   if (candidates.length === 1) {
-    return {
-      type: 'selected',
+    const result = {
+      type: "selected",
       mintUrl: candidates[0].mintUrl,
       balance: candidates[0].balance,
-    };
+    } as const;
+    logger.info("mintSelection.select.selected", {
+      reason: "single_candidate",
+      ...mintUrlFields(result.mintUrl),
+      balance: result.balance,
+      candidateCount: candidates.length,
+    });
+    return result;
   }
 
-  return { type: 'selectionNeeded', validMints: candidates };
+  const result = { type: "selectionNeeded" as const, validMints: candidates };
+  logger.info("mintSelection.select.selectionNeeded", {
+    candidateCount: candidates.length,
+    candidates: candidates.map((candidate) => ({
+      ...mintUrlFields(candidate.mintUrl),
+      balance: candidate.balance,
+    })),
+  });
+  return result;
 }
 
 /**
@@ -112,6 +182,13 @@ export function selectMint(
  * Lightning melts can use any trusted mint with balance.
  * Prefers the wallet's preferred mint if it has sufficient balance.
  */
-export function selectMintForMelt(ctx: WalletContext, minAmount?: number): MintSelectionResult {
-  return selectMint(ctx, { minAmount, strategy: 'highestBalance' });
+export function selectMintForMelt(
+  ctx: WalletContext,
+  minAmount?: number,
+): MintSelectionResult {
+  logger.debug("mintSelection.selectForMelt.start", {
+    trustedMintCount: ctx.trustedMintUrls.length,
+    hasMinAmount: minAmount != null && minAmount > 0,
+  });
+  return selectMint(ctx, { minAmount, strategy: "highestBalance" });
 }

@@ -2,9 +2,15 @@ import {
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
 } from '../../mint-capabilities';
+import { logger, mintUrlFields } from '../../logger';
 import type { MintMethodRequirement, WalletContext } from '../../types';
 import type { PaymentCopyKey } from '../../copy';
-import type { FlowContext, FlowStep, MintQuoteMethod, StepDataMap } from '../types';
+import type {
+  FlowContext,
+  FlowStep,
+  MintQuoteMethod,
+  StepDataMap,
+} from '../types';
 
 export type ReceiveFlowState =
   | {
@@ -37,22 +43,49 @@ export interface ReceiveFlowDefinition {
   copyKeys: (state: ReceiveFlowState) => readonly PaymentCopyKey[];
 }
 
-function selectLightningMint(walletCtx: WalletContext, unit: string): string | null {
-  const requirement: MintMethodRequirement = { operation: 'mint', method: 'bolt11', unit };
+function selectLightningMint(
+  walletCtx: WalletContext,
+  unit: string,
+): string | null {
+  const requirement: MintMethodRequirement = {
+    operation: 'mint',
+    method: 'bolt11',
+    unit,
+  };
   const candidates = buildMethodAwareMintCandidates(walletCtx, requirement);
   const preferred = walletCtx.preferredMintUrl;
-  return (
+  const selected =
     (preferred &&
-    candidates.find((candidate) => candidate.mintUrl === preferred)?.status !== 'disabled'
+    candidates.find((candidate) => candidate.mintUrl === preferred)?.status !==
+      'disabled'
       ? preferred
-      : candidates.find((candidate) => candidate.status !== 'disabled')?.mintUrl) ?? null
-  );
+      : candidates.find((candidate) => candidate.status !== 'disabled')
+          ?.mintUrl) ?? null;
+  logger.info('flow.receive.selectLightningMint', {
+    unit,
+    hasPreferredMintUrl: !!preferred,
+    preferredMintUrlLength: preferred?.length ?? 0,
+    candidateCount: candidates.length,
+    enabledCandidateCount: candidates.filter(
+      (candidate) => candidate.status !== 'disabled',
+    ).length,
+    hasSelectedMintUrl: !!selected,
+    selectedMintUrlLength: selected?.length ?? 0,
+  });
+  return selected;
 }
 
 export function startReceiveLightningFlow(
   walletCtx: WalletContext,
   unit: string,
 ): ReceiveFlowTransitionResult<'enterAmount'> {
+  logger.info('flow.receiveLightning.start', {
+    unit,
+    trustedMintCount: walletCtx.trustedMintUrls.length,
+    hasPreferredMintUrl: !!walletCtx.preferredMintUrl,
+    preferredMintUrlLength: walletCtx.preferredMintUrl?.length ?? 0,
+    balanceMintCount: Object.keys(walletCtx.mintBalances).length,
+  });
   const mintUrl = selectLightningMint(walletCtx, unit);
   const context: FlowContext = {
     unit,
@@ -61,6 +94,13 @@ export function startReceiveLightningFlow(
     mintQuoteMethod: 'bolt11',
   };
 
+  logger.info('flow.receiveLightning.result', {
+    unit,
+    ...mintUrlFields(mintUrl),
+    hasPreselectedMint: !!mintUrl,
+    destination: context.destination,
+    method: context.mintQuoteMethod,
+  });
   return {
     step: 'enterAmount',
     context,
@@ -79,6 +119,11 @@ export function startReceiveFlow(
   walletCtx: WalletContext,
   unit: string,
 ): ReceiveFlowTransitionResult<'navigateToReceive'> {
+  logger.info('flow.receiveHub.start', {
+    unit,
+    trustedMintCount: walletCtx.trustedMintUrls.length,
+    balanceMintCount: Object.keys(walletCtx.mintBalances).length,
+  });
   return {
     step: 'navigateToReceive',
     context: { unit },
@@ -88,11 +133,17 @@ export function startReceiveFlow(
 
 export const receiveFlow: ReceiveFlowDefinition = {
   initial: { type: 'receive-hub', unit: 'sat' },
-  transition: (event, walletCtx) =>
-    event.type === 'START_RECEIVE_LIGHTNING'
+  transition: (event, walletCtx) => {
+    logger.info('flow.receive.transition', {
+      eventType: event.type,
+      unit: event.unit,
+    });
+    return event.type === 'START_RECEIVE_LIGHTNING'
       ? startReceiveLightningFlow(walletCtx, event.unit)
-      : startReceiveFlow(walletCtx, event.unit),
-  actions: (state) => (state.type === 'receive-hub' ? ['showReceiveHub'] : ['enterAmount']),
+      : startReceiveFlow(walletCtx, event.unit);
+  },
+  actions: (state) =>
+    state.type === 'receive-hub' ? ['showReceiveHub'] : ['enterAmount'],
   copyKeys: (state) =>
     state.type === 'receive-hub'
       ? ['timeline.flow.receive']

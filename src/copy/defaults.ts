@@ -43,6 +43,9 @@ export const paymentCopyDefaults = {
 
   'timeline.receive.pending.label': 'Pending',
   'timeline.receive.pending.info': 'Tap Redeem to add to wallet',
+  'timeline.receive.accepted.label': 'Token accepted',
+  'timeline.receive.waiting.label': 'Waiting to redeem',
+  'timeline.receive.waiting.info': "We'll add this ecash to your wallet when you're back online.",
   'timeline.receive.redeemed.label': 'Added to wallet',
   'timeline.receive.redeemed.info': '+{amount} sats added to wallet',
   'timeline.receive.alreadySpent.label': 'Already spent',
@@ -51,6 +54,7 @@ export const paymentCopyDefaults = {
   'timeline.status.failed': 'Failed',
   'timeline.status.complete': 'Complete',
   'timeline.status.inProgress': 'In Progress',
+  'timeline.status.waiting': 'Waiting',
   'timeline.status.awaitingPayment': 'Awaiting Payment',
   'timeline.status.ready': 'Ready',
   'timeline.status.cancelled': 'Cancelled',
