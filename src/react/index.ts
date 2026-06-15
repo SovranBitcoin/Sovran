@@ -22,6 +22,9 @@ export {
   type UseColadaTransactionsResult,
 } from './useColadaTransactions';
 
+// Balance breakdown read model
+export { useColadaBalance } from './useColadaBalance';
+
 export type {
   BleAdapter,
   CameraAdapter,

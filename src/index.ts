@@ -130,6 +130,15 @@ export type {
   TransactionPaymentType,
 } from './history';
 
+// Balance breakdown read model (framework-agnostic)
+export {
+  amountToNumber,
+  emptyBalanceBreakdown,
+  sumAmounts,
+  sumReservedSends,
+} from './balance';
+export type { WalletBalanceBreakdown } from './balance';
+
 // Adapter contracts
 export type {
   BleAdapter,
