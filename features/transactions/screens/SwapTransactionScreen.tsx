@@ -29,6 +29,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { TransactionDetailShell } from '@/features/transactions/components/detail/TransactionDetailShell';
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
@@ -411,7 +412,10 @@ export function SwapTransactionScreen({ groupId }: Props) {
   );
 
   return (
-    <Screen name="SwapTransactionScreen" contentPadding={0}>
+    <TransactionDetailShell
+      screenName="SwapTransactionScreen"
+      testID={`swap-id-${group.id}`}
+      footer={null}>
       <VStack gap={12}>
         {/* ── Header: amount + swap icon (matches HistoryEntryHeader pattern) ── */}
         <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
@@ -597,7 +601,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
           ]}
         />
       </VStack>
-    </Screen>
+    </TransactionDetailShell>
   );
 }
 

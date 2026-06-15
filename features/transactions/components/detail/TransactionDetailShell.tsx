@@ -15,8 +15,12 @@ interface TransactionDetailShellProps {
   screenName: string;
   /** Stable per-entry testID (e.g. `send-token-id-${entry.id}`). */
   testID: string;
-  /** The decorated history entry; fed to header/refresh/timeline. */
-  entry: DetailEntry;
+  /**
+   * The decorated history entry; fed to the default header/refresh/timeline.
+   * Optional: composite views (e.g. a swap group, which isn't a single coco
+   * entry) omit it and supply their own header/body via the slots below.
+   */
+  entry?: DetailEntry;
   /** Mint info for the refresh row. */
   mintInfo?: MintInfo;
   /** Whether the header shows the recipient avatar (sends with a recipient). */
@@ -59,7 +63,10 @@ interface TransactionDetailShellProps {
  * screen only supplies its variable pieces (warnings, details, buttons).
  *
  * Loading/error states stay in the screens because their recovery actions
- * differ; the shell assumes a resolved `entry`.
+ * differ; the shell assumes a resolved `entry` when one is supplied. When
+ * `entry` is omitted, the entry-driven header/refresh/timeline are skipped and
+ * the screen drives the whole body through `beforeStatus`/`statusRow`/
+ * `timeline`/`children` (used by the swap-group detail view).
  */
 export function TransactionDetailShell({
   screenName,
@@ -79,10 +86,14 @@ export function TransactionDetailShell({
       {headerOverride}
       <View testID={testID}>
         <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={showRecipientAvatar} />
+          {entry ? (
+            <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={showRecipientAvatar} />
+          ) : null}
           {beforeStatus}
-          {statusRow ?? <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />}
-          {timeline ?? <HistoryEntryTimeline historyEntry={entry} />}
+          {entry
+            ? (statusRow ?? <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />)
+            : statusRow}
+          {entry ? (timeline ?? <HistoryEntryTimeline historyEntry={entry} />) : timeline}
           {children}
         </VStack>
       </View>
