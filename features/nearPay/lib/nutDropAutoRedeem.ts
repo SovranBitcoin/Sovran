@@ -6,6 +6,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
 import { paymentLog } from '@/shared/lib/logger';
@@ -135,6 +136,16 @@ function getOrchestrator(): MeshRedeemOrchestrator {
           tokenHash,
           kind === 'spent' ? new Error('Token was already redeemed') : new Error('Redeem failed')
         );
+    },
+    onRedeemed: (_tokenHash, _entry, historyEntryId) => {
+      if (!historyEntryId) return;
+      // Nut Drop tokens are P2PK-locked to us. The redeemed proofs are swapped
+      // for fresh ones, so the proof-secret fallback can't see the original
+      // lock — annotate the resulting receive so it shows the lock badge.
+      // (Counterparty-by-npub needs peerID→favorite resolution; deferred.)
+      setTransactionAnnotation(`id:${historyEntryId}`, {
+        lock: { type: 'p2pk', direction: 'incoming' },
+      });
     },
   });
   return orchestrator;
