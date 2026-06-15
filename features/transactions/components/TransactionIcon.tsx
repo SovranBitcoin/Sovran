@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
+import opacity from 'hex-color-opacity';
 import { isSendTokenCancelled, isP2PKLocked, getCounterparty } from '@sovranbitcoin/colada';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -22,7 +23,11 @@ export default function TransactionIcon({
   historyEntry,
   isLoading,
 }: TransactionIconProps): React.ReactNode {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [foreground, surfaceSecondary, muted] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'muted',
+  ] as const);
   const cancelledSend = historyEntry.type === 'send' && isSendTokenCancelled(historyEntry);
   // P2PK lock badge: annotation (outgoing locks, Nut Drop receives) or the
   // proof-secret fallback colada applies for un-annotated locked sends.
@@ -103,8 +108,9 @@ export default function TransactionIcon({
           <Icon name={iconName} color={foreground} size={24} />
         )}
         {showCornerBadge && (
-          // Bottom-right badge over the icon/avatar. A background-colored disc
-          // keeps the glyph legible over any row.
+          // Bottom-right badge over the icon/avatar. The disc matches the card
+          // fill behind the row (surface-secondary) with a subtly darker ring
+          // so it reads as part of the card rather than the screen background.
           <View
             style={{
               position: 'absolute',
@@ -113,7 +119,9 @@ export default function TransactionIcon({
               width: 14,
               height: 14,
               borderRadius: 7,
-              backgroundColor: background,
+              backgroundColor: surfaceSecondary,
+              borderWidth: 1,
+              borderColor: opacity(muted, 0.35),
               alignItems: 'center',
               justifyContent: 'center',
             }}>
