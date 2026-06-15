@@ -27,7 +27,7 @@
 // cleanup, migration, and reserved-proof paths. Keep future reach-ins here.
 // See `../.agents/skills/sovran-architecture-workflow`.
 
-import type { CoreProof, Manager, MeltOperation, MeltOperationState } from '@cashu/coco-core';
+import type { CoreProof, Manager } from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';
 import { cashuLog } from '@/shared/lib/logger';
 
@@ -50,9 +50,6 @@ interface ManagerInternals {
       keysetId: string,
       counter: number
     ): Promise<{ mintUrl: string; keysetId: string; counter: number }>;
-  };
-  meltOperationRepository: {
-    getByState(state: MeltOperationState): Promise<MeltOperation[]>;
   };
   mintOperationRepository: {
     delete(id: string): Promise<void>;
@@ -244,34 +241,6 @@ export async function overwriteCounter(
       ...mintUrlLogFields(mintUrl),
       keysetId,
       counter,
-      error: errorMessage(error),
-    });
-    throw error;
-  }
-}
-
-/**
- * Melt operations in a given state, via the private MeltOperationRepository.
- *
- * The `prepareMeltBolt11`/`executeMelt` flow stores operations here but does
- * not emit `melt-quote:created`, so the public history is incomplete — this
- * is the seam history-merge code uses to bridge the gap.
- */
-export async function listMeltOperationsByState(
-  manager: Manager,
-  state: MeltOperationState
-): Promise<MeltOperation[]> {
-  cashuLog.debug('cashu.manager_internals.melt_operations_by_state.start', { state });
-  try {
-    const operations = await internals(manager).meltOperationRepository.getByState(state);
-    cashuLog.debug('cashu.manager_internals.melt_operations_by_state.done', {
-      state,
-      count: operations.length,
-    });
-    return operations;
-  } catch (error) {
-    cashuLog.warn('cashu.manager_internals.melt_operations_by_state.failed', {
-      state,
       error: errorMessage(error),
     });
     throw error;

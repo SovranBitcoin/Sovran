@@ -430,6 +430,7 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
     <ColadaProviderBase
       handlers={handlers}
       instance={instance}
+      getManager={() => manager}
       operations={operationsOverride}
       notifications={createSovranNotifications({
         getPubkey: () => pubkeyRef.current,
