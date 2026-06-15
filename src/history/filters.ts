@@ -1,10 +1,16 @@
 import type { HistoryEntry, SendHistoryEntry } from "@cashu/coco-core";
 
 import { logger } from "../logger";
-import { getHistoryEntryOnchainMintAddress } from "./timeline";
+import {
+  getHistoryEntryOnchainMintAddress,
+  mintHistoryEntryExpired,
+} from "./timeline";
 
 export type TransactionPaymentType = "all" | "lightning" | "ecash" | "onchain";
 export type TransactionDirection = "all" | "incoming" | "outgoing";
+
+/** Which list section a history entry belongs to. */
+export type TransactionBucket = "pending" | "confirmed" | "expired";
 
 const CANCELLABLE_SEND_STATES = new Set(["pending", "prepared"]);
 
@@ -254,7 +260,12 @@ export function isPendingTransaction(
     result = String(historyEntry.state).toLowerCase() === "unpaid";
     reason = "melt";
   } else {
-    result = isCancellablePendingEcash(historyEntry);
+    // A receive in `executing` state is a received-but-not-yet-redeemed token
+    // (e.g. a P2PK token accepted while the mint was unreachable). It is not
+    // yet in spendable balance, so it belongs in the pending section.
+    result =
+      isCancellablePendingEcash(historyEntry) ||
+      (historyEntry.type === "receive" && isReceiveTokenPending(historyEntry));
     reason = "ecash";
   }
 
@@ -265,4 +276,29 @@ export function isPendingTransaction(
     result,
   });
   return result;
+}
+
+/**
+ * True when an entry is an unpaid Lightning/onchain mint quote whose invoice
+ * has expired. Used to bucket it under Expired instead of Pending.
+ */
+export function isMintExpired(historyEntry: HistoryEntry): boolean {
+  if (historyEntry.type !== "mint") return false;
+  if (String(historyEntry.state).toUpperCase() !== "UNPAID") return false;
+  return mintHistoryEntryExpired(
+    historyEntry as Extract<HistoryEntry, { type: "mint" }>,
+  );
+}
+
+/**
+ * Single source of truth for which section a history entry renders in.
+ * Expired wins over pending; everything else is confirmed.
+ */
+export function bucketTransaction(
+  historyEntry: HistoryEntry,
+  options: { isCollapsingGhost?: boolean } = {},
+): TransactionBucket {
+  if (isMintExpired(historyEntry)) return "expired";
+  if (isPendingTransaction(historyEntry, options)) return "pending";
+  return "confirmed";
 }

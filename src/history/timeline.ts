@@ -222,7 +222,7 @@ function onchainPaidStepType(
   return stepType;
 }
 
-function mintHistoryEntryExpired(
+export function mintHistoryEntryExpired(
   historyEntry: Extract<HistoryEntry, { type: "mint" }>,
 ): boolean {
   try {

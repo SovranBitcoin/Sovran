@@ -85,15 +85,18 @@ export type {
 // History / payment-state timeline
 export {
   buildTimeline,
+  bucketTransaction,
   getCardLabel,
   getHistoryEntryRefreshLabel,
   getSendTokenReachabilityWarning,
   getHistoryEntryOnchainMintAddress,
   getStatusColorType,
   getStatusHeader,
+  inFlightReceiveToHistoryEntry,
   isCancellablePendingEcash,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
+  isMintExpired,
   isMintQuotePaymentObserved,
   isOnchainHistoryEntry,
   isPendingTransaction,
@@ -117,6 +120,7 @@ export type {
   SendTokenWarningCopy,
   TimelineItem,
   TimelineStepType,
+  TransactionBucket,
   TransactionDirection,
   TransactionPaymentType,
 } from './history';

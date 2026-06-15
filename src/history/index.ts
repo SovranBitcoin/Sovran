@@ -1,7 +1,9 @@
 export {
+  bucketTransaction,
   isCancellablePendingEcash,
   isMeltQuotePaid,
   isMeltQuoteReadyToPay,
+  isMintExpired,
   isMintQuotePaymentObserved,
   isOnchainHistoryEntry,
   isPendingTransaction,
@@ -16,6 +18,8 @@ export {
   matchesTransactionFilters,
   matchesTransactionPaymentType,
 } from './filters';
+export type { TransactionBucket } from './filters';
+export { inFlightReceiveToHistoryEntry } from './inFlightReceives';
 export {
   getHistoryEntryRefreshLabel,
 } from './refresh';
