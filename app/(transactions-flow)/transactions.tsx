@@ -34,6 +34,9 @@ const ParamsSchema = z.object({
   filterDirection: z.enum(['all', 'incoming', 'outgoing']).optional(),
   filterStatus: z.enum(['All', 'Confirmed', 'Pending', 'Expired']).optional(),
   filterMintUrl: z.string().max(2048).optional(),
+  filterSource: z.enum(['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink']).optional(),
+  filterLock: z.enum(['all', 'locked', 'unlocked']).optional(),
+  filterCounterparty: z.enum(['all', 'with']).optional(),
 });
 
 function FilterButton() {
@@ -78,6 +81,9 @@ function TransactionsRoute() {
     direction,
     status,
     mintUrl,
+    source,
+    lock,
+    counterparty,
     selectedMonth,
     setSelectedMonth,
     setCurrency,
@@ -85,6 +91,9 @@ function TransactionsRoute() {
     setDirection,
     setStatus,
     setMintUrl,
+    setSource,
+    setLock,
+    setCounterparty,
   } = useTransactionsFilter();
 
   const filterCurrency = params?.filterCurrency;
@@ -92,6 +101,9 @@ function TransactionsRoute() {
   const filterDirection = params?.filterDirection;
   const filterStatus = params?.filterStatus;
   const filterMintUrl = params?.filterMintUrl;
+  const filterSource = params?.filterSource;
+  const filterLock = params?.filterLock;
+  const filterCounterparty = params?.filterCounterparty;
 
   // Sync filter params from URL to context (when returning from filter flow)
   React.useEffect(() => {
@@ -117,17 +129,26 @@ function TransactionsRoute() {
     if (filterDirection) setDirection(filterDirection);
     if (filterStatus) setStatus(filterStatus);
     if (filterMintUrl) setMintUrl(filterMintUrl);
+    if (filterSource) setSource(filterSource);
+    if (filterLock) setLock(filterLock);
+    if (filterCounterparty) setCounterparty(filterCounterparty);
   }, [
     filterCurrency,
     filterPaymentType,
     filterDirection,
     filterStatus,
     filterMintUrl,
+    filterSource,
+    filterLock,
+    filterCounterparty,
     setCurrency,
     setPaymentType,
     setDirection,
     setStatus,
     setMintUrl,
+    setSource,
+    setLock,
+    setCounterparty,
   ]);
 
   // Handle transaction press — declared before the early-return so the hook
@@ -231,6 +252,9 @@ function TransactionsRoute() {
         filterPaymentType={paymentType}
         filterDirection={direction}
         filterMintUrl={mintUrl}
+        filterSource={source}
+        filterLock={lock}
+        filterCounterparty={counterparty}
         filterMonth={selectedMonth}
         onMonthChange={setSelectedMonth}
       />

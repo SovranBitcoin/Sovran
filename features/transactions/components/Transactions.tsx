@@ -23,9 +23,13 @@ import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import {
   bucketTransaction,
+  getCounterparty,
+  getScanSource,
   getSwap,
   isCancellablePendingEcash,
+  isP2PKLocked,
   matchesTransactionFilters,
+  type ScanMethod,
   type TransactionDirection,
   type TransactionPaymentType,
 } from '@sovranbitcoin/colada';
@@ -88,6 +92,10 @@ interface Props {
   filter?: TransactionDirection;
   type?: TransactionPaymentType;
   mintUrlFilter?: string;
+  /** Annotation filters (default 'all'). */
+  source?: 'all' | ScanMethod;
+  lock?: 'all' | 'locked' | 'unlocked';
+  counterparty?: 'all' | 'with';
   at?: 'all' | 'at';
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
   days?: number;
@@ -129,6 +137,9 @@ export const Transactions = React.memo(
     filter = 'all',
     type = 'all',
     mintUrlFilter = 'all',
+    source = 'all',
+    lock = 'all',
+    counterparty = 'all',
     tab = 'All',
     days = 1,
     hideExpired = false,
@@ -175,6 +186,11 @@ export const Transactions = React.memo(
           return false;
         }
 
+        // Annotation-driven filters (source/transport, P2PK lock, counterparty).
+        if (source !== 'all' && getScanSource(historyEntry)?.method !== source) return false;
+        if (lock !== 'all' && isP2PKLocked(historyEntry) !== (lock === 'locked')) return false;
+        if (counterparty === 'with' && !getCounterparty(historyEntry)?.pubkey) return false;
+
         // Filter out expired transactions if hideExpired is true
         if (hideExpired) {
           const isExpired =
@@ -211,7 +227,18 @@ export const Transactions = React.memo(
         });
       }
       return result;
-    }, [history, account.unit, mintUrlFilter, filter, type, hideExpired, selectedMonth]);
+    }, [
+      history,
+      account.unit,
+      mintUrlFilter,
+      filter,
+      type,
+      source,
+      lock,
+      counterparty,
+      hideExpired,
+      selectedMonth,
+    ]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
     const timelineItems: TimelineItem[] = useMemo(() => {
