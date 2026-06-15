@@ -13,6 +13,7 @@ export { TransactionLocationSection } from './components/TransactionLocationSect
 export { HistoryEntryHeader } from './components/detail/HistoryEntryHeader';
 export { HistoryEntryRefresh } from './components/detail/HistoryEntryRefresh';
 export { HistoryEntryTimeline } from './components/detail/HistoryEntryTimeline';
+export { TransactionDetailShell } from './components/detail/TransactionDetailShell';
 export {
   useTransactionSource,
   useBip321Info,
@@ -23,4 +24,3 @@ export {
   useTransactionsFilter,
 } from './components/TransactionsFilterContext';
 export { useHistoryWithMelts } from './hooks/useHistoryWithMelts';
-export { useHistoryEntry } from './hooks/useHistoryEntry';

@@ -9,9 +9,9 @@ import type { BoundAction } from '@sovranbitcoin/colada/react';
 import { MintSelector } from '@/features/wallet';
 import {
   Bip321MethodIcons,
-  HistoryEntryHeader,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
+  TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
 } from '@/features/transactions';
@@ -32,10 +32,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Card } from '@/shared/ui/composed/Card';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
-import { Screen } from '@/shared/ui/composed/Screen';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { View } from '@/shared/ui/primitives/View/View';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
 
@@ -185,13 +182,13 @@ export function OnchainReceiveScreen({
   );
 
   return (
-    <Screen name="OnchainReceiveScreen" contentPadding={0} footer={bottomButtons}>
-      <View testID={`mint-quote-id-${entry.id}`}>
-        <VStack gap={12}>
-          <HistoryEntryHeader
-            historyEntry={entry as unknown as HistoryEntry}
-            showRecipientAvatar={false}
-          />
+    <TransactionDetailShell
+      screenName="OnchainReceiveScreen"
+      testID={`mint-quote-id-${entry.id}`}
+      entry={entry as unknown as HistoryEntry}
+      footer={bottomButtons}
+      beforeStatus={
+        <>
           {!isPaid && (
             <PaymentInfo
               data={[{ name: 'Onchain Payment', value: paymentInfoValue }]}
@@ -199,9 +196,11 @@ export function OnchainReceiveScreen({
               copyTarget="address"
             />
           )}
-
           {isPaid && <TransactionLocationSection transactionId={entry.id} />}
-
+        </>
+      }
+      statusRow={
+        <>
           {!isPaid ? (
             <MintSelector
               width={quoteCardWidth}
@@ -215,43 +214,42 @@ export function OnchainReceiveScreen({
               historyEntry={entry as unknown as HistoryEntry}
             />
           ) : null}
-
           {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
-
-          <HistoryEntryTimeline
-            historyEntry={entry as unknown as HistoryEntry}
-            onchainConfirmationProgress={onchainConfirmationProgress}
-          />
-
-          <DetailsSection
-            items={[
-              entry.id && { title: 'ID', value: entry.id },
-              source && { title: 'Source', value: source },
-              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-              bip321.optionKinds && {
-                title: 'Payment Methods',
-                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="onchain" />,
-              },
-              { title: 'Date', value: entry.createdAt.datetime },
-              {
-                title: 'Amount',
-                value: formatAmount({ amount: entry.amount, unit: entry.unit }),
-              },
-              { title: 'State', value: entry.state },
-              entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
-              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-              {
-                title: 'Network Fee',
-                value: 'Paid by sender',
-              },
-              onchainAddress && {
-                title: 'Address',
-                value: truncateMiddle(onchainAddress, 10),
-              },
-            ].flatMap((item) => (item ? [item] : []))}
-          />
-        </VStack>
-      </View>
-    </Screen>
+        </>
+      }
+      timeline={
+        <HistoryEntryTimeline
+          historyEntry={entry as unknown as HistoryEntry}
+          onchainConfirmationProgress={onchainConfirmationProgress}
+        />
+      }>
+      <DetailsSection
+        items={[
+          entry.id && { title: 'ID', value: entry.id },
+          source && { title: 'Source', value: source },
+          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+          bip321.optionKinds && {
+            title: 'Payment Methods',
+            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="onchain" />,
+          },
+          { title: 'Date', value: entry.createdAt.datetime },
+          {
+            title: 'Amount',
+            value: formatAmount({ amount: entry.amount, unit: entry.unit }),
+          },
+          { title: 'State', value: entry.state },
+          entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+          {
+            title: 'Network Fee',
+            value: 'Paid by sender',
+          },
+          onchainAddress && {
+            title: 'Address',
+            value: truncateMiddle(onchainAddress, 10),
+          },
+        ].flatMap((item) => (item ? [item] : []))}
+      />
+    </TransactionDetailShell>
   );
 }

@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import { useWindowDimensions, View } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 
 import { Stack } from 'expo-router';
 
@@ -22,9 +22,8 @@ import { useScreenActions } from '@sovranbitcoin/colada/react';
 import { MintSelector } from '@/features/wallet';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
-  HistoryEntryHeader,
   HistoryEntryRefresh,
-  HistoryEntryTimeline,
+  TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
   Bip321MethodIcons,
@@ -33,9 +32,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import { Screen } from '@/shared/ui/composed/Screen';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
@@ -166,65 +163,63 @@ export function LightningSendScreen({
   );
 
   return (
-    <Screen name="LightningSendScreen" contentPadding={0} footer={bottomButtons}>
-      {recipientPubkey && headerDisplayName ? (
-        // Override the layout's static "Send Lightning" title with the
-        // resolved recipient identity. Expo Router lets a screen body
-        // render `<Stack.Screen options={...} />` to update its own
-        // active-route options without re-declaring at the layout level.
-        // See `AmountFlowScreen.tsx` for the same pattern.
-        <Stack.Screen
-          options={{
-            headerTitle: () => (
-              <RecipientHeader
-                pubkey={recipientPubkey}
-                displayName={headerDisplayName}
-                avatarUrl={headerAvatarUrl}
-              />
-            ),
-          }}
-        />
-      ) : null}
-      <View testID={`melt-quote-id-${entry.id}`}>
-        <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
-
-          {isPaid && <TransactionLocationSection transactionId={entry.id} />}
-
-          {isReadyToPay ? (
-            <MintSelector
-              width={quoteCardWidth}
-              unit={entry.unit}
-              selectedMintUrl={mintUrl}
-              onRequestMintList={onRequestMintList}
-            />
-          ) : mintInfo ? (
-            <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
-          ) : null}
-
-          <HistoryEntryTimeline historyEntry={entry} />
-
-          <DetailsSection
-            items={[
-              source && { title: 'Source', value: source },
-              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-              bip321.optionKinds && {
-                title: 'Payment Methods',
-                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
-              },
-              { title: 'Date', value: entry.createdAt.datetime },
-              { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
-              { title: 'State', value: entry.state },
-              entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
-              entry.metadata?.meltTarget && {
-                title: 'Destination',
-                value: truncateMiddle(entry.metadata.meltTarget, 12),
-              },
-              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-            ].flatMap((item) => (item ? [item] : []))}
+    <TransactionDetailShell
+      screenName="LightningSendScreen"
+      testID={`melt-quote-id-${entry.id}`}
+      entry={entry}
+      footer={bottomButtons}
+      headerOverride={
+        recipientPubkey && headerDisplayName ? (
+          // Override the layout's static "Send Lightning" title with the
+          // resolved recipient identity. Expo Router lets a screen body
+          // render `<Stack.Screen options={...} />` to update its own
+          // active-route options without re-declaring at the layout level.
+          // See `AmountFlowScreen.tsx` for the same pattern.
+          <Stack.Screen
+            options={{
+              headerTitle: () => (
+                <RecipientHeader
+                  pubkey={recipientPubkey}
+                  displayName={headerDisplayName}
+                  avatarUrl={headerAvatarUrl}
+                />
+              ),
+            }}
           />
-        </VStack>
-      </View>
-    </Screen>
+        ) : null
+      }
+      beforeStatus={isPaid ? <TransactionLocationSection transactionId={entry.id} /> : null}
+      statusRow={
+        isReadyToPay ? (
+          <MintSelector
+            width={quoteCardWidth}
+            unit={entry.unit}
+            selectedMintUrl={mintUrl}
+            onRequestMintList={onRequestMintList}
+          />
+        ) : mintInfo ? (
+          <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
+        ) : null
+      }>
+      <DetailsSection
+        items={[
+          source && { title: 'Source', value: source },
+          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+          bip321.optionKinds && {
+            title: 'Payment Methods',
+            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
+          },
+          { title: 'Date', value: entry.createdAt.datetime },
+          { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+          { title: 'State', value: entry.state },
+          entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+          entry.metadata?.meltTarget && {
+            title: 'Destination',
+            value: truncateMiddle(entry.metadata.meltTarget, 12),
+          },
+          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+        ].flatMap((item) => (item ? [item] : []))}
+      />
+    </TransactionDetailShell>
   );
 }

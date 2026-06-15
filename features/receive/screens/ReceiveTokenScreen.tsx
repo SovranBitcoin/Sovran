@@ -13,22 +13,17 @@ import { isReceiveTokenPending, isReceiveTokenRedeemed } from '@sovranbitcoin/co
 import { useScreenActions } from '@sovranbitcoin/colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
-  HistoryEntryHeader,
-  HistoryEntryRefresh,
-  HistoryEntryTimeline,
+  TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
   Bip321MethodIcons,
 } from '@/features/transactions';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import { View } from '@/shared/ui/primitives/View/View';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface ReceiveTokenScreenProps {
@@ -124,34 +119,28 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
   );
 
   return (
-    <Screen name="ReceiveTokenScreen" contentPadding={0} footer={bottomButtons}>
-      <View testID={`receive-token-id-${entry.id}`}>
-        <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
-
-          {isRedeemed && <TransactionLocationSection transactionId={entry.id} />}
-
-          <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
-
-          <HistoryEntryTimeline historyEntry={entry} />
-
-          <DetailsSection
-            items={[
-              source && { title: 'Source', value: source },
-              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-              bip321.optionKinds && {
-                title: 'Payment Methods',
-                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
-              },
-              { title: 'Date', value: entry.createdAt.datetime },
-              { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
-              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-              entry.p2pkPubkey && { title: 'P2PK', value: entry.p2pkPubkey.truncate(8) },
-              entry.tokenString && { title: 'Token', value: entry.tokenString.truncate(6) },
-            ].flatMap((item) => (item ? [item] : []))}
-          />
-        </VStack>
-      </View>
-    </Screen>
+    <TransactionDetailShell
+      screenName="ReceiveTokenScreen"
+      testID={`receive-token-id-${entry.id}`}
+      entry={entry}
+      mintInfo={mintInfo}
+      footer={bottomButtons}
+      beforeStatus={isRedeemed ? <TransactionLocationSection transactionId={entry.id} /> : null}>
+      <DetailsSection
+        items={[
+          source && { title: 'Source', value: source },
+          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+          bip321.optionKinds && {
+            title: 'Payment Methods',
+            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
+          },
+          { title: 'Date', value: entry.createdAt.datetime },
+          { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+          entry.p2pkPubkey && { title: 'P2PK', value: entry.p2pkPubkey.truncate(8) },
+          entry.tokenString && { title: 'Token', value: entry.tokenString.truncate(6) },
+        ].flatMap((item) => (item ? [item] : []))}
+      />
+    </TransactionDetailShell>
   );
 }
