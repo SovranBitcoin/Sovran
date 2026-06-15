@@ -23,17 +23,24 @@ export function useReservedProofs(): ReservedProofsResult {
     let cancelled = false;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    async function loadReserved() {
+    async function loadReserved(reason: string) {
       try {
+        walletLog.debug('reservedProofs.load.start', { reason });
         const proofs = await getReservedProofs(managerRef.current);
-        if (cancelled) return;
+        if (cancelled) {
+          walletLog.debug('reservedProofs.load.stale_result', { reason });
+          return;
+        }
         const total = proofs.reduce((sum, proof) => sum + amountToNumber(proof.amount), 0);
-        walletLog.info('reservedProofs.loaded', { count: proofs.length, total });
+        walletLog.info('reservedProofs.loaded', { reason, count: proofs.length, total });
         setReservedTotal(total);
         setReservedProofs(proofs);
       } catch (err) {
-        if (cancelled) return;
-        walletLog.error('reservedProofs.error', { error: err });
+        if (cancelled) {
+          walletLog.debug('reservedProofs.error.stale_result', { reason });
+          return;
+        }
+        walletLog.error('reservedProofs.error', { reason, error: err });
         setReservedTotal(0);
         setReservedProofs([]);
       }
@@ -41,24 +48,40 @@ export function useReservedProofs(): ReservedProofsResult {
 
     // Debounce event-driven reloads — coco fires multiple proof events in
     // quick succession during operations. Wait 150ms for them to settle.
-    function scheduleLoad() {
+    function scheduleLoad(reason: string) {
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(loadReserved, 150);
+      walletLog.debug('reservedProofs.load.scheduled', { reason, debounceMs: 150 });
+      debounceTimer = setTimeout(() => loadReserved(reason), 150);
     }
 
     // Initial load (no debounce)
-    void loadReserved();
+    void loadReserved('initial');
 
-    manager.on('proofs:reserved', scheduleLoad);
-    manager.on('proofs:released', scheduleLoad);
-    manager.on('proofs:state-changed', scheduleLoad);
+    const onReserved = () => {
+      walletLog.debug('reservedProofs.event_received', { event: 'proofs:reserved' });
+      scheduleLoad('proofs:reserved');
+    };
+    const onReleased = () => {
+      walletLog.debug('reservedProofs.event_received', { event: 'proofs:released' });
+      scheduleLoad('proofs:released');
+    };
+    const onStateChanged = () => {
+      walletLog.debug('reservedProofs.event_received', { event: 'proofs:state-changed' });
+      scheduleLoad('proofs:state-changed');
+    };
+
+    walletLog.debug('reservedProofs.subscribe');
+    manager.on('proofs:reserved', onReserved);
+    manager.on('proofs:released', onReleased);
+    manager.on('proofs:state-changed', onStateChanged);
 
     return () => {
       cancelled = true;
       if (debounceTimer) clearTimeout(debounceTimer);
-      manager.off('proofs:reserved', scheduleLoad);
-      manager.off('proofs:released', scheduleLoad);
-      manager.off('proofs:state-changed', scheduleLoad);
+      walletLog.debug('reservedProofs.unsubscribe');
+      manager.off('proofs:reserved', onReserved);
+      manager.off('proofs:released', onReleased);
+      manager.off('proofs:state-changed', onStateChanged);
     };
   }, [manager]);
 

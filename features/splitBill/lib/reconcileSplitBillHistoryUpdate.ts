@@ -10,6 +10,8 @@
 
 import { isMintQuotePaymentObserved } from '@sovranbitcoin/colada';
 
+import { cashuLog } from '@/shared/lib/logger';
+
 interface ReconcilerStore {
   quoteIdToSplitBill: Record<string, { groupId: string; participantId: string }>;
   markPaymentPaidByQuoteId: (quoteId: string) => void;
@@ -28,18 +30,70 @@ export function reconcileSplitBillHistoryUpdate(
   entry: ReconcilerEntry,
   store: ReconcilerStore
 ): ReconcilerOutcome {
-  if (entry.type !== 'mint') return 'ignored';
+  if (entry.type !== 'mint') {
+    cashuLog.debug('split_bill.history_reconcile.result', {
+      outcome: 'ignored',
+      reason: 'wrong-type',
+      type: entry.type,
+      state: entry.state ?? null,
+    });
+    return 'ignored';
+  }
   const quoteId = entry.quoteId;
-  if (!quoteId) return 'ignored';
+  if (!quoteId) {
+    cashuLog.debug('split_bill.history_reconcile.result', {
+      outcome: 'ignored',
+      reason: 'missing-quote-id',
+      type: entry.type,
+      state: entry.state ?? null,
+    });
+    return 'ignored';
+  }
   const ref = store.quoteIdToSplitBill[quoteId];
-  if (!ref) return 'ignored';
+  if (!ref) {
+    cashuLog.debug('split_bill.history_reconcile.result', {
+      outcome: 'ignored',
+      reason: 'untracked-quote-id',
+      type: entry.type,
+      state: entry.state ?? null,
+      quoteId,
+    });
+    return 'ignored';
+  }
   if (isMintQuotePaymentObserved(entry)) {
     store.markPaymentPaidByQuoteId(quoteId);
+    cashuLog.info('split_bill.history_reconcile.result', {
+      outcome: 'paid',
+      reason: 'payment-observed',
+      type: entry.type,
+      state: entry.state ?? null,
+      quoteId,
+      groupId: ref.groupId,
+      participantId: ref.participantId,
+    });
     return 'paid';
   }
   if (entry.state === 'EXPIRED') {
     store.markPaymentExpiredByQuoteId(quoteId);
+    cashuLog.info('split_bill.history_reconcile.result', {
+      outcome: 'expired',
+      reason: 'expired-state',
+      type: entry.type,
+      state: entry.state,
+      quoteId,
+      groupId: ref.groupId,
+      participantId: ref.participantId,
+    });
     return 'expired';
   }
+  cashuLog.debug('split_bill.history_reconcile.result', {
+    outcome: 'ignored',
+    reason: 'not-observed-or-expired',
+    type: entry.type,
+    state: entry.state ?? null,
+    quoteId,
+    groupId: ref.groupId,
+    participantId: ref.participantId,
+  });
   return 'ignored';
 }

@@ -24,6 +24,38 @@ interface CashuTokenBubbleProps {
   isOwn: boolean;
 }
 
+interface DecodedCashuTokenBubble {
+  amount: number;
+  unit: string;
+  mintUrl: string;
+  proofCount: number;
+  hasP2PKProofs: boolean;
+}
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
+function tokenLogFields(token: string): Record<string, unknown> {
+  return {
+    tokenLength: token.length,
+  };
+}
+
+function hasP2PKProofs(proofs: readonly { secret: string }[]): boolean {
+  return proofs.some((proof) => {
+    try {
+      const parsed = JSON.parse(proof.secret);
+      return Array.isArray(parsed) && parsed[0] === 'P2PK';
+    } catch {
+      return false;
+    }
+  });
+}
+
 /**
  * Inline ecash redeem affordance rendered alongside a chat-message bubble.
  * Lifted from `features/user/screens/UserMessagesScreen.tsx` so every DM
@@ -38,33 +70,80 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
     'success',
   ] as const);
 
-  let amount = 0;
-  let unit = '';
-  let mintUrl = '';
-  let isValid = false;
+  const decodedToken = React.useMemo<DecodedCashuTokenBubble | null>(() => {
+    try {
+      const decoded = getTokenMetadata(token);
+      const next = {
+        amount: amountToNumber(decoded.amount),
+        unit: decoded.unit || 'sats',
+        mintUrl: decoded.mint || '',
+        proofCount: decoded.incompleteProofs.length,
+        hasP2PKProofs: hasP2PKProofs(decoded.incompleteProofs),
+      };
+      log.info('chat.cashu_token.detected', {
+        ...tokenLogFields(token),
+        ...mintUrlLogFields(next.mintUrl),
+        isOwn,
+        amount: next.amount,
+        unit: next.unit,
+        proofCount: next.proofCount,
+        hasP2PKProofs: next.hasP2PKProofs,
+        expectedNext: isOwn ? 'cancel_or_ignore' : 'redeem_affordance',
+      });
+      return next;
+    } catch (error) {
+      log.warn('chat.cashu_token.decode_failed', {
+        ...tokenLogFields(token),
+        isOwn,
+        error,
+      });
+      return null;
+    }
+  }, [isOwn, token]);
 
-  try {
-    const decoded = getTokenMetadata(token);
-    amount = amountToNumber(decoded.amount);
-    unit = decoded.unit || 'sats';
-    mintUrl = decoded.mint || '';
-    isValid = true;
-  } catch (error) {
-    log.error('chat.cashu_decode_failed', { error });
-    isValid = false;
-  }
-
-  const usdAmount = isValid
-    ? formatAmount({ amount, unit }, { displayAs: 'usd', currencyDisplay: 'symbol' })
+  const usdAmount = decodedToken
+    ? formatAmount(
+        { amount: decodedToken.amount, unit: decodedToken.unit },
+        { displayAs: 'usd', currencyDisplay: 'symbol' }
+      )
     : '';
 
   const handlePress = () => {
-    if (!isValid) {
+    if (!decodedToken) {
+      log.warn('chat.cashu_token.press_invalid', {
+        ...tokenLogFields(token),
+        isOwn,
+      });
       staticPopup('invalid-token');
       return;
     }
 
-    const receiveHistoryEntry = buildReceiveHistoryEntry(token, unit);
+    let receiveHistoryEntry: ReturnType<typeof buildReceiveHistoryEntry>;
+    try {
+      receiveHistoryEntry = buildReceiveHistoryEntry(token, decodedToken.unit);
+    } catch (error) {
+      log.error('chat.cashu_token.build_receive_history_failed', {
+        ...tokenLogFields(token),
+        ...mintUrlLogFields(decodedToken.mintUrl),
+        isOwn,
+        error,
+      });
+      staticPopup('invalid-token');
+      return;
+    }
+
+    log.info('chat.cashu_token.navigate_receive_token', {
+      ...tokenLogFields(token),
+      ...mintUrlLogFields(decodedToken.mintUrl),
+      isOwn,
+      historyEntryId: receiveHistoryEntry.id,
+      historyState: receiveHistoryEntry.state,
+      amount: decodedToken.amount,
+      unit: decodedToken.unit,
+      proofCount: decodedToken.proofCount,
+      hasP2PKProofs: decodedToken.hasP2PKProofs,
+      expectedNext: 'receive_token_screen_redeem',
+    });
 
     router.navigate({
       pathname: '/receiveToken',
@@ -74,7 +153,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
     });
   };
 
-  if (!isValid) {
+  if (!decodedToken) {
     return null;
   }
 
@@ -83,6 +162,7 @@ export function CashuTokenBubble({ token, isOwn }: CashuTokenBubbleProps) {
   // affordance in the message stream rather than a loud hero banner. The action
   // is a subtle tinted pill (success for Redeem, muted for Cancel).
   const actionColor = isOwn ? opacity(foreground, alpha.strong) : success;
+  const { amount, unit, mintUrl } = decodedToken;
 
   return (
     <View

@@ -1,4 +1,5 @@
 import { toSafeSatAmount } from '@/shared/lib/cashu/amount';
+import { cashuLog } from '@/shared/lib/logger';
 import type { TransferStep } from '@/features/mint/components/rebalance';
 import type { StepState } from '@/features/mint/components/rebalance/groupSteps';
 
@@ -50,7 +51,11 @@ const EXECUTING_STATUSES = new Set<StepState['status']>([
 ]);
 
 export function createInitialStepStates(steps: readonly TransferStep[]): Record<string, StepState> {
-  return Object.fromEntries(steps.map((step) => [step.id, { status: 'pending' as const }]));
+  const states = Object.fromEntries(steps.map((step) => [step.id, { status: 'pending' as const }]));
+  cashuLog.debug('mint.rebalance.run_state.initial_steps', {
+    stepCount: steps.length,
+  });
+  return states;
 }
 
 export function mergeStepState(
@@ -58,10 +63,17 @@ export function mergeStepState(
   stepId: string,
   update: Partial<StepState>
 ): Record<string, StepState> {
-  return {
+  const next = {
     ...states,
     [stepId]: { ...states[stepId], ...update },
   };
+  cashuLog.debug('mint.rebalance.run_state.merge_step', {
+    stepId,
+    previousStatus: states[stepId]?.status ?? null,
+    nextStatus: next[stepId]?.status ?? null,
+    updateKeys: Object.keys(update).sort(),
+  });
+  return next;
 }
 
 export function computeRebalanceStepCounts(
@@ -83,7 +95,7 @@ export function computeRebalanceStepCounts(
   }
 
   const terminal = completed + failed + skipped;
-  return {
+  const counts = {
     completed,
     failed,
     skipped,
@@ -93,16 +105,27 @@ export function computeRebalanceStepCounts(
       !hasRunPlan || steps.length === 0 ? 0 : Math.max(0, Math.min(1, terminal / steps.length)),
     hasFailedStep: failed > 0,
   };
+  cashuLog.debug('mint.rebalance.run_state.step_counts', {
+    stepCount: steps.length,
+    hasRunPlan,
+    ...counts,
+  });
+  return counts;
 }
 
 export function countRunnableSteps(
   steps: readonly TransferStep[],
   stepStates: Record<string, StepState>
 ): number {
-  return steps.filter((step) => {
+  const count = steps.filter((step) => {
     const status = stepStates[step.id]?.status;
     return status !== 'done' && status !== 'skipped';
   }).length;
+  cashuLog.debug('mint.rebalance.run_state.runnable_steps', {
+    stepCount: steps.length,
+    runnableCount: count,
+  });
+  return count;
 }
 
 export function resetFailedStepStates(
@@ -120,6 +143,10 @@ export function resetFailedStepStates(
       };
     }
   }
+  cashuLog.debug('mint.rebalance.run_state.reset_failed', {
+    stepCount: steps.length,
+    failedBeforeCount: steps.filter((step) => states[step.id]?.status === 'failed').length,
+  });
   return next;
 }
 
@@ -129,8 +156,22 @@ export function insertStepsAfter(
   toInsert: readonly TransferStep[]
 ): TransferStep[] {
   const index = steps.findIndex((step) => step.id === afterId);
-  if (index === -1) return [...steps];
-  return [...steps.slice(0, index + 1), ...toInsert, ...steps.slice(index + 1)];
+  if (index === -1) {
+    cashuLog.warn('mint.rebalance.run_state.insert_steps.missing_after', {
+      afterId,
+      originalCount: steps.length,
+      insertCount: toInsert.length,
+    });
+    return [...steps];
+  }
+  const next = [...steps.slice(0, index + 1), ...toInsert, ...steps.slice(index + 1)];
+  cashuLog.info('mint.rebalance.run_state.insert_steps.result', {
+    afterId,
+    originalCount: steps.length,
+    insertCount: toInsert.length,
+    nextCount: next.length,
+  });
+  return next;
 }
 
 export function createChainSteps({
@@ -158,6 +199,12 @@ export function createChainSteps({
       chainHopIndex: index,
     });
   }
+  cashuLog.info('mint.rebalance.run_state.chain_steps.result', {
+    chainId,
+    pathLength: chainPath.length,
+    stepCount: steps.length,
+    idPrefix,
+  });
   return steps;
 }
 
@@ -180,6 +227,12 @@ export function applyInsertedChainStates(
     next[step.id] = { status: 'pending' };
   }
 
+  cashuLog.info('mint.rebalance.run_state.inserted_chain_states.result', {
+    skippedOriginalStepId,
+    insertedStepCount: insertedSteps.length,
+    nextStateCount: Object.keys(next).length,
+    originalUpdateKeys: Object.keys(originalUpdate).sort(),
+  });
   return next;
 }
 
@@ -219,6 +272,14 @@ export function createMiddlemanCandidateRoutes({
     });
   }
 
+  cashuLog.info('mint.rebalance.run_state.middleman_routes.result', {
+    hasGraphSuggestion: !!suggestion?.path && suggestion.path.length >= 3,
+    graphPathLength: suggestion?.path?.length ?? null,
+    localFallbackCount: localFallbackMintUrls.length,
+    routeCount: routes.length,
+    routeSources: routes.map((route) => route.source),
+    fromEqualsTo: fromMintUrl === toMintUrl,
+  });
   return routes;
 }
 
@@ -232,6 +293,12 @@ export function formatCandidateRoutingDetail({
   pathNames: readonly string[];
 }): string {
   const intermediaryNames = pathNames.slice(1, -1).join(' → ');
+  cashuLog.debug('mint.rebalance.run_state.route_detail', {
+    routeIndex,
+    routeCount,
+    pathNameCount: pathNames.length,
+    intermediaryCount: Math.max(0, pathNames.length - 2),
+  });
   if (routeCount > 1) {
     return `Trying route ${routeIndex + 1}/${routeCount}: via ${intermediaryNames}…`;
   }
@@ -252,17 +319,47 @@ export function computeInitialTransferAmount({
   const minRequired = minTransferThreshold + feeHeadroom;
   const requestedSatAmount = toSafeSatAmount(requestedAmount) ?? 0;
   if (sourceBalance < minRequired || requestedSatAmount < minTransferThreshold) {
+    cashuLog.info('mint.rebalance.run_state.initial_transfer_amount', {
+      status: 'skip',
+      requestedAmount,
+      requestedSatAmount,
+      sourceBalance,
+      minTransferThreshold,
+      feeHeadroom,
+      minRequired,
+    });
     return { status: 'skip', minRequired };
   }
 
   if (requestedSatAmount + feeHeadroom > sourceBalance) {
+    const amount = toSafeSatAmount(sourceBalance - feeHeadroom) ?? 0;
+    cashuLog.info('mint.rebalance.run_state.initial_transfer_amount', {
+      status: 'capped',
+      requestedAmount,
+      requestedSatAmount,
+      sourceBalance,
+      minTransferThreshold,
+      feeHeadroom,
+      minRequired,
+      amount,
+    });
     return {
       status: 'capped',
-      amount: toSafeSatAmount(sourceBalance - feeHeadroom) ?? 0,
+      amount,
       capped: true,
     };
   }
 
+  cashuLog.info('mint.rebalance.run_state.initial_transfer_amount', {
+    status: 'ready',
+    requestedAmount,
+    requestedSatAmount,
+    sourceBalance,
+    minTransferThreshold,
+    feeHeadroom,
+    minRequired,
+    amount: requestedSatAmount,
+  });
   return {
     status: 'ready',
     amount: requestedSatAmount,
@@ -275,20 +372,45 @@ export function normalizeRebalanceTransferError(error: unknown): string {
   const lower = message.toLowerCase();
 
   if (message.includes('lnd is not ready') || message.includes('not ready for')) {
+    cashuLog.warn('mint.rebalance.run_state.error_normalized', {
+      reason: 'lnd-not-ready',
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
     return 'Mint Lightning node is not ready. The mint may be starting up or syncing. Try again in a few minutes.';
   }
   if (lower.includes('no_route') || lower.includes('ran out of routes')) {
+    cashuLog.warn('mint.rebalance.run_state.error_normalized', {
+      reason: 'no-route',
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
     return 'No Lightning route found. No middleman route available either.';
   }
   if (message.includes('FAILURE_REASON_TIMEOUT')) {
+    cashuLog.warn('mint.rebalance.run_state.error_normalized', {
+      reason: 'timeout',
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
     return 'Lightning payment timed out. The mint may be slow to respond.';
   }
   if (message.includes('invoice expired') || message.includes('EXPIRED')) {
+    cashuLog.warn('mint.rebalance.run_state.error_normalized', {
+      reason: 'invoice-expired',
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
     return 'Invoice expired before payment could complete. Please retry.';
   }
   if (lower.includes('insufficient')) {
+    cashuLog.warn('mint.rebalance.run_state.error_normalized', {
+      reason: 'insufficient',
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
     return 'Insufficient balance or liquidity for this transfer.';
   }
 
+  cashuLog.warn('mint.rebalance.run_state.error_normalized', {
+    reason: 'passthrough',
+    errorName: error instanceof Error ? error.name : typeof error,
+    messageLength: message.length,
+  });
   return message;
 }

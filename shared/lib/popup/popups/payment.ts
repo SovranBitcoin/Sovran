@@ -2,6 +2,7 @@ import React from 'react';
 import { showCustomToast } from './bridge';
 import { PaymentStatusToast } from '../PaymentStatusToast';
 import { SwapStatusToast } from '../SwapStatusToast';
+import { popupLog } from '@/shared/lib/logger';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { makeStaticPopup, makeParamPopup } from './factory';
@@ -18,6 +19,27 @@ export function paymentStatusPopup(payload: {
   receiveEntryId?: string;
 }): void {
   const { variant, id, amount, unit, mintUrl, operationId, receiveEntryId } = payload;
+  popupLog.info('popup.payment_status.show', {
+    variant,
+    paymentIdLength: id.length,
+    hasMintUrl: mintUrl.length > 0,
+    mintUrlLength: mintUrl.length,
+    amount,
+    unit,
+    operationIdLength: operationId?.length ?? 0,
+    receiveEntryIdLength: receiveEntryId?.length ?? 0,
+  });
+  const debugFields = {
+    paymentId: id,
+    id,
+    variant,
+    hasMintUrl: mintUrl.length > 0,
+    mintUrlLength: mintUrl.length,
+    amount,
+    unit,
+    ...(operationId !== undefined ? { operationId } : {}),
+    ...(receiveEntryId !== undefined ? { receiveEntryId } : {}),
+  };
   showCustomToast({
     component: (toastProps) =>
       React.createElement(PaymentStatusToast, {
@@ -31,7 +53,15 @@ export function paymentStatusPopup(payload: {
         ...(receiveEntryId !== undefined && { receiveEntryId }),
       }),
     duration: 'persistent',
-    onHide: () => usePaymentStatusStore.getState().setActive(null),
+    debugLabel: `payment-status:${variant}`,
+    debugFields,
+    onHide: () => {
+      popupLog.info('popup.payment_status.hide', {
+        variant,
+        paymentIdLength: id.length,
+      });
+      usePaymentStatusStore.getState().clearActive(id);
+    },
   });
 }
 
@@ -58,14 +88,22 @@ export function isSwapStatusToastMounted(): boolean {
 }
 
 export function swapStatusPopup(): void {
-  if (swapToastMounted) return;
+  if (swapToastMounted) {
+    popupLog.debug('popup.swap_status.skip_already_mounted');
+    return;
+  }
   swapToastMounted = true;
+  popupLog.info('popup.swap_status.show');
   showCustomToast({
     component: (toastProps) => React.createElement(SwapStatusToast, toastProps),
     duration: 'persistent',
     onHide: () => {
       swapToastMounted = false;
       const cur = useSwapStatusStore.getState().active;
+      popupLog.info('popup.swap_status.hide', {
+        hasActive: !!cur,
+        state: cur?.state ?? null,
+      });
       // Mid-flight swipe leaves the gate engaged; clear only after the
       // toast unmounts in a terminal state (or the store is already empty).
       if (!cur || cur.state !== 'running') {

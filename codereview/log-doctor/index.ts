@@ -35,6 +35,9 @@
  *   feed         Feed/thread GraphQL, page mapping, and reply seed/render flow
  *   full         Full entries but deduplicated and trimmed
  *   diff         Compare latest session against previous to isolate failure-specific entries
+ *   devices      List device/session labels found in a mixed log
+ *   payment      Payment/receive/redeem timeline grouped by operation ids
+ *   toasts       Toast lifecycle timeline grouped by toast/payment ids
  *   flows        Reconstruct cross-async traces using flowId in ctx
  *   ws           WebSocket connection health, subscription analysis, message rates
  *   gc           Hermes memory trend, GC pressure, JS thread blocks, leak detection
@@ -51,6 +54,9 @@
  *   --since <ms>        Only entries after this _t value
  *   --until <ms>        Only entries before this _t value
  *   --event <pattern>   Filter to events matching this substring
+ *   --device <pattern>  Filter to device label/session/platform matching pattern
+ *   --platform <name>   Filter to platform: ios, android, web, ...
+ *   --session <id>      Filter to logSessionId/expoSessionId matching id
  *   --latest            Only analyse the most recent app session (detects restarts via _t resets)
  *   --format <fmt>      Output format for 'full' mode: json (default), yaml, md (pipe-delimited)
  *   --token-budget <n>  Max approximate tokens — output is pruned to fit
@@ -119,6 +125,9 @@ interface Options {
   since: number | null;
   until: number | null;
   eventFilter: string | null;
+  deviceFilter: string | null;
+  platformFilter: string | null;
+  sessionFilter: string | null;
   latest: boolean;
   /** Output format for full mode: 'json' (default), 'yaml', or 'md' (pipe-delimited) */
   format: 'json' | 'yaml' | 'md';
@@ -130,7 +139,7 @@ interface Options {
 
 // ─── Parse CLI args ──────────────────────────────────────────────────────────
 
-function parseArgs(argv: string[]): Options {
+export function parseArgs(argv: string[]): Options {
   const args = argv.slice(2);
   const opts: Options = {
     mode: 'stats',
@@ -143,6 +152,9 @@ function parseArgs(argv: string[]): Options {
     since: null,
     until: null,
     eventFilter: null,
+    deviceFilter: null,
+    platformFilter: null,
+    sessionFilter: null,
     latest: false,
     format: 'json',
     tokenBudget: null,
@@ -174,6 +186,12 @@ function parseArgs(argv: string[]): Options {
       opts.until = parseFloat(args[++i]);
     } else if (arg === '--event' && args[i + 1]) {
       opts.eventFilter = args[++i];
+    } else if (arg === '--device' && args[i + 1]) {
+      opts.deviceFilter = args[++i];
+    } else if (arg === '--platform' && args[i + 1]) {
+      opts.platformFilter = args[++i].toLowerCase();
+    } else if (arg === '--session' && args[i + 1]) {
+      opts.sessionFilter = args[++i];
     } else if (arg === '--latest') {
       opts.latest = true;
     } else if (arg === '--format' && args[i + 1]) {
@@ -192,7 +210,7 @@ function parseArgs(argv: string[]): Options {
 
 // ─── Parse log input ─────────────────────────────────────────────────────────
 
-function parseLogInput(raw: string): LogEntry[] {
+export function parseLogInput(raw: string): LogEntry[] {
   const entries: LogEntry[] = [];
   const lines = raw.split('\n');
 
@@ -232,17 +250,92 @@ function parseLogInput(raw: string): LogEntry[] {
   return entries;
 }
 
+// ─── Device/session helpers ─────────────────────────────────────────────────
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function deviceLabel(entry: LogEntry): string {
+  const device = entry.device ?? {};
+  return (
+    asString(device.label) ??
+    asString(device.logSessionId) ??
+    asString(device.expoSessionId) ??
+    asString(device.platform) ??
+    'unknown'
+  );
+}
+
+function deviceClockKey(entry: LogEntry): string {
+  const device = entry.device ?? {};
+  const platform = asString(device.platform)?.toLowerCase() ?? 'unknown';
+  const name = asString(device.deviceName)?.toLowerCase() ?? 'device';
+  return `${platform}:${name}`;
+}
+
+function devicePlatform(entry: LogEntry): string | null {
+  return asString(entry.device?.platform)?.toLowerCase() ?? null;
+}
+
+function sessionValues(entry: LogEntry): string[] {
+  const device = entry.device ?? {};
+  return [device.logSessionId, device.expoSessionId, device.label]
+    .map(asString)
+    .filter((value): value is string => value !== null);
+}
+
+function matchesPattern(value: string, pattern: string): boolean {
+  try {
+    return new RegExp(pattern, 'i').test(value);
+  } catch {
+    return value.toLowerCase().includes(pattern.toLowerCase());
+  }
+}
+
+function deviceMatches(entry: LogEntry, pattern: string): boolean {
+  const device = entry.device ?? {};
+  const haystack = [
+    device.label,
+    device.platform,
+    device.logSessionId,
+    device.expoSessionId,
+    device.osVersion,
+    device.appVersion,
+    JSON.stringify(device),
+  ]
+    .map((value) => (typeof value === 'string' ? value : value == null ? '' : String(value)))
+    .join(' ');
+  return matchesPattern(haystack, pattern);
+}
+
+function deviceTag(entry: LogEntry): string {
+  const platform = devicePlatform(entry) ?? 'unknown';
+  const session = sessionValues(entry)[0] ?? deviceLabel(entry);
+  const shortSession = session.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 8) || '?';
+  return `${platform}:${shortSession}`;
+}
+
+function hasMultipleDevices(entries: LogEntry[]): boolean {
+  return new Set(entries.map(deviceLabel)).size > 1;
+}
+
 // ─── Session detection ──────────────────────────────────────────────────────
 // When `expo start 2>&1 | tee log.txt` runs across hot-reloads or restarts,
 // multiple sessions are concatenated. A session boundary is detected when _t
 // jumps backwards (performance.now() resets on restart) or there is a gap > 60s.
 
-function extractLatestSession(entries: LogEntry[]): LogEntry[] {
+function extractLatestSessionForOneClock(entries: LogEntry[]): LogEntry[] {
   if (entries.length === 0) return entries;
   let lastBoundary = 0;
   let prevT = -1;
+  let prevSession = sessionValues(entries[0])[0] ?? null;
   for (let i = 0; i < entries.length; i++) {
+    const currentSession = sessionValues(entries[i])[0] ?? null;
     const t = entries[i]._t ?? 0;
+    if (i > 0 && currentSession && prevSession && currentSession !== prevSession) {
+      lastBoundary = i;
+    }
     if (prevT >= 0) {
       const delta = t - prevT;
       if (delta < -500 || delta > 60_000) {
@@ -251,6 +344,7 @@ function extractLatestSession(entries: LogEntry[]): LogEntry[] {
       }
     }
     prevT = t;
+    prevSession = currentSession;
   }
   const session = entries.slice(lastBoundary);
   if (lastBoundary > 0) {
@@ -261,6 +355,36 @@ function extractLatestSession(entries: LogEntry[]): LogEntry[] {
     );
   }
   return session;
+}
+
+export function extractLatestSession(entries: LogEntry[]): LogEntry[] {
+  if (entries.length === 0) return entries;
+
+  const grouped = new Map<string, LogEntry[]>();
+  for (const entry of entries) {
+    const key = deviceClockKey(entry);
+    const bucket = grouped.get(key) ?? [];
+    bucket.push(entry);
+    grouped.set(key, bucket);
+  }
+
+  if (grouped.size <= 1) return extractLatestSessionForOneClock(entries);
+
+  const keep = new Set<LogEntry>();
+  let kept = 0;
+  for (const bucket of grouped.values()) {
+    const latest = extractLatestSessionForOneClock(bucket);
+    kept += latest.length;
+    for (const entry of latest) keep.add(entry);
+  }
+
+  if (kept < entries.length) {
+    console.error(
+      `[--latest] Mixed devices: skipped ${entries.length - kept} older entries across ${grouped.size} device sessions`
+    );
+  }
+
+  return entries.filter((entry) => keep.has(entry));
 }
 
 // ─── Pagination helper ───────────────────────────────────────────────────────
@@ -298,10 +422,18 @@ const INSTRUMENTATION_EVENTS = new Set([
 
 // ─── Filter entries ──────────────────────────────────────────────────────────
 
-function filterEntries(entries: LogEntry[], opts: Options): LogEntry[] {
+export function filterEntries(entries: LogEntry[], opts: Options): LogEntry[] {
   return entries.filter((e) => {
     if (opts.since !== null && e._t !== undefined && e._t < opts.since) return false;
     if (opts.until !== null && e._t !== undefined && e._t > opts.until) return false;
+    if (opts.platformFilter && devicePlatform(e) !== opts.platformFilter) return false;
+    if (opts.deviceFilter && !deviceMatches(e, opts.deviceFilter)) return false;
+    if (
+      opts.sessionFilter &&
+      !sessionValues(e).some((value) => matchesPattern(value, opts.sessionFilter!))
+    ) {
+      return false;
+    }
     if (opts.eventFilter) {
       try {
         if (!new RegExp(opts.eventFilter).test(e.event)) return false;
@@ -584,12 +716,15 @@ function modeStats(entries: LogEntry[], opts: Options): string {
 function modeTimeline(entries: LogEntry[], opts: Options): string {
   const { page, footer } = paginate(entries, opts);
   const lines: string[] = [];
+  const showDevice = hasMultipleDevices(entries);
 
   // For delta computation, get the entry just before the page
   let prevT: number | null =
     opts.offset > 0 && entries[opts.offset - 1] ? (entries[opts.offset - 1]._t ?? null) : null;
 
-  lines.push('DELTA      LVL    EVENT                              PARAMS');
+  lines.push(
+    `${showDevice ? 'DEVICE        ' : ''}DELTA      LVL    EVENT                              PARAMS`
+  );
   lines.push('-'.repeat(100));
 
   for (const e of page) {
@@ -602,7 +737,7 @@ function modeTimeline(entries: LogEntry[], opts: Options): string {
     const event = e.event.padEnd(35).slice(0, 35);
     const params = shortParams(e.params);
 
-    let line = `${deltaStr} ${lvl} ${event} ${params}`;
+    let line = `${showDevice ? `${deviceTag(e).padEnd(13).slice(0, 13)} ` : ''}${deltaStr} ${lvl} ${event} ${params}`;
     if (e.error) line += ` ERR:${e.error.name}:${e.error.message}`;
     lines.push(line);
   }
@@ -610,6 +745,183 @@ function modeTimeline(entries: LogEntry[], opts: Options): string {
   lines.push(footer);
 
   return lines.join('\n');
+}
+
+// ─── Mode: devices ───────────────────────────────────────────────────────────
+
+export function modeDevices(entries: LogEntry[], _opts: Options): string {
+  const devices = new Map<
+    string,
+    {
+      count: number;
+      firstT: number;
+      lastT: number;
+      device: Record<string, unknown> | undefined;
+      warn: number;
+      error: number;
+      events: Set<string>;
+    }
+  >();
+
+  for (const entry of entries) {
+    const key = deviceLabel(entry);
+    const t = entry._t ?? 0;
+    const existing = devices.get(key) ?? {
+      count: 0,
+      firstT: t,
+      lastT: t,
+      device: entry.device,
+      warn: 0,
+      error: 0,
+      events: new Set<string>(),
+    };
+    existing.count++;
+    existing.firstT = Math.min(existing.firstT, t);
+    existing.lastT = Math.max(existing.lastT, t);
+    existing.device = existing.device ?? entry.device;
+    if (entry.level === 'warn') existing.warn++;
+    if (entry.level === 'error' || entry.level === 'fatal') existing.error++;
+    existing.events.add(entry.event);
+    devices.set(key, existing);
+  }
+
+  const lines: string[] = [];
+  lines.push(`DEVICES (${devices.size})`);
+  lines.push('');
+  for (const [key, info] of [...devices.entries()].sort((a, b) => b[1].count - a[1].count)) {
+    const span = `${Math.round(info.firstT)}ms..${Math.round(info.lastT)}ms`;
+    lines.push(
+      `  ${key}  entries=${info.count} span=${span} warn=${info.warn} error=${info.error} events=${info.events.size}`
+    );
+    if (info.device) lines.push(`    ${JSON.stringify(info.device)}`);
+  }
+  return lines.join('\n');
+}
+
+// ─── Mode: payment / toasts ─────────────────────────────────────────────────
+
+const CORRELATION_KEYS = [
+  'toastId',
+  'paymentId',
+  'id',
+  'operationId',
+  'receiveEntryId',
+  'quoteId',
+  'tokenHash',
+  'flowId',
+  'entryId',
+] as const;
+
+function fieldString(value: unknown): string | null {
+  if (typeof value === 'string' && value.length > 0) return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function correlationKey(entry: LogEntry): string {
+  for (const key of CORRELATION_KEYS) {
+    const value = fieldString(entry.params?.[key]) ?? fieldString(entry.ctx?.[key]);
+    if (value) return `${key}:${value}`;
+  }
+  return `unlinked:${entry.event}`;
+}
+
+function groupEntries(entries: LogEntry[]): Map<string, LogEntry[]> {
+  const groups = new Map<string, LogEntry[]>();
+  for (const entry of entries) {
+    const key = correlationKey(entry);
+    const group = groups.get(key) ?? [];
+    group.push(entry);
+    groups.set(key, group);
+  }
+  return groups;
+}
+
+function renderGroupedTimeline(title: string, entries: LogEntry[], opts: Options): string {
+  if (entries.length === 0) return `No ${title.toLowerCase()} entries found.`;
+  const grouped = [...groupEntries(entries).entries()].sort((a, b) => {
+    const aStart = a[1][0]?._t ?? 0;
+    const bStart = b[1][0]?._t ?? 0;
+    return aStart - bStart;
+  });
+  const { page, footer } = paginate(grouped, opts);
+  const multiDevice = hasMultipleDevices(entries);
+  const lines: string[] = [];
+  lines.push(`${title.toUpperCase()} (${entries.length} entries, ${grouped.length} groups)`);
+  lines.push('');
+
+  for (const [groupId, group] of page) {
+    const first = group[0];
+    const last = group[group.length - 1];
+    const duration = Math.round(((last?._t ?? 0) - (first?._t ?? 0)) * 100) / 100;
+    const hasError = group.some((entry) => entry.level === 'error' || entry.level === 'fatal');
+    const hasWarning = group.some((entry) => entry.level === 'warn');
+    const outcome = hasError ? 'ERROR' : hasWarning ? 'WARN' : 'OK';
+    lines.push(`  ${groupId} (${duration}ms, ${outcome})`);
+
+    const startT = first?._t ?? 0;
+    for (const entry of group) {
+      const rel = Math.round(((entry._t ?? 0) - startT) * 100) / 100;
+      const tag = multiDevice ? `${deviceTag(entry)} ` : '';
+      const params = shortParams(entry.params, 8);
+      const err = entry.error ? ` ERR:${entry.error.name}:${entry.error.message}` : '';
+      lines.push(
+        `    +${rel}ms ${tag}${levelIcon(entry.level)} ${entry.event.padEnd(42).slice(0, 42)} ${params}${err}`
+      );
+    }
+    lines.push('');
+  }
+
+  lines.push(footer);
+  return lines.join('\n');
+}
+
+function isPaymentAuditEvent(entry: LogEntry): boolean {
+  const event = entry.event;
+  if (
+    event.startsWith('payment.') ||
+    event.startsWith('hook.payment_status.') ||
+    event.startsWith('screenAction.receiveToken.') ||
+    event.startsWith('operations.executeReceive') ||
+    event.startsWith('operations.executeAutoRedeem') ||
+    event.startsWith('store.nut_drop_queue.') ||
+    event.startsWith('near_pay.') ||
+    event === 'machine.transition' ||
+    event === 'machine.event.received' ||
+    event === 'machine.stale_result.ignored'
+  ) {
+    return true;
+  }
+  if (event.startsWith('coco.')) {
+    const searchable = `${event} ${shortParams(entry.params, 12)}`.toLowerCase();
+    return (
+      searchable.includes('receive') ||
+      searchable.includes('p2pk') ||
+      searchable.includes('network') ||
+      searchable.includes('mint_operation') ||
+      searchable.includes('proof')
+    );
+  }
+  return false;
+}
+
+export function modePayment(entries: LogEntry[], opts: Options): string {
+  return renderGroupedTimeline('payment audit', entries.filter(isPaymentAuditEvent), opts);
+}
+
+function isToastAuditEvent(entry: LogEntry): boolean {
+  const event = entry.event;
+  return (
+    event.startsWith('popup.toast.') ||
+    event.startsWith('popup.status_toast.') ||
+    event.startsWith('payment.status.') ||
+    event.startsWith('hook.payment_status.') ||
+    event.startsWith('payment.receive.')
+  );
+}
+
+export function modeToasts(entries: LogEntry[], opts: Options): string {
+  return renderGroupedTimeline('toast audit', entries.filter(isToastAuditEvent), opts);
 }
 
 // ─── Mode: errors ────────────────────────────────────────────────────────────
@@ -2784,7 +3096,7 @@ async function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, flows, ws, gc, budget, phone'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, devices, payment, toasts, flows, ws, gc, budget, phone'
     );
     process.exit(1);
   }
@@ -2798,7 +3110,8 @@ async function main() {
 
   // diff mode needs all sessions before --latest filtering
   if (opts.mode === 'diff') {
-    let output = modeDiff(allEntries, opts);
+    const diffEntries = filterEntries(allEntries, opts);
+    let output = modeDiff(diffEntries, opts);
     if (opts.tokenBudget !== null) output = applyTokenBudget(output, opts.tokenBudget);
     console.log(output);
     return;
@@ -2846,6 +3159,15 @@ async function main() {
     case 'full':
       output = modeFull(entries, opts);
       break;
+    case 'devices':
+      output = modeDevices(entries, opts);
+      break;
+    case 'payment':
+      output = modePayment(entries, opts);
+      break;
+    case 'toasts':
+      output = modeToasts(entries, opts);
+      break;
     case 'flows':
       output = modeFlows(entries, opts);
       break;
@@ -2870,7 +3192,7 @@ async function main() {
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, flows, ws, gc, budget, crypto, ops, perf, phone'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, feed, full, diff, devices, payment, toasts, flows, ws, gc, budget, crypto, ops, perf, phone'
       );
       process.exit(1);
   }
@@ -2887,7 +3209,10 @@ async function main() {
 // module by the test-dsl executor (or any other consumer). The entry can
 // be the real index, or the back-compat shim at scripts/log-doctor.ts that
 // just imports this file.
-const __thisFile = url.fileURLToPath(import.meta.url);
+const __thisFile =
+  typeof __filename === 'string'
+    ? nodePath.resolve(__filename)
+    : url.fileURLToPath(import.meta.url);
 const __entryFile = process.argv[1] ? nodePath.resolve(process.argv[1]) : '';
 const __isShimEntry = __entryFile.endsWith(`${nodePath.sep}scripts${nodePath.sep}log-doctor.ts`);
 if (__entryFile === __thisFile || __isShimEntry) {

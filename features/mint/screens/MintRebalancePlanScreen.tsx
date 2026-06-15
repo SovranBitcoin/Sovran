@@ -39,7 +39,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useLifecycleLogger } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useMintRebalanceOrchestrator } from '@/features/mint/hooks/useMintRebalanceOrchestrator';
 import { LoadingIndicator } from '@/shared/blocks/status';
 
@@ -96,6 +96,9 @@ export function MintRebalancePlanScreen() {
   useEffect(() => {
     let cancelled = false;
     const loadMintInfo = async () => {
+      paymentLog.info('mint.rebalance_plan.mint_info.load_start', {
+        trustedMintCount: trustedMints.length,
+      });
       const results = await Promise.allSettled(
         trustedMints.map((mint) =>
           getMintInfo(mint.mintUrl).then(
@@ -104,7 +107,13 @@ export function MintRebalancePlanScreen() {
           )
         )
       );
-      if (cancelled) return;
+      if (cancelled) {
+        paymentLog.info('mint.rebalance_plan.mint_info.load_stale', {
+          trustedMintCount: trustedMints.length,
+          resultCount: results.length,
+        });
+        return;
+      }
       const infoMap: Record<string, GetInfoResponse | null> = {};
       for (const r of results) {
         if (r.status === 'fulfilled') {
@@ -112,6 +121,13 @@ export function MintRebalancePlanScreen() {
           infoMap[url] = info;
         }
       }
+      paymentLog.info('mint.rebalance_plan.mint_info.load_done', {
+        trustedMintCount: trustedMints.length,
+        resultCount: results.length,
+        fulfilledCount: results.filter((result) => result.status === 'fulfilled').length,
+        rejectedCount: results.filter((result) => result.status === 'rejected').length,
+        infoCount: Object.keys(infoMap).length,
+      });
       setMintInfoMap(infoMap);
     };
     void loadMintInfo();
@@ -158,9 +174,48 @@ export function MintRebalancePlanScreen() {
     [plan.steps, stepStates, runPlan]
   );
 
+  useEffect(() => {
+    paymentLog.debug('mint.rebalance_plan.render_state', {
+      unit,
+      trustedMintCount: trustedMints.length,
+      mintsForUnitCount: mintsForUnit.length,
+      mintUrlCount: mintUrls.length,
+      liveBalanceCount: Object.keys(liveBalances).length,
+      distributionCount: Object.keys(distribution).length,
+      mintInfoCount: Object.keys(mintInfoMap).length,
+      middlemanRouting,
+      minTransferThreshold,
+      planStepCount: plan.steps.length,
+      totalAmount: plan.totalAmount,
+      alreadyBalanced,
+      runStatus,
+      hasRunPlan: !!runPlan,
+      stepCounts,
+      swapGroupIdLength: swapGroupId?.length ?? 0,
+    });
+  }, [
+    alreadyBalanced,
+    distribution,
+    liveBalances,
+    middlemanRouting,
+    minTransferThreshold,
+    mintInfoMap,
+    mintUrls.length,
+    mintsForUnit.length,
+    plan.steps.length,
+    plan.totalAmount,
+    runPlan,
+    runStatus,
+    stepCounts,
+    swapGroupId,
+    trustedMints.length,
+    unit,
+  ]);
+
   const handleDone = useCallback(() => {
+    paymentLog.info('mint.rebalance_plan.done_press', { runStatus });
     router.dismissTo('/');
-  }, []);
+  }, [runStatus]);
 
   const bottomButtons = useMemo(() => {
     if (alreadyBalanced || plan.steps.length === 0) {
@@ -194,7 +249,12 @@ export function MintRebalancePlanScreen() {
                     {
                       text: 'Retry failed',
                       variant: 'secondary' as const,
-                      onPress: async () => handleRetryFailed(),
+                      onPress: async () => {
+                        paymentLog.info('mint.rebalance_plan.retry_failed_press', {
+                          failedCount: stepCounts.failed,
+                        });
+                        return handleRetryFailed();
+                      },
                     },
                   ]
                 : []),
@@ -212,12 +272,25 @@ export function MintRebalancePlanScreen() {
               {
                 text: 'Cancel',
                 variant: 'secondary' as const,
-                onPress: async () => handleDone(),
+                onPress: async () => {
+                  paymentLog.info('mint.rebalance_plan.cancel_press', {
+                    runStatus,
+                    planStepCount: plan.steps.length,
+                  });
+                  return handleDone();
+                },
               },
               {
                 text: 'Start rebalancing',
                 variant: 'primary' as const,
-                onPress: async () => handleStart(),
+                onPress: async () => {
+                  paymentLog.info('mint.rebalance_plan.start_press', {
+                    planStepCount: plan.steps.length,
+                    totalAmount: plan.totalAmount,
+                    unit,
+                  });
+                  return handleStart();
+                },
               },
             ]}
           />
@@ -233,6 +306,10 @@ export function MintRebalancePlanScreen() {
               text: runStatus === 'cancelled' ? 'Done' : 'Stop',
               variant: 'secondary' as const,
               onPress: async () => {
+                paymentLog.info('mint.rebalance_plan.stop_or_done_press', {
+                  runStatus,
+                  executing: stepCounts.executing,
+                });
                 if (runStatus === 'cancelled') return handleDone();
                 if (runStatus === 'running') return handleCancelRun();
                 return handleDone();
@@ -246,12 +323,14 @@ export function MintRebalancePlanScreen() {
   }, [
     alreadyBalanced,
     plan.steps,
+    plan.totalAmount,
     stepCounts,
     runStatus,
     handleDone,
     handleStart,
     handleRetryFailed,
     handleCancelRun,
+    unit,
   ]);
 
   return (
@@ -406,16 +485,46 @@ export function MintRebalancePlanScreen() {
                   routeSuggestion={state.routeSuggestion}
                   routingDetail={state.routingDetail}
                   onRouteThrough={
-                    runStatus !== 'running' ? () => handleRouteThrough(step) : undefined
+                    runStatus !== 'running'
+                      ? () => {
+                          paymentLog.info('mint.rebalance_plan.step_route_through_press', {
+                            stepIdLength: step.id.length,
+                            amount: step.amount,
+                            unit,
+                          });
+                          return handleRouteThrough(step);
+                        }
+                      : undefined
                   }
                   onRetry={
                     runStatus !== 'running' &&
                     state.status === 'failed' &&
                     !String(state.errorMessage ?? '').startsWith('Payment pending.')
-                      ? () => handleRetry(step)
+                      ? () => {
+                          paymentLog.info('mint.rebalance_plan.step_retry_press', {
+                            stepIdLength: step.id.length,
+                            amount: step.amount,
+                            unit,
+                            status: state.status,
+                            errorMessageLength: state.errorMessage?.length ?? 0,
+                          });
+                          return handleRetry(step);
+                        }
                       : undefined
                   }
-                  onSkip={runStatus !== 'running' ? () => handleSkip(step) : undefined}
+                  onSkip={
+                    runStatus !== 'running'
+                      ? () => {
+                          paymentLog.info('mint.rebalance_plan.step_skip_press', {
+                            stepIdLength: step.id.length,
+                            amount: step.amount,
+                            unit,
+                            status: state.status,
+                          });
+                          return handleSkip(step);
+                        }
+                      : undefined
+                  }
                   chainInfo={
                     step.chainId && step.chainPath
                       ? {
@@ -438,6 +547,10 @@ export function MintRebalancePlanScreen() {
           <Pressable
             haptics
             onPress={() => {
+              paymentLog.info('mint.rebalance_plan.view_swap_press', {
+                swapGroupIdLength: swapGroupId.length,
+                stepCount: plan.steps.length,
+              });
               router.navigate({
                 pathname: '/swap',
                 params: { groupId: swapGroupId },

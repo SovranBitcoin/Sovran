@@ -30,6 +30,13 @@ import { useTransactionDistributionStore } from '@/shared/stores/profile/transac
 
 type EntryRecord = Record<string, unknown>;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 const HISTORY_TYPE_BY_SCREEN: Partial<Record<ScreenType, string>> = {
   meltQuote: 'melt',
   mintQuote: 'mint',
@@ -513,7 +520,7 @@ export function createSovranScreenActionsBridge({
               });
             } catch (error) {
               paymentLog.warn('send.mint_info_fetch_failed', {
-                mintUrl,
+                ...mintUrlLogFields(mintUrl),
                 error: error instanceof Error ? error : new Error(String(error)),
               });
             }

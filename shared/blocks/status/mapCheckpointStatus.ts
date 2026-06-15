@@ -8,6 +8,7 @@ export type CheckpointStatus =
   | 'future-small'
   | 'next-pending'
   | 'current'
+  | 'waiting'
   | 'complete'
   | 'success'
   | 'failed'
@@ -27,6 +28,8 @@ export function mapCheckpointStatusToIndicator(status: CheckpointStatus): Indica
       return { phase: 'idle', result: 'success' };
     case 'current':
       return { phase: 'loading', result: 'success' };
+    case 'waiting':
+      return { phase: 'idle', result: 'warning' };
     case 'complete':
     case 'success':
       return { phase: 'done', result: 'success' };

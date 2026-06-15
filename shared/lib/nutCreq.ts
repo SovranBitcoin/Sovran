@@ -1,4 +1,5 @@
 import { PaymentRequest, decodePaymentRequest, type NUT10Option } from '@cashu/cashu-ts';
+import { cashuLog } from '@/shared/lib/logger';
 
 /**
  * NUT-18 payment request (`creq…`) used as Nut Drop's capability + mint signal,
@@ -25,8 +26,20 @@ const P2PK_PUBKEY_RE = /^02[0-9a-f]{64}$/i;
  */
 export function buildStandingCreq(params: { mints: string[]; pubkey33: string }): string | null {
   const mints = Array.from(new Set(params.mints.filter(Boolean))).slice(0, MAX_ADVERTISED_MINTS);
-  if (mints.length === 0) return null;
-  if (!P2PK_PUBKEY_RE.test(params.pubkey33)) return null;
+  const base = {
+    inputMintCount: params.mints.length,
+    advertisedMintCount: mints.length,
+    pubkeyLength: params.pubkey33.length,
+    pubkeyValid: P2PK_PUBKEY_RE.test(params.pubkey33),
+  };
+  if (mints.length === 0) {
+    cashuLog.info('cashu.creq.build.skipped', { ...base, reason: 'no-mints' });
+    return null;
+  }
+  if (!P2PK_PUBKEY_RE.test(params.pubkey33)) {
+    cashuLog.warn('cashu.creq.build.skipped', { ...base, reason: 'invalid-p2pk-pubkey' });
+    return null;
+  }
   try {
     const request = new PaymentRequest(
       undefined, // transports — delivery is the BLE DM, not Nostr/HTTP
@@ -38,8 +51,14 @@ export function buildStandingCreq(params: { mints: string[]; pubkey33: string })
       false, // singleUse
       { kind: 'P2PK', data: params.pubkey33, tags: [] } satisfies NUT10Option
     );
-    return request.toEncodedRequest();
+    const creq = request.toEncodedRequest();
+    cashuLog.info('cashu.creq.build.done', {
+      ...base,
+      creqLength: creq.length,
+    });
+    return creq;
   } catch {
+    cashuLog.warn('cashu.creq.build.failed', base);
     return null;
   }
 }
@@ -53,7 +72,13 @@ interface ParsedCreq {
 
 /** Decode a peer's `creq` → accepted mints + P2PK lock key. Null if invalid. */
 export function parseCreq(creq: string): ParsedCreq | null {
-  if (!creq.toLowerCase().startsWith('creq')) return null;
+  if (!creq.toLowerCase().startsWith('creq')) {
+    cashuLog.debug('cashu.creq.parse.rejected', {
+      creqLength: creq.length,
+      reason: 'missing-prefix',
+    });
+    return null;
+  }
   try {
     const request = decodePaymentRequest(creq);
     const mints = (request.mints ?? []).filter(Boolean);
@@ -62,8 +87,19 @@ export function parseCreq(creq: string): ParsedCreq | null {
     if (nut10 && nut10.kind?.toUpperCase() === 'P2PK' && typeof nut10.data === 'string') {
       lockPubkey33 = P2PK_PUBKEY_RE.test(nut10.data) ? nut10.data : null;
     }
+    cashuLog.debug('cashu.creq.parse.done', {
+      creqLength: creq.length,
+      mintCount: mints.length,
+      hasNut10: !!nut10,
+      nut10Kind: nut10?.kind ?? null,
+      hasValidLockPubkey: !!lockPubkey33,
+      lockPubkeyLength: typeof nut10?.data === 'string' ? nut10.data.length : 0,
+    });
     return { mints, lockPubkey33 };
   } catch {
+    cashuLog.warn('cashu.creq.parse.failed', {
+      creqLength: creq.length,
+    });
     return null;
   }
 }
@@ -77,11 +113,42 @@ export function lockableMintsFromCreq(
   creq: string | undefined,
   nostrPubkeyHex: string | undefined
 ): string[] | null {
-  if (!creq || !nostrPubkeyHex) return null;
+  if (!creq || !nostrPubkeyHex) {
+    cashuLog.debug('cashu.creq.lockable.rejected', {
+      reason: 'missing-input',
+      hasCreq: !!creq,
+      creqLength: creq?.length ?? 0,
+      hasNostrPubkey: !!nostrPubkeyHex,
+      nostrPubkeyLength: nostrPubkeyHex?.length ?? 0,
+    });
+    return null;
+  }
   const parsed = parseCreq(creq);
-  if (!parsed) return null;
+  if (!parsed) {
+    cashuLog.debug('cashu.creq.lockable.rejected', {
+      reason: 'parse-failed',
+      creqLength: creq.length,
+      nostrPubkeyLength: nostrPubkeyHex.length,
+    });
+    return null;
+  }
   const expected = `02${nostrPubkeyHex}`.toLowerCase();
-  if (!parsed.lockPubkey33 || parsed.lockPubkey33.toLowerCase() !== expected) return null;
+  if (!parsed.lockPubkey33 || parsed.lockPubkey33.toLowerCase() !== expected) {
+    cashuLog.debug('cashu.creq.lockable.rejected', {
+      reason: 'lock-mismatch',
+      creqLength: creq.length,
+      mintCount: parsed.mints.length,
+      hasLockPubkey: !!parsed.lockPubkey33,
+      lockPubkeyLength: parsed.lockPubkey33?.length ?? 0,
+      nostrPubkeyLength: nostrPubkeyHex.length,
+    });
+    return null;
+  }
+  cashuLog.info('cashu.creq.lockable.done', {
+    creqLength: creq.length,
+    mintCount: parsed.mints.length,
+    nostrPubkeyLength: nostrPubkeyHex.length,
+  });
   return parsed.mints;
 }
 
@@ -103,6 +170,16 @@ export function creqParseDiagnostics(peer: { creq?: string; nostrPubkeyHex?: str
 } {
   const parsed = peer.creq ? parseCreq(peer.creq) : null;
   const receiverMints = lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex);
+  cashuLog.debug('cashu.creq.diagnostics', {
+    peerHasCreq: !!peer.creq,
+    creqLength: peer.creq?.length ?? 0,
+    peerHasNostrPubkey: !!peer.nostrPubkeyHex,
+    nostrPubkeyLength: peer.nostrPubkeyHex?.length ?? 0,
+    creqDecoded: !!parsed,
+    creqMintCount: parsed?.mints.length ?? 0,
+    creqLockMatchesNpub: receiverMints !== null,
+    receiverMintCount: receiverMints?.length ?? 0,
+  });
   return {
     peerHasCreq: !!peer.creq,
     creqDecoded: !!parsed,

@@ -23,6 +23,13 @@ interface NostrDiscoveredMintData {
   mintInfo: GetInfoResponse | null;
 }
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 interface UseNostrDiscoveredMintsResult {
   mints: NostrDiscoveredMintData[];
   loading: boolean;
@@ -140,7 +147,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
           if (controller.signal.aborted) return;
           const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
           cashuLog.debug('mint.nostr.info.resolved', {
-            url,
+            ...mintUrlLogFields(url),
             hasInfo: !!info,
             hasIcon: !!info?.icon_url,
             name: info?.name,
@@ -154,7 +161,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
         } catch (err) {
           if (controller.signal.aborted) return;
           cashuLog.warn('mint.nostr.info.error', {
-            url,
+            ...mintUrlLogFields(url),
             error: err instanceof Error ? err : new Error(String(err)),
           });
           appendMintIfNew(setMints, { url, score, recommendations, mintInfo: null });

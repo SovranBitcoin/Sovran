@@ -1,12 +1,7 @@
 import React, { useCallback } from 'react';
 import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
 
-import {
-  HistoryEntry,
-  MintHistoryEntry,
-  ReceiveHistoryEntry,
-  SendHistoryEntry,
-} from '@cashu/coco-core';
+import { HistoryEntry, MintHistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import opacity from 'hex-color-opacity';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -36,7 +31,7 @@ import {
   getMeltDetailPathname,
   getMintDetailPathname,
 } from '@/shared/lib/nav/transactionDetailRoutes';
-import { log, Log } from '@/shared/lib/logger';
+import { cashuLog, log, Log } from '@/shared/lib/logger';
 import { useScanEntryForTransactionId, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useTransactionDistributionStore,
@@ -129,42 +124,73 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
 
   const handlePress = useCallback((): void => {
     log.debug('transaction.press', { type: historyEntry.type, id: historyEntry.id });
+    const serializedHistoryEntry = JSON.stringify(historyEntry);
+    const entryState =
+      typeof (historyEntry as Record<string, unknown>).state === 'string'
+        ? (historyEntry as Record<string, unknown>).state
+        : null;
 
     switch (historyEntry.type) {
       case 'mint': {
+        const pathname = getMintDetailPathname(historyEntry);
+        cashuLog.info('transaction.row.open_detail', {
+          type: historyEntry.type,
+          state: entryState,
+          pathname,
+          serializedLength: serializedHistoryEntry.length,
+        });
         router.navigate({
-          pathname: getMintDetailPathname(historyEntry),
+          pathname,
           params: {
-            mintHistoryEntry: JSON.stringify(historyEntry),
+            mintHistoryEntry: serializedHistoryEntry,
           },
         });
         return;
       }
       case 'melt': {
+        const pathname = getMeltDetailPathname(historyEntry);
+        cashuLog.info('transaction.row.open_detail', {
+          type: historyEntry.type,
+          state: entryState,
+          pathname,
+          serializedLength: serializedHistoryEntry.length,
+        });
         router.navigate({
-          pathname: getMeltDetailPathname(historyEntry),
+          pathname,
           params: {
-            meltHistoryEntry: JSON.stringify(historyEntry),
+            meltHistoryEntry: serializedHistoryEntry,
           },
         });
         return;
       }
       case 'send': {
         // Coco uses 'send' for ecash sends
+        cashuLog.info('transaction.row.open_detail', {
+          type: historyEntry.type,
+          state: entryState,
+          pathname: '/sendToken',
+          serializedLength: serializedHistoryEntry.length,
+        });
         router.navigate({
           pathname: '/sendToken',
           params: {
-            sendHistoryEntry: JSON.stringify(historyEntry),
+            sendHistoryEntry: serializedHistoryEntry,
           },
         });
         return;
       }
       case 'receive': {
         // Coco uses 'receive' for ecash receives
+        cashuLog.info('transaction.row.open_detail', {
+          type: historyEntry.type,
+          state: entryState,
+          pathname: '/receiveToken',
+          serializedLength: serializedHistoryEntry.length,
+        });
         router.navigate({
           pathname: '/receiveToken',
           params: {
-            receiveHistoryEntry: JSON.stringify(historyEntry as ReceiveHistoryEntry),
+            receiveHistoryEntry: serializedHistoryEntry,
           },
         });
         return;

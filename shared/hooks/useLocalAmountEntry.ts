@@ -12,10 +12,11 @@
  * `usePricelistStore`, so changing either flows through automatically.
  */
 
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { createAmountActionManager } from '@sovranbitcoin/colada';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
+import { paymentLog } from '@/shared/lib/logger';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 
@@ -57,29 +58,34 @@ export function useLocalAmountEntry(
   // forcing a manager rebuild on every price tick.
   const priceRef = useLatestRef(usePricelistStore((s) => s.getBtcPrice(displayCurrency)) ?? 0);
 
-  const manager = useMemo(
-    () =>
-      createAmountActionManager({
-        getMintUrl: () => undefined,
-        getProofAmounts: () => [],
-        getBtcPrice: () => priceRef.current,
-        offlineOptimization: false,
-        unit,
-        fiatCurrency: displayCurrency,
-        fiatSymbol,
-        quickSendConfig: null,
-      }),
-    [unit, displayCurrency, fiatSymbol]
-  );
+  const manager = useMemo(() => {
+    paymentLog.debug('localAmountEntry.manager.create', {
+      unit,
+      displayCurrency,
+      hasFiatSymbol: !!fiatSymbol,
+    });
+    return createAmountActionManager({
+      getMintUrl: () => undefined,
+      getProofAmounts: () => [],
+      getBtcPrice: () => priceRef.current,
+      offlineOptimization: false,
+      unit,
+      fiatCurrency: displayCurrency,
+      fiatSymbol,
+      quickSendConfig: null,
+    });
+  }, [unit, displayCurrency, fiatSymbol]);
 
   // The manager only fires its own listeners on setInput/toggle. Price ticks
   // arrive through the pricelist store; fan them into the same listener so
   // `secondaryDisplay` refreshes without requiring a keypress.
   const subscribe = useCallback(
     (listener: () => void) => {
+      paymentLog.debug('localAmountEntry.subscribe');
       const unsubManager = manager.subscribe(listener);
       const unsubPrice = usePricelistStore.subscribe(listener);
       return () => {
+        paymentLog.debug('localAmountEntry.unsubscribe');
         unsubManager();
         unsubPrice();
       };
@@ -89,14 +95,46 @@ export function useLocalAmountEntry(
 
   const resolution = useSyncExternalStore(subscribe, manager.inspect, manager.inspect);
 
+  useEffect(() => {
+    paymentLog.debug('localAmountEntry.resolution', {
+      inputMode: resolution.inputMode,
+      numericValue: resolution.numericValue,
+      effectiveSatAmount: resolution.effectiveSatAmount,
+      unit: resolution.unit,
+      keyboardUnit: resolution.keyboardUnit,
+      hasSecondaryDisplay: !!resolution.secondaryDisplay,
+      fiatCurrency: resolution.fiatCurrency,
+      hasFiatSymbol: !!resolution.fiatSymbol,
+      hasBtcPrice: resolution.btcPrice > 0,
+      rawInputLength: resolution.rawInput.length,
+    });
+  }, [
+    resolution.btcPrice,
+    resolution.effectiveSatAmount,
+    resolution.fiatCurrency,
+    resolution.fiatSymbol,
+    resolution.inputMode,
+    resolution.keyboardUnit,
+    resolution.numericValue,
+    resolution.rawInput.length,
+    resolution.secondaryDisplay,
+    resolution.unit,
+  ]);
+
   const onKeyPress = useCallback(
     (value: string) => {
+      paymentLog.debug('localAmountEntry.keyPress', {
+        valueLength: value.length,
+        isDelete: value === 'delete',
+        isDecimal: value === '.',
+      });
       manager.setInput(value);
     },
     [manager]
   );
 
   const onToggleMode = useCallback(() => {
+    paymentLog.debug('localAmountEntry.toggle');
     manager.toggle();
   }, [manager]);
 

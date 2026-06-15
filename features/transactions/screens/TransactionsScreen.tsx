@@ -44,6 +44,13 @@ type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 const MONTH_SELECTOR_HEIGHT = 48;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 interface TransactionsScreenProps {
   initialTab?: StatusTab;
   /** Called when a transaction is tapped - used for flow-aware navigation */
@@ -112,7 +119,7 @@ export function TransactionsScreen({
       }
       log.info('transactions.pending.cancel.one', {
         operationId: entry.operationId,
-        mintUrl: entry.mintUrl,
+        ...mintUrlLogFields(entry.mintUrl),
       });
       await reclaimOne(entry.operationId);
     },

@@ -6,6 +6,7 @@ import {
   type StrikeState,
 } from '@/features/nearPay/lib/nutDropStrikeState';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import { paymentLog } from '@/shared/lib/logger';
 
 const LIVE_STATUSES = new Set(['pending', 'redeeming']);
 
@@ -42,13 +43,42 @@ export function useNutDropStrike(): ReadonlyMap<string, StrikeState> {
     const baseline = baselineRef.current;
     if (!baseline) return;
 
+    const previousMap = prevRef.current;
     const { map: nextMap, nextDeadline } = deriveStrikeMap({
       entries: byTokenHash as Record<string, StrikeQueueEntry>,
-      prev: prevRef.current,
+      prev: previousMap,
       baselineTerminalHashes: baseline.terminal,
       baselineLiveHashes: baseline.live,
       now: Date.now(),
     });
+    for (const [peerID, state] of nextMap) {
+      const previous = previousMap.get(peerID);
+      if (
+        previous?.status === state.status &&
+        previous.entrance === state.entrance &&
+        previous.redeemedAmount === state.redeemedAmount
+      ) {
+        continue;
+      }
+      paymentLog.info('near_pay.strike.state', {
+        peerID,
+        from: previous?.status ?? null,
+        to: state.status,
+        entrance: state.entrance,
+        redeemedAmount: state.redeemedAmount ?? null,
+        unit: state.unit ?? null,
+      });
+    }
+    for (const [peerID, previous] of previousMap) {
+      if (!nextMap.has(peerID)) {
+        paymentLog.info('near_pay.strike.state', {
+          peerID,
+          from: previous.status,
+          to: 'removed',
+          entrance: previous.entrance,
+        });
+      }
+    }
     prevRef.current = nextMap;
 
     // Retire surfaced redemptions: redeemed entries persist in the queue

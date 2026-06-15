@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 
 import type { ProfileEntry } from '@/shared/stores/global/profileStore';
+import { redactError, storeLog } from '@/shared/lib/logger';
 
 const GLOBAL_ZUSTAND_STORE_KEYS = [
   'settings-store',
@@ -127,14 +128,23 @@ async function getSecureStoreInventory(
 
 async function getCocoDatabaseInventory(): Promise<string[]> {
   const documentDirectory = FileSystem.documentDirectory;
-  if (!documentDirectory) return [];
+  if (!documentDirectory) {
+    storeLog.debug('storage.inventory.coco_databases.skipped', {
+      reason: 'missing-document-directory',
+    });
+    return [];
+  }
 
   const sqliteDirectory = `${documentDirectory}SQLite`;
 
   try {
     const files = await FileSystem.readDirectoryAsync(sqliteDirectory);
     return files.filter((file) => COCO_DB_REGEX.test(file)).sort();
-  } catch {
+  } catch (error) {
+    storeLog.warn('storage.inventory.coco_databases.failed', {
+      hasDocumentDirectory: true,
+      error: redactError(error),
+    });
     return [];
   }
 }
@@ -142,11 +152,26 @@ async function getCocoDatabaseInventory(): Promise<string[]> {
 export async function getStorageInventorySnapshot(
   profiles: ProfileEntry[]
 ): Promise<StorageInventorySnapshot> {
+  storeLog.info('storage.inventory.snapshot.start', {
+    profileCount: profiles.length,
+    importedProfileCount: profiles.filter((profile) => profile.source === 'imported').length,
+  });
+
   const [zustand, secureStore, cocoDatabases] = await Promise.all([
     getZustandInventory(),
     getSecureStoreInventory(profiles),
     getCocoDatabaseInventory(),
   ]);
+
+  storeLog.info('storage.inventory.snapshot.done', {
+    globalStoreCount: zustand.existingGlobalStoreKeys.length,
+    profileStoreCount: zustand.existingProfileStoreKeys.length,
+    legacyBareProfileStoreCount: zustand.existingLegacyBareProfileKeys.length,
+    uncategorizedStoreCount: zustand.existingUncategorizedStoreKeys.length,
+    secureStoreProbeCount: secureStore.length,
+    secureStoreExistingCount: secureStore.filter((entry) => entry.exists).length,
+    cocoDatabaseCount: cocoDatabases.length,
+  });
 
   return { zustand, secureStore, cocoDatabases };
 }
@@ -165,17 +190,34 @@ export async function getStorageInventorySnapshot(
  */
 export async function getFullAsyncStorageDump(): Promise<Record<string, unknown>> {
   const allKeys = await AsyncStorage.getAllKeys();
+  storeLog.info('storage.inventory.full_dump.start', { keyCount: allKeys.length });
+
   const pairs = await AsyncStorage.multiGet(allKeys);
   const raw: Record<string, unknown> = {};
+  let jsonValueCount = 0;
+  let rawStringValueCount = 0;
+
   for (const [key, value] of pairs) {
     if (value == null) continue;
     try {
       raw[key] = JSON.parse(value);
+      jsonValueCount += 1;
     } catch {
       raw[key] = value;
+      rawStringValueCount += 1;
     }
   }
-  return redactStorageDump(raw);
+
+  const redacted = redactStorageDump(raw);
+  storeLog.info('storage.inventory.full_dump.done', {
+    keyCount: allKeys.length,
+    storedValueCount: Object.keys(raw).length,
+    jsonValueCount,
+    rawStringValueCount,
+    redactedTopLevelCount: Object.keys(redacted).length,
+  });
+
+  return redacted;
 }
 
 const REDACTED_GEOLOCATION_KEY_PATTERN = /^transaction-location-store(:|$)/;

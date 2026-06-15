@@ -25,7 +25,7 @@
  *   - no bolt11 yet                → spinner placeholder.
  */
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,7 +37,7 @@ import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { getContrastColors, useDominantColor } from '@/shared/lib/colorExtraction';
 import { AnimatedQRCode } from '@/shared/ui/composed/QRCode';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -95,8 +95,134 @@ export function ParticipantCard({
   const isSelf = participant.source === 'self' || participant.channel === 'self';
   const qrDimmed = isPaid || isExpired;
   const canView = !!participant.mintQuoteId && !!onView;
+  const canRetry = !!onRetry && isFailed && !participant.bolt11;
+  const groupIdLength = group.id.length;
+  const participantIdLength = participant.id.length;
+  const bolt11Length = participant.bolt11?.length ?? 0;
+  const hasBolt11 = !!participant.bolt11;
+  const hasMintQuoteId = !!participant.mintQuoteId;
+  const hasDeliveryError = !!participant.deliveryError;
+  const hasAvatarUrl = !!participant.avatarUrl;
+  const hasPubkey = !!participant.pubkey;
+  const pubkeyLength = participant.pubkey?.length ?? 0;
+  const hasPeerID = !!participant.peerID;
+  const peerIDLength = participant.peerID?.length ?? 0;
+  const hasNickname = !!participant.nickname;
+  const nicknameLength = participant.nickname?.length ?? 0;
 
   const title = participant.nickname ?? seed.slice(0, 12);
+
+  useEffect(() => {
+    paymentLog.debug('split_bill.participant_card.render', {
+      groupIdLength,
+      groupState: group.state,
+      unit: group.unit,
+      participantIdLength,
+      participantSource: participant.source,
+      participantChannel: participant.channel,
+      amount: participant.amount,
+      paymentState: participant.paymentState,
+      deliveryState: participant.deliveryState,
+      hasDeliveryError,
+      hasMintQuoteId,
+      hasBolt11,
+      bolt11Length,
+      hasPubkey,
+      pubkeyLength,
+      hasPeerID,
+      peerIDLength,
+      hasNickname,
+      nicknameLength,
+      hasAvatarUrl,
+      isPaid,
+      isExpired,
+      isFailed,
+      isSelf,
+      qrDimmed,
+      canView,
+      canRetry,
+    });
+  }, [
+    bolt11Length,
+    canRetry,
+    canView,
+    groupIdLength,
+    group.state,
+    group.unit,
+    hasAvatarUrl,
+    hasBolt11,
+    hasDeliveryError,
+    hasMintQuoteId,
+    hasNickname,
+    hasPeerID,
+    hasPubkey,
+    isExpired,
+    isFailed,
+    isPaid,
+    isSelf,
+    nicknameLength,
+    participant.amount,
+    participant.channel,
+    participant.deliveryState,
+    participant.paymentState,
+    participant.source,
+    participantIdLength,
+    peerIDLength,
+    pubkeyLength,
+    qrDimmed,
+  ]);
+
+  const handleRetry = useCallback(() => {
+    if (!onRetry) return;
+    paymentLog.info('split_bill.participant_card.retry_press', {
+      groupIdLength,
+      participantIdLength,
+      participantSource: participant.source,
+      participantChannel: participant.channel,
+      paymentState: participant.paymentState,
+      deliveryState: participant.deliveryState,
+      hasBolt11,
+      hasMintQuoteId,
+    });
+    onRetry(participant.id);
+  }, [
+    groupIdLength,
+    hasBolt11,
+    hasMintQuoteId,
+    onRetry,
+    participant.channel,
+    participant.deliveryState,
+    participant.id,
+    participant.paymentState,
+    participant.source,
+    participantIdLength,
+  ]);
+
+  const handleView = useCallback(() => {
+    if (!onView) return;
+    paymentLog.info('split_bill.participant_card.view_press', {
+      groupIdLength,
+      participantIdLength,
+      participantSource: participant.source,
+      participantChannel: participant.channel,
+      paymentState: participant.paymentState,
+      deliveryState: participant.deliveryState,
+      hasBolt11,
+      hasMintQuoteId,
+    });
+    onView(participant.id);
+  }, [
+    groupIdLength,
+    hasBolt11,
+    hasMintQuoteId,
+    onView,
+    participant.channel,
+    participant.deliveryState,
+    participant.id,
+    participant.paymentState,
+    participant.source,
+    participantIdLength,
+  ]);
 
   // Internal (`self`) participants are paid via an internal coco transfer —
   // there's no Lightning invoice to share. Show a different placeholder
@@ -129,7 +255,7 @@ export function ParticipantCard({
 
   const retryCTA = (
     <Pressable
-      onPress={onRetry ? () => onRetry(participant.id) : undefined}
+      onPress={onRetry ? handleRetry : undefined}
       accessibilityRole="button"
       accessibilityLabel={`Retry delivery to ${title}`}
       style={({ pressed }) => [
@@ -229,7 +355,7 @@ export function ParticipantCard({
               on the wallet home points to. Text-only; a trailing arrow glyph
               felt cluttered next to the QR. */}
           <Pressable
-            onPress={canView ? () => onView(participant.id) : undefined}
+            onPress={canView ? handleView : undefined}
             disabled={!canView}
             accessibilityRole="button"
             accessibilityLabel={`${viewLabel} for ${title}`}

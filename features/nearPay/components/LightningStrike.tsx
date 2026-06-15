@@ -304,7 +304,7 @@ export function LightningStrike({
       return;
     }
 
-    if (status === 'success') {
+    if (status === 'success' || status === 'waiting') {
       crackleEnergy.set(1);
       // Two bright resolve flashes, then everything hands over to the ring.
       bolt0.set(

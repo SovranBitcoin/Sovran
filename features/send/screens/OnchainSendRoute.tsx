@@ -6,6 +6,7 @@ import React from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 
+import { paymentLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 import { OnchainSendScreen } from './OnchainSendScreen';
@@ -22,6 +23,11 @@ interface OnchainSendRouteProps {
 export function OnchainSendRoute({ where }: OnchainSendRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
+  paymentLog.info('send.onchain.route_ready', {
+    where,
+    meltHistoryEntryLength: params.meltHistoryEntry?.length ?? 0,
+    hasMeltHistoryEntry: !!params.meltHistoryEntry,
+  });
 
   return (
     <OnchainSendScreen

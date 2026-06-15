@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { MintListItem } from '@sovranbitcoin/colada';
 
+import { cashuLog } from '@/shared/lib/logger';
+
 function hasItems(items: MintListItem[] | null | undefined): items is MintListItem[] {
   return Array.isArray(items) && items.length > 0;
 }
@@ -14,9 +16,43 @@ export function resolveStickyMintSelectorItems({
   entryItems: MintListItem[] | null | undefined;
   previousLiveItems: MintListItem[] | null | undefined;
 }): MintListItem[] {
-  if (hasItems(liveItems)) return liveItems;
-  if (hasItems(previousLiveItems)) return previousLiveItems;
-  if (hasItems(entryItems)) return entryItems;
+  const liveCount = Array.isArray(liveItems) ? liveItems.length : 0;
+  const previousLiveCount = Array.isArray(previousLiveItems) ? previousLiveItems.length : 0;
+  const entryCount = Array.isArray(entryItems) ? entryItems.length : 0;
+
+  if (hasItems(liveItems)) {
+    cashuLog.debug('mint.selector.sticky_items.result', {
+      source: 'live',
+      liveCount,
+      previousLiveCount,
+      entryCount,
+    });
+    return liveItems;
+  }
+  if (hasItems(previousLiveItems)) {
+    cashuLog.debug('mint.selector.sticky_items.result', {
+      source: 'previous-live',
+      liveCount,
+      previousLiveCount,
+      entryCount,
+    });
+    return previousLiveItems;
+  }
+  if (hasItems(entryItems)) {
+    cashuLog.debug('mint.selector.sticky_items.result', {
+      source: 'entry',
+      liveCount,
+      previousLiveCount,
+      entryCount,
+    });
+    return entryItems;
+  }
+  cashuLog.debug('mint.selector.sticky_items.result', {
+    source: 'empty',
+    liveCount,
+    previousLiveCount,
+    entryCount,
+  });
   return [];
 }
 
@@ -29,6 +65,9 @@ export function useStickyMintSelectorItems(
   useEffect(() => {
     if (hasItems(liveItems)) {
       previousLiveItemsRef.current = liveItems;
+      cashuLog.debug('mint.selector.sticky_items.cache_live', {
+        liveCount: liveItems.length,
+      });
     }
   }, [liveItems]);
 

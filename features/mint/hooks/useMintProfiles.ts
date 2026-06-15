@@ -22,6 +22,13 @@ interface MintWithInfo {
   mintInfo?: MintInfoForNostr;
 }
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * For a list of mints with their NUT-06 info, fetch Nostr profiles for any
  * mint operator that has a Nostr pubkey in their contacts. Populates
@@ -48,8 +55,8 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
           if (result.isOk()) {
             const { followers, score } = result.value;
             cashuLog.debug('mint.profile.resolved', {
-              mintUrl: key,
-              pubkey,
+              ...mintUrlLogFields(key),
+              pubkeyLength: pubkey.length,
               followers,
               reputation: typeof score === 'number' ? Math.round(score) : null,
             });

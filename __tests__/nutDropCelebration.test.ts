@@ -22,6 +22,10 @@ function success(peerID: string, amount = 21, now = T0): CelebrationEvent {
   return { type: 'strike-success', peerID, amount, unit: 'sat', now };
 }
 
+function waiting(peerID: string, now = T0): CelebrationEvent {
+  return { type: 'strike-waiting', peerID, now };
+}
+
 function failed(peerID: string, now = T0): CelebrationEvent {
   return { type: 'strike-failed', peerID, now };
 }
@@ -74,6 +78,23 @@ describe('celebrationReducer', () => {
     expect(state.current).toMatchObject({ amount: 21 });
     state = celebrationReducer(state, complete('centering', T0 + 300));
     expect(state.phase).toBe('held');
+  });
+
+  it('plays the held lightning beat without amount reveal when waiting lands mid-flight', () => {
+    let state = run([active(ALICE), waiting(ALICE, T0 + 100)]);
+    expect(state.phase).toBe('centering');
+    expect(state.current).toMatchObject({ amount: null, waiting: true });
+    state = celebrationReducer(state, complete('centering', T0 + 300));
+    expect(state.phase).toBe('held');
+    expect(state.current).toMatchObject({ amount: null, waiting: true });
+  });
+
+  it('leaves awaiting for the full held beat when waiting lands after arrival', () => {
+    let state = run([active(ALICE), complete('centering', T0 + 300)]);
+    expect(state.phase).toBe('awaiting');
+    state = celebrationReducer(state, waiting(ALICE, T0 + 900));
+    expect(state.phase).toBe('held');
+    expect(state.current).toMatchObject({ amount: null, waiting: true });
   });
 
   it('starts a ceremony from a bare success (ambient entries)', () => {

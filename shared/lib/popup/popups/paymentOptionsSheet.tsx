@@ -19,6 +19,7 @@ import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { getEcashTokenAmount } from '@/shared/lib/cashu/utils';
+import { cashuLog } from '@/shared/lib/logger';
 
 import { showActionSheet } from './bridge';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
@@ -44,11 +45,43 @@ function getMethodIcon(kind: OptionKind): string {
 }
 
 function getOptionAmount(option: AnnotatedOption['option']): number | undefined {
-  if (option.amount != null && option.amount > 0) return option.amount;
-  if (option.kind === 'paymentRequest') {
-    return defaultDetectors.getPaymentRequestInfo(option.value)?.amount ?? undefined;
+  if (option.amount != null && option.amount > 0) {
+    cashuLog.debug('payment.options.amount.result', {
+      kind: option.kind,
+      source: 'option.amount',
+      hasAmount: true,
+      amount: option.amount,
+    });
+    return option.amount;
   }
-  if (option.kind === 'ecashToken') return getEcashTokenAmount(option.value);
+  if (option.kind === 'paymentRequest') {
+    const amount = defaultDetectors.getPaymentRequestInfo(option.value)?.amount ?? undefined;
+    cashuLog.debug('payment.options.amount.result', {
+      kind: option.kind,
+      source: 'payment-request-info',
+      hasAmount: amount != null,
+      valueLength: option.value.length,
+      amount,
+    });
+    return amount;
+  }
+  if (option.kind === 'ecashToken') {
+    const amount = getEcashTokenAmount(option.value);
+    cashuLog.debug('payment.options.amount.result', {
+      kind: option.kind,
+      source: 'ecash-token',
+      hasAmount: amount != null,
+      valueLength: option.value.length,
+      amount,
+    });
+    return amount;
+  }
+  cashuLog.debug('payment.options.amount.result', {
+    kind: option.kind,
+    source: 'none',
+    hasAmount: false,
+    valueLength: option.value.length,
+  });
   return undefined;
 }
 
@@ -115,14 +148,39 @@ export function PaymentOptionsContent({ payload, close, isFallback }: PaymentOpt
   // Distinguish user-pick close (machine.chooseOption already fired) from
   // overlay-tap / swipe-down close (machine still needs `onDismiss`).
   const pickedRef = useRef(false);
+  const dismissLogRef = useRef({
+    isFallback,
+    optionCount: options.length,
+    failedCount: failedSet.size,
+    hasLastFailedMessage: !!lastFailedMessage,
+  });
+  dismissLogRef.current = {
+    isFallback,
+    optionCount: options.length,
+    failedCount: failedSet.size,
+    hasLastFailedMessage: !!lastFailedMessage,
+  };
   useEffect(
     () => () => {
-      if (!pickedRef.current) onDismiss?.();
+      if (!pickedRef.current) {
+        cashuLog.info('payment.options.dismissed', dismissLogRef.current);
+        onDismiss?.();
+      }
     },
     [onDismiss]
   );
 
   const title = isFallback ? 'Payment failed — try another method' : 'Choose how to pay';
+  useEffect(() => {
+    cashuLog.info('payment.options.presented', {
+      isFallback,
+      optionCount: options.length,
+      failedCount: failedSet.size,
+      optionKinds: options.map((option) => option.option.kind),
+      recommendedCount: options.filter((option) => option.status === 'recommended').length,
+      disabledCount: options.filter((option) => option.status === 'disabled').length,
+    });
+  }, [failedSet.size, isFallback, options]);
 
   return (
     <View>
@@ -142,6 +200,14 @@ export function PaymentOptionsContent({ payload, close, isFallback }: PaymentOpt
             failedReason={lastFailedMessage}
             onPress={() => {
               pickedRef.current = true;
+              cashuLog.info('payment.options.choice', {
+                isFallback,
+                kind: annotated.option.kind,
+                status: annotated.status,
+                isFailed: failedSet.has(annotated.option.value),
+                valueLength: annotated.option.value.length,
+                hasAmount: getOptionAmount(annotated.option) != null,
+              });
               void machine.chooseOption(annotated.option);
               close();
             }}
@@ -153,9 +219,20 @@ export function PaymentOptionsContent({ payload, close, isFallback }: PaymentOpt
 }
 
 export function paymentOptionsPopup(payload: ActionSheetPayloads['payment-options']): void {
+  cashuLog.info('payment.options.popup', {
+    isFallback: false,
+    optionCount: payload.options.length,
+    optionKinds: payload.options.map((option) => option.option.kind),
+  });
   showActionSheet('payment-options', payload);
 }
 
 export function paymentFallbackPopup(payload: ActionSheetPayloads['payment-fallback']): void {
+  cashuLog.info('payment.options.popup', {
+    isFallback: true,
+    optionCount: payload.options.length,
+    failedCount: payload.failedOptionValues.length,
+    optionKinds: payload.options.map((option) => option.option.kind),
+  });
   showActionSheet('payment-fallback', payload);
 }

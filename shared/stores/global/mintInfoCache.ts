@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { log, storeLog } from '@/shared/lib/logger';
+import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
@@ -76,6 +76,12 @@ const useMintInfoCache = create<MintInfoCacheState>()(
 
       setMintInfo: (mintUrl, info) => {
         const key = normalizeMintUrlKey(mintUrl);
+        storeLog.debug('store.mint_info.set', {
+          mintUrl,
+          key,
+          hasName: typeof info.name === 'string' && info.name.length > 0,
+          hasNuts: !!info.nuts,
+        });
         set((state) => {
           const next = {
             ...state.byMintUrl,
@@ -89,14 +95,21 @@ const useMintInfoCache = create<MintInfoCacheState>()(
       removeMintInfo: (mintUrl) => {
         const key = normalizeMintUrlKey(mintUrl);
         set((state) => {
-          if (!state.byMintUrl[key]) return state;
+          if (!state.byMintUrl[key]) {
+            storeLog.debug('store.mint_info.remove.skip_missing', { mintUrl, key });
+            return state;
+          }
           const next = { ...state.byMintUrl };
           delete next[key];
+          storeLog.info('store.mint_info.removed', { mintUrl, key });
           return { byMintUrl: next };
         });
       },
 
-      clear: () => set({ byMintUrl: {} }),
+      clear: () => {
+        storeLog.info('store.mint_info.clear');
+        set({ byMintUrl: {} });
+      },
     }),
     persistConfig({
       name: 'mint-info-cache',
@@ -129,15 +142,28 @@ export async function getCachedMintInfo(
   const now = Date.now();
   const isFresh = !!entry && now - entry.fetchedAt <= STALE_TTL_MS;
 
-  if (isFresh) return entry.info;
+  if (isFresh) {
+    storeLog.debug('store.mint_info.cache.hit_fresh', {
+      mintUrl,
+      key,
+      ageMs: now - entry.fetchedAt,
+    });
+    return entry.info;
+  }
 
   if (entry) {
     // SWR: return stale immediately, refresh in the background.
+    storeLog.info('store.mint_info.cache.hit_stale', {
+      mintUrl,
+      key,
+      ageMs: now - entry.fetchedAt,
+    });
     refreshInBackground(fetcher, mintUrl);
     return entry.info;
   }
 
   // True miss: must await.
+  storeLog.info('store.mint_info.cache.miss', { mintUrl, key });
   return fetchAndCache(fetcher, mintUrl);
 }
 
@@ -147,15 +173,33 @@ function fetchAndCache(
 ): Promise<GetInfoResponse> {
   const key = normalizeMintUrlKey(mintUrl);
   const existing = inflight.get(key);
-  if (existing) return existing;
+  if (existing) {
+    storeLog.debug('store.mint_info.fetch.join_inflight', { mintUrl, key });
+    return existing;
+  }
 
   const p = (async () => {
     try {
+      storeLog.debug('store.mint_info.fetch.start', { mintUrl, key });
       const info = await fetcher(mintUrl);
       useMintInfoCache.getState().setMintInfo(mintUrl, info);
+      storeLog.info('store.mint_info.fetch.success', {
+        mintUrl,
+        key,
+        hasName: typeof info.name === 'string' && info.name.length > 0,
+        hasNuts: !!info.nuts,
+      });
       return info;
+    } catch (err) {
+      storeLog.warn('store.mint_info.fetch.failed', {
+        mintUrl,
+        key,
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+      throw err;
     } finally {
       inflight.delete(key);
+      storeLog.debug('store.mint_info.fetch.cleared_inflight', { mintUrl, key });
     }
   })();
   inflight.set(key, p);
@@ -167,10 +211,15 @@ function refreshInBackground(
   mintUrl: string
 ): void {
   const key = normalizeMintUrlKey(mintUrl);
-  if (inflight.has(key)) return;
+  if (inflight.has(key)) {
+    storeLog.debug('store.mint_info.swr_refresh.join_inflight', { mintUrl, key });
+    return;
+  }
+  storeLog.debug('store.mint_info.swr_refresh.start', { mintUrl, key });
   fetchAndCache(fetcher, mintUrl).catch((err) => {
-    log.warn('mint.info.cache.swr_refresh_failed', {
+    storeLog.warn('store.mint_info.swr_refresh.failed', {
       mintUrl,
+      key,
       error: err instanceof Error ? err : new Error(String(err)),
     });
   });
@@ -185,15 +234,27 @@ function refreshInBackground(
  * Wire once per manager lifetime in `CocoProvider`.
  */
 export function attachMintInfoCacheToManager(manager: Manager): () => void {
-  const handler = ({ mint }: { mint: { mintUrl: string; mintInfo?: GetInfoResponse } }) => {
-    if (mint?.mintInfo && mint.mintUrl) {
-      useMintInfoCache.getState().setMintInfo(mint.mintUrl, mint.mintInfo);
-    }
-  };
-  manager.on('mint:added', handler);
-  manager.on('mint:updated', handler);
+  const makeHandler =
+    (eventName: 'mint:added' | 'mint:updated') =>
+    ({ mint }: { mint: { mintUrl: string; mintInfo?: GetInfoResponse } }) => {
+      storeLog.debug('store.mint_info.manager_event', {
+        eventName,
+        mintUrl: mint?.mintUrl,
+        hasMintInfo: !!mint?.mintInfo,
+      });
+      if (mint?.mintInfo && mint.mintUrl) {
+        useMintInfoCache.getState().setMintInfo(mint.mintUrl, mint.mintInfo);
+      }
+    };
+
+  const addedHandler = makeHandler('mint:added');
+  const updatedHandler = makeHandler('mint:updated');
+  storeLog.info('store.mint_info.attach_manager');
+  manager.on('mint:added', addedHandler);
+  manager.on('mint:updated', updatedHandler);
   return () => {
-    manager.off('mint:added', handler);
-    manager.off('mint:updated', handler);
+    storeLog.info('store.mint_info.detach_manager');
+    manager.off('mint:added', addedHandler);
+    manager.off('mint:updated', updatedHandler);
   };
 }

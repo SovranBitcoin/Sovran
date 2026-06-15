@@ -26,8 +26,10 @@ import type {
   MeltHistoryEntry,
   SendHistoryEntry,
   MintHistoryEntry,
+  ReceiveHistoryEntry,
 } from '@cashu/coco-core';
 import {
+  classifyMeshRedeemError,
   isSendTokenCancelled,
   isSendTokenComplete,
   withTimeout,
@@ -42,7 +44,7 @@ import {
 } from '@sovranbitcoin/colada';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 import { prepareBolt11MintQuote } from '@/shared/lib/cashu/cocoOperations';
 import { getMintQuotePaymentValue, getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import {
@@ -69,6 +71,7 @@ import {
   staticPopup,
   paramPopup,
 } from '@/shared/lib/popup';
+import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
 import { sendBLEPrivateMessageWhole } from '@/features/bitchat/lib/blePrivateDelivery';
@@ -90,30 +93,171 @@ import { useTransactionDistributionStore } from '@/shared/stores/profile/transac
 // createSovranExecuteReceive
 // =============================================================================
 
+type ReceiveOperationLike = {
+  id: string;
+  mintUrl: string;
+  unit?: string;
+  amount?: AmountValue;
+  state: string;
+  createdAt?: number;
+  updatedAt?: number;
+};
+
+function isRecoverableReceiveError(err: unknown): boolean {
+  const kind = classifyMeshRedeemError(err);
+  return kind === 'network' || kind === 'retryable';
+}
+
+function receiveHistoryId(operationId: string): string {
+  return `receive:${operationId}`;
+}
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
+async function findReceiveHistoryEntryForOperation(
+  manager: Manager,
+  operationId: string,
+  mintUrl: string,
+  beforeIds: Set<string>
+): Promise<ReceiveHistoryEntry | null> {
+  const direct = await manager.history.getHistoryEntryById(receiveHistoryId(operationId));
+  if (direct?.type === 'receive') return direct as ReceiveHistoryEntry;
+
+  const after = await manager.history.getPaginatedHistory(0, 100);
+  return (
+    after.find((h): h is ReceiveHistoryEntry => {
+      if (h.type !== 'receive' || h.mintUrl !== mintUrl) return false;
+      if (h.operationId === operationId) return true;
+      return !beforeIds.has(h.id);
+    }) ?? null
+  );
+}
+
+async function waitForReceiveHistoryEntry(
+  manager: Manager,
+  operationId: string,
+  mintUrl: string,
+  beforeIds: Set<string>
+): Promise<ReceiveHistoryEntry | null> {
+  const MAX_ATTEMPTS = 50; // ~10s of polling at 200ms intervals
+  const DELAY_MS = 200;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const entry = await findReceiveHistoryEntryForOperation(
+        manager,
+        operationId,
+        mintUrl,
+        beforeIds
+      );
+      if (entry) {
+        paymentLog.info('payment.execute_receive.found', {
+          ...mintUrlLogFields(mintUrl),
+          realId: entry.id,
+          operationId,
+          attempts: attempt + 1,
+        });
+        return entry;
+      }
+    } catch (e) {
+      paymentLog.warn('payment.execute_receive.poll_failed', {
+        attempt,
+        operationId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+    await new Promise((r) => setTimeout(r, DELAY_MS));
+  }
+  return null;
+}
+
+function buildPendingReceiveEntry(
+  operation: ReceiveOperationLike,
+  tokenString: string,
+  fallbackMintUrl: string,
+  fallbackAmount: number
+) {
+  const now = Date.now();
+  const mintUrl = operation.mintUrl || fallbackMintUrl;
+  const amount = amountToNumber(operation.amount ?? fallbackAmount);
+  const unit = operation.unit ?? 'sat';
+
+  return {
+    id: `receive-${operation.id}`,
+    type: 'receive' as const,
+    createdAt: operation.createdAt ?? now,
+    updatedAt: operation.updatedAt ?? now,
+    mintUrl,
+    unit,
+    amount,
+    state: 'executing',
+    operationId: operation.id,
+    metadata: {
+      rawToken: tokenString,
+      operationId: operation.id,
+      pendingReason: 'network',
+    },
+  };
+}
+
+function buildFallbackFinalizedReceiveEntry(
+  tokenString: string,
+  mintUrl: string,
+  amount: number,
+  operationId?: string
+) {
+  let tokenAmount = amount;
+  let tokenUnit = 'sat';
+  try {
+    const metadata = getTokenMetadata(tokenString);
+    tokenAmount = amountToNumber(metadata.amount);
+    tokenUnit = metadata.unit ?? 'sat';
+  } catch (error) {
+    paymentLog.warn('payment.execute_receive.fallback_decode_failed', {
+      ...mintUrlLogFields(mintUrl),
+      operationId: operationId ?? null,
+      tokenLength: tokenString.length,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  const now = Date.now();
+  return {
+    id: mintLocalId('redeemed'),
+    type: 'receive' as const,
+    source: 'legacy' as const,
+    legacyHistoryId: mintLocalId('redeemed'),
+    createdAt: now,
+    updatedAt: now,
+    mintUrl,
+    unit: tokenUnit,
+    amount: tokenAmount,
+    state: 'finalized',
+    ...(operationId ? { operationId } : {}),
+    metadata: { rawToken: tokenString, ...(operationId ? { operationId } : {}) },
+  };
+}
+
 /**
  * Sovran-side override for colada's default `executeReceive`.
  *
  * Why this exists:
  *
- * colada's default `executeReceive` (defaultOperations.ts:502) calls
- * `mgr.wallet.receive(token)`, then tries to find the resulting persisted
- * history entry by matching `metadata.rawToken === tokenString || h.token ===
- * tokenString`. When the lookup fails (race against coco's history write, or
- * a metadata-shape mismatch), it falls back to a SYNTHESIZED entry with id
- * `redeemed-${Date.now()}`.
+ * colada's default `executeReceive` calls `mgr.wallet.receive(token)`, which
+ * hides Coco's operation lifecycle behind a single promise. That makes a
+ * recoverable offline receive look like a terminal receive failure to the UI.
  *
- * That synthesized id then propagates through the entire downstream chain
- * (setEntry, linkTransaction, onReceiveConfirmed, onTransactionCreated), so
- * the location stamp and scan-history link end up keyed to a fake id. When
- * the user later opens the receive from the transaction list, the row carries
- * coco's *real* persisted id, the lookups miss, and the location/source
- * disappear.
+ * We still need the older real-id safeguard too: if the receive finalizes
+ * immediately, never let a synthesized id flow through setEntry,
+ * linkTransaction, onReceiveConfirmed, or onTransactionCreated.
  *
- * The fix is to NEVER let a synthesized id flow downstream. We snapshot the
- * set of receive entry ids for this mint BEFORE calling `wallet.receive`,
- * then after the receive we poll the history for any new id that wasn't in
- * the snapshot. Set-difference is robust regardless of how `metadata` /
- * `token` is shaped on the persisted entry.
+ * The fix is to use Coco receive ops directly. If the operation reaches
+ * `executing` and the mint/network is unreachable, we return Colada's
+ * pending result so the screen can wait for recovery. If it finalizes
+ * immediately, we still poll Coco history and use its real persisted id.
  */
 export function createSovranExecuteReceive(
   getManager: () => Manager | null
@@ -138,6 +282,7 @@ export function createSovranExecuteReceive(
       );
     } catch (e) {
       paymentLog.warn('payment.execute_receive.snapshot_failed', {
+        ...mintUrlLogFields(mintUrl),
         error: e instanceof Error ? e.message : String(e),
       });
       beforeIds = new Set();
@@ -157,87 +302,139 @@ export function createSovranExecuteReceive(
           return false;
         }
       });
-    } catch {
+    } catch (error) {
+      paymentLog.warn('payment.execute_receive.p2pk_detection_decode_failed', {
+        ...mintUrlLogFields(mintUrl),
+        tokenLength: tokenString.length,
+        error: error instanceof Error ? error.message : String(error),
+      });
       // proof decode failure — fall back to false (no regression)
     }
 
     paymentLog.info('payment.execute_receive.start', {
-      mintUrl,
+      ...mintUrlLogFields(mintUrl),
       beforeCount: beforeIds.size,
+      tokenLength: tokenString.length,
+      hadP2PKProofs,
+      expectedNext: 'prepare_receive_operation',
     });
-    await manager.wallet.receive(tokenString);
 
-    // Poll for the newly persisted receive entry. Set difference makes this
-    // robust to race conditions in coco's history flush — we just wait until
-    // a new receive id appears for this mint.
-    const MAX_ATTEMPTS = 50; // ~10s of polling at 200ms intervals
-    const DELAY_MS = 200;
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      try {
-        const after = await manager.history.getPaginatedHistory(0, 100);
-        const newEntry = (after as readonly Record<string, unknown>[]).find((h) => {
-          const id = typeof h.id === 'string' ? h.id : '';
-          return (
-            h.type === 'receive' && h.mintUrl === mintUrl && id.length > 0 && !beforeIds.has(id)
-          );
+    const prepared = await manager.ops.receive.prepare({ token: tokenString });
+    paymentLog.info('payment.execute_receive.prepared', {
+      ...mintUrlLogFields(mintUrl),
+      operationId: prepared.id,
+      expectedNext: 'execute_or_mark_pending',
+    });
+
+    try {
+      const finalized = await manager.ops.receive.execute(prepared);
+      paymentLog.info('payment.execute_receive.executed', {
+        ...mintUrlLogFields(finalized.mintUrl),
+        operationId: finalized.id,
+        state: finalized.state,
+        expectedNext: 'history_entry_link',
+      });
+      const entry = await waitForReceiveHistoryEntry(
+        manager,
+        finalized.id,
+        finalized.mintUrl,
+        beforeIds
+      );
+      if (entry) {
+        paymentLog.info('payment.execute_receive.finalized', {
+          ...mintUrlLogFields(entry.mintUrl),
+          operationId: finalized.id,
+          receiveEntryId: entry.id,
+          hadP2PKProofs,
+          expectedNext: 'colada_receive_success',
         });
-        if (newEntry?.id) {
-          paymentLog.info('payment.execute_receive.found', {
-            mintUrl,
-            realId: newEntry.id,
-            attempts: attempt + 1,
+        return {
+          status: 'finalized',
+          historyEntry: JSON.stringify(entry),
+          hadP2PKProofs,
+        };
+      }
+
+      paymentLog.error('payment.execute_receive.timeout_fallback', {
+        ...mintUrlLogFields(mintUrl),
+        operationId: finalized.id,
+        polledMs: 10_000,
+      });
+      const fallbackEntry = buildFallbackFinalizedReceiveEntry(
+        tokenString,
+        finalized.mintUrl,
+        amountToNumber(finalized.amount),
+        finalized.id
+      );
+      return {
+        status: 'finalized',
+        historyEntry: JSON.stringify(fallbackEntry),
+        hadP2PKProofs,
+      };
+    } catch (err) {
+      let latest: ReceiveOperationLike | null = null;
+      try {
+        latest = (await manager.ops.receive.get(prepared.id)) as ReceiveOperationLike | null;
+      } catch (getErr) {
+        paymentLog.warn('payment.execute_receive.get_after_error_failed', {
+          operationId: prepared.id,
+          error: getErr instanceof Error ? getErr.message : String(getErr),
+        });
+      }
+
+      if (latest?.state === 'finalized') {
+        const entry = await waitForReceiveHistoryEntry(
+          manager,
+          latest.id,
+          latest.mintUrl,
+          beforeIds
+        );
+        if (entry) {
+          paymentLog.info('payment.execute_receive.finalized_after_error', {
+            ...mintUrlLogFields(entry.mintUrl),
+            operationId: latest.id,
+            receiveEntryId: entry.id,
+            hadP2PKProofs,
+            expectedNext: 'colada_receive_success',
           });
           return {
-            historyEntry: JSON.stringify(newEntry),
+            status: 'finalized',
+            historyEntry: JSON.stringify(entry),
             hadP2PKProofs,
           };
         }
-      } catch (e) {
-        paymentLog.warn('payment.execute_receive.poll_failed', {
-          attempt,
-          error: e instanceof Error ? e.message : String(e),
-        });
       }
-      await new Promise((r) => setTimeout(r, DELAY_MS));
-    }
 
-    // No real entry materialized within ~10s. The receive's proofs are
-    // already persisted (mgr.wallet.receive returned successfully), so we
-    // cannot fail the UX without confusing the user. Fall back to coco's
-    // original synthesized-entry behavior so the receive screen still
-    // completes — but log loudly so the deeper coco-history flush issue
-    // gets attention.
-    paymentLog.error('payment.execute_receive.timeout_fallback', {
-      mintUrl,
-      polledMs: MAX_ATTEMPTS * DELAY_MS,
-    });
-    let tokenAmount = 0;
-    let tokenUnit = 'sat';
-    try {
-      const metadata = getTokenMetadata(tokenString);
-      tokenAmount = amountToNumber(metadata.amount);
-      tokenUnit = metadata.unit ?? 'sat';
-    } catch {
-      /* ignore */
+      if (latest?.state === 'executing' && isRecoverableReceiveError(err)) {
+        paymentLog.info('payment.execute_receive.pending_recovery', {
+          ...mintUrlLogFields(latest.mintUrl),
+          operationId: latest.id,
+          hadP2PKProofs,
+          pendingReason: 'network',
+          expectedNext: 'coco_recovery_then_success_toast',
+          error: err instanceof Error ? err.message : String(err),
+        });
+        const pendingEntry = buildPendingReceiveEntry(latest, tokenString, mintUrl, _amount);
+        return {
+          status: 'pending',
+          operationId: latest.id,
+          historyEntry: JSON.stringify(pendingEntry),
+          pendingReason: 'network',
+          message: RECEIVE_PENDING_TOAST_COPY.subtitle,
+          hadP2PKProofs,
+        };
+      }
+
+      paymentLog.error('payment.execute_receive.failed_terminal', {
+        ...mintUrlLogFields(mintUrl),
+        operationId: prepared.id,
+        latestState: latest?.state ?? null,
+        hadP2PKProofs,
+        error: err instanceof Error ? err.message : String(err),
+        expectedNext: 'colada_receive_failed',
+      });
+      throw err;
     }
-    const now = Date.now();
-    const fallbackEntry = {
-      id: mintLocalId('redeemed'),
-      type: 'receive' as const,
-      source: 'legacy' as const,
-      legacyHistoryId: mintLocalId('redeemed'),
-      createdAt: now,
-      updatedAt: now,
-      mintUrl,
-      unit: tokenUnit,
-      amount: tokenAmount,
-      state: 'finalized',
-      metadata: { rawToken: tokenString },
-    };
-    return {
-      historyEntry: JSON.stringify(fallbackEntry),
-      hadP2PKProofs,
-    };
   };
 }
 
@@ -297,7 +494,10 @@ export function createSovranExecuteMintQuote(
       beforeIds = new Set();
     }
 
-    paymentLog.info('payment.execute_mint_quote.start', { mintUrl, amount });
+    paymentLog.info('payment.execute_mint_quote.start', {
+      ...mintUrlLogFields(mintUrl),
+      amount,
+    });
     const mintOp = await withTimeout(
       prepareBolt11MintQuote(manager, mintUrl, amount, _unit),
       MINT_QUOTE_PREPARE_TIMEOUT_MS,
@@ -340,7 +540,7 @@ export function createSovranExecuteMintQuote(
         });
         if (persisted) {
           paymentLog.info('payment.execute_mint_quote.found', {
-            mintUrl,
+            ...mintUrlLogFields(mintUrl),
             persistedId: persisted.id,
             constructedId: mintOp.id,
             matchedById: persisted.id === mintOp.id,
@@ -362,7 +562,7 @@ export function createSovranExecuteMintQuote(
     // Last resort: same fallback as coco's default. Logged loudly so we know
     // the polling didn't catch the persisted row.
     paymentLog.error('payment.execute_mint_quote.timeout_fallback', {
-      mintUrl,
+      ...mintUrlLogFields(mintUrl),
       operationId: mintOp.id,
       polledMs: MAX_ATTEMPTS * DELAY_MS,
     });
@@ -447,15 +647,21 @@ export function createSovranNotifications(
       paramPopup('nfc-error', { title: 'NFC Read Failed', message });
     },
     onPaymentProcessing: (data) => {
-      paymentLog.info('payment.processing', {
-        variant: data.variant,
-        mintUrl: data.mintUrl,
-        amount: data.amount,
-        unit: data.unit,
-      });
+      const store = usePaymentStatusStore.getState();
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
       const id = `${data.variant}-${Date.now()}`;
-      usePaymentStatusStore.getState().setActive({
+      paymentLog.info('payment.processing', {
+        variant: data.variant,
+        statusVariant: variant,
+        id,
+        ...mintUrlLogFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        activeId: store.active?.id ?? null,
+        activeState: store.active?.state ?? null,
+        expectedNext: 'processing_to_terminal_or_delivered',
+      });
+      store.setActive({
         variant,
         id,
         mintUrl: data.mintUrl,
@@ -472,33 +678,99 @@ export function createSovranNotifications(
       });
     },
     onPaymentConfirmed: (data) => {
-      paymentLog.info('payment.confirmed', { variant: data.variant });
       const store = usePaymentStatusStore.getState();
-      if (store.active) {
-        if (data.variant === 'paymentRequest') {
-          store.setDelivered(store.active.id);
-        } else if (data.variant === 'melt' && data.historyEntry) {
-          try {
-            const parsed = JSON.parse(data.historyEntry);
-            if (parsed.state === 'PENDING') return;
-          } catch {
-            /* fall through to confirm */
+      paymentLog.info('payment.confirmed', {
+        variant: data.variant,
+        ...mintUrlLogFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        activeId: store.active?.id ?? null,
+        activeState: store.active?.state ?? null,
+        historyEntryLength: data.historyEntry.length,
+      });
+      if (!store.active) {
+        paymentLog.warn('payment.confirmed.skipped', {
+          variant: data.variant,
+          reason: 'no_active_status_toast',
+        });
+        return;
+      }
+
+      if (data.variant === 'paymentRequest') {
+        paymentLog.info('payment.confirmed.route', {
+          variant: data.variant,
+          action: 'set_delivered',
+          activeId: store.active.id,
+          activeState: store.active.state,
+          expectedNext: 'delivered_then_later_confirmed',
+        });
+        store.setDelivered(store.active.id);
+      } else if (data.variant === 'melt' && data.historyEntry) {
+        try {
+          const parsed = JSON.parse(data.historyEntry);
+          if (parsed.state === 'PENDING') {
+            paymentLog.info('payment.confirmed.skipped', {
+              variant: data.variant,
+              reason: 'melt_history_pending',
+              activeId: store.active.id,
+              activeState: store.active.state,
+            });
+            return;
           }
-          store.setConfirmed(store.active.id);
-        } else {
-          store.setConfirmed(store.active.id);
+        } catch (error) {
+          paymentLog.warn('payment.confirmed.history_parse_failed', {
+            variant: data.variant,
+            historyEntryLength: data.historyEntry.length,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
+        paymentLog.info('payment.confirmed.route', {
+          variant: data.variant,
+          action: 'set_confirmed',
+          activeId: store.active.id,
+          activeState: store.active.state,
+        });
+        store.setConfirmed(store.active.id);
+      } else {
+        paymentLog.info('payment.confirmed.route', {
+          variant: data.variant,
+          action: 'set_confirmed',
+          activeId: store.active.id,
+          activeState: store.active.state,
+        });
+        store.setConfirmed(store.active.id);
       }
     },
     onPaymentFailed: (data) => {
-      paymentLog.error('payment.failed', { message: data.message, rolledBack: data.rolledBack });
       const store = usePaymentStatusStore.getState();
-      if (store.active) {
-        const msg = data.rolledBack
-          ? `${data.message}\nYour funds have been returned.`
-          : data.message;
-        store.setFailed(store.active.id, new Error(msg));
+      paymentLog.error('payment.failed', {
+        variant: data.variant,
+        ...mintUrlLogFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        message: data.message,
+        rolledBack: data.rolledBack,
+        activeId: store.active?.id ?? null,
+        activeState: store.active?.state ?? null,
+      });
+      if (!store.active) {
+        paymentLog.warn('payment.failed.skipped', {
+          variant: data.variant,
+          reason: 'no_active_status_toast',
+        });
+        return;
       }
+      const msg = data.rolledBack
+        ? `${data.message}\nYour funds have been returned.`
+        : data.message;
+      paymentLog.info('payment.failed.route', {
+        variant: data.variant,
+        action: 'set_failed',
+        activeId: store.active.id,
+        activeState: store.active.state,
+        rolledBack: data.rolledBack,
+      });
+      store.setFailed(store.active.id, new Error(msg));
     },
     onScanEmpty: (source) => {
       if (source === 'clipboard') staticPopup('no-clipboard-address');
@@ -582,8 +854,16 @@ export function createSovranNotifications(
     },
 
     onReceiveProcessing: ({ id, mintUrl, amount, unit }) => {
-      paymentLog.info('payment.receive.processing', { id, mintUrl, amount, unit });
       const store = usePaymentStatusStore.getState();
+      paymentLog.info('payment.receive.processing', {
+        id,
+        ...mintUrlLogFields(mintUrl),
+        amount,
+        unit,
+        activeId: store.active?.id ?? null,
+        activeState: store.active?.state ?? null,
+        expectedNext: 'processing_to_confirmed_or_waiting_or_failed',
+      });
       if (store.active?.id === id && store.active?.state === 'failed') {
         store.setActive(null);
       }
@@ -604,9 +884,55 @@ export function createSovranNotifications(
       });
     },
 
-    onReceiveConfirmed: async ({ id, historyEntry }) => {
-      paymentLog.info('payment.receive.confirmed', { id });
+    onReceivePending: ({ id, mintUrl, amount, unit, operationId, message }) => {
       const store = usePaymentStatusStore.getState();
+      const wasActive = store.active?.id === id;
+      paymentLog.info('payment.receive.pending', {
+        id,
+        ...mintUrlLogFields(mintUrl),
+        amount,
+        unit,
+        operationId,
+        activeId: store.active?.id ?? null,
+        activeState: store.active?.state ?? null,
+        wasActive,
+        toastPolicy: 'terminal_warning_then_new_success',
+        expectedNext: 'coco_recovery_then_success_toast',
+      });
+      if (!wasActive) {
+        store.setActive({
+          variant: 'receive-ecash',
+          id,
+          mintUrl,
+          amount,
+          unit,
+          state: 'processing',
+        });
+        paymentStatusPopup({
+          variant: 'receive-ecash',
+          id,
+          mintUrl,
+          amount,
+          unit,
+        });
+      }
+      store.setWaiting(id, {
+        title: RECEIVE_PENDING_TOAST_COPY.title,
+        subtitle: message ?? RECEIVE_PENDING_TOAST_COPY.subtitle,
+      });
+    },
+
+    onReceiveConfirmed: async ({ id, historyEntry }) => {
+      const store = usePaymentStatusStore.getState();
+      paymentLog.info('payment.receive.confirmed', {
+        id,
+        activeId: store.active?.id ?? null,
+        activeState: store.active?.state ?? null,
+        expectedNext:
+          store.active?.state === 'waiting'
+            ? 'listener_mounts_new_success_toast'
+            : 'active_toast_confirmed',
+      });
       if (store.active?.id === id) {
         store.setConfirmed(id);
       }
@@ -621,8 +947,17 @@ export function createSovranNotifications(
     },
 
     onReceiveFailed: ({ id, message }) => {
-      paymentLog.error('payment.receive.failed', { id, message });
       const store = usePaymentStatusStore.getState();
+      paymentLog.error('payment.receive.failed', {
+        id,
+        message,
+        activeId: store.active?.id ?? null,
+        activeState: store.active?.state ?? null,
+        expectedNext:
+          store.active?.id === id && store.active?.state === 'processing'
+            ? 'active_toast_failed'
+            : 'static_receive_failed_popup',
+      });
       if (store.active?.id === id && store.active?.state === 'processing') {
         store.setFailed(id, new Error(message));
       } else {
@@ -1000,10 +1335,11 @@ export function createSovranHandlers({
 
     navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit, recipientPubkey }) => {
       paymentLog.info('payment.step.navigate_payment_request', {
-        mintUrl,
+        ...mintUrlLogFields(mintUrl),
         amount,
         unit,
         recipientPubkeyPresent: !!recipientPubkey,
+        paymentRequestLength: paymentRequest.length,
       });
       const entry = {
         id: mintLocalId('pr-preview'),
@@ -1036,9 +1372,10 @@ export function createSovranHandlers({
       recipientProfile,
     }) => {
       paymentLog.info('payment.step.navigate_melt_preview', {
-        mintUrl,
+        ...mintUrlLogFields(mintUrl),
         amount,
         unit,
+        meltTargetLength: meltTarget.length,
         recipientPubkeyPresent: !!recipientPubkey,
         recipientProfilePresent: !!recipientProfile,
         recipientProfileDisplayName: recipientProfile?.displayName ?? null,

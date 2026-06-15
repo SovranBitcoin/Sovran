@@ -22,7 +22,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
-import { useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { cashuLog, Log, redactError, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatDate } from '@/shared/lib/date';
 
 const ParamsSchema = z.object({
@@ -32,6 +32,13 @@ const ParamsSchema = z.object({
     .max(2048)
     .regex(/^https?:\/\//, 'mintUrl must be http(s)'),
 });
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
 
 const StarRating = React.memo(function StarRating({
   score,
@@ -321,28 +328,57 @@ export function MintReviewsScreen() {
 
   useEffect(() => {
     if (!mintUrl) {
+      cashuLog.warn('mint.reviews.fetch.skipped', { reason: 'missing_mint_url' });
       setKymLoading(false);
       return;
     }
+    const cachedAtStart = useKYMMintStore.getState().getCached(mintUrl);
     // Show cached data immediately if available
-    if (cached) setKymLoading(false);
+    if (cachedAtStart) setKymLoading(false);
     // Always fetch fresh from server. Abort on unmount or if mintUrl changes
     // mid-flight so a slow review fetch doesn't write into a stale screen.
     const controller = new AbortController();
+    cashuLog.info('mint.reviews.fetch.start', {
+      ...mintUrlLogFields(mintUrl),
+      hasCached: !!cachedAtStart,
+      cachedScore: cachedAtStart?.score ?? null,
+      cachedRecommendationCount: cachedAtStart?.recommendations.length ?? 0,
+    });
     reviewMint({ mintUrl, signal: controller.signal })
       .then((result) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          cashuLog.debug('mint.reviews.fetch.stale', {
+            ...mintUrlLogFields(mintUrl),
+            reason: 'aborted_before_result',
+          });
+          return;
+        }
+        cashuLog.info('mint.reviews.fetch.result', {
+          ...mintUrlLogFields(mintUrl),
+          ok: result.isOk(),
+          hasScore: result.isOk() && result.value.score !== null,
+          recommendationCount: result.isOk() ? result.value.recommendations.length : 0,
+        });
         if (result.isOk() && result.value.score !== null) {
           useKYMMintStore
             .getState()
             .setCached(mintUrl, result.value.score, result.value.recommendations);
         }
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        cashuLog.warn('mint.reviews.fetch.failed', {
+          ...mintUrlLogFields(mintUrl),
+          error: redactError(error),
+        });
+      })
       .finally(() => {
         if (!controller.signal.aborted) setKymLoading(false);
       });
-    return () => controller.abort();
+    return () => {
+      cashuLog.debug('mint.reviews.fetch.abort', { ...mintUrlLogFields(mintUrl) });
+      controller.abort();
+    };
   }, [mintUrl]);
 
   const isLoading = kymLoading;

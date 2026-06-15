@@ -4,6 +4,11 @@ import { Toast } from 'heroui-native';
 
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { useCapabilities } from '@/shared/ui/capability';
+import {
+  TOAST_DANGER_DARK_BG,
+  TOAST_SUCCESS_DARK_BG,
+  TOAST_WARNING_DARK_BG,
+} from '@/shared/lib/brandColors';
 
 /**
  * Frosted-glass toast frame shared by every custom toast (CompactToast,
@@ -41,8 +46,9 @@ export function useToastFrosted(): boolean {
 // tints over mostly-light page content, so the same ratio over a dark
 // base would under-read; 0.45 lands at the same perceived strength.
 export const OPAQUE_TINT_MIX = 0.45;
-export const SUCCESS_DARK_BG = '#089A2C';
-export const DANGER_DARK_BG = '#9A082E';
+export const SUCCESS_DARK_BG = TOAST_SUCCESS_DARK_BG;
+export const DANGER_DARK_BG = TOAST_DANGER_DARK_BG;
+export const WARNING_DARK_BG = TOAST_WARNING_DARK_BG;
 
 type ToastVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger';
 

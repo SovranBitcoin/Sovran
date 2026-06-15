@@ -2,6 +2,7 @@ import type { BLEPeer } from 'bitchat-module';
 
 import type { RecentPeopleProfileRow } from '@/features/feed/hooks/useRecentPeopleProfiles';
 import { resolveIdentityName } from '@/shared/lib/identity';
+import { paymentLog } from '@/shared/lib/logger';
 import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 
 import type { NearPayLayoutPeer } from './peerLayout';
@@ -39,13 +40,34 @@ export function peerDisplayName(peer: BLEPeer, profile?: RecentPeopleProfileRow)
 
 export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): NearPayLayoutPeer {
   const creqMints = lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex);
+  const identitySeed = peerIdentitySeed(peer);
+  const displayName = peerDisplayName(peer, profile);
+  paymentLog.debug('near_pay.peer.layout', {
+    peerIdLength: peer.peerID.length,
+    hasNickname: !!peer.nickname,
+    isConnected: peer.isConnected,
+    hasDirectLink: peer.hasDirectLink,
+    hasNostrPubkey: !!peer.nostrPubkeyHex,
+    nostrPubkeyLength: peer.nostrPubkeyHex?.length ?? 0,
+    hasNoisePublicKey: !!peer.noisePublicKeyHex,
+    noisePublicKeyLength: peer.noisePublicKeyHex?.length ?? 0,
+    hasCreq: !!peer.creq,
+    creqLength: peer.creq?.length ?? 0,
+    lockable: creqMints !== null,
+    lockableMintCount: creqMints?.length ?? 0,
+    identitySeedLength: identitySeed.length,
+    displayNameLength: displayName.length,
+    hasProfile: !!profile,
+    profileLoading: profile?.isLoading ?? false,
+    hasAvatar: !!profile?.metadata?.picture,
+  });
   return {
     peerID: peer.peerID,
     nickname: peer.nickname,
     isConnected: peer.isConnected,
     hasDirectLink: peer.hasDirectLink,
     lastSeen: peer.lastSeen,
-    name: peerDisplayName(peer, profile),
+    name: displayName,
     avatarUrl: profile?.metadata?.picture ?? null,
     // Lockable ⇒ the peer advertised a valid standing creq (Sovran/cashu-capable).
     // The shared-mint check still runs at tap time; this drives the radar
@@ -53,7 +75,7 @@ export function toLayoutPeer(peer: BLEPeer, profile?: RecentPeopleProfileRow): N
     lockable: creqMints !== null,
     nostrPubkeyHex: peer.nostrPubkeyHex,
     creq: peer.creq,
-    identitySeed: peerIdentitySeed(peer),
+    identitySeed,
     profileLoading: profile?.isLoading ?? false,
   };
 }

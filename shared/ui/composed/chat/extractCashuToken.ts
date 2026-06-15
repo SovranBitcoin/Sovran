@@ -1,4 +1,5 @@
 import { isValidEcashToken } from '@/shared/lib/cashu/utils';
+import { cashuLog } from '@/shared/lib/logger';
 
 /**
  * Scan a chat-message body for an embedded `cashuA…`/`cashuB…` token. Returns
@@ -7,7 +8,14 @@ import { isValidEcashToken } from '@/shared/lib/cashu/utils';
  * redeem affordance regardless of transport.
  */
 export function extractCashuToken(content: string): string | null {
-  if (!content || typeof content !== 'string') return null;
+  if (!content || typeof content !== 'string') {
+    cashuLog.debug('chat.ecash_token.extract.result', {
+      reason: 'empty',
+      contentLength: typeof content === 'string' ? content.length : null,
+      found: false,
+    });
+    return null;
+  }
 
   const lowerContent = content.toLowerCase();
   const cashuAIndex = lowerContent.indexOf('cashua');
@@ -20,7 +28,14 @@ export function extractCashuToken(content: string): string | null {
     tokenStartIndex = cashuBIndex;
   }
 
-  if (tokenStartIndex === -1) return null;
+  if (tokenStartIndex === -1) {
+    cashuLog.debug('chat.ecash_token.extract.result', {
+      reason: 'no-prefix',
+      contentLength: content.length,
+      found: false,
+    });
+    return null;
+  }
 
   const remainingText = content.slice(tokenStartIndex);
   let token = '';
@@ -36,6 +51,13 @@ export function extractCashuToken(content: string): string | null {
     .slice(0, whitespaceMatch ? whitespaceMatch.index : remainingText.length)
     .slice(0, maxTokenLength);
   if (wholeCandidate.length > 6 && isValidEcashToken(wholeCandidate)) {
+    cashuLog.info('chat.ecash_token.extract.result', {
+      reason: 'whole-candidate',
+      contentLength: content.length,
+      tokenLength: wholeCandidate.length,
+      prefixKind: wholeCandidate.slice(0, 6).toLowerCase(),
+      found: true,
+    });
     return wholeCandidate;
   }
 
@@ -52,5 +74,22 @@ export function extractCashuToken(content: string): string | null {
     }
   }
 
-  return token || null;
+  if (token) {
+    cashuLog.info('chat.ecash_token.extract.result', {
+      reason: 'incremental-candidate',
+      contentLength: content.length,
+      tokenLength: token.length,
+      prefixKind: token.slice(0, 6).toLowerCase(),
+      found: true,
+    });
+    return token;
+  }
+
+  cashuLog.debug('chat.ecash_token.extract.result', {
+    reason: 'invalid-candidate',
+    contentLength: content.length,
+    prefixKind: remainingText.slice(0, 6).toLowerCase(),
+    found: false,
+  });
+  return null;
 }

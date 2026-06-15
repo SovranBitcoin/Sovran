@@ -9,7 +9,7 @@
 import React, { useEffect } from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
-import { isReceiveTokenRedeemed } from '@sovranbitcoin/colada';
+import { isReceiveTokenPending, isReceiveTokenRedeemed } from '@sovranbitcoin/colada';
 import { useScreenActions } from '@sovranbitcoin/colada/react';
 import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
@@ -49,15 +49,30 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
   }, [error]);
 
   const isRedeemed = isReceiveTokenRedeemed(entry);
+  const isPendingReceive = isReceiveTokenPending(entry);
+  const canClose = isRedeemed || isPendingReceive;
 
   useEffect(() => {
     if (!entry) return;
     paymentLog.debug('receive.token.render', {
+      id: entry.id,
+      state: entry.state,
       isRedeemed,
+      isPendingReceive,
+      canClose,
+      redeemAvailable: actions.redeem.available,
+      redeemLoading: actions.redeem.loading,
       amount: entry.amount,
       unit: entry.unit,
     });
-  }, [entry, isRedeemed]);
+  }, [
+    actions.redeem.available,
+    actions.redeem.loading,
+    canClose,
+    entry,
+    isRedeemed,
+    isPendingReceive,
+  ]);
 
   if (error) {
     return (
@@ -84,14 +99,14 @@ export function ReceiveTokenScreen({ receiveHistoryEntry }: ReceiveTokenScreenPr
             icon: 'ri:close-circle-line',
             variant: 'secondary',
             onPress: async () => actions.back.execute(),
-            condition: isRedeemed,
+            condition: canClose,
           },
           {
             testID: 'receive-token-cancel',
             text: 'Cancel',
             variant: 'secondary',
             onPress: async () => actions.back.execute(),
-            condition: !isRedeemed,
+            condition: !canClose,
           },
           {
             testID: 'receive-token-redeem',

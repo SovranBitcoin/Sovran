@@ -79,7 +79,7 @@ interface LogEntry {
     message: string;
     stack: string[];
   };
-  /** Expo session + device metadata (only on first log or when requested) */
+  /** Compact per-entry Expo session + device metadata for mixed-device log files. */
   device?: Record<string, unknown>;
   /** Present on span-end logs: duration in ms, from monotonic clock */
   duration_ms?: number;
@@ -188,6 +188,7 @@ export const monotonicNow: () => number =
     : () => Date.now();
 
 const _t0 = monotonicNow();
+const LOG_SESSION_ID = `${Date.now().toString(36)}-${Math.round(_t0).toString(36)}`;
 function now(): number {
   return Math.round((monotonicNow() - _t0) * 100) / 100;
 }
@@ -195,6 +196,12 @@ function now(): number {
 // ─── Expo Device Info (lazy-loaded) ──────────────────────────────────────────
 
 let _cachedDeviceInfo: Record<string, unknown> | null = null;
+let _cachedEntryDeviceInfo: Record<string, unknown> | null = null;
+
+function shortId(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  return value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 12) || null;
+}
 
 function getExpoDeviceInfo(): Record<string, unknown> {
   if (_cachedDeviceInfo) return _cachedDeviceInfo;
@@ -202,24 +209,47 @@ function getExpoDeviceInfo(): Record<string, unknown> {
   try {
     const Constants = require('expo-constants').default;
     const config = Constants.expoConfig;
+    const expoSessionId = Constants.sessionId;
+    const labelSession = shortId(expoSessionId) ?? shortId(LOG_SESSION_ID) ?? 'session';
 
     _cachedDeviceInfo = {
       platform: Platform.OS,
       osVersion: Platform.Version,
       appName: config?.name,
       appVersion: config?.version,
-      expoSessionId: Constants.sessionId,
+      logSessionId: LOG_SESSION_ID,
+      expoSessionId,
+      label: `${Platform.OS}:${labelSession}`,
+      deviceName: typeof Constants.deviceName === 'string' ? Constants.deviceName : undefined,
       isDevice: Constants.isDevice,
       execEnv: Constants.executionEnvironment,
     };
   } catch {
+    const labelSession = shortId(LOG_SESSION_ID) ?? 'session';
     _cachedDeviceInfo = {
       platform: Platform.OS,
       osVersion: Platform.Version,
+      logSessionId: LOG_SESSION_ID,
+      label: `${Platform.OS}:${labelSession}`,
     };
   }
 
   return _cachedDeviceInfo;
+}
+
+function getEntryDeviceInfo(): Record<string, unknown> {
+  if (_cachedEntryDeviceInfo) return _cachedEntryDeviceInfo;
+  const full = getExpoDeviceInfo();
+  _cachedEntryDeviceInfo = {
+    label: full.label,
+    platform: full.platform,
+    logSessionId: full.logSessionId,
+    expoSessionId: full.expoSessionId,
+    appVersion: full.appVersion,
+    osVersion: full.osVersion,
+    deviceName: full.deviceName,
+  };
+  return _cachedEntryDeviceInfo;
 }
 
 // ─── Value Summarization ─────────────────────────────────────────────────────
@@ -572,7 +602,6 @@ interface LoggerCore {
   enabled: boolean;
   dedupWindowMs: number;
   minSeverity: number;
-  hasLoggedDevice: boolean;
   lastEvent: string;
   lastEventTime: number;
   lastEntry: LogEntry | null;
@@ -587,6 +616,8 @@ function flushSuppressedDedup(core: LoggerCore): void {
     level: core.lastEntry.level,
     event: core.lastEvent,
     src: core.lastEntry.src,
+    ...(core.lastEntry.ctx ? { ctx: core.lastEntry.ctx } : {}),
+    device: getEntryDeviceInfo(),
     params: { _suppressed: core.dedupCount },
   };
   core.buffer.push(summary);
@@ -631,7 +662,6 @@ export function createLogger(options: LoggerOptions = {}): Logger {
     enabled,
     dedupWindowMs,
     minSeverity: LEVEL_SEVERITY[level],
-    hasLoggedDevice: false,
     lastEvent: '',
     lastEventTime: 0,
     lastEntry: null,
@@ -704,14 +734,10 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
       event,
       src,
       ...(Object.keys(context).length > 0 ? { ctx: context } : {}),
+      device: getEntryDeviceInfo(),
       ...(cleanParams ? { params: cleanParams } : {}),
       ...(errorInfo ? { error: errorInfo } : {}),
     };
-
-    if (!core.hasLoggedDevice) {
-      entry.device = getExpoDeviceInfo();
-      core.hasLoggedDevice = true;
-    }
 
     core.buffer.push(entry);
     core.lastEntry = entry;

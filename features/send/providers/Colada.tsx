@@ -69,6 +69,13 @@ const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' }
 // 10s `updateMint` timeout so one dead mint can't visibly gate the list.
 const FIRST_OPEN_DEADLINE_MS = 3000;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 export function SovranColadaProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
   const { keys } = useNostrKeysContext();
@@ -152,9 +159,25 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
       createColada({
         manager,
         sendNostrDM: async (nprofile, message) => {
+          paymentLog.info('colada.adapter.send_nostr_dm.start', {
+            hasPrivateKey: !!privateKeyRef.current,
+            nprofileLength: nprofile.length,
+            messageLength: message.length,
+          });
           const pk = privateKeyRef.current;
           if (!pk) throw new Error('Nostr keys not available');
-          await sendDirectMessageToRelays({ senderPrivateKey: pk, nprofile, message });
+          try {
+            await sendDirectMessageToRelays({ senderPrivateKey: pk, nprofile, message });
+            paymentLog.info('colada.adapter.send_nostr_dm.done', {
+              nprofileLength: nprofile.length,
+            });
+          } catch (error) {
+            paymentLog.warn('colada.adapter.send_nostr_dm.failed', {
+              nprofileLength: nprofile.length,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          }
         },
         getOffline,
         // Disabled while the send-memo UI is WIP. With memos on, a proof-selector
@@ -171,12 +194,34 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         // source caches first so offline Select Mint rows keep the rich data
         // the app has already seen; online opens refresh those caches behind
         // the same API surface.
-        fetchMintCatalog: (mintUrls) =>
-          getMintCatalog(
-            mintUrls,
-            (url) => getCachedMintInfo((u) => manager.mint.getMintInfo(u), url),
-            { networkMode: getOffline() ? 'cache-only' : 'cache-first' }
-          ),
+        fetchMintCatalog: async (mintUrls) => {
+          const startedAt = performance.now();
+          const networkMode = getOffline() ? 'cache-only' : 'cache-first';
+          paymentLog.info('colada.adapter.fetch_mint_catalog.start', {
+            mintCount: mintUrls.length,
+            networkMode,
+          });
+          try {
+            const catalog = await getMintCatalog(
+              mintUrls,
+              (url) => getCachedMintInfo((u) => manager.mint.getMintInfo(u), url),
+              { networkMode }
+            );
+            paymentLog.info('colada.adapter.fetch_mint_catalog.done', {
+              mintCount: mintUrls.length,
+              returnedCount: Object.keys(catalog).length,
+              duration_ms: Math.round(performance.now() - startedAt),
+            });
+            return catalog;
+          } catch (error) {
+            paymentLog.warn('colada.adapter.fetch_mint_catalog.failed', {
+              mintCount: mintUrls.length,
+              duration_ms: Math.round(performance.now() - startedAt),
+              error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          }
+        },
         // Per-mint NUT-06 fetcher for the Select Mint list. Routes through the
         // 24h SWR cache so a dead mint can't gate the screen — cached entries
         // resolve synchronously, and even a true cold miss is bounded to
@@ -184,12 +229,33 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         // Coco's 10s `updateMint` timeout (patches/@cashu+coco-core+...patch)
         // still backstops the underlying HTTP; the background refresh continues
         // after the deadline and writes through via attachMintInfoCacheToManager.
-        fetchMintInfo: (url) =>
-          withTimeout(
-            getCachedMintInfo((u) => manager.mint.getMintInfo(u), url),
-            FIRST_OPEN_DEADLINE_MS,
-            'buildMintListItems.getMintInfo'
-          ).catch(() => null),
+        fetchMintInfo: async (url) => {
+          const startedAt = performance.now();
+          paymentLog.debug('colada.adapter.fetch_mint_info.start', {
+            ...mintUrlLogFields(url),
+            timeoutMs: FIRST_OPEN_DEADLINE_MS,
+          });
+          try {
+            const info = await withTimeout(
+              getCachedMintInfo((u) => manager.mint.getMintInfo(u), url),
+              FIRST_OPEN_DEADLINE_MS,
+              'buildMintListItems.getMintInfo'
+            );
+            paymentLog.debug('colada.adapter.fetch_mint_info.done', {
+              ...mintUrlLogFields(url),
+              hasInfo: !!info,
+              duration_ms: Math.round(performance.now() - startedAt),
+            });
+            return info;
+          } catch (error) {
+            paymentLog.warn('colada.adapter.fetch_mint_info.failed', {
+              ...mintUrlLogFields(url),
+              duration_ms: Math.round(performance.now() - startedAt),
+              error: error instanceof Error ? error.message : String(error),
+            });
+            return null;
+          }
+        },
         // Trust-review screen still pulls per-mint detail (swap-by-swap timing)
         // from the local audit / KYM caches populated by `useAuditedMint`.
         enrichMintReviewInfo: getSovranMintEnrichment,
@@ -226,24 +292,56 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         // the machine's resolver treats it as best-effort cosmetic data and
         // does not block the flow.
         resolveRecipientProfile: async (pubkey, signal): Promise<RecipientProfile | null> => {
+          paymentLog.debug('colada.adapter.resolve_recipient_profile.start', {
+            pubkeyLength: pubkey.length,
+          });
           const currentNdk = ndkRef.current;
-          if (!currentNdk) return null;
-          if (signal?.aborted) return null;
+          if (!currentNdk) {
+            paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+              reason: 'no_ndk',
+            });
+            return null;
+          }
+          if (signal?.aborted) {
+            paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+              reason: 'aborted_before_fetch',
+            });
+            return null;
+          }
           try {
             const event = await currentNdk.fetchEvent({
               kinds: [Metadata as number],
               authors: [pubkey],
               limit: 1,
             });
-            if (!event) return null;
+            if (!event) {
+              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+                reason: 'not_found',
+              });
+              return null;
+            }
             const parsed = parseRawMetadata(event.content);
-            if (!parsed) return null;
+            if (!parsed) {
+              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+                reason: 'invalid_metadata',
+              });
+              return null;
+            }
             // Warm the shared SWR cache so other surfaces (ContactRow,
             // DmChatHeader, profile screens, HistoryEntryHeader) hit warm
             // cache for this pubkey on next render without re-fetching.
             useNostrMetadataCache.getState().setProfile(pubkey, parsed);
             const displayName = resolveIdentityName({ pubkey, nostrProfile: parsed });
-            if (!displayName) return null;
+            if (!displayName) {
+              paymentLog.debug('colada.adapter.resolve_recipient_profile.skipped', {
+                reason: 'no_display_name',
+              });
+              return null;
+            }
+            paymentLog.debug('colada.adapter.resolve_recipient_profile.done', {
+              hasAvatar: !!parsed.picture,
+              hasNip05: !!parsed.nip05,
+            });
             return {
               displayName,
               avatarUrl: parsed.picture ?? null,

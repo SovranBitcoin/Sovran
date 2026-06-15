@@ -36,11 +36,19 @@ jest.mock('@/shared/lib/date', () => ({
 
 jest.mock('@/shared/lib/logger', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const logger = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  };
 
   return {
     Log: ({ children }: { children?: React.ReactNode }) =>
       ReactActual.createElement(ReactActual.Fragment, null, children),
-    log: { error: jest.fn() },
+    log: logger,
+    cashuLog: logger,
+    paymentLog: logger,
   };
 });
 

@@ -48,7 +48,14 @@ export function useAppBalance(): number {
   // refs, logger calls) re-fire under StrictMode and Suspense retries.
   const prevBalance = useRef<number | null>(null);
   useEffect(() => {
-    if (prevBalance.current !== null && prevBalance.current !== total) {
+    if (prevBalance.current === null) {
+      walletLog.debug('wallet.balance.snapshot', {
+        total,
+        mintCount: stableMintUrls.length,
+        mockMode,
+        source: mockMode ? 'mock' : 'coco',
+      });
+    } else if (prevBalance.current !== total) {
       walletLog.info('wallet.balance.changed', {
         from: prevBalance.current,
         to: total,

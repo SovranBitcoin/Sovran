@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { isSendTokenCancelled } from '@sovranbitcoin/colada';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 
 interface TransactionIconProps {
   historyEntry: HistoryEntry;
@@ -18,10 +18,11 @@ export default function TransactionIcon({
   isLoading,
 }: TransactionIconProps): React.ReactNode {
   const foreground = useThemeColor('foreground');
+  const cancelledSend = historyEntry.type === 'send' && isSendTokenCancelled(historyEntry);
 
-  const getIconName = () => {
+  const iconName = useMemo(() => {
     // Check if this is a rolled back send transaction
-    if (historyEntry.type === 'send' && isSendTokenCancelled(historyEntry)) {
+    if (cancelledSend) {
       return 'mdi:cancel'; // Cancelled/rolled back icon
     }
 
@@ -37,7 +38,17 @@ export default function TransactionIcon({
       default:
         return 'fluent:circle-16-filled';
     }
-  };
+  }, [cancelledSend, historyEntry.type]);
+
+  useEffect(() => {
+    paymentLog.debug('tx.icon.render', {
+      type: historyEntry.type,
+      state: String((historyEntry as { state?: unknown }).state ?? ''),
+      isLoading: !!isLoading,
+      cancelledSend,
+      iconName,
+    });
+  }, [cancelledSend, historyEntry, iconName, isLoading]);
 
   return (
     <Log name="TransactionIcon">
@@ -47,7 +58,7 @@ export default function TransactionIcon({
         {isLoading ? (
           <Spinner size={22} color={foreground} />
         ) : (
-          <Icon name={getIconName()} color={foreground} size={24} />
+          <Icon name={iconName} color={foreground} size={24} />
         )}
       </View>
     </Log>

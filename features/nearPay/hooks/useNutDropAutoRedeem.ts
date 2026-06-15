@@ -14,6 +14,13 @@ import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * App-wide Nut Drop receive pipeline. Mounted in BitchatBLEProvider (inside
  * AccountScopedProviders, so it remounts per profile and classifies against
@@ -36,12 +43,15 @@ import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
  */
 async function drainWithBackgroundBudget(): Promise<void> {
   if (AppState.currentState === 'active') {
+    paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'message_active' });
     return drainNutDropRedeemQueue();
   }
+  paymentLog.info('near_pay.redeem.background_budget.start', { appState: AppState.currentState });
   const handle = await beginBLEBackgroundTask('nutdrop-redeem');
   try {
     await drainNutDropRedeemQueue();
   } finally {
+    paymentLog.info('near_pay.redeem.background_budget.end', { handle });
     void endBLEBackgroundTask(handle);
   }
 }
@@ -68,12 +78,21 @@ export function useNutDropAutoRedeem(): void {
       // A private DM is addressed to us, so redeem locked-to-me OR bearer; only
       // ignore a token locked to a different key (shouldn't reach us in a DM).
       if (classified.classification === 'locked-to-other') {
-        paymentLog.debug('near_pay.redeem.ignored_locked_to_other');
+        paymentLog.debug('near_pay.redeem.ignored_locked_to_other', {
+          senderPeerID: event.peerID,
+        });
         return;
       }
-      if (!classified.mintUrl) return;
+      if (!classified.mintUrl) {
+        paymentLog.warn('near_pay.redeem.ignored_missing_mint', {
+          classification: classified.classification,
+          senderPeerID: event.peerID,
+        });
+        return;
+      }
 
-      const enqueued = useNutDropRedeemQueueStore.getState().enqueue(meshTokenDedupeKey(token), {
+      const tokenHash = meshTokenDedupeKey(token);
+      const enqueued = useNutDropRedeemQueueStore.getState().enqueue(tokenHash, {
         token,
         mintUrl: classified.mintUrl,
         amount: classified.amount,
@@ -81,9 +100,10 @@ export function useNutDropAutoRedeem(): void {
         senderPeerID: event.peerID,
       });
       paymentLog.info('near_pay.redeem.token_received', {
+        tokenHash: tokenHash.slice(0, 12),
         classification: classified.classification,
         amount: classified.amount,
-        mintUrl: classified.mintUrl,
+        ...mintUrlLogFields(classified.mintUrl),
         enqueued,
         senderPeerID: event.peerID,
       });
@@ -92,10 +112,14 @@ export function useNutDropAutoRedeem(): void {
 
     // Mount-time drain: catches entries persisted while the app was dead or
     // the previous drain was interrupted mid-flight.
+    paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'mount' });
     void drainNutDropRedeemQueue();
 
     const appStateSub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void drainNutDropRedeemQueue();
+      if (state === 'active') {
+        paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'app_active' });
+        void drainNutDropRedeemQueue();
+      }
     });
 
     return () => {
@@ -107,6 +131,7 @@ export function useNutDropAutoRedeem(): void {
   // Offline → online: retry anything parked on mint unreachability.
   useEffect(() => {
     if (wasOffline.current && !isOffline) {
+      paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'offline_to_online' });
       void drainNutDropRedeemQueue();
     }
     wasOffline.current = isOffline;

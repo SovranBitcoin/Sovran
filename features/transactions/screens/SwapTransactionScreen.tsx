@@ -58,7 +58,7 @@ import Icon from 'assets/icons';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { cashuLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 interface Props {
   groupId: string | undefined;
@@ -125,15 +125,34 @@ function buildSwapEntryRowProps(
   );
 
   const handlePress = () => {
+    const serializedHistoryEntry = JSON.stringify(historyEntry);
+    const entryState =
+      typeof (historyEntry as Record<string, unknown>).state === 'string'
+        ? (historyEntry as Record<string, unknown>).state
+        : null;
     if (historyEntry.type === 'mint') {
+      const pathname = getMintDetailPathname(historyEntry);
+      cashuLog.info('swap.transaction.row.open_detail', {
+        type: historyEntry.type,
+        state: entryState,
+        pathname,
+        serializedLength: serializedHistoryEntry.length,
+      });
       router.navigate({
-        pathname: getMintDetailPathname(historyEntry),
-        params: { mintHistoryEntry: JSON.stringify(historyEntry) },
+        pathname,
+        params: { mintHistoryEntry: serializedHistoryEntry },
       });
     } else {
+      const pathname = getMeltDetailPathname(historyEntry);
+      cashuLog.info('swap.transaction.row.open_detail', {
+        type: historyEntry.type,
+        state: entryState,
+        pathname,
+        serializedLength: serializedHistoryEntry.length,
+      });
       router.navigate({
-        pathname: getMeltDetailPathname(historyEntry),
-        params: { meltHistoryEntry: JSON.stringify(historyEntry) },
+        pathname,
+        params: { meltHistoryEntry: serializedHistoryEntry },
       });
     }
   };

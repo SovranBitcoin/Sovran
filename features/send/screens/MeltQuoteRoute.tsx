@@ -11,6 +11,7 @@ import { z } from 'zod';
 import type { HistoryEntry } from '@cashu/coco-core';
 
 import { getOnchainMeltAddress } from '@/shared/lib/cashu/onchainMelt';
+import { paymentLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { LightningSendRoute } from './LightningSendRoute';
 import { OnchainSendRoute } from './OnchainSendRoute';
@@ -30,21 +31,36 @@ interface MeltQuoteRouteProps {
   onRequestMintList?: () => void;
 }
 
-function isOnchainMeltParam(meltHistoryEntry: string | null | undefined): boolean {
-  if (!meltHistoryEntry) return false;
+function classifyMeltParam(meltHistoryEntry: string | null | undefined): {
+  isOnchain: boolean;
+  hasEntry: boolean;
+  parsed: boolean;
+  addressPresent: boolean;
+} {
+  if (!meltHistoryEntry) {
+    return { isOnchain: false, hasEntry: false, parsed: false, addressPresent: false };
+  }
 
   try {
-    return !!getOnchainMeltAddress(JSON.parse(meltHistoryEntry) as HistoryEntry);
+    const addressPresent = !!getOnchainMeltAddress(JSON.parse(meltHistoryEntry) as HistoryEntry);
+    return { isOnchain: addressPresent, hasEntry: true, parsed: true, addressPresent };
   } catch {
-    return false;
+    return { isOnchain: false, hasEntry: true, parsed: false, addressPresent: false };
   }
 }
 
 export function MeltQuoteRoute({ where, onRequestMintList }: MeltQuoteRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
+  const classification = classifyMeltParam(params.meltHistoryEntry);
+  paymentLog.info('send.melt_quote.route_dispatch', {
+    where,
+    ...classification,
+    meltHistoryEntryLength: params.meltHistoryEntry?.length ?? 0,
+    hasMintListCallback: !!onRequestMintList,
+  });
 
-  return isOnchainMeltParam(params.meltHistoryEntry) ? (
+  return classification.isOnchain ? (
     <OnchainSendRoute where={where} />
   ) : (
     <LightningSendRoute where={where} onRequestMintList={onRequestMintList} />

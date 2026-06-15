@@ -14,6 +14,7 @@ import { useManager } from '@cashu/coco-react';
 import type { MintCatalogEntry } from '@sovranbitcoin/colada';
 
 import { getMintCatalog } from '@/shared/lib/getMintCatalog';
+import { log } from '@/shared/lib/logger';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 
@@ -28,23 +29,61 @@ export function useMintCatalog(mintUrls: string[]): Record<string, MintCatalogEn
 
   useEffect(() => {
     if (mintUrls.length === 0 || !manager) {
+      log.debug('mint.catalog.skip', {
+        reason: mintUrls.length === 0 ? 'empty' : 'missing_manager',
+        mintCount: mintUrls.length,
+      });
       setCatalog({});
       return;
     }
 
     let cancelled = false;
+    const networkMode = isOffline ? 'cache-only' : 'cache-first';
+    log.info('mint.catalog.load.start', {
+      mintCount: mintUrls.length,
+      networkMode,
+      keyLength: key.length,
+    });
     getMintCatalog(mintUrls, (url) => getCachedMintInfo((u) => manager.mint.getMintInfo(u), url), {
-      networkMode: isOffline ? 'cache-only' : 'cache-first',
+      networkMode,
     })
       .then((result) => {
-        if (!cancelled) setCatalog(result);
+        if (cancelled) {
+          log.debug('mint.catalog.load.stale_result', {
+            mintCount: mintUrls.length,
+            networkMode,
+          });
+          return;
+        }
+        log.info('mint.catalog.load.success', {
+          mintCount: mintUrls.length,
+          resultCount: Object.keys(result).length,
+          networkMode,
+        });
+        setCatalog(result);
       })
-      .catch(() => {
-        if (!cancelled) setCatalog({});
+      .catch((err) => {
+        if (cancelled) {
+          log.debug('mint.catalog.load.error_stale_result', {
+            mintCount: mintUrls.length,
+            networkMode,
+          });
+          return;
+        }
+        log.warn('mint.catalog.load.failed', {
+          mintCount: mintUrls.length,
+          networkMode,
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+        setCatalog({});
       });
 
     return () => {
       cancelled = true;
+      log.debug('mint.catalog.load.cancel', {
+        mintCount: mintUrls.length,
+        networkMode,
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, manager, isOffline]);

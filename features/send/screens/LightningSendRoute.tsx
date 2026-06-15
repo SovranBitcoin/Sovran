@@ -17,6 +17,7 @@ import React from 'react';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { z } from 'zod';
 import { LightningSendScreen } from './LightningSendScreen';
+import { paymentLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
@@ -37,6 +38,12 @@ interface LightningSendRouteProps {
 export function LightningSendRoute({ where, onRequestMintList }: LightningSendRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
+  paymentLog.info('send.lightning.route_ready', {
+    where,
+    meltHistoryEntryLength: params.meltHistoryEntry?.length ?? 0,
+    hasMeltHistoryEntry: !!params.meltHistoryEntry,
+    hasMintListCallback: !!onRequestMintList,
+  });
 
   return (
     <LightningSendScreen

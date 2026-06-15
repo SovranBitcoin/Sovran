@@ -9,6 +9,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo, React
 import type { TransactionDirection, TransactionPaymentType } from '@sovranbitcoin/colada';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { cashuLog } from '@/shared/lib/logger';
 
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
@@ -60,6 +61,14 @@ export function TransactionsFilterProvider({
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const openFilterSheet = useCallback(() => {
+    cashuLog.info('transactions.filters.open', {
+      currency,
+      paymentType,
+      direction,
+      status,
+      hasMintFilter: mintUrl !== 'all',
+      hasSelectedMonth: !!selectedMonth,
+    });
     router.navigate({
       pathname: '/filters',
       params: {
@@ -70,7 +79,7 @@ export function TransactionsFilterProvider({
         mintUrl,
       },
     });
-  }, [currency, paymentType, direction, status, mintUrl]);
+  }, [currency, paymentType, direction, status, mintUrl, selectedMonth]);
 
   const hasActiveFilters = useMemo(() => {
     return paymentType !== 'all' || direction !== 'all' || status !== 'All' || mintUrl !== 'all';

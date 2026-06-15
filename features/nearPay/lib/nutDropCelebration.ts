@@ -7,9 +7,9 @@
  * The ceremony starts when a locked drop ARRIVES (fresh strike turns
  * active): the sender's avatar flies to center stage and crackles gold
  * while the redeem runs ('awaiting'). The impact (sky bolts + haptic +
- * amount reveal) fires only on CONFIRMED success — truth still gates the
- * payoff, the staging just starts earlier. A failed or stuck redeem exits
- * with a quiet return flight, no impact.
+ * amount reveal) fires on CONFIRMED success. A retry-waiting receive gets the
+ * full lightning beat without an amount reveal. A failed or stuck redeem exits
+ * with a quiet return flight.
  *
  * Restraint rules live here (unit-tested), not in the animation code:
  * - one ceremony at a time; same-sender redemptions fold into the displayed
@@ -30,6 +30,8 @@ export interface CelebrationRequest {
   /** Confirmed redeemed amount — null until the strike reports success. */
   amount: number | null;
   unit: string;
+  /** True when the token was accepted locally and will retry when online. */
+  waiting: boolean;
   /** When the request was last refreshed (UNIX ms) — freshness anchor. */
   firedAt: number;
   /** Abbreviated hold for queued / inside-cooldown repeats. */
@@ -56,6 +58,8 @@ export type CelebrationEvent =
   | { type: 'strike-active'; peerID: string; unit: string; now: number }
   /** The redeem confirmed; `amount` is the per-cycle delta. */
   | { type: 'strike-success'; peerID: string; amount: number; unit: string; now: number }
+  /** The redeem was accepted locally and is waiting for network/mint recovery. */
+  | { type: 'strike-waiting'; peerID: string; now: number }
   /** The redeem failed or went backoff-stuck — exit without an impact. */
   | { type: 'strike-failed'; peerID: string; now: number }
   | { type: 'gate-changed'; gated: boolean; now: number }
@@ -130,6 +134,7 @@ function enqueue(state: CelebrationState, request: CelebrationRequest): Celebrat
     queue[existingIndex] = {
       ...existing,
       amount: request.amount === null ? existing.amount : (existing.amount ?? 0) + request.amount,
+      waiting: existing.waiting || request.waiting,
       // A fresh drop refreshes the freshness anchor.
       firedAt: request.firedAt,
     };
@@ -151,6 +156,7 @@ export function celebrationReducer(
         peerID: event.peerID,
         amount: null,
         unit: event.unit,
+        waiting: false,
         firedAt: event.now,
         abbreviated: false,
       };
@@ -169,6 +175,7 @@ export function celebrationReducer(
             phase: state.phase === 'awaiting' ? 'held' : state.phase,
             current: {
               ...state.current,
+              waiting: false,
               amount: (state.current.amount ?? 0) + event.amount,
               unit: event.unit,
             },
@@ -182,12 +189,36 @@ export function celebrationReducer(
         peerID: event.peerID,
         amount: event.amount,
         unit: event.unit,
+        waiting: false,
         firedAt: event.now,
         abbreviated: false,
       };
       if (state.phase !== 'idle' || state.gated) return enqueue(state, request);
       // Success with no prior staging (ambient entries, races): play the
       // whole ceremony with the amount known — impact on arrival.
+      return startCeremony(state, request, event.now, false);
+    }
+
+    case 'strike-waiting': {
+      if (state.current && state.current.peerID === event.peerID) {
+        if (state.phase === 'centering' || state.phase === 'awaiting' || state.phase === 'held') {
+          return {
+            ...state,
+            phase: state.phase === 'awaiting' ? 'held' : state.phase,
+            current: { ...state.current, waiting: true },
+          };
+        }
+      }
+
+      const request: CelebrationRequest = {
+        peerID: event.peerID,
+        amount: null,
+        unit: 'sat',
+        waiting: true,
+        firedAt: event.now,
+        abbreviated: false,
+      };
+      if (state.phase !== 'idle' || state.gated) return enqueue(state, request);
       return startCeremony(state, request, event.now, false);
     }
 
@@ -228,7 +259,10 @@ export function celebrationReducer(
           // at center and crackle until it does.
           return {
             ...state,
-            phase: state.current !== null && state.current.amount !== null ? 'held' : 'awaiting',
+            phase:
+              state.current !== null && (state.current.amount !== null || state.current.waiting)
+                ? 'held'
+                : 'awaiting',
           };
         case 'awaiting':
           // Safety timeout — the strike layer normally reports failure

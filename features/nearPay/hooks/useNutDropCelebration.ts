@@ -27,6 +27,7 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
  * - fresh 'strike'-entrance active → the takeover starts (flight + gold
  *   crackle while the redeem runs);
  * - 'active' → 'success' → the impact (the amount is a per-cycle delta);
+ * - 'active' → 'waiting' → full lightning beat with no amount reveal;
  * - 'active' → 'fading'/removed → quiet return flight, no impact.
  *
  * Haptics are the never-fatiguing information channel and fire exactly once
@@ -52,6 +53,11 @@ export function useNutDropCelebration({
   const [celebration, dispatch] = useReducer(celebrationReducer, INITIAL_CELEBRATION_STATE);
   const prevStrikeRef = useRef<ReadonlyMap<string, StrikeState>>(new Map());
   const pendingImpactHapticRef = useRef(false);
+  const celebrationDebugRef = useRef<{
+    peerID: string | null;
+    waiting: boolean;
+    hasAmount: boolean;
+  }>({ peerID: null, waiting: false, hasAmount: false });
 
   // Re-runs on gate/phase ticks are harmless no-ops: an unchanged strike map
   // diffs against itself, so no transition can fire twice.
@@ -99,6 +105,17 @@ export function useNutDropCelebration({
         continue;
       }
 
+      if (state.status === 'waiting' && prevStatus === 'active') {
+        void EnhancedHaptics.warningHaptic();
+        paymentLog.info('near_pay.celebration.waiting_observed', {
+          peerID,
+          reducedMotion,
+        });
+        if (reducedMotion) continue;
+        dispatch({ type: 'strike-waiting', peerID, now: Date.now() });
+        continue;
+      }
+
       if (prevStatus === 'active' && state.status === 'fading') {
         if (reducedMotion) continue;
         dispatch({ type: 'strike-failed', peerID, now: Date.now() });
@@ -135,6 +152,11 @@ export function useNutDropCelebration({
   // timeout. Keyed on phase + abbreviated only: a same-sender coalesce
   // updates the amount without restarting the hold timer.
   const abbreviated = celebration.current?.abbreviated ?? false;
+  celebrationDebugRef.current = {
+    peerID: celebration.current?.peerID ?? null,
+    waiting: celebration.current?.waiting ?? false,
+    hasAmount: celebration.current?.amount !== null,
+  };
   useEffect(() => {
     if (celebration.phase === 'idle') return;
     const holdMs = abbreviated ? CELEBRATION_HOLD_ABBREVIATED_MS : CELEBRATION_HOLD_MS;
@@ -149,15 +171,32 @@ export function useNutDropCelebration({
     // Token the dispatch with the phase this timer was scheduled for: the
     // reducer drops it if a skip/gate/success flip won the race.
     const scheduledPhase = celebration.phase;
+    const scheduledDebug = celebrationDebugRef.current;
+    paymentLog.debug('near_pay.celebration.phase_scheduled', {
+      phase: scheduledPhase,
+      delayMs: delay,
+      peerID: scheduledDebug.peerID,
+      waiting: scheduledDebug.waiting,
+      hasAmount: scheduledDebug.hasAmount,
+      abbreviated,
+    });
     const timer = setTimeout(() => {
+      paymentLog.debug('near_pay.celebration.phase_complete', {
+        phase: scheduledPhase,
+        peerID: scheduledDebug.peerID,
+      });
       dispatch({ type: 'phase-complete', phase: scheduledPhase, now: Date.now() });
     }, delay);
     return () => clearTimeout(timer);
   }, [abbreviated, celebration.phase]);
 
   const skip = useCallback(() => {
+    paymentLog.info('near_pay.celebration.skipped', {
+      phase: celebration.phase,
+      peerID: celebration.current?.peerID ?? null,
+    });
     dispatch({ type: 'skip', now: Date.now() });
-  }, []);
+  }, [celebration.current?.peerID, celebration.phase]);
 
   return { celebration, skip };
 }

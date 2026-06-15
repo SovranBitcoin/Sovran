@@ -12,6 +12,7 @@
  */
 
 import { create } from 'zustand';
+import { paymentLog } from '@/shared/lib/logger';
 
 export type NfcTapPhase = 'armed' | 'reading' | 'selecting' | 'creating' | 'writing';
 
@@ -25,6 +26,12 @@ interface NfcTapStore {
 export const useNfcTapStore = create<NfcTapStore>((set) => ({
   armed: false,
   phase: 'armed',
-  setArmed: (armed) => set({ armed }),
-  setPhase: (phase) => set({ phase }),
+  setArmed: (armed) => {
+    paymentLog.info('nfc.tap_store.set_armed', { armed });
+    set({ armed });
+  },
+  setPhase: (phase) => {
+    paymentLog.info('nfc.tap_store.set_phase', { phase });
+    set({ phase });
+  },
 }));

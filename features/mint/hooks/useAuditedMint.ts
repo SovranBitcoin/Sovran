@@ -15,6 +15,13 @@ interface UseAuditedMintResult {
   error?: string;
 }
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
   const [auditInfo, setAuditInfo] = useState<AuditInfo>();
   const [mintInfo, setMintInfo] = useState<GetInfoResponse>();
@@ -45,16 +52,16 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
         const stale = isStale(mintUrl);
 
         if (cached && !stale) {
-          cashuLog.debug('mint.audit.cache.hit', { mintUrl });
+          cashuLog.debug('mint.audit.cache.hit', { ...mintUrlLogFields(mintUrl) });
           setAuditInfo(transformAuditData(cached.auditData));
           setMintInfo(cached.mintInfo);
           setLoading(false);
           return;
         }
-        cashuLog.debug('mint.audit.cache.miss', { mintUrl });
+        cashuLog.debug('mint.audit.cache.miss', { ...mintUrlLogFields(mintUrl) });
 
         // Fetch audit data directly from API
-        cashuLog.info('mint.audit.fetch', { mintUrl });
+        cashuLog.info('mint.audit.fetch', { ...mintUrlLogFields(mintUrl) });
         const auditResult = await auditMint({ mintUrl, signal: controller.signal });
         if (controller.signal.aborted) return;
         if (auditResult.isOk()) {
@@ -73,7 +80,7 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
           // Cache both audit data and mint info if both succeeded
           if (auditResult.isOk()) {
             cashuLog.info('mint.audit.complete', {
-              mintUrl,
+              ...mintUrlLogFields(mintUrl),
               score: transformAuditData(auditResult.value).score,
             });
             setCached(mintUrl, auditResult.value, mintInfoData);
@@ -84,7 +91,7 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
       } catch (err) {
         if (controller.signal.aborted) return;
         cashuLog.error('mint.audit.error', {
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
           error: err instanceof Error ? err : new Error(String(err)),
         });
         setError('Failed to load mint information');

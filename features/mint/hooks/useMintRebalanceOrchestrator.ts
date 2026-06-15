@@ -43,6 +43,13 @@ import {
   resetFailedStepStates,
 } from '@/features/mint/lib/rebalanceRunState';
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 export type RebalanceRunStatus = 'idle' | 'running' | 'finished' | 'cancelled';
 
 export interface MintLite {
@@ -200,7 +207,10 @@ export function useMintRebalanceOrchestrator({
           // Don't swallow silently — a transient balance-fetch failure looks
           // identical to a real "balance didn't increase" timeout downstream,
           // and that ambiguity hides operator-actionable network issues.
-          cashuLog.warn('mint.rebalance.balance_fetch_failed', { mintUrl, error });
+          cashuLog.warn('mint.rebalance.balance_fetch_failed', {
+            ...mintUrlLogFields(mintUrl),
+            error,
+          });
           return {};
         }
       };
@@ -245,12 +255,15 @@ export function useMintRebalanceOrchestrator({
     async (temporarilyTrusted: string[], warnStepId: string | undefined) => {
       const { stranded, untrustErrors } = await releaseTrustWindow(manager, temporarilyTrusted);
       for (const { url, error } of untrustErrors) {
-        cashuLog.warn('mint.rebalance.untrust_failed', { url, error });
+        cashuLog.warn('mint.rebalance.untrust_failed', { ...mintUrlLogFields(url), error });
       }
       if (stranded.length > 0) {
         // Louder than the previous silent log.warn — this is a recovery_required
         // signal: funds remain on an intermediary the user did not pre-trust.
-        cashuLog.warn('mint.rebalance.middleman_recovery_required', { stranded });
+        cashuLog.warn('mint.rebalance.middleman_recovery_required', {
+          strandedCount: stranded.length,
+          strandedMintUrlLengths: stranded.map((item) => item.url.length),
+        });
         if (warnStepId) {
           updateStepState(warnStepId, {
             routingDetail: formatStrandedRoutingDetail(stranded),
@@ -737,7 +750,10 @@ export function useMintRebalanceOrchestrator({
                   await manager.mint.addMint(url, { trusted: true });
                   temporarilyTrusted.push(url);
                 } catch (trustErr) {
-                  cashuLog.warn('mint.rebalance.trust_failed', { url, error: trustErr });
+                  cashuLog.warn('mint.rebalance.trust_failed', {
+                    ...mintUrlLogFields(url),
+                    error: trustErr,
+                  });
                 }
               }
             }
@@ -1371,7 +1387,7 @@ export function useMintRebalanceOrchestrator({
             await manager.mint.addMint(url, { trusted: true });
             temporarilyTrusted.push(url);
           } catch (err) {
-            cashuLog.warn('mint.rebalance.trust_failed', { url, error: err });
+            cashuLog.warn('mint.rebalance.trust_failed', { ...mintUrlLogFields(url), error: err });
           }
         }
       }

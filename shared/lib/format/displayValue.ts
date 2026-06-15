@@ -5,6 +5,8 @@
  * it without re-implementing prefix detection.
  */
 
+import { paymentLog } from '@/shared/lib/logger';
+
 type DisplayValueLayout =
   | { kind: 'prefix-split'; prefix: 'npub' | 'lnbc1' | 'cashuA' | 'cashuB' | 'creqA'; body: string }
   | { kind: 'email'; username: string; domain: string }
@@ -18,6 +20,25 @@ const PREFIXES_GATED: readonly ('npub' | 'lnbc1' | 'cashuA' | 'cashuB')[] = [
   'cashuB',
 ];
 
+function logDisplayValueResult(
+  result: DisplayValueLayout,
+  context: { rawLength: number; special: boolean; reason: string }
+): DisplayValueLayout {
+  paymentLog.debug('format.display_value.result', {
+    kind: result.kind,
+    special: context.special,
+    reason: context.reason,
+    rawLength: context.rawLength,
+    prefix: result.kind === 'prefix-split' ? result.prefix : null,
+    bodyLength: result.kind === 'prefix-split' ? result.body.length : null,
+    usernameLength: result.kind === 'email' ? result.username.length : null,
+    domainLength: result.kind === 'email' ? result.domain.length : null,
+    valueLength:
+      result.kind === 'plain' || result.kind === 'bitcoin-uri' ? result.value.length : null,
+  });
+  return result;
+}
+
 /**
  * Detect a display layout for `raw`. `special` mirrors DetailsList's existing
  * gate — when false, only inputs whose protocol-shape is unambiguous regardless
@@ -27,7 +48,11 @@ const PREFIXES_GATED: readonly ('npub' | 'lnbc1' | 'cashuA' | 'cashuB')[] = [
  */
 export function formatDisplayValue(raw: unknown, special: boolean): DisplayValueLayout {
   if (typeof raw !== 'string' || raw.length === 0) {
-    return { kind: 'plain', value: String(raw ?? '') };
+    const value = String(raw ?? '');
+    return logDisplayValueResult(
+      { kind: 'plain', value },
+      { rawLength: value.length, special, reason: 'non-string-or-empty' }
+    );
   }
 
   if (special && raw.includes('@')) {
@@ -35,17 +60,28 @@ export function formatDisplayValue(raw: unknown, special: boolean): DisplayValue
     const username = raw.slice(0, at);
     const domain = raw.slice(at + 1);
     if (username.length > 0 && domain.length > 0) {
-      return { kind: 'email', username, domain };
+      return logDisplayValueResult(
+        { kind: 'email', username, domain },
+        { rawLength: raw.length, special, reason: 'email' }
+      );
     }
   }
 
   if (raw.startsWith('creqA')) {
     const body = raw.slice('creqA'.length);
-    if (body.length > 0) return { kind: 'prefix-split', prefix: 'creqA', body };
+    if (body.length > 0) {
+      return logDisplayValueResult(
+        { kind: 'prefix-split', prefix: 'creqA', body },
+        { rawLength: raw.length, special, reason: 'creq-prefix' }
+      );
+    }
   }
 
   if (raw.startsWith('bitcoin:?lightning=') && raw.includes('&cashu=')) {
-    return { kind: 'bitcoin-uri', value: raw };
+    return logDisplayValueResult(
+      { kind: 'bitcoin-uri', value: raw },
+      { rawLength: raw.length, special, reason: 'bitcoin-uri' }
+    );
   }
 
   if (special) {
@@ -53,11 +89,17 @@ export function formatDisplayValue(raw: unknown, special: boolean): DisplayValue
       if (raw.startsWith(prefix)) {
         const body = raw.slice(prefix.length);
         if (body.length > 0 && !body.startsWith(' ')) {
-          return { kind: 'prefix-split', prefix, body };
+          return logDisplayValueResult(
+            { kind: 'prefix-split', prefix, body },
+            { rawLength: raw.length, special, reason: 'gated-prefix' }
+          );
         }
       }
     }
   }
 
-  return { kind: 'plain', value: raw };
+  return logDisplayValueResult(
+    { kind: 'plain', value: raw },
+    { rawLength: raw.length, special, reason: 'plain' }
+  );
 }

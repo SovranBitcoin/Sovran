@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { paymentLog } from '@/shared/lib/logger';
 
 type AmountInputMode = 'sat' | 'fiat';
 
@@ -35,12 +36,40 @@ interface AmountDraftStore {
  */
 export const useAmountDraftStore = create<AmountDraftStore>((set, get) => ({
   pending: null,
-  stash: (draft) => set({ pending: draft }),
+  stash: (draft) => {
+    paymentLog.info('amount_draft.stash', {
+      scope: draft.scope,
+      rawInputLength: draft.rawInput.length,
+      inputMode: draft.inputMode,
+    });
+    set({ pending: draft });
+  },
   take: (scope) => {
     const p = get().pending;
-    if (!p || p.scope !== scope) return null;
+    if (!p || p.scope !== scope) {
+      paymentLog.info('amount_draft.take_miss', {
+        scope,
+        hasPending: !!p,
+        pendingScope: p?.scope ?? null,
+        pendingRawInputLength: p?.rawInput.length ?? 0,
+      });
+      return null;
+    }
+    paymentLog.info('amount_draft.take_hit', {
+      scope,
+      rawInputLength: p.rawInput.length,
+      inputMode: p.inputMode,
+    });
     set({ pending: null });
     return p;
   },
-  clear: () => set({ pending: null }),
+  clear: () => {
+    const p = get().pending;
+    paymentLog.info('amount_draft.clear', {
+      hadPending: !!p,
+      pendingScope: p?.scope ?? null,
+      pendingRawInputLength: p?.rawInput.length ?? 0,
+    });
+    set({ pending: null });
+  },
 }));

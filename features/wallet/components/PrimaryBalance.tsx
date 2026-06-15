@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -225,8 +225,24 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     : pendingSends.reduce((sum, tx) => sum + amountToNumber(tx.amount), 0);
   const pendingUnit = pendingSends[0]?.unit || 'sat';
 
+  useEffect(() => {
+    walletLog.debug('wallet.balance.ecash_status', {
+      accountUnit: account.unit,
+      pendingCount: pendingSends.length,
+      pendingTotal,
+      pendingUnit,
+      reservedTotal,
+      mockMode,
+    });
+  }, [account.unit, mockMode, pendingSends.length, pendingTotal, pendingUnit, reservedTotal]);
+
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
   const handlePendingPress = useCallback(() => {
+    walletLog.info('wallet.pending.press', {
+      pendingCount: pendingSends.length,
+      pendingTotal,
+      unit: pendingUnit,
+    });
     router.navigate({
       pathname: '/transactions',
       params: {
@@ -237,7 +253,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         filterMintUrl: 'all',
       },
     });
-  }, [router, account.unit]);
+  }, [router, account.unit, pendingSends.length, pendingTotal, pendingUnit]);
 
   // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
   // dropped by `useSingleFlight` until the first interaction settles.
@@ -266,12 +282,16 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       }
     };
 
+    walletLog.info('wallet.reserved.menu_open', { reservedTotal });
     await new Promise<void>((resolve) => {
       actionMenuPopup({
         title: 'Reserved Proofs',
         // Fires on overlay-tap / swipe-down (no item picked); the picked
         // path resolves from the button's onPress finally-block instead.
-        onDismiss: () => resolve(),
+        onDismiss: () => {
+          walletLog.debug('wallet.reserved.menu_dismissed');
+          resolve();
+        },
         buttons: [
           {
             testID: 'reserved-proofs-recover',
@@ -279,6 +299,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             description: 'Checks pending send and melt operations',
             icon: 'mdi:wrench',
             onPress: async () => {
+              walletLog.info('wallet.reserved.recovery_selected', { reservedTotal });
               try {
                 await recoverPending();
               } finally {

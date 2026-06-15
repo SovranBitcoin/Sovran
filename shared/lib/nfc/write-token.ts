@@ -18,8 +18,16 @@ import { writeNdefTextRecord } from './write';
 import { withSession } from './session';
 import { nfcLog } from '../logger';
 
+function nfcErrorFields(error: unknown): Record<string, unknown> {
+  return {
+    error: error instanceof Error ? error.message : String(error),
+    code: error instanceof NfcError ? error.code : undefined,
+    statusWord: error instanceof NfcError ? error.statusWord : undefined,
+  };
+}
+
 export async function writeTokenToNFC(token: string): Promise<void> {
-  nfcLog.info('nfc.write.start');
+  nfcLog.info('nfc.write.start', { tokenLength: token.length });
 
   // Support/enabled preflight (typed NOT_SUPPORTED / NOT_ENABLED throws) is
   // owned by acquireSession inside withSession.
@@ -44,15 +52,21 @@ export async function writeTokenToNFC(token: string): Promise<void> {
       }
 
       await writeNdefTextRecord(token);
-      nfcLog.info('nfc.write.success');
+      nfcLog.info('nfc.write.success', { tokenLength: token.length });
     });
   } catch (error) {
     // Preserve UserCancel so the caller can distinguish a user-initiated
     // close from a real failure — wrapping it as 'WRITE_FAILED' would
     // trigger an error popup for a normal cancel.
-    if (isUserCancelError(error)) throw error;
+    if (isUserCancelError(error)) {
+      nfcLog.debug('nfc.write.cancelled', { tokenLength: token.length });
+      throw error;
+    }
     const message = error instanceof Error ? error.message : String(error);
-    nfcLog.error('nfc.write.failed', { error: message });
+    nfcLog.error('nfc.write.failed', {
+      tokenLength: token.length,
+      ...nfcErrorFields(error),
+    });
     if (error instanceof NfcError) throw error;
     throw new NfcError(message, 'WRITE_FAILED');
   }

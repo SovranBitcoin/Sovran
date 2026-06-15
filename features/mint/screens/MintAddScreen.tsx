@@ -47,6 +47,13 @@ const CURRENCY_TABS_HEIGHT = 48;
 
 // MintStatCell removed — stats now rendered inline
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 interface PseudoMint {
   url: string;
   isPseudoMint: true;
@@ -346,12 +353,12 @@ export function MintAddScreen() {
       cashuLog.debug('mint.add.url_validation.loading');
     } else if (validationState.isValid === true) {
       cashuLog.info('mint.add.url_validation.valid', {
-        url: validatedUrl,
+        ...mintUrlLogFields(validatedUrl),
         hasIcon: !!customMintInfo?.icon_url,
         name: customMintInfo?.name,
       });
     } else if (validationState.isValid === false) {
-      cashuLog.debug('mint.add.url_validation.invalid', { url: validatedUrl });
+      cashuLog.debug('mint.add.url_validation.invalid', { ...mintUrlLogFields(validatedUrl) });
     }
   }, [validationState, validatedUrl, customMintInfo]);
 
@@ -464,7 +471,7 @@ export function MintAddScreen() {
         next.add(mintUrl);
       }
       cashuLog.debug('mint.add.item.toggle', {
-        mintUrl: normalizeMintUrlKey(mintUrl),
+        ...mintUrlLogFields(normalizeMintUrlKey(mintUrl)),
         selected: !wasSelected,
         totalSelected: next.size,
       });
@@ -501,11 +508,18 @@ export function MintAddScreen() {
       for (let i = 0; i < mintUrlsToAdd.length; i++) {
         const mintUrl = mintUrlsToAdd[i];
         const itemT0 = performance.now();
-        log.debug('mint.add.item.adding', { index: i + 1, total: mintUrlsToAdd.length, mintUrl });
+        log.debug('mint.add.item.adding', {
+          index: i + 1,
+          total: mintUrlsToAdd.length,
+          ...mintUrlLogFields(mintUrl),
+        });
         try {
           await manager.mint.addMint(mintUrl, { trusted: true });
           const addDuration = Math.round(performance.now() - itemT0);
-          log.info('mint.add.item.added', { mintUrl, duration_ms: addDuration });
+          log.info('mint.add.item.added', {
+            ...mintUrlLogFields(mintUrl),
+            duration_ms: addDuration,
+          });
           results.push(mintUrl);
 
           // Restore proofs for the newly added mint
@@ -513,12 +527,12 @@ export function MintAddScreen() {
             const restoreT0 = performance.now();
             await manager.wallet.restore(mintUrl);
             log.info('mint.add.restore.success', {
-              mintUrl,
+              ...mintUrlLogFields(mintUrl),
               duration_ms: Math.round(performance.now() - restoreT0),
             });
           } catch (restoreErr) {
             log.warn('mint.add.restore.failed', {
-              mintUrl,
+              ...mintUrlLogFields(mintUrl),
               error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
             });
           }
@@ -528,7 +542,7 @@ export function MintAddScreen() {
           }
         } catch (err) {
           log.error('mint.add.item.failed', {
-            mintUrl,
+            ...mintUrlLogFields(mintUrl),
             duration_ms: Math.round(performance.now() - itemT0),
             error: err instanceof Error ? err.message : String(err),
           });

@@ -13,6 +13,7 @@ import type {
   RepositoryTransactionScope,
   SendOperationRepository,
 } from '@cashu/coco-core';
+import { cashuLog } from '@/shared/lib/logger';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -27,6 +28,19 @@ const MELT_OPERATION_NUMBER_FIELDS = [
   'effectiveFee',
 ] as const;
 
+function persistedValueKind(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+function logInvalidPersistedNumber(context: string, value: unknown): void {
+  cashuLog.warn('cashu.repository.number_field_invalid', {
+    context,
+    valueKind: persistedValueKind(value),
+  });
+}
+
 function toPersistedCocoNumber(value: unknown, context: string): number {
   let amount: number;
 
@@ -36,20 +50,24 @@ function toPersistedCocoNumber(value: unknown, context: string): number {
     amount = Number(value);
   } else if (typeof value === 'string') {
     if (value.trim() === '') {
+      logInvalidPersistedNumber(context, value);
       throw new Error(`Invalid persisted Coco ${context}: ${String(value)}`);
     }
     amount = Number(value);
   } else if (typeof value === 'object' && value != null && 'toNumber' in value) {
     const maybeNumberLike = value as { toNumber?: unknown };
     if (typeof maybeNumberLike.toNumber !== 'function') {
+      logInvalidPersistedNumber(context, value);
       throw new Error(`Invalid persisted Coco ${context}: ${String(value)}`);
     }
     amount = maybeNumberLike.toNumber();
   } else {
+    logInvalidPersistedNumber(context, value);
     throw new Error(`Invalid persisted Coco ${context}: ${String(value)}`);
   }
 
   if (!Number.isFinite(amount) || !Number.isSafeInteger(amount)) {
+    logInvalidPersistedNumber(context, value);
     throw new Error(`Invalid persisted Coco ${context}: ${String(value)}`);
   }
 
@@ -63,6 +81,7 @@ function normalizeNumberFields<T extends object>(
 ): T {
   let changed = false;
   const updates: UnknownRecord = {};
+  const normalizedFields: string[] = [];
   const record = value as UnknownRecord;
 
   for (const field of fields) {
@@ -72,12 +91,18 @@ function normalizeNumberFields<T extends object>(
     if (current == null || typeof current === 'number') continue;
 
     updates[field] = toPersistedCocoNumber(current, `${context}.${field}`);
+    normalizedFields.push(field);
     changed = true;
   }
 
   if (!changed) return value;
 
   const normalized: T = { ...value, ...updates };
+  cashuLog.debug('cashu.repository.number_fields_normalized', {
+    context,
+    fields: normalizedFields,
+    fieldCount: normalizedFields.length,
+  });
   return normalized;
 }
 
@@ -272,31 +297,63 @@ function wrapKeyRingRepository(
   overlay: Map<string, Keypair>
 ): KeyRingRepository {
   return {
-    getPersistedKeyPair: async (publicKey) =>
-      overlay.get(publicKey) ?? repository.getPersistedKeyPair(publicKey),
+    getPersistedKeyPair: async (publicKey) => {
+      const overlayKeyPair = overlay.get(publicKey);
+      if (overlayKeyPair) {
+        cashuLog.debug('cashu.repository.keyring.overlay_hit', {
+          overlaySize: overlay.size,
+        });
+        return overlayKeyPair;
+      }
+      return repository.getPersistedKeyPair(publicKey);
+    },
     setPersistedKeyPair: async (keyPair) => {
       if (ephemeralPubkeys.has(keyPair.publicKeyHex)) {
         overlay.set(keyPair.publicKeyHex, keyPair);
+        cashuLog.info('cashu.repository.keyring.ephemeral_set', {
+          overlaySize: overlay.size,
+          ephemeralCount: ephemeralPubkeys.size,
+        });
         // Scrub any legacy plaintext row written by builds that predate the
         // overlay. Exact primary-key match — cannot touch other keys.
         await repository.deletePersistedKeyPair(keyPair.publicKeyHex);
+        cashuLog.info('cashu.repository.keyring.ephemeral_scrubbed', {
+          overlaySize: overlay.size,
+        });
         return;
       }
       return repository.setPersistedKeyPair(keyPair);
     },
     deletePersistedKeyPair: async (publicKey) => {
-      overlay.delete(publicKey);
+      const removedOverlay = overlay.delete(publicKey);
+      if (removedOverlay) {
+        cashuLog.debug('cashu.repository.keyring.overlay_deleted', {
+          overlaySize: overlay.size,
+        });
+      }
       return repository.deletePersistedKeyPair(publicKey);
     },
     getAllPersistedKeyPairs: async () => {
       const persisted = await repository.getAllPersistedKeyPairs();
       const filtered = persisted.filter((keyPair) => !overlay.has(keyPair.publicKeyHex));
+      cashuLog.debug('cashu.repository.keyring.all_loaded', {
+        persistedCount: persisted.length,
+        overlayCount: overlay.size,
+        returnedCount: filtered.length + overlay.size,
+      });
       return [...filtered, ...overlay.values()];
     },
     getLatestKeyPair: async () => {
       const latest = await repository.getLatestKeyPair();
-      if (latest) return latest;
+      if (latest) {
+        cashuLog.debug('cashu.repository.keyring.latest_loaded', { source: 'persisted' });
+        return latest;
+      }
       const first = overlay.values().next();
+      cashuLog.debug('cashu.repository.keyring.latest_loaded', {
+        source: first.done ? 'none' : 'overlay',
+        overlaySize: overlay.size,
+      });
       return first.done ? null : first.value;
     },
     getLastDerivationIndex: () => repository.getLastDerivationIndex(),
@@ -335,6 +392,10 @@ export function createSovranCocoRepositories(
   options: SovranCocoRepositoriesOptions = {}
 ): Repositories {
   const ephemeralPubkeys = options.ephemeralKeyringPubkeys ?? new Set<string>();
+  cashuLog.info('cashu.repository.wrapper.created', {
+    hasEphemeralKeyring: ephemeralPubkeys.size > 0,
+    ephemeralCount: ephemeralPubkeys.size,
+  });
   // One overlay per repositories instance (one manager per profile session);
   // the SAME wrapped keyring is shared by the top-level repo and every
   // transaction scope so reads inside transactions see overlay keys.
@@ -347,7 +408,26 @@ export function createSovranCocoRepositories(
   return {
     ...normalizeRepositoryScope(repositories, keyRing),
     init: () => repositories.init(),
-    withTransaction: (fn) =>
-      repositories.withTransaction((scope) => fn(normalizeRepositoryScope(scope, keyRing))),
+    withTransaction: async (fn) => {
+      const startedAt = Date.now();
+      cashuLog.debug('cashu.repository.transaction.start', {
+        hasEphemeralKeyring: ephemeralPubkeys.size > 0,
+      });
+      try {
+        const result = await repositories.withTransaction((scope) =>
+          fn(normalizeRepositoryScope(scope, keyRing))
+        );
+        cashuLog.debug('cashu.repository.transaction.done', {
+          duration_ms: Date.now() - startedAt,
+        });
+        return result;
+      } catch (error) {
+        cashuLog.warn('cashu.repository.transaction.failed', {
+          duration_ms: Date.now() - startedAt,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
+    },
   };
 }

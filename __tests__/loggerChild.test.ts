@@ -34,7 +34,7 @@ describe('logger child sharing (audit 56.json F-003 / F-006 / F-009 / F-013)', (
     expect(root.getRecentLogs().map((e) => e.event)).toContain('should.land');
   });
 
-  it('device info attaches once across parent + many children (F-006)', () => {
+  it('device info attaches to every entry across parent + many children (F-006)', () => {
     const root = makeIsolated();
     const a = root.child({ module: 'a' });
     const b = root.child({ module: 'b' });
@@ -44,7 +44,14 @@ describe('logger child sharing (audit 56.json F-003 / F-006 / F-009 / F-013)', (
     c.warn('c.first');
     root.warn('root.next');
     const withDevice = root.getRecentLogs().filter((e) => !!e.device);
-    expect(withDevice.length).toBe(1);
+    expect(withDevice.length).toBe(4);
+    for (const entry of withDevice) {
+      expect(entry.device).toMatchObject({
+        platform: expect.any(String),
+        label: expect.any(String),
+        logSessionId: expect.any(String),
+      });
+    }
   });
 
   it('child shares transports with parent (F-009)', () => {

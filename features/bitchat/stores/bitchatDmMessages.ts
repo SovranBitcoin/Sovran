@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
+import { bitchatLog } from '@/shared/lib/logger';
 import type {
   BLEDeliveryStatus,
   BLEDeliveryStatusEvent,
@@ -37,6 +38,7 @@ interface BitchatDmMessagesStore {
 }
 
 function mapStatus(status: BLEDeliveryStatus): BleDmDeliveryStatus {
+  bitchatLog.debug('bitchat.dm.status.map', { nativeStatus: status });
   switch (status) {
     case 'sending':
       return 'sending';
@@ -68,11 +70,30 @@ const STATUS_RANK: Record<BleDmDeliveryStatus, number> = {
 };
 
 function appendCapped(prev: BleDmMessage[], msg: BleDmMessage): BleDmMessage[] {
-  if (prev.some((m) => m.id === msg.id)) return prev;
+  if (prev.some((m) => m.id === msg.id)) {
+    bitchatLog.debug('bitchat.dm.thread.append.skipped_duplicate', {
+      messageId: msg.id,
+      previousCount: prev.length,
+      isOwn: msg.isOwn,
+      contentLength: msg.content.length,
+    });
+    return prev;
+  }
   const last = prev[prev.length - 1];
   const inOrder = !last || msg.timestamp >= last.timestamp;
   const next = inOrder ? [...prev, msg] : [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-  return next.length > MESSAGE_BUFFER_CAP ? next.slice(next.length - MESSAGE_BUFFER_CAP) : next;
+  const capped = next.length > MESSAGE_BUFFER_CAP;
+  const result = capped ? next.slice(next.length - MESSAGE_BUFFER_CAP) : next;
+  bitchatLog.debug('bitchat.dm.thread.append.result', {
+    previousCount: prev.length,
+    nextCount: result.length,
+    capped,
+    inOrder,
+    isOwn: msg.isOwn,
+    contentLength: msg.content.length,
+    deliveryStatus: msg.deliveryStatus ?? null,
+  });
+  return result;
 }
 
 /**
@@ -123,6 +144,12 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
     (set, get) => ({
       byPeer: {},
       appendIncoming: (event) => {
+        bitchatLog.info('bitchat.dm.incoming.append', {
+          peerID: event.peerID,
+          messageId: event.id,
+          contentLength: event.content.length,
+          isOwn: event.isOwn,
+        });
         const msg: BleDmMessage = {
           id: event.id,
           content: event.content,
@@ -140,6 +167,13 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
         }));
       },
       appendOutgoing: (message, peerID) => {
+        bitchatLog.info('bitchat.dm.outgoing.append', {
+          peerID,
+          messageId: message.id,
+          contentLength: message.content.length,
+          deliveryStatus: message.deliveryStatus ?? null,
+          isPending: message.isPending ?? null,
+        });
         set((state) => ({
           byPeer: {
             ...state.byPeer,
@@ -149,6 +183,12 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
       },
       applyDeliveryStatus: (event) => {
         const incoming = mapStatus(event.status);
+        bitchatLog.info('bitchat.dm.delivery_status.apply', {
+          messageId: event.messageID,
+          incoming,
+          nativeStatus: event.status,
+          hasReason: !!event.reason,
+        });
         set((state) => {
           // Outbound messages are keyed by `peerID === counterparty`, but the
           // delivery status event carries only `messageID`. Find which peer's
@@ -172,9 +212,30 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
                   failureReason: incoming === 'failed' ? event.reason : undefined,
                 };
                 mutated = true;
+                bitchatLog.info('bitchat.dm.delivery_status.updated', {
+                  peerID: peer,
+                  messageId: event.messageID,
+                  previousStatus: current.deliveryStatus ?? 'sending',
+                  nextStatus: incoming,
+                  hasFailureReason: incoming === 'failed' && !!event.reason,
+                });
+              } else {
+                bitchatLog.debug('bitchat.dm.delivery_status.skipped_downgrade', {
+                  peerID: peer,
+                  messageId: event.messageID,
+                  previousStatus: current.deliveryStatus ?? 'sending',
+                  incoming,
+                });
               }
             }
             next[peer] = updated;
+          }
+          if (!mutated) {
+            bitchatLog.debug('bitchat.dm.delivery_status.no_match_or_noop', {
+              messageId: event.messageID,
+              incoming,
+              peerCount: Object.keys(state.byPeer).length,
+            });
           }
           return mutated ? { byPeer: next } : state;
         });
@@ -182,8 +243,15 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
       getForPeer: (peerID) => get().byPeer[peerID] ?? [],
       clearForPeer: (peerID) =>
         set((state) => {
-          if (!state.byPeer[peerID]) return state;
+          if (!state.byPeer[peerID]) {
+            bitchatLog.debug('bitchat.dm.thread.clear.skipped_missing', { peerID });
+            return state;
+          }
           const { [peerID]: _removed, ...rest } = state.byPeer;
+          bitchatLog.info('bitchat.dm.thread.clear', {
+            peerID,
+            removedCount: state.byPeer[peerID]?.length ?? 0,
+          });
           return { byPeer: rest };
         }),
     }),
@@ -198,14 +266,19 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
         // and the relaunch — better to flag the ambiguity than show a
         // permanent spinner. Inbound messages and already-delivered/read
         // outbound messages pass through untouched.
-        if (!state) return;
+        if (!state) {
+          bitchatLog.debug('bitchat.dm.hydrate.skipped_empty');
+          return;
+        }
         let mutated = false;
+        let demotedCount = 0;
         const next: Record<string, BleDmMessage[]> = {};
         for (const [peer, thread] of Object.entries(state.byPeer)) {
           let changed = false;
           const updated = thread.map((m) => {
             if (m.isOwn && (m.deliveryStatus === 'sending' || m.deliveryStatus === 'sent')) {
               changed = true;
+              demotedCount += 1;
               return {
                 ...m,
                 deliveryStatus: 'failed' as const,
@@ -223,7 +296,15 @@ export const useBitchatDmMessagesStore = create<BitchatDmMessagesStore>()(
           }
         }
         if (mutated) {
+          bitchatLog.info('bitchat.dm.hydrate.demoted_pending', {
+            peerCount: Object.keys(state.byPeer).length,
+            demotedCount,
+          });
           useBitchatDmMessagesStore.setState({ byPeer: next });
+        } else {
+          bitchatLog.debug('bitchat.dm.hydrate.no_demotions', {
+            peerCount: Object.keys(state.byPeer).length,
+          });
         }
       },
     })

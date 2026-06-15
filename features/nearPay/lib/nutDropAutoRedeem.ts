@@ -4,9 +4,11 @@ import { createDefaultOperations } from '@sovranbitcoin/colada/operations';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { paymentStatusPopup } from '@/shared/lib/popup';
+import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { paymentLog } from '@/shared/lib/logger';
 
 /**
  * Drains the persisted Nut Drop redeem queue through colada's mesh redeem
@@ -27,6 +29,13 @@ function restoreSettled(): boolean {
 
 function getManager() {
   return CocoManager.isInitialized() ? CocoManager.getInstance() : null;
+}
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
 }
 
 let orchestrator: MeshRedeemOrchestrator | null = null;
@@ -54,12 +63,27 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         useNutDropRedeemQueueStore.getState().scheduleRetry(tokenHash, error),
     },
     onRedeeming: (tokenHash, entry) => {
+      paymentLog.info('near_pay.redeem.queue.redeeming', {
+        tokenHash: tokenHash.slice(0, 12),
+        ...mintUrlLogFields(entry.mintUrl),
+        amount: entry.amount,
+        unit: entry.unit,
+        appState: AppState.currentState,
+        visibleToast: AppState.currentState === 'active',
+      });
       // Same toast pipeline as a manually redeemed token (processing →
       // green confirmed): coco's receive-op:finalized / history:updated
       // events flip it to confirmed through usePaymentStatusListener.
       // Only when the user can see it; backgrounded redeems surface through
       // the transaction history.
-      if (AppState.currentState !== 'active') return;
+      if (AppState.currentState !== 'active') {
+        paymentLog.info('near_pay.redeem.toast_suppressed', {
+          tokenHash: tokenHash.slice(0, 12),
+          reason: 'app_not_active',
+          appState: AppState.currentState,
+        });
+        return;
+      }
       usePaymentStatusStore.getState().setActive({
         variant: 'receive-ecash',
         id: tokenHash,
@@ -76,10 +100,35 @@ function getOrchestrator(): MeshRedeemOrchestrator {
         unit: entry.unit,
       });
     },
-    onFailed: (tokenHash, _entry, kind) => {
-      // Don't leave a mounted toast spinning forever — flip it to the
-      // standard failed state (the retry path mounts a fresh one later).
-      if (usePaymentStatusStore.getState().active?.id !== tokenHash) return;
+    onFailed: (tokenHash, entry, kind) => {
+      paymentLog.warn('near_pay.redeem.queue.failed', {
+        tokenHash: tokenHash.slice(0, 12),
+        ...mintUrlLogFields(entry.mintUrl),
+        amount: entry.amount,
+        unit: entry.unit,
+        kind,
+        activeId: usePaymentStatusStore.getState().active?.id ?? null,
+        activeState: usePaymentStatusStore.getState().active?.state ?? null,
+      });
+      // Network/retryable failures are queued for another redeem attempt, so
+      // keep the visible toast pending instead of presenting a terminal error.
+      if (usePaymentStatusStore.getState().active?.id !== tokenHash) {
+        paymentLog.info('near_pay.redeem.toast_update_suppressed', {
+          tokenHash: tokenHash.slice(0, 12),
+          kind,
+          reason: 'active_id_mismatch',
+        });
+        return;
+      }
+      if (kind === 'network' || kind === 'retryable') {
+        paymentLog.info('near_pay.redeem.toast_waiting', {
+          tokenHash: tokenHash.slice(0, 12),
+          kind,
+          expectedNext: 'retry_when_online_or_backoff_elapsed',
+        });
+        usePaymentStatusStore.getState().setWaiting(tokenHash, RECEIVE_PENDING_TOAST_COPY);
+        return;
+      }
       usePaymentStatusStore
         .getState()
         .setFailed(
@@ -92,5 +141,22 @@ function getOrchestrator(): MeshRedeemOrchestrator {
 }
 
 export async function drainNutDropRedeemQueue(): Promise<void> {
-  await getOrchestrator().drain();
+  const entries = Object.values(useNutDropRedeemQueueStore.getState().byTokenHash);
+  paymentLog.info('near_pay.redeem.drain.start', {
+    entries: entries.length,
+    pending: entries.filter((entry) => entry.status === 'pending').length,
+    redeeming: entries.filter((entry) => entry.status === 'redeeming').length,
+    restoreSettled: restoreSettled(),
+    hasManager: !!getManager(),
+    appState: AppState.currentState,
+  });
+  try {
+    await getOrchestrator().drain();
+    paymentLog.info('near_pay.redeem.drain.done');
+  } catch (error) {
+    paymentLog.error('near_pay.redeem.drain.failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }

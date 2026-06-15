@@ -33,7 +33,36 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   const [shade400, shade500, danger] = useThemeColor(['shade-400', 'shade-500', 'danger'] as const);
 
   const peerName = resolveIdentityName({ pubkey, nostrProfile: metadata });
-  const bubbleMessages = useMemo<ChatBubbleMessage[]>(() => messages.map(toBubble), [messages]);
+  const peerPubkeyLength = pubkey.length;
+  const bubbleMessages = useMemo<ChatBubbleMessage[]>(() => {
+    const mapped = messages.map(toBubble);
+    const cashuTokenCount = mapped.filter((message) => !!message.cashuToken).length;
+    const ownCount = mapped.filter((message) => message.isOwn).length;
+    const pendingCount = messages.filter((message) => message.isPending).length;
+    const contentLengthTotal = messages.reduce(
+      (total, message) => total + message.content.length,
+      0
+    );
+
+    wnLog.debug('whitenoise.dm.messages.mapped_to_chat', {
+      peerPubkeyLength,
+      messageCount: messages.length,
+      cashuTokenCount,
+      ownCount,
+      pendingCount,
+      contentLengthTotal,
+      hasCashuToken: cashuTokenCount > 0,
+      hasPending: pendingCount > 0,
+      isClientReady,
+      isCreatingGroup,
+      hasGroup,
+      isLoading,
+      hasError: !!error,
+      errorLength: error?.length ?? 0,
+    });
+
+    return mapped;
+  }, [error, hasGroup, isClientReady, isCreatingGroup, isLoading, messages, peerPubkeyLength]);
 
   return (
     <Screen name="WhitenoiseDMScreen" scroll="none">

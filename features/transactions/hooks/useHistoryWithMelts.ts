@@ -67,13 +67,15 @@ export function useHistoryWithMelts(pageSize = 100) {
 
   const fetchMeltOps = useCallback(async () => {
     try {
+      log.debug('tx.melt_ops.fetch.start');
       const [finalized, pending, prepared] = await Promise.all([
         listMeltOperationsByState(manager, 'finalized'),
         listMeltOperationsByState(manager, 'pending'),
         listMeltOperationsByState(manager, 'prepared'),
       ]);
 
-      const entries = [...finalized, ...pending, ...prepared]
+      const operations = [...finalized, ...pending, ...prepared];
+      const entries = operations
         .map(meltOpToHistoryEntry)
         .filter((e): e is MeltHistoryEntry => e !== null);
 
@@ -81,14 +83,20 @@ export function useHistoryWithMelts(pageSize = 100) {
         finalized: finalized.length,
         pending: pending.length,
         prepared: prepared.length,
+        rawCount: operations.length,
         converted: entries.length,
+        skipped: operations.length - entries.length,
       });
 
       if (isMountedRef.current) {
         setMeltEntries(entries);
+      } else {
+        log.debug('tx.melt_ops.fetch.stale_result');
       }
-    } catch {
-      log.warn('tx.melt_ops.fetch_error');
+    } catch (err) {
+      log.warn('tx.melt_ops.fetch_error', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       // Repository may not be accessible — fall back to history-only
     }
   }, [manager]);
@@ -101,14 +109,17 @@ export function useHistoryWithMelts(pageSize = 100) {
   // Re-fetch when melt operation events reach Colada's bus so the list stays in sync.
   useEffect(() => {
     const handler = () => {
+      log.debug('tx.melt_ops.event', { type: 'melt.updated' });
       void fetchMeltOps();
     };
+    log.debug('tx.melt_ops.subscribe', { type: 'melt.updated' });
     return bus.subscribe({ type: 'melt.updated' }, handler);
   }, [bus, fetchMeltOps]);
 
   // Re-fetch history when any transaction state changes (pending → confirmed, etc.)
   useEffect(() => {
     return bus.subscribe({ type: 'history.updated' }, () => {
+      log.debug('tx.history.event', { type: 'history.updated' });
       void paginatedResult.refresh();
     });
   }, [bus, paginatedResult.refresh]);
@@ -166,7 +177,16 @@ export function useHistoryWithMelts(pageSize = 100) {
 
   // Wrap refresh to also re-fetch melt operations
   const refresh = useCallback(async () => {
-    await Promise.all([paginatedResult.refresh(), fetchMeltOps()]);
+    log.debug('tx.history.refresh.start');
+    try {
+      await Promise.all([paginatedResult.refresh(), fetchMeltOps()]);
+      log.debug('tx.history.refresh.done');
+    } catch (err) {
+      log.warn('tx.history.refresh.failed', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+      throw err;
+    }
   }, [paginatedResult.refresh, fetchMeltOps]);
 
   // When mock mode is active, replace the real history with mock data

@@ -43,6 +43,13 @@ const INSPECT_BUTTON_RADIUS = Math.round(INSPECT_BUTTON_SIZE * 0.18);
 
 const CURRENCY_TABS_HEIGHT = 48;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 interface MintListScreenProps {
   /** Pre-built mint rows from buildMintListItems(). Already sorted and availability-annotated. */
   items: MintListItem[];
@@ -156,13 +163,13 @@ export const MintListScreen = memo(function MintListScreen({
     (item: MintListItem) => {
       if (isExecuting || item.status !== 'available') {
         cashuLog.debug('mint.list.select.blocked', {
-          mintUrl: item.mintUrl,
+          ...mintUrlLogFields(item.mintUrl),
           isExecuting,
           status: item.status,
         });
         return;
       }
-      cashuLog.info('mint.list.select', { mintUrl: item.mintUrl, unit: item.unit });
+      cashuLog.info('mint.list.select', { ...mintUrlLogFields(item.mintUrl), unit: item.unit });
       onMintSelect(item);
     },
     [isExecuting, onMintSelect]

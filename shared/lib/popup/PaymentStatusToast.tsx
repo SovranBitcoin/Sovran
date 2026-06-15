@@ -113,6 +113,9 @@ type PaymentStatusToastProps = {
   operationId?: string;
   /** For receive-ecash: receiveEntryId set when receive:created fires, used for View button */
   receiveEntryId?: string;
+  toastId?: string;
+  debugLabel?: string;
+  toastDebugFields?: Record<string, unknown>;
   /** All remaining props come from ToastComponentProps and are forwarded to Toast root */
   [key: string]: unknown;
 };
@@ -125,42 +128,96 @@ export function PaymentStatusToast({
   unit,
   operationId,
   receiveEntryId,
+  toastId,
+  debugLabel,
+  toastDebugFields,
   ...toastProps
 }: PaymentStatusToastProps) {
   const hide = toastProps.hide as (ids?: string | string[] | 'all') => void;
+  const toastDebugFieldsRef = React.useRef(toastDebugFields);
   const paymentCopy = usePaymentCopyResolver();
   const cases = React.useMemo(() => createPaymentStatusToastCases(paymentCopy), [paymentCopy]);
   const config = cases[variant];
   const active = usePaymentStatusStore((s) => s.active);
-  const isDelivered = active?.id === paymentId && active?.state === 'delivered';
-  const isConfirmed = active?.id === paymentId && active?.state === 'confirmed';
-  const isFailed = active?.id === paymentId && active?.state === 'failed';
+  const activeForPayment = active?.id === paymentId ? active : null;
+  const terminalSnapshotRef = React.useRef<typeof active>(null);
+  if (
+    activeForPayment &&
+    (activeForPayment.state === 'waiting' ||
+      activeForPayment.state === 'confirmed' ||
+      activeForPayment.state === 'failed')
+  ) {
+    terminalSnapshotRef.current = activeForPayment;
+  }
+  const terminalSnapshot =
+    terminalSnapshotRef.current?.id === paymentId ? terminalSnapshotRef.current : null;
+  const effectiveActive = activeForPayment ?? terminalSnapshot;
+  const isDelivered = activeForPayment?.state === 'delivered';
+  const isWaiting = effectiveActive?.state === 'waiting';
+  const isConfirmed = effectiveActive?.state === 'confirmed';
+  const isFailed = effectiveActive?.state === 'failed';
   const status: StatusToastStatus = isConfirmed
     ? 'confirmed'
     : isFailed
       ? 'failed'
-      : isDelivered
-        ? 'delivered'
-        : 'pending';
+      : isWaiting
+        ? 'warning'
+        : isDelivered
+          ? 'delivered'
+          : 'pending';
   // For melt: operationId may be set by melt-op:finalized after toast mounts
   const effectiveOperationId =
-    variant === 'melt' ? (active?.operationId ?? operationId) : operationId;
+    variant === 'melt' ? (effectiveActive?.operationId ?? operationId) : operationId;
   // For receive-ecash: receiveEntryId may be set by receive:created after toast mounts
   const effectiveReceiveEntryId =
-    variant === 'receive-ecash' ? (active?.receiveEntryId ?? receiveEntryId) : undefined;
+    variant === 'receive-ecash' ? (effectiveActive?.receiveEntryId ?? receiveEntryId) : undefined;
+  React.useEffect(() => {
+    popupLog.info('popup.status_toast.status', {
+      toastId: toastId ?? null,
+      debugLabel: debugLabel ?? null,
+      variant,
+      paymentId,
+      status,
+      hasMintUrl: mintUrl.length > 0,
+      mintUrlLength: mintUrl.length,
+      amount,
+      unit,
+      activeState: activeForPayment?.state ?? null,
+      effectiveState: effectiveActive?.state ?? null,
+      hasTerminalSnapshot: !!terminalSnapshot,
+      operationId: effectiveOperationId ?? null,
+      receiveEntryId: effectiveReceiveEntryId ?? null,
+      ...(toastDebugFieldsRef.current ?? {}),
+    });
+  }, [
+    activeForPayment?.state,
+    amount,
+    debugLabel,
+    effectiveActive?.state,
+    effectiveOperationId,
+    effectiveReceiveEntryId,
+    mintUrl,
+    paymentId,
+    status,
+    terminalSnapshot,
+    toastId,
+    unit,
+    variant,
+  ]);
   const confirmedSubmessage =
     typeof config.submessageConfirmed === 'function'
       ? config.submessageConfirmed(amount, unit)
       : config.submessageConfirmed;
 
+  const pendingSubtitle = effectiveActive?.subtitleOverride ?? config.submessagePending;
   const submessage = isConfirmed
     ? confirmedSubmessage
     : isFailed
-      ? (active?.errorMessage ?? config.submessageFailed)
+      ? (effectiveActive?.errorMessage ?? config.submessageFailed)
       : isDelivered && 'submessageDelivered' in config
         ? config.submessageDelivered
         : 'submessagePending' in config
-          ? config.submessagePending
+          ? pendingSubtitle
           : confirmedSubmessage;
 
   // Foreground tracks the toast surface so the segmented amount row matches
@@ -266,13 +323,26 @@ export function PaymentStatusToast({
   // Reactive on purpose: leave the radar and the title reverts.
   const radarVisible = useNearPaySessionStore((s) => s.radarVisible);
   const onNutDropRadar = variant === 'receive-ecash' && radarVisible;
+  const title =
+    effectiveActive?.titleOverride ?? (onNutDropRadar ? 'Received payment' : config.message);
+  const statusToastDebugFields = React.useMemo(
+    () => ({
+      toastId: toastId ?? null,
+      debugLabel: debugLabel ?? null,
+      variant,
+      paymentId,
+      status,
+    }),
+    [debugLabel, paymentId, status, toastId, variant]
+  );
 
   return (
     <StatusToast
       status={status}
-      title={onNutDropRadar ? 'Received payment' : config.message}
+      title={title}
       subtitle={subtitleNode}
       action={action}
+      debugFields={statusToastDebugFields}
       toastProps={{ ...toastProps, hide }}
     />
   );

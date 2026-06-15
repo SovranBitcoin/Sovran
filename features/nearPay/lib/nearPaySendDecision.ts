@@ -1,5 +1,6 @@
 import type { BLEPeer } from 'bitchat-module';
 
+import { paymentLog } from '@/shared/lib/logger';
 import { lockableMintsFromCreq } from '@/shared/lib/nutCreq';
 
 /**
@@ -28,25 +29,60 @@ export function planNearPaySend(args: {
 }): NearPaySendPlan {
   const { peer, ourMints, isOffline } = args;
   const acceptedMints = lockableMintsFromCreq(peer.creq, peer.nostrPubkeyHex);
+  const logBase = {
+    peerHasCreq: !!peer.creq,
+    peerHasNostrPubkey: !!peer.nostrPubkeyHex,
+    creqLength: peer.creq?.length ?? 0,
+    nostrPubkeyLength: peer.nostrPubkeyHex?.length ?? 0,
+    ourMintCount: ourMints.length,
+    isOffline,
+    acceptedMintCount: acceptedMints?.length ?? 0,
+  };
 
   // A valid creq favorite is the capability signal for the extended private-DM
   // wire format. Without it, a stock or stale client could drop the token.
   if (!peer.creq || !peer.nostrPubkeyHex) {
+    paymentLog.info('near_pay.send.plan', {
+      ...logBase,
+      mode: 'block',
+      reason: 'no-creq',
+    });
     return { mode: 'block', reason: 'no-creq' };
   }
   if (!acceptedMints) {
+    paymentLog.info('near_pay.send.plan', {
+      ...logBase,
+      mode: 'block',
+      reason: 'invalid-creq',
+    });
     return { mode: 'block', reason: 'invalid-creq' };
   }
 
   const shared = ourMints.filter((m) => acceptedMints.includes(m));
   if (shared.length === 0) {
+    paymentLog.info('near_pay.send.plan', {
+      ...logBase,
+      mode: 'block',
+      reason: 'no-shared-mint',
+      sharedMintCount: 0,
+    });
     return { mode: 'block', reason: 'no-shared-mint' };
   }
   if (isOffline) {
     // Offline: P2PK locking needs a mint swap → bearer from a shared mint
     // (still redeemable, and the DM keeps it private).
+    paymentLog.info('near_pay.send.plan', {
+      ...logBase,
+      mode: 'bearer',
+      sharedMintCount: shared.length,
+    });
     return { mode: 'bearer', allowedMints: shared };
   }
+  paymentLog.info('near_pay.send.plan', {
+    ...logBase,
+    mode: 'lock',
+    sharedMintCount: shared.length,
+  });
   return {
     mode: 'lock',
     lockPubkey: `02${peer.nostrPubkeyHex}`,

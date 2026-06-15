@@ -12,6 +12,13 @@ interface ValidationState {
   error: string | null;
 }
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * Debounced mint URL validation via fetchMintInfo.
  * Marks a mint as valid only when its /v1/info endpoint responds successfully.
@@ -42,7 +49,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     try {
       new URL(normalizedUrl);
     } catch {
-      log.debug('mint.validate.invalid_url', { mintUrl });
+      log.debug('mint.validate.invalid_url', { mintUrlLength: mintUrl.length });
       setValidationState({ isValid: false, isLoading: false, error: 'Invalid URL format' });
       setMintInfo(null);
       return;
@@ -52,14 +59,14 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     const controller = new AbortController();
     inFlightRef.current = controller;
 
-    log.debug('mint.validate.start', { mintUrl: normalizedUrl });
+    log.debug('mint.validate.start', { ...mintUrlLogFields(normalizedUrl) });
     setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     const mintInfoResult = await fetchMintInfo(normalizedUrl, { signal: controller.signal });
     if (controller.signal.aborted) return;
 
     if (mintInfoResult.isErr()) {
-      log.warn('mint.validate.unreachable', { mintUrl: normalizedUrl });
+      log.warn('mint.validate.unreachable', { ...mintUrlLogFields(normalizedUrl) });
       setValidationState({
         isValid: false,
         isLoading: false,
@@ -68,7 +75,10 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       setMintInfo(null);
     } else {
       const hasValidInfo = mintInfoResult.value !== null;
-      log.info('mint.validate.result', { mintUrl: normalizedUrl, isValid: hasValidInfo });
+      log.info('mint.validate.result', {
+        ...mintUrlLogFields(normalizedUrl),
+        isValid: hasValidInfo,
+      });
       setValidationState({
         isValid: hasValidInfo,
         isLoading: false,

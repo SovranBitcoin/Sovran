@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import { HistoryEntry } from '@cashu/coco-core';
 import opacity from 'hex-color-opacity';
@@ -16,7 +16,7 @@ import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 
 import TransactionIcon from '../TransactionIcon';
 
@@ -68,6 +68,35 @@ export function HistoryEntryHeader({
 
   const isSend = isOutgoingTransaction({ type });
   const isReceive = !isSend;
+
+  useEffect(() => {
+    paymentLog.debug('tx.history_header.render', {
+      hasHistoryEntry: !!historyEntry,
+      hasPendingData: !!pendingData,
+      type,
+      state: String((historyEntry as { state?: unknown } | undefined)?.state ?? ''),
+      amount: numericAmount,
+      unit,
+      direction: isSend ? 'send' : 'receive',
+      isLoading: !!isLoading,
+      showRecipientAvatar,
+      recipientPubkeyLength: recipientPubkey?.length ?? 0,
+      hasRecipientMetadata: !!recipientMetadata,
+      hasRecipientPicture: !!recipientMetadata?.picture,
+      hasRecipientName: !!(recipientMetadata?.displayName ?? recipientMetadata?.name),
+    });
+  }, [
+    historyEntry,
+    isLoading,
+    isSend,
+    numericAmount,
+    pendingData,
+    recipientMetadata,
+    recipientPubkey,
+    showRecipientAvatar,
+    type,
+    unit,
+  ]);
 
   // Avatar size and icon overlay size for recipient mode
   const avatarSize = 48;

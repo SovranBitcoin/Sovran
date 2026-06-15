@@ -40,6 +40,13 @@ const ParamsSchema = z.object({
   continueParams: z.string().min(1).max(4_000).optional(),
 });
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 function MintListRoute() {
   const params = useRouteParams(ParamsSchema, { where: 'mint-flow.list' });
 
@@ -107,6 +114,12 @@ function MintListRoute() {
         showDetailsButton={showDetailsButton}
         closeButtonLabel="Close"
         onMintSelect={(item) => {
+          cashuLog.info('mint.list.select', {
+            ...mintUrlLogFields(item.mintUrl),
+            unit: item.unit,
+            onSelectAction,
+            hasContinuePathname: !!params?.continuePathname,
+          });
           if (onSelectAction === 'continue' && params?.continuePathname) {
             const continueParams = params.continueParams ? JSON.parse(params.continueParams) : {};
             router.navigate({
@@ -121,6 +134,9 @@ function MintListRoute() {
           }
         }}
         onInspectMint={(mintUrl) => {
+          cashuLog.info('mint.list.inspect', {
+            ...mintUrlLogFields(mintUrl),
+          });
           router.navigate({
             pathname: '/info',
             params: { mintUrl },

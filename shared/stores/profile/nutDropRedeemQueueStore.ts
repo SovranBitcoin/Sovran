@@ -175,6 +175,14 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
           return;
         }
         const backoff = Math.min(BASE_BACKOFF_MS * 2 ** (attempts - 1), MAX_BACKOFF_MS);
+        const nextAttemptAt = Date.now() + backoff;
+        storeLog.info('store.nut_drop_queue.retry_scheduled', {
+          tokenHash: tokenHash.slice(0, 12),
+          attempts,
+          backoffMs: backoff,
+          nextAttemptAt,
+          error,
+        });
         set((state) => ({
           byTokenHash: {
             ...state.byTokenHash,
@@ -182,7 +190,7 @@ export const useNutDropRedeemQueueStore = create<NutDropRedeemQueueStore>()(
               ...existing,
               status: 'pending',
               attempts,
-              nextAttemptAt: Date.now() + backoff,
+              nextAttemptAt,
               lastError: error,
             },
           },

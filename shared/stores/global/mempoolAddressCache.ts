@@ -44,6 +44,10 @@ function normalizeAddressKey(address: string): string {
   return address.trim();
 }
 
+function summarizeAddress(address: string): Record<string, unknown> {
+  return { addressLength: address.trim().length };
+}
+
 function evictIfOverCap(byAddress: Record<string, MempoolAddressCacheEntry>): void {
   if (Object.keys(byAddress).length <= MAX_ENTRIES) return;
   const evictCount = Math.max(1, Math.floor(MAX_ENTRIES * 0.1));
@@ -62,18 +66,32 @@ export const useMempoolAddressCache = create<MempoolAddressCacheState>()(
 
       setAddressStats: (address, stats) => {
         const key = normalizeAddressKey(address);
-        if (!key) return;
+        if (!key) {
+          storeLog.debug('store.mempool_address.set.skipped', { reason: 'empty_address' });
+          return;
+        }
         set((state) => {
           const next = {
             ...state.byAddress,
             [key]: { stats, fetchedAt: Date.now() },
           };
           evictIfOverCap(next);
+          storeLog.debug('store.mempool_address.set', {
+            ...summarizeAddress(address),
+            confirmedTxCount: stats.chain_stats.tx_count,
+            mempoolTxCount: stats.mempool_stats.tx_count,
+            totalCached: Object.keys(next).length,
+          });
           return { byAddress: next };
         });
       },
 
-      clear: () => set({ byAddress: {} }),
+      clear: () => {
+        storeLog.info('store.mempool_address.clear', {
+          totalCached: Object.keys(useMempoolAddressCache.getState().byAddress).length,
+        });
+        set({ byAddress: {} });
+      },
     }),
     persistConfig({
       name: 'mempool-address-cache',
@@ -92,26 +110,53 @@ export async function getCachedMempoolAddressStats(
   address: string
 ): Promise<MempoolAddressStats> {
   const key = normalizeAddressKey(address);
+  if (!key) {
+    storeLog.warn('store.mempool_address.cache.invalid_request', { reason: 'empty_address' });
+  }
   const entry = getValidatedCacheEntry(key);
   const now = Date.now();
 
   if (entry && now - entry.fetchedAt <= STALE_TTL_MS) {
+    storeLog.debug('store.mempool_address.cache.hit', {
+      ...summarizeAddress(address),
+      ageMs: now - entry.fetchedAt,
+    });
     return entry.stats;
   }
 
   if (entry) {
+    storeLog.info('store.mempool_address.cache.stale', {
+      ...summarizeAddress(address),
+      ageMs: now - entry.fetchedAt,
+    });
     refreshInBackground(fetcher, address);
     return entry.stats;
   }
 
+  storeLog.info('store.mempool_address.cache.miss', summarizeAddress(address));
   return fetchAndCache(fetcher, address);
 }
 
 function getValidatedCacheEntry(key: string): MempoolAddressCacheEntry | undefined {
   const entry = useMempoolAddressCache.getState().byAddress[key];
-  if (!entry) return undefined;
+  if (!entry) {
+    storeLog.debug('store.mempool_address.cache.lookup_miss', {
+      addressLength: key.length,
+    });
+    return undefined;
+  }
   const parsed = MempoolAddressStatsSchema.safeParse(entry.stats);
-  if (!parsed.success) return undefined;
+  if (!parsed.success) {
+    storeLog.warn('store.mempool_address.cache.invalid_shape', {
+      addressLength: key.length,
+      issueCount: parsed.error.issues.length,
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        code: issue.code,
+      })),
+    });
+    return undefined;
+  }
   return { ...entry, stats: parsed.data };
 }
 
@@ -121,15 +166,35 @@ function fetchAndCache(
 ): Promise<MempoolAddressStats> {
   const key = normalizeAddressKey(address);
   const existing = inflight.get(key);
-  if (existing) return existing;
+  if (existing) {
+    storeLog.debug('store.mempool_address.fetch.join_inflight', {
+      ...summarizeAddress(address),
+    });
+    return existing;
+  }
 
   const p = (async () => {
     try {
+      storeLog.info('store.mempool_address.fetch.start', summarizeAddress(address));
       const stats = await fetcher(address);
       useMempoolAddressCache.getState().setAddressStats(address, stats);
+      storeLog.info('store.mempool_address.fetch.done', {
+        ...summarizeAddress(address),
+        confirmedTxCount: stats.chain_stats.tx_count,
+        mempoolTxCount: stats.mempool_stats.tx_count,
+      });
       return stats;
+    } catch (error) {
+      storeLog.warn('store.mempool_address.fetch.failed', {
+        ...summarizeAddress(address),
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      throw error;
     } finally {
       inflight.delete(key);
+      storeLog.debug('store.mempool_address.fetch.inflight_cleared', {
+        ...summarizeAddress(address),
+      });
     }
   })();
   inflight.set(key, p);
@@ -141,10 +206,15 @@ function refreshInBackground(
   address: string
 ): void {
   const key = normalizeAddressKey(address);
-  if (inflight.has(key)) return;
+  if (inflight.has(key)) {
+    storeLog.debug('store.mempool_address.swr.skip_inflight', {
+      ...summarizeAddress(address),
+    });
+    return;
+  }
   fetchAndCache(fetcher, address).catch((error) => {
     log.warn('mempool.address.cache.swr_refresh_failed', {
-      addressPreview: `${address.slice(0, 8)}…${address.slice(-6)}`,
+      ...summarizeAddress(address),
       error: error instanceof Error ? error : new Error(String(error)),
     });
   });

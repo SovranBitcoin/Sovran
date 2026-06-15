@@ -163,8 +163,22 @@ export function FiltersScreen() {
     [trustedMints]
   );
 
+  const mintFilterLogFields = useCallback(
+    (value: string): Record<string, unknown> => ({
+      hasMintFilter: value !== 'all',
+      mintUrlLength: value !== 'all' ? value.length : 0,
+    }),
+    []
+  );
+
   const handleApply = useCallback(() => {
-    log.info('tx.filters.apply', { currency, paymentType, direction, status, mintUrl });
+    log.info('tx.filters.apply', {
+      currency,
+      paymentType,
+      direction,
+      status,
+      ...mintFilterLogFields(mintUrl),
+    });
     router.dismissTo({
       pathname: '/transactions',
       params: {
@@ -175,7 +189,7 @@ export function FiltersScreen() {
         filterMintUrl: mintUrl,
       },
     });
-  }, [currency, paymentType, direction, status, mintUrl]);
+  }, [currency, paymentType, direction, status, mintUrl, mintFilterLogFields]);
 
   const handleReset = useCallback(() => {
     log.info('tx.filters.reset');

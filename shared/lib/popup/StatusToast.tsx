@@ -11,6 +11,7 @@ import Animated, {
 import opacity from 'hex-color-opacity';
 
 import { LoadingIndicator, type Phase, type Result } from '@/shared/blocks/status';
+import { popupLog } from '@/shared/lib/logger';
 
 import { blendColors } from '@/shared/lib/colorExtraction';
 
@@ -21,6 +22,7 @@ import {
   SUCCESS_DARK_BG,
   TINT_ALPHA,
   ToastSlab,
+  WARNING_DARK_BG,
   useToastFrosted,
 } from './ToastSlab';
 
@@ -30,7 +32,7 @@ const SUB_FONT_SIZE = 13;
 const TERMINAL_TINT_DURATION_MS = 800;
 const AUTO_DISMISS_MS = 3000;
 
-export type StatusToastStatus = 'pending' | 'delivered' | 'confirmed' | 'failed';
+export type StatusToastStatus = 'pending' | 'delivered' | 'confirmed' | 'failed' | 'warning';
 
 type StatusToastProps = {
   status: StatusToastStatus;
@@ -43,6 +45,8 @@ type StatusToastProps = {
   subtitle?: React.ReactNode;
   /** Right-aligned action pill. Hidden when omitted. */
   action?: { label: string; onPress: () => void };
+  /** Structured lifecycle context for log-doctor toast audits. */
+  debugFields?: Record<string, unknown>;
   /**
    * From the heroui toast manager — `hide` plus internal positioning props.
    * Spread onto the underlying `<Toast>` root.
@@ -56,19 +60,28 @@ type StatusToastProps = {
  *
  * Renders the frosted-glass slab with a `<LoadingIndicator>`, title + optional
  * subtitle, and optional action pill. The tint background interpolates from
- * the theme surface to success or danger when `status` flips to a terminal
- * value (`'confirmed'` or `'failed'`); 3 seconds later the toast manager is
- * told to hide. `'pending'` and `'delivered'` are non-terminal and keep the
- * toast visible until the caller flips status or unmounts the component.
+ * the theme surface to success, warning, or danger when `status` flips to a
+ * terminal value (`'confirmed'`, `'warning'`, or `'failed'`); 3 seconds later
+ * the toast manager is told to hide. `'pending'` and `'delivered'` are
+ * non-terminal and keep the toast visible until the caller flips status or
+ * unmounts the component.
  */
-export function StatusToast({ status, title, subtitle, action, toastProps }: StatusToastProps) {
+export function StatusToast({
+  status,
+  title,
+  subtitle,
+  action,
+  debugFields,
+  toastProps,
+}: StatusToastProps) {
   const { bg: surfaceBg, fg: surfaceFg } = useToastSurface();
   // Opaque on non-frosted platforms (Android) — see ToastSlab.
   const frosted = useToastFrosted();
   const surfaceBgTint = frosted ? opacity(surfaceBg, TINT_ALPHA) : surfaceBg;
 
-  const isTerminal = status === 'confirmed' || status === 'failed';
-  const targetBg = status === 'failed' ? DANGER_DARK_BG : SUCCESS_DARK_BG;
+  const isTerminal = status === 'confirmed' || status === 'warning' || status === 'failed';
+  const targetBg =
+    status === 'failed' ? DANGER_DARK_BG : status === 'warning' ? WARNING_DARK_BG : SUCCESS_DARK_BG;
   // Frosted: translucent tint, the blur supplies the softness. Opaque:
   // composite the same tint into the surface slab mathematically —
   // raw SUCCESS/DANGER hexes at full opacity read far too strong.
@@ -77,7 +90,8 @@ export function StatusToast({ status, title, subtitle, action, toastProps }: Sta
     : blendColors(surfaceBg, targetBg, OPAQUE_TINT_MIX);
 
   const indicatorPhase: Phase = isTerminal ? 'done' : 'loading';
-  const indicatorResult: Result = status === 'failed' ? 'error' : 'success';
+  const indicatorResult: Result =
+    status === 'failed' ? 'error' : status === 'warning' ? 'warning' : 'success';
 
   const confirmedProgress = useSharedValue(isTerminal ? 1 : 0);
 
@@ -91,9 +105,22 @@ export function StatusToast({ status, title, subtitle, action, toastProps }: Sta
   const hide = toastProps.hide;
   useEffect(() => {
     if (!isTerminal) return;
-    const timer = setTimeout(() => hide(), AUTO_DISMISS_MS);
+    popupLog.info('popup.status_toast.auto_dismiss_scheduled', {
+      status,
+      title,
+      delayMs: AUTO_DISMISS_MS,
+      ...(debugFields ?? {}),
+    });
+    const timer = setTimeout(() => {
+      popupLog.info('popup.status_toast.auto_dismiss_fired', {
+        status,
+        title,
+        ...(debugFields ?? {}),
+      });
+      hide();
+    }, AUTO_DISMISS_MS);
     return () => clearTimeout(timer);
-  }, [isTerminal, hide]);
+  }, [debugFields, hide, isTerminal, status, title]);
 
   const backgroundStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
