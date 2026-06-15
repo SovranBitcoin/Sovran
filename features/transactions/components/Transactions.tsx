@@ -18,6 +18,7 @@ import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
 import { SplitBillTransactionRow } from '@/features/transactions/components/SplitBillTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
+import { isInFlightReceiveEntry } from '@/features/transactions/lib/inFlightReceives';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -293,6 +294,12 @@ export const Transactions = React.memo(
           }
 
           const historyEntry = item.data;
+
+          // Unredeemed receives (coco receive in `executing`) render like a
+          // normal receive row but belong in Pending until redeemed. colada
+          // only models finalized/rolled_back receives, so bucket them here.
+          if (isInFlightReceiveEntry(historyEntry)) return 'pending';
+
           const isCollapsingGhost =
             historyEntry.type === 'send' &&
             collapsing.has((historyEntry as SendHistoryEntry).operationId);

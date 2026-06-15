@@ -9,6 +9,8 @@ import type {
   MeltOperationState,
 } from '@cashu/coco-core';
 import { listMeltOperationsByState } from '@/shared/lib/cashu/managerInternals';
+import { useInFlightReceives } from '@/shared/hooks/useInFlightReceives';
+import { inFlightReceiveToHistoryEntry } from '@/features/transactions/lib/inFlightReceives';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { log } from '@/shared/lib/logger';
@@ -54,6 +56,10 @@ export function useHistoryWithMelts(pageSize = 100) {
   const paginatedResult = usePaginatedHistory(pageSize);
   const manager = useManager();
   const bus = useColadaSubscriptions();
+  // Received-but-not-yet-redeemed ecash (coco receives stuck in `executing`,
+  // e.g. P2PK tokens accepted offline). coco never projects these to history,
+  // so we synthesize pending receive entries and merge them in below.
+  const { receives: inFlightReceives } = useInFlightReceives();
   const mockMode = useSettingsStore((s) => s.mockMode);
   const mockHistory = useMockDataStore((s) => s.mockHistory);
   const [meltEntries, setMeltEntries] = useState<MeltHistoryEntry[]>([]);
@@ -124,28 +130,46 @@ export function useHistoryWithMelts(pageSize = 100) {
     });
   }, [bus, paginatedResult.refresh]);
 
-  // Merge melt operations into history, deduplicating by quoteId.
+  // Synthetic pending entries for received-but-unredeemed ecash.
+  const receiveEntries = useMemo(
+    () => inFlightReceives.map(inFlightReceiveToHistoryEntry),
+    [inFlightReceives]
+  );
+
+  // Merge melt operations + in-flight receives into history, deduplicating by
+  // quoteId (melts) and operationId (receives).
   // Stabilise: only return a new array ref if entries actually changed.
   const prevMergedRef = useRef<HistoryEntry[]>([]);
   const mergedHistory = useMemo(() => {
     const existingQuoteIds = new Set<string>();
+    const existingReceiveOpIds = new Set<string>();
     for (const h of paginatedResult.history) {
       if (h.type === 'melt') {
         const quoteId = (h as MeltHistoryEntry).quoteId;
         if (quoteId) existingQuoteIds.add(quoteId);
+      } else if (h.type === 'receive') {
+        const opId = (h as { operationId?: string }).operationId;
+        if (opId) existingReceiveOpIds.add(opId);
       }
     }
 
     const newMelts = meltEntries.filter((m) => !existingQuoteIds.has(m.quoteId));
+    // Drop any in-flight receive that has already finalized into real history.
+    const newReceives = receiveEntries.filter((r) => {
+      const opId = (r as { operationId?: string }).operationId;
+      return opId ? !existingReceiveOpIds.has(opId) : true;
+    });
+    const supplements = [...newMelts, ...newReceives];
     const merged =
-      newMelts.length === 0
+      supplements.length === 0
         ? paginatedResult.history
-        : [...paginatedResult.history, ...newMelts].sort((a, b) => b.createdAt - a.createdAt);
+        : [...paginatedResult.history, ...supplements].sort((a, b) => b.createdAt - a.createdAt);
 
-    if (newMelts.length > 0) {
+    if (supplements.length > 0) {
       log.debug('tx.history.merged', {
         paginatedCount: paginatedResult.history.length,
         supplementedMelts: newMelts.length,
+        supplementedReceives: newReceives.length,
         totalCount: merged.length,
       });
     }
@@ -173,7 +197,7 @@ export function useHistoryWithMelts(pageSize = 100) {
     if (identical) return prev;
     prevMergedRef.current = merged;
     return merged;
-  }, [paginatedResult.history, meltEntries]);
+  }, [paginatedResult.history, meltEntries, receiveEntries]);
 
   // Wrap refresh to also re-fetch melt operations
   const refresh = useCallback(async () => {

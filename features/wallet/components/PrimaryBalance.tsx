@@ -39,6 +39,7 @@ import { isReservedSendHistoryEntry } from '@sovranbitcoin/colada';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { alpha } from '@/shared/styles/tokens';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
+import { useInFlightReceives } from '@/shared/hooks/useInFlightReceives';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog, Log } from '@/shared/lib/logger';
 
@@ -214,9 +215,13 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
-  const [foreground, warning] = useThemeColor(['foreground', 'warning'] as const);
+  const [foreground, warning, accent] = useThemeColor(['foreground', 'warning', 'accent'] as const);
   const balanceTint = opacity(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
   const { reservedTotal } = useReservedProofs();
+  // Ecash received but not yet redeemed (swapped) into spendable balance —
+  // typically P2PK tokens accepted while offline. Invisible to balance/history
+  // otherwise; surfaced here so funds-in-limbo are visible and retryable.
+  const { lockedTotal, lockedUnit } = useInFlightReceives();
   const pendingSends = history.filter((entry): entry is SendHistoryEntry =>
     isReservedSendHistoryEntry(entry)
   );
@@ -265,11 +270,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
         await manager.ops.send.recovery.run();
         await manager.ops.melt.recovery.run();
+        // Also redeem any receives stranded in `executing` (e.g. P2PK tokens
+        // accepted while offline) so the same action drains incoming limbo.
+        await manager.ops.receive.recovery.run();
         walletLog.info('wallet.reserved.recovery_complete');
         staticPopup('reserved-proofs-freed', {
           text:
             'Recovery completed.\n' +
-            'Checked pending send and melt operations.\n' +
+            'Checked pending send, melt, and receive operations.\n' +
             'If reserved balance is still stuck, use force cleanup.',
         });
       } catch (error) {
@@ -296,7 +304,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           {
             testID: 'reserved-proofs-recover',
             text: 'Recover pending operations',
-            description: 'Checks pending send and melt operations',
+            description: 'Checks pending send, melt, and receive operations',
             icon: 'mdi:wrench',
             onPress: async () => {
               walletLog.info('wallet.reserved.recovery_selected', { reservedTotal });
@@ -313,6 +321,33 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   }, [reservedTotal]);
 
   const handleReservedPress = useSingleFlight(handleReservedPressInner);
+
+  // REDEEMING pill: retry redeeming received-but-unswapped ecash. Tapping runs
+  // coco's receive recovery sweep, which swaps any `executing` receives once
+  // the mint is reachable; on success they leave limbo and join the balance.
+  const handleRedeemingPressInner = useCallback(async () => {
+    walletLog.info('wallet.redeeming.recovery_start', { lockedTotal });
+    try {
+      const manager = CocoManager.getInstance();
+      await manager.ops.receive.recovery.run();
+      walletLog.info('wallet.redeeming.recovery_complete');
+      staticPopup('redeem-receives-done', {
+        text:
+          'Checked unredeemed ecash.\n' +
+          'Anything redeemable is now in your balance. Tokens still waiting ' +
+          'need the mint to be reachable.',
+      });
+    } catch (error) {
+      walletLog.error('wallet.redeeming.recovery_failed', {
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      staticPopup('redeem-receives-failed', {
+        text: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }, [lockedTotal]);
+
+  const handleRedeemingPress = useSingleFlight(handleRedeemingPressInner);
 
   return (
     <Log name="PrimaryBalance">
@@ -351,6 +386,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           sfSymbol="lock.fill"
           tintColor={warning}
           onPress={handleReservedPress}
+        />
+        <EcashStatusPill
+          label="REDEEMING"
+          totalAmount={lockedTotal}
+          unit={lockedUnit}
+          sfSymbol="hourglass"
+          tintColor={accent}
+          onPress={handleRedeemingPress}
         />
       </VStack>
     </Log>
