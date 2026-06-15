@@ -9,9 +9,10 @@
 // the instance does everything else.
 // ---------------------------------------------------------------------------
 
-import type { Manager } from '@cashu/coco-core';
-import { createPaymentMachine } from '../machine/createMachine';
-import { logger, setLogger, type CocoLogger } from '../logger';
+import type { Manager } from "@cashu/coco-core";
+import type { AnnotationStoreAdapter } from "../annotations";
+import { createPaymentMachine } from "../machine/createMachine";
+import { logger, setLogger, type CocoLogger } from "../logger";
 import type {
   MachineOperations,
   NfcIOAdapter,
@@ -20,25 +21,25 @@ import type {
   ScanSources,
   StepHandlerMap,
   URDecoderLike,
-} from '../machine/types';
+} from "../machine/types";
 import type {
   MintCatalogEntry,
   MintContactProfileResolver,
   MintReviewInfo,
   MintReviewsFetcher,
   WalletContext,
-} from '../types';
-import { createDefaultOperations } from '../operations/defaultOperations';
+} from "../types";
+import { createDefaultOperations } from "../operations/defaultOperations";
 import {
   createWalletContextTracker,
   type WalletContextTracker,
-} from './walletContextTracker';
-import { createNostrGraphqlMintEnrichment } from '../nostr-graphql';
+} from "./walletContextTracker";
+import { createNostrGraphqlMintEnrichment } from "../nostr-graphql";
 
 // NUT-06 mint info as returned by coco's `Manager`. Re-derived here (rather than
 // imported from cashu-ts) so the type tracks whatever shape `mgr.mint.getMintInfo`
 // actually resolves to.
-type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
+type MintInfo = Awaited<ReturnType<Manager["mint"]["getMintInfo"]>>;
 
 // ---------------------------------------------------------------------------
 // Config
@@ -46,6 +47,13 @@ type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
 
 export interface ColadaConfig {
   manager: Manager;
+
+  /**
+   * Persistence for transaction annotations (per-transaction side-data coco
+   * does not store). Framework-agnostic; the wallet owns persistence +
+   * profile-scoping. Read hooks fall back to an in-memory adapter when absent.
+   */
+  annotationStore?: AnnotationStoreAdapter;
 
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
 
@@ -130,8 +138,8 @@ export function createColada(config: ColadaConfig): ColadaInstance {
 
   if (config.logger) setLogger(config.logger);
 
-  logger.info('core.createColada.start', {
-    unit: config.unit ?? 'sat',
+  logger.info("core.createColada.start", {
+    unit: config.unit ?? "sat",
     hasLogger: !!config.logger,
     hasOfflineGetter: !!config.getOffline,
     hasLocaleGetter: !!config.getLocale,
@@ -161,7 +169,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
         endpoint: config.nostrGraphqlEndpoint,
       })
     : null;
-  logger.info('core.createColada.enrichment', {
+  logger.info("core.createColada.enrichment", {
     graphqlEnabled: !!graphqlEnrichment,
     explicitContactResolver: !!config.resolveMintContactProfile,
     explicitReviewsFetcher: !!config.fetchMintReviews,
@@ -185,7 +193,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     shouldMockFailSend: config.shouldMockFailSend,
     lightningTimeoutMs: config.lightningTimeoutMs,
   });
-  logger.info('core.createColada.operations.ready', {
+  logger.info("core.createColada.operations.ready", {
     operationCount: Object.keys(operations).length,
     hasExecuteReceive: !!operations.executeReceive,
     hasExecuteSend: !!operations.executeSend,
@@ -203,7 +211,7 @@ export function createColada(config: ColadaConfig): ColadaInstance {
     subscribeWalletContext: tracker.subscribe,
     operations,
     dispose: () => {
-      logger.info('core.createColada.dispose');
+      logger.info("core.createColada.dispose");
       tracker.dispose();
     },
   };
@@ -230,13 +238,13 @@ export function createMachineFromInstance(
     notifications,
     getOffline,
     getLocale,
-    unit = 'sat',
+    unit = "sat",
     nfcAdapter,
     scanSources,
     createURDecoder,
   } = config;
 
-  logger.info('core.createMachineFromInstance.start', {
+  logger.info("core.createMachineFromInstance.start", {
     unit,
     handlerCount: Object.keys(handlers).length,
     notificationCount: Object.keys(notifications ?? {}).length,
@@ -253,7 +261,7 @@ export function createMachineFromInstance(
     getContext: instance.tracker.getContext,
     getUnit: () => unit,
     getOffline: getOffline ?? (() => false),
-    getLocale: getLocale ?? (() => 'en'),
+    getLocale: getLocale ?? (() => "en"),
     unit,
     operations: instance.operations as MachineOperations,
     enableEcashSendMemo: instance.config.enableEcashSendMemo,
@@ -263,6 +271,6 @@ export function createMachineFromInstance(
     nfcAdapter,
   });
 
-  logger.info('core.createMachineFromInstance.ready');
+  logger.info("core.createMachineFromInstance.ready");
   return machine;
 }

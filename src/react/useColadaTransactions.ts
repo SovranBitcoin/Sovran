@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  HistoryEntry,
-  Manager,
-  MeltHistoryEntry,
-} from "@cashu/coco-core";
+import type { HistoryEntry, Manager, MeltHistoryEntry } from "@cashu/coco-core";
 
 import { logger } from "../logger";
 import {
@@ -12,7 +8,12 @@ import {
   mergeTransactionSources,
   sameTransactionList,
 } from "../history/aggregate";
-import { useColadaManager } from "./ColadaProvider";
+import {
+  candidateKeys,
+  firstAnnotationRecord,
+  mergeAnnotationsIntoEntry,
+} from "../annotations";
+import { useAnnotationStore, useColadaManager } from "./ColadaProvider";
 
 export interface UseColadaTransactionsResult {
   /** Merged, deduped, newest-first transaction history. */
@@ -29,21 +30,68 @@ export interface UseColadaTransactionsResult {
   isFetching: boolean;
 }
 
+function sameMetadata(
+  a: Record<string, string> | undefined,
+  b: Record<string, string> | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return !a && !b;
+  const aKeys = Object.keys(a);
+  if (aKeys.length !== Object.keys(b).length) return false;
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+/**
+ * Like `sameTransactionList` but also compares merged metadata, so an annotation
+ * change (which mutates content without changing id/state) re-renders the row
+ * while un-annotated rows keep their reference.
+ */
+function sameAnnotatedList(
+  a: readonly HistoryEntry[],
+  b: readonly HistoryEntry[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      (x as { state?: unknown }).state !== (y as { state?: unknown }).state ||
+      !sameMetadata(
+        (x as { metadata?: Record<string, string> }).metadata,
+        (y as { metadata?: Record<string, string> }).metadata,
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * The canonical wallet transaction list. Wraps coco's paginated history and
  * supplements it with melt operations and received-but-unredeemed (executing)
- * ecash that coco does not project into history, deduped and classified-ready.
+ * ecash that coco does not project into history, deduped and classified-ready,
+ * then merges per-transaction annotations into each entry's metadata.
  *
  * React binding over the framework-agnostic aggregation in `history/aggregate`.
  * Consumers bucket entries with `bucketTransaction`.
  */
-export function useColadaTransactions(pageSize = 100): UseColadaTransactionsResult {
+export function useColadaTransactions(
+  pageSize = 100,
+): UseColadaTransactionsResult {
   const manager = useColadaManager();
+  const annotationStore = useAnnotationStore();
 
   const [cocoHistory, setCocoHistory] = useState<HistoryEntry[]>([]);
   const [meltEntries, setMeltEntries] = useState<MeltHistoryEntry[]>([]);
   const [receiveEntries, setReceiveEntries] = useState<HistoryEntry[]>([]);
   const [isFetching, setIsFetching] = useState(false);
+  // Bumped whenever the annotation store changes so the merged list recomputes.
+  const [annotationVersion, setAnnotationVersion] = useState(0);
 
   // coco pagination state — mirrors @cashu/coco-react usePaginatedHistory.
   const offsetRef = useRef(0);
@@ -69,7 +117,12 @@ export function useColadaTransactions(pageSize = 100): UseColadaTransactionsResu
   const fetchPage = useCallback(
     async (offset: number): Promise<HistoryEntry[]> => {
       try {
-        return (await managerRef.current.history.getPaginatedHistory(offset, pageSize)) ?? [];
+        return (
+          (await managerRef.current.history.getPaginatedHistory(
+            offset,
+            pageSize,
+          )) ?? []
+        );
       } catch (err) {
         logger.warn("history.transactions.page_failed", {
           offset,
@@ -142,6 +195,14 @@ export function useColadaTransactions(pageSize = 100): UseColadaTransactionsResu
       cancelled = true;
     };
   }, [manager, pageSize, fetchPage, fetchSupplements, setFetching]);
+
+  // Annotation store changes -> recompute the merged list (new metadata only).
+  useEffect(() => {
+    const unsubscribe = annotationStore.subscribe(() =>
+      setAnnotationVersion((v) => v + 1),
+    );
+    return unsubscribe;
+  }, [annotationStore]);
 
   // coco history changes (mint/melt/send/receive projected) -> refresh page 0.
   useEffect(() => {
@@ -229,7 +290,7 @@ export function useColadaTransactions(pageSize = 100): UseColadaTransactionsResu
   // Merge sources; keep a stable reference when the display-relevant content
   // (id + state per row) is unchanged so consumers don't re-render needlessly.
   const prevMergedRef = useRef<HistoryEntry[]>([]);
-  const history = useMemo(() => {
+  const baseHistory = useMemo(() => {
     const merged = mergeTransactionSources({
       cocoHistory,
       meltEntries,
@@ -241,6 +302,27 @@ export function useColadaTransactions(pageSize = 100): UseColadaTransactionsResu
     prevMergedRef.current = merged;
     return merged;
   }, [cocoHistory, meltEntries, receiveEntries]);
+
+  // Merge per-transaction annotations into each entry's metadata. Un-annotated
+  // rows keep their reference (mergeAnnotationsIntoEntry is identity on empty),
+  // and the metadata-aware gate keeps the list stable across renders unless an
+  // annotation actually changed.
+  const prevAnnotatedRef = useRef<HistoryEntry[]>([]);
+  const history = useMemo(() => {
+    const annotated = baseHistory.map((entry) =>
+      mergeAnnotationsIntoEntry(
+        entry,
+        firstAnnotationRecord(annotationStore.getMany(candidateKeys(entry))),
+      ),
+    );
+    if (sameAnnotatedList(prevAnnotatedRef.current, annotated)) {
+      return prevAnnotatedRef.current;
+    }
+    prevAnnotatedRef.current = annotated;
+    return annotated;
+    // annotationVersion drives recompute when the store mutates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseHistory, annotationStore, annotationVersion]);
 
   return useMemo(
     () => ({

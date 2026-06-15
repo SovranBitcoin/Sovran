@@ -17,14 +17,22 @@ import React, {
   useLayoutEffect,
   useMemo,
   useRef,
-} from 'react';
+} from "react";
 
-import { useLatestRef } from './useLatestRef';
-import { createPaymentCopyResolver, registerPaymentCopyLocale } from '../copy';
-import type { PaymentCopyCatalog, PaymentCopyResolver } from '../copy';
-import { registerLocale } from '../formatting/locales';
-import { errField, logger, setLogger } from '../logger';
-import { createPaymentMachine } from '../machine/createMachine';
+import { useLatestRef } from "./useLatestRef";
+import {
+  createInMemoryAnnotationStore,
+  encodeAnnotation,
+  type AnnotationEntryLike,
+  type AnnotationStoreAdapter,
+  type TransactionAnnotation,
+} from "../annotations";
+import { annotationKey as deriveAnnotationKey } from "../annotations";
+import { createPaymentCopyResolver, registerPaymentCopyLocale } from "../copy";
+import type { PaymentCopyCatalog, PaymentCopyResolver } from "../copy";
+import { registerLocale } from "../formatting/locales";
+import { errField, logger, setLogger } from "../logger";
+import { createPaymentMachine } from "../machine/createMachine";
 import type {
   BleAdapter,
   CameraAdapter,
@@ -44,8 +52,8 @@ import type {
   ShareAdapter,
   StorageAdapter,
   ColadaAdapters,
-} from '../adapters/types';
-import type { Manager } from '@cashu/coco-core';
+} from "../adapters/types";
+import type { Manager } from "@cashu/coco-core";
 import type {
   MachineOperations,
   NotificationHandlerMap,
@@ -53,18 +61,18 @@ import type {
   ScanSourceResult,
   ScanSources,
   StepHandlerMap,
-} from '../machine/types';
+} from "../machine/types";
 import type {
   ScreenActionHandlerMap,
   ScreenActionsBridge,
-} from '../screen-actions/types';
-import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
-import { createSubscriptionBus } from '../subscriptions';
-import type { ColadaSubscriptionBus } from '../subscriptions';
-import type { Detectors, WalletContext } from '../types';
-import type { ColadaInstance } from '../core/createColada';
+} from "../screen-actions/types";
+import type { NavigationCallbacks } from "../screen-actions/defaultHandlers";
+import { createSubscriptionBus } from "../subscriptions";
+import type { ColadaSubscriptionBus } from "../subscriptions";
+import type { Detectors, WalletContext } from "../types";
+import type { ColadaInstance } from "../core/createColada";
 
-export type { ScreenActionsBridge } from '../screen-actions/types';
+export type { ScreenActionsBridge } from "../screen-actions/types";
 
 /**
  * Defence-in-depth cap on deep-link host length. The OS typically caps intent
@@ -111,6 +119,13 @@ export interface ColadaProviderProps {
    * specific coco React binding. The wallet owns the manager lifecycle.
    */
   getManager?: () => Manager | null;
+  /**
+   * Persistence for transaction annotations (per-transaction side-data the coco
+   * core does not store: counterparty, scan source, P2PK lock, distribution,
+   * location, swap grouping). The wallet owns persistence + profile-scoping; if
+   * omitted, an in-memory adapter is used (annotations won't survive restart).
+   */
+  annotationStore?: AnnotationStoreAdapter;
   /** Operation overrides. Top-level value wins over `instance.operations`. */
   operations?: MachineOperations;
   /** Custom protocol detectors. */
@@ -176,6 +191,7 @@ interface ColadaContextValue {
   >;
   adaptersRef: React.MutableRefObject<ColadaAdapters>;
   getManagerRef: React.MutableRefObject<(() => Manager | null) | undefined>;
+  annotationStoreRef: React.MutableRefObject<AnnotationStoreAdapter>;
   subscriptionBusRef: React.MutableRefObject<ColadaSubscriptionBus>;
   notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
   operationsRef: React.MutableRefObject<Partial<MachineOperations> | undefined>;
@@ -196,33 +212,33 @@ function scanSourceFromClipboard(
   adapter: ClipboardAdapter,
 ): () => Promise<ScanSourceResult> {
   return async () => {
-    logger.debug('react.clipboardScan.start', {
+    logger.debug("react.clipboardScan.start", {
       hasReadText: !!adapter.readText,
     });
     if (!adapter.readText) {
-      logger.debug('react.clipboardScan.result', {
+      logger.debug("react.clipboardScan.result", {
         empty: true,
-        reason: 'missing_adapter',
+        reason: "missing_adapter",
       });
       return { empty: true };
     }
     try {
       const data = await adapter.readText();
       if (data && data.trim()) {
-        logger.info('react.clipboardScan.result', {
+        logger.info("react.clipboardScan.result", {
           empty: false,
           dataLength: data.length,
           trimmedLength: data.trim().length,
         });
         return { data };
       }
-      logger.debug('react.clipboardScan.result', {
+      logger.debug("react.clipboardScan.result", {
         empty: true,
-        reason: 'empty_clipboard',
+        reason: "empty_clipboard",
       });
       return { empty: true };
     } catch (error) {
-      logger.warn('react.clipboardScan.failed', { error: errField(error) });
+      logger.warn("react.clipboardScan.failed", { error: errField(error) });
       return {
         error: error instanceof Error ? error : new Error(String(error)),
       };
@@ -268,6 +284,7 @@ export function ColadaProvider({
   handlers: handlersFactory,
   instance,
   getManager: getManagerProp,
+  annotationStore: annotationStoreProp,
   operations: operationsProp,
   detectors,
   notifications,
@@ -377,7 +394,7 @@ export function ColadaProvider({
     if (!nostrAdapter?.sendDirectMessage && !nostrAdapter?.resolveProfile) {
       return baseOperations;
     }
-    logger.info('react.provider.operations.override', {
+    logger.info("react.provider.operations.override", {
       hasBaseOperations: !!baseOperations,
       hasNostrSendDirectMessage: !!nostrAdapter.sendDirectMessage,
       hasNostrResolveProfile: !!nostrAdapter.resolveProfile,
@@ -399,7 +416,21 @@ export function ColadaProvider({
   // Prefer an explicit getManager prop; otherwise fall back to the manager the
   // createColada instance already holds, so wallets get read hooks for free.
   const getManagerRef = useLatestRef<(() => Manager | null) | undefined>(
-    getManagerProp ?? (instance ? () => instance.config.manager ?? null : undefined),
+    getManagerProp ??
+      (instance ? () => instance.config.manager ?? null : undefined),
+  );
+  // Annotation persistence: explicit prop wins, else the createColada instance's
+  // adapter, else a lazily-created in-memory default (stable for this mount).
+  const defaultAnnotationStoreRef = useRef<AnnotationStoreAdapter | undefined>(
+    undefined,
+  );
+  if (!defaultAnnotationStoreRef.current) {
+    defaultAnnotationStoreRef.current = createInMemoryAnnotationStore();
+  }
+  const annotationStoreRef = useLatestRef<AnnotationStoreAdapter>(
+    annotationStoreProp ??
+      instance?.config.annotationStore ??
+      defaultAnnotationStoreRef.current,
   );
   const subscriptionBusRef = useLatestRef(subscriptionBus);
   const notificationsRef = useLatestRef(notifications);
@@ -417,13 +448,13 @@ export function ColadaProvider({
   const getDisplayCurrencyRef = useLatestRef(getDisplayCurrency);
 
   const walletContextRef = useRef<WalletContext | null>(null);
-  const unitRef = useRef('sat');
+  const unitRef = useRef("sat");
   const optionDismissRef = useRef<(() => void) | undefined>(undefined);
   const handlersRef = useRef<StepHandlerMap>({});
   const machineRef = useRef<PaymentMachine | null>(null);
 
   useEffect(() => {
-    logger.info('react.provider.config', {
+    logger.info("react.provider.config", {
       hasInstance: !!instance,
       hasOperationsProp: !!operationsProp,
       operationCount: Object.keys(operations ?? {}).length,
@@ -470,7 +501,7 @@ export function ColadaProvider({
   // render).
   useEffect(() => {
     if (!translations) return;
-    logger.info('react.provider.translations.register', {
+    logger.info("react.provider.translations.register", {
       localeCount: Object.keys(translations).length,
       locales: Object.keys(translations),
     });
@@ -482,23 +513,23 @@ export function ColadaProvider({
 
   useEffect(() => {
     if (!loggerAdapter) return undefined;
-    logger.info('react.provider.logger.bind');
+    logger.info("react.provider.logger.bind");
     setLogger(loggerAdapter);
     return () => {
-      logger.info('react.provider.logger.unbind');
+      logger.info("react.provider.logger.unbind");
       setLogger(null);
     };
   }, [loggerAdapter]);
 
   useEffect(() => {
-    logger.info('react.provider.subscriptionBus.bind', {
+    logger.info("react.provider.subscriptionBus.bind", {
       hasBridge: !!screenActionsBridge,
     });
     return screenActionsBridge?.bindSubscriptionBus?.(subscriptionBus);
   }, [screenActionsBridge, subscriptionBus]);
 
   if (!machineRef.current) {
-    logger.info('react.provider.machine.create', {
+    logger.info("react.provider.machine.create", {
       hasInstance: !!instance,
       detectorOverride: !!detectors,
       operationCount: Object.keys(operations ?? {}).length,
@@ -521,7 +552,7 @@ export function ColadaProvider({
         : () => {
             if (!walletContextRef.current) {
               throw new Error(
-                'ColadaProvider has no wallet context bound yet.',
+                "ColadaProvider has no wallet context bound yet.",
               );
             }
             return walletContextRef.current;
@@ -529,7 +560,7 @@ export function ColadaProvider({
       getUnit: () => unitRef.current,
       getOffline: () => getOfflineRef.current?.() ?? false,
       enableEcashSendMemo,
-      getLocale: () => getLocaleRef.current?.() ?? 'en',
+      getLocale: () => getLocaleRef.current?.() ?? "en",
       operations: operations as MachineOperations | undefined,
       notifications,
       createURDecoder,
@@ -540,7 +571,7 @@ export function ColadaProvider({
     handlersRef.current = handlersFactory(machineRef.current, {
       getOptionDismiss: () => optionDismissRef.current,
     });
-    logger.info('react.provider.machine.ready', {
+    logger.info("react.provider.machine.ready", {
       handlerCount: Object.keys(handlersRef.current).length,
     });
   }
@@ -553,7 +584,7 @@ export function ColadaProvider({
     handlersRef.current = handlersFactory(machineRef.current, {
       getOptionDismiss: () => optionDismissRef.current,
     });
-    logger.debug('react.provider.handlers.bound', {
+    logger.debug("react.provider.handlers.bound", {
       handlerCount: Object.keys(handlersRef.current).length,
     });
   }, [handlersFactory]);
@@ -566,7 +597,7 @@ export function ColadaProvider({
     // Extract scheme and host from scheme://host or scheme:host
     const match = url.match(/^([a-zA-Z][a-zA-Z0-9+\-.]*):(?:\/\/)?([^/?#]+)/);
     if (!match) {
-      logger.warn('deepLink.parse.failed', { urlLength: url.length });
+      logger.warn("deepLink.parse.failed", { urlLength: url.length });
       return;
     }
 
@@ -578,12 +609,12 @@ export function ColadaProvider({
     // too. A wallet passing `customSchemes: ['Cashu']` would otherwise
     // never match.
     const accepted = new Set([
-      'cashu',
+      "cashu",
       ...(deepLinks.customSchemes ?? []).map((s) => s.toLowerCase()),
     ]);
     if (!accepted.has(scheme)) {
-      logger.debug('deepLink.ignored', {
-        reason: 'scheme_not_accepted',
+      logger.debug("deepLink.ignored", {
+        reason: "scheme_not_accepted",
         scheme,
         hostLength: host.length,
       });
@@ -592,8 +623,8 @@ export function ColadaProvider({
 
     const ignored = new Set(deepLinks.ignoredHosts ?? []);
     if (ignored.has(host)) {
-      logger.debug('deepLink.ignored', {
-        reason: 'host_ignored',
+      logger.debug("deepLink.ignored", {
+        reason: "host_ignored",
         scheme,
         hostLength: host.length,
       });
@@ -601,18 +632,18 @@ export function ColadaProvider({
     }
 
     if (host.length > DEEP_LINK_HOST_MAX_LENGTH) {
-      logger.warn('deepLink.host.too_long', { length: host.length });
-      deepLinks.onError?.(new Error('DEEP_LINK_TOO_LONG'));
+      logger.warn("deepLink.host.too_long", { length: host.length });
+      deepLinks.onError?.(new Error("DEEP_LINK_TOO_LONG"));
       return;
     }
 
-    logger.info('deepLink.scan.start', {
+    logger.info("deepLink.scan.start", {
       scheme,
       hostLength: host.length,
       customSchemeCount: deepLinks.customSchemes?.length ?? 0,
     });
-    machineRef.current.scan(host, { source: 'deeplink' }).catch((err) => {
-      logger.warn('deepLink.scan.failed', {
+    machineRef.current.scan(host, { source: "deeplink" }).catch((err) => {
+      logger.warn("deepLink.scan.failed", {
         scheme,
         hostLength: host.length,
         error: errField(err),
@@ -638,6 +669,7 @@ export function ColadaProvider({
       paymentCopyOverridesRef,
       adaptersRef,
       getManagerRef,
+      annotationStoreRef,
       subscriptionBusRef,
       notificationsRef,
       operationsRef,
@@ -668,7 +700,7 @@ export function useColadaContext(): ColadaContextValue {
   const ctx = useContext(ColadaContext);
   if (!ctx) {
     throw new Error(
-      'ColadaProvider is missing. Wrap the app with ColadaProvider.',
+      "ColadaProvider is missing. Wrap the app with ColadaProvider.",
     );
   }
   return ctx;
@@ -686,15 +718,69 @@ export function useColadaManager(): Manager {
   const manager = useColadaContext().getManagerRef.current?.();
   if (!manager) {
     throw new Error(
-      'colada manager is unavailable. Pass `getManager` (or a createColada `instance`) to ColadaProvider.',
+      "colada manager is unavailable. Pass `getManager` (or a createColada `instance`) to ColadaProvider.",
     );
   }
   return manager;
 }
 
+/**
+ * The annotation persistence adapter (per-transaction side-data). Falls back to
+ * an in-memory adapter when the wallet didn't supply one.
+ */
+export function useAnnotationStore(): AnnotationStoreAdapter {
+  return useColadaContext().annotationStoreRef.current;
+}
+
+export interface SetTransactionAnnotation {
+  /**
+   * Write an annotation patch. `target` is either an explicit key
+   * (`raw:...`, `quote:...`, `op:...`, `id:...`) or an entry whose canonical
+   * key is derived. Patches are additive at the field level.
+   */
+  set: (
+    target: string | AnnotationEntryLike,
+    patch: TransactionAnnotation,
+  ) => void;
+  /**
+   * Bridge a preview-time key (e.g. a `raw:` scan key) onto the final entry's
+   * key once it exists, so the annotation resolves for the persisted row.
+   */
+  linkAnnotation: (
+    fromKey: string,
+    toKey: string | AnnotationEntryLike,
+  ) => void;
+}
+
+/**
+ * Writer for transaction annotations. The app calls this during payment flows
+ * when it learns side-data coco never stores (counterparty, scan source, P2PK
+ * lock, distribution, location, swap).
+ */
+export function useSetTransactionAnnotation(): SetTransactionAnnotation {
+  const store = useAnnotationStore();
+  return useMemo<SetTransactionAnnotation>(
+    () => ({
+      set: (target, patch) => {
+        const key =
+          typeof target === "string" ? target : deriveAnnotationKey(target);
+        store.set(key, encodeAnnotation(patch));
+      },
+      linkAnnotation: (fromKey, toKey) => {
+        const record = store.get(fromKey);
+        if (!record) return;
+        const key =
+          typeof toKey === "string" ? toKey : deriveAnnotationKey(toKey);
+        store.set(key, record);
+      },
+    }),
+    [store],
+  );
+}
+
 export function usePaymentCopy(): PaymentCopyResolver {
   const ctx = useContext(ColadaContext);
-  const locale = ctx?.getLocaleRef.current?.() ?? 'en';
+  const locale = ctx?.getLocaleRef.current?.() ?? "en";
   const overrides = ctx?.paymentCopyOverridesRef.current;
   return useMemo(
     () => createPaymentCopyResolver({ locale, overrides }),
@@ -722,7 +808,7 @@ interface UsePaymentFlowMachineConfig {
  */
 export function usePaymentFlowMachine({
   walletContext,
-  unit = 'sat',
+  unit = "sat",
   onOptionDismiss,
 }: UsePaymentFlowMachineConfig): PaymentMachine {
   const ctx = usePaymentFlowContext();
@@ -733,7 +819,7 @@ export function usePaymentFlowMachine({
   useEffect(() => {
     ctx.walletContextRef.current = walletContext;
     ctx.unitRef.current = unit;
-    logger.debug('react.paymentFlowMachine.bindContext', {
+    logger.debug("react.paymentFlowMachine.bindContext", {
       unit,
       ...summarizeWalletContext(walletContext),
     });
@@ -741,13 +827,13 @@ export function usePaymentFlowMachine({
 
   useEffect(() => {
     ctx.optionDismissRef.current = onOptionDismiss;
-    logger.debug('react.paymentFlowMachine.bindOptionDismiss', {
+    logger.debug("react.paymentFlowMachine.bindOptionDismiss", {
       hasOptionDismiss: !!onOptionDismiss,
     });
     return () => {
       if (ctx.optionDismissRef.current === onOptionDismiss) {
         ctx.optionDismissRef.current = undefined;
-        logger.debug('react.paymentFlowMachine.clearOptionDismiss');
+        logger.debug("react.paymentFlowMachine.clearOptionDismiss");
       }
     };
   }, [ctx, onOptionDismiss]);
