@@ -205,6 +205,26 @@ describe("selectors over a merged entry", () => {
   it("reports not-locked for an un-annotated entry", () => {
     expect(isP2PKLocked({ id: "a", metadata: {} })).toBe(false);
   });
+
+  it("falls back to proof secrets when there is no lock annotation", () => {
+    const p2pkSecret = JSON.stringify(["P2PK", { data: "02abc" }]);
+    const locked = { id: "s", token: { proofs: [{ secret: p2pkSecret }] } };
+    const bearer = {
+      id: "s2",
+      token: { proofs: [{ secret: "plain-secret" }] },
+    };
+    expect(isP2PKLocked(locked)).toBe(true);
+    expect(isP2PKLocked(bearer)).toBe(false);
+  });
+
+  it("reads legacy v3 token shape for the proof fallback", () => {
+    const p2pkSecret = JSON.stringify(["P2PK", { data: "02abc" }]);
+    const v3 = {
+      id: "s3",
+      token: { token: [{ proofs: [{ secret: p2pkSecret }] }] },
+    };
+    expect(isP2PKLocked(v3)).toBe(true);
+  });
 });
 
 describe("in-memory annotation store", () => {

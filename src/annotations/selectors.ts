@@ -53,10 +53,42 @@ export function getSwap(
   return getAnnotation(entry).swap ?? null;
 }
 
+type EntryWithToken = EntryWithMetadata & { token?: unknown };
+
+/** Best-effort proof extraction from a (send) history entry's token. */
+function entryProofs(entry: EntryWithToken): Array<{ secret: string }> {
+  const token = entry.token as
+    | { proofs?: unknown; token?: unknown }
+    | undefined;
+  if (!token) return [];
+  if (Array.isArray(token.proofs))
+    return token.proofs as Array<{ secret: string }>;
+  // Legacy v3 token: { token: [{ proofs: [...] }] }
+  if (Array.isArray(token.token)) {
+    return (token.token as Array<{ proofs?: unknown }>).flatMap((t) =>
+      Array.isArray(t?.proofs) ? (t.proofs as Array<{ secret: string }>) : [],
+    );
+  }
+  return [];
+}
+
+function proofsHaveP2PK(proofs: ReadonlyArray<{ secret: string }>): boolean {
+  return proofs.some((proof) => {
+    try {
+      const parsed = JSON.parse(proof.secret);
+      return Array.isArray(parsed) && parsed[0] === "P2PK";
+    } catch {
+      return false;
+    }
+  });
+}
+
 /**
- * True when the transaction is P2PK-locked. Resolves from the annotation today;
- * Slice E adds a proof-secret fallback for un-annotated historical rows.
+ * True when the transaction is P2PK-locked. Resolves from the annotation (set
+ * for outgoing locks and Nut Drop receives), falling back to inspecting the
+ * entry's token proof secrets for un-annotated rows (e.g. historical sends).
  */
-export function isP2PKLocked(entry: EntryWithMetadata): boolean {
-  return getAnnotation(entry).lock?.type === "p2pk";
+export function isP2PKLocked(entry: EntryWithToken): boolean {
+  if (getAnnotation(entry).lock?.type === "p2pk") return true;
+  return proofsHaveP2PK(entryProofs(entry));
 }
