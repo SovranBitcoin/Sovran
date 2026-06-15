@@ -17,39 +17,39 @@ export {
   matchesTransactionDirection,
   matchesTransactionFilters,
   matchesTransactionPaymentType,
-} from './filters';
-export type { TransactionBucket } from './filters';
-export { inFlightReceiveToHistoryEntry } from './inFlightReceives';
+} from "./filters";
+export type { TransactionBucket } from "./filters";
+export { inFlightReceiveToHistoryEntry } from "./inFlightReceives";
 export {
   listInFlightReceiveEntries,
   listMeltSupplementEntries,
   meltOpToHistoryEntry,
   mergeTransactionSources,
   sameTransactionList,
-} from './aggregate';
-export {
-  getHistoryEntryRefreshLabel,
-} from './refresh';
+} from "./aggregate";
+export { getHistoryEntryRefreshLabel } from "./refresh";
 export {
   getSendTokenReachabilityWarning,
   shouldShowMintOfflineWarning,
-} from './sendTokenWarning';
+} from "./sendTokenWarning";
 export {
   buildTimeline,
   getCardLabel,
   getHistoryEntryOnchainMintAddress,
   getStatusColorType,
   getStatusHeader,
-} from './timeline';
+} from "./timeline";
+export { groupTimeline } from "./grouping";
+export type { ColadaTimelineItem, SwapTimelineState } from "./grouping";
 export type {
   SendTokenReachabilityStatus,
   SendTokenReachabilityWarningOptions,
   SendTokenWarningCopy,
-} from './sendTokenWarning';
-export type { TransactionDirection, TransactionPaymentType } from './filters';
+} from "./sendTokenWarning";
+export type { TransactionDirection, TransactionPaymentType } from "./filters";
 export type {
   BuildTimelineInput,
   OnchainConfirmationProgress,
   TimelineItem,
   TimelineStepType,
-} from './timeline';
+} from "./timeline";

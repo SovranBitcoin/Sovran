@@ -11,10 +11,10 @@ export {
   type ColadaInstance,
   type CreateMachineFromInstanceConfig,
   type WalletContextTracker,
-} from './core';
+} from "./core";
 
 // Re-export Manager type so consumers don't need to import coco-cashu-core
-export type { Manager } from '@cashu/coco-core';
+export type { Manager } from "@cashu/coco-core";
 
 // Wallet seed helpers
 export {
@@ -25,7 +25,7 @@ export {
   isValidCashuMnemonic,
   normalizeCashuMnemonic,
   tryDeriveStandardCashuSeed,
-} from './wallet-seed';
+} from "./wallet-seed";
 export type {
   CashuSeedCache,
   CashuSeedCacheContext,
@@ -34,11 +34,11 @@ export type {
   CreateCashuSeedGetterConfig,
   DeriveStandardCashuSeedOptions,
   GenerateCashuMnemonicOptions,
-} from './wallet-seed';
+} from "./wallet-seed";
 
 // Logger seam — consumers inject a structured logger via the `logger` option
 // on `createColada`; tests and standalone consumers get a no-op default.
-export { setLogger, type CocoLogger } from './logger';
+export { setLogger, type CocoLogger } from "./logger";
 
 // Copy / i18n
 export {
@@ -50,13 +50,13 @@ export {
   getOnchainConfirmationProgress,
   MempoolAddressStatsSchema,
   summarizeMempoolAddress,
-} from './chain';
+} from "./chain";
 export type {
   MempoolAddressSummary,
   MempoolAddressStats,
   MempoolSpaceChainAdapterOptions,
   OnchainConfirmationProgress as ChainOnchainConfirmationProgress,
-} from './chain';
+} from "./chain";
 
 export {
   createPaymentCopyGroups,
@@ -71,7 +71,7 @@ export {
   resolvePaymentCopy,
   SEND_COPY,
   TOAST_COPY,
-} from './copy';
+} from "./copy";
 export type {
   PaymentCopyCatalog,
   PaymentCopyError,
@@ -80,7 +80,7 @@ export type {
   PaymentCopyResolver,
   PaymentCopyResult,
   PaymentCopyVariables,
-} from './copy';
+} from "./copy";
 
 // History / payment-state timeline
 export {
@@ -92,6 +92,7 @@ export {
   getHistoryEntryOnchainMintAddress,
   getStatusColorType,
   getStatusHeader,
+  groupTimeline,
   inFlightReceiveToHistoryEntry,
   listInFlightReceiveEntries,
   listMeltSupplementEntries,
@@ -116,19 +117,55 @@ export {
   matchesTransactionFilters,
   matchesTransactionPaymentType,
   shouldShowMintOfflineWarning,
-} from './history';
+} from "./history";
 export type {
   BuildTimelineInput,
+  ColadaTimelineItem,
   OnchainConfirmationProgress,
   SendTokenReachabilityStatus,
   SendTokenReachabilityWarningOptions,
   SendTokenWarningCopy,
+  SwapTimelineState,
   TimelineItem,
   TimelineStepType,
   TransactionBucket,
   TransactionDirection,
   TransactionPaymentType,
-} from './history';
+} from "./history";
+
+// Transaction annotations (per-transaction side-data: counterparty, scan
+// source, P2PK lock, distribution, location, swap grouping). colada owns the
+// model + keying + selectors; the consuming wallet supplies persistence.
+export {
+  ANNOTATION_KEYS,
+  annotationKey,
+  candidateKeys,
+  createInMemoryAnnotationStore,
+  decodeAnnotation,
+  encodeAnnotation,
+  firstAnnotationRecord,
+  getAnnotation,
+  getCounterparty,
+  getDistribution,
+  getLocation,
+  getScanSource,
+  getSwap,
+  isP2PKLocked,
+  mergeAnnotationsIntoEntry,
+  normaliseAnnotationRaw,
+  rawAnnotationKey,
+} from "./annotations";
+export type {
+  AnnotationEntryLike,
+  AnnotationRecord,
+  AnnotationStoreAdapter,
+  CounterpartyDirection,
+  DistributionSource,
+  LockDirection,
+  ScanMethod,
+  SwapRole,
+  TransactionAnnotation,
+} from "./annotations";
 
 // Balance breakdown read model (framework-agnostic)
 export {
@@ -136,8 +173,8 @@ export {
   emptyBalanceBreakdown,
   sumAmounts,
   sumReservedSends,
-} from './balance';
-export type { WalletBalanceBreakdown } from './balance';
+} from "./balance";
+export type { WalletBalanceBreakdown } from "./balance";
 
 // Adapter contracts
 export type {
@@ -169,13 +206,13 @@ export type {
   SecureStorageAdapter,
   ShareAdapter,
   StorageAdapter,
-} from './adapters';
+} from "./adapters";
 
 // Subscription bus
 export {
   createSubscriptionBus,
   matchesSubscriptionFilter,
-} from './subscriptions';
+} from "./subscriptions";
 export type {
   ColadaSubscriptionBus,
   ColadaSubscriptionEvent,
@@ -195,27 +232,27 @@ export type {
   SubscriptionEventType,
   SubscriptionFilter,
   SubscriptionListener,
-} from './subscriptions';
+} from "./subscriptions";
 
 // Machine (state machine core)
-export { createPaymentMachine } from './machine/createMachine';
-export { resolveNext } from './machine/resolveNext';
+export { createPaymentMachine } from "./machine/createMachine";
+export { resolveNext } from "./machine/resolveNext";
 
 // Pipeline utilities (usable standalone)
-export { parsePaymentInput, isBip321 } from './parse';
+export { parsePaymentInput, isBip321 } from "./parse";
 export {
   buildBip321OnchainUri,
   formatSatsAsBtcAmount,
   type BuildBip321OnchainUriOptions,
-} from './bip321';
-export { resolveIntent } from './intent';
-export { defaultDetectors } from './detectors';
-export { annotateOptions } from './annotate';
+} from "./bip321";
+export { resolveIntent } from "./intent";
+export { defaultDetectors } from "./detectors";
+export { annotateOptions } from "./annotate";
 export {
   selectMint,
   selectMintForMelt,
   type MintSelectionConfig,
-} from './mint-selection';
+} from "./mint-selection";
 export {
   buildMethodAwareMintCandidates,
   createAmountEntryMethodContext,
@@ -231,14 +268,14 @@ export {
   methodContextHasCompatibleMint,
   methodContextHasSupportingMint,
   type MintMethodAmountAvailability,
-} from './mint-capabilities';
+} from "./mint-capabilities";
 export {
   validateIntent,
   checkWalletCapabilities,
   checkAllCapabilities,
   isValidSatAmount,
   MAX_SAT_AMOUNT,
-} from './guards';
+} from "./guards";
 // Normalization
 export {
   sanitizeInput,
@@ -248,7 +285,7 @@ export {
   stripLightningPrefixes,
   stripCashuPrefixes,
   inputVariants,
-} from './normalize';
+} from "./normalize";
 
 // Proof composition primitives
 export {
@@ -257,7 +294,7 @@ export {
   composeFiat,
   getRoundedFiatMinorUnitForSats,
   getSatRangeForDisplayedFiatMinorUnit,
-} from './offline';
+} from "./offline";
 
 // Machine types
 export type {
@@ -285,9 +322,9 @@ export type {
   ScanSources,
   NfcIOAdapter,
   RecipientProfile,
-} from './machine/types';
+} from "./machine/types";
 
-export type { MintAvailability } from './machine/selectMintContext';
+export type { MintAvailability } from "./machine/selectMintContext";
 
 // Amount actions (amount screen action system)
 export {
@@ -295,7 +332,7 @@ export {
   resolveAmount,
   resolutionEqual,
   computeQuickSendSuggestions,
-} from './amount-actions';
+} from "./amount-actions";
 export type {
   AmountInputMode,
   CoreAmountResolution,
@@ -304,7 +341,7 @@ export type {
   AmountActionManager,
   QuickSendSuggestion,
   QuickSendConfig,
-} from './amount-actions';
+} from "./amount-actions";
 
 // Screen actions (post-terminal screen action system)
 export {
@@ -317,7 +354,7 @@ export {
   decorateEntry,
   meltOperationToScreenActionEntry,
   createDefaultScreenActionHandlers,
-} from './screen-actions';
+} from "./screen-actions";
 export type {
   ActionAvailability,
   ActionHandler,
@@ -338,12 +375,12 @@ export type {
   ScreenActionSession,
   ScreenActionSessionSnapshot,
   ScreenType,
-} from './screen-actions';
+} from "./screen-actions";
 
 // Formatting utilities
-export { FormattedTimestamp } from './formatting';
-export { FormattedString, type TruncateMode } from './formatting';
-export { localizeReason, type LocalizedReason } from './formatting';
+export { FormattedTimestamp } from "./formatting";
+export { FormattedString, type TruncateMode } from "./formatting";
+export { localizeReason, type LocalizedReason } from "./formatting";
 
 // LNURL resolution (lightning address & lnurlp → bolt11)
 export {
@@ -355,11 +392,11 @@ export {
   isLightningInvoiceBolt11,
   LnurlError,
   type LnurlErrorCode,
-} from './lnurl';
+} from "./lnurl";
 
 // Recipient identity resolution (Lightning Address → Nostr hex pubkey)
-export { fetchNip05Pubkey } from './nip05';
-export { resolveRecipientPubkey } from './recipient';
+export { fetchNip05Pubkey } from "./nip05";
+export { resolveRecipientPubkey } from "./recipient";
 
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
 // `DOMException`, so callers must duck-type aborts via `isAbortError`
@@ -373,13 +410,13 @@ export {
   withTimeout,
   DEFAULT_TIMEOUT_MS,
   type RequestControls,
-} from './safeFetch';
+} from "./safeFetch";
 
-export { createNostrGraphqlMintEnrichment } from './nostr-graphql';
+export { createNostrGraphqlMintEnrichment } from "./nostr-graphql";
 export type {
   NostrGraphqlMintEnrichment,
   NostrGraphqlMintEnrichmentConfig,
-} from './nostr-graphql';
+} from "./nostr-graphql";
 
 // Domain types
 export type {
@@ -421,9 +458,9 @@ export type {
   FiatMinorUnitSatRange,
   CompositionResult,
   FiatCompositionResult,
-} from './types';
+} from "./types";
 
 // Mesh transport (Nut Drop): token classification on receive and the
 // auto-redeem orchestrator. Ecash is locked to the recipient's announced
 // P2PK key and broadcast on the public mesh — no in-band handshake.
-export * from './transport';
+export * from "./transport";
