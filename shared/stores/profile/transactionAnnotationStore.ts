@@ -18,7 +18,11 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 
-import type { AnnotationRecord, AnnotationStoreAdapter } from '@sovranbitcoin/colada';
+import type {
+  AnnotationRecord,
+  AnnotationStoreAdapter,
+  TransactionAnnotation,
+} from '@sovranbitcoin/colada';
 import { encodeAnnotation } from '@sovranbitcoin/colada';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
@@ -90,6 +94,35 @@ export const transactionAnnotationAdapter: AnnotationStoreAdapter = {
 };
 
 // ---------------------------------------------------------------------------
+// Imperative writers (for non-React payment-flow modules)
+// ---------------------------------------------------------------------------
+
+/** Write an annotation patch under an explicit colada key. */
+export function setTransactionAnnotation(key: string, patch: TransactionAnnotation): void {
+  applyPatch(key, encodeAnnotation(patch));
+}
+
+/** Bridge a preview/raw key onto a final entry key (additive). */
+export function linkTransactionAnnotation(fromKey: string, toKey: string): void {
+  const record = transactionAnnotationAdapter.get(fromKey);
+  if (record) applyPatch(toKey, record);
+}
+
+/**
+ * Record an outbound distribution under a `quote:`/`id:` key, first-write-wins —
+ * a later `displayed` inference cannot clobber a real copy/share/airdrop, and a
+ * real action recorded after `displayed` is also ignored (matches the legacy
+ * distribution store's guard).
+ */
+export function setDistributionAnnotation(
+  key: string,
+  source: NonNullable<TransactionAnnotation['distribution']>['source']
+): void {
+  if (transactionAnnotationAdapter.get(key)?.distributionSource) return;
+  applyPatch(key, encodeAnnotation({ distribution: { source } }));
+}
+
+// ---------------------------------------------------------------------------
 // One-time legacy migration
 // ---------------------------------------------------------------------------
 
@@ -118,10 +151,12 @@ export async function migrateLegacyTransactionAnnotations(): Promise<void> {
       { useScanHistoryStore },
       { useTransactionDistributionStore },
       { useTransactionLocationStore },
+      { useSwapTransactionsStore },
     ] = await Promise.all([
       import('@/shared/stores/profile/scanHistoryStore'),
       import('@/shared/stores/profile/transactionDistributionStore'),
       import('@/shared/stores/profile/transactionLocationStore'),
+      import('@/shared/stores/profile/swapTransactionsStore'),
     ]);
 
     await Promise.all([
@@ -129,6 +164,7 @@ export async function migrateLegacyTransactionAnnotations(): Promise<void> {
       whenHydrated(useScanHistoryStore),
       whenHydrated(useTransactionDistributionStore),
       whenHydrated(useTransactionLocationStore),
+      whenHydrated(useSwapTransactionsStore),
     ]);
 
     if (useTransactionAnnotationStore.getState()._migratedLegacy) return;
@@ -180,8 +216,24 @@ export async function migrateLegacyTransactionAnnotations(): Promise<void> {
       locations += 1;
     }
 
+    let swaps = 0;
+    for (const [quoteId, ref] of Object.entries(
+      useSwapTransactionsStore.getState().quoteIdToGroup
+    )) {
+      mergeInto(
+        `quote:${quoteId}`,
+        encodeAnnotation({ swap: { groupId: ref.groupId, role: ref.kind } })
+      );
+      swaps += 1;
+    }
+
     useTransactionAnnotationStore.setState({ annotations: next, _migratedLegacy: true });
-    storeLog.info('store.tx_annotation.migrated_legacy', { scans, distributions, locations });
+    storeLog.info('store.tx_annotation.migrated_legacy', {
+      scans,
+      distributions,
+      locations,
+      swaps,
+    });
   } catch (error) {
     storeLog.warn('store.tx_annotation.migrate_failed', {
       error: error instanceof Error ? error.message : String(error),

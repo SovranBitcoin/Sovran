@@ -15,6 +15,7 @@ import {
   useSwapTransactionsStore,
   type SwapLegLocalStatus,
 } from '@/shared/stores/profile/swapTransactionsStore';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import type { MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';
@@ -430,6 +431,10 @@ export function useMintRebalanceOrchestrator({
           const legId = ensureLegId();
           if (groupId && legId && mq.quoteId) {
             useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, mq.quoteId);
+            // Annotation: colada groups the timeline by swapGroupId.
+            setTransactionAnnotation(`quote:${mq.quoteId}`, {
+              swap: { groupId, role: 'mint' },
+            });
           }
           return mq;
         };
@@ -496,6 +501,9 @@ export function useMintRebalanceOrchestrator({
               useSwapTransactionsStore.getState().tagMelt(groupId, legId, {
                 quoteId: prepared.quoteId,
                 operationId: prepared.id,
+              });
+              setTransactionAnnotation(`quote:${prepared.quoteId}`, {
+                swap: { groupId, role: 'melt' },
               });
             }
           }
@@ -921,6 +929,9 @@ export function useMintRebalanceOrchestrator({
                     useSwapTransactionsStore
                       .getState()
                       .tagMintQuote(groupId, hopLegId, hopMq.quoteId);
+                    setTransactionAnnotation(`quote:${hopMq.quoteId}`, {
+                      swap: { groupId, role: 'mint', chainId, hopIndex: hopIdx },
+                    });
                   }
                   useSwapTransactionsStore
                     .getState()
@@ -976,6 +987,9 @@ export function useMintRebalanceOrchestrator({
                   useSwapTransactionsStore.getState().tagMelt(groupId, hopLegId, {
                     quoteId: hopPrepared.quoteId,
                     operationId: hopPrepared.id,
+                  });
+                  setTransactionAnnotation(`quote:${hopPrepared.quoteId}`, {
+                    swap: { groupId, role: 'melt', chainId, hopIndex: hopIdx },
                   });
                   useSwapTransactionsStore.getState().setLegStatus(groupId, hopLegId, {
                     localStatus: 'verifying',
