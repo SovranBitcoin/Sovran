@@ -146,7 +146,11 @@ function getOrchestrator(): MeshRedeemOrchestrator {
       // Nut Drop tokens are P2PK-locked to us. The redeemed proofs are swapped
       // for fresh ones, so the proof-secret fallback can't see the original
       // lock — annotate the resulting receive so it shows the lock badge.
-      const patch: TransactionAnnotation = { lock: { type: 'p2pk', direction: 'incoming' } };
+      const patch: TransactionAnnotation = {
+        lock: { type: 'p2pk', direction: 'incoming' },
+        // Arrived over the BLE/bitchat mesh — surfaces a bluetooth source badge.
+        scan: { method: 'ble' },
+      };
       // Resolve the sender's Nostr identity from the live BLE peer registry
       // (peerID → nostrPubkeyHex via the bitchat favorite exchange) so the row
       // can show their avatar. Avatar URL comes from the warm kind-0 cache when

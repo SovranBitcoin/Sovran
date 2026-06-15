@@ -12,6 +12,7 @@ const SOURCE_LABELS: Record<ScanMethod, string> = {
   nfc: 'NFC',
   paste: 'Clipboard',
   deeplink: 'Deep Link',
+  ble: 'Bluetooth',
 };
 
 function isLightningKind(k: string) {

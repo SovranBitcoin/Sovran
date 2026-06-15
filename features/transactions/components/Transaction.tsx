@@ -61,6 +61,7 @@ const SOURCE_ICONS: Record<TransactionSource, string> = {
   nfc: 'lucide:nfc',
   paste: 'lucide:clipboard-paste',
   deeplink: 'lucide:link',
+  ble: 'mdi:bluetooth',
   // Outbound (transaction distribution)
   copy: 'lets-icons:copy',
   share: 'ri:share-fill',

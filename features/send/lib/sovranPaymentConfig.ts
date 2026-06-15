@@ -1247,6 +1247,19 @@ async function deliverNearPayIfActive(
       sendMs: Math.round(result.sendMs * 100) / 100,
       ...(result.handshakeError ? { handshakeError: result.handshakeError } : {}),
     });
+
+    // Delivered over the BLE/bitchat mesh — stamp a bluetooth source badge on
+    // the resulting send transaction.
+    try {
+      const entry = JSON.parse(historyEntry) as { id?: unknown };
+      if (typeof entry.id === 'string') {
+        setTransactionAnnotation(`id:${entry.id}`, { scan: { method: 'ble' } });
+      }
+    } catch (e) {
+      paymentLog.warn('near_pay.delivery.ble_source_annotation_failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   } catch (err) {
     paymentLog.error('near_pay.delivery.failed', {
       peerID: active.recipient.peerID,

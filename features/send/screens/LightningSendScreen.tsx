@@ -11,7 +11,7 @@
  * entry; the pay action handles LNURL resolution + prepareMeltBolt11 + executeMelt.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import { Stack } from 'expo-router';
@@ -38,6 +38,7 @@ import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { RecipientHeader } from '../components/RecipientHeader';
 
 const QUOTE_CARD_HORIZONTAL_MARGIN = 16;
@@ -100,6 +101,26 @@ export function LightningSendScreen({
     : null;
   const headerDisplayName = entryDisplayName ?? fallbackDisplayName ?? null;
   const headerAvatarUrl = entryAvatarUrl ?? liveNostrMetadata?.picture ?? null;
+
+  // Persist the recipient's nostr identity as a counterparty annotation keyed to
+  // the melt's quoteId, so the transactions row + detail show their avatar. The
+  // preview metadata (recipientPubkey/...) is transient; only the annotation
+  // survives onto the persisted melt row. Fires once quoteId is non-empty.
+  const recipientNip05 =
+    typeof entry?.metadata?.recipientNip05 === 'string' ? entry.metadata.recipientNip05 : undefined;
+  useEffect(() => {
+    const quoteId = entry?.quoteId;
+    if (!quoteId || !recipientPubkey) return;
+    setTransactionAnnotation(`quote:${quoteId}`, {
+      counterparty: {
+        pubkey: recipientPubkey,
+        direction: 'recipient',
+        ...(headerDisplayName ? { displayName: headerDisplayName } : {}),
+        ...(headerAvatarUrl ? { avatarUrl: headerAvatarUrl } : {}),
+        ...(recipientNip05 ? { nip05: recipientNip05 } : {}),
+      },
+    });
+  }, [entry?.quoteId, recipientPubkey, headerDisplayName, headerAvatarUrl, recipientNip05]);
 
   if (error) {
     log.warn('send.lightning.error', { error });
