@@ -1,0 +1,190 @@
+/**
+ * @fileoverview Transaction annotation store (profile-scoped persistence)
+ *
+ * Backs colada's `AnnotationStoreAdapter` with MMKV/AsyncStorage so the
+ * per-transaction side-data colada owns (counterparty, scan source, P2PK lock,
+ * distribution, location, swap grouping) survives restart and stays
+ * profile-isolated. colada owns the model, keying, and selectors; this store is
+ * pure persistence keyed by colada's annotation keys (`raw:`/`quote:`/`op:`/`id:`).
+ *
+ * Profile switches do a full app reload (profileSessionOrchestrator), so the
+ * store + adapter are recreated per profile — no cross-profile bleed.
+ *
+ * Legacy data (scan-history transaction links, distribution, location) is
+ * imported once per profile by `migrateLegacyTransactionAnnotations`.
+ */
+
+import { create } from 'zustand';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
+import { z } from 'zod';
+
+import type { AnnotationRecord, AnnotationStoreAdapter } from '@sovranbitcoin/colada';
+import { encodeAnnotation } from '@sovranbitcoin/colada';
+
+import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
+
+interface TransactionAnnotationState {
+  /** colada annotation key -> flat annotation record. */
+  annotations: Record<string, AnnotationRecord>;
+  /** True once legacy scan/distribution/location data was imported (per profile). */
+  _migratedLegacy: boolean;
+}
+
+const PersistedTransactionAnnotationStore = z.object({
+  annotations: z
+    .record(z.string().max(256), z.record(z.string().max(64), z.string().max(16_384)))
+    .default({}),
+  _migratedLegacy: z.boolean().default(false),
+});
+
+export const useTransactionAnnotationStore = create<TransactionAnnotationState>()(
+  subscribeWithSelector(
+    persist(
+      (): TransactionAnnotationState => ({
+        annotations: {},
+        _migratedLegacy: false,
+      }),
+      persistConfig({
+        name: 'transaction-annotation-store',
+        storage: createProfileScopedStorage(),
+        schema: PersistedTransactionAnnotationStore,
+        logKey: 'tx_annotation',
+        partialize: (state) => ({
+          annotations: state.annotations,
+          _migratedLegacy: state._migratedLegacy,
+        }),
+      })
+    )
+  )
+);
+
+/** Field-level additive merge of a patch into the record at `key`. */
+function applyPatch(key: string, patch: AnnotationRecord): void {
+  if (Object.keys(patch).length === 0) return;
+  useTransactionAnnotationStore.setState((state) => ({
+    annotations: {
+      ...state.annotations,
+      [key]: { ...(state.annotations[key] ?? {}), ...patch },
+    },
+  }));
+}
+
+/**
+ * The adapter colada consumes. Reads are synchronous (render path); the backing
+ * MMKV/AsyncStorage write happens via zustand persist after `set`.
+ */
+export const transactionAnnotationAdapter: AnnotationStoreAdapter = {
+  get: (key) => useTransactionAnnotationStore.getState().annotations[key],
+  getMany: (keys) => {
+    const { annotations } = useTransactionAnnotationStore.getState();
+    return keys.map((key) => annotations[key]);
+  },
+  set: applyPatch,
+  has: (key) => key in useTransactionAnnotationStore.getState().annotations,
+  subscribe: (listener) =>
+    useTransactionAnnotationStore.subscribe((state, prev) => {
+      if (state.annotations !== prev.annotations) listener();
+    }),
+};
+
+// ---------------------------------------------------------------------------
+// One-time legacy migration
+// ---------------------------------------------------------------------------
+
+async function whenHydrated(store: {
+  persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void };
+}): Promise<void> {
+  if (store.persist.hasHydrated()) return;
+  await new Promise<void>((resolve) => {
+    const unsub = store.persist.onFinishHydration(() => {
+      unsub();
+      resolve();
+    });
+  });
+}
+
+/**
+ * Import legacy per-transaction side-data into annotation keys, once per
+ * profile. Distribution rows are written under both `quote:` and `id:` (the old
+ * store keyed mint quotes by quoteId, others by entry id); scan + location rows
+ * key by `id:<transactionId>`. colada's `mergeAnnotationRecords` recombines them
+ * across an entry's candidate keys at read time.
+ */
+export async function migrateLegacyTransactionAnnotations(): Promise<void> {
+  try {
+    const [
+      { useScanHistoryStore },
+      { useTransactionDistributionStore },
+      { useTransactionLocationStore },
+    ] = await Promise.all([
+      import('@/shared/stores/profile/scanHistoryStore'),
+      import('@/shared/stores/profile/transactionDistributionStore'),
+      import('@/shared/stores/profile/transactionLocationStore'),
+    ]);
+
+    await Promise.all([
+      whenHydrated(useTransactionAnnotationStore),
+      whenHydrated(useScanHistoryStore),
+      whenHydrated(useTransactionDistributionStore),
+      whenHydrated(useTransactionLocationStore),
+    ]);
+
+    if (useTransactionAnnotationStore.getState()._migratedLegacy) return;
+
+    const next: Record<string, AnnotationRecord> = {
+      ...useTransactionAnnotationStore.getState().annotations,
+    };
+    const mergeInto = (key: string, record: AnnotationRecord) => {
+      if (Object.keys(record).length === 0) return;
+      next[key] = { ...(next[key] ?? {}), ...record };
+    };
+
+    let scans = 0;
+    for (const entry of useScanHistoryStore.getState().entries) {
+      if (!entry.transactionId) continue;
+      mergeInto(
+        `id:${entry.transactionId}`,
+        encodeAnnotation({
+          scan: {
+            method: entry.source,
+            raw: entry.raw,
+            container: entry.container,
+            optionKinds: entry.optionKinds,
+            inputType: entry.inputType,
+          },
+        })
+      );
+      scans += 1;
+    }
+
+    let distributions = 0;
+    for (const [key, value] of Object.entries(
+      useTransactionDistributionStore.getState().distributions
+    )) {
+      const record = encodeAnnotation({ distribution: { source: value.source } });
+      mergeInto(`quote:${key}`, record);
+      mergeInto(`id:${key}`, record);
+      distributions += 1;
+    }
+
+    let locations = 0;
+    for (const [entryId, value] of Object.entries(
+      useTransactionLocationStore.getState().locations
+    )) {
+      mergeInto(
+        `id:${entryId}`,
+        encodeAnnotation({ location: { lat: value.latitude, lng: value.longitude } })
+      );
+      locations += 1;
+    }
+
+    useTransactionAnnotationStore.setState({ annotations: next, _migratedLegacy: true });
+    storeLog.info('store.tx_annotation.migrated_legacy', { scans, distributions, locations });
+  } catch (error) {
+    storeLog.warn('store.tx_annotation.migrate_failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
