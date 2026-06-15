@@ -18,7 +18,6 @@ import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
 import { SplitBillTransactionRow } from '@/features/transactions/components/SplitBillTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
-import { isInFlightReceiveEntry } from '@/features/transactions/lib/inFlightReceives';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -29,8 +28,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import {
+  bucketTransaction,
   isCancellablePendingEcash,
-  isPendingTransaction,
   matchesTransactionFilters,
   type TransactionDirection,
   type TransactionPaymentType,
@@ -294,25 +293,13 @@ export const Transactions = React.memo(
           }
 
           const historyEntry = item.data;
-
-          // Unredeemed receives (coco receive in `executing`) render like a
-          // normal receive row but belong in Pending until redeemed. colada
-          // only models finalized/rolled_back receives, so bucket them here.
-          if (isInFlightReceiveEntry(historyEntry)) return 'pending';
-
           const isCollapsingGhost =
             historyEntry.type === 'send' &&
             collapsing.has((historyEntry as SendHistoryEntry).operationId);
-          const isPending = isPendingTransaction(historyEntry, { isCollapsingGhost });
 
-          // Check if it's an expired mint transaction
-          const isExpired =
-            historyEntry.type === 'mint' &&
-            String(historyEntry.state) === 'UNPAID' &&
-            mintHistoryEntryExpired(historyEntry);
-
-          if (isExpired) return 'expired';
-          return isPending ? 'pending' : 'confirmed';
+          // Single colada classifier: handles expired mint quotes, pending
+          // sends, and unredeemed (executing) receives in one place.
+          return bucketTransaction(historyEntry, { isCollapsingGhost });
         }),
       [sortedTimeline, collapsing]
     );

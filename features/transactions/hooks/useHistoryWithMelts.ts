@@ -10,7 +10,7 @@ import type {
 } from '@cashu/coco-core';
 import { listMeltOperationsByState } from '@/shared/lib/cashu/managerInternals';
 import { useInFlightReceives } from '@/shared/hooks/useInFlightReceives';
-import { inFlightReceiveToHistoryEntry } from '@/features/transactions/lib/inFlightReceives';
+import { inFlightReceiveToHistoryEntry } from '@sovranbitcoin/colada';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { log } from '@/shared/lib/logger';
