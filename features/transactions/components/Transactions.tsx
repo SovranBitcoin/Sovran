@@ -7,12 +7,7 @@ import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import _ from 'lodash';
 
-import {
-  HistoryEntry,
-  MeltHistoryEntry,
-  MintHistoryEntry,
-  SendHistoryEntry,
-} from '@cashu/coco-core';
+import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
@@ -28,6 +23,7 @@ import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import {
   bucketTransaction,
+  getSwap,
   isCancellablePendingEcash,
   matchesTransactionFilters,
   type TransactionDirection,
@@ -146,7 +142,6 @@ export const Transactions = React.memo(
     const collapsing = useRollbackStore((s) => s.collapsing);
 
     const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
-    const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {
@@ -163,10 +158,10 @@ export const Transactions = React.memo(
         if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
         if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
 
-        if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
-          const quoteId = (historyEntry as MintHistoryEntry | MeltHistoryEntry).quoteId;
-          if (quoteId && quoteIdToGroup[quoteId]) return false;
-        }
+        // Hide legs that belong to a swap group — colada surfaces the group as a
+        // single row. The swap annotation (merged onto the entry) is the signal,
+        // so the app no longer reaches into the swap store's quoteId index.
+        if (getSwap(historyEntry)?.groupId) return false;
 
         if (!matchesTransactionFilters(historyEntry, { paymentType: type, direction: filter })) {
           return false;
@@ -208,16 +203,7 @@ export const Transactions = React.memo(
         });
       }
       return result;
-    }, [
-      history,
-      account.unit,
-      mintUrlFilter,
-      filter,
-      type,
-      hideExpired,
-      selectedMonth,
-      quoteIdToGroup,
-    ]);
+    }, [history, account.unit, mintUrlFilter, filter, type, hideExpired, selectedMonth]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
     const timelineItems: TimelineItem[] = useMemo(() => {
