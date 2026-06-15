@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 
 import { HistoryEntry } from '@cashu/coco-core';
+import { getCounterparty, isP2PKLocked } from '@sovranbitcoin/colada';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
@@ -50,7 +51,12 @@ export function HistoryEntryHeader({
   showRecipientAvatar = true,
   isLoading,
 }: HistoryEntryHeaderProps) {
-  const avatarRecipientPubkey = showRecipientAvatar ? recipientPubkey : undefined;
+  // Counterparty from the persisted annotation (Nut Drop send/receive) is the
+  // fallback when the caller didn't thread a transient recipientPubkey.
+  const counterparty = historyEntry ? getCounterparty(historyEntry) : null;
+  const effectiveRecipientPubkey = recipientPubkey ?? counterparty?.pubkey ?? undefined;
+  const avatarRecipientPubkey = showRecipientAvatar ? effectiveRecipientPubkey : undefined;
+  const counterpartyLocked = historyEntry ? isP2PKLocked(historyEntry) : false;
   const { metadata: recipientMetadata } = useNostrProfileMetadata(avatarRecipientPubkey);
   const [foreground, surface, background, danger, success] = useThemeColor([
     'foreground',
@@ -104,12 +110,20 @@ export function HistoryEntryHeader({
 
   const renderIcon = () => {
     if (avatarRecipientPubkey) {
-      const recipientName = recipientMetadata?.displayName ?? recipientMetadata?.name;
+      const recipientName =
+        recipientMetadata?.displayName ?? recipientMetadata?.name ?? counterparty?.displayName;
+      const recipientPicture = recipientMetadata?.picture ?? counterparty?.avatarUrl;
+      // Overlay: lock when P2PK-locked (high signal), else the direction arrow.
+      const overlayIcon = counterpartyLocked
+        ? 'solar:key-bold'
+        : isSend
+          ? 'fluent:arrow-upload-16-filled'
+          : 'fluent:arrow-download-16-filled';
       return (
         <View className="relative">
           <Avatar
-            state={recipientMetadata?.picture ? 'image' : 'fallback'}
-            picture={recipientMetadata?.picture}
+            state={recipientPicture ? 'image' : 'fallback'}
+            picture={recipientPicture}
             seed={avatarRecipientPubkey}
             size={avatarSize}
             name={recipientName}
@@ -128,11 +142,7 @@ export function HistoryEntryHeader({
               borderWidth: 2,
               borderColor: background,
             }}>
-            <Icon
-              name="fluent:arrow-upload-16-filled"
-              color={opacity(foreground, 0.9)}
-              size={iconOverlaySize - 8}
-            />
+            <Icon name={overlayIcon} color={opacity(foreground, 0.9)} size={iconOverlaySize - 8} />
           </View>
         </View>
       );

@@ -1,11 +1,16 @@
 import React, { useEffect, useMemo } from 'react';
-import { isSendTokenCancelled, isP2PKLocked } from '@sovranbitcoin/colada';
+import { isSendTokenCancelled, isP2PKLocked, getCounterparty } from '@sovranbitcoin/colada';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { Log, paymentLog } from '@/shared/lib/logger';
+
+const ICON_SIZE = 28;
 
 interface TransactionIconProps {
   historyEntry: HistoryEntry;
@@ -22,6 +27,23 @@ export default function TransactionIcon({
   // P2PK lock badge: annotation (outgoing locks, Nut Drop receives) or the
   // proof-secret fallback colada applies for un-annotated locked sends.
   const locked = !isLoading && isP2PKLocked(historyEntry);
+
+  // Counterparty nostr identity (Nut Drop send/receive). When known, the avatar
+  // replaces the directional arrow; direction still reads from the amount color.
+  const counterparty = getCounterparty(historyEntry);
+  const counterpartyPubkey = counterparty?.pubkey;
+  // Reactive but fetch-free read of the warm kind-0 cache, so the avatar fills
+  // in if the profile is already cached and updates without per-row fetches.
+  const cachedProfile = useNostrMetadataCache((s) =>
+    counterpartyPubkey ? s.byPubkey[counterpartyPubkey] : undefined
+  );
+  const showAvatar = !isLoading && !!counterpartyPubkey;
+  const avatarPicture = counterparty?.avatarUrl ?? cachedProfile?.picture;
+  const avatarName =
+    counterparty?.displayName ??
+    (counterpartyPubkey
+      ? resolveIdentityName({ pubkey: counterpartyPubkey, nostrProfile: cachedProfile })
+      : undefined);
 
   const iconName = useMemo(() => {
     // Check if this is a rolled back send transaction
@@ -43,6 +65,12 @@ export default function TransactionIcon({
     }
   }, [cancelledSend, historyEntry.type]);
 
+  // Corner badge: lock wins (high signal); otherwise, when the avatar replaced
+  // the center arrow, surface the direction there. No badge when the center
+  // already shows the directional arrow.
+  const showCornerBadge = !isLoading && (locked || showAvatar);
+  const cornerIcon = locked ? 'solar:key-bold' : iconName;
+
   useEffect(() => {
     paymentLog.debug('tx.icon.render', {
       type: historyEntry.type,
@@ -50,8 +78,11 @@ export default function TransactionIcon({
       isLoading: !!isLoading,
       cancelledSend,
       iconName,
+      locked,
+      showAvatar,
+      hasAvatarPicture: !!avatarPicture,
     });
-  }, [cancelledSend, historyEntry, iconName, isLoading]);
+  }, [cancelledSend, historyEntry, iconName, isLoading, locked, showAvatar, avatarPicture]);
 
   return (
     <Log name="TransactionIcon">
@@ -60,12 +91,20 @@ export default function TransactionIcon({
         style={{ marginTop: 6 }}>
         {isLoading ? (
           <Spinner size={22} color={foreground} />
+        ) : showAvatar ? (
+          <Avatar
+            state={avatarPicture ? 'image' : 'fallback'}
+            picture={avatarPicture}
+            seed={counterpartyPubkey}
+            name={avatarName}
+            size={ICON_SIZE}
+          />
         ) : (
           <Icon name={iconName} color={foreground} size={24} />
         )}
-        {locked && (
-          // Small P2PK-lock badge in the bottom-right of the direction icon. The
-          // background-colored disc keeps the key glyph legible over any row.
+        {showCornerBadge && (
+          // Bottom-right badge over the icon/avatar. A background-colored disc
+          // keeps the glyph legible over any row.
           <View
             style={{
               position: 'absolute',
@@ -78,7 +117,7 @@ export default function TransactionIcon({
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <Icon name="solar:key-bold" color={foreground} size={10} />
+            <Icon name={cornerIcon} color={foreground} size={10} />
           </View>
         )}
       </View>

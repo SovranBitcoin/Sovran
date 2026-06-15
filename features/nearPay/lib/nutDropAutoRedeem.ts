@@ -1,10 +1,14 @@
 import { AppState } from 'react-native';
 import { createMeshRedeemOrchestrator, type MeshRedeemOrchestrator } from '@sovranbitcoin/colada';
+import type { TransactionAnnotation } from '@sovranbitcoin/colada';
 import { createDefaultOperations } from '@sovranbitcoin/colada/operations';
+import { getBLEPeers } from 'bitchat-module';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
+import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
@@ -137,15 +141,30 @@ function getOrchestrator(): MeshRedeemOrchestrator {
           kind === 'spent' ? new Error('Token was already redeemed') : new Error('Redeem failed')
         );
     },
-    onRedeemed: (_tokenHash, _entry, historyEntryId) => {
+    onRedeemed: (_tokenHash, entry, historyEntryId) => {
       if (!historyEntryId) return;
       // Nut Drop tokens are P2PK-locked to us. The redeemed proofs are swapped
       // for fresh ones, so the proof-secret fallback can't see the original
       // lock — annotate the resulting receive so it shows the lock badge.
-      // (Counterparty-by-npub needs peerID→favorite resolution; deferred.)
-      setTransactionAnnotation(`id:${historyEntryId}`, {
-        lock: { type: 'p2pk', direction: 'incoming' },
-      });
+      const patch: TransactionAnnotation = { lock: { type: 'p2pk', direction: 'incoming' } };
+      // Resolve the sender's Nostr identity from the live BLE peer registry
+      // (peerID → nostrPubkeyHex via the bitchat favorite exchange) so the row
+      // can show their avatar. Avatar URL comes from the warm kind-0 cache when
+      // present; otherwise the row falls back to a pubkey-seeded identicon.
+      const peer = entry.senderPeerID
+        ? getBLEPeers().find((p) => p.peerID === entry.senderPeerID)
+        : undefined;
+      const pubkey = peer ? peerNostrPubkey(peer) : null;
+      if (pubkey) {
+        const cached = useNostrMetadataCache.getState().byPubkey[pubkey];
+        patch.counterparty = {
+          pubkey,
+          direction: 'sender',
+          ...(peer?.nickname ? { displayName: peer.nickname } : {}),
+          ...(cached?.picture ? { avatarUrl: cached.picture } : {}),
+        };
+      }
+      setTransactionAnnotation(`id:${historyEntryId}`, patch);
     },
   });
   return orchestrator;
