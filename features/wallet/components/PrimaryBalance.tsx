@@ -11,7 +11,6 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { useAppBalance } from '@/features/wallet/hooks/useAppBalance';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import {
   Host,
@@ -33,14 +32,9 @@ import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
-import { usePaginatedHistory } from '@cashu/coco-react';
-import type { SendHistoryEntry } from '@cashu/coco-core';
-import { isReservedSendHistoryEntry } from '@sovranbitcoin/colada';
+import { useColadaBalance } from '@sovranbitcoin/colada/react';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { alpha } from '@/shared/styles/tokens';
-import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
-import { useInFlightReceives } from '@/shared/hooks/useInFlightReceives';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog, Log } from '@/shared/lib/logger';
 
 interface Account {
@@ -199,13 +193,16 @@ function EcashStatusPill({
  */
 export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactElement {
   const router = useGuardedRouter();
-  const { history } = usePaginatedHistory();
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
   const mockMode = useSettingsStore((state) => state.mockMode);
+  const mockBalance = useMockDataStore((state) => state.mockBalance);
   const mockPendingAmount = useMockDataStore((state) => state.mockPendingAmount);
-  const balance = useAppBalance();
+  // Single colada read model for every figure: total (spendable + reserved),
+  // reserved, pending (cancellable ecash sends), and redeeming (received-but-
+  // unredeemed ecash — e.g. P2PK tokens accepted offline, invisible otherwise).
+  const breakdown = useColadaBalance();
   const btcPrice = useBtcPrice(displayCurrency);
 
   const toggleUnit = useCallback(async () => {
@@ -213,38 +210,32 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
   }, [displayBtc, setDisplayBtc]);
 
+  const balance = mockMode ? mockBalance : breakdown.total;
+  const reservedTotal = breakdown.reserved;
+  const pendingTotal = mockMode ? mockPendingAmount : breakdown.pending;
+  const lockedTotal = breakdown.redeeming;
+  // Pills sum sat-denominated amounts; label as sat (matches RESERVED).
+  const pendingUnit = 'sat';
+  const lockedUnit = 'sat';
+
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
   const [foreground, warning, accent] = useThemeColor(['foreground', 'warning', 'accent'] as const);
   const balanceTint = opacity(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
-  const { reservedTotal } = useReservedProofs();
-  // Ecash received but not yet redeemed (swapped) into spendable balance —
-  // typically P2PK tokens accepted while offline. Invisible to balance/history
-  // otherwise; surfaced here so funds-in-limbo are visible and retryable.
-  const { lockedTotal, lockedUnit } = useInFlightReceives();
-  const pendingSends = history.filter((entry): entry is SendHistoryEntry =>
-    isReservedSendHistoryEntry(entry)
-  );
-  const pendingTotal = mockMode
-    ? mockPendingAmount
-    : pendingSends.reduce((sum, tx) => sum + amountToNumber(tx.amount), 0);
-  const pendingUnit = pendingSends[0]?.unit || 'sat';
 
   useEffect(() => {
     walletLog.debug('wallet.balance.ecash_status', {
       accountUnit: account.unit,
-      pendingCount: pendingSends.length,
       pendingTotal,
-      pendingUnit,
       reservedTotal,
+      lockedTotal,
       mockMode,
     });
-  }, [account.unit, mockMode, pendingSends.length, pendingTotal, pendingUnit, reservedTotal]);
+  }, [account.unit, mockMode, pendingTotal, reservedTotal, lockedTotal]);
 
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
   const handlePendingPress = useCallback(() => {
     walletLog.info('wallet.pending.press', {
-      pendingCount: pendingSends.length,
       pendingTotal,
       unit: pendingUnit,
     });
@@ -258,7 +249,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         filterMintUrl: 'all',
       },
     });
-  }, [router, account.unit, pendingSends.length, pendingTotal, pendingUnit]);
+  }, [router, account.unit, pendingTotal, pendingUnit]);
 
   // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
   // dropped by `useSingleFlight` until the first interaction settles.

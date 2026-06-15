@@ -1,70 +1,19 @@
 /**
  * App-level balance hook.
  *
- * Wraps coco's useBalanceContext + useMints and returns a single total
- * balance number. When mock mode is active, returns the mock balance instead.
+ * The balance breakdown now lives in colada (`useColadaBalance`); this is a
+ * thin Sovran adapter that returns the single total and layers mock mode on
+ * top. `total` is spendable + reserved (coco's BalanceSnapshot.total).
  */
 
-import { useEffect, useMemo, useRef } from 'react';
-
-import { useBalanceContext, useMints } from '@cashu/coco-react';
+import { useColadaBalance } from '@sovranbitcoin/colada/react';
 
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
-import { walletLog } from '@/shared/lib/logger';
 
 export function useAppBalance(): number {
   const mockMode = useSettingsStore((s) => s.mockMode);
   const mockBalance = useMockDataStore((s) => s.mockBalance);
-  const { balances: rawBalanceCtx } = useBalanceContext();
-  const { mints: rawMints } = useMints();
-
-  // Stabilise coco-react references
-  const liveBalances = useShallowMemo(rawBalanceCtx.byMint);
-
-  // Stabilise mints array — only recompute when URLs actually change
-  const mintUrls = useMemo(() => rawMints.map((m) => m.mintUrl), [rawMints]);
-  const prevMintUrlsRef = useRef(mintUrls);
-  const stableMintUrls = useMemo(() => {
-    const prev = prevMintUrlsRef.current;
-    if (prev.length === mintUrls.length && prev.every((u, i) => u === mintUrls[i])) {
-      return prev;
-    }
-    prevMintUrlsRef.current = mintUrls;
-    return mintUrls;
-  }, [mintUrls]);
-
-  const total = useMemo(
-    () =>
-      mockMode
-        ? mockBalance
-        : stableMintUrls.reduce((sum, url) => sum + amountToNumber(liveBalances[url]?.total), 0),
-    [mockMode, mockBalance, liveBalances, stableMintUrls]
-  );
-
-  // Notify on transitions in an effect — render-phase side effects (writes to
-  // refs, logger calls) re-fire under StrictMode and Suspense retries.
-  const prevBalance = useRef<number | null>(null);
-  useEffect(() => {
-    if (prevBalance.current === null) {
-      walletLog.debug('wallet.balance.snapshot', {
-        total,
-        mintCount: stableMintUrls.length,
-        mockMode,
-        source: mockMode ? 'mock' : 'coco',
-      });
-    } else if (prevBalance.current !== total) {
-      walletLog.info('wallet.balance.changed', {
-        from: prevBalance.current,
-        to: total,
-        mintCount: stableMintUrls.length,
-        mockMode,
-      });
-    }
-    prevBalance.current = total;
-  }, [total, stableMintUrls.length, mockMode]);
-
-  return total;
+  const { total } = useColadaBalance();
+  return mockMode ? mockBalance : total;
 }
