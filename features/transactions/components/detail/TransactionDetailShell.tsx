@@ -1,11 +1,14 @@
 import React from 'react';
 
+import { getCounterparty } from '@sovranbitcoin/colada';
+
 import { Screen } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HistoryEntryHeader } from '@/features/transactions/components/detail/HistoryEntryHeader';
 import { HistoryEntryRefresh } from '@/features/transactions/components/detail/HistoryEntryRefresh';
 import { HistoryEntryTimeline } from '@/features/transactions/components/detail/HistoryEntryTimeline';
+import { CounterpartyTransactions } from '@/features/transactions/components/CounterpartyTransactions';
 
 type DetailEntry = React.ComponentProps<typeof HistoryEntryTimeline>['historyEntry'];
 type MintInfo = React.ComponentProps<typeof HistoryEntryRefresh>['mintInfo'];
@@ -81,6 +84,9 @@ export function TransactionDetailShell({
   timeline,
   children,
 }: TransactionDetailShellProps): React.ReactElement {
+  // Other transactions with the same nostr counterparty (Nut Drop / lightning-
+  // address-to-nostr). Rendered after the details as a mini relationship view.
+  const counterpartyPubkey = entry ? getCounterparty(entry)?.pubkey : undefined;
   return (
     <Screen name={screenName} contentPadding={0} footer={footer}>
       {headerOverride}
@@ -95,6 +101,9 @@ export function TransactionDetailShell({
             : statusRow}
           {entry ? (timeline ?? <HistoryEntryTimeline historyEntry={entry} />) : timeline}
           {children}
+          {entry && counterpartyPubkey ? (
+            <CounterpartyTransactions pubkey={counterpartyPubkey} excludeId={entry.id} />
+          ) : null}
         </VStack>
       </View>
     </Screen>

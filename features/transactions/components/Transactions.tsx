@@ -75,6 +75,13 @@ interface Props {
   listKey?: string;
   account: Account;
   showMore: boolean;
+  /**
+   * Embedded mode (use with `showMore`): renders the per-person/relationship
+   * list inside another screen. Hides the global "View all" link, shows all
+   * date groups (no `days` cap), and skips the swap-store injection so the list
+   * is driven purely by the passed `history`.
+   */
+  embedded?: boolean;
   history: HistoryEntry[];
   isFetching?: boolean; // Loading state for fetching transactions
   // Filtering options
@@ -116,6 +123,7 @@ export const Transactions = React.memo(
     listKey,
     account,
     showMore,
+    embedded = false,
     history,
     isFetching = false,
     filter = 'all',
@@ -212,8 +220,10 @@ export const Transactions = React.memo(
         data: entry,
       }));
 
-      // Only include swap items when showing all filters / types
-      if (filter !== 'all' || type !== 'all') return txItems;
+      // Only include swap items when showing all filters / types. Embedded mode
+      // (per-person relationship view) is driven purely by the passed history —
+      // swaps are self-rebalances with no counterparty, so never inject them.
+      if (embedded || filter !== 'all' || type !== 'all') return txItems;
 
       const monthFilter = (createdAt: number) => {
         if (!selectedMonth) return true;
@@ -232,7 +242,7 @@ export const Transactions = React.memo(
         }));
 
       return [...txItems, ...swapItems];
-    }, [filteredHistory, swapGroups, filter, type, selectedMonth]);
+    }, [filteredHistory, swapGroups, filter, type, selectedMonth, embedded]);
 
     const sortedTimeline = useMemo(
       () => _.orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
@@ -281,7 +291,9 @@ export const Transactions = React.memo(
           'desc'
         );
 
-        const datesToShow = showMore ? _.take(sortedDateEntries, days) : sortedDateEntries;
+        // Embedded mode shows every date group (no `days` cap).
+        const datesToShow =
+          showMore && !embedded ? _.take(sortedDateEntries, days) : sortedDateEntries;
 
         return datesToShow.map(({ dateString }) => ({
           title: dateString,
@@ -310,7 +322,7 @@ export const Transactions = React.memo(
         });
       }
       return result;
-    }, [pending, confirmed, expired, showMore, days]);
+    }, [pending, confirmed, expired, showMore, days, embedded]);
 
     const sectionsToDisplay = useMemo(() => {
       log.debug('transactions.sections_computed', {
@@ -508,7 +520,7 @@ export const Transactions = React.memo(
                         </View>
                       </BlurCardFrame>
                     </View>
-                    {label === 'Confirmed' && (
+                    {label === 'Confirmed' && !embedded && (
                       <Link
                         href={{
                           pathname: '/transactions',
