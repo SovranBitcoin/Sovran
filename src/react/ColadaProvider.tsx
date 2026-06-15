@@ -45,6 +45,7 @@ import type {
   StorageAdapter,
   ColadaAdapters,
 } from '../adapters/types';
+import type { Manager } from '@cashu/coco-core';
 import type {
   MachineOperations,
   NotificationHandlerMap,
@@ -104,6 +105,12 @@ export interface ColadaProviderProps {
   handlers: (machine: PaymentMachine, refs: PaymentFlowRefs) => StepHandlerMap;
   /** Engine instance from `createColada()`. */
   instance?: ColadaInstance;
+  /**
+   * Accessor for the live coco `Manager`. Enables colada's read hooks
+   * (`useColadaTransactions`, `useColadaBalance`) without depending on a
+   * specific coco React binding. The wallet owns the manager lifecycle.
+   */
+  getManager?: () => Manager | null;
   /** Operation overrides. Top-level value wins over `instance.operations`. */
   operations?: MachineOperations;
   /** Custom protocol detectors. */
@@ -168,6 +175,7 @@ interface ColadaContextValue {
     Partial<PaymentCopyCatalog> | undefined
   >;
   adaptersRef: React.MutableRefObject<ColadaAdapters>;
+  getManagerRef: React.MutableRefObject<(() => Manager | null) | undefined>;
   subscriptionBusRef: React.MutableRefObject<ColadaSubscriptionBus>;
   notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
   operationsRef: React.MutableRefObject<Partial<MachineOperations> | undefined>;
@@ -259,6 +267,7 @@ export function ColadaProvider({
   children,
   handlers: handlersFactory,
   instance,
+  getManager: getManagerProp,
   operations: operationsProp,
   detectors,
   notifications,
@@ -387,6 +396,11 @@ export function ColadaProvider({
     Partial<PaymentCopyCatalog> | undefined
   >(paymentCopyOverrides);
   const adaptersRef = useLatestRef(adapters);
+  // Prefer an explicit getManager prop; otherwise fall back to the manager the
+  // createColada instance already holds, so wallets get read hooks for free.
+  const getManagerRef = useLatestRef<(() => Manager | null) | undefined>(
+    getManagerProp ?? (instance ? () => instance.config.manager ?? null : undefined),
+  );
   const subscriptionBusRef = useLatestRef(subscriptionBus);
   const notificationsRef = useLatestRef(notifications);
   const operationsRef = useLatestRef<Partial<MachineOperations> | undefined>(
@@ -623,6 +637,7 @@ export function ColadaProvider({
       getDisplayCurrencyRef,
       paymentCopyOverridesRef,
       adaptersRef,
+      getManagerRef,
       subscriptionBusRef,
       notificationsRef,
       operationsRef,
@@ -661,6 +676,20 @@ export function useColadaContext(): ColadaContextValue {
 
 export function useColadaSubscriptions(): ColadaSubscriptionBus {
   return useColadaContext().subscriptionBusRef.current;
+}
+
+/**
+ * The live coco `Manager`, for colada's read hooks. Requires the wallet to pass
+ * `getManager` (or a `createColada` instance) to `ColadaProvider`.
+ */
+export function useColadaManager(): Manager {
+  const manager = useColadaContext().getManagerRef.current?.();
+  if (!manager) {
+    throw new Error(
+      'colada manager is unavailable. Pass `getManager` (or a createColada `instance`) to ColadaProvider.',
+    );
+  }
+  return manager;
 }
 
 export function usePaymentCopy(): PaymentCopyResolver {

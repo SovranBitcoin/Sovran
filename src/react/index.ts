@@ -6,6 +6,7 @@
 export {
   ColadaProvider,
   useColadaContext,
+  useColadaManager,
   useColadaSubscriptions,
   usePaymentCopy,
   usePaymentFlowMachine,
@@ -14,6 +15,12 @@ export {
   type PaymentFlowRefs,
   type ScreenActionsBridge,
 } from './ColadaProvider';
+
+// Transaction list read model
+export {
+  useColadaTransactions,
+  type UseColadaTransactionsResult,
+} from './useColadaTransactions';
 
 export type {
   BleAdapter,
