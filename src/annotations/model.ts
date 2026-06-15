@@ -44,7 +44,7 @@ export const ANNOTATION_KEYS = {
 export type AnnotationRecord = Record<string, string>;
 
 export type CounterpartyDirection = "sender" | "recipient";
-export type ScanMethod = "qr" | "nfc" | "paste" | "deeplink";
+export type ScanMethod = "qr" | "nfc" | "paste" | "deeplink" | "ble";
 export type LockDirection = "incoming" | "outgoing";
 export type DistributionSource = "copy" | "share" | "airdrop" | "displayed";
 export type SwapRole = "mint" | "melt";
