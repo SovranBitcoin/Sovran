@@ -1280,6 +1280,7 @@ export function createSovranHandlers({
       createdOffline,
       mintWasOffline,
       recipientPubkey,
+      recipientProfile,
       p2pkLockPubkey,
     }) => {
       paymentLog.info('payment.step.send_complete', {
@@ -1326,6 +1327,33 @@ export function createSovranHandlers({
       const enrichedHistoryEntry = recipientPubkey
         ? injectRecipientPubkey(historyEntry, recipientPubkey)
         : historyEntry;
+
+      // Persist the recipient's nostr identity as a counterparty annotation so
+      // the transactions row + detail show their avatar (the transient
+      // metadata injection above only survives this navigation).
+      if (recipientPubkey) {
+        try {
+          const entry = JSON.parse(enrichedHistoryEntry) as { id?: unknown };
+          if (typeof entry.id === 'string') {
+            setTransactionAnnotation(`id:${entry.id}`, {
+              counterparty: {
+                pubkey: recipientPubkey,
+                direction: 'recipient',
+                ...(recipientProfile?.displayName
+                  ? { displayName: recipientProfile.displayName }
+                  : {}),
+                ...(recipientProfile?.avatarUrl ? { avatarUrl: recipientProfile.avatarUrl } : {}),
+                ...(recipientProfile?.nip05 ? { nip05: recipientProfile.nip05 } : {}),
+              },
+            });
+          }
+        } catch (e) {
+          paymentLog.warn('payment.send_complete.counterparty_annotation_failed', {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+
       if (createdOffline) {
         try {
           const entry = JSON.parse(enrichedHistoryEntry) as { id?: unknown; mintUrl?: unknown };
