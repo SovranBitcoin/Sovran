@@ -1,87 +1,86 @@
-/**
- * iOS 26+ Liquid Glass variant: a glass capsule via expo-glass-effect's
- * GlassView (a UIVisualEffectView-backed React Native view). We deliberately do
- * NOT use an @expo/ui SwiftUI `Host`: Host views (UIHostingController) don't
- * follow an RN ScrollView's content transform and visually pin to the top while
- * scrolling (expo/expo#46278). GlassView scrolls like any RN view.
- *
- * Currency selection uses heroui-native's anchored popover Menu (a real RN
- * context menu) so it stays a tap-anchored menu — not a bottom sheet — while
- * the trigger pill remains a plain scrollable view.
- */
-
 import React from 'react';
+import { Host, Menu, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/ui/swift-ui';
+import {
+  environment,
+  font,
+  foregroundStyle,
+  frame,
+  glassEffect,
+} from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 
-import { GlassView } from 'expo-glass-effect';
-import { Menu } from 'heroui-native';
-
-import { Text } from '@/shared/ui/primitives/Text';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
-import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
+import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { DisplayCurrency } from '@/shared/stores/global/settingsStore';
+import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
-
-const CURRENCY_OPTIONS: { code: DisplayCurrency; label: string; symbol: string }[] = [
-  { code: 'usd', label: 'USD', symbol: '$' },
-  { code: 'eur', label: 'EUR', symbol: '€' },
-  { code: 'gbp', label: 'GBP', symbol: '£' },
-];
+import { zIndex } from '@/shared/styles/tokens';
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
-  const { text, iosHeight, handleSelectCurrency, onPress, enableCurrencyMenu, textSize } =
+  const { handleSelectCurrency, text, iosHeight, iosWidth, onPress, enableCurrencyMenu, textSize } =
     useFiatCurrencyPill(props);
+
+  const colorScheme = useColorScheme();
   const textColor = useThemeColor('foreground');
+  const glassModifiers = [
+    environment('colorScheme', colorScheme),
+    frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
+    glassEffect({
+      shape: 'capsule' as const,
+      glass: {
+        tint: opacity(INVARIANT_WHITE, 0.15),
+        variant: 'regular' as const,
+        interactive: true,
+      },
+    }),
+  ];
 
-  const pill = (
-    <GlassView
-      glassEffectStyle="regular"
-      isInteractive
-      tintColor={opacity(INVARIANT_WHITE, 0.15)}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        borderRadius: 999,
-        paddingHorizontal: 14,
-        minHeight: iosHeight,
-      }}>
-      <Text overpass size={textSize} bold color={textColor} style={{ letterSpacing: 0.3 }}>
-        {text}
-      </Text>
-    </GlassView>
-  );
+  const glassTextModifiers = [
+    font({ size: textSize, design: 'monospaced' as const, weight: 'bold' as const }),
+    foregroundStyle(textColor),
+    frame({ height: 22, width: iosWidth, alignment: 'center' }),
+  ];
 
-  if (!enableCurrencyMenu) {
+  // Renders each menu row's systemImage in the default label color
+  // instead of the inherited system accent (which would tint $/€/£).
+  const menuItemModifiers = [
+    foregroundStyle({ type: 'hierarchical' as const, style: 'primary' as const }),
+  ];
+
+  if (enableCurrencyMenu) {
     return (
-      <Pressable onPress={onPress} disabled={!onPress}>
-        {pill}
-      </Pressable>
+      <Host style={{ zIndex: zIndex.sticky }} matchContents>
+        <Menu
+          onPrimaryAction={onPress}
+          label={<SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>}
+          modifiers={glassModifiers}>
+          <SwiftUIButton
+            systemImage="dollarsign"
+            label="USD"
+            modifiers={menuItemModifiers}
+            onPress={() => handleSelectCurrency('usd')}
+          />
+          <SwiftUIButton
+            systemImage="eurosign"
+            label="EUR"
+            modifiers={menuItemModifiers}
+            onPress={() => handleSelectCurrency('eur')}
+          />
+          <SwiftUIButton
+            systemImage="sterlingsign"
+            label="GBP"
+            modifiers={menuItemModifiers}
+            onPress={() => handleSelectCurrency('gbp')}
+          />
+        </Menu>
+      </Host>
     );
   }
 
   return (
-    <Menu presentation="popover">
-      <Menu.Trigger>{pill}</Menu.Trigger>
-      <Menu.Portal>
-        <MenuScrim />
-        <Menu.Content presentation="popover">
-          {CURRENCY_OPTIONS.map((option) => (
-            <Menu.Item key={option.code} onPress={() => handleSelectCurrency(option.code)}>
-              <HStack align="center" gap={10} style={{ flex: 1, minWidth: 160 }}>
-                <Text size={16} bold color={textColor} style={{ width: 20, textAlign: 'center' }}>
-                  {option.symbol}
-                </Text>
-                <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
-              </HStack>
-            </Menu.Item>
-          ))}
-        </Menu.Content>
-      </Menu.Portal>
-    </Menu>
+    <Host style={{ zIndex: zIndex.sticky }} matchContents>
+      <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
+        <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
+      </SwiftUIButton>
+    </Host>
   );
 }
