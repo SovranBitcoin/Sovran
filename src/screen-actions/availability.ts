@@ -2,24 +2,45 @@
 // Screen Actions — availability logic (pure, UI-agnostic)
 // ---------------------------------------------------------------------------
 
-import type { ActionAvailability, ScreenActionName, ScreenType } from './types';
+import type { ActionAvailability, ScreenActionName, ScreenType } from "./types";
 import {
   evaluateMintMethodAmountAvailability,
   isMethodImplemented,
   methodContextHasSupportingMint,
   type MintMethodAmountAvailability,
-} from '../mint-capabilities';
-import type { AmountEntryMethodContext, MintMethodRequirement } from '../types';
+} from "../mint-capabilities";
+import { logger } from "../logger";
+import type { AmountEntryMethodContext, MintMethodRequirement } from "../types";
 
-type AvailabilityMap<S extends ScreenType> = Record<ScreenActionName[S], ActionAvailability>;
+type AvailabilityMap<S extends ScreenType> = Record<
+  ScreenActionName[S],
+  ActionAvailability
+>;
 
-function getSelectedMintUrl(entry: Record<string, unknown>): string | undefined {
-  if (typeof entry.selectedMintUrl === 'string' && entry.selectedMintUrl.length > 0) {
+function getSelectedMintUrl(
+  entry: Record<string, unknown>,
+): string | undefined {
+  if (
+    typeof entry.selectedMintUrl === "string" &&
+    entry.selectedMintUrl.length > 0
+  ) {
+    logger.debug("screenActions.availability.selectedMintUrl", {
+      source: "selectedMintUrl",
+      hasMintUrl: true,
+    });
     return entry.selectedMintUrl;
   }
-  if (typeof entry.mintUrl === 'string' && entry.mintUrl.length > 0) {
+  if (typeof entry.mintUrl === "string" && entry.mintUrl.length > 0) {
+    logger.debug("screenActions.availability.selectedMintUrl", {
+      source: "mintUrl",
+      hasMintUrl: true,
+    });
     return entry.mintUrl;
   }
+  logger.debug("screenActions.availability.selectedMintUrl", {
+    source: "none",
+    hasMintUrl: false,
+  });
   return undefined;
 }
 
@@ -28,59 +49,132 @@ function getAmountAvailability(
   requirement: MintMethodRequirement,
   amount: number,
   selectedMintUrl: string | undefined,
-  options: { requireBalance?: boolean } = {}
+  options: { requireBalance?: boolean } = {},
 ): MintMethodAmountAvailability | null {
-  if (!methodContext) return null;
-  return evaluateMintMethodAmountAvailability(methodContext, requirement, {
+  if (!methodContext) {
+    logger.debug("screenActions.availability.methodAmount", {
+      reason: "missing-method-context",
+      operation: requirement.operation,
+      method: requirement.method,
+      unit: requirement.unit,
+      amount,
+      selectedMintUrl: selectedMintUrl ?? null,
+      requireBalance: options.requireBalance ?? null,
+      availableCandidateCount: null,
+    });
+    return null;
+  }
+  const availability = evaluateMintMethodAmountAvailability(
+    methodContext,
+    requirement,
+    {
+      amount,
+      ...(selectedMintUrl ? { selectedMintUrl } : {}),
+      ...(options.requireBalance != null
+        ? { requireBalance: options.requireBalance }
+        : {}),
+    },
+  );
+  logger.debug("screenActions.availability.methodAmount", {
+    reason: "evaluated",
+    operation: requirement.operation,
+    method: requirement.method,
+    unit: requirement.unit,
     amount,
-    ...(selectedMintUrl ? { selectedMintUrl } : {}),
-    ...(options.requireBalance != null ? { requireBalance: options.requireBalance } : {}),
+    selectedMintUrl: selectedMintUrl ?? null,
+    requireBalance: options.requireBalance ?? null,
+    availableCandidateCount: availability.availableCandidates.length,
+    hasSelectedCandidate: !!availability.selectedCandidate,
+    selectedUnavailableReason:
+      availability.selectedUnavailableReason?.message ?? null,
+    firstUnavailableReason:
+      availability.firstUnavailableReason?.message ?? null,
   });
+  return availability;
 }
 
 function hasCompatibleCandidate(
   availability: MintMethodAmountAvailability | null,
-  fallbackWhenContextMissing: boolean
+  fallbackWhenContextMissing: boolean,
 ): boolean {
-  return availability ? availability.availableCandidates.length > 0 : fallbackWhenContextMissing;
+  const result = availability
+    ? availability.availableCandidates.length > 0
+    : fallbackWhenContextMissing;
+  logger.debug("screenActions.availability.compatibleCandidate", {
+    hasAvailability: !!availability,
+    fallbackWhenContextMissing,
+    availableCandidateCount: availability?.availableCandidates.length ?? null,
+    result,
+  });
+  return result;
 }
 
 function methodAmountReason(
   _availability: MintMethodAmountAvailability | null,
-  fallback: string
+  fallback: string,
 ): string {
+  logger.debug("screenActions.availability.methodAmountReason", {
+    hasAvailability: !!_availability,
+    fallback,
+  });
   return fallback;
+}
+
+function summarizeAvailabilityMap(
+  availability: Record<string, ActionAvailability>,
+) {
+  return Object.fromEntries(
+    Object.entries(availability).map(([name, item]) => [
+      name,
+      {
+        available: item.available,
+        reason: item.reason ?? null,
+        variantCount: item.variants?.length ?? 0,
+        availableVariantCount:
+          item.variants?.filter((variant) => variant.available).length ?? 0,
+      },
+    ]),
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Per-screen rules
 // ---------------------------------------------------------------------------
 
-function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<'sendToken'> {
+function sendTokenAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"sendToken"> {
   const state = entry.state as string | undefined;
   const token = entry.token;
   const operationId = entry.operationId;
 
-  const isPaid = state === 'finalized' || state === 'rolledBack';
+  const isPaid = state === "finalized" || state === "rolledBack";
   const hasToken = token != null;
   const canAct = !isPaid && hasToken;
+  logger.debug("screenActions.availability.sendToken.context", {
+    state: state ?? null,
+    hasToken,
+    hasOperationId: operationId != null,
+    isPaid,
+    canAct,
+  });
 
   return {
     copy: {
       available: canAct,
       variants: [
         {
-          id: 'text',
-          label: 'as Text',
-          description: 'Copy the token as plain text',
-          icon: 'lets-icons:copy',
+          id: "text",
+          label: "as Text",
+          description: "Copy the token as plain text",
+          icon: "lets-icons:copy",
           available: canAct,
         },
         {
-          id: 'emoji',
-          label: 'as Emoji',
-          description: 'Copy the token as emoji',
-          icon: 'fluent:emoji-24-filled',
+          id: "emoji",
+          label: "as Emoji",
+          description: "Copy the token as emoji",
+          icon: "fluent:emoji-24-filled",
           available: canAct,
         },
       ],
@@ -88,39 +182,59 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
     share: { available: canAct },
     nfc: { available: canAct },
     checkStatus: {
-      available: canAct && state === 'pending',
+      available: canAct && state === "pending",
     },
     cancel: {
       available: canAct && operationId != null,
-      ...(!operationId && canAct ? { reason: 'Missing operation ID — cannot cancel' } : {}),
+      ...(!operationId && canAct
+        ? { reason: "Missing operation ID — cannot cancel" }
+        : {}),
     },
     back: { available: true },
   };
 }
 
-function receiveTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<'receiveToken'> {
+function receiveTokenAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"receiveToken"> {
   const metadata = entry.metadata;
   const rawToken =
-    typeof metadata === 'object' && metadata !== null
+    typeof metadata === "object" && metadata !== null
       ? (metadata as Record<string, unknown>).rawToken
       : undefined;
   // Entries built by buildReceiveHistoryEntry carry the token in
   // metadata.rawToken rather than entry.token, so accept either.
   const hasToken =
-    entry.token != null || (typeof rawToken === 'string' && rawToken.length > 0);
+    entry.token != null ||
+    (typeof rawToken === "string" && rawToken.length > 0);
   const id = entry.id as string | undefined;
-  const isScanPlaceholder = id?.startsWith('receive-') ?? false;
+  const isScanPlaceholder = id?.startsWith("receive-") ?? false;
   const isRedeemed = !isScanPlaceholder;
+  const isPending = entry.state === "executing";
+  logger.debug("screenActions.availability.receiveToken.context", {
+    state: String(entry.state ?? ""),
+    hasToken,
+    hasId: !!id,
+    isScanPlaceholder,
+    isRedeemed,
+    isPending,
+  });
 
   return {
-    redeem: { available: !isRedeemed && hasToken },
+    redeem: { available: !isRedeemed && !isPending && hasToken },
     back: { available: true },
   };
 }
 
-function mintQuoteAvailability(entry: Record<string, unknown>): AvailabilityMap<'mintQuote'> {
+function mintQuoteAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"mintQuote"> {
   const state = entry.state as string | undefined;
-  const isPaid = state === 'ISSUED' || state === 'PAID';
+  const isPaid = state === "ISSUED" || state === "PAID";
+  logger.debug("screenActions.availability.mintQuote.context", {
+    state: state ?? null,
+    isPaid,
+  });
 
   return {
     copy: { available: !isPaid },
@@ -129,28 +243,43 @@ function mintQuoteAvailability(entry: Record<string, unknown>): AvailabilityMap<
   };
 }
 
-function meltQuoteAvailability(entry: Record<string, unknown>): AvailabilityMap<'meltQuote'> {
+function meltQuoteAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"meltQuote"> {
   const state = entry.state as string | undefined;
   const quoteId = entry.quoteId as string | undefined;
-  const isPaid = state === 'PAID';
-  const isPending = state === 'PENDING';
+  const isPaid = state === "PAID";
+  const isPending = state === "PENDING";
   const isPreview = !quoteId;
+  logger.debug("screenActions.availability.meltQuote.context", {
+    state: state ?? null,
+    hasQuoteId: !!quoteId,
+    isPaid,
+    isPending,
+    isPreview,
+  });
 
   return {
-    pay: { available: !isPaid && !isPending && state === 'UNPAID' },
-    cancel: { available: !isPreview && (state === 'UNPAID' || isPending) },
+    pay: { available: !isPaid && !isPending && state === "UNPAID" },
+    cancel: { available: !isPreview && (state === "UNPAID" || isPending) },
     back: { available: true },
   };
 }
 
 function paymentRequestAvailability(
-  entry: Record<string, unknown>
-): AvailabilityMap<'paymentRequest'> {
+  entry: Record<string, unknown>,
+): AvailabilityMap<"paymentRequest"> {
   const metadata = entry.metadata as Record<string, unknown> | undefined;
   const phase = metadata?.phase as string | undefined;
   const hasOperationId = !!(entry.operationId || metadata?.operationId);
-  const isPreview = (phase === 'preview' || !phase) && !hasOperationId;
-  const isDelivered = phase === 'delivered' || hasOperationId;
+  const isPreview = (phase === "preview" || !phase) && !hasOperationId;
+  const isDelivered = phase === "delivered" || hasOperationId;
+  logger.debug("screenActions.availability.paymentRequest.context", {
+    phase: phase ?? null,
+    hasOperationId,
+    isPreview,
+    isDelivered,
+  });
 
   return {
     confirm: { available: isPreview },
@@ -159,21 +288,35 @@ function paymentRequestAvailability(
   };
 }
 
-function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMap<'amountEntry'> {
-  const effectiveSat = typeof entry.effectiveSatAmount === 'number' ? entry.effectiveSatAmount : 0;
+function amountEntryAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"amountEntry"> {
+  const effectiveSat =
+    typeof entry.effectiveSatAmount === "number" ? entry.effectiveSatAmount : 0;
   const destination = entry.destination as string | undefined;
-  const isSendEcash = destination === 'sendEcash';
-  const isMeltQuote = destination === 'meltQuote';
-  const isMintQuote = destination === 'mintQuote';
-  const isPaymentRequest = destination === 'paymentRequest';
+  const isSendEcash = destination === "sendEcash";
+  const isMeltQuote = destination === "meltQuote";
+  const isMintQuote = destination === "mintQuote";
+  const isPaymentRequest = destination === "paymentRequest";
   const isSendSideAmountEntry = isSendEcash || isMeltQuote;
-  const meltTarget = typeof entry.meltTarget === 'string' ? entry.meltTarget : '';
+  const meltTarget =
+    typeof entry.meltTarget === "string" ? entry.meltTarget : "";
   const hasMeltTarget = meltTarget.length > 0;
   const hasFiatToggle =
-    typeof entry.fiatCurrency === 'string' &&
+    typeof entry.fiatCurrency === "string" &&
     entry.fiatCurrency.length > 0 &&
-    typeof entry.btcPrice === 'number' &&
+    typeof entry.btcPrice === "number" &&
     entry.btcPrice > 0;
+  logger.debug("screenActions.availability.amountEntry.context", {
+    effectiveSat,
+    destination: destination ?? null,
+    hasMeltTarget,
+    hasFiatToggle,
+    isSendEcash,
+    isMeltQuote,
+    isMintQuote,
+    isPaymentRequest,
+  });
 
   // The Next menu surfaces applicable rails and disables the ones that do not
   // apply to the current flow. Onchain is only listed when at least one trusted
@@ -188,78 +331,89 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   // button and produce a silent no-op when the handler — which only sees
   // effectiveSatAmount — early-returns.
   const nextCanFire = effectiveSat >= 1 && Number.isFinite(effectiveSat);
-  const unit = typeof entry.unit === 'string' ? entry.unit : 'sat';
-  const methodContext = entry.methodContext as AmountEntryMethodContext | undefined;
+  const unit = typeof entry.unit === "string" ? entry.unit : "sat";
+  const methodContext = entry.methodContext as
+    | AmountEntryMethodContext
+    | undefined;
   const selectedMintUrl = getSelectedMintUrl(entry);
   const receiveLightningRequirement: MintMethodRequirement = {
-    operation: 'mint',
-    method: 'bolt11',
+    operation: "mint",
+    method: "bolt11",
     unit,
   };
   const receiveOnchainRequirement: MintMethodRequirement = {
-    operation: 'mint',
-    method: 'onchain',
+    operation: "mint",
+    method: "onchain",
     unit,
   };
   const sendLightningRequirement: MintMethodRequirement = {
-    operation: 'melt',
-    method: 'bolt11',
+    operation: "melt",
+    method: "bolt11",
     unit,
   };
   const sendOnchainRequirement: MintMethodRequirement = {
-    operation: 'melt',
-    method: 'onchain',
+    operation: "melt",
+    method: "onchain",
     unit,
   };
   const receiveLightningAvailability = getAmountAvailability(
     methodContext,
     receiveLightningRequirement,
     effectiveSat,
-    selectedMintUrl
+    selectedMintUrl,
   );
   const receiveOnchainSupported = methodContextHasSupportingMint(
     methodContext,
-    receiveOnchainRequirement
+    receiveOnchainRequirement,
   );
   const receiveOnchainAvailability = getAmountAvailability(
     methodContext,
     receiveOnchainRequirement,
     effectiveSat,
-    selectedMintUrl
+    selectedMintUrl,
   );
   const sendLightningAvailability = getAmountAvailability(
     methodContext,
     sendLightningRequirement,
     effectiveSat,
     selectedMintUrl,
-    { requireBalance: true }
+    { requireBalance: true },
   );
-  const receiveLightningCompatible = hasCompatibleCandidate(receiveLightningAvailability, true);
-  const receiveOnchainCompatible = hasCompatibleCandidate(receiveOnchainAvailability, false);
-  const sendLightningCompatible = hasCompatibleCandidate(sendLightningAvailability, true);
+  const receiveLightningCompatible = hasCompatibleCandidate(
+    receiveLightningAvailability,
+    true,
+  );
+  const receiveOnchainCompatible = hasCompatibleCandidate(
+    receiveOnchainAvailability,
+    false,
+  );
+  const sendLightningCompatible = hasCompatibleCandidate(
+    sendLightningAvailability,
+    true,
+  );
   const sendOnchainSupported = methodContextHasSupportingMint(
     methodContext,
-    sendOnchainRequirement
+    sendOnchainRequirement,
   );
 
   // ── ecash ──────────────────────────────────────────────────────────
   let ecashAvailable = false;
   let ecashDescription: string | undefined;
   let ecashReason: string | undefined;
-  let ecashLabel = 'as Ecash';
+  let ecashLabel = "as Ecash";
   if (isMintQuote) {
-    ecashReason = 'Not available for receive';
+    ecashReason = "Not available for receive";
   } else if (isMeltQuote) {
-    ecashReason = 'Lightning destination';
+    ecashReason = "Lightning destination";
   } else if (isPaymentRequest) {
     ecashAvailable = nextCanFire;
-    ecashDescription = 'Send a Cashu payment request';
-    ecashLabel = 'as Ecash (payment request)';
+    ecashDescription = "Send a Cashu payment request";
+    ecashLabel = "as Ecash (payment request)";
   } else if (isSendEcash) {
     ecashAvailable = nextCanFire;
-    ecashDescription = 'Send as a Cashu token';
+    ecashDescription = "Send as a Cashu token";
   } else {
-    ecashReason = 'Unavailable';
+    ecashReason = "Unavailable";
   }
 
   // ── lightning ──────────────────────────────────────────────────────
@@ -268,7 +422,7 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   // NIP-05 targets, truncated middle for bolt11 / LNURL strings.
   const formatLightningTarget = (target: string): string => {
     const trimmed = target.trim();
-    if (trimmed.includes('@')) return trimmed;
+    if (trimmed.includes("@")) return trimmed;
     if (trimmed.length <= 18) return trimmed;
     return `${trimmed.slice(0, 9)}…${trimmed.slice(-9)}`;
   };
@@ -278,26 +432,26 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   let lightningReason: string | undefined;
   if (isMintQuote) {
     lightningAvailable = nextCanFire && receiveLightningCompatible;
-    lightningDescription = 'Create a Lightning invoice';
+    lightningDescription = "Create a Lightning invoice";
     if (!receiveLightningCompatible) {
       lightningReason = methodAmountReason(
         receiveLightningAvailability,
-        'No trusted mint supports Lightning receive'
+        "No trusted mint supports Lightning receive",
       );
     }
   } else if (isMeltQuote) {
     lightningAvailable = nextCanFire && sendLightningCompatible;
     lightningDescription = hasMeltTarget
       ? `Pay ${formatLightningTarget(meltTarget)} over Lightning`
-      : 'Pay over Lightning';
+      : "Pay over Lightning";
     if (!sendLightningCompatible) {
       lightningReason = methodAmountReason(
         sendLightningAvailability,
-        'No trusted mint can pay over Lightning'
+        "No trusted mint can pay over Lightning",
       );
     }
   } else if (isPaymentRequest) {
-    lightningReason = 'Not supported for payment requests';
+    lightningReason = "Not supported for payment requests";
   } else if (isSendEcash) {
     if (hasMeltTarget) {
       lightningAvailable = nextCanFire && sendLightningCompatible;
@@ -305,38 +459,44 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
       if (!sendLightningCompatible) {
         lightningReason = methodAmountReason(
           sendLightningAvailability,
-          'No trusted mint can pay over Lightning'
+          "No trusted mint can pay over Lightning",
         );
       }
     } else {
-      lightningReason = 'No Lightning target';
+      lightningReason = "No Lightning target";
     }
   } else {
-    lightningReason = 'Unavailable';
+    lightningReason = "Unavailable";
   }
 
   // ── onchain ────────────────────────────────────────────────────────
   // Coco currently supports reusable onchain mint quotes only. Only surface
   // onchain when at least one trusted mint advertises the relevant NUT method.
-  const receiveOnchainImplemented = isMethodImplemented(receiveOnchainRequirement);
+  const receiveOnchainImplemented = isMethodImplemented(
+    receiveOnchainRequirement,
+  );
   const sendOnchainImplemented = isMethodImplemented(sendOnchainRequirement);
-  const showOnchainReceive = isMintQuote && receiveOnchainImplemented && receiveOnchainSupported;
-  const showOnchainSend = !isMintQuote && sendOnchainImplemented && sendOnchainSupported;
-  const onchainAvailable = showOnchainReceive ? nextCanFire && receiveOnchainCompatible : false;
+  const showOnchainReceive =
+    isMintQuote && receiveOnchainImplemented && receiveOnchainSupported;
+  const showOnchainSend =
+    !isMintQuote && sendOnchainImplemented && sendOnchainSupported;
+  const onchainAvailable = showOnchainReceive
+    ? nextCanFire && receiveOnchainCompatible
+    : false;
   const onchainDescription = showOnchainReceive
-    ? 'Create an onchain receive address'
+    ? "Create an onchain receive address"
     : showOnchainSend
-      ? 'Pay to an onchain address'
+      ? "Pay to an onchain address"
       : undefined;
   const onchainReason = showOnchainReceive
     ? receiveOnchainCompatible
       ? undefined
       : methodAmountReason(
           receiveOnchainAvailability,
-          'No trusted mint can create an onchain receive address'
+          "No trusted mint can create an onchain receive address",
         )
     : showOnchainSend
-      ? 'Onchain send is not supported yet'
+      ? "Onchain send is not supported yet"
       : undefined;
 
   // Base order — available entries bubble to the top via a stable sort below
@@ -344,17 +504,17 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   // sink to the bottom.
   const baseVariants = [
     {
-      id: 'ecash',
+      id: "ecash",
       label: ecashLabel,
-      icon: 'ph:coins',
+      icon: "ph:coins",
       available: ecashAvailable,
       ...(ecashDescription ? { description: ecashDescription } : {}),
       ...(ecashReason ? { reason: ecashReason } : {}),
     },
     {
-      id: 'lightning',
-      label: 'as Lightning',
-      icon: 'mingcute:lightning-fill',
+      id: "lightning",
+      label: "as Lightning",
+      icon: "mingcute:lightning-fill",
       available: lightningAvailable,
       ...(lightningDescription ? { description: lightningDescription } : {}),
       ...(lightningReason ? { reason: lightningReason } : {}),
@@ -362,9 +522,9 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
     ...(showOnchainReceive || showOnchainSend
       ? [
           {
-            id: 'onchain',
-            label: 'as Onchain',
-            icon: 'hugeicons:blockchain-01',
+            id: "onchain",
+            label: "as Onchain",
+            icon: "hugeicons:blockchain-01",
             available: onchainAvailable,
             ...(onchainDescription ? { description: onchainDescription } : {}),
             ...(onchainReason ? { reason: onchainReason } : {}),
@@ -379,11 +539,30 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
       return a.i - b.i;
     })
     .map(({ v }) => v);
-  const hasAvailableNextVariant = nextVariants.some((variant) => variant.available);
+  const hasAvailableNextVariant = nextVariants.some(
+    (variant) => variant.available,
+  );
   const nextUnavailableReason =
-    nextVariants.find((variant) => !variant.available && variant.id !== 'ecash' && variant.reason)
-      ?.reason ??
-    nextVariants.find((variant) => !variant.available && variant.reason)?.reason;
+    nextVariants.find(
+      (variant) =>
+        !variant.available && variant.id !== "ecash" && variant.reason,
+    )?.reason ??
+    nextVariants.find((variant) => !variant.available && variant.reason)
+      ?.reason;
+  logger.info("screenActions.availability.amountEntry.result", {
+    destination: destination ?? null,
+    effectiveSat,
+    nextCanFire,
+    hasAvailableNextVariant,
+    nextUnavailableReason: nextUnavailableReason ?? null,
+    variantSummary: nextVariants.map((variant) => ({
+      id: variant.id,
+      available: variant.available,
+      reason: variant.reason ?? null,
+    })),
+    showOnchainReceive,
+    showOnchainSend,
+  });
 
   return {
     setInput: { available: true },
@@ -402,9 +581,16 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   };
 }
 
-function mintInfoAvailability(entry: Record<string, unknown>): AvailabilityMap<'mintInfo'> {
+function mintInfoAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"mintInfo"> {
   const isTrusted = entry.isTrusted === true;
-  const hasMintUrl = typeof entry.mintUrl === 'string' && entry.mintUrl.length > 0;
+  const hasMintUrl =
+    typeof entry.mintUrl === "string" && entry.mintUrl.length > 0;
+  logger.debug("screenActions.availability.mintInfo.context", {
+    isTrusted,
+    hasMintUrl,
+  });
   return {
     trust: { available: !isTrusted },
     copy: { available: hasMintUrl },
@@ -413,10 +599,19 @@ function mintInfoAvailability(entry: Record<string, unknown>): AvailabilityMap<'
   };
 }
 
-function mintSelectorAvailability(entry: Record<string, unknown>): AvailabilityMap<'mintSelector'> {
+function mintSelectorAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"mintSelector"> {
   const items = entry.items;
   const hasItems = Array.isArray(items) && items.length > 0;
   const isManagement = !entry.destination;
+  logger.debug("screenActions.availability.mintSelector.context", {
+    hasItems,
+    itemCount: Array.isArray(items) ? items.length : 0,
+    isManagement,
+    destination:
+      typeof entry.destination === "string" ? entry.destination : null,
+  });
 
   return {
     select: { available: hasItems },
@@ -427,18 +622,32 @@ function mintSelectorAvailability(entry: Record<string, unknown>): AvailabilityM
   };
 }
 
-function receiveAvailability(entry: Record<string, unknown>): AvailabilityMap<'receive'> {
-  const hasNpc = typeof entry.npcAddress === 'string' && entry.npcAddress.length > 0;
-  const hasP2pk = typeof entry.p2pkKey === 'string' && entry.p2pkKey.length > 0;
+function receiveAvailability(
+  entry: Record<string, unknown>,
+): AvailabilityMap<"receive"> {
+  const hasNpc =
+    typeof entry.npcAddress === "string" && entry.npcAddress.length > 0;
+  const hasP2pk = typeof entry.p2pkKey === "string" && entry.p2pkKey.length > 0;
   const isReceiveHub =
-    entry.type === 'receive' && typeof entry.id === 'string' && entry.id === 'receive-hub';
+    entry.type === "receive" &&
+    typeof entry.id === "string" &&
+    entry.id === "receive-hub";
   const unit = entry.unit as string | undefined;
   const hubLoaded = isReceiveHub;
-  const methodContext = entry.methodContext as AmountEntryMethodContext | undefined;
+  const methodContext = entry.methodContext as
+    | AmountEntryMethodContext
+    | undefined;
   const canReceiveLightning = methodContextHasSupportingMint(methodContext, {
-    operation: 'mint',
-    method: 'bolt11',
-    unit: unit ?? 'sat',
+    operation: "mint",
+    method: "bolt11",
+    unit: unit ?? "sat",
+  });
+  logger.debug("screenActions.availability.receive.context", {
+    hasNpc,
+    hasP2pk,
+    isReceiveHub,
+    unit: unit ?? null,
+    canReceiveLightning,
   });
 
   return {
@@ -447,10 +656,12 @@ function receiveAvailability(entry: Record<string, unknown>): AvailabilityMap<'r
     paste: { available: hubLoaded },
     fixedAmount: {
       available: hubLoaded && canReceiveLightning,
-      ...(!canReceiveLightning ? { reason: 'No trusted mint supports Lightning receive' } : {}),
+      ...(!canReceiveLightning
+        ? { reason: "No trusted mint supports Lightning receive" }
+        : {}),
     },
     scanQr: { available: hubLoaded },
-    changeNpcMint: { available: hubLoaded && hasNpc && unit === 'sat' },
+    changeNpcMint: { available: hubLoaded && hasNpc && unit === "sat" },
     back: { available: true },
   };
 }
@@ -477,11 +688,19 @@ const AVAILABILITY_FNS: {
  * Pure check — is the payment request entry still in preview state?
  * Returns false once an operationId is present (i.e. the operation executed).
  */
-export function isPaymentRequestPreview(entry: Record<string, unknown>): boolean {
+export function isPaymentRequestPreview(
+  entry: Record<string, unknown>,
+): boolean {
   const metadata = entry.metadata as Record<string, unknown> | undefined;
   const phase = metadata?.phase as string | undefined;
   const hasOperationId = !!(entry.operationId || metadata?.operationId);
-  return (phase === 'preview' || !phase) && !hasOperationId;
+  const result = (phase === "preview" || !phase) && !hasOperationId;
+  logger.debug("screenActions.availability.paymentRequestPreview", {
+    phase: phase ?? null,
+    hasOperationId,
+    result,
+  });
+  return result;
 }
 
 /**
@@ -490,10 +709,17 @@ export function isPaymentRequestPreview(entry: Record<string, unknown>): boolean
  */
 export function getAvailableActions<S extends ScreenType>(
   screenType: S,
-  entry: Record<string, unknown>
+  entry: Record<string, unknown>,
 ): Record<ScreenActionName[S], ActionAvailability> {
   const fn = AVAILABILITY_FNS[screenType] as (
-    e: Record<string, unknown>
+    e: Record<string, unknown>,
   ) => Record<ScreenActionName[S], ActionAvailability>;
-  return fn(entry);
+  const availability = fn(entry);
+  logger.info("screenActions.availability.result", {
+    screenType,
+    entryType: typeof entry.type === "string" ? entry.type : null,
+    entryState: typeof entry.state === "string" ? entry.state : null,
+    actionSummary: summarizeAvailabilityMap(availability),
+  });
+  return availability;
 }

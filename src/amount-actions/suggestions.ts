@@ -7,8 +7,9 @@
 // All suggestions are guaranteed offline-composable.
 // ---------------------------------------------------------------------------
 
-import { composeFiat, composeSatoshis } from '../offline';
-import type { QuickSendConfig, QuickSendSuggestion } from './types';
+import { composeFiat, composeSatoshis } from "../offline";
+import { logger } from "../logger";
+import type { QuickSendConfig, QuickSendSuggestion } from "./types";
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -16,13 +17,17 @@ import type { QuickSendConfig, QuickSendSuggestion } from './types';
 
 const SATS_PER_BTC = 100_000_000;
 
-const DEFAULT_FIAT_TARGETS = [0.1, 0.25, 0.5, 1, 2, 3, 5, 10, 15, 20, 25, 50, 100];
+const DEFAULT_FIAT_TARGETS = [
+  0.1, 0.25, 0.5, 1, 2, 3, 5, 10, 15, 20, 25, 50, 100,
+];
 
-const DEFAULT_SAT_TARGETS = [21, 50, 100, 250, 500, 1000, 2100, 5000, 10000, 21000, 50000, 100000];
+const DEFAULT_SAT_TARGETS = [
+  21, 50, 100, 250, 500, 1000, 2100, 5000, 10000, 21000, 50000, 100000,
+];
 
 const DEFAULT_LIMIT = 3;
 
-const satFormatter = new Intl.NumberFormat('en-US', {
+const satFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
@@ -36,10 +41,10 @@ function formatFiatLabel(amount: number, symbol: string): string {
 }
 
 function fiatToRawInput(fiat: number): string {
-  if (fiat <= 0) return '';
+  if (fiat <= 0) return "";
   if (fiat === Math.floor(fiat)) return String(fiat);
   const str = fiat.toFixed(2);
-  return str.replace(/0+$/, '').replace(/\.$/, '');
+  return str.replace(/0+$/, "").replace(/\.$/, "");
 }
 
 /**
@@ -69,17 +74,36 @@ export function computeQuickSendSuggestions(
     fiatCurrency?: string;
     fiatSymbol?: string;
     config?: QuickSendConfig;
-  } = {}
+  } = {},
 ): QuickSendSuggestion[] {
   const { fiatCurrency, fiatSymbol, config } = options;
   const fiatTargets = config?.fiatTargets ?? DEFAULT_FIAT_TARGETS;
   const satTargets = config?.satTargets ?? DEFAULT_SAT_TARGETS;
   const limit = config?.limit ?? DEFAULT_LIMIT;
 
-  if (proofAmounts.length === 0) return [];
+  logger.debug("amount.suggestions.start", {
+    proofCount: proofAmounts.length,
+    hasBtcPrice: btcPrice > 0,
+    hasFiatCurrency: !!fiatCurrency,
+    hasFiatSymbol: !!fiatSymbol,
+    fiatTargetCount: fiatTargets.length,
+    satTargetCount: satTargets.length,
+    limit,
+  });
+
+  if (proofAmounts.length === 0) {
+    logger.debug("amount.suggestions.empty", { reason: "no_proofs" });
+    return [];
+  }
 
   const totalBalance = proofAmounts.reduce((a, b) => a + b, 0);
-  if (totalBalance <= 0) return [];
+  if (totalBalance <= 0) {
+    logger.debug("amount.suggestions.empty", {
+      reason: "non_positive_balance",
+      proofCount: proofAmounts.length,
+    });
+    return [];
+  }
 
   const hasFiat = !!fiatCurrency && !!fiatSymbol && btcPrice > 0;
   const satsPerFiat = btcPrice > 0 ? SATS_PER_BTC / btcPrice : 0;
@@ -102,11 +126,16 @@ export function computeQuickSendSuggestions(
       allFiat.push({
         label: formatFiatLabel(fiatAmount, fiatSymbol!),
         inputValue: fiatToRawInput(fiatAmount),
-        inputMode: 'fiat',
+        inputMode: "fiat",
         satoshis: sats,
       });
     }
   }
+  logger.debug("amount.suggestions.fiat.collected", {
+    enabled: hasFiat,
+    totalBalance,
+    collected: allFiat.length,
+  });
 
   // Collect ALL achievable sat suggestions
   const allSat: QuickSendSuggestion[] = [];
@@ -122,27 +151,42 @@ export function computeQuickSendSuggestions(
     allSat.push({
       label: `${satFormatter.format(satTarget)} sats`,
       inputValue: String(satTarget),
-      inputMode: 'sat',
+      inputMode: "sat",
       satoshis: satTarget,
     });
   }
+  logger.debug("amount.suggestions.sat.collected", {
+    totalBalance,
+    collected: allSat.length,
+  });
 
   // Pick evenly distributed subset from each category, merge, sort
   const pickedFiat = pickDistributed(allFiat, limit);
   const pickedSat = pickDistributed(allSat, limit);
 
-  const sorted = [...pickedFiat, ...pickedSat].sort((a, b) => a.satoshis - b.satoshis);
+  const sorted = [...pickedFiat, ...pickedSat].sort(
+    (a, b) => a.satoshis - b.satoshis,
+  );
 
   // Append "Send all" as the last suggestion (always composable — uses all proofs)
   if (totalBalance > 0) {
     sorted.push({
       label: `Send all ${satFormatter.format(totalBalance)} sats`,
       inputValue: String(totalBalance),
-      inputMode: 'sat',
+      inputMode: "sat",
       satoshis: totalBalance,
       sendAll: true,
     });
   }
 
+  logger.info("amount.suggestions.result", {
+    totalBalance,
+    fiatCollected: allFiat.length,
+    satCollected: allSat.length,
+    pickedFiat: pickedFiat.length,
+    pickedSat: pickedSat.length,
+    totalSuggestions: sorted.length,
+    includesSendAll: totalBalance > 0,
+  });
   return sorted;
 }

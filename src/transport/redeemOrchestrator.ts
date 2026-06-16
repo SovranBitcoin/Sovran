@@ -20,7 +20,7 @@
 
 import type { Manager } from '@cashu/coco-core';
 import { NetworkError, HttpResponseError } from '@cashu/coco-core';
-import { logger } from '../logger';
+import { logger, mintUrlFields } from '../logger';
 
 export type MeshRedeemStatus =
   | 'pending'
@@ -170,7 +170,7 @@ export function createMeshRedeemOrchestrator(
           config.queue.markStatus(tokenHash, 'untrusted-mint');
           logger.warn('transport.redeem.untrustedMint', {
             tokenHash: tokenHash.slice(0, 12),
-            mintUrl: entry.mintUrl,
+            ...mintUrlFields(entry.mintUrl),
           });
           continue;
         }
@@ -183,7 +183,7 @@ export function createMeshRedeemOrchestrator(
           logger.info('transport.redeem.success', {
             tokenHash: tokenHash.slice(0, 12),
             amount: entry.amount,
-            mintUrl: entry.mintUrl,
+            ...mintUrlFields(entry.mintUrl),
           });
           config.onRedeemed?.(tokenHash, entry, historyEntryId);
         } catch (err) {

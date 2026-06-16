@@ -1,4 +1,5 @@
-import type { ChainAddressSummary } from '../adapters';
+import type { ChainAddressSummary } from "../adapters";
+import { logger } from "../logger";
 
 export const DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS = 6;
 
@@ -15,7 +16,13 @@ export function getOnchainConfirmationProgress(
   summary: ChainAddressSummary | null | undefined,
   requiredConfirmations = DEFAULT_ONCHAIN_REQUIRED_CONFIRMATIONS,
 ): OnchainConfirmationProgress | null {
-  if (!summary) return null;
+  if (!summary) {
+    logger.debug("chain.onchain.confirmationProgress.result", {
+      reason: "missing-summary",
+      requiredConfirmations,
+    });
+    return null;
+  }
 
   const normalizedRequired =
     Number.isSafeInteger(requiredConfirmations) && requiredConfirmations > 0
@@ -26,31 +33,75 @@ export function getOnchainConfirmationProgress(
   const hasConfirmedPayment = summary.confirmedTxCount > 0;
 
   if (!hasUnconfirmedPayment && !hasConfirmedPayment) {
+    logger.debug("chain.onchain.confirmationProgress.result", {
+      reason: "no-payment",
+      requiredConfirmations: normalizedRequired,
+      unconfirmedTxCount: summary.unconfirmedTxCount,
+      confirmedTxCount: summary.confirmedTxCount,
+    });
     return null;
   }
 
-  const currentConfirmations = hasConfirmedPayment ? summary.confirmedFundingConfirmations : null;
+  const currentConfirmations = hasConfirmedPayment
+    ? summary.confirmedFundingConfirmations
+    : null;
   const cappedConfirmations =
-    currentConfirmations == null ? null : Math.min(currentConfirmations, normalizedRequired);
+    currentConfirmations == null
+      ? null
+      : Math.min(currentConfirmations, normalizedRequired);
 
-  return {
+  const progress = {
     hasPayment: true,
     hasUnconfirmedPayment,
     receivedSats,
     currentConfirmations: cappedConfirmations,
     requiredConfirmations: normalizedRequired,
-    isSatisfied: currentConfirmations != null && currentConfirmations >= normalizedRequired,
+    isSatisfied:
+      currentConfirmations != null &&
+      currentConfirmations >= normalizedRequired,
   };
+  logger.info("chain.onchain.confirmationProgress.result", {
+    reason: progress.isSatisfied ? "satisfied" : "waiting",
+    hasUnconfirmedPayment,
+    receivedSats,
+    currentConfirmations: cappedConfirmations,
+    requiredConfirmations: normalizedRequired,
+    isSatisfied: progress.isSatisfied,
+  });
+  return progress;
 }
 
-export function getOnchainConfirmationInfo(progress: OnchainConfirmationProgress): string {
+export function getOnchainConfirmationInfo(
+  progress: OnchainConfirmationProgress,
+): string {
   if (progress.hasUnconfirmedPayment && progress.currentConfirmations == null) {
-    return 'Waiting for first confirmation';
+    logger.debug("chain.onchain.confirmationInfo.result", {
+      reason: "waiting-first-confirmation",
+      hasUnconfirmedPayment: progress.hasUnconfirmedPayment,
+      currentConfirmations: progress.currentConfirmations,
+      requiredConfirmations: progress.requiredConfirmations,
+      isSatisfied: progress.isSatisfied,
+    });
+    return "Waiting for first confirmation";
   }
 
   if (progress.currentConfirmations == null) {
-    return 'Payment confirmed onchain';
+    logger.debug("chain.onchain.confirmationInfo.result", {
+      reason: "confirmed-no-count",
+      hasUnconfirmedPayment: progress.hasUnconfirmedPayment,
+      currentConfirmations: progress.currentConfirmations,
+      requiredConfirmations: progress.requiredConfirmations,
+      isSatisfied: progress.isSatisfied,
+    });
+    return "Payment confirmed onchain";
   }
 
+  logger.debug("chain.onchain.confirmationInfo.result", {
+    reason: "counted-confirmations",
+    hasUnconfirmedPayment: progress.hasUnconfirmedPayment,
+    currentConfirmations: progress.currentConfirmations,
+    requiredConfirmations: progress.requiredConfirmations,
+    isSatisfied: progress.isSatisfied,
+  });
   return `${progress.currentConfirmations}/${progress.requiredConfirmations} confirmations`;
 }

@@ -39,6 +39,16 @@ function isOnionHost(host: string): boolean {
   return host.toLowerCase().endsWith('.onion');
 }
 
+function loggableAddress(address: string): Record<string, unknown> {
+  const parsed = parseLightningAddress(address);
+  return {
+    inputLength: address.length,
+    parsed: !!parsed,
+    usernameLength: parsed?.username.length ?? 0,
+    domain: parsed?.domain ?? null,
+  };
+}
+
 /**
  * Resolve a Lightning Address to a Nostr hex pubkey via NIP-05.
  *
@@ -57,25 +67,62 @@ function isOnionHost(host: string): boolean {
  */
 export async function fetchNip05Pubkey(
   address: string,
-  controls: RequestControls = {}
+  controls: RequestControls = {},
 ): Promise<string | null> {
+  logger.info('nip05.resolve.start', {
+    ...loggableAddress(address),
+    hasSignal: !!controls.signal,
+    signalAborted: controls.signal?.aborted === true,
+    timeoutMs: controls.timeoutMs ?? null,
+  });
   const parsed = parseLightningAddress(address);
-  if (!parsed) return null;
+  if (!parsed) {
+    logger.debug('nip05.resolve.skipped', {
+      reason: 'not_lightning_address',
+      inputLength: address.length,
+    });
+    return null;
+  }
   const { username, domain } = parsed;
-  if (isOnionHost(domain)) return null;
+  if (isOnionHost(domain)) {
+    logger.info('nip05.resolve.skipped', {
+      reason: 'onion_host',
+      domain,
+      usernameLength: username.length,
+    });
+    return null;
+  }
 
   const url = `https://${domain}/.well-known/nostr.json?name=${encodeURIComponent(username)}`;
 
   let response: Response;
   try {
+    logger.debug('nip05.fetch.start', {
+      domain,
+      usernameLength: username.length,
+    });
     response = await safeFetch(url, controls);
   } catch (e) {
-    if (isAbortError(e)) return null;
-    logger.warn('nip05.fetchFailed', { error: errField(e) });
+    if (isAbortError(e)) {
+      logger.warn('nip05.fetch.timeout', {
+        domain,
+        usernameLength: username.length,
+      });
+      return null;
+    }
+    logger.warn('nip05.fetchFailed', {
+      domain,
+      usernameLength: username.length,
+      error: errField(e),
+    });
     return null;
   }
   if (!response.ok) {
-    logger.warn('nip05.httpError', { status: response.status });
+    logger.warn('nip05.httpError', {
+      domain,
+      usernameLength: username.length,
+      status: response.status,
+    });
     return null;
   }
 
@@ -83,24 +130,52 @@ export async function fetchNip05Pubkey(
   try {
     raw = await response.json();
   } catch (e) {
-    logger.warn('nip05.invalidJson', { error: errField(e) });
+    logger.warn('nip05.invalidJson', {
+      domain,
+      usernameLength: username.length,
+      error: errField(e),
+    });
     return null;
   }
 
   const result = Nip05Response.safeParse(raw);
   if (!result.success) {
-    logger.warn('nip05.invalidShape');
+    logger.warn('nip05.invalidShape', {
+      domain,
+      usernameLength: username.length,
+      issueCount: result.error.issues.length,
+      issues: result.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        code: issue.code,
+      })),
+    });
     return null;
   }
 
   const names = result.data.names;
   const hex = names[username] ?? names[username.toLowerCase()] ?? null;
-  if (!hex) return null;
+  if (!hex) {
+    logger.info('nip05.resolve.empty', {
+      domain,
+      usernameLength: username.length,
+      namesCount: Object.keys(names).length,
+    });
+    return null;
+  }
 
   const lower = hex.toLowerCase();
   if (!HEX_PUBKEY.test(lower)) {
-    logger.warn('nip05.invalidHex');
+    logger.warn('nip05.invalidHex', {
+      domain,
+      usernameLength: username.length,
+      pubkeyLength: hex.length,
+    });
     return null;
   }
+  logger.info('nip05.resolve.done', {
+    domain,
+    usernameLength: username.length,
+    pubkeyLength: lower.length,
+  });
   return lower;
 }

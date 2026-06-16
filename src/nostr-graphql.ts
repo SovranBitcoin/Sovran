@@ -1,7 +1,16 @@
-import { createNaggClient, NaggUnknownDataSchema, type NaggError } from '@sovranbitcoin/nagg-ts';
+import {
+  createNaggClient,
+  NaggUnknownDataSchema,
+  type NaggError,
+} from '@sovranbitcoin/nagg-ts';
 import { z } from 'zod';
+import { errField, logger, mintUrlFields } from './logger';
 import type { RequestControls } from './safeFetch';
-import type { MintContactProfile, MintReviewRecommendation, MintReviewsSummary } from './types';
+import type {
+  MintContactProfile,
+  MintReviewRecommendation,
+  MintReviewsSummary,
+} from './types';
 
 export interface NostrGraphqlMintEnrichmentConfig {
   endpoint: string;
@@ -13,11 +22,11 @@ export interface NostrGraphqlMintEnrichment {
   resolveMintContactProfile: (
     pubkey: string,
     mintUrl: string,
-    controls?: RequestControls
+    controls?: RequestControls,
   ) => Promise<MintContactProfile | undefined>;
   fetchMintReviews: (
     mintUrl: string,
-    controls?: RequestControls
+    controls?: RequestControls,
   ) => Promise<MintReviewsSummary | undefined>;
 }
 
@@ -109,11 +118,59 @@ query ColadaMintReviews($mintUrls: [String!]!, $limit: Int!) {
 }
 `;
 
+function summarizeEndpoint(endpoint: string): Record<string, unknown> {
+  try {
+    const url = new URL(endpoint);
+    return {
+      endpointLength: endpoint.length,
+      protocol: url.protocol.replace(/:$/, ''),
+      host: url.host,
+      pathnameLength: url.pathname.length,
+    };
+  } catch {
+    return {
+      endpointLength: endpoint.length,
+      protocol: null,
+      host: null,
+      pathnameLength: 0,
+    };
+  }
+}
+
+function queryName(query: string): string {
+  const match = /\b(?:query|mutation)\s+([A-Za-z0-9_]+)/.exec(query);
+  return match?.[1] ?? 'anonymous';
+}
+
+function loggableZodIssues(error: z.ZodError): Array<{
+  path: string;
+  code: string;
+}> {
+  return error.issues.map((issue) => ({
+    path: issue.path.join('.'),
+    code: issue.code,
+  }));
+}
+
+function summarizeControls(controls: RequestControls): Record<string, unknown> {
+  return {
+    hasSignal: !!controls.signal,
+    signalAborted: controls.signal?.aborted === true,
+    timeoutMs: controls.timeoutMs ?? null,
+  };
+}
+
 export function createNostrGraphqlMintEnrichment(
-  config: NostrGraphqlMintEnrichmentConfig
+  config: NostrGraphqlMintEnrichmentConfig,
 ): NostrGraphqlMintEnrichment {
   const endpoint = config.endpoint.trim();
   const reviewLimit = Math.max(1, Math.min(config.reviewLimit ?? 100, 500));
+  logger.info('nostrGraphql.create', {
+    ...summarizeEndpoint(endpoint),
+    requestedReviewLimit: config.reviewLimit ?? null,
+    reviewLimit,
+    timeoutMs: config.timeoutMs ?? null,
+  });
   const client = createNaggClient({
     endpoint,
     defaultTimeoutMs: config.timeoutMs,
@@ -121,53 +178,116 @@ export function createNostrGraphqlMintEnrichment(
 
   return {
     resolveMintContactProfile: async (pubkey, _mintUrl, controls = {}) => {
-      const data = await postGraphql(client, CONTACT_PROFILE_QUERY, { pubkey }, ContactProfileData, {
+      const effectiveControls = {
         ...controls,
         timeoutMs: controls.timeoutMs ?? config.timeoutMs,
-      });
-      const event = data.events.nodes.find((node) => node.kind === 0 && node.pubkey === pubkey);
-      const profile = event ? parseProfileEvent(event.content) : null;
-      if (!profile) return undefined;
-      return {
-        pubkey,
-        ...profileFields(profile),
       };
+      logger.info('nostrGraphql.contactProfile.start', {
+        pubkeyLength: pubkey.length,
+        ...mintUrlFields(_mintUrl),
+        ...summarizeControls(effectiveControls),
+      });
+      try {
+        const data = await postGraphql(
+          client,
+          CONTACT_PROFILE_QUERY,
+          { pubkey },
+          ContactProfileData,
+          effectiveControls,
+        );
+        const event = data.events.nodes.find(
+          (node) => node.kind === 0 && node.pubkey === pubkey,
+        );
+        const profile = event ? parseProfileEvent(event.content) : null;
+        logger.info('nostrGraphql.contactProfile.result', {
+          pubkeyLength: pubkey.length,
+          ...mintUrlFields(_mintUrl),
+          nodeCount: data.events.nodes.length,
+          matchedEvent: !!event,
+          hasProfile: !!profile,
+          hasName: !!profile?.name,
+          hasDisplayName: !!profile?.displayName,
+          hasPicture: !!profile?.picture || !!profile?.image,
+        });
+        if (!profile) return undefined;
+        return {
+          pubkey,
+          ...profileFields(profile),
+        };
+      } catch (error) {
+        logger.warn('nostrGraphql.contactProfile.failed', {
+          pubkeyLength: pubkey.length,
+          ...mintUrlFields(_mintUrl),
+          error: errField(error),
+        });
+        throw error;
+      }
     },
 
     fetchMintReviews: async (mintUrl, controls = {}) => {
       const mintUrls = mintURLCandidates(mintUrl);
-      const data = await postGraphql(
-        client,
-        MINT_REVIEWS_QUERY,
-        { mintUrls, limit: reviewLimit },
-        MintReviewsData,
-        {
-          ...controls,
-          timeoutMs: controls.timeoutMs ?? config.timeoutMs,
-        }
-      );
-      const recommendations = data.events.nodes
-        .filter((event) => event.kind === 38000 && isReviewForMint(event, mintUrls))
-        .map(reviewFromEvent)
-        .filter((review): review is MintReviewRecommendation => review !== null)
-        .sort((a, b) => b.created_at - a.created_at);
-
-      const score =
-        recommendations.length > 0
-          ? recommendations.reduce((sum, review) => sum + review.score, 0) / recommendations.length
-          : null;
-      const lastUpdated =
-        recommendations.length > 0
-          ? Math.max(...recommendations.map((review) => review.created_at))
-          : null;
-
-      return {
-        mintUrl,
-        score,
-        recommendations,
-        lastUpdated,
-        fromCache: true,
+      const effectiveControls = {
+        ...controls,
+        timeoutMs: controls.timeoutMs ?? config.timeoutMs,
       };
+      logger.info('nostrGraphql.mintReviews.start', {
+        ...mintUrlFields(mintUrl),
+        candidateCount: mintUrls.length,
+        reviewLimit,
+        ...summarizeControls(effectiveControls),
+      });
+      try {
+        const data = await postGraphql(
+          client,
+          MINT_REVIEWS_QUERY,
+          { mintUrls, limit: reviewLimit },
+          MintReviewsData,
+          effectiveControls,
+        );
+        const matchingEvents = data.events.nodes.filter(
+          (event) => event.kind === 38000 && isReviewForMint(event, mintUrls),
+        );
+        const recommendations = matchingEvents
+          .map(reviewFromEvent)
+          .filter(
+            (review): review is MintReviewRecommendation => review !== null,
+          )
+          .sort((a, b) => b.created_at - a.created_at);
+
+        const score =
+          recommendations.length > 0
+            ? recommendations.reduce((sum, review) => sum + review.score, 0) /
+              recommendations.length
+            : null;
+        const lastUpdated =
+          recommendations.length > 0
+            ? Math.max(...recommendations.map((review) => review.created_at))
+            : null;
+
+        logger.info('nostrGraphql.mintReviews.result', {
+          ...mintUrlFields(mintUrl),
+          nodeCount: data.events.nodes.length,
+          matchingEventCount: matchingEvents.length,
+          recommendationCount: recommendations.length,
+          score,
+          lastUpdated,
+        });
+
+        return {
+          mintUrl,
+          score,
+          recommendations,
+          lastUpdated,
+          fromCache: true,
+        };
+      } catch (error) {
+        logger.warn('nostrGraphql.mintReviews.failed', {
+          ...mintUrlFields(mintUrl),
+          candidateCount: mintUrls.length,
+          error: errField(error),
+        });
+        throw error;
+      }
     },
   };
 }
@@ -177,8 +297,14 @@ async function postGraphql<T extends z.ZodType>(
   query: string,
   variables: Record<string, unknown>,
   dataSchema: T,
-  controls: RequestControls
+  controls: RequestControls,
 ): Promise<z.infer<T>> {
+  const operationName = queryName(query);
+  logger.info('nostrGraphql.query.start', {
+    operationName,
+    variableKeys: Object.keys(variables),
+    ...summarizeControls(controls),
+  });
   const result = await client.query({
     query,
     variables,
@@ -187,12 +313,22 @@ async function postGraphql<T extends z.ZodType>(
     timeoutMs: controls.timeoutMs,
   });
   if (result.isErr()) {
+    logger.warn('nostrGraphql.query.failed', {
+      operationName,
+      errorType: result.error.type,
+      error: result.error.message,
+    });
     throw errorFromNaggError(result.error);
   }
   const parsed = dataSchema.safeParse(result.value);
   if (!parsed.success) {
+    logger.warn('nostrGraphql.query.invalidShape', {
+      operationName,
+      issues: loggableZodIssues(parsed.error),
+    });
     throw new Error('GraphQL response did not match the expected shape');
   }
+  logger.info('nostrGraphql.query.done', { operationName });
   return parsed.data;
 }
 
@@ -205,22 +341,30 @@ function errorFromNaggError(error: NaggError): Error {
   return out;
 }
 
-function parseProfileEvent(content: string):
-  | {
-      name?: string;
-      displayName?: string;
-      picture?: string;
-      image?: string;
-    }
-  | null {
+function parseProfileEvent(content: string): {
+  name?: string;
+  displayName?: string;
+  picture?: string;
+  image?: string;
+} | null {
   let raw: unknown;
   try {
     raw = JSON.parse(content);
   } catch {
+    logger.warn('nostrGraphql.profile.parseFailed', {
+      contentLength: content.length,
+      reason: 'invalid_json',
+    });
     return null;
   }
   const parsed = ProfileMetadata.safeParse(raw);
-  if (!parsed.success) return null;
+  if (!parsed.success) {
+    logger.warn('nostrGraphql.profile.invalidShape', {
+      contentLength: content.length,
+      issues: loggableZodIssues(parsed.error),
+    });
+    return null;
+  }
   return {
     name: parsed.data.name,
     displayName: parsed.data.display_name ?? parsed.data.displayName,
@@ -231,8 +375,18 @@ function parseProfileEvent(content: string):
 
 function reviewFromEvent(event: z.infer<typeof GraphqlEventWithPubkeyEvents>) {
   const parsed = parseMintReviewContent(event.content);
-  if (!parsed) return null;
-  const profileEvent = event.pubkeyEvents?.find((profile) => profile.kind === 0);
+  if (!parsed) {
+    logger.debug('nostrGraphql.review.skipped', {
+      eventIdPresent: event.id.length > 0,
+      pubkeyLength: event.pubkey.length,
+      reason: 'invalid_review_content',
+      contentLength: event.content.length,
+    });
+    return null;
+  }
+  const profileEvent = event.pubkeyEvents?.find(
+    (profile) => profile.kind === 0,
+  );
   const profile = profileEvent ? parseProfileEvent(profileEvent.content) : null;
   return {
     score: parsed.score,
@@ -258,16 +412,22 @@ function profileFields(profile: {
   };
 }
 
-function parseMintReviewContent(raw: string): { score: number; comment: string } | null {
+function parseMintReviewContent(
+  raw: string,
+): { score: number; comment: string } | null {
   const match = raw.match(/^\s*\[(\d+)\/(\d+)\]\s*(.*)$/);
   if (!match) return null;
   const score = Number.parseInt(match[1] ?? '', 10);
   const outOf = Number.parseInt(match[2] ?? '', 10);
-  if (!Number.isFinite(score) || score < 0 || score > 5 || outOf !== 5) return null;
+  if (!Number.isFinite(score) || score < 0 || score > 5 || outOf !== 5)
+    return null;
   return { score, comment: match[3]?.trim() ?? '' };
 }
 
-function isReviewForMint(event: z.infer<typeof GraphqlEventWithPubkeyEvents>, mintUrls: string[]) {
+function isReviewForMint(
+  event: z.infer<typeof GraphqlEventWithPubkeyEvents>,
+  mintUrls: string[],
+) {
   const reviewedURLs = tagValues(event.tags, 'u');
   return (
     tagValues(event.tags, 'k').includes('38172') &&
@@ -283,12 +443,15 @@ function mintURLCandidates(value: string): string[] {
   const trimmed = value.trim();
   const withoutSlash = trimmed.replace(/\/+$/, '');
   const withSlash = withoutSlash ? `${withoutSlash}/` : '';
-  return Array.from(new Set([trimmed, withoutSlash, withSlash].filter(Boolean)));
+  return Array.from(
+    new Set([trimmed, withoutSlash, withSlash].filter(Boolean)),
+  );
 }
 
 function eventCreatedAtSeconds(value: string | number | Date): number {
   if (value instanceof Date) return Math.floor(value.getTime() / 1000);
-  if (typeof value === 'number') return value > 1_000_000_000_000 ? Math.floor(value / 1000) : value;
+  if (typeof value === 'number')
+    return value > 1_000_000_000_000 ? Math.floor(value / 1000) : value;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : 0;
 }

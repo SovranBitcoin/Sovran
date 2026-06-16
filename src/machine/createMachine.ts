@@ -1,7 +1,7 @@
 import { defaultDetectors } from '../detectors';
 import { isMintOfflineError } from '../errors';
 import { t } from '../formatting/locales';
-import { errField, logger } from '../logger';
+import { errField, logger, mintUrlFields } from '../logger';
 import { buildProofSuggestions } from './amountFallback';
 import {
   runConfirmMeltEffect,
@@ -551,7 +551,15 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     }
     sendLocked = true;
     const sendGeneration = flowGeneration;
-    logger.info('machine.event.received', { type: event.type, currentStep: step });
+    logger.info('machine.event.received', {
+      type: event.type,
+      currentStep: step,
+      flowSource: flowCtx.source,
+      intentType: flowCtx.intent?.type,
+      hasMintUrl: !!flowCtx.mintUrl,
+      hasAmount: flowCtx.amount != null,
+      unit: flowCtx.unit,
+    });
 
     // Handle CONFIRM_MELT/CONFIRM_PAYMENT_REQUEST directly — these bypass transition().
     // On success: stepData is updated with historyEntry but step stays unchanged
@@ -590,9 +598,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       const originalStep = step;
       const data = stepData as StepDataMap['navigateToMeltPreview'];
       logger.info('machine.confirmMelt.start', {
-        mintUrl: data.mintUrl,
+        ...mintUrlFields(data.mintUrl),
         amount: data.amount,
-        targetPreview: data.meltTarget?.slice(0, 30),
+        meltTargetLength: data.meltTarget?.length ?? 0,
       });
       handlerExecuting = true;
       notify();
@@ -613,7 +621,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
       if (effect.isOk()) {
         if (effect.value.kind === 'stale') return;
-        logger.info('machine.melt.success', { mintUrl: data.mintUrl });
+        logger.info('machine.melt.success', { ...mintUrlFields(data.mintUrl) });
 
         for (const link of effect.value.links) {
           if (link.type === 'linkTransaction') {
@@ -672,8 +680,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         for (const h of holders) h.rolledBack = rolledBack;
       };
       logger.info('machine.confirmPaymentRequest.start', {
-        mintUrl: data.mintUrl,
+        ...mintUrlFields(data.mintUrl),
         amount: data.amount,
+        paymentRequestLength: data.paymentRequest.length,
       });
       handlerExecuting = true;
       notify();
@@ -699,7 +708,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           // Delivery failed but ecash was reclaimed — route through standard
           // failure path so BIP321 multi-option flows show the fallback selector.
           logger.warn('machine.paymentRequest.rolledBack', {
-            mintUrl: data.mintUrl,
+            ...mintUrlFields(data.mintUrl),
             errorMessage: effect.value.errorMessage,
           });
           settle(true);
@@ -712,7 +721,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           );
         } else {
           // Normal success path
-          logger.info('machine.paymentRequest.success', { mintUrl: data.mintUrl });
+          logger.info('machine.paymentRequest.success', { ...mintUrlFields(data.mintUrl) });
           settle(false);
 
           for (const link of effect.value.links) {
@@ -814,7 +823,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     flowCtx = result.context;
     setStep(result.step, result.data);
     if (step !== prevStep) {
-      logger.info('machine.transition', { from: prevStep, to: step, eventType: event.type });
+      logger.info('machine.transition', {
+        from: prevStep,
+        to: step,
+        eventType: event.type,
+        flowSource: flowCtx.source,
+        intentType: flowCtx.intent?.type,
+        hasMintUrl: !!flowCtx.mintUrl,
+        hasAmount: flowCtx.amount != null,
+        unit: flowCtx.unit,
+      });
     }
 
     // Kick off NIP-05 + kind-0 resolution as a background side effect when
@@ -1009,7 +1027,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         const hasExactLocalProofs = proofAmounts.length > 0 && localProofs.exactMatch;
         const shouldCreateLocalTokenFirst = hasExactLocalProofs && !!operations.executeOfflineSend;
         logger.info('machine.confirmSend.start', {
-          mintUrl: data.mintUrl,
+          ...mintUrlFields(data.mintUrl),
           amount: data.amount,
           hasExactLocalProofs,
           localFirst: shouldCreateLocalTokenFirst,
@@ -1066,7 +1084,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       } else if (step === 'createMintQuote') {
         const data = stepData as StepDataMap['createMintQuote'];
         logger.info('machine.createMintQuote.start', {
-          mintUrl: data.mintUrl,
+          ...mintUrlFields(data.mintUrl),
           amount: data.amount,
           method: data.method ?? 'bolt11',
         });

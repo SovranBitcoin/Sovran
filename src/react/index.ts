@@ -5,15 +5,31 @@
 // Provider & flow hooks
 export {
   ColadaProvider,
+  useAnnotationStore,
   useColadaContext,
+  useColadaManager,
   useColadaSubscriptions,
   usePaymentCopy,
   usePaymentFlowMachine,
+  useSetTransactionAnnotation,
   type DeepLinkConfig,
   type ColadaProviderProps,
   type PaymentFlowRefs,
   type ScreenActionsBridge,
-} from './ColadaProvider';
+  type SetTransactionAnnotation,
+} from "./ColadaProvider";
+
+// Transaction list read model
+export {
+  useColadaTransactions,
+  type UseColadaTransactionsResult,
+} from "./useColadaTransactions";
+
+// Single-entry annotation read model
+export { useColadaTransactionAnnotation } from "./useColadaTransactionAnnotation";
+
+// Balance breakdown read model
+export { useColadaBalance } from "./useColadaBalance";
 
 export type {
   BleAdapter,
@@ -33,7 +49,7 @@ export type {
   SecureStorageAdapter,
   ShareAdapter,
   StorageAdapter,
-} from '../adapters';
+} from "../adapters";
 
 export type {
   ColadaSubscriptionBus,
@@ -42,13 +58,13 @@ export type {
   SubscriptionEventType,
   SubscriptionFilter,
   SubscriptionListener,
-} from '../subscriptions';
+} from "../subscriptions";
 
 export type {
   PaymentCopyKey,
   PaymentCopyResolver,
   PaymentCopyVariables,
-} from '../copy';
+} from "../copy";
 
 // Scan types (machine.scan uses these)
 export type {
@@ -57,7 +73,7 @@ export type {
   ProcessResult,
   ScanSourceResult,
   ScanSources,
-} from '../machine/types';
+} from "../machine/types";
 
 // Post-terminal screen actions
 export {
@@ -66,13 +82,19 @@ export {
   type BoundAction,
   type UseScreenActionsConfig,
   type UseScreenActionsResult,
-} from './useScreenActions';
+} from "./useScreenActions";
 
 // Re-export suggestion types for convenience
-export type { QuickSendSuggestion, QuickSendConfig } from '../amount-actions/types';
+export type {
+  QuickSendSuggestion,
+  QuickSendConfig,
+} from "../amount-actions/types";
 
 // Low-level machine hook (for wallets not using ColadaProvider)
-export { usePaymentMachine, type UsePaymentMachineConfig } from './usePaymentMachine';
+export {
+  usePaymentMachine,
+  type UsePaymentMachineConfig,
+} from "./usePaymentMachine";
 
 // Execution state subscription
-export { useExecutionState } from './useExecutionState';
+export { useExecutionState } from "./useExecutionState";

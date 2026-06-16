@@ -21,6 +21,7 @@ import type {
   CreateAmountActionManagerConfig,
   QuickSendSuggestion,
 } from '../amount-actions/types';
+import { logger } from '../logger';
 import {
   createScreenActionSession,
   type ScreenActionSession,
@@ -88,6 +89,65 @@ export type UseScreenActionsResult<
   suggestions: QuickSendSuggestion[];
 };
 
+function summarizeEntryParam(
+  entryParam: Record<string, unknown> | string | null | undefined,
+): Record<string, unknown> {
+  if (entryParam == null) return { entryKind: 'none' };
+  if (typeof entryParam === 'string') {
+    return { entryKind: 'string', entryLength: entryParam.length };
+  }
+
+  const keys = Object.keys(entryParam);
+  const normalized = keys.map((key) => key.toLowerCase());
+  return {
+    entryKind: 'object',
+    entryKeyCount: keys.length,
+    hasAmount: normalized.includes('amount'),
+    hasMintUrl: normalized.includes('minturl'),
+    hasToken: normalized.some((key) => key.includes('token')),
+    hasPaymentRequest: normalized.some((key) => key.includes('paymentrequest')),
+    hasMeltTarget: normalized.some((key) => key.includes('melttarget')),
+    hasQuoteId: normalized.some((key) => key.includes('quoteid')),
+    hasOperationId: normalized.some((key) => key.includes('operationid')),
+  };
+}
+
+function summarizeHandlerMap(
+  handlers: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const names = Object.keys(handlers ?? {}).sort();
+  return {
+    handlerCount: names.length,
+    handlerNames: names,
+  };
+}
+
+function summarizeActionStates(
+  actions: Record<string, ActionState>,
+): Record<string, unknown> {
+  const entries = Object.entries(actions);
+  let availableCount = 0;
+  let loadingCount = 0;
+  let variantCount = 0;
+  let unavailableCount = 0;
+
+  for (const [, state] of entries) {
+    if (state.available) availableCount += 1;
+    else unavailableCount += 1;
+    if (state.loading) loadingCount += 1;
+    variantCount += state.variants?.length ?? 0;
+  }
+
+  return {
+    actionCount: entries.length,
+    availableCount,
+    unavailableCount,
+    loadingCount,
+    variantCount,
+    actionNames: entries.map(([name]) => name).sort(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Internal: config-based manager (tests / advanced callers)
 // ---------------------------------------------------------------------------
@@ -116,6 +176,17 @@ export function useScreenActionsWithConfig<S extends ScreenType>(
   const sessionRef = useRef<ScreenActionSession<S> | null>(null);
 
   if (!sessionRef.current) {
+    logger.info('react.useScreenActionsWithConfig.session.create', {
+      screenType,
+      ...summarizeEntryParam(entryParam),
+      ...summarizeHandlerMap(handlers as Record<string, unknown> | undefined),
+      defaultHandlerCount: Object.keys(defaultHandlers ?? {}).length,
+      hasGetExtraContext: !!getExtraContext,
+      hasEntryUpdates: !!onEntryUpdate,
+      hasShouldApplyEntryUpdate: !!shouldApplyEntryUpdate,
+      hasMergeEntryUpdate: !!mergeEntryUpdate,
+      hasAmountConfig: !!amountConfig,
+    });
     sessionRef.current = createScreenActionSession<S>({
       screenType,
       handlers,
@@ -141,20 +212,54 @@ export function useScreenActionsWithConfig<S extends ScreenType>(
   }
 
   const session = sessionRef.current;
+  const snapshotKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    logger.debug('react.useScreenActionsWithConfig.entrySeed', {
+      screenType,
+      ...summarizeEntryParam(entryParam),
+    });
     session.setEntrySeed(entryParam);
-  }, [entryParam, session]);
+  }, [entryParam, screenType, session]);
 
   useEffect(() => {
-    return () => session.dispose();
-  }, [session]);
+    return () => {
+      logger.info('react.useScreenActionsWithConfig.session.dispose', {
+        screenType,
+      });
+      session.dispose();
+    };
+  }, [screenType, session]);
 
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.inspect,
     session.inspect,
   );
+
+  useEffect(() => {
+    const actionSummary = summarizeActionStates(snapshot.actions);
+    const key = JSON.stringify({
+      screenType,
+      error: snapshot.error,
+      mintUrlLength: snapshot.mintUrl?.length ?? 0,
+      suggestionCount: snapshot.suggestions.length,
+      ...actionSummary,
+      ...summarizeEntryParam(snapshot.entry),
+    });
+    if (snapshotKeyRef.current === key) return;
+    snapshotKeyRef.current = key;
+    logger.debug('react.useScreenActionsWithConfig.snapshot', {
+      screenType,
+      hasError: !!snapshot.error,
+      errorLength: snapshot.error?.length ?? 0,
+      hasMintUrl: !!snapshot.mintUrl,
+      mintUrlLength: snapshot.mintUrl?.length ?? 0,
+      suggestionCount: snapshot.suggestions.length,
+      ...summarizeEntryParam(snapshot.entry),
+      ...actionSummary,
+    });
+  }, [screenType, snapshot]);
 
   const actions = useMemo(() => {
     const bound = {} as Record<ScreenActionName[S], BoundAction>;
@@ -339,6 +444,18 @@ export function useScreenActions(
 
   const sessionRef = useRef<ScreenActionSession<ScreenType> | null>(null);
   if (!sessionRef.current) {
+    logger.info('react.useScreenActions.session.create', {
+      screenType,
+      isAmountEntry,
+      ...summarizeEntryParam(entryParam),
+      ...summarizeHandlerMap(handlers as Record<string, unknown> | undefined),
+      defaultHandlerCount: Object.keys(defaultHandlersForScreen ?? {}).length,
+      hasBridge: !!screenActionsBridge,
+      hasSubscriptionBus: !!subscriptionBusRef.current,
+      hasEffectiveAmountConfig: !!effectiveAmountConfig,
+      hasProvidedAmountConfig: !!options?.amountConfig,
+      hasDerivedAmountConfig: !!derivedAmountConfig,
+    });
     sessionRef.current = createScreenActionSession({
       screenType,
       handlers,
@@ -352,20 +469,61 @@ export function useScreenActions(
   }
 
   const session = sessionRef.current;
+  const snapshotKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    logger.debug('react.useScreenActions.entrySeed', {
+      screenType,
+      isAmountEntry,
+      ...summarizeEntryParam(entryParam),
+    });
     session.setEntrySeed(entryParam);
-  }, [entryParam, session]);
+  }, [entryParam, isAmountEntry, screenType, session]);
 
   useEffect(() => {
-    return () => session.dispose();
-  }, [session]);
+    return () => {
+      logger.info('react.useScreenActions.session.dispose', {
+        screenType,
+        isAmountEntry,
+      });
+      session.dispose();
+    };
+  }, [isAmountEntry, screenType, session]);
 
   const snapshot = useSyncExternalStore(
     session.subscribe,
     session.inspect,
     session.inspect,
   );
+
+  useEffect(() => {
+    const actionSummary = summarizeActionStates(snapshot.actions);
+    const key = JSON.stringify({
+      screenType,
+      isAmountEntry,
+      error: snapshot.error,
+      mintUrlLength: snapshot.mintUrl?.length ?? 0,
+      sourceLength: snapshot.source?.length ?? 0,
+      suggestionCount: snapshot.suggestions.length,
+      ...actionSummary,
+      ...summarizeEntryParam(snapshot.entry),
+    });
+    if (snapshotKeyRef.current === key) return;
+    snapshotKeyRef.current = key;
+    logger.debug('react.useScreenActions.snapshot', {
+      screenType,
+      isAmountEntry,
+      hasError: !!snapshot.error,
+      errorLength: snapshot.error?.length ?? 0,
+      hasMintUrl: !!snapshot.mintUrl,
+      mintUrlLength: snapshot.mintUrl?.length ?? 0,
+      hasSource: !!snapshot.source,
+      sourceLength: snapshot.source?.length ?? 0,
+      suggestionCount: snapshot.suggestions.length,
+      ...summarizeEntryParam(snapshot.entry),
+      ...actionSummary,
+    });
+  }, [isAmountEntry, screenType, snapshot]);
 
   const actions = useMemo(() => {
     const bound = {} as Record<ScreenActionName[ScreenType], BoundAction>;

@@ -2,7 +2,13 @@ import { createAmountEntryMethodContext } from '../../mint-capabilities';
 import { selectMint } from '../../mint-selection';
 import type { WalletContext } from '../../types';
 import type { PaymentCopyKey } from '../../copy';
-import type { FlowContext, FlowStep, RecipientProfile, StepDataMap } from '../types';
+import type {
+  FlowContext,
+  FlowStep,
+  RecipientProfile,
+  StepDataMap,
+} from '../types';
+import { logger, mintUrlFields } from '../../logger';
 
 export type SendFlowState =
   | {
@@ -62,18 +68,43 @@ export function startSendEcashFlow(
   unit: string,
   opts: StartSendEcashOptions = {},
 ): SendFlowTransitionResult {
+  logger.info('flow.sendEcash.start', {
+    unit,
+    offline: opts.offline === true,
+    hasMeltTarget: !!opts.meltTarget,
+    meltTargetLength: opts.meltTarget?.length ?? 0,
+    hasRecipientPubkey: !!opts.recipientPubkey,
+    recipientPubkeyLength: opts.recipientPubkey?.length ?? 0,
+    hasRecipientProfile: !!opts.recipientProfile,
+    p2pkLocked: !!opts.p2pkLockPubkey,
+    p2pkLockPubkeyLength: opts.p2pkLockPubkey?.length ?? 0,
+    allowedMintCount: opts.allowedMints?.length ?? 0,
+    trustedMintCount: walletCtx.trustedMintUrls.length,
+    balanceMintCount: Object.keys(walletCtx.mintBalances).length,
+  });
   const context: FlowContext = {
     unit,
     destination: 'sendEcash',
     offline: opts.offline,
     ...(opts.meltTarget ? { meltTarget: opts.meltTarget } : {}),
     ...(opts.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
-    ...(opts.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
-    ...(opts.p2pkLockPubkey ? { p2pkLockPubkey: opts.p2pkLockPubkey.toLowerCase() } : {}),
+    ...(opts.recipientProfile
+      ? { recipientProfile: opts.recipientProfile }
+      : {}),
+    ...(opts.p2pkLockPubkey
+      ? { p2pkLockPubkey: opts.p2pkLockPubkey.toLowerCase() }
+      : {}),
   };
   // A malformed lock key must abort the flow — silently dropping it would
   // downgrade the send to a bearer token on whatever surface requested a lock.
-  if (opts.p2pkLockPubkey && !P2PK_LOCK_PUBKEY_PATTERN.test(opts.p2pkLockPubkey)) {
+  if (
+    opts.p2pkLockPubkey &&
+    !P2PK_LOCK_PUBKEY_PATTERN.test(opts.p2pkLockPubkey)
+  ) {
+    logger.warn('flow.sendEcash.invalidP2pkLock', {
+      p2pkLockPubkeyLength: opts.p2pkLockPubkey.length,
+      allowedMintCount: opts.allowedMints?.length ?? 0,
+    });
     return {
       step: 'error',
       context,
@@ -85,12 +116,21 @@ export function startSendEcashFlow(
   }
   const selection = selectMint(
     walletCtx,
-    opts.allowedMints && opts.allowedMints.length > 0 ? { allowedMints: opts.allowedMints } : {},
+    opts.allowedMints && opts.allowedMints.length > 0
+      ? { allowedMints: opts.allowedMints }
+      : {},
   );
 
   switch (selection.type) {
     case 'selected':
       context.mintUrl = selection.mintUrl;
+      logger.info('flow.sendEcash.selectedMint', {
+        unit,
+        ...mintUrlFields(selection.mintUrl),
+        offline: opts.offline === true,
+        p2pkLocked: !!opts.p2pkLockPubkey,
+        allowedMintCount: opts.allowedMints?.length ?? 0,
+      });
       return {
         step: 'enterAmount',
         context,
@@ -101,12 +141,23 @@ export function startSendEcashFlow(
             destination: 'sendEcash',
             methodContext: createAmountEntryMethodContext(walletCtx),
             ...(opts.meltTarget ? { meltTarget: opts.meltTarget } : {}),
-            ...(opts.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
-            ...(opts.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
+            ...(opts.recipientPubkey
+              ? { recipientPubkey: opts.recipientPubkey }
+              : {}),
+            ...(opts.recipientProfile
+              ? { recipientProfile: opts.recipientProfile }
+              : {}),
           },
         },
       };
     case 'selectionNeeded':
+      logger.info('flow.sendEcash.selectionNeeded', {
+        unit,
+        candidateCount: selection.validMints.length,
+        offline: opts.offline === true,
+        p2pkLocked: !!opts.p2pkLockPubkey,
+        allowedMintCount: opts.allowedMints?.length ?? 0,
+      });
       return {
         step: 'selectMint',
         context,
@@ -115,11 +166,23 @@ export function startSendEcashFlow(
           unit,
           destination: 'sendEcash',
           ...(opts.meltTarget ? { meltTarget: opts.meltTarget } : {}),
-          ...(opts.recipientPubkey ? { recipientPubkey: opts.recipientPubkey } : {}),
-          ...(opts.recipientProfile ? { recipientProfile: opts.recipientProfile } : {}),
+          ...(opts.recipientPubkey
+            ? { recipientPubkey: opts.recipientPubkey }
+            : {}),
+          ...(opts.recipientProfile
+            ? { recipientProfile: opts.recipientProfile }
+            : {}),
         },
       };
     case 'noValidMint':
+      logger.warn('flow.sendEcash.noValidMint', {
+        unit,
+        reasonCode: selection.reason.code,
+        reasonMessage: selection.reason.message,
+        offline: opts.offline === true,
+        p2pkLocked: !!opts.p2pkLockPubkey,
+        allowedMintCount: opts.allowedMints?.length ?? 0,
+      });
       return {
         step: 'error',
         context,

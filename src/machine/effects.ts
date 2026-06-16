@@ -2,6 +2,7 @@ import { errAsync, okAsync, ResultAsync } from 'neverthrow';
 
 import { isMintOfflineError } from '../errors';
 import { t } from '../formatting/locales';
+import { errField, logger, mintUrlFields } from '../logger';
 import { parseHistoryEntryOnce } from '../operations/historyEntry';
 import { buildChooseProofsData, buildProofSuggestions } from './amountFallback';
 import type {
@@ -341,12 +342,80 @@ export interface RunRecipientProfileEffectConfig {
   isStale: (op: string) => boolean;
 }
 
+function summarizeContext(context: FlowContext): Record<string, unknown> {
+  return {
+    destination: context.destination ?? null,
+    unit: context.unit,
+    offline: context.offline === true,
+    localProofSend: context.localProofSend === true,
+    mintUnreachableConfirmed: context.mintUnreachableConfirmed === true,
+    hasPaymentRequest: !!context.paymentRequest,
+    paymentRequestLength: context.paymentRequest?.length ?? 0,
+    hasMeltTarget: !!context.meltTarget,
+    meltTargetLength: context.meltTarget?.length ?? 0,
+    hasRecipientPubkey: !!context.recipientPubkey,
+    hasRecipientProfile: !!context.recipientProfile,
+    hasP2pkLockPubkey: !!context.p2pkLockPubkey,
+    p2pkLockPubkeyLength: context.p2pkLockPubkey?.length ?? 0,
+    hasMemo: !!context.memo,
+    rawInputLength: context.rawInput?.length ?? 0,
+    source: context.source ?? null,
+  };
+}
+
+function summarizeNotifications(
+  notifications: MachineEffectNotification[],
+): Record<string, unknown> {
+  const byType: Record<string, number> = {};
+  const paymentVariants: string[] = [];
+
+  for (const notification of notifications) {
+    byType[notification.type] = (byType[notification.type] ?? 0) + 1;
+    if (notification.type === 'onPaymentConfirmed') {
+      paymentVariants.push(notification.data.variant);
+    }
+  }
+
+  return {
+    count: notifications.length,
+    byType,
+    paymentVariants,
+  };
+}
+
+function summarizeLinks(links: MachineEffectLink[]): Record<string, unknown> {
+  return {
+    count: links.length,
+    linkTypes: links.map((link) => link.type),
+    withInputCount: links.filter((link) => link.input.length > 0).length,
+    transactionIdPresentCount: links.filter(
+      (link) => link.transactionId.length > 0,
+    ).length,
+  };
+}
+
+function summarizeHistoryEntry(historyEntry: string): Record<string, unknown> {
+  const parsed = parseHistoryEntryOnce(historyEntry);
+  return {
+    historyEntryLength: historyEntry.length,
+    transactionIdPresent: !!parsed?.id,
+  };
+}
+
 function toMintQuoteEffectError(
   cause: unknown,
   data: StepDataMap['createMintQuote'],
   locale: string,
 ): MintQuoteEffectError {
   const mintUnreachable = isMintOfflineError(cause);
+  logger.warn('effects.mintQuote.error', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    method: data.method ?? 'bolt11',
+    mintUnreachable,
+    error: errField(cause),
+  });
   return {
     kind: 'failed',
     cause,
@@ -366,6 +435,9 @@ function toMintReviewInfoEffectError(
   cause: unknown,
   locale: string,
 ): MintReviewInfoEffectError {
+  logger.warn('effects.mintReviewInfo.error', {
+    error: errField(cause),
+  });
   return {
     kind: 'failed',
     cause,
@@ -381,6 +453,9 @@ function toTrustMintEffectError(
   cause: unknown,
   locale: string,
 ): TrustMintEffectError {
+  logger.warn('effects.trustMint.error', {
+    error: errField(cause),
+  });
   return {
     kind: 'failed',
     cause,
@@ -395,12 +470,14 @@ function toTrustMintEffectError(
 function createOfflineMintQuoteError(locale: string): Error {
   const error = new Error(t('MINT_UNREACHABLE', locale));
   error.name = 'MintFetchError';
+  logger.info('effects.mintQuote.offlineBlocked');
   return error;
 }
 
 function createOfflineSendError(locale: string): Error {
   const error = new Error(t('MINT_UNREACHABLE', locale));
   error.name = 'MintFetchError';
+  logger.info('effects.send.offlineErrorCreated');
   return error;
 }
 
@@ -413,7 +490,30 @@ function buildTransactionCreatedNotifications(args: {
   context: FlowContext;
 }): MachineEffectNotification[] {
   const parsed = parseHistoryEntryOnce(args.historyEntry);
-  if (!parsed?.id) return [];
+  if (!parsed?.id) {
+    logger.warn('effects.transactionNotification.skipped', {
+      reason: 'missing_transaction_id',
+      type: args.type,
+      ...mintUrlFields(args.mintUrl),
+      amount: args.amount,
+      unit: args.unit,
+      historyEntryLength: args.historyEntry.length,
+      rawInputLength: args.context.rawInput?.length ?? 0,
+      source: args.context.source ?? null,
+    });
+    return [];
+  }
+
+  logger.info('effects.transactionNotification.created', {
+    type: args.type,
+    ...mintUrlFields(args.mintUrl),
+    amount: args.amount,
+    unit: args.unit,
+    historyEntryLength: args.historyEntry.length,
+    transactionIdPresent: true,
+    rawInputLength: args.context.rawInput?.length ?? 0,
+    source: args.context.source ?? null,
+  });
 
   return [
     {
@@ -501,6 +601,17 @@ function buildConfirmMeltResult(
     );
   }
 
+  logger.info('effects.confirmMelt.result', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    meltTargetLength: data.meltTarget.length,
+    ...summarizeHistoryEntry(result.historyEntry),
+    links: summarizeLinks(links),
+    notifications: summarizeNotifications(notifications),
+    context: summarizeContext(context),
+  });
+
   return {
     kind: 'completed',
     step: 'navigateToMeltPreview',
@@ -552,6 +663,17 @@ function buildConfirmPaymentRequestResult(
       },
     });
   }
+
+  logger.info('effects.paymentRequest.result', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    paymentRequestLength: data.paymentRequest.length,
+    ...summarizeHistoryEntry(result.historyEntry),
+    links: summarizeLinks(links),
+    notifications: summarizeNotifications(notifications),
+    context: summarizeContext(context),
+  });
 
   return {
     kind: 'completed',
@@ -606,6 +728,17 @@ function buildNfcWriteBackResult(
     });
   }
 
+  logger.info('effects.nfcWriteBack.result', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    operationIdPresent: result.operationId.length > 0,
+    ...summarizeHistoryEntry(result.historyEntry),
+    links: summarizeLinks(links),
+    notifications: summarizeNotifications(notifications),
+    context: summarizeContext(context),
+  });
+
   return {
     kind: 'completed',
     step: 'sendComplete',
@@ -625,6 +758,11 @@ function buildNfcWriteBackError(args: {
 }): NfcWriteBackEffectError {
   const message =
     args.cause instanceof Error ? args.cause.message : 'NFC write failed';
+
+  logger.warn('effects.nfcWriteBack.error', {
+    rolledBack: args.rolledBack,
+    error: errField(args.cause),
+  });
 
   return {
     kind: 'failed',
@@ -653,6 +791,27 @@ function buildSendCompleteResult(args: {
     ...args.context,
     ...args.contextPatch,
   };
+  const notifications = buildTransactionCreatedNotifications({
+    historyEntry: args.result.historyEntry,
+    type: 'send',
+    mintUrl: args.data.mintUrl,
+    amount: args.data.amount,
+    unit: effectiveContext.unit,
+    context: effectiveContext,
+  });
+
+  logger.info('effects.sendComplete.result', {
+    path: args.path,
+    ...mintUrlFields(args.data.mintUrl),
+    amount: args.data.amount,
+    unit: effectiveContext.unit,
+    createdOffline: args.createdOffline,
+    mintWasOffline: args.mintWasOffline,
+    contextPatched: !!args.contextPatch,
+    ...summarizeHistoryEntry(args.result.historyEntry),
+    notifications: summarizeNotifications(notifications),
+    context: summarizeContext(effectiveContext),
+  });
 
   return {
     kind: 'completed',
@@ -669,14 +828,7 @@ function buildSendCompleteResult(args: {
         : {}),
     },
     ...(args.contextPatch ? { context: args.contextPatch } : {}),
-    notifications: buildTransactionCreatedNotifications({
-      historyEntry: args.result.historyEntry,
-      type: 'send',
-      mintUrl: args.data.mintUrl,
-      amount: args.data.amount,
-      unit: effectiveContext.unit,
-      context: effectiveContext,
-    }),
+    notifications,
   };
 }
 
@@ -684,7 +836,17 @@ function executeSendOperation(
   operation: SendOperation,
   data: StepDataMap['confirmSend'],
   options?: { p2pkLockPubkey?: string },
+  path: ConfirmSendEffectPath | 'forcedLocalProbe' = 'online',
 ): ResultAsync<SendOperationResult, unknown> {
+  logger.info('effects.sendOperation.start', {
+    path,
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    hasMemo: !!data.memo,
+    p2pkLocked: !!options?.p2pkLockPubkey,
+    p2pkLockPubkeyLength: options?.p2pkLockPubkey?.length ?? 0,
+  });
+
   return ResultAsync.fromThrowable(
     () =>
       options?.p2pkLockPubkey
@@ -692,7 +854,16 @@ function executeSendOperation(
         : data.memo
           ? operation(data.mintUrl, data.amount, data.memo)
           : operation(data.mintUrl, data.amount),
-    (cause) => cause,
+    (cause) => {
+      logger.warn('effects.sendOperation.threw', {
+        path,
+        ...mintUrlFields(data.mintUrl),
+        amount: data.amount,
+        p2pkLocked: !!options?.p2pkLockPubkey,
+        error: errField(cause),
+      });
+      return cause;
+    },
   )();
 }
 
@@ -703,6 +874,15 @@ function toConfirmSendEffectError(args: {
   fallbackFailure?: unknown;
 }): ConfirmSendEffectError {
   const mintUnreachable = isMintOfflineError(args.cause);
+  logger.warn('effects.confirmSend.error', {
+    mintUnreachable,
+    contextPatched: !!args.contextPatch,
+    fallbackFailed: !!args.fallbackFailure,
+    error: errField(args.cause),
+    fallbackError: args.fallbackFailure
+      ? errField(args.fallbackFailure)
+      : undefined,
+  });
   return {
     kind: 'failed',
     cause: args.cause,
@@ -731,9 +911,20 @@ function buildMintUnreachableContextPatch(args: {
     !args.forceLocalSend &&
     !args.shouldCreateLocalTokenFirst;
 
-  if (!mintUnreachableConfirmed || args.context.mintUnreachableConfirmed)
+  if (!mintUnreachableConfirmed || args.context.mintUnreachableConfirmed) {
+    logger.debug('effects.mintUnreachablePatch.skipped', {
+      mintUnreachableConfirmed,
+      alreadyConfirmed: args.context.mintUnreachableConfirmed === true,
+      forceLocalSend: args.forceLocalSend,
+      shouldCreateLocalTokenFirst: args.shouldCreateLocalTokenFirst,
+    });
     return undefined;
+  }
 
+  logger.info('effects.mintUnreachablePatch.created', {
+    forceLocalSend: args.forceLocalSend,
+    shouldCreateLocalTokenFirst: args.shouldCreateLocalTokenFirst,
+  });
   return { mintUnreachableConfirmed: true };
 }
 
@@ -745,8 +936,21 @@ function handleConfirmSendFailure(args: {
   shouldCreateLocalTokenFirst: boolean;
 }): ResultAsync<ConfirmSendEffectSuccess, ConfirmSendEffectError> {
   const { config } = args;
-  if (config.isStale('executeSend.catch'))
+  logger.warn('effects.confirmSend.failure', {
+    ...mintUrlFields(config.data.mintUrl),
+    amount: config.data.amount,
+    forceLocalSend: args.forceLocalSend,
+    shouldCreateLocalTokenFirst: args.shouldCreateLocalTokenFirst,
+    proofCount: config.proofAmounts.length,
+    p2pkLocked: !!config.context.p2pkLockPubkey,
+    mintUnreachable: isMintOfflineError(args.cause),
+    error: errField(args.cause),
+  });
+
+  if (config.isStale('executeSend.catch')) {
+    logger.info('effects.confirmSend.stale', { op: 'executeSend.catch' });
     return okAsync({ kind: 'stale' } as const);
+  }
 
   const contextPatch = buildMintUnreachableContextPatch({
     cause: args.cause,
@@ -759,6 +963,12 @@ function handleConfirmSendFailure(args: {
   // A locked send has no offline fallback and no local-proof rerouting —
   // both would produce a bearer token. Surface the original failure.
   if (config.context.p2pkLockPubkey) {
+    logger.warn('effects.confirmSend.failure.p2pkLockedNoFallback', {
+      ...mintUrlFields(config.data.mintUrl),
+      amount: config.data.amount,
+      mintUnreachable: isMintOfflineError(args.cause),
+      contextPatched: !!contextPatch,
+    });
     return errAsync(
       toConfirmSendEffectError({
         cause: args.cause,
@@ -777,18 +987,32 @@ function handleConfirmSendFailure(args: {
       config.proofAmounts,
       config.data.amount,
     );
+    logger.info('effects.confirmSend.offlineFallback.considered', {
+      ...mintUrlFields(config.data.mintUrl),
+      amount: config.data.amount,
+      proofCount: config.proofAmounts.length,
+      exactMatch: built.exactMatch,
+      hasSuggestion: built.hasSuggestion,
+    });
 
     if (built.exactMatch) {
       return executeSendOperation(
         config.operations.executeOfflineSend,
         config.data,
+        undefined,
+        'offlineFallback',
       )
         .andThen((result) => {
-          if (config.isStale('executeOfflineSend'))
+          if (config.isStale('executeOfflineSend')) {
+            logger.info('effects.confirmSend.stale', {
+              op: 'executeOfflineSend',
+              path: 'offlineFallback',
+            });
             return okAsync({
               kind: 'stale',
               ...(contextPatch ? { context: contextPatch } : {}),
             } as const);
+          }
 
           return okAsync(
             buildSendCompleteResult({
@@ -805,11 +1029,16 @@ function handleConfirmSendFailure(args: {
           );
         })
         .orElse((fallbackFailure) => {
-          if (config.isStale('executeOfflineSend.catch'))
+          if (config.isStale('executeOfflineSend.catch')) {
+            logger.info('effects.confirmSend.stale', {
+              op: 'executeOfflineSend.catch',
+              path: 'offlineFallback',
+            });
             return okAsync({
               kind: 'stale',
               ...(contextPatch ? { context: contextPatch } : {}),
             } as const);
+          }
 
           return errAsync(
             toConfirmSendEffectError({
@@ -829,6 +1058,13 @@ function handleConfirmSendFailure(args: {
       config.data.amount,
     );
     if (!built.exactMatch && built.hasSuggestion) {
+      logger.info('effects.confirmSend.chooseProofs', {
+        ...mintUrlFields(config.data.mintUrl),
+        amount: config.data.amount,
+        unit: effectiveContext.unit,
+        proofCount: config.proofAmounts.length,
+        contextPatched: !!contextPatch,
+      });
       return okAsync({
         kind: 'chooseProofs' as const,
         step: 'chooseProofs' as const,
@@ -867,7 +1103,22 @@ export function runMintQuoteEffect({
 > {
   const locale = getLocale();
 
+  logger.info('effects.mintQuote.start', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    method: data.method ?? 'bolt11',
+    offline: getOffline(),
+    context: summarizeContext(context),
+  });
+
   if (getOffline()) {
+    logger.warn('effects.mintQuote.blocked', {
+      reason: 'offline',
+      ...mintUrlFields(data.mintUrl),
+      amount: data.amount,
+      unit: data.unit,
+    });
     return errAsync(
       toMintQuoteEffectError(createOfflineMintQuoteError(locale), data, locale),
     );
@@ -884,8 +1135,17 @@ export function runMintQuoteEffect({
     (cause) => toMintQuoteEffectError(cause, data, locale),
   )()
     .andThen((result) => {
-      if (isStale('executeMintQuote'))
+      if (isStale('executeMintQuote')) {
+        logger.info('effects.mintQuote.stale', { op: 'executeMintQuote' });
         return okAsync({ kind: 'stale' } as const);
+      }
+      logger.info('effects.mintQuote.completed', {
+        ...mintUrlFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        method: data.method ?? 'bolt11',
+        ...summarizeHistoryEntry(result.historyEntry),
+      });
       return okAsync({
         kind: 'completed' as const,
         step: 'mintQuoteCreated' as const,
@@ -894,8 +1154,19 @@ export function runMintQuoteEffect({
       });
     })
     .orElse((failure) => {
-      if (isStale('executeMintQuote.catch'))
+      if (isStale('executeMintQuote.catch')) {
+        logger.info('effects.mintQuote.stale', {
+          op: 'executeMintQuote.catch',
+        });
         return okAsync({ kind: 'stale' } as const);
+      }
+      logger.warn('effects.mintQuote.failed', {
+        ...mintUrlFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        method: data.method ?? 'bolt11',
+        error: errField(failure.cause),
+      });
       return errAsync(failure);
     });
 }
@@ -909,20 +1180,47 @@ export function runConfirmMeltEffect({
   ConfirmMeltEffectSuccess,
   ConfirmMeltEffectError
 > {
+  logger.info('effects.confirmMelt.start', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    meltTargetLength: data.meltTarget.length,
+    context: summarizeContext(context),
+  });
+
   return ResultAsync.fromThrowable(
     () => operation(data.mintUrl, data.meltTarget, data.amount, data.unit),
-    (cause): ConfirmMeltEffectError => ({
-      kind: 'failed',
-      cause,
-    }),
+    (cause): ConfirmMeltEffectError => {
+      logger.warn('effects.confirmMelt.threw', {
+        ...mintUrlFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        error: errField(cause),
+      });
+      return {
+        kind: 'failed',
+        cause,
+      };
+    },
   )()
     .andThen((result) => {
-      if (isStale('executeMelt')) return okAsync({ kind: 'stale' } as const);
+      if (isStale('executeMelt')) {
+        logger.info('effects.confirmMelt.stale', { op: 'executeMelt' });
+        return okAsync({ kind: 'stale' } as const);
+      }
       return okAsync(buildConfirmMeltResult(result, data, context));
     })
     .orElse((failure) => {
-      if (isStale('executeMelt.catch'))
+      if (isStale('executeMelt.catch')) {
+        logger.info('effects.confirmMelt.stale', { op: 'executeMelt.catch' });
         return okAsync({ kind: 'stale' } as const);
+      }
+      logger.warn('effects.confirmMelt.failed', {
+        ...mintUrlFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        error: errField(failure.cause),
+      });
       return errAsync(failure);
     });
 }
@@ -936,18 +1234,45 @@ export function runConfirmPaymentRequestEffect({
   ConfirmPaymentRequestEffectSuccess,
   ConfirmPaymentRequestEffectError
 > {
+  logger.info('effects.paymentRequest.start', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    paymentRequestLength: data.paymentRequest.length,
+    context: summarizeContext(context),
+  });
+
   return ResultAsync.fromThrowable(
     () => operation(data.mintUrl, data.paymentRequest, data.amount, data.unit),
-    (cause): ConfirmPaymentRequestEffectError => ({
-      kind: 'failed',
-      cause,
-    }),
+    (cause): ConfirmPaymentRequestEffectError => {
+      logger.warn('effects.paymentRequest.threw', {
+        ...mintUrlFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        error: errField(cause),
+      });
+      return {
+        kind: 'failed',
+        cause,
+      };
+    },
   )()
     .andThen((result) => {
-      if (isStale('executePaymentRequest'))
+      if (isStale('executePaymentRequest')) {
+        logger.info('effects.paymentRequest.stale', {
+          op: 'executePaymentRequest',
+        });
         return okAsync({ kind: 'stale' } as const);
+      }
 
       if (result.rolledBack) {
+        logger.warn('effects.paymentRequest.rolledBack', {
+          ...mintUrlFields(data.mintUrl),
+          amount: data.amount,
+          unit: data.unit,
+          hasErrorMessage: !!result.errorMessage,
+          ...summarizeHistoryEntry(result.historyEntry),
+        });
         return okAsync({
           kind: 'rolledBack' as const,
           cause: new Error(result.errorMessage ?? 'Delivery failed'),
@@ -958,8 +1283,18 @@ export function runConfirmPaymentRequestEffect({
       return okAsync(buildConfirmPaymentRequestResult(result, data, context));
     })
     .orElse((failure) => {
-      if (isStale('executePaymentRequest.catch'))
+      if (isStale('executePaymentRequest.catch')) {
+        logger.info('effects.paymentRequest.stale', {
+          op: 'executePaymentRequest.catch',
+        });
         return okAsync({ kind: 'stale' } as const);
+      }
+      logger.warn('effects.paymentRequest.failed', {
+        ...mintUrlFields(data.mintUrl),
+        amount: data.amount,
+        unit: data.unit,
+        error: errField(failure.cause),
+      });
       return errAsync(failure);
     });
 }
@@ -980,13 +1315,31 @@ export function runMintReviewInfoEffect({
       ? (data as StepDataMap['reviewMint']).mintUrl
       : (data as StepDataMap['openMint']).url;
 
+  logger.info('effects.mintReviewInfo.start', {
+    step,
+    ...mintUrlFields(mintUrl),
+    hasReviewToken: step === 'reviewMint',
+  });
+
   return ResultAsync.fromThrowable(
     () => operation(mintUrl),
     (cause) => toMintReviewInfoEffectError(cause, locale),
   )()
     .andThen((info) => {
-      if (isStale('buildMintReviewInfo'))
+      if (isStale('buildMintReviewInfo')) {
+        logger.info('effects.mintReviewInfo.stale', {
+          op: 'buildMintReviewInfo',
+          step,
+          ...mintUrlFields(mintUrl),
+        });
         return okAsync({ kind: 'stale' } as const);
+      }
+
+      logger.info('effects.mintReviewInfo.completed', {
+        step,
+        ...mintUrlFields(mintUrl),
+        hasMintInfo: !!info,
+      });
 
       if (step === 'reviewMint') {
         return okAsync({
@@ -1009,8 +1362,19 @@ export function runMintReviewInfoEffect({
       });
     })
     .orElse((failure) => {
-      if (isStale('buildMintReviewInfo.catch'))
+      if (isStale('buildMintReviewInfo.catch')) {
+        logger.info('effects.mintReviewInfo.stale', {
+          op: 'buildMintReviewInfo.catch',
+          step,
+          ...mintUrlFields(mintUrl),
+        });
         return okAsync({ kind: 'stale' } as const);
+      }
+      logger.warn('effects.mintReviewInfo.failed', {
+        step,
+        ...mintUrlFields(mintUrl),
+        error: errField(failure.cause),
+      });
       return errAsync(failure);
     });
 }
@@ -1026,17 +1390,31 @@ export function runTrustMintEffect({
 > {
   const locale = getLocale();
 
+  logger.info('effects.trustMint.start', {
+    ...mintUrlFields(data.mintUrl),
+  });
+
   return ResultAsync.fromThrowable(
     () => operation(data.mintUrl),
     (cause) => toTrustMintEffectError(cause, locale),
   )()
     .andThen(() => {
-      if (isStale('trustMint')) return okAsync({ kind: 'stale' } as const);
+      if (isStale('trustMint')) {
+        logger.info('effects.trustMint.stale', { op: 'trustMint' });
+        return okAsync({ kind: 'stale' } as const);
+      }
+      logger.info('effects.trustMint.completed', { ...mintUrlFields(data.mintUrl) });
       return okAsync({ kind: 'completed' } as const);
     })
     .orElse((failure) => {
-      if (isStale('trustMint.catch'))
+      if (isStale('trustMint.catch')) {
+        logger.info('effects.trustMint.stale', { op: 'trustMint.catch' });
         return okAsync({ kind: 'stale' } as const);
+      }
+      logger.warn('effects.trustMint.failed', {
+        ...mintUrlFields(data.mintUrl),
+        error: errField(failure.cause),
+      });
       return errAsync(failure);
     });
 }
@@ -1049,19 +1427,53 @@ export function runMintListEnrichmentEffect({
   MintListEnrichmentEffectSuccess,
   MintListEnrichmentEffectError
 > {
+  logger.info('effects.mintListEnrichment.start', {
+    candidateCount: data.candidates.length,
+    supportedMintCount: data.supportedMintUrls?.length ?? 0,
+    amount: data.amount ?? null,
+    unit: data.unit,
+    destination: data.destination ?? null,
+    scope: data.scope ?? 'selected',
+    mintListItemsStatus: data.mintListItemsStatus ?? null,
+  });
+
   return ResultAsync.fromThrowable(
     async () => {
       const items = await operation(data);
-      if (isStale('buildMintListItems')) return { kind: 'stale' } as const;
+      if (isStale('buildMintListItems')) {
+        logger.info('effects.mintListEnrichment.stale', {
+          op: 'buildMintListItems',
+          itemCount: items.length,
+        });
+        return { kind: 'stale' } as const;
+      }
+      logger.info('effects.mintListEnrichment.completed', {
+        itemCount: items.length,
+        candidateCount: data.candidates.length,
+      });
       return { kind: 'completed' as const, items };
     },
-    (cause): MintListEnrichmentEffectError => ({
-      kind: 'failed',
-      cause,
-    }),
+    (cause): MintListEnrichmentEffectError => {
+      logger.warn('effects.mintListEnrichment.threw', {
+        candidateCount: data.candidates.length,
+        error: errField(cause),
+      });
+      return {
+        kind: 'failed',
+        cause,
+      };
+    },
   )().orElse((failure) => {
-    if (isStale('buildMintListItems.catch'))
+    if (isStale('buildMintListItems.catch')) {
+      logger.info('effects.mintListEnrichment.stale', {
+        op: 'buildMintListItems.catch',
+      });
       return okAsync({ kind: 'stale' } as const);
+    }
+    logger.warn('effects.mintListEnrichment.failed', {
+      candidateCount: data.candidates.length,
+      error: errField(failure.cause),
+    });
     return errAsync(failure);
   });
 }
@@ -1078,41 +1490,89 @@ export function runNfcWriteBackEffect({
   NfcWriteBackEffectSuccess,
   NfcWriteBackEffectError
 > {
+  logger.info('effects.nfcWriteBack.start', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: data.unit,
+    paymentRequestLength: data.paymentRequest.length,
+    hasRollback: !!rollbackSend,
+    context: summarizeContext(context),
+  });
+
   return ResultAsync.fromPromise(
     (async () => {
       let nfcSendResult: NfcSendOperationResult | null = null;
 
       try {
+        logger.info('effects.nfcWriteBack.progress', { phase: 'creating' });
         onProgress?.({ phase: 'creating' });
         nfcSendResult = await executeNfcSend(data.mintUrl, data.amount);
-        if (isStale('executeNfcSend')) return { kind: 'stale' } as const;
+        logger.info('effects.nfcWriteBack.tokenCreated', {
+          operationIdPresent: nfcSendResult.operationId.length > 0,
+          ...summarizeHistoryEntry(nfcSendResult.historyEntry),
+        });
+        if (isStale('executeNfcSend')) {
+          logger.info('effects.nfcWriteBack.stale', { op: 'executeNfcSend' });
+          return { kind: 'stale' } as const;
+        }
 
+        logger.info('effects.nfcWriteBack.progress', { phase: 'writing' });
         onProgress?.({ phase: 'writing' });
         await nfcAdapter.writeToken(nfcSendResult.token);
-        if (isStale('nfc.writeToken')) return { kind: 'stale' } as const;
+        if (isStale('nfc.writeToken')) {
+          logger.info('effects.nfcWriteBack.stale', { op: 'nfc.writeToken' });
+          return { kind: 'stale' } as const;
+        }
 
         await nfcAdapter.releaseSession();
-        if (isStale('nfc.releaseSession')) return { kind: 'stale' } as const;
+        if (isStale('nfc.releaseSession')) {
+          logger.info('effects.nfcWriteBack.stale', {
+            op: 'nfc.releaseSession',
+          });
+          return { kind: 'stale' } as const;
+        }
 
         return buildNfcWriteBackResult(nfcSendResult, data, context);
       } catch (cause) {
         if (isStale('executeNfcSend.catch')) {
+          logger.info('effects.nfcWriteBack.stale', {
+            op: 'executeNfcSend.catch',
+          });
           return { kind: 'stale' } as const;
         }
+
+        logger.warn('effects.nfcWriteBack.failed', {
+          hasPreparedSend: !!nfcSendResult,
+          hasRollback: !!rollbackSend,
+          error: errField(cause),
+        });
 
         let rolledBack = false;
         if (nfcSendResult && rollbackSend) {
           try {
             await rollbackSend(nfcSendResult.operationId);
             rolledBack = true;
-          } catch {
+            logger.info('effects.nfcWriteBack.rollback.completed', {
+              operationIdPresent: nfcSendResult.operationId.length > 0,
+            });
+          } catch (rollbackErr) {
+            logger.warn('effects.nfcWriteBack.rollback.failed', {
+              operationIdPresent: nfcSendResult.operationId.length > 0,
+              error: errField(rollbackErr),
+            });
             // Rollback is best-effort; the caller still needs the write failure.
           }
         }
 
         try {
           await nfcAdapter.releaseSession();
-        } catch {
+          logger.info('effects.nfcWriteBack.release.completed', {
+            failurePath: true,
+          });
+        } catch (releaseErr) {
+          logger.warn('effects.nfcWriteBack.release.failed', {
+            error: errField(releaseErr),
+          });
           // Release is idempotent and best-effort on the failure path.
         }
 
@@ -1131,22 +1591,55 @@ export function runRecipientPubkeyEffect({
   RecipientPubkeyEffectSuccess,
   RecipientPubkeyEffectError
 > {
+  logger.info('effects.recipientPubkey.start', {
+    targetLength: target.length,
+  });
+
   return ResultAsync.fromThrowable(
     async () => {
       const pubkey = await operation(target);
-      if (isStale('resolveRecipientPubkey'))
+      if (isStale('resolveRecipientPubkey')) {
+        logger.info('effects.recipientPubkey.stale', {
+          op: 'resolveRecipientPubkey',
+          targetLength: target.length,
+        });
         return { kind: 'stale' as const, target };
-      if (!pubkey) return { kind: 'empty' as const, target };
+      }
+      if (!pubkey) {
+        logger.info('effects.recipientPubkey.empty', {
+          targetLength: target.length,
+        });
+        return { kind: 'empty' as const, target };
+      }
+      logger.info('effects.recipientPubkey.resolved', {
+        targetLength: target.length,
+        pubkeyLength: pubkey.length,
+      });
       return { kind: 'resolved' as const, target, pubkey };
     },
-    (cause): RecipientPubkeyEffectError => ({
-      kind: 'failed',
-      target,
-      cause,
-    }),
+    (cause): RecipientPubkeyEffectError => {
+      logger.warn('effects.recipientPubkey.threw', {
+        targetLength: target.length,
+        error: errField(cause),
+      });
+      return {
+        kind: 'failed',
+        target,
+        cause,
+      };
+    },
   )().orElse((failure) => {
-    if (isStale('resolveRecipientPubkey.catch'))
+    if (isStale('resolveRecipientPubkey.catch')) {
+      logger.info('effects.recipientPubkey.stale', {
+        op: 'resolveRecipientPubkey.catch',
+        targetLength: target.length,
+      });
       return okAsync({ kind: 'stale' as const, target });
+    }
+    logger.warn('effects.recipientPubkey.failed', {
+      targetLength: target.length,
+      error: errField(failure.cause),
+    });
     return errAsync(failure);
   });
 }
@@ -1159,22 +1652,57 @@ export function runRecipientProfileEffect({
   RecipientProfileEffectSuccess,
   RecipientProfileEffectError
 > {
+  logger.info('effects.recipientProfile.start', {
+    pubkeyLength: pubkey.length,
+  });
+
   return ResultAsync.fromThrowable(
     async () => {
       const profile = await operation(pubkey);
-      if (isStale('resolveRecipientProfile'))
+      if (isStale('resolveRecipientProfile')) {
+        logger.info('effects.recipientProfile.stale', {
+          op: 'resolveRecipientProfile',
+          pubkeyLength: pubkey.length,
+        });
         return { kind: 'stale' as const, pubkey };
-      if (!profile) return { kind: 'empty' as const, pubkey };
+      }
+      if (!profile) {
+        logger.info('effects.recipientProfile.empty', {
+          pubkeyLength: pubkey.length,
+        });
+        return { kind: 'empty' as const, pubkey };
+      }
+      logger.info('effects.recipientProfile.resolved', {
+        pubkeyLength: pubkey.length,
+        hasDisplayName: profile.displayName.length > 0,
+        hasAvatarUrl: !!profile.avatarUrl,
+        hasNip05: !!profile.nip05,
+      });
       return { kind: 'resolved' as const, pubkey, profile };
     },
-    (cause): RecipientProfileEffectError => ({
-      kind: 'failed',
-      pubkey,
-      cause,
-    }),
+    (cause): RecipientProfileEffectError => {
+      logger.warn('effects.recipientProfile.threw', {
+        pubkeyLength: pubkey.length,
+        error: errField(cause),
+      });
+      return {
+        kind: 'failed',
+        pubkey,
+        cause,
+      };
+    },
   )().orElse((failure) => {
-    if (isStale('resolveRecipientProfile.catch'))
+    if (isStale('resolveRecipientProfile.catch')) {
+      logger.info('effects.recipientProfile.stale', {
+        op: 'resolveRecipientProfile.catch',
+        pubkeyLength: pubkey.length,
+      });
       return okAsync({ kind: 'stale' as const, pubkey });
+    }
+    logger.warn('effects.recipientProfile.failed', {
+      pubkeyLength: pubkey.length,
+      error: errField(failure.cause),
+    });
     return errAsync(failure);
   });
 }
@@ -1213,9 +1741,30 @@ export function runConfirmSendEffect({
     isStale,
   };
 
+  logger.info('effects.confirmSend.start', {
+    ...mintUrlFields(data.mintUrl),
+    amount: data.amount,
+    unit: context.unit,
+    p2pkLocked,
+    appOffline,
+    forceLocalSend,
+    hasExactLocalProofs,
+    shouldCreateLocalTokenFirst,
+    proofCount: proofAmounts.length,
+    hasOfflineSend: !!operations.executeOfflineSend,
+    hasMemo: !!data.memo,
+    context: summarizeContext(context),
+  });
+
   // Locked + offline fails fast: there is no offline shape of a locked send,
   // so don't even attempt the operation or any fallback routing.
   if (p2pkLocked && appOffline) {
+    logger.warn('effects.confirmSend.blocked', {
+      reason: 'p2pk_locked_offline',
+      ...mintUrlFields(data.mintUrl),
+      amount: data.amount,
+      proofCount: proofAmounts.length,
+    });
     return errAsync({
       kind: 'failed',
       cause: createOfflineSendError(locale),
@@ -1228,10 +1777,20 @@ export function runConfirmSendEffect({
   }
 
   if (shouldCreateLocalTokenFirst && operations.executeOfflineSend) {
-    return executeSendOperation(operations.executeOfflineSend, data)
+    return executeSendOperation(
+      operations.executeOfflineSend,
+      data,
+      undefined,
+      'localFirst',
+    )
       .andThen((result) => {
-        if (isStale('executeOfflineSend.localFirst'))
+        if (isStale('executeOfflineSend.localFirst')) {
+          logger.info('effects.confirmSend.stale', {
+            op: 'executeOfflineSend.localFirst',
+            path: 'localFirst',
+          });
           return okAsync({ kind: 'stale' } as const);
+        }
 
         return okAsync(
           buildSendCompleteResult({
@@ -1256,6 +1815,13 @@ export function runConfirmSendEffect({
   }
 
   if (forceLocalSend && operations.executeOfflineSend) {
+    logger.info('effects.confirmSend.forcedLocal', {
+      ...mintUrlFields(data.mintUrl),
+      amount: data.amount,
+      appOffline,
+      contextOffline: context.offline === true,
+      localProofSend: context.localProofSend === true,
+    });
     return handleConfirmSendFailure({
       cause: createOfflineSendError(locale),
       config,
@@ -1269,9 +1835,16 @@ export function runConfirmSendEffect({
     operations.executeSend,
     data,
     p2pkLocked ? { p2pkLockPubkey: context.p2pkLockPubkey } : undefined,
+    'online',
   )
     .andThen((result) => {
-      if (isStale('executeSend')) return okAsync({ kind: 'stale' } as const);
+      if (isStale('executeSend')) {
+        logger.info('effects.confirmSend.stale', {
+          op: 'executeSend',
+          path: 'online',
+        });
+        return okAsync({ kind: 'stale' } as const);
+      }
 
       return okAsync(
         buildSendCompleteResult({

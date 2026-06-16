@@ -14,7 +14,7 @@
 import { getEncodedToken, getTokenMetadata } from '@cashu/cashu-ts';
 
 import { isMintOfflineError } from '../errors';
-import { errField, logger } from '../logger';
+import { errField, logger, mintUrlFields } from '../logger';
 import type {
   AmountEntryDisplayMetadata,
   Destination,
@@ -206,17 +206,38 @@ export function createDefaultScreenActionHandlers(
         const scannedRawInput = flowCtx?.rawInput;
 
         const tokenString = encodeToken(entry);
-        if (!tokenString || !mintUrl) return;
+        if (!tokenString || !mintUrl) {
+          logger.warn('screenAction.receiveToken.redeem.skipped', {
+            id,
+            hasMintUrl: !!mintUrl,
+            hasToken: !!tokenString,
+          });
+          return;
+        }
+
+        logger.info('screenAction.receiveToken.redeem.start', {
+          id,
+          ...mintUrlFields(mintUrl),
+          amount,
+          unit,
+          source: flowCtx?.source,
+          tokenLength: tokenString.length,
+        });
 
         // Validate unit — only sat is supported
         try {
           const decoded = getTokenMetadata(tokenString);
           if (decoded.unit && decoded.unit !== 'sat') {
+            logger.warn('screenAction.receiveToken.redeem.unsupportedUnit', {
+              id,
+              ...mintUrlFields(mintUrl),
+              unit: decoded.unit,
+            });
             notify('onUnsupportedTokenUnit', { unit: decoded.unit });
             return;
           }
         } catch (e) {
-          logger.warn('screenAction.receiveToken.unitDecodeFailed', { error: errField(e) });
+          logger.warn('screenAction.receiveToken.unitDecodeFailed', { id, error: errField(e) });
         }
 
         // Check mint trust
@@ -224,6 +245,11 @@ export function createDefaultScreenActionHandlers(
         if (ops?.isMintTrusted) {
           const trusted = await ops.isMintTrusted(mintUrl);
           if (!trusted) {
+            logger.info('screenAction.receiveToken.redeem.untrustedMint', {
+              id,
+              ...mintUrlFields(mintUrl),
+              expectedNext: 'review_mint_then_retry_redeem',
+            });
             const machine = getMachine();
             if (machine) {
               await machine.reviewMint(mintUrl, tokenString);
@@ -233,18 +259,73 @@ export function createDefaultScreenActionHandlers(
         }
 
         // Dispatch processing notification
-        logger.info('screenAction.receiveToken.redeem.processing', { mintUrl, amount, id });
+        logger.info('screenAction.receiveToken.redeem.processing', {
+          ...mintUrlFields(mintUrl),
+          amount,
+          unit,
+          id,
+          expectedNext: 'execute_receive',
+        });
         notify('onReceiveProcessing', { id, mintUrl, amount: amount ?? 0, unit });
 
         // Execute receive
-        if (!ops?.executeReceive) return;
+        if (!ops?.executeReceive) {
+          logger.warn('screenAction.receiveToken.redeem.noExecuteReceive', {
+            id,
+            ...mintUrlFields(mintUrl),
+          });
+          return;
+        }
 
         try {
           const result = await ops.executeReceive(tokenString, mintUrl, amount ?? 0);
-          logger.info('screenAction.receiveToken.redeem.success', { mintUrl });
+
+          const setEntry = (ctx as EntryLike).setEntry as ((e: EntryLike) => void) | undefined;
+          if (result.status === 'pending') {
+            logger.info('screenAction.receiveToken.redeem.pending', {
+              id,
+              ...mintUrlFields(mintUrl),
+              amount: amount ?? 0,
+              unit,
+              operationId: result.operationId,
+              pendingReason: result.pendingReason,
+              hadP2PKProofs: result.hadP2PKProofs,
+              expectedNext: 'wallet_core_recovery_finalizes_receive',
+            });
+            const pendingEntry = parseHistoryEntryOnce(result.historyEntry);
+            if (setEntry && pendingEntry) {
+              setEntry(pendingEntry as EntryLike);
+            }
+            notify('onReceivePending', {
+              id,
+              mintUrl,
+              amount: amount ?? 0,
+              unit,
+              operationId: result.operationId,
+              pendingReason: result.pendingReason,
+              historyEntry: result.historyEntry,
+              ...(result.message ? { message: result.message } : {}),
+            });
+            if (result.hadP2PKProofs != null) {
+              notify('onP2PKReceiveCompleted', {
+                transactionId: id,
+                mintUrl,
+                hadP2PKProofs: result.hadP2PKProofs,
+              });
+            }
+            return;
+          }
+
+          logger.info('screenAction.receiveToken.redeem.success', {
+            id,
+            ...mintUrlFields(mintUrl),
+            amount: amount ?? 0,
+            unit,
+            hadP2PKProofs: result.hadP2PKProofs,
+            expectedNext: 'receive_confirmed_notification',
+          });
 
           // Update screen entry with real history entry
-          const setEntry = (ctx as EntryLike).setEntry as ((e: EntryLike) => void) | undefined;
           logger.info('screenAction.receiveToken.redeem.entryUpdate.eligibility', {
             hasSetEntry: !!setEntry,
             hasHistoryEntry: !!result.historyEntry,
@@ -303,6 +384,14 @@ export function createDefaultScreenActionHandlers(
             });
           }
         } catch (err) {
+          logger.warn('screenAction.receiveToken.redeem.failed', {
+            id,
+            ...mintUrlFields(mintUrl),
+            amount: amount ?? 0,
+            unit,
+            error: errField(err),
+            expectedNext: 'receive_failed_notification',
+          });
           notify('onReceiveFailed', {
             id,
             mintUrl,
@@ -485,9 +574,9 @@ export function createDefaultScreenActionHandlers(
         const ops = getOperations();
         if (!ops?.trustMint) return;
 
-        logger.info('screenAction.mintInfo.trust.start', { mintUrl });
+        logger.info('screenAction.mintInfo.trust.start', { ...mintUrlFields(mintUrl) });
         await ops.trustMint(mintUrl);
-        logger.info('screenAction.mintInfo.trust.done', { mintUrl });
+        logger.info('screenAction.mintInfo.trust.done', { ...mintUrlFields(mintUrl) });
         notify('onMintTrustedFromScreen', {
           mintUrl,
           fromAccepter: entry.fromAccepter === true,
@@ -505,7 +594,7 @@ export function createDefaultScreenActionHandlers(
         const entry = ctx.entry as EntryLike;
         const scope = (entry.scope as 'npc' | 'selected') ?? 'selected';
         if (!mintUrl || !machine) return;
-        logger.info('screenAction.mintSelector.select', { mintUrl, scope });
+        logger.info('screenAction.mintSelector.select', { ...mintUrlFields(mintUrl), scope });
         await machine.changeMint(mintUrl, { scope });
       },
 
@@ -526,7 +615,7 @@ export function createDefaultScreenActionHandlers(
             infoEntry = { ...(info as unknown as EntryLike) };
           } catch (e) {
             logger.warn('screenAction.mintInfo.buildReviewInfo.failed', {
-              mintUrl,
+              ...mintUrlFields(mintUrl),
               error: errField(e),
             });
           }
@@ -656,10 +745,10 @@ export function createDefaultScreenActionHandlers(
 
         logger.info('screenAction.amountEntry.next.confirm', {
           amount: effectiveSat,
-          mintUrl: mintUrl || null,
+          ...mintUrlFields(mintUrl || null),
           destination,
           variantId: variantId ?? null,
-          meltTargetPreview: meltTarget ? meltTarget.slice(0, 30) + '…' : null,
+          meltTargetLength: meltTarget?.length ?? 0,
           recipientPubkeyPresent: !!recipientPubkey,
           recipientProfilePresent: !!recipientProfile,
         });

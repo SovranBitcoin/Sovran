@@ -5,6 +5,8 @@
 // BOM, URI-decode. No protocol-specific detection — that's the parser's job.
 // ---------------------------------------------------------------------------
 
+import { logger } from './logger';
+
 const ZERO_WIDTH_RE = /[\u200B-\u200D\uFEFF]/g;
 
 const GENERIC_PREFIXES = [
@@ -36,7 +38,17 @@ const WEB_WALLET_HOSTS: readonly {
  * Remove zero-width characters and BOM, then trim whitespace.
  */
 export function sanitizeInput(value: string): string {
-  return value.replace(ZERO_WIDTH_RE, '').trim();
+  const zeroWidthMatches = value.match(ZERO_WIDTH_RE);
+  const sanitized = value.replace(ZERO_WIDTH_RE, '').trim();
+  if (sanitized.length !== value.length || zeroWidthMatches) {
+    logger.debug('normalize.sanitize.changed', {
+      inputLength: value.length,
+      outputLength: sanitized.length,
+      zeroWidthCount: zeroWidthMatches?.length ?? 0,
+      trimmed: sanitized.length !== value.replace(ZERO_WIDTH_RE, '').length,
+    });
+  }
+  return sanitized;
 }
 
 /**
@@ -44,8 +56,20 @@ export function sanitizeInput(value: string): string {
  */
 export function safeDecodeURIComponent(value: string): string {
   try {
-    return decodeURIComponent(value);
+    const decoded = decodeURIComponent(value);
+    if (decoded !== value) {
+      logger.debug('normalize.decode.changed', {
+        inputLength: value.length,
+        outputLength: decoded.length,
+        percentCount: (value.match(/%/g) ?? []).length,
+      });
+    }
+    return decoded;
   } catch {
+    logger.warn('normalize.decode.failed', {
+      inputLength: value.length,
+      percentCount: (value.match(/%/g) ?? []).length,
+    });
     return value;
   }
 }
@@ -56,11 +80,25 @@ export function safeDecodeURIComponent(value: string): string {
  */
 export function stripPrefixes(value: string, prefixes: string[]): string {
   let next = sanitizeInput(value);
+  let strippedCount = 0;
+  const strippedPrefixes: string[] = [];
 
   for (;;) {
     const lower = next.toLowerCase();
     const matched = prefixes.find((p) => lower.startsWith(p));
-    if (!matched) return next;
+    if (!matched) {
+      if (strippedCount > 0) {
+        logger.debug('normalize.prefixes.stripped', {
+          inputLength: value.length,
+          outputLength: next.length,
+          strippedCount,
+          prefixes: strippedPrefixes,
+        });
+      }
+      return next;
+    }
+    strippedCount += 1;
+    strippedPrefixes.push(matched);
     next = next.slice(matched.length).trim();
   }
 }
@@ -83,7 +121,12 @@ export function stripLightningPrefixes(value: string): string {
  * Strip Cashu-specific prefixes.
  */
 export function stripCashuPrefixes(value: string): string {
-  return stripPrefixes(value, ['web+cashu://', 'web+cashu:', 'cashu://', 'cashu:']);
+  return stripPrefixes(value, [
+    'web+cashu://',
+    'web+cashu:',
+    'cashu://',
+    'cashu:',
+  ]);
 }
 
 /**
@@ -94,12 +137,21 @@ export function stripCashuPrefixes(value: string): string {
  */
 export function extractWebWalletToken(value: string): string | null {
   const trimmed = sanitizeInput(value);
-  if (!/^https?:\/\//i.test(trimmed)) return null;
+  if (!/^https?:\/\//i.test(trimmed)) {
+    logger.debug('normalize.webWallet.skipped', {
+      reason: 'not_http_url',
+      inputLength: trimmed.length,
+    });
+    return null;
+  }
 
   let url: URL;
   try {
     url = new URL(trimmed);
   } catch {
+    logger.warn('normalize.webWallet.parseFailed', {
+      inputLength: trimmed.length,
+    });
     return null;
   }
 
@@ -108,12 +160,34 @@ export function extractWebWalletToken(value: string): string | null {
     if (entry.host !== host) continue;
     if (entry.source === 'query' && entry.param) {
       const raw = url.searchParams.get(entry.param);
-      if (raw) return safeDecodeURIComponent(raw).trim();
+      if (raw) {
+        const token = safeDecodeURIComponent(raw).trim();
+        logger.info('normalize.webWallet.tokenExtracted', {
+          host,
+          source: entry.source,
+          param: entry.param,
+          tokenLength: token.length,
+        });
+        return token;
+      }
     } else if (entry.source === 'fragment') {
       const frag = url.hash.replace(/^#/, '');
-      if (frag) return safeDecodeURIComponent(frag).trim();
+      if (frag) {
+        const token = safeDecodeURIComponent(frag).trim();
+        logger.info('normalize.webWallet.tokenExtracted', {
+          host,
+          source: entry.source,
+          tokenLength: token.length,
+        });
+        return token;
+      }
     }
   }
+  logger.debug('normalize.webWallet.noToken', {
+    host,
+    queryKeyCount: Array.from(url.searchParams.keys()).length,
+    hasFragment: url.hash.length > 0,
+  });
   return null;
 }
 
@@ -138,6 +212,16 @@ export function inputVariants(raw: string): Set<string> {
     variants.add(webWalletToken);
     variants.add(stripGenericPrefixes(webWalletToken));
   }
+
+  logger.debug('normalize.inputVariants.result', {
+    rawLength: raw.length,
+    sanitizedLength: sanitized.length,
+    variantCount: variants.size,
+    addedStripped: stripped !== sanitized,
+    addedDecodedRaw: decodedRaw !== sanitized,
+    addedDecodedStripped: decodedStripped !== stripped,
+    webWalletTokenLength: webWalletToken?.length ?? null,
+  });
 
   return variants;
 }

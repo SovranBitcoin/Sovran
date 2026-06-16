@@ -103,6 +103,18 @@ describe('receiveTokenAvailability — redeem', () => {
 
     expect(actions.redeem.available).toBe(false);
   });
+
+  it('redeem is unavailable for a pending recovery entry', () => {
+    const actions = getAvailableActions('receiveToken', {
+      id: 'receive-op-123',
+      type: 'receive',
+      amount: 21,
+      state: 'executing',
+      metadata: { rawToken: 'cashuBexampletoken', operationId: 'op-123' },
+    });
+
+    expect(actions.redeem.available).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

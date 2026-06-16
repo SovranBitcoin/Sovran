@@ -12,7 +12,8 @@
 import { logger } from '../logger';
 import { resolveAmount, resolutionEqual } from './resolve';
 import { computeQuickSendSuggestions } from './suggestions';
-import type { QuickSendSuggestion ,
+import type {
+  QuickSendSuggestion,
   AmountActionManager,
   AmountInputMode,
   AmountResolution,
@@ -41,7 +42,7 @@ function formatSecondaryDisplay(
   inputMode: AmountInputMode,
   displaySats: number,
   displayFiat: number | null,
-  fiatSymbol: string
+  fiatSymbol: string,
 ): string {
   if (inputMode === 'fiat') {
     if (displaySats > 0) {
@@ -64,8 +65,12 @@ function asGetter<T>(value: T | (() => T)): () => T {
   return typeof value === 'function' ? (value as () => T) : () => value;
 }
 
+function sumAmounts(amounts: number[]): number {
+  return amounts.reduce((total, amount) => total + amount, 0);
+}
+
 export function createAmountActionManager(
-  config: CreateAmountActionManagerConfig
+  config: CreateAmountActionManagerConfig,
 ): AmountActionManager {
   const {
     getMintUrl,
@@ -82,28 +87,52 @@ export function createAmountActionManager(
   const getUnit = asGetter(unit);
   const getFiatCurrency = asGetter<string | undefined>(fiatCurrency);
   const getFiatSymbol = asGetter<string | undefined>(fiatSymbol);
-  const hasFiatToggleNow = (): boolean => !!getFiatCurrency() && !!getFiatSymbol();
+  const hasFiatToggleNow = (): boolean =>
+    !!getFiatCurrency() && !!getFiatSymbol();
   const suggestionsDisabled = quickSendConfig === null;
 
   let inputMode: AmountInputMode = 'sat';
   let rawInput = '';
   let prevResolution: AmountResolution | null = null;
+  let prevComputeLogKey: string | null = null;
   const listeners = new Set<() => void>();
+
+  logger.info('amountActions.manager.create', {
+    hasInitialMintUrl: !!getMintUrl(),
+    initialMintUrlLength: getMintUrl()?.length ?? 0,
+    offlineOptimizationIsGetter: typeof offlineOptimization === 'function',
+    unitIsGetter: typeof unit === 'function',
+    fiatCurrencyIsGetter: typeof fiatCurrency === 'function',
+    fiatSymbolIsGetter: typeof fiatSymbol === 'function',
+    hasFiatCurrency: !!getFiatCurrency(),
+    hasFiatSymbol: !!getFiatSymbol(),
+    suggestionsDisabled,
+  });
 
   // Suggestion cache — invalidated when proofs or price change
   const EMPTY_SUGGESTIONS: QuickSendSuggestion[] = [];
-  let sugCache: { len: number; sum: number; price: number; result: QuickSendSuggestion[] } | null =
-    null;
+  let sugCache: {
+    len: number;
+    sum: number;
+    price: number;
+    result: QuickSendSuggestion[];
+  } | null = null;
 
   function getSuggestions(): QuickSendSuggestion[] {
-    if (!getOfflineOptimization() || suggestionsDisabled) return EMPTY_SUGGESTIONS;
+    if (!getOfflineOptimization() || suggestionsDisabled)
+      return EMPTY_SUGGESTIONS;
     const proofs = getProofAmounts();
     const price = getBtcPrice();
     if (proofs.length === 0 || price <= 0) return EMPTY_SUGGESTIONS;
 
     const len = proofs.length;
     const sum = proofs.reduce((a, b) => a + b, 0);
-    if (sugCache && sugCache.len === len && sugCache.sum === sum && sugCache.price === price) {
+    if (
+      sugCache &&
+      sugCache.len === len &&
+      sugCache.sum === sum &&
+      sugCache.price === price
+    ) {
       return sugCache.result;
     }
 
@@ -130,6 +159,11 @@ export function createAmountActionManager(
     // already promotes a new ref only when the resolution actually changed,
     // so notifying here without clearing the cache lets useSyncExternalStore
     // skip re-renders for setInput calls that produce structurally equal output.
+    logger.debug('amountActions.notify', {
+      listenerCount: listeners.size,
+      inputMode,
+      rawInputLength: rawInput.length,
+    });
     for (const fn of listeners) fn();
   }
 
@@ -157,18 +191,25 @@ export function createAmountActionManager(
       numericValue,
       proofAmounts,
       btcPrice,
-      offlineOpt
+      offlineOpt,
     );
 
     // Keyboard unit: fiat currency code in fiat mode, base unit otherwise
-    const keyboardUnit = inputMode === 'fiat' && fiatCurrencyNow ? fiatCurrencyNow : unitNow;
+    const keyboardUnit =
+      inputMode === 'fiat' && fiatCurrencyNow ? fiatCurrencyNow : unitNow;
 
     // Secondary display: only when fiat toggle is available and btcPrice is valid
     const secondaryDisplay = fiatToggleActive
-      ? formatSecondaryDisplay(inputMode, core.displaySats, core.displayFiat, fiatSymbolNow!)
+      ? formatSecondaryDisplay(
+          inputMode,
+          core.displaySats,
+          core.displayFiat,
+          fiatSymbolNow!,
+        )
       : null;
 
-    return {
+    const suggestions = getSuggestions();
+    const result: AmountResolution = {
       ...core,
       unit: unitNow,
       keyboardUnit,
@@ -176,8 +217,60 @@ export function createAmountActionManager(
       fiatCurrency: fiatToggleActive ? fiatCurrencyNow! : null,
       fiatSymbol: fiatToggleActive ? fiatSymbolNow! : null,
       btcPrice,
-      suggestions: getSuggestions(),
+      suggestions,
     };
+
+    const proofTotal = sumAmounts(proofAmounts);
+    const computeLogKey = JSON.stringify({
+      inputMode: result.inputMode,
+      rawInputLength: result.rawInput.length,
+      numericValue: result.numericValue,
+      effectiveSatAmount: result.effectiveSatAmount,
+      displaySats: result.displaySats,
+      displayFiat: result.displayFiat,
+      autoOptimized: result.autoOptimized,
+      canSendOffline: result.canSendOffline,
+      unit: result.unit,
+      keyboardUnit: result.keyboardUnit,
+      btcPrice,
+      offlineOpt,
+      fiatToggleAvailable,
+      fiatToggleActive,
+      hasMintUrl: !!mintUrl,
+      proofCount: proofAmounts.length,
+      proofTotal,
+      suggestionCount: suggestions.length,
+    });
+    if (computeLogKey !== prevComputeLogKey) {
+      prevComputeLogKey = computeLogKey;
+      logger.info('amountActions.compute.result', {
+        inputMode: result.inputMode,
+        rawInputLength: result.rawInput.length,
+        numericValue: result.numericValue,
+        effectiveSatAmount: result.effectiveSatAmount,
+        displaySats: result.displaySats,
+        hasDisplayFiat: result.displayFiat != null,
+        displayFiat: result.displayFiat,
+        autoOptimized: result.autoOptimized,
+        canSendOffline: result.canSendOffline,
+        unit: result.unit,
+        keyboardUnit: result.keyboardUnit,
+        hasSecondaryDisplay: result.secondaryDisplay != null,
+        hasFiatCurrency: result.fiatCurrency != null,
+        hasFiatSymbol: result.fiatSymbol != null,
+        btcPrice,
+        offlineOptimization: offlineOpt,
+        fiatToggleAvailable,
+        fiatToggleActive,
+        hasMintUrl: !!mintUrl,
+        mintUrlLength: mintUrl?.length ?? 0,
+        proofCount: proofAmounts.length,
+        proofTotal,
+        suggestionCount: suggestions.length,
+      });
+    }
+
+    return result;
   }
 
   // ---------------------------------------------------------------------------
@@ -194,28 +287,76 @@ export function createAmountActionManager(
   };
 
   const setInput = (input: string): void => {
+    logger.info('amountActions.setInput', {
+      previousRawInputLength: rawInput.length,
+      nextRawInputLength: input.length,
+      unchanged: input === rawInput,
+      inputMode,
+    });
     rawInput = input;
     notify();
   };
 
   const setMode = (mode: AmountInputMode): void => {
-    if (!hasFiatToggleNow() || mode === inputMode) return;
+    if (!hasFiatToggleNow()) {
+      logger.info('amountActions.setMode.skipped', {
+        reason: 'fiat-toggle-unavailable',
+        requestedMode: mode,
+        inputMode,
+        rawInputLength: rawInput.length,
+      });
+      return;
+    }
+    if (mode === inputMode) {
+      logger.debug('amountActions.setMode.skipped', {
+        reason: 'already-selected',
+        requestedMode: mode,
+        inputMode,
+        rawInputLength: rawInput.length,
+      });
+      return;
+    }
+    logger.info('amountActions.setMode.done', {
+      previousMode: inputMode,
+      nextMode: mode,
+      rawInputLength: rawInput.length,
+    });
     inputMode = mode;
     // Don't notify — caller will follow with setInput.
   };
 
   const toggle = (): void => {
-    if (!hasFiatToggleNow()) return;
+    if (!hasFiatToggleNow()) {
+      logger.info('amountActions.toggle.skipped', {
+        reason: 'fiat-toggle-unavailable',
+        inputMode,
+        rawInputLength: rawInput.length,
+      });
+      return;
+    }
 
     const btcPrice = getBtcPrice();
-    if (btcPrice <= 0) return;
+    if (btcPrice <= 0) {
+      logger.info('amountActions.toggle.skipped', {
+        reason: 'btc-price-unavailable',
+        inputMode,
+        rawInputLength: rawInput.length,
+        btcPrice,
+      });
+      return;
+    }
 
     const current = inspect();
+    const previousMode = inputMode;
 
     if (inputMode === 'sat') {
       // sat → fiat: convert current sats to fiat display value
       inputMode = 'fiat';
-      if (current.numericValue > 0 && current.displayFiat != null && current.displayFiat > 0) {
+      if (
+        current.numericValue > 0 &&
+        current.displayFiat != null &&
+        current.displayFiat > 0
+      ) {
         rawInput = fiatToRawInput(current.displayFiat);
       } else {
         rawInput = '';
@@ -229,13 +370,29 @@ export function createAmountActionManager(
         rawInput = '';
       }
     }
+    logger.info('amountActions.toggle.done', {
+      previousMode,
+      nextMode: inputMode,
+      previousRawInputLength: current.rawInput.length,
+      nextRawInputLength: rawInput.length,
+      btcPrice,
+      effectiveSatAmount: current.effectiveSatAmount,
+      hasDisplayFiat: current.displayFiat != null,
+      displayFiat: current.displayFiat,
+    });
     notify();
   };
 
   const subscribe = (listener: () => void): (() => void) => {
     listeners.add(listener);
+    logger.debug('amountActions.subscribe', {
+      listenerCount: listeners.size,
+    });
     return () => {
       listeners.delete(listener);
+      logger.debug('amountActions.unsubscribe', {
+        listenerCount: listeners.size,
+      });
     };
   };
 

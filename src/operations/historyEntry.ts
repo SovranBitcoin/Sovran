@@ -20,12 +20,34 @@ export interface ParsedHistoryEntry {
  * Returns `null` (and logs a structured warn) when the payload is malformed
  * so callers can branch on a single null check instead of nesting try/catch.
  */
-export function parseHistoryEntryOnce(raw: string | null | undefined): ParsedHistoryEntry | null {
-  if (!raw) return null;
+export function parseHistoryEntryOnce(
+  raw: string | null | undefined,
+): ParsedHistoryEntry | null {
+  if (!raw) {
+    logger.debug('historyEntry.parseSkipped', {
+      reason: raw == null ? 'nullish' : 'empty',
+    });
+    return null;
+  }
   try {
-    return JSON.parse(raw) as ParsedHistoryEntry;
+    const parsed = JSON.parse(raw) as ParsedHistoryEntry;
+    logger.debug('historyEntry.parseSucceeded', {
+      rawLength: raw.length,
+      keyCount: Object.keys(parsed).length,
+      hasId: !!parsed.id,
+      idLength: parsed.id?.length ?? 0,
+      type: parsed.type ?? null,
+      amount: parsed.amount ?? null,
+      metadataKeyCount: parsed.metadata
+        ? Object.keys(parsed.metadata).length
+        : 0,
+    });
+    return parsed;
   } catch (e) {
-    logger.warn('historyEntry.parseFailed', { error: errField(e) });
+    logger.warn('historyEntry.parseFailed', {
+      rawLength: raw.length,
+      error: errField(e),
+    });
     return null;
   }
 }
