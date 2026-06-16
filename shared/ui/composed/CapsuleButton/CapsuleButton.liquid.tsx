@@ -1,52 +1,103 @@
 import React from 'react';
-import {
-  Host,
-  Button as SwiftUIButton,
-  HStack as SwiftUIHStack,
-  Image as SwiftUIImage,
-  Text as SwiftUIText,
-} from '@expo/ui/swift-ui';
-import { buttonStyle, font, foregroundStyle, frame, padding } from '@expo/ui/swift-ui/modifiers';
+import { StyleSheet } from 'react-native';
+import { PressableFeedback } from 'heroui-native';
 
+import { GlassView } from 'expo-glass-effect';
+
+import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { controlHeight } from '@/shared/styles/tokens';
+import { Text } from '@/shared/ui/primitives/Text';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
 
-const DEFAULT_HEIGHT = 48;
+// controlHeight.cta — matches the blur/flat variants (48) so all tiers agree.
+const DEFAULT_HEIGHT = controlHeight.cta;
 
-// Note on testID: SwiftUI Buttons inside a Host don't accept a React testID
-// prop, and a wrapper RN View with pointerEvents="box-none" can leak touches
-// to siblings instead of routing them through the SwiftUI Button. The clean
-// path is to set the testID on the EXISTING parent View at the call site
-// (e.g. the `<View className="flex-1">` wrapper around it at the call site).
-// That parent View already routes touches correctly through to the Host.
-// We accept and ignore the testID prop here so the type stays uniform with
-// the iOS / Android variants.
+// Render Liquid Glass via expo-glass-effect's GlassView (a UIVisualEffectView-
+// backed React Native view) rather than an @expo/ui SwiftUI `Host`. Host views
+// are rendered by a UIHostingController that does NOT follow an RN ScrollView's
+// content transform, so they visually pin to the top while scrolling
+// (expo/expo#46278). GlassView is a normal RN view and scrolls correctly.
 export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactElement {
   const [foreground] = useThemeColor(['foreground'] as const);
-  const { label, systemIcon, color = foreground, onPress, height = DEFAULT_HEIGHT } = props;
+  const {
+    label,
+    icon,
+    onPress,
+    color = foreground,
+    height = DEFAULT_HEIGHT,
+    testID,
+    roundedSide = 'all',
+  } = props;
+  const cornerStyle = getCornerStyle(roundedSide);
+
   return (
-    <Host style={{ height, width: '100%' }} matchContents={false}>
-      <SwiftUIButton
-        modifiers={[
-          buttonStyle('glass'),
-          frame({ height, maxWidth: Infinity, alignment: 'center' }),
-        ]}
-        onPress={onPress}>
-        <SwiftUIHStack
-          alignment="center"
+    <GlassView
+      testID={testID}
+      glassEffectStyle="regular"
+      isInteractive
+      style={[styles.glass, cornerStyle, { minHeight: height }]}>
+      <PressableFeedback
+        animation={false}
+        onPress={onPress}
+        style={[styles.pressable, { minHeight: height }]}>
+        <HStack
+          align="center"
+          justify="center"
           spacing={8}
-          modifiers={[frame({ maxWidth: Infinity, alignment: 'center' })]}>
-          {systemIcon && <SwiftUIImage systemName={systemIcon as any} size={18} color={color} />}
-          <SwiftUIText
-            modifiers={[
-              font({ size: 14, weight: 'bold' }),
-              foregroundStyle(color),
-              padding({ vertical: 8 }),
-            ]}>
+          style={[styles.content, { minHeight: height }]}>
+          <Icon name={icon} size={16} color={color} />
+          <Text size={14} bold style={{ color }}>
             {label}
-          </SwiftUIText>
-        </SwiftUIHStack>
-      </SwiftUIButton>
-    </Host>
+          </Text>
+        </HStack>
+        <PressableFeedback.Ripple />
+      </PressableFeedback>
+    </GlassView>
   );
 }
+
+const styles = StyleSheet.create({
+  glass: {
+    width: '100%',
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  pressable: {
+    width: '100%',
+    overflow: 'hidden',
+  },
+  content: {
+    width: '100%',
+    paddingHorizontal: 12,
+  },
+});
+
+function getCornerStyle(roundedSide: NonNullable<CapsuleButtonProps['roundedSide']>) {
+  switch (roundedSide) {
+    case 'left':
+      return cornerStyles.leftCorners;
+    case 'right':
+      return cornerStyles.rightCorners;
+    case 'all':
+    default:
+      return cornerStyles.allCorners;
+  }
+}
+
+const CORNER_RADIUS = 24;
+
+const cornerStyles = StyleSheet.create({
+  allCorners: {
+    borderRadius: CORNER_RADIUS,
+  },
+  leftCorners: {
+    borderTopLeftRadius: CORNER_RADIUS,
+    borderBottomLeftRadius: CORNER_RADIUS,
+  },
+  rightCorners: {
+    borderTopRightRadius: CORNER_RADIUS,
+    borderBottomRightRadius: CORNER_RADIUS,
+  },
+});

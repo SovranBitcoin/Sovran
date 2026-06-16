@@ -12,22 +12,8 @@ import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill'
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
-import {
-  Host,
-  Button as SwiftUIButton,
-  HStack as SwiftUIHStack,
-  Image as SwiftUIImage,
-  Text as SwiftUIText,
-} from '@expo/ui/swift-ui';
-import {
-  environment,
-  font,
-  foregroundStyle,
-  frame,
-  glassEffect,
-} from '@expo/ui/swift-ui/modifiers';
+import { GlassView } from 'expo-glass-effect';
 import { useCapabilities } from '@/shared/ui/capability';
-import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -88,13 +74,13 @@ const BALANCE_SECTION_GAP = 18;
 // ---------------------------------------------------------------------------
 
 const PILL_TEXT_SIZE = 11;
-const PILL_IOS_HEIGHT = 30;
 
 interface EcashStatusPillProps {
   label: string;
   totalAmount: number;
   unit: string;
-  sfSymbol: React.ComponentProps<typeof SwiftUIImage>['systemName'];
+  /** Retained for caller compatibility; the GlassView pill renders an RN icon. */
+  sfSymbol?: string;
   tintColor?: string;
   onPress?: () => void;
 }
@@ -103,7 +89,6 @@ function EcashStatusPill({
   label,
   totalAmount,
   unit,
-  sfSymbol,
   tintColor,
   onPress,
 }: EcashStatusPillProps): React.ReactElement | null {
@@ -112,48 +97,42 @@ function EcashStatusPill({
     'surface-secondary',
     'muted',
   ] as const);
-  const colorScheme = useColorScheme();
   const tint = tintColor ?? foreground;
   const { liquidGlass } = useCapabilities();
-  const glassPillModifiers = liquidGlass
-    ? [
-        glassEffect({
-          shape: 'capsule' as const,
-          glass: { tint: opacity(tint, 0.15), variant: 'regular' as const, interactive: false },
-        }),
-      ]
-    : [];
 
   if (totalAmount <= 0) return null;
 
   const text = `${label}: ${totalAmount.toLocaleString()} ${unit.toUpperCase()}`;
-  const iosWidth = Math.max(72, Math.round(text.length * (PILL_TEXT_SIZE * 0.62) + 28 + 17));
 
+  // Liquid Glass via expo-glass-effect's GlassView (UIVisualEffectView, a real
+  // RN view) instead of an @expo/ui SwiftUI Host — Host views (UIHostingController)
+  // pin to the top inside an RN ScrollView instead of following the scroll
+  // (expo/expo#46278). GlassView scrolls correctly.
   if (liquidGlass) {
     return (
-      <Host matchContents>
-        <SwiftUIButton
-          onPress={onPress}
-          modifiers={[
-            environment('colorScheme', colorScheme),
-            frame({ height: PILL_IOS_HEIGHT, width: iosWidth, alignment: 'center' }),
-            ...glassPillModifiers,
-          ]}>
-          <SwiftUIHStack
-            alignment="center"
-            spacing={5}
-            modifiers={[frame({ width: iosWidth, alignment: 'center' })]}>
-            <SwiftUIImage systemName={sfSymbol} size={12} color={opacity(tint, 0.85)} />
-            <SwiftUIText
-              modifiers={[
-                font({ size: PILL_TEXT_SIZE, design: 'monospaced', weight: 'bold' }),
-                foregroundStyle(opacity(tint, 0.85)),
-              ]}>
+      <Pressable onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
+        <GlassView
+          glassEffectStyle="regular"
+          isInteractive={false}
+          {...(tintColor ? { tintColor: opacity(tint, 0.15) } : {})}
+          style={{ borderRadius: 999, overflow: 'hidden' }}>
+          <HStack
+            align="center"
+            justify="center"
+            gap={6}
+            style={{ paddingHorizontal: 12, paddingVertical: 5 }}>
+            <Icon name="majesticons:coins" size={14} color={opacity(tint, 0.85)} />
+            <UntranslatedText
+              overpass
+              bold
+              size={PILL_TEXT_SIZE}
+              color={opacity(tint, 0.85)}
+              style={{ letterSpacing: 0.5 }}>
               {text}
-            </SwiftUIText>
-          </SwiftUIHStack>
-        </SwiftUIButton>
-      </Host>
+            </UntranslatedText>
+          </HStack>
+        </GlassView>
+      </Pressable>
     );
   }
 
