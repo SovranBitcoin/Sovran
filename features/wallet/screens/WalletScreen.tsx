@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react';
-import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, StyleSheet, useWindowDimensions, type NativeScrollEvent } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
 
@@ -23,6 +23,7 @@ import { QRButton } from '@/shared/ui/composed/QRButton';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { CapabilityProvider, useCapabilities } from '@/shared/ui/capability';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
@@ -75,6 +76,38 @@ export function WalletScreen() {
   // clips, and stays balanced when empty. The boot-splash → QR morph remeasures
   // the QR position just before morphing, so a content-driven height is safe.
   const minBalanceHeight = Math.max(windowHeight * 0.22, 200);
+
+  // Liquid-glass views can't follow an RN ScrollView's content transform — they
+  // visually pin to the top while scrolling. So while the page is actively
+  // scrolling, suppress liquid glass on the header (the variant resolver falls
+  // back to the blur surface, which scrolls correctly), then restore it once
+  // scrolling settles. Scoped to the header only, so the transactions list
+  // doesn't re-render on scroll start/stop.
+  const caps = useCapabilities();
+  const [glassSuppressed, setGlassSuppressed] = useState(false);
+  const scrollingRef = useRef(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleScrollActivity = useCallback((_e: { nativeEvent: NativeScrollEvent }) => {
+    if (!scrollingRef.current) {
+      scrollingRef.current = true;
+      setGlassSuppressed(true);
+    }
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      scrollingRef.current = false;
+      setGlassSuppressed(false);
+    }, 120);
+  }, []);
+  useEffect(
+    () => () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    },
+    []
+  );
+  const headerCaps = useMemo(
+    () => (caps.liquidGlass && glassSuppressed ? { ...caps, liquidGlass: false } : caps),
+    [caps, glassSuppressed]
+  );
 
   const [contentHeight, setContentHeight] = useState(0);
 
@@ -181,117 +214,120 @@ export function WalletScreen() {
       <LayoutDebugWrapper
         onContentSizeChange={onContentSizeChange}
         refreshControl={pullToAi.refreshControl}
+        onScroll={handleScrollActivity}
         contentContainerStyle={styles.scrollContent}>
         <Log name="WalletScreen" style={styles.screen}>
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
-          <View style={styles.topArea}>
-            <Account account={ACCOUNT} minHeight={minBalanceHeight} />
+          <CapabilityProvider value={headerCaps}>
+            <View style={styles.topArea}>
+              <Account account={ACCOUNT} minHeight={minBalanceHeight} />
 
-            <HStack justify="space-around" style={styles.secondaryActions}>
-              <CircleActionButton
-                icon="mdi:swap-horizontal"
-                systemIcon="arrow.left.arrow.right"
-                label="Swap"
-                testID="wallet-swap"
-                disabled={isSwapping}
-                onPress={() => {
-                  walletLog.info('wallet.swap.tap', { unit: ACCOUNT.unit });
-                  router.navigate({
-                    pathname: '/(mint-flow)/distribution',
-                    params: { unit: ACCOUNT.unit },
-                  });
-                }}
-              />
-              {nfcSupported ? (
+              <HStack justify="space-around" style={styles.secondaryActions}>
                 <CircleActionButton
-                  icon="lucide:nfc"
-                  systemIcon="wave.3.right"
-                  label="NFC"
-                  testID="wallet-nfc"
+                  icon="mdi:swap-horizontal"
+                  systemIcon="arrow.left.arrow.right"
+                  label="Swap"
+                  testID="wallet-swap"
                   disabled={isSwapping}
-                  onPress={handleNfc}
+                  onPress={() => {
+                    walletLog.info('wallet.swap.tap', { unit: ACCOUNT.unit });
+                    router.navigate({
+                      pathname: '/(mint-flow)/distribution',
+                      params: { unit: ACCOUNT.unit },
+                    });
+                  }}
                 />
-              ) : null}
-              <Menu presentation="bottom-sheet">
-                <Menu.Trigger
-                  ref={moreMenuTriggerRef}
-                  style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-                  <View style={{ width: 1, height: 1 }} />
-                </Menu.Trigger>
-                <CircleActionButton
-                  icon="tabler:dots"
-                  systemIcon="ellipsis"
-                  label="More"
-                  testID="wallet-more"
-                  onPress={openMoreMenu}
-                />
-                <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
-                  <MenuScrim />
-                  <Menu.Content presentation="bottom-sheet">
-                    <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
-                      Select option
-                    </Menu.Label>
-                    <Menu.Item testID="wallet-action-theme" onPress={handleTheme}>
-                      <HStack align="center" gap={10} style={{ flex: 1 }}>
-                        <Icon name="mdi:palette" size={20} />
-                        <View style={{ flex: 1 }}>
-                          <Menu.ItemTitle>Theme</Menu.ItemTitle>
-                          <Menu.ItemDescription>Change wallet appearance</Menu.ItemDescription>
-                        </View>
-                      </HStack>
-                    </Menu.Item>
-                    <Menu.Item
-                      testID="wallet-action-near-pay"
-                      isDisabled={isSwapping}
-                      onPress={handleNearPay}>
-                      <HStack align="center" gap={10} style={{ flex: 1 }}>
-                        <Icon name="mdi:bluetooth" size={20} />
-                        <View style={{ flex: 1 }}>
-                          <Menu.ItemTitle>Nut Drop</Menu.ItemTitle>
-                          <Menu.ItemDescription>Pay a nearby BitChat user</Menu.ItemDescription>
-                        </View>
-                      </HStack>
-                    </Menu.Item>
-                  </Menu.Content>
-                </Menu.Portal>
-              </Menu>
-            </HStack>
+                {nfcSupported ? (
+                  <CircleActionButton
+                    icon="lucide:nfc"
+                    systemIcon="wave.3.right"
+                    label="NFC"
+                    testID="wallet-nfc"
+                    disabled={isSwapping}
+                    onPress={handleNfc}
+                  />
+                ) : null}
+                <Menu presentation="bottom-sheet">
+                  <Menu.Trigger
+                    ref={moreMenuTriggerRef}
+                    style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+                    <View style={{ width: 1, height: 1 }} />
+                  </Menu.Trigger>
+                  <CircleActionButton
+                    icon="tabler:dots"
+                    systemIcon="ellipsis"
+                    label="More"
+                    testID="wallet-more"
+                    onPress={openMoreMenu}
+                  />
+                  <Menu.Portal disableFullWindowOverlay={Platform.OS === 'android'}>
+                    <MenuScrim />
+                    <Menu.Content presentation="bottom-sheet">
+                      <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
+                        Select option
+                      </Menu.Label>
+                      <Menu.Item testID="wallet-action-theme" onPress={handleTheme}>
+                        <HStack align="center" gap={10} style={{ flex: 1 }}>
+                          <Icon name="mdi:palette" size={20} />
+                          <View style={{ flex: 1 }}>
+                            <Menu.ItemTitle>Theme</Menu.ItemTitle>
+                            <Menu.ItemDescription>Change wallet appearance</Menu.ItemDescription>
+                          </View>
+                        </HStack>
+                      </Menu.Item>
+                      <Menu.Item
+                        testID="wallet-action-near-pay"
+                        isDisabled={isSwapping}
+                        onPress={handleNearPay}>
+                        <HStack align="center" gap={10} style={{ flex: 1 }}>
+                          <Icon name="mdi:bluetooth" size={20} />
+                          <View style={{ flex: 1 }}>
+                            <Menu.ItemTitle>Nut Drop</Menu.ItemTitle>
+                            <Menu.ItemDescription>Pay a nearby BitChat user</Menu.ItemDescription>
+                          </View>
+                        </HStack>
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Portal>
+                </Menu>
+              </HStack>
 
-            {/* Wrap the Receive / Send / QR row in a single pointerEvents=none
+              {/* Wrap the Receive / Send / QR row in a single pointerEvents=none
                 shroud while swapping. CapsuleButton and QRButton don't accept a
                 `disabled` prop, so the cheapest correct gate is to short-circuit
                 touches at the parent and reduce opacity to match
                 CircleActionButton's disabled treatment (0.4). */}
-            <View
-              pointerEvents={isSwapping ? 'none' : 'auto'}
-              style={[styles.primaryActions, { opacity: isSwapping ? 0.4 : 1 }]}>
-              <View style={styles.capsuleRow}>
-                <View testID="wallet-receive" style={styles.capsuleSlot}>
-                  <CapsuleButton
-                    label="Receive"
-                    icon="lucide:arrow-down-left"
-                    systemIcon={RECEIVE_SYSTEM_ICON}
-                    roundedSide="left"
-                    onPress={handleReceive}
-                  />
+              <View
+                pointerEvents={isSwapping ? 'none' : 'auto'}
+                style={[styles.primaryActions, { opacity: isSwapping ? 0.4 : 1 }]}>
+                <View style={styles.capsuleRow}>
+                  <View testID="wallet-receive" style={styles.capsuleSlot}>
+                    <CapsuleButton
+                      label="Receive"
+                      icon="lucide:arrow-down-left"
+                      systemIcon={RECEIVE_SYSTEM_ICON}
+                      roundedSide="left"
+                      onPress={handleReceive}
+                    />
+                  </View>
+                  <View testID="wallet-send" style={styles.capsuleSlot}>
+                    <CapsuleButton
+                      label="Send"
+                      icon="lucide:arrow-up-right"
+                      systemIcon={SEND_SYSTEM_ICON}
+                      roundedSide="right"
+                      onPress={handleSend}
+                    />
+                  </View>
                 </View>
-                <View testID="wallet-send" style={styles.capsuleSlot}>
-                  <CapsuleButton
-                    label="Send"
-                    icon="lucide:arrow-up-right"
-                    systemIcon={SEND_SYSTEM_ICON}
-                    roundedSide="right"
-                    onPress={handleSend}
-                  />
-                </View>
-              </View>
 
-              <View pointerEvents="box-none" style={styles.qrAnchor}>
-                <QRButton onPress={handleScanQR} size={QR_BUTTON_SIZE} />
+                <View pointerEvents="box-none" style={styles.qrAnchor}>
+                  <QRButton onPress={handleScanQR} size={QR_BUTTON_SIZE} />
+                </View>
               </View>
             </View>
-          </View>
+          </CapabilityProvider>
 
           <View style={styles.content}>
             <Transactions account={ACCOUNT} showMore={true} history={history} hideExpired={true} />
