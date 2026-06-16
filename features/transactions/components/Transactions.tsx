@@ -365,6 +365,26 @@ export const Transactions = React.memo(
       return sections.all;
     }, [sections, tab]);
 
+    // Embedded (per-person) list groups purely by date — no pending/confirmed/
+    // expired split — so each date renders once under a single date header.
+    const embeddedSections = useMemo<Section[]>(() => {
+      if (!embedded) return [];
+      const groupedByDate = _.groupBy(sortedTimeline, (item) =>
+        formatDate(getTimelineCreatedAt(item), 'long-date')
+      );
+      const dateEntries = Object.keys(groupedByDate).map((dateString) => ({
+        dateString,
+        originalDate: new Date(getTimelineCreatedAt(groupedByDate[dateString][0])),
+      }));
+      return _.orderBy(dateEntries, (e) => e.originalDate.getTime(), 'desc').map(
+        ({ dateString }) => ({
+          title: dateString,
+          data: groupedByDate[dateString],
+          index: `embedded-${dateString}`,
+        })
+      );
+    }, [embedded, sortedTimeline]);
+
     // Cancellable subset of the visible pending bucket: ecash sends only.
     // Used by the parent screen to drive the "Cancel N pending" footer.
     const visiblePendingEcash = useMemo<SendHistoryEntry[]>(() => {
@@ -471,6 +491,20 @@ export const Transactions = React.memo(
       ),
       [muted, borderColor, foreground]
     );
+
+    if (embedded) {
+      // Non-virtualized, date-grouped list for embedding inside a detail
+      // screen's ScrollView (one date header per date, no status containers).
+      return (
+        <View className="w-full">
+          {embeddedSections.map((section) => (
+            <React.Fragment key={section.index ?? section.title}>
+              {renderSection({ item: section })}
+            </React.Fragment>
+          ))}
+        </View>
+      );
+    }
 
     if (showMore) {
       if (isFetching) {
