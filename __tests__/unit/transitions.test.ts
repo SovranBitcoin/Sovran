@@ -456,6 +456,25 @@ describe('transition — REQUEST_MINT_SELECTOR', () => {
       ],
     });
   });
+
+  it('drops a stale destination for an NPC-scoped request', () => {
+    // Opening the npub.cash mint picker must ignore a lingering receive
+    // destination so it shows the full trusted-mint list (not one filtered by
+    // the stale method requirement) and leaves clean context behind it.
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'mintQuote',
+      mintQuoteMethod: 'bolt11',
+      amount: 500,
+    };
+    const result = tx('enterAmount', ctx, { type: 'REQUEST_MINT_SELECTOR', scope: 'npc' });
+
+    expect(result.step).toBe('selectMint');
+    expect(result.context.destination).toBeUndefined();
+    expect(result.data.scope).toBe('npc');
+    expect(result.data.destination).toBeUndefined();
+    expect(result.data.methodRequirement).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1085,6 +1104,27 @@ describe('transition — MINT_SELECTED', () => {
       mintUrl: MINT1,
     });
     expect(result.step).toBe('dismiss');
+  });
+
+  it('dismisses for an NPC-scoped selection and never advances the flow', () => {
+    // NPC scope only sets which mint backs the npub.cash address. Even when a
+    // stale `destination: mintQuote` lingers (e.g. the user opened Fixed Amount
+    // then backed out), picking an NPC mint must NOT reopen the amount selector.
+    const ctx: FlowContext = {
+      ...idle,
+      destination: 'mintQuote',
+      mintQuoteMethod: 'bolt11',
+    };
+    const result = tx('selectMint', ctx, {
+      type: 'MINT_SELECTED',
+      mintUrl: MINT2,
+      scope: 'npc',
+    });
+    expect(result.step).toBe('dismiss');
+    // The stale receive context is dropped — only the chosen mint survives.
+    expect(result.context.mintUrl).toBe(MINT2);
+    expect(result.context.destination).toBeUndefined();
+    expect(result.context.mintQuoteMethod).toBeUndefined();
   });
 });
 

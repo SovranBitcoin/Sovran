@@ -573,9 +573,17 @@ export function requestMintSelector(
   currentCtx: FlowContext,
   walletCtx: WalletContext,
 ): ContextResolutionResult<"selectMint"> {
-  const ctx = currentCtx.destination
-    ? currentCtx
-    : ({ unit: currentCtx.unit } as FlowContext);
+  // An NPC-scoped selection only chooses which mint backs the npub.cash
+  // address. It must never inherit a stale receive/send `destination` (e.g.
+  // a `mintQuote` left over from a Fixed Amount lightning flow the user backed
+  // out of) — otherwise picking a mint would resolve that destination and
+  // reopen the amount selector. Opening the picker with a clean context also
+  // shows the full trusted-mint list instead of one filtered by the stale
+  // destination's method requirement.
+  const ctx =
+    currentCtx.destination && event.scope !== "npc"
+      ? currentCtx
+      : ({ unit: currentCtx.unit } as FlowContext);
   logger.debug("contextResolution.requestMintSelector.start", {
     scope: event.scope,
     ...summarizeContext(ctx),
