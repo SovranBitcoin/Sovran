@@ -18,16 +18,17 @@ import { Menu } from 'heroui-native';
 
 import { Text } from '@/shared/ui/primitives/Text';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { MenuScrim } from '@/shared/blocks/popup/MenuScrim';
 import { INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 
-const CURRENCY_OPTIONS: { code: DisplayCurrency; label: string }[] = [
-  { code: 'usd', label: 'USD' },
-  { code: 'eur', label: 'EUR' },
-  { code: 'gbp', label: 'GBP' },
+const CURRENCY_OPTIONS: { code: DisplayCurrency; label: string; symbol: string }[] = [
+  { code: 'usd', label: 'USD', symbol: '$' },
+  { code: 'eur', label: 'EUR', symbol: '€' },
+  { code: 'gbp', label: 'GBP', symbol: '£' },
 ];
 
 export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.ReactElement {
@@ -71,7 +72,12 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
         <Menu.Content presentation="popover">
           {CURRENCY_OPTIONS.map((option) => (
             <Menu.Item key={option.code} onPress={() => handleSelectCurrency(option.code)}>
-              <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
+              <HStack align="center" gap={10} style={{ flex: 1, minWidth: 160 }}>
+                <Text size={16} bold color={textColor} style={{ width: 20, textAlign: 'center' }}>
+                  {option.symbol}
+                </Text>
+                <Menu.ItemTitle>{option.label}</Menu.ItemTitle>
+              </HStack>
             </Menu.Item>
           ))}
         </Menu.Content>
