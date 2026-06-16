@@ -26,8 +26,8 @@ export default function HomeLayout() {
   // Shared inline header search, like Feed/Contacts. `transparent` keeps the
   // wallpaper showing through the header; the wallet's MintSelector stays as the
   // idle title (GlassSearchBar takes over while searching). The drawer button +
-  // search toggle are supplied by SearchLayout. WalletScreen reads the search
-  // context and renders the people-search view in place while searching.
+  // search toggle are supplied by SearchLayout. WalletScreen layers the shared
+  // search overlay above the mounted wallet body while searching.
   return (
     <SearchLayout
       title="Wallet"

@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { ScreenContainer } from '@/features/contacts/components/ScreenContainer';
 import {
   HomeFeed,
@@ -9,7 +8,7 @@ import {
   FEED_FILTER_FOLLOWING_POPULAR,
   FEED_FILTER_FOLLOWING_RECENT,
 } from '@/features/feed/components/HomeFeed';
-import { UnifiedSearch } from '@/shared/ui/composed/search/UnifiedSearch';
+import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { FeedTabButton } from '@/features/feed/components/FeedTabButton';
 import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { actionMenuPopup } from '@/shared/lib/popup';
@@ -116,7 +115,6 @@ const filtersInnerStyles = StyleSheet.create({
 export function FeedScreen() {
   useLifecycleLogger('FeedScreen', feedLog);
 
-  const { isSearching } = useSearchContext();
   const [activeTab, setActiveTab] = useState<FeedTabId>(FEED_TAB_FOR_YOU);
   const [followingMode, setFollowingMode] = useState<FollowingMode>('Popular');
   const [surface, separator] = useThemeColor(['surface', 'separator-secondary'] as const);
@@ -139,16 +137,6 @@ export function FeedScreen() {
     setFollowingMode(mode);
     setActiveTab(FEED_TAB_FOLLOWING);
   }, []);
-
-  // While searching, UnifiedSearch owns the whole surface (its own scope-tab
-  // row + body); the For You/Following filter row is only for the idle feed.
-  if (isSearching) {
-    return (
-      <Log name="FeedScreen" style={[styles.root, { backgroundColor: surface }]}>
-        <UnifiedSearch recentContext="feed" />
-      </Log>
-    );
-  }
 
   return (
     <Log name="FeedScreen" style={[styles.root, { backgroundColor: surface }]}>
@@ -173,6 +161,7 @@ export function FeedScreen() {
       <ScreenContainer>
         <HomeFeed activeFilter={activeFilter} />
       </ScreenContainer>
+      <SearchOverlay recentContext="feed" />
     </Log>
   );
 }

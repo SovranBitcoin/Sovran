@@ -36,9 +36,7 @@ import { showActionSheet } from '@/shared/lib/popup';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
-import { UnifiedSearch } from '@/shared/ui/composed/search/UnifiedSearch';
+import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 
 const ACCOUNT = { unit: 'sat' } as const;
 
@@ -63,11 +61,7 @@ export function WalletScreen() {
   useLifecycleLogger('WalletScreen');
   useBackgroundConfig({ blurMode: 'partial' });
 
-  // Inline header search (shared with Feed). While searching, the wallet body is
-  // replaced by the people-search view — see the render branch below.
-  const { isSearching } = useSearchContext();
   const headerHeight = useHeaderHeight();
-  const surface = useThemeColor('surface');
 
   const { height: windowHeight } = useWindowDimensions();
   // Phone-dimension floor for the balance region. It grows naturally with its
@@ -162,20 +156,8 @@ export function WalletScreen() {
     void machine.scan?.(undefined, { source: 'nfc' });
   }, [machine, nfcArmed]);
 
-  // Keep BootEntrance mounted across the search toggle so the splash→QR morph
-  // never replays; swap only the inner body. The transparent wallet header means
-  // the search view must paint its own surface and inset below the header.
-  if (isSearching) {
-    return (
-      <BootEntrance>
-        <View
-          style={[styles.searchContainer, { backgroundColor: surface, paddingTop: headerHeight }]}>
-          <UnifiedSearch recentContext="wallet" />
-        </View>
-      </BootEntrance>
-    );
-  }
-
+  // Keep BootEntrance and the wallet body mounted across the search toggle so
+  // the splash→QR morph never replays and closing search restores this screen.
   return (
     <BootEntrance>
       <LayoutDebugWrapper
@@ -301,14 +283,12 @@ export function WalletScreen() {
           </View>
         </Log>
       </LayoutDebugWrapper>
+      <SearchOverlay recentContext="wallet" topInset={headerHeight} />
     </BootEntrance>
   );
 }
 
 const styles = StyleSheet.create({
-  searchContainer: {
-    flex: 1,
-  },
   scrollContent: {
     flexGrow: 1,
     padding: 0,
