@@ -35,6 +35,7 @@ import { cashuLog, log, Log } from '@/shared/lib/logger';
 import { useColadaTransactionAnnotation } from '@sovranbitcoin/colada/react';
 import type { DistributionSource, ScanMethod } from '@sovranbitcoin/colada';
 import { getOnchainTransactionStatusLabel } from '../lib/onchainTransactionStatus';
+import { getTransactionActionLabel } from '../lib/transactionPresentation';
 
 /**
  * Unified source for the row badge. Combines inbound (scan source) and
@@ -200,7 +201,7 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
     isRolledBack,
     fiatAmount,
     handlePress,
-    displayLabel: historyEntry.type[0].toUpperCase() + historyEntry.type.slice(1),
+    displayLabel: getTransactionActionLabel(historyEntry.type),
   };
 };
 

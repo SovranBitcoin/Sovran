@@ -75,6 +75,10 @@ interface Section {
   index?: string;
 }
 
+const DATE_HEADER_HEIGHT = 30;
+const ESTIMATED_TRANSACTION_ROW_HEIGHT = 72;
+const ESTIMATED_SECTION_CHROME_HEIGHT = DATE_HEADER_HEIGHT + spacing.xs + spacing.lg;
+
 interface Props {
   header?: React.ReactElement | (() => React.ReactElement) | null;
   listKey?: string;
@@ -168,9 +172,6 @@ export const Transactions = React.memo(
       if (account.unit === 'all') return Object.values(swapGroupsById);
       return Object.values(swapGroupsById).filter((g) => g.unit === account.unit);
     }, [swapGroupsById, account.unit]);
-
-    const HEADER_HEIGHT = 30;
-    const ITEM_HEIGHT = 69;
 
     const filteredHistory = useMemo(() => {
       const t0 = performance.now();
@@ -366,6 +367,15 @@ export const Transactions = React.memo(
       return sections.all;
     }, [sections, tab]);
 
+    const estimatedSectionItemSize = useMemo(() => {
+      if (sectionsToDisplay.length === 0) {
+        return ESTIMATED_SECTION_CHROME_HEIGHT + ESTIMATED_TRANSACTION_ROW_HEIGHT;
+      }
+      const totalRows = sectionsToDisplay.reduce((sum, section) => sum + section.data.length, 0);
+      const averageRows = Math.max(1, totalRows / sectionsToDisplay.length);
+      return ESTIMATED_SECTION_CHROME_HEIGHT + averageRows * ESTIMATED_TRANSACTION_ROW_HEIGHT;
+    }, [sectionsToDisplay]);
+
     // Embedded (per-person) list groups purely by date — no pending/confirmed/
     // expired split — so each date renders once under a single date header.
     const embeddedSections = useMemo<Section[]>(() => {
@@ -428,22 +438,10 @@ export const Transactions = React.memo(
       [onTransactionPress, onCancelPendingEcash]
     );
 
-    const getFixedItemSize = useCallback((section: Section): number | undefined => {
-      // Pure transaction sections are uniform-height, so we can hand LegendList
-      // an exact fixed size (fast path, no measurement). Sections containing
-      // swap or split-bill rows have content-dependent heights — trusting the
-      // 69px-per-row constant there mis-sized them and caused overlap, gaps,
-      // and scroll jumps. Returning `undefined` tells LegendList to measure
-      // those sections instead.
-      const hasVariableRow = section.data.some((item) => item.kind === 'swap');
-      if (hasVariableRow) return undefined;
-      return HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16;
-    }, []);
-
     const renderSection = useCallback(
       ({ item: section }: { item: Section }) => (
         <VStack spacing={4} className="mb-4">
-          <Text size={14} heavy color={opacity(foreground, 0.33)} style={{ height: HEADER_HEIGHT }}>
+          <Text size={14} heavy color={opacity(foreground, 0.33)} style={styles.dateHeader}>
             {section.title}
           </Text>
           <View style={[styles.card, { borderColor }]}>
@@ -635,8 +633,12 @@ export const Transactions = React.memo(
           style={{ flex: 1 }}
           data={sectionsToDisplay}
           keyExtractor={(section) => section.index ?? section.title}
-          getFixedItemSize={getFixedItemSize}
-          estimatedItemSize={HEADER_HEIGHT + ITEM_HEIGHT + 16}
+          // Date sections are not fixed-height LegendList items: each one
+          // wraps a label plus a card of rows whose measured height can change
+          // with badges, status text, and rollback collapse animations.
+          // Let LegendList measure the real position; this is only the first
+          // allocation hint.
+          estimatedItemSize={estimatedSectionItemSize}
           maintainVisibleContentPosition
           // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
           // triggers a fresh LinearTransition on every measured-position
@@ -676,6 +678,9 @@ const styles = StyleSheet.create({
   },
   content: {
     zIndex: zIndex.raised,
+  },
+  dateHeader: {
+    height: DATE_HEADER_HEIGHT,
   },
   sectionHeader: {
     paddingHorizontal: 16,

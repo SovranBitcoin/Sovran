@@ -8,6 +8,7 @@ import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import type { SymbolViewProps } from 'expo-symbols';
 
 import opacity from 'hex-color-opacity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
@@ -17,9 +18,10 @@ import { HeaderGlassCircle } from '@/shared/ui/composed/HeaderGlassCircle';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { headerButtonSize } from '@/shared/styles/tokens';
 
-type HeaderIconName = string;
+type HeaderIconName = Extract<SymbolViewProps['name'], string>;
 
 const ANDROID_HEADER_ICON_MAP: Partial<Record<HeaderIconName, string>> = {
+  'clock.arrow.circlepath': 'mdi:clock-outline',
   'line.3.horizontal': 'mdi:menu',
   'wave.3.right': 'lucide:nfc',
   magnifyingglass: 'mingcute:search-3-line',
@@ -59,7 +61,7 @@ export function HeaderIconButton({
     Platform.OS === 'android' ? (
       <Icon name={ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu'} size={size} color={color} />
     ) : (
-      <IconSymbol name={icon as any} size={size} color={color} />
+      <IconSymbol name={icon} size={size} color={color} />
     );
 
   if (supportsLiquidGlass()) {

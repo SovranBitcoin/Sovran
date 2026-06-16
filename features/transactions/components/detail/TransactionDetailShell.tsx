@@ -85,7 +85,7 @@ export function TransactionDetailShell({
   children,
 }: TransactionDetailShellProps): React.ReactElement {
   // Other transactions with the same nostr counterparty (Nut Drop / lightning-
-  // address-to-nostr). Rendered after the details as a mini relationship view.
+  // address-to-nostr). Rendered before technical details as a mini relationship view.
   const counterpartyPubkey = entry ? getCounterparty(entry)?.pubkey : undefined;
   return (
     <Screen name={screenName} contentPadding={0} footer={footer}>
@@ -100,10 +100,10 @@ export function TransactionDetailShell({
             ? (statusRow ?? <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />)
             : statusRow}
           {entry ? (timeline ?? <HistoryEntryTimeline historyEntry={entry} />) : timeline}
-          {children}
           {entry && counterpartyPubkey ? (
             <CounterpartyTransactions pubkey={counterpartyPubkey} excludeId={entry.id} />
           ) : null}
+          {children}
         </VStack>
       </View>
     </Screen>

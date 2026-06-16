@@ -55,6 +55,7 @@ import { formatDate } from '@/shared/lib/date';
 import { formatAmount } from '@/shared/lib/currency';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintManagement } from '@/features/mint';
+import { getTransactionActionDirection } from '@/features/transactions/lib/transactionPresentation';
 import Icon from 'assets/icons';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
@@ -118,7 +119,7 @@ function buildSwapEntryRowProps(
   mintIconUrl: string | undefined,
   mintName: string
 ) {
-  const isSend = historyEntry.type === 'melt';
+  const type = getTransactionActionDirection(historyEntry.type);
   const numericAmount = amountToNumber(historyEntry.amount);
   const fiatAmount = formatAmount(
     { amount: Math.abs(numericAmount), unit: historyEntry.unit },
@@ -159,7 +160,7 @@ function buildSwapEntryRowProps(
   };
 
   return {
-    type: (isSend ? 'send' : 'receive') as 'send' | 'receive',
+    type,
     mintIconUrl,
     mintName,
     amount: numericAmount,

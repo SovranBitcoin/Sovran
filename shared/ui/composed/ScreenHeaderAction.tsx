@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
@@ -26,8 +26,10 @@ import { alpha, headerButtonSize, hitSlop } from '@/shared/styles/tokens';
  */
 interface ScreenHeaderActionProps {
   icon: string;
-  onPress: () => void;
+  /** Omit for status-only header chrome that should not behave like a button. */
+  onPress?: () => void;
   testID?: string;
+  accessibilityLabel?: string;
   color?: string;
   size?: number;
   disabled?: boolean;
@@ -40,6 +42,7 @@ export function ScreenHeaderAction({
   icon,
   onPress,
   testID,
+  accessibilityLabel,
   color,
   size = 24,
   disabled,
@@ -55,12 +58,39 @@ export function ScreenHeaderAction({
     <Icon name={icon} size={size} color={color ?? opacity(foreground, alpha.prominent)} />
   );
 
+  const circleStyle = React.useMemo(
+    () => [
+      styles.circle,
+      { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) },
+      { opacity: disabled ? 0.4 : 1 },
+    ],
+    [disabled, muted, surfaceSecondary]
+  );
+
   if (supportsLiquidGlass()) {
     return (
-      <HeaderGlassCircle onPress={onPress} disabled={disabled}>
+      <HeaderGlassCircle
+        onPress={onPress}
+        disabled={disabled}
+        testID={testID}
+        accessibilityLabel={accessibilityLabel}>
         {glyph}
         {accessory}
       </HeaderGlassCircle>
+    );
+  }
+
+  if (!onPress) {
+    return (
+      <View
+        style={circleStyle}
+        testID={testID}
+        accessible={!!accessibilityLabel}
+        accessibilityRole={accessibilityLabel ? 'image' : undefined}
+        accessibilityLabel={accessibilityLabel}>
+        {glyph}
+        {accessory}
+      </View>
     );
   }
 
@@ -69,11 +99,9 @@ export function ScreenHeaderAction({
       onPress={onPress}
       hitSlop={hitSlop.default}
       activeOpacity={0.7}
-      style={[
-        styles.circle,
-        { backgroundColor: surfaceSecondary, borderColor: opacity(muted, 0.3) },
-        { opacity: disabled ? 0.4 : 1 },
-      ]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={circleStyle}
       disabled={disabled}
       testID={testID}>
       {glyph}

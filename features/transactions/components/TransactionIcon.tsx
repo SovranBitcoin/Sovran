@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { isSendTokenCancelled, isP2PKLocked, getCounterparty } from '@sovranbitcoin/colada';
+import { isSendTokenCancelled, getCounterparty } from '@sovranbitcoin/colada';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
@@ -28,12 +28,9 @@ export default function TransactionIcon({
     'surface-secondary',
   ] as const);
   const cancelledSend = historyEntry.type === 'send' && isSendTokenCancelled(historyEntry);
-  // P2PK lock badge: annotation (outgoing locks, Nut Drop receives) or the
-  // proof-secret fallback colada applies for un-annotated locked sends.
-  const locked = !isLoading && isP2PKLocked(historyEntry);
 
   // Counterparty nostr identity (Nut Drop send/receive). When known, the avatar
-  // replaces the directional arrow; direction still reads from the amount color.
+  // replaces the center arrow, so the direction moves to the corner badge.
   const counterparty = getCounterparty(historyEntry);
   const counterpartyPubkey = counterparty?.pubkey;
   // Reactive but fetch-free read of the warm kind-0 cache, so the avatar fills
@@ -69,11 +66,9 @@ export default function TransactionIcon({
     }
   }, [cancelledSend, historyEntry.type]);
 
-  // Corner badge: lock wins (high signal); otherwise, when the avatar replaced
-  // the center arrow, surface the direction there. No badge when the center
-  // already shows the directional arrow.
-  const showCornerBadge = !isLoading && (locked || showAvatar);
-  const cornerIcon = locked ? 'solar:key-bold' : iconName;
+  // When the avatar replaces the center arrow, surface the transaction
+  // direction in the corner badge.
+  const showCornerBadge = !isLoading && showAvatar;
 
   useEffect(() => {
     paymentLog.debug('tx.icon.render', {
@@ -82,11 +77,10 @@ export default function TransactionIcon({
       isLoading: !!isLoading,
       cancelledSend,
       iconName,
-      locked,
       showAvatar,
       hasAvatarPicture: !!avatarPicture,
     });
-  }, [cancelledSend, historyEntry, iconName, isLoading, locked, showAvatar, avatarPicture]);
+  }, [cancelledSend, historyEntry, iconName, isLoading, showAvatar, avatarPicture]);
 
   return (
     <Log name="TransactionIcon">
@@ -124,7 +118,7 @@ export default function TransactionIcon({
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <Icon name={cornerIcon} color={foreground} size={10} />
+            <Icon name={iconName} color={foreground} size={10} />
           </View>
         )}
       </View>

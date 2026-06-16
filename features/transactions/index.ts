@@ -23,4 +23,8 @@ export {
   TransactionsFilterProvider,
   useTransactionsFilter,
 } from './components/TransactionsFilterContext';
+export {
+  getTransactionActionDirection,
+  getTransactionActionLabel,
+} from './lib/transactionPresentation';
 export { useHistoryWithMelts } from './hooks/useHistoryWithMelts';

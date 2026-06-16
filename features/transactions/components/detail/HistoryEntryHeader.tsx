@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 
 import { HistoryEntry } from '@cashu/coco-core';
-import { getCounterparty, isP2PKLocked } from '@sovranbitcoin/colada';
+import { getCounterparty } from '@sovranbitcoin/colada';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
@@ -32,7 +32,7 @@ interface HistoryEntryHeaderProps {
   };
   /**
    * Nostr pubkey (hex) of the recipient — surfaces a Nostr-themed avatar
-   * with an outgoing-arrow overlay in place of the default transaction
+   * with a direction-arrow overlay in place of the default transaction
    * icon. Profile picture / display name are resolved from the metadata
    * cache. Set by the chat→send-money flow via
    * `entry.metadata.recipientPubkey` (see `colada` types).
@@ -56,7 +56,6 @@ export function HistoryEntryHeader({
   const counterparty = historyEntry ? getCounterparty(historyEntry) : null;
   const effectiveRecipientPubkey = recipientPubkey ?? counterparty?.pubkey ?? undefined;
   const avatarRecipientPubkey = showRecipientAvatar ? effectiveRecipientPubkey : undefined;
-  const counterpartyLocked = historyEntry ? isP2PKLocked(historyEntry) : false;
   const { metadata: recipientMetadata } = useNostrProfileMetadata(avatarRecipientPubkey);
   const [foreground, surface, background, danger, success] = useThemeColor([
     'foreground',
@@ -113,12 +112,9 @@ export function HistoryEntryHeader({
       const recipientName =
         recipientMetadata?.displayName ?? recipientMetadata?.name ?? counterparty?.displayName;
       const recipientPicture = recipientMetadata?.picture ?? counterparty?.avatarUrl;
-      // Overlay: lock when P2PK-locked (high signal), else the direction arrow.
-      const overlayIcon = counterpartyLocked
-        ? 'solar:key-bold'
-        : isSend
-          ? 'fluent:arrow-upload-16-filled'
-          : 'fluent:arrow-download-16-filled';
+      const overlayIcon = isSend
+        ? 'fluent:arrow-upload-16-filled'
+        : 'fluent:arrow-download-16-filled';
       return (
         <View className="relative">
           <Avatar
