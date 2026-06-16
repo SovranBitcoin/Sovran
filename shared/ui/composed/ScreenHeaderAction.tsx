@@ -25,7 +25,9 @@ import { alpha, headerButtonSize, hitSlop } from '@/shared/styles/tokens';
  * geometry.
  */
 interface ScreenHeaderActionProps {
-  icon: string;
+  icon?: string;
+  /** Optional custom center content, used for loading indicators. */
+  children?: React.ReactNode;
   /** Omit for status-only header chrome that should not behave like a button. */
   onPress?: () => void;
   testID?: string;
@@ -40,6 +42,7 @@ interface ScreenHeaderActionProps {
 
 export function ScreenHeaderAction({
   icon,
+  children,
   onPress,
   testID,
   accessibilityLabel,
@@ -54,9 +57,11 @@ export function ScreenHeaderAction({
     'muted',
   ] as const);
 
-  const glyph = (
-    <Icon name={icon} size={size} color={color ?? opacity(foreground, alpha.prominent)} />
-  );
+  const content =
+    children ??
+    (icon ? (
+      <Icon name={icon} size={size} color={color ?? opacity(foreground, alpha.prominent)} />
+    ) : null);
 
   const circleStyle = React.useMemo(
     () => [
@@ -74,7 +79,7 @@ export function ScreenHeaderAction({
         disabled={disabled}
         testID={testID}
         accessibilityLabel={accessibilityLabel}>
-        {glyph}
+        {content}
         {accessory}
       </HeaderGlassCircle>
     );
@@ -88,7 +93,7 @@ export function ScreenHeaderAction({
         accessible={!!accessibilityLabel}
         accessibilityRole={accessibilityLabel ? 'image' : undefined}
         accessibilityLabel={accessibilityLabel}>
-        {glyph}
+        {content}
         {accessory}
       </View>
     );
@@ -104,7 +109,7 @@ export function ScreenHeaderAction({
       style={circleStyle}
       disabled={disabled}
       testID={testID}>
-      {glyph}
+      {content}
       {accessory}
     </Pressable>
   );

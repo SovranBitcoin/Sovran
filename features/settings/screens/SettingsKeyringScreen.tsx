@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LoadingIndicator } from '@/shared/blocks/status';
 import * as Clipboard from 'expo-clipboard';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
+import { useNavigationState } from '@react-navigation/native';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -25,6 +25,7 @@ import { parseP2PKSecretInput } from '@sovranbitcoin/coco-cashu-plugin-p2pk-impo
 import { INVARIANT_BLACK, INVARIANT_WHITE } from '@/shared/lib/brandColors';
 import QRCode from 'react-native-qrcode-svg';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import opacity from 'hex-color-opacity';
 import {
   Button,
@@ -35,6 +36,13 @@ import {
 } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { headerButtonSize, spacing } from '@/shared/styles/tokens';
+
+const headerBalanceSpacerStyle = {
+  height: headerButtonSize,
+  opacity: 0,
+  width: headerButtonSize,
+};
 
 /**
  * CurrentKeyItem - Featured display for the active/most recent key
@@ -215,6 +223,7 @@ export const SettingsKeyringScreen: React.FC = () => {
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
   const manager = useManager();
   const { keys: nostrKeys, isReady: nostrKeysReady } = useNostrKeysContext();
+  const isFirstScreen = useNavigationState((state) => state.index === 0);
 
   const [keypairs, setKeypairs] = useState<Keypair[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -411,35 +420,59 @@ export const SettingsKeyringScreen: React.FC = () => {
 
   const canImportCurrentNsec = !!manager && nostrKeysReady && !!nostrKeys?.privateKey;
   const isKeyringActionPending = isGenerating || isImportingCurrentNsec;
+  const handleHeaderBack = useCallback(() => {
+    router.back();
+  }, []);
+  const renderHeaderLeft = useCallback(
+    () => (
+      <HStack spacing={spacing.xs}>
+        <ScreenHeaderAction
+          icon={
+            isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
+          }
+          onPress={handleHeaderBack}
+          accessibilityLabel={isFirstScreen ? 'Close settings' : 'Go back'}
+        />
+        <View pointerEvents="none" style={headerBalanceSpacerStyle} />
+      </HStack>
+    ),
+    [handleHeaderBack, isFirstScreen]
+  );
+  const renderHeaderRight = useCallback(
+    () => (
+      <HStack spacing={spacing.xs}>
+        <ScreenHeaderAction
+          icon="mdi:key-arrow-right"
+          onPress={handleImportNsec}
+          disabled={isKeyringActionPending}
+          testID="keyring-import-trigger"
+          accessibilityLabel="Import P2PK key"
+        />
+        <ScreenHeaderAction
+          icon="mdi:key-plus"
+          onPress={isGenerating ? undefined : handleGenerateKey}
+          disabled={isKeyringActionPending && !isGenerating}
+          accessibilityLabel={isGenerating ? 'Generating P2PK key' : 'Generate P2PK key'}>
+          {isGenerating ? (
+            <LoadingIndicator size={22} phase="loading" color={foreground} />
+          ) : undefined}
+        </ScreenHeaderAction>
+      </HStack>
+    ),
+    [foreground, handleGenerateKey, handleImportNsec, isGenerating, isKeyringActionPending]
+  );
+  const stackOptions = useMemo(
+    () => ({
+      title: 'P2PK Keys',
+      headerLeft: renderHeaderLeft,
+      headerRight: renderHeaderRight,
+    }),
+    [renderHeaderLeft, renderHeaderRight]
+  );
 
   return (
     <Screen name="SettingsKeyringScreen">
-      <Stack.Screen
-        options={{
-          title: 'P2PK Keys',
-          headerRight: () => (
-            <HStack spacing={4}>
-              <Pressable
-                onPress={handleImportNsec}
-                style={{ padding: 8 }}
-                disabled={isKeyringActionPending}
-                testID="keyring-import-trigger">
-                <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
-              </Pressable>
-              <Pressable
-                onPress={handleGenerateKey}
-                style={{ padding: 8 }}
-                disabled={isKeyringActionPending}>
-                {isGenerating ? (
-                  <LoadingIndicator size={22} phase="loading" color={foreground} />
-                ) : (
-                  <Icon name="mdi:key-plus" size={22} color={foreground} />
-                )}
-              </Pressable>
-            </HStack>
-          ),
-        }}
-      />
+      <Stack.Screen options={stackOptions} />
       {/* Quick Access Toggle */}
       <Section title="Preferences">
         <ListGroup variant="secondary">
