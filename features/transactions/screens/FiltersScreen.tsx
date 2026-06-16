@@ -13,7 +13,6 @@ import { z } from 'zod';
 
 import Icon from 'assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
-import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -23,7 +22,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { extractDomain } from '@/shared/lib/url';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
-import { spacing, radius, alpha, zIndex } from '@/shared/styles/tokens';
+import { spacing, radius, alpha } from '@/shared/styles/tokens';
 import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
@@ -105,7 +104,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode; scroll?: boo
   children,
   scroll = false,
 }) => {
-  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const foreground = useThemeColor('foreground');
 
   return (
     <VStack gap={spacing.sm} style={styles.section}>
@@ -120,20 +119,16 @@ const Section: React.FC<{ title: string; children: React.ReactNode; scroll?: boo
         }}>
         {title}
       </Text>
-      <View style={[styles.card, { borderColor: opacity(muted, alpha.soft) }]}>
-        <BlurCardFrame accentColor={muted} glow={false}>
-          {scroll ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.cardContent}>
-              {children}
-            </ScrollView>
-          ) : (
-            <View style={[styles.cardContent, styles.chipsRow]}>{children}</View>
-          )}
-        </BlurCardFrame>
-      </View>
+      {scroll ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRowScroll}>
+          {children}
+        </ScrollView>
+      ) : (
+        <View style={styles.chipsRow}>{children}</View>
+      )}
     </VStack>
   );
 };
@@ -502,17 +497,8 @@ export function FiltersScreen() {
 const styles = StyleSheet.create({
   filterContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   section: { marginBottom: spacing.xl },
-  card: {
-    borderRadius: radius['2xl'],
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
-  cardContent: {
-    padding: spacing.md,
-    zIndex: zIndex.raised,
-  },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chipsRowScroll: { flexDirection: 'row', alignItems: 'center', paddingRight: spacing.lg },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
