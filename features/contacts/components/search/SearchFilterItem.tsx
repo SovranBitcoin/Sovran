@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Text, StyleSheet } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
-import { Feather } from '@expo/vector-icons';
+import Icon from 'assets/icons';
 import type { RefObject } from 'react';
 import type { FlatList } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -53,7 +53,9 @@ function FilterItem<F extends string>({
         }}
         style={[styles.pressable, isActive && { backgroundColor: activeBg }]}>
         <Animated.View style={[styles.inner, rStyle]}>
-          {item === 'All filters' ? <Feather name="sliders" size={18} color={foreground} /> : null}
+          {item === 'All filters' ? (
+            <Icon name="fluent:filter-16-filled" size={18} color={foreground} />
+          ) : null}
           <Text style={[styles.label, { color: foreground }]}>{item}</Text>
         </Animated.View>
       </Pressable>
