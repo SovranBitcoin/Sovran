@@ -74,6 +74,7 @@ const BALANCE_SECTION_GAP = 18;
 // ---------------------------------------------------------------------------
 
 const PILL_TEXT_SIZE = 11;
+const PILL_HEIGHT = 30;
 
 interface EcashStatusPillProps {
   label: string;
@@ -115,12 +116,13 @@ function EcashStatusPill({
           glassEffectStyle="regular"
           isInteractive={false}
           {...(tintColor ? { tintColor: opacity(tint, 0.15) } : {})}
-          style={{ borderRadius: 999, overflow: 'hidden' }}>
-          <HStack
-            align="center"
-            justify="center"
-            gap={6}
-            style={{ paddingHorizontal: 12, paddingVertical: 5 }}>
+          style={{
+            borderRadius: 999,
+            overflow: 'hidden',
+            minHeight: PILL_HEIGHT,
+            justifyContent: 'center',
+          }}>
+          <HStack align="center" justify="center" gap={6} style={{ paddingHorizontal: 12 }}>
             <Icon name="majesticons:coins" size={14} color={opacity(tint, 0.85)} />
             <UntranslatedText
               overpass
@@ -151,7 +153,7 @@ function EcashStatusPill({
           borderWidth: 1,
           borderColor: tintColor ? opacity(tint, 0.3) : opacity(mutedColor, 0.3),
           paddingHorizontal: 12,
-          paddingVertical: 5,
+          minHeight: PILL_HEIGHT,
         }}>
         <Icon name="majesticons:coins" size={14} color={opacity(tint, 0.8)} />
         <UntranslatedText
