@@ -7,7 +7,8 @@
  * usePaymentFlowMachine after entry is available).
  */
 
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
@@ -26,8 +27,9 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
-import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { UnderlineTabs } from '@/shared/ui/composed/UnderlineTabs';
+import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -172,6 +174,63 @@ const ReceiveP2pkTab = memo(function ReceiveP2pkTab({ data, actions, muted }: Re
   );
 });
 
+const QR_PLACEHOLDER_HORIZONTAL_INSET = 32;
+
+function ReceiveHubPlaceholder() {
+  const { width } = useWindowDimensions();
+  const qrFrameSize = Math.max(0, Math.min(width, 600) - QR_PLACEHOLDER_HORIZONTAL_INSET);
+  const qrPlaceholderStyle = useMemo(
+    () => [styles.qrPlaceholder, { width: qrFrameSize, height: qrFrameSize }],
+    [qrFrameSize]
+  );
+
+  return (
+    <>
+      <View testID="receive-hub-placeholder" style={styles.placeholderContainer}>
+        <Skeleton testID="receive-hub-qr-placeholder" style={qrPlaceholderStyle} />
+      </View>
+      <View className="mx-4">
+        <Section title="RECEIVE ADDRESS">
+          <GradientCard>
+            <ListGroup variant="transparent">
+              <ListGroup.Item disabled>
+                <ListGroup.ItemPrefix>
+                  <Skeleton style={styles.placeholderIcon} />
+                </ListGroup.ItemPrefix>
+                <ListGroup.ItemContent>
+                  <Skeleton style={styles.placeholderLine} />
+                </ListGroup.ItemContent>
+                <ListGroup.ItemSuffix>
+                  <Skeleton style={styles.placeholderIcon} />
+                </ListGroup.ItemSuffix>
+              </ListGroup.Item>
+            </ListGroup>
+          </GradientCard>
+        </Section>
+      </View>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  placeholderContainer: {
+    alignItems: 'center',
+  },
+  qrPlaceholder: {
+    borderRadius: 16,
+  },
+  placeholderIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  placeholderLine: {
+    width: '58%',
+    height: 18,
+    borderRadius: 9,
+  },
+});
+
 interface ReceiveScreenProps {
   receiveEntry?: string | Record<string, unknown>;
   unit: string;
@@ -188,6 +247,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   );
 
   const receiveEntryData = entry as ReceiveHubEntry | null;
+  const hasReceiveEntryData = Boolean(receiveEntryData);
 
   const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
   const tabs = quickAccessP2PK ? ['Lightning', 'P2PK'] : ['Lightning'];
@@ -216,50 +276,56 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
     );
   }
 
-  if (!receiveEntryData) {
-    return <ScreenLoadingState message="Loading..." />;
-  }
-
   return (
     <ScreenWrapper
       name="ReceiveScreen"
       contentPadding={0}
+      deferContent={false}
       footer={
         <BottomButtons>
           <ButtonHandler
             buttons={[
               {
                 testID: 'receive-paste',
-                text: actions.paste.loading ? 'Pasting...' : 'Paste',
+                text: hasReceiveEntryData && actions.paste.loading ? 'Pasting...' : 'Paste',
                 icon: 'lets-icons:copy',
                 variant: 'primary',
                 onPress: async () => {
+                  if (!hasReceiveEntryData) return;
                   await actions.paste.execute();
                 },
-                loading: actions.paste.loading,
-                condition: actions.paste.available,
+                loading: hasReceiveEntryData && actions.paste.loading,
+                disabled: !hasReceiveEntryData,
+                condition: hasReceiveEntryData ? actions.paste.available : true,
               },
               {
                 testID: 'receive-fixed-amount',
-                text: actions.fixedAmount.loading ? 'Opening...' : 'Fixed Amount',
+                text:
+                  hasReceiveEntryData && actions.fixedAmount.loading
+                    ? 'Opening...'
+                    : 'Fixed Amount',
                 icon: 'mdi:decimal',
                 variant: 'secondary',
                 onPress: async () => {
+                  if (!hasReceiveEntryData) return;
                   await actions.fixedAmount.execute();
                 },
-                loading: actions.fixedAmount.loading,
-                condition: actions.fixedAmount.available,
+                loading: hasReceiveEntryData && actions.fixedAmount.loading,
+                disabled: !hasReceiveEntryData,
+                condition: hasReceiveEntryData ? actions.fixedAmount.available : true,
               },
               {
                 testID: 'receive-scan-qr',
-                text: actions.scanQr.loading ? 'Opening...' : 'Scan QR',
+                text: hasReceiveEntryData && actions.scanQr.loading ? 'Opening...' : 'Scan QR',
                 icon: 'stash:qr-code',
                 variant: 'secondary',
                 onPress: async () => {
+                  if (!hasReceiveEntryData) return;
                   await actions.scanQr.execute();
                 },
-                loading: actions.scanQr.loading,
-                condition: actions.scanQr.available,
+                loading: hasReceiveEntryData && actions.scanQr.loading,
+                disabled: !hasReceiveEntryData,
+                condition: hasReceiveEntryData ? actions.scanQr.available : true,
               },
             ]}
           />
@@ -271,7 +337,9 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         </View>
       )}
 
-      {quickAccessP2PK && selectedTab === 'P2PK' ? (
+      {!receiveEntryData ? (
+        <ReceiveHubPlaceholder />
+      ) : quickAccessP2PK && selectedTab === 'P2PK' ? (
         <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
       ) : (
         <ReceiveLightningTab
