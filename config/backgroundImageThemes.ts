@@ -36,17 +36,16 @@ export interface GradientColor {
 }
 
 /**
- * Background image require() mappings.
- * Maps theme name to the image asset.
+ * Background image source registry, keyed by theme name.
+ *
+ * Wallpapers ship via the remote catalog now: `downloadedThemeRegistry` mutates
+ * this object with `{ uri: localUri }` entries as wallpapers are downloaded, and
+ * `SpriteView`/`UnitPreviewCard` fall back to the catalog thumb or palette
+ * gradient when a theme has no entry yet. The legacy bundled PNGs were removed
+ * to drop ~20MB from the app binary, so this starts empty and is populated at
+ * runtime. (The color/gradient metadata below is static and stays.)
  */
-export const backgroundImageThemes: Record<string, ImageSource> = {
-  cosmicpurple: require('assets/images/backgrounds/cosmic-purple.png'),
-  deepocean: require('assets/images/backgrounds/deep-ocean.png'),
-  mountainpeaks: require('assets/images/backgrounds/mountain-peaks.png'),
-  mountainsky: require('assets/images/backgrounds/mountain-sky.png'),
-  mysticblue: require('assets/images/backgrounds/mystic-blue.png'),
-  royalpurple: require('assets/images/backgrounds/royal-purple.png'),
-};
+export const backgroundImageThemes: Record<string, ImageSource> = {};
 
 /**
  * Array of all background image theme names.
