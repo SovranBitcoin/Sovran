@@ -245,7 +245,22 @@ function handleMintSelected(
     ...mintUrlFields(event.mintUrl),
     amount: event.amount,
     destination: event.destination ?? currentCtx.destination,
+    scope: event.scope,
   });
+
+  // An NPC-scoped selection only sets which mint backs the npub.cash address.
+  // It is persist-only — the wallet persists it via `onNpcMintChanged` — and
+  // must never advance a receive/send flow. Guarding here keeps the invariant
+  // even if a stale `destination` (e.g. from a backed-out Fixed Amount flow)
+  // is still in context, which would otherwise reopen the amount selector.
+  if (event.scope === 'npc') {
+    return {
+      step: 'dismiss',
+      context: { unit: currentCtx.unit, mintUrl: event.mintUrl },
+      data: {} as any,
+    };
+  }
+
   const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
   const ctx: FlowContext = shouldResetContext
     ? {
