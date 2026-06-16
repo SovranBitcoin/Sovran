@@ -1,6 +1,6 @@
 {
   "name": "@sovranbitcoin/colada",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Colada is standardized payment UX logic for Coco-based wallets. Parsing, classification, routing, annotation, offline suggestions \u2014 UI and navigation agnostic.",
   "license": "MIT",
   "repository": {
