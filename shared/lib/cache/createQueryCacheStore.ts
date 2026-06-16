@@ -17,6 +17,7 @@ import { create, type StateCreator, type StoreApi, type UseBoundStore } from 'zu
 import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { storeLog } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import { currentCacheEpoch } from './cacheSession';
 import type { QueryCacheEntry } from './queryCacheTypes';
@@ -86,12 +87,33 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
   const maxEntries = opts.maxEntries ?? 200;
   const logKey = opts.logKey ?? opts.name.replace(/-/g, '_');
 
+  const logCtx = {
+    cache: logKey,
+    persist: opts.persist !== false,
+    hostScoped: !!opts.hostScoped,
+    staleTtlMs: opts.staleTtlMs,
+    maxEntries,
+  };
+
+  const keyMeta = (key: string) => ({
+    keyLength: key.length,
+    cacheEpoch: currentCacheEpoch(),
+  });
+
+  storeLog.info('query_cache.create', logCtx);
+
   function evictIfOverCap(byKey: Record<string, QueryCacheEntry<TData>>): void {
     const keys = Object.keys(byKey);
     if (keys.length <= maxEntries) return;
     const evictCount = Math.max(1, Math.floor(maxEntries * 0.1));
     const sorted = Object.entries(byKey).sort((a, b) => a[1].fetchedAt - b[1].fetchedAt);
     for (let i = 0; i < evictCount; i++) delete byKey[sorted[i][0]];
+    storeLog.warn('query_cache.evict_lru', {
+      ...logCtx,
+      beforeCount: keys.length,
+      evictCount,
+      afterCount: Object.keys(byKey).length,
+    });
   }
 
   const creator: StateCreator<QueryCacheState<TData>> = (set) => ({
@@ -108,17 +130,41 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
           },
         };
         evictIfOverCap(next);
+        storeLog.debug('query_cache.entry.set', {
+          ...logCtx,
+          ...keyMeta(key),
+          beforeCount: Object.keys(state.byKey).length,
+          afterCount: Object.keys(next).length,
+          hadEntry: !!state.byKey[key],
+          viewerKeyLength: meta.viewerKey.length,
+          hasCursor: !!meta.cursor,
+          dataKind: Array.isArray(data) ? 'array' : typeof data,
+        });
         return { byKey: next };
       });
     },
     removeEntry: (key) =>
       set((state) => {
+        const existed = !!state.byKey[key];
+        storeLog.debug('query_cache.entry.remove', {
+          ...logCtx,
+          ...keyMeta(key),
+          existed,
+          beforeCount: Object.keys(state.byKey).length,
+        });
         if (!state.byKey[key]) return state;
         const next = { ...state.byKey };
         delete next[key];
         return { byKey: next };
       }),
-    clear: () => set({ byKey: {} }),
+    clear: () => {
+      const beforeCount = Object.keys(use.getState().byKey).length;
+      storeLog.info('query_cache.clear', {
+        ...logCtx,
+        beforeCount,
+      });
+      set({ byKey: {} });
+    },
   });
 
   const use =
@@ -147,6 +193,10 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
   const isColdStart = (key: string): boolean => touchedEpochByKey.get(key) !== currentCacheEpoch();
   const markTouched = (key: string): void => {
     touchedEpochByKey.set(key, currentCacheEpoch());
+    storeLog.debug('query_cache.touch', {
+      ...logCtx,
+      ...keyMeta(key),
+    });
   };
 
   const run = (
@@ -157,18 +207,52 @@ export function createQueryCacheStore<TData>(opts: QueryCacheStoreOptions): Quer
   ): Promise<TData> => {
     if (!force) {
       const existing = inFlight.get(key);
-      if (existing) return existing;
+      if (existing) {
+        storeLog.debug('query_cache.run.join_inflight', {
+          ...logCtx,
+          ...keyMeta(key),
+          viewerKeyLength: viewerKey.length,
+        });
+        return existing;
+      }
     }
+    storeLog.info('query_cache.run.start', {
+      ...logCtx,
+      ...keyMeta(key),
+      force,
+      viewerKeyLength: viewerKey.length,
+      hadEntry: !!getEntry(key),
+      fresh: isFresh(getEntry(key)),
+    });
     const promise = fetcher().then(({ data, cursor }) => {
       use.getState().setEntry(key, data, { viewerKey, cursor });
       markTouched(key);
+      storeLog.info('query_cache.run.done', {
+        ...logCtx,
+        ...keyMeta(key),
+        hasCursor: !!cursor,
+        dataKind: Array.isArray(data) ? 'array' : typeof data,
+      });
       return data;
     });
     inFlight.set(key, promise);
     const cleanup = () => {
-      if (inFlight.get(key) === promise) inFlight.delete(key);
+      if (inFlight.get(key) === promise) {
+        inFlight.delete(key);
+        storeLog.debug('query_cache.run.cleanup', {
+          ...logCtx,
+          ...keyMeta(key),
+        });
+      }
     };
-    promise.then(cleanup, cleanup);
+    promise.then(cleanup, (error) => {
+      storeLog.warn('query_cache.run.failed', {
+        ...logCtx,
+        ...keyMeta(key),
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      cleanup();
+    });
     return promise;
   };
 

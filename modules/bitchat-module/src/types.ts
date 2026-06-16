@@ -68,25 +68,47 @@ export interface BLEPeer {
   hasDirectLink: boolean;
   lastSeen: number;
   /**
-   * True when the peer's last verified announce carried the ecash capability
-   * TLV — i.e. the peer can receive P2PK-locked cashu (open extension; any
-   * bitchat client may implement it). Invariant: equals
-   * `p2pkPubkeyHex !== undefined`. Authentic to the announcing peer
-   * (announces are Ed25519-signed) but any client could claim it — treat as
-   * a feature gate, not a trust signal.
+   * The peer's x-only Nostr pubkey (64-hex), learned via bitchat's native
+   * favorite-notification exchange (`[FAVORITED]:<npub>:<creq>`). THIS is the peer's
+   * Sovran identity: use it directly for the kind-0 profile lookup, and
+   * "02"-prefix it for the NUT-11 P2PK lock target. Present only once the peer
+   * has favorited us back (Sovran ↔ Sovran); absent for stock/vanilla clients
+   * and peers we haven't exchanged identity with, which are not eligible for
+   * Nut Drop token DMs.
    */
-  supportsP2pkEcash: boolean;
+  nostrPubkeyHex?: string;
   /**
-   * Ecash capability bitmask (0 for peers without the TLV). Bit 0 (0x01):
-   * the peer auto-redeems P2PK-locked cashu tokens seen on the public mesh.
+   * The peer's standing NUT-18 payment request (`creq…`) from its favorite —
+   * advertises the mints it accepts + its P2PK lock key. Decode it (cashu-ts)
+   * to gate lockability (its `nut10` key must match `02`+`nostrPubkeyHex`) and
+   * to pick a mint the receiver actually accepts. Absent ⇒ not lockable.
    */
-  ecashCapabilities: number;
+  creq?: string;
   /**
-   * The peer's Cashu P2PK lock target: 33-byte compressed hex
-   * ("02" + their x-only Nostr pubkey). Lock Nut Drop tokens to this key.
-   * Absent for peers without the ecash capability TLV.
+   * The peer's announced Curve25519 noise static key (64-hex) — bitchat's
+   * own identity, present for EVERY peer including stock clients. A stable
+   * pseudonym seed for identicons/word-pair names across nickname changes.
+   * NOT a Nostr pubkey: never use it for kind-0 profile lookups. For peers we
+   * have exchanged identity with prefer `nostrPubkeyHex` (the real Nostr
+   * identity); this is the fallback identicon seed otherwise.
    */
-  p2pkPubkeyHex?: string;
+  noisePublicKeyHex?: string;
+}
+
+/**
+ * Payload dispatched on the `onBLEPeerIdentity` event when a peer hands us
+ * their Nostr identity via bitchat's native favorite notification
+ * (`[FAVORITED]:<npub>:<creq>`). `nostrPubkeyHex` is the peer's x-only pubkey (64-hex,
+ * absent on an `[UNFAVORITED]` or an unparseable npub). iOS emits this for
+ * immediacy; on both platforms the same value also appears on the polled
+ * `BLEPeer.nostrPubkeyHex`, which NearPay treats as the source of truth.
+ */
+export interface BLEPeerIdentityEvent {
+  peerID: string;
+  isFavorite: boolean;
+  nostrPubkeyHex?: string;
+  /** The peer's standing NUT-18 payment request (mints + P2PK lock key). */
+  creq?: string;
 }
 
 export interface BLEMessageEvent {

@@ -6,13 +6,14 @@
  * serialized entry.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { z } from 'zod';
 
 import { MintQuoteRoute } from '@/features/receive';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { cashuLog } from '@/shared/lib/logger';
 
 const ParamsSchema = z.object({
   unit: z.string().min(1).max(16).optional(),
@@ -29,7 +30,18 @@ export default function ModalScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
 
+  useEffect(() => {
+    cashuLog.info('receive.mint_quote.route.ready', {
+      where: 'receive-flow.mintQuote',
+      unit,
+      paramsValid: !!params,
+      trustedMintCount: walletContext.trustedMintUrls.length,
+      balanceMintCount: Object.keys(walletContext.mintBalances).length,
+    });
+  }, [params, unit, walletContext.mintBalances, walletContext.trustedMintUrls.length]);
+
   const handleRequestMintList = useCallback(() => {
+    cashuLog.info('receive.mint_quote.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
   }, [machine]);
 

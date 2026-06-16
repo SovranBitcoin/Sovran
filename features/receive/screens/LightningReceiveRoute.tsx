@@ -18,6 +18,7 @@ import React, { useMemo } from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
 import { LightningReceiveScreen } from './LightningReceiveScreen';
+import { paymentLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
@@ -40,6 +41,12 @@ export function LightningReceiveRoute({ where, onRequestMintList }: LightningRec
   const params = useRouteParams(ParamsSchema, { where });
   const screenOptions = useMemo(() => ({ title: 'Receive Lightning' }), []);
   if (!params) return null;
+  paymentLog.info('receive.lightning.route_ready', {
+    where,
+    mintHistoryEntryLength: params.mintHistoryEntry.length,
+    unit: params.unit ?? null,
+    hasMintListCallback: !!onRequestMintList,
+  });
 
   return (
     <>

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import { HistoryEntry } from '@cashu/coco-core';
+import { getCounterparty } from '@sovranbitcoin/colada';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
@@ -16,7 +17,7 @@ import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 
 import TransactionIcon from '../TransactionIcon';
 
@@ -31,7 +32,7 @@ interface HistoryEntryHeaderProps {
   };
   /**
    * Nostr pubkey (hex) of the recipient — surfaces a Nostr-themed avatar
-   * with an outgoing-arrow overlay in place of the default transaction
+   * with a direction-arrow overlay in place of the default transaction
    * icon. Profile picture / display name are resolved from the metadata
    * cache. Set by the chat→send-money flow via
    * `entry.metadata.recipientPubkey` (see `colada` types).
@@ -50,7 +51,11 @@ export function HistoryEntryHeader({
   showRecipientAvatar = true,
   isLoading,
 }: HistoryEntryHeaderProps) {
-  const avatarRecipientPubkey = showRecipientAvatar ? recipientPubkey : undefined;
+  // Counterparty from the persisted annotation (Nut Drop send/receive) is the
+  // fallback when the caller didn't thread a transient recipientPubkey.
+  const counterparty = historyEntry ? getCounterparty(historyEntry) : null;
+  const effectiveRecipientPubkey = recipientPubkey ?? counterparty?.pubkey ?? undefined;
+  const avatarRecipientPubkey = showRecipientAvatar ? effectiveRecipientPubkey : undefined;
   const { metadata: recipientMetadata } = useNostrProfileMetadata(avatarRecipientPubkey);
   const [foreground, surface, background, danger, success] = useThemeColor([
     'foreground',
@@ -69,18 +74,52 @@ export function HistoryEntryHeader({
   const isSend = isOutgoingTransaction({ type });
   const isReceive = !isSend;
 
+  useEffect(() => {
+    paymentLog.debug('tx.history_header.render', {
+      hasHistoryEntry: !!historyEntry,
+      hasPendingData: !!pendingData,
+      type,
+      state: String((historyEntry as { state?: unknown } | undefined)?.state ?? ''),
+      amount: numericAmount,
+      unit,
+      direction: isSend ? 'send' : 'receive',
+      isLoading: !!isLoading,
+      showRecipientAvatar,
+      recipientPubkeyLength: recipientPubkey?.length ?? 0,
+      hasRecipientMetadata: !!recipientMetadata,
+      hasRecipientPicture: !!recipientMetadata?.picture,
+      hasRecipientName: !!(recipientMetadata?.displayName ?? recipientMetadata?.name),
+    });
+  }, [
+    historyEntry,
+    isLoading,
+    isSend,
+    numericAmount,
+    pendingData,
+    recipientMetadata,
+    recipientPubkey,
+    showRecipientAvatar,
+    type,
+    unit,
+  ]);
+
   // Avatar size and icon overlay size for recipient mode
   const avatarSize = 48;
   const iconOverlaySize = 24;
 
   const renderIcon = () => {
     if (avatarRecipientPubkey) {
-      const recipientName = recipientMetadata?.displayName ?? recipientMetadata?.name;
+      const recipientName =
+        recipientMetadata?.displayName ?? recipientMetadata?.name ?? counterparty?.displayName;
+      const recipientPicture = recipientMetadata?.picture ?? counterparty?.avatarUrl;
+      const overlayIcon = isSend
+        ? 'fluent:arrow-upload-16-filled'
+        : 'fluent:arrow-download-16-filled';
       return (
         <View className="relative">
           <Avatar
-            state={recipientMetadata?.picture ? 'image' : 'fallback'}
-            picture={recipientMetadata?.picture}
+            state={recipientPicture ? 'image' : 'fallback'}
+            picture={recipientPicture}
             seed={avatarRecipientPubkey}
             size={avatarSize}
             name={recipientName}
@@ -99,11 +138,7 @@ export function HistoryEntryHeader({
               borderWidth: 2,
               borderColor: background,
             }}>
-            <Icon
-              name="fluent:arrow-upload-16-filled"
-              color={opacity(foreground, 0.9)}
-              size={iconOverlaySize - 8}
-            />
+            <Icon name={overlayIcon} color={opacity(foreground, 0.9)} size={iconOverlaySize - 8} />
           </View>
         </View>
       );

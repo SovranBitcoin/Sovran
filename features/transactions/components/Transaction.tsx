@@ -1,12 +1,7 @@
 import React, { useCallback } from 'react';
 import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
 
-import {
-  HistoryEntry,
-  MintHistoryEntry,
-  ReceiveHistoryEntry,
-  SendHistoryEntry,
-} from '@cashu/coco-core';
+import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import opacity from 'hex-color-opacity';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
@@ -36,20 +31,18 @@ import {
   getMeltDetailPathname,
   getMintDetailPathname,
 } from '@/shared/lib/nav/transactionDetailRoutes';
-import { log, Log } from '@/shared/lib/logger';
-import { useScanEntryForTransactionId, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
-import {
-  useTransactionDistributionStore,
-  DistributionSource,
-} from '@/shared/stores/profile/transactionDistributionStore';
+import { cashuLog, log, Log } from '@/shared/lib/logger';
+import { useColadaTransactionAnnotation } from '@sovranbitcoin/colada/react';
+import type { DistributionSource, ScanMethod } from '@sovranbitcoin/colada';
 import { getOnchainTransactionStatusLabel } from '../lib/onchainTransactionStatus';
+import { getTransactionActionLabel } from '../lib/transactionPresentation';
 
 /**
- * Unified source for the row badge. Combines inbound (scan history) and
- * outbound (transaction distribution) sources into one type so the icon
- * switch and label maps cover every value in one place.
+ * Unified source for the row badge. Combines inbound (scan source) and
+ * outbound (distribution) sources into one type so the icon switch and label
+ * maps cover every value in one place.
  */
-type TransactionSource = ScanSource | DistributionSource;
+type TransactionSource = ScanMethod | DistributionSource;
 
 /**
  * Icon name for each source value. Every value here MUST be present in the
@@ -69,6 +62,7 @@ const SOURCE_ICONS: Record<TransactionSource, string> = {
   nfc: 'lucide:nfc',
   paste: 'lucide:clipboard-paste',
   deeplink: 'lucide:link',
+  ble: 'mdi:bluetooth',
   // Outbound (transaction distribution)
   copy: 'lets-icons:copy',
   share: 'ri:share-fill',
@@ -93,20 +87,18 @@ const SOURCE_ICONS: Record<TransactionSource, string> = {
  * is the more specific signal.
  */
 const useTransactionSource = (historyEntry: HistoryEntry): TransactionSource | null => {
-  const scanEntry = useScanEntryForTransactionId(historyEntry.id);
-  const distKey =
-    historyEntry.type === 'mint' ? (historyEntry as MintHistoryEntry).quoteId : historyEntry.id;
-  const fromDistribution = useTransactionDistributionStore(
-    (state) => state.distributions[distKey]?.source ?? null
-  );
-  return scanEntry?.source ?? fromDistribution;
+  // Pass the full entry so colada resolves the scan (id:) and distribution
+  // (quote:) annotations across the entry's candidate keys.
+  const annotation = useColadaTransactionAnnotation(historyEntry);
+  return annotation.scan?.method ?? annotation.distribution?.source ?? null;
 };
 
 /** Returns BIP321 option kinds for a transaction, or null if not BIP321. */
 const useBip321Options = (transactionId: string): string[] | null => {
-  const scanEntry = useScanEntryForTransactionId(transactionId);
-  if (scanEntry?.container !== 'bip321' || !scanEntry.optionKinds?.length) return null;
-  return scanEntry.optionKinds;
+  const annotation = useColadaTransactionAnnotation({ id: transactionId });
+  const scan = annotation.scan;
+  if (scan?.container !== 'bip321' || !scan.optionKinds?.length) return null;
+  return scan.optionKinds;
 };
 
 /**
@@ -129,42 +121,73 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
 
   const handlePress = useCallback((): void => {
     log.debug('transaction.press', { type: historyEntry.type, id: historyEntry.id });
+    const serializedHistoryEntry = JSON.stringify(historyEntry);
+    const entryState =
+      typeof (historyEntry as Record<string, unknown>).state === 'string'
+        ? (historyEntry as Record<string, unknown>).state
+        : null;
 
     switch (historyEntry.type) {
       case 'mint': {
+        const pathname = getMintDetailPathname(historyEntry);
+        cashuLog.info('transaction.row.open_detail', {
+          type: historyEntry.type,
+          state: entryState,
+          pathname,
+          serializedLength: serializedHistoryEntry.length,
+        });
         router.navigate({
-          pathname: getMintDetailPathname(historyEntry),
+          pathname,
           params: {
-            mintHistoryEntry: JSON.stringify(historyEntry),
+            mintHistoryEntry: serializedHistoryEntry,
           },
         });
         return;
       }
       case 'melt': {
+        const pathname = getMeltDetailPathname(historyEntry);
+        cashuLog.info('transaction.row.open_detail', {
+          type: historyEntry.type,
+          state: entryState,
+          pathname,
+          serializedLength: serializedHistoryEntry.length,
+        });
         router.navigate({
-          pathname: getMeltDetailPathname(historyEntry),
+          pathname,
           params: {
-            meltHistoryEntry: JSON.stringify(historyEntry),
+            meltHistoryEntry: serializedHistoryEntry,
           },
         });
         return;
       }
       case 'send': {
         // Coco uses 'send' for ecash sends
+        cashuLog.info('transaction.row.open_detail', {
+          type: historyEntry.type,
+          state: entryState,
+          pathname: '/sendToken',
+          serializedLength: serializedHistoryEntry.length,
+        });
         router.navigate({
           pathname: '/sendToken',
           params: {
-            sendHistoryEntry: JSON.stringify(historyEntry),
+            sendHistoryEntry: serializedHistoryEntry,
           },
         });
         return;
       }
       case 'receive': {
         // Coco uses 'receive' for ecash receives
+        cashuLog.info('transaction.row.open_detail', {
+          type: historyEntry.type,
+          state: entryState,
+          pathname: '/receiveToken',
+          serializedLength: serializedHistoryEntry.length,
+        });
         router.navigate({
           pathname: '/receiveToken',
           params: {
-            receiveHistoryEntry: JSON.stringify(historyEntry as ReceiveHistoryEntry),
+            receiveHistoryEntry: serializedHistoryEntry,
           },
         });
         return;
@@ -178,7 +201,7 @@ const useTransactionRow = (historyEntry: HistoryEntry) => {
     isRolledBack,
     fiatAmount,
     handlePress,
-    displayLabel: historyEntry.type[0].toUpperCase() + historyEntry.type.slice(1),
+    displayLabel: getTransactionActionLabel(historyEntry.type),
   };
 };
 

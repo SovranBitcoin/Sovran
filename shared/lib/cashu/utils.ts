@@ -18,6 +18,13 @@ import { log } from '../logger';
 import { mintLocalId } from '../id';
 import { amountToNumber } from './amount';
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * Validates if a string is a valid ecash token by attempting to decode it
  *
@@ -61,7 +68,7 @@ export function getEcashTokenAmount(token: string): number | undefined {
     log.debug('cashu.utils.get_ecash_token_amount', {
       amount,
       proofCount: decoded.incompleteProofs.length,
-      mint: decoded.mint,
+      ...mintUrlLogFields(decoded.mint),
     });
     return amount;
   } catch {
@@ -102,13 +109,23 @@ export function buildReceiveHistoryEntry(
   unitOverride?: string
 ): ReceiveHistoryEntry & { source: 'legacy'; legacyHistoryId: string; updatedAt: number } {
   log.info('cashu.utils.build_receive_history_entry', { tokenLen: rawToken.length, unitOverride });
-  const decodedToken = getTokenMetadata(rawToken);
+  let decodedToken: ReturnType<typeof getTokenMetadata>;
+  try {
+    decodedToken = getTokenMetadata(rawToken);
+  } catch (error) {
+    log.error('cashu.utils.build_receive_history_entry.decode_failed', {
+      tokenLen: rawToken.length,
+      unitOverride,
+      error,
+    });
+    throw error;
+  }
   const p2pkPubkey = extractP2PKPubkey(decodedToken.incompleteProofs);
   const amount = amountToNumber(decodedToken.amount);
   log.debug('cashu.utils.build_receive_history_entry.decoded', {
     amount: String(amount),
     proofCount: decodedToken.incompleteProofs.length,
-    mint: decodedToken.mint,
+    ...mintUrlLogFields(decodedToken.mint),
     hasP2pk: !!p2pkPubkey,
   });
   const now = Date.now();

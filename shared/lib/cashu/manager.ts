@@ -49,6 +49,13 @@ const GIVEAWAY_P2PK_SECRET: string | null =
     ? Constants.expoConfig.extra.giveawayP2pkSecret
     : null;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
 }
@@ -113,6 +120,11 @@ export class CocoManager {
   static setAccountIndex(index: number, imported = false): void {
     this.accountIndex = index;
     this.isImportedProfile = imported;
+    cashuLog.info('cashu.manager.account_index_set', {
+      accountIndex: index,
+      imported,
+      dbName: this.getDbName(),
+    });
   }
 
   /** Get the SQLite database name for the current account index */
@@ -126,6 +138,9 @@ export class CocoManager {
    */
   static setCashuMnemonic(mnemonic: string): void {
     this.cashuMnemonic = mnemonic;
+    cashuLog.debug('cashu.manager.cashu_mnemonic_set', {
+      hasMnemonic: mnemonic.length > 0,
+    });
   }
 
   /**
@@ -134,6 +149,9 @@ export class CocoManager {
    */
   static setSignerKey(sk: Uint8Array): void {
     this.signerKey = new Uint8Array(sk);
+    cashuLog.debug('cashu.manager.signer_key_set', {
+      byteLength: sk.length,
+    });
   }
 
   /**
@@ -149,16 +167,28 @@ export class CocoManager {
     // to return the existing instance or start a fresh one.
     if (this.pendingCleanup) {
       initLog('CocoManager', 'cleanup in progress, waiting before initialize...');
+      cashuLog.info('cashu.manager.initialize.wait_cleanup', {
+        accountIndex: this.accountIndex,
+        dbName: this.getDbName(),
+      });
       await this.pendingCleanup;
     }
 
     if (this.instance) {
       initLog('CocoManager', 'already initialized, returning existing instance');
+      cashuLog.debug('cashu.manager.initialize.reuse', {
+        accountIndex: this.accountIndex,
+        dbName: this.getDbName(),
+      });
       return this.instance;
     }
 
     if (this.pendingInit) {
       initLog('CocoManager', 'initialization in progress, awaiting in-flight promise');
+      cashuLog.info('cashu.manager.initialize.join_pending', {
+        accountIndex: this.accountIndex,
+        dbName: this.getDbName(),
+      });
       return this.pendingInit;
     }
 
@@ -170,9 +200,18 @@ export class CocoManager {
 
         // 1. SQLite database (async to avoid blocking JS thread during profile switch)
         const dbName = this.getDbName();
+        cashuLog.info('cashu.manager.initialize.start', {
+          accountIndex: this.accountIndex,
+          dbName,
+          importedProfile: this.isImportedProfile,
+          hasCashuMnemonic: !!this.cashuMnemonic,
+          hasSignerKey: !!p2pkImportSecretKey,
+          hasGiveawayP2PK: !!GIVEAWAY_P2PK_SECRET,
+        });
         const db = await initPhase(`CocoManager.openDB[${dbName}]`, () =>
           SQLite.openDatabaseAsync(dbName)
         );
+        cashuLog.debug('cashu.manager.sqlite_opened', { dbName });
         this.db = db;
         const database = db as unknown as ExpoSqliteRepositoriesOptions['database'];
         // The profile's signer key is imported into coco's keyring (p2pk-import
@@ -183,11 +222,16 @@ export class CocoManager {
         if (p2pkImportSecretKey) {
           ephemeralKeyringPubkeys.add(`02${getPublicKey(new Uint8Array(p2pkImportSecretKey))}`);
         }
+        cashuLog.info('cashu.manager.repositories.create', {
+          dbName,
+          ephemeralKeyringCount: ephemeralKeyringPubkeys.size,
+        });
         const repositories = createSovranCocoRepositories(
           new ExpoSqliteRepositories({ database }),
           { ephemeralKeyringPubkeys }
         );
         await initPhase('CocoManager.reposInit', () => repositories.init());
+        cashuLog.debug('cashu.manager.repositories.ready', { dbName });
 
         // 2. Seed getter (lazy — no crypto work until first call, cached after)
         // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
@@ -212,20 +256,34 @@ export class CocoManager {
               const cached = await retrieveCashuSeed(accountIndex);
               if (cached && cached.mnemonicHash === mnemonicHash) {
                 initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
+                cashuLog.debug('cashu.manager.seed_cache.hit', { accountIndex });
                 return cached.seed;
               }
+              cashuLog.debug('cashu.manager.seed_cache.miss', {
+                accountIndex,
+                hadCachedSeed: !!cached,
+              });
               return null;
             },
             store: (seed, { mnemonic }) => {
               const mnemonicHash = hashMnemonic(mnemonic);
-              storeCashuSeed(accountIndex, seed, mnemonicHash).catch((e) =>
-                cashuLog.warn('cashu.manager.seed_cache_store_failed', { error: e })
-              );
+              storeCashuSeed(accountIndex, seed, mnemonicHash)
+                .then(() => cashuLog.debug('cashu.manager.seed_cache.stored', { accountIndex }))
+                .catch((e) =>
+                  cashuLog.warn('cashu.manager.seed_cache_store_failed', {
+                    error: e instanceof Error ? e.message : String(e),
+                  })
+                );
             },
           },
         });
 
         this.seedGetter = seedGetter;
+        cashuLog.debug('cashu.manager.seed_getter_ready', {
+          accountIndex,
+          importedProfile: isImported,
+          hasInjectedCashuMnemonic: !!cashuMnemonic,
+        });
 
         // 3. Core plugins. The P2PK import imports two kinds of key:
         //   - The active profile's signer snapshot (captured for THIS manager
@@ -244,6 +302,11 @@ export class CocoManager {
             },
           }),
         ];
+        cashuLog.info('cashu.manager.plugins.configured', {
+          pluginCount: plugins.length,
+          hasProfileP2PKKey: !!p2pkImportSecretKey,
+          hasGiveawayP2PK: !!GIVEAWAY_P2PK_SECRET,
+        });
 
         // 4. Create Manager
         initLog('CocoManager', 'creating Manager instance...');
@@ -258,6 +321,8 @@ export class CocoManager {
         initLog('CocoManager', 'Manager created');
         cashuLog.info('cashu.manager.initialized', {
           duration_ms: Math.round((performance.now() - initStart) * 100) / 100,
+          accountIndex,
+          dbName,
         });
 
         return this.instance;
@@ -282,6 +347,7 @@ export class CocoManager {
    */
   static async enableSafeWatchers(): Promise<void> {
     if (!this.instance) {
+      cashuLog.warn('cashu.manager.safe_watchers.no_instance');
       throw new Error('Manager not initialized. Call initialize() first.');
     }
     this.isBackgroundRunning = true;
@@ -291,6 +357,8 @@ export class CocoManager {
     try {
       if (this.seedGetter) {
         await initPhase('CocoManager.seedCacheWarm', () => this.seedGetter!());
+      } else {
+        cashuLog.warn('cashu.manager.seed_cache_warm.skipped', { reason: 'missing_seed_getter' });
       }
 
       try {
@@ -303,6 +371,7 @@ export class CocoManager {
           await new Promise((resolve) => setTimeout(resolve, 2000));
           await this.instance.enableProofStateWatcher();
           initLog('CocoManager', 'proof state watcher enabled on retry');
+          cashuLog.info('cashu.manager.proof_watcher_retry_done');
         } catch (retryError) {
           cashuLog.error('cashu.manager.proof_watcher_retry_failed', { error: retryError });
         }
@@ -330,6 +399,7 @@ export class CocoManager {
   static async enableNpcSyncAndProcessor(): Promise<void> {
     const manager = this.instance;
     if (!manager) {
+      cashuLog.warn('cashu.manager.npc_sync_and_processor.no_instance');
       throw new Error('Manager not initialized. Call initialize() first.');
     }
     this.isBackgroundRunning = true;
@@ -348,9 +418,16 @@ export class CocoManager {
           // narrower than a per-callsite `any`.
           manager.use(npcPlugin as unknown as Plugin);
           this.npcPluginRegistered = true;
+          cashuLog.info('cashu.manager.npc_plugin_registered');
+        } else {
+          cashuLog.debug('cashu.manager.npc_plugin_registration_skipped', {
+            hasPlugin: !!npcPlugin,
+            alreadyRegistered: this.npcPluginRegistered,
+          });
         }
         await manager.initPlugins();
         initLog('CocoManager', 'plugins initialized');
+        cashuLog.info('cashu.manager.plugins_initialized', { hasNpcPlugin: !!npcPlugin });
       } catch (error) {
         cashuLog.warn('cashu.manager.plugins_init_failed', { error });
       }
@@ -370,6 +447,9 @@ export class CocoManager {
         initLog('CocoManager', 'enabling mint quote watcher...');
         await manager.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
         initLog('CocoManager', 'mint quote watcher enabled');
+        cashuLog.info('cashu.manager.quote_watcher_enabled', {
+          watchExistingPendingOnStart: true,
+        });
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
       }
@@ -383,6 +463,10 @@ export class CocoManager {
           initialEnqueueDelayMs: 2000,
         });
         initLog('CocoManager', 'mint quote processor enabled');
+        cashuLog.info('cashu.manager.quote_processor_enabled', {
+          processIntervalMs: 5000,
+          maxRetries: 3,
+        });
       } catch (error) {
         cashuLog.warn('cashu.manager.quote_processor_failed', { error });
       }
@@ -391,6 +475,7 @@ export class CocoManager {
         initLog('CocoManager', 'recovering pending mint operations...');
         await manager.recoverPendingMintOperations();
         initLog('CocoManager', 'pending mint operation recovery done');
+        cashuLog.info('cashu.manager.pending_mint_recovery_done');
       } catch (error) {
         cashuLog.warn('cashu.manager.pending_mint_recovery_failed', { error });
       }
@@ -401,6 +486,10 @@ export class CocoManager {
           cashuLog.info('cashu.manager.paid_mint_quotes_requeued', {
             requeued: result.requeued.length,
           });
+        } else {
+          cashuLog.debug('cashu.manager.paid_mint_quote_requeue_noop', {
+            requeued: result.requeued.length,
+          });
         }
       } catch (error) {
         cashuLog.warn('cashu.manager.paid_mint_quote_requeue_failed', { error });
@@ -409,9 +498,13 @@ export class CocoManager {
       if (npcPlugin) {
         const timeoutMs = 15_000;
         initLog('CocoManager', 'NPC sync starting...');
+        cashuLog.info('cashu.manager.npc_sync.start', { timeoutMs });
         let syncTimeout: ReturnType<typeof setTimeout> | null = null;
         const syncPromise = npcPlugin.sync().then(
-          () => initLog('CocoManager', 'NPC sync done'),
+          () => {
+            initLog('CocoManager', 'NPC sync done');
+            cashuLog.info('cashu.manager.npc_sync.done');
+          },
           (error) => cashuLog.warn('cashu.manager.npc_sync_failed', { error })
         );
         try {
@@ -483,12 +576,14 @@ export class CocoManager {
     // sampled `pendingCleanup` only sees the second teardown and can race the
     // still-running first one (db.closeAsync / repository teardown).
     if (this.pendingCleanup) {
+      cashuLog.info('cashu.manager.cleanup_join_pending');
       return this.pendingCleanup;
     }
 
     const doCleanup = async () => {
       if (!this.instance) {
         this.clearSensitiveRuntimeState();
+        cashuLog.debug('cashu.manager.cleanup_skipped', { reason: 'no_instance' });
         return;
       }
 
@@ -531,8 +626,11 @@ export class CocoManager {
           try {
             await db.closeAsync();
             cashuLog.debug('cashu.manager.sqlite_closed');
-          } catch {
+          } catch (error) {
             // Already closed (e.g. hot reload or rapid profile switch) — safe to ignore
+            cashuLog.debug('cashu.manager.sqlite_close_skipped', {
+              error: error instanceof Error ? error.message : String(error),
+            });
           }
         }
 
@@ -789,12 +887,19 @@ export class CocoManager {
     const manager = this.getInstance();
 
     try {
+      cashuLog.info('cashu.manager.proofs_restore_start', { ...mintUrlLogFields(mintUrl) });
       const inflight = await getInflightProofs(manager, [mintUrl]);
-      if (inflight.length === 0) return 0;
+      if (inflight.length === 0) {
+        cashuLog.debug('cashu.manager.proofs_restore_noop', { ...mintUrlLogFields(mintUrl) });
+        return 0;
+      }
 
       const secrets = inflight.map((p) => p.secret);
       await restoreProofsToReady(manager, mintUrl, secrets);
-      cashuLog.info('cashu.manager.proofs_restored', { count: secrets.length, mintUrl });
+      cashuLog.info('cashu.manager.proofs_restored', {
+        count: secrets.length,
+        ...mintUrlLogFields(mintUrl),
+      });
       return secrets.length;
     } catch (err) {
       cashuLog.warn('cashu.manager.proofs_restore_failed', { error: err });

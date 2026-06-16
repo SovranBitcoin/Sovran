@@ -14,7 +14,7 @@ import type { GlassVariant } from 'liquid-glass-text';
 
 import { formatAmount } from '@/shared/lib/currency';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/utils';
 import { useCapabilities } from '@/shared/ui/capability';
 import { useColorScheme } from '@/shared/hooks/useColorScheme';
@@ -132,6 +132,44 @@ export function AmountFormatter({
   const useGlass = liquid && liquidGlass;
   const colorScheme = useColorScheme();
   const containerClass = centered ? 'items-center justify-center' : 'flex-row items-center';
+
+  useEffect(() => {
+    paymentLog.debug('amount_formatter.render', {
+      unit,
+      amount: numericAmount,
+      formattedLength: decorated.length,
+      textLength: text.length,
+      displayBtc,
+      size,
+      weight,
+      centered,
+      animated,
+      useTypeColors,
+      transactionType,
+      liquid,
+      liquidGlass,
+      useGlass,
+      hasSign: !!sign,
+      colorMode: color === null ? 'none' : color ? 'explicit' : 'theme',
+    });
+  }, [
+    animated,
+    centered,
+    color,
+    decorated.length,
+    displayBtc,
+    liquid,
+    liquidGlass,
+    numericAmount,
+    sign,
+    size,
+    text.length,
+    transactionType,
+    unit,
+    useGlass,
+    useTypeColors,
+    weight,
+  ]);
 
   return (
     <Log name="AmountFormatter">
@@ -261,6 +299,11 @@ function ScaleWrapper({
   useEffect(() => {
     if (!animated) return;
     const target = text.length > 6 ? 1 - (text.length - 6) * 0.05 : 1;
+    paymentLog.debug('amount_formatter.scale', {
+      textLength: text.length,
+      target,
+      animated,
+    });
     Animated.timing(scaleAnim, { toValue: target, duration: 300, useNativeDriver: true }).start();
   }, [animated, text, scaleAnim]);
 

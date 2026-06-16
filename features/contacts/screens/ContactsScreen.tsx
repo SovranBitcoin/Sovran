@@ -17,8 +17,7 @@ import { prefetchImages } from '@/shared/lib/imageCache';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatRelative } from '@/shared/lib/date';
-import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
-import { UnifiedSearch } from '@/shared/ui/composed/search/UnifiedSearch';
+import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 import { Log, log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   ContactRow,
@@ -89,9 +88,6 @@ function GroupsTierRow({ tier }: { tier: TierEntry }) {
 
 export const ContactsScreen = () => {
   useLifecycleLogger('ContactsScreen');
-  // While searching, the unified search surface takes over completely; the
-  // idle tabs/pills/lists below are only the non-search experience.
-  const { isSearching } = useSearchContext();
   const [activeTab, setActiveTab] = useState<TopTab>('contacts');
   const [activeFilter, setActiveFilter] = useState<ContactsFilter>('All');
   const [surface, separator, muted] = useThemeColor([
@@ -486,15 +482,6 @@ export const ContactsScreen = () => {
     />
   );
 
-  // Live search is a single, consistent surface shared with Feed and Wallet.
-  if (isSearching) {
-    return (
-      <Log name="ContactsScreen" style={[styles.root, { backgroundColor: surface }]}>
-        <UnifiedSearch recentContext="contacts" />
-      </Log>
-    );
-  }
-
   return (
     <Log name="ContactsScreen" style={[styles.root, { backgroundColor: surface }]}>
       <View
@@ -534,6 +521,7 @@ export const ContactsScreen = () => {
       <ScreenContainer>
         {activeTab === 'groups' ? renderGroupsList() : renderContactsList()}
       </ScreenContainer>
+      <SearchOverlay recentContext="contacts" />
     </Log>
   );
 };

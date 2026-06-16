@@ -39,6 +39,13 @@ type SearchResultRowsProps = {
 
 const keyExtractor = (item: AllSearchResult) => item.id;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 function GeohashJumpRow({ geohash }: { geohash: string }) {
   return (
     <ContactRow
@@ -98,7 +105,7 @@ function MintRow({ mint }: { mint: Extract<AllSearchResult, { type: 'mint' }>['m
       stats={['score']}
       trailingVariant="chevron"
       onPress={() => {
-        cashuLog.info('mint.search.press', { mintUrl: mint.url, source: 'search' });
+        cashuLog.info('mint.search.press', { ...mintUrlLogFields(mint.url), source: 'search' });
         router.push(buildMintInfoHref(mint.url));
       }}
       testID={`contact-row:mint:${mint.url}`}

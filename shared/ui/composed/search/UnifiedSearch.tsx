@@ -1,12 +1,11 @@
 /**
  * @fileoverview The one search experience, mounted by every surface.
  *
- * Contacts, Feed, and Wallet each render `<UnifiedSearch recentContext="…" />`
- * inside their `isSearching` branch and get the identical UX: one scope-tab row
- * (All / People / Posts / Mints / Groups), an "All" default that aggregates
- * people + places + mints into one ranked list, and a consistent empty-query
- * recents view. A single `selectedScope` value drives the highlight, so two
- * tabs can never read as selected at once.
+ * Contacts, Feed, and Wallet mount this through `SearchOverlay` and get the
+ * identical UX: one scope-tab row (All / People / Posts / Mints / Groups), an
+ * "All" default that aggregates people + places + mints into one ranked list,
+ * and a consistent empty-query recents view. A single `selectedScope` value
+ * drives the highlight, so two tabs can never read as selected at once.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';

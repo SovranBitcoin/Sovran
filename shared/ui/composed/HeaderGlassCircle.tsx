@@ -24,13 +24,18 @@ export function HeaderGlassCircle({
   onPress,
   disabled = false,
   children,
+  testID,
+  accessibilityLabel,
 }: {
-  onPress: () => void;
+  onPress?: () => void;
   disabled?: boolean;
   children: React.ReactNode;
+  testID?: string;
+  accessibilityLabel?: string;
 }) {
   const colorScheme = useColorScheme();
   const size = headerButtonSize;
+  const interactive = !!onPress && !disabled;
   const containerStyle = React.useMemo(
     () => [styles.box, { opacity: disabled ? 0.4 : 1 }],
     [disabled]
@@ -42,19 +47,24 @@ export function HeaderGlassCircle({
       frame({ height: size, width: size, alignment: 'center' as const }),
       glassEffect({
         shape: 'circle' as const,
-        glass: { variant: 'regular' as const, interactive: !disabled },
+        glass: { variant: 'regular' as const, interactive },
       }),
     ],
-    [colorScheme, disabled, size]
+    [colorScheme, interactive, size]
   );
 
   return (
-    <View style={containerStyle}>
+    <View
+      style={containerStyle}
+      testID={testID}
+      accessible={!!accessibilityLabel}
+      accessibilityRole={onPress ? 'button' : accessibilityLabel ? 'image' : undefined}
+      accessibilityLabel={accessibilityLabel}>
       {/* No matchContents: SwiftUI ideal-size measurement can report
           fractional widths that nudge UIKit's bar-item math; the host is
           a fixed headerButtonSize square. */}
       <Host style={styles.host}>
-        <SwiftUIButton modifiers={buttonModifiers} onPress={disabled ? undefined : onPress}>
+        <SwiftUIButton modifiers={buttonModifiers} onPress={interactive ? onPress : undefined}>
           <View style={styles.content}>{children}</View>
         </SwiftUIButton>
       </Host>

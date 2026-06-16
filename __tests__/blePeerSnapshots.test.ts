@@ -13,8 +13,6 @@ function peer(peerID: string, overrides: Partial<BLEPeer> = {}): BLEPeer {
     isConnected: true,
     hasDirectLink: true,
     lastSeen: 1,
-    supportsP2pkEcash: false,
-    ecashCapabilities: 0,
     ...overrides,
   };
 }
@@ -44,20 +42,15 @@ describe('BLE peer snapshot equality', () => {
     );
   });
 
-  it('updates when the ecash capability extension appears or its lock key changes', () => {
-    const capable = peer('a', {
-      supportsP2pkEcash: true,
-      ecashCapabilities: 1,
-      p2pkPubkeyHex: `02${'ab'.repeat(32)}`,
-    });
-    expect(areBLEPeerSnapshotsEquivalent([peer('a')], [capable])).toBe(false);
+  it('updates when a peer hands us its Nostr identity (favorites us back)', () => {
+    const identified = peer('a', { nostrPubkeyHex: 'ab'.repeat(32) });
+    expect(areBLEPeerSnapshotsEquivalent([peer('a')], [identified])).toBe(false);
     expect(
-      areBLEPeerSnapshotsEquivalent(
-        [capable],
-        [{ ...capable, p2pkPubkeyHex: `02${'cd'.repeat(32)}` }]
-      )
+      areBLEPeerSnapshotsEquivalent([identified], [{ ...identified, nostrPubkeyHex: undefined }])
     ).toBe(false);
-    expect(areBLEPeerSnapshotsEquivalent([capable], [{ ...capable, lastSeen: 99 }])).toBe(true);
+    expect(areBLEPeerSnapshotsEquivalent([identified], [{ ...identified, lastSeen: 99 }])).toBe(
+      true
+    );
   });
 });
 

@@ -16,6 +16,7 @@ import { decodeUrlOrAddress, isLightningInvoiceBolt11 } from '@sovranbitcoin/col
 import Icon from 'assets/icons';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { cashuLog } from '@/shared/lib/logger';
 
 import { showActionSheet } from './bridge';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
@@ -38,7 +39,16 @@ export function getProofSuggestionDisplay(
   payload: Pick<ActionSheetPayloads['proof-selector'], 'displayMetadata'>
 ): ProofSuggestionDisplay {
   const metadata = payload.displayMetadata;
-  if (metadata?.inputMode !== 'fiat') return { kind: 'sat', amount, unit };
+  if (metadata?.inputMode !== 'fiat') {
+    cashuLog.debug('proof.selector.display.result', {
+      inputMode: metadata?.inputMode ?? 'sat',
+      result: 'sat',
+      amount,
+      unit,
+      hasBtcPrice: false,
+    });
+    return { kind: 'sat', amount, unit };
+  }
 
   const fiat =
     metadata.displaySats === amount && metadata.displayFiat != null
@@ -47,7 +57,23 @@ export function getProofSuggestionDisplay(
         ? Math.round((amount / 100_000_000) * metadata.btcPrice * 100) / 100
         : null;
 
-  if (fiat == null) return { kind: 'sat', amount, unit };
+  if (fiat == null) {
+    cashuLog.debug('proof.selector.display.result', {
+      inputMode: metadata.inputMode,
+      result: 'sat',
+      amount,
+      unit,
+      hasBtcPrice: metadata.btcPrice > 0,
+    });
+    return { kind: 'sat', amount, unit };
+  }
+  cashuLog.debug('proof.selector.display.result', {
+    inputMode: metadata.inputMode,
+    result: 'fiat',
+    amount,
+    unit,
+    hasBtcPrice: metadata.btcPrice > 0,
+  });
   return { kind: 'fiat', label: `${metadata.fiatSymbol ?? ''}${fiat.toFixed(2)}` };
 }
 
@@ -55,6 +81,7 @@ export function submitProofSuggestion(
   machine: ActionSheetPayloads['proof-selector']['machine'],
   amount: number
 ): void {
+  cashuLog.info('proof.selector.choice', { amount });
   void machine.chooseProofs(amount);
 }
 
@@ -62,10 +89,25 @@ export function shouldShowProofSelectorMintChange(
   payload: Pick<ActionSheetPayloads['proof-selector'], 'meltTarget' | 'paymentRequest'>
 ): boolean {
   const meltTarget = payload.meltTarget?.trim();
-  if (!meltTarget || payload.paymentRequest) return true;
+  if (!meltTarget || payload.paymentRequest) {
+    cashuLog.debug('proof.selector.change_mint.result', {
+      reason: !meltTarget ? 'missing-melt-target' : 'has-payment-request',
+      showChangeMint: true,
+      hasMeltTarget: !!meltTarget,
+      hasPaymentRequest: !!payload.paymentRequest,
+    });
+    return true;
+  }
   const isLightningTarget =
     isLightningInvoiceBolt11(meltTarget) || decodeUrlOrAddress(meltTarget) != null;
-  return !isLightningTarget;
+  const showChangeMint = !isLightningTarget;
+  cashuLog.debug('proof.selector.change_mint.result', {
+    reason: isLightningTarget ? 'lightning-target' : 'non-lightning-target',
+    showChangeMint,
+    hasMeltTarget: true,
+    meltTargetLength: meltTarget.length,
+  });
+  return showChangeMint;
 }
 
 function SuggestionRow({ text, icon, display, onPress }: SuggestionRowProps) {
@@ -108,6 +150,18 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
   const { suggestions, unit, machine } = payload;
   const showChangeMint = shouldShowProofSelectorMintChange(payload);
 
+  React.useEffect(() => {
+    cashuLog.info('proof.selector.presented', {
+      unit,
+      hasRoundUp: suggestions?.roundUp != null,
+      roundUpAmount: suggestions?.roundUp?.amount ?? null,
+      hasRoundDown: suggestions?.roundDown != null,
+      roundDownAmount: suggestions?.roundDown?.amount ?? null,
+      showChangeMint,
+      inputMode: payload.displayMetadata?.inputMode ?? 'sat',
+    });
+  }, [payload.displayMetadata?.inputMode, showChangeMint, suggestions, unit]);
+
   return (
     <View>
       <BottomSheet.Title className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
@@ -141,6 +195,9 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
             <View className="bg-foreground/10 mx-3 my-1 h-px" />
             <Menu.Item
               onPress={() => {
+                cashuLog.info('proof.selector.change_mint.choice', {
+                  source: 'proof-selector',
+                });
                 void machine.requestMintSelector();
                 close();
               }}>
@@ -161,5 +218,11 @@ export function ProofSelectorContent({ payload, close }: ProofSelectorContentPro
 }
 
 export function proofSelectorPopup(payload: ActionSheetPayloads['proof-selector']): void {
+  cashuLog.info('proof.selector.popup', {
+    unit: payload.unit,
+    hasRoundUp: payload.suggestions?.roundUp != null,
+    hasRoundDown: payload.suggestions?.roundDown != null,
+    inputMode: payload.displayMetadata?.inputMode ?? 'sat',
+  });
   showActionSheet('proof-selector', payload);
 }

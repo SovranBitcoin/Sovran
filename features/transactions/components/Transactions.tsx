@@ -5,18 +5,13 @@ import { Easing, LinearTransition } from 'react-native-reanimated';
 import { AnimatedLegendList } from '@legendapp/list/reanimated';
 import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
-import _ from 'lodash';
+import groupBy from 'lodash/groupBy';
+import orderBy from 'lodash/orderBy';
 
-import {
-  HistoryEntry,
-  MeltHistoryEntry,
-  MintHistoryEntry,
-  SendHistoryEntry,
-} from '@cashu/coco-core';
+import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
-import { SplitBillTransactionRow } from '@/features/transactions/components/SplitBillTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
@@ -28,9 +23,14 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/date';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import {
+  bucketTransaction,
+  getCounterparty,
+  getScanSource,
+  getSwap,
   isCancellablePendingEcash,
-  isPendingTransaction,
+  isP2PKLocked,
   matchesTransactionFilters,
+  type ScanMethod,
   type TransactionDirection,
   type TransactionPaymentType,
 } from '@sovranbitcoin/colada';
@@ -42,20 +42,13 @@ import {
   useSwapTransactionsStore,
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
-import {
-  useSplitBillTransactionsStore,
-  type SplitBillGroup,
-} from '@/shared/stores/profile/splitBillTransactionsStore';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
 // live in the same sorted list.
 // ---------------------------------------------------------------------------
 
-type TimelineItem =
-  | { kind: 'transaction'; data: HistoryEntry }
-  | { kind: 'swap'; data: SwapGroup }
-  | { kind: 'split-bill'; data: SplitBillGroup };
+type TimelineItem = { kind: 'transaction'; data: HistoryEntry } | { kind: 'swap'; data: SwapGroup };
 
 function getTimelineCreatedAt(item: TimelineItem): number {
   return item.data.createdAt;
@@ -63,7 +56,6 @@ function getTimelineCreatedAt(item: TimelineItem): number {
 
 function getTimelineKey(item: TimelineItem): string {
   if (item.kind === 'swap') return `swap-${item.data.id}`;
-  if (item.kind === 'split-bill') return `split-bill-${item.data.id}`;
   const entry = item.data;
   if (entry.id) return entry.id;
   // Bearer tokens MUST NOT become React keys; Math.random() destroys list
@@ -83,17 +75,32 @@ interface Section {
   index?: string;
 }
 
+const DATE_HEADER_HEIGHT = 30;
+const ESTIMATED_TRANSACTION_ROW_HEIGHT = 72;
+const ESTIMATED_SECTION_CHROME_HEIGHT = DATE_HEADER_HEIGHT + spacing.xs + spacing.lg;
+
 interface Props {
   header?: React.ReactElement | (() => React.ReactElement) | null;
   listKey?: string;
   account: Account;
   showMore: boolean;
+  /**
+   * Embedded mode (use with `showMore`): renders the per-person/relationship
+   * list inside another screen. Hides the global "View all" link, shows all
+   * date groups (no `days` cap), and skips the swap-store injection so the list
+   * is driven purely by the passed `history`.
+   */
+  embedded?: boolean;
   history: HistoryEntry[];
   isFetching?: boolean; // Loading state for fetching transactions
   // Filtering options
   filter?: TransactionDirection;
   type?: TransactionPaymentType;
   mintUrlFilter?: string;
+  /** Annotation filters (default 'all'). */
+  source?: 'all' | ScanMethod;
+  lock?: 'all' | 'locked' | 'unlocked';
+  counterparty?: 'all' | 'with';
   at?: 'all' | 'at';
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
   days?: number;
@@ -129,11 +136,15 @@ export const Transactions = React.memo(
     listKey,
     account,
     showMore,
+    embedded = false,
     history,
     isFetching = false,
     filter = 'all',
     type = 'all',
     mintUrlFilter = 'all',
+    source = 'all',
+    lock = 'all',
+    counterparty = 'all',
     tab = 'All',
     days = 1,
     hideExpired = false,
@@ -155,41 +166,32 @@ export const Transactions = React.memo(
     const collapsing = useRollbackStore((s) => s.collapsing);
 
     const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
-    const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
-    const quoteIdToSplitBill = useSplitBillTransactionsStore((state) => state.quoteIdToSplitBill);
-    const splitBillGroupsById = useSplitBillTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {
       if (account.unit === 'all') return Object.values(swapGroupsById);
       return Object.values(swapGroupsById).filter((g) => g.unit === account.unit);
     }, [swapGroupsById, account.unit]);
 
-    const splitBillGroups = useMemo(() => {
-      if (account.unit === 'all') return Object.values(splitBillGroupsById);
-      return Object.values(splitBillGroupsById).filter((g) => g.unit === account.unit);
-    }, [splitBillGroupsById, account.unit]);
-
-    const HEADER_HEIGHT = 30;
-    const ITEM_HEIGHT = 69;
-
     const filteredHistory = useMemo(() => {
       const t0 = performance.now();
-      const result = _.filter(history, (historyEntry: HistoryEntry) => {
+      const result = history.filter((historyEntry: HistoryEntry) => {
         if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
         if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
 
-        if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
-          const quoteId = (historyEntry as MintHistoryEntry | MeltHistoryEntry).quoteId;
-          if (quoteId && quoteIdToGroup[quoteId]) return false;
-          // Also hide individual mint entries that belong to a split-bill
-          // group — they're surfaced through the meta-row instead.
-          if (quoteId && quoteIdToSplitBill[quoteId]) return false;
-        }
+        // Hide legs that belong to a swap group — colada surfaces the group as a
+        // single row. The swap annotation (merged onto the entry) is the signal,
+        // so the app no longer reaches into the swap store's quoteId index.
+        if (getSwap(historyEntry)?.groupId) return false;
 
         if (!matchesTransactionFilters(historyEntry, { paymentType: type, direction: filter })) {
           return false;
         }
+
+        // Annotation-driven filters (source/transport, P2PK lock, counterparty).
+        if (source !== 'all' && getScanSource(historyEntry)?.method !== source) return false;
+        if (lock !== 'all' && isP2PKLocked(historyEntry) !== (lock === 'locked')) return false;
+        if (counterparty === 'with' && !getCounterparty(historyEntry)?.pubkey) return false;
 
         // Filter out expired transactions if hideExpired is true
         if (hideExpired) {
@@ -233,10 +235,11 @@ export const Transactions = React.memo(
       mintUrlFilter,
       filter,
       type,
+      source,
+      lock,
+      counterparty,
       hideExpired,
       selectedMonth,
-      quoteIdToGroup,
-      quoteIdToSplitBill,
     ]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
@@ -246,8 +249,10 @@ export const Transactions = React.memo(
         data: entry,
       }));
 
-      // Only include swap items when showing all filters / types
-      if (filter !== 'all' || type !== 'all') return txItems;
+      // Only include swap items when showing all filters / types. Embedded mode
+      // (per-person relationship view) is driven purely by the passed history —
+      // swaps are self-rebalances with no counterparty, so never inject them.
+      if (embedded || filter !== 'all' || type !== 'all') return txItems;
 
       const monthFilter = (createdAt: number) => {
         if (!selectedMonth) return true;
@@ -265,47 +270,28 @@ export const Transactions = React.memo(
           data: group,
         }));
 
-      const splitBillItems: TimelineItem[] = splitBillGroups
-        .filter((group) => monthFilter(group.createdAt))
-        .map((group) => ({
-          kind: 'split-bill' as const,
-          data: group,
-        }));
-
-      return [...txItems, ...swapItems, ...splitBillItems];
-    }, [filteredHistory, swapGroups, splitBillGroups, filter, type, selectedMonth]);
+      return [...txItems, ...swapItems];
+    }, [filteredHistory, swapGroups, filter, type, selectedMonth, embedded]);
 
     const sortedTimeline = useMemo(
-      () => _.orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
+      () => orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
       [timelineItems]
     );
 
     const { pending, confirmed, expired } = useMemo(
       () =>
-        _.groupBy(sortedTimeline, (item: TimelineItem) => {
+        groupBy(sortedTimeline, (item: TimelineItem) => {
           // Swap items are always "confirmed"
           if (item.kind === 'swap') return 'confirmed';
-          if (item.kind === 'split-bill') {
-            // Bucket split-bill groups into pending until fully paid.
-            if (item.data.state === 'paid') return 'confirmed';
-            if (item.data.state === 'expired' || item.data.state === 'cancelled') return 'expired';
-            return 'pending';
-          }
 
           const historyEntry = item.data;
           const isCollapsingGhost =
             historyEntry.type === 'send' &&
             collapsing.has((historyEntry as SendHistoryEntry).operationId);
-          const isPending = isPendingTransaction(historyEntry, { isCollapsingGhost });
 
-          // Check if it's an expired mint transaction
-          const isExpired =
-            historyEntry.type === 'mint' &&
-            String(historyEntry.state) === 'UNPAID' &&
-            mintHistoryEntryExpired(historyEntry);
-
-          if (isExpired) return 'expired';
-          return isPending ? 'pending' : 'confirmed';
+          // Single colada classifier: handles expired mint quotes, pending
+          // sends, and unredeemed (executing) receives in one place.
+          return bucketTransaction(historyEntry, { isCollapsingGhost });
         }),
       [sortedTimeline, collapsing]
     );
@@ -314,7 +300,7 @@ export const Transactions = React.memo(
       const t0 = performance.now();
       const createSections = (items: TimelineItem[], prefix: string) => {
         // Group by date string for display, but keep track of the original date for sorting
-        const groupedByDate = _.groupBy(items, (item) =>
+        const groupedByDate = groupBy(items, (item) =>
           formatDate(getTimelineCreatedAt(item), 'long-date')
         );
 
@@ -328,13 +314,15 @@ export const Transactions = React.memo(
         });
 
         // Sort by original date in descending order (newest first)
-        const sortedDateEntries = _.orderBy(
+        const sortedDateEntries = orderBy(
           dateEntries,
           (entry) => entry.originalDate.getTime(),
           'desc'
         );
 
-        const datesToShow = showMore ? _.take(sortedDateEntries, days) : sortedDateEntries;
+        // Embedded mode shows every date group (no `days` cap).
+        const datesToShow =
+          showMore && !embedded ? sortedDateEntries.slice(0, days) : sortedDateEntries;
 
         return datesToShow.map(({ dateString }) => ({
           title: dateString,
@@ -363,7 +351,7 @@ export const Transactions = React.memo(
         });
       }
       return result;
-    }, [pending, confirmed, expired, showMore, days]);
+    }, [pending, confirmed, expired, showMore, days, embedded]);
 
     const sectionsToDisplay = useMemo(() => {
       log.debug('transactions.sections_computed', {
@@ -378,6 +366,35 @@ export const Transactions = React.memo(
       if (tab === 'Expired') return sections.expired;
       return sections.all;
     }, [sections, tab]);
+
+    const estimatedSectionItemSize = useMemo(() => {
+      if (sectionsToDisplay.length === 0) {
+        return ESTIMATED_SECTION_CHROME_HEIGHT + ESTIMATED_TRANSACTION_ROW_HEIGHT;
+      }
+      const totalRows = sectionsToDisplay.reduce((sum, section) => sum + section.data.length, 0);
+      const averageRows = Math.max(1, totalRows / sectionsToDisplay.length);
+      return ESTIMATED_SECTION_CHROME_HEIGHT + averageRows * ESTIMATED_TRANSACTION_ROW_HEIGHT;
+    }, [sectionsToDisplay]);
+
+    // Embedded (per-person) list groups purely by date — no pending/confirmed/
+    // expired split — so each date renders once under a single date header.
+    const embeddedSections = useMemo<Section[]>(() => {
+      if (!embedded) return [];
+      const groupedByDate = groupBy(sortedTimeline, (item) =>
+        formatDate(getTimelineCreatedAt(item), 'long-date')
+      );
+      const dateEntries = Object.keys(groupedByDate).map((dateString) => ({
+        dateString,
+        originalDate: new Date(getTimelineCreatedAt(groupedByDate[dateString][0])),
+      }));
+      return orderBy(dateEntries, (e) => e.originalDate.getTime(), 'desc').map(
+        ({ dateString }) => ({
+          title: dateString,
+          data: groupedByDate[dateString],
+          index: `embedded-${dateString}`,
+        })
+      );
+    }, [embedded, sortedTimeline]);
 
     // Cancellable subset of the visible pending bucket: ecash sends only.
     // Used by the parent screen to drive the "Cancel N pending" footer.
@@ -409,9 +426,6 @@ export const Transactions = React.memo(
         if (item.kind === 'swap') {
           return <SwapTransactionRow key={key} group={item.data} />;
         }
-        if (item.kind === 'split-bill') {
-          return <SplitBillTransactionRow key={key} group={item.data} />;
-        }
         return (
           <Transaction
             key={key}
@@ -424,24 +438,10 @@ export const Transactions = React.memo(
       [onTransactionPress, onCancelPendingEcash]
     );
 
-    const getFixedItemSize = useCallback((section: Section): number | undefined => {
-      // Pure transaction sections are uniform-height, so we can hand LegendList
-      // an exact fixed size (fast path, no measurement). Sections containing
-      // swap or split-bill rows have content-dependent heights — trusting the
-      // 69px-per-row constant there mis-sized them and caused overlap, gaps,
-      // and scroll jumps. Returning `undefined` tells LegendList to measure
-      // those sections instead.
-      const hasVariableRow = section.data.some(
-        (item) => item.kind === 'swap' || item.kind === 'split-bill'
-      );
-      if (hasVariableRow) return undefined;
-      return HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16;
-    }, []);
-
     const renderSection = useCallback(
       ({ item: section }: { item: Section }) => (
         <VStack spacing={4} className="mb-4">
-          <Text size={14} heavy color={opacity(foreground, 0.33)} style={{ height: HEADER_HEIGHT }}>
+          <Text size={14} heavy color={opacity(foreground, 0.33)} style={styles.dateHeader}>
             {section.title}
           </Text>
           <View style={[styles.card, { borderColor }]}>
@@ -490,6 +490,20 @@ export const Transactions = React.memo(
       ),
       [muted, borderColor, foreground]
     );
+
+    if (embedded) {
+      // Non-virtualized, date-grouped list for embedding inside a detail
+      // screen's ScrollView (one date header per date, no status containers).
+      return (
+        <View className="w-full">
+          {embeddedSections.map((section) => (
+            <React.Fragment key={section.index ?? section.title}>
+              {renderSection({ item: section })}
+            </React.Fragment>
+          ))}
+        </View>
+      );
+    }
 
     if (showMore) {
       if (isFetching) {
@@ -566,7 +580,7 @@ export const Transactions = React.memo(
                         </View>
                       </BlurCardFrame>
                     </View>
-                    {label === 'Confirmed' && (
+                    {label === 'Confirmed' && !embedded && (
                       <Link
                         href={{
                           pathname: '/transactions',
@@ -619,8 +633,12 @@ export const Transactions = React.memo(
           style={{ flex: 1 }}
           data={sectionsToDisplay}
           keyExtractor={(section) => section.index ?? section.title}
-          getFixedItemSize={getFixedItemSize}
-          estimatedItemSize={HEADER_HEIGHT + ITEM_HEIGHT + 16}
+          // Date sections are not fixed-height LegendList items: each one
+          // wraps a label plus a card of rows whose measured height can change
+          // with badges, status text, and rollback collapse animations.
+          // Let LegendList measure the real position; this is only the first
+          // allocation hint.
+          estimatedItemSize={estimatedSectionItemSize}
           maintainVisibleContentPosition
           // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
           // triggers a fresh LinearTransition on every measured-position
@@ -660,6 +678,9 @@ const styles = StyleSheet.create({
   },
   content: {
     zIndex: zIndex.raised,
+  },
+  dateHeader: {
+    height: DATE_HEADER_HEIGHT,
   },
   sectionHeader: {
     paddingHorizontal: 16,

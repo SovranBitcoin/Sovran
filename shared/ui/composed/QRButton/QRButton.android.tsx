@@ -19,6 +19,7 @@ import {
 } from '@/shared/lib/qrButtonAnchor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useQRButtonPressFeedback } from './useQRButtonPressFeedback';
 
 export interface QRButtonProps {
   onPress: () => void;
@@ -59,7 +60,8 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   const animatedRef = useAnimatedRef<Animated.View>();
   const morphCompleted = useBootMorphCompleted();
   const visibility = useSharedValue(morphCompleted ? 1 : 0);
-  const visibilityStyle = useAnimatedStyle(() => ({ opacity: visibility.value }));
+  const visibilityStyle = useAnimatedStyle(() => ({ opacity: visibility.get() }));
+  const pressFeedback = useQRButtonPressFeedback();
 
   const publishAnchor = useCallback(() => {
     // Android's UI-thread measurement can report pageX/pageY in a different
@@ -77,7 +79,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   }, [animatedRef, borderRadius]);
 
   useEffect(() => {
-    visibility.value = withTiming(morphCompleted ? 1 : 0, { duration: 180 });
+    visibility.set(withTiming(morphCompleted ? 1 : 0, { duration: 180 }));
   }, [morphCompleted, visibility]);
 
   useEffect(() => {
@@ -95,49 +97,54 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
         onLayout={publishAnchor}
         collapsable={false}
         style={[{ width: size, height: size }, visibilityStyle]}>
-        <Pressable
-          style={[styles.touchable, pressableStyle]}
-          className="items-center justify-center"
-          haptics={{ type: 'impact', impactStyle: 'light' }}
-          activeOpacity={0.75}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          onPress={onPress}>
-          <SquircleView style={[styles.container, containerStyle]} pointerEvents="none">
-            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: background }]} />
+        <Animated.View style={[{ width: size, height: size }, pressFeedback.animatedStyle]}>
+          <Pressable
+            accessibilityLabel="Scan QR code"
+            accessibilityRole="button"
+            style={[styles.touchable, pressableStyle]}
+            className="items-center justify-center"
+            activeOpacity={1}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={onPress}
+            onPressIn={pressFeedback.onPressIn}
+            onPressOut={pressFeedback.onPressOut}>
+            <SquircleView style={[styles.container, containerStyle]} pointerEvents="none">
+              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: background }]} />
+              <View
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  { backgroundColor: opacity(foreground, 0.65) },
+                ]}
+              />
+              <LinearGradient
+                colors={[
+                  foreground,
+                  opacity(foreground, 0.8),
+                  opacity(foreground, 0.7),
+                  opacity(foreground, 0.6),
+                ]}
+                locations={[0, 0.35, 0.6, 1]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  { borderWidth: 1, borderColor: opacity(foreground, 0.4) },
+                ]}
+              />
+            </SquircleView>
             <View
               style={[
                 StyleSheet.absoluteFillObject,
-                { backgroundColor: opacity(foreground, 0.65) },
+                { justifyContent: 'center', alignItems: 'center' },
               ]}
-            />
-            <LinearGradient
-              colors={[
-                foreground,
-                opacity(foreground, 0.8),
-                opacity(foreground, 0.7),
-                opacity(foreground, 0.6),
-              ]}
-              locations={[0, 0.35, 0.6, 1]}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <View
-              style={[
-                StyleSheet.absoluteFillObject,
-                { borderWidth: 1, borderColor: opacity(foreground, 0.4) },
-              ]}
-            />
-          </SquircleView>
-          <View
-            style={[
-              StyleSheet.absoluteFillObject,
-              { justifyContent: 'center', alignItems: 'center' },
-            ]}
-            pointerEvents="none">
-            <Icon name="stash:qr-code" size={38} color={background} />
-          </View>
-        </Pressable>
+              pointerEvents="none">
+              <Icon name="stash:qr-code" size={38} color={background} />
+            </View>
+          </Pressable>
+        </Animated.View>
       </Animated.View>
     </Log>
   );

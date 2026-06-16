@@ -150,7 +150,6 @@ const flowGroups = [
   '(mint-flow)',
   '(filter-flow)',
   '(map-flow)',
-  '(split-bill-flow)',
   '(theme-flow)',
   '(profile-flow)',
 ].map((name) => modalFlow(name));

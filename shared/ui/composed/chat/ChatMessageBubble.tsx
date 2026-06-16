@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -9,6 +9,7 @@ import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { formatRelative } from '@/shared/lib/date';
+import { chatLog } from '@/shared/lib/logger';
 import { CashuTokenBubble } from './CashuTokenBubble';
 import type { ChatBubbleMessage } from './types';
 
@@ -77,6 +78,42 @@ export function ChatMessageBubble({
     ? message.content.replace(cashuToken, '').trim()
     : message.content;
   const hasText = displayContent.length > 0;
+
+  useEffect(() => {
+    chatLog.debug('chat.message_bubble.render', {
+      idLength: message.id.length,
+      isOwn: message.isOwn,
+      isFirstInGroup,
+      isLastInGroup,
+      senderIdLength: message.senderId.length,
+      senderNameLength: message.sender?.length ?? 0,
+      contentLength: message.content.length,
+      displayContentLength: displayContent.length,
+      hasCashuToken: !!cashuToken,
+      cashuTokenLength: cashuToken?.length ?? 0,
+      hasText,
+      deliveryStatus: message.deliveryStatus ?? null,
+      showAvatar,
+      showName,
+      showTimestamp,
+      hasOwnAvatar: !!ownAvatar,
+      hasCounterpartyAvatarOverride: counterpartyAvatar !== undefined,
+      canRetry: !!onRetry && message.deliveryStatus === 'failed',
+    });
+  }, [
+    cashuToken,
+    counterpartyAvatar,
+    displayContent.length,
+    hasText,
+    isFirstInGroup,
+    isLastInGroup,
+    message,
+    onRetry,
+    ownAvatar,
+    showAvatar,
+    showName,
+    showTimestamp,
+  ]);
 
   const counterpartyAvatarNode =
     counterpartyAvatar === null ? null : counterpartyAvatar !== undefined ? (
@@ -177,7 +214,15 @@ export function ChatMessageBubble({
           ) : null}
           {message.isOwn && message.deliveryStatus === 'failed' && onRetry ? (
             <Pressable
-              onPress={onRetry}
+              onPress={() => {
+                chatLog.info('chat.message_bubble.retry_press', {
+                  idLength: message.id.length,
+                  contentLength: message.content.length,
+                  hasCashuToken: !!cashuToken,
+                  cashuTokenLength: cashuToken?.length ?? 0,
+                });
+                onRetry();
+              }}
               hitSlop={8}
               style={{ alignSelf: 'flex-end', marginTop: 2 }}>
               <Text size={11} style={{ color: danger, fontWeight: '600' }}>

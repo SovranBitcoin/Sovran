@@ -240,6 +240,16 @@ const STATIC_POPUPS = {
     icon: 'icon:mdi:shield',
     type: 'error',
   },
+  'redeem-receives-done': {
+    message: 'Checked unredeemed ecash',
+    icon: 'icon:mdi:cash-refund',
+    type: 'success',
+  },
+  'redeem-receives-failed': {
+    message: 'Could not redeem ecash',
+    icon: 'icon:mdi:alert-circle',
+    type: 'error',
+  },
 
   // routstr
   'routstr-transaction-failed': {

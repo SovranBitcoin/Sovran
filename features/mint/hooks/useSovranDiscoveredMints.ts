@@ -29,6 +29,13 @@ const SOVRAN_MINTS_API_URL = 'https://api.sovran.money/api/cashu/mints';
 
 const CONCURRENT_LIMIT = 5;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * Appends a mint to state if not already present (by normalized URL).
  */
@@ -127,7 +134,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
             if (controller.signal.aborted) return;
             const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
             cashuLog.debug('mint.sovran.info.resolved', {
-              url,
+              ...mintUrlLogFields(url),
               hasInfo: !!info,
               hasIcon: !!info?.icon_url,
               name: info?.name,
@@ -137,7 +144,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
           } catch (err) {
             if (controller.signal.aborted) return;
             cashuLog.warn('mint.sovran.info.error', {
-              url,
+              ...mintUrlLogFields(url),
               error: err instanceof Error ? err : new Error(String(err)),
               progress: `${++resolved}/${total}`,
             });

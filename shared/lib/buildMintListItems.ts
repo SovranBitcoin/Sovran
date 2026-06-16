@@ -6,7 +6,15 @@ import {
   type MintListItem,
 } from '@sovranbitcoin/colada';
 
+import { log } from '@/shared/lib/logger';
 import { getMintDisplayName } from '@/shared/lib/url';
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
 
 /**
  * Builds a fully-resolved `MintListItem[]` from trusted mints, their availability,
@@ -24,6 +32,13 @@ export function buildMintListItems(
   catalog: Record<string, MintCatalogEntry> = {},
   offlineCheck?: { amount: number; proofAmounts: Record<string, number[]> }
 ): MintListItem[] {
+  log.debug('mint.listItems.build.start', {
+    trustedMintCount: trustedMints.length,
+    availabilityCount: availability.length,
+    catalogCount: Object.keys(catalog).length,
+    hasOfflineCheck: !!offlineCheck,
+    offlineAmount: offlineCheck?.amount,
+  });
   const availMap = new Map(availability.map((a) => [a.mintUrl, a]));
 
   const mintUrls = [
@@ -31,7 +46,7 @@ export function buildMintListItems(
     ...trustedMints.filter((m) => !availMap.has(m.mintUrl)).map((m) => m.mintUrl),
   ];
 
-  return mintUrls
+  const items = mintUrls
     .map((mintUrl): MintListItem => {
       const mint = trustedMints.find((m) => m.mintUrl === mintUrl);
       const avail = availMap.get(mintUrl);
@@ -67,4 +82,21 @@ export function buildMintListItems(
       if (b.status === 'available' && a.status !== 'available') return 1;
       return b.balance - a.balance;
     });
+  log.info('mint.listItems.build.result', {
+    itemCount: items.length,
+    availableCount: items.filter((item) => item.status === 'available').length,
+    disabledCount: items.filter((item) => item.status !== 'available').length,
+    offlineKnownCount: items.filter((item) => item.worksOffline != null).length,
+    offlineComposableCount: items.filter((item) => item.worksOffline === true).length,
+    items: items.map((item) => ({
+      ...mintUrlLogFields(item.mintUrl),
+      status: item.status,
+      balance: item.balance,
+      reasonCode: item.reason?.code,
+      isPreferred: item.isPreferred,
+      hasCatalog: item.kymScore != null || item.auditScore != null || item.contactFollowers != null,
+      worksOffline: item.worksOffline,
+    })),
+  });
+  return items;
 }

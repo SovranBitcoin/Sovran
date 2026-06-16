@@ -35,6 +35,20 @@ initLog('Module', 'WalletContextProvider loaded');
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
+function preferredMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasPreferredMintUrl: !!mintUrl,
+    preferredMintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 export function useWalletContext(): WalletContext {
   const ctx = useContext(WalletContextCtx);
   if (!ctx) {
@@ -125,11 +139,18 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     for (const url of stableMintUrls) {
       try {
         const proofs = await getReadyProofs(manager, url);
-        next[url] = proofs.map((p) => amountToNumber(p.amount)).sort((a, b) => a - b);
-        totalReady += next[url].reduce((sum, n) => sum + n, 0);
+        const amounts = proofs.map((p) => amountToNumber(p.amount)).sort((a, b) => a - b);
+        const proofTotal = amounts.reduce((sum, n) => sum + n, 0);
+        next[url] = amounts;
+        totalReady += proofTotal;
+        walletLog.debug('provider.wallet_context.proof_fetch_done', {
+          ...mintUrlLogFields(url),
+          proofCount: amounts.length,
+          proofTotal,
+        });
       } catch (err) {
         walletLog.warn('provider.wallet_context.proof_fetch_failed', {
-          mintUrl: url,
+          ...mintUrlLogFields(url),
           error: err instanceof Error ? err : new Error(String(err)),
         });
         next[url] = [];
@@ -149,10 +170,17 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   }, [fetchProofAmounts, balanceSignature]);
 
   const value = useMemo<WalletContext>(() => {
+    const proofMintCount = Object.keys(proofAmounts).length;
+    const proofCount = Object.values(proofAmounts).reduce(
+      (sum, amounts) => sum + amounts.length,
+      0
+    );
     walletLog.info('provider.wallet_context.value_updated', {
       trustedMintCount: stableMintUrls.length,
       totalBalance: Object.values(mintBalancesOnly).reduce((sum, b) => sum + b, 0),
-      preferredMintUrl,
+      proofMintCount,
+      proofCount,
+      ...preferredMintLogFields(preferredMintUrl),
     });
     return {
       trustedMintUrls: stableMintUrls,

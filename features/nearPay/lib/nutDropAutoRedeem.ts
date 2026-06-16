@@ -1,154 +1,196 @@
 import { AppState } from 'react-native';
-import { NetworkError, HttpResponseError } from '@cashu/coco-core';
+import { createMeshRedeemOrchestrator, type MeshRedeemOrchestrator } from '@sovranbitcoin/colada';
+import type { TransactionAnnotation } from '@sovranbitcoin/colada';
+import { createDefaultOperations } from '@sovranbitcoin/colada/operations';
+import { getBLEPeers } from 'bitchat-module';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { paymentLog } from '@/shared/lib/logger';
+import { peerNostrPubkey } from '@/features/nearPay/lib/peerProfile';
 import { paymentStatusPopup } from '@/shared/lib/popup';
+import { RECEIVE_PENDING_TOAST_COPY } from '@/shared/lib/popup/paymentStatusCopy';
+import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useWalletLifecycleStore } from '@/shared/stores/global/walletLifecycleStore';
+import { paymentLog } from '@/shared/lib/logger';
 
 /**
- * Drains the persisted Nut Drop redeem queue: every `pending` entry past its
- * backoff window is redeemed via `manager.wallet.receive` — a deliberate
- * direct coco call (sanctioned exception to the "ride colada" rule: this is
- * a background wallet operation with no screen to drive; it mirrors
- * colada's own executeReceive, and coco auto-detects the P2PK lock and
- * signs from the keyring where the profile's Nostr key is already imported).
- *
- * Gates, in order:
- * 1. Manager initialized — never touch the wallet mid-profile-switch.
- * 2. NUT-13 restore settled ('complete'/'not-needed') — receives swap with
- *    deterministic counters; redeeming mid-restore desyncs them.
- * 3. Mint trust — coco's `wallet.receive` AUTO-TRUSTS unknown mints
- *    (addMintByUrl trusted:true). Without this gate a hostile mesh message
- *    could inject an arbitrary mint into the wallet. Untrusted-mint drops
- *    park in the queue for the user's manual review flow instead.
+ * Drains the persisted Nut Drop redeem queue through colada's mesh redeem
+ * orchestrator. Colada owns the gates (manager init, NUT-13 restore settled,
+ * mint trust — never auto-trust a mint pushed at us over the mesh), the
+ * retry ordering, and the receive itself (`executeAutoRedeem`, which
+ * resolves the REAL persisted history id by set-difference polling —
+ * retiring the old direct-coco exception). This module owns what's
+ * app-shaped: the persisted queue store behind the port and the toast
+ * pipeline. Tokens arrive as private Noise DMs (classified in
+ * `useNutDropAutoRedeem`), so there is no sender to push status back to.
  */
-
-/** Single-flight latch — drain triggers overlap (message, AppState, online). */
-let inFlight = false;
-
-function classifyReceiveError(err: unknown): 'spent' | 'network' | 'retryable' | 'fatal' {
-  const message = err instanceof Error ? err.message : String(err);
-  if (/already.{0,8}spent|token.{0,8}spent|11001/i.test(message)) return 'spent';
-  if (err instanceof NetworkError) return 'network';
-  if (err instanceof HttpResponseError && err.status >= 500) return 'network';
-  if (err instanceof Error && err.name === 'MintFetchError') return 'network';
-  if (/network|timeout|timed out|fetch failed|abort/i.test(message)) return 'network';
-  // Manager/keyring races (e.g. key pair not registered yet) — retry later.
-  if (/key pair not found/i.test(message)) return 'retryable';
-  return 'fatal';
-}
 
 function restoreSettled(): boolean {
   const status = useWalletLifecycleStore.getState().restoreStatus;
   return status === 'complete' || status === 'not-needed';
 }
 
-export async function drainNutDropRedeemQueue(): Promise<void> {
-  if (inFlight) return;
-  if (!CocoManager.isInitialized()) return;
-  if (!restoreSettled()) {
-    paymentLog.debug('near_pay.redeem.waiting_for_restore');
-    return;
-  }
+function getManager() {
+  return CocoManager.isInitialized() ? CocoManager.getInstance() : null;
+}
 
-  inFlight = true;
-  try {
-    const manager = CocoManager.getInstance();
-    const queue = useNutDropRedeemQueueStore.getState();
-    queue.prune();
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
 
-    const now = Date.now();
-    const due = Object.entries(queue.byTokenHash).filter(
-      ([, entry]) => entry.status === 'pending' && entry.nextAttemptAt <= now
-    );
-    if (due.length === 0) return;
+let orchestrator: MeshRedeemOrchestrator | null = null;
 
-    paymentLog.info('near_pay.redeem.drain_start', { dueCount: due.length });
+function getOrchestrator(): MeshRedeemOrchestrator {
+  if (orchestrator) return orchestrator;
 
-    for (const [tokenHash, entry] of due) {
-      const { markStatus, scheduleRetry } = useNutDropRedeemQueueStore.getState();
+  // A dedicated default-operations bag just for the background receive —
+  // the colada React instance lives in the provider tree and this drain
+  // must run with no screen mounted.
+  const operations = createDefaultOperations({ getManager });
+  const executeAutoRedeem = operations.executeAutoRedeem;
+  if (!executeAutoRedeem) throw new Error('colada executeAutoRedeem operation missing');
 
-      let trusted: boolean;
-      try {
-        trusted = await manager.mint.isTrustedMint(entry.mintUrl);
-      } catch (err) {
-        scheduleRetry(tokenHash, err instanceof Error ? err.message : String(err));
-        continue;
-      }
-      if (!trusted) {
-        // Never auto-trust a mint pushed at us over the mesh. The entry stays
-        // visible (status untrusted-mint) for a future manual review surface.
-        markStatus(tokenHash, 'untrusted-mint');
-        paymentLog.warn('near_pay.redeem.untrusted_mint', {
-          tokenHash: tokenHash.slice(0, 12),
-          mintUrl: entry.mintUrl,
-        });
-        continue;
-      }
-
-      markStatus(tokenHash, 'redeeming');
+  orchestrator = createMeshRedeemOrchestrator({
+    getManager,
+    isRestoreSettled: restoreSettled,
+    executeAutoRedeem,
+    queue: {
+      prune: () => useNutDropRedeemQueueStore.getState().prune(),
+      entries: () => useNutDropRedeemQueueStore.getState().byTokenHash,
+      markStatus: (tokenHash, status, error) =>
+        useNutDropRedeemQueueStore.getState().markStatus(tokenHash, status, error),
+      scheduleRetry: (tokenHash, error) =>
+        useNutDropRedeemQueueStore.getState().scheduleRetry(tokenHash, error),
+    },
+    onRedeeming: (tokenHash, entry) => {
+      paymentLog.info('near_pay.redeem.queue.redeeming', {
+        tokenHash: tokenHash.slice(0, 12),
+        ...mintUrlLogFields(entry.mintUrl),
+        amount: entry.amount,
+        unit: entry.unit,
+        appState: AppState.currentState,
+        visibleToast: AppState.currentState === 'active',
+      });
       // Same toast pipeline as a manually redeemed token (processing →
-      // green confirmed): mount it before the receive so coco's
-      // receive-op:finalized / history:updated events flip it to confirmed
-      // through usePaymentStatusListener, exactly like the regular flow.
+      // green confirmed): coco's receive-op:finalized / history:updated
+      // events flip it to confirmed through usePaymentStatusListener.
       // Only when the user can see it; backgrounded redeems surface through
-      // the transaction history (coco persists the receive entry).
-      const toastShown = AppState.currentState === 'active';
-      if (toastShown) {
-        usePaymentStatusStore.getState().setActive({
-          variant: 'receive-ecash',
-          id: tokenHash,
-          mintUrl: entry.mintUrl,
-          amount: entry.amount,
-          unit: entry.unit,
-          state: 'processing',
-        });
-        paymentStatusPopup({
-          variant: 'receive-ecash',
-          id: tokenHash,
-          mintUrl: entry.mintUrl,
-          amount: entry.amount,
-          unit: entry.unit,
-        });
-      }
-      try {
-        await manager.wallet.receive(entry.token);
-        markStatus(tokenHash, 'redeemed');
-        paymentLog.info('near_pay.redeem.success', {
+      // the transaction history.
+      if (AppState.currentState !== 'active') {
+        paymentLog.info('near_pay.redeem.toast_suppressed', {
           tokenHash: tokenHash.slice(0, 12),
-          amount: entry.amount,
-          mintUrl: entry.mintUrl,
+          reason: 'app_not_active',
+          appState: AppState.currentState,
         });
-      } catch (err) {
-        const kind = classifyReceiveError(err);
-        const message = err instanceof Error ? err.message : String(err);
-        paymentLog.warn('near_pay.redeem.attempt_failed', {
+        return;
+      }
+      usePaymentStatusStore.getState().setActive({
+        variant: 'receive-ecash',
+        id: tokenHash,
+        mintUrl: entry.mintUrl,
+        amount: entry.amount,
+        unit: entry.unit,
+        state: 'processing',
+      });
+      paymentStatusPopup({
+        variant: 'receive-ecash',
+        id: tokenHash,
+        mintUrl: entry.mintUrl,
+        amount: entry.amount,
+        unit: entry.unit,
+      });
+    },
+    onFailed: (tokenHash, entry, kind) => {
+      paymentLog.warn('near_pay.redeem.queue.failed', {
+        tokenHash: tokenHash.slice(0, 12),
+        ...mintUrlLogFields(entry.mintUrl),
+        amount: entry.amount,
+        unit: entry.unit,
+        kind,
+        activeId: usePaymentStatusStore.getState().active?.id ?? null,
+        activeState: usePaymentStatusStore.getState().active?.state ?? null,
+      });
+      // Network/retryable failures are queued for another redeem attempt, so
+      // keep the visible toast pending instead of presenting a terminal error.
+      if (usePaymentStatusStore.getState().active?.id !== tokenHash) {
+        paymentLog.info('near_pay.redeem.toast_update_suppressed', {
           tokenHash: tokenHash.slice(0, 12),
           kind,
-          error: message,
+          reason: 'active_id_mismatch',
         });
-        if (kind === 'spent') {
-          // Duplicate delivery race (we already redeemed an equivalent token)
-          // or sender reclaimed. Nothing actionable for the user.
-          markStatus(tokenHash, 'spent', message);
-        } else if (kind === 'network' || kind === 'retryable') {
-          scheduleRetry(tokenHash, message);
-        } else {
-          markStatus(tokenHash, 'failed', message);
-        }
-        // Don't leave a mounted toast spinning forever — flip it to the
-        // standard failed state (the retry path mounts a fresh one later).
-        if (toastShown && usePaymentStatusStore.getState().active?.id === tokenHash) {
-          usePaymentStatusStore
-            .getState()
-            .setFailed(tokenHash, kind === 'spent' ? new Error('Token was already redeemed') : err);
-        }
+        return;
       }
-    }
-  } finally {
-    inFlight = false;
+      if (kind === 'network' || kind === 'retryable') {
+        paymentLog.info('near_pay.redeem.toast_waiting', {
+          tokenHash: tokenHash.slice(0, 12),
+          kind,
+          expectedNext: 'retry_when_online_or_backoff_elapsed',
+        });
+        usePaymentStatusStore.getState().setWaiting(tokenHash, RECEIVE_PENDING_TOAST_COPY);
+        return;
+      }
+      usePaymentStatusStore
+        .getState()
+        .setFailed(
+          tokenHash,
+          kind === 'spent' ? new Error('Token was already redeemed') : new Error('Redeem failed')
+        );
+    },
+    onRedeemed: (_tokenHash, entry, historyEntryId) => {
+      if (!historyEntryId) return;
+      // Nut Drop tokens are P2PK-locked to us. The redeemed proofs are swapped
+      // for fresh ones, so the proof-secret fallback can't see the original
+      // lock — annotate the resulting receive so it shows the lock badge.
+      const patch: TransactionAnnotation = {
+        lock: { type: 'p2pk', direction: 'incoming' },
+        // Arrived over the BLE/bitchat mesh — surfaces a bluetooth source badge.
+        scan: { method: 'ble' },
+      };
+      // Resolve the sender's Nostr identity from the live BLE peer registry
+      // (peerID → nostrPubkeyHex via the bitchat favorite exchange) so the row
+      // can show their avatar. Avatar URL comes from the warm kind-0 cache when
+      // present; otherwise the row falls back to a pubkey-seeded identicon.
+      const peer = entry.senderPeerID
+        ? getBLEPeers().find((p) => p.peerID === entry.senderPeerID)
+        : undefined;
+      const pubkey = peer ? peerNostrPubkey(peer) : null;
+      if (pubkey) {
+        const cached = useNostrMetadataCache.getState().byPubkey[pubkey];
+        patch.counterparty = {
+          pubkey,
+          direction: 'sender',
+          ...(peer?.nickname ? { displayName: peer.nickname } : {}),
+          ...(cached?.picture ? { avatarUrl: cached.picture } : {}),
+        };
+      }
+      setTransactionAnnotation(`id:${historyEntryId}`, patch);
+    },
+  });
+  return orchestrator;
+}
+
+export async function drainNutDropRedeemQueue(): Promise<void> {
+  const entries = Object.values(useNutDropRedeemQueueStore.getState().byTokenHash);
+  paymentLog.info('near_pay.redeem.drain.start', {
+    entries: entries.length,
+    pending: entries.filter((entry) => entry.status === 'pending').length,
+    redeeming: entries.filter((entry) => entry.status === 'redeeming').length,
+    restoreSettled: restoreSettled(),
+    hasManager: !!getManager(),
+    appState: AppState.currentState,
+  });
+  try {
+    await getOrchestrator().drain();
+    paymentLog.info('near_pay.redeem.drain.done');
+  } catch (error) {
+    paymentLog.error('near_pay.redeem.drain.failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
 }

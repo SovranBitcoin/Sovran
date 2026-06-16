@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MintAvailability } from '@sovranbitcoin/colada';
@@ -13,6 +13,7 @@ import {
 } from '@/features/wallet/lib/walletHeader';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
+import { walletLog } from '@/shared/lib/logger';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 
 export interface MintSelectorProps {
@@ -46,6 +47,13 @@ interface MintSelectorShared {
     buttonWidth: number;
     contentWidth: number;
     contentHeight: number;
+  };
+}
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
   };
 }
 
@@ -87,6 +95,40 @@ export function useMintSelector({
     const contentHeight = HEADER_LAYOUT.BUTTON_HEIGHT - HEADER_LAYOUT.CONTENT_PADDING_VERTICAL;
     return { buttonWidth, contentWidth, contentHeight };
   }, [width, windowWidth]);
+
+  useEffect(() => {
+    walletLog.debug('mintSelector.state', {
+      ...mintUrlLogFields(mintUrl),
+      selectedFromProps: !!selectedMintUrl,
+      hasStoredSelectedMint: !!storedSelectedMint,
+      mintCount: mints.length,
+      hasMintData: !!mintData,
+      hasMintInfo: !!mintInfo,
+      hasIcon: !!mintIconUrl,
+      balance,
+      unit,
+      isMintsLoading,
+      isLoading,
+      hasRequestMintList: !!onRequestMintList,
+      buttonWidth: dimensions.buttonWidth,
+      contentWidth: dimensions.contentWidth,
+    });
+  }, [
+    balance,
+    dimensions.buttonWidth,
+    dimensions.contentWidth,
+    isLoading,
+    isMintsLoading,
+    mintData,
+    mintIconUrl,
+    mintInfo,
+    mintUrl,
+    mints.length,
+    onRequestMintList,
+    selectedMintUrl,
+    storedSelectedMint,
+    unit,
+  ]);
 
   return {
     mintUrl,

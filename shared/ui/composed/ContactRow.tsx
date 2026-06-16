@@ -18,7 +18,7 @@
  * Spec: see `docs/contact-row.md`.
  */
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import opacity from 'hex-color-opacity';
 import type { MintListItem } from '@sovranbitcoin/colada';
 
@@ -45,6 +45,7 @@ import { formatCompact } from '@/shared/lib/number';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { formatRelative } from '@/shared/lib/date';
 import { BLUETOOTH_ACCENT, CONNECTED_ACCENT } from '@/shared/lib/brandColors';
+import { paymentLog } from '@/shared/lib/logger';
 
 // ---------------------------------------------------------------------------
 // Identity types
@@ -122,6 +123,9 @@ interface BleIdentity {
    *  15s spool fallback and may not arrive. */
   hasDirectLink?: boolean;
   lastSeen?: number;
+  /** Preferred identicon/word-pair seed (e.g. the peer's announced noise
+   *  key — stable across nickname changes); falls back to `peerID`. */
+  identitySeed?: string;
 }
 
 interface GeohashIdentity {
@@ -240,6 +244,8 @@ export function bleIdentity(peer: {
   isConnected?: boolean;
   hasDirectLink?: boolean;
   lastSeen?: number;
+  /** Preferred identicon/word-pair seed (e.g. the announced noise key). */
+  identitySeed?: string;
 }): BleIdentity {
   return { kind: 'ble', ...peer };
 }
@@ -416,7 +422,7 @@ function deriveSeed(ids: Identity[]): string | undefined {
   const self = find(ids, 'self');
   if (self) return self.pubkey;
   const ble = find(ids, 'ble');
-  if (ble) return ble.peerID;
+  if (ble) return ble.identitySeed ?? ble.peerID;
   const geohash = find(ids, 'geohash');
   if (geohash) return geohash.geohash;
   return undefined;
@@ -649,6 +655,13 @@ export function ContactRow({
   const self = find(identities, 'self');
   const ble = find(identities, 'ble');
   const geohash = find(identities, 'geohash');
+  const identityKinds = identities.map((item) => item.kind);
+  const identityKindList = identityKinds.join(',');
+  const mintUrlLength = mint?.mintUrl.length ?? 0;
+  const mintDisplayNameLength = mint?.displayName.length ?? 0;
+  const mintStats = mint?.stats;
+  const hasMintBalance = typeof mintStats?.balance === 'number';
+  const mintBalance = hasMintBalance ? mintStats.balance : null;
 
   const resolvedLoading = loading ?? nostr?.isLoadingProfile ?? false;
 
@@ -759,6 +772,7 @@ export function ContactRow({
   // ---- Accent (stats + NIP-05) -----------------------------------------
 
   const statKeys = statsOverride ?? DEFAULT_STATS_BY_KIND[primary.kind];
+  const statKeyList = statKeys.join(',');
   const statList: RowStat[] =
     hideMetadata || resolvedLoading ? [] : buildStats(identities, statKeys, { warning, success });
 
@@ -766,6 +780,7 @@ export function ContactRow({
     showNip05 && !hideMetadata && !resolvedLoading && nostr?.profile?.nip05
       ? { handle: nostr.profile.nip05 }
       : undefined;
+  const hasNip05 = !!nip05;
 
   const accentNode = <RowStatsAccent stats={statList} note={disabledReason} nip05={nip05} />;
 
@@ -783,9 +798,45 @@ export function ContactRow({
     />
   ) : null;
 
-  const inspectNode = onInspectPress ? (
+  const logMintInteraction = (
+    event: 'contact_row.mint.inspect_press' | 'contact_row.mint.press'
+  ) => {
+    if (!mint) return;
+    paymentLog.info(event, {
+      identityCount: identities.length,
+      identityKinds: identityKindList,
+      primaryKind: primary.kind,
+      mintUrlLength,
+      displayNameLength: mintDisplayNameLength,
+      hasIconUrl: !!mint.iconUrl,
+      hasBalance: hasMintBalance,
+      balance: mintBalance,
+      unit: mintStats?.unit ?? null,
+      status: mintStats?.status ?? null,
+      worksOffline: mintStats?.worksOffline ?? null,
+      statCount: statList.length,
+      statKeys: statKeyList,
+      resolvedLoading,
+      selectable,
+      selected,
+      disabled,
+      hasOnPress: !!onPress,
+      hasOnToggle: !!onToggle,
+      hasInspectPress: !!onInspectPress,
+    });
+  };
+
+  const inspectPress =
+    mint && onInspectPress
+      ? () => {
+          logMintInteraction('contact_row.mint.inspect_press');
+          onInspectPress();
+        }
+      : onInspectPress;
+
+  const inspectNode = inspectPress ? (
     <Pressable
-      onPress={onInspectPress}
+      onPress={inspectPress}
       hitSlop={8}
       style={{ padding: 8, borderRadius: 999, backgroundColor: opacity(foreground, 0.06) }}>
       <Icon name="bx:dots-vertical-rounded" size={18} color={foreground} />
@@ -809,29 +860,46 @@ export function ContactRow({
     ) : null;
 
   let trailingNode: ReactNode;
+  let trailingSource: string;
   if (trailingOverride !== undefined) {
     trailingNode = trailingOverride;
+    trailingSource = 'override';
   } else if (selectable) {
     trailingNode = selectionNode;
+    trailingSource = 'selection';
   } else if (trailingVariant === 'spinner') {
     trailingNode = <Spinner size={20} />;
+    trailingSource = 'spinner';
   } else if (trailingVariant === 'chevron') {
     trailingNode = chevronNode;
+    trailingSource = 'chevron';
   } else if (trailingVariant === 'none') {
     trailingNode = null;
+    trailingSource = 'none';
   } else if (inspectNode) {
     trailingNode = inspectNode;
+    trailingSource = 'inspect';
   } else if (geohash) {
     trailingNode = chevronNode;
+    trailingSource = 'geohash-chevron';
   } else if (bleConnectionNode) {
     trailingNode = bleConnectionNode;
+    trailingSource = 'ble-connection';
   } else {
     trailingNode = null;
+    trailingSource = 'empty';
   }
 
   // ---- Interaction ------------------------------------------------------
 
   const effectivePress = onPress ?? (selectable ? () => onToggle?.() : undefined);
+  const trackedPress =
+    mint && effectivePress
+      ? () => {
+          logMintInteraction('contact_row.mint.press');
+          effectivePress();
+        }
+      : effectivePress;
 
   // ---- Skeleton width variation ----------------------------------------
   // When the row is in its loading state, pick deterministic title /
@@ -844,6 +912,107 @@ export function ContactRow({
   const subtitlePlaceholder = resolvedLoading
     ? pickPlaceholder(seed, SUBTITLE_PLACEHOLDER_WIDTHS)
     : undefined;
+
+  const subtitleSource =
+    subtitleOverride === null
+      ? 'suppressed'
+      : subtitleOverride !== undefined
+        ? typeof subtitleOverride === 'string'
+          ? 'override-string'
+          : 'override-node'
+        : mint && hasMintBalance && mintStats?.unit
+          ? 'mint-balance'
+          : 'derived';
+
+  useEffect(() => {
+    if (!mint) return;
+    paymentLog.debug('contact_row.mint.render', {
+      identityCount: identities.length,
+      identityKinds: identityKindList,
+      primaryKind: primary.kind,
+      mintUrlLength,
+      displayNameLength: mintDisplayNameLength,
+      hasIconUrl: !!mint.iconUrl,
+      hasBalance: hasMintBalance,
+      balance: mintBalance,
+      unit: mintStats?.unit ?? null,
+      status: mintStats?.status ?? null,
+      kymScore: mintStats?.kymScore ?? null,
+      reviewCount: mintStats?.reviewCount ?? null,
+      auditScore: mintStats?.auditScore ?? null,
+      auditState: mintStats?.auditState ?? null,
+      auditTotalOps: mintStats?.auditTotalOps ?? null,
+      worksOffline: mintStats?.worksOffline ?? null,
+      contactFollowers: mintStats?.contactFollowers ?? null,
+      contactReputation: mintStats?.contactReputation ?? null,
+      hasNostrCompanion: !!nostr,
+      hasBleCompanion: !!ble,
+      hasSelfCompanion: !!self,
+      hasGeohashCompanion: !!geohash,
+      resolvedLoading,
+      hideMetadata,
+      showNip05,
+      statKeys: statKeyList,
+      statCount: statList.length,
+      hasNip05,
+      subtitleSource,
+      trailingSource,
+      accentPosition: accentPosition ?? null,
+      selectable,
+      selected,
+      disabled,
+      disabledReasonLength: disabledReason?.length ?? 0,
+      padding,
+      hasOnPress: !!onPress,
+      hasOnToggle: !!onToggle,
+      hasInspectPress: !!onInspectPress,
+      hasTitleOverride: titleOverride !== undefined,
+      titleOverrideLength: typeof titleOverride === 'string' ? titleOverride.length : null,
+      testIDLength: testID?.length ?? 0,
+    });
+  }, [
+    accentPosition,
+    ble,
+    disabled,
+    disabledReason,
+    geohash,
+    hasMintBalance,
+    hideMetadata,
+    hasNip05,
+    identities.length,
+    identityKindList,
+    mint,
+    mintBalance,
+    mintDisplayNameLength,
+    mintStats?.auditScore,
+    mintStats?.auditState,
+    mintStats?.auditTotalOps,
+    mintStats?.contactFollowers,
+    mintStats?.contactReputation,
+    mintStats?.kymScore,
+    mintStats?.reviewCount,
+    mintStats?.status,
+    mintStats?.unit,
+    mintStats?.worksOffline,
+    mintUrlLength,
+    nostr,
+    onInspectPress,
+    onPress,
+    onToggle,
+    padding,
+    primary.kind,
+    resolvedLoading,
+    selectable,
+    selected,
+    self,
+    showNip05,
+    statKeyList,
+    statList.length,
+    subtitleSource,
+    testID,
+    titleOverride,
+    trailingSource,
+  ]);
 
   return (
     <ListRow
@@ -858,7 +1027,7 @@ export function ContactRow({
       accent={accentNode}
       accentPosition={accentPosition}
       trailing={trailingNode}
-      onPress={effectivePress}
+      onPress={trackedPress}
       loading={resolvedLoading}
       disabled={disabled}
       padding={padding}

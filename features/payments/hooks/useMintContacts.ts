@@ -16,6 +16,13 @@ interface MintWithInfo {
   mintInfo: GetInfoResponse;
 }
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 export interface MintContact {
   type: 'mint';
   pubkey: string | null;
@@ -64,7 +71,7 @@ export function useMintContacts(
               return { mint, mintInfo };
             } catch (err) {
               paymentLog.warn('payment.mint.contacts.info_failed', {
-                mintUrl: mint.mintUrl,
+                ...mintUrlLogFields(mint.mintUrl),
                 error: err instanceof Error ? err : new Error(String(err)),
               });
               return { mint, mintInfo: null };
@@ -125,7 +132,7 @@ export function useMintContacts(
           mintPubkey = npubToPubkey(nostrContact.info);
         } catch (err) {
           paymentLog.warn('payment.mint.contacts.npub_decode_failed', {
-            mintUrl: mint.mintUrl,
+            ...mintUrlLogFields(mint.mintUrl),
             error: err instanceof Error ? err : new Error(String(err)),
           });
         }

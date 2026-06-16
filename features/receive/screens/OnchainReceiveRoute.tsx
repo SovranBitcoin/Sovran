@@ -38,6 +38,13 @@ export function OnchainReceiveRoute({
 }: OnchainReceiveRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
+  paymentLog.info('receive.onchain.route_ready', {
+    where,
+    mintHistoryEntryLength: params.mintHistoryEntry.length,
+    unit: params.unit ?? null,
+    extraButtonCount: extraButtons.length,
+    hasMintListCallback: !!onRequestMintList,
+  });
 
   return (
     <OnchainReceiveRouteContent
@@ -68,6 +75,19 @@ function OnchainReceiveRouteContent({
   useEffect(() => {
     if (error) paymentLog.warn('receive.onchain.error', { error });
   }, [error]);
+
+  useEffect(() => {
+    if (!typedEntry) return;
+    paymentLog.debug('receive.onchain.route_entry', {
+      state: typedEntry.state,
+      amount: typedEntry.amount,
+      unit: typedEntry.unit,
+      hasMintInfo: !!mintInfo,
+      actionNames: Object.keys(actions),
+      source,
+      hasMintUrl: !!mintUrl,
+    });
+  }, [actions, mintInfo, mintUrl, source, typedEntry]);
 
   if (error) {
     return (

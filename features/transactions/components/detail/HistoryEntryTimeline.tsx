@@ -44,7 +44,7 @@ import {
 import { getOnchainMintAddress } from '@/shared/lib/cashu/onchainMint';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
@@ -220,6 +220,55 @@ export function HistoryEntryTimeline({
   const cardLabel = getCardLabel(historyEntry, timeline, tokenCreated, nostrSent, paymentCopy);
   const statusHeader = getStatusHeader(timeline);
   const statusColorType = getStatusColorType(timeline);
+  const timelineSignature = useMemo(
+    () => timeline.map((item) => `${item.state}:${item.stepType}`).join('|'),
+    [timeline]
+  );
+  const timelineStepTypes = useMemo(
+    () =>
+      timelineSignature
+        ? timelineSignature.split('|').map((part) => {
+            const segments = part.split(':');
+            return segments[segments.length - 1] as TimelineStepType;
+          })
+        : [],
+    [timelineSignature]
+  );
+
+  useEffect(() => {
+    paymentLog.debug('tx.history_timeline.render', {
+      type: historyEntry.type,
+      state: String((historyEntry as { state?: unknown }).state ?? ''),
+      timelineItemCount: timelineStepTypes.length,
+      stepTypes: timelineStepTypes,
+      currentLikeCount: timelineStepTypes.filter(
+        (stepType) => stepType === 'current' || stepType === 'waiting' || stepType === 'success'
+      ).length,
+      futureCount: timelineStepTypes.filter(
+        (stepType) => stepType === 'next-pending' || stepType === 'future-small'
+      ).length,
+      statusColorType,
+      cardLabelLength: cardLabel.length,
+      statusHeaderLength: statusHeader.length,
+      hasMeltQuote: !!meltQuote,
+      tokenCreated: tokenCreated ?? null,
+      nostrSent: nostrSent ?? null,
+      isOnchainMint,
+      hasOnchainConfirmationProgress: !!onchainConfirmationProgress,
+    });
+  }, [
+    cardLabel.length,
+    historyEntry,
+    isOnchainMint,
+    meltQuote,
+    nostrSent,
+    onchainConfirmationProgress,
+    statusColorType,
+    statusHeader.length,
+    timelineSignature,
+    timelineStepTypes,
+    tokenCreated,
+  ]);
 
   const getExpiryBadge = (): string | null => {
     if (historyEntry.type === 'melt' && meltQuote && !meltQuoteExpired(meltQuote, currentTime)) {
@@ -249,11 +298,13 @@ export function HistoryEntryTimeline({
     if (
       currentItem.stepType === 'complete' ||
       currentItem.stepType === 'current' ||
+      currentItem.stepType === 'waiting' ||
       currentItem.stepType === 'success'
     ) {
       if (
         nextItem.stepType === 'complete' ||
         nextItem.stepType === 'current' ||
+        nextItem.stepType === 'waiting' ||
         nextItem.stepType === 'success'
       ) {
         return 'complete';
@@ -278,6 +329,7 @@ export function HistoryEntryTimeline({
   const getStateTextColor = (stepType: TimelineStepType, isFuture: boolean) => {
     if (isFuture) return foreground50;
     if (stepType === 'expired') return dangerColor;
+    if (stepType === 'waiting') return warningColor;
     if (stepType === 'already-spent') return warningColor;
     if (stepType === 'rolled-back') return warningColor;
     return foreground;
@@ -331,6 +383,7 @@ export function HistoryEntryTimeline({
             const lineDelay = dotDelay + 150;
 
             const contentMarginTop = item.stepType === 'future-small' ? -7 : -3;
+            const isWaitingStep = item.stepType === 'waiting';
 
             return (
               <Animated.View key={item.state} entering={FadeInDown.delay(index * 60).duration(250)}>
@@ -339,9 +392,11 @@ export function HistoryEntryTimeline({
                     <LoadingIndicator
                       size={20}
                       transitionDelayMs={dotDelay}
+                      color={isWaitingStep ? warningColor : undefined}
                       successColor={successColor}
                       errorColor={dangerColor}
                       revertedColor={warningColor}
+                      warningColor={warningColor}
                       confirmationProgress={confirmationProgress}
                       {...mapCheckpointStatusToIndicator(
                         timelineStepTypeToCheckpointStatus(item.stepType)

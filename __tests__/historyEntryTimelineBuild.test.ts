@@ -420,6 +420,12 @@ describe('getStatusColorType', () => {
       'warning'
     );
   });
+
+  it('waiting maps to warning', () => {
+    expect(getStatusColorType([{ state: 'a', displayLabel: '', stepType: 'waiting' }])).toBe(
+      'warning'
+    );
+  });
 });
 
 describe('getStatusHeader', () => {
@@ -431,6 +437,16 @@ describe('getStatusHeader', () => {
         { state: 'c', displayLabel: 'Next', stepType: 'next-pending' },
       ])
     ).toBe('NOW');
+  });
+
+  it('prefers waiting over next-pending', () => {
+    expect(
+      getStatusHeader([
+        { state: 'a', displayLabel: 'Old', stepType: 'complete' },
+        { state: 'b', displayLabel: 'Waiting', stepType: 'waiting' },
+        { state: 'c', displayLabel: 'Next', stepType: 'next-pending' },
+      ])
+    ).toBe('WAITING');
   });
 
   it('falls back to next-pending when no terminal step exists', () => {

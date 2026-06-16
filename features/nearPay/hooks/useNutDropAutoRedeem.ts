@@ -1,34 +1,38 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import {
-  addBLEMessageListener,
+  addBLEPrivateMessageListener,
   beginBLEBackgroundTask,
   endBLEBackgroundTask,
 } from 'bitchat-module';
+import { classifyMeshToken, meshTokenDedupeKey } from '@sovranbitcoin/colada';
 
 import { drainNutDropRedeemQueue } from '@/features/nearPay/lib/nutDropAutoRedeem';
-import { classifyToken, tokenDedupeKey } from '@/features/nearPay/lib/nutDropTokens';
 import { paymentLog } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useNutDropRedeemQueueStore } from '@/shared/stores/profile/nutDropRedeemQueueStore';
 import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
- * App-wide Nut Drop auto-redeem pipeline. Mounted in BitchatBLEProvider
- * (inside AccountScopedProviders, so it remounts per profile and always
- * classifies against the ACTIVE profile's lock key).
+ * App-wide Nut Drop receive pipeline. Mounted in BitchatBLEProvider (inside
+ * AccountScopedProviders, so it remounts per profile and classifies against
+ * the ACTIVE profile's P2PK key).
  *
- * Every public BLE mesh message is checked for a cashu token:
- * - locked to my key  → persist into the redeem queue, then drain.
- * - locked to someone else → silent ignore. This also covers the sender
- *   seeing its own broadcast echo (the lock is the recipient's key).
- * - bearer (vanilla bitchat sender) → untouched; the chat surface keeps
- *   today's manual CashuTokenBubble tap-to-redeem.
+ * Every Nut Drop token arrives as a private Noise DM (encrypted to us). Each
+ * DM is classified against my key: locked-to-me OR bearer → enqueue for
+ * auto-redeem (a DM is addressed to us, so a bearer token in it is ours);
+ * locked-to-other → ignore (shouldn't reach us in a DM).
  *
- * Drain triggers beyond message arrival: app returning to foreground,
- * offline→online transitions, and profile mount (manager init catches
- * entries queued while the app was dead).
+ * Drain triggers: message arrival, app foreground, offline→online, and
+ * profile mount (manager init catches entries queued while dead).
  */
 /**
  * Drain wrapped in an iOS background-task assertion when the app is
@@ -39,12 +43,15 @@ import { extractCashuToken } from '@/shared/ui/composed/chat/extractCashuToken';
  */
 async function drainWithBackgroundBudget(): Promise<void> {
   if (AppState.currentState === 'active') {
+    paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'message_active' });
     return drainNutDropRedeemQueue();
   }
+  paymentLog.info('near_pay.redeem.background_budget.start', { appState: AppState.currentState });
   const handle = await beginBLEBackgroundTask('nutdrop-redeem');
   try {
     await drainNutDropRedeemQueue();
   } finally {
+    paymentLog.info('near_pay.redeem.background_budget.end', { handle });
     void endBLEBackgroundTask(handle);
   }
 }
@@ -56,56 +63,75 @@ export function useNutDropAutoRedeem(): void {
   const wasOffline = useRef(isOffline);
 
   useEffect(() => {
-    if (!myPubkey33) return;
+    if (!myPubkey33 || !keys) {
+      paymentLog.info('near_pay.mesh.runtime_skipped', { hasKeys: !!keys });
+      return;
+    }
 
     paymentLog.info('near_pay.redeem.listener_mounted');
-    const subscription = addBLEMessageListener((event) => {
-      if (event.isPrivate) return;
+    const subscription = addBLEPrivateMessageListener((event) => {
+      if (event.isOwn) return;
       const token = extractCashuToken(event.content);
       if (!token) return;
 
-      const classified = classifyToken(token, myPubkey33);
-      if (classified.classification !== 'locked-to-me') {
-        if (classified.classification === 'locked-to-other') {
-          paymentLog.debug('near_pay.redeem.ignored_locked_to_other');
-        }
+      const classified = classifyMeshToken(token, myPubkey33);
+      // A private DM is addressed to us, so redeem locked-to-me OR bearer; only
+      // ignore a token locked to a different key (shouldn't reach us in a DM).
+      if (classified.classification === 'locked-to-other') {
+        paymentLog.debug('near_pay.redeem.ignored_locked_to_other', {
+          senderPeerID: event.peerID,
+        });
         return;
       }
-      if (!classified.mintUrl) return;
+      if (!classified.mintUrl) {
+        paymentLog.warn('near_pay.redeem.ignored_missing_mint', {
+          classification: classified.classification,
+          senderPeerID: event.peerID,
+        });
+        return;
+      }
 
-      const enqueued = useNutDropRedeemQueueStore.getState().enqueue(tokenDedupeKey(token), {
+      const tokenHash = meshTokenDedupeKey(token);
+      const enqueued = useNutDropRedeemQueueStore.getState().enqueue(tokenHash, {
         token,
         mintUrl: classified.mintUrl,
         amount: classified.amount,
         unit: classified.unit ?? 'sat',
-        senderPeerID: event.senderPeerID,
+        senderPeerID: event.peerID,
       });
-      paymentLog.info('near_pay.redeem.locked_token_received', {
+      paymentLog.info('near_pay.redeem.token_received', {
+        tokenHash: tokenHash.slice(0, 12),
+        classification: classified.classification,
         amount: classified.amount,
-        mintUrl: classified.mintUrl,
+        ...mintUrlLogFields(classified.mintUrl),
         enqueued,
-        senderPeerID: event.senderPeerID,
+        senderPeerID: event.peerID,
       });
       void drainWithBackgroundBudget();
     });
 
     // Mount-time drain: catches entries persisted while the app was dead or
     // the previous drain was interrupted mid-flight.
+    paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'mount' });
     void drainNutDropRedeemQueue();
 
     const appStateSub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void drainNutDropRedeemQueue();
+      if (state === 'active') {
+        paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'app_active' });
+        void drainNutDropRedeemQueue();
+      }
     });
 
     return () => {
       subscription.remove();
       appStateSub.remove();
     };
-  }, [myPubkey33]);
+  }, [keys, myPubkey33]);
 
   // Offline → online: retry anything parked on mint unreachability.
   useEffect(() => {
     if (wasOffline.current && !isOffline) {
+      paymentLog.info('near_pay.redeem.drain_trigger', { trigger: 'offline_to_online' });
       void drainNutDropRedeemQueue();
     }
     wasOffline.current = isOffline;

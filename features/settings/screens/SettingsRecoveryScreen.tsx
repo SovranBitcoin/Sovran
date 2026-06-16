@@ -32,6 +32,13 @@ const MAX_DISCOVERED_MINTS = 100;
 
 const parseMintList = parseWith(MintListResponse, 'cashu/mints');
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 function normalizeMintUrl(url: string): string {
   return url.replace(/\/$/, '').toLowerCase();
 }
@@ -268,7 +275,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         const isDiscovered = i >= knownMintUrls.length;
         const mintT0 = performance.now();
         cashuLog.info('recovery.mint.start', {
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
           mintIndex: i,
           totalMints: allMintUrls.length,
           isDiscovered,
@@ -277,7 +284,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           await manager.wallet.restore(mintUrl);
         } catch (error) {
           cashuLog.warn('recovery.mint.restore_threw', {
-            mintUrl,
+            ...mintUrlLogFields(mintUrl),
             error: (error as Error)?.message,
           });
         }
@@ -314,10 +321,12 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           discoveredEmpty.map(async (r) => {
             try {
               await manager.mint.untrustMint(r.mint);
-              cashuLog.info('recovery.cleanup.discovered_mint_untrusted', { mintUrl: r.mint });
+              cashuLog.info('recovery.cleanup.discovered_mint_untrusted', {
+                ...mintUrlLogFields(r.mint),
+              });
             } catch (e) {
               cashuLog.warn('recovery.cleanup.untrust_failed', {
-                mintUrl: r.mint,
+                ...mintUrlLogFields(r.mint),
                 error: (e as Error)?.message,
               });
             }
@@ -342,7 +351,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
             await deleteMintOperation(manager, op.id).catch((e) =>
               cashuLog.warn('recovery.cleanup.delete_failed', {
                 operationId: op.id,
-                mintUrl: op.mintUrl,
+                ...mintUrlLogFields(op.mintUrl),
                 error: (e as Error)?.message,
               })
             );

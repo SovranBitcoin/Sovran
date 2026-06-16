@@ -50,3 +50,12 @@ export const LIGHTNING_GOLD_GLOW = '#FFE099';
 
 /** Pale gold rim-light — LIGHTNING_GOLD analog of LIGHTNING_RIM. */
 export const LIGHTNING_GOLD_RIM = '#FFECBF';
+
+/** Theme-invariant dark success tint for animated frosted payment toasts. */
+export const TOAST_SUCCESS_DARK_BG = '#089A2C';
+
+/** Theme-invariant dark danger tint for animated frosted payment toasts. */
+export const TOAST_DANGER_DARK_BG = '#9A082E';
+
+/** Theme-invariant dark warning tint for animated frosted payment toasts. */
+export const TOAST_WARNING_DARK_BG = '#9A6A08';

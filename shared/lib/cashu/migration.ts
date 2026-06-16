@@ -6,6 +6,21 @@ import { RootState } from '@/redux/store/reducer.deprecated';
 import { CashuProfile } from '@/redux/cashu/types.deprecated';
 import { cashuLog } from '../logger';
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
+function profileLogFields(profile: CashuProfile): Record<string, unknown> {
+  return {
+    mintCount: profile.mints.length,
+    proofMintCount: Object.keys(profile.proofs).length,
+    counterMintCount: Object.keys(profile.counters).length,
+  };
+}
+
 /**
  * Data migration utility to move from Redux-based Cashu state to Coco repositories.
  * This handles the migration of existing user data safely.
@@ -50,7 +65,7 @@ export class DataMigration {
       return result;
     }
 
-    cashuLog.debug('cashu.migration.profile_data', { profile });
+    cashuLog.debug('cashu.migration.profile_data', profileLogFields(profile));
 
     try {
       await this.migrateMints(profile, result);
@@ -83,27 +98,33 @@ export class DataMigration {
     }
 
     const mintUrls = Array.from(uniqueMints);
-    cashuLog.info('cashu.migration.mints_found', { count: mintUrls.length, mintUrls });
+    cashuLog.info('cashu.migration.mints_found', { count: mintUrls.length });
 
     for (const mintUrl of mintUrls) {
       try {
-        cashuLog.debug('cashu.migration.adding_mint', { mintUrl });
+        cashuLog.debug('cashu.migration.adding_mint', { ...mintUrlLogFields(mintUrl) });
         await this.manager.mint.addMint(mintUrl, { trusted: true });
 
         try {
           const mintInfo = await this.manager.mint.getMintInfo(mintUrl);
-          cashuLog.debug('cashu.migration.mint_info_loaded', { mintUrl });
+          cashuLog.debug('cashu.migration.mint_info_loaded', {
+            ...mintUrlLogFields(mintUrl),
+            hasInfo: !!mintInfo,
+          });
         } catch (infoError) {
-          cashuLog.warn('cashu.migration.mint_info_failed', { mintUrl, error: infoError });
+          cashuLog.warn('cashu.migration.mint_info_failed', {
+            ...mintUrlLogFields(mintUrl),
+            error: infoError,
+          });
         }
 
         result.mintsMigrated++;
-        cashuLog.info('cashu.migration.mint_migrated', { mintUrl });
+        cashuLog.info('cashu.migration.mint_migrated', { ...mintUrlLogFields(mintUrl) });
       } catch (error) {
-        cashuLog.error('cashu.migration.mint_failed', { mintUrl, error });
+        cashuLog.error('cashu.migration.mint_failed', { ...mintUrlLogFields(mintUrl), error });
         result.errors.push({
           type: 'mint_migration_failed',
-          message: `Failed to migrate mint ${mintUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `Failed to migrate mint: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
       }
     }
@@ -122,14 +143,17 @@ export class DataMigration {
         const satProofs = proofs.filter((proof) => {
           const unit = keysetUnitMap.get(proof.id);
           if (unit !== 'sat') {
-            cashuLog.debug('cashu.migration.skip_non_sat', { unit, mintUrl });
+            cashuLog.debug('cashu.migration.skip_non_sat', {
+              unit,
+              ...mintUrlLogFields(mintUrl),
+            });
             return false;
           }
           return true;
         });
 
         if (satProofs.length === 0) {
-          cashuLog.debug('cashu.migration.no_proofs', { mintUrl });
+          cashuLog.debug('cashu.migration.no_proofs', { ...mintUrlLogFields(mintUrl) });
           continue;
         }
 
@@ -141,12 +165,12 @@ export class DataMigration {
           const state = proofStates[i];
 
           if (state.state === CheckStateEnum.SPENT) {
-            cashuLog.debug('cashu.migration.skip_spent', { mintUrl });
+            cashuLog.debug('cashu.migration.skip_spent', { ...mintUrlLogFields(mintUrl) });
             continue;
           }
 
           if (state.state === CheckStateEnum.PENDING) {
-            cashuLog.debug('cashu.migration.skip_pending', { mintUrl });
+            cashuLog.debug('cashu.migration.skip_pending', { ...mintUrlLogFields(mintUrl) });
             continue;
           }
 
@@ -154,12 +178,12 @@ export class DataMigration {
           result.proofsMigrated++;
         }
 
-        cashuLog.info('cashu.migration.proofs_migrated', { mintUrl });
+        cashuLog.info('cashu.migration.proofs_migrated', { ...mintUrlLogFields(mintUrl) });
       } catch (error) {
-        cashuLog.error('cashu.migration.proofs_failed', { mintUrl, error });
+        cashuLog.error('cashu.migration.proofs_failed', { ...mintUrlLogFields(mintUrl), error });
         result.errors.push({
           type: 'proofs_migration_failed',
-          message: `Failed to migrate proofs for ${mintUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `Failed to migrate proofs: ${error instanceof Error ? error.message : 'Unknown error'}`,
         });
       }
     }
@@ -168,7 +192,9 @@ export class DataMigration {
   private async migrateCounters(profile: CashuProfile, result: MigrationResult): Promise<void> {
     let totalCounters = 0;
 
-    cashuLog.debug('cashu.migration.counters', { counters: profile.counters });
+    cashuLog.debug('cashu.migration.counters', {
+      counterMintCount: Object.keys(profile.counters).length,
+    });
     for (const [, counters] of Object.entries(profile.counters)) {
       totalCounters += Object.keys(counters).length;
     }
@@ -185,11 +211,15 @@ export class DataMigration {
         try {
           await overwriteCounter(this.manager, mintUrl, keysetId, counter);
           result.countersMigrated++;
-          cashuLog.debug('cashu.migration.counter_migrated', { mintUrl, keysetId, counter });
+          cashuLog.debug('cashu.migration.counter_migrated', {
+            ...mintUrlLogFields(mintUrl),
+            keysetId,
+            counter,
+          });
         } catch (error) {
           result.errors.push({
             type: 'counter_migration_failed',
-            message: `Failed to migrate counter for ${mintUrl}:${keysetId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            message: `Failed to migrate counter for keyset ${keysetId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
           });
         }
       }

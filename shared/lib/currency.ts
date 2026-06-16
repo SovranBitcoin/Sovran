@@ -9,6 +9,7 @@
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { cashuLog } from '@/shared/lib/logger';
 
 interface AmountWithUnit {
   amount: AmountValue;
@@ -63,7 +64,15 @@ function getRate(unit: string): number {
     eur: pricelist?.eur?.btc ?? 53_500,
     gbp: pricelist?.gbp?.btc ?? 47_800,
   };
-  return rates[unit] ?? 1;
+  const rate = rates[unit] ?? 1;
+  cashuLog.debug('currency.rate.result', {
+    unit,
+    source:
+      rates[unit] == null ? 'fallback-one' : pricelist ? 'store-or-static' : 'static-fallback',
+    hasPricelist: !!pricelist,
+    rate,
+  });
+  return rate;
 }
 
 export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions = {}): string {
@@ -76,7 +85,18 @@ export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions
     const asBtc = displayBtc === 0;
     const value = asBtc ? amount / 100_000_000 : amount;
     const formatted = (asBtc ? btcFormatter : satsFormatter).format(value);
-    return displayBtc === 2 ? `${formatted} sats` : formatted;
+    const result = displayBtc === 2 ? `${formatted} sats` : formatted;
+    cashuLog.debug('currency.format.result', {
+      inputUnit,
+      outputUnit,
+      amount,
+      useUserPreference: true,
+      displayBtc,
+      asBtc,
+      currencyDisplay: options.currencyDisplay ?? null,
+      resultLength: result.length,
+    });
+    return result;
   }
 
   const adjustedInput = FIAT_UNITS.includes(inputUnit) ? amount / 100 : amount;
@@ -88,11 +108,43 @@ export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions
   const display = options.currencyDisplay ?? (FIAT_UNITS.includes(outputUnit) ? 'symbol' : 'none');
 
   if (display === 'symbol' && SYMBOLS[outputUnit]) {
-    return `${SYMBOLS[outputUnit]}${formatted}`;
+    const result = `${SYMBOLS[outputUnit]}${formatted}`;
+    cashuLog.debug('currency.format.result', {
+      inputUnit,
+      outputUnit,
+      amount,
+      adjustedInput,
+      outputValue,
+      useUserPreference: false,
+      currencyDisplay: display,
+      resultLength: result.length,
+    });
+    return result;
   }
   if (display === 'name') {
-    return `${formatted} ${outputUnit}`;
+    const result = `${formatted} ${outputUnit}`;
+    cashuLog.debug('currency.format.result', {
+      inputUnit,
+      outputUnit,
+      amount,
+      adjustedInput,
+      outputValue,
+      useUserPreference: false,
+      currencyDisplay: display,
+      resultLength: result.length,
+    });
+    return result;
   }
 
+  cashuLog.debug('currency.format.result', {
+    inputUnit,
+    outputUnit,
+    amount,
+    adjustedInput,
+    outputValue,
+    useUserPreference: false,
+    currencyDisplay: display,
+    resultLength: formatted.length,
+  });
   return formatted;
 }

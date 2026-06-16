@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { parsePaymentError } from '@/shared/lib/popup/parsePaymentError';
 import { paymentLog } from '@/shared/lib/logger';
 
-type PaymentStatusState = 'processing' | 'delivered' | 'confirmed' | 'failed';
+type PaymentStatusState = 'processing' | 'delivered' | 'waiting' | 'confirmed' | 'failed';
 
 interface ActivePaymentStatus {
   variant: 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
@@ -19,51 +19,159 @@ interface ActivePaymentStatus {
   receiveEntryId?: string;
   /** User-friendly reason when state is 'failed' */
   errorMessage?: string;
+  /** Optional title override while the payment is still pending. */
+  titleOverride?: string;
+  /** Optional subtitle override while the payment is still pending. */
+  subtitleOverride?: string;
 }
 
 type PaymentStatusStore = {
   active: ActivePaymentStatus | null;
   setActive: (payment: ActivePaymentStatus | null) => void;
+  clearActive: (id?: string) => void;
+  setWaiting: (id: string, copy: { title: string; subtitle: string }) => void;
   setDelivered: (id: string) => void;
   setConfirmed: (id: string, extra?: { operationId?: string; receiveEntryId?: string }) => void;
   setFailed: (id: string, error?: unknown) => void;
 };
 
+function withoutStatusCopy(active: ActivePaymentStatus): ActivePaymentStatus {
+  const next = { ...active };
+  delete next.titleOverride;
+  delete next.subtitleOverride;
+  return next;
+}
+
 export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   active: null,
   setActive: (payment) => {
-    paymentLog.info(
-      'payment.status.set_active',
-      payment
-        ? {
-            variant: payment.variant,
-            id: payment.id,
-            state: payment.state,
-            amount: payment.amount,
-            unit: payment.unit,
-          }
-        : { cleared: true }
-    );
-    set({ active: payment });
+    set((s) => {
+      paymentLog.info(
+        'payment.status.set_active',
+        payment
+          ? {
+              variant: payment.variant,
+              id: payment.id,
+              state: payment.state,
+              amount: payment.amount,
+              unit: payment.unit,
+              previousId: s.active?.id ?? null,
+              previousState: s.active?.state ?? null,
+            }
+          : {
+              cleared: true,
+              previousId: s.active?.id ?? null,
+              previousState: s.active?.state ?? null,
+            }
+      );
+      return { active: payment };
+    });
   },
+  clearActive: (id) =>
+    set((s) => {
+      if (id !== undefined && s.active?.id !== id) {
+        paymentLog.debug('payment.status.clear_active.skipped', {
+          requestedId: id,
+          activeId: s.active?.id ?? null,
+          activeState: s.active?.state ?? null,
+          reason: 'id_mismatch',
+        });
+        return s;
+      }
+      paymentLog.info('payment.status.clear_active', {
+        id: s.active?.id ?? null,
+        from: s.active?.state ?? null,
+        requestedId: id ?? null,
+      });
+      return { active: null };
+    }),
+  setWaiting: (id, copy) =>
+    set((s) => {
+      if (s.active?.id !== id) {
+        paymentLog.debug('payment.status.waiting.skipped', {
+          requestedId: id,
+          activeId: s.active?.id ?? null,
+          activeState: s.active?.state ?? null,
+          reason: 'id_mismatch',
+        });
+        return s;
+      }
+      if (s.active.state === 'confirmed' || s.active.state === 'failed') {
+        paymentLog.debug('payment.status.waiting.skipped', {
+          requestedId: id,
+          activeId: s.active.id,
+          activeState: s.active.state,
+          reason: 'terminal_state',
+        });
+        return s;
+      }
+      paymentLog.info('payment.status.waiting', {
+        id,
+        variant: s.active.variant,
+        from: s.active.state,
+        to: 'waiting',
+        expectedNext: 'terminal_warning_toast_then_later_success_toast',
+      });
+      return {
+        active: {
+          ...s.active,
+          state: 'waiting' as const,
+          titleOverride: copy.title,
+          subtitleOverride: copy.subtitle,
+        },
+      };
+    }),
   setDelivered: (id) =>
     set((s) => {
-      if (s.active?.id !== id) return s;
-      if (s.active.state === 'confirmed' || s.active.state === 'failed') return s;
+      if (s.active?.id !== id) {
+        paymentLog.debug('payment.status.delivered.skipped', {
+          requestedId: id,
+          activeId: s.active?.id ?? null,
+          activeState: s.active?.state ?? null,
+          reason: 'id_mismatch',
+        });
+        return s;
+      }
+      if (
+        s.active.state === 'waiting' ||
+        s.active.state === 'confirmed' ||
+        s.active.state === 'failed'
+      ) {
+        paymentLog.debug('payment.status.delivered.skipped', {
+          requestedId: id,
+          activeId: s.active.id,
+          activeState: s.active.state,
+          reason: 'terminal_or_waiting_state',
+        });
+        return s;
+      }
       paymentLog.info('payment.status.delivered', {
         id,
         variant: s.active.variant,
         from: s.active.state,
+        to: 'delivered',
       });
       return { active: { ...s.active, state: 'delivered' as const } };
     }),
   setConfirmed: (id, extra) =>
     set((s) => {
-      if (s.active?.id !== id) return s;
+      if (s.active?.id !== id) {
+        paymentLog.debug('payment.status.confirmed.skipped', {
+          requestedId: id,
+          activeId: s.active?.id ?? null,
+          activeState: s.active?.state ?? null,
+          reason: 'id_mismatch',
+        });
+        return s;
+      }
       if (s.active.state === 'confirmed') {
         // Already confirmed — only merge extra data (operationId, receiveEntryId)
         paymentLog.debug('payment.status.confirmed.merge_extra', { id, hasExtra: !!extra });
         return extra ? { active: { ...s.active!, ...extra } } : s;
+      }
+      if (s.active.state === 'waiting') {
+        paymentLog.debug('payment.status.confirmed.skip_waiting', { id });
+        return s;
       }
       if (s.active.state === 'failed') {
         paymentLog.debug('payment.status.confirmed.skip_failed', { id });
@@ -73,24 +181,48 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
         id,
         variant: s.active.variant,
         from: s.active.state,
+        to: 'confirmed',
         hasOperationId: !!extra?.operationId,
         hasReceiveEntryId: !!extra?.receiveEntryId,
       });
-      return { active: { ...s.active!, state: 'confirmed' as const, ...extra } };
+      return {
+        active: { ...withoutStatusCopy(s.active!), state: 'confirmed' as const, ...extra },
+      };
     }),
   setFailed: (id, error) =>
     set((s) => {
-      if (s.active?.id !== id || s.active.state === 'failed' || s.active.state === 'confirmed')
+      if (s.active?.id !== id) {
+        paymentLog.debug('payment.status.failed.skipped', {
+          requestedId: id,
+          activeId: s.active?.id ?? null,
+          activeState: s.active?.state ?? null,
+          reason: 'id_mismatch',
+        });
         return s;
+      }
+      if (
+        s.active.state === 'waiting' ||
+        s.active.state === 'failed' ||
+        s.active.state === 'confirmed'
+      ) {
+        paymentLog.debug('payment.status.failed.skipped', {
+          requestedId: id,
+          activeId: s.active.id,
+          activeState: s.active.state,
+          reason: 'terminal_or_waiting_state',
+        });
+        return s;
+      }
       const errorMessage = error !== undefined ? parsePaymentError(error) : undefined;
       paymentLog.error('payment.status.failed', {
         id,
         variant: s.active.variant,
         from: s.active.state,
+        to: 'failed',
         errorMessage,
       });
       return {
-        active: { ...s.active!, state: 'failed' as const, errorMessage },
+        active: { ...withoutStatusCopy(s.active!), state: 'failed' as const, errorMessage },
       };
     }),
 }));

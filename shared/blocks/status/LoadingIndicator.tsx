@@ -1,9 +1,10 @@
 /**
  * Canonical animated status indicator.
  *
- * Three phases (`idle` / `loading` / `done`) and three result variants
- * (`success` / `error` / `reverted`). The done state cuts a check, cross,
- * or counter-clockwise revert arrow out of a filled disc via SVG mask.
+ * Three phases (`idle` / `loading` / `done`) and four result variants
+ * (`success` / `error` / `reverted` / `warning`). The done state cuts a
+ * check, cross, counter-clockwise revert arrow, or Wi-Fi glyph out of a
+ * filled disc via SVG mask.
  *
  * Replaces the old PaymentStatusIcon, AnimatedCheckpointDot, and the
  * SettingsRecoveryScreen shield. For non-animated checks use
@@ -34,7 +35,7 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export type Phase = 'idle' | 'loading' | 'done';
-export type Result = 'success' | 'error' | 'reverted';
+export type Result = 'success' | 'error' | 'reverted' | 'warning';
 
 export interface ConfirmationProgress {
   currentConfirmations: number | null;
@@ -58,6 +59,8 @@ export interface LoadingIndicatorProps {
   errorColor?: string;
   /** Done/reverted disc + glyph color. Defaults to theme `warning`. */
   revertedColor?: string;
+  /** Done/warning disc + glyph color. Defaults to theme `warning`. */
+  warningColor?: string;
   /** Defer the phase/result transition by this many ms. Used by timeline
    *  and chain UIs to cascade indicators left→right (dot completes → line
    *  fills → next dot activates). Default 0 (transition immediately). */
@@ -132,6 +135,9 @@ const ICON = {
     len: 121,
     transform: 'rotate(-135 50 50)',
   },
+  wifiA: { d: 'M 24 42 C 38 29 62 29 76 42', len: 70 },
+  wifiB: { d: 'M 35 53 C 44 45 56 45 65 53', len: 45 },
+  wifiC: { d: 'M 48 64 L 52 64', len: 12 },
 } as const;
 
 const E_RING = Easing.bezier(0.65, 0, 0.35, 1);
@@ -309,6 +315,7 @@ export function LoadingIndicator({
   successColor,
   errorColor,
   revertedColor,
+  warningColor,
   transitionDelayMs = 0,
   playOnMount = false,
   segmentedProgress,
@@ -324,6 +331,7 @@ export function LoadingIndicator({
   const okColor = successColor ?? themeSuccess;
   const errColor = errorColor ?? themeDanger;
   const revColor = revertedColor ?? themeWarning;
+  const warnColor = warningColor ?? themeWarning;
   const segmentCompleted = segmentedProgress?.completedSegments ?? null;
   const segmentCount = segmentedProgress?.segmentCount ?? null;
   const confirmationCurrent = confirmationProgress?.currentConfirmations ?? null;
@@ -353,7 +361,13 @@ export function LoadingIndicator({
   const shouldShowResult = segmentedComplete || (!isSegmentedMode && effectivePhase === 'done');
   const resultDelayMs = segmentedComplete ? SEGMENT_ANIM_MS : 0;
   const resultColor =
-    effectiveResult === 'error' ? errColor : effectiveResult === 'reverted' ? revColor : okColor;
+    effectiveResult === 'error'
+      ? errColor
+      : effectiveResult === 'reverted'
+        ? revColor
+        : effectiveResult === 'warning'
+          ? warnColor
+          : okColor;
 
   // Mount in terminal state when phase='done': skip the ring/fill/icon
   // choreography and render the resolved frame immediately. Matches
@@ -368,6 +382,7 @@ export function LoadingIndicator({
   const startedSuccess = startedDone && startedResult === 'success';
   const startedError = startedDone && startedResult === 'error';
   const startedReverted = startedDone && startedResult === 'reverted';
+  const startedWarning = startedDone && startedResult === 'warning';
 
   const dashA = useSharedValue(startedDone ? DASH.done[0] : DASH.idle[0]);
   const dashB = useSharedValue(startedDone ? DASH.done[1] : DASH.idle[1]);
@@ -384,6 +399,7 @@ export function LoadingIndicator({
   const checkOff = useSharedValue(startedSuccess ? 0 : ICON.check.len);
   const xOff = useSharedValue(startedError ? 0 : ICON.xA.len);
   const revertOff = useSharedValue(startedReverted ? 0 : ICON.revert.len);
+  const wifiOff = useSharedValue(startedWarning ? 0 : ICON.wifiA.len);
 
   // Lerp speed toward target each frame; bail out cheaply when idle so
   // a screen with many indicators (e.g. a long history list) doesn't
@@ -453,6 +469,7 @@ export function LoadingIndicator({
       checkOff.set(effectiveResult === 'success' ? drawIn() : undraw(ICON.check.len));
       xOff.set(effectiveResult === 'error' ? drawIn() : undraw(ICON.xA.len));
       revertOff.set(effectiveResult === 'reverted' ? drawIn() : undraw(ICON.revert.len));
+      wifiOff.set(effectiveResult === 'warning' ? drawIn() : undraw(ICON.wifiA.len));
     } else {
       colorProgress.set(t(0, { duration: D_FILL_OUT, easing: E_DEF }));
       fillOpac.set(t(0, { duration: D_FILL_OUT, easing: E_DEF }));
@@ -460,6 +477,7 @@ export function LoadingIndicator({
       checkOff.set(t(ICON.check.len, { duration: D_ICON_OUT, easing: E_DEF }));
       xOff.set(t(ICON.xA.len, { duration: D_ICON_OUT, easing: E_DEF }));
       revertOff.set(t(ICON.revert.len, { duration: D_ICON_OUT, easing: E_DEF }));
+      wifiOff.set(t(ICON.wifiA.len, { duration: D_ICON_OUT, easing: E_DEF }));
     }
 
     return () => {
@@ -483,6 +501,7 @@ export function LoadingIndicator({
     checkOff,
     xOff,
     revertOff,
+    wifiOff,
   ]);
 
   const ringStrokeAP = useAnimatedProps(() => ({
@@ -511,6 +530,7 @@ export function LoadingIndicator({
   const checkAP = useAnimatedProps(() => ({ strokeDashoffset: checkOff.get() }));
   const xAP = useAnimatedProps(() => ({ strokeDashoffset: xOff.get() }));
   const revertAP = useAnimatedProps(() => ({ strokeDashoffset: revertOff.get() }));
+  const wifiAP = useAnimatedProps(() => ({ strokeDashoffset: wifiOff.get() }));
   const resultDiscRadius = isSegmentedMode ? SEGMENT_RESULT_DISC_R : RING_R;
 
   return (
@@ -559,6 +579,33 @@ export function LoadingIndicator({
                 strokeDasharray={ICON.revert.len}
                 transform={ICON.revert.transform}
                 animatedProps={revertAP}
+              />
+              <AnimatedPath
+                d={ICON.wifiA.d}
+                stroke="black"
+                strokeWidth={ICON_STROKE}
+                strokeLinecap="round"
+                fill="none"
+                strokeDasharray={ICON.wifiA.len}
+                animatedProps={wifiAP}
+              />
+              <AnimatedPath
+                d={ICON.wifiB.d}
+                stroke="black"
+                strokeWidth={ICON_STROKE}
+                strokeLinecap="round"
+                fill="none"
+                strokeDasharray={ICON.wifiA.len}
+                animatedProps={wifiAP}
+              />
+              <AnimatedPath
+                d={ICON.wifiC.d}
+                stroke="black"
+                strokeWidth={ICON_STROKE}
+                strokeLinecap="round"
+                fill="none"
+                strokeDasharray={ICON.wifiA.len}
+                animatedProps={wifiAP}
               />
             </Mask>
           </Defs>

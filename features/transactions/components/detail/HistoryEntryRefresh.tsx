@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -14,7 +14,7 @@ import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { usePaymentCopyResolver } from '@/shared/hooks/usePaymentCopyResolver';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 
 interface HistoryEntryRefreshProps {
   mintInfo?: GetInfoResponse | null;
@@ -28,6 +28,19 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
   const loading = !mintInfo;
   const text = paymentCopy.text;
   const statusLabel = getHistoryEntryRefreshLabel(historyEntry, paymentCopy);
+
+  useEffect(() => {
+    paymentLog.debug('tx.history_refresh.render', {
+      type: historyEntry.type,
+      state: historyEntry.state ?? null,
+      loading,
+      hasMintInfo: !!mintInfo,
+      hasMintName: !!mintInfo?.name,
+      hasMintIcon: !!mintInfo?.icon_url,
+      statusLabelLength: statusLabel.length,
+      editable: !!onPress,
+    });
+  }, [historyEntry, loading, mintInfo, onPress, statusLabel.length]);
 
   const row = (
     <ListGroup.Item disabled>
@@ -63,7 +76,16 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
       <GradientCard style={styles.card}>
         <ListGroup variant="transparent">
           {onPress ? (
-            <PressableFeedback animation={false} onPress={onPress}>
+            <PressableFeedback
+              animation={false}
+              onPress={() => {
+                paymentLog.info('tx.history_refresh.press', {
+                  type: historyEntry.type,
+                  state: historyEntry.state ?? null,
+                  hasMintInfo: !!mintInfo,
+                });
+                onPress();
+              }}>
               <PressableFeedback.Scale>{row}</PressableFeedback.Scale>
               <PressableFeedback.Ripple />
             </PressableFeedback>

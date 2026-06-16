@@ -7,6 +7,7 @@
  * Lifecycle per peer:
  *   live entry (pending/redeeming)        → 'active'  (crackle)
  *   all tracked entries redeemed + ≥MIN   → 'success' (resolve pulse, then gone)
+ *   retry-waiting entry + ≥MIN            → 'waiting' (accepted, retry later)
  *   all terminal but not redeemed         → 'fading'  (quiet fade, then gone)
  *   still active at MAX cap               → 'fading'  (backoff-stuck entries)
  *
@@ -14,7 +15,7 @@
  * set) never animate — reopening the screen after a redemption shows nothing.
  */
 
-export type StrikeStatus = 'active' | 'success' | 'fading';
+export type StrikeStatus = 'active' | 'success' | 'waiting' | 'fading';
 
 export interface StrikeState {
   status: StrikeStatus;
@@ -45,6 +46,8 @@ export interface StrikeQueueEntry {
   receivedAt: number;
   amount: number;
   unit: string;
+  attempts?: number;
+  nextAttemptAt?: number;
 }
 
 /** Minimum visible strike duration — instant redemptions still get a beat. */
@@ -53,11 +56,19 @@ export const STRIKE_MIN_VISIBLE_MS = 1400;
 export const STRIKE_MAX_ACTIVE_MS = 8000;
 /** How long the success resolve stays mounted before removal. */
 export const STRIKE_SUCCESS_LINGER_MS = 900;
+/** How long the accepted/waiting resolve stays mounted before removal. */
+export const STRIKE_WAITING_LINGER_MS = 900;
 /** How long the fade-out stays mounted before removal. */
 export const STRIKE_FADE_LINGER_MS = 350;
 
 const LIVE_STATUSES = new Set(['pending', 'redeeming']);
 const FAILURE_STATUSES = new Set(['spent', 'untrusted-mint', 'failed']);
+
+function isRetryWaitingEntry(entry: StrikeQueueEntry, now: number): boolean {
+  return (
+    entry.status === 'pending' && (entry.attempts ?? 0) > 0 && (entry.nextAttemptAt ?? 0) > now
+  );
+}
 
 export interface DeriveStrikeMapInput {
   entries: Record<string, StrikeQueueEntry>;
@@ -84,6 +95,7 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
     string,
     {
       live: number;
+      waiting: number;
       redeemed: number;
       failed: number;
       ambient: boolean;
@@ -97,6 +109,7 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
     if (baselineTerminalHashes.has(hash)) continue;
     const bucket = byPeer.get(entry.senderPeerID) ?? {
       live: 0,
+      waiting: 0,
       redeemed: 0,
       failed: 0,
       ambient: false,
@@ -104,7 +117,9 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
       unit: null,
       redeemedHashes: [],
     };
-    if (LIVE_STATUSES.has(entry.status)) {
+    if (isRetryWaitingEntry(entry, now)) {
+      bucket.waiting += 1;
+    } else if (LIVE_STATUSES.has(entry.status)) {
       bucket.live += 1;
       if (baselineLiveHashes.has(hash)) bucket.ambient = true;
     } else if (entry.status === 'redeemed') {
@@ -127,11 +142,15 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
 
   for (const [peerID, bucket] of byPeer) {
     const previous = prev.get(peerID);
-    // A success/fading state that already ran its linger is gone for good —
+    // A success/waiting/fading state that already ran its linger is gone for good —
     // don't resurrect it from the same (now stale) queue entries.
     if (previous && previous.status !== 'active') {
       const linger =
-        previous.status === 'success' ? STRIKE_SUCCESS_LINGER_MS : STRIKE_FADE_LINGER_MS;
+        previous.status === 'success'
+          ? STRIKE_SUCCESS_LINGER_MS
+          : previous.status === 'waiting'
+            ? STRIKE_WAITING_LINGER_MS
+            : STRIKE_FADE_LINGER_MS;
       if (now - previous.statusChangedAt >= linger) continue;
       map.set(peerID, previous);
       propose(previous.statusChangedAt + linger);
@@ -174,6 +193,18 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
       continue;
     }
 
+    if (bucket.waiting > 0 && bucket.redeemed === 0 && bucket.failed === 0) {
+      if (!previous) continue; // retry wait already existed before this screen tracked it
+      if (activeFor < STRIKE_MIN_VISIBLE_MS) {
+        map.set(peerID, { status: 'active', activatedAt, entrance, statusChangedAt: activatedAt });
+        propose(activatedAt + STRIKE_MIN_VISIBLE_MS);
+      } else {
+        map.set(peerID, { status: 'waiting', activatedAt, entrance, statusChangedAt: now });
+        propose(now + STRIKE_WAITING_LINGER_MS);
+      }
+      continue;
+    }
+
     if (bucket.failed > 0 && previous) {
       map.set(peerID, { status: 'fading', activatedAt, entrance, statusChangedAt: now });
       propose(now + STRIKE_FADE_LINGER_MS);
@@ -184,7 +215,12 @@ export function deriveStrikeMap(input: DeriveStrikeMapInput): DeriveStrikeMapRes
   // the queue grouping (e.g. entries pruned mid-linger).
   for (const [peerID, state] of prev) {
     if (map.has(peerID) || state.status === 'active') continue;
-    const linger = state.status === 'success' ? STRIKE_SUCCESS_LINGER_MS : STRIKE_FADE_LINGER_MS;
+    const linger =
+      state.status === 'success'
+        ? STRIKE_SUCCESS_LINGER_MS
+        : state.status === 'waiting'
+          ? STRIKE_WAITING_LINGER_MS
+          : STRIKE_FADE_LINGER_MS;
     if (now - state.statusChangedAt < linger) {
       map.set(peerID, state);
       propose(state.statusChangedAt + linger);

@@ -76,7 +76,7 @@ import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Log, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, nostrLog, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
@@ -92,6 +92,13 @@ const UserProfileParamsSchema = z
     message: 'either npub or pubkey is required',
     path: ['pubkey'],
   });
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
 
 function buildUpdatedContactTags(
   existingTags: string[][],
@@ -740,6 +747,11 @@ export function UserProfileScreen() {
   const lud16 = rawLud16 && LightningAddress.safeParse(rawLud16).success ? rawLud16 : undefined;
   const handleSendMoney = useCallback(() => {
     if (!lud16) {
+      paymentLog.warn('user.profile.send_money.unavailable', {
+        recipientPubkeyLength: pubkey.length,
+        hasRawLightningAddress: !!rawLud16,
+        rawLightningAddressLength: rawLud16?.length ?? 0,
+      });
       // Button always renders (no pop-in after the profile metadata
       // resolves) — a missing/invalid Lightning address answers on press.
       paramPopup('action-unavailable', {
@@ -748,18 +760,38 @@ export function UserProfileScreen() {
       });
       return;
     }
-    nostrLog.debug('user.profile.send_money', { lud16 });
-    void machine.startSendEcash({
-      reset: true,
-      meltTarget: lud16,
-      recipientPubkey: pubkey,
-      recipientProfile: {
-        displayName,
-        avatarUrl: cachedProfile?.picture ?? null,
-        nip05: cachedProfile?.nip05 ?? null,
-      },
+    paymentLog.info('user.profile.send_money.start', {
+      recipientPubkeyLength: pubkey.length,
+      meltTargetLength: lud16.length,
+      hasDisplayName: displayName.length > 0,
+      hasAvatarUrl: !!cachedProfile?.picture,
+      hasNip05: !!cachedProfile?.nip05,
     });
-  }, [lud16, machine, pubkey, displayName, cachedProfile?.picture, cachedProfile?.nip05]);
+    void (async () => {
+      try {
+        await machine.startSendEcash({
+          reset: true,
+          meltTarget: lud16,
+          recipientPubkey: pubkey,
+          recipientProfile: {
+            displayName,
+            avatarUrl: cachedProfile?.picture ?? null,
+            nip05: cachedProfile?.nip05 ?? null,
+          },
+        });
+        paymentLog.info('user.profile.send_money.started', {
+          recipientPubkeyLength: pubkey.length,
+          meltTargetLength: lud16.length,
+        });
+      } catch (error) {
+        paymentLog.warn('user.profile.send_money.failed_to_start', {
+          recipientPubkeyLength: pubkey.length,
+          meltTargetLength: lud16.length,
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
+      }
+    })();
+  }, [lud16, machine, pubkey, displayName, cachedProfile?.picture, cachedProfile?.nip05, rawLud16]);
 
   const followerCount = profileData?.followers;
   const reputationScore = typeof profileData?.score === 'number' ? profileData.score : undefined;
@@ -926,8 +958,12 @@ export function UserProfileScreen() {
 
   const handleMintInfoPress = useCallback(() => {
     if (!profileMintUrl) return;
+    paymentLog.info('user.profile.mint_info.open', {
+      ...mintUrlLogFields(profileMintUrl),
+      source: mintUrlParam ? 'route_param' : 'profile_api',
+    });
     router.navigate(buildMintInfoHref(profileMintUrl));
-  }, [profileMintUrl]);
+  }, [mintUrlParam, profileMintUrl]);
 
   // ===========================
   // PROFILE INFO ITEMS (data-driven)

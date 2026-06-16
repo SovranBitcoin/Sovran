@@ -13,6 +13,11 @@
 //      anchor (or drop the patch if upstream now does the right thing) and
 //      rerun this script. Each block is anchored to a specific upstream line
 //      pattern, so a missed match means upstream changed shape.
+//
+// Nut Drop note: peer Nostr identity is exchanged via bitchat's NATIVE
+// favorite notification ([FAVORITED]:npub), not a custom announce TLV, so this
+// patcher carries NO ecash-specific or signing-canonicalization patches — only
+// the build fix-ups, the mainnet UUID, and two small interop/privacy tweaks.
 
 const fs = require('fs');
 const path = require('path');
@@ -51,6 +56,17 @@ function walk(dir, out = []) {
   return out;
 }
 
+function readExistingVendorCommit(file, pattern) {
+  try {
+    const match = fs.readFileSync(file, 'utf8').match(pattern);
+    const commit = match?.[1]?.trim();
+    if (commit && commit !== 'unknown') return commit;
+  } catch {
+    /* generated file absent — fall through to unknown */
+  }
+  return 'unknown';
+}
+
 // Bitchat uses Swift 5.9+ scoped imports like `private import struct CryptoKit.SHA256`
 // in BitFoundation. When all sources land in the same module, the same framework
 // is also imported plainly elsewhere — Swift then errors with "ambiguous implicit
@@ -82,8 +98,8 @@ const MAINNET_UUID = 'F47B5E2D-4A9E-4C5A-9B3F-8E1D2C3A4B5C';
 // semantics by removing the guard that rejects on mismatch. `derivedPeerID`
 // stays live — the accept path below still consumes it. Idempotent: once the
 // guard is gone, the anchor won't match.
-// TODO(sovran): re-test against a current App Store bitchat build; if its
-// announces now pass the derived-peerID check, drop this patch entirely.
+// TODO(sovran): re-test against a current App Store bitchat build (v1.5.3+); if
+// its announces now pass the derived-peerID check, drop this patch entirely.
 const MISMATCH_GUARD_ANCHOR =
   /        guard derivedPeerID == peerID else \{\n            return \.reject\(\.senderMismatch\(derivedPeerID: derivedPeerID\)\)\n        \}\n/;
 const MISMATCH_GUARD_REPLACEMENT =
@@ -104,118 +120,90 @@ const LINKSTATE_REPLACEMENT =
   '    // state for the hasDirectLink peer flag.\n' +
   '    func linkState(for peerID: PeerID)';
 
-// --- Append the ecash capability TLV (0xF0) to outgoing announces ---
-//
-// Clients that can receive P2PK-locked cashu advertise it with an announce
-// TLV (magic "NUTXX" + capability flags + the profile's Cashu P2PK pubkey)
-// so the Nut Drop UI can lock tokens to capable peers. Open extension — any
-// bitchat client may implement it (spec draft in
-// modules/bitchat-module/docs/nut-xx-ecash-capability-announcement.md).
-// Vanilla bitchat decoders skip unknown announce TLVs by design (upstream
-// Packets.swift "tolerant decoder" + unit test), and the TLV is appended
-// BEFORE signPacket so the Ed25519 announce signature covers it — vanilla
-// verification still passes. TLV bytes come from EcashAnnounceState
-// (EcashAnnounceExtension.swift, Sovran-owned, same compiled module).
-// Idempotent: once `guard var payload` is in place, the anchor won't match.
-const ECASH_ANNOUNCE_INJECT_ANCHOR =
-  /        guard let payload = announcement\.encode\(\) else \{\n            SecureLogger\.error\("❌ Failed to encode announce packet", category: \.session\)\n            return\n        \}\n/;
-const ECASH_ANNOUNCE_INJECT_REPLACEMENT =
-  '        guard var payload = announcement.encode() else {\n' +
-  '            SecureLogger.error("❌ Failed to encode announce packet", category: .session)\n' +
-  '            return\n' +
-  '        }\n' +
-  '        // [sovran] append ecash capability TLV (0xF0). Vanilla decoders skip\n' +
-  '        // unknown announce TLVs; appended before signPacket so the announce\n' +
-  '        // signature covers it.\n' +
-  '        if let ecashTLV = EcashAnnounceState.shared.localTLV {\n' +
-  '            payload.append(ecashTLV)\n' +
-  '        }\n';
+// (Removed: the neighbor-gossip suppression patch. Sovran now announces its
+// direct-neighbors TLV exactly like upstream bitchat — matching Android, which
+// never suppressed it, and restoring visibility to stock clients. Keeping vendor
+// divergence to the agreed minimum: extended length, the favorite/creq, the
+// tie-breaker, and the upstream-iOS re-handshake recovery.)
 
-// --- Record the ecash capability TLV from verified incoming announces ---
+// --- Extend PrivateMessagePacket content length (0xFF sentinel) ---
 //
-// Parses the raw announce payload out-of-band (same pattern upstream Android
-// uses for its gossip TLV) and stores per-peer flags + P2PK pubkey for
-// BitChatBLEBridge.getPeers(). Verified announces only — the recording sits
-// after the unverified-announce early return inside the registry barrier, at
-// the same spot upstream persists identity. A verified announce WITHOUT the
-// TLV clears the entry (announce TLVs are authoritative per-announce).
-const ECASH_ANNOUNCE_PARSE_ANCHOR =
-  /        \/\/ Persist cryptographic identity and signing key for robust offline verification\n        env\.persistIdentity\(announcement\)\n/;
-const ECASH_ANNOUNCE_PARSE_REPLACEMENT =
-  '        // [sovran] record/clear the ecash capability TLV (0xF0). Verified\n' +
-  '        // announces only; absence of the TLV clears the entry.\n' +
-  '        if verifiedAnnounce {\n' +
-  '            EcashAnnounceState.shared.record(peerID: peerID.id, announcePayload: packet.payload)\n' +
-  '        }\n' +
+// Upstream caps private-message content at 255 bytes (1-byte TLV length;
+// encode() returns nil above it). Sovran delivers an ecash token — and a
+// creq-bearing favorite — as a single private Noise DM that exceeds 255 bytes.
+// The transport already fragments large encrypted packets, so the only blocker
+// is the content-length field. Extend it: length 0x00–0xFE = literal 1 byte
+// (byte-identical to stock); 0xFF = sentinel + 2-byte big-endian length
+// (≤64 KB). messageID stays 1-byte. Stock misparses our >254-byte content,
+// which is acceptable (Sovran↔Sovran payments). Mirror in sync-bitchat-android.js.
+const EXTENDED_PM_ENCODE_ANCHOR =
+  /        guard let contentData = content\.data\(using: \.utf8\), contentData\.count <= 255 else \{ return nil \}\n        data\.append\(TLVType\.content\.rawValue\)\n        data\.append\(UInt8\(contentData\.count\)\)/;
+const EXTENDED_PM_ENCODE_REPLACEMENT =
+  '        // [sovran] extended content length: 0x00–0xFE literal; 0xFF sentinel\n' +
+  '        // + 2-byte big-endian length (≤64 KB). messageID stays 1-byte.\n' +
+  '        guard let contentData = content.data(using: .utf8), contentData.count <= 0xFFFF else { return nil }\n' +
+  '        data.append(TLVType.content.rawValue)\n' +
+  '        if contentData.count <= 0xFE {\n' +
+  '            data.append(UInt8(contentData.count))\n' +
+  '        } else {\n' +
+  '            data.append(0xFF)\n' +
+  '            data.append(UInt8((contentData.count >> 8) & 0xFF))\n' +
+  '            data.append(UInt8(contentData.count & 0xFF))\n' +
+  '        }';
+const EXTENDED_PM_DECODE_ANCHOR =
+  /            let length = Int\(data\[offset\]\)\n            offset \+= 1\n\n            guard offset \+ length <= data\.count else \{ return nil \}\n            let value = data\[offset\.\.<offset \+ length\]\n            offset \+= length\n\n            switch type \{\n            case \.messageID:/;
+const EXTENDED_PM_DECODE_REPLACEMENT =
+  '            // [sovran] extended length read: 0xFF sentinel → 2-byte big-endian.\n' +
+  '            var length = Int(data[offset])\n' +
+  '            offset += 1\n' +
+  '            if length == 0xFF {\n' +
+  '                guard offset + 2 <= data.count else { return nil }\n' +
+  '                length = (Int(data[offset]) << 8) | Int(data[offset + 1])\n' +
+  '                offset += 2\n' +
+  '            }\n' +
   '\n' +
-  '        // Persist cryptographic identity and signing key for robust offline verification\n' +
-  '        env.persistIdentity(announcement)\n';
+  '            guard offset + length <= data.count else { return nil }\n' +
+  '            let value = data[offset..<offset + length]\n' +
+  '            offset += length\n' +
+  '\n' +
+  '            switch type {\n' +
+  '            case .messageID:';
 
-// --- Compression-independent signing form ---
+// --- Keep iOS fragment packets below the BLE/GATT exact-boundary failure ---
 //
-// Upstream signs/verifies packets over BinaryProtocol.encode(unsignedPacket),
-// which COMPRESSES payloads above 100 bytes — and raw-deflate output is not
-// canonical across implementations (Apple libcompression vs java.util.zip
-// emit different bytes for identical input). Base announces (~76 B) stay
-// under the threshold, but Sovran's ecash TLV (+42 B) pushes them over, so a
-// cross-platform verifier re-compresses with ITS deflater, the bytes never
-// match the signature, and Android (which hard-requires verified announces)
-// drops every iOS Sovran announce. Fix: the SIGNING form is encoded without
-// compression on both Sovran platforms (wire format untouched — transmitted
-// packets still compress). Mirror patch lives in sync-bitchat-android.js.
-const ENCODE_COMPRESS_PARAM_ANCHOR =
-  /    static func encode\(_ packet: BitchatPacket, padding: Bool = true\) -> Data\? \{\n        let version = packet\.version\n        guard version == 1 \|\| version == 2 else \{ return nil \}\n\n        \/\/ Try to compress payload when beneficial, keeping original size for later decoding\n        var payload = packet\.payload\n        var isCompressed = false\n        var originalPayloadSize: Int\?\n        if CompressionUtil\.shouldCompress\(payload\) \{/;
-const ENCODE_COMPRESS_PARAM_REPLACEMENT =
-  '    // [sovran] compressPayload: lets the signing form opt out of compression —\n' +
-  '    // deflate output is not canonical across platforms, so signatures over a\n' +
-  '    // compressed encoding fail to verify between iOS and Android.\n' +
-  '    static func encode(_ packet: BitchatPacket, padding: Bool = true, compressPayload: Bool = true) -> Data? {\n' +
-  '        let version = packet.version\n' +
-  '        guard version == 1 || version == 2 else { return nil }\n' +
-  '\n' +
-  '        // Try to compress payload when beneficial, keeping original size for later decoding\n' +
-  '        var payload = packet.payload\n' +
-  '        var isCompressed = false\n' +
-  '        var originalPayloadSize: Int?\n' +
-  '        if compressPayload, CompressionUtil.shouldCompress(payload) {';
-const SIGNING_NO_COMPRESS_ANCHOR =
-  /            isRSR: false \/\/ RSR flag is mutable and not part of the signature\n        \)\n        return BinaryProtocol\.encode\(unsignedPacket\)/;
-const SIGNING_NO_COMPRESS_REPLACEMENT =
-  '            isRSR: false // RSR flag is mutable and not part of the signature\n' +
+// A 514-byte token produced a two-fragment Noise packet where fragment 0 encoded
+// to 513 bytes (14-byte v1 header + sender + recipient + 13-byte fragment
+// header + 470-byte chunk). Android received only the first 512 bytes, so its
+// decoder saw a declared payload length one byte larger than the bytes present.
+// Keep the vendor's transport fragmentation, but leave explicit headroom for
+// directed fragments.
+const FRAGMENT_CHUNK_HEADROOM_ANCHOR =
+  '        let chunk = context.maxChunk ?? calculatedChunk\n' +
+  '        let safeChunk = max(64, chunk)';
+const FRAGMENT_CHUNK_HEADROOM_REPLACEMENT =
+  '        let chunk = context.maxChunk ?? calculatedChunk\n' +
+  '        // [sovran] Keep each encoded fragment packet under the BLE/GATT\n' +
+  '        // 512-byte boundary. A directed v1 fragment carries a 14-byte\n' +
+  '        // BinaryProtocol header, sender, recipient, and a 13-byte fragment\n' +
+  '        // payload header; without headroom the first fragment can encode to\n' +
+  '        // 513 bytes and Android receives a truncated 512-byte frame.\n' +
+  '        let fragmentRouteBytes = (fragmentVersion == 2) ? (1 + ((packet.route?.count ?? 0) * 8)) : 0\n' +
+  '        let fragmentRecipientBytes = (context.directedPeer != nil || packet.recipientID != nil) ? 8 : 0\n' +
+  '        let fragmentBinaryHeaderBytes = (fragmentVersion == 2) ? 16 : 14\n' +
+  '        let fragmentWireHeadroomBytes = 16\n' +
+  '        let maxWireChunk = max(\n' +
+  '            64,\n' +
+  '            bleMaxMTU - fragmentBinaryHeaderBytes - 8 - fragmentRecipientBytes - fragmentRouteBytes - 13 - fragmentWireHeadroomBytes\n' +
   '        )\n' +
-  '        // [sovran] sign over the UNCOMPRESSED encoding: verifiers re-encode with\n' +
-  '        // their own compressor and cross-platform deflate bytes differ.\n' +
-  '        return BinaryProtocol.encode(unsignedPacket, compressPayload: false)';
-
-// --- Suppress the direct-neighbors gossip TLV (0x04) in our announces ---
-//
-// Upstream gossips the peerIDs of connected peers inside every announce.
-// Sovran's privacy contract is that an announce discloses ONLY the current
-// profile's own identity — never the set of peers this device has seen
-// (which can include the user's own other profiles on a second device).
-// Receivers treat the absent TLV as "no neighbor claims" (optional field).
-const NEIGHBOR_GOSSIP_ANCHOR =
-  /        let connectedPeerIDs: \[Data\] = collectionsQueue\.sync \{\n            peerRegistry\.connectedRoutingData\n        \}\n[ \t]*\n        let announcement = AnnouncementPacket\(\n            nickname: myNickname,\n            noisePublicKey: noisePub,\n            signingPublicKey: signingPub,\n            directNeighbors: connectedPeerIDs\n        \)/;
-const NEIGHBOR_GOSSIP_REPLACEMENT =
-  '        // [sovran] neighbors gossip suppressed: announces disclose only the\n' +
-  '        // current profile’s own identity, never the peerIDs this device has\n' +
-  '        // seen. Receivers treat the absent 0x04 TLV as "no neighbor claims".\n' +
-  '        let announcement = AnnouncementPacket(\n' +
-  '            nickname: myNickname,\n' +
-  '            noisePublicKey: noisePub,\n' +
-  '            signingPublicKey: signingPub,\n' +
-  '            directNeighbors: nil\n' +
-  '        )';
+  '        let safeChunk = max(64, min(chunk, maxWireChunk))';
 
 let patched = 0;
 const applied = {
   mismatchGuard: false,
   linkState: false,
-  ecashAnnounceInject: false,
-  ecashAnnounceParse: false,
-  encodeCompressParam: false,
-  signingNoCompress: false,
-  neighborGossip: false,
+  extendedPmEncode: false,
+  extendedPmDecode: false,
+  fragmentChunkHeadroom: false,
 };
 for (const file of walk(ROOT)) {
   const before = fs.readFileSync(file, 'utf8');
@@ -232,31 +220,17 @@ for (const file of walk(ROOT)) {
     let next = after.replace(LINKSTATE_ANCHOR, LINKSTATE_REPLACEMENT);
     if (next !== after) applied.linkState = true;
     after = next;
-    next = after.replace(ECASH_ANNOUNCE_INJECT_ANCHOR, ECASH_ANNOUNCE_INJECT_REPLACEMENT);
-    if (next !== after) applied.ecashAnnounceInject = true;
-    after = next;
-    next = after.replace(NEIGHBOR_GOSSIP_ANCHOR, NEIGHBOR_GOSSIP_REPLACEMENT);
-    if (next !== after) applied.neighborGossip = true;
+    next = after.replace(FRAGMENT_CHUNK_HEADROOM_ANCHOR, FRAGMENT_CHUNK_HEADROOM_REPLACEMENT);
+    if (next !== after) applied.fragmentChunkHeadroom = true;
     after = next;
   }
-  if (file.endsWith('BinaryProtocol.swift')) {
-    const next = after.replace(ENCODE_COMPRESS_PARAM_ANCHOR, ENCODE_COMPRESS_PARAM_REPLACEMENT);
-    if (next !== after) applied.encodeCompressParam = true;
+  if (file.endsWith('Packets.swift')) {
+    let next = after.replace(EXTENDED_PM_ENCODE_ANCHOR, EXTENDED_PM_ENCODE_REPLACEMENT);
+    if (next !== after) applied.extendedPmEncode = true;
     after = next;
-  }
-  if (file.endsWith('BitchatPacket.swift')) {
-    const next = after.replace(SIGNING_NO_COMPRESS_ANCHOR, SIGNING_NO_COMPRESS_REPLACEMENT);
-    if (next !== after) applied.signingNoCompress = true;
+    next = after.replace(EXTENDED_PM_DECODE_ANCHOR, EXTENDED_PM_DECODE_REPLACEMENT);
+    if (next !== after) applied.extendedPmDecode = true;
     after = next;
-  }
-  if (file.endsWith('BLEAnnounceHandler.swift')) {
-    // The anchor text survives inside the replacement (the persist block is
-    // re-emitted), so gate on the marker to stay idempotent.
-    if (!after.includes('[sovran] record/clear the ecash capability TLV')) {
-      const next = after.replace(ECASH_ANNOUNCE_PARSE_ANCHOR, ECASH_ANNOUNCE_PARSE_REPLACEMENT);
-      if (next !== after) applied.ecashAnnounceParse = true;
-      after = next;
-    }
   }
   if (after !== before) {
     fs.writeFileSync(file, after);
@@ -267,8 +241,19 @@ for (const file of walk(ROOT)) {
 // Anchored patches must either apply now or already be applied from a previous
 // run. Anything else means upstream changed shape — fail loudly so the vendor
 // bump doesn't silently ship without the patch.
-function assertApplied(name, appliedNow, file, alreadyPattern) {
+function assertApplied(name, appliedNow, file, alreadyPattern, optional = false) {
   if (appliedNow) return;
+  // A patch whose target file does not exist at the pinned vendor version is
+  // skipped (the upstream code it adjusts isn't there to adjust). Used for
+  // version-specific files like BLEAnnounceHandlingPolicy.swift (post-v1.5.1).
+  if (!fs.existsSync(file)) {
+    if (optional) {
+      console.warn(`[patch-bitchat-imports] SKIP: ${name} — target file absent at this vendor version`);
+      return;
+    }
+    console.error(`[patch-bitchat-imports] FATAL: ${name} target file missing: ${path.relative(ROOT, file)}`);
+    process.exit(1);
+  }
   const content = fs.readFileSync(file, 'utf8');
   if (alreadyPattern.test(content)) return;
   console.error(
@@ -281,7 +266,10 @@ assertApplied(
   'MISMATCH_GUARD',
   applied.mismatchGuard,
   path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandlingPolicy.swift'),
-  /\[sovran\] sender-mismatch reject relaxed/
+  /\[sovran\] sender-mismatch reject relaxed/,
+  // Optional: this file (and the strict sender-mismatch check it relaxes) was
+  // added after v1.5.1. On the v1.5.1 pin there is nothing to relax.
+  true
 );
 assertApplied(
   'LINKSTATE',
@@ -290,40 +278,50 @@ assertApplied(
   /\[sovran\] de-privatized/
 );
 assertApplied(
-  'ECASH_ANNOUNCE_INJECT',
-  applied.ecashAnnounceInject,
+  'EXTENDED_PM_ENCODE',
+  applied.extendedPmEncode,
+  path.join(ROOT, 'bitchat', 'Protocols', 'Packets.swift'),
+  /\[sovran\] extended content length: 0x00/
+);
+assertApplied(
+  'EXTENDED_PM_DECODE',
+  applied.extendedPmDecode,
+  path.join(ROOT, 'bitchat', 'Protocols', 'Packets.swift'),
+  /\[sovran\] extended length read: 0xFF sentinel/
+);
+assertApplied(
+  'FRAGMENT_CHUNK_HEADROOM',
+  applied.fragmentChunkHeadroom,
   path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
-  /\[sovran\] append ecash capability TLV/
-);
-assertApplied(
-  'ECASH_ANNOUNCE_PARSE',
-  applied.ecashAnnounceParse,
-  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEAnnounceHandler.swift'),
-  /\[sovran\] record\/clear the ecash capability TLV/
-);
-const BIT_FOUNDATION = path.join(
-  ROOT,
-  'localPackages',
-  'BitFoundation',
-  'Sources',
-  'BitFoundation'
-);
-assertApplied(
-  'ENCODE_COMPRESS_PARAM',
-  applied.encodeCompressParam,
-  path.join(BIT_FOUNDATION, 'BinaryProtocol.swift'),
-  /\[sovran\] compressPayload: lets the signing form opt out/
-);
-assertApplied(
-  'SIGNING_NO_COMPRESS',
-  applied.signingNoCompress,
-  path.join(BIT_FOUNDATION, 'BitchatPacket.swift'),
-  /\[sovran\] sign over the UNCOMPRESSED encoding/
-);
-assertApplied(
-  'NEIGHBOR_GOSSIP',
-  applied.neighborGossip,
-  path.join(ROOT, 'bitchat', 'Services', 'BLE', 'BLEService.swift'),
-  /\[sovran\] neighbors gossip suppressed/
+  /\[sovran\] Keep each encoded fragment packet under the BLE\/GATT/
 );
 console.log(`[patch-bitchat-imports] patched ${patched} file(s)`);
+
+// Bake the vendored submodule commit into a generated Swift constant so the
+// running build's bitchat version is logged at startBLE (bitchat.peers.ble_start_ok)
+// — catching a stale build that predates a fragmentation/protocol fix. Best-effort;
+// preserves the existing baked SHA when EAS_NO_VCS archives strip .git metadata.
+(function writeVendorVersion() {
+  const out = path.join(path.resolve(__dirname, '..', 'ios'), 'BitchatVendorVersion.swift');
+  let commit = readExistingVendorCommit(out, /static let commit = "([^"]+)"/);
+  try {
+    const gitCommit =
+      require('child_process')
+        .execSync('git rev-parse --short HEAD', { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim();
+    if (gitCommit) commit = gitCommit;
+  } catch {
+    /* git unavailable — keep the existing baked SHA */
+  }
+  fs.writeFileSync(
+    out,
+    '// GENERATED at prebuild by scripts/patch-bitchat-imports.js — do not edit by hand.\n' +
+      '// Short SHA of the vendored ios/BitChatVendor submodule this build compiled from,\n' +
+      '// logged at startBLE so the running build’s bitchat version is verifiable.\n' +
+      'enum BitchatVendor {\n' +
+      `    static let commit = "${commit}"\n` +
+      '}\n'
+  );
+  console.log(`[patch-bitchat-imports] vendor version: ${commit}`);
+})();

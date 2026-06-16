@@ -14,6 +14,7 @@ import {
   useTransactionLocationStore,
   type TransactionCoordinates,
 } from '@/shared/stores/profile/transactionLocationStore';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 
 /**
  * Capture current location for a transaction.
@@ -59,5 +60,8 @@ export async function captureAndStoreLocation(transactionId: string): Promise<bo
   if (!location) return false;
 
   useTransactionLocationStore.getState().setTransactionLocation(transactionId, location);
+  setTransactionAnnotation(`id:${transactionId}`, {
+    location: { lat: location.latitude, lng: location.longitude },
+  });
   return true;
 }

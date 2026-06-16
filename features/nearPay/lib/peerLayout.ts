@@ -11,14 +11,29 @@ export interface NearPayLayoutPeer {
   name: string;
   avatarUrl?: string | null;
   /**
-   * True when the peer announced the ecash capability TLV — they can receive
-   * P2PK-locked drops. False ⇒ vanilla bitchat peer (bearer sends only).
+   * True once the peer's favorite carried a valid `creq` (identity + accepted
+   * mints) — i.e. a Sovran peer we can send an extended token DM to. False ⇒
+   * stock/vanilla peer or one we haven't exchanged identity with yet.
+   * Requires `nostrPubkeyHex`, `creq`, and a matching `nut10` lock key.
    */
-  supportsP2pkEcash: boolean;
-  /** Cashu P2PK lock target from the peer's announce ("02" + x-only); '' for vanilla peers. */
-  p2pkPubkeyHex: string;
-  /** The peer's Nostr pubkey (x-only hex) — `p2pkPubkeyHex` minus the "02". */
-  nostrPubkey: string;
+  lockable: boolean;
+  /**
+   * The peer's x-only Nostr pubkey (64-hex), learned via the favorite exchange.
+   * Use it for the kind-0 profile and "02"-prefix it for the NUT-11 P2PK lock
+   * target.
+   */
+  nostrPubkeyHex?: string;
+  /**
+   * The peer's standing NUT-18 payment request (`creq…`) — accepted mints +
+   * P2PK lock key. Decoded to verify the lock key and pick a shared mint.
+   */
+  creq?: string;
+  /**
+   * Identity seed for identicons/word-pair names. For Sovran peers it is the
+   * x-only Nostr pubkey (real identity); for stock peers the announced noise
+   * key (stable pseudonym), with the 16-hex peerID as final fallback.
+   */
+  identitySeed: string;
   /**
    * True while the peer's kind-0 profile fetch is in flight — the avatar
    * shows the loading state instead of flashing the identicon fallback.

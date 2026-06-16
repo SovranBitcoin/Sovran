@@ -4,6 +4,7 @@ import {
   STRIKE_MAX_ACTIVE_MS,
   STRIKE_MIN_VISIBLE_MS,
   STRIKE_SUCCESS_LINGER_MS,
+  STRIKE_WAITING_LINGER_MS,
   type DeriveStrikeMapInput,
   type StrikeQueueEntry,
   type StrikeState,
@@ -15,9 +16,25 @@ const T0 = 1_000_000;
 function entry(
   status: StrikeQueueEntry['status'],
   senderPeerID: string | null = PEER,
-  amount = 21
+  amount = 21,
+  overrides: Partial<StrikeQueueEntry> = {}
 ): StrikeQueueEntry {
-  return { status, senderPeerID: senderPeerID ?? undefined, receivedAt: T0, amount, unit: 'sat' };
+  return {
+    status,
+    senderPeerID: senderPeerID ?? undefined,
+    receivedAt: T0,
+    amount,
+    unit: 'sat',
+    ...overrides,
+  };
+}
+
+function retryWaitingEntry(overrides: Partial<StrikeQueueEntry> = {}): StrikeQueueEntry {
+  return entry('pending', PEER, 21, {
+    attempts: 1,
+    nextAttemptAt: T0 + 30_000,
+    ...overrides,
+  });
 }
 
 function strikeState(overrides: Partial<StrikeState> = {}): StrikeState {
@@ -83,6 +100,25 @@ describe('deriveStrikeMap', () => {
     });
     expect(after.map.get(PEER)?.status).toBe('success');
     expect(after.nextDeadline).toBe(T0 + STRIKE_MIN_VISIBLE_MS + STRIKE_SUCCESS_LINGER_MS);
+  });
+
+  it('holds active until the minimum beat, then resolves to waiting', () => {
+    const prev = new Map([[PEER, strikeState()]]);
+    const early = derive({
+      entries: { h1: retryWaitingEntry() },
+      prev,
+      now: T0 + 200,
+    });
+    expect(early.map.get(PEER)?.status).toBe('active');
+    expect(early.nextDeadline).toBe(T0 + STRIKE_MIN_VISIBLE_MS);
+
+    const after = derive({
+      entries: { h1: retryWaitingEntry() },
+      prev,
+      now: T0 + STRIKE_MIN_VISIBLE_MS,
+    });
+    expect(after.map.get(PEER)?.status).toBe('waiting');
+    expect(after.nextDeadline).toBe(T0 + STRIKE_MIN_VISIBLE_MS + STRIKE_WAITING_LINGER_MS);
   });
 
   it('sums the redeemed amounts onto the success state for the celebration', () => {
@@ -155,6 +191,11 @@ describe('deriveStrikeMap', () => {
   it('leaves redeemedAmount off non-success states', () => {
     const { map } = derive({ entries: { h1: entry('pending') } });
     expect(map.get(PEER)?.redeemedAmount).toBeUndefined();
+  });
+
+  it('does not animate a retry-waiting entry that was never active', () => {
+    const { map } = derive({ entries: { h1: retryWaitingEntry() } });
+    expect(map.size).toBe(0);
   });
 
   it('removes the success state after its linger and never resurrects it', () => {

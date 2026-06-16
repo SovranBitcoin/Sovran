@@ -15,6 +15,7 @@ import {
   useSwapTransactionsStore,
   type SwapLegLocalStatus,
 } from '@/shared/stores/profile/swapTransactionsStore';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import type { MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';
@@ -42,6 +43,13 @@ import {
   normalizeRebalanceTransferError,
   resetFailedStepStates,
 } from '@/features/mint/lib/rebalanceRunState';
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
 
 export type RebalanceRunStatus = 'idle' | 'running' | 'finished' | 'cancelled';
 
@@ -200,7 +208,10 @@ export function useMintRebalanceOrchestrator({
           // Don't swallow silently — a transient balance-fetch failure looks
           // identical to a real "balance didn't increase" timeout downstream,
           // and that ambiguity hides operator-actionable network issues.
-          cashuLog.warn('mint.rebalance.balance_fetch_failed', { mintUrl, error });
+          cashuLog.warn('mint.rebalance.balance_fetch_failed', {
+            ...mintUrlLogFields(mintUrl),
+            error,
+          });
           return {};
         }
       };
@@ -245,12 +256,15 @@ export function useMintRebalanceOrchestrator({
     async (temporarilyTrusted: string[], warnStepId: string | undefined) => {
       const { stranded, untrustErrors } = await releaseTrustWindow(manager, temporarilyTrusted);
       for (const { url, error } of untrustErrors) {
-        cashuLog.warn('mint.rebalance.untrust_failed', { url, error });
+        cashuLog.warn('mint.rebalance.untrust_failed', { ...mintUrlLogFields(url), error });
       }
       if (stranded.length > 0) {
         // Louder than the previous silent log.warn — this is a recovery_required
         // signal: funds remain on an intermediary the user did not pre-trust.
-        cashuLog.warn('mint.rebalance.middleman_recovery_required', { stranded });
+        cashuLog.warn('mint.rebalance.middleman_recovery_required', {
+          strandedCount: stranded.length,
+          strandedMintUrlLengths: stranded.map((item) => item.url.length),
+        });
         if (warnStepId) {
           updateStepState(warnStepId, {
             routingDetail: formatStrandedRoutingDetail(stranded),
@@ -417,6 +431,10 @@ export function useMintRebalanceOrchestrator({
           const legId = ensureLegId();
           if (groupId && legId && mq.quoteId) {
             useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, mq.quoteId);
+            // Annotation: colada groups the timeline by swapGroupId.
+            setTransactionAnnotation(`quote:${mq.quoteId}`, {
+              swap: { groupId, role: 'mint' },
+            });
           }
           return mq;
         };
@@ -483,6 +501,9 @@ export function useMintRebalanceOrchestrator({
               useSwapTransactionsStore.getState().tagMelt(groupId, legId, {
                 quoteId: prepared.quoteId,
                 operationId: prepared.id,
+              });
+              setTransactionAnnotation(`quote:${prepared.quoteId}`, {
+                swap: { groupId, role: 'melt' },
               });
             }
           }
@@ -737,7 +758,10 @@ export function useMintRebalanceOrchestrator({
                   await manager.mint.addMint(url, { trusted: true });
                   temporarilyTrusted.push(url);
                 } catch (trustErr) {
-                  cashuLog.warn('mint.rebalance.trust_failed', { url, error: trustErr });
+                  cashuLog.warn('mint.rebalance.trust_failed', {
+                    ...mintUrlLogFields(url),
+                    error: trustErr,
+                  });
                 }
               }
             }
@@ -905,6 +929,9 @@ export function useMintRebalanceOrchestrator({
                     useSwapTransactionsStore
                       .getState()
                       .tagMintQuote(groupId, hopLegId, hopMq.quoteId);
+                    setTransactionAnnotation(`quote:${hopMq.quoteId}`, {
+                      swap: { groupId, role: 'mint', chainId, hopIndex: hopIdx },
+                    });
                   }
                   useSwapTransactionsStore
                     .getState()
@@ -960,6 +987,9 @@ export function useMintRebalanceOrchestrator({
                   useSwapTransactionsStore.getState().tagMelt(groupId, hopLegId, {
                     quoteId: hopPrepared.quoteId,
                     operationId: hopPrepared.id,
+                  });
+                  setTransactionAnnotation(`quote:${hopPrepared.quoteId}`, {
+                    swap: { groupId, role: 'melt', chainId, hopIndex: hopIdx },
                   });
                   useSwapTransactionsStore.getState().setLegStatus(groupId, hopLegId, {
                     localStatus: 'verifying',
@@ -1371,7 +1401,7 @@ export function useMintRebalanceOrchestrator({
             await manager.mint.addMint(url, { trusted: true });
             temporarilyTrusted.push(url);
           } catch (err) {
-            cashuLog.warn('mint.rebalance.trust_failed', { url, error: err });
+            cashuLog.warn('mint.rebalance.trust_failed', { ...mintUrlLogFields(url), error: err });
           }
         }
       }

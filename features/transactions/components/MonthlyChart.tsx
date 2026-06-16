@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View as RNView } from 'react-native';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Svg, { Path, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
@@ -15,7 +15,7 @@ import type { HistoryEntry } from '@cashu/coco-core';
 import { isSettledReceiveHistoryEntry, isSettledSpendHistoryEntry } from '@sovranbitcoin/colada';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { zIndex } from '@/shared/styles/tokens';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -277,6 +277,40 @@ const MonthlyChart = React.memo(function MonthlyChart({
   }, [daysInMonth, drawableWidth]);
 
   const hasData = totalAmount > 0;
+
+  useEffect(() => {
+    paymentLog.debug('tx.monthly_chart.render', {
+      mode,
+      unit,
+      historyCount: history.length,
+      mockMode,
+      actualPointCount: actualPoints.length,
+      projectedPointCount: projectedPoints.length,
+      totalAmount,
+      projectedTotal,
+      dailyChange,
+      daysInMonth,
+      todayDay,
+      hasData,
+      drawableWidth,
+      drawableHeight,
+    });
+  }, [
+    actualPoints.length,
+    dailyChange,
+    daysInMonth,
+    drawableHeight,
+    drawableWidth,
+    hasData,
+    history.length,
+    mockMode,
+    mode,
+    projectedPoints.length,
+    projectedTotal,
+    todayDay,
+    totalAmount,
+    unit,
+  ]);
 
   // Change indicator icon: spent = arrow-up (spending rising), received = arrow-up (income rising)
   const changeIcon = 'mdi:arrow-up';

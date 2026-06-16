@@ -36,9 +36,7 @@ import { showActionSheet } from '@/shared/lib/popup';
 import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
-import { UnifiedSearch } from '@/shared/ui/composed/search/UnifiedSearch';
+import { SearchOverlay } from '@/shared/ui/composed/search/SearchOverlay';
 
 const ACCOUNT = { unit: 'sat' } as const;
 
@@ -63,18 +61,14 @@ export function WalletScreen() {
   useLifecycleLogger('WalletScreen');
   useBackgroundConfig({ blurMode: 'partial' });
 
-  // Inline header search (shared with Feed). While searching, the wallet body is
-  // replaced by the people-search view — see the render branch below.
-  const { isSearching } = useSearchContext();
   const headerHeight = useHeaderHeight();
-  const surface = useThemeColor('surface');
 
   const { height: windowHeight } = useWindowDimensions();
-  // Deterministic header height — locked so the QR button below it lands at
-  // a stable Y on first paint. The boot-splash → QR morph reads the button's
-  // window position once layout settles; a flex-driven height would shift as
-  // history/transactions data loads beneath the topArea, breaking alignment.
-  const pagerHeight = Math.max(windowHeight * 0.22, 200);
+  // Phone-dimension floor for the balance region. It grows naturally with its
+  // contents (PENDING/RESERVED/REDEEMING pills) above this minimum so nothing
+  // clips, and stays balanced when empty. The boot-splash → QR morph remeasures
+  // the QR position just before morphing, so a content-driven height is safe.
+  const minBalanceHeight = Math.max(windowHeight * 0.22, 200);
 
   const [contentHeight, setContentHeight] = useState(0);
 
@@ -162,20 +156,8 @@ export function WalletScreen() {
     void machine.scan?.(undefined, { source: 'nfc' });
   }, [machine, nfcArmed]);
 
-  // Keep BootEntrance mounted across the search toggle so the splash→QR morph
-  // never replays; swap only the inner body. The transparent wallet header means
-  // the search view must paint its own surface and inset below the header.
-  if (isSearching) {
-    return (
-      <BootEntrance>
-        <View
-          style={[styles.searchContainer, { backgroundColor: surface, paddingTop: headerHeight }]}>
-          <UnifiedSearch recentContext="wallet" />
-        </View>
-      </BootEntrance>
-    );
-  }
-
+  // Keep BootEntrance and the wallet body mounted across the search toggle so
+  // the splash→QR morph never replays and closing search restores this screen.
   return (
     <BootEntrance>
       <LayoutDebugWrapper
@@ -186,7 +168,7 @@ export function WalletScreen() {
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
           <View style={styles.topArea}>
-            <Account account={ACCOUNT} pagerHeight={pagerHeight} />
+            <Account account={ACCOUNT} minHeight={minBalanceHeight} />
 
             <HStack justify="space-around" style={styles.secondaryActions}>
               <CircleActionButton
@@ -301,14 +283,12 @@ export function WalletScreen() {
           </View>
         </Log>
       </LayoutDebugWrapper>
+      <SearchOverlay recentContext="wallet" topInset={headerHeight} />
     </BootEntrance>
   );
 }
 
 const styles = StyleSheet.create({
-  searchContainer: {
-    flex: 1,
-  },
   scrollContent: {
     flexGrow: 1,
     padding: 0,

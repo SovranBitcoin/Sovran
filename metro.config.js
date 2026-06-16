@@ -95,15 +95,19 @@ config.resolver = {
   },
 };
 
-// Enable source maps for better debugging
+// Production minification. Identifier mangling is left ON (Terser's default):
+// `keep_*names` were previously forced true for readable stack traces, but that
+// inflates the Hermes bytecode shipped to every install. Crash readability now
+// relies on the EAS-generated source maps instead. Verified safe: no runtime
+// branches on `fn.name`/`constructor.name` (only `app/_layout.tsx` reads
+// `Component.displayName || Component.name` for debug labels, which tolerates
+// mangled names). `drop_console` strips dev-only console.* calls from release
+// bundles — the app's own structured `log.*` (shared/lib/logger) is untouched.
 config.transformer = {
   ...config.transformer,
   minifierConfig: {
-    keep_classnames: true,
-    keep_fnames: true,
-    mangle: {
-      keep_classnames: true,
-      keep_fnames: true,
+    compress: {
+      drop_console: ['log', 'debug', 'info'],
     },
   },
   // Defer `require()` evaluation per module until first use. With this

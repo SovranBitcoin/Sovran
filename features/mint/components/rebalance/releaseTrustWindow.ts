@@ -1,5 +1,13 @@
 import { extractDomain } from '@/shared/lib/url';
 import { amountToNumber, type AmountValue } from '@/shared/lib/cashu/amount';
+import { cashuLog } from '@/shared/lib/logger';
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
 
 type BalanceMap = Record<string, { total?: AmountValue } | undefined>;
 
@@ -31,20 +39,60 @@ export async function releaseTrustWindow(
   temporarilyTrusted: readonly string[]
 ): Promise<ReleaseTrustWindowResult> {
   if (temporarilyTrusted.length === 0) {
+    cashuLog.debug('mint.rebalance.trust_window.release.result', {
+      reason: 'empty',
+      temporarilyTrustedCount: 0,
+      strandedCount: 0,
+      untrustErrorCount: 0,
+    });
     return { stranded: [], untrustErrors: [] };
   }
-  const balances = await manager.wallet.balances.byMint().catch(() => ({}) as BalanceMap);
+  cashuLog.info('mint.rebalance.trust_window.release.start', {
+    temporarilyTrustedCount: temporarilyTrusted.length,
+    mintDomains: temporarilyTrusted.map(extractDomain),
+  });
+  const balances = await manager.wallet.balances.byMint().catch((error) => {
+    cashuLog.warn('mint.rebalance.trust_window.balance_failed', {
+      temporarilyTrustedCount: temporarilyTrusted.length,
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
+    return {} as BalanceMap;
+  });
   const stranded: StrandedMint[] = [];
   const untrustErrors: { url: string; error: unknown }[] = [];
   for (const url of temporarilyTrusted) {
     const balance = amountToNumber(balances[url]?.total);
-    if (balance > 0) stranded.push({ url, balance });
+    if (balance > 0) {
+      cashuLog.warn('mint.rebalance.trust_window.stranded_balance', {
+        ...mintUrlLogFields(url),
+        mintDomain: extractDomain(url),
+        balance,
+      });
+      stranded.push({ url, balance });
+    }
     try {
       await manager.mint.untrustMint(url);
+      cashuLog.info('mint.rebalance.trust_window.untrust_done', {
+        ...mintUrlLogFields(url),
+        mintDomain: extractDomain(url),
+        hadStrandedBalance: balance > 0,
+      });
     } catch (error) {
+      cashuLog.warn('mint.rebalance.trust_window.untrust_failed', {
+        ...mintUrlLogFields(url),
+        mintDomain: extractDomain(url),
+        hadStrandedBalance: balance > 0,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
       untrustErrors.push({ url, error });
     }
   }
+  cashuLog.info('mint.rebalance.trust_window.release.result', {
+    temporarilyTrustedCount: temporarilyTrusted.length,
+    strandedCount: stranded.length,
+    strandedTotal: stranded.reduce((sum, item) => sum + item.balance, 0),
+    untrustErrorCount: untrustErrors.length,
+  });
   return { stranded, untrustErrors };
 }
 

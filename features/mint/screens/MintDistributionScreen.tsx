@@ -39,6 +39,13 @@ const ParamsSchema = z.object({
   unit: z.string().max(16).optional(),
 });
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 export function MintDistributionScreen() {
   useLifecycleLogger('MintDistributionScreen');
   const [foreground, background, danger] = useThemeColor([
@@ -156,7 +163,7 @@ export function MintDistributionScreen() {
   const handleDistributionChange = useCallback(
     (mintUrl: string, bp: number) => {
       log.debug('mint.distribution.change', {
-        mintUrl,
+        ...mintUrlLogFields(mintUrl),
         basisPoints: bp,
         currency: selectedCurrency,
       });
@@ -167,6 +174,11 @@ export function MintDistributionScreen() {
 
   const handleMax = useCallback(
     (mintUrl: string) => {
+      log.info('mint.distribution.max', {
+        ...mintUrlLogFields(mintUrl),
+        currency: selectedCurrency,
+        mintCount: mintUrls.length,
+      });
       maxMint(selectedCurrency, mintUrl, mintUrls);
     },
     [selectedCurrency, mintUrls, maxMint]
@@ -174,6 +186,11 @@ export function MintDistributionScreen() {
 
   const handleMin = useCallback(
     (mintUrl: string) => {
+      log.info('mint.distribution.min', {
+        ...mintUrlLogFields(mintUrl),
+        currency: selectedCurrency,
+        mintCount: mintUrls.length,
+      });
       minMint(selectedCurrency, mintUrl, mintUrls);
     },
     [selectedCurrency, mintUrls, minMint]

@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { getContrastColors, FALLBACK_COLORS, useDominantColor } from '@/shared/lib/colorExtraction';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 
 const MIN_PERCENTAGE_FOR_AVATAR = 12;
@@ -82,6 +82,34 @@ const AnimatedSegment: React.FC<SegmentProps> = ({
     animatedWidth.value = withSpring(targetWidth, SPRING_CONFIG);
   }, [targetWidth, animatedWidth]);
 
+  useEffect(() => {
+    paymentLog.debug('mint.distribution.segment.render', {
+      bp,
+      totalWidth,
+      colorIndex,
+      isFirst,
+      activeCount,
+      percentage,
+      targetWidth,
+      showAvatar,
+      hasMintInfo: !!mintInfo,
+      hasMintIcon: !!mintIcon,
+      hasLoadedDominantColor: hasLoaded,
+    });
+  }, [
+    activeCount,
+    bp,
+    colorIndex,
+    hasLoaded,
+    isFirst,
+    mintIcon,
+    mintInfo,
+    percentage,
+    showAvatar,
+    targetWidth,
+    totalWidth,
+  ]);
+
   const animatedStyle = useAnimatedStyle(() => ({
     width: animatedWidth.value,
     marginLeft: isFirst ? 0 : GAP_WIDTH,
@@ -146,7 +174,13 @@ export const DistributionBar: React.FC<DistributionBarProps> = ({
   const [containerWidth, setContainerWidth] = useState(0);
 
   const handleLayout = (event: LayoutChangeEvent) => {
-    setContainerWidth(event.nativeEvent.layout.width);
+    const width = event.nativeEvent.layout.width;
+    paymentLog.debug('mint.distribution_bar.layout', {
+      width,
+      mintCount: mintUrls.length,
+      activeCount,
+    });
+    setContainerWidth(width);
   };
 
   const activeCount = useMemo(() => {
@@ -154,6 +188,18 @@ export const DistributionBar: React.FC<DistributionBarProps> = ({
   }, [distribution, mintUrls]);
 
   const isEmpty = activeCount === 0;
+
+  useEffect(() => {
+    paymentLog.debug('mint.distribution_bar.render', {
+      mintCount: mintUrls.length,
+      distributionCount: Object.keys(distribution).length,
+      activeCount,
+      isEmpty,
+      containerWidth,
+      totalBasisPoints: mintUrls.reduce((sum, url) => sum + (distribution[url] || 0), 0),
+      mintInfoCount: Object.keys(mintInfoMap).length,
+    });
+  }, [activeCount, containerWidth, distribution, isEmpty, mintInfoMap, mintUrls]);
 
   return (
     <Log name="DistributionBar">

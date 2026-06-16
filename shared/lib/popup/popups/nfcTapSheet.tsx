@@ -30,6 +30,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { paymentLog } from '@/shared/lib/logger';
 import { useNfcTapStore, type NfcTapPhase } from '@/shared/stores/runtime/nfcTapStore';
 import { fontSize, spacing } from '@/shared/styles/tokens';
 import type { CustomSheetSharedProps } from '@/shared/lib/popup/sheets/types';
@@ -71,30 +72,52 @@ export function NfcTapContent({ close, setFooterConfig }: CustomSheetSharedProps
 
   useEffect(() => {
     setFooterConfig({
-      buttons: [{ label: 'Close', onPress: close, variant: 'tertiary' }],
+      buttons: [
+        {
+          label: 'Close',
+          onPress: () => {
+            paymentLog.info('nfc.tap_sheet.close_press', { phase });
+            close();
+          },
+          variant: 'tertiary',
+        },
+      ],
     });
-    return () => setFooterConfig(null);
-  }, [close, setFooterConfig]);
+    paymentLog.info('nfc.tap_sheet.footer_attach', { phase });
+    return () => {
+      paymentLog.info('nfc.tap_sheet.footer_detach', { phase });
+      setFooterConfig(null);
+    };
+  }, [close, phase, setFooterConfig]);
 
   // Expanding radar ring behind the glyph — scale up while fading out, on
   // repeat. Drives only transform/opacity, so it stays on the UI thread.
   const pulse = useSharedValue(0);
   useEffect(() => {
+    paymentLog.debug('nfc.tap_sheet.pulse_start', { phase });
     pulse.value = withRepeat(
       withTiming(1, { duration: PULSE_MS, easing: Easing.out(Easing.quad) }),
       -1,
       false
     );
     return () => {
+      paymentLog.debug('nfc.tap_sheet.pulse_stop', { phase });
       pulse.value = 0;
     };
-  }, [pulse]);
+  }, [phase, pulse]);
   const ringStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 + pulse.value * (RING_MAX_SCALE - 1) }],
     opacity: 0.5 * (1 - pulse.value),
   }));
 
   const { title, subtitle } = PHASE_TEXT[phase];
+  useEffect(() => {
+    paymentLog.debug('nfc.tap_sheet.phase_render', {
+      phase,
+      titleLength: title.length,
+      subtitleLength: subtitle.length,
+    });
+  }, [phase, subtitle.length, title.length]);
 
   return (
     <VStack align="center" gap={spacing.md} style={styles.body}>

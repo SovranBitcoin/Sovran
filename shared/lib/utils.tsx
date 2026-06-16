@@ -12,7 +12,6 @@ import React from 'react';
 import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import { type ClassValue, clsx } from 'clsx';
 import { decode } from '@gandlaf21/bolt11-decode';
-import _ from 'lodash';
 import { twMerge } from 'tailwind-merge';
 
 import type { HistoryEntry } from '@cashu/coco-core';
@@ -51,7 +50,8 @@ export function mintHistoryEntryExpired(historyEntry: AnyMintHistoryEntry): bool
     const paymentRequest = decode(historyEntry.paymentRequest);
 
     const expiry = paymentRequest.expiry ?? 3600;
-    const timestamp = _.find(paymentRequest.sections, { name: 'timestamp' })?.value ?? 0;
+    const timestamp =
+      paymentRequest.sections.find((section) => section.name === 'timestamp')?.value ?? 0;
     const expiryTime = (timestamp + expiry) * 1000;
 
     return Date.now() > expiryTime;
@@ -77,7 +77,8 @@ export function getMintHistoryEntryTimeUntilExpiry(
     const paymentRequest = decode(historyEntry.paymentRequest);
 
     const expiry = paymentRequest.expiry ?? 3600;
-    const timestamp = _.find(paymentRequest.sections, { name: 'timestamp' })?.value ?? 0;
+    const timestamp =
+      paymentRequest.sections.find((section) => section.name === 'timestamp')?.value ?? 0;
     const expiryTime = (timestamp + expiry) * 1000;
 
     const timeLeft = Math.floor((expiryTime - Date.now()) / 1000);

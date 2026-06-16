@@ -24,7 +24,7 @@ let cachedInnerXmlPromise: Promise<string> | null = null;
 function loadPatternInnerXml(): Promise<string> {
   if (cachedInnerXmlPromise) return cachedInnerXmlPromise;
   cachedInnerXmlPromise = (async () => {
-    const asset = Asset.fromModule(require('@/assets/icons/internal/pattern.svg'));
+    const asset = Asset.fromModule(require('@/assets/patterns/pattern.svg'));
     await asset.downloadAsync();
     if (!asset.localUri) throw new Error('pattern.svg has no localUri after download');
     const raw = await FileSystem.readAsStringAsync(asset.localUri);
@@ -68,7 +68,7 @@ interface PatternBackgroundProps {
 }
 
 /**
- * Tileable background pattern. Loads `assets/icons/internal/pattern.svg`
+ * Tileable background pattern. Loads `assets/patterns/pattern.svg`
  * once at runtime, rewrites it to be theme-colorable (see comments above
  * `FIRST_PATH_RE`), wraps it in an outer `<svg>` whose `<defs><pattern>`
  * references the rewritten artwork, and lets `react-native-svg` rasterize

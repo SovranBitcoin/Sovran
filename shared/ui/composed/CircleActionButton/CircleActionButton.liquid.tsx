@@ -1,88 +1,58 @@
 import React from 'react';
-import {
-  Host,
-  Button as SwiftUIButton,
-  HStack as SwiftUIHStack,
-  Image as SwiftUIImage,
-} from '@expo/ui/swift-ui';
-import { buttonStyle, environment, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
+import { StyleSheet } from 'react-native';
 
-import { useColorScheme } from '@/shared/hooks/useColorScheme';
+import { GlassView } from 'expo-glass-effect';
+
+import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { CIRCLE_SIZE, ICON_SIZE, type CircleActionButtonProps } from './CircleActionButton.types';
 import { CircleActionButtonShell } from './CircleActionButtonShell';
 
-const CIRCLE_STYLE = { height: CIRCLE_SIZE, width: CIRCLE_SIZE };
-const GLASS_BUTTON_STYLE = buttonStyle('glass');
-const BUTTON_FRAME = frame({ height: CIRCLE_SIZE, width: CIRCLE_SIZE });
-const LIFECYCLE_FRAME = frame({ height: CIRCLE_SIZE, width: CIRCLE_SIZE, alignment: 'center' });
-const BUTTON_CONTENT_MODIFIERS = [
-  frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
-];
-const noopPress = () => {};
-
-/**
- * iOS 26+ liquid-glass circle. Tap-only actions mirror the CameraScreen.tsx
- * iOS toolbar (`buttonStyle('glass')` + `glassEffect`). Held actions use the
- * same SwiftUI glass host wrapped in the shared Pressable so press-in/out
- * gestures still get the SF Symbol/liquid surface.
- */
+// Liquid Glass via expo-glass-effect's GlassView (a UIVisualEffectView-backed
+// RN view) rather than an @expo/ui SwiftUI `Host`. Host views (UIHostingController)
+// don't follow an RN ScrollView's content transform and visually pin to the top
+// while scrolling (expo/expo#46278); GlassView scrolls like any RN view.
 export function CircleActionButtonLiquid(props: CircleActionButtonProps): React.ReactElement {
   const [foreground] = useThemeColor(['foreground'] as const);
-  const colorScheme = useColorScheme();
-  const { systemIcon, onPress, onPressIn, onPressOut, disabled = false, color } = props;
+  const { icon, onPress, onPressIn, onPressOut, disabled = false, color } = props;
   const iconColor = color ?? foreground;
   const interactive = !disabled && !!(onPress || onPressIn || onPressOut);
-  const usesPressLifecycle = !!(onPressIn || onPressOut);
-  const glassEffectModifier = React.useMemo(
-    () => glassEffect({ shape: 'circle', glass: { variant: 'regular', interactive } }),
-    [interactive]
-  );
-  const buttonModifiers = React.useMemo(
-    () => [
-      GLASS_BUTTON_STYLE,
-      environment('colorScheme', colorScheme),
-      BUTTON_FRAME,
-      glassEffectModifier,
-    ],
-    [colorScheme, glassEffectModifier]
-  );
-  const lifecycleModifiers = React.useMemo(
-    () => [environment('colorScheme', colorScheme), LIFECYCLE_FRAME, glassEffectModifier],
-    [colorScheme, glassEffectModifier]
-  );
-
-  if (usesPressLifecycle) {
-    return (
-      <CircleActionButtonShell {...props}>
-        <Pressable
-          onPress={interactive ? onPress : undefined}
-          onPressIn={interactive ? onPressIn : undefined}
-          onPressOut={interactive ? onPressOut : undefined}
-          disabled={!interactive}
-          activeOpacity={1}
-          hitSlop={6}
-          style={CIRCLE_STYLE}>
-          <Host style={CIRCLE_STYLE} matchContents={false}>
-            <SwiftUIHStack alignment="center" modifiers={lifecycleModifiers}>
-              <SwiftUIImage systemName={systemIcon as never} size={ICON_SIZE} color={iconColor} />
-            </SwiftUIHStack>
-          </Host>
-        </Pressable>
-      </CircleActionButtonShell>
-    );
-  }
 
   return (
     <CircleActionButtonShell {...props}>
-      <Host style={CIRCLE_STYLE} matchContents={false}>
-        <SwiftUIButton modifiers={buttonModifiers} onPress={interactive ? onPress : noopPress}>
-          <SwiftUIHStack alignment="center" modifiers={BUTTON_CONTENT_MODIFIERS}>
-            <SwiftUIImage systemName={systemIcon as never} size={ICON_SIZE} color={iconColor} />
-          </SwiftUIHStack>
-        </SwiftUIButton>
-      </Host>
+      <Pressable
+        onPress={interactive ? onPress : undefined}
+        onPressIn={interactive ? onPressIn : undefined}
+        onPressOut={interactive ? onPressOut : undefined}
+        disabled={!interactive}
+        style={({ pressed }) => [
+          styles.pressable,
+          pressed && interactive ? { opacity: 0.85 } : null,
+        ]}
+        hitSlop={6}>
+        <GlassView
+          glassEffectStyle="regular"
+          isInteractive={interactive}
+          style={[
+            styles.circle,
+            { width: CIRCLE_SIZE, height: CIRCLE_SIZE, borderRadius: CIRCLE_SIZE / 2 },
+          ]}>
+          <Icon name={icon} size={ICON_SIZE} color={iconColor} />
+        </GlassView>
+      </Pressable>
     </CircleActionButtonShell>
   );
 }
+
+const styles = StyleSheet.create({
+  pressable: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+});

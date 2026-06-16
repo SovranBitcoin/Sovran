@@ -209,16 +209,6 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
   )
 );
 
-/**
- * O(1) selector for the scan-history entry linked to a given transaction id.
- * Row + detail surfaces both consume this so they share one subscription
- * shape and skip the per-render `entries.find` scan that compounds with
- * scroll length × scan-history depth.
- */
-export function useScanEntryForTransactionId(
-  transactionId: string | undefined
-): ScanHistoryEntry | null {
-  return useScanHistoryStore((state) =>
-    transactionId ? (state.entriesByTransactionId[transactionId] ?? null) : null
-  );
-}
+// Per-transaction scan lookup moved to colada annotations
+// (useColadaTransactionAnnotation); this store now backs only the recents list
+// and the transaction-link bookkeeping consumed by the one-time migration.

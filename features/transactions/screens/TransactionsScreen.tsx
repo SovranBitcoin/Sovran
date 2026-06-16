@@ -39,10 +39,22 @@ import {
   type TransactionDirection,
   type TransactionPaymentType,
 } from '@sovranbitcoin/colada';
+import type {
+  TransactionSourceFilter,
+  TransactionLockFilter,
+  TransactionCounterpartyFilter,
+} from '../components/TransactionsFilterContext';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
 const MONTH_SELECTOR_HEIGHT = 48;
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
 
 interface TransactionsScreenProps {
   initialTab?: StatusTab;
@@ -56,6 +68,12 @@ interface TransactionsScreenProps {
   filterDirection?: TransactionDirection;
   /** External filter: mint URL (from filter flow) */
   filterMintUrl?: string;
+  /** External filter: source/transport (qr/nfc/ble/paste/deeplink) */
+  filterSource?: TransactionSourceFilter;
+  /** External filter: P2PK lock state */
+  filterLock?: TransactionLockFilter;
+  /** External filter: has a nostr counterparty */
+  filterCounterparty?: TransactionCounterpartyFilter;
   /** External filter: selected month key (format: "YYYY-MM") */
   filterMonth?: string | null;
   /** Callback when month selection changes */
@@ -69,6 +87,9 @@ export function TransactionsScreen({
   filterPaymentType = 'all',
   filterDirection = 'all',
   filterMintUrl = 'all',
+  filterSource = 'all',
+  filterLock = 'all',
+  filterCounterparty = 'all',
   filterMonth,
   onMonthChange,
 }: TransactionsScreenProps) {
@@ -112,7 +133,7 @@ export function TransactionsScreen({
       }
       log.info('transactions.pending.cancel.one', {
         operationId: entry.operationId,
-        mintUrl: entry.mintUrl,
+        ...mintUrlLogFields(entry.mintUrl),
       });
       await reclaimOne(entry.operationId);
     },
@@ -298,6 +319,9 @@ export function TransactionsScreen({
                 filter={direction}
                 type={paymentType}
                 mintUrlFilter={filterMintUrl}
+                source={filterSource}
+                lock={filterLock}
+                counterparty={filterCounterparty}
                 at="all"
                 tab={tab}
                 selectedMonth={month.key}
@@ -325,6 +349,9 @@ export function TransactionsScreen({
           filter={direction}
           type={paymentType}
           mintUrlFilter={filterMintUrl}
+          source={filterSource}
+          lock={filterLock}
+          counterparty={filterCounterparty}
           at="all"
           tab={tab}
           selectedMonth={selectedMonth}

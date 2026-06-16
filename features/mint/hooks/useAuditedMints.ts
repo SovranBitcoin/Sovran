@@ -22,6 +22,13 @@ interface UseAuditedMintsResult {
 
 const CONCURRENT_LIMIT = 5;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * Batch hook for loading audit data for multiple mints at once.
  *
@@ -130,7 +137,7 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
         }
 
         cashuLog.debug('mint.audit.fetch.success', {
-          mintUrl: normalized,
+          ...mintUrlLogFields(normalized),
           hasAudit: !!auditInfo,
           hasMintInfo: !!mintInfo,
         });
@@ -143,7 +150,7 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
         }
       } catch {
         if (controller.signal.aborted) return;
-        cashuLog.warn('mint.audit.fetch.error', { mintUrl: normalized });
+        cashuLog.warn('mint.audit.fetch.error', { ...mintUrlLogFields(normalized) });
         if (mountedRef.current) {
           setData((prev) => ({
             ...prev,

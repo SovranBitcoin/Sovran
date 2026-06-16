@@ -19,6 +19,20 @@ import { paymentLog } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
+function activeMintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    activeHasMintUrl: !!mintUrl,
+    activeMintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * Decide whether a `mint-op:pending` event with `lastObservedRemoteState === 'PAID'`
  * should surface a "Payment received" toast. Only NPC sync produces these events
@@ -41,6 +55,46 @@ function shouldShowNpcReceivePopup(
   return nowMs - observedAtMs <= NPC_RECEIVE_POPUP_MAX_AGE_MS;
 }
 
+function showConfirmedReceiveEcashToast(input: {
+  id: string;
+  mintUrl: string;
+  amount: number;
+  unit: string;
+  receiveEntryId?: string;
+  source: 'history_updated_waiting' | 'receive_finalized_waiting';
+}): void {
+  const { id, mintUrl, amount, unit, receiveEntryId, source } = input;
+  const active = usePaymentStatusStore.getState().active;
+  paymentLog.info('hook.payment_status.receive_waiting_finalized_new_toast', {
+    id,
+    ...mintUrlLogFields(mintUrl),
+    amount,
+    unit,
+    receiveEntryId: receiveEntryId ?? null,
+    source,
+    previousActiveId: active?.id ?? null,
+    previousActiveState: active?.state ?? null,
+    toastPolicy: 'mount_new_success_toast_after_waiting_warning',
+  });
+  usePaymentStatusStore.getState().setActive({
+    variant: 'receive-ecash',
+    id,
+    mintUrl,
+    amount,
+    unit,
+    state: 'confirmed',
+    ...(receiveEntryId ? { receiveEntryId } : {}),
+  });
+  paymentStatusPopup({
+    variant: 'receive-ecash',
+    id,
+    mintUrl,
+    amount,
+    unit,
+    ...(receiveEntryId ? { receiveEntryId } : {}),
+  });
+}
+
 export function usePaymentStatusListener(): void {
   const { manager } = useManagerContext();
 
@@ -60,7 +114,7 @@ export function usePaymentStatusListener(): void {
           quoteId,
           state: remoteState ?? null,
           method: operation.method,
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
         });
         if (remoteState !== 'PAID') return;
 
@@ -69,7 +123,7 @@ export function usePaymentStatusListener(): void {
         if (isSwapStatusActive()) {
           paymentLog.info('hook.payment_status.suppressed_for_swap', {
             quoteId,
-            mintUrl,
+            ...mintUrlLogFields(mintUrl),
             phase: 'mint_quote_state_changed',
           });
           return;
@@ -83,7 +137,7 @@ export function usePaymentStatusListener(): void {
 
         paymentLog.info('hook.payment_status.receive_processing', {
           quoteId,
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
           amount,
           unit,
           isDuplicate,
@@ -100,7 +154,7 @@ export function usePaymentStatusListener(): void {
         if (isDuplicate) {
           paymentLog.info('hook.payment_status.receive_popup_suppressed', {
             quoteId,
-            mintUrl,
+            ...mintUrlLogFields(mintUrl),
             reason: 'already_active',
           });
           return;
@@ -116,7 +170,7 @@ export function usePaymentStatusListener(): void {
       if (operation.state === 'init') {
         paymentLog.debug('hook.payment_status.mint_pending_init_skipped', {
           operationId,
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
         });
         return;
       }
@@ -128,13 +182,17 @@ export function usePaymentStatusListener(): void {
         unit,
       } = operation;
       const amount = amountToNumber(operation.amount);
-      paymentLog.debug('hook.payment_status.mint_quote_added', { quoteId, state, mintUrl });
+      paymentLog.debug('hook.payment_status.mint_quote_added', {
+        quoteId,
+        state,
+        ...mintUrlLogFields(mintUrl),
+      });
       if (state !== 'PAID') return;
 
       if (isSwapStatusActive()) {
         paymentLog.info('hook.payment_status.suppressed_for_swap', {
           quoteId,
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
           phase: 'mint_quote_added',
         });
         return;
@@ -143,7 +201,7 @@ export function usePaymentStatusListener(): void {
       if (!shouldShowNpcReceivePopup(lastObservedRemoteStateAt)) {
         paymentLog.info('hook.payment_status.npc_quote_suppressed', {
           quoteId,
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
           observedAt: lastObservedRemoteStateAt ?? null,
           ageMs:
             typeof lastObservedRemoteStateAt === 'number'
@@ -159,7 +217,7 @@ export function usePaymentStatusListener(): void {
 
       paymentLog.info('hook.payment_status.npc_receive_processing', {
         quoteId,
-        mintUrl,
+        ...mintUrlLogFields(mintUrl),
         amount,
         unit,
         isDuplicate,
@@ -176,7 +234,7 @@ export function usePaymentStatusListener(): void {
       if (isDuplicate) {
         paymentLog.info('hook.payment_status.receive_popup_suppressed', {
           quoteId,
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
           reason: 'already_active',
         });
         return;
@@ -203,28 +261,73 @@ export function usePaymentStatusListener(): void {
       if (entry.type !== 'receive' || entry.state !== 'finalized') return;
       const store = usePaymentStatusStore.getState();
       const active = store.active;
+      const amount = amountToNumber(entry.amount);
       if (
         !active ||
         active.variant !== 'receive-ecash' ||
         active.mintUrl !== mintUrl ||
-        active.amount !== amountToNumber(entry.amount) ||
+        active.amount !== amount ||
         active.receiveEntryId ||
         !entry.id
       ) {
+        paymentLog.debug('hook.payment_status.receive_entry_link_skipped', {
+          ...mintUrlLogFields(mintUrl),
+          amount,
+          entryId: entry.id ?? null,
+          activeId: active?.id ?? null,
+          activeVariant: active?.variant ?? null,
+          ...activeMintUrlLogFields(active?.mintUrl),
+          activeAmount: active?.amount ?? null,
+          activeState: active?.state ?? null,
+          hasReceiveEntryId: !!active?.receiveEntryId,
+          reason: !active
+            ? 'no_active'
+            : active.variant !== 'receive-ecash'
+              ? 'active_variant_mismatch'
+              : active.mintUrl !== mintUrl
+                ? 'mint_mismatch'
+                : active.amount !== amount
+                  ? 'amount_mismatch'
+                  : active.receiveEntryId
+                    ? 'already_linked'
+                    : 'entry_missing_id',
+        });
         return;
       }
       paymentLog.info('hook.payment_status.receive_entry_linked', {
-        mintUrl,
-        amount: amountToNumber(entry.amount),
+        ...mintUrlLogFields(mintUrl),
+        amount,
         entryId: entry.id,
+        from: active.state,
+      });
+
+      if (active.state === 'waiting') {
+        showConfirmedReceiveEcashToast({
+          id: entry.id,
+          mintUrl,
+          amount,
+          unit: active.unit,
+          receiveEntryId: entry.id,
+          source: 'history_updated_waiting',
+        });
+        return;
+      }
+
+      paymentLog.info('hook.payment_status.receive_entry_confirm_same_toast', {
+        id: active.id,
+        ...mintUrlLogFields(mintUrl),
+        amount,
+        receiveEntryId: entry.id,
+        from: active.state,
       });
       store.setConfirmed(active.id, { receiveEntryId: entry.id });
     });
 
     const offReceiveCreated = manager.on('receive-op:finalized', ({ mintUrl, operation }) => {
+      const amount = amountToNumber(operation.amount);
       paymentLog.info('hook.payment_status.receive_created', {
-        mintUrl,
-        amount: amountToNumber(operation.amount),
+        ...mintUrlLogFields(mintUrl),
+        amount,
         operationId: operation.id,
       });
       // Transition the toast to 'confirmed' even if history:updated
@@ -234,20 +337,59 @@ export function usePaymentStatusListener(): void {
       if (
         active?.variant === 'receive-ecash' &&
         active.mintUrl === mintUrl &&
-        active.amount === amountToNumber(operation.amount)
+        active.amount === amount
       ) {
+        if (active.state === 'waiting') {
+          showConfirmedReceiveEcashToast({
+            id: operation.id,
+            mintUrl,
+            amount,
+            unit: operation.unit,
+            source: 'receive_finalized_waiting',
+          });
+          return;
+        }
+        paymentLog.info('hook.payment_status.receive_created_confirm_same_toast', {
+          id: active.id,
+          ...mintUrlLogFields(mintUrl),
+          amount,
+          from: active.state,
+          operationId: operation.id,
+        });
         store.setConfirmed(active.id);
+      } else {
+        paymentLog.debug('hook.payment_status.receive_created_skipped', {
+          ...mintUrlLogFields(mintUrl),
+          amount,
+          operationId: operation.id,
+          activeId: active?.id ?? null,
+          activeVariant: active?.variant ?? null,
+          ...activeMintUrlLogFields(active?.mintUrl),
+          activeAmount: active?.amount ?? null,
+          activeState: active?.state ?? null,
+          reason: !active
+            ? 'no_active'
+            : active.variant !== 'receive-ecash'
+              ? 'active_variant_mismatch'
+              : active.mintUrl !== mintUrl
+                ? 'mint_mismatch'
+                : 'amount_mismatch',
+        });
       }
     });
 
     const offSendFinalized = manager.on('send:finalized', ({ mintUrl, operationId, operation }) => {
       const amount = amountToNumber(operation.amount);
       const unit = 'sat';
-      paymentLog.info('hook.payment_status.send_finalized', { operationId, mintUrl, amount });
+      paymentLog.info('hook.payment_status.send_finalized', {
+        operationId,
+        ...mintUrlLogFields(mintUrl),
+        amount,
+      });
       if (isSwapStatusActive()) {
         paymentLog.info('hook.payment_status.suppressed_for_swap', {
           operationId,
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
           phase: 'send_finalized',
         });
         return;
@@ -260,10 +402,23 @@ export function usePaymentStatusListener(): void {
           (store.active?.state === 'processing' || store.active?.state === 'delivered'));
 
       if (hadPending) {
+        paymentLog.info('hook.payment_status.send_confirm_same_toast', {
+          operationId,
+          activeId: store.active?.id ?? null,
+          activeVariant: store.active?.variant ?? null,
+          activeState: store.active?.state ?? null,
+        });
         store.setConfirmed(store.active!.id, { operationId });
         return;
       }
 
+      paymentLog.info('hook.payment_status.send_new_success_toast', {
+        operationId,
+        ...mintUrlLogFields(mintUrl),
+        amount,
+        unit,
+        reason: 'no_matching_active_toast',
+      });
       store.setActive({
         variant: 'send',
         id: operationId,
@@ -294,14 +449,14 @@ export function usePaymentStatusListener(): void {
         if (!('quoteId' in operation) || !('amount' in operation)) return;
         paymentLog.info('hook.payment_status.melt_finalized', {
           operationId,
-          mintUrl,
+          ...mintUrlLogFields(mintUrl),
           quoteId: operation.quoteId,
           amount: amountToNumber(operation.amount),
         });
         if (isSwapStatusActive()) {
           paymentLog.info('hook.payment_status.suppressed_for_swap', {
             operationId,
-            mintUrl,
+            ...mintUrlLogFields(mintUrl),
             quoteId: operation.quoteId,
             phase: 'melt_finalized',
           });
@@ -316,11 +471,25 @@ export function usePaymentStatusListener(): void {
 
         if (hadActive) {
           // Still processing → confirm. Already confirmed → just merge operationId for View button.
+          paymentLog.info('hook.payment_status.melt_confirm_same_toast', {
+            operationId,
+            quoteId: operation.quoteId,
+            activeId: store.active?.id ?? null,
+            activeState: store.active?.state ?? null,
+          });
           store.setConfirmed(store.active!.id, { operationId });
         } else {
           // Background melt (no active toast) — show new confirmed toast
           const amount = amountToNumber(operation.amount);
           const unit = 'sat';
+          paymentLog.info('hook.payment_status.melt_new_success_toast', {
+            operationId,
+            quoteId: operation.quoteId,
+            ...mintUrlLogFields(mintUrl),
+            amount,
+            unit,
+            reason: 'no_matching_active_toast',
+          });
           store.setActive({
             variant: 'melt',
             id: operation.quoteId,

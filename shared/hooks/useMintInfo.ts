@@ -5,6 +5,13 @@ import type { MintInfo } from '@cashu/cashu-ts';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { cashuLog } from '@/shared/lib/logger';
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * Loads mint info for a given mint URL.
  *
@@ -24,7 +31,9 @@ export function useMintInfo(mintUrl: string | string | undefined | null): MintIn
       match?.mintInfo && Object.keys(match.mintInfo).length > 0
         ? (match.mintInfo as MintInfo)
         : null;
-    if (normalizedUrl) cashuLog.debug('mintInfo.cache', { mintUrl: normalizedUrl, hit: !!hit });
+    if (normalizedUrl) {
+      cashuLog.debug('mintInfo.cache', { ...mintUrlLogFields(normalizedUrl), hit: !!hit });
+    }
     return hit;
   }, [normalizedUrl, mints]);
 
@@ -36,16 +45,19 @@ export function useMintInfo(mintUrl: string | string | undefined | null): MintIn
       return;
     }
     let mounted = true;
-    cashuLog.info('mintInfo.fetch.start', { mintUrl: normalizedUrl });
+    cashuLog.info('mintInfo.fetch.start', { ...mintUrlLogFields(normalizedUrl) });
     getMintInfo(normalizedUrl)
       .then((info) => {
         if (mounted) {
-          cashuLog.info('mintInfo.fetch.ok', { mintUrl: normalizedUrl, hasInfo: !!info });
+          cashuLog.info('mintInfo.fetch.ok', {
+            ...mintUrlLogFields(normalizedUrl),
+            hasInfo: !!info,
+          });
           setFetchedInfo(info as MintInfo);
         }
       })
       .catch((err) => {
-        cashuLog.warn('mintInfo.fetch.fail', { mintUrl: normalizedUrl, error: err });
+        cashuLog.warn('mintInfo.fetch.fail', { ...mintUrlLogFields(normalizedUrl), error: err });
         if (mounted) setFetchedInfo(null);
       });
     return () => {

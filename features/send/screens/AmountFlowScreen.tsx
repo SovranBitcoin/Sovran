@@ -21,8 +21,8 @@ import { useWalletContextWithOverride } from '@/shared/providers/WalletContextPr
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
-import Icon from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { ScreenErrorState } from '@/shared/ui/composed/ScreenStates';
 import { paymentLog, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import { useNearPaySessionStore } from '@/shared/stores/runtime/nearPayStore';
@@ -257,14 +257,20 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
   const renderHeaderRight = useCallback(
     () => (
       <View style={offlineIconStyle}>
-        <Icon
-          name={canSendOffline === true ? 'mdi:airplane' : 'mdi:wifi'}
+        <ScreenHeaderAction
+          icon={canSendOffline === true ? 'mdi:airplane' : 'mdi:wifi'}
           size={18}
-          color={foreground}
+          accessibilityLabel={
+            canSendOffline === true
+              ? 'Offline send available'
+              : canSendOffline === false
+                ? 'Network required'
+                : 'Checking offline send availability'
+          }
         />
       </View>
     ),
-    [canSendOffline, foreground, offlineIconStyle]
+    [canSendOffline, offlineIconStyle]
   );
   const stackOptions = useMemo(
     () => ({
@@ -276,16 +282,12 @@ export function AmountFlowContent({ amountEntry, headerMode = 'native' }: Amount
     }),
     [foreground, isSendOperation, mintUrl, renderHeaderRight, renderHeaderTitle]
   );
+  const handleErrorGoBack = useCallback(() => {
+    void actions.back.execute();
+  }, [actions.back]);
 
   if (error) {
-    return (
-      <ScreenErrorState
-        message={error}
-        onGoBack={() => {
-          void actions.back.execute();
-        }}
-      />
-    );
+    return <ScreenErrorState message={error} onGoBack={handleErrorGoBack} />;
   }
 
   if (!entry) {

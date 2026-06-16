@@ -4,7 +4,6 @@ jest.mock('bitchat-module', () => ({
   startBLE: jest.fn(),
   startBLEPrivateChat: jest.fn(),
   sendBLEPrivateMessage: jest.fn(),
-  sendBLEMessage: jest.fn(),
 }));
 
 jest.mock('@/shared/lib/id', () => ({
@@ -14,7 +13,7 @@ jest.mock('@/shared/lib/id', () => ({
 import {
   chunkUtf8,
   sendBLEPrivateMessageChunks,
-  sendBLEPublicMessage,
+  sendBLEPrivateMessageWhole,
 } from '@/features/bitchat/lib/blePrivateDelivery';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
@@ -144,58 +143,133 @@ describe('BitChat BLE private delivery', () => {
   });
 });
 
-describe('BitChat BLE public message delivery', () => {
-  it('sends the whole token as a single public message after starting BLE', async () => {
+describe('BitChat BLE whole private-DM delivery', () => {
+  it('sends the whole token as a single private DM after the handshake', async () => {
     const startBLE = jest
       .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
       .mockResolvedValue(undefined);
-    const sendBLEMessage = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
-    // A multi-KB token that would have been split into many private DM chunks.
+    const startBLEPrivateChat = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+    const sendBLEPrivateMessage = jest
+      .fn<Promise<string>, [string, string, string, string]>()
+      .mockResolvedValue('message-1');
+    const sleep = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
+    // A multi-KB token — fits ONE message thanks to the extended PM length.
     const token = `cashuB${'A'.repeat(4000)}`;
 
-    const result = await sendBLEPublicMessage({
+    const result = await sendBLEPrivateMessageWhole({
+      peerID: 'peer-a',
       content: token,
       nickname: 'sender',
       profileScope: 'profile-a',
       identityMaterial: IDENTITY_MATERIAL,
-      deps: { startBLE, sendBLEMessage, now: () => 0 },
+      deps: {
+        startBLE,
+        startBLEPrivateChat,
+        sendBLEPrivateMessage,
+        sleep,
+        createMessageId: () => 'nutdrop-id',
+        now: () => 0,
+      },
     });
 
     expect(startBLE).toHaveBeenCalledWith('sender', 'profile-a', IDENTITY_MATERIAL);
-    expect(sendBLEMessage).toHaveBeenCalledTimes(1);
-    expect(sendBLEMessage).toHaveBeenCalledWith(token);
-    expect(result).toEqual({ startupMs: 0, sendMs: 0 });
+    expect(startBLEPrivateChat).toHaveBeenCalledWith('peer-a');
+    expect(sendBLEPrivateMessage).toHaveBeenCalledTimes(1);
+    expect(sendBLEPrivateMessage).toHaveBeenCalledWith('peer-a', token, 'sender', 'nutdrop-id');
+    expect(result).toEqual({
+      messageId: 'nutdrop-id',
+      startupMs: 0,
+      handshakeMs: 0,
+      sendMs: 0,
+    });
+  });
+
+  it('reports a handshake error without throwing, then still sends', async () => {
+    const startBLE = jest
+      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .mockResolvedValue(undefined);
+    const startBLEPrivateChat = jest
+      .fn<Promise<void>, [string]>()
+      .mockRejectedValue(new Error('handshake timed out'));
+    const sendBLEPrivateMessage = jest
+      .fn<Promise<string>, [string, string, string, string]>()
+      .mockResolvedValue('message-1');
+    const sleep = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
+
+    const result = await sendBLEPrivateMessageWhole({
+      peerID: 'peer-a',
+      content: 'cashuB...',
+      nickname: 'sender',
+      profileScope: 'profile-a',
+      identityMaterial: IDENTITY_MATERIAL,
+      deps: {
+        startBLE,
+        startBLEPrivateChat,
+        sendBLEPrivateMessage,
+        sleep,
+        createMessageId: () => 'nutdrop-id',
+        now: () => 0,
+      },
+    });
+
+    expect(result.handshakeError).toBe('handshake timed out');
+    expect(sendBLEPrivateMessage).toHaveBeenCalledTimes(1);
   });
 
   it('fails safely before native calls when profile scope is missing', async () => {
-    const sendBLEMessage = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+    const startBLE = jest
+      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .mockResolvedValue(undefined);
 
     await expect(
-      sendBLEPublicMessage({
+      sendBLEPrivateMessageWhole({
+        peerID: 'peer-a',
         content: 'cashuA...',
         nickname: 'sender',
         profileScope: '',
         identityMaterial: IDENTITY_MATERIAL,
-        deps: { sendBLEMessage },
+        deps: { startBLE },
       })
     ).rejects.toThrow('BitChat profile scope unavailable');
 
-    expect(sendBLEMessage).not.toHaveBeenCalled();
+    expect(startBLE).not.toHaveBeenCalled();
   });
 
   it('fails safely before native calls when identity material is missing', async () => {
-    const sendBLEMessage = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+    const startBLE = jest
+      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .mockResolvedValue(undefined);
 
     await expect(
-      sendBLEPublicMessage({
+      sendBLEPrivateMessageWhole({
+        peerID: 'peer-a',
         content: 'cashuA...',
         nickname: 'sender',
         profileScope: 'profile-a',
         identityMaterial: null,
-        deps: { sendBLEMessage },
+        deps: { startBLE },
       })
     ).rejects.toThrow('BitChat identity material unavailable');
 
-    expect(sendBLEMessage).not.toHaveBeenCalled();
+    expect(startBLE).not.toHaveBeenCalled();
+  });
+
+  it('fails safely before native calls when the peer is missing', async () => {
+    const startBLE = jest
+      .fn<Promise<void>, [string, string, BitchatBLEIdentityMaterial]>()
+      .mockResolvedValue(undefined);
+
+    await expect(
+      sendBLEPrivateMessageWhole({
+        peerID: '',
+        content: 'cashuA...',
+        nickname: 'sender',
+        profileScope: 'profile-a',
+        identityMaterial: IDENTITY_MATERIAL,
+        deps: { startBLE },
+      })
+    ).rejects.toThrow('BitChat peer unavailable');
+
+    expect(startBLE).not.toHaveBeenCalled();
   });
 });

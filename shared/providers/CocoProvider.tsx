@@ -31,10 +31,22 @@ interface CocoProviderProps {
   children: ReactNode;
 }
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
+function defaultSelectedMintLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasDefaultSelectedMint: !!mintUrl,
+    defaultSelectedMintLength: mintUrl?.length ?? 0,
+  };
+}
+
 async function initializeDefaultMints(manager: Manager): Promise<void> {
   try {
-    log.info('coco.init_default_mints');
-
     // Default mint set installed on first run. Mirrors numo's curated list
     // (minibits + chorus + cubabitcoin) plus our own mint.sovran.money, but
     // deliberately excludes coinos. Sovran's own mint is the default selection.
@@ -45,29 +57,40 @@ async function initializeDefaultMints(manager: Manager): Promise<void> {
       'https://mint.cubabitcoin.org',
     ];
     const defaultSelectedMint = 'https://mint.sovran.money';
+    log.info('coco.init_default_mints', {
+      defaultMintCount: defaultMints.length,
+      ...defaultSelectedMintLogFields(defaultSelectedMint),
+    });
 
     for (const mintUrl of defaultMints) {
       try {
+        log.debug('coco.mint_trust_check.start', { ...mintUrlLogFields(mintUrl) });
         const isKnown = await manager.mint.isTrustedMint(mintUrl);
         if (isKnown) {
-          log.debug('coco.mint_exists', { mintUrl });
+          log.debug('coco.mint_exists', { ...mintUrlLogFields(mintUrl) });
           continue;
         }
 
         await manager.mint.addMint(mintUrl, { trusted: true });
-        log.info('coco.mint_added', { mintUrl });
+        log.info('coco.mint_added', { ...mintUrlLogFields(mintUrl) });
       } catch (error) {
-        log.warn('coco.mint_add_failed', { mintUrl, error });
+        log.warn('coco.mint_add_failed', { ...mintUrlLogFields(mintUrl), error });
       }
     }
 
     try {
       const { selectedMint, setSelectedMint } = useMintStore.getState();
+      log.debug('coco.default_mint_selection.check', {
+        hasSelectedMint: !!selectedMint,
+        ...defaultSelectedMintLogFields(defaultSelectedMint),
+      });
       if (!selectedMint) {
         const isDefaultTrusted = await manager.mint.isTrustedMint(defaultSelectedMint);
         if (isDefaultTrusted) {
           setSelectedMint(defaultSelectedMint);
-          log.info('coco.mint_selected');
+          log.info('coco.mint_selected', { ...mintUrlLogFields(defaultSelectedMint) });
+        } else {
+          log.warn('coco.default_mint_not_trusted', { ...mintUrlLogFields(defaultSelectedMint) });
         }
       }
     } catch (error) {
@@ -119,22 +142,33 @@ export function CocoProvider({ children }: CocoProviderProps) {
       try {
         stage.log('Initializing Coco...');
         initLog('Coco', 'Phase 1 starting');
+        log.info('coco.phase1.start', {
+          hasKeys: !!keys,
+          hasPrivateKey: !!keys?.privateKey,
+        });
 
         // Pass the already-derived private key so CocoManager doesn't re-derive
         if (keys?.privateKey) {
           CocoManager.setSignerKey(keys.privateKey);
+        } else {
+          log.warn('coco.phase1.no_private_key_for_manager');
         }
 
         const mgr = await initPhase('Coco.managerInit', () => CocoManager.initialize());
         setManager(mgr);
+        log.info('coco.phase1.manager_ready');
 
         initLog('Coco', 'setting isReady=true, calling stage.complete()');
         setIsReady(true);
         stage.complete();
         initLog('Coco', 'Phase 1 complete');
+        log.info('coco.phase1.done');
       } catch (error) {
         initLog('Coco', `Phase 1 ERROR: ${error}`);
         const errorMessage = error instanceof Error ? error.message : 'Initialization failed';
+        log.error('coco.phase1.failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         setMigrationError(error instanceof Error ? error : new Error('Initialization failed'));
         stage.error(errorMessage);
       }
@@ -150,6 +184,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       hasStarted.current = false;
       setManager(null);
       setIsReady(false);
+      log.info('coco.phase1.cleanup_requested');
       CocoManager.cleanup().catch((error) => {
         log.error('coco.cleanup_failed', { error });
       });
@@ -167,6 +202,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
     const runBackground = async () => {
       try {
         initLog('Coco-bg', 'Phase 2 starting');
+        log.info('coco.phase2.start');
 
         // Safe to enable observe-only watchers and pre-warm the seed cache
         // immediately — neither uses the deterministic counter.
@@ -185,17 +221,30 @@ export function CocoProvider({ children }: CocoProviderProps) {
 
         try {
           bgStage.log('Recovering pending operations...');
+          log.info('coco.recovery.send.start');
           await initPhase('Coco-bg.sendRecovery', () => manager.ops.send.recovery.run());
+          log.info('coco.recovery.send.done');
+          log.info('coco.recovery.melt.start');
           await initPhase('Coco-bg.meltRecovery', () => manager.ops.melt.recovery.run());
+          log.info('coco.recovery.melt.done');
+          log.info('coco.recovery.receive.start');
           await initPhase('Coco-bg.receiveRecovery', () => manager.ops.receive.recovery.run());
+          log.info('coco.recovery.receive.done');
         } catch (recoveryErr) {
           initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
+          log.warn('coco.recovery.failed', {
+            error: recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr),
+          });
         }
 
         bgStage.complete();
         initLog('Coco-bg', 'Phase 2 complete');
+        log.info('coco.phase2.done');
       } catch (error) {
         initLog('Coco-bg', `Phase 2 failed (non-fatal): ${error}`);
+        log.warn('coco.phase2.failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         bgStage.complete();
       }
     };
@@ -223,12 +272,15 @@ export function CocoProvider({ children }: CocoProviderProps) {
       unsubscribe = null;
       // Tiny extra defer keeps Phase 2's first await off the morph's last
       // animation frame.
+      log.info('coco.phase2.defer_start');
       deferHandle = deferWork('coco.phase2', runBackground, 50);
     };
 
     if (getBootMorphCompleted()) {
+      log.debug('coco.phase2.boot_morph_already_done');
       start();
     } else {
+      log.debug('coco.phase2.wait_boot_morph');
       unsubscribe = subscribeBootMorphCompleted((completed) => {
         if (completed) start();
       });
@@ -242,6 +294,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       unsubscribe?.();
       deferHandle?.cancel();
+      log.info('coco.phase2.cleanup');
       // Symmetric to Phase 1: a deps change (profile switch via keys.pubkey,
       // or a re-init that produced a fresh manager) must allow the bg work
       // to re-run for the new identity. Without this, the new manager never
@@ -259,6 +312,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
   // window elapsed.
   useEffect(() => {
     if (!manager) return;
+    log.info('coco.mint_info_cache.attach');
     return attachMintInfoCacheToManager(manager);
   }, [manager]);
 

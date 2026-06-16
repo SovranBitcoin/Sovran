@@ -1,9 +1,4 @@
-import {
-  sendBLEMessage,
-  sendBLEPrivateMessage,
-  startBLE,
-  startBLEPrivateChat,
-} from 'bitchat-module';
+import { sendBLEPrivateMessage, startBLE, startBLEPrivateChat } from 'bitchat-module';
 import type { BitchatBLEIdentityMaterial } from 'bitchat-module';
 
 import { mintLocalId } from '@/shared/lib/id';
@@ -134,61 +129,69 @@ export async function sendBLEPrivateMessageChunks({
   };
 }
 
-interface SendBLEPublicMessageDeps {
+interface SendBLEPrivateMessageWholeDeps {
   startBLE?: typeof startBLE;
-  sendBLEMessage?: typeof sendBLEMessage;
+  startBLEPrivateChat?: typeof startBLEPrivateChat;
+  sendBLEPrivateMessage?: typeof sendBLEPrivateMessage;
+  createMessageId?: () => string;
+  sleep?: (ms: number) => Promise<void>;
   now?: () => number;
 }
 
-interface SendBLEPublicMessageOptions {
+interface SendBLEPrivateMessageWholeOptions {
+  peerID: string;
   content: string;
   nickname: string;
   profileScope: string;
   identityMaterial: BitchatBLEIdentityMaterial | null | undefined;
-  deps?: SendBLEPublicMessageDeps;
+  messageIdPrefix?: string;
+  handshakeDelayMs?: number;
+  deps?: SendBLEPrivateMessageWholeDeps;
 }
 
-interface SendBLEPublicMessageResult {
+interface SendBLEPrivateMessageWholeResult {
+  messageId: string;
   startupMs: number;
+  handshakeMs: number;
   sendMs: number;
+  handshakeError?: string;
 }
 
 /**
- * Send `content` as a SINGLE public BLE mesh message and let the transport
- * handle fragmentation/reassembly.
+ * Send `content` as a SINGLE private Noise DM to `peerID`.
  *
- * Why public + one message instead of a private Noise DM:
- * bitchat's private-message wire format (`PrivateMessagePacket`) carries the
- * text in a TLV with a ONE-byte length prefix, so content is hard-capped at
- * 255 UTF-8 bytes — `encode()` returns nil and drops anything larger. That is
- * why a multi-KB ecash token previously had to be split into many separate
- * Noise DMs (`sendBLEPrivateMessageChunks`), which unmodified bitchat receivers
- * cannot reassemble — they surface as many disjoint messages, none of which is
- * a complete token.
+ * Sovran extends the bitchat `PrivateMessagePacket` content length (a 0xFF
+ * sentinel + 2-byte length), so a whole multi-KB ecash token fits ONE private
+ * message — the 255-byte cap was a message-format limit, not a transport one,
+ * and the transport fragments the encrypted packet transparently. Only Sovran
+ * peers can decode our >254-byte DMs (stock misparses them), which is
+ * acceptable: Nut Drop payments are Sovran↔Sovran, and a Noise DM is encrypted
+ * to the recipient, so the token (locked or bearer) stays private and safe —
+ * no public-mesh broadcast of payment metadata.
  *
- * The public `.message` path instead carries up to 60_000 bytes (2-byte length
- * field), is transparently BLE-fragmented on send and reassembled into exactly
- * ONE message on receive, and stock bitchat already detects `cashu…` tokens and
- * renders them as a single tappable, redeemable chip. So the whole token lands
- * as one unit on an unmodified receiver with no receiver-side changes.
- *
- * Trade-off: a public message is broadcast across the mesh (signed but NOT
- * Noise-encrypted), so the bearer token is readable by any peer in BLE/relay
- * range. This is inherent — stock bitchat only renders Cashu tokens on the
- * public path — and matches the "drop" semantics of NearPay/Nut Drop.
+ * `startBLE` here is defensive (BLE is already up from the radar) and passes no
+ * creq, so it never clears the advertised creq — only `stop()` does.
  */
-export async function sendBLEPublicMessage({
+export async function sendBLEPrivateMessageWhole({
+  peerID,
   content,
   nickname,
   profileScope,
   identityMaterial,
+  messageIdPrefix = 'nutdrop',
+  handshakeDelayMs = DEFAULT_HANDSHAKE_DELAY_MS,
   deps,
-}: SendBLEPublicMessageOptions): Promise<SendBLEPublicMessageResult> {
+}: SendBLEPrivateMessageWholeOptions): Promise<SendBLEPrivateMessageWholeResult> {
   if (!profileScope) throw new Error('BitChat profile scope unavailable');
   if (!identityMaterial) throw new Error('BitChat identity material unavailable');
+  if (!peerID) throw new Error('BitChat peer unavailable');
 
   const startBLEFn = deps?.startBLE ?? startBLE;
-  const sendMessageFn = deps?.sendBLEMessage ?? sendBLEMessage;
+  const startPrivateChatFn = deps?.startBLEPrivateChat ?? startBLEPrivateChat;
+  const sendPrivateMessageFn = deps?.sendBLEPrivateMessage ?? sendBLEPrivateMessage;
+  const createMessageId = deps?.createMessageId ?? (() => mintLocalId(messageIdPrefix));
+  const sleep =
+    deps?.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const now = deps?.now ?? (() => performance.now());
 
   const effectiveNickname = nickname || 'sovran';
@@ -197,8 +200,23 @@ export async function sendBLEPublicMessage({
   await startBLEFn(effectiveNickname, profileScope, identityMaterial);
   const startupMs = now() - startupAt;
 
-  const sendAt = now();
-  await sendMessageFn(content);
+  const handshakeAt = now();
+  let handshakeError: string | undefined;
+  await startPrivateChatFn(peerID).catch((err: unknown) => {
+    handshakeError = err instanceof Error ? err.message : String(err);
+  });
+  const handshakeMs = now() - handshakeAt;
+  await sleep(handshakeDelayMs);
 
-  return { startupMs, sendMs: now() - sendAt };
+  const sendAt = now();
+  const messageId = createMessageId();
+  await sendPrivateMessageFn(peerID, content, effectiveNickname, messageId);
+
+  return {
+    messageId,
+    startupMs,
+    handshakeMs,
+    sendMs: now() - sendAt,
+    ...(handshakeError ? { handshakeError } : {}),
+  };
 }

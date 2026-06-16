@@ -84,6 +84,12 @@ export const FEED_FILTER_FOR_YOU = 'For You';
 export const FEED_FILTER_FOLLOWING_POPULAR = 'Following Popular';
 export const FEED_FILTER_FOLLOWING_RECENT = 'Following Recent';
 
+// How many posts each home feed (For You, Following Popular/Recent) requests.
+// Kept deliberately small — the feed paints faster and pagination tops it up as
+// the user scrolls, rather than fetching a large batch up front.
+const FEED_INITIAL_LIMIT = 15;
+const FEED_PAGE_LIMIT = 10;
+
 // Stable config object — avoids re-triggering useBackgroundConfig every render
 const BG_CONFIG = { blurMode: 'full' as const };
 const FEED_AVATAR_SIZE = 36;
@@ -342,7 +348,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         const phase1 = await client.getFeed({
           spec,
           userPubkey,
-          limit: 30,
+          limit: FEED_INITIAL_LIMIT,
           refresh: isRefresh,
           signal: controller.signal,
         });
@@ -464,7 +470,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       const page = await client.getFeed({
         spec: currentSpec,
         userPubkey,
-        limit: 20,
+        limit: FEED_PAGE_LIMIT,
         until: paginationUntilRef.current,
         offset: paginationOffsetRef.current > 0 ? paginationOffsetRef.current : undefined,
         signal: controller.signal,

@@ -27,8 +27,9 @@
 // cleanup, migration, and reserved-proof paths. Keep future reach-ins here.
 // See `../.agents/skills/sovran-architecture-workflow`.
 
-import type { CoreProof, Manager, MeltOperation, MeltOperationState } from '@cashu/coco-core';
+import type { CoreProof, Manager } from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';
+import { cashuLog } from '@/shared/lib/logger';
 
 interface ManagerInternals {
   proofRepository: {
@@ -50,9 +51,6 @@ interface ManagerInternals {
       counter: number
     ): Promise<{ mintUrl: string; keysetId: string; counter: number }>;
   };
-  meltOperationRepository: {
-    getByState(state: MeltOperationState): Promise<MeltOperation[]>;
-  };
   mintOperationRepository: {
     delete(id: string): Promise<void>;
   };
@@ -62,47 +60,152 @@ function internals(manager: Manager): ManagerInternals {
   return manager as unknown as ManagerInternals;
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /** Ready (UNSPENT, unreserved) proofs for one mint, via the private ProofService. */
-export function getReadyProofs(manager: Manager, mintUrl: string): Promise<CoreProof[]> {
-  return internals(manager).proofService.getReadyProofs(mintUrl);
+export async function getReadyProofs(manager: Manager, mintUrl: string): Promise<CoreProof[]> {
+  cashuLog.debug('cashu.manager_internals.ready_proofs.start', {
+    ...mintUrlLogFields(mintUrl),
+  });
+  try {
+    const proofs = await internals(manager).proofService.getReadyProofs(mintUrl);
+    cashuLog.debug('cashu.manager_internals.ready_proofs.done', {
+      ...mintUrlLogFields(mintUrl),
+      count: proofs.length,
+    });
+    return proofs;
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.ready_proofs.failed', {
+      ...mintUrlLogFields(mintUrl),
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 /** Wallet for one mint, via the private WalletService. */
-export function getWallet(manager: Manager, mintUrl: string): Promise<Wallet> {
-  return internals(manager).walletService.getWallet(mintUrl);
+export async function getWallet(manager: Manager, mintUrl: string): Promise<Wallet> {
+  cashuLog.debug('cashu.manager_internals.wallet.start', { ...mintUrlLogFields(mintUrl) });
+  try {
+    const wallet = await internals(manager).walletService.getWallet(mintUrl);
+    cashuLog.debug('cashu.manager_internals.wallet.done', { ...mintUrlLogFields(mintUrl) });
+    return wallet;
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.wallet.failed', {
+      ...mintUrlLogFields(mintUrl),
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 /** All proofs reserved by an in-flight operation (have `usedByOperationId`). */
-export function getReservedProofs(manager: Manager): Promise<CoreProof[]> {
-  return internals(manager).proofRepository.getReservedProofs();
+export async function getReservedProofs(manager: Manager): Promise<CoreProof[]> {
+  cashuLog.debug('cashu.manager_internals.reserved_proofs.start');
+  try {
+    const proofs = await internals(manager).proofRepository.getReservedProofs();
+    cashuLog.debug('cashu.manager_internals.reserved_proofs.done', { count: proofs.length });
+    return proofs;
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.reserved_proofs.failed', {
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 /**
  * Inflight proofs (transient state during mint/melt), optionally filtered by mint.
  * Used by the per-mint rebalance recovery to clear leftovers after a melt failure.
  */
-export function getInflightProofs(manager: Manager, mintUrls?: string[]): Promise<CoreProof[]> {
-  return internals(manager).proofRepository.getInflightProofs(mintUrls);
+export async function getInflightProofs(
+  manager: Manager,
+  mintUrls?: string[]
+): Promise<CoreProof[]> {
+  cashuLog.debug('cashu.manager_internals.inflight_proofs.start', {
+    mintCount: mintUrls?.length ?? null,
+  });
+  try {
+    const proofs = await internals(manager).proofRepository.getInflightProofs(mintUrls);
+    cashuLog.debug('cashu.manager_internals.inflight_proofs.done', {
+      mintCount: mintUrls?.length ?? null,
+      count: proofs.length,
+    });
+    return proofs;
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.inflight_proofs.failed', {
+      mintCount: mintUrls?.length ?? null,
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 /**
  * Move proofs from `inflight` back to `ready` and clear their operation tag.
  * Application-level equivalent of the "Restore Inflight" debug button.
  */
-export function restoreProofsToReady(
+export async function restoreProofsToReady(
   manager: Manager,
   mintUrl: string,
   secrets: string[]
 ): Promise<void> {
-  return internals(manager).proofService.restoreProofsToReady(mintUrl, secrets);
+  cashuLog.info('cashu.manager_internals.restore_proofs.start', {
+    ...mintUrlLogFields(mintUrl),
+    count: secrets.length,
+  });
+  try {
+    await internals(manager).proofService.restoreProofsToReady(mintUrl, secrets);
+    cashuLog.info('cashu.manager_internals.restore_proofs.done', {
+      ...mintUrlLogFields(mintUrl),
+      count: secrets.length,
+    });
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.restore_proofs.failed', {
+      ...mintUrlLogFields(mintUrl),
+      count: secrets.length,
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 /**
  * Persist proofs in the given mint+state, via the private ProofService.
  * Used by the legacy Redux→Coco migration to seed the proof table.
  */
-export function saveProofs(manager: Manager, mintUrl: string, proofs: CoreProof[]): Promise<void> {
-  return internals(manager).proofService.saveProofs(mintUrl, proofs);
+export async function saveProofs(
+  manager: Manager,
+  mintUrl: string,
+  proofs: CoreProof[]
+): Promise<void> {
+  cashuLog.info('cashu.manager_internals.save_proofs.start', {
+    ...mintUrlLogFields(mintUrl),
+    count: proofs.length,
+  });
+  try {
+    await internals(manager).proofService.saveProofs(mintUrl, proofs);
+    cashuLog.info('cashu.manager_internals.save_proofs.done', {
+      ...mintUrlLogFields(mintUrl),
+      count: proofs.length,
+    });
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.save_proofs.failed', {
+      ...mintUrlLogFields(mintUrl),
+      count: proofs.length,
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -110,27 +213,38 @@ export function saveProofs(manager: Manager, mintUrl: string, proofs: CoreProof[
  * CounterService. Used by the legacy Redux→Coco migration to recover counters
  * the user already burnt before installing the Coco-backed build.
  */
-export function overwriteCounter(
+export async function overwriteCounter(
   manager: Manager,
   mintUrl: string,
   keysetId: string,
   counter: number
 ): Promise<{ mintUrl: string; keysetId: string; counter: number }> {
-  return internals(manager).counterService.overwriteCounter(mintUrl, keysetId, counter);
-}
-
-/**
- * Melt operations in a given state, via the private MeltOperationRepository.
- *
- * The `prepareMeltBolt11`/`executeMelt` flow stores operations here but does
- * not emit `melt-quote:created`, so the public history is incomplete — this
- * is the seam history-merge code uses to bridge the gap.
- */
-export function listMeltOperationsByState(
-  manager: Manager,
-  state: MeltOperationState
-): Promise<MeltOperation[]> {
-  return internals(manager).meltOperationRepository.getByState(state);
+  cashuLog.info('cashu.manager_internals.counter_overwrite.start', {
+    ...mintUrlLogFields(mintUrl),
+    keysetId,
+    counter,
+  });
+  try {
+    const result = await internals(manager).counterService.overwriteCounter(
+      mintUrl,
+      keysetId,
+      counter
+    );
+    cashuLog.info('cashu.manager_internals.counter_overwrite.done', {
+      ...mintUrlLogFields(mintUrl),
+      keysetId,
+      counter: result.counter,
+    });
+    return result;
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.counter_overwrite.failed', {
+      ...mintUrlLogFields(mintUrl),
+      keysetId,
+      counter,
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -140,6 +254,16 @@ export function listMeltOperationsByState(
  * generated against a stale counter (NPC-sync race) and would loop forever.
  * Coco does not yet expose a public abandon API; revisit when it does.
  */
-export function deleteMintOperation(manager: Manager, id: string): Promise<void> {
-  return internals(manager).mintOperationRepository.delete(id);
+export async function deleteMintOperation(manager: Manager, id: string): Promise<void> {
+  cashuLog.info('cashu.manager_internals.mint_operation_delete.start', { id });
+  try {
+    await internals(manager).mintOperationRepository.delete(id);
+    cashuLog.info('cashu.manager_internals.mint_operation_delete.done', { id });
+  } catch (error) {
+    cashuLog.warn('cashu.manager_internals.mint_operation_delete.failed', {
+      id,
+      error: errorMessage(error),
+    });
+    throw error;
+  }
 }

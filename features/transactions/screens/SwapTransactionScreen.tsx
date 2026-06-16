@@ -29,6 +29,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { TransactionDetailShell } from '@/features/transactions/components/detail/TransactionDetailShell';
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
@@ -54,11 +55,12 @@ import { formatDate } from '@/shared/lib/date';
 import { formatAmount } from '@/shared/lib/currency';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintManagement } from '@/features/mint';
+import { getTransactionActionDirection } from '@/features/transactions/lib/transactionPresentation';
 import Icon from 'assets/icons';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { cashuLog, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 interface Props {
   groupId: string | undefined;
@@ -117,7 +119,7 @@ function buildSwapEntryRowProps(
   mintIconUrl: string | undefined,
   mintName: string
 ) {
-  const isSend = historyEntry.type === 'melt';
+  const type = getTransactionActionDirection(historyEntry.type);
   const numericAmount = amountToNumber(historyEntry.amount);
   const fiatAmount = formatAmount(
     { amount: Math.abs(numericAmount), unit: historyEntry.unit },
@@ -125,21 +127,40 @@ function buildSwapEntryRowProps(
   );
 
   const handlePress = () => {
+    const serializedHistoryEntry = JSON.stringify(historyEntry);
+    const entryState =
+      typeof (historyEntry as Record<string, unknown>).state === 'string'
+        ? (historyEntry as Record<string, unknown>).state
+        : null;
     if (historyEntry.type === 'mint') {
+      const pathname = getMintDetailPathname(historyEntry);
+      cashuLog.info('swap.transaction.row.open_detail', {
+        type: historyEntry.type,
+        state: entryState,
+        pathname,
+        serializedLength: serializedHistoryEntry.length,
+      });
       router.navigate({
-        pathname: getMintDetailPathname(historyEntry),
-        params: { mintHistoryEntry: JSON.stringify(historyEntry) },
+        pathname,
+        params: { mintHistoryEntry: serializedHistoryEntry },
       });
     } else {
+      const pathname = getMeltDetailPathname(historyEntry);
+      cashuLog.info('swap.transaction.row.open_detail', {
+        type: historyEntry.type,
+        state: entryState,
+        pathname,
+        serializedLength: serializedHistoryEntry.length,
+      });
       router.navigate({
-        pathname: getMeltDetailPathname(historyEntry),
-        params: { meltHistoryEntry: JSON.stringify(historyEntry) },
+        pathname,
+        params: { meltHistoryEntry: serializedHistoryEntry },
       });
     }
   };
 
   return {
-    type: (isSend ? 'send' : 'receive') as 'send' | 'receive',
+    type,
     mintIconUrl,
     mintName,
     amount: numericAmount,
@@ -392,7 +413,10 @@ export function SwapTransactionScreen({ groupId }: Props) {
   );
 
   return (
-    <Screen name="SwapTransactionScreen" contentPadding={0}>
+    <TransactionDetailShell
+      screenName="SwapTransactionScreen"
+      testID={`swap-id-${group.id}`}
+      footer={null}>
       <VStack gap={12}>
         {/* ── Header: amount + swap icon (matches HistoryEntryHeader pattern) ── */}
         <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
@@ -578,7 +602,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
           ]}
         />
       </VStack>
-    </Screen>
+    </TransactionDetailShell>
   );
 }
 

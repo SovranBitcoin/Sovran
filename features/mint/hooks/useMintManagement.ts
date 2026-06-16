@@ -14,6 +14,13 @@ import { getCachedMintInfo } from '@/shared/stores/global/mintInfoCache';
 // reads from the shared result.
 let inflightLoad: Promise<Mint[]> | null = null;
 
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
+}
+
 /**
  * Subscribes to the trusted-mints list and re-exposes `getMintInfo` behind
  * loading state. Stays reactive to coco's mint:* events so consumers see
@@ -24,46 +31,61 @@ export function useMintManagement() {
   const [mints, setMints] = useState<Mint[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const loadMints = useCallback(async () => {
-    setIsLoading(true);
+  const loadMints = useCallback(
+    async (reason: string = 'manual') => {
+      log.debug('mint.list.load.request', { reason, hasInflight: !!inflightLoad });
+      setIsLoading(true);
 
-    try {
-      // Reuse an in-flight promise if another consumer is already loading.
-      const promise =
-        inflightLoad ??
-        (inflightLoad = (async () => {
-          log.debug('mint.list.load.start');
-          try {
-            return await manager.mint.getAllTrustedMints();
-          } finally {
-            inflightLoad = null;
-          }
-        })());
-      const allMints = await promise;
-      setMints(allMints);
-      log.info('mint.list.load.success', { count: allMints.length });
-    } catch (err) {
-      log.error('mint.list.load.error', {
-        error: err instanceof Error ? err : new Error('Failed to load mints'),
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [manager]);
+      try {
+        // Reuse an in-flight promise if another consumer is already loading.
+        let promise = inflightLoad;
+        if (promise) {
+          log.debug('mint.list.load.join_inflight', { reason });
+        } else {
+          promise = inflightLoad = (async () => {
+            log.debug('mint.list.load.start', { reason });
+            try {
+              return await manager.mint.getAllTrustedMints();
+            } finally {
+              inflightLoad = null;
+              log.debug('mint.list.load.clear_inflight', { reason });
+            }
+          })();
+        }
+        const allMints = await promise;
+        setMints(allMints);
+        log.info('mint.list.load.success', { reason, count: allMints.length });
+      } catch (err) {
+        log.error('mint.list.load.error', {
+          reason,
+          error: err instanceof Error ? err : new Error('Failed to load mints'),
+        });
+      } finally {
+        log.debug('mint.list.load.done', { reason });
+        setIsLoading(false);
+      }
+    },
+    [manager]
+  );
 
   const getMintInfo = useCallback(
     async (mintUrl: string) => {
       try {
+        log.debug('mint.info.fetch.start', { ...mintUrlLogFields(mintUrl) });
         // SWR through `mintInfoCache`: cached fresh resolves instantly, stale
         // resolves with the prior value and refreshes in the background, miss
         // awaits coco's `getMintInfo` (which itself blocks on HTTP only when
         // its own 5-minute window has expired).
         const info = await getCachedMintInfo((url) => manager.mint.getMintInfo(url), mintUrl);
-        log.debug('mint.info.fetch.success', { mintUrl });
+        log.debug('mint.info.fetch.success', {
+          ...mintUrlLogFields(mintUrl),
+          hasName: typeof info.name === 'string' && info.name.length > 0,
+          hasNuts: !!info.nuts,
+        });
         return info;
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to get mint info');
-        log.error('mint.info.fetch.error', { mintUrl, error });
+        log.error('mint.info.fetch.error', { ...mintUrlLogFields(mintUrl), error });
         throw error;
       }
     },
@@ -72,7 +94,7 @@ export function useMintManagement() {
 
   useEffect(() => {
     if (!manager) return;
-    void loadMints();
+    void loadMints('mount');
 
     // Stay reactive to mint changes that happen outside this hook —
     // notably during recovery, where the coco patch refreshes mint info
@@ -84,18 +106,25 @@ export function useMintManagement() {
     // through to the gradient placeholder, which reads as "icon
     // disappeared") and known mints keep stale mintInfo if it was
     // refreshed under them.
-    const refresh = () => {
-      void loadMints();
+    const refresh = (reason: string) => {
+      log.debug('mint.list.event', { reason });
+      void loadMints(reason);
     };
-    manager.on('mint:added', refresh);
-    manager.on('mint:updated', refresh);
-    manager.on('mint:trusted', refresh);
-    manager.on('mint:untrusted', refresh);
+    const onAdded = () => refresh('mint:added');
+    const onUpdated = () => refresh('mint:updated');
+    const onTrusted = () => refresh('mint:trusted');
+    const onUntrusted = () => refresh('mint:untrusted');
+    log.debug('mint.list.subscribe');
+    manager.on('mint:added', onAdded);
+    manager.on('mint:updated', onUpdated);
+    manager.on('mint:trusted', onTrusted);
+    manager.on('mint:untrusted', onUntrusted);
     return () => {
-      manager.off('mint:added', refresh);
-      manager.off('mint:updated', refresh);
-      manager.off('mint:trusted', refresh);
-      manager.off('mint:untrusted', refresh);
+      log.debug('mint.list.unsubscribe');
+      manager.off('mint:added', onAdded);
+      manager.off('mint:updated', onUpdated);
+      manager.off('mint:trusted', onTrusted);
+      manager.off('mint:untrusted', onUntrusted);
     };
   }, [loadMints, manager]);
 

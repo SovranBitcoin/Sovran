@@ -20,6 +20,14 @@ import { writeNdefTextRecord } from './write';
 import { acquireSession, releaseSession } from './session';
 import { nfcLog } from '../logger';
 
+function nfcErrorFields(error: unknown): Record<string, unknown> {
+  return {
+    error: error instanceof Error ? error.message : String(error),
+    code: error instanceof NfcError ? error.code : undefined,
+    statusWord: error instanceof NfcError ? error.statusWord : undefined,
+  };
+}
+
 export function createNfcAdapter(): NfcIOAdapter {
   return {
     async readPaymentRequest(): Promise<string> {
@@ -107,13 +115,14 @@ export function createNfcAdapter(): NfcIOAdapter {
 
         return text;
       } catch (e) {
+        nfcLog.warn('nfc.adapter.read_failed', nfcErrorFields(e));
         await releaseSession();
         throw e;
       }
     },
 
     async writeToken(token: string): Promise<void> {
-      nfcLog.info('nfc.adapter.write_start');
+      nfcLog.info('nfc.adapter.write_start', { tokenLength: token.length });
 
       try {
         const r = await sendApdu(SELECT_NDEF, 'SELECT NDEF (write)');
@@ -126,8 +135,12 @@ export function createNfcAdapter(): NfcIOAdapter {
         }
 
         await writeNdefTextRecord(token);
-        nfcLog.info('nfc.adapter.write_success');
+        nfcLog.info('nfc.adapter.write_success', { tokenLength: token.length });
       } catch (e) {
+        nfcLog.warn('nfc.adapter.write_failed', {
+          tokenLength: token.length,
+          ...nfcErrorFields(e),
+        });
         await releaseSession();
         throw e;
       }
@@ -137,8 +150,13 @@ export function createNfcAdapter(): NfcIOAdapter {
 
     async isAvailable(): Promise<boolean> {
       const supported = await isNfcSupported();
-      if (!supported) return false;
-      return isNfcEnabled();
+      if (!supported) {
+        nfcLog.debug('nfc.adapter.availability', { supported, enabled: false });
+        return false;
+      }
+      const enabled = await isNfcEnabled();
+      nfcLog.debug('nfc.adapter.availability', { supported, enabled });
+      return enabled;
     },
   };
 }

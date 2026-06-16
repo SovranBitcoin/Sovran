@@ -4,6 +4,7 @@
 
 import { err, errAsync, ok, Result, ResultAsync } from 'neverthrow';
 import { Linking } from 'react-native';
+import { cashuLog } from '@/shared/lib/logger';
 
 type OpenUrlError =
   | { type: 'invalid-url'; raw: string }
@@ -23,11 +24,26 @@ export function validateExternalUrl(raw: string): Result<URL, OpenUrlError> {
   try {
     parsed = new URL(raw);
   } catch {
+    cashuLog.warn('url.external.validate.failed', {
+      rawLength: raw.length,
+      reason: 'invalid-url',
+    });
     return err({ type: 'invalid-url', raw });
   }
   if (!ALLOWED_SCHEMES.has(parsed.protocol)) {
+    cashuLog.warn('url.external.validate.failed', {
+      rawLength: raw.length,
+      reason: 'unsupported-scheme',
+      scheme: parsed.protocol,
+    });
     return err({ type: 'unsupported-scheme', scheme: parsed.protocol });
   }
+  cashuLog.debug('url.external.validate.ok', {
+    rawLength: raw.length,
+    scheme: parsed.protocol,
+    hostLength: parsed.host.length,
+    pathLength: parsed.pathname.length,
+  });
   return ok(parsed);
 }
 
@@ -39,9 +55,21 @@ export function validateExternalUrl(raw: string): Result<URL, OpenUrlError> {
 export function openExternalUrl(raw: string): ResultAsync<void, OpenUrlError> {
   const validated = validateExternalUrl(raw);
   if (validated.isErr()) return errAsync(validated.error);
+  cashuLog.info('url.external.open.start', {
+    rawLength: raw.length,
+    scheme: validated.value.protocol,
+    hostLength: validated.value.host.length,
+  });
   return ResultAsync.fromPromise(
     Linking.openURL(validated.value.toString()).then(() => undefined),
-    (cause): OpenUrlError => ({ type: 'open-failed', cause })
+    (cause): OpenUrlError => {
+      cashuLog.warn('url.external.open.failed', {
+        rawLength: raw.length,
+        scheme: validated.value.protocol,
+        error: cause instanceof Error ? cause : new Error(String(cause)),
+      });
+      return { type: 'open-failed', cause };
+    }
   );
 }
 
@@ -59,17 +87,33 @@ export function normalizeMintUrlKey(url: string): string {
   const withoutProtocol = url.replace(/^https?:\/\//, '');
   const slashIndex = withoutProtocol.indexOf('/');
   if (slashIndex === -1) {
-    return withoutProtocol
+    const result = withoutProtocol
       .toLowerCase()
       .replace(/^www\./, '')
       .replace(/\/$/, '');
+    cashuLog.debug('url.mint.normalize_key', {
+      inputLength: url.length,
+      resultLength: result.length,
+      hadProtocol: /^https?:\/\//.test(url),
+      hadPath: false,
+    });
+    return result;
   }
   const domain = withoutProtocol
     .slice(0, slashIndex)
     .toLowerCase()
     .replace(/^www\./, '');
   const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
-  return domain + path;
+  const result = domain + path;
+  cashuLog.debug('url.mint.normalize_key', {
+    inputLength: url.length,
+    resultLength: result.length,
+    hadProtocol: /^https?:\/\//.test(url),
+    hadPath: true,
+    domainLength: domain.length,
+    pathLength: path.length,
+  });
+  return result;
 }
 
 /**
@@ -83,14 +127,26 @@ export function normalizeMintUrlKey(url: string): string {
  * extractDomain('invalid-url') // 'invalid-url'
  */
 export function extractDomain(url: string): string {
-  if (!url) return '';
+  if (!url) {
+    cashuLog.debug('url.domain.extract', { inputLength: 0, resultLength: 0, empty: true });
+    return '';
+  }
 
   try {
     // Remove both http and https protocols
     const withoutProtocol = url.replace(/^https?:\/\//, '');
     // Split by '/' and take the first part (domain)
-    return withoutProtocol.split('/')[0] || url;
+    const result = withoutProtocol.split('/')[0] || url;
+    cashuLog.debug('url.domain.extract', {
+      inputLength: url.length,
+      resultLength: result.length,
+      hadProtocol: /^https?:\/\//.test(url),
+    });
+    return result;
   } catch {
+    cashuLog.warn('url.domain.extract.failed', {
+      inputLength: url.length,
+    });
     return url;
   }
 }
@@ -118,18 +174,48 @@ export function normalizeUrlForApi(rawUrl: string): string {
   const slashIndex = withoutProtocol.indexOf('/');
   if (slashIndex === -1) {
     const domain = withoutProtocol.toLowerCase().replace(/^www\./, '');
-    return `https://${domain}`;
+    const result = `https://${domain}`;
+    cashuLog.debug('url.api.normalize', {
+      inputLength: rawUrl.length,
+      trimmedLength: trimmed.length,
+      resultLength: result.length,
+      hadPath: false,
+    });
+    return result;
   }
   const domain = withoutProtocol
     .slice(0, slashIndex)
     .toLowerCase()
     .replace(/^www\./, '');
   const path = withoutProtocol.slice(slashIndex);
-  return `https://${domain}${path}`;
+  const result = `https://${domain}${path}`;
+  cashuLog.debug('url.api.normalize', {
+    inputLength: rawUrl.length,
+    trimmedLength: trimmed.length,
+    resultLength: result.length,
+    hadPath: true,
+    domainLength: domain.length,
+    pathLength: path.length,
+  });
+  return result;
 }
 
 export function getMintDisplayName(url: string, mintInfo?: { name?: string } | null): string {
-  if (!url) return 'Unknown Mint';
+  if (!url) {
+    cashuLog.debug('url.mint.display_name', {
+      inputLength: 0,
+      hasMintInfoName: !!mintInfo?.name,
+      source: 'unknown',
+    });
+    return 'Unknown Mint';
+  }
 
-  return mintInfo?.name || extractDomain(url) || 'Unknown Mint';
+  const result = mintInfo?.name || extractDomain(url) || 'Unknown Mint';
+  cashuLog.debug('url.mint.display_name', {
+    inputLength: url.length,
+    resultLength: result.length,
+    hasMintInfoName: !!mintInfo?.name,
+    source: mintInfo?.name ? 'mint-info' : result === 'Unknown Mint' ? 'unknown' : 'domain',
+  });
+  return result;
 }

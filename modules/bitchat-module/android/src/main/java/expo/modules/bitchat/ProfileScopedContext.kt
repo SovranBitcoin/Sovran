@@ -38,5 +38,8 @@ class ProfileScopedContext(base: Context, private val suffix: String) :
     override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
         super.getSharedPreferences(BitchatProfileScope.scopedPrefsName(suffix, name), mode)
 
+    override fun deleteSharedPreferences(name: String): Boolean =
+        super.deleteSharedPreferences(BitchatProfileScope.scopedPrefsName(suffix, name))
+
     override fun getApplicationContext(): Context = this
 }

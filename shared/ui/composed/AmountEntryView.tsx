@@ -7,7 +7,7 @@
  * no colada imports, no feature imports that would create cycles.
  */
 
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text as RNText, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +28,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
+import { cashuLog } from '@/shared/lib/logger';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
@@ -247,7 +248,16 @@ export function AmountEntryView({
             <Pressable
               key={isSendAll ? 'send-all' : s.satoshis}
               testID={chipTestID}
-              onPress={() => onSuggestionTap?.(s)}
+              onPress={() => {
+                cashuLog.info('amount_entry.suggestion.press', {
+                  chipTestID,
+                  inputMode: s.inputMode,
+                  satoshis: s.satoshis,
+                  sendAll: !!s.sendAll,
+                  hasHandler: !!onSuggestionTap,
+                });
+                onSuggestionTap?.(s);
+              }}
               style={({ pressed }) => ({
                 paddingHorizontal: 14,
                 paddingVertical: 7,
@@ -289,6 +299,97 @@ export function AmountEntryView({
   }, [transactionType, suggestions, onSuggestionTap, foreground, background]);
 
   const useTypeColors = transactionType === 'send' || transactionType === 'receive';
+  const logNextPress = useCallback(
+    (source: 'plain' | 'leading-row') => {
+      cashuLog.info('amount_entry.next.press', {
+        source,
+        transactionType,
+        inputMode,
+        rawInputLength: rawInput.length,
+        numericValue,
+        unit,
+        nextDisabled,
+        nextLoading,
+        hasNextVariants: !!nextVariants?.length,
+        extraButtonCount: extraButtons?.length ?? 0,
+        hasLeadingBottomButton: !!leadingBottomButton,
+      });
+    },
+    [
+      extraButtons?.length,
+      inputMode,
+      leadingBottomButton,
+      nextDisabled,
+      nextLoading,
+      nextVariants?.length,
+      numericValue,
+      rawInput.length,
+      transactionType,
+      unit,
+    ]
+  );
+  const handleKeyPress = useCallback(
+    (value: string) => {
+      cashuLog.debug('amount_entry.keyboard.input', {
+        transactionType,
+        inputMode,
+        previousLength: rawInput.length,
+        nextLength: value.length,
+        numericValue,
+        unit,
+      });
+      onKeyPress(value);
+    },
+    [inputMode, numericValue, onKeyPress, rawInput.length, transactionType, unit]
+  );
+  const handleToggleMode = useCallback(() => {
+    cashuLog.info('amount_entry.mode.toggle', {
+      transactionType,
+      inputMode,
+      rawInputLength: rawInput.length,
+      numericValue,
+      hasToggleHandler: !!onToggleMode,
+    });
+    onToggleMode?.();
+  }, [inputMode, numericValue, onToggleMode, rawInput.length, transactionType]);
+
+  useEffect(() => {
+    cashuLog.debug('amount_entry.render_state', {
+      transactionType,
+      inputMode,
+      unit,
+      keyboardUnit,
+      rawInputLength: rawInput.length,
+      numericValue,
+      nextDisabled,
+      nextLoading,
+      hasNotice: !!noticeText,
+      hasWarning: !!warningText,
+      suggestionCount: suggestions.length,
+      nextVariantCount: nextVariants?.length ?? 0,
+      extraButtonCount: extraButtons?.length ?? 0,
+      hasLeadingBottomButton: !!leadingBottomButton,
+      isCompactPhone,
+      isVeryCompactPhone,
+    });
+  }, [
+    extraButtons?.length,
+    inputMode,
+    isCompactPhone,
+    isVeryCompactPhone,
+    keyboardUnit,
+    leadingBottomButton,
+    nextDisabled,
+    nextLoading,
+    nextVariants?.length,
+    noticeText,
+    numericValue,
+    rawInput.length,
+    suggestions.length,
+    transactionType,
+    unit,
+    warningText,
+  ]);
 
   return (
     <View style={{ flex: 1, backgroundColor: background }}>
@@ -320,7 +421,7 @@ export function AmountEntryView({
               />
             )}
             {secondaryDisplay && (
-              <CurrencySwapperPill inputMode={inputMode} onPress={onToggleMode} />
+              <CurrencySwapperPill inputMode={inputMode} onPress={handleToggleMode} />
             )}
             {noticeText != null && noticeText.length > 0 ? (
               <Text size={13} weight="bold" style={[styles.noticeText, { color: danger }]}>
@@ -343,7 +444,7 @@ export function AmountEntryView({
           unit={keyboardUnit}
           compact={isCompactPhone}
           value={rawInput}
-          onKeyPress={onKeyPress}
+          onKeyPress={handleKeyPress}
         />
         <HStack justify="center" align="center">
           {nextVariants && nextVariants.length > 0 ? (
@@ -391,7 +492,15 @@ export function AmountEntryView({
                     variant={extraButtons[0].variant}
                     loading={extraButtons[0].loading}
                     disabled={extraButtons[0].disabled}
-                    onPress={() => extraButtons[0].onPress?.()}
+                    onPress={() => {
+                      cashuLog.info('amount_entry.extra_button.press', {
+                        index: 0,
+                        testID: extraButtons[0].testID ?? null,
+                        disabled: extraButtons[0].disabled ?? false,
+                        loading: extraButtons[0].loading ?? false,
+                      });
+                      void extraButtons[0].onPress?.();
+                    }}
                   />
                 </View>
               ) : null}
@@ -409,7 +518,15 @@ export function AmountEntryView({
                     variant={extraButtons[1].variant ?? 'secondary'}
                     loading={extraButtons[1].loading}
                     disabled={extraButtons[1].disabled}
-                    onPress={() => extraButtons[1].onPress?.()}
+                    onPress={() => {
+                      cashuLog.info('amount_entry.extra_button.press', {
+                        index: 1,
+                        testID: extraButtons[1].testID ?? null,
+                        disabled: extraButtons[1].disabled ?? false,
+                        loading: extraButtons[1].loading ?? false,
+                      });
+                      void extraButtons[1].onPress?.();
+                    }}
                   />
                 </View>
               ) : null}
@@ -430,6 +547,7 @@ export function AmountEntryView({
                   loading={nextLoading}
                   disabled={nextDisabled}
                   onPress={async () => {
+                    logNextPress('leading-row');
                     await onNext();
                   }}
                 />
@@ -444,6 +562,7 @@ export function AmountEntryView({
                   icon: nextIcon,
                   variant: 'primary',
                   onPress: async () => {
+                    logNextPress('plain');
                     await onNext();
                   },
                   loading: nextLoading,

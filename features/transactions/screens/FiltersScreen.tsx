@@ -1,5 +1,6 @@
 /**
- * Transaction filter selection UI: currency, payment type, direction, status, mint.
+ * Transaction filter selection UI: currency, payment type, direction, status,
+ * mint, and the annotation-driven filters (source, P2PK lock, counterparty).
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -13,6 +14,7 @@ import { z } from 'zod';
 import Icon from 'assets/icons';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
 import { Text } from '@/shared/ui/primitives/Text';
+import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
@@ -20,18 +22,26 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { extractDomain } from '@/shared/lib/url';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
-import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
+import { spacing, radius, alpha } from '@/shared/styles/tokens';
 import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import {
+  getCounterparty,
+  getScanSource,
+  getSwap,
+  isP2PKLocked,
   isPendingTransaction,
   matchesTransactionFilters,
+  type ScanMethod,
   type TransactionDirection,
   type TransactionPaymentType,
 } from '@sovranbitcoin/colada';
 
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
+type SourceFilter = 'all' | ScanMethod;
+type LockFilter = 'all' | 'locked' | 'unlocked';
+type CounterpartyFilter = 'all' | 'with';
 
 const SUPPORTED_CURRENCIES = ['ALL', 'SAT', 'USD', 'EUR', 'GBP'];
 
@@ -41,6 +51,9 @@ const ParamsSchema = z.object({
   direction: z.enum(['all', 'incoming', 'outgoing']).optional(),
   status: z.enum(['All', 'Confirmed', 'Pending', 'Expired']).optional(),
   mintUrl: z.string().max(2048).optional(),
+  source: z.enum(['all', 'qr', 'nfc', 'ble', 'paste', 'deeplink']).optional(),
+  lock: z.enum(['all', 'locked', 'unlocked']).optional(),
+  counterparty: z.enum(['all', 'with']).optional(),
 });
 
 interface ChipProps {
@@ -51,7 +64,11 @@ interface ChipProps {
 }
 
 const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
-  const foreground = useThemeColor('foreground');
+  const [foreground, accent, accentSoft] = useThemeColor([
+    'foreground',
+    'accent',
+    'accent-soft',
+  ] as const);
 
   return (
     <Pressable
@@ -59,17 +76,21 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
       style={[
         styles.chip,
         {
-          backgroundColor: isSelected ? opacity(foreground, 0.15) : opacity(foreground, 0.05),
-          borderColor: isSelected ? opacity(foreground, 0.25) : opacity(foreground, 0.08),
+          backgroundColor: isSelected ? accentSoft : opacity(foreground, alpha.faint),
+          borderColor: isSelected ? accent : opacity(foreground, alpha.subtle),
         },
       ]}>
       {icon ? (
-        <Icon name={icon} size={16} color={isSelected ? foreground : opacity(foreground, 0.4)} />
+        <Icon
+          name={icon}
+          size={16}
+          color={isSelected ? accent : opacity(foreground, alpha.muted)}
+        />
       ) : null}
       <Text
         size={14}
         style={{
-          color: isSelected ? foreground : opacity(foreground, 0.4),
+          color: isSelected ? foreground : opacity(foreground, alpha.muted),
           fontFamily: 'OxygenBold',
         }}>
         {label}
@@ -78,24 +99,37 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
   );
 };
 
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => {
+const Section: React.FC<{ title: string; children: React.ReactNode; scroll?: boolean }> = ({
+  title,
+  children,
+  scroll = false,
+}) => {
   const foreground = useThemeColor('foreground');
 
   return (
-    <View style={styles.section}>
+    <VStack gap={spacing.sm} style={styles.section}>
       <Text
         size={13}
         style={{
-          color: opacity(foreground, 0.33),
+          color: opacity(foreground, alpha.muted),
           fontFamily: 'OxygenBold',
           textTransform: 'uppercase',
           letterSpacing: 1,
-          marginBottom: 12,
+          marginLeft: spacing.xs,
         }}>
         {title}
       </Text>
-      <View style={styles.chipsRow}>{children}</View>
-    </View>
+      {scroll ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRowScroll}>
+          {children}
+        </ScrollView>
+      ) : (
+        <View style={styles.chipsRow}>{children}</View>
+      )}
+    </VStack>
   );
 };
 
@@ -106,7 +140,11 @@ const MintSelectorChip: React.FC<{
   isSelected: boolean;
   onPress: () => void;
 }> = ({ showIcon = true, name, iconUrl, isSelected, onPress }) => {
-  const foreground = useThemeColor('foreground');
+  const [foreground, accent, accentSoft] = useThemeColor([
+    'foreground',
+    'accent',
+    'accent-soft',
+  ] as const);
 
   return (
     <Pressable
@@ -114,8 +152,8 @@ const MintSelectorChip: React.FC<{
       style={[
         styles.mintChip,
         {
-          backgroundColor: isSelected ? opacity(foreground, 0.15) : opacity(foreground, 0.05),
-          borderColor: isSelected ? opacity(foreground, 0.25) : opacity(foreground, 0.08),
+          backgroundColor: isSelected ? accentSoft : opacity(foreground, alpha.faint),
+          borderColor: isSelected ? accent : opacity(foreground, alpha.subtle),
         },
       ]}>
       {showIcon ? <MintIcon iconUrl={iconUrl} size={22} name={name} alt={`${name} icon`} /> : null}
@@ -123,7 +161,7 @@ const MintSelectorChip: React.FC<{
         size={13}
         numberOfLines={1}
         style={{
-          color: isSelected ? foreground : opacity(foreground, 0.7),
+          color: isSelected ? foreground : opacity(foreground, alpha.strong),
           fontFamily: 'OxygenBold',
           maxWidth: 140,
         }}>
@@ -138,8 +176,6 @@ export function FiltersScreen() {
   const foreground = useThemeColor('foreground');
   const { trustedMints } = useMints();
   const { history } = useHistoryWithMelts();
-  const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
-  const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
   const params = useRouteParams(ParamsSchema, { where: 'filter-flow.filters' });
 
@@ -150,6 +186,11 @@ export function FiltersScreen() {
   const [direction, setDirection] = useState<TransactionDirection>(params?.direction || 'all');
   const [status, setStatus] = useState<Status>(params?.status || 'All');
   const [mintUrl, setMintUrl] = useState<string>(params?.mintUrl || 'all');
+  const [source, setSource] = useState<SourceFilter>(params?.source || 'all');
+  const [lock, setLock] = useState<LockFilter>(params?.lock || 'all');
+  const [counterparty, setCounterparty] = useState<CounterpartyFilter>(
+    params?.counterparty || 'all'
+  );
 
   const mintOptions = useMemo(
     () => [
@@ -164,7 +205,16 @@ export function FiltersScreen() {
   );
 
   const handleApply = useCallback(() => {
-    log.info('tx.filters.apply', { currency, paymentType, direction, status, mintUrl });
+    log.info('tx.filters.apply', {
+      currency,
+      paymentType,
+      direction,
+      status,
+      source,
+      lock,
+      counterparty,
+      hasMintFilter: mintUrl !== 'all',
+    });
     router.dismissTo({
       pathname: '/transactions',
       params: {
@@ -173,9 +223,12 @@ export function FiltersScreen() {
         filterDirection: direction,
         filterStatus: status,
         filterMintUrl: mintUrl,
+        filterSource: source,
+        filterLock: lock,
+        filterCounterparty: counterparty,
       },
     });
-  }, [currency, paymentType, direction, status, mintUrl]);
+  }, [currency, paymentType, direction, status, mintUrl, source, lock, counterparty]);
 
   const handleReset = useCallback(() => {
     log.info('tx.filters.reset');
@@ -184,6 +237,9 @@ export function FiltersScreen() {
     setDirection('all');
     setStatus('All');
     setMintUrl('all');
+    setSource('all');
+    setLock('all');
+    setCounterparty('all');
   }, []);
 
   const hasActiveFilters = useMemo(
@@ -192,8 +248,11 @@ export function FiltersScreen() {
       paymentType !== 'all' ||
       direction !== 'all' ||
       status !== 'All' ||
-      mintUrl !== 'all',
-    [currency, paymentType, direction, status, mintUrl]
+      mintUrl !== 'all' ||
+      source !== 'all' ||
+      lock !== 'all' ||
+      counterparty !== 'all',
+    [currency, paymentType, direction, status, mintUrl, source, lock, counterparty]
   );
 
   const resultCount = useMemo(() => {
@@ -203,12 +262,14 @@ export function FiltersScreen() {
       if (normalizedCurrency !== 'all' && historyEntry.unit !== normalizedCurrency) return false;
       if (mintUrl !== 'all' && historyEntry.mintUrl !== mintUrl) return false;
 
-      if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
-        const quoteId = (historyEntry as any).quoteId as string | undefined;
-        if (quoteId && quoteIdToGroup[quoteId]) return false;
-      }
+      // Swap legs are surfaced as a single grouped row (annotation-driven).
+      if (getSwap(historyEntry)?.groupId) return false;
 
       if (!matchesTransactionFilters(historyEntry, { paymentType, direction })) return false;
+
+      if (source !== 'all' && getScanSource(historyEntry)?.method !== source) return false;
+      if (lock !== 'all' && isP2PKLocked(historyEntry) !== (lock === 'locked')) return false;
+      if (counterparty === 'with' && !getCounterparty(historyEntry)?.pubkey) return false;
 
       if (status === 'All') return true;
 
@@ -224,22 +285,8 @@ export function FiltersScreen() {
       return true;
     });
 
-    const shouldIncludeSwapRows =
-      paymentType === 'all' &&
-      direction === 'all' &&
-      mintUrl === 'all' &&
-      status !== 'Pending' &&
-      status !== 'Expired';
-
-    const swapCount = shouldIncludeSwapRows
-      ? Object.values(swapGroupsById).filter((group) => {
-          if (normalizedCurrency !== 'all' && group.unit !== normalizedCurrency) return false;
-          return true;
-        }).length
-      : 0;
-
-    return filteredTransactions.length + swapCount;
-  }, [currency, direction, history, mintUrl, paymentType, quoteIdToGroup, status, swapGroupsById]);
+    return filteredTransactions.length;
+  }, [currency, direction, history, mintUrl, paymentType, source, lock, counterparty, status]);
 
   return (
     <ScreenWrapper
@@ -251,7 +298,9 @@ export function FiltersScreen() {
             onPress={handleReset}
             disabled={!hasActiveFilters}
             style={[styles.resetButton, { opacity: hasActiveFilters ? 1 : 0 }]}>
-            <Text size={14} style={{ color: opacity(foreground, 0.4), fontFamily: 'OxygenBold' }}>
+            <Text
+              size={14}
+              style={{ color: opacity(foreground, alpha.muted), fontFamily: 'OxygenBold' }}>
               Reset
             </Text>
           </Pressable>
@@ -267,22 +316,17 @@ export function FiltersScreen() {
         </BottomButtons>
       }>
       <View style={styles.filterContent}>
-        <Section title="Mint">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.mintChipsRow}>
-            {mintOptions.map((mint) => (
-              <MintSelectorChip
-                key={mint.mintUrl}
-                showIcon={mint.mintUrl !== 'all'}
-                name={mint.name}
-                iconUrl={mint.icon_url}
-                isSelected={mintUrl === mint.mintUrl}
-                onPress={() => setMintUrl(mint.mintUrl)}
-              />
-            ))}
-          </ScrollView>
+        <Section title="Mint" scroll>
+          {mintOptions.map((mint) => (
+            <MintSelectorChip
+              key={mint.mintUrl}
+              showIcon={mint.mintUrl !== 'all'}
+              name={mint.name}
+              iconUrl={mint.icon_url}
+              isSelected={mintUrl === mint.mintUrl}
+              onPress={() => setMintUrl(mint.mintUrl)}
+            />
+          ))}
         </Section>
 
         <Section title="Currency">
@@ -370,39 +414,115 @@ export function FiltersScreen() {
             onPress={() => setStatus('Expired')}
           />
         </Section>
+
+        <Section title="Source">
+          <Chip
+            label="All"
+            icon="fluent:apps-16-filled"
+            isSelected={source === 'all'}
+            onPress={() => setSource('all')}
+          />
+          <Chip
+            label="QR"
+            icon="stash:qr-code"
+            isSelected={source === 'qr'}
+            onPress={() => setSource('qr')}
+          />
+          <Chip
+            label="NFC"
+            icon="lucide:nfc"
+            isSelected={source === 'nfc'}
+            onPress={() => setSource('nfc')}
+          />
+          <Chip
+            label="Bluetooth"
+            icon="mdi:bluetooth"
+            isSelected={source === 'ble'}
+            onPress={() => setSource('ble')}
+          />
+          <Chip
+            label="Paste"
+            icon="lucide:clipboard-paste"
+            isSelected={source === 'paste'}
+            onPress={() => setSource('paste')}
+          />
+          <Chip
+            label="Link"
+            icon="lucide:link"
+            isSelected={source === 'deeplink'}
+            onPress={() => setSource('deeplink')}
+          />
+        </Section>
+
+        <Section title="Lock">
+          <Chip
+            label="All"
+            icon="fluent:apps-16-filled"
+            isSelected={lock === 'all'}
+            onPress={() => setLock('all')}
+          />
+          <Chip
+            label="Locked"
+            icon="solar:key-bold"
+            isSelected={lock === 'locked'}
+            onPress={() => setLock('locked')}
+          />
+          <Chip
+            label="Unlocked"
+            icon="mdi:lock-open-variant-outline"
+            isSelected={lock === 'unlocked'}
+            onPress={() => setLock('unlocked')}
+          />
+        </Section>
+
+        <Section title="Counterparty">
+          <Chip
+            label="All"
+            icon="fluent:apps-16-filled"
+            isSelected={counterparty === 'all'}
+            onPress={() => setCounterparty('all')}
+          />
+          <Chip
+            label="With a person"
+            icon="ph:user-bold"
+            isSelected={counterparty === 'with'}
+            onPress={() => setCounterparty('with')}
+          />
+        </Section>
       </View>
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  filterContent: { paddingHorizontal: 16 },
-  section: { marginBottom: 24 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  mintChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
+  section: { marginBottom: spacing.xl },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chipsRowScroll: { flexDirection: 'row', alignItems: 'center', paddingRight: spacing.lg },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
     borderCurve: 'continuous',
     borderWidth: 1,
   },
   mintChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
     borderCurve: 'continuous',
     borderWidth: 1,
+    marginRight: spacing.sm,
   },
   resetButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     alignItems: 'center',
   },
 });

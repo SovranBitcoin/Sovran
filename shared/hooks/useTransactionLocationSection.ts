@@ -15,6 +15,7 @@ import {
   type TransactionLocation,
 } from '@/shared/stores/profile/transactionLocationStore';
 import { getLocationForTransaction } from '@/shared/hooks/useTransactionLocation';
+import { setTransactionAnnotation } from '@/shared/stores/profile/transactionAnnotationStore';
 
 interface UseTransactionLocationSectionResult {
   location: TransactionLocation | null;
@@ -70,6 +71,9 @@ export function useTransactionLocationSection(
 
       if (capturedLocation) {
         setTransactionLocation(transactionId, capturedLocation);
+        setTransactionAnnotation(`id:${transactionId}`, {
+          location: { lat: capturedLocation.latitude, lng: capturedLocation.longitude },
+        });
         return true;
       }
       return false;

@@ -12,7 +12,7 @@
  * (A → B → C → …) with the active hop highlighted.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -31,7 +31,7 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 import Icon from 'assets/icons';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 
 export type StepStatus =
   | 'pending'
@@ -92,6 +92,7 @@ interface RebalanceStepRowProps {
 }
 
 export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
+  id,
   fromMintUrl,
   fromMintInfo,
   toMintUrl,
@@ -127,6 +128,49 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   }, [routeSuggestion]);
 
   const totalHops = chainInfo ? chainInfo.chainPath.length - 1 : 0;
+
+  useEffect(() => {
+    paymentLog.debug('mint.rebalance.step_row.render', {
+      idLength: id.length,
+      fromMintUrlLength: fromMintUrl.length,
+      toMintUrlLength: toMintUrl.length,
+      hasFromMintInfo: !!fromMintInfo,
+      hasToMintInfo: !!toMintInfo,
+      amount,
+      unit,
+      status,
+      errorMessageLength: errorMessage?.length ?? 0,
+      errorIsNoRoute: String(errorMessage ?? '').includes('no_route'),
+      routeSuggestionStatus: routeSuggestion?.status ?? null,
+      routePathCount: routeSuggestion?.path?.length ?? 0,
+      routePathNameCount: routeSuggestion?.pathNames?.length ?? 0,
+      hasRouteThrough: !!onRouteThrough,
+      hasRetry: !!onRetry,
+      hasSkip: !!onSkip,
+      hasChainInfo: !!chainInfo,
+      chainPathCount: chainInfo?.chainPath.length ?? 0,
+      chainHopIndex: chainInfo?.chainHopIndex ?? null,
+      totalHops,
+      routingDetailLength: routingDetail?.length ?? 0,
+    });
+  }, [
+    amount,
+    chainInfo,
+    errorMessage,
+    fromMintInfo,
+    fromMintUrl.length,
+    id.length,
+    onRetry,
+    onRouteThrough,
+    onSkip,
+    routeSuggestion,
+    routingDetail,
+    status,
+    toMintInfo,
+    toMintUrl.length,
+    totalHops,
+    unit,
+  ]);
 
   return (
     <Log name="RebalanceStepRow">
@@ -228,7 +272,16 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
               <HStack gap={8} className="px-4">
                 {routeSuggestion?.status === 'found' && routeSuggestion?.path && onRouteThrough ? (
                   <Pressable
-                    onPress={onRouteThrough}
+                    onPress={() => {
+                      paymentLog.info('mint.rebalance.step_row.press', {
+                        action: 'route-through',
+                        status,
+                        amount,
+                        unit,
+                        routePathCount: routeSuggestion.path?.length ?? 0,
+                      });
+                      onRouteThrough();
+                    }}
                     haptics
                     style={{
                       backgroundColor: primaryColor700,
@@ -252,7 +305,16 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                   </Pressable>
                 ) : onRetry ? (
                   <Pressable
-                    onPress={onRetry}
+                    onPress={() => {
+                      paymentLog.info('mint.rebalance.step_row.press', {
+                        action: 'retry',
+                        status,
+                        amount,
+                        unit,
+                        errorIsNoRoute: String(errorMessage ?? '').includes('no_route'),
+                      });
+                      onRetry();
+                    }}
                     haptics
                     style={{
                       backgroundColor: primaryColor700,
@@ -270,7 +332,15 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                 ) : null}
                 {onSkip && (
                   <Pressable
-                    onPress={onSkip}
+                    onPress={() => {
+                      paymentLog.info('mint.rebalance.step_row.press', {
+                        action: 'skip',
+                        status,
+                        amount,
+                        unit,
+                      });
+                      onSkip();
+                    }}
                     haptics
                     style={{
                       backgroundColor: primaryColor700,

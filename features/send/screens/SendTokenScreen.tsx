@@ -20,16 +20,13 @@ import {
 } from '@sovranbitcoin/colada';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
-  HistoryEntryHeader,
-  HistoryEntryRefresh,
-  HistoryEntryTimeline,
+  TransactionDetailShell,
   TransactionLocationSection,
   useBip321Info,
   Bip321MethodIcons,
 } from '@/features/transactions';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { Screen } from '@/shared/ui/composed/Screen';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -38,7 +35,6 @@ import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -297,23 +293,14 @@ export function SendTokenScreen({
   );
 
   return (
-    <Screen name="SendTokenScreen" contentPadding={0} footer={bottomButtons}>
-      {/*
-       * Id marker wraps the screen body — lets `phone test` capture
-       * the entry id of the send currently being viewed via
-       * `capture #send-token-id-* suffix`. Same rationale as the
-       * LightningReceiveScreen marker: without an in-screen source of the
-       * entry id, tests have to guess from the transaction list on
-       * the wallet home, where `findByTestIDPrefix` returns the
-       * visually-topmost match and can pick up a stale row from a
-       * previous run. Wrapping the VStack (rather than a zero-sized
-       * sibling) guarantees a non-zero rect so the node appears in
-       * the iOS AX tree.
-       */}
-      <View testID={`send-token-id-${entry.id}`}>
-        <VStack gap={12}>
-          <HistoryEntryHeader historyEntry={entry} showRecipientAvatar={false} />
-
+    <TransactionDetailShell
+      screenName="SendTokenScreen"
+      testID={`send-token-id-${entry.id}`}
+      entry={entry}
+      mintInfo={mintInfo}
+      footer={bottomButtons}
+      beforeStatus={
+        <>
           {reachabilityWarning && (
             <View style={styles.reachabilityWarning}>
               <Alert status="warning" className="bg-surface-secondary">
@@ -347,39 +334,34 @@ export function SendTokenScreen({
           ) : null}
 
           {isComplete && <TransactionLocationSection transactionId={entry.id} />}
-
-          <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
-
-          <HistoryEntryTimeline historyEntry={entry} />
-
-          <DetailsSection
-            items={[
-              source && { title: 'Source', value: source },
-              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-              bip321.optionKinds && {
-                title: 'Payment Methods',
-                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
-              },
-              { title: 'Date', value: entry.createdAt.datetime },
-              {
-                title: 'Amount',
-                value: formatAmount({ amount: entry.amount, unit: entry.unit }),
-              },
-              { title: 'State', value: entry.state },
-              entry.operationId && {
-                title: 'Operation ID',
-                value: truncateMiddle(entry.operationId, 7),
-              },
-              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-              entry.tokenString && {
-                title: 'Token',
-                value: entry.tokenString.truncate(6),
-              },
-            ].flatMap((item) => (item ? [item] : []))}
-          />
-        </VStack>
-      </View>
-    </Screen>
+        </>
+      }>
+      <DetailsSection
+        items={[
+          source && { title: 'Source', value: source },
+          bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+          bip321.optionKinds && {
+            title: 'Payment Methods',
+            value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
+          },
+          { title: 'Date', value: entry.createdAt.datetime },
+          {
+            title: 'Amount',
+            value: formatAmount({ amount: entry.amount, unit: entry.unit }),
+          },
+          { title: 'State', value: entry.state },
+          entry.operationId && {
+            title: 'Operation ID',
+            value: truncateMiddle(entry.operationId, 7),
+          },
+          mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+          entry.tokenString && {
+            title: 'Token',
+            value: entry.tokenString.truncate(6),
+          },
+        ].flatMap((item) => (item ? [item] : []))}
+      />
+    </TransactionDetailShell>
   );
 }
 

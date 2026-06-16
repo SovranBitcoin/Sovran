@@ -30,6 +30,7 @@ class BitChatModule : Module() {
             "onBLEPrivateMessage",
             "onBLEDeliveryStatus",
             "onBLEPeerUpdate",
+            "onBLEPeerIdentity",
             "onBLEStateChanged",
             "onBLEBackgroundTaskExpiring",
             "onNostrMessage",
@@ -62,8 +63,9 @@ class BitChatModule : Module() {
                 noisePrivateKeyHex: String,
                 signingPrivateKeyHex: String,
                 p2pkPubkeyHex: String,
+                creq: String?,
             ->
-            BitChatBLEBridge.start(nickname, profileScope, noisePrivateKeyHex, signingPrivateKeyHex, p2pkPubkeyHex)
+            BitChatBLEBridge.start(nickname, profileScope, noisePrivateKeyHex, signingPrivateKeyHex, p2pkPubkeyHex, creq)
         }
 
         AsyncFunction("sendBLEMessage") { content: String ->
@@ -87,6 +89,10 @@ class BitChatModule : Module() {
             BitChatBLEBridge.sendPrivateMessage(content, peerID, nickname, messageID)
         }
 
+        AsyncFunction("sendBLEFavorite") { peerID: String, isFavorite: Boolean ->
+            BitChatBLEBridge.sendFavorite(peerID, isFavorite)
+        }
+
         Function("getBLEPeers") {
             BitChatBLEBridge.getPeers()
         }
@@ -97,6 +103,13 @@ class BitChatModule : Module() {
 
         Function("getBLEState") {
             BitChatBLEBridge.bluetoothState()
+        }
+
+        // Short SHA of the vendored bitchat submodule this build compiled from —
+        // logged at startBLE so a stale build (e.g. one predating a fragmentation
+        // fix) is obvious from log.txt. Baked by scripts/sync-bitchat-android.js.
+        Function("bitchatVendorVersion") {
+            BitchatVendorVersion.commit
         }
 
         // iOS-only background-task assertions; the mesh foreground service

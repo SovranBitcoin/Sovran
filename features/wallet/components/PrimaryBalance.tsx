@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -11,35 +11,16 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { useAppBalance } from '@/features/wallet/hooks/useAppBalance';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
-import {
-  Host,
-  Button as SwiftUIButton,
-  HStack as SwiftUIHStack,
-  Image as SwiftUIImage,
-  Text as SwiftUIText,
-} from '@expo/ui/swift-ui';
-import {
-  environment,
-  font,
-  foregroundStyle,
-  frame,
-  glassEffect,
-} from '@expo/ui/swift-ui/modifiers';
+import { GlassView } from 'expo-glass-effect';
 import { useCapabilities } from '@/shared/ui/capability';
-import { useColorScheme } from '@/shared/hooks/useColorScheme';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
-import { usePaginatedHistory } from '@cashu/coco-react';
-import type { SendHistoryEntry } from '@cashu/coco-core';
-import { isReservedSendHistoryEntry } from '@sovranbitcoin/colada';
+import { useColadaBalance } from '@sovranbitcoin/colada/react';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { alpha } from '@/shared/styles/tokens';
-import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
-import { amountToNumber } from '@/shared/lib/cashu/amount';
 import { walletLog, Log } from '@/shared/lib/logger';
 
 interface Account {
@@ -93,13 +74,14 @@ const BALANCE_SECTION_GAP = 18;
 // ---------------------------------------------------------------------------
 
 const PILL_TEXT_SIZE = 11;
-const PILL_IOS_HEIGHT = 30;
+const PILL_HEIGHT = 30;
 
 interface EcashStatusPillProps {
   label: string;
   totalAmount: number;
   unit: string;
-  sfSymbol: React.ComponentProps<typeof SwiftUIImage>['systemName'];
+  /** Retained for caller compatibility; the GlassView pill renders an RN icon. */
+  sfSymbol?: string;
   tintColor?: string;
   onPress?: () => void;
 }
@@ -108,7 +90,6 @@ function EcashStatusPill({
   label,
   totalAmount,
   unit,
-  sfSymbol,
   tintColor,
   onPress,
 }: EcashStatusPillProps): React.ReactElement | null {
@@ -117,48 +98,43 @@ function EcashStatusPill({
     'surface-secondary',
     'muted',
   ] as const);
-  const colorScheme = useColorScheme();
   const tint = tintColor ?? foreground;
   const { liquidGlass } = useCapabilities();
-  const glassPillModifiers = liquidGlass
-    ? [
-        glassEffect({
-          shape: 'capsule' as const,
-          glass: { tint: opacity(tint, 0.15), variant: 'regular' as const, interactive: false },
-        }),
-      ]
-    : [];
 
   if (totalAmount <= 0) return null;
 
   const text = `${label}: ${totalAmount.toLocaleString()} ${unit.toUpperCase()}`;
-  const iosWidth = Math.max(72, Math.round(text.length * (PILL_TEXT_SIZE * 0.62) + 28 + 17));
 
+  // Liquid Glass via expo-glass-effect's GlassView (UIVisualEffectView, a real
+  // RN view) instead of an @expo/ui SwiftUI Host — Host views (UIHostingController)
+  // pin to the top inside an RN ScrollView instead of following the scroll
+  // (expo/expo#46278). GlassView scrolls correctly.
   if (liquidGlass) {
     return (
-      <Host matchContents>
-        <SwiftUIButton
-          onPress={onPress}
-          modifiers={[
-            environment('colorScheme', colorScheme),
-            frame({ height: PILL_IOS_HEIGHT, width: iosWidth, alignment: 'center' }),
-            ...glassPillModifiers,
-          ]}>
-          <SwiftUIHStack
-            alignment="center"
-            spacing={5}
-            modifiers={[frame({ width: iosWidth, alignment: 'center' })]}>
-            <SwiftUIImage systemName={sfSymbol} size={12} color={opacity(tint, 0.85)} />
-            <SwiftUIText
-              modifiers={[
-                font({ size: PILL_TEXT_SIZE, design: 'monospaced', weight: 'bold' }),
-                foregroundStyle(opacity(tint, 0.85)),
-              ]}>
+      <Pressable onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
+        <GlassView
+          glassEffectStyle="regular"
+          isInteractive={false}
+          {...(tintColor ? { tintColor: opacity(tint, 0.15) } : {})}
+          style={{
+            borderRadius: 999,
+            overflow: 'hidden',
+            minHeight: PILL_HEIGHT,
+            justifyContent: 'center',
+          }}>
+          <HStack align="center" justify="center" gap={6} style={{ paddingHorizontal: 12 }}>
+            <Icon name="majesticons:coins" size={14} color={opacity(tint, 0.85)} />
+            <UntranslatedText
+              overpass
+              bold
+              size={PILL_TEXT_SIZE}
+              color={opacity(tint, 0.85)}
+              style={{ letterSpacing: 0.5 }}>
               {text}
-            </SwiftUIText>
-          </SwiftUIHStack>
-        </SwiftUIButton>
-      </Host>
+            </UntranslatedText>
+          </HStack>
+        </GlassView>
+      </Pressable>
     );
   }
 
@@ -177,7 +153,7 @@ function EcashStatusPill({
           borderWidth: 1,
           borderColor: tintColor ? opacity(tint, 0.3) : opacity(mutedColor, 0.3),
           paddingHorizontal: 12,
-          paddingVertical: 5,
+          minHeight: PILL_HEIGHT,
         }}>
         <Icon name="majesticons:coins" size={14} color={opacity(tint, 0.8)} />
         <UntranslatedText
@@ -198,13 +174,16 @@ function EcashStatusPill({
  */
 export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactElement {
   const router = useGuardedRouter();
-  const { history } = usePaginatedHistory();
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
   const mockMode = useSettingsStore((state) => state.mockMode);
+  const mockBalance = useMockDataStore((state) => state.mockBalance);
   const mockPendingAmount = useMockDataStore((state) => state.mockPendingAmount);
-  const balance = useAppBalance();
+  // Single colada read model for every figure: total (spendable + reserved),
+  // reserved, pending (cancellable ecash sends), and redeeming (received-but-
+  // unredeemed ecash — e.g. P2PK tokens accepted offline, invisible otherwise).
+  const breakdown = useColadaBalance();
   const btcPrice = useBtcPrice(displayCurrency);
 
   const toggleUnit = useCallback(async () => {
@@ -212,21 +191,35 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     setDisplayBtc(((displayBtc + 1) % 4) as DisplayBtcMode);
   }, [displayBtc, setDisplayBtc]);
 
+  const balance = mockMode ? mockBalance : breakdown.total;
+  const reservedTotal = breakdown.reserved;
+  const pendingTotal = mockMode ? mockPendingAmount : breakdown.pending;
+  const lockedTotal = breakdown.redeeming;
+  // Pills sum sat-denominated amounts; label as sat (matches RESERVED).
+  const pendingUnit = 'sat';
+  const lockedUnit = 'sat';
+
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
-  const [foreground, warning] = useThemeColor(['foreground', 'warning'] as const);
+  const [foreground, warning, accent] = useThemeColor(['foreground', 'warning', 'accent'] as const);
   const balanceTint = opacity(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
-  const { reservedTotal } = useReservedProofs();
-  const pendingSends = history.filter((entry): entry is SendHistoryEntry =>
-    isReservedSendHistoryEntry(entry)
-  );
-  const pendingTotal = mockMode
-    ? mockPendingAmount
-    : pendingSends.reduce((sum, tx) => sum + amountToNumber(tx.amount), 0);
-  const pendingUnit = pendingSends[0]?.unit || 'sat';
+
+  useEffect(() => {
+    walletLog.debug('wallet.balance.ecash_status', {
+      accountUnit: account.unit,
+      pendingTotal,
+      reservedTotal,
+      lockedTotal,
+      mockMode,
+    });
+  }, [account.unit, mockMode, pendingTotal, reservedTotal, lockedTotal]);
 
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
   const handlePendingPress = useCallback(() => {
+    walletLog.info('wallet.pending.press', {
+      pendingTotal,
+      unit: pendingUnit,
+    });
     router.navigate({
       pathname: '/transactions',
       params: {
@@ -237,7 +230,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         filterMintUrl: 'all',
       },
     });
-  }, [router, account.unit]);
+  }, [router, account.unit, pendingTotal, pendingUnit]);
 
   // Wrap the menu in a promise so a rapid second tap on the Reserved pill is
   // dropped by `useSingleFlight` until the first interaction settles.
@@ -249,11 +242,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
         await manager.ops.send.recovery.run();
         await manager.ops.melt.recovery.run();
+        // Also redeem any receives stranded in `executing` (e.g. P2PK tokens
+        // accepted while offline) so the same action drains incoming limbo.
+        await manager.ops.receive.recovery.run();
         walletLog.info('wallet.reserved.recovery_complete');
         staticPopup('reserved-proofs-freed', {
           text:
             'Recovery completed.\n' +
-            'Checked pending send and melt operations.\n' +
+            'Checked pending send, melt, and receive operations.\n' +
             'If reserved balance is still stuck, use force cleanup.',
         });
       } catch (error) {
@@ -266,19 +262,24 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       }
     };
 
+    walletLog.info('wallet.reserved.menu_open', { reservedTotal });
     await new Promise<void>((resolve) => {
       actionMenuPopup({
         title: 'Reserved Proofs',
         // Fires on overlay-tap / swipe-down (no item picked); the picked
         // path resolves from the button's onPress finally-block instead.
-        onDismiss: () => resolve(),
+        onDismiss: () => {
+          walletLog.debug('wallet.reserved.menu_dismissed');
+          resolve();
+        },
         buttons: [
           {
             testID: 'reserved-proofs-recover',
             text: 'Recover pending operations',
-            description: 'Checks pending send and melt operations',
+            description: 'Checks pending send, melt, and receive operations',
             icon: 'mdi:wrench',
             onPress: async () => {
+              walletLog.info('wallet.reserved.recovery_selected', { reservedTotal });
               try {
                 await recoverPending();
               } finally {
@@ -292,6 +293,33 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   }, [reservedTotal]);
 
   const handleReservedPress = useSingleFlight(handleReservedPressInner);
+
+  // REDEEMING pill: retry redeeming received-but-unswapped ecash. Tapping runs
+  // coco's receive recovery sweep, which swaps any `executing` receives once
+  // the mint is reachable; on success they leave limbo and join the balance.
+  const handleRedeemingPressInner = useCallback(async () => {
+    walletLog.info('wallet.redeeming.recovery_start', { lockedTotal });
+    try {
+      const manager = CocoManager.getInstance();
+      await manager.ops.receive.recovery.run();
+      walletLog.info('wallet.redeeming.recovery_complete');
+      staticPopup('redeem-receives-done', {
+        text:
+          'Checked unredeemed ecash.\n' +
+          'Anything redeemable is now in your balance. Tokens still waiting ' +
+          'need the mint to be reachable.',
+      });
+    } catch (error) {
+      walletLog.error('wallet.redeeming.recovery_failed', {
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      staticPopup('redeem-receives-failed', {
+        text: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }, [lockedTotal]);
+
+  const handleRedeemingPress = useSingleFlight(handleRedeemingPressInner);
 
   return (
     <Log name="PrimaryBalance">
@@ -330,6 +358,14 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           sfSymbol="lock.fill"
           tintColor={warning}
           onPress={handleReservedPress}
+        />
+        <EcashStatusPill
+          label="REDEEMING"
+          totalAmount={lockedTotal}
+          unit={lockedUnit}
+          sfSymbol="hourglass"
+          tintColor={accent}
+          onPress={handleRedeemingPress}
         />
       </VStack>
     </Log>

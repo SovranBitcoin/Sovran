@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { z } from 'zod';
+import { paymentLog } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { isOnchainMintQuoteParam } from '../lib/mintQuotePresentation';
 import { LightningReceiveRoute } from './LightningReceiveRoute';
@@ -32,8 +33,16 @@ interface MintQuoteRouteProps {
 export function MintQuoteRoute({ where, onRequestMintList }: MintQuoteRouteProps) {
   const params = useRouteParams(ParamsSchema, { where });
   if (!params) return null;
+  const isOnchain = isOnchainMintQuoteParam(params.mintHistoryEntry);
+  paymentLog.info('receive.mint_quote.route_dispatch', {
+    where,
+    isOnchain,
+    mintHistoryEntryLength: params.mintHistoryEntry.length,
+    unit: params.unit ?? null,
+    hasMintListCallback: !!onRequestMintList,
+  });
 
-  return isOnchainMintQuoteParam(params.mintHistoryEntry) ? (
+  return isOnchain ? (
     <OnchainReceiveRoute where={where} onRequestMintList={onRequestMintList} />
   ) : (
     <LightningReceiveRoute where={where} onRequestMintList={onRequestMintList} />

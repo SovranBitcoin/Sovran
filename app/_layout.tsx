@@ -9,7 +9,7 @@ import 'intl/locale-data/jsonp/en';
 import Animated from 'react-native-reanimated';
 
 import { useFonts } from '@/shared/hooks/useFonts';
-import { initLog, useInitMount } from '@/shared/lib/logger';
+import { cashuLog, initLog, paymentLog, useInitMount } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Dimensions, Image, LogBox, Platform, StyleSheet, View } from 'react-native';
@@ -51,7 +51,6 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
 import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
-import { useSplitBillPaymentReconciler } from '@/features/splitBill/hooks/useSplitBillOrchestrator';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
@@ -140,6 +139,12 @@ function AccountScopedProviders({
 }) {
   useInitMount('AccountScopedProviders');
   initLog('AccountScoped', `render — accountIndex=${accountIndex}`);
+  useEffect(() => {
+    cashuLog.info('app.account_scoped_providers.mount', { accountIndex });
+    return () => {
+      cashuLog.info('app.account_scoped_providers.unmount', { accountIndex });
+    };
+  }, [accountIndex]);
   const InnerProviders = useMemo(
     () =>
       compose([
@@ -200,19 +205,25 @@ function TransitionGuardCleanup() {
 
 /** Subscribes to coco mint-quote events and shows payment status sheet for NPC payments */
 function PaymentStatusListener() {
+  useEffect(() => {
+    paymentLog.info('app.payment_status_listener.mount');
+    return () => {
+      paymentLog.info('app.payment_status_listener.unmount');
+    };
+  }, []);
   usePaymentStatusListener();
   return null;
 }
 
 /** Re-pops the unified Swap toast on running→terminal transitions when the user dismissed mid-flight. */
 function SwapStatusListener() {
+  useEffect(() => {
+    paymentLog.info('app.swap_status_listener.mount');
+    return () => {
+      paymentLog.info('app.swap_status_listener.unmount');
+    };
+  }, []);
   useSwapStatusListener();
-  return null;
-}
-
-/** Subscribes to coco history:updated events and flips split-bill participant payment state. */
-function SplitBillPaymentReconciler() {
-  useSplitBillPaymentReconciler();
   return null;
 }
 
@@ -356,7 +367,6 @@ function RootLayoutContent() {
       <KeyDerivationRegistrar />
       <PaymentStatusListener />
       <SwapStatusListener />
-      <SplitBillPaymentReconciler />
       <ProfileBalanceSync />
       <ProfileMetadataSync />
       <StatusBar

@@ -16,18 +16,19 @@ interface AccountData {
 
 interface AccountProps {
   account: AccountData;
-  // Pinned, deterministic height for the header pager. Set by the wallet so
-  // the action rows below sit at a stable Y on first paint — the boot-splash
-  // → QR morph reads the QR button's window position, and a flex-driven
-  // height would let async layout (history, wallpaper image, safe-area)
-  // shift it after the splash has already locked onto a target rect.
-  pagerHeight: number;
+  // Phone-dimension floor for the balance region. The region grows naturally
+  // with its contents (e.g. the PENDING/RESERVED/REDEEMING pills) above this
+  // minimum, so nothing clips when pills are present and it stays visually
+  // balanced when they're absent. The boot-splash → QR morph stays correct
+  // because the splash gate remeasures the QR position (requestQRButtonRemeasure)
+  // right before morphing, so a content-driven height is safe.
+  minHeight: number;
 }
 
-export function Account({ account, pagerHeight }: AccountProps): React.ReactElement {
+export function Account({ account, minHeight }: AccountProps): React.ReactElement {
   return (
     <Log name="Account">
-      <View style={[styles.container, { height: pagerHeight }]}>
+      <View style={[styles.container, { minHeight }]}>
         <VStack style={styles.balanceSlot}>
           <VStack align="center" gap={8}>
             <PrimaryBalance account={account} />
@@ -40,7 +41,6 @@ export function Account({ account, pagerHeight }: AccountProps): React.ReactElem
 
 const styles = StyleSheet.create({
   container: {
-    overflow: 'hidden',
     width: '100%',
     zIndex: zIndex.sticky,
   },

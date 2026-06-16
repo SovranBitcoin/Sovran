@@ -5,22 +5,23 @@ import { storeLog } from '@/shared/lib/logger';
 type NearPaySessionPhase = 'picking' | 'transitioning' | 'amount';
 
 /**
- * How the broadcast token must be protected for this session. Discriminated
- * so every consumer is forced to handle both modes explicitly:
- * - `p2pk`: the recipient announced the ecash capability TLV; the token is
- *   locked to their announced key ("02" + x-only Nostr pubkey) so only they
- *   can redeem it.
- * - `bearer`: vanilla bitchat recipient — the token is broadcast UNLOCKED
- *   and anyone on the mesh can claim it. Only ever chosen after the sender
- *   explicitly confirmed the bearer warning.
+ * How this session's token is locked. Every Nut Drop send is delivered the same
+ * way — a private Noise DM to a creq-confirmed Sovran peer — so the distinction
+ * is the token lock:
+ * - `locked: true`: P2PK-locked to the recipient's announced key (a Sovran
+ *   peer). Only they can redeem it.
+ * - `locked: false`: an unlocked bearer token from a shared mint, used only
+ *   when the peer advertised a valid creq but we cannot P2PK-lock offline.
  */
-export type NearPayDelivery = { mode: 'p2pk'; p2pkPubkeyHex: string } | { mode: 'bearer' };
+export type NearPayDelivery = { locked: boolean };
 
 interface NearPayRecipient {
   peerID: string;
   nickname: string;
   hasDirectLink: boolean;
   lastSeen: number;
+  /** Capability proof: the peer advertised a valid creq favorite before send. */
+  creq?: string;
   delivery: NearPayDelivery;
 }
 
@@ -61,7 +62,8 @@ export const useNearPaySessionStore = create<NearPaySessionStore>((set, get) => 
     storeLog.info('near_pay.session.start', {
       peerID: recipient.peerID,
       hasDirectLink: recipient.hasDirectLink,
-      deliveryMode: recipient.delivery.mode,
+      peerHasCreq: !!recipient.creq,
+      locked: recipient.delivery.locked,
     });
     set({
       active: {

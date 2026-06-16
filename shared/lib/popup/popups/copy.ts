@@ -1,4 +1,5 @@
 import { popup } from './engine';
+import { popupLog } from '@/shared/lib/logger';
 import type { PopupOverrides } from './types';
 
 const COPY_CONFIGS = {
@@ -60,5 +61,10 @@ export type CopyTarget = keyof typeof COPY_CONFIGS;
 
 export function copyPopup(target: CopyTarget, overrides?: PopupOverrides): void {
   const config = COPY_CONFIGS[target];
+  popupLog.info('popup.copy.show', {
+    target,
+    hasOverrides: !!overrides,
+    overrideKeys: overrides ? Object.keys(overrides) : [],
+  });
   popup({ message: config.title, text: config.text, type: 'success', ...overrides });
 }

@@ -32,6 +32,7 @@ import type { MintCatalogEntry } from '@sovranbitcoin/colada';
 
 import { transformAuditData } from '@/features/mint/lib/auditInfo';
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
+import { log } from '@/shared/lib/logger';
 import {
   extractMintNostrPubkey,
   type MintInfoForNostr,
@@ -58,6 +59,13 @@ function isMintInfoObject(value: unknown): value is Record<string, unknown> {
 
 function hasCatalogFields(entry: MintCatalogEntry): boolean {
   return Object.values(entry).some((value) => value !== undefined);
+}
+
+function mintUrlLogFields(mintUrl: string | null | undefined): Record<string, unknown> {
+  return {
+    hasMintUrl: !!mintUrl,
+    mintUrlLength: mintUrl?.length ?? 0,
+  };
 }
 
 function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unknown } {
@@ -88,6 +96,14 @@ function readCachedEntry(mintUrl: string): { entry: MintCatalogEntry; info: unkn
     }
   }
 
+  log.debug('mint.catalog.cache.read', {
+    ...mintUrlLogFields(mintUrl),
+    hasAudit: !!audit,
+    hasKym: !!kym,
+    hasProfile: !!profile,
+    hasCatalogFields: hasCatalogFields(entry),
+    hasInfo: isMintInfoObject(info),
+  });
   return { entry, info };
 }
 
@@ -99,14 +115,31 @@ async function resolveNostrProfile(
   const profileStore = useMintProfileStore.getState();
   const cached = profileStore.getCached(mintUrl);
   if (cached && !profileStore.isStale(mintUrl)) {
+    log.debug('mint.catalog.profile.cache_hit', { ...mintUrlLogFields(mintUrl) });
     return { followers: cached.followers, reputation: cached.reputation };
   }
-  const profile = await fetchNostrProfile(pubkey, { signal }).catch(() => null);
+  log.debug('mint.catalog.profile.fetch_start', {
+    ...mintUrlLogFields(mintUrl),
+    pubkeyLength: pubkey.length,
+  });
+  const profile = await fetchNostrProfile(pubkey, { signal }).catch((err) => {
+    log.warn('mint.catalog.profile.fetch_failed', {
+      ...mintUrlLogFields(mintUrl),
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
+    return null;
+  });
   if (profile && profile.isOk()) {
     const { followers, score } = profile.value;
     useMintProfileStore.getState().setCached(mintUrl, followers, score);
+    log.info('mint.catalog.profile.fetch_success', {
+      ...mintUrlLogFields(mintUrl),
+      followers,
+      hasReputation: typeof score === 'number',
+    });
     return { followers, reputation: score };
   }
+  log.debug('mint.catalog.profile.unavailable', { ...mintUrlLogFields(mintUrl) });
   return undefined;
 }
 
@@ -123,9 +156,26 @@ async function fetchEntry(
   cached: { entry: MintCatalogEntry; info: unknown },
   signal?: AbortSignal
 ): Promise<MintCatalogEntry> {
+  log.debug('mint.catalog.entry.fetch_start', {
+    ...mintUrlLogFields(mintUrl),
+    hasCachedFields: hasCatalogFields(cached.entry),
+    hasCachedInfo: isMintInfoObject(cached.info),
+  });
   const [auditRes, reviewRes] = await Promise.all([
-    auditMint({ mintUrl, signal }).catch(() => null),
-    reviewMint({ mintUrl, signal }).catch(() => null),
+    auditMint({ mintUrl, signal }).catch((err) => {
+      log.warn('mint.catalog.entry.audit_failed', {
+        ...mintUrlLogFields(mintUrl),
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+      return null;
+    }),
+    reviewMint({ mintUrl, signal }).catch((err) => {
+      log.warn('mint.catalog.entry.review_failed', {
+        ...mintUrlLogFields(mintUrl),
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+      return null;
+    }),
   ]);
 
   const entry: MintCatalogEntry = { ...cached.entry };
@@ -144,16 +194,41 @@ async function fetchEntry(
     // operator pubkey resolution and the cached `mintInfo` stay populated.
     info = isMintInfoObject(audit.info) ? audit.info : null;
     if (!info) {
-      info = await getMintInfo(mintUrl).catch(() => null);
+      log.debug('mint.catalog.entry.audit_missing_info_fetch_direct', {
+        ...mintUrlLogFields(mintUrl),
+      });
+      info = await getMintInfo(mintUrl).catch((err) => {
+        log.warn('mint.catalog.entry.direct_info_failed', {
+          ...mintUrlLogFields(mintUrl),
+          source: 'audit_missing_info',
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+        return null;
+      });
     }
     if (info) {
       useAuditMintStore.getState().setCached(mintUrl, audit, info as unknown as GetInfoResponse);
     }
+    log.info('mint.catalog.entry.audit_ok', {
+      ...mintUrlLogFields(mintUrl),
+      auditState: audit.state,
+      hasInfo: isMintInfoObject(info),
+    });
   } else {
     // … otherwise hit the mint directly for NUT-06 info so we can still
     // resolve the operator's Nostr profile. No audit data is available
     // in this path — the row will render without the audit pill.
-    info = await getMintInfo(mintUrl).catch(() => null);
+    log.debug('mint.catalog.entry.audit_unavailable_fetch_direct', {
+      ...mintUrlLogFields(mintUrl),
+    });
+    info = await getMintInfo(mintUrl).catch((err) => {
+      log.warn('mint.catalog.entry.direct_info_failed', {
+        ...mintUrlLogFields(mintUrl),
+        source: 'audit_unavailable',
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+      return null;
+    });
   }
 
   if (reviewRes && reviewRes.isOk()) {
@@ -165,6 +240,13 @@ async function fetchEntry(
     // `recommendations` is the authoritative source for the count regardless
     // of whether `score` was computable — keep it visible either way.
     entry.reviewCount = review.recommendations.length;
+    log.info('mint.catalog.entry.review_ok', {
+      ...mintUrlLogFields(mintUrl),
+      hasScore: review.score !== null,
+      reviewCount: review.recommendations.length,
+    });
+  } else {
+    log.debug('mint.catalog.entry.review_unavailable', { ...mintUrlLogFields(mintUrl) });
   }
 
   const pubkey = extractMintNostrPubkey(info as MintInfoForNostr);
@@ -176,8 +258,20 @@ async function fetchEntry(
         entry.contactReputation = Math.round(profile.reputation);
       }
     }
+  } else {
+    log.debug('mint.catalog.entry.no_operator_pubkey', {
+      ...mintUrlLogFields(mintUrl),
+      hasInfo: isMintInfoObject(info),
+    });
   }
 
+  log.info('mint.catalog.entry.fetch_done', {
+    ...mintUrlLogFields(mintUrl),
+    hasCatalogFields: hasCatalogFields(entry),
+    hasAuditScore: entry.auditScore != null,
+    hasKymScore: entry.kymScore != null,
+    hasContactProfile: entry.contactFollowers != null || entry.contactReputation != null,
+  });
   return entry;
 }
 
@@ -195,14 +289,27 @@ async function fetchCatalogEntries(
   cachedByUrl: Record<string, { entry: MintCatalogEntry; info: unknown }>,
   signal?: AbortSignal
 ): Promise<Record<string, MintCatalogEntry>> {
+  log.debug('mint.catalog.entries.fetch_start', { mintCount: mintUrls.length });
   const entries = await Promise.all(
     mintUrls.map(async (url) => {
       const cached = cachedByUrl[url] ?? readCachedEntry(url);
-      const entry = await fetchEntry(url, getMintInfo, cached, signal).catch(() => cached.entry);
+      const entry = await fetchEntry(url, getMintInfo, cached, signal).catch((err) => {
+        log.warn('mint.catalog.entries.entry_failed_using_cache', {
+          ...mintUrlLogFields(url),
+          hasCachedFields: hasCatalogFields(cached.entry),
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+        return cached.entry;
+      });
       return [url, entry] as const;
     })
   );
-  return Object.fromEntries(entries.filter(([, entry]) => hasCatalogFields(entry)));
+  const result = Object.fromEntries(entries.filter(([, entry]) => hasCatalogFields(entry)));
+  log.info('mint.catalog.entries.fetch_done', {
+    mintCount: mintUrls.length,
+    resultCount: Object.keys(result).length,
+  });
+  return result;
 }
 
 function refreshCatalogInBackground(
@@ -211,7 +318,20 @@ function refreshCatalogInBackground(
   cachedByUrl: Record<string, { entry: MintCatalogEntry; info: unknown }>,
   signal?: AbortSignal
 ): void {
-  void fetchCatalogEntries(mintUrls, getMintInfo, cachedByUrl, signal).catch(() => {});
+  log.debug('mint.catalog.background_refresh.start', { mintCount: mintUrls.length });
+  void fetchCatalogEntries(mintUrls, getMintInfo, cachedByUrl, signal)
+    .then((result) => {
+      log.debug('mint.catalog.background_refresh.done', {
+        mintCount: mintUrls.length,
+        resultCount: Object.keys(result).length,
+      });
+    })
+    .catch((err) => {
+      log.warn('mint.catalog.background_refresh.failed', {
+        mintCount: mintUrls.length,
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
+    });
 }
 
 /**
@@ -225,9 +345,17 @@ export async function getMintCatalog(
   getMintInfo: MintInfoLookup,
   options?: AbortSignal | GetMintCatalogOptions
 ): Promise<Record<string, MintCatalogEntry>> {
-  if (mintUrls.length === 0) return {};
+  if (mintUrls.length === 0) {
+    log.debug('mint.catalog.get.empty');
+    return {};
+  }
 
   const { networkMode = 'cache-first', signal } = normalizeOptions(options);
+  log.info('mint.catalog.get.start', {
+    mintCount: mintUrls.length,
+    networkMode,
+    hasSignal: !!signal,
+  });
   const cachedByUrl = Object.fromEntries(mintUrls.map((url) => [url, readCachedEntry(url)]));
   const cachedCatalog = Object.fromEntries(
     Object.entries(cachedByUrl)
@@ -235,13 +363,32 @@ export async function getMintCatalog(
       .map(([url, cached]) => [url, cached.entry])
   );
 
-  if (networkMode === 'cache-only') return cachedCatalog;
+  if (networkMode === 'cache-only') {
+    log.info('mint.catalog.get.cache_only', {
+      mintCount: mintUrls.length,
+      cachedCount: Object.keys(cachedCatalog).length,
+    });
+    return cachedCatalog;
+  }
 
   if (networkMode === 'cache-first' && Object.keys(cachedCatalog).length > 0) {
+    log.info('mint.catalog.get.cache_first_hit', {
+      mintCount: mintUrls.length,
+      cachedCount: Object.keys(cachedCatalog).length,
+    });
     refreshCatalogInBackground(mintUrls, getMintInfo, cachedByUrl, signal);
     return cachedCatalog;
   }
 
   const freshCatalog = await fetchCatalogEntries(mintUrls, getMintInfo, cachedByUrl, signal);
-  return Object.keys(freshCatalog).length > 0 ? freshCatalog : cachedCatalog;
+  const result = Object.keys(freshCatalog).length > 0 ? freshCatalog : cachedCatalog;
+  log.info('mint.catalog.get.done', {
+    mintCount: mintUrls.length,
+    freshCount: Object.keys(freshCatalog).length,
+    cachedCount: Object.keys(cachedCatalog).length,
+    resultCount: Object.keys(result).length,
+    usedFallbackCache:
+      Object.keys(freshCatalog).length === 0 && Object.keys(cachedCatalog).length > 0,
+  });
+  return result;
 }
