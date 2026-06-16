@@ -1,5 +1,4 @@
 import React from 'react';
-import { View as RNView } from 'react-native';
 import { Host, Menu, Button as SwiftUIButton, Text as SwiftUIText } from '@expo/ui/swift-ui';
 import {
   environment,
@@ -49,47 +48,39 @@ export function FiatCurrencyPillLiquid(props: FiatCurrencyPillProps): React.Reac
 
   if (enableCurrencyMenu) {
     return (
-      // collapsable={false} forces a stable native wrapper UIView so the
-      // SwiftUI Host (UIHostingController) is a real subview of the scroll
-      // content and tracks its transform, instead of pinning to the top
-      // (see expo/expo#46278). Experimental — GlassView is the guaranteed fix.
-      <RNView collapsable={false}>
-        <Host style={{ zIndex: zIndex.sticky }} matchContents>
-          <Menu
-            onPrimaryAction={onPress}
-            label={<SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>}
-            modifiers={glassModifiers}>
-            <SwiftUIButton
-              systemImage="dollarsign"
-              label="USD"
-              modifiers={menuItemModifiers}
-              onPress={() => handleSelectCurrency('usd')}
-            />
-            <SwiftUIButton
-              systemImage="eurosign"
-              label="EUR"
-              modifiers={menuItemModifiers}
-              onPress={() => handleSelectCurrency('eur')}
-            />
-            <SwiftUIButton
-              systemImage="sterlingsign"
-              label="GBP"
-              modifiers={menuItemModifiers}
-              onPress={() => handleSelectCurrency('gbp')}
-            />
-          </Menu>
-        </Host>
-      </RNView>
+      <Host style={{ zIndex: zIndex.sticky }} matchContents>
+        <Menu
+          onPrimaryAction={onPress}
+          label={<SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>}
+          modifiers={glassModifiers}>
+          <SwiftUIButton
+            systemImage="dollarsign"
+            label="USD"
+            modifiers={menuItemModifiers}
+            onPress={() => handleSelectCurrency('usd')}
+          />
+          <SwiftUIButton
+            systemImage="eurosign"
+            label="EUR"
+            modifiers={menuItemModifiers}
+            onPress={() => handleSelectCurrency('eur')}
+          />
+          <SwiftUIButton
+            systemImage="sterlingsign"
+            label="GBP"
+            modifiers={menuItemModifiers}
+            onPress={() => handleSelectCurrency('gbp')}
+          />
+        </Menu>
+      </Host>
     );
   }
 
   return (
-    <RNView collapsable={false}>
-      <Host style={{ zIndex: zIndex.sticky }} matchContents>
-        <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
-          <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
-        </SwiftUIButton>
-      </Host>
-    </RNView>
+    <Host style={{ zIndex: zIndex.sticky }} matchContents>
+      <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
+        <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
+      </SwiftUIButton>
+    </Host>
   );
 }
