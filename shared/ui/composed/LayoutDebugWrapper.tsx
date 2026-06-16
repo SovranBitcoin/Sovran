@@ -95,8 +95,6 @@ interface LayoutDebugWrapperProps {
   refreshControl?: React.ReactElement<RefreshControlProps>;
   onScrollBeginDrag?: ScrollViewProps['onScrollBeginDrag'];
   onScrollEndDrag?: ScrollViewProps['onScrollEndDrag'];
-  /** Scroll passthrough (merged with the internal debug inset tracker). */
-  onScroll?: ScrollViewProps['onScroll'];
 }
 
 export function LayoutDebugWrapper({
@@ -108,7 +106,6 @@ export function LayoutDebugWrapper({
   refreshControl,
   onScrollBeginDrag,
   onScrollEndDrag,
-  onScroll,
 }: LayoutDebugWrapperProps) {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
@@ -119,23 +116,17 @@ export function LayoutDebugWrapper({
     right: 0,
   });
 
-  const handleScroll = useCallback(
-    (event: { nativeEvent: NativeScrollEvent }) => {
-      if (debug) {
-        const { contentInset } = event.nativeEvent;
-        if (contentInset) {
-          setAdjustedInsets({
-            top: contentInset.top,
-            bottom: contentInset.bottom,
-            left: contentInset.left,
-            right: contentInset.right,
-          });
-        }
-      }
-      onScroll?.(event as Parameters<NonNullable<ScrollViewProps['onScroll']>>[0]);
-    },
-    [debug, onScroll]
-  );
+  const handleScroll = useCallback((event: { nativeEvent: NativeScrollEvent }) => {
+    const { contentInset } = event.nativeEvent;
+    if (contentInset) {
+      setAdjustedInsets({
+        top: contentInset.top,
+        bottom: contentInset.bottom,
+        left: contentInset.left,
+        right: contentInset.right,
+      });
+    }
+  }, []);
 
   const actualBottomInset = adjustedInsets.bottom;
   const estimatedBottomArea = TAB_BAR_HEIGHT + insets.bottom;
@@ -260,7 +251,7 @@ export function LayoutDebugWrapper({
           className="flex-1"
           contentInsetAdjustmentBehavior="automatic"
           scrollEventThrottle={16}
-          onScroll={debug || onScroll ? handleScroll : undefined}
+          onScroll={debug ? handleScroll : undefined}
           onScrollBeginDrag={onScrollBeginDrag}
           onScrollEndDrag={onScrollEndDrag}
           onContentSizeChange={onContentSizeChange}
