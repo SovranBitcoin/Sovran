@@ -2158,7 +2158,7 @@ function modeGC(entries: LogEntry[], _opts: Options): string {
 // ─── Mode: crypto ───────────────────────────────────────────────────────────
 
 function modeCrypto(entries: LogEntry[], opts: Options): string {
-  // Crypto ops come from __CASHU_PERF or native_crypto events
+  // Crypto timing can come from native_crypto events or structured _perf entries.
   const cryptoOps = [
     'hashToCurve',
     'hash_e',
@@ -2348,7 +2348,7 @@ function modeOps(entries: LogEntry[], opts: Options): string {
     lines.push('');
   }
 
-  // Show wallet-level operations (wallet.send, wallet.receive, etc. from cashu-ts __CASHU_PERF)
+  // Show wallet-level operations from app payment/wallet logs.
   const walletOps = entries.filter((e) => {
     return (
       e.event.startsWith('wallet.action.') ||

@@ -115,40 +115,6 @@ interface RecoveryResult {
   fundsFound?: boolean;
 }
 
-interface RecoveryConfig {
-  batchSize: number;
-  chunkSize: number;
-  probeSize: number;
-  parallelKeysets: boolean;
-  skipProbe: boolean;
-}
-
-const DEFAULT_CONFIG: RecoveryConfig = {
-  batchSize: 25,
-  chunkSize: 8,
-  probeSize: 5,
-  parallelKeysets: true,
-  skipProbe: false,
-};
-
-// ─── Globals for tuning (read by cashu-ts + coco-core patches) ──────────────
-
-declare global {
-  var __CASHU_PERF:
-    | {
-        enabled: boolean;
-        log: Record<string, unknown>[];
-        enable(): void;
-        disable(): void;
-        dump(): Record<string, unknown>[];
-        summary(): Record<string, { count: number; totalMs: number; min: number; max: number }>;
-        report(): string;
-      }
-    | undefined;
-
-  var __CASHU_RECOVERY_CONFIG: RecoveryConfig | undefined;
-}
-
 // ─── Main screen ────────────────────────────────────────────────────────────
 
 interface SettingsRecoveryScreenProps {
@@ -243,9 +209,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       return;
     }
 
-    const config = DEFAULT_CONFIG;
-    globalThis.__CASHU_RECOVERY_CONFIG = config;
-    globalThis.__CASHU_PERF?.enable();
     const t0 = performance.now();
 
     setRecoveryState('recovering');
@@ -258,7 +221,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       knownMints: knownMintUrls.length,
       discoveredMints: probeMintUrls.length,
       deepProbe,
-      config,
     });
 
     const recoveryResults: RecoveryResult[] = allMintUrls.map((url, i) => ({
@@ -380,14 +342,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         successCount,
         knownFailureCount,
         totalResults: recoveryResults.length,
-        perfLogEntries: globalThis.__CASHU_PERF?.dump()?.length ?? 0,
-        config,
       });
-      const summary = globalThis.__CASHU_PERF?.summary();
-      if (summary) cashuLog.info('recovery.perf_summary', summary);
-
-      globalThis.__CASHU_PERF?.disable();
-      globalThis.__CASHU_RECOVERY_CONFIG = undefined;
 
       if (knownFailureCount === 0) {
         // Gate-mode owns its own UI through to AppGate's transition (SOV-00 §8).
@@ -412,8 +367,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         setRecoveryState('error');
       }
     } catch (error) {
-      globalThis.__CASHU_PERF?.disable();
-      globalThis.__CASHU_RECOVERY_CONFIG = undefined;
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       setErrorMessage(errorMsg);
       if (!gateMode) {

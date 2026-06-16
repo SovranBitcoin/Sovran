@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { storeLog } from '@/shared/lib/logger';
+import { storeLog, applyFileLogging } from '@/shared/lib/logger';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
 import {
   AVATAR_FALLBACK_VARIANTS,
@@ -65,6 +65,13 @@ interface SettingsState {
   quickAccessP2PK: boolean;
   regenerateP2PKOnReceive: boolean;
   sendLocationEnabled: boolean;
+  /**
+   * Dev toggle: mirror every structured log into a persistent on-device NDJSON
+   * file (Settings → Storage → Export). Lets logs be captured and exported
+   * while offline, when the Metro/dev-server console is unreachable. Dev-only;
+   * inert in production builds (see `loggerFile.ts`).
+   */
+  fileLoggingEnabled: boolean;
   avatarFallbackVariant: AvatarFallbackVariant;
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
@@ -114,6 +121,7 @@ const PersistedSettings = z.object({
   quickAccessP2PK: z.boolean().default(false),
   regenerateP2PKOnReceive: z.boolean().default(true),
   sendLocationEnabled: z.boolean().default(false),
+  fileLoggingEnabled: z.boolean().default(false),
   avatarFallbackVariant: z.enum(AVATAR_FALLBACK_VARIANTS).default(DEFAULT_AVATAR_FALLBACK_VARIANT),
   minTransferThreshold: z.number().int().nonnegative().default(5),
   middlemanRouting: PersistedMiddlemanRouting.default({
@@ -143,6 +151,7 @@ const DEFAULT_SETTINGS: SettingsState = {
   quickAccessP2PK: false,
   regenerateP2PKOnReceive: true,
   sendLocationEnabled: false,
+  fileLoggingEnabled: false,
   avatarFallbackVariant: DEFAULT_AVATAR_FALLBACK_VARIANT,
   minTransferThreshold: 5,
   middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
@@ -198,6 +207,10 @@ interface SettingsActions {
   // Send location stamping
   setSendLocationEnabled: (enabled: boolean) => void;
   getSendLocationEnabled: () => boolean;
+
+  // On-device file logging (dev diagnostics)
+  setFileLoggingEnabled: (enabled: boolean) => void;
+  getFileLoggingEnabled: () => boolean;
 
   // Avatar fallback variation
   setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => void;
@@ -324,6 +337,15 @@ export const useSettingsStore = create<SettingsStore>()(
         },
         getSendLocationEnabled: () => get().sendLocationEnabled,
 
+        // File logging — drive the logger's file transport alongside the
+        // persisted flag so toggling takes effect immediately.
+        setFileLoggingEnabled: (enabled: boolean) => {
+          storeLog.info('store.settings.set_file_logging', { enabled });
+          set({ fileLoggingEnabled: enabled });
+          applyFileLogging(enabled);
+        },
+        getFileLoggingEnabled: () => get().fileLoggingEnabled,
+
         // Avatar fallback
         setAvatarFallbackVariant: (variant: AvatarFallbackVariant) => {
           storeLog.info('store.settings.set_avatar_fallback_variant', { variant });
@@ -393,12 +415,16 @@ export const useSettingsStore = create<SettingsStore>()(
           quickAccessP2PK: state.quickAccessP2PK,
           regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
           sendLocationEnabled: state.sendLocationEnabled,
+          fileLoggingEnabled: state.fileLoggingEnabled,
           avatarFallbackVariant: state.avatarFallbackVariant,
           minTransferThreshold: state.minTransferThreshold,
           middlemanRouting: state.middlemanRouting,
         }),
         afterHydrate: (state, error) => {
           if (error) return;
+          // Resume on-device file logging if it was left on (dev-only; no-op in
+          // production). Mirrors the persisted toggle into the logger transport.
+          applyFileLogging(state?.fileLoggingEnabled ?? false);
           if (state?.mockMode) {
             const { useMockDataStore } = require('../runtime/mockDataStore') as {
               useMockDataStore: { getState: () => { activate: () => void } };

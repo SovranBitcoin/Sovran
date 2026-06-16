@@ -63,7 +63,7 @@ interface LoggerOptions {
   dedupWindowMs?: number;
 }
 
-interface LogEntry {
+export interface LogEntry {
   ts: string;
   /** Monotonic ms since app start via performance.now(). Subtract any two _t values
    *  to find the gap — immune to clock skew, sub-ms precision. */
@@ -125,6 +125,15 @@ export interface Logger {
    * recursive tree walk — when logging is disabled. Dynamic: respects setLevel.
    */
   isLevelEnabled(level: LogLevel): boolean;
+  /**
+   * Register an additional transport on this logger's shared core. Every
+   * subsequent entry (from this logger and all child loggers, which share the
+   * core) is forwarded to `transport` alongside the console transport. Used to
+   * attach the on-device file transport (see `loggerFile.ts`) so logs survive
+   * offline / dev-server disconnect. The transport receives the same compacted,
+   * secret-redacted `LogEntry` the console gets — never raw params.
+   */
+  addTransport(transport: (entry: LogEntry) => void): void;
   /** Get the ring buffer contents (useful for crash reports or LLM context dumps) */
   getRecentLogs(): LogEntry[];
   /** Clear the ring buffer */
@@ -779,6 +788,9 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
     },
     isLevelEnabled: (queryLevel) =>
       SHOW_LOGS && core.enabled && LEVEL_SEVERITY[queryLevel] >= core.minSeverity,
+    addTransport: (transport) => {
+      core.transports.push(transport);
+    },
     getRecentLogs: () => core.buffer.getAll(),
     clearRecentLogs: () => core.buffer.clear(),
     dumpForLLM: (dumpOpts?: DumpOptions) => {

@@ -1,9 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Share } from 'react-native';
 
-import { Button, Card } from 'heroui-native';
+import { Button, Card, Switch as HeroSwitch } from 'heroui-native';
 import * as Clipboard from 'expo-clipboard';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import {
+  log,
+  useLifecycleLogger,
+  exportLogFile,
+  clearLogFile,
+  getLogFileInfo,
+  type LogFileInfo,
+} from '@/shared/lib/logger';
 
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import {
@@ -12,10 +19,18 @@ import {
   type ZustandInventory,
 } from '@/shared/lib/debug/storageInventory';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 
 const KEY_FONT_SIZE = 11;
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 const EMPTY_ZUSTAND_GROUPS: ZustandInventory = {
   existingGlobalStoreKeys: [],
   existingProfileStoreKeys: [],
@@ -166,7 +181,42 @@ export const SettingsStorageScreen = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isCopyingLogs, setIsCopyingLogs] = useState(false);
+  const [isExportingLogs, setIsExportingLogs] = useState(false);
+  const [logFileInfo, setLogFileInfo] = useState<LogFileInfo>(() => getLogFileInfo());
   const [error, setError] = useState<string | null>(null);
+
+  const fileLoggingEnabled = useSettingsStore((state) => state.fileLoggingEnabled);
+  const setFileLoggingEnabled = useSettingsStore((state) => state.setFileLoggingEnabled);
+
+  const refreshLogFileInfo = useCallback(() => setLogFileInfo(getLogFileInfo()), []);
+
+  const handleToggleFileLogging = useCallback(
+    (next: boolean) => {
+      setFileLoggingEnabled(next);
+      refreshLogFileInfo();
+    },
+    [setFileLoggingEnabled, refreshLogFileInfo]
+  );
+
+  const handleExportLogFile = useCallback(async () => {
+    setIsExportingLogs(true);
+    try {
+      const shared = await exportLogFile();
+      if (!shared) {
+        Alert.alert('No logs yet', 'Enable "Save logs to file", reproduce the issue, then export.');
+      }
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : 'Export failed');
+    } finally {
+      setIsExportingLogs(false);
+      refreshLogFileInfo();
+    }
+  }, [refreshLogFileInfo]);
+
+  const handleClearLogFile = useCallback(() => {
+    clearLogFile();
+    refreshLogFileInfo();
+  }, [refreshLogFileInfo]);
   const [zustandGroups, setZustandGroups] = useState<ZustandInventory>(EMPTY_ZUSTAND_GROUPS);
   const [secureStoreKeys, setSecureStoreKeys] = useState<string[]>([]);
   const [cocoDbFiles, setCocoDbFiles] = useState<string[]>([]);
@@ -320,6 +370,44 @@ export const SettingsStorageScreen = () => {
                 Failed to refresh inventory: {error}
               </Text>
             ) : null}
+          </Card.Body>
+        </Card>
+
+        <Card variant="secondary" className="mb-4">
+          <Card.Body className="gap-3">
+            <View className="flex-row items-center justify-between">
+              <Text bold size={16}>
+                On-Device Log File
+              </Text>
+              <HeroSwitch
+                isSelected={fileLoggingEnabled}
+                onSelectedChange={handleToggleFileLogging}
+              />
+            </View>
+            <Text size={12} className="text-foreground/70">
+              Mirror logs to a file on the device so they survive offline, when the dev-server
+              console is unreachable. Export the file and evaluate it later with log-doctor.
+            </Text>
+            <Text size={11} className="text-foreground/50">
+              {fileLoggingEnabled ? 'Saving logs to file.' : 'Not saving.'}
+              {logFileInfo.exists ? ` Stored: ${formatBytes(logFileInfo.bytes)}.` : ' No file yet.'}
+            </Text>
+            <View className="flex-row gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                isDisabled={isExportingLogs || !logFileInfo.exists}
+                onPress={handleExportLogFile}>
+                <Button.Label>{isExportingLogs ? 'Exporting...' : 'Export Log File'}</Button.Label>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                isDisabled={!logFileInfo.exists}
+                onPress={handleClearLogFile}>
+                <Button.Label>Clear Log File</Button.Label>
+              </Button>
+            </View>
           </Card.Body>
         </Card>
 

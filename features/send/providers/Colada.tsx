@@ -230,9 +230,8 @@ export function SovranColadaProvider({ children }: { children: React.ReactNode }
         // 24h SWR cache so a dead mint can't gate the screen — cached entries
         // resolve synchronously, and even a true cold miss is bounded to
         // FIRST_OPEN_DEADLINE_MS so the slowest mint doesn't pin the list.
-        // Coco's 10s `updateMint` timeout (patches/@cashu+coco-core+...patch)
-        // still backstops the underlying HTTP; the background refresh continues
-        // after the deadline and writes through via attachMintInfoCacheToManager.
+        // The background refresh continues after the deadline and writes through
+        // via attachMintInfoCacheToManager.
         fetchMintInfo: async (url) => {
           const startedAt = performance.now();
           paymentLog.debug('colada.adapter.fetch_mint_info.start', {

@@ -3,19 +3,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
-const packageJsonPath = path.join(root, 'package.json');
-const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-const cashuTsSpec = packageJson.dependencies?.['@cashu/cashu-ts'] ?? '';
-const cocoCoreSpec = packageJson.dependencies?.['@cashu/coco-core'] ?? '';
-const usesLocalCocoCore =
-  typeof cocoCoreSpec === 'string' &&
-  (cocoCoreSpec.startsWith('file:') || cocoCoreSpec.startsWith('link:'));
-const usesCashuTsPatchVersion =
-  typeof cashuTsSpec === 'string' &&
-  (cashuTsSpec === '3.5.0' || cashuTsSpec.startsWith('^3.5.0') || cashuTsSpec.startsWith('~3.5.0'));
-
-const cashuTsPatchPath = path.join(root, 'patches', '@cashu+cashu-ts+3.5.0.patch');
-const cocoCorePatchPath = path.join(root, 'patches', '@cashu+coco-core+1.0.0.patch');
 const cashuKymPatchPath = path.join(root, 'patches', 'cashu-kym+0.4.1.patch');
 const patchPackageEntry = path.join(root, 'node_modules', 'patch-package', 'index.js');
 const skippedPatches = [];
@@ -160,22 +147,6 @@ function skipPatch(patchPath, suffix, message) {
 }
 
 try {
-  if (!usesCashuTsPatchVersion) {
-    skipPatch(
-      cashuTsPatchPath,
-      'skip-cashu-ts-v4',
-      'Skipping @cashu/cashu-ts 3.5.0 patch for current cashu-ts dependency'
-    );
-  }
-
-  if (usesLocalCocoCore) {
-    skipPatch(
-      cocoCorePatchPath,
-      'skip-local-coco',
-      'Skipping @cashu/coco-core patch for local coco dependency'
-    );
-  }
-
   applyCashuKymPatch();
   skipPatch(cashuKymPatchPath, 'skip-scripted', 'Skipping cashu-kym patch-package file');
 

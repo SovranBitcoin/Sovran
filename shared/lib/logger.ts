@@ -45,6 +45,9 @@ export {
   mapLog,
 } from './loggerCore';
 
+export { applyFileLogging, exportLogFile, clearLogFile, getLogFileInfo } from './loggerFile';
+export type { LogFileInfo } from './loggerFile';
+
 export { stopJSThreadMonitor } from './loggerJsThread';
 export { deferWork } from './loggerDefer';
 export { useRenderLogger, useLifecycleLogger } from './loggerHooks';

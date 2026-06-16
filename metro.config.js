@@ -161,24 +161,6 @@ const herouiNativeProviderPath = path.resolve(
   'index.js'
 );
 
-// Force `@cashu/cashu-ts` to resolve to the patched ESM bundle. The
-// patch in `patches/@cashu+cashu-ts+3.5.0.patch` only edits
-// `lib/cashu-ts.es.js` (where it installs the `__CASHU_NATIVE` global
-// and the native-crypto fast-path branches). Metro's default resolver,
-// driven by Expo's `resolverMainFields: ['react-native', 'browser', 'main']`
-// plus the package's exports map (`require → cashu-ts.cjs`), picks the
-// CJS bundle — which has none of the patch. Result: every session logs
-// `cashu.native_crypto.hook_missing` and cashu-ts crypto runs in pure
-// JS, blocking the JS thread for seconds during recovery.
-const cashuTsEsmPath = path.resolve(
-  __dirname,
-  'node_modules',
-  '@cashu',
-  'cashu-ts',
-  'lib',
-  'cashu-ts.es.js'
-);
-
 // Save Uniwind's resolver before adding ours — Uniwind intercepts CSS
 // imports and swaps them for platform-specific JS. Overwriting it causes a
 // black screen because styles never load.
@@ -207,12 +189,6 @@ uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: herouiNativeProviderPath,
-    };
-  }
-  if (moduleName === '@cashu/cashu-ts') {
-    return {
-      type: 'sourceFile',
-      filePath: cashuTsEsmPath,
     };
   }
   // Force the shared, type-bearing libs to the app's single copy. The
