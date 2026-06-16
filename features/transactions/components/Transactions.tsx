@@ -5,7 +5,8 @@ import { Easing, LinearTransition } from 'react-native-reanimated';
 import { AnimatedLegendList } from '@legendapp/list/reanimated';
 import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
-import _ from 'lodash';
+import groupBy from 'lodash/groupBy';
+import orderBy from 'lodash/orderBy';
 
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 
@@ -173,7 +174,7 @@ export const Transactions = React.memo(
 
     const filteredHistory = useMemo(() => {
       const t0 = performance.now();
-      const result = _.filter(history, (historyEntry: HistoryEntry) => {
+      const result = history.filter((historyEntry: HistoryEntry) => {
         if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
         if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
 
@@ -272,13 +273,13 @@ export const Transactions = React.memo(
     }, [filteredHistory, swapGroups, filter, type, selectedMonth, embedded]);
 
     const sortedTimeline = useMemo(
-      () => _.orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
+      () => orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
       [timelineItems]
     );
 
     const { pending, confirmed, expired } = useMemo(
       () =>
-        _.groupBy(sortedTimeline, (item: TimelineItem) => {
+        groupBy(sortedTimeline, (item: TimelineItem) => {
           // Swap items are always "confirmed"
           if (item.kind === 'swap') return 'confirmed';
 
@@ -298,7 +299,7 @@ export const Transactions = React.memo(
       const t0 = performance.now();
       const createSections = (items: TimelineItem[], prefix: string) => {
         // Group by date string for display, but keep track of the original date for sorting
-        const groupedByDate = _.groupBy(items, (item) =>
+        const groupedByDate = groupBy(items, (item) =>
           formatDate(getTimelineCreatedAt(item), 'long-date')
         );
 
@@ -312,7 +313,7 @@ export const Transactions = React.memo(
         });
 
         // Sort by original date in descending order (newest first)
-        const sortedDateEntries = _.orderBy(
+        const sortedDateEntries = orderBy(
           dateEntries,
           (entry) => entry.originalDate.getTime(),
           'desc'
@@ -320,7 +321,7 @@ export const Transactions = React.memo(
 
         // Embedded mode shows every date group (no `days` cap).
         const datesToShow =
-          showMore && !embedded ? _.take(sortedDateEntries, days) : sortedDateEntries;
+          showMore && !embedded ? sortedDateEntries.slice(0, days) : sortedDateEntries;
 
         return datesToShow.map(({ dateString }) => ({
           title: dateString,
@@ -369,14 +370,14 @@ export const Transactions = React.memo(
     // expired split — so each date renders once under a single date header.
     const embeddedSections = useMemo<Section[]>(() => {
       if (!embedded) return [];
-      const groupedByDate = _.groupBy(sortedTimeline, (item) =>
+      const groupedByDate = groupBy(sortedTimeline, (item) =>
         formatDate(getTimelineCreatedAt(item), 'long-date')
       );
       const dateEntries = Object.keys(groupedByDate).map((dateString) => ({
         dateString,
         originalDate: new Date(getTimelineCreatedAt(groupedByDate[dateString][0])),
       }));
-      return _.orderBy(dateEntries, (e) => e.originalDate.getTime(), 'desc').map(
+      return orderBy(dateEntries, (e) => e.originalDate.getTime(), 'desc').map(
         ({ dateString }) => ({
           title: dateString,
           data: groupedByDate[dateString],
