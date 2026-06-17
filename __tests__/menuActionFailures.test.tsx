@@ -18,6 +18,13 @@ jest.mock('@/shared/lib/logger', () => ({
     error: (...args: unknown[]) => mockLogError(...args),
     warn: jest.fn(),
   },
+  storeLog: {
+    debug: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+  },
+  redactError: (error: unknown) => error,
 }));
 
 jest.mock('@/shared/hooks/useThemeColor', () => ({

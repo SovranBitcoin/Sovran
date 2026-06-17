@@ -28,6 +28,7 @@ import { Platform, StyleProp, ViewStyle } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 
 import { Button } from '@/shared/ui/primitives/Button';
+import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon from 'assets/icons';
@@ -92,6 +93,13 @@ interface ActionMenuButtonProps {
   menuTitle?: string;
   /** Style applied to the outer HStack container. */
   style?: StyleProp<ViewStyle>;
+  /**
+   * Render the trigger as a `CircleActionButton` (the Swap/NFC/More wallet
+   * affordance) instead of a full-width `Button`. Tapping it always opens the
+   * menu — there is no default action. Use where the action belongs to a row of
+   * icon buttons rather than a footer CTA (e.g. the profile Send Message).
+   */
+  circle?: { icon: string; systemIcon?: string; label: string };
 }
 
 const MENU_WIDTH = 260;
@@ -109,6 +117,7 @@ export function ActionMenuButton({
   presentation = 'popover',
   menuTitle,
   style,
+  circle,
 }: ActionMenuButtonProps) {
   const defaultVariant = variants[0];
   const hasVariants = variants.length > 0;
@@ -160,6 +169,30 @@ export function ActionMenuButton({
           onPress={() => {}}
         />
       </View>
+    );
+  }
+
+  // Circle trigger — render the icon button in a row of CircleActionButtons.
+  // Tapping always opens the menu (same hidden-trigger-ref pattern the
+  // WalletScreen "More" button uses), since there is no sensible default.
+  if (circle) {
+    return (
+      <Menu presentation={presentation}>
+        <Menu.Trigger
+          ref={menuTriggerRef}
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+          <View style={{ width: 1, height: 1 }} />
+        </Menu.Trigger>
+        <CircleActionButton
+          icon={circle.icon}
+          systemIcon={circle.systemIcon}
+          label={circle.label}
+          testID={testID}
+          disabled={disabled}
+          onPress={openMenu}
+        />
+        {renderMenuPortal(variants, testID, presentation, menuTitle)}
+      </Menu>
     );
   }
 

@@ -10,6 +10,7 @@ import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { CapsuleButtonFlat } from './CapsuleButton.flat';
 import type { CapsuleButtonProps } from './CapsuleButton.types';
 
 // controlHeight.cta — matches the liquid variant (48) so all three tiers agree.
@@ -17,40 +18,70 @@ const DEFAULT_HEIGHT = controlHeight.cta;
 
 export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+
+  // A filled CTA is opaque, so the blur would be hidden — render the same solid
+  // capsule the flat tier does. (After the hook call to satisfy rules-of-hooks.)
+  if (props.filled) return <CapsuleButtonFlat {...props} />;
+
   const {
     label,
     icon,
     onPress,
     color = foreground,
+    isActive = false,
     height = DEFAULT_HEIGHT,
     testID,
     roundedSide = 'all',
+    fitContent = false,
+    iconSize = 16,
+    textSize = 14,
+    labelNumberOfLines,
+    style,
+    contentStyle,
+    textStyle,
   } = props;
   const accentColor = muted;
+  // Active → a foreground tint over the blur + a foreground border (the
+  // selected/toggle look); inactive → the neutral muted treatment used by the
+  // status pills.
+  const borderColor = isActive ? foreground : accentColor;
   const cornerStyle = getCornerStyle(roundedSide);
+  const widthStyle = fitContent ? null : styles.fullWidth;
 
   return (
     <View
       testID={testID}
       style={[
         styles.card,
+        widthStyle,
         cornerStyle,
         {
           minHeight: height,
         },
+        style,
       ]}>
       <BlurCardFrame accentColor={accentColor}>
+        {isActive ? (
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(foreground, 0.12) }]}
+          />
+        ) : null}
         <PressableFeedback
           animation={false}
           onPress={onPress}
-          style={[styles.pressable, { minHeight: height }]}>
+          style={[styles.pressable, widthStyle, { minHeight: height }]}>
           <HStack
             align="center"
             justify="center"
             spacing={8}
-            style={[styles.content, { minHeight: height }]}>
-            <Icon name={icon} size={16} color={color} />
-            <Text size={14} bold style={{ color }}>
+            style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
+            <Icon name={icon} size={iconSize} color={color} />
+            <Text
+              size={textSize}
+              bold
+              numberOfLines={labelNumberOfLines}
+              style={[{ color }, textStyle]}>
               {label}
             </Text>
           </HStack>
@@ -65,7 +96,7 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
           StyleSheet.absoluteFillObject,
           cornerStyle,
           styles.borderOverlay,
-          { borderColor: opacity(accentColor, 0.3) },
+          { borderColor: opacity(borderColor, 0.3) },
         ]}
       />
     </View>
@@ -74,16 +105,16 @@ export function CapsuleButtonBlur(props: CapsuleButtonProps): React.ReactElement
 
 const styles = StyleSheet.create({
   card: {
-    width: '100%',
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
-  pressable: {
+  fullWidth: {
     width: '100%',
+  },
+  pressable: {
     overflow: 'hidden',
   },
   content: {
-    width: '100%',
     paddingHorizontal: 12,
   },
   borderOverlay: {

@@ -15,46 +15,74 @@ import type { CapsuleButtonProps } from './CapsuleButton.types';
 const DEFAULT_HEIGHT = controlHeight.cta;
 
 export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement {
-  const [foreground, surfaceSecondary, muted] = useThemeColor([
+  const [foreground, surfaceSecondary, muted, background] = useThemeColor([
     'foreground',
     'surface-secondary',
     'muted',
+    'background',
   ] as const);
   const {
     label,
     icon,
     onPress,
-    color = foreground,
+    color,
+    isActive = false,
+    filled = false,
     height = DEFAULT_HEIGHT,
     testID,
     roundedSide = 'all',
+    fitContent = false,
+    iconSize = 16,
+    textSize = 14,
+    labelNumberOfLines,
+    style,
+    contentStyle,
+    textStyle,
   } = props;
 
   const cornerStyle = getCornerStyle(roundedSide);
+  const widthStyle = fitContent ? null : styles.fullWidth;
+
+  // filled → solid foreground CTA with inverted content; active → tinted fill;
+  // default → the neutral surface used by the status pills. An explicit `color`
+  // always wins for the content.
+  const contentColor = color ?? (filled ? background : foreground);
+  const backgroundColor = filled
+    ? foreground
+    : isActive
+      ? opacity(foreground, 0.14)
+      : surfaceSecondary;
+  const borderColor = filled
+    ? foreground
+    : isActive
+      ? opacity(foreground, 0.3)
+      : opacity(muted, 0.3);
 
   return (
     <View
       testID={testID}
       style={[
         styles.card,
+        widthStyle,
         cornerStyle,
-        {
-          minHeight: height,
-          backgroundColor: surfaceSecondary,
-          borderColor: opacity(muted, 0.3),
-        },
+        { minHeight: height, backgroundColor, borderColor },
+        style,
       ]}>
       <PressableFeedback
         animation={false}
         onPress={onPress}
-        style={[styles.pressable, { minHeight: height }]}>
+        style={[styles.pressable, widthStyle, { minHeight: height }]}>
         <HStack
           align="center"
           justify="center"
           spacing={8}
-          style={[styles.content, { minHeight: height }]}>
-          <Icon name={icon} size={16} color={color} />
-          <Text size={14} bold style={{ color }}>
+          style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
+          <Icon name={icon} size={iconSize} color={contentColor} />
+          <Text
+            size={textSize}
+            bold
+            numberOfLines={labelNumberOfLines}
+            style={[{ color: contentColor }, textStyle]}>
             {label}
           </Text>
         </HStack>
@@ -66,17 +94,17 @@ export function CapsuleButtonFlat(props: CapsuleButtonProps): React.ReactElement
 
 const styles = StyleSheet.create({
   card: {
-    width: '100%',
     borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
   },
-  pressable: {
+  fullWidth: {
     width: '100%',
+  },
+  pressable: {
     overflow: 'hidden',
   },
   content: {
-    width: '100%',
     paddingHorizontal: 12,
   },
 });

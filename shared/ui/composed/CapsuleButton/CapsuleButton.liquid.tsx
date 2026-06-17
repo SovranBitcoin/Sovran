@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
+import opacity from 'hex-color-opacity';
 
 import { GlassView } from 'expo-glass-effect';
 
@@ -20,35 +21,57 @@ const DEFAULT_HEIGHT = controlHeight.cta;
 // content transform, so they visually pin to the top while scrolling
 // (expo/expo#46278). GlassView is a normal RN view and scrolls correctly.
 export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactElement {
-  const [foreground] = useThemeColor(['foreground'] as const);
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const {
     label,
     icon,
     onPress,
-    color = foreground,
+    color,
+    isActive = false,
+    filled = false,
     height = DEFAULT_HEIGHT,
     testID,
     roundedSide = 'all',
+    fitContent = false,
+    iconSize = 16,
+    textSize = 14,
+    labelNumberOfLines,
+    style,
+    contentStyle,
+    textStyle,
   } = props;
   const cornerStyle = getCornerStyle(roundedSide);
+  const widthStyle = fitContent ? null : styles.fullWidth;
+
+  // filled → a heavily foreground-tinted "prominent" glass (the inverted CTA),
+  // with content flipped to `background`; active → a subtle foreground tint;
+  // default → untinted clear glass, matching the status pills. An explicit
+  // `color` always wins for the content.
+  const contentColor = color ?? (filled ? background : foreground);
+  const tintColor = filled ? foreground : isActive ? opacity(foreground, 0.18) : undefined;
 
   return (
     <GlassView
       testID={testID}
       glassEffectStyle="regular"
       isInteractive
-      style={[styles.glass, cornerStyle, { minHeight: height }]}>
+      tintColor={tintColor}
+      style={[styles.glass, widthStyle, cornerStyle, { minHeight: height }, style]}>
       <PressableFeedback
         animation={false}
         onPress={onPress}
-        style={[styles.pressable, { minHeight: height }]}>
+        style={[styles.pressable, widthStyle, { minHeight: height }]}>
         <HStack
           align="center"
           justify="center"
           spacing={8}
-          style={[styles.content, { minHeight: height }]}>
-          <Icon name={icon} size={16} color={color} />
-          <Text size={14} bold style={{ color }}>
+          style={[styles.content, widthStyle, { minHeight: height }, contentStyle]}>
+          <Icon name={icon} size={iconSize} color={contentColor} />
+          <Text
+            size={textSize}
+            bold
+            numberOfLines={labelNumberOfLines}
+            style={[{ color: contentColor }, textStyle]}>
             {label}
           </Text>
         </HStack>
@@ -60,16 +83,16 @@ export function CapsuleButtonLiquid(props: CapsuleButtonProps): React.ReactEleme
 
 const styles = StyleSheet.create({
   glass: {
-    width: '100%',
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
-  pressable: {
+  fullWidth: {
     width: '100%',
+  },
+  pressable: {
     overflow: 'hidden',
   },
   content: {
-    width: '100%',
     paddingHorizontal: 12,
   },
 });
