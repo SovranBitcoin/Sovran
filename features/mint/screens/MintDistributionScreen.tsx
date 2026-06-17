@@ -14,12 +14,11 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Button } from '@/shared/ui/primitives/Button';
 import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
-import Icon from 'assets/icons';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { MintDistributionItem, DistributionBar } from '@/features/mint/components/distribution';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { Card } from '@/shared/ui/composed/Card';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { useMints, useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { amountToNumber } from '@/shared/lib/cashu/amount';
@@ -318,7 +317,9 @@ export function MintDistributionScreen() {
           options={{
             title: 'Balance split',
             headerRight: () => (
-              <Pressable
+              <ScreenHeaderAction
+                icon="mdi:help-circle"
+                accessibilityLabel="Balance split help"
                 onPress={() => {
                   Alert.alert(
                     'Balance Split',
@@ -330,9 +331,7 @@ export function MintDistributionScreen() {
                     [{ text: 'Got it' }]
                   );
                 }}
-                className="p-2">
-                <Icon name="mdi:help-circle" size={24} color={foreground} />
-              </Pressable>
+              />
             ),
           }}
         />

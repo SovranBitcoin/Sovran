@@ -8,7 +8,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
 
@@ -21,6 +20,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import Icon from 'assets/icons';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { MintIcon } from '@/shared/ui/composed/MintIcon';
@@ -533,9 +533,11 @@ export function MintInfoScreen() {
                       params: { mintUrl },
                     }}
                     asChild>
-                    <Pressable style={{ padding: 8 }}>
-                      <Icon name="ic:round-star" size={24} color={starColor} />
-                    </Pressable>
+                    <ScreenHeaderAction
+                      icon="ic:round-star"
+                      color={starColor}
+                      accessibilityLabel="View mint reviews"
+                    />
                   </Link>
                 ),
         }}

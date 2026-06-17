@@ -20,6 +20,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Screen } from '@/shared/ui/composed/Screen';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SquircleView } from '@/shared/ui/primitives/SquircleView';
 import Icon from 'assets/icons';
@@ -321,11 +322,13 @@ export function ClaimUsernameScreen() {
 
   const CloseButton = useCallback(
     () => (
-      <Pressable onPress={handleClose} style={{ padding: 8 }}>
-        <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-      </Pressable>
+      <ScreenHeaderAction
+        icon="material-symbols:close-rounded"
+        onPress={handleClose}
+        accessibilityLabel="Close"
+      />
     ),
-    [foreground, handleClose]
+    [handleClose]
   );
 
   const handleHeroLayout = useCallback(() => {

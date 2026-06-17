@@ -281,22 +281,22 @@ const HeaderBadge = React.memo(function HeaderBadge({
   );
 
   return (
-    <Pressable onPress={onPress} hitSlop={8} haptics style={styles.headerBadgePressable}>
-      <View>
-        <Icon
-          name="mdi:account-group"
-          size={iconSize.xl}
-          color={count > 0 ? foreground : shade400}
-        />
-        {count > 0 ? (
+    <ScreenHeaderAction
+      icon="mdi:account-group"
+      size={iconSize.xl}
+      color={count > 0 ? foreground : shade400}
+      onPress={onPress}
+      accessibilityLabel="Nearby peers"
+      accessory={
+        count > 0 ? (
           <View style={badgeStyle}>
             <Text size={10} style={badgeTextStyle}>
               {count}
             </Text>
           </View>
-        ) : null}
-      </View>
-    </Pressable>
+        ) : undefined
+      }
+    />
   );
 });
 
@@ -2340,13 +2340,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-  headerBadgePressable: {
-    padding: spacing.sm,
-  },
   headerBadge: {
     position: 'absolute',
-    right: -6,
-    top: -5,
+    right: 2,
+    top: 2,
     minWidth: 16,
     height: 16,
     paddingHorizontal: spacing.xs,

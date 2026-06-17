@@ -1,14 +1,13 @@
 import React, { useCallback, useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
-import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { nip19 } from 'nostr-tools';
-import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -112,9 +111,12 @@ export function DmChatHeader({
   const trailingNode =
     trailing ??
     (npub ? (
-      <Pressable onPress={handleShareQr} style={{ padding: 8 }}>
-        <Icon name="stash:qr-code" size={20} color={foreground} />
-      </Pressable>
+      <ScreenHeaderAction
+        icon="stash:qr-code"
+        size={20}
+        onPress={handleShareQr}
+        accessibilityLabel="Share profile QR"
+      />
     ) : null);
 
   return (
@@ -127,9 +129,11 @@ export function DmChatHeader({
         headerBackVisible: false,
         headerTintColor: foreground,
         headerLeft: () => (
-          <Pressable onPress={onBack} style={{ padding: 8 }} hitSlop={8}>
-            <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
-          </Pressable>
+          <ScreenHeaderAction
+            icon="material-symbols:arrow-back-rounded"
+            onPress={onBack}
+            accessibilityLabel="Go back"
+          />
         ),
         headerTitle: () => (
           <View
