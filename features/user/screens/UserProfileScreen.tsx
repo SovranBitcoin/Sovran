@@ -31,6 +31,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
+import { publishEvent } from '@/shared/lib/nostr/publish';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -997,7 +998,10 @@ export function UserProfileScreen() {
       contactEvent.tags = nextTags;
       contactEvent.content = contactsContent;
       contactEvent.created_at = createdAt;
-      await contactEvent.publish();
+      // Contact list is replaceable + important: land it on as many write relays
+      // as possible via the central seam (outbox-aware, with retry).
+      const published = await publishEvent({ ndk, event: contactEvent, resolveOn: 'all-settled' });
+      if (published.isErr()) throw new Error('contacts publish failed');
       nostrLog.info('user.profile.follow.published', { pubkey, shouldFollow });
       setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
       clearFollowOptimistic(pubkey);

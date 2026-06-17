@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/shallow';
 
 import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/feedTypes';
 import { log } from '@/shared/lib/logger';
+import { publishEvent } from '@/shared/lib/nostr/publish';
 import { paramPopup } from '@/shared/lib/popup';
 import { useKeyedSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
@@ -183,7 +184,9 @@ async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
         ['p', target.pubkey],
       ];
       ndkEvent.created_at = Math.floor(Date.now() / 1000);
-      await ndkEvent.publish();
+      // Reactions are latency-sensitive: settle as soon as one relay accepts.
+      const published = await publishEvent({ ndk, event: ndkEvent, resolveOn: 'first-ok' });
+      if (published.isErr()) throw new Error(`${label} publish failed`);
       onActivated?.(eventId);
       setOptimistic(eventId, {
         value: nextActive,
@@ -205,7 +208,8 @@ async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
       ['k', String(kind)],
     ];
     deleteEvent.created_at = Math.floor(Date.now() / 1000);
-    await deleteEvent.publish();
+    const deleted = await publishEvent({ ndk, event: deleteEvent, resolveOn: 'first-ok' });
+    if (deleted.isErr()) throw new Error(`${label} delete publish failed`);
     onDeactivated?.(eventId);
     setOptimistic(eventId, { value: nextActive, pending: false, delta, expectedCount });
   } catch {

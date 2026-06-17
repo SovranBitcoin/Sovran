@@ -49,6 +49,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   showBorder = true,
   onCommentPress,
   onRepostPress,
+  onQuotePress,
   onLikePress,
   reposted = false,
   liked = false,
@@ -65,6 +66,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   showBorder?: boolean;
   onCommentPress?: () => void;
   onRepostPress?: () => void;
+  onQuotePress?: () => void;
   onLikePress?: () => void;
   reposted?: boolean;
   liked?: boolean;
@@ -100,13 +102,16 @@ export const MetricsFooter = React.memo(function MetricsFooter({
         {
           text: 'Quote',
           icon: 'mdi:format-quote-close',
-          disabled: true,
-          reason: 'Coming soon',
-          onPress: (close) => close(),
+          disabled: !onQuotePress,
+          reason: onQuotePress ? undefined : 'Coming soon',
+          onPress: (close) => {
+            close();
+            onQuotePress?.();
+          },
         },
       ],
     });
-  }, [onRepostPress, reposted]);
+  }, [onRepostPress, onQuotePress, reposted]);
 
   return (
     <View
@@ -121,6 +126,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           disabled={!onCommentPress}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`Reply, ${metrics.replyCount} replies`}
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <HStack align="center" gap={5}>
             <Icon name="iconamoon:comment-fill" size={iconSize - 1} color={iconColor} />
@@ -134,6 +141,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           disabled={!onRepostPress || repostPending}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`${reposted ? 'Reposted' : 'Repost'}, ${metrics.repostCount} reposts`}
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <AnimatedMetric
             iconName="garden:arrow-retweet-fill-16"
@@ -151,6 +160,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           disabled={!onLikePress || likePending}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}
+          accessibilityRole="button"
+          accessibilityLabel={`${liked ? 'Liked' : 'Like'}, ${metrics.likeCount} likes`}
           hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <AnimatedMetric
             iconName="iconamoon:heart-fill"

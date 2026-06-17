@@ -189,6 +189,65 @@ export function tryNpubEncode(hex: string): string {
   }
 }
 
+/** NIP-92 imeta metadata for a media url. */
+export interface ImetaInfo {
+  url: string;
+  mimeType?: string;
+  alt?: string;
+  width?: number;
+  height?: number;
+  blurhash?: string;
+}
+
+/**
+ * Parses NIP-92 `imeta` tags into a `url → metadata` map, so the renderer can
+ * use real dimensions (no layout shift), surface alt text to accessibility, and
+ * show blurhash placeholders. Each imeta tag is space-delimited
+ * `["imeta", "url …", "m …", "dim WxH", "alt …", "blurhash …"]`.
+ */
+export function parseImetaTags(tags: readonly string[][]): Map<string, ImetaInfo> {
+  const map = new Map<string, ImetaInfo>();
+  for (const tag of tags) {
+    if (tag[0] !== 'imeta') continue;
+    const info: ImetaInfo = { url: '' };
+    for (let i = 1; i < tag.length; i += 1) {
+      const field = tag[i];
+      if (typeof field !== 'string') continue;
+      const sp = field.indexOf(' ');
+      if (sp < 0) continue;
+      const key = field.slice(0, sp);
+      const value = field.slice(sp + 1);
+      if (key === 'url') info.url = value;
+      else if (key === 'm') info.mimeType = value;
+      else if (key === 'alt') info.alt = value;
+      else if (key === 'blurhash') info.blurhash = value;
+      else if (key === 'dim') {
+        const [w, h] = value.split('x').map((n) => Number(n));
+        if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+          info.width = w;
+          info.height = h;
+        }
+      }
+    }
+    if (info.url) map.set(info.url, info);
+  }
+  return map;
+}
+
+/** Encodes a NIP-19 `nevent` for an event (for quotes / share links). '' on error. */
+export function tryNeventEncode(
+  id: string,
+  author?: string,
+  kind?: number,
+  relays?: readonly string[]
+): string {
+  try {
+    return nip19.neventEncode({ id, author, kind, relays: relays ? [...relays] : undefined });
+  } catch {
+    return '';
+  }
+}
+
 export function prettifyUrl(raw: string): string {
   try {
     const u = new URL(raw);

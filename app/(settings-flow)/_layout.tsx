@@ -18,6 +18,7 @@ const PROFILE_OPTIONS = { title: 'Profile' };
 const AVATAR_OPTIONS = { title: 'Avatar fallback' };
 const NOTIFICATION_POLICY_OPTIONS = { title: 'Notifications' };
 const ROUTING_OPTIONS = { title: 'Swap routing' };
+const RELAYS_OPTIONS = { title: 'Relays' };
 const KEYRING_OPTIONS = { title: 'P2PK Keys' };
 const STORAGE_OPTIONS = { title: 'Storage inventory' };
 const DESIGN_SYSTEM_OPTIONS = { title: 'Design system' };
@@ -44,6 +45,7 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="avatar" options={AVATAR_OPTIONS} />
       <Stack.Screen name="notification-policy" options={NOTIFICATION_POLICY_OPTIONS} />
       <Stack.Screen name="routing" options={ROUTING_OPTIONS} />
+      <Stack.Screen name="relays" options={RELAYS_OPTIONS} />
       <Stack.Screen name="keyring" options={KEYRING_OPTIONS} />
       <Stack.Screen name="storage" options={STORAGE_OPTIONS} />
       <Stack.Screen name="design-system" options={DESIGN_SYSTEM_OPTIONS} />

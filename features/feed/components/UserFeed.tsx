@@ -33,7 +33,9 @@ import { log, Log } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
+import { Button } from 'heroui-native';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
@@ -315,12 +317,23 @@ export const RepostCard = React.memo(function RepostCard({
 // Empty State
 // ============================================================================
 
-function EmptyFeed() {
+function EmptyFeed({ isOwnProfile }: { isOwnProfile?: boolean }) {
+  const openComposer = useOpenComposer();
+  const action = isOwnProfile ? (
+    <Button variant="secondary" size="sm" onPress={() => openComposer({ mode: 'new' })}>
+      <Button.Label>Write a post</Button.Label>
+    </Button>
+  ) : undefined;
   return (
     <EmptyState
       icon="mdi:message-text"
       title="No posts yet"
-      subtitle="This user hasn't posted any notes."
+      subtitle={
+        isOwnProfile
+          ? 'Share your first note with the world.'
+          : "This user hasn't posted any notes."
+      }
+      action={action}
     />
   );
 }
@@ -957,7 +970,7 @@ export function UserFeed({
         {isLoading ? (
           <Spinner size={22} style={{ marginTop: 32 }} />
         ) : feedItems.length === 0 ? (
-          <EmptyFeed />
+          <EmptyFeed isOwnProfile={isOwnProfile} />
         ) : null}
       </View>
     </View>

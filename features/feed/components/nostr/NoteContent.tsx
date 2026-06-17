@@ -23,6 +23,8 @@ import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ContentSegment, FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
 import { collectQuoteTagIds, parseContent, prettifyUrl, tryNpubEncode } from './feedParse';
+import { PollCard } from './poll/PollCard';
+import { POLL_KIND } from './poll/pollParse';
 import { formatRelative } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
 import { fontSize } from '@/shared/styles/tokens';
@@ -626,6 +628,11 @@ export const NoteContent = React.memo(function NoteContent({
         return null;
     }
   };
+
+  // A NIP-88 poll (kind:1068) renders as a poll card instead of text content.
+  if (overlayEvent?.kind === POLL_KIND) {
+    return <PollCard event={overlayEvent} />;
+  }
 
   return (
     <VStack gap={0}>

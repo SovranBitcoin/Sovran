@@ -24,7 +24,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
 import { formatDate, formatRelative } from '@/shared/lib/date';
-import { tryNpubEncode } from './feedParse';
+import { tryNpubEncode, tryNeventEncode } from './feedParse';
+import { useOpenComposer } from '@/features/composer/publish/useComposerActions';
 import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
 import { MetricsFooter } from './MetricsFooter';
 import {
@@ -195,6 +196,17 @@ export const PostCard = React.memo(function PostCard({
     });
   }, [event.pubkey]);
 
+  const openComposer = useOpenComposer();
+  const handleQuotePress = useCallback(() => {
+    const nevent = tryNeventEncode(event.id, event.pubkey, event.kind);
+    openComposer({
+      mode: 'quote',
+      quotedId: event.id,
+      quotedPubkey: event.pubkey,
+      quotedNevent: nevent || undefined,
+    });
+  }, [event.id, event.pubkey, event.kind, openComposer]);
+
   const suppressThreadTapRef = useRef(false);
 
   const handleNestedPressIn = useCallback(() => {
@@ -315,6 +327,7 @@ export const PostCard = React.memo(function PostCard({
               borderColor={foreground}
               onCommentPress={onCommentPress ?? navigateToThread}
               onRepostPress={onRepostPress}
+              onQuotePress={handleQuotePress}
               onLikePress={onLikePress}
               reposted={reposted}
               liked={liked}
@@ -460,6 +473,7 @@ export const PostCard = React.memo(function PostCard({
             showBorder={!fullBleedFooterBorder && showMetricsBorder}
             onCommentPress={isThread ? (onCommentPress ?? navigateToThread) : undefined}
             onRepostPress={onRepostPress}
+            onQuotePress={handleQuotePress}
             onLikePress={onLikePress}
             reposted={reposted}
             liked={liked}

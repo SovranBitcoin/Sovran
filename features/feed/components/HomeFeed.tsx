@@ -15,11 +15,7 @@ import {
 } from 'react';
 import { StyleSheet, type LayoutChangeEvent } from 'react-native';
 import { usePullToAiRefreshControl } from '@/shared/blocks/PullToAiRefreshControl';
-import { Text } from '@/shared/ui/primitives/Text';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log, feedLog } from '@/shared/lib/logger';
@@ -30,10 +26,19 @@ import {
 } from '@legendapp/list/react-native';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
+import { router } from 'expo-router';
+import { Button } from 'heroui-native';
 import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
 import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import { EmptyState } from '@/shared/ui/composed/EmptyState';
+import {
+  selectFeedEmptyMode,
+  FEED_EMPTY_COPY,
+  type FeedEmptyMode,
+} from '@/features/feed/lib/feedEmptyStates';
 
 import type { FeedEvent, FeedItem, NoteMetrics, ProfileInfo } from './nostr/feedTypes';
 import { DEFAULT_METRICS } from './nostr/feedTypes';
@@ -106,21 +111,27 @@ const FEED_REPOST_ORIGINAL_AVATAR_CENTER_Y = FEED_REPOST_HEADER_HEIGHT + FEED_AV
 // Empty / Error States
 // ============================================================================
 
-function EmptyFeed() {
-  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
-
+function EmptyFeed({
+  mode,
+  onRefresh,
+  onFindPeople,
+}: {
+  mode: FeedEmptyMode;
+  onRefresh: () => void;
+  onFindPeople: () => void;
+}) {
+  if (mode === 'loading') return null;
+  const copy = FEED_EMPTY_COPY[mode];
+  const action = copy.ctaLabel ? (
+    <Button
+      variant="secondary"
+      size="sm"
+      onPress={copy.ctaAction === 'find-people' ? onFindPeople : onRefresh}>
+      <Button.Label>{copy.ctaLabel}</Button.Label>
+    </Button>
+  ) : undefined;
   return (
-    <VStack align="center" style={styles.emptyState}>
-      <Icon name="mdi:message-text" size={40} color={defaultColor} />
-      <Spacer size={8} />
-      <Text bold size={16} style={{ color: opacity(foreground, 0.5) }}>
-        No posts yet
-      </Text>
-      <Spacer size={4} />
-      <Text size={13} style={styles.emptyText}>
-        Pull down to refresh or try a different feed.
-      </Text>
-    </VStack>
+    <EmptyState icon={copy.icon} title={copy.title} subtitle={copy.subtitle} action={action} />
   );
 }
 
@@ -207,6 +218,10 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const [isLoading, setIsLoading] = useState(() => !seed);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const followCount = useNostrSocialStore((s) => Object.keys(s.followingPubkeys).length);
+  const isFollowingFeed =
+    activeFilter === FEED_FILTER_FOLLOWING_POPULAR || activeFilter === FEED_FILTER_FOLLOWING_RECENT;
   const hasMoreRef = useRef(
     seed ? seed.paginationUntil > 0 && seed.orderedFeedItems.length > 0 : true
   );
@@ -365,6 +380,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
         feedPageCache.setEntry(cacheKey, phase1, { viewerKey: userPubkey || '' });
         feedPageCache.markTouched(cacheKey);
         didApplyPage = true;
+        setLoadError(false);
         setIsLoading(false);
         setIsRefreshing(false);
         requestAnimationFrame(() => {
@@ -412,6 +428,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
           setQuotedEventsMap(new Map());
           setProfilesMap(new Map());
         }
+        setLoadError(true);
         setIsLoading(false);
         setIsRefreshing(false);
       } finally {
@@ -1057,7 +1074,21 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             itemsAreEqual={feedRowsAreEqual}
             recycleItems
             ListEmptyComponent={
-              isLoading ? <Spinner size={22} style={styles.loader} /> : <EmptyFeed />
+              isLoading ? (
+                <Spinner size={22} style={styles.loader} />
+              ) : (
+                <EmptyFeed
+                  mode={selectFeedEmptyMode({
+                    isLoading,
+                    hasError: loadError,
+                    rowCount: 0,
+                    isFollowingFeed,
+                    followCount,
+                  })}
+                  onRefresh={handleRefresh}
+                  onFindPeople={() => router.push('/contacts')}
+                />
+              )
             }
             ListFooterComponent={
               // Only show the pagination spinner once there's content — never

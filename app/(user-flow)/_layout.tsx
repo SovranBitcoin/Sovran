@@ -18,6 +18,7 @@ import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 const PROFILE_OPTIONS = { title: 'Profile' };
 const USER_MESSAGES_OPTIONS = { headerShown: false };
+const COMPOSER_OPTIONS = { headerShown: false };
 const SHARE_OPTIONS = { title: 'Share profile' };
 const THREAD_OPTIONS = { title: 'Thread' };
 const GEOHASH_CHAT_OPTIONS = { headerShown: false };
@@ -35,6 +36,7 @@ export default function UserFlowLayout() {
     <Stack screenOptions={screenOptions}>
       <Stack.Screen name="profile" options={PROFILE_OPTIONS} />
       <Stack.Screen name="userMessages" options={USER_MESSAGES_OPTIONS} />
+      <Stack.Screen name="composer" options={COMPOSER_OPTIONS} />
       <Stack.Screen name="share" options={SHARE_OPTIONS} />
       <Stack.Screen name="thread" options={THREAD_OPTIONS} />
       <Stack.Screen name="geohashChat" options={GEOHASH_CHAT_OPTIONS} />
