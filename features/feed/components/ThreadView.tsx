@@ -24,7 +24,7 @@ import { PostCard, PostCardSkeleton } from './nostr/PostCard';
 import {
   msUntilLoadingShimmerPassEnds,
   SKELETON_EXIT_DURATION_MS,
-} from './nostr/SkeletonExitShimmer';
+} from '@/shared/ui/composed/SkeletonExitShimmer';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 
 import { useThread, type ThreadItem } from '@/features/feed/hooks/useThread';

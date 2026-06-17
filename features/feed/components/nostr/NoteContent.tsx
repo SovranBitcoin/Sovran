@@ -25,8 +25,11 @@ import type { ContentSegment, FeedEvent, NoteMetrics, ProfileInfo } from './feed
 import { collectQuoteTagIds, parseContent, prettifyUrl, tryNpubEncode } from './feedParse';
 import { formatRelative } from '@/shared/lib/date';
 import { sharedStyles } from './feedStyles';
+import { fontSize } from '@/shared/styles/tokens';
 
 const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
+export const NOTE_CONTENT_FONT_SIZE = fontSize.lg;
+export const NOTE_CONTENT_LINE_HEIGHT = 24;
 
 // ─── Inline renderers ────────────────────────────────────────────────────────
 
@@ -50,7 +53,7 @@ const InlineMention = React.memo(function InlineMention({
   return (
     <Text
       bold
-      size={15}
+      size={NOTE_CONTENT_FONT_SIZE}
       style={{ color: opacity(foreground, 0.5) }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -65,7 +68,7 @@ const InlineMention = React.memo(function InlineMention({
 const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }) {
   const foreground = useThemeColor('foreground');
   return (
-    <Text bold size={15} style={{ color: opacity(foreground, 0.5) }}>
+    <Text bold size={NOTE_CONTENT_FONT_SIZE} style={{ color: opacity(foreground, 0.5) }}>
       #{tag}
     </Text>
   );
@@ -83,7 +86,7 @@ const InlineLink = React.memo(function InlineLink({
   const foreground = useThemeColor('foreground');
   return (
     <Text
-      size={15}
+      size={NOTE_CONTENT_FONT_SIZE}
       style={{ color: opacity(foreground, 0.5) }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
@@ -615,7 +618,7 @@ export const NoteContent = React.memo(function NoteContent({
         );
       case 'naddr':
         return (
-          <Text key={i} bold size={15} style={accentColor}>
+          <Text key={i} bold size={NOTE_CONTENT_FONT_SIZE} style={accentColor}>
             [article]
           </Text>
         );
@@ -627,14 +630,16 @@ export const NoteContent = React.memo(function NoteContent({
   return (
     <VStack gap={0}>
       {hasInline && (
-        <Text size={15} style={[textColor, { lineHeight: 22 }]}>
+        <Text
+          size={NOTE_CONTENT_FONT_SIZE}
+          style={[textColor, { lineHeight: NOTE_CONTENT_LINE_HEIGHT }]}>
           {activeSegments.map((seg, i) => renderSegment(seg, i))}
           {!expanded && isTruncated && truncatedLastText !== undefined && (
             <React.Fragment key="truncated-tail">{truncatedLastText}</React.Fragment>
           )}
           {!expanded && isTruncated && (
             <Text
-              size={15}
+              size={NOTE_CONTENT_FONT_SIZE}
               style={accentColor}
               onPressIn={onInlineActionPressIn}
               onPressOut={onInlineActionPressOut}
@@ -644,7 +649,7 @@ export const NoteContent = React.memo(function NoteContent({
           )}
           {expanded && isTruncated && (
             <Text
-              size={15}
+              size={NOTE_CONTENT_FONT_SIZE}
               style={accentColor}
               onPressIn={onInlineActionPressIn}
               onPressOut={onInlineActionPressOut}

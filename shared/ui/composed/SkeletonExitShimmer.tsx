@@ -18,9 +18,10 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export const SKELETON_EXIT_DURATION_MS = 620;
-export const SKELETON_LOADING_SHIMMER_DURATION_MS = 2200;
-export const SKELETON_LOADING_SHIMMER_GAP_MS = 350;
-export const SKELETON_LOADING_SHIMMER_CYCLE_MS =
+// Internal timing — not exported (only this module reads them).
+const SKELETON_LOADING_SHIMMER_DURATION_MS = 2200;
+const SKELETON_LOADING_SHIMMER_GAP_MS = 350;
+const SKELETON_LOADING_SHIMMER_CYCLE_MS =
   SKELETON_LOADING_SHIMMER_DURATION_MS + SKELETON_LOADING_SHIMMER_GAP_MS;
 
 /**

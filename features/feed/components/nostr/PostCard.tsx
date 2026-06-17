@@ -25,9 +25,12 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
 import { formatDate, formatRelative } from '@/shared/lib/date';
 import { tryNpubEncode } from './feedParse';
-import { NoteContent } from './NoteContent';
+import { NoteContent, NOTE_CONTENT_FONT_SIZE, NOTE_CONTENT_LINE_HEIGHT } from './NoteContent';
 import { MetricsFooter } from './MetricsFooter';
-import { SkeletonExitReveal, SkeletonLoadingShimmer } from './SkeletonExitShimmer';
+import {
+  SkeletonExitReveal,
+  SkeletonLoadingShimmer,
+} from '@/shared/ui/composed/SkeletonExitShimmer';
 import { sharedStyles } from './feedStyles';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log } from '@/shared/lib/logger';
@@ -554,7 +557,13 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
 
           <VStack spacing={0}>
             {skeletonVariant.content.map((line) => (
-              <Text key={line} loading placeholder={line} size={15} style={pcStyles.noteTextLine} />
+              <Text
+                key={line}
+                loading
+                placeholder={line}
+                size={NOTE_CONTENT_FONT_SIZE}
+                style={pcStyles.noteTextLine}
+              />
             ))}
           </VStack>
 
@@ -595,7 +604,7 @@ export const PostCardSkeleton = React.memo(function PostCardSkeleton({
                   key={line}
                   loading
                   placeholder={line}
-                  size={15}
+                  size={NOTE_CONTENT_FONT_SIZE}
                   style={pcStyles.noteTextLine}
                 />
               ))}
@@ -725,7 +734,7 @@ const pcStyles = StyleSheet.create({
     paddingBottom: 10,
   },
   noteTextLine: {
-    lineHeight: 22,
+    lineHeight: NOTE_CONTENT_LINE_HEIGHT,
   },
   lineAbove: {
     position: 'absolute',
