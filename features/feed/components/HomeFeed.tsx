@@ -32,6 +32,7 @@ import { getFeedClient } from '@/features/feed/data/useFeedClient';
 import type { FeedParseResult } from '@/features/feed/data/feedClient';
 import { feedPageCache, feedPageKey } from '@/features/feed/data/feedCache';
 import { useFeedIgnoreStore } from '@/features/feed/stores/ignoreStore';
+import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { EmptyState } from '@/shared/ui/composed/EmptyState';
 import {
@@ -222,6 +223,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
   const followCount = useNostrSocialStore((s) => Object.keys(s.followingPubkeys).length);
   const isFollowingFeed =
     activeFilter === FEED_FILTER_FOLLOWING_POPULAR || activeFilter === FEED_FILTER_FOLLOWING_RECENT;
+  const openPostActions = usePostActions();
   const hasMoreRef = useRef(
     seed ? seed.paginationUntil > 0 && seed.orderedFeedItems.length > 0 : true
   );
@@ -798,6 +800,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   likePendingDirection={engagement.likePendingDirection}
                   repostPendingDirection={engagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(item.event)}
+                  onMorePress={() => openPostActions(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current(replyPreviewEvents)}
@@ -830,6 +833,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                         likePendingDirection={replyEngagement.likePendingDirection}
                         repostPendingDirection={replyEngagement.repostPendingDirection}
                         onLikePress={() => toggleLikeRef.current(replyEvent)}
+                        onMorePress={() => openPostActions(replyEvent)}
                         onRepostPress={() => toggleRepostRef.current(replyEvent)}
                         getThreadContext={() => getThreadContextRef.current()}
                         showFooterBorder={isLastReply}
@@ -866,6 +870,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   likePendingDirection={rootEngagement.likePendingDirection}
                   repostPendingDirection={rootEngagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(rootEvent)}
+                  onMorePress={() => openPostActions(rootEvent)}
                   onRepostPress={() => toggleRepostRef.current(rootEvent)}
                   skipAnimation={!isFirstRender.current}
                   getThreadContext={() => getThreadContextRef.current()}
@@ -891,6 +896,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                   likePendingDirection={engagement.likePendingDirection}
                   repostPendingDirection={engagement.repostPendingDirection}
                   onLikePress={() => toggleLikeRef.current(item.event)}
+                  onMorePress={() => openPostActions(item.event)}
                   onRepostPress={() => toggleRepostRef.current(item.event)}
                   getThreadContext={() => getThreadContextRef.current()}
                   fullBleedFooterBorder
@@ -917,6 +923,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
             likePendingDirection={engagement.likePendingDirection}
             repostPendingDirection={engagement.repostPendingDirection}
             onLikePress={() => toggleLikeRef.current(item.event)}
+            onMorePress={() => openPostActions(item.event)}
             onRepostPress={() => toggleRepostRef.current(item.event)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
@@ -953,6 +960,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 likePendingDirection={rootEngagement.likePendingDirection}
                 repostPendingDirection={rootEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(rootEvent)}
+                onMorePress={() => openPostActions(rootEvent)}
                 onRepostPress={() => toggleRepostRef.current(rootEvent)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
@@ -981,6 +989,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
                 likePendingDirection={repostEngagement.likePendingDirection}
                 repostPendingDirection={repostEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(originalEvent)}
+                onMorePress={() => openPostActions(originalEvent)}
                 onRepostPress={() => toggleRepostRef.current(originalEvent)}
                 skipAnimation={!isFirstRender.current}
                 getThreadContext={() => getThreadContextRef.current()}
@@ -1026,6 +1035,7 @@ export function HomeFeed({ activeFilter }: HomeFeedProps) {
       toggleLikeRef,
       toggleRepostRef,
       getThreadContextRef,
+      openPostActions,
     ]
   );
 

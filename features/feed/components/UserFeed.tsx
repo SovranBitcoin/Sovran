@@ -91,6 +91,7 @@ import {
   type ImageOverlayReplaceLayout,
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { usePostActions } from '@/features/feed/hooks/usePostActions';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -670,6 +671,7 @@ export function UserFeed({
   );
   const toggleLikeRef = useLatestRef(toggleLike);
   const toggleRepostRef = useLatestRef(toggleRepost);
+  const openPostActions = usePostActions();
 
   const videoPosts = useMemo((): VideoPostRecord[] => {
     const sourceEvents: FeedEvent[] = [];
@@ -810,6 +812,7 @@ export function UserFeed({
                 likePendingDirection={rootEngagement.likePendingDirection}
                 repostPendingDirection={rootEngagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(rootEvent)}
+                onMorePress={() => openPostActions(rootEvent)}
                 onRepostPress={() => toggleRepostRef.current(rootEvent)}
                 skipAnimation={!isFirstRender.current}
                 showLineBelow
@@ -832,6 +835,7 @@ export function UserFeed({
                 likePendingDirection={engagement.likePendingDirection}
                 repostPendingDirection={engagement.repostPendingDirection}
                 onLikePress={() => toggleLikeRef.current(item.event)}
+                onMorePress={() => openPostActions(item.event)}
                 onRepostPress={() => toggleRepostRef.current(item.event)}
                 showLineAbove
                 getThreadContext={() => getThreadContextRef.current()}
@@ -857,6 +861,7 @@ export function UserFeed({
             likePendingDirection={engagement.likePendingDirection}
             repostPendingDirection={engagement.repostPendingDirection}
             onLikePress={() => toggleLikeRef.current(item.event)}
+            onMorePress={() => openPostActions(item.event)}
             onRepostPress={() => toggleRepostRef.current(item.event)}
             skipAnimation={!isFirstRender.current}
             getThreadContext={() => getThreadContextRef.current()}
@@ -889,6 +894,7 @@ export function UserFeed({
               likePendingDirection={rootEngagement.likePendingDirection}
               repostPendingDirection={rootEngagement.repostPendingDirection}
               onLikePress={() => toggleLikeRef.current(rootEvent)}
+              onMorePress={() => openPostActions(rootEvent)}
               onRepostPress={() => toggleRepostRef.current(rootEvent)}
               skipAnimation={!isFirstRender.current}
               showLineBelow
@@ -914,6 +920,7 @@ export function UserFeed({
               likePendingDirection={engagement.likePendingDirection}
               repostPendingDirection={engagement.repostPendingDirection}
               onLikePress={() => toggleLikeRef.current(originalEvent)}
+              onMorePress={() => openPostActions(originalEvent)}
               onRepostPress={() => toggleRepostRef.current(originalEvent)}
               skipAnimation={!isFirstRender.current}
               getThreadContext={() => getThreadContextRef.current()}
@@ -957,6 +964,7 @@ export function UserFeed({
       toggleLikeRef,
       toggleRepostRef,
       getThreadContextRef,
+      openPostActions,
     ]
   );
 
