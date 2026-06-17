@@ -1,17 +1,16 @@
 /**
- * iOS bundle entry. Imports all three variants — the capability dispatcher
- * picks one per render based on `liquidGlass` / `frostedSurface`.
+ * iOS bundle entry. Liquid glass gets the native glass renderer; every
+ * non-liquid capability gets the shared flat fallback.
  */
 import { defineVariants } from '@/shared/ui/capability';
 
-import BalancePillBlur from './BalancePill.blur';
 import BalancePillFlat from './BalancePill.flat';
 import BalancePillLiquid from './BalancePill.liquid';
 import type { BalancePillProps } from './BalancePill.types';
 
 const BalancePill = defineVariants<BalancePillProps>('BalancePill', {
   liquid: BalancePillLiquid,
-  blur: BalancePillBlur,
+  blur: BalancePillFlat,
   flat: BalancePillFlat,
 });
 

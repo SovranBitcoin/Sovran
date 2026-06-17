@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { StyleSheet } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -20,7 +21,6 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { actionMenuPopup, staticPopup } from '@/shared/lib/popup';
 import { useColadaBalance } from '@sovranbitcoin/colada/react';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { alpha } from '@/shared/styles/tokens';
 import { walletLog, Log } from '@/shared/lib/logger';
 
 interface Account {
@@ -82,7 +82,6 @@ interface EcashStatusPillProps {
   unit: string;
   /** Retained for caller compatibility; the GlassView pill renders an RN icon. */
   sfSymbol?: string;
-  tintColor?: string;
   onPress?: () => void;
 }
 
@@ -90,7 +89,6 @@ function EcashStatusPill({
   label,
   totalAmount,
   unit,
-  tintColor,
   onPress,
 }: EcashStatusPillProps): React.ReactElement | null {
   const [foreground, surfaceSecondary, mutedColor] = useThemeColor([
@@ -98,8 +96,17 @@ function EcashStatusPill({
     'surface-secondary',
     'muted',
   ] as const);
-  const tint = tintColor ?? foreground;
   const { liquidGlass } = useCapabilities();
+  const flatPillStyle = useMemo(
+    () => [
+      styles.flatStatusPill,
+      {
+        backgroundColor: surfaceSecondary,
+        borderColor: opacity(mutedColor, 0.3),
+      },
+    ],
+    [mutedColor, surfaceSecondary]
+  );
 
   if (totalAmount <= 0) return null;
 
@@ -112,24 +119,15 @@ function EcashStatusPill({
   if (liquidGlass) {
     return (
       <Pressable onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
-        <GlassView
-          glassEffectStyle="regular"
-          isInteractive={false}
-          {...(tintColor ? { tintColor: opacity(tint, 0.15) } : {})}
-          style={{
-            borderRadius: 999,
-            overflow: 'hidden',
-            minHeight: PILL_HEIGHT,
-            justifyContent: 'center',
-          }}>
-          <HStack align="center" justify="center" gap={6} style={{ paddingHorizontal: 12 }}>
-            <Icon name="majesticons:coins" size={14} color={opacity(tint, 0.85)} />
+        <GlassView glassEffectStyle="regular" isInteractive={false} style={styles.liquidStatusPill}>
+          <HStack align="center" justify="center" gap={6} style={styles.statusPillContent}>
+            <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.85)} />
             <UntranslatedText
               overpass
               bold
               size={PILL_TEXT_SIZE}
-              color={opacity(tint, 0.85)}
-              style={{ letterSpacing: 0.5 }}>
+              color={opacity(foreground, 0.85)}
+              style={styles.statusPillText}>
               {text}
             </UntranslatedText>
           </HStack>
@@ -140,28 +138,20 @@ function EcashStatusPill({
 
   return (
     <Pressable onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
+      {/* Standard flat-pill recipe shared with FiatCurrencyPill, BalancePill, and CircleActionButton. */}
       <HStack
         align="center"
         justify="center"
         gap={6}
         className="overflow-hidden rounded-full"
-        style={{
-          // Standard flat-pill recipe: untinted = surface-secondary + muted
-          // border (CircleActionButton contract); tinted (RESERVED) mirrors
-          // the liquid glassEffect tint at alpha.subtle.
-          backgroundColor: tintColor ? opacity(tint, alpha.subtle) : surfaceSecondary,
-          borderWidth: 1,
-          borderColor: tintColor ? opacity(tint, 0.3) : opacity(mutedColor, 0.3),
-          paddingHorizontal: 12,
-          minHeight: PILL_HEIGHT,
-        }}>
-        <Icon name="majesticons:coins" size={14} color={opacity(tint, 0.8)} />
+        style={flatPillStyle}>
+        <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.8)} />
         <UntranslatedText
           overpass
           bold
           size={PILL_TEXT_SIZE}
-          color={opacity(tint, 0.8)}
-          style={{ letterSpacing: 0.5 }}>
+          color={opacity(foreground, 0.8)}
+          style={styles.statusPillText}>
           {text}
         </UntranslatedText>
       </HStack>
@@ -201,7 +191,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
-  const [foreground, warning, accent] = useThemeColor(['foreground', 'warning', 'accent'] as const);
+  const foreground = useThemeColor('foreground');
   const balanceTint = opacity(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
 
   useEffect(() => {
@@ -325,14 +315,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     <Log name="PrimaryBalance">
       <VStack align="center" gap={BALANCE_SECTION_GAP} className="z-9">
         <FiatCurrencyPill displayText={displayText} textSize={12} />
-        <Pressable
-          onPress={toggleUnit}
-          style={{
-            alignSelf: 'stretch',
-            height: BALANCE_TAP_HEIGHT,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
+        <Pressable onPress={toggleUnit} style={styles.balancePressable}>
           <AmountFormatter
             amount={balance}
             unit={account.unit}
@@ -356,7 +339,6 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           totalAmount={reservedTotal}
           unit="sat"
           sfSymbol="lock.fill"
-          tintColor={warning}
           onPress={handleReservedPress}
         />
         <EcashStatusPill
@@ -364,10 +346,35 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           totalAmount={lockedTotal}
           unit={lockedUnit}
           sfSymbol="hourglass"
-          tintColor={accent}
           onPress={handleRedeemingPress}
         />
       </VStack>
     </Log>
   );
 }
+
+const styles = StyleSheet.create({
+  liquidStatusPill: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    minHeight: PILL_HEIGHT,
+    justifyContent: 'center',
+  },
+  statusPillContent: {
+    paddingHorizontal: 12,
+  },
+  statusPillText: {
+    letterSpacing: 0.5,
+  },
+  flatStatusPill: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    minHeight: PILL_HEIGHT,
+  },
+  balancePressable: {
+    alignSelf: 'stretch',
+    height: BALANCE_TAP_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
