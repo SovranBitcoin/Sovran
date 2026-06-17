@@ -221,6 +221,7 @@ export function SignerHubScreen(): React.ReactElement {
               icon={{ name: 'mdi:bell', color: warning }}
               title={pendingRowTitle(pendingCount)}
               subtitle={PENDING_ROW_SUBTITLE}
+              wrapSubtitle
               trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
               onPress={openRequests}
               testID="signer-hub-pending-row"
@@ -254,6 +255,7 @@ export function SignerHubScreen(): React.ReactElement {
                   }
                   title={appDisplayName(connection)}
                   subtitle={connectionSubtitle(connection)}
+                  wrapSubtitle
                   trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
                   onPress={() => openAppDetail(connection.clientPubkey)}
                 />
@@ -269,6 +271,7 @@ export function SignerHubScreen(): React.ReactElement {
             icon={{ name: 'mdi:qrcode-scan' }}
             title={SCAN_QR_LABEL}
             subtitle={SCAN_QR_SUBTITLE}
+            wrapSubtitle
             onPress={openScan}
             testID="signer-hub-scan-row"
           />
@@ -277,6 +280,7 @@ export function SignerHubScreen(): React.ReactElement {
             icon={{ name: 'lucide:clipboard-paste' }}
             title={PASTE_LINK_LABEL}
             subtitle={PASTE_LINK_SUBTITLE}
+            wrapSubtitle
             onPress={openPasteLink}
             testID="signer-hub-paste-row"
           />
@@ -285,6 +289,7 @@ export function SignerHubScreen(): React.ReactElement {
             icon={{ name: 'mdi:share-variant' }}
             title={SHARE_SIGNER_LABEL}
             subtitle={SHARE_SIGNER_SUBTITLE}
+            wrapSubtitle
             onPress={openShare}
             testID="signer-hub-share-row"
           />
@@ -297,6 +302,7 @@ export function SignerHubScreen(): React.ReactElement {
             icon={{ name: 'lucide:activity' }}
             title={ACTIVITY_ROW_TITLE}
             subtitle={ACTIVITY_ROW_SUBTITLE}
+            wrapSubtitle
             trailing={<Icon name="mdi:chevron-right" size={20} color={foreground} />}
             onPress={openActivity}
             testID="signer-hub-activity-row"
@@ -313,6 +319,7 @@ export function SignerHubScreen(): React.ReactElement {
               </Text>
             }
             subtitle={RESET_SIGNER_SUBTITLE}
+            wrapSubtitle
             accessibilityLabel={RESET_SIGNER_LABEL}
             trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
             onPress={confirmReset}

@@ -327,6 +327,7 @@ export function SignerRequestsScreen(): React.ReactElement {
                       }}
                       title={entry.headline}
                       subtitle={previewSubtitleFor(request)}
+                      wrapSubtitle
                       trailing={
                         <Text size={13} bold color={urgent ? warning : muted}>
                           {countdownLabel(remainingMs)}

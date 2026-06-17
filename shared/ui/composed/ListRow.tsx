@@ -11,7 +11,7 @@
  *
  *   • leading  — one of { avatar, iconCircle, custom ReactNode }
  *   • title    — string or ReactNode  (string → 16/600, single line, ellipsize)
- *   • subtitle — string or ReactNode  (string → 14 @ 0.5 opacity, single line)
+ *   • subtitle — string or ReactNode  (string → 14 @ 0.5 opacity, single line by default)
  *   • accent   — ReactNode rendered as a third line (stats row, etc.)
  *   • trailing — any ReactNode (chevron, icon, checkbox, spinner, amount…)
  *
@@ -72,8 +72,10 @@ interface ListRowProps {
    *  fallback). */
   title?: string | ReactNode;
 
-  /** Secondary line. String → 14 @ 0.5 opacity ellipsize. */
+  /** Secondary line. String → 14 @ 0.5 opacity. */
   subtitle?: string | ReactNode;
+  /** Allow string subtitles to wrap instead of ellipsizing to one line. */
+  wrapSubtitle?: boolean;
 
   /** Optional third line — stats rows, inline amounts, etc. */
   accent?: ReactNode;
@@ -155,6 +157,7 @@ export function ListRow({
   subtitlePlaceholder = 'Secondary line',
   titleFallback,
   subtitleFallback,
+  wrapSubtitle = false,
   testID,
   padding = 'default',
   paddingHorizontal = 20,
@@ -239,7 +242,7 @@ export function ListRow({
     ) : (
       <Text
         size={14}
-        numberOfLines={1}
+        numberOfLines={wrapSubtitle ? undefined : 1}
         color={opacity(foreground, 0.5)}
         loading={loading}
         placeholder={subtitlePlaceholder}

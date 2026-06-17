@@ -187,7 +187,7 @@ function PeerAccessIdentity({ pubkey, sublabel }: { pubkey: string; sublabel: st
         <Text size={14} color={foreground} numberOfLines={1}>
           {name}
         </Text>
-        <Text size={12} color={muted} numberOfLines={1}>
+        <Text size={12} color={muted}>
           {sublabel}
         </Text>
       </View>
@@ -939,6 +939,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
               paddingHorizontal={MANAGE_ROW_INSET}
               title="Rename App"
               subtitle={RENAME_APP_SUBTITLE}
+              wrapSubtitle
               trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
               onPress={openRename}
             />
@@ -946,6 +947,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
               paddingHorizontal={MANAGE_ROW_INSET}
               title="View Activity"
               subtitle={VIEW_ACTIVITY_SUBTITLE}
+              wrapSubtitle
               trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
               onPress={openActivity}
             />
@@ -953,6 +955,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
               paddingHorizontal={MANAGE_ROW_INSET}
               title={RESTORE_DEFAULTS_LABEL}
               subtitle={RESTORE_DEFAULTS_SUBTITLE}
+              wrapSubtitle
               trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
               onPress={confirmRestoreDefaults}
             />
@@ -970,6 +973,7 @@ export function SignerAppDetailScreen(): React.ReactElement {
                 </Text>
               }
               subtitle={DISCONNECT_SUBTITLE}
+              wrapSubtitle
               accessibilityLabel="Disconnect App"
               trailing={<Icon name="mdi:chevron-right" size={18} color={muted} />}
               onPress={confirmDisconnect}
