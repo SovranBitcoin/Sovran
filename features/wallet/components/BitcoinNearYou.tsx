@@ -225,9 +225,23 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
 
     void (async () => {
       try {
-        const { status } = await Location.getForegroundPermissionsAsync();
+        // Request (not just check) permission, matching every other location
+        // consumer in the app (MapScreen, useTransactionLocation,
+        // useLocationTiers). The old check-only call left permission
+        // undetermined, so this card never had a fix and stayed on the London
+        // default.
+        const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') return;
-        const loc = await Location.getLastKnownPositionAsync();
+
+        // Last-known gives an instant first paint, but returns null when the OS
+        // has no cached fix (fresh boot, no recent location use) — which was the
+        // other path into the London fallback. Fall back to a live fix.
+        let loc = await Location.getLastKnownPositionAsync();
+        if (!loc && !cancelled) {
+          loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+        }
         if (loc && !cancelled) {
           const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
           setCoords(safe);
