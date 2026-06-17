@@ -15,6 +15,10 @@ import Reanimated, {
 import { Image } from 'expo-image';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Text } from '@/shared/ui/primitives/Text';
+import Icon from 'assets/icons';
+import opacity from 'hex-color-opacity';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../feedTypes';
 import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType, ThumbnailLayout } from './types';
@@ -87,6 +91,7 @@ export const ImageBlock = React.memo(function ImageBlock({
   onPressIn?: () => void;
   onPressOut?: () => void;
 } & Partial<ImageBlockOverlayPostProps>) {
+  const [foreground] = useThemeColor(['foreground'] as const);
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
   const [error, setError] = useState(false);
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
@@ -322,7 +327,19 @@ export const ImageBlock = React.memo(function ImageBlock({
     opacity: (thumbnailBlur.value / THUMB_BLUR_MAX_INTENSITY) * ANDROID_THUMB_DIM_MAX_OPACITY,
   }));
 
-  if (error) return null;
+  if (error) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={alt ? `Image unavailable: ${alt}` : 'Image unavailable'}
+        style={[styles.unavailable, { backgroundColor: opacity(foreground, 0.06) }]}>
+        <Icon name="mdi:image-broken-variant" size={22} color={opacity(foreground, 0.4)} />
+        <Text size={12} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
+          Image unavailable
+        </Text>
+      </View>
+    );
+  }
 
   const image = (
     <Image
@@ -389,6 +406,13 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  unavailable: {
+    marginVertical: 6,
+    borderRadius: 12,
+    paddingVertical: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   thumbnailDimAndroid: {
     borderRadius: 12,
