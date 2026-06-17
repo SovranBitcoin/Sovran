@@ -38,9 +38,9 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { openExternalUrl } from '@/shared/lib/url';
 import * as Clipboard from 'expo-clipboard';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
-import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { Button } from '@/shared/ui/primitives/Button';
+import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
+import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
+import { SkeletonLoadingShimmer } from '@/shared/ui/composed/SkeletonExitShimmer';
 import { LightningAddress } from '@sovranbitcoin/schemas';
 import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
@@ -73,7 +73,7 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { useDominantColor, getContrastColors } from '@/shared/lib/colorExtraction';
 import type { VideoPostRecord, StoryUser } from '@/features/feed';
-import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, nostrLog, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
@@ -128,6 +128,16 @@ function buildUpdatedContactTags(
 // ============================================================================
 // Profile Stats Grid
 // ============================================================================
+
+/** Shared height for stat pills + their skeletons so the two never differ. */
+const STAT_CARD_HEIGHT = 96;
+
+/**
+ * Skeleton placeholder fill — the same low-contrast alpha the thread skeletons
+ * and `Text loading` use, so motion reads from the shimmer sweep rather than a
+ * per-element pulse. See `shared/ui/composed/SkeletonExitShimmer`.
+ */
+const SKELETON_FILL_ALPHA = 0.07;
 
 function ProfileStatsGridComponent({
   followingCount,
@@ -186,50 +196,87 @@ function ProfileStatsGridComponent({
   ];
 
   const showSkeleton = isLoading && !hasValidData;
+  // Collapse to a two-pill layout only once loading has settled — during a
+  // partial load `reputationScore` is still undefined, and flipping layout then
+  // would snap the grid the moment the score arrived.
+  const reputationUnavailable = !isLoading && reputationScore === undefined;
 
-  const renderStatCard = (stat: (typeof stats)[0], _index: number) => (
+  const renderStatCard = (stat: (typeof stats)[0]) => (
     <View key={stat.label} style={styles.statItem}>
-      <View
-        style={[
-          styles.statCard,
-          { backgroundColor: surfaceSecondary, borderColor: surfaceTertiary },
-        ]}>
-        <Text
-          loading={showSkeleton}
-          placeholder="FOLLOWING"
-          bold
-          size={12}
-          style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
-          {stat.label.toUpperCase()}
-        </Text>
-        <Text
-          loading={showSkeleton || stat.valueLoading}
-          placeholder="1,234"
-          bold
-          size={stat.smallValue ? 16 : 20}
-          style={{ color: foreground, marginBottom: 2 }}>
-          {stat.value}
-        </Text>
-        <Text
-          loading={showSkeleton}
-          placeholder="Network score"
-          bold
-          size={12}
-          style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
-          {stat.description}
-        </Text>
-      </View>
+      {showSkeleton ? (
+        // One placeholder for the whole pill (not three stacked text
+        // skeletons). Thread-style: a static low-contrast box — the motion
+        // comes from the SkeletonLoadingShimmer sweeping the whole grid.
+        <View
+          style={[
+            styles.statCardSkeleton,
+            { backgroundColor: opacity(foreground, SKELETON_FILL_ALPHA) },
+          ]}
+        />
+      ) : (
+        <View
+          style={[
+            styles.statCard,
+            { backgroundColor: surfaceSecondary, borderColor: surfaceTertiary },
+          ]}>
+          <Text bold size={12} style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
+            {stat.label.toUpperCase()}
+          </Text>
+          <Text
+            loading={stat.valueLoading}
+            placeholder="1,234"
+            bold
+            size={stat.smallValue ? 16 : 20}
+            style={{ color: foreground, marginBottom: 2 }}>
+            {stat.value}
+          </Text>
+          <Text bold size={12} style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
+            {stat.description}
+          </Text>
+        </View>
+      )}
     </View>
   );
 
+  // While loading: 2×2 placeholders under one shimmer sweep (thread-style),
+  // rather than four independently-pulsing boxes.
+  if (showSkeleton) {
+    return (
+      <View style={styles.statsGrid}>
+        <View style={styles.statsRow}>{stats.slice(0, 2).map(renderStatCard)}</View>
+        <View style={styles.statsRow}>{stats.slice(2, 4).map(renderStatCard)}</View>
+        <SkeletonLoadingShimmer active />
+      </View>
+    );
+  }
+
+  // Reputation unavailable → Following/Followers stay as pills, Joined drops to
+  // a small caption beneath them so we show two pills + text instead of "N/A".
+  if (reputationUnavailable) {
+    return (
+      <View style={styles.statsGrid}>
+        <View style={styles.statsRow}>
+          {renderStatCard(stats[0])}
+          {renderStatCard(stats[1])}
+        </View>
+        <Text
+          size={13}
+          style={{
+            color: opacity(foreground, 0.5),
+            textAlign: 'center',
+            marginTop: 12,
+            paddingHorizontal: 6,
+          }}>
+          Joined {joinedDate || 'Unknown'}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.statsGrid}>
-      <View style={styles.statsRow}>
-        {stats.slice(0, 2).map((stat, i) => renderStatCard(stat, i))}
-      </View>
-      <View style={styles.statsRow}>
-        {stats.slice(2, 4).map((stat, i) => renderStatCard(stat, i + 2))}
-      </View>
+      <View style={styles.statsRow}>{stats.slice(0, 2).map(renderStatCard)}</View>
+      <View style={styles.statsRow}>{stats.slice(2, 4).map(renderStatCard)}</View>
     </View>
   );
 }
@@ -246,7 +293,7 @@ function TopFollowersComponent({
   topFollowers: TopFollower[];
   isLoading: boolean;
 }) {
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const foreground = useThemeColor('foreground');
   const profileFlowGroup = useActiveProfileFlowGroup();
   const { width: screenWidth } = useWindowDimensions();
   const fadeAnim = useSharedValue(0);
@@ -307,19 +354,14 @@ function TopFollowersComponent({
 
   const renderSkeleton = (index: number) => (
     <View key={index} style={[styles.topFollowerGridItem, { width: itemWidth }]}>
-      <Skeleton
-        style={[
-          styles.topFollowerAvatar,
-          { width: avatarSize, height: avatarSize, backgroundColor: surfaceTertiary },
-        ]}
-      />
-      <Skeleton
+      <Avatar state="loading" size={avatarSize} />
+      <View
         style={{
           width: itemWidth - 24,
           height: 12,
           borderRadius: 4,
           marginTop: 6,
-          backgroundColor: surfaceTertiary,
+          backgroundColor: opacity(foreground, SKELETON_FILL_ALPHA),
         }}
       />
     </View>
@@ -334,7 +376,10 @@ function TopFollowersComponent({
         TOP FOLLOWERS
       </Text>
       {isLoading ? (
-        <View style={styles.topFollowersGrid}>{[0, 1, 2, 3, 4, 5].map(renderSkeleton)}</View>
+        <View style={styles.topFollowersGrid}>
+          {[0, 1, 2, 3, 4, 5].map(renderSkeleton)}
+          <SkeletonLoadingShimmer active />
+        </View>
       ) : (
         <Animated.View style={fadeStyle}>
           <View style={styles.topFollowersGrid}>{followersWithProfiles.map(renderItem)}</View>
@@ -362,6 +407,7 @@ function BannerWithAvatarComponent({
   isFollowing,
   isFollowLoading,
   onToggleFollow,
+  onSendMoney,
   hasStories,
   onAvatarPress,
 }: {
@@ -376,6 +422,7 @@ function BannerWithAvatarComponent({
   isFollowing: boolean;
   isFollowLoading: boolean;
   onToggleFollow: () => void;
+  onSendMoney: () => void;
   hasStories?: boolean;
   onAvatarPress?: () => void;
 }) {
@@ -573,65 +620,89 @@ function BannerWithAvatarComponent({
 
       {/* Name and NIP-05 */}
       <VStack align="center" style={{ marginTop: 8 }}>
-        <View style={{ alignSelf: 'center' }}>
-          <Text
-            loading={isLoading}
-            placeholder="Display Name"
-            bold
-            size={22}
-            style={{
-              color: foreground,
-              includeFontPadding: false,
-              lineHeight: Math.round(22 * 1.25),
-            }}>
-            {displayName}
-          </Text>
-        </View>
-        {(isLoading || nip05) && (
+        {/* Identity block \u2014 name, nip-05 and the follow button share one
+            ambient shimmer sweep while loading (the thread skeleton treatment)
+            instead of independently pulsing. */}
+        <View style={styles.identityBlock}>
           <View style={{ alignSelf: 'center' }}>
-            <HStack align="center" gap={4}>
-              {!isLoading && (
-                <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
-              )}
-              <Text
-                loading={isLoading}
-                placeholder="username@relay.example"
-                size={14}
-                style={{ color: opacity(foreground, 0.4) }}>
-                {nip05 || '\u00A0'}
-              </Text>
-            </HStack>
+            <Text
+              loading={isLoading}
+              placeholder="Display Name"
+              bold
+              size={22}
+              style={{
+                color: foreground,
+                includeFontPadding: false,
+                lineHeight: Math.round(22 * 1.25),
+              }}>
+              {displayName}
+            </Text>
           </View>
-        )}
-        {showFollowButton &&
-          (isLoading ? (
-            <HeroSkeleton
-              className="h-[34px] min-w-[108px] rounded-full"
-              style={{ marginTop: 10 }}
+          {(isLoading || nip05) && (
+            <View style={{ alignSelf: 'center' }}>
+              <HStack align="center" gap={4}>
+                {!isLoading && (
+                  <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
+                )}
+                <Text
+                  loading={isLoading}
+                  placeholder="username@relay.example"
+                  size={14}
+                  style={{ color: opacity(foreground, 0.4) }}>
+                  {nip05 || '\u00A0'}
+                </Text>
+              </HStack>
+            </View>
+          )}
+          {showFollowButton &&
+            (isLoading ? (
+              <View
+                style={[
+                  styles.followButton,
+                  {
+                    backgroundColor: opacity(foreground, SKELETON_FILL_ALPHA),
+                    borderColor: 'transparent',
+                  },
+                ]}
+              />
+            ) : (
+              // Reuses the status-pill CapsuleButton. Unfollowed → `filled`
+              // solid-foreground CTA (inverted content) to draw the tap;
+              // following → `isActive` tinted pill. Both honored across
+              // liquid-glass, blur and flat.
+              <CapsuleButton
+                label={isFollowing ? 'Following' : 'Follow'}
+                icon={isFollowing ? 'mdi:check' : 'la:user-plus'}
+                systemIcon={isFollowing ? 'checkmark' : 'person.badge.plus'}
+                isActive={isFollowing}
+                filled={!isFollowing}
+                onPress={isFollowLoading ? () => {} : onToggleFollow}
+                fitContent
+                height={34}
+                iconSize={15}
+                textSize={13}
+                style={[styles.followCapsule, isFollowLoading && styles.followButtonDisabled]}
+                testID="profile-follow-button"
+              />
+            ))}
+          {isLoading && <SkeletonLoadingShimmer active />}
+        </View>
+
+        {/* Send Money / Message — the wallet circle-action affordance, grouped
+            directly under the Follow button. Gated on showFollowButton so it
+            only shows for other people's profiles once our keys resolve. */}
+        {showFollowButton && (
+          <HStack justify="center" gap={28} style={{ marginTop: 16 }}>
+            <CircleActionButton
+              icon="mdi:cash-multiple"
+              systemIcon="bitcoinsign.circle"
+              label="Send Money"
+              testID="profile-send-money"
+              onPress={onSendMoney}
             />
-          ) : (
-            <Pressable
-              activeOpacity={0.8}
-              onPress={onToggleFollow}
-              disabled={isFollowLoading}
-              style={[
-                styles.followButton,
-                {
-                  backgroundColor: isFollowing ? opacity(foreground, 0.12) : foreground,
-                  borderColor: isFollowing ? opacity(foreground, 0.25) : foreground,
-                },
-                isFollowLoading && styles.followButtonDisabled,
-              ]}>
-              <Text
-                bold
-                size={13}
-                style={{
-                  color: isFollowing ? foreground : background,
-                }}>
-                {isFollowing ? 'Following' : 'Follow'}
-              </Text>
-            </Pressable>
-          ))}
+            <SendMessageMenu pubkey={pubkey} displayName={displayName} circle />
+          </HStack>
+        )}
       </VStack>
     </View>
   );
@@ -1101,6 +1172,7 @@ export function UserProfileScreen() {
                 isFollowing={isFollowingProfile}
                 isFollowLoading={followInFlight}
                 onToggleFollow={handleToggleFollow}
+                onSendMoney={handleSendMoney}
                 hasStories={hasStories}
                 onAvatarPress={handleAvatarStoryPress}
               />
@@ -1162,27 +1234,6 @@ export function UserProfileScreen() {
           }
         />
       ) : null}
-
-      {/* Both actions render unconditionally (for OTHER people's profiles)
-          so the row never snaps in when the profile metadata resolves; a
-          missing Lightning address surfaces as a popup on press instead. */}
-      {!isOwnProfile ? (
-        <BottomButtons>
-          <HStack>
-            <View style={{ flex: 1 }}>
-              <Button
-                text="Send Money"
-                variant="primary"
-                onPress={handleSendMoney}
-                testID="profile-send-money"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <SendMessageMenu pubkey={pubkey} displayName={displayName} variant="secondary" />
-            </View>
-          </HStack>
-        </BottomButtons>
-      ) : null}
     </Log>
   );
 }
@@ -1215,26 +1266,18 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
+    minHeight: STAT_CARD_HEIGHT,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
     justifyContent: 'flex-start',
   },
-  skeletonLabel: {
-    width: 80,
-    height: 14,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  skeletonValue: {
-    height: 28,
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-  skeletonDesc: {
-    width: 120,
-    height: 14,
-    borderRadius: 4,
+  // One pulsing block matching the loaded pill's footprint, so swapping the
+  // skeleton for the real card doesn't shift the grid.
+  statCardSkeleton: {
+    flex: 1,
+    height: STAT_CARD_HEIGHT,
+    borderRadius: 12,
   },
   topFollowersGrid: {
     flexDirection: 'row',
@@ -1245,8 +1288,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  topFollowerAvatar: {
-    borderRadius: 32,
+  identityBlock: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
   },
   followButton: {
     marginTop: 10,
@@ -1257,6 +1301,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
+  },
+  followCapsule: {
+    marginTop: 10,
+    minWidth: 108,
   },
   followButtonDisabled: {
     opacity: 0.6,

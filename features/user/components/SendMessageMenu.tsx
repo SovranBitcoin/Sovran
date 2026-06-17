@@ -13,6 +13,11 @@ type Props = {
   displayName: string;
   /** Button emphasis — profile footer renders it secondary beside Send Money. */
   variant?: 'primary' | 'secondary';
+  /**
+   * Render as a `CircleActionButton` (icon + label) instead of a full-width
+   * button. Used in the profile action row beside the Send Money circle.
+   */
+  circle?: boolean;
 };
 
 /**
@@ -26,7 +31,7 @@ type Props = {
  * is rendered as disabled with a "not in BLE range" reason instead of being
  * hidden, so the user understands it's a possible transport at all.
  */
-export function SendMessageMenu({ pubkey, displayName, variant = 'primary' }: Props) {
+export function SendMessageMenu({ pubkey, displayName, variant = 'primary', circle }: Props) {
   const { peers } = useBLEPeers();
   const { isReady: whitenoiseReady } = useWhitenoiseSetup();
   const whitenoiseEnabled = useSettingsStore((state) => state.whitenoiseEnabled);
@@ -133,6 +138,9 @@ export function SendMessageMenu({ pubkey, displayName, variant = 'primary' }: Pr
       menuTitle="Send via"
       presentation="bottom-sheet"
       collapsedPressOpensMenu
+      circle={
+        circle ? { icon: 'mdi:message-text', systemIcon: 'message', label: 'Message' } : undefined
+      }
     />
   );
 }
