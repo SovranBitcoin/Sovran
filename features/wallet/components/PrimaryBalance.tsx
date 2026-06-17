@@ -1,20 +1,17 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { View } from '@/shared/ui/primitives/View/View';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill';
-import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
-import { GlassView } from 'expo-glass-effect';
-import { useCapabilities } from '@/shared/ui/capability';
+import { CapsuleButton } from '@/shared/ui/composed/CapsuleButton';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -75,14 +72,13 @@ const BALANCE_SECTION_GAP = 18;
 
 const PILL_TEXT_SIZE = 11;
 const PILL_HEIGHT = 30;
+const PILL_ICON_SIZE = 14;
 
 interface EcashStatusPillProps {
   label: string;
   totalAmount: number;
   unit: string;
-  /** Retained for caller compatibility; the GlassView pill renders an RN icon. */
-  sfSymbol?: string;
-  onPress?: () => void;
+  onPress: () => void;
 }
 
 function EcashStatusPill({
@@ -91,71 +87,28 @@ function EcashStatusPill({
   unit,
   onPress,
 }: EcashStatusPillProps): React.ReactElement | null {
-  const [foreground, surfaceSecondary, mutedColor] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'muted',
-  ] as const);
-  const { liquidGlass } = useCapabilities();
-  const flatPillStyle = useMemo(
-    () => [
-      styles.flatStatusPill,
-      {
-        backgroundColor: surfaceSecondary,
-        borderColor: opacity(mutedColor, 0.3),
-      },
-    ],
-    [mutedColor, surfaceSecondary]
-  );
+  const foreground = useThemeColor('foreground');
 
   if (totalAmount <= 0) return null;
 
   const text = `${label}: ${totalAmount.toLocaleString()} ${unit.toUpperCase()}`;
 
-  // Liquid Glass via expo-glass-effect's GlassView (UIVisualEffectView, a real
-  // RN view) instead of an @expo/ui SwiftUI Host — Host views (UIHostingController)
-  // pin to the top inside an RN ScrollView instead of following the scroll
-  // (expo/expo#46278). GlassView scrolls correctly.
-  if (liquidGlass) {
-    return (
-      <Pressable onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
-        <GlassView glassEffectStyle="regular" isInteractive={false} style={styles.liquidStatusPill}>
-          <HStack align="center" justify="center" gap={6} style={styles.statusPillContent}>
-            <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.85)} />
-            <UntranslatedText
-              overpass
-              bold
-              size={PILL_TEXT_SIZE}
-              color={opacity(foreground, 0.85)}
-              style={styles.statusPillText}>
-              {text}
-            </UntranslatedText>
-          </HStack>
-        </GlassView>
-      </Pressable>
-    );
-  }
-
   return (
-    <Pressable onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
-      {/* Standard flat-pill recipe shared with FiatCurrencyPill, BalancePill, and CircleActionButton. */}
-      <HStack
-        align="center"
-        justify="center"
-        gap={6}
-        className="overflow-hidden rounded-full"
-        style={flatPillStyle}>
-        <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.8)} />
-        <UntranslatedText
-          overpass
-          bold
-          size={PILL_TEXT_SIZE}
-          color={opacity(foreground, 0.8)}
-          style={styles.statusPillText}>
-          {text}
-        </UntranslatedText>
-      </HStack>
-    </Pressable>
+    <View style={styles.statusPillButtonSlot}>
+      <CapsuleButton
+        label={text}
+        icon="majesticons:coins"
+        onPress={onPress}
+        color={opacity(foreground, 0.85)}
+        height={PILL_HEIGHT}
+        fitContent
+        iconSize={PILL_ICON_SIZE}
+        textSize={PILL_TEXT_SIZE}
+        labelNumberOfLines={1}
+        contentStyle={styles.statusPillContent}
+        textStyle={styles.statusPillText}
+      />
+    </View>
   );
 }
 
@@ -331,21 +284,18 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
           label="PENDING"
           totalAmount={pendingTotal}
           unit={pendingUnit}
-          sfSymbol="clock.arrow.trianglehead.counterclockwise.rotate.90"
           onPress={handlePendingPress}
         />
         <EcashStatusPill
           label="RESERVED"
           totalAmount={reservedTotal}
           unit="sat"
-          sfSymbol="lock.fill"
           onPress={handleReservedPress}
         />
         <EcashStatusPill
           label="REDEEMING"
           totalAmount={lockedTotal}
           unit={lockedUnit}
-          sfSymbol="hourglass"
           onPress={handleRedeemingPress}
         />
       </VStack>
@@ -354,22 +304,17 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 }
 
 const styles = StyleSheet.create({
-  liquidStatusPill: {
-    borderRadius: 999,
-    overflow: 'hidden',
-    minHeight: PILL_HEIGHT,
-    justifyContent: 'center',
+  statusPillButtonSlot: {
+    alignSelf: 'center',
+    maxWidth: '92%',
   },
   statusPillContent: {
     paddingHorizontal: 12,
+    gap: 6,
   },
   statusPillText: {
     letterSpacing: 0.5,
-  },
-  flatStatusPill: {
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    minHeight: PILL_HEIGHT,
+    flexShrink: 1,
   },
   balancePressable: {
     alignSelf: 'stretch',
