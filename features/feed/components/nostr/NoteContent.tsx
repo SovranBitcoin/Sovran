@@ -22,7 +22,13 @@ import { usePaymentFlowMachine } from '@sovranbitcoin/colada/react';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ContentSegment, FeedEvent, NoteMetrics, ProfileInfo } from './feedTypes';
-import { collectQuoteTagIds, parseContent, prettifyUrl, tryNpubEncode } from './feedParse';
+import {
+  collectQuoteTagIds,
+  parseContent,
+  parseImetaTags,
+  prettifyUrl,
+  tryNpubEncode,
+} from './feedParse';
 import { PollCard } from './poll/PollCard';
 import { POLL_KIND } from './poll/pollParse';
 import { formatRelative } from '@/shared/lib/date';
@@ -484,6 +490,9 @@ export const NoteContent = React.memo(function NoteContent({
     return { inlineSegments: inline, blockSegments: blocks };
   }, [content]);
 
+  // NIP-92 imeta metadata (alt text / dimensions) keyed by media url.
+  const imetaByUrl = useMemo(() => parseImetaTags(overlayEvent?.tags ?? []), [overlayEvent]);
+
   const { mediaSegments, allMediaUrls, allMediaTypes, overlayPost } = useMemo(() => {
     const media = blockSegments.filter(
       (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
@@ -683,6 +692,7 @@ export const NoteContent = React.memo(function NoteContent({
                   <ImageBlock
                     key={`b${i}`}
                     url={seg.url}
+                    alt={imetaByUrl.get(seg.url)?.alt}
                     allImageUrls={imageUrls.length > 1 ? imageUrls : undefined}
                     imageIndex={imageIndex >= 0 ? imageIndex : 0}
                     allMediaUrls={allMediaUrls.length > 0 ? allMediaUrls : undefined}

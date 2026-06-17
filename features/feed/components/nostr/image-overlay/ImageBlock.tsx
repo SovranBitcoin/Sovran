@@ -46,6 +46,7 @@ interface ImageBlockOverlayPostProps {
 
 export const ImageBlock = React.memo(function ImageBlock({
   url,
+  alt,
   allImageUrls,
   allMediaUrls,
   mediaTypes,
@@ -70,6 +71,8 @@ export const ImageBlock = React.memo(function ImageBlock({
   onActionPressOut,
 }: {
   url: string;
+  /** NIP-92 imeta alt text, used as the image's accessibility label. */
+  alt?: string;
   /** When the post has multiple images, pass all urls so the overlay can show a pager. */
   allImageUrls?: string[];
   /** Index of this image among the post's images (for opening overlay at the correct page). */
@@ -330,6 +333,9 @@ export const ImageBlock = React.memo(function ImageBlock({
       cachePolicy="disk"
       recyclingKey={url}
       transition={300}
+      accessible={!!alt}
+      accessibilityLabel={alt}
+      accessibilityRole="image"
       onLoad={(e) => {
         const { width, height } = e.source;
         if (width && height) setAspectRatio(width / height);
