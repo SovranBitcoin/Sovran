@@ -460,35 +460,42 @@ export const Transactions = React.memo(
     );
 
     const emptyComponent = useMemo(
-      () => (
-        <View className="pt-8">
-          <View style={[styles.card, { borderColor }]}>
-            <BlurCardFrame accentColor={muted}>
-              <View style={styles.emptyState}>
-                <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
-                <Text
-                  size={16}
-                  style={{
-                    color: opacity(foreground, 0.66),
-                    fontFamily: 'OxygenBold',
-                    textAlign: 'center',
-                  }}>
-                  No transactions found
-                </Text>
-                <Text
-                  size={14}
-                  style={{
-                    color: opacity(foreground, 0.4),
-                    textAlign: 'center',
-                  }}>
-                  Try adjusting your filters or check back later
-                </Text>
-              </View>
-            </BlurCardFrame>
+      () =>
+        // While the first page is in flight the list is empty, so this renders
+        // in place of the rows. Match the feed's loading affordance (a centered
+        // spinner) instead of flashing the "No transactions found" card, which
+        // reads as "you have none" when we simply haven't loaded yet.
+        isFetching ? (
+          <Spinner size={22} style={{ alignSelf: 'center', marginTop: 48 }} />
+        ) : (
+          <View className="pt-8">
+            <View style={[styles.card, { borderColor }]}>
+              <BlurCardFrame accentColor={muted}>
+                <View style={styles.emptyState}>
+                  <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
+                  <Text
+                    size={16}
+                    style={{
+                      color: opacity(foreground, 0.66),
+                      fontFamily: 'OxygenBold',
+                      textAlign: 'center',
+                    }}>
+                    No transactions found
+                  </Text>
+                  <Text
+                    size={14}
+                    style={{
+                      color: opacity(foreground, 0.4),
+                      textAlign: 'center',
+                    }}>
+                    Try adjusting your filters or check back later
+                  </Text>
+                </View>
+              </BlurCardFrame>
+            </View>
           </View>
-        </View>
-      ),
-      [muted, borderColor, foreground]
+        ),
+      [isFetching, muted, borderColor, foreground]
     );
 
     if (embedded) {
@@ -639,6 +646,7 @@ export const Transactions = React.memo(
           // Let LegendList measure the real position; this is only the first
           // allocation hint.
           estimatedItemSize={estimatedSectionItemSize}
+          drawDistance={400}
           maintainVisibleContentPosition
           // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
           // triggers a fresh LinearTransition on every measured-position
